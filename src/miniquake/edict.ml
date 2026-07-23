@@ -1,0 +1,208 @@
+package miniquake.edict
+
+import miniquake.types as t
+import miniquake.constants as c
+import miniquake.mathlib as math
+import miniquake.format.bsp as bsp
+import miniquake.byteio as bio
+import miniquake.array_util as arrayutil
+
+function emptyBaseline()
+  return t.EntityBaseline(0, 0, 0, 0, t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
+end function
+
+function create(number)
+  return t.QuakeEdict(
+    number,
+    false,
+    0.0,
+    [],
+    [],
+    "",
+    "",
+    0,
+    0,
+    0,
+    0,
+    0,
+    t.Vec3(0.0, 0.0, 0.0),
+    t.Vec3(0.0, 0.0, 0.0),
+    t.Vec3(0.0, 0.0, 0.0),
+    t.Vec3(0.0, 0.0, 0.0),
+    t.Vec3(0.0, 0.0, 0.0),
+    c.MOVETYPE_NONE,
+    c.SOLID_NOT,
+    0,
+    0.0,
+    t.Vec3(0.0, 0.0, c.DEFAULT_VIEWHEIGHT),
+    false,
+    -1,
+    emptyBaseline(),
+  )
+end function
+
+function value(entity, key)
+  return bsp.entityValue(entity, key)
+end function
+
+function numberValue(text, fallback)
+  if text == "" then return fallback end if
+  result = toNumber(text)
+  if result is int or result is float then return result end if
+  return fallback
+end function
+
+function setPair(edict, key, newValue)
+  for each pair in edict.keyValues
+    if pair.key == key then pair.value = newValue; return true end if
+  end for
+  edict.keyValues = edict.keyValues + [t.EntityPair(key, newValue)]
+  return true
+end function
+
+function getPair(edict, key)
+  for each pair in edict.keyValues
+    if pair.key == key then return pair.value end if
+  end for
+  return ""
+end function
+
+function copyPairs(entity)
+  result = arrayutil.makeEmptyArray(len(entity.pairs))
+  index = 0
+  while index < len(entity.pairs)
+    pair = entity.pairs[index]
+    result[index] = t.EntityPair(pair.key, pair.value)
+    index = index + 1
+  end while
+  return result
+end function
+
+function fromEntity(number, entity)
+  edict = create(number)
+  edict.keyValues = copyPairs(entity)
+  edict.className = value(entity, "classname")
+  edict.model = value(entity, "model")
+  edict.frame = numberValue(value(entity, "frame"), 0)
+  edict.skin = numberValue(value(entity, "skin"), 0)
+  edict.colormap = numberValue(value(entity, "colormap"), 0)
+  edict.effects = numberValue(value(entity, "effects"), 0)
+  edict.origin = bsp.entityVector(entity, "origin")
+  edict.angles = bsp.entityVector(entity, "angles")
+  angle = value(entity, "angle")
+  if angle != "" then edict.angles.y = numberValue(angle, 0.0) end if
+  edict.velocity = bsp.entityVector(entity, "velocity")
+  mins = value(entity, "mins")
+  maxs = value(entity, "maxs")
+  if mins != "" then edict.mins = bsp.parseVector(mins) end if
+  if maxs != "" then edict.maxs = bsp.parseVector(maxs) end if
+  edict.moveType = numberValue(value(entity, "movetype"), c.MOVETYPE_NONE)
+  edict.solid = numberValue(value(entity, "solid"), c.SOLID_NOT)
+  edict.flags = numberValue(value(entity, "flags"), 0)
+  edict.health = numberValue(value(entity, "health"), 0.0)
+  viewOffset = value(entity, "view_ofs")
+  if viewOffset != "" then edict.viewOffset = bsp.parseVector(viewOffset) end if
+
+  if number == 0 or bio.equalInsensitive(edict.className, "worldspawn") then
+    edict.moveType = c.MOVETYPE_PUSH
+    edict.solid = c.SOLID_BSP
+    edict.modelIndex = 1
+    edict.model = "maps/world.bsp"
+  end if
+  return edict
+end function
+
+function loadMapEntities(map)
+  if len(map.entities) == 0 then
+    worldEntity = t.Entity([t.EntityPair("classname", "worldspawn")])
+    return [fromEntity(0, worldEntity)]
+  end if
+  result = arrayutil.makeEmptyArray(len(map.entities))
+  index = 0
+  while index < len(map.entities)
+    result[index] = fromEntity(index, map.entities[index])
+    index = index + 1
+  end while
+  return result
+end function
+
+function findClass(edicts, className)
+  wanted = bio.lower(className)
+  builder = arrayutil.createArrayBuilder(16)
+  for each item in edicts
+    if not item.free and bio.lower(item.className) == wanted then arrayutil.pushArrayBuilder(builder, item) end if
+  end for
+  return arrayutil.finishArrayBuilder(builder)
+end function
+
+function findFirstClass(edicts, className)
+  wanted = bio.lower(className)
+  for each item in edicts
+    if not item.free and bio.lower(item.className) == wanted then return item end if
+  end for
+  return void
+end function
+
+function spawnPoint(edicts, deathmatch)
+  selected = void
+  if deathmatch then selected = findFirstClass(edicts, "info_player_deathmatch") end if
+  if selected is void then selected = findFirstClass(edicts, "info_player_start") end if
+  if selected is void then selected = findFirstClass(edicts, "testplayerstart") end if
+  if selected is void then return [t.Vec3(0.0, 0.0, 64.0), t.Vec3(0.0, 0.0, 0.0)] end if
+  return [math.copy(selected.origin), math.copy(selected.angles)]
+end function
+
+function allocate(edicts, currentTime)
+  index = 1
+  while index < len(edicts)
+    item = edicts[index]
+    if item.free and (item.freeTime < 2.0 or currentTime - item.freeTime > 0.5) then
+      replacement = create(index)
+      edicts[index] = replacement
+      return replacement
+    end if
+    index = index + 1
+  end while
+  replacement = create(len(edicts))
+  edicts = edicts + [replacement]
+  return [replacement, edicts]
+end function
+
+function free(item, currentTime)
+  item.free = true
+  item.freeTime = currentTime
+  item.model = ""
+  item.modelIndex = 0
+  item.solid = c.SOLID_NOT
+  item.origin = t.Vec3(0.0, 0.0, 0.0)
+  item.velocity = t.Vec3(0.0, 0.0, 0.0)
+  return true
+end function
+
+function baseline(item)
+  item.baseline = t.EntityBaseline(
+    item.modelIndex,
+    item.frame,
+    item.colormap,
+    item.skin,
+    math.copy(item.origin),
+    math.copy(item.angles),
+  )
+  return item.baseline
+end function
+
+function buildBaselines(edicts)
+  count = 0
+  for each item in edicts
+    if not item.free then count = count + 1 end if
+  end for
+  result = arrayutil.makeEmptyArray(count)
+  index = 0
+  for each item in edicts
+    if not item.free then
+      result[index] = baseline(item)
+      index = index + 1
+    end if
+  end for
+  return result
+end function

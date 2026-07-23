@@ -1,0 +1,13 @@
+# Generated build products and validation reports.
+/build/
+/native/build/
+
+# Quake game data must be supplied by a local installation.
+*.pak
+
+# Local working notes and Python caches.
+/Bisheriger Chatverlauf.txt
+/oiriginal quake source code/
+__pycache__/
+*.py[cod]
+.pytest_cache/
