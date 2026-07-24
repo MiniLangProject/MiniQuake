@@ -1,0 +1,25 @@
+{
+  "schema": "miniquake.differential.v1",
+  "unit": "wad",
+  "reference_execution": "patched-pinned-source-worktree",
+  "command": "py -3 tools/wad_differential.py",
+  "inputs": {
+    "reference_source": "reference/quake/WinQuake/wad.c",
+    "reference_harness": "reference/harness/wad_pinned_driver.c",
+    "instrumentation_patch": "reference/patches/wad_pinned_oracle.patch",
+    "oracle_stub_header": "reference/harness/wad_oracle_stubs.h",
+    "minilang_fixture": "tests/wad_differential_fixture.ml",
+    "ported_module": "src/miniquake/wad.ml"
+  },
+  "pinned_commit": "bf4ac424ce754894ac8f1dae6a3981954bc9852d",
+  "events": 6,
+  "epsilon": 0,
+  "functions": [
+    {"name": "W_CleanupName", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:mixed-truncate"]},
+    {"name": "W_LoadWadFile", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:synthetic-wad2"]},
+    {"name": "W_GetLumpinfo", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:case-insensitive-first"]},
+    {"name": "W_GetLumpName", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:first-by-name"]},
+    {"name": "W_GetLumpNum", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:picture-by-index"]},
+    {"name": "SwapPic", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:little-endian-header"]}
+  ]
+}

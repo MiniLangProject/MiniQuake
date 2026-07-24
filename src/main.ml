@@ -31,7 +31,11 @@ import miniquake.game_validation as gameValidation
 import miniquake.runtime_validation as runtimeValidation
 import miniquake.net_udp as udp
 import miniquake.host as host
+import miniquake.sys_win as sysWin
 import miniquake.byteio as bio
+import miniquake.native as native
+import miniquake.filesystem as qfs
+import miniquake.sound.mixer as mixer
 import std.fs as fs
 
 function printUsage()
@@ -47,6 +51,7 @@ function printUsage()
   print "  --spr FILE                 inspect an IDSP v1 sprite"
   print "  --progs FILE               inspect a progs.dat v6 program"
   print "  --wav FILE                 inspect a PCM RIFF/WAVE sound"
+  print "  --ogg FILE                 inspect and decode an Ogg Vorbis music track"
   print "  --demo FILE                inspect a Quake network demo"
   print "  --demo-verify FILE         replay every demo message through the client"
   print "  --message FILE             parse a raw protocol-15 server message"
@@ -66,7 +71,11 @@ function printUsage()
   print "                             run the textured host and exit automatically"
   print "  --soak BASE MAP [FRAMES] [-game DIR]"
   print "                             run GC/heap stability validation (default 10000)"
+  print "  --long-soak MODE BASE TARGET [FRAMES] [-game DIR] [-port N]"
+  print "                             100k-frame listen/dedicated/demo resource soak"
   print "  --udp-smoke [TIMEOUT_MS]   exchange a datagram through Winsock loopback"
+  print "  --music-smoke BASE GAME TRACK"
+  print "                             decode and mix an OGG replacement track"
   print "  --play BASEDIR MAP         shorthand for -basedir BASEDIR +map MAP"
   print ""
   print "  --version                  print version information"
@@ -76,6 +85,43 @@ end function
 function fail(result)
   print "MiniQuake: " + result.message
   return 2
+end function
+
+function inspectOgg(filename)
+  data = fs.readAllBytes(filename)
+  if native.oggOpen(data, len(data)) == 0 then return error(2414, "invalid Ogg Vorbis file " + filename) end if
+  rate = native.oggRate()
+  channels = native.oggChannels()
+  frames = native.oggFrames()
+  capacity = frames
+  if capacity > 4096 then capacity = 4096 end if
+  output = bytes(capacity * channels * 2)
+  decoded = native.oggDecode(output, capacity)
+  native.oggClose()
+  if decoded < 1 then return error(2415, "Ogg Vorbis produced no PCM samples") end if
+  print "Ogg Vorbis " + filename
+  print "  rate=" + rate + " channels=" + channels + " frames=" + frames
+  print "  decoded=" + decoded + " first-pcm=" + bio.i16(output, 0)
+  return 0
+end function
+
+function musicSmoke(baseDirectory, gameDirectory, trackText)
+  track = toNumber(trackText)
+  if track is void then return error(2416, "invalid music track " + trackText) end if
+  filesystem = qfs.initialize(baseDirectory, gameDirectory)
+  soundMixer = mixer.create(filesystem, 22050)
+  soundMixer.enabled = true
+  played = try(mixer.playMusic(soundMixer, native.trunc(track), true))
+  if played is error then qfs.release(filesystem); return played end if
+  mixed = mixer.mix(soundMixer, 512)
+  music = soundMixer.music
+  print "MiniQuake OGG music smoke"
+  print "  game=" + gameDirectory + " track=" + music.number
+  print "  source=" + music.rate + "Hz channels=" + music.channels + " frames=" + music.frames
+  print "  mixed=" + (len(mixed) / 4) + " stereo frames first-pcm=" + bio.i16(mixed, 0)
+  mixer.stopMusic(soundMixer)
+  qfs.release(filesystem)
+  return 0
 end function
 
 function inspectPack(filename)
@@ -200,6 +246,17 @@ function gameOption(arguments)
   return gameDirectory
 end function
 
+function integerNamedOption(arguments, name, fallback, minimum, maximum)
+  index = 1
+  while index + 1 < len(arguments)
+    if bio.lower(arguments[index]) == name then
+      return boundedInteger(arguments[index + 1], fallback, minimum, maximum)
+    end if
+    index = index + 1
+  end while
+  return fallback
+end function
+
 function optionalFrameCount(arguments, index, fallback, maximum)
   if index >= len(arguments) then return fallback end if
   value = toNumber(arguments[index])
@@ -226,6 +283,18 @@ end function
 function runSoakCommand(arguments)
   frames = optionalFrameCount(arguments, 3, 10000, 2000000000)
   return host.runSoak(headlessArguments(arguments[1], arguments[2], gameOption(arguments)), frames)
+end function
+
+function runLongSoakCommand(arguments)
+  mode = bio.lower(arguments[1])
+  frames = optionalFrameCount(arguments, 4, 100000, 2000000000)
+  port = integerNamedOption(arguments, "-port", 26000, 1, 65534)
+  result = try(host.runLongSoak(arguments[2], gameOption(arguments), mode, arguments[3], frames, port))
+  if result is error then
+    print "MiniQuake long soak: " + result.message
+    return 3
+  end if
+  return 0
 end function
 
 function renderSmoke(arguments)
@@ -286,6 +355,7 @@ function main(args)
   if command == "--spr" and len(args) == 2 then return inspectSprite(args[1]) end if
   if command == "--progs" and len(args) == 2 then return inspectProgs(args[1]) end if
   if command == "--wav" and len(args) == 2 then return inspectWav(args[1]) end if
+  if command == "--ogg" and len(args) == 2 then return inspectOgg(args[1]) end if
   if command == "--demo" and len(args) == 2 then return inspectDemo(args[1]) end if
   if command == "--demo-verify" and len(args) == 2 then return verifyDemo(args[1]) end if
   if command == "--message" and len(args) == 2 then return inspectMessage(args[1]) end if
@@ -296,12 +366,14 @@ function main(args)
   if command == "--validate-runtime" and len(args) >= 3 then return runRuntimeValidationCommand(args) end if
   if command == "--render-smoke" and len(args) >= 3 then return renderSmoke(args) end if
   if command == "--soak" and len(args) >= 3 then return runSoakCommand(args) end if
+  if command == "--long-soak" and len(args) >= 4 then return runLongSoakCommand(args) end if
   if command == "--udp-smoke" and len(args) <= 2 then return runUdpSmoke(args) end if
-  if command == "--play" and len(args) == 3 then return host.run(args) end if
+  if command == "--music-smoke" and len(args) == 4 then return musicSmoke(args[1], args[2], args[3]) end if
+  if command == "--play" and len(args) == 3 then return sysWin.WinMain(args, host.run) end if
   if len(bytes(command)) > 1 and decode(slice(bytes(command), 0, 2)) == "--" then
     print "MiniQuake: invalid command or argument count"
     printUsage()
     return 2
   end if
-  return host.run(args)
+  return sysWin.WinMain(args, host.run)
 end function

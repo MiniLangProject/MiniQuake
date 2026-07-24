@@ -1,0 +1,196 @@
+{
+  "schema": "miniquake.view.reference-differential.v1",
+  "command": "python tools/view_differential.py",
+  "reference_execution": "direct-pinned-source-build",
+  "pinned_commit": "bf4ac424ce754894ac8f1dae6a3981954bc9852d",
+  "unit": "view",
+  "reference_source": "reference/quake/WinQuake/view.c",
+  "minilang_modules": [
+    "src/miniquake/view.ml",
+    "src/miniquake/types.ml",
+    "src/miniquake/mathlib.ml",
+    "src/miniquake/host.ml"
+  ],
+  "inputs": [
+    "reference/fixtures/view/mq_view_fixture.c",
+    "tests/view_differential_fixture.ml"
+  ],
+  "events": 23,
+  "epsilon": 1e-5,
+  "functions": [
+    {
+      "name": "V_CalcRoll",
+      "source_line": 81,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:view_calc_roll"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "V_CalcBob",
+      "source_line": 112,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:view_calc_bob"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "V_StartPitchDrift",
+      "source_line": 146,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:view_start_drift"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "V_StopPitchDrift",
+      "source_line": 162,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:view_stop_drift"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "V_DriftPitch",
+      "source_line": 182,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:view_drift_pitch"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "BuildGammaTable",
+      "source_line": 268,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:view_build_gamma", "exact:full-gamma-table-hash"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "V_CheckGamma",
+      "source_line": 295,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:view_check_gamma", "exact:full-gamma-table-hash"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "V_ParseDamage",
+      "source_line": 316,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:view_parse_damage"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "V_cshift_f",
+      "source_line": 387,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:view_cshift"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "V_BonusFlash_f",
+      "source_line": 403,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:view_bonus"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "V_SetContentsColor",
+      "source_line": 418,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:view_contents"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "V_CalcPowerupCshift",
+      "source_line": 442,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:view_powerup"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "V_CalcBlend",
+      "source_line": 482,
+      "source_definitions": 1,
+      "preprocessor_path": "GLQUAKE",
+      "evidence": ["reference-differential:view_blend"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "V_UpdatePalette",
+      "source_line": 527,
+      "source_definitions": 1,
+      "preprocessor_path": "GLQUAKE",
+      "evidence": [
+        "reference-differential:view_update_palette",
+        "exact:palette-and-all-three-ramp-hashes"
+      ],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "V_UpdatePalette",
+      "source_line": 614,
+      "source_definitions": 1,
+      "preprocessor_path": "!GLQUAKE",
+      "evidence": ["excluded-build-configuration:software-renderer"],
+      "classification": "excluded-build-configuration"
+    },
+    {
+      "name": "angledelta",
+      "source_line": 692,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:view_angle_delta"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "CalcGunAngle",
+      "source_line": 705,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:view_gun_angle"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "V_BoundOffsets",
+      "source_line": 763,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:view_bound_offsets"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "V_AddIdle",
+      "source_line": 793,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:view_add_idle"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "V_CalcViewRoll",
+      "source_line": 808,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:view_calc_view_roll"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "V_CalcIntermissionRefdef",
+      "source_line": 837,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:view_intermission"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "V_CalcRefdef",
+      "source_line": 864,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:view_calc_refdef"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "V_RenderView",
+      "source_line": 995,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:view_render_view"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "V_Init",
+      "source_line": 1071,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:view_init", "exact:command-and-cvar-registration-counts"],
+      "classification": "reference-differential"
+    }
+  ]
+}

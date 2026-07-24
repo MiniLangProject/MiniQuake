@@ -1,0 +1,89 @@
+{
+  "schema": "miniquake.differential.v1",
+  "unit": "cl_parse",
+  "command": "py -3 tools/cl_parse_differential.py",
+  "inputs": {
+    "reference_source": "reference/quake/WinQuake/cl_parse.c",
+    "reference_harness": "reference/harness/cl_parse_oracle.c",
+    "minilang_fixture": "tests/cl_parse_differential_fixture.ml",
+    "ported_modules": [
+      "src/miniquake/client_protocol.ml",
+      "src/miniquake/client.ml"
+    ]
+  },
+  "pinned_commit": "bf4ac424ce754894ac8f1dae6a3981954bc9852d",
+  "reference_execution": "direct-pinned-source-build",
+  "patches": [
+    "replace quakedef.h with deterministic Protocol-15 and subsystem stubs"
+  ],
+  "events": 11,
+  "epsilon": 1e-5,
+  "functions": [
+    {
+      "name": "CL_EntityNum",
+      "source_definitions": 1,
+      "classification": "reference-differential",
+      "evidence": ["differential:extend"]
+    },
+    {
+      "name": "CL_ParseStartSoundPacket",
+      "source_definitions": 1,
+      "classification": "reference-differential",
+      "evidence": ["differential:all_fields"]
+    },
+    {
+      "name": "CL_KeepaliveMessage",
+      "source_definitions": 1,
+      "classification": "reference-differential",
+      "evidence": ["differential:nop_restore_send"]
+    },
+    {
+      "name": "CL_ParseServerInfo",
+      "source_definitions": 1,
+      "classification": "reference-differential",
+      "evidence": ["differential:protocol15_precache"]
+    },
+    {
+      "name": "CL_ParseUpdate",
+      "source_definitions": 1,
+      "classification": "reference-differential",
+      "evidence": ["differential:all_protocol15_bits"]
+    },
+    {
+      "name": "CL_ParseBaseline",
+      "source_definitions": 1,
+      "classification": "reference-differential",
+      "evidence": ["differential:interleaved"]
+    },
+    {
+      "name": "CL_ParseClientdata",
+      "source_definitions": 1,
+      "classification": "reference-differential",
+      "evidence": ["differential:all_fields_missionpack"]
+    },
+    {
+      "name": "CL_NewTranslation",
+      "source_definitions": 1,
+      "classification": "reference-differential",
+      "evidence": ["differential:forward_reverse_ranges"]
+    },
+    {
+      "name": "CL_ParseStatic",
+      "source_definitions": 1,
+      "classification": "reference-differential",
+      "evidence": ["differential:baseline_copy"]
+    },
+    {
+      "name": "CL_ParseStaticSound",
+      "source_definitions": 1,
+      "classification": "reference-differential",
+      "evidence": ["differential:protocol15"]
+    },
+    {
+      "name": "CL_ParseServerMessage",
+      "source_definitions": 1,
+      "classification": "reference-differential",
+      "evidence": ["differential:svc_state"]
+    }
+  ]
+}

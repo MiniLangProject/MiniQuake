@@ -1,0 +1,16 @@
+LIBRARY cvar_oracle
+EXPORTS
+    Cvar_FindVar
+    Cvar_VariableValue
+    Cvar_VariableString
+    Cvar_CompleteVariable
+    Cvar_Set
+    Cvar_SetValue
+    Cvar_RegisterVariable
+    Cvar_Command
+    Cvar_WriteVariables
+    cvar_fixture_register
+    cvar_set_command
+    cvar_broadcast_calls
+    cvar_console_calls
+    cvar_archive

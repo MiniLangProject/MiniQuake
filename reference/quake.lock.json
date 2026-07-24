@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "repository": "https://github.com/id-software/quake.git",
+  "commit": "bf4ac424ce754894ac8f1dae6a3981954bc9852d",
+  "tree": "ff4a31bc2a3ae18eb8fa5bbca9a9bab90f0d11ab",
+  "source_scope": {
+    "root": "WinQuake",
+    "extensions": [
+      ".c",
+      ".h"
+    ],
+    "file_count": 213,
+    "manifest_sha256": "b42429d723e4071d92e20bbe6021a51e287493f44b74d729b695f970961e5e29"
+  },
+  "oracle": {
+    "historical_executable": "WinQuake/kit/GLQUAKE.EXE",
+    "size": 435712,
+    "sha256": "04862c835c399bc9184f62101ae0390c2a758c21656ec06dcc0384e0f373d588"
+  }
+}

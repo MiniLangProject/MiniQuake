@@ -9,9 +9,11 @@ function createBoxHull(mins, maxs)
 end function
 
 function inside(box, point)
-  return point.x >= box.mins.x and point.x <= box.maxs.x and
-    point.y >= box.mins.y and point.y <= box.maxs.y and
-    point.z >= box.mins.z and point.z <= box.maxs.z
+  // world.c's six-node box hull sends points exactly on a maximum plane to
+  // CONTENTS_EMPTY, while minimum planes remain part of the solid half-space.
+  return point.x >= box.mins.x and point.x < box.maxs.x and
+    point.y >= box.mins.y and point.y < box.maxs.y and
+    point.z >= box.mins.z and point.z < box.maxs.z
 end function
 
 function truePointContents(box, point)
@@ -25,12 +27,18 @@ end function
 
 function traceLine(box, start, finish)
   if inside(box, start) then
-    return t.Trace(true, true, false, false, 0.0, start, emptyPlane(), 0)
+    // SV_RecursiveHullCheck permits a move that starts solid to escape into
+    // open space.  It reports startsolid, but no impact fraction on the exit.
+    if not inside(box, finish) then
+      return t.Trace(false, true, true, false, 1.0, finish, emptyPlane(), 0)
+    end if
+    return t.Trace(true, true, false, false, 1.0, finish, emptyPlane(), 0)
   end if
 
   entry = 0.0
   exit = 1.0
   hitNormal = t.Vec3(0.0, 0.0, 0.0)
+  hitDistance = 0.0
   valid = true
 
   startValues = [start.x, start.y, start.z]
@@ -63,6 +71,9 @@ function traceLine(box, start, finish)
         if axis == 0 then hitNormal = t.Vec3(nearNormal, 0.0, 0.0) end if
         if axis == 1 then hitNormal = t.Vec3(0.0, nearNormal, 0.0) end if
         if axis == 2 then hitNormal = t.Vec3(0.0, 0.0, nearNormal) end if
+        // The recursive hull trace reports the actual box plane, not the
+        // epsilon-shifted impact point used to calculate the safe fraction.
+        if delta > 0.0 then hitDistance = -mins[axis] else hitDistance = maxs[axis] end if
       end if
       if farTime < exit then exit = farTime end if
       if entry > exit then valid = false end if
@@ -75,7 +86,6 @@ function traceLine(box, start, finish)
   end if
 
   impact = math.multiplyAdd(start, entry, math.subtract(finish, start))
-  distance = math.dot(hitNormal, impact)
-  plane = t.Plane(hitNormal, distance, 0, 0)
+  plane = t.Plane(hitNormal, hitDistance, 0, 0)
   return t.Trace(false, false, true, false, entry, impact, plane, 0)
 end function

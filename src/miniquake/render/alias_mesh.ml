@@ -298,13 +298,8 @@ function frameForNumber(model, frameNumber, time)
   set = model.frames[index]
   if len(set.frames) == 0 then return void end if
   if not set.grouped or len(set.frames) == 1 then return set.frames[0] end if
-  fullInterval = set.intervals[len(set.intervals) - 1]
-  if fullInterval <= 0.0 then return set.frames[0] end if
-  target = time - compatAliasNative.trunc(time / fullInterval) * fullInterval
-  pose = 0
-  while pose < len(set.frames) - 1 and set.intervals[pose] <= target
-    pose = pose + 1
-  end while
+  if len(set.intervals) == 0 or set.intervals[0] <= 0.0 then return set.frames[0] end if
+  pose = compatAliasNative.trunc(time / set.intervals[0]) % len(set.frames)
   return set.frames[pose]
 end function
 

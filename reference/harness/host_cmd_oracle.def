@@ -1,0 +1,3 @@
+LIBRARY host_cmd_oracle
+EXPORTS
+    host_cmd_oracle_jsonl

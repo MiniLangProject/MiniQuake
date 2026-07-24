@@ -1,0 +1,10 @@
+LIBRARY chase_oracle
+EXPORTS
+    Chase_Init
+    Chase_Reset
+    TraceLine
+    Chase_Update
+    chase_setup
+    chase_register_calls
+    chase_get_cvars
+    chase_get_view

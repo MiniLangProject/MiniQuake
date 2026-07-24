@@ -1,0 +1,77 @@
+{
+  "schema": "miniquake.semantic-port-review.v1",
+  "unit": "gl_mesh",
+  "reference_commit": "bf4ac424ce754894ac8f1dae6a3981954bc9852d",
+  "reviewer": "alias_viewmodel_parity",
+  "original_files": [
+    "gl_mesh.c"
+  ],
+  "minilang_modules": [
+    "src/miniquake/render/alias_mesh.ml",
+    "src/miniquake/render/entities.ml"
+  ],
+  "original_sha256": {
+    "gl_mesh.c": "edd5453ad3f87d8c9a01257495a120c3f403c065e53f406030b2f2f1fee87a85"
+  },
+  "minilang_sha256": {
+    "src/miniquake/render/alias_mesh.ml": "0b3a4313bc3f2f523461b10833756512c25e60524e7926cdfa66de0a70fbe401",
+    "src/miniquake/render/entities.ml": "7679e4df4d11dd17618f89a09d032d9e171fb0694c118c352d184c611e8f4469"
+  },
+  "function_review_scope": "all-target-functions",
+  "features": [
+    {
+      "name": "strip and fan candidate walks",
+      "status": "parity",
+      "original": [
+        "gl_mesh.c:58",
+        "gl_mesh.c:127"
+      ],
+      "minilang": [
+        "src/miniquake/render/alias_mesh.ml:92",
+        "src/miniquake/render/alias_mesh.ml:143"
+      ],
+      "evidence": [
+        "py -3 tools/gl_mesh_differential.py",
+        "tests/alias_renderer_port_tests.ml:testMeshTerminationAndCacheBranches"
+      ]
+    },
+    {
+      "name": "best primitive selection, seam correction, half-texel coordinates, and terminator",
+      "status": "parity",
+      "original": [
+        "gl_mesh.c:198"
+      ],
+      "minilang": [
+        "src/miniquake/render/alias_mesh.ml:193"
+      ],
+      "evidence": [
+        "py -3 tools/gl_mesh_differential.py",
+        "differential:BuildTris/strip"
+      ]
+    },
+    {
+      "name": "display-list command and pose reorder cache",
+      "status": "documented-platform-bridge",
+      "original": [
+        "gl_mesh.c:290"
+      ],
+      "minilang": [
+        "src/miniquake/render/alias_mesh.ml:281",
+        "src/miniquake/render/entities.ml:308"
+      ],
+      "evidence": [
+        "py -3 tools/gl_mesh_differential.py",
+        "differential:GL_MakeAliasModelDisplayLists/build",
+        "tests/alias_renderer_port_tests.ml:testMeshTerminationAndCacheBranches"
+      ]
+    }
+  ],
+  "commands": [
+    "py -3 tools/gl_mesh_differential.py",
+    "build/AliasRendererPortTests.exe"
+  ],
+  "open_findings": [],
+  "limitations": [
+    "The original optional glquake/*.ms2 disk cache and hunk-relative copied pose block are represented by a process-local immutable AliasMesh cache over the source poses. The generated primitive commands, reordered vertex indices, pose-vertex count, and rendered result are equivalent; no public Quake file or wire format depends on .ms2."
+  ]
+}

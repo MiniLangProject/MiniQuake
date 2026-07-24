@@ -45,6 +45,10 @@ function writeFloat(buffer, value)
 end function
 
 function writeString(buffer, text)
+  if text is void then
+    writeByte(buffer, 0)
+    return true
+  end if
   encoded = bytes(text)
   sz.writeBytes(buffer, encoded)
   writeByte(buffer, 0)
@@ -55,7 +59,9 @@ function writeCoord(buffer, value)
 end function
 
 function writeAngle(buffer, value)
-  writeByte(buffer, native.trunc(value * 256.0 / 360.0) & 255)
+  // common.c casts the angle before multiplying, rather than casting the
+  // fully-scaled result.
+  writeByte(buffer, native.trunc((native.trunc(value) * 256) / 360) & 255)
 end function
 
 function beginReading(buffer)
@@ -69,67 +75,71 @@ end function
 function need(reader, count)
   if reader.readCount + count > len(reader.data) then
     reader.badRead = true
-    return error(1300, "MSG_Read overflow")
+    return false
   end if
-  return reader.readCount
+  return true
 end function
 
 function readChar(reader)
-  offset = need(reader, 1)
+  if not need(reader, 1) then return -1 end if
+  offset = reader.readCount
   reader.readCount = reader.readCount + 1
   return bio.i8(reader.data, offset)
 end function
 
 function readByte(reader)
-  offset = need(reader, 1)
+  if not need(reader, 1) then return -1 end if
+  offset = reader.readCount
   reader.readCount = reader.readCount + 1
   return bio.u8(reader.data, offset)
 end function
 
 function readShort(reader)
-  offset = need(reader, 2)
+  if not need(reader, 2) then return -1 end if
+  offset = reader.readCount
   reader.readCount = reader.readCount + 2
   return bio.i16(reader.data, offset)
 end function
 
 function readUnsignedShort(reader)
-  offset = need(reader, 2)
+  if not need(reader, 2) then return -1 end if
+  offset = reader.readCount
   reader.readCount = reader.readCount + 2
   return bio.u16(reader.data, offset)
 end function
 
 function readLong(reader)
-  offset = need(reader, 4)
+  if not need(reader, 4) then return -1 end if
+  offset = reader.readCount
   reader.readCount = reader.readCount + 4
   return bio.i32(reader.data, offset)
 end function
 
 function readUnsignedLong(reader)
-  offset = need(reader, 4)
+  if not need(reader, 4) then return -1 end if
+  offset = reader.readCount
   reader.readCount = reader.readCount + 4
   return bio.u32(reader.data, offset)
 end function
 
 function readFloat(reader)
-  offset = need(reader, 4)
+  // The 1.09 source omitted this bounds check.  Returning the same sentinel
+  // used by the integer readers is the memory-safe platform divergence.
+  if not need(reader, 4) then return -1.0 end if
+  offset = reader.readCount
   reader.readCount = reader.readCount + 4
   return bio.f32(reader.data, offset)
 end function
 
 function readString(reader)
-  output = bytes(2048)
+  output = bytes(2047)
   count = 0
-  done = false
-  while not done and reader.readCount < len(reader.data)
-    value = readByte(reader)
-    if value == 0 then
-      done = true
-    else if count < len(output) then
-      output[count] = value
-      count = count + 1
-    end if
+  while count < len(output)
+    value = readChar(reader)
+    if value == -1 or value == 0 then break end if
+    output[count] = value & 255
+    count = count + 1
   end while
-  if not done then reader.badRead = true end if
   return decode(slice(output, 0, count))
 end function
 
@@ -138,9 +148,78 @@ function readCoord(reader)
 end function
 
 function readAngle(reader)
-  return readByte(reader) * (360.0 / 256.0)
+  return readChar(reader) * (360.0 / 256.0)
 end function
 
 function remaining(reader)
   return len(reader.data) - reader.readCount
+end function
+
+// Direct pendants for the message section of WinQuake/common.c.
+function MSG_WriteChar(buffer, value)
+  return writeChar(buffer, value)
+end function
+
+function MSG_WriteByte(buffer, value)
+  return writeByte(buffer, value)
+end function
+
+function MSG_WriteShort(buffer, value)
+  return writeShort(buffer, value)
+end function
+
+function MSG_WriteLong(buffer, value)
+  return writeLong(buffer, value)
+end function
+
+function MSG_WriteFloat(buffer, value)
+  return writeFloat(buffer, value)
+end function
+
+function MSG_WriteString(buffer, text)
+  return writeString(buffer, text)
+end function
+
+function MSG_WriteCoord(buffer, value)
+  return writeCoord(buffer, value)
+end function
+
+function MSG_WriteAngle(buffer, value)
+  return writeAngle(buffer, value)
+end function
+
+function MSG_BeginReading(buffer)
+  return beginReading(buffer)
+end function
+
+function MSG_ReadChar(reader)
+  return readChar(reader)
+end function
+
+function MSG_ReadByte(reader)
+  return readByte(reader)
+end function
+
+function MSG_ReadShort(reader)
+  return readShort(reader)
+end function
+
+function MSG_ReadLong(reader)
+  return readLong(reader)
+end function
+
+function MSG_ReadFloat(reader)
+  return readFloat(reader)
+end function
+
+function MSG_ReadString(reader)
+  return readString(reader)
+end function
+
+function MSG_ReadCoord(reader)
+  return readCoord(reader)
+end function
+
+function MSG_ReadAngle(reader)
+  return readAngle(reader)
 end function

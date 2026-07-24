@@ -1,0 +1,3 @@
+LIBRARY sv_phys_oracle
+EXPORTS
+    sv_phys_oracle_jsonl

@@ -26,13 +26,83 @@ function parseSingleFrame(data, offset, numVertices)
   return [t.MdlFrame(name, mins, maxs, vertices), offset + size]
 end function
 
-function parseSkin(data, offset, skinBytes)
+function Mod_FloodFillSkin(skin, skinWidth, skinHeight)
+  if skinWidth <= 0 or skinHeight <= 0 or len(skin) < skinWidth * skinHeight then return skin end if
+  fillColor = skin[0]
+  filledColor = 0
+  if fillColor == filledColor or fillColor == 255 then return skin end if
+
+  fifoX = arrayutil.makeFilledArray(4096, 0)
+  fifoY = arrayutil.makeFilledArray(4096, 0)
+  input = 1
+  output = 0
+  fifoX[0] = 0
+  fifoY[0] = 0
+  while output != input
+    x = fifoX[output]
+    y = fifoY[output]
+    output = (output + 1) & 4095
+    fillDestination = filledColor
+
+    if x > 0 then
+      adjacent = x - 1 + skinWidth * y
+      if skin[adjacent] == fillColor then
+        skin[adjacent] = 255
+        fifoX[input] = x - 1
+        fifoY[input] = y
+        input = (input + 1) & 4095
+      else
+        if skin[adjacent] != 255 then fillDestination = skin[adjacent] end if
+      end if
+    end if
+    if x < skinWidth - 1 then
+      adjacent = x + 1 + skinWidth * y
+      if skin[adjacent] == fillColor then
+        skin[adjacent] = 255
+        fifoX[input] = x + 1
+        fifoY[input] = y
+        input = (input + 1) & 4095
+      else
+        if skin[adjacent] != 255 then fillDestination = skin[adjacent] end if
+      end if
+    end if
+    if y > 0 then
+      adjacent = x + skinWidth * (y - 1)
+      if skin[adjacent] == fillColor then
+        skin[adjacent] = 255
+        fifoX[input] = x
+        fifoY[input] = y - 1
+        input = (input + 1) & 4095
+      else
+        if skin[adjacent] != 255 then fillDestination = skin[adjacent] end if
+      end if
+    end if
+    if y < skinHeight - 1 then
+      adjacent = x + skinWidth * (y + 1)
+      if skin[adjacent] == fillColor then
+        skin[adjacent] = 255
+        fifoX[input] = x
+        fifoY[input] = y + 1
+        input = (input + 1) & 4095
+      else
+        if skin[adjacent] != 255 then fillDestination = skin[adjacent] end if
+      end if
+    end if
+    skin[x + skinWidth * y] = fillDestination
+  end while
+  return skin
+end function
+
+function parseSkin(data, offset, skinWidth, skinHeight)
+  skinBytes = skinWidth * skinHeight
   if offset + 4 > len(data) then return error(1802, "MDL skin type outside file") end if
   group = bio.i32(data, offset)
   offset = offset + 4
-  if group == 0 then
+  if group == c.ALIAS_SKIN_SINGLE then
     if offset + skinBytes > len(data) then return error(1803, "MDL skin outside file") end if
-    return [t.MdlSkin(false, [], [slice(data, offset, skinBytes)]), offset + skinBytes]
+    image = slice(data, offset, skinBytes)
+    Mod_FloodFillSkin(image, skinWidth, skinHeight)
+    return [t.MdlSkin(false, [], [image]), offset + skinBytes]
   end if
   if offset + 4 > len(data) then return error(1804, "MDL skin group outside file") end if
   count = bio.i32(data, offset)
@@ -51,41 +121,65 @@ function parseSkin(data, offset, skinBytes)
   while i < count
     if offset + skinBytes > len(data) then return error(1807, "MDL grouped skin outside file") end if
     images[i] = slice(data, offset, skinBytes)
+    Mod_FloodFillSkin(images[i], skinWidth, skinHeight)
     offset = offset + skinBytes
     i = i + 1
   end while
   return [t.MdlSkin(true, intervals, images), offset]
 end function
 
+function Mod_LoadAliasFrame(data, offset, numVertices)
+  return parseSingleFrame(data, offset, numVertices)
+end function
+
+function Mod_LoadAliasGroup(data, offset, numVertices)
+  if offset + 12 > len(data) then return error(1818, "MDL frame group outside file") end if
+  count = bio.i32(data, offset)
+  if count <= 0 then return error(1810, "invalid MDL frame group") end if
+  cursor = offset + 12
+  intervals = arrayutil.makeEmptyArray(count)
+  index = 0
+  while index < count
+    if cursor + 4 > len(data) then return error(1811, "MDL frame interval outside file") end if
+    intervals[index] = bio.f32(data, cursor)
+    cursor = cursor + 4
+    index = index + 1
+  end while
+  frames = arrayutil.makeEmptyArray(count)
+  index = 0
+  while index < count
+    parsed = Mod_LoadAliasFrame(data, cursor, numVertices)
+    if parsed is error then return parsed end if
+    frames[index] = parsed[0]
+    cursor = parsed[1]
+    index = index + 1
+  end while
+  return [t.MdlFrameSet(true, intervals, frames), cursor]
+end function
+
 function parseFrameSet(data, offset, numVertices)
   if offset + 4 > len(data) then return error(1808, "MDL frame type outside file") end if
   group = bio.i32(data, offset)
   offset = offset + 4
-  if group == 0 then
-    parsed = parseSingleFrame(data, offset, numVertices)
+  if group == c.ALIAS_SINGLE then
+    parsed = Mod_LoadAliasFrame(data, offset, numVertices)
+    if parsed is error then return parsed end if
     return [t.MdlFrameSet(false, [], [parsed[0]]), parsed[1]]
   end if
-  if offset + 12 > len(data) then return error(1809, "MDL frame group outside file") end if
-  count = bio.i32(data, offset)
-  offset = offset + 12
-  if count <= 0 then return error(1810, "invalid MDL frame group") end if
-  intervals = arrayutil.makeEmptyArray(count)
-  i = 0
-  while i < count
-    if offset + 4 > len(data) then return error(1811, "MDL frame interval outside file") end if
-    intervals[i] = bio.f32(data, offset)
-    offset = offset + 4
-    i = i + 1
-  end while
-  frames = arrayutil.makeEmptyArray(count)
-  i = 0
-  while i < count
-    parsed = parseSingleFrame(data, offset, numVertices)
-    frames[i] = parsed[0]
+  return Mod_LoadAliasGroup(data, offset, numVertices)
+end function
+
+function Mod_LoadAllSkins(data, offset, numSkins, skinWidth, skinHeight)
+  skins = arrayutil.makeEmptyArray(numSkins)
+  index = 0
+  while index < numSkins
+    parsed = parseSkin(data, offset, skinWidth, skinHeight)
+    if parsed is error then return parsed end if
+    skins[index] = parsed[0]
     offset = parsed[1]
-    i = i + 1
+    index = index + 1
   end while
-  return [t.MdlFrameSet(true, intervals, frames), offset]
+  return [skins, offset]
 end function
 
 function parse(data, filename)
@@ -106,20 +200,21 @@ function parse(data, filename)
   syncType = bio.i32(data, 72)
   flags = bio.i32(data, 76)
   modelSize = bio.f32(data, 80)
-  if numSkins < 0 or skinWidth <= 0 or skinHeight <= 0 or numVertices < 0 or numTriangles < 0 or numFrames < 0 then
+  if numSkins < 1 or numSkins > c.MAX_SKINS then return error(1815, "Mod_LoadAliasModel: Invalid # of skins: " + numSkins) end if
+  if skinWidth <= 0 or skinHeight <= 0 then return error(1815, filename + ": invalid MDL skin dimensions") end if
+  if skinHeight > c.MAX_LBM_HEIGHT then return error(1815, "model " + filename + " has a skin taller than " + c.MAX_LBM_HEIGHT) end if
+  if numVertices <= 0 then return error(1815, "model " + filename + " has no vertices") end if
+  if numVertices > c.MAX_ALIAS_VERTS then return error(1815, "model " + filename + " has too many vertices") end if
+  if numTriangles <= 0 or numTriangles > c.MAX_ALIAS_TRIS then return error(1815, "model " + filename + " has invalid triangle count") end if
+  if numFrames < 1 then
     return error(1815, filename + ": invalid MDL counts")
   end if
 
   offset = 84
-  skinBytes = skinWidth * skinHeight
-  skins = arrayutil.makeEmptyArray(numSkins)
-  i = 0
-  while i < numSkins
-    parsedSkin = parseSkin(data, offset, skinBytes)
-    skins[i] = parsedSkin[0]
-    offset = parsedSkin[1]
-    i = i + 1
-  end while
+  parsedSkins = Mod_LoadAllSkins(data, offset, numSkins, skinWidth, skinHeight)
+  if parsedSkins is error then return parsedSkins end if
+  skins = parsedSkins[0]
+  offset = parsedSkins[1]
 
   texCoords = arrayutil.makeEmptyArray(numVertices)
   i = 0
@@ -134,21 +229,33 @@ function parse(data, filename)
   i = 0
   while i < numTriangles
     if offset + 16 > len(data) then return error(1817, "MDL triangle outside file") end if
-    triangles[i] = t.MdlTriangle(bio.i32(data, offset), bio.i32(data, offset + 4), bio.i32(data, offset + 8), bio.i32(data, offset + 12))
+    triangle = t.MdlTriangle(bio.i32(data, offset), bio.i32(data, offset + 4), bio.i32(data, offset + 8), bio.i32(data, offset + 12))
+    if triangle.vertex0 < 0 or triangle.vertex0 >= numVertices or triangle.vertex1 < 0 or triangle.vertex1 >= numVertices or triangle.vertex2 < 0 or triangle.vertex2 >= numVertices then
+      return error(1819, filename + ": MDL triangle vertex outside model")
+    end if
+    triangles[i] = triangle
     offset = offset + 16
     i = i + 1
   end while
 
   frames = arrayutil.makeEmptyArray(numFrames)
+  poseCount = 0
   i = 0
   while i < numFrames
     parsedFrame = parseFrameSet(data, offset, numVertices)
+    if parsedFrame is error then return parsedFrame end if
     frames[i] = parsedFrame[0]
+    poseCount = poseCount + len(frames[i].frames)
+    if poseCount > c.MAX_ALIAS_FRAMES then return error(1820, filename + ": too many alias poses") end if
     offset = parsedFrame[1]
     i = i + 1
   end while
 
-  return t.MdlModel(filename, data, version, scale, scaleOrigin, boundingRadius, eyePosition, numSkins, skinWidth, skinHeight, numVertices, numTriangles, numFrames, syncType, flags, modelSize, skins, texCoords, triangles, frames)
+  return t.MdlModel(filename, data, version, scale, scaleOrigin, boundingRadius, eyePosition, numSkins, skinWidth, skinHeight, numVertices, numTriangles, numFrames, syncType, flags, modelSize * c.ALIAS_BASE_SIZE_RATIO, skins, texCoords, triangles, frames)
+end function
+
+function Mod_LoadAliasModel(data, filename)
+  return parse(data, filename)
 end function
 
 function load(filename)

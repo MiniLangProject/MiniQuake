@@ -8,6 +8,7 @@ import miniquake.view as view
 import miniquake.console as console
 import miniquake.cmd as cmd
 import miniquake.client as clientRuntime
+import miniquake.cvar as cvar
 
 function appendParticles(current, spawned)
   return particleSystem.appendLimited(current, spawned)
@@ -20,23 +21,35 @@ function safeSound(mixer, entityNumber, channelNumber, name, origin, volume, att
   return result
 end function
 
+// TE_SPIKE and TE_SUPERSPIKE share the engine-wide C rand() stream with the
+// particle and entity-effect code.  Four out of five impacts use tink1; the
+// fifth consumes a second random value to select one of the three ricochets
+// (with the original 0/3 fall-through both selecting ric3).
+function spikeImpactSound()
+  if particleSystem.compatRand() % 5 != 0 then return "weapons/tink1.wav" end if
+  random = particleSystem.compatRand() & 3
+  if random == 1 then return "weapons/ric1.wav" end if
+  if random == 2 then return "weapons/ric2.wav" end if
+  return "weapons/ric3.wav"
+end function
+
 function processTemporary(value, mixer, currentParticles, currentTemporary, currentTime)
   spawned = []
   type = value.type
   if type == c.TE_WIZSPIKE then
-    spawned = particleSystem.pointEffect(value.origin, 30, 20, currentTime + 0.6)
+    spawned = particleSystem.pointEffect(value.origin, 30, 20, currentTime)
     safeSound(mixer, -1, 0, "wizard/hit.wav", value.origin, 1.0, 1.0)
   else if type == c.TE_KNIGHTSPIKE then
-    spawned = particleSystem.pointEffect(value.origin, 20, 226, currentTime + 0.6)
+    spawned = particleSystem.pointEffect(value.origin, 20, 226, currentTime)
     safeSound(mixer, -1, 0, "hknight/hit.wav", value.origin, 1.0, 1.0)
   else if type == c.TE_SPIKE then
-    spawned = particleSystem.pointEffect(value.origin, 10, 0, currentTime + 0.6)
-    safeSound(mixer, -1, 0, "weapons/tink1.wav", value.origin, 1.0, 1.0)
+    spawned = particleSystem.pointEffect(value.origin, 10, 0, currentTime)
+    safeSound(mixer, -1, 0, spikeImpactSound(), value.origin, 1.0, 1.0)
   else if type == c.TE_SUPERSPIKE then
-    spawned = particleSystem.pointEffect(value.origin, 20, 0, currentTime + 0.6)
-    safeSound(mixer, -1, 0, "weapons/tink1.wav", value.origin, 1.0, 1.0)
+    spawned = particleSystem.pointEffect(value.origin, 20, 0, currentTime)
+    safeSound(mixer, -1, 0, spikeImpactSound(), value.origin, 1.0, 1.0)
   else if type == c.TE_GUNSHOT then
-    spawned = particleSystem.pointEffect(value.origin, 20, 0, currentTime + 0.6)
+    spawned = particleSystem.pointEffect(value.origin, 20, 0, currentTime)
   else if type == c.TE_EXPLOSION then
     spawned = particleSystem.explosion(value.origin, currentTime)
     light = clientRuntime.CL_AllocDlightAt(0, currentTime)
@@ -83,14 +96,13 @@ function pruneTemporary(currentTemporary, currentTime)
   return alive
 end function
 
-function process(events, client, player, mixer, viewState, consoleState, commandSystem, currentParticles, currentTemporary, currentTime)
+function process(events, client, player, mixer, viewState, consoleState, commandSystem, currentParticles, currentTemporary, currentTime, registry)
   currentTemporary = pruneTemporary(currentTemporary, currentTime)
   for each item in events
     name = item.command
     payload = item.payload
     if name == "svc_print" then
-      console.append(consoleState, payload)
-      print payload
+      console.Con_Printf(consoleState, payload, consoleState.dedicated, false)
     else if name == "svc_centerprint" then
       console.centerPrint(consoleState, payload, currentTime, 2.0)
     else if name == "svc_stufftext" then
@@ -108,14 +120,25 @@ function process(events, client, player, mixer, viewState, consoleState, command
     else if name == "svc_spawnstaticsound" then
       soundIndex = payload[1]
       if soundIndex > 0 and soundIndex < len(client.soundPrecache) then
-        safeSound(mixer, 0, 0, client.soundPrecache[soundIndex], payload[0], payload[2] / 255.0, payload[3] / 64.0)
+        if mixer is not void then sound.staticSound(mixer, client.soundPrecache[soundIndex], payload[0], payload[2] / 255.0, payload[3]) end if
       end if
     else if name == "svc_particle" then
-      currentParticles = appendParticles(currentParticles, particleSystem.runEffect(payload[0], payload[1], payload[2], payload[3], currentTime + 0.6))
+      currentParticles = appendParticles(currentParticles, particleSystem.runEffect(payload[0], payload[1], payload[2], payload[3], currentTime))
     else if name == "svc_damage" then
-      count = payload[0] * 0.5 + payload[1] * 0.5
-      direction = math.subtract(player.origin, payload[2])
-      view.addDamage(viewState, count, direction, player.viewAngles, 0.6, 0.6, 0.5)
+      // V_ParseDamage receives the impact source, not a pre-normalized vector.
+      // Preserve the original armor/blood split because it controls both the
+      // minimum kick and the damage cshift color.
+      view.V_ParseDamage(
+        viewState,
+        payload[0],
+        payload[1],
+        payload[2],
+        player.origin,
+        player.renderAngles,
+        cvar.variableValue(registry, "v_kickroll"),
+        cvar.variableValue(registry, "v_kickpitch"),
+        cvar.variableValue(registry, "v_kicktime"),
+      )
     else if name == "svc_temp_entity" then
       result = processTemporary(payload, mixer, currentParticles, currentTemporary, currentTime)
       currentParticles = result[0]
@@ -124,6 +147,12 @@ function process(events, client, player, mixer, viewState, consoleState, command
       console.centerPrint(consoleState, payload, currentTime, 8.0)
     else if name == "svc_intermission" then
       console.centerPrint(consoleState, "Intermission", currentTime, 4.0)
+    else if name == "svc_setpause" then
+      if mixer is not void then
+        if payload != 0 then sound.pauseMusic(mixer) else sound.resumeMusic(mixer) end if
+      end if
+    else if name == "svc_sellscreen" then
+      cmd.insertText(commandSystem, "help\n")
     end if
   end for
   return [currentParticles, currentTemporary]

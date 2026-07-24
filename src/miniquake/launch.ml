@@ -110,6 +110,9 @@ function parse(args)
   validateOnly = false
   headless = false
   timedemo = false
+  explicitGame = false
+  rogue = false
+  hipnotic = false
 
   index = 0
   while index < len(args)
@@ -138,6 +141,7 @@ function parse(args)
       continue
     else if lower == "-game" and index + 1 < len(args) then
       gameDirectory = args[index + 1]
+      explicitGame = true
       index = index + 2
       continue
     else if lower == "-width" and index + 1 < len(args) then
@@ -162,6 +166,12 @@ function parse(args)
       fullscreen = false
     else if lower == "-nosound" then
       noSound = true
+    else if lower == "-safe" then
+      noSound = true
+    else if lower == "-rogue" then
+      rogue = true
+    else if lower == "-hipnotic" then
+      hipnotic = true
     else if lower == "-developer" or lower == "-dev" then
       developer = true
     else if lower == "-dedicated" then
@@ -185,6 +195,12 @@ function parse(args)
     index = index + 1
   end while
 
+  // COM_InitFilesystem adds mission-pack directories after id1, with
+  // hipnotic after rogue, unless an explicit -game directory overrides both.
+  if not explicitGame then
+    if rogue then gameDirectory = "rogue" end if
+    if hipnotic then gameDirectory = "hipnotic" end if
+  end if
   if startMap == "" then startMap = "start" end if
   return t.LaunchOptions(
     args,

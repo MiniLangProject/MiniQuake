@@ -1,0 +1,28 @@
+{
+  "schema": "miniquake.differential.v1",
+  "unit": "snd_win",
+  "reference_execution": "patched-pinned-source-worktree",
+  "command": "py -3 tools/snd_win_differential.py",
+  "inputs": {
+    "reference_source": "reference/quake/WinQuake/snd_win.c",
+    "reference_harness": "reference/harness/snd_win_pinned_driver.c",
+    "instrumentation_patch": "reference/patches/snd_win_pinned_oracle.patch",
+    "oracle_stub_header": "reference/harness/snd_win_oracle_stubs.h",
+    "minilang_fixture": "tests/snd_win_differential_fixture.ml",
+    "ported_module": "src/miniquake/sound/snd_win.ml"
+  },
+  "pinned_commit": "bf4ac424ce754894ac8f1dae6a3981954bc9852d",
+  "events": 9,
+  "epsilon": 0,
+  "functions": [
+    {"name": "S_BlockSound", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:wave"]},
+    {"name": "S_UnblockSound", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:wave"]},
+    {"name": "FreeSound", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:wave"]},
+    {"name": "SNDDMA_InitDirect", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:missing-dsound"]},
+    {"name": "SNDDMA_InitWav", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:success"]},
+    {"name": "SNDDMA_Init", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:fallback"]},
+    {"name": "SNDDMA_GetDMAPos", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:wave"]},
+    {"name": "SNDDMA_Submit", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:refill"]},
+    {"name": "SNDDMA_Shutdown", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:wave"]}
+  ]
+}

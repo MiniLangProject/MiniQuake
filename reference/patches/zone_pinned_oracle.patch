@@ -1,0 +1,15 @@
+diff --git a/WinQuake/zone.c b/WinQuake/zone.c
+index 818c181..0000000 100644
+--- a/WinQuake/zone.c
++++ b/WinQuake/zone.c
+@@ -19,6 +19,10 @@ See the GNU General Public License for more details.
+ */
+ // Z_zone.c
+ 
++#ifdef MINIQUAKE_PINNED_ORACLE
++#include "zone_oracle_stubs.h"
++#else
+ #include "quakedef.h"
++#endif
+ 
+ #define	DYNAMIC_SIZE	0xc000

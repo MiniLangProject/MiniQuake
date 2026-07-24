@@ -11,7 +11,7 @@ import miniquake.quakec.builtins as qcbuiltins
 import miniquake.edict as edict
 import miniquake.sizebuf as sz
 import miniquake.message as msg
-import miniquake.net_loop as netloop
+import miniquake.net_main as netmain
 import miniquake.cmd as cmd
 import miniquake.cvar as cvar
 import miniquake.input as input
@@ -22,6 +22,8 @@ import miniquake.world_bsp as world
 import miniquake.server_collision as collision
 import miniquake.native as native
 import miniquake.array_util as arrayutil
+import miniquake.byteio as bio
+import miniquake.platform.win32 as win
 
 function zeroSpawnParms()
   return arrayutil.makeFilledArray(16, 0.0)
@@ -35,11 +37,15 @@ function createServerClient(index)
     0,
     "unconnected",
     0,
+    false,
     index + 1,
     void,
     sz.alloc(c.MAX_MSGLEN),
     zeroSpawnParms(),
     input.createCommand(),
+    arrayutil.makeFilledArray(16, 0.0),
+    0,
+    -999999,
   )
 end function
 
@@ -57,6 +63,7 @@ function create(maxClients)
     index = index + 1
   end while
   return t.GameServer(
+    false,
     false,
     false,
     false,
@@ -85,8 +92,27 @@ function create(maxClients)
     false,
     false,
     0,
+    0,
+    1,
     [],
   )
+end function
+
+function resizeClients(server, requested)
+  if server.active then return error(2803, "maxplayers can not be changed while a server is running.") end if
+  count = requested
+  if count < 1 then count = 1 end if
+  if count > c.MAX_CLIENTS then count = c.MAX_CLIENTS end if
+  clients = arrayutil.makeEmptyArray(count)
+  index = 0
+  while index < count
+    if index < len(server.clients) then clients[index] = server.clients[index] else clients[index] = createServerClient(index) end if
+    clients[index].edictIndex = index + 1
+    index = index + 1
+  end while
+  server.clients = clients
+  server.maxClients = count
+  return count
 end function
 
 function hasBspSuffix(name)
@@ -252,7 +278,9 @@ function spawn(server, filesystem, mapName, skill)
   name = cleanMapName(mapName)
   if name == "" then return error(2800, "SV_SpawnServer: empty map name") end if
   server.loading = true
+  server.loadGame = false
   server.active = false
+  server.paused = false
   server.time = 1.0
   server.mapName = name
   server.modelName = "maps/" + name + ".bsp"
@@ -265,7 +293,9 @@ function spawn(server, filesystem, mapName, skill)
   mapData = qfs.readFile(filesystem, server.modelName)
   server.worldModel = bsp.parse(mapData, server.modelName)
   progsData = qfs.readFile(filesystem, "progs.dat")
-  server.progs = progs.parse(progsData, "progs.dat")
+  loadedProgs = try(qcedict.PR_LoadProgs(progsData, "progs.dat"))
+  if loadedProgs is error then return loadedProgs end if
+  server.progs = loadedProgs
   server.machine = vm.create(server.progs, server.maxEdicts)
   server.edicts = loadEdicts(server, server.worldModel)
   server.numEdicts = len(server.edicts)
@@ -277,6 +307,11 @@ function spawn(server, filesystem, mapName, skill)
   if len(server.worldModel.entities) > 0 then levelName = bsp.entityValue(server.worldModel.entities[0], "message") end if
   if levelName == "" then levelName = name end if
   server.levelName = levelName
+  server.cdTrack = 0
+  if len(server.worldModel.entities) > 0 then
+    parsedTrack = toNumber(bsp.entityValue(server.worldModel.entities[0], "sounds"))
+    if parsedTrack is not void then server.cdTrack = native.trunc(parsedTrack) end if
+  end if
   location = edict.spawnPoint(server.edicts, server.deathmatch)
   server.spawnPoint = location[0]
   server.spawnAngles = location[1]
@@ -298,8 +333,8 @@ end function
 
 function sendBuffer(client, buffer)
   if client.socket is void then return -1 end if
-  if not netloop.canSendMessage(client.socket) then return 0 end if
-  return netloop.sendMessage(client.socket, buffer)
+  if not netmain.NET_CanSendMessage(client.socket) then return 0 end if
+  return netmain.NET_SendMessage(client.socket, buffer)
 end function
 
 function sendServerInfo(server, client)
@@ -324,14 +359,19 @@ function sendServerInfo(server, client)
   end while
   msg.writeByte(buffer, 0)
   msg.writeByte(buffer, c.SVC_CDTRACK)
-  msg.writeByte(buffer, 0)
-  msg.writeByte(buffer, 0)
+  msg.writeByte(buffer, server.cdTrack)
+  msg.writeByte(buffer, server.cdTrack)
   msg.writeByte(buffer, c.SVC_SETVIEW)
   msg.writeShort(buffer, client.edictIndex)
   msg.writeByte(buffer, c.SVC_SIGNONNUM)
   msg.writeByte(buffer, c.SIGNON_SERVERINFO)
   client.signonStage = c.SIGNON_SERVERINFO
-  return sendBuffer(client, buffer)
+  sent = sendBuffer(client, buffer)
+  if sent == 0 then
+    if client.message.curSize + buffer.curSize > client.message.maxSize then return error(2804, "SV_SendServerinfo: client message overflow") end if
+    sz.write(client.message, buffer.data, 0, buffer.curSize)
+  end if
+  return sent
 end function
 
 function globalSpawnParmOffset(machine, index)
@@ -375,12 +415,100 @@ function acceptLocal(server, socket)
   selected.colors = 0
   selected.command = input.createCommand()
   sz.clear(selected.message)
+  netmain.NET_ConnectionAccepted()
   if server.machine is not void and server.machine.context is not void then
-    executeQcFunction(server, "SetNewParms", selected.edictIndex, 0)
-    copyGlobalsToSpawnParms(server, selected)
+    // A loadgame connection preserves the spawn parms restored from disk.
+    // SV_ConnectClient deliberately skips SetNewParms while sv.loadgame is set.
+    if not server.loadGame then
+      executeQcFunction(server, "SetNewParms", selected.edictIndex, 0)
+      copyGlobalsToSpawnParms(server, selected)
+    end if
   end if
   sendServerInfo(server, selected)
   return selected
+end function
+
+function copyNumberArray(values)
+  result = []
+  for each value in values
+    result = result + [value]
+  end for
+  return result
+end function
+
+function saveSpawnParmsForChange(server)
+  if server.machine is void or server.machine.context is void then return false end if
+  serverFlagsOffset = vm.globalOffset(server.machine, "serverflags")
+  if serverFlagsOffset >= 0 then server.serverFlags = native.trunc(vm.globalFloat(server.machine, serverFlagsOffset)) end if
+  for each clientValue in server.clients
+    if clientValue.active then
+      executeQcFunction(server, "SetChangeParms", clientValue.edictIndex, 0)
+      copyGlobalsToSpawnParms(server, clientValue)
+    end if
+  end for
+  return true
+end function
+
+function preserveClientConnections(server)
+  snapshot = []
+  for each clientValue in server.clients
+    snapshot = snapshot + [[
+      clientValue.active,
+      clientValue.socket,
+      clientValue.name,
+      clientValue.colors,
+      clientValue.privileged,
+      copyNumberArray(clientValue.spawnParms),
+      clientValue.command,
+      copyNumberArray(clientValue.pingTimes),
+      clientValue.numPings,
+      clientValue.oldFrags,
+    ]]
+  end for
+  return snapshot
+end function
+
+function sendReconnect(server)
+  buffer = sz.alloc(128)
+  msg.writeByte(buffer, c.SVC_STUFFTEXT)
+  msg.writeString(buffer, "reconnect\n")
+  return netmain.NET_SendToAll(server.clients, buffer, 5.0)
+end function
+
+function beginChangeLevel(server)
+  saveSpawnParmsForChange(server)
+  snapshot = preserveClientConnections(server)
+  if server.active then sendReconnect(server) end if
+  return snapshot
+end function
+
+function finishChangeLevel(server, snapshot)
+  index = 0
+  restored = 0
+  while index < len(server.clients) and index < len(snapshot)
+    saved = snapshot[index]
+    clientValue = server.clients[index]
+    if saved[0] and saved[1] is not void and not saved[1].disconnected then
+      clientValue.active = true
+      clientValue.spawned = false
+      clientValue.sendSignon = true
+      clientValue.signonStage = 0
+      clientValue.socket = saved[1]
+      clientValue.name = saved[2]
+      clientValue.colors = saved[3]
+      clientValue.privileged = saved[4]
+      clientValue.spawnParms = saved[5]
+      clientValue.command = saved[6]
+      clientValue.pingTimes = saved[7]
+      clientValue.numPings = saved[8]
+      clientValue.oldFrags = saved[9]
+      sz.clear(clientValue.message)
+      sendServerInfo(server, clientValue)
+      restored = restored + 1
+    end if
+    index = index + 1
+  end while
+  return restored
 end function
 
 function writeSignonStage2(server, client)
@@ -412,14 +540,29 @@ function placeClient(server, client, player)
 end function
 
 function writeSpawn(server, client, player)
-  placeClient(server, client, player)
-  if server.machine is not void and server.machine.context is not void then
-    copySpawnParmsToGlobals(server, client)
-    syncPlayerToQuakeC(server, client, player)
-    executeQcFunction(server, "ClientConnect", client.edictIndex, 0)
-    executeQcFunction(server, "PutClientInServer", client.edictIndex, 0)
-    syncPlayerFromQuakeC(server, client, player)
-    syncQuakeCEdicts(server)
+  if server.loadGame then
+    // Host_Spawn_f treats a restored game as fully initialized.  It merely
+    // unpauses and serializes the saved player; entrance QuakeC must not run.
+    server.paused = false
+    if server.machine is not void and server.machine.context is not void then
+      syncPlayerFromQuakeC(server, client, player)
+      syncQuakeCEdicts(server)
+    end if
+  else
+    placeClient(server, client, player)
+    if server.machine is not void and server.machine.context is not void then
+      copySpawnParmsToGlobals(server, client)
+      syncPlayerToQuakeC(server, client, player)
+      executeQcFunction(server, "ClientConnect", client.edictIndex, 0)
+      if client.socket is not void and win.ticks() / 1000.0 - client.socket.connectTime <= server.time then
+        // Host_Spawn_f sends this through Sys_Printf.  Prefix it internally so
+        // the host can preserve Sys_Printf's dedicated-only output contract.
+        server.diagnostics = server.diagnostics + ["SYS_PRINT:" + client.name + " entered the game"]
+      end if
+      executeQcFunction(server, "PutClientInServer", client.edictIndex, 0)
+      syncPlayerFromQuakeC(server, client, player)
+      syncQuakeCEdicts(server)
+    end if
   end if
   buffer = sz.alloc(c.MAX_MSGLEN)
   msg.writeByte(buffer, c.SVC_TIME)
@@ -432,7 +575,10 @@ function writeSpawn(server, client, player)
     if other.active then msg.writeString(buffer, other.name) else msg.writeString(buffer, "") end if
     msg.writeByte(buffer, c.SVC_UPDATEFRAGS)
     msg.writeByte(buffer, index)
-    msg.writeShort(buffer, 0)
+    frags = 0
+    if server.machine is not void then frags = native.trunc(qcFloat(server.machine, other.edictIndex, "frags", 0.0)) end if
+    other.oldFrags = frags
+    msg.writeShort(buffer, frags)
     msg.writeByte(buffer, c.SVC_UPDATECOLORS)
     msg.writeByte(buffer, index)
     msg.writeByte(buffer, other.colors)
@@ -445,12 +591,27 @@ function writeSpawn(server, client, player)
     msg.writeString(buffer, server.lightStyles[index])
     index = index + 1
   end while
+  if server.machine is not void then
+    statNames = ["total_secrets", "total_monsters", "found_secrets", "killed_monsters"]
+    statNumbers = [c.STAT_TOTALSECRETS, c.STAT_TOTALMONSTERS, c.STAT_SECRETS, c.STAT_MONSTERS]
+    index = 0
+    while index < len(statNames)
+      offset = vm.globalOffset(server.machine, statNames[index])
+      value = 0
+      if offset >= 0 then value = native.trunc(vm.globalFloat(server.machine, offset)) end if
+      msg.writeByte(buffer, c.SVC_UPDATESTAT)
+      msg.writeByte(buffer, statNumbers[index])
+      msg.writeLong(buffer, value)
+      index = index + 1
+    end while
+  end if
   msg.writeByte(buffer, c.SVC_SETVIEW)
   msg.writeShort(buffer, client.edictIndex)
   msg.writeByte(buffer, c.SVC_SETANGLE)
   msg.writeAngle(buffer, player.viewAngles.x)
   msg.writeAngle(buffer, player.viewAngles.y)
   msg.writeAngle(buffer, 0.0)
+  writeClientData(buffer, player)
   msg.writeByte(buffer, c.SVC_SIGNONNUM)
   msg.writeByte(buffer, c.SIGNON_SPAWN)
   client.signonStage = c.SIGNON_SPAWN
@@ -466,29 +627,400 @@ function writeBegin(client)
   return sendBuffer(client, buffer)
 end function
 
-function executeStringCommand(server, client, text, player)
-  args = cmd.tokenize(text)
-  if len(args) == 0 then return false end if
-  name = args[0]
-  if name == "prespawn" then return writeSignonStage2(server, client) end if
-  if name == "name" and len(args) >= 2 then client.name = args[1]; return true end if
-  if name == "color" and len(args) >= 2 then
-    top = toNumber(args[1])
-    bottom = top
-    if len(args) >= 3 then bottom = toNumber(args[2]) end if
-    if top is void then top = 0 end if
-    if bottom is void then bottom = 0 end if
-    client.colors = ((native.trunc(top) & 15) << 4) | (native.trunc(bottom) & 15)
-    return true
+function clientPrint(clientValue, text)
+  if clientValue is void or not clientValue.active then return false end if
+  msg.writeByte(clientValue.message, c.SVC_PRINT)
+  msg.writeString(clientValue.message, text)
+  return true
+end function
+
+function commandText(args, first)
+  result = ""
+  index = first
+  while index < len(args)
+    if result != "" then result = result + " " end if
+    result = result + args[index]
+    index = index + 1
+  end while
+  return result
+end function
+
+function truncateBytes(text, maximum)
+  data = bytes(text)
+  if len(data) <= maximum then return text end if
+  if maximum <= 0 then return "" end if
+  return decode(slice(data, 0, maximum))
+end function
+
+function clientFloat(server, clientValue, fieldName, fallback)
+  if server.machine is void then return fallback end if
+  return qcFloat(server.machine, clientValue.edictIndex, fieldName, fallback)
+end function
+
+function setClientFloat(server, clientValue, fieldName, value)
+  if server.machine is void then return false end if
+  return setQcEntityFloat(server, clientValue.edictIndex, fieldName, value)
+end function
+
+function setClientName(server, clientValue, newName)
+  limited = truncateBytes(newName, 15)
+  previous = clientValue.name
+  clientValue.name = limited
+  if server.machine is not void then qcedict.setKeyValue(server.machine, clientValue.edictIndex, "netname", limited) end if
+  if previous != "" and previous != "unconnected" and previous != limited then
+    server.diagnostics = server.diagnostics + [previous + " renamed to " + limited]
   end if
-  if name == "spawn" then return writeSpawn(server, client, player) end if
-  if name == "begin" then return writeBegin(client) end if
-  if name == "disconnect" then client.active = false; client.spawned = false; return true end if
+  msg.writeByte(server.reliableDatagram, c.SVC_UPDATENAME)
+  msg.writeByte(server.reliableDatagram, clientValue.edictIndex - 1)
+  msg.writeString(server.reliableDatagram, limited)
+  return limited
+end function
+
+function colorComponent(value)
+  result = native.trunc(value) & 15
+  if result > 13 then result = 13 end if
+  return result
+end function
+
+function setClientColors(server, clientValue, topValue, bottomValue)
+  top = colorComponent(topValue)
+  bottom = colorComponent(bottomValue)
+  colors = top * 16 + bottom
+  clientValue.colors = colors
+  setClientFloat(server, clientValue, "team", bottom + 1)
+  msg.writeByte(server.reliableDatagram, c.SVC_UPDATECOLORS)
+  msg.writeByte(server.reliableDatagram, clientValue.edictIndex - 1)
+  msg.writeByte(server.reliableDatagram, colors)
+  return colors
+end function
+
+function privilegedCommandAllowed(server, clientValue)
+  return not server.deathmatch or clientValue.privileged
+end function
+
+function Host_Status_f(server, requester)
+  clientPrint(requester, "host:    " + cvar.variableString(server.machine.context.cvars, "hostname") + "\n")
+  clientPrint(requester, "version: " + c.QUAKE_VERSION + "\n")
+  clientPrint(requester, "map:     " + server.mapName + "\n")
+  active = 0
+  for each clientValue in server.clients
+    if clientValue.active then active = active + 1 end if
+  end for
+  clientPrint(requester, "players: " + active + " active (" + server.maxClients + " max)\n\n")
+  now = native.trunc(server.time)
+  index = 0
+  while index < len(server.clients)
+    clientValue = server.clients[index]
+    if clientValue.active then
+      address = "LOCAL"
+      seconds = now
+      if clientValue.socket is not void then
+        if clientValue.socket.transport == "udp" then address = clientValue.socket.address + ":" + clientValue.socket.port end if
+        seconds = native.trunc(server.time - clientValue.socket.connectTime)
+        if seconds < 0 then seconds = 0 end if
+      end if
+      minutes = native.trunc(seconds / 60)
+      seconds = seconds - minutes * 60
+      hours = native.trunc(minutes / 60)
+      minutes = minutes - hours * 60
+      frags = native.trunc(clientFloat(server, clientValue, "frags", 0.0))
+      clientPrint(requester, "#" + (index + 1) + " " + clientValue.name + " " + frags + " " + hours + ":" + minutes + ":" + seconds + "\n")
+      clientPrint(requester, "   " + address + "\n")
+    end if
+    index = index + 1
+  end while
+  return true
+end function
+
+function Host_God_f(server, clientValue)
+  if not privilegedCommandAllowed(server, clientValue) then return false end if
+  flags = native.trunc(clientFloat(server, clientValue, "flags", 0.0)) ^ c.FL_GODMODE
+  setClientFloat(server, clientValue, "flags", flags)
+  if (flags & c.FL_GODMODE) != 0 then clientPrint(clientValue, "godmode ON\n") else clientPrint(clientValue, "godmode OFF\n") end if
+  return true
+end function
+
+function Host_Notarget_f(server, clientValue)
+  if not privilegedCommandAllowed(server, clientValue) then return false end if
+  flags = native.trunc(clientFloat(server, clientValue, "flags", 0.0)) ^ c.FL_NOTARGET
+  setClientFloat(server, clientValue, "flags", flags)
+  if (flags & c.FL_NOTARGET) != 0 then clientPrint(clientValue, "notarget ON\n") else clientPrint(clientValue, "notarget OFF\n") end if
+  return true
+end function
+
+function Host_Noclip_f(server, clientValue)
+  if not privilegedCommandAllowed(server, clientValue) then return false end if
+  moveType = native.trunc(clientFloat(server, clientValue, "movetype", c.MOVETYPE_WALK))
+  if moveType == c.MOVETYPE_NOCLIP then
+    setClientFloat(server, clientValue, "movetype", c.MOVETYPE_WALK)
+    clientPrint(clientValue, "noclip OFF\n")
+  else
+    setClientFloat(server, clientValue, "movetype", c.MOVETYPE_NOCLIP)
+    clientPrint(clientValue, "noclip ON\n")
+  end if
+  return true
+end function
+
+function Host_Fly_f(server, clientValue)
+  if not privilegedCommandAllowed(server, clientValue) then return false end if
+  moveType = native.trunc(clientFloat(server, clientValue, "movetype", c.MOVETYPE_WALK))
+  if moveType == c.MOVETYPE_FLY then
+    setClientFloat(server, clientValue, "movetype", c.MOVETYPE_WALK)
+    clientPrint(clientValue, "flymode OFF\n")
+  else
+    setClientFloat(server, clientValue, "movetype", c.MOVETYPE_FLY)
+    clientPrint(clientValue, "flymode ON\n")
+  end if
+  return true
+end function
+
+function Host_Ping_f(server, requester)
+  clientPrint(requester, "Client ping times:\n")
+  for each clientValue in server.clients
+    if clientValue.active then
+      total = 0.0
+      for each sample in clientValue.pingTimes
+        total = total + sample
+      end for
+      if len(clientValue.pingTimes) > 0 then total = total / len(clientValue.pingTimes) end if
+      clientPrint(requester, native.trunc(total * 1000.0) + " " + clientValue.name + "\n")
+    end if
+  end for
+  return true
+end function
+
+function Host_Name_f(server, clientValue, args)
+  if len(args) < 2 then return clientPrint(clientValue, "\"name\" is \"" + clientValue.name + "\"\n") end if
+  return setClientName(server, clientValue, commandText(args, 1))
+end function
+
+function Host_Say(server, sender, args, teamOnly)
+  if len(args) < 2 then return false end if
+  body = commandText(args, 1)
+  prefixData = bytes(1)
+  prefixData[0] = 1
+  prefix = decode(prefixData) + sender.name + ": "
+  maximum = 62 - len(bytes(prefix))
+  text = prefix + truncateBytes(body, maximum) + "\n"
+  senderTeam = native.trunc(clientFloat(server, sender, "team", 0.0))
+  teamplay = cvar.variableValue(server.machine.context.cvars, "teamplay") != 0.0
+  for each target in server.clients
+    allowed = target.active and target.spawned
+    if allowed and teamOnly and teamplay then
+      allowed = native.trunc(clientFloat(server, target, "team", 0.0)) == senderTeam
+    end if
+    if allowed then clientPrint(target, text) end if
+  end for
+  server.diagnostics = server.diagnostics + [decode(slice(bytes(text), 1, len(bytes(text)) - 1))]
+  return true
+end function
+
+function Host_Say_f(server, sender, args)
+  return Host_Say(server, sender, args, false)
+end function
+
+function Host_Say_Team_f(server, sender, args)
+  return Host_Say(server, sender, args, true)
+end function
+
+function Host_Tell_f(server, sender, args)
+  if len(args) < 3 then return false end if
+  targetName = args[1]
+  // host_cmd.c uses Cmd_Args here (the complete text after "tell"), so the
+  // target token is intentionally repeated in the private message body.
+  body = commandText(args, 1)
+  prefix = sender.name + ": "
+  text = prefix + truncateBytes(body, 62 - len(bytes(prefix))) + "\n"
+  for each target in server.clients
+    if target.active and target.spawned and bio.equalInsensitive(target.name, targetName) then
+      clientPrint(target, text)
+      return true
+    end if
+  end for
   return false
 end function
 
-function readMove(reader, client)
+function Host_Color_f(server, clientValue, args)
+  if len(args) < 2 then
+    clientPrint(clientValue, "\"color\" is \"" + (clientValue.colors >> 4) + " " + (clientValue.colors & 15) + "\"\n")
+    clientPrint(clientValue, "color <0-13> [0-13]\n")
+    return true
+  end if
+  top = toNumber(args[1])
+  if top is void then top = 0 end if
+  bottom = top
+  if len(args) >= 3 then bottom = toNumber(args[2]); if bottom is void then bottom = 0 end if end if
+  setClientColors(server, clientValue, top, bottom)
+  return true
+end function
+
+function Host_Kill_f(server, clientValue)
+  if clientFloat(server, clientValue, "health", 0.0) <= 0.0 then
+    clientPrint(clientValue, "Can't suicide -- allready dead!\n")
+    return false
+  end if
+  executeQcFunction(server, "ClientKill", clientValue.edictIndex, 0)
+  return true
+end function
+
+function Host_Pause_f(server, clientValue)
+  if cvar.variableValue(server.machine.context.cvars, "pausable") == 0.0 then
+    clientPrint(clientValue, "Pause not allowed.\n")
+    return false
+  end if
+  server.paused = not server.paused
+  action = "unpaused"
+  if server.paused then action = "paused" end if
+  broadcastPrint(server, clientValue.name + " " + action + " the game\n")
+  msg.writeByte(server.reliableDatagram, c.SVC_SETPAUSE)
+  if server.paused then msg.writeByte(server.reliableDatagram, 1) else msg.writeByte(server.reliableDatagram, 0) end if
+  return true
+end function
+
+function Host_PreSpawn_f(server, clientValue)
+  if clientValue.spawned then return clientPrint(clientValue, "prespawn not valid -- allready spawned\n") end if
+  return writeSignonStage2(server, clientValue)
+end function
+
+function Host_Spawn_f(server, clientValue, player)
+  if clientValue.spawned then return clientPrint(clientValue, "Spawn not valid -- allready spawned\n") end if
+  return writeSpawn(server, clientValue, player)
+end function
+
+function Host_Begin_f(clientValue)
+  return writeBegin(clientValue)
+end function
+
+function Host_Kick_f(server, sourceClient, args)
+  if len(args) < 2 then return false end if
+  if sourceClient is not void and server.deathmatch and not sourceClient.privileged then return false end if
+  targetIndex = -1
+  messageStart = 2
+  if len(args) > 2 and args[1] == "#" then
+    number = toNumber(args[2])
+    if number is not void then targetIndex = native.trunc(number) - 1 end if
+    messageStart = 3
+  else
+    index = 0
+    while index < len(server.clients)
+      if server.clients[index].active and bio.equalInsensitive(server.clients[index].name, args[1]) then targetIndex = index; break end if
+      index = index + 1
+    end while
+  end if
+  if targetIndex < 0 or targetIndex >= len(server.clients) then return false end if
+  target = server.clients[targetIndex]
+  if not target.active then return false end if
+  if sourceClient is not void and target.edictIndex == sourceClient.edictIndex then return false end if
+  who = "Console"
+  if sourceClient is not void then who = sourceClient.name end if
+  reason = commandText(args, messageStart)
+  if reason == "" then clientPrint(target, "Kicked by " + who + "\n") else clientPrint(target, "Kicked by " + who + ": " + reason + "\n") end if
+  dropClient(server, target, false)
+  return true
+end function
+
+function setGiveField(server, clientValue, name, value)
+  if server.machine is void then return false end if
+  return qcedict.setKeyValue(server.machine, clientValue.edictIndex, name, "" + value)
+end function
+
+function Host_Give_f(server, clientValue, args)
+  if len(args) < 3 or not privilegedCommandAllowed(server, clientValue) then return false end if
+  token = args[1]
+  if token == "" then return false end if
+  value = toNumber(args[2])
+  if value is void then value = 0 end if
+  first = bytes(token)[0]
+  if first >= 48 and first <= 57 then
+    items = native.trunc(clientFloat(server, clientValue, "items", 0.0))
+    if server.machine.context.filesystem.gameDirectory == "hipnotic" then
+      if first == 54 and len(bytes(token)) > 1 and bytes(token)[1] == 97 then items = items | c.HIT_PROXIMITY_GUN
+      else if first == 54 then items = items | c.IT_GRENADE_LAUNCHER
+      else if first == 57 then items = items | c.HIT_LASER_CANNON
+      else if first == 48 then items = items | c.HIT_MJOLNIR
+      else if first >= 50 then items = items | (c.IT_SHOTGUN << (first - 50))
+      end if
+    else if first >= 50 then
+      items = items | (c.IT_SHOTGUN << (first - 50))
+    end if
+    setClientFloat(server, clientValue, "items", items)
+    return true
+  end if
+  rogue = server.machine.context.filesystem.gameDirectory == "rogue"
+  if first == 115 then
+    if rogue then setGiveField(server, clientValue, "ammo_shells1", value) end if
+    setClientFloat(server, clientValue, "ammo_shells", value)
+  else if first == 110 then
+    if rogue then
+      setGiveField(server, clientValue, "ammo_nails1", value)
+      if clientFloat(server, clientValue, "weapon", 0.0) <= c.IT_LIGHTNING then setClientFloat(server, clientValue, "ammo_nails", value) end if
+    else
+      setClientFloat(server, clientValue, "ammo_nails", value)
+    end if
+  else if first == 108 and rogue then
+    setGiveField(server, clientValue, "ammo_lava_nails", value)
+    if clientFloat(server, clientValue, "weapon", 0.0) > c.IT_LIGHTNING then setClientFloat(server, clientValue, "ammo_nails", value) end if
+  else if first == 114 then
+    if rogue then
+      setGiveField(server, clientValue, "ammo_rockets1", value)
+      if clientFloat(server, clientValue, "weapon", 0.0) <= c.IT_LIGHTNING then setClientFloat(server, clientValue, "ammo_rockets", value) end if
+    else
+      setClientFloat(server, clientValue, "ammo_rockets", value)
+    end if
+  else if first == 109 and rogue then
+    setGiveField(server, clientValue, "ammo_multi_rockets", value)
+    if clientFloat(server, clientValue, "weapon", 0.0) > c.IT_LIGHTNING then setClientFloat(server, clientValue, "ammo_rockets", value) end if
+  else if first == 104 then setClientFloat(server, clientValue, "health", value)
+  else if first == 99 then
+    if rogue then
+      setGiveField(server, clientValue, "ammo_cells1", value)
+      if clientFloat(server, clientValue, "weapon", 0.0) <= c.IT_LIGHTNING then setClientFloat(server, clientValue, "ammo_cells", value) end if
+    else
+      setClientFloat(server, clientValue, "ammo_cells", value)
+    end if
+  else if first == 112 and rogue then
+    setGiveField(server, clientValue, "ammo_plasma", value)
+    if clientFloat(server, clientValue, "weapon", 0.0) > c.IT_LIGHTNING then setClientFloat(server, clientValue, "ammo_cells", value) end if
+  else
+    return false
+  end if
+  return true
+end function
+
+function executeStringCommand(server, client, text, player)
+  args = cmd.tokenize(text)
+  if len(args) == 0 then return false end if
+  name = bio.lower(args[0])
+  if name == "prespawn" then return Host_PreSpawn_f(server, client) end if
+  if name == "name" then return Host_Name_f(server, client, args) end if
+  if name == "color" then return Host_Color_f(server, client, args) end if
+  if name == "spawn" then return Host_Spawn_f(server, client, player) end if
+  if name == "begin" then return Host_Begin_f(client) end if
+  if name == "status" then return Host_Status_f(server, client) end if
+  if name == "god" then return Host_God_f(server, client) end if
+  if name == "notarget" then return Host_Notarget_f(server, client) end if
+  if name == "noclip" then return Host_Noclip_f(server, client) end if
+  if name == "fly" then return Host_Fly_f(server, client) end if
+  if name == "ping" then return Host_Ping_f(server, client) end if
+  if name == "say" then return Host_Say_f(server, client, args) end if
+  if name == "say_team" then return Host_Say_Team_f(server, client, args) end if
+  if name == "tell" then return Host_Tell_f(server, client, args) end if
+  if name == "kill" then return Host_Kill_f(server, client) end if
+  if name == "pause" then return Host_Pause_f(server, client) end if
+  if name == "kick" then return Host_Kick_f(server, client, args) end if
+  if name == "give" then return Host_Give_f(server, client, args) end if
+  if name == "disconnect" then return dropClient(server, client, false) end if
+  return false
+end function
+
+function readMove(server, reader, client)
   clientTime = msg.readFloat(reader)
+  ping = server.time - clientTime
+  if ping < 0.0 then ping = 0.0 end if
+  if len(client.pingTimes) > 0 then
+    client.pingTimes[client.numPings % len(client.pingTimes)] = ping
+    client.numPings = client.numPings + 1
+  end if
   client.command.viewAngles = t.Vec3(msg.readAngle(reader), msg.readAngle(reader), msg.readAngle(reader))
   client.command.forwardMove = msg.readShort(reader)
   client.command.sideMove = msg.readShort(reader)
@@ -499,6 +1031,60 @@ function readMove(reader, client)
   return clientTime
 end function
 
+function dropClient(server, client, crashed)
+  if not crashed and client.active and client.spawned and server.machine is not void then
+    executeQcFunction(server, "ClientDisconnect", client.edictIndex, 0)
+  end if
+  wasConnected = client.active and client.socket is not void
+  if client.socket is not void then
+    if not crashed then
+      buffer = sz.alloc(8)
+      msg.writeByte(buffer, c.SVC_DISCONNECT)
+      netmain.NET_SendUnreliableMessage(client.socket, buffer)
+    end if
+    netmain.NET_Close(client.socket)
+  end if
+  client.socket = void
+  client.active = false
+  client.spawned = false
+  client.sendSignon = false
+  client.signonStage = 0
+  client.name = ""
+  client.oldFrags = -999999
+  sz.clear(client.message)
+  scoreIndex = client.edictIndex - 1
+  if scoreIndex >= 0 and scoreIndex < server.maxClients then
+    // host.c appends the removal update directly to every remaining active
+    // client's reliable message, after the dropped client is marked inactive.
+    for each peer in server.clients
+      if peer.active then
+        msg.writeByte(peer.message, c.SVC_UPDATENAME)
+        msg.writeByte(peer.message, scoreIndex)
+        msg.writeString(peer.message, "")
+        msg.writeByte(peer.message, c.SVC_UPDATEFRAGS)
+        msg.writeByte(peer.message, scoreIndex)
+        msg.writeShort(peer.message, 0)
+        msg.writeByte(peer.message, c.SVC_UPDATECOLORS)
+        msg.writeByte(peer.message, scoreIndex)
+        msg.writeByte(peer.message, 0)
+      end if
+    end for
+  end if
+  if wasConnected then netmain.NET_ConnectionClosed() end if
+  return true
+end function
+
+function dropTimedOutClients(server, timeoutSeconds)
+  dropped = 0
+  for each client in server.clients
+    if client.active and netmain.NET_SocketTimedOut(client.socket, timeoutSeconds) then
+      dropClient(server, client, true)
+      dropped = dropped + 1
+    end if
+  end for
+  return dropped
+end function
+
 function readClientMessage(server, client, data, player)
   reader = msg.beginReadingBytes(data)
   while msg.remaining(reader) > 0
@@ -506,11 +1092,10 @@ function readClientMessage(server, client, data, player)
     if command == c.CLC_NOP then
       continue
     else if command == c.CLC_DISCONNECT then
-      client.active = false
-      client.spawned = false
+      dropClient(server, client, false)
       return false
     else if command == c.CLC_MOVE then
-      readMove(reader, client)
+      readMove(server, reader, client)
     else if command == c.CLC_STRINGCMD then
       executeStringCommand(server, client, msg.readString(reader), player)
     else
@@ -525,11 +1110,16 @@ function pumpClientMessages(server, player)
   processed = 0
   for each client in server.clients
     if client.active and client.socket is not void then
-      messageType = netloop.getMessage(client.socket, destination)
+      messageType = netmain.NET_GetMessage(client.socket, destination, netmain.net_messagetimeout)
+      if messageType < 0 then
+        dropClient(server, client, true)
+        continue
+      end if
       while messageType > 0
         readClientMessage(server, client, sz.dataSlice(destination), player)
         processed = processed + 1
-        messageType = netloop.getMessage(client.socket, destination)
+        messageType = netmain.NET_GetMessage(client.socket, destination, netmain.net_messagetimeout)
+        if messageType < 0 then dropClient(server, client, true); break end if
       end while
     end if
   end for
@@ -695,7 +1285,7 @@ function sendClientFrame(server, client, player)
     index = index + 1
   end while
   appendDatagram(buffer, server.datagram)
-  return netloop.sendUnreliableMessage(client.socket, buffer)
+  return netmain.NET_SendUnreliableMessage(client.socket, buffer)
 end function
 
 function qcEntityVector(server, entityIndex, name)
@@ -744,10 +1334,10 @@ function runEntityThink(server, entityIndex, frameTime)
   machine = server.machine
   nextThink = qcFloat(machine, entityIndex, "nextthink", 0.0)
   if nextThink <= 0.0 or nextThink > server.time + frameTime then return true end if
-  thinkFunction = qcWord(machine, entityIndex, "think", 0)
-  if thinkFunction == 0 then return true end if
   if nextThink < server.time then nextThink = server.time end if
   setQcEntityFloat(server, entityIndex, "nextthink", 0.0)
+  thinkFunction = qcWord(machine, entityIndex, "think", 0)
+  if thinkFunction == 0 then return error(2810, "PR_ExecuteProgram: NULL function") end if
   vm.setGlobalFloat(machine, c.QC_GLOBAL_TIME, nextThink)
   vm.setWord(machine, c.QC_GLOBAL_SELF, entityIndex)
   vm.setWord(machine, c.QC_GLOBAL_OTHER, 0)
@@ -757,8 +1347,8 @@ end function
 
 function executePusherThink(server, pusherIndex)
   thinkFunction = qcWord(server.machine, pusherIndex, "think", 0)
-  if thinkFunction == 0 then return true end if
   setQcEntityFloat(server, pusherIndex, "nextthink", 0.0)
+  if thinkFunction == 0 then return error(2810, "PR_ExecuteProgram: NULL function") end if
   vm.setGlobalFloat(server.machine, c.QC_GLOBAL_TIME, server.time)
   vm.setWord(server.machine, c.QC_GLOBAL_SELF, pusherIndex)
   vm.setWord(server.machine, c.QC_GLOBAL_OTHER, 0)
@@ -791,7 +1381,6 @@ function movePusher(server, pusherIndex, moveTime)
 
   movedIndexes = arrayutil.createArrayBuilder(16)
   movedOrigins = arrayutil.createArrayBuilder(16)
-  movedFlags = arrayutil.createArrayBuilder(16)
   blockedBy = -1
   runtime = server.machine.context.edicts
   index = 1
@@ -819,7 +1408,6 @@ function movePusher(server, pusherIndex, moveTime)
           origin = qcEntityVector(server, index, "origin")
           arrayutil.pushArrayBuilder(movedIndexes, index)
           arrayutil.pushArrayBuilder(movedOrigins, origin)
-          arrayutil.pushArrayBuilder(movedFlags, flags)
           if moveType != c.MOVETYPE_WALK then
             flags = flags & ~c.FL_ONGROUND
             setQcEntityFloat(server, index, "flags", flags)
@@ -858,14 +1446,16 @@ function movePusher(server, pusherIndex, moveTime)
     setQcEntityFloat(server, pusherIndex, "ltime", oldLtime)
     indexes = arrayutil.finishArrayBuilder(movedIndexes)
     origins = arrayutil.finishArrayBuilder(movedOrigins)
-    flagsValues = arrayutil.finishArrayBuilder(movedFlags)
+    // In sv_phys.c the blocked callback runs while previously carried
+    // entities are still at their pushed locations. The rollback follows the
+    // callback, and only origins are restored (the cleared onground flag is
+    // deliberately not restored).
+    runQcBlocked(server, pusherIndex, blockedBy)
     rollback = 0
     while rollback < len(indexes)
       setQcEntityVector(server, indexes[rollback], "origin", origins[rollback])
-      setQcEntityFloat(server, indexes[rollback], "flags", flagsValues[rollback])
       rollback = rollback + 1
     end while
-    runQcBlocked(server, pusherIndex, blockedBy)
     return false
   end if
   return true
@@ -1080,7 +1670,41 @@ function flushQuakeCEvents(server)
   return written
 end function
 
+function broadcastPrint(server, text)
+  written = 0
+  for each clientValue in server.clients
+    if clientValue.active and clientValue.spawned then
+      msg.writeByte(clientValue.message, c.SVC_PRINT)
+      msg.writeString(clientValue.message, text)
+      written = written + 1
+    end if
+  end for
+  return written
+end function
+
+function updateReliableClientState(server)
+  if server.machine is void then return 0 end if
+  changed = 0
+  index = 0
+  while index < len(server.clients)
+    clientValue = server.clients[index]
+    if clientValue.active then
+      frags = native.trunc(qcFloat(server.machine, clientValue.edictIndex, "frags", 0.0))
+      if frags != clientValue.oldFrags then
+        clientValue.oldFrags = frags
+        msg.writeByte(server.reliableDatagram, c.SVC_UPDATEFRAGS)
+        msg.writeByte(server.reliableDatagram, index)
+        msg.writeShort(server.reliableDatagram, frags)
+        changed = changed + 1
+      end if
+    end if
+    index = index + 1
+  end while
+  return changed
+end function
+
 function sendReliableMessages(server)
+  updateReliableClientState(server)
   sent = 0
   for each clientValue in server.clients
     if clientValue.active and clientValue.socket is not void then
@@ -1096,10 +1720,11 @@ function sendReliableMessages(server)
   return sent
 end function
 
-function frame(server, player, frameTime, registry)
-  if not server.active or server.paused then return false end if
+function frameMode(server, player, frameTime, registry, simulate)
+  if not server.active then return false end if
   pumpClientMessages(server, player)
 
+  if simulate then
   // SV_Physics ordering: StartFrame, client edicts in numerical order, then
   // every remaining entity. This matters for pushers: a door/platform moves
   // after the player and carries anything standing on it during that frame.
@@ -1152,6 +1777,7 @@ function frame(server, player, frameTime, registry)
     syncQuakeCEdicts(server)
     flushQuakeCEvents(server)
   end if
+  end if
   sendReliableMessages(server)
   for each clientValue in server.clients
     sendClientFrame(server, clientValue, player)
@@ -1160,9 +1786,15 @@ function frame(server, player, frameTime, registry)
   return true
 end function
 
+function frame(server, player, frameTime, registry)
+  return frameMode(server, player, frameTime, registry, not server.paused)
+end function
+
 function shutdown(server)
   for each client in server.clients
-    if client.socket is not void then netloop.close(client.socket) end if
+    wasConnected = client.active and client.socket is not void
+    if client.socket is not void then netmain.NET_Close(client.socket) end if
+    if wasConnected then netmain.NET_ConnectionClosed() end if
     client.active = false
     client.spawned = false
   end for
@@ -1237,12 +1869,15 @@ function createQuakeCContext(server, filesystem, registry, commandSystem, runtim
     [],
     [],
     server.time,
-    1,
+    server.randomSeed,
     "",
     0,
     server,
     clientMessageBuffers(server),
     clientSpawnParmBuffers(server),
+    0,
+    0.0,
+    bytes(),
   )
 end function
 
@@ -1351,7 +1986,15 @@ function syncQuakeCEdicts(server)
 end function
 
 function spawnRuntime(server, filesystem, mapName, skill, registry, commandSystem)
+  // The C runtime owns one process-global rand() stream.  Preserve its latest
+  // value across SV_SpawnServer even though the MiniLang QC context is rebuilt.
+  if server.machine is not void and server.machine.context is not void then
+    server.randomSeed = server.machine.context.randomSeed
+  end if
   spawn(server, filesystem, mapName, skill)
+  // spawn() prepares the BSP/progs shell, but Quake keeps sv.state at
+  // ss_loading through ED_LoadFromFile, the two settle frames and baselines.
+  server.loading = true
   // The QuakeC spawn builtins append static entities and ambient sounds to the
   // signon stream. Discard the provisional non-QC baseline before ED_LoadFromFile.
   sz.clear(server.signon)
@@ -1402,6 +2045,8 @@ function spawnRuntime(server, filesystem, mapName, skill, registry, commandSyste
     "QuakeC functions=" + len(server.progs.functions) + " edicts=" + server.numEdicts,
     "signon bytes=" + server.signon.curSize + " compatibility statics=" + staticResult[0] + "/" + staticResult[1],
   ]
+  server.randomSeed = contextValue.randomSeed
+  server.loading = false
   return server
 end function
 

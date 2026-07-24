@@ -1,0 +1,16 @@
+diff --git a/WinQuake/gl_warp.c b/WinQuake/gl_warp.c
+index b052d01..0219165 100644
+--- a/WinQuake/gl_warp.c
++++ b/WinQuake/gl_warp.c
+@@ -19,7 +19,11 @@ See the GNU General Public License for more details.
+ */
+ // gl_warp.c -- sky and water polygons
+ 
++#ifdef MINIQUAKE_RENDERER_WARP_TRACE_FIXTURE
++#include "mq_gl_warp_fixture.h"
++#else
+ #include "quakedef.h"
++#endif
+ 
+ extern	model_t	*loadmodel;
+ 

@@ -1,0 +1,189 @@
+{
+  "schema": "miniquake.semantic-port-review.v1",
+  "unit": "sys_win",
+  "reference_commit": "bf4ac424ce754894ac8f1dae6a3981954bc9852d",
+  "reviewer": "platform_bridge_parity",
+  "original_files": [
+    "sys.h",
+    "sys_win.c",
+    "sys_wina.s",
+    "winquake.h"
+  ],
+  "minilang_modules": [
+    "src/miniquake/sys_win.ml",
+    "src/miniquake/host.ml",
+    "src/miniquake/platform/win32.ml",
+    "src/miniquake/native.ml"
+  ],
+  "original_sha256": {
+    "sys.h": "4a6ac7f17fd3080b6dd8f508c20f3d8c23d74cbf689d4962acf94596d6cb2e60",
+    "sys_win.c": "ee307d57db1518fac09b41b3652b713e989a1b76aad418aaf2a5c7f814d31ceb",
+    "sys_wina.s": "ee75d022fa41931776f9301a62685093fa39859a4c7682c194eca4f7fe906cfa",
+    "winquake.h": "0ca8eef3648b808162f3f577f6680b79f275c75aa50be1c46e1bae5a77c96f60"
+  },
+  "minilang_sha256": {
+    "src/miniquake/sys_win.ml": "f949b25ac5ae0743bdcce6a0b1aa671233d23ea3b33bf66a5a8a9b4351d212ef",
+    "src/miniquake/host.ml": "531c3d7d039fb80c91ada52e9af7d8cdc0eeb5e6e94bb975491b3154f6da6b85",
+    "src/miniquake/platform/win32.ml": "a58e4522c687dd8ad15c4a89d1af404970c61c5e8d8e143e9abf908c9f2bdac7",
+    "src/miniquake/native.ml": "b21f0c591373c3fec6188f34f3b0dea7b260d9fbfc21d242a993e99c1fd97088"
+  },
+  "function_review_scope": "all-target-functions",
+  "features": [
+    {
+      "name": "memory page-in and fixed ten-slot file-handle API",
+      "status": "documented-platform-bridge",
+      "original": [
+        "sys_win.c:68",
+        "sys_win.c:100",
+        "sys_win.c:116",
+        "sys_win.c:134",
+        "sys_win.c:163",
+        "sys_win.c:183",
+        "sys_win.c:193",
+        "sys_win.c:202",
+        "sys_win.c:212",
+        "sys_win.c:222",
+        "sys_win.c:245"
+      ],
+      "minilang": [
+        "src/miniquake/sys_win.ml:153",
+        "src/miniquake/sys_win.ml:172",
+        "src/miniquake/sys_win.ml:187",
+        "src/miniquake/sys_win.ml:198",
+        "src/miniquake/sys_win.ml:216",
+        "src/miniquake/sys_win.ml:234",
+        "src/miniquake/sys_win.ml:242",
+        "src/miniquake/sys_win.ml:249",
+        "src/miniquake/sys_win.ml:259",
+        "src/miniquake/sys_win.ml:269",
+        "src/miniquake/sys_win.ml:274"
+      ],
+      "evidence": [
+        "py -3 tools/sys_win_differential.py",
+        "tests/sys_win_parity_tests.ml"
+      ]
+    },
+    {
+      "name": "writable-code protection and floating-point control hooks",
+      "status": "documented-platform-bridge",
+      "original": [
+        "sys_win.c:264",
+        "sys_win.c:275",
+        "sys_win.c:279",
+        "sys_win.c:283",
+        "sys_win.c:287",
+        "sys_wina.s:38",
+        "sys_wina.s:80",
+        "sys_wina.s:87",
+        "sys_wina.s:93"
+      ],
+      "minilang": [
+        "src/miniquake/sys_win.ml:279",
+        "src/miniquake/sys_win.ml:290",
+        "src/miniquake/sys_win.ml:294",
+        "src/miniquake/sys_win.ml:298",
+        "src/miniquake/sys_win.ml:302",
+        "src/miniquake/native.ml:66"
+      ],
+      "evidence": [
+        "py -3 tools/sys_win_differential.py",
+        "tests/sys_win_parity_tests.ml",
+        "native/miniquake_native.c"
+      ]
+    },
+    {
+      "name": "high-resolution timer reduction, backward-counter handling, wrap, and start time",
+      "status": "parity",
+      "original": [
+        "sys_win.c:298",
+        "sys_win.c:467",
+        "sys_win.c:534"
+      ],
+      "minilang": [
+        "src/miniquake/sys_win.ml:349",
+        "src/miniquake/sys_win.ml:398",
+        "src/miniquake/sys_win.ml:429"
+      ],
+      "evidence": [
+        "py -3 tools/sys_win_differential.py",
+        "tests/sys_win_parity_tests.ml"
+      ]
+    },
+    {
+      "name": "fatal error, dedicated output, quit, and host shutdown lifecycle",
+      "status": "documented-platform-bridge",
+      "original": [
+        "sys_win.c:346",
+        "sys_win.c:426",
+        "sys_win.c:442"
+      ],
+      "minilang": [
+        "src/miniquake/sys_win.ml:371",
+        "src/miniquake/sys_win.ml:383",
+        "src/miniquake/sys_win.ml:390",
+        "src/miniquake/host.ml:2693"
+      ],
+      "evidence": [
+        "py -3 tools/sys_win_differential.py",
+        "tests/sys_win_parity_tests.ml",
+        "src/miniquake/host.ml:2728"
+      ]
+    },
+    {
+      "name": "dedicated console editing, QHOST polling, sleep, and Win32 message pump",
+      "status": "documented-platform-bridge",
+      "original": [
+        "sys_win.c:555",
+        "sys_win.c:635",
+        "sys_win.c:641",
+        "sys_win.c:673"
+      ],
+      "minilang": [
+        "src/miniquake/sys_win.ml:467",
+        "src/miniquake/sys_win.ml:505",
+        "src/miniquake/sys_win.ml:512",
+        "src/miniquake/sys_win.ml:524",
+        "src/miniquake/platform/win32.ml:15",
+        "src/miniquake/platform/win32.ml:204"
+      ],
+      "evidence": [
+        "py -3 tools/sys_win_differential.py",
+        "tests/sys_win_parity_tests.ml:testConsoleInput",
+        "tests/sys_win_parity_tests.ml:testQHostPolling",
+        "native/miniquake_native.c"
+      ]
+    },
+    {
+      "name": "WinMain arguments, memory policy, dedicated setup, timing, and host frame loop",
+      "status": "documented-platform-bridge",
+      "original": [
+        "sys_win.c:692"
+      ],
+      "minilang": [
+        "src/miniquake/sys_win.ml:532",
+        "src/miniquake/sys_win.ml:550",
+        "src/miniquake/sys_win.ml:572",
+        "src/miniquake/host.ml:2728",
+        "src/miniquake/host.ml:2738",
+        "src/miniquake/host.ml:2752",
+        "src/miniquake/host.ml:2764",
+        "src/miniquake/host.ml:2794"
+      ],
+      "evidence": [
+        "py -3 tools/sys_win_differential.py",
+        "tests/sys_win_parity_tests.ml:testCommandLineAndWinMain",
+        "src/miniquake/host.ml:2728"
+      ]
+    }
+  ],
+  "commands": [
+    "py -3 tools/sys_win_differential.py",
+    "build/platform_parity/sys_win_parity_tests.exe"
+  ],
+  "open_findings": [],
+  "limitations": [
+    "The 32-bit x87 control-word assembly is a no-op on the x64/SSE build; the compiler and native bridge use precise floating-point mode instead.",
+    "Sys_Error returns a fatal MiniLang error for the outer host lifecycle to shut down instead of owning a recursive MessageBox/60-second console wait and calling exit directly.",
+    "The original WinMain body is split between sys_win.WinMain and host.run so the host loop remains MiniLang-owned; the pinned differential and focused tests cover the system policy, while process-level shutdown remains a separate host gate."
+  ]
+}

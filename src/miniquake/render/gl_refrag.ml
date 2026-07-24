@@ -1,0 +1,190 @@
+package miniquake.render.gl_refrag
+
+import miniquake.constants as c
+import miniquake.mathlib as math
+import miniquake.render.entities as entities
+import miniquake.array_util as arrayutil
+import miniquake.types as t
+
+// Direct MiniLang pendant of WinQuake/gl_refrag.c. Native pointer-linked
+// efrags are represented by shared EfragRef objects in per-entity/per-leaf
+// arrays; insertion, removal, BSP splitting and visible-entity de-duplication
+// retain the original behavior.
+
+struct EfragRef
+  entity
+  leafIndex
+end struct
+
+refragLeafs = []
+refragNodes = []
+refragPlanes = []
+refragBspModels = []
+refragModels = []
+refragEntities = []
+refragLeafEfrags = []
+refragEntityEfrags = []
+r_pefragtopnode = void
+r_addent = void
+r_emins = void
+r_emaxs = void
+cl_visedicts = []
+cl_numvisedicts = 0
+
+function Configure(renderer, entityRenderer, entityStates)
+  global refragLeafs, refragNodes, refragPlanes, refragBspModels
+  global refragModels, refragEntities, refragLeafEfrags, refragEntityEfrags
+  global r_pefragtopnode, r_addent, cl_visedicts, cl_numvisedicts
+  refragLeafs = renderer.map.leafs
+  refragNodes = renderer.map.nodes
+  refragPlanes = renderer.map.planes
+  refragBspModels = renderer.map.models
+  refragModels = entityRenderer.models
+  refragEntities = entityStates
+  refragLeafEfrags = arrayutil.makeEmptyArray(len(refragLeafs))
+  index = 0
+  while index < len(refragLeafEfrags)
+    refragLeafEfrags[index] = []
+    index = index + 1
+  end while
+  refragEntityEfrags = arrayutil.makeEmptyArray(len(refragEntities))
+  index = 0
+  while index < len(refragEntityEfrags)
+    refragEntityEfrags[index] = []
+    index = index + 1
+  end while
+  r_pefragtopnode = void
+  r_addent = void
+  cl_visedicts = []
+  cl_numvisedicts = 0
+  return true
+end function
+
+function R_RemoveEfrags(ent)
+  global refragLeafEfrags, refragEntityEfrags
+  if ent is void or ent.number < 0 or ent.number >= len(refragEntityEfrags) then return false end if
+  for each reference in refragEntityEfrags[ent.number]
+    leafIndex = reference.leafIndex
+    if leafIndex >= 0 and leafIndex < len(refragLeafEfrags) then
+      source = refragLeafEfrags[leafIndex]
+      builder = arrayutil.createArrayBuilder(len(source))
+      for each candidate in source
+        if candidate != reference then arrayutil.pushArrayBuilder(builder, candidate) end if
+      end for
+      refragLeafEfrags[leafIndex] = arrayutil.finishArrayBuilder(builder)
+    end if
+  end for
+  refragEntityEfrags[ent.number] = []
+  return true
+end function
+
+function appendEfrag(leafIndex)
+  global refragLeafEfrags, refragEntityEfrags, r_pefragtopnode
+  if r_addent is void or leafIndex < 0 or leafIndex >= len(refragLeafEfrags) then return false end if
+  reference = EfragRef(r_addent, leafIndex)
+  // Original leaf links are head-inserted while entity links retain traversal
+  // order. Shared objects preserve both views without native pointers.
+  refragLeafEfrags[leafIndex] = [reference] + refragLeafEfrags[leafIndex]
+  if r_addent.number >= 0 and r_addent.number < len(refragEntityEfrags) then
+    refragEntityEfrags[r_addent.number] = refragEntityEfrags[r_addent.number] + [reference]
+  end if
+  if r_pefragtopnode is void then r_pefragtopnode = -1 - leafIndex end if
+  return true
+end function
+
+function R_SplitEntityOnNode(nodeNumber)
+  global r_pefragtopnode
+  if r_addent is void then return 0 end if
+  if nodeNumber < 0 then
+    leafIndex = -1 - nodeNumber
+    if leafIndex < 0 or leafIndex >= len(refragLeafs) then return 0 end if
+    if refragLeafs[leafIndex].contents == c.CONTENTS_SOLID then return 0 end if
+    if appendEfrag(leafIndex) then return 1 end if
+    return 0
+  end if
+  if nodeNumber >= len(refragNodes) then return 0 end if
+  node = refragNodes[nodeNumber]
+  if node.planeIndex < 0 or node.planeIndex >= len(refragPlanes) then return 0 end if
+  sides = math.boxOnPlaneSide(r_emins, r_emaxs, refragPlanes[node.planeIndex])
+  if sides == 3 and r_pefragtopnode is void then r_pefragtopnode = nodeNumber end if
+  count = 0
+  if (sides & 1) != 0 then count = count + R_SplitEntityOnNode(node.child0) end if
+  if (sides & 2) != 0 then count = count + R_SplitEntityOnNode(node.child1) end if
+  return count
+end function
+
+function modelBounds(ent)
+  if ent.modelIndex <= 0 or ent.modelIndex >= len(refragModels) then return void end if
+  model = refragModels[ent.modelIndex]
+  if model.kind == entities.MODEL_BRUSH then
+    submodelIndex = entities.brushModelIndex(model.name)
+    if submodelIndex <= 0 or submodelIndex >= len(refragBspModels) then return void end if
+    submodel = refragBspModels[submodelIndex]
+    return [math.add(ent.origin, submodel.mins), math.add(ent.origin, submodel.maxs)]
+  end if
+  radius = 0.0
+  if model.kind == entities.MODEL_ALIAS and model.aliasModel is not void then radius = model.aliasModel.boundingRadius end if
+  if model.kind == entities.MODEL_SPRITE and model.spriteModel is not void then radius = model.spriteModel.boundingRadius end if
+  if radius <= 0.0 then radius = 16.0 end if
+  extent = t.Vec3(radius, radius, radius)
+  return [math.subtract(ent.origin, extent), math.add(ent.origin, extent)]
+end function
+
+function R_AddEfrags(ent)
+  global r_addent, r_emins, r_emaxs, r_pefragtopnode
+  if ent is void or len(refragBspModels) == 0 then return 0 end if
+  bounds = modelBounds(ent)
+  if bounds is void then return 0 end if
+  r_addent = ent
+  r_emins = bounds[0]
+  r_emaxs = bounds[1]
+  r_pefragtopnode = void
+  root = refragBspModels[0].headNodes[0]
+  count = R_SplitEntityOnNode(root)
+  r_addent = void
+  return count
+end function
+
+function R_StoreEfrags(leafIndex)
+  global cl_visedicts, cl_numvisedicts
+  builder = arrayutil.createArrayBuilder(c.MAX_VISEDICTS)
+  if leafIndex >= 0 and leafIndex < len(refragLeafEfrags) then
+    for each reference in refragLeafEfrags[leafIndex]
+      entity = reference.entity
+      present = false
+      index = 0
+      while index < builder.count
+        if builder.values[index].number == entity.number then present = true end if
+        index = index + 1
+      end while
+      modelValid = entity.modelIndex > 0 and entity.modelIndex < len(refragModels)
+      if modelValid and not present and builder.count < c.MAX_VISEDICTS then
+        arrayutil.pushArrayBuilder(builder, entity)
+      end if
+    end for
+  end if
+  cl_visedicts = arrayutil.finishArrayBuilder(builder)
+  cl_numvisedicts = len(cl_visedicts)
+  return cl_visedicts
+end function
+
+function SetSplitState(entity, mins, maxs)
+  global r_addent, r_emins, r_emaxs, r_pefragtopnode
+  r_addent = entity
+  r_emins = mins
+  r_emaxs = maxs
+  r_pefragtopnode = void
+  return true
+end function
+
+function GetState(entityNumber)
+  entityCount = 0
+  if entityNumber >= 0 and entityNumber < len(refragEntityEfrags) then entityCount = len(refragEntityEfrags[entityNumber]) end if
+  leafCounts = arrayutil.makeEmptyArray(len(refragLeafEfrags))
+  index = 0
+  while index < len(refragLeafEfrags)
+    leafCounts[index] = len(refragLeafEfrags[index])
+    index = index + 1
+  end while
+  return [entityCount, r_pefragtopnode, leafCounts]
+end function

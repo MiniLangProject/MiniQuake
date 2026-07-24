@@ -1,0 +1,32 @@
+{
+  "schema": "miniquake.differential.v1",
+  "unit": "net_loop",
+  "reference_execution": "patched-pinned-source-worktree",
+  "command": "py -3 tools/net_loop_differential.py",
+  "inputs": {
+    "reference_source": "reference/quake/WinQuake/net_loop.c",
+    "reference_harness": "reference/harness/net_loop_pinned_driver.c",
+    "instrumentation_patch": "reference/patches/net_loop_pinned_oracle.patch",
+    "oracle_stub_header": "reference/harness/net_loop_oracle_stubs.h",
+    "minilang_fixture": "tests/net_loop_differential_fixture.ml",
+    "ported_module": "src/miniquake/net_loop.ml"
+  },
+  "pinned_commit": "bf4ac424ce754894ac8f1dae6a3981954bc9852d",
+  "events": 14,
+  "epsilon": 0,
+  "functions": [
+    {"name": "Loop_Init", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:client-dedicated"]},
+    {"name": "Loop_Shutdown", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:no-op"]},
+    {"name": "Loop_Listen", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:no-op"]},
+    {"name": "Loop_SearchForHosts", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:active-local-host"]},
+    {"name": "Loop_Connect", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:wrong-local"]},
+    {"name": "Loop_CheckNewConnections", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:pending"]},
+    {"name": "IntAlign", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:boundaries"]},
+    {"name": "Loop_GetMessage", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:reliable", "differential:unreliable"]},
+    {"name": "Loop_SendMessage", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:reliable"]},
+    {"name": "Loop_SendUnreliableMessage", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:unreliable"]},
+    {"name": "Loop_CanSendMessage", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:ready"]},
+    {"name": "Loop_CanSendUnreliableMessage", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:always"]},
+    {"name": "Loop_Close", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:client"]}
+  ]
+}

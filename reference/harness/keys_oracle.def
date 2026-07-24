@@ -1,0 +1,15 @@
+LIBRARY keys_oracle
+EXPORTS
+    Key_Console
+    Key_Message
+    Key_StringToKeynum
+    Key_KeynumToString
+    Key_SetBinding
+    Key_Unbind_f
+    Key_Unbindall_f
+    Key_Bind_f
+    Key_WriteBindings
+    Key_Init
+    Key_Event
+    Key_ClearStates
+    keys_oracle_jsonl

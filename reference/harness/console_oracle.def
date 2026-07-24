@@ -1,0 +1,20 @@
+LIBRARY console_oracle
+EXPORTS
+    Con_ToggleConsole_f
+    Con_Clear_f
+    Con_ClearNotify
+    Con_MessageMode_f
+    Con_MessageMode2_f
+    Con_CheckResize
+    Con_Init
+    Con_Linefeed
+    Con_Print
+    Con_DebugLog
+    Con_Printf
+    Con_DPrintf
+    Con_SafePrintf
+    Con_DrawInput
+    Con_DrawNotify
+    Con_DrawConsole
+    Con_NotifyBox
+    console_oracle_jsonl

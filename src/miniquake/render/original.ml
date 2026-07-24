@@ -142,6 +142,15 @@ function R_ConfigureCompatibility(
   if client is not void then rCompatViewEntity = client.viewEntity end if
   rCompatDrawEntities = compatBoolCvar("r_drawentities", 1.0)
   rCompatDrawViewModel = compatBoolCvar("r_drawviewmodel", 1.0)
+  compatRmainEntities.ConfigureAliasRendering(
+    compatBoolCvar("gl_smoothmodels", 1.0),
+    compatBoolCvar("gl_affinemodels", 0.0),
+    compatBoolCvar("r_shadows", 0.0),
+    compatBoolCvar("gl_nocolors", 0.0),
+    // GLQuake 1.09 exposes this misspelled cvar name.
+    compatBoolCvar("gl_doubleeys", 1.0),
+  )
+  compatRmainWorld.R_SetSubdivideSize(compatCvarValue("gl_subdivide_size", 128.0))
   if renderer is not void and viewState is not void then
     dynamicLights = compatRmainClient.clDlights
     lightStyles = []
@@ -415,7 +424,7 @@ function R_DrawAliasModel(entity)
   currententity = entity
   r_entorigin = compatRmainMath.copy(entity.origin)
   modelorg = compatRmainMath.subtract(r_origin, r_entorigin)
-  result = compatRmainEntities.drawAlias(rCompatEntityRenderer, model, entity, rCompatTime)
+  result = compatRmainEntities.drawAlias(rCompatEntityRenderer, model, entity, rCompatTime, false)
   c_alias_polys = c_alias_polys + model.aliasModel.numTriangles
   return result
 end function

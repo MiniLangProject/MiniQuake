@@ -1,0 +1,16 @@
+diff --git a/WinQuake/gl_rsurf.c b/WinQuake/gl_rsurf.c
+index 8504049..2a95553 100644
+--- a/WinQuake/gl_rsurf.c
++++ b/WinQuake/gl_rsurf.c
+@@ -19,7 +19,11 @@ See the GNU General Public License for more details.
+ */
+ // r_surf.c: surface-related refresh code
+ 
++#ifdef MINIQUAKE_RENDERER_RSURF_TRACE_FIXTURE
++#include "mq_gl_rsurf_fixture.h"
++#else
+ #include "quakedef.h"
++#endif
+ 
+ int			skytexturenum;
+ 

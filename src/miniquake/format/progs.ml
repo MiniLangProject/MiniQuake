@@ -35,12 +35,18 @@ function parse(data, filename)
   globalsCount = bio.i32(data, 52)
   entityFields = bio.i32(data, 56)
 
-  checkSection(data, statementOffset, statementCount, 8, "statements")
-  checkSection(data, globalDefOffset, globalDefCount, 8, "globaldefs")
-  checkSection(data, fieldDefOffset, fieldDefCount, 8, "fielddefs")
-  checkSection(data, functionOffset, functionCount, 36, "functions")
-  checkSection(data, stringOffset, stringCount, 1, "strings")
-  checkSection(data, globalsOffset, globalsCount, 4, "globals")
+  sectionCheck = checkSection(data, statementOffset, statementCount, 8, "statements")
+  if sectionCheck is error then return sectionCheck end if
+  sectionCheck = checkSection(data, globalDefOffset, globalDefCount, 8, "globaldefs")
+  if sectionCheck is error then return sectionCheck end if
+  sectionCheck = checkSection(data, fieldDefOffset, fieldDefCount, 8, "fielddefs")
+  if sectionCheck is error then return sectionCheck end if
+  sectionCheck = checkSection(data, functionOffset, functionCount, 36, "functions")
+  if sectionCheck is error then return sectionCheck end if
+  sectionCheck = checkSection(data, stringOffset, stringCount, 1, "strings")
+  if sectionCheck is error then return sectionCheck end if
+  sectionCheck = checkSection(data, globalsOffset, globalsCount, 4, "globals")
+  if sectionCheck is error then return sectionCheck end if
 
   strings = slice(data, stringOffset, stringCount)
   statements = arrayutil.makeEmptyArray(statementCount)
@@ -75,9 +81,9 @@ function parse(data, filename)
     offset = functionOffset + i * 36
     nameOffset = bio.i32(data, offset + 16)
     fileOffset = bio.i32(data, offset + 20)
-    parmSize = arrayutil.makeEmptyArray(8)
+    parmSize = arrayutil.makeEmptyArray(c.QC_MAX_PARMS)
     p = 0
-    while p < 8
+    while p < c.QC_MAX_PARMS
       parmSize[p] = bio.u8(data, offset + 28 + p)
       p = p + 1
     end while

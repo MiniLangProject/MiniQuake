@@ -1,0 +1,81 @@
+{
+  "schema": "miniquake.semantic-port-review.v1",
+  "unit": "net_loop",
+  "reference_commit": "bf4ac424ce754894ac8f1dae6a3981954bc9852d",
+  "reviewer": "client_network_audit",
+  "original_files": [
+    "net_loop.c",
+    "net_loop.h"
+  ],
+  "minilang_modules": [
+    "src/miniquake/net_loop.ml"
+  ],
+  "original_sha256": {
+    "net_loop.c": "6b05d93c7b3369f282be174e322499420849109526a881b5ae18a9d778988e75",
+    "net_loop.h": "48f02fcd177bdbd5dcd423b740fbee441969752925538213e9f95c2a744b4a90"
+  },
+  "minilang_sha256": {
+    "src/miniquake/net_loop.ml": "55228fe8209bb52ef44bf1fa3b357d251a838c5dca8e0d7d5a5dd70e9abf4867"
+  },
+  "function_review_scope": "all-target-functions",
+  "features": [
+    {
+      "name": "loop driver initialization, local host discovery, case-insensitive LOCAL connection, pending-server accept, and close/reconnect lifecycle",
+      "status": "parity",
+      "original": [
+        "net_loop.c:55",
+        "net_loop.c:67",
+        "net_loop.c:83",
+        "net_loop.c:115",
+        "net_loop.c:249"
+      ],
+      "minilang": [
+        "src/miniquake/net_loop.ml:815",
+        "src/miniquake/net_loop.ml:829",
+        "src/miniquake/net_loop.ml:845",
+        "src/miniquake/net_loop.ml:852",
+        "src/miniquake/net_loop.ml:887"
+      ],
+      "evidence": [
+        "py -3 tools/net_loop_differential.py",
+        "tests/net_loop_port_tests.ml:testInitSearchAndIntAlign",
+        "tests/net_loop_port_tests.ml:testCapacityCloseAndReconnect",
+        "tests/net_main_tests.ml:case-insensitive-LOCAL"
+      ]
+    },
+    {
+      "name": "four-byte record alignment, reliable backpressure and acknowledgement, unreliable capacity, message ordering, and read counters",
+      "status": "parity",
+      "original": [
+        "net_loop.c:133",
+        "net_loop.c:141",
+        "net_loop.c:196",
+        "net_loop.c:226",
+        "net_loop.c:232",
+        "net_loop.c:238"
+      ],
+      "minilang": [
+        "src/miniquake/net_loop.ml:527",
+        "src/miniquake/net_loop.ml:867",
+        "src/miniquake/net_loop.ml:871",
+        "src/miniquake/net_loop.ml:875",
+        "src/miniquake/net_loop.ml:879",
+        "src/miniquake/net_loop.ml:883"
+      ],
+      "evidence": [
+        "py -3 tools/net_loop_differential.py",
+        "tests/net_loop_port_tests.ml:testConnectionAndMessageOrder",
+        "tests/host_lifecycle_tests.ml:move-before-reliable-wire"
+      ]
+    }
+  ],
+  "commands": [
+    "py -3 tools/net_loop_differential.py",
+    "build/audit_net_loop_tests.exe",
+    "build/audit_net_main_tests.exe"
+  ],
+  "open_findings": [],
+  "limitations": [
+    "The loop driver's observable byte records, backpressure, discovery, and lifetime semantics are preserved; MiniLang stores queued records as typed byte arrays instead of pointer-aligned C memory."
+  ]
+}

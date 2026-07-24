@@ -13,6 +13,18 @@ Version.
 
 ## Status
 
+Der abgeschlossene Quell-Port-Sweep weist **63/63** zielrelevante logische
+C/H-Einheiten mit MiniLang-Pendant, **1069/1069** gemappte
+C-Funktionsdefinitionen und **9/9** gemappte Ziel-Assemblerexporte aus. Der
+davon getrennte strikte Funktionsparitätsbericht belegt aktuell
+**52/1069 Definitionen**. Diese Quote zählt nur Referenzdifferentiale,
+bidirektionale GLQuake-Interop oder byte-exakte Originalartefakt-Kompatibilität
+und erst nach bestandenem, hashgebundenem Vollreview der gesamten logischen
+Einheit. Der laufende Plan deckt **63/63** Einheiten einmalig ab; derzeit sind
+**6/63** Einheiten semantisch vollständig reauditiert. Die verbindlichen
+Berichte stehen in `audit/SEMANTIC_AUDIT_PLAN.json`,
+`audit/SEMANTIC_PORT_REVIEW.json` und `audit/BEHAVIORAL_PARITY.json`.
+
 Der vollständige automatisierte Windows-Pfad ist gegen die Steam-Retaildaten
 bestätigt:
 
@@ -21,8 +33,10 @@ bestätigt:
 - lokaler Protokoll-15-Signon bis Stufe 4
 - QuakeC-Spawn und BSP-Hull-Kollision
 - 720 integrierte `Host_Frame`-Iterationen
-- 15 Kern- und 22 Meilensteinprüfungen
-- Winsock-UDP-Loopback
+- 16 Kern- und 24 Meilensteinprüfungen
+- Winsock-/Protocol-15-, LAN-Such-, Listen- und Dedicated-Funktionspfade
+- originale Savegames, Config-Archivierung sowie Demo-Aufnahme/-Wiedergabe/-Timedemo
+- OGG-Musik aus `music/trackNN.ogg` und der Steam-Rerelease-Struktur
 - WGL/OpenGL-Readback und 240 integrierte Renderframes
 - 10.000-Frame-Soak, Heapprüfung und sauberer Shutdown
 
@@ -106,9 +120,11 @@ klassischen Menüpfad.
 
 Das originale Customize-Controls-Menü besitzt jetzt 18 Aktionen, zeigt bis zu
 zwei Bindings, bindet mit Enter und löscht mit Backspace/Delete. Load/Save,
-Player Setup, Video und die Netzwerkdialoge besitzen Navigation und Artwork;
-die zugrundeliegenden Savegame-, Setup-, Videomodus- und Netzwerk-Backends sind
-noch nicht 1:1 abgeschlossen.
+Player Setup, Video und die Netzwerkdialoge besitzen Navigation und Artwork.
+Load/Save verwendet originale Quake-v5-Saves. Setup-, Video- und
+Netzwerkmenüfunktionen sind im strikten Port-Sweep enthalten; reale
+Displaywechsel und die prozessweite Netzwerk-Interop bleiben eigene
+End-to-End-Abnahmen.
 
 ### Sound
 
@@ -123,13 +139,18 @@ fertigen Stereo-Block. `_snd_mixahead` bestimmt die Zielmenge kurzer
 512-Sample-Blöcke; nach dem Rendern erfolgt wie bei WinQuakes `S_ExtraUpdate`
 ein zweites nicht blockierendes Top-up. Die native `waveOut`-Brücke durchsucht
 alle acht Ringheader nach einem freien oder bereits beendeten Puffer, statt an
-einem noch belegten Folgeslot dauerhaft zu stoppen. CD-Audio beziehungsweise
-Musik ist weiterhin offen.
+einem noch belegten Folgeslot dauerhaft zu stoppen.
+
+Die CD-Track-Kommandos werden modern auf `music/trackNN.ogg` abgebildet. Neben
+dem aktiven Quake-Suchpfad werden `rerelease/<game>/music`-Ordner gefunden. Der
+eingebettete, reproduzierbar gepinnte OGG-Decoder benötigt keine zusätzliche
+Laufzeitinstallation; Play, Loop, Stop, Pause und Resume sind implementiert.
+Physische CD-Laufwerke bleiben eine dokumentierte moderne Abweichung.
 
 ## Enthaltener Umfang
 
-- 77 MiniLang-Quell- und Testdateien
-- 15 Kern- und 22 Meilensteinprüfungen
+- 98 MiniLang-Quelldateien und 85 MiniLang-Test-Fixtures
+- 16 Kern- und 24 Meilensteinprüfungen
 - PAK, WAD2, BSP v29, IDPO v6, IDSP v1, `progs.dat` v6, WAV und DEM
 - Quake-Protokoll 15, Baselines, Fast-Entity-Updates und Loopback
 - QuakeC-VM, Edicts und ein wachsender Builtin-Satz
@@ -137,7 +158,8 @@ Musik ist weiterhin offen.
 - BSP-Welt-, Brush-, Aliasmodell-, Sprite-, Partikel- und 2D-Renderer
 - Software-Soundmixer mit räumlichen, lokalen und Ambientkanälen
 - Console, qpic-basiertes Menü, originale Statusbar und View-Effekte
-- Datagramm-Framing und Winsock-/UDP-Brücke
+- Reliable Datagramm-Framing mit Fragmentierung, ACK/NAK und Retransmit
+- direkter UDP-Connect, Listen-/Dedicated-Server, LAN-Suche und Timeouts
 - Headless-, Render-, UDP-, Soak- und Echtdaten-Validierung
 
 ## Build unter Windows
@@ -155,8 +177,8 @@ cd C:\Users\nilsk\Desktop\MiniQuake
 Das erwartete Testende lautet:
 
 ```text
-MiniQuake core tests passed: 15
-MiniQuake milestone tests passed: 22
+MiniQuake core tests passed: 16
+MiniQuake milestone tests passed: 24
 [MiniQuake] build completed: ...\build\MiniQuake.exe
 ```
 
@@ -215,6 +237,7 @@ Einzelpfade:
 .\build\MiniQuake.exe --gl-smoke-frames 120
 .\build\MiniQuake.exe --udp-smoke 2000
 .\build\MiniQuake.exe --soak $QuakeBase start 10000 -game id1
+python .\tools\retail_demo_matrix.py --basedir $QuakeBase
 ```
 
 Der automatische Bericht wird als `build\real-game-validation.json`
@@ -236,15 +259,29 @@ die exklusive native Boundary und das Fehlen von Quake-Spieldaten.
 python .\native\build_bridge.py --clean
 ```
 
-Dafür werden `clang-cl` und `lld-link` benötigt.
+Bevorzugt werden `clang-cl` und `lld-link`; alternativ erkennt das Skript eine
+installierte x64-MSVC-Toolchain (`cl`, `link`, `lib`) automatisch.
 
-## Noch offene 1:1-Parität
+## Noch offene End-to-End-Abnahme
 
-Insbesondere fehlen noch vollständige Savegame-/Edict-Semantik, die restliche
-QuakeC-Builtin- und Physikparität, Renderer- und Soundsonderfälle, vollständige
-Setup-/Video-/Netzwerkmenüs, CD-Audio, kompletter UDP-Verbindungsaufbau sowie
-längere Demo-/Timing-Abnahmen. Der dateiweise Abgleich steht in
-`PORT_AUDIT.md`; die interaktive Abnahme in `PARITY_TEST_PLAN.md`.
+Die Quell- und strikte Funktionsquote beträgt 100 %. Bereits grün sind alle
+73 spielbaren Retail-Maps, der MiniQuake-Zwei-Prozess-Pfad mit LAN-Suche,
+Protocol-15-Signon und Crash-Reconnect sowie ein deterministischer
+Paketverlust-/ACK-Verlust-/Retransmit-/Timeout-/Mapwechsel-Test. Die echte
+Zwei-Client-Matrix besteht zusätzlich je Client unabhängige DATA-/ACK-Verluste,
+unzuverlässiges Packet-Reordering, ein 32-KiB/s-Limit je Richtung,
+gemeinsamen Mapwechsel, isolierten Timeout und Reconnect. Auch ein
+historischer GLQuake-Client verbindet sich vollständig mit dem
+MiniQuake-Dedicated-Server. Die umgekehrte Richtung ist derzeit durch einen
+reproduzierbaren Absturz des unveränderten historischen `GLQUAKE.EXE`
+(`0xC0000005`) vor Öffnung seines Servers blockiert.
+
+Noch ausstehend sind insbesondere der vollständige instrumentierte
+Referenzprozess, Screenshotparität, reale Display-/Gamma-/Controller-Abnahme
+sowie 100.000-Frame-Soaks für Listen-, Dedicated- und Demo-Betrieb. Der
+100.000-Frame-id1-Singleplayer-Soak ist bereits grün. Der aktuelle Belegstand steht in
+`docs/IMPLEMENTATION_PROGRESS.md`; der dateiweise Abgleich in `PORT_AUDIT.md`
+und die interaktive Abnahme in `PARITY_TEST_PLAN.md`.
 
 ## Lizenz
 

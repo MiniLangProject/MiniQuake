@@ -1,0 +1,36 @@
+{
+  "schema": "miniquake.differential.v1",
+  "unit": "console",
+  "reference_execution": "patched-pinned-source-worktree",
+  "command": "py -3 tools/console_differential.py",
+  "inputs": {
+    "reference_source": "reference/quake/WinQuake/console.c",
+    "reference_harness": "reference/harness/console_pinned_driver.c",
+    "instrumentation_patch": "reference/patches/console_pinned_oracle.patch",
+    "oracle_stub_header": "reference/harness/console_oracle_stubs.h",
+    "minilang_fixture": "tests/console_differential_fixture.ml",
+    "ported_module": "src/miniquake/console.ml"
+  },
+  "pinned_commit": "bf4ac424ce754894ac8f1dae6a3981954bc9852d",
+  "events": 17,
+  "epsilon": 1e-5,
+  "functions": [
+    {"name": "Con_ToggleConsole_f", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:connected"]},
+    {"name": "Con_Clear_f", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:buffer"]},
+    {"name": "Con_ClearNotify", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:times"]},
+    {"name": "Con_MessageMode_f", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:public"]},
+    {"name": "Con_MessageMode2_f", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:team"]},
+    {"name": "Con_CheckResize", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:wider"]},
+    {"name": "Con_Init", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:startup"]},
+    {"name": "Con_Linefeed", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:blank"]},
+    {"name": "Con_Print", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:lines"]},
+    {"name": "Con_DebugLog", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:append"]},
+    {"name": "Con_Printf", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:visible"]},
+    {"name": "Con_DPrintf", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:enabled"]},
+    {"name": "Con_SafePrintf", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:loading"]},
+    {"name": "Con_DrawInput", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:cursor"]},
+    {"name": "Con_DrawNotify", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:fresh"]},
+    {"name": "Con_DrawConsole", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:rows"]},
+    {"name": "Con_NotifyBox", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:notice"]}
+  ]
+}

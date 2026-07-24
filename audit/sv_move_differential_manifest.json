@@ -1,0 +1,66 @@
+{
+  "schema": "miniquake.differential.v1",
+  "unit": "sv_move",
+  "reference_execution": "patched-pinned-source-worktree",
+  "command": "py -3 tools/sv_move_differential.py",
+  "inputs": {
+    "reference_source": "reference/quake/WinQuake/sv_move.c",
+    "reference_harness": "reference/harness/sv_move_pinned_driver.c",
+    "instrumentation_patch": "reference/patches/sv_move_pinned_oracle.patch",
+    "oracle_stub_header": "reference/harness/sv_move_oracle_stubs.h",
+    "minilang_fixture": "tests/sv_move_differential_fixture.ml",
+    "ported_module": "src/miniquake/server_move.ml"
+  },
+  "pinned_commit": "bf4ac424ce754894ac8f1dae6a3981954bc9852d",
+  "events": 13,
+  "epsilon": 1e-5,
+  "functions": [
+    {
+      "name": "SV_CheckBottom",
+      "source_definitions": 1,
+      "classification": "reference-differential",
+      "evidence": ["differential:floor", "differential:gap"]
+    },
+    {
+      "name": "SV_movestep",
+      "source_definitions": 1,
+      "classification": "reference-differential",
+      "evidence": [
+        "differential:floor",
+        "differential:partial_ground_fall",
+        "differential:fly",
+        "differential:swim_exit"
+      ]
+    },
+    {
+      "name": "SV_StepDirection",
+      "source_definitions": 1,
+      "classification": "reference-differential",
+      "evidence": ["differential:yaw_gate"]
+    },
+    {
+      "name": "SV_FixCheckBottom",
+      "source_definitions": 1,
+      "classification": "reference-differential",
+      "evidence": ["differential:clear_partial_ground"]
+    },
+    {
+      "name": "SV_NewChaseDir",
+      "source_definitions": 1,
+      "classification": "reference-differential",
+      "evidence": ["differential:diagonal"]
+    },
+    {
+      "name": "SV_CloseEnough",
+      "source_definitions": 1,
+      "classification": "reference-differential",
+      "evidence": ["differential:distant", "differential:near"]
+    },
+    {
+      "name": "SV_MoveToGoal",
+      "source_definitions": 1,
+      "classification": "reference-differential",
+      "evidence": ["differential:direct", "differential:airborne"]
+    }
+  ]
+}

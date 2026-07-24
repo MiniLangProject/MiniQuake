@@ -1,0 +1,704 @@
+{
+  "schema": "miniquake.renderer.reference-differential.v1",
+  "command": "python tools/renderer_differential.py",
+  "reference_execution": "patched-pinned-source-worktree",
+  "pinned_commit": "bf4ac424ce754894ac8f1dae6a3981954bc9852d",
+  "comparison_policy": {
+    "command_sequence_operations_and_integer_arguments": "exact",
+    "floating_point_arguments": "unit epsilon",
+    "classification_rule": "Only scenes executing a body compiled from the pinned original source are reference-differential. Mini-only focused, core, milestone, screenshot and retail tests are not counted here."
+  },
+  "units": [
+    {
+      "unit": "gl_draw",
+      "reference_source": "reference/quake/WinQuake/gl_draw.c",
+      "minilang_modules": [
+        "src/miniquake/render/draw2d.ml",
+        "src/miniquake/render/gl11.ml"
+      ],
+      "inputs": [
+        "reference/patches/renderer_trace_fixture.patch",
+        "tests/renderer_trace_fixture.ml"
+      ],
+      "events": 12,
+      "epsilon": 0,
+      "functions": [
+        {
+          "name": "GL_Bind",
+          "source_definitions": 1,
+          "evidence": ["reference-differential:draw_tile_clear"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "Draw_TileClear",
+          "source_definitions": 1,
+          "evidence": ["reference-differential:draw_tile_clear"],
+          "classification": "reference-differential"
+        }
+      ]
+    },
+    {
+      "unit": "gl_warp",
+      "reference_source": "reference/quake/WinQuake/gl_warp.c",
+      "minilang_modules": ["src/miniquake/render/gl_warp.ml"],
+      "inputs": [
+        "reference/patches/renderer_warp_trace_fixture.patch",
+        "reference/fixtures/renderer/mq_gl_warp_fixture.h",
+        "reference/fixtures/renderer/mq_gl_warp_fixture.c",
+        "tests/renderer_warp_trace_fixture.ml"
+      ],
+      "events": 107,
+      "epsilon": 1e-5,
+      "functions": [
+        {
+          "name": "BoundPoly",
+          "source_definitions": 1,
+          "evidence": ["reference-differential:warp_bound_poly"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "SubdividePolygon",
+          "source_definitions": 1,
+          "evidence": ["reference-differential:warp_subdivide_polygon"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "GL_SubdivideSurface",
+          "source_definitions": 1,
+          "evidence": ["reference-differential:warp_gl_subdivide_surface"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "EmitWaterPolys",
+          "source_definitions": 1,
+          "evidence": ["reference-differential:warp_emit_water"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "EmitSkyPolys",
+          "source_definitions": 1,
+          "evidence": ["reference-differential:warp_emit_sky"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "EmitBothSkyLayers",
+          "source_definitions": 1,
+          "evidence": ["reference-differential:warp_both_sky_layers"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_DrawSkyChain",
+          "source_definitions": 1,
+          "preprocessor_path": "!QUAKE2",
+          "evidence": ["reference-differential:warp_draw_sky_chain"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_InitSky",
+          "source_definitions": 1,
+          "evidence": ["reference-differential:warp_init_sky", "exact:solid-and-alpha-full-image-hash"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "LoadPCX",
+          "source_definitions": 1,
+          "evidence": ["excluded-target:QUAKE2"],
+          "classification": "excluded-target"
+        },
+        {
+          "name": "fgetLittleShort",
+          "source_definitions": 1,
+          "evidence": ["excluded-target:QUAKE2"],
+          "classification": "excluded-target"
+        },
+        {
+          "name": "fgetLittleLong",
+          "source_definitions": 1,
+          "evidence": ["excluded-target:QUAKE2"],
+          "classification": "excluded-target"
+        },
+        {
+          "name": "LoadTGA",
+          "source_definitions": 1,
+          "evidence": ["excluded-target:QUAKE2"],
+          "classification": "excluded-target"
+        },
+        {
+          "name": "R_LoadSkys",
+          "source_definitions": 1,
+          "evidence": ["excluded-target:QUAKE2"],
+          "classification": "excluded-target"
+        },
+        {
+          "name": "DrawSkyPolygon",
+          "source_definitions": 1,
+          "evidence": ["excluded-target:QUAKE2"],
+          "classification": "excluded-target"
+        },
+        {
+          "name": "ClipSkyPolygon",
+          "source_definitions": 1,
+          "evidence": ["excluded-target:QUAKE2"],
+          "classification": "excluded-target"
+        },
+        {
+          "name": "R_DrawSkyChain",
+          "source_definitions": 1,
+          "preprocessor_path": "QUAKE2",
+          "evidence": ["excluded-target:QUAKE2"],
+          "classification": "excluded-target"
+        },
+        {
+          "name": "R_ClearSkyBox",
+          "source_definitions": 1,
+          "evidence": ["excluded-target:QUAKE2"],
+          "classification": "excluded-target"
+        },
+        {
+          "name": "MakeSkyVec",
+          "source_definitions": 1,
+          "evidence": ["excluded-target:QUAKE2"],
+          "classification": "excluded-target"
+        },
+        {
+          "name": "R_DrawSkyBox",
+          "source_definitions": 1,
+          "evidence": ["excluded-target:QUAKE2"],
+          "classification": "excluded-target"
+        }
+      ]
+    },
+    {
+      "unit": "gl_rlight",
+      "reference_source": "reference/quake/WinQuake/gl_rlight.c",
+      "minilang_modules": ["src/miniquake/render/gl_rlight.ml"],
+      "inputs": [
+        "reference/patches/renderer_rlight_trace_fixture.patch",
+        "reference/fixtures/renderer/mq_gl_rlight_fixture.h",
+        "reference/fixtures/renderer/mq_gl_rlight_fixture.c",
+        "tests/renderer_rlight_trace_fixture.ml"
+      ],
+      "events": 63,
+      "epsilon": 1e-5,
+      "functions": [
+        {
+          "name": "R_AnimateLight",
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rlight_animate"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "AddLightBlend",
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rlight_add_blend"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_RenderDlight",
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rlight_render_dlight", "reference-differential:rlight_render_dlight_inside"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_RenderDlights",
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rlight_render_dlights"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_MarkLights",
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rlight_mark_lights"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_PushDlights",
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rlight_push_dlights"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "RecursiveLightPoint",
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rlight_recursive_light_point"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_LightPoint",
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rlight_light_point", "reference-differential:rlight_light_point_no_data"],
+          "classification": "reference-differential"
+        }
+      ]
+    },
+    {
+      "unit": "gl_rsurf",
+      "reference_source": "reference/quake/WinQuake/gl_rsurf.c",
+      "minilang_modules": [
+        "src/miniquake/render/world.ml",
+        "src/miniquake/render/gl11.ml",
+        "src/miniquake/render/gl_warp.ml",
+        "src/miniquake/render/gl_rlight.ml"
+      ],
+      "inputs": [
+        "reference/patches/renderer_rsurf_trace_fixture.patch",
+        "reference/fixtures/renderer/mq_gl_rsurf_fixture.h",
+        "reference/fixtures/renderer/mq_gl_rsurf_fixture.c",
+        "tests/renderer_rsurf_trace_fixture.ml"
+      ],
+      "events": 233,
+      "epsilon": 1e-5,
+      "functions": [
+        {
+          "name": "R_AddDynamicLights",
+          "source_line": 68,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rsurf_add_dynamic_lights", "exact:blocklights-full-fixture-hash"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_BuildLightMap",
+          "source_line": 138,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rsurf_build_lightmap", "exact:destination-and-cached-style-state"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_TextureAnimation",
+          "source_line": 233,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rsurf_texture_animation"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "GL_DisableMultitexture",
+          "source_line": 286,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rsurf_disable_multitexture"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "GL_EnableMultitexture",
+          "source_line": 295,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rsurf_enable_multitexture"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_DrawSequentialPoly",
+          "source_line": 313,
+          "source_definitions": 1,
+          "preprocessor_path": "#if 0",
+          "evidence": ["excluded-build-config:literal-#if-0"],
+          "classification": "excluded-build-config"
+        },
+        {
+          "name": "R_DrawSequentialPoly",
+          "source_line": 410,
+          "source_definitions": 1,
+          "preprocessor_path": "#else of literal #if 0",
+          "evidence": ["reference-differential:rsurf_sequential_single", "reference-differential:rsurf_sequential_mtex"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "DrawGLWaterPoly",
+          "source_line": 593,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rsurf_draw_water_poly"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "DrawGLWaterPolyLightmap",
+          "source_line": 617,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rsurf_draw_water_lightmap"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "DrawGLPoly",
+          "source_line": 646,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rsurf_draw_poly"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_BlendLightmaps",
+          "source_line": 667,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rsurf_blend_lightmaps", "exact:dirty-atlas-upload-region-hash"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_RenderBrushPoly",
+          "source_line": 754,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rsurf_render_brush_normal", "reference-differential:rsurf_render_brush_sky", "reference-differential:rsurf_render_brush_turb"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_RenderDynamicLightmaps",
+          "source_line": 832,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rsurf_dynamic_lightmaps", "exact:lightmap-atlas-full-hash"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_MirrorChain",
+          "source_line": 890,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rsurf_mirror_chain"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_DrawWaterSurfaces",
+          "source_line": 905,
+          "source_definitions": 1,
+          "preprocessor_path": "#if 0",
+          "evidence": ["excluded-build-config:literal-#if-0"],
+          "classification": "excluded-build-config"
+        },
+        {
+          "name": "R_DrawWaterSurfaces",
+          "source_line": 954,
+          "source_definitions": 1,
+          "preprocessor_path": "#else of literal #if 0",
+          "evidence": ["reference-differential:rsurf_draw_water_surfaces"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "DrawTextureChains",
+          "source_line": 1026,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rsurf_draw_texture_chains"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_DrawBrushModel",
+          "source_line": 1075,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rsurf_draw_brush_model"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_RecursiveWorldNode",
+          "source_line": 1187,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rsurf_recursive_world_node"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_DrawWorld",
+          "source_line": 1313,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rsurf_draw_world"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_MarkLeaves",
+          "source_line": 1349,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rsurf_mark_leaves"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "AllocBlock",
+          "source_line": 1400,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rsurf_alloc_block"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "BuildSurfaceDisplayList",
+          "source_line": 1452,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rsurf_build_display_list"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "GL_CreateSurfaceLightmap",
+          "source_line": 1572,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rsurf_create_surface_lightmap", "exact:lightmap-atlas-full-hash"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "GL_BuildLightmaps",
+          "source_line": 1598,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rsurf_build_lightmaps"],
+          "classification": "reference-differential"
+        }
+      ]
+    },
+    {
+      "unit": "gl_refrag",
+      "reference_source": "reference/quake/WinQuake/gl_refrag.c",
+      "minilang_modules": ["src/miniquake/render/gl_refrag.ml"],
+      "inputs": [
+        "reference/patches/renderer_refrag_trace_fixture.patch",
+        "reference/fixtures/renderer/mq_gl_refrag_fixture.h",
+        "reference/fixtures/renderer/mq_gl_refrag_fixture.c",
+        "tests/renderer_refrag_trace_fixture.ml"
+      ],
+      "events": 4,
+      "epsilon": 1e-5,
+      "functions": [
+        {
+          "name": "R_RemoveEfrags",
+          "source_line": 51,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:refrag_remove"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_SplitEntityOnNode",
+          "source_line": 90,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:refrag_split"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_AddEfrags",
+          "source_line": 163,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:refrag_add"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_StoreEfrags",
+          "source_line": 197,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:refrag_store"],
+          "classification": "reference-differential"
+        }
+      ]
+    },
+    {
+      "unit": "gl_rmisc",
+      "reference_source": "reference/quake/WinQuake/gl_rmisc.c",
+      "minilang_modules": ["src/miniquake/render/gl_rmisc.ml"],
+      "inputs": [
+        "reference/patches/renderer_rmisc_trace_fixture.patch",
+        "reference/fixtures/renderer/mq_gl_rmisc_fixture.h",
+        "reference/fixtures/renderer/mq_gl_rmisc_fixture.c",
+        "tests/renderer_rmisc_trace_fixture.ml"
+      ],
+      "events": 14,
+      "epsilon": 1e-5,
+      "functions": [
+        {
+          "name": "R_InitTextures",
+          "source_line": 31,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmisc_init_textures", "exact:all-four-mip-levels-full-hash"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_InitParticleTexture",
+          "source_line": 70,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmisc_init_particle", "exact:rgba-full-image-hash"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_Envmap_f",
+          "source_line": 106,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmisc_envmap"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_Init",
+          "source_line": 171,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmisc_init"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_TranslatePlayerSkin",
+          "source_line": 230,
+          "source_definitions": 1,
+          "preprocessor_path": "#else of literal #if 0 inside body",
+          "evidence": ["reference-differential:rmisc_translate_skin", "exact:translated-rgba-full-image-hash"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_NewMap",
+          "source_line": 379,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmisc_new_map"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_TimeRefresh_f",
+          "source_line": 425,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmisc_time_refresh"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "D_FlushCaches",
+          "source_line": 451,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmisc_flush_caches"],
+          "classification": "reference-differential"
+        }
+      ]
+    },
+    {
+      "unit": "gl_rmain",
+      "reference_source": "reference/quake/WinQuake/gl_rmain.c",
+      "minilang_modules": ["src/miniquake/render/gl_rmain.ml"],
+      "inputs": [
+        "reference/patches/renderer_rmain_trace_fixture.patch",
+        "reference/fixtures/renderer/mq_gl_rmain_redirect.h",
+        "reference/fixtures/renderer/mq_gl_rmain_fixture.c",
+        "tests/renderer_rmain_trace_fixture.ml"
+      ],
+      "events": 20,
+      "epsilon": 1e-5,
+      "functions": [
+        {
+          "name": "R_CullBox",
+          "source_line": 111,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmain_cull_box"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_RotateForEntity",
+          "source_line": 122,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmain_rotate_entity"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_GetSpriteFrame",
+          "source_line": 144,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmain_get_sprite_frame"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_DrawSpriteModel",
+          "source_line": 197,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmain_draw_sprite"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "GL_DrawAliasFrame",
+          "source_line": 289,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmain_alias_frame"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "GL_DrawAliasShadow",
+          "source_line": 347,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmain_alias_shadow"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_SetupAliasFrame",
+          "source_line": 415,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmain_setup_alias_frame"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_DrawAliasModel",
+          "source_line": 446,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmain_draw_alias_model"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_DrawEntitiesOnList",
+          "source_line": 602,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmain_draw_entities"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_DrawViewModel",
+          "source_line": 647,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmain_draw_view_model"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_PolyBlend",
+          "source_line": 718,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmain_poly_blend"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "SignbitsForPlane",
+          "source_line": 753,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmain_signbits"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_SetFrustum",
+          "source_line": 769,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmain_set_frustum"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_SetupFrame",
+          "source_line": 810,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmain_setup_frame"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "MYgluPerspective",
+          "source_line": 844,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmain_perspective"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_SetupGL",
+          "source_line": 864,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmain_setup_gl"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_RenderScene",
+          "source_line": 949,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmain_render_scene"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_Clear",
+          "source_line": 983,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmain_clear"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_Mirror",
+          "source_line": 1035,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmain_mirror"],
+          "classification": "reference-differential"
+        },
+        {
+          "name": "R_RenderView",
+          "source_line": 1104,
+          "source_definitions": 1,
+          "evidence": ["reference-differential:rmain_render_view"],
+          "classification": "reference-differential"
+        }
+      ]
+    }
+  ]
+}

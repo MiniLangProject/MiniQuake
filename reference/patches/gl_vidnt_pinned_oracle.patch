@@ -1,0 +1,23 @@
+diff --git a/WinQuake/gl_vidnt.c b/WinQuake/gl_vidnt.c
+index 5999a58..c768a95 100644
+--- a/WinQuake/gl_vidnt.c
++++ b/WinQuake/gl_vidnt.c
+@@ -22,6 +22,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ #include "resource.h"
+ #include <commctrl.h>
+ 
++#ifdef MINIQUAKE_PINNED_ORACLE
++#include "gl_vidnt_oracle_hooks.h"
++#endif
++
+ #define MAX_MODE_LIST	30
+ #define VID_ROW_SIZE	3
+ #define WARP_WIDTH		320
+@@ -1947,3 +1951,7 @@ void VID_MenuKey (int key)
+ 		break;
+ 	}
+ }
++
++#ifdef MINIQUAKE_PINNED_ORACLE
++#include "gl_vidnt_oracle.inc"
++#endif

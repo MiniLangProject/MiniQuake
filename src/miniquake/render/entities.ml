@@ -2,15 +2,15 @@ package miniquake.render.entities
 
 import miniquake.types as t
 import miniquake.constants as c
-import miniquake.filesystem as qfs
-import miniquake.format.mdl as mdl
-import miniquake.format.sprite as spr
+import miniquake.model_registry as modelRegistry
 import miniquake.render.gl11 as gl
 import miniquake.render.world as worldRenderer
 import miniquake.byteio as bio
 import miniquake.native as native
 import miniquake.array_util as arrayutil
 import miniquake.mathlib as math
+import miniquake.render.alias_mesh as aliasMesh
+import miniquake.render.draw2d as draw2d
 
 const MODEL_NONE = 0
 const MODEL_BRUSH = 1
@@ -20,6 +20,32 @@ const MODEL_SPRITE = 3
 const SPR_ORIENTED = 3
 
 translatedPlayerTextures = []
+renderModelRegistry = void
+aliasSmoothModels = true
+aliasAffineModels = false
+aliasShadows = false
+aliasNoColors = false
+aliasDoubleEyes = true
+
+function ConfigureAliasRendering(smoothModels, affineModels, shadows, noColors, doubleEyes)
+  global aliasSmoothModels, aliasAffineModels, aliasShadows, aliasNoColors, aliasDoubleEyes
+  aliasSmoothModels = smoothModels
+  aliasAffineModels = affineModels
+  aliasShadows = shadows
+  aliasNoColors = noColors
+  aliasDoubleEyes = doubleEyes
+  return [
+    aliasSmoothModels, aliasAffineModels, aliasShadows,
+    aliasNoColors, aliasDoubleEyes,
+  ]
+end function
+
+function AliasRenderingConfiguration()
+  return [
+    aliasSmoothModels, aliasAffineModels, aliasShadows,
+    aliasNoColors, aliasDoubleEyes,
+  ]
+end function
 
 function startsWith(text, prefix)
   left = bytes(text)
@@ -51,24 +77,23 @@ function emptyModel(name, kind)
 end function
 
 function loadModel(renderer, name)
+  global renderModelRegistry
   if name == "" then return emptyModel(name, MODEL_NONE) end if
   if startsWith(name, "*") then return emptyModel(name, MODEL_BRUSH) end if
-  data = try(qfs.readFile(renderer.filesystem, name))
-  if data is error then return emptyModel(name, MODEL_NONE) end if
-  if endsWithInsensitive(name, ".mdl") then
-    parsed = try(mdl.parse(data, name))
-    if parsed is error then return emptyModel(name, MODEL_NONE) end if
-    return t.ClientRenderModel(name, MODEL_ALIAS, parsed, void, [], false)
-  end if
-  if endsWithInsensitive(name, ".spr") then
-    parsed = try(spr.parse(data, name))
-    if parsed is error then return emptyModel(name, MODEL_NONE) end if
-    return t.ClientRenderModel(name, MODEL_SPRITE, void, parsed, [], false)
-  end if
+  if renderModelRegistry is void then renderModelRegistry = modelRegistry.Mod_Init(modelRegistry.create(), void) end if
+  parsed = try(modelRegistry.Mod_ForName(renderModelRegistry, renderer.filesystem, name, false))
+  if parsed is error or parsed is void then return emptyModel(name, MODEL_NONE) end if
+  kind = modelRegistry.modelType(renderModelRegistry, name)
+  if kind == modelRegistry.MOD_ALIAS then return t.ClientRenderModel(name, MODEL_ALIAS, parsed, void, [], false) end if
+  if kind == modelRegistry.MOD_SPRITE then return t.ClientRenderModel(name, MODEL_SPRITE, void, parsed, [], false) end if
+  if kind == modelRegistry.MOD_BRUSH then return emptyModel(name, MODEL_BRUSH) end if
   return emptyModel(name, MODEL_NONE)
 end function
 
 function create(filesystem, palette, modelPrecache)
+  global renderModelRegistry
+  renderModelRegistry = modelRegistry.Mod_Init(modelRegistry.create(), void)
+  draw2d.Draw_SetPalette(palette)
   renderer = t.EntityRenderer(filesystem, palette, [], 0)
   synchronize(renderer, modelPrecache)
   return renderer
@@ -127,21 +152,33 @@ end function
 function uploadAlias(renderer, model)
   if model.uploaded then return true end if
   source = model.aliasModel
+  draw2d.Draw_SetPalette(renderer.palette)
   model.textureIds = arrayutil.makeFilledArray(len(source.skins), 0)
   index = 0
   while index < len(source.skins)
     skin = source.skins[index]
-    if len(skin.images) > 0 then
-      rgba = worldRenderer.indexedToRgba(skin.images[0], renderer.palette, false)
-      texture = gl.generateTexture()
-      gl.bindTexture(texture)
-      gl.textureParameter(gl.GL_TEXTURE_MIN_FILTER, gl.GL_NEAREST)
-      gl.textureParameter(gl.GL_TEXTURE_MAG_FILTER, gl.GL_NEAREST)
-      gl.textureParameter(gl.GL_TEXTURE_WRAP_S, gl.GL_REPEAT)
-      gl.textureParameter(gl.GL_TEXTURE_WRAP_T, gl.GL_REPEAT)
-      gl.uploadRgba(source.skinWidth, source.skinHeight, rgba)
-      model.textureIds[index] = texture
-    end if
+    textures = arrayutil.makeFilledArray(4, 0)
+    imageIndex = 0
+    while imageIndex < len(skin.images)
+      identifier = source.filename + "_" + index
+      if len(skin.images) > 1 then identifier = identifier + "_" + imageIndex end if
+      texture = draw2d.GL_LoadTexture(
+        identifier,
+        source.skinWidth,
+        source.skinHeight,
+        skin.images[imageIndex],
+        true,
+        false,
+      )
+      textures[imageIndex & 3] = texture
+      imageIndex = imageIndex + 1
+    end while
+    available = imageIndex
+    while imageIndex < 4 and available > 0
+      textures[imageIndex] = textures[imageIndex - available]
+      imageIndex = imageIndex + 1
+    end while
+    model.textureIds[index] = textures
     index = index + 1
   end while
   if len(model.textureIds) == 0 then model.textureIds = [0] end if
@@ -152,6 +189,7 @@ end function
 function uploadSprite(renderer, model)
   if model.uploaded then return true end if
   source = model.spriteModel
+  draw2d.Draw_SetPalette(renderer.palette)
   // Keep one texture-id array per top-level frame so grouped sprite frames
   // retain all of their independently timed images.
   model.textureIds = arrayutil.makeEmptyArray(len(source.frames))
@@ -162,14 +200,16 @@ function uploadSprite(renderer, model)
     groupIndex = 0
     while groupIndex < len(frameSet.frames)
       frame = frameSet.frames[groupIndex]
-      rgba = worldRenderer.indexedToRgba(frame.pixels, renderer.palette, true)
-      texture = gl.generateTexture()
-      gl.bindTexture(texture)
-      gl.textureParameter(gl.GL_TEXTURE_MIN_FILTER, gl.GL_NEAREST)
-      gl.textureParameter(gl.GL_TEXTURE_MAG_FILTER, gl.GL_NEAREST)
-      gl.textureParameter(gl.GL_TEXTURE_WRAP_S, gl.GL_CLAMP)
-      gl.textureParameter(gl.GL_TEXTURE_WRAP_T, gl.GL_CLAMP)
-      gl.uploadRgba(frame.width, frame.height, rgba)
+      identifier = source.filename + "_" + frameIndex
+      if frameSet.grouped then identifier = identifier + "_" + groupIndex end if
+      texture = draw2d.GL_LoadTexture(
+        identifier,
+        frame.width,
+        frame.height,
+        frame.pixels,
+        true,
+        true,
+      )
       textures[groupIndex] = texture
       groupIndex = groupIndex + 1
     end while
@@ -201,11 +241,17 @@ end function
 
 function aliasFrame(source, frameNumber, time)
   if len(source.frames) == 0 then return void end if
-  index = frameNumber % len(source.frames)
-  if index < 0 then index = 0 end if
+  index = frameNumber
+  if index < 0 or index >= len(source.frames) then index = 0 end if
   set = source.frames[index]
   if len(set.frames) == 0 then return void end if
-  if set.grouped then return set.frames[cycleIndex(set.intervals, time, len(set.frames))] end if
+  if set.grouped then
+    interval = 0.0
+    if len(set.intervals) > 0 then interval = set.intervals[0] end if
+    if interval <= 0.0 then return set.frames[0] end if
+    pose = native.trunc(time / interval) % len(set.frames)
+    return set.frames[pose]
+  end if
   return set.frames[0]
 end function
 
@@ -240,7 +286,25 @@ function aliasVertex(source, packed)
   )
 end function
 
-function drawAlias(renderer, model, entity, time)
+function aliasShade(model, entity, time, viewModel)
+  ambient = worldRenderer.R_LightPoint(entity.origin)
+  shade = ambient
+  for each light in worldRenderer.R_ActiveDynamicLights()
+    if light.radius > 0.0 and light.die >= time then
+      distance = math.Length(math.VectorSubtract(entity.origin, light.origin))
+      addition = light.radius - distance
+      if addition > 0.0 then ambient = ambient + addition; shade = shade + addition end if
+    end if
+  end for
+  if viewModel and ambient < 24.0 then ambient = 24.0; shade = 24.0 end if
+  if ambient > 128.0 then ambient = 128.0 end if
+  if ambient + shade > 192.0 then shade = 192.0 - ambient end if
+  if entity.colormap != 0 and ambient < 8.0 then ambient = 8.0; shade = 8.0 end if
+  if model.name == "progs/flame.mdl" or model.name == "progs/flame2.mdl" then ambient = 256.0; shade = 256.0 end if
+  return [shade / 200.0, ambient]
+end function
+
+function drawAlias(renderer, model, entity, time, viewModel)
   uploadAlias(renderer, model)
   source = model.aliasModel
   frame = aliasFrame(source, entity.frame, time)
@@ -248,33 +312,64 @@ function drawAlias(renderer, model, entity, time)
   skin = entity.skin
   if skin < 0 or skin >= len(model.textureIds) then skin = 0 end if
   texture = 0
-  if len(model.textureIds) > 0 then texture = model.textureIds[skin] end if
+  if len(model.textureIds) > 0 then
+    skinTextures = model.textureIds[skin]
+    if skinTextures is array then
+      texture = skinTextures[native.trunc(time * 10.0) & 3]
+    else
+      texture = skinTextures
+    end if
+  end if
   translated = translatedPlayerTexture(entity.number)
-  if entity.colormap != 0 and translated != 0 then texture = translated end if
+  if not aliasNoColors and entity.colormap != 0 and translated != 0 then texture = translated end if
   if texture != 0 then gl.bindTexture(texture) end if
+  lighting = aliasShade(model, entity, time, viewModel)
+  aliasMesh.configureAliasModel(source)
+  aliasMesh.configureAliasLighting(lighting[0], lighting[1], entity.angles.y, worldRenderer.lightspot)
+  mesh = aliasMesh.GL_MakeAliasModelDisplayLists(source, source)
   gl.pushMatrix()
   gl.translate(entity.origin.x, entity.origin.y, entity.origin.z)
   gl.rotate(entity.angles.y, 0.0, 0.0, 1.0)
   gl.rotate(-entity.angles.x, 0.0, 1.0, 0.0)
   gl.rotate(entity.angles.z, 1.0, 0.0, 0.0)
+  if model.name == "progs/eyes.mdl" and aliasDoubleEyes then
+    gl.translate(source.scaleOrigin.x, source.scaleOrigin.y, source.scaleOrigin.z - 30.0)
+    gl.scale(source.scale.x * 2.0, source.scale.y * 2.0, source.scale.z * 2.0)
+  else
+    gl.translate(source.scaleOrigin.x, source.scaleOrigin.y, source.scaleOrigin.z)
+    gl.scale(source.scale.x, source.scale.y, source.scale.z)
+  end if
+  // R_SetupGL leaves front-face culling enabled for alias models.  The
+  // production world path deliberately draws BSP polygons two-sided, so
+  // restore the GLQuake alias state locally instead of inheriting that state.
+  // Without this, normally hidden weapon backfaces can win the depth test and
+  // expose unrelated parts of the skin.
+  gl.cullFace(gl.GL_FRONT)
+  gl.enable(gl.GL_CULL_FACE)
+  if aliasSmoothModels then gl.shadeModel(gl.GL_SMOOTH) end if
+  gl.textureEnvironment(gl.GL_MODULATE)
+  drawn = aliasMesh.drawAliasMesh(source, frame, mesh)
+  gl.textureEnvironment(gl.GL_REPLACE)
+  gl.shadeModel(gl.GL_FLAT)
   gl.color(255, 255, 255, 255)
-  gl.begin(gl.GL_TRIANGLES)
-  for each triangle in source.triangles
-    indices = [triangle.vertex0, triangle.vertex1, triangle.vertex2]
-    for each vertexIndex in indices
-      if vertexIndex >= 0 and vertexIndex < len(frame.vertices) and vertexIndex < len(source.texCoords) then
-        coordinate = source.texCoords[vertexIndex]
-        s = coordinate.s
-        if triangle.facesFront == 0 and coordinate.onSeam != 0 then s = s + source.skinWidth / 2 end if
-        gl.texcoord2((s + 0.5) / source.skinWidth, (coordinate.t + 0.5) / source.skinHeight)
-        value = aliasVertex(source, frame.vertices[vertexIndex])
-        gl.vertex3(value.x, value.y, value.z)
-      end if
-    end for
-  end for
-  gl.finishPrimitive()
+  gl.disable(gl.GL_CULL_FACE)
   gl.popMatrix()
-  return len(source.triangles)
+  if aliasShadows then
+    gl.pushMatrix()
+    gl.translate(entity.origin.x, entity.origin.y, entity.origin.z)
+    gl.rotate(entity.angles.y, 0.0, 0.0, 1.0)
+    gl.rotate(-entity.angles.x, 0.0, 1.0, 0.0)
+    gl.rotate(entity.angles.z, 1.0, 0.0, 0.0)
+    gl.disable(gl.GL_TEXTURE_2D)
+    gl.enable(gl.GL_BLEND)
+    gl.color(0, 0, 0, 128)
+    aliasMesh.GL_DrawAliasShadow(source, frame)
+    gl.enable(gl.GL_TEXTURE_2D)
+    gl.disable(gl.GL_BLEND)
+    gl.color(255, 255, 255, 255)
+    gl.popMatrix()
+  end if
+  return drawn
 end function
 
 function drawSprite(renderer, model, entity, viewRight, viewUp, time)
@@ -376,6 +471,9 @@ end function
 
 function render(renderer, worldRendererValue, entities, viewEntity, viewRight, viewUp, time)
   rendered = 0
+  // R_DrawEntitiesOnList renders opaque alias/brush models first and performs
+  // a second pass for alpha-tested sprites.  Keeping the passes separate is
+  // observable where a sprite intersects an alias model.
   index = 0
   while index < len(entities)
     entity = entities[index]
@@ -385,9 +483,18 @@ function render(renderer, worldRendererValue, entities, viewEntity, viewRight, v
         drawBrush(worldRendererValue, model, entity)
         rendered = rendered + 1
       else if model.kind == MODEL_ALIAS then
-        drawAlias(renderer, model, entity, time)
+        drawAlias(renderer, model, entity, time, false)
         rendered = rendered + 1
-      else if model.kind == MODEL_SPRITE then
+      end if
+    end if
+    index = index + 1
+  end while
+  index = 0
+  while index < len(entities)
+    entity = entities[index]
+    if entity is not void and entity.number != viewEntity and entity.modelIndex > 0 and entity.modelIndex < len(renderer.models) then
+      model = renderer.models[entity.modelIndex]
+      if model.kind == MODEL_SPRITE then
         drawSprite(renderer, model, entity, viewRight, viewUp, time)
         rendered = rendered + 1
       end if
@@ -408,15 +515,9 @@ function renderViewModel(renderer, player, view, time)
   model = renderer.models[player.weapon]
   if model is void or model.kind != MODEL_ALIAS then return 0 end if
 
-  // WinQuake starts the view model at the player origin plus viewheight, then
-  // adds the weapon bob. view.origin already includes stair smoothing; retain
-  // that correction while keeping the original forward bob component.
-  gunOrigin = t.Vec3(
-    view.origin.x + view.forward.x * view.bob * 0.4 - 0.03125,
-    view.origin.y + view.forward.y * view.bob * 0.4 - 0.03125,
-    view.origin.z - 0.03125,
-  )
-  gunAngles = t.Vec3(-view.angles.x, view.angles.y, view.angles.z)
+  if not view.viewModelVisible then return 0 end if
+  gunOrigin = math.copy(view.gunOrigin)
+  gunAngles = math.copy(view.gunAngles)
   entity = t.ClientEntityState(
     0,
     player.weapon,
@@ -427,9 +528,15 @@ function renderViewModel(renderer, player, view, time)
     gunOrigin,
     gunAngles,
     time,
+    math.copy(gunOrigin),
+    math.copy(gunOrigin),
+    math.copy(gunAngles),
+    math.copy(gunAngles),
+    true,
+    [player.weapon, player.weaponFrame, 0, 0, math.copy(gunOrigin), math.copy(gunAngles), 0],
   )
   gl.depthRange(0.0, 0.3)
-  result = drawAlias(renderer, model, entity, time)
+  result = drawAlias(renderer, model, entity, time, true)
   gl.depthRange(0.0, 1.0)
   return result
 end function
@@ -455,4 +562,3 @@ function destroy(renderer)
   translatedPlayerTextures = []
   return true
 end function
-

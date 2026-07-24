@@ -6,6 +6,20 @@ struct Vec3
   z
 end struct
 
+struct Link
+  previous
+  next
+end struct
+
+struct CommonFileHandle
+  data
+  position
+  length
+  persistent
+  closed
+  source
+end struct
+
 struct Plane
   normal
   dist
@@ -37,6 +51,7 @@ end struct
 
 struct CvarRegistry
   variables
+  serverChanges
 end struct
 
 struct CommandAlias
@@ -48,6 +63,7 @@ struct CommandSystem
   commands
   aliases
   arguments
+  rawArgs
   text
   wait
 end struct
@@ -87,12 +103,35 @@ struct LoopSocket
   messageTypes
   canSend
   disconnected
+  transport
+  udp
+  address
+  port
+  channel
+  lastReceiveTime
+  connectTime
+  lastSendTime
+  driver
+  landriver
 end struct
 
 struct LoopState
   client
   server
   pending
+  listener
+  pendingRemote
+  hostName
+  mapName
+  currentPlayers
+  maxPlayers
+  remoteSockets
+  hostCache
+  banAddress
+  banMask
+  playerInfo
+  serverRules
+  lanEnabled
 end struct
 
 struct MemoryBlock
@@ -385,6 +424,7 @@ struct QuakeCMachine
   currentFunction
   statement
   returnWord
+  argCount
   edicts
   builtins
   runaway
@@ -392,6 +432,7 @@ struct QuakeCMachine
   edictFree
   dynamicStrings
   randomSeed
+  trace
 end struct
 
 struct WaveInfo
@@ -412,6 +453,19 @@ end struct
 struct Demo
   forcedTrack
   messages
+  trackHeader
+end struct
+
+struct SaveGame
+  version
+  comment
+  spawnParms
+  skill
+  mapName
+  time
+  lightStyles
+  globalState
+  entities
 end struct
 
 struct ProtocolEvent
@@ -433,11 +487,20 @@ struct FileSystem
   baseDirectory
   gameDirectory
   searchPaths
+  cacheDirectory
+  modified
+  registered
+  staticRegistered
+  progsHack
 end struct
 
 struct ModelRegistry
   names
   models
+  needLoad
+  types
+  touched
+  noVis
 end struct
 
 struct UserCommand
@@ -567,16 +630,21 @@ struct ServerClient
   signonStage
   name
   colors
+  privileged
   edictIndex
   socket
   message
   spawnParms
   command
+  pingTimes
+  numPings
+  oldFrags
 end struct
 
 struct GameServer
   active
   loading
+  loadGame
   paused
   time
   mapName
@@ -603,6 +671,8 @@ struct GameServer
   deathmatch
   coop
   serverFlags
+  cdTrack
+  randomSeed
   diagnostics
 end struct
 
@@ -627,7 +697,42 @@ struct LocalClient
   player
   lastMessageTime
   command
+  name
+  colors
   localAuthoritative
+  scores
+  stats
+  itemGetTime
+  completedTime
+  faceAnimTime
+  items
+  idealPitch
+  time
+  oldTime
+  messageTimes
+  velocitySamples
+  viewAngleSamples
+  spawnParms
+  visibleEntities
+  initialized
+  demoPlayback
+  timedemo
+  noLerp
+  lightStyles
+  paused
+  intermission
+  intermissionText
+  cdTrack
+  loopTrack
+  sellScreen
+  standardQuake
+end struct
+
+struct ClientScore
+  name
+  enterTime
+  frags
+  colors
 end struct
 
 struct PlayerState
@@ -758,6 +863,22 @@ struct GameSession
   audioStarted
   renderedFrames
   simulatedFrames
+  demoName
+  demoRecording
+  demoPlayback
+  timedemoActive
+  timedemoStartFrame
+  timedemoStartTime
+  timedemoLastFrame
+  lastRemoteHost
+  demoLoop
+  demoNumber
+  hostTime
+  shutdownStarted
+  inError
+  frameTrace
+  profileTime
+  profileCount
 end struct
 
 // -----------------------------------------------------------------------------
@@ -834,6 +955,9 @@ struct QuakeCContext
   server
   clientMessages
   clientSpawnParms
+  lastCheckClient
+  lastCheckTime
+  checkPvs
 end struct
 
 struct DynamicLight
@@ -855,6 +979,12 @@ struct ClientEntityState
   origin
   angles
   messageTime
+  messageOrigin
+  previousMessageOrigin
+  messageAngles
+  previousMessageAngles
+  forceLink
+  baseline
 end struct
 
 struct SoundEffect
@@ -876,6 +1006,19 @@ struct MixerChannel
   sample
   looping
   active
+  endTime
+end struct
+
+struct MusicTrack
+  number
+  samples
+  rate
+  channels
+  frames
+  position
+  looping
+  playing
+  paused
 end struct
 
 struct SoundMixer
@@ -892,6 +1035,13 @@ struct SoundMixer
   enabled
   underruns
   submittedBuffers
+  music
+  musicVolume
+  paintedTime
+  blockDepth
+  staticAllocations
+  playHash
+  playVolumeHash
 end struct
 
 struct ConsoleState
@@ -904,6 +1054,28 @@ struct ConsoleState
   toggleLatch
   centerText
   centerUntil
+  textBuffer
+  lineWidth
+  totalLines
+  currentLine
+  cursorX
+  carriageReturn
+  notifyTimes
+  realtime
+  visiblePixelLines
+  forcedUp
+  initialized
+  notifyPixelLines
+  debugLog
+  debugLogName
+  filesystem
+  lineCount
+  talkSoundRequested
+  drawTrace
+  updateRequested
+  safePrintDepth
+  notifyBoxText
+  dedicated
 end struct
 
 struct MenuPicture
@@ -926,6 +1098,36 @@ struct MenuState
   initialized
   statusText
   waitingForKey
+  pageSelections
+  drawTrace
+  action
+  setupHostname
+  setupName
+  setupTop
+  setupBottom
+  setupOldTop
+  setupOldBottom
+  lanPort
+  lanPortText
+  lanJoinName
+  joiningGame
+  tcpAvailable
+  localAddress
+  maxPlayers
+  maxPlayersLimit
+  startEpisode
+  startLevel
+  missionPack
+  searchComplete
+  searchCompleteTime
+  servers
+  serverListSorted
+  returnReason
+  enterSound
+  excludedPaths
+  videoDrawCallback
+  videoKeyCallback
+  loadable
 end struct
 
 struct ViewState
@@ -940,6 +1142,28 @@ struct ViewState
   blend
   oldZ
   oldZValid
+  gunOrigin
+  gunAngles
+  pitchVelocity
+  noDrift
+  driftMove
+  lastStop
+  damageTime
+  damageRoll
+  damagePitch
+  cshifts
+  previousCshifts
+  gammaTable
+  ramps
+  oldGamma
+  oldGunYaw
+  oldGunPitch
+  intermission
+  viewModelVisible
+  commandTrace
+  lastInputPitch
+  lastInputPitchValid
+  emptyCshift
 end struct
 
 struct AliasGpuModel
@@ -976,6 +1200,14 @@ struct UdpSocket
   port
   address
   open
+  bindAddress
+  broadcast
+end struct
+
+struct WinSockAddress
+  family
+  address
+  port
 end struct
 
 struct HostSoakResult
@@ -1028,6 +1260,12 @@ struct DemoPlayback
   payloadBytes
   complete
   errors
+  timedemo
+  startFrame
+  startTime
+  lastFrame
+  stopped
+  finishResult
 end struct
 
 struct DemoVerification
@@ -1054,4 +1292,11 @@ struct DatagramChannel
   unreliableSendSequence
   unreliableReceiveSequence
   droppedUnreliable
+  ackSequence
+  sendMessage
+  receiveMessage
+  canSend
+  sendNext
+  lastSendTime
+  packetsReSent
 end struct

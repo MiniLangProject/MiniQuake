@@ -1,0 +1,97 @@
+{
+  "schema": "miniquake.differential.v1",
+  "unit": "sv_user",
+  "reference_execution": "patched-pinned-source-worktree",
+  "command": "py -3 tools/sv_user_differential.py",
+  "inputs": {
+    "reference_source": "reference/quake/WinQuake/sv_user.c",
+    "reference_harness": "reference/harness/sv_user_pinned_driver.c",
+    "instrumentation_patch": "reference/patches/sv_user_pinned_oracle.patch",
+    "oracle_stub_header": "reference/harness/sv_user_oracle_stubs.h",
+    "minilang_fixture": "tests/sv_user_differential_fixture.ml",
+    "ported_module": "src/miniquake/sv_user.ml"
+  },
+  "pinned_commit": "bf4ac424ce754894ac8f1dae6a3981954bc9852d",
+  "events": 15,
+  "epsilon": 1e-5,
+  "functions": [
+    {
+      "name": "SV_SetIdealPitch",
+      "source_definitions": 1,
+      "evidence": ["differential:uniform_slope", "focused:bsp_trace"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "SV_UserFriction",
+      "source_definitions": 1,
+      "evidence": ["differential:floor", "differential:edge"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "SV_Accelerate",
+      "source_definitions": 1,
+      "evidence": ["differential:ground"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "SV_Accelerate",
+      "source_definitions": 1,
+      "evidence": ["excluded-build-configuration:#if-0-alternate-body"],
+      "classification": "excluded-build-configuration"
+    },
+    {
+      "name": "SV_AirAccelerate",
+      "source_definitions": 1,
+      "evidence": ["differential:cap30"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "DropPunchAngle",
+      "source_definitions": 1,
+      "evidence": ["differential:decay"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "SV_WaterMove",
+      "source_definitions": 1,
+      "evidence": ["differential:forward", "differential:idle_sink"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "SV_WaterJump",
+      "source_definitions": 1,
+      "evidence": ["differential:active", "differential:expired"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "SV_AirMove",
+      "source_definitions": 1,
+      "evidence": ["differential:noclip"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "SV_ClientThink",
+      "source_definitions": 1,
+      "evidence": ["differential:waterjump-angles"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "SV_ReadClientMove",
+      "source_definitions": 1,
+      "evidence": ["differential:protocol15"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "SV_ReadClientMessage",
+      "source_definitions": 1,
+      "evidence": ["differential:string-and-move"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "SV_RunClients",
+      "source_definitions": 1,
+      "evidence": ["differential:pause-spawn-gate"],
+      "classification": "reference-differential"
+    }
+  ]
+}

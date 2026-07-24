@@ -1,10 +1,14 @@
 package miniquake.quakec.vm
 
 import miniquake.types as t
+import miniquake.constants as c
 import miniquake.native as native
 import miniquake.quakec.opcodes as op
 import miniquake.byteio as bio
 import miniquake.array_util as arrayutil
+
+const MAX_STACK_DEPTH = 32
+const LOCALSTACK_SIZE = 2048
 
 function zeroArray(count)
   return arrayutil.makeFilledArray(count, 0)
@@ -24,7 +28,7 @@ function create(program, maxEdicts)
   end while
   edictFree = arrayutil.makeFilledArray(maxEdicts, true)
   if maxEdicts > 0 then edictFree[0] = false end if
-  return t.QuakeCMachine(program, globals, [], 0, 0, 0, edicts, [], 100000, void, edictFree, [], 1)
+  return t.QuakeCMachine(program, globals, [], 0, 0, 0, 0, edicts, [], 100000, void, edictFree, [], 1, false)
 end function
 
 function ensureGlobal(machine, offset)
@@ -131,9 +135,23 @@ function saveLocals(machine, functionValue)
   return saved
 end function
 
+function savedLocalCount(machine)
+  count = 0
+  for each frame in machine.callStack
+    count = count + len(frame.savedLocals)
+  end for
+  return count
+end function
+
 function enterFunction(machine, functionIndex)
   if functionIndex <= 0 or functionIndex >= len(machine.program.functions) then return error(2204, "bad QuakeC function index " + functionIndex) end if
   functionValue = machine.program.functions[functionIndex]
+  // PR_EnterFunction increments pr_depth before checking MAX_STACK_DEPTH, so
+  // depths 1..31 are usable and depth 32 is the original overflow boundary.
+  if len(machine.callStack) + 1 >= MAX_STACK_DEPTH then return error(2214, "QuakeC stack overflow") end if
+  if savedLocalCount(machine) + functionValue.locals > LOCALSTACK_SIZE then
+    return error(2215, "QuakeC locals stack overflow")
+  end if
   frame = t.QuakeCCallFrame(machine.statement, machine.currentFunction, saveLocals(machine, functionValue))
   machine.callStack = machine.callStack + [frame]
   destination = functionValue.parmStart
@@ -158,7 +176,7 @@ function popArray(values)
 end function
 
 function leaveFunction(machine)
-  if len(machine.callStack) == 0 then return false end if
+  if len(machine.callStack) == 0 then return error(2217, "prog stack underflow") end if
   frame = machine.callStack[len(machine.callStack) - 1]
   functionValue = machine.program.functions[machine.currentFunction]
   i = 0
@@ -178,15 +196,217 @@ function callBuiltin(machine, builtinIndex)
   return machine.builtins[index](machine)
 end function
 
+function opcodeName(code)
+  names = [
+    "DONE", "MUL_F", "MUL_V", "MUL_FV", "MUL_VF", "DIV_F",
+    "ADD_F", "ADD_V", "SUB_F", "SUB_V", "EQ_F", "EQ_V", "EQ_S",
+    "EQ_E", "EQ_FNC", "NE_F", "NE_V", "NE_S", "NE_E", "NE_FNC",
+    "LE", "GE", "LT", "GT", "LOAD_F", "LOAD_V", "LOAD_S",
+    "LOAD_ENT", "LOAD_FLD", "LOAD_FNC", "ADDRESS", "STORE_F",
+    "STORE_V", "STORE_S", "STORE_ENT", "STORE_FLD", "STORE_FNC",
+    "STOREP_F", "STOREP_V", "STOREP_S", "STOREP_ENT", "STOREP_FLD",
+    "STOREP_FNC", "RETURN", "NOT_F", "NOT_V", "NOT_S", "NOT_ENT",
+    "NOT_FNC", "IF", "IFNOT", "CALL0", "CALL1", "CALL2", "CALL3",
+    "CALL4", "CALL5", "CALL6", "CALL7", "CALL8", "STATE", "GOTO",
+    "AND", "OR", "BITAND", "BITOR",
+  ]
+  if code < 0 or code >= len(names) then return "BAD_OPCODE_" + code end if
+  return names[code]
+end function
+
+function debugFloor(value)
+  truncated = native.trunc(value)
+  if value < truncated then return truncated - 1 end if
+  return truncated
+end function
+
+function debugCeil(value)
+  truncated = native.trunc(value)
+  if value > truncated then return truncated + 1 end if
+  return truncated
+end function
+
+function debugOneDecimal(value)
+  scaled = 0
+  if value >= 0.0 then scaled = debugFloor(value * 10.0 + 0.5) else scaled = debugCeil(value * 10.0 - 0.5) end if
+  negative = scaled < 0
+  if negative then scaled = -scaled end if
+  text = "" + native.trunc(scaled / 10) + "." + (scaled % 10)
+  if negative then text = "-" + text end if
+  while len(bytes(text)) < 5
+    text = " " + text
+  end while
+  return text
+end function
+
+function definitionAtOffset(definitions, offset)
+  for each definition in definitions
+    if definition.offset == offset then return definition end if
+  end for
+  return void
+end function
+
+function debugValueString(machine, definition, offset)
+  valueType = definition.type & 0x7fff
+  if valueType == c.EV_STRING then return stringAt(machine, offset) end if
+  if valueType == c.EV_ENTITY then return "entity " + word(machine, offset) end if
+  if valueType == c.EV_FUNCTION then
+    index = word(machine, offset)
+    if index < 0 or index >= len(machine.program.functions) then return "" end if
+    return machine.program.functions[index].name + "()"
+  end if
+  if valueType == c.EV_FIELD then
+    field = definitionAtOffset(machine.program.fieldDefs, word(machine, offset))
+    if field is void then return "" end if
+    return "." + field.name
+  end if
+  if valueType == c.EV_VOID then return "void" end if
+  if valueType == c.EV_FLOAT then return debugOneDecimal(globalFloat(machine, offset)) end if
+  if valueType == c.EV_VECTOR then
+    value = vector(machine, offset)
+    return "'" + debugOneDecimal(value.x) + " " + debugOneDecimal(value.y) + " " + debugOneDecimal(value.z) + "'"
+  end if
+  if valueType == c.EV_POINTER then return "pointer" end if
+  return "bad type " + valueType
+end function
+
+function debugGlobalString(machine, offset, includeContents)
+  definition = definitionAtOffset(machine.program.globalDefs, offset)
+  text = ""
+  if definition is void then
+    text = offset + "(???)"
+  else
+    text = offset + "(" + definition.name + ")"
+    if includeContents then text = text + debugValueString(machine, definition, offset) end if
+  end if
+  while len(bytes(text)) < 20
+    text = text + " "
+  end while
+  return text + " "
+end function
+
+function printStatement(machine, statementValue)
+  text = ""
+  codeName = opcodeName(statementValue.op)
+  if statementValue.op >= 0 and statementValue.op <= op.OP_BITOR then
+    text = codeName + " "
+    padding = len(bytes(codeName))
+    while padding < 10
+      text = text + " "
+      padding = padding + 1
+    end while
+  end if
+  if statementValue.op == op.OP_IF or statementValue.op == op.OP_IFNOT then
+    return text + debugGlobalString(machine, statementValue.a, true) + "branch " + statementValue.b
+  end if
+  if statementValue.op == op.OP_GOTO then return text + "branch " + statementValue.a end if
+  if statementValue.op >= op.OP_STORE_F and statementValue.op <= op.OP_STORE_FNC then
+    return text + debugGlobalString(machine, statementValue.a, true) +
+      debugGlobalString(machine, statementValue.b, false)
+  end if
+  if statementValue.a != 0 then text = text + debugGlobalString(machine, statementValue.a, true) end if
+  if statementValue.b != 0 then text = text + debugGlobalString(machine, statementValue.b, true) end if
+  if statementValue.c != 0 then text = text + debugGlobalString(machine, statementValue.c, false) end if
+  return text
+end function
+
+function stackLine(functionValue)
+  fileName = functionValue.file
+  while len(bytes(fileName)) < 12
+    fileName = " " + fileName
+  end while
+  return fileName + " : " + functionValue.name
+end function
+
+function stackTrace(machine)
+  lines = []
+  if len(machine.callStack) == 0 then return ["<NO STACK>"] end if
+  index = len(machine.callStack) - 1
+  current = machine.currentFunction
+  while index >= 0
+    if current <= 0 or current >= len(machine.program.functions) then
+      lines = lines + ["<NO FUNCTION>"]
+    else
+      functionValue = machine.program.functions[current]
+      lines = lines + [stackLine(functionValue)]
+    end if
+    current = machine.callStack[index].functionIndex
+    index = index - 1
+  end while
+  // pr_stack[0] is the frame that existed before the outermost entry.  The
+  // original trace includes it (normally as <NO FUNCTION>).
+  if current <= 0 or current >= len(machine.program.functions) then
+    lines = lines + ["<NO FUNCTION>"]
+  else
+    lines = lines + [stackLine(machine.program.functions[current])]
+  end if
+  return lines
+end function
+
+function profileReport(machine)
+  lines = []
+  emitted = 0
+  while true
+    bestIndex = -1
+    bestValue = 0
+    index = 0
+    while index < len(machine.program.functions)
+      if machine.program.functions[index].profile > bestValue then
+        bestValue = machine.program.functions[index].profile
+        bestIndex = index
+      end if
+      index = index + 1
+    end while
+    if bestIndex < 0 then break end if
+    if emitted < 10 then lines = lines + [bestValue + " " + machine.program.functions[bestIndex].name] end if
+    functionValue = machine.program.functions[bestIndex]
+    functionValue.profile = 0
+    machine.program.functions[bestIndex] = functionValue
+    emitted = emitted + 1
+  end while
+  return lines
+end function
+
+function runError(machine, message)
+  if machine.context is not void then
+    statementIndex = machine.statement - 1
+    if statementIndex < 0 then statementIndex = 0 end if
+    if statementIndex < len(machine.program.statements) then
+      machine.context.consoleLines = machine.context.consoleLines + [printStatement(machine, machine.program.statements[statementIndex])]
+    end if
+    for each line in stackTrace(machine)
+      machine.context.consoleLines = machine.context.consoleLines + [line]
+    end for
+    machine.context.consoleLines = machine.context.consoleLines + [message]
+  end if
+  machine.callStack = []
+  machine.currentFunction = 0
+  return error(2216, "Program error: " + message)
+end function
+
 function floatTruth(value)
   return value != 0.0
 end function
 
+function stringCompare(left, right)
+  leftBytes = bytes(left)
+  rightBytes = bytes(right)
+  count = len(leftBytes)
+  if len(rightBytes) < count then count = len(rightBytes) end if
+  index = 0
+  while index < count
+    if leftBytes[index] != rightBytes[index] then return leftBytes[index] - rightBytes[index] end if
+    index = index + 1
+  end while
+  return len(leftBytes) - len(rightBytes)
+end function
+
 
 function definitionOffset(definitions, name)
-  wanted = bio.lower(name)
   for each definition in definitions
-    if bio.lower(definition.name) == wanted then return definition.offset end if
+    // ED_FindField/ED_FindGlobal use strcmp.  Treating generated names as
+    // case-insensitive accepts entity/save data that GLQuake rejects.
+    if definition.name == name then return definition.offset end if
   end for
   return -1
 end function
@@ -221,30 +441,39 @@ function executeState(machine, frameOffset, thinkOffset)
 end function
 
 function execute(machine, functionIndex)
-  machine.callStack = []
-  machine.currentFunction = 0
-  machine.statement = 0
-  enterFunction(machine, functionIndex)
+  // PR_ExecuteProgram may be entered recursively from builtins such as
+  // walkmove/movetogoal when relinking an edict touches a trigger.  The stock
+  // VM records the current depth and returns when the nested function has
+  // unwound to that depth; it does not discard the caller's execution state.
+  // Resetting the shared stack here made the suspended caller resume at the
+  // statement following the nested function's DONE opcode.
+  exitDepth = len(machine.callStack)
+  entered = try(enterFunction(machine, functionIndex))
+  if entered is error then return runError(machine, entered.message) end if
   running = true
   steps = 0
   while running
-    if steps >= machine.runaway then return error(2206, "QuakeC runaway loop") end if
-    if machine.statement < 0 or machine.statement >= len(machine.program.statements) then return error(2207, "QuakeC statement outside program") end if
+    if steps >= machine.runaway then return runError(machine, "runaway loop error") end if
+    if machine.statement < 0 or machine.statement >= len(machine.program.statements) then return runError(machine, "statement outside program") end if
     statement = machine.program.statements[machine.statement]
     machine.statement = machine.statement + 1
     steps = steps + 1
+    functionValue = machine.program.functions[machine.currentFunction]
+    functionValue.profile = functionValue.profile + 1
+    machine.program.functions[machine.currentFunction] = functionValue
     code = statement.op
+    if machine.trace and machine.context is not void then
+      machine.context.consoleLines = machine.context.consoleLines + [printStatement(machine, statement)]
+    end if
 
     if code == op.OP_DONE or code == op.OP_RETURN then
       setWord(machine, op.OFS_RETURN, word(machine, statement.a))
       setWord(machine, op.OFS_RETURN + 1, word(machine, statement.a + 1))
       setWord(machine, op.OFS_RETURN + 2, word(machine, statement.a + 2))
       machine.returnWord = word(machine, op.OFS_RETURN)
-      if len(machine.callStack) <= 1 then
-        machine.callStack = []
+      leaveFunction(machine)
+      if len(machine.callStack) <= exitDepth then
         running = false
-      else
-        leaveFunction(machine)
       end if
     else if code == op.OP_MUL_F then
       setGlobalFloat(machine, statement.c, globalFloat(machine, statement.a) * globalFloat(machine, statement.b))
@@ -291,7 +520,7 @@ function execute(machine, functionIndex)
       b = vector(machine, statement.b)
       setGlobalFloat(machine, statement.c, a.x != b.x or a.y != b.y or a.z != b.z)
     else if code == op.OP_NE_S then
-      setGlobalFloat(machine, statement.c, stringAt(machine, statement.a) != stringAt(machine, statement.b))
+      setGlobalFloat(machine, statement.c, stringCompare(stringAt(machine, statement.a), stringAt(machine, statement.b)))
     else if code == op.OP_NE_E or code == op.OP_NE_FNC then
       setGlobalFloat(machine, statement.c, word(machine, statement.a) != word(machine, statement.b))
     else if code == op.OP_LE then
@@ -313,6 +542,9 @@ function execute(machine, functionIndex)
     else if code == op.OP_ADDRESS then
       entityIndex = word(machine, statement.a)
       fieldOffset = word(machine, statement.b)
+      if entityIndex == 0 and machine.context is not void and machine.context.server is not void and machine.context.server.active and not machine.context.server.loading then
+        return runError(machine, "assignment to world entity")
+      end if
       setWord(machine, statement.c, entityIndex * machine.program.entityFields + fieldOffset)
     else if code >= op.OP_STORE_F and code <= op.OP_STORE_FNC then
       setWord(machine, statement.b, word(machine, statement.a))
@@ -339,20 +571,24 @@ function execute(machine, functionIndex)
     else if code == op.OP_NOT_ENT or code == op.OP_NOT_FNC then
       setGlobalFloat(machine, statement.c, word(machine, statement.a) == 0)
     else if code == op.OP_IF then
-      if floatTruth(globalFloat(machine, statement.a)) then machine.statement = machine.statement + statement.b - 1 end if
+      if word(machine, statement.a) != 0 then machine.statement = machine.statement + statement.b - 1 end if
     else if code == op.OP_IFNOT then
-      if not floatTruth(globalFloat(machine, statement.a)) then machine.statement = machine.statement + statement.b - 1 end if
+      if word(machine, statement.a) == 0 then machine.statement = machine.statement + statement.b - 1 end if
     else if code >= op.OP_CALL0 and code <= op.OP_CALL8 then
+      machine.argCount = code - op.OP_CALL0
       targetIndex = word(machine, statement.a)
-      if targetIndex <= 0 or targetIndex >= len(machine.program.functions) then return error(2208, "bad QuakeC call target") end if
+      if targetIndex <= 0 or targetIndex >= len(machine.program.functions) then return runError(machine, "NULL function") end if
       target = machine.program.functions[targetIndex]
       if target.firstStatement < 0 then
-        callBuiltin(machine, target.firstStatement)
+        builtinResult = try(callBuiltin(machine, target.firstStatement))
+        if builtinResult is error then return runError(machine, builtinResult.message) end if
       else
-        enterFunction(machine, targetIndex)
+        entered = try(enterFunction(machine, targetIndex))
+        if entered is error then return runError(machine, entered.message) end if
       end if
     else if code == op.OP_STATE then
-      executeState(machine, statement.a, statement.b)
+      stateResult = try(executeState(machine, statement.a, statement.b))
+      if stateResult is error then return runError(machine, stateResult.message) end if
     else if code == op.OP_GOTO then
       machine.statement = machine.statement + statement.a - 1
     else if code == op.OP_AND then
@@ -364,7 +600,7 @@ function execute(machine, functionIndex)
     else if code == op.OP_BITOR then
       setGlobalFloat(machine, statement.c, native.trunc(globalFloat(machine, statement.a)) | native.trunc(globalFloat(machine, statement.b)))
     else
-      return error(2209, "unsupported QuakeC opcode " + code)
+      return runError(machine, "Bad opcode " + code)
     end if
   end while
   return machine.returnWord
@@ -376,26 +612,23 @@ function setContext(machine, context)
 end function
 
 function fieldOffset(machine, name)
-  wanted = bio.lower(name)
   for each definition in machine.program.fieldDefs
-    if bio.lower(definition.name) == wanted then return definition.offset end if
+    if definition.name == name then return definition.offset end if
   end for
   return -1
 end function
 
 function globalOffset(machine, name)
-  wanted = bio.lower(name)
   for each definition in machine.program.globalDefs
-    if bio.lower(definition.name) == wanted then return definition.offset end if
+    if definition.name == name then return definition.offset end if
   end for
   return -1
 end function
 
 function functionIndex(machine, name)
-  wanted = bio.lower(name)
   index = 0
   while index < len(machine.program.functions)
-    if bio.lower(machine.program.functions[index].name) == wanted then return index end if
+    if machine.program.functions[index].name == name then return index end if
     index = index + 1
   end while
   return 0
@@ -443,7 +676,36 @@ function clearEntity(machine, entityIndex)
 end function
 
 function randomFloat(machine)
-  machine.randomSeed = (machine.randomSeed * 1103515245 + 12345) & 0x7fffffff
-  return (machine.randomSeed & 0xffff) / 65535.0
+  machine.randomSeed = (machine.randomSeed * 214013 + 2531011) & 0xffffffff
+  return ((machine.randomSeed >> 16) & 0x7fff) / 32767.0
 end function
 
+// Names matching the GLQuake entry points keep the source-to-port mapping
+// explicit while the lower-camel functions remain the idiomatic MiniLang API.
+function PR_PrintStatement(machine, statementValue)
+  return printStatement(machine, statementValue)
+end function
+
+function PR_StackTrace(machine)
+  return stackTrace(machine)
+end function
+
+function PR_Profile_f(machine)
+  return profileReport(machine)
+end function
+
+function PR_RunError(machine, message)
+  return runError(machine, message)
+end function
+
+function PR_EnterFunction(machine, functionIndexValue)
+  return enterFunction(machine, functionIndexValue)
+end function
+
+function PR_LeaveFunction(machine)
+  return leaveFunction(machine)
+end function
+
+function PR_ExecuteProgram(machine, functionIndexValue)
+  return execute(machine, functionIndexValue)
+end function

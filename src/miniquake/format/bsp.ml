@@ -4,6 +4,7 @@ import miniquake.types as t
 import miniquake.constants as c
 import miniquake.byteio as bio
 import miniquake.array_util as arrayutil
+import miniquake.native as native
 import std.fs as fs
 
 function parseLumps(data)
@@ -187,8 +188,9 @@ function parseModels(data, lump)
   i = 0
   while i < count
     offset = lump.offset + i * 64
-    mins = t.Vec3(bio.f32(data, offset), bio.f32(data, offset + 4), bio.f32(data, offset + 8))
-    maxs = t.Vec3(bio.f32(data, offset + 12), bio.f32(data, offset + 16), bio.f32(data, offset + 20))
+    // Mod_LoadSubmodels deliberately spreads both sides by one unit.
+    mins = t.Vec3(bio.f32(data, offset) - 1.0, bio.f32(data, offset + 4) - 1.0, bio.f32(data, offset + 8) - 1.0)
+    maxs = t.Vec3(bio.f32(data, offset + 12) + 1.0, bio.f32(data, offset + 16) + 1.0, bio.f32(data, offset + 20) + 1.0)
     origin = t.Vec3(bio.f32(data, offset + 24), bio.f32(data, offset + 28), bio.f32(data, offset + 32))
     headNodes = [bio.i32(data, offset + 36), bio.i32(data, offset + 40), bio.i32(data, offset + 44), bio.i32(data, offset + 48)]
     result[i] = t.BspModel(mins, maxs, origin, headNodes, bio.i32(data, offset + 52), bio.i32(data, offset + 56), bio.i32(data, offset + 60))
@@ -207,7 +209,10 @@ function parseTextures(data, lump)
   while i < count
     relative = bio.i32(data, lump.offset + 4 + i * 4)
     if relative < 0 then
-      result[i] = void
+      // makeEmptyArray already contains void in every slot.  Reassigning void
+      // through an index is rejected by the MiniLang runtime; a negative BSP
+      // miptex offset intentionally leaves this slot empty.
+      i = i
     else
       offset = lump.offset + relative
       if offset + 40 > lump.offset + lump.length then return error(1715, "BSP texture header outside lump") end if
@@ -215,10 +220,21 @@ function parseTextures(data, lump)
       width = bio.i32(data, offset + 16)
       height = bio.i32(data, offset + 20)
       mipOffsets = [bio.i32(data, offset + 24), bio.i32(data, offset + 28), bio.i32(data, offset + 32), bio.i32(data, offset + 36)]
-      pixels = bytes()
-      if width > 0 and height > 0 and mipOffsets[0] >= 40 and offset + mipOffsets[0] + width * height <= lump.offset + lump.length then
-        pixels = slice(data, offset + mipOffsets[0], width * height)
-      end if
+      if width <= 0 or height <= 0 then return error(1724, "Texture " + name + " has invalid dimensions") end if
+      if (width & 15) != 0 or (height & 15) != 0 then return error(1725, "Texture " + name + " is not 16 aligned") end if
+      levelWidth = width
+      levelHeight = height
+      level = 0
+      while level < 4
+        levelSize = levelWidth * levelHeight
+        if mipOffsets[level] < 40 or offset + mipOffsets[level] + levelSize > lump.offset + lump.length then
+          return error(1726, "Texture " + name + " mip level outside lump")
+        end if
+        if levelWidth > 1 then levelWidth = levelWidth / 2 end if
+        if levelHeight > 1 then levelHeight = levelHeight / 2 end if
+        level = level + 1
+      end while
+      pixels = slice(data, offset + mipOffsets[0], width * height)
       result[i] = t.BspTexture(name, width, height, mipOffsets, pixels)
     end if
     i = i + 1
@@ -250,7 +266,11 @@ function tokenizeEntities(text)
       scan = i
       count = 0
       while scan < len(source) and source[scan] != 34
-        if source[scan] == 92 and scan + 1 < len(source) then scan = scan + 1 end if
+        // COM_Parse leaves backslash pairs in quoted entity text and
+        // ED_NewString performs the conversion afterwards: \n becomes a
+        // newline, while every other pair becomes one literal backslash.
+        // A backslash does not escape a quote in the original parser.
+        if source[scan] == 92 and scan + 1 < len(source) and source[scan + 1] != 34 then scan = scan + 1 end if
         count = count + 1
         scan = scan + 1
       end while
@@ -258,8 +278,12 @@ function tokenizeEntities(text)
       inputIndex = start
       outputIndex = 0
       while inputIndex < scan
-        if source[inputIndex] == 92 and inputIndex + 1 < scan then inputIndex = inputIndex + 1 end if
-        output[outputIndex] = source[inputIndex]
+        if source[inputIndex] == 92 and inputIndex + 1 < scan then
+          inputIndex = inputIndex + 1
+          if source[inputIndex] == 110 then output[outputIndex] = 10 else output[outputIndex] = 92 end if
+        else
+          output[outputIndex] = source[inputIndex]
+        end if
         outputIndex = outputIndex + 1
         inputIndex = inputIndex + 1
       end while
@@ -358,29 +382,446 @@ function decompressVisibility(data, offset, rowBytes)
   return output
 end function
 
+function Mod_DecompressVis(data, offset, numLeafs)
+  rowBytes = (numLeafs + 7) >> 3
+  if offset < 0 then return bytes(rowBytes, 255) end if
+  return decompressVisibility(data, offset, rowBytes)
+end function
+
+function exactPrefix(text, prefix)
+  source = bytes(text)
+  wanted = bytes(prefix)
+  if len(wanted) > len(source) then return false end if
+  index = 0
+  while index < len(wanted)
+    if source[index] != wanted[index] then return false end if
+    index = index + 1
+  end while
+  return true
+end function
+
+function sameAnimationName(left, right)
+  leftBytes = bytes(left)
+  rightBytes = bytes(right)
+  if len(leftBytes) != len(rightBytes) or len(leftBytes) < 2 then return false end if
+  index = 2
+  while index < len(leftBytes)
+    if leftBytes[index] != rightBytes[index] then return false end if
+    index = index + 1
+  end while
+  return true
+end function
+
+function animationSlot(name)
+  source = bytes(name)
+  if len(source) < 2 or source[0] != 43 then return error(1727, "Bad animating texture " + name) end if
+  value = source[1]
+  if value >= 97 and value <= 122 then value = value - 32 end if
+  if value >= 48 and value <= 57 then return [0, value - 48] end if
+  if value >= 65 and value <= 74 then return [1, value - 65] end if
+  return error(1727, "Bad animating texture " + name)
+end function
+
+function emptyAnimationTable(count)
+  result = arrayutil.makeEmptyArray(count)
+  index = 0
+  while index < count
+    // anim_total, anim_min, anim_max, anim_next, alternate_anims
+    result[index] = [0, 0, 0, -1, -1]
+    index = index + 1
+  end while
+  return result
+end function
+
+// The pointer links of texture_t are represented as stable texture indices.
+function sequenceTextureAnimations(textures)
+  table = emptyAnimationTable(len(textures))
+  index = 0
+  while index < len(textures)
+    texture = textures[index]
+    if texture is void or not exactPrefix(texture.name, "+") or table[index][3] >= 0 then index = index + 1; continue end if
+    regular = arrayutil.makeFilledArray(10, -1)
+    alternate = arrayutil.makeFilledArray(10, -1)
+    max = 0
+    alternateMax = 0
+
+    scan = index
+    while scan < len(textures)
+      candidate = textures[scan]
+      if candidate is not void and exactPrefix(candidate.name, "+") and sameAnimationName(candidate.name, texture.name) then
+        slot = animationSlot(candidate.name)
+        if slot is error then return slot end if
+        if slot[0] == 0 then
+          regular[slot[1]] = scan
+          if slot[1] + 1 > max then max = slot[1] + 1 end if
+        else
+          alternate[slot[1]] = scan
+          if slot[1] + 1 > alternateMax then alternateMax = slot[1] + 1 end if
+        end if
+      end if
+      scan = scan + 1
+    end while
+
+    frame = 0
+    while frame < max
+      textureIndex = regular[frame]
+      if textureIndex < 0 then return error(1728, "Missing frame " + frame + " of " + texture.name) end if
+      table[textureIndex] = [max * 2, frame * 2, (frame + 1) * 2, regular[(frame + 1) % max], -1]
+      if alternateMax > 0 then table[textureIndex][4] = alternate[0] end if
+      frame = frame + 1
+    end while
+    frame = 0
+    while frame < alternateMax
+      textureIndex = alternate[frame]
+      if textureIndex < 0 then return error(1729, "Missing frame " + frame + " of " + texture.name) end if
+      table[textureIndex] = [alternateMax * 2, frame * 2, (frame + 1) * 2, alternate[(frame + 1) % alternateMax], -1]
+      if max > 0 then table[textureIndex][4] = regular[0] end if
+      frame = frame + 1
+    end while
+    index = index + 1
+  end while
+  return table
+end function
+
+function textureAnimationIndex(textures, baseIndex, time, alternate)
+  if baseIndex < 0 or baseIndex >= len(textures) or textures[baseIndex] is void then return baseIndex end if
+  table = sequenceTextureAnimations(textures)
+  if table is error then return table end if
+  current = baseIndex
+  if alternate and table[current][4] >= 0 then current = table[current][4] end if
+  total = table[current][0]
+  if total == 0 then return current end if
+  relative = native.trunc(time * 10.0) % total
+  traversed = 0
+  while relative < table[current][1] or relative >= table[current][2]
+    current = table[current][3]
+    traversed = traversed + 1
+    if current < 0 or current >= len(table) or traversed > 100 then return error(1730, "R_TextureAnimation: broken cycle") end if
+  end while
+  return current
+end function
+
+function floorValue(value)
+  result = native.trunc(value)
+  if result > value then result = result - 1 end if
+  return result
+end function
+
+function ceilValue(value)
+  result = native.trunc(value)
+  if result < value then result = result + 1 end if
+  return result
+end function
+
+function surfaceVertex(map, face, edgeNumber)
+  surfEdgeIndex = face.firstEdge + edgeNumber
+  if surfEdgeIndex < 0 or surfEdgeIndex >= len(map.surfEdges) then return error(1731, "CalcSurfaceExtents: bad surfedge") end if
+  signedEdge = map.surfEdges[surfEdgeIndex]
+  edgeIndex = signedEdge
+  if edgeIndex < 0 then edgeIndex = -edgeIndex end if
+  if edgeIndex < 0 or edgeIndex >= len(map.edges) then return error(1732, "CalcSurfaceExtents: bad edge") end if
+  edge = map.edges[edgeIndex]
+  vertexIndex = edge.vertex0
+  if signedEdge < 0 then vertexIndex = edge.vertex1 end if
+  if vertexIndex < 0 or vertexIndex >= len(map.vertices) then return error(1733, "CalcSurfaceExtents: bad vertex") end if
+  return map.vertices[vertexIndex].position
+end function
+
+function CalcSurfaceExtents(map, faceIndex)
+  if faceIndex < 0 or faceIndex >= len(map.faces) then return error(1734, "CalcSurfaceExtents: bad surface") end if
+  face = map.faces[faceIndex]
+  if face.texInfo < 0 or face.texInfo >= len(map.texInfo) then return error(1735, "CalcSurfaceExtents: bad texinfo") end if
+  tex = map.texInfo[face.texInfo]
+  minimums = [999999.0, 999999.0]
+  maximums = [-99999.0, -99999.0]
+  edge = 0
+  while edge < face.numEdges
+    vertex = surfaceVertex(map, face, edge)
+    if vertex is error then return vertex end if
+    s = vertex.x * tex.s[0] + vertex.y * tex.s[1] + vertex.z * tex.s[2] + tex.s[3]
+    tv = vertex.x * tex.t[0] + vertex.y * tex.t[1] + vertex.z * tex.t[2] + tex.t[3]
+    if s < minimums[0] then minimums[0] = s end if
+    if s > maximums[0] then maximums[0] = s end if
+    if tv < minimums[1] then minimums[1] = tv end if
+    if tv > maximums[1] then maximums[1] = tv end if
+    edge = edge + 1
+  end while
+  textureMins = [0, 0]
+  extents = [0, 0]
+  axis = 0
+  while axis < 2
+    blockMin = floorValue(minimums[axis] / 16.0)
+    blockMax = ceilValue(maximums[axis] / 16.0)
+    textureMins[axis] = blockMin * 16
+    extents[axis] = (blockMax - blockMin) * 16
+    if (tex.flags & c.TEX_SPECIAL) == 0 and extents[axis] > 512 then return error(1736, "Bad surface extents") end if
+    axis = axis + 1
+  end while
+  return [textureMins, extents]
+end function
+
+function texInfoMipAdjust(info)
+  lengthS = native.sqrt(info.s[0] * info.s[0] + info.s[1] * info.s[1] + info.s[2] * info.s[2])
+  lengthT = native.sqrt(info.t[0] * info.t[0] + info.t[1] * info.t[1] + info.t[2] * info.t[2])
+  average = (lengthS + lengthT) / 2.0
+  if average < 0.32 then return 4 end if
+  if average < 0.49 then return 3 end if
+  if average < 0.99 then return 2 end if
+  return 1
+end function
+
+function planeSignBits(plane)
+  bits = 0
+  if plane.normal.x < 0.0 then bits = bits | 1 end if
+  if plane.normal.y < 0.0 then bits = bits | 2 end if
+  if plane.normal.z < 0.0 then bits = bits | 4 end if
+  return bits
+end function
+
+function Mod_SetParent(map)
+  nodeParents = arrayutil.makeFilledArray(len(map.nodes), -1)
+  leafParents = arrayutil.makeFilledArray(len(map.leafs), -1)
+  if len(map.nodes) == 0 then return [nodeParents, leafParents] end if
+  pendingNodes = arrayutil.makeFilledArray(len(map.nodes), 0)
+  pendingParents = arrayutil.makeFilledArray(len(map.nodes), -1)
+  visited = bytes(len(map.nodes))
+  top = 1
+  while top > 0
+    top = top - 1
+    nodeIndex = pendingNodes[top]
+    parentIndex = pendingParents[top]
+    if nodeIndex < 0 or nodeIndex >= len(map.nodes) then return error(1737, "Mod_SetParent: bad node") end if
+    if visited[nodeIndex] != 0 then return error(1754, "Mod_SetParent: cyclic node graph") end if
+    visited[nodeIndex] = 1
+    nodeParents[nodeIndex] = parentIndex
+    node = map.nodes[nodeIndex]
+    children = [node.child0, node.child1]
+    for each child in children
+      if child >= 0 then
+        if top >= len(pendingNodes) then return error(1754, "Mod_SetParent: cyclic node graph") end if
+        pendingNodes[top] = child
+        pendingParents[top] = nodeIndex
+        top = top + 1
+      else
+        leafIndex = -1 - child
+        if leafIndex < 0 or leafIndex >= len(map.leafs) then return error(1738, "Mod_SetParent: bad leaf") end if
+        leafParents[leafIndex] = nodeIndex
+      end if
+    end for
+  end while
+  return [nodeParents, leafParents]
+end function
+
+function faceUnderwater(map, faceIndex)
+  leafIndex = 0
+  while leafIndex < len(map.leafs)
+    leaf = map.leafs[leafIndex]
+    if leaf.contents != c.CONTENTS_EMPTY then
+      mark = 0
+      while mark < leaf.numMarkSurfaces
+        markIndex = leaf.firstMarkSurface + mark
+        if markIndex >= 0 and markIndex < len(map.markSurfaces) and map.markSurfaces[markIndex] == faceIndex then return true end if
+        mark = mark + 1
+      end while
+    end if
+    leafIndex = leafIndex + 1
+  end while
+  return false
+end function
+
+function validateBrushModel(map)
+  if len(map.models) == 0 then return error(1748, "Mod_LoadBrushModel: no submodels") end if
+  animations = sequenceTextureAnimations(map.textures)
+  if animations is error then return animations end if
+  index = 0
+  while index < len(map.edges)
+    edge = map.edges[index]
+    if edge.vertex0 < 0 or edge.vertex0 >= len(map.vertices) or edge.vertex1 < 0 or edge.vertex1 >= len(map.vertices) then
+      return error(1739, "Mod_LoadEdges: bad vertex number")
+    end if
+    index = index + 1
+  end while
+  index = 0
+  while index < len(map.texInfo)
+    info = map.texInfo[index]
+    if len(map.textures) > 0 and (info.textureIndex < 0 or info.textureIndex >= len(map.textures)) then
+      return error(1740, "miptex >= loadmodel->numtextures")
+    end if
+    texInfoMipAdjust(info)
+    index = index + 1
+  end while
+  index = 0
+  while index < len(map.faces)
+    face = map.faces[index]
+    if face.planeIndex < 0 or face.planeIndex >= len(map.planes) then return error(1741, "Mod_LoadFaces: bad plane") end if
+    if face.texInfo < 0 or face.texInfo >= len(map.texInfo) then return error(1742, "Mod_LoadFaces: bad texinfo") end if
+    extents = CalcSurfaceExtents(map, index)
+    if extents is error then return extents end if
+    index = index + 1
+  end while
+  index = 0
+  while index < len(map.markSurfaces)
+    if map.markSurfaces[index] < 0 or map.markSurfaces[index] >= len(map.faces) then return error(1743, "Mod_ParseMarksurfaces: bad surface number") end if
+    index = index + 1
+  end while
+  index = 0
+  while index < len(map.nodes)
+    node = map.nodes[index]
+    if node.planeIndex < 0 or node.planeIndex >= len(map.planes) then return error(1744, "Mod_LoadNodes: bad plane") end if
+    children = [node.child0, node.child1]
+    for each child in children
+      if child >= len(map.nodes) then return error(1745, "Mod_LoadNodes: bad child") end if
+      if child < 0 and (-1 - child < 0 or -1 - child >= len(map.leafs)) then return error(1746, "Mod_LoadNodes: bad leaf") end if
+    end for
+    index = index + 1
+  end while
+  index = 0
+  while index < len(map.clipNodes)
+    if map.clipNodes[index].planeIndex < 0 or map.clipNodes[index].planeIndex >= len(map.planes) then return error(1747, "Mod_LoadClipnodes: bad plane") end if
+    index = index + 1
+  end while
+  index = 0
+  while index < len(map.leafs)
+    leaf = map.leafs[index]
+    if leaf.firstMarkSurface < 0 or leaf.numMarkSurfaces < 0 or leaf.firstMarkSurface + leaf.numMarkSurfaces > len(map.markSurfaces) then
+      return error(1749, "Mod_LoadLeafs: bad marksurface range")
+    end if
+    if leaf.visibilityOffset >= len(map.visibility) then return error(1750, "Mod_LoadLeafs: bad visibility offset") end if
+    index = index + 1
+  end while
+  index = 0
+  while index < len(map.models)
+    model = map.models[index]
+    if model.firstFace < 0 or model.numFaces < 0 or model.firstFace + model.numFaces > len(map.faces) then
+      return error(1751, "Mod_LoadSubmodels: bad face range")
+    end if
+    if model.headNodes[0] < 0 or model.headNodes[0] >= len(map.nodes) then return error(1752, "Mod_LoadSubmodels: bad draw headnode") end if
+    hull = 1
+    while hull < 4
+      if model.headNodes[hull] >= len(map.clipNodes) then return error(1753, "Mod_LoadSubmodels: bad clip headnode") end if
+      hull = hull + 1
+    end while
+    index = index + 1
+  end while
+  parents = Mod_SetParent(map)
+  if parents is error then return parents end if
+  return true
+end function
+
+// Logical equivalents of the original per-lump loaders.  Their storage
+// outputs are immutable arrays rather than hunk pointer ranges.
+function Mod_LoadTextures(data, lump)
+  textures = parseTextures(data, lump)
+  if textures is error then return textures end if
+  animation = sequenceTextureAnimations(textures)
+  if animation is error then return animation end if
+  return textures
+end function
+
+function Mod_LoadLighting(data, lump)
+  return slice(data, lump.offset, lump.length)
+end function
+
+function Mod_LoadVisibility(data, lump)
+  return slice(data, lump.offset, lump.length)
+end function
+
+function Mod_LoadEntities(data, lump)
+  if lump.length == 0 then return "" end if
+  return decode(slice(data, lump.offset, lump.length))
+end function
+
+function Mod_LoadVertexes(data, lump)
+  return parseVertices(data, lump)
+end function
+
+function Mod_LoadSubmodels(data, lump)
+  return parseModels(data, lump)
+end function
+
+function Mod_LoadEdges(data, lump)
+  return parseEdges(data, lump)
+end function
+
+function Mod_LoadTexinfo(data, lump)
+  return parseTexInfo(data, lump)
+end function
+
+function Mod_LoadFaces(data, lump)
+  return parseFaces(data, lump)
+end function
+
+function Mod_LoadNodes(data, lump)
+  return parseNodes(data, lump)
+end function
+
+function Mod_LoadLeafs(data, lump)
+  return parseLeafs(data, lump)
+end function
+
+function Mod_LoadClipnodes(data, lump)
+  return parseClipNodes(data, lump)
+end function
+
+function Mod_LoadMarksurfaces(data, lump)
+  return parseMarkSurfaces(data, lump)
+end function
+
+function Mod_LoadSurfedges(data, lump)
+  return parseSurfEdges(data, lump)
+end function
+
+function Mod_LoadPlanes(data, lump)
+  return parsePlanes(data, lump)
+end function
+
 function parse(data, filename)
   if len(data) < 4 then return error(1722, filename + ": BSP file is truncated") end if
   version = bio.i32(data, 0)
   if version != c.BSP_VERSION then return error(1723, filename + ": unsupported BSP version " + version) end if
   lumps = parseLumps(data)
+  if lumps is error then return lumps end if
   entityLump = lumps[c.LUMP_ENTITIES]
-  entityText = decode(slice(data, entityLump.offset, entityLump.length))
+  entityText = Mod_LoadEntities(data, entityLump)
+  if entityText is error then return entityText end if
   entities = parseEntities(entityText)
-  planes = parsePlanes(data, lumps[c.LUMP_PLANES])
-  textures = parseTextures(data, lumps[c.LUMP_TEXTURES])
-  vertices = parseVertices(data, lumps[c.LUMP_VERTEXES])
-  visibility = slice(data, lumps[c.LUMP_VISIBILITY].offset, lumps[c.LUMP_VISIBILITY].length)
-  nodes = parseNodes(data, lumps[c.LUMP_NODES])
-  texInfo = parseTexInfo(data, lumps[c.LUMP_TEXINFO])
-  faces = parseFaces(data, lumps[c.LUMP_FACES])
-  lighting = slice(data, lumps[c.LUMP_LIGHTING].offset, lumps[c.LUMP_LIGHTING].length)
-  clipNodes = parseClipNodes(data, lumps[c.LUMP_CLIPNODES])
-  leafs = parseLeafs(data, lumps[c.LUMP_LEAFS])
-  markSurfaces = parseMarkSurfaces(data, lumps[c.LUMP_MARKSURFACES])
-  edges = parseEdges(data, lumps[c.LUMP_EDGES])
-  surfEdges = parseSurfEdges(data, lumps[c.LUMP_SURFEDGES])
-  models = parseModels(data, lumps[c.LUMP_MODELS])
-  return t.BspMap(filename, data, version, lumps, entityText, entities, planes, textures, vertices, visibility, nodes, texInfo, faces, lighting, clipNodes, leafs, markSurfaces, edges, surfEdges, models)
+  if entities is error then return entities end if
+  planes = Mod_LoadPlanes(data, lumps[c.LUMP_PLANES])
+  if planes is error then return planes end if
+  textures = Mod_LoadTextures(data, lumps[c.LUMP_TEXTURES])
+  if textures is error then return textures end if
+  vertices = Mod_LoadVertexes(data, lumps[c.LUMP_VERTEXES])
+  if vertices is error then return vertices end if
+  visibility = Mod_LoadVisibility(data, lumps[c.LUMP_VISIBILITY])
+  if visibility is error then return visibility end if
+  nodes = Mod_LoadNodes(data, lumps[c.LUMP_NODES])
+  if nodes is error then return nodes end if
+  texInfo = Mod_LoadTexinfo(data, lumps[c.LUMP_TEXINFO])
+  if texInfo is error then return texInfo end if
+  faces = Mod_LoadFaces(data, lumps[c.LUMP_FACES])
+  if faces is error then return faces end if
+  lighting = Mod_LoadLighting(data, lumps[c.LUMP_LIGHTING])
+  if lighting is error then return lighting end if
+  clipNodes = Mod_LoadClipnodes(data, lumps[c.LUMP_CLIPNODES])
+  if clipNodes is error then return clipNodes end if
+  leafs = Mod_LoadLeafs(data, lumps[c.LUMP_LEAFS])
+  if leafs is error then return leafs end if
+  markSurfaces = Mod_LoadMarksurfaces(data, lumps[c.LUMP_MARKSURFACES])
+  if markSurfaces is error then return markSurfaces end if
+  edges = Mod_LoadEdges(data, lumps[c.LUMP_EDGES])
+  if edges is error then return edges end if
+  surfEdges = Mod_LoadSurfedges(data, lumps[c.LUMP_SURFEDGES])
+  if surfEdges is error then return surfEdges end if
+  models = Mod_LoadSubmodels(data, lumps[c.LUMP_MODELS])
+  if models is error then return models end if
+  map = t.BspMap(filename, data, version, lumps, entityText, entities, planes, textures, vertices, visibility, nodes, texInfo, faces, lighting, clipNodes, leafs, markSurfaces, edges, surfEdges, models)
+  valid = validateBrushModel(map)
+  if valid is error then return valid end if
+  return map
+end function
+
+function Mod_LoadBrushModel(data, filename)
+  return parse(data, filename)
 end function
 
 function load(filename)

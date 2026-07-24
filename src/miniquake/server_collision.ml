@@ -288,9 +288,33 @@ function executeTouch(server, selfIndex, otherIndex)
 end function
 
 function impact(server, firstEntity, secondEntity)
+  // SV_Impact deliberately evaluates the second callback after the first one,
+  // even if the first callback freed either edict.  The C engine still holds
+  // both edict pointers and tests their current touch/solid fields.  Trigger
+  // linking uses executeTouch's validity guard; collision impact must not.
+  machine = server.machine
+  oldSelf = vm.word(machine, c.QC_GLOBAL_SELF)
+  oldOther = vm.word(machine, c.QC_GLOBAL_OTHER)
+  vm.setGlobalFloat(machine, c.QC_GLOBAL_TIME, server.time)
   touched = 0
-  if executeTouch(server, firstEntity, secondEntity) then touched = touched + 1 end if
-  if executeTouch(server, secondEntity, firstEntity) then touched = touched + 1 end if
+  firstSolid = native.trunc(entityFloat(server, firstEntity, "solid", c.SOLID_NOT))
+  firstTouch = entityWord(server, firstEntity, "touch", 0)
+  if firstTouch != 0 and firstSolid != c.SOLID_NOT then
+    vm.setWord(machine, c.QC_GLOBAL_SELF, firstEntity)
+    vm.setWord(machine, c.QC_GLOBAL_OTHER, secondEntity)
+    vm.execute(machine, firstTouch)
+    touched = touched + 1
+  end if
+  secondSolid = native.trunc(entityFloat(server, secondEntity, "solid", c.SOLID_NOT))
+  secondTouch = entityWord(server, secondEntity, "touch", 0)
+  if secondTouch != 0 and secondSolid != c.SOLID_NOT then
+    vm.setWord(machine, c.QC_GLOBAL_SELF, secondEntity)
+    vm.setWord(machine, c.QC_GLOBAL_OTHER, firstEntity)
+    vm.execute(machine, secondTouch)
+    touched = touched + 1
+  end if
+  vm.setWord(machine, c.QC_GLOBAL_SELF, oldSelf)
+  vm.setWord(machine, c.QC_GLOBAL_OTHER, oldOther)
   return touched
 end function
 
@@ -302,9 +326,10 @@ function pushEntity(server, entityIndex, push)
   moveType = c.MOVE_NORMAL
   entityMoveType = native.trunc(entityFloat(server, entityIndex, "movetype", c.MOVETYPE_NONE))
   if entityMoveType == c.MOVETYPE_FLYMISSILE then moveType = c.MOVE_MISSILE end if
-  if entityMoveType == c.MOVETYPE_TOSS or entityMoveType == c.MOVETYPE_BOUNCE or entityMoveType == c.MOVETYPE_FLY or entityMoveType == c.MOVETYPE_FLYMISSILE then
-    moveType = c.MOVE_MISSILE
-  end if
+  solid = native.trunc(entityFloat(server, entityIndex, "solid", c.SOLID_NOT))
+  if solid == c.SOLID_TRIGGER or solid == c.SOLID_NOT then moveType = c.MOVE_NOMONSTERS end if
+  // MOVETYPE_FLYMISSILE takes precedence over the entity's solid type.
+  if entityMoveType == c.MOVETYPE_FLYMISSILE then moveType = c.MOVE_MISSILE end if
   trace = move(server, origin, mins, maxs, target, moveType, entityIndex)
   setEntityVector(server, entityIndex, "origin", trace.endPosition)
   if trace.entity >= 0 and trace.fraction < 1.0 then impact(server, entityIndex, trace.entity) end if

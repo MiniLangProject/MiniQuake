@@ -19,7 +19,23 @@ function drawingClipNodes(map)
   index = 0
   while index < len(map.nodes)
     node = map.nodes[index]
-    result[index] = t.BspClipNode(node.planeIndex, node.child0, node.child1)
+    child0 = node.child0
+    child1 = node.child1
+    // Mod_MakeHull0 converts negative drawing-node children (encoded leaf
+    // indexes) into the leaf's CONTENTS_* value.  Treating -1/-2 directly as
+    // EMPTY/SOLID happens to compile, but reverses or corrupts arbitrary BSP
+    // leaf contents.
+    if child0 < 0 then
+      leafIndex = -1 - child0
+      if leafIndex < 0 or leafIndex >= len(map.leafs) then return error(2507, "Mod_MakeHull0: bad child leaf") end if
+      child0 = map.leafs[leafIndex].contents
+    end if
+    if child1 < 0 then
+      leafIndex = -1 - child1
+      if leafIndex < 0 or leafIndex >= len(map.leafs) then return error(2507, "Mod_MakeHull0: bad child leaf") end if
+      child1 = map.leafs[leafIndex].contents
+    end if
+    result[index] = t.BspClipNode(node.planeIndex, child0, child1)
     index = index + 1
   end while
   return result
@@ -180,18 +196,22 @@ function pointContentsWorld(map, point)
 end function
 
 function leafForPoint(map, point)
-  if len(map.models) == 0 then return 0 end if
+  if map is void or len(map.models) == 0 or len(map.nodes) == 0 then return error(2513, "Mod_PointInLeaf: bad model") end if
   number = map.models[0].headNodes[0]
   while number >= 0
-    if number >= len(map.nodes) then return 0 end if
+    if number >= len(map.nodes) then return error(2514, "Mod_PointInLeaf: bad node") end if
     node = map.nodes[number]
-    if node.planeIndex < 0 or node.planeIndex >= len(map.planes) then return 0 end if
+    if node.planeIndex < 0 or node.planeIndex >= len(map.planes) then return error(2515, "Mod_PointInLeaf: bad plane") end if
     plane = map.planes[node.planeIndex]
     if planeDistance(plane, point) < 0.0 then number = node.child1 else number = node.child0 end if
   end while
   leafIndex = -1 - number
-  if leafIndex < 0 or leafIndex >= len(map.leafs) then return 0 end if
+  if leafIndex < 0 or leafIndex >= len(map.leafs) then return error(2516, "Mod_PointInLeaf: bad leaf") end if
   return leafIndex
+end function
+
+function Mod_PointInLeaf(point, map)
+  return leafForPoint(map, point)
 end function
 
 function leafPvs(map, leafIndex)
@@ -205,6 +225,10 @@ function leafPvs(map, leafIndex)
   leaf = map.leafs[leafIndex]
   if leaf.visibilityOffset < 0 then return bytes(rowBytes, 255) end if
   return bsp.decompressVisibility(map.visibility, leaf.visibilityOffset, rowBytes)
+end function
+
+function Mod_LeafPVS(leafIndex, map)
+  return leafPvs(map, leafIndex)
 end function
 
 function leafVisible(pvs, leafIndex)
@@ -308,4 +332,23 @@ function traceBrushModel(map, modelIndex, entityOrigin, start, mins, maxs, finis
   result = traceInHull(hull, localStart, localFinish)
   if result.fraction != 1.0 then result.endPosition = math.add(result.endPosition, offset) end if
   return result
+end function
+
+function absoluteValue(value)
+  if value < 0.0 then return -value end if
+  return value
+end function
+
+function RadiusFromBounds(mins, maxs)
+  x = absoluteValue(mins.x)
+  if absoluteValue(maxs.x) > x then x = absoluteValue(maxs.x) end if
+  y = absoluteValue(mins.y)
+  if absoluteValue(maxs.y) > y then y = absoluteValue(maxs.y) end if
+  z = absoluteValue(mins.z)
+  if absoluteValue(maxs.z) > z then z = absoluteValue(maxs.z) end if
+  return math.length(t.Vec3(x, y, z))
+end function
+
+function Mod_MakeHull0(map)
+  return drawingClipNodes(map)
 end function

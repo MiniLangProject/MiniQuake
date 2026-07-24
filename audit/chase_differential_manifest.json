@@ -1,0 +1,23 @@
+{
+  "schema": "miniquake.differential.v1",
+  "unit": "chase",
+  "reference_execution": "patched-pinned-source-worktree",
+  "command": "py -3 tools/chase_differential.py",
+  "inputs": {
+    "reference_source": "reference/quake/WinQuake/chase.c",
+    "reference_harness": "reference/harness/chase_pinned_driver.c",
+    "instrumentation_patch": "reference/patches/chase_pinned_oracle.patch",
+    "oracle_stub_header": "reference/harness/chase_oracle_stubs.h",
+    "minilang_fixture": "tests/chase_differential_fixture.ml",
+    "ported_module": "src/miniquake/chase.ml"
+  },
+  "pinned_commit": "bf4ac424ce754894ac8f1dae6a3981954bc9852d",
+  "events": 4,
+  "epsilon": 1e-5,
+  "functions": [
+    {"name": "Chase_Init", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:four-default-cvars"]},
+    {"name": "Chase_Reset", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:no-op"]},
+    {"name": "TraceLine", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:clear-line"]},
+    {"name": "Chase_Update", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:clear-camera"]}
+  ]
+}

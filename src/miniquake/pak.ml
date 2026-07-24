@@ -2,8 +2,13 @@ package miniquake.pak
 
 import miniquake.types as t
 import miniquake.byteio as bio
+import miniquake.crc as crc
 import miniquake.array_util as arrayutil
 import std.fs as fs
+
+const MAX_FILES_IN_PACK = 2048
+const PAK0_COUNT = 339
+const PAK0_CRC = 32981
 
 function parse(data, filename)
   if len(data) < 12 then return error(1500, filename + ": PACK header is truncated") end if
@@ -15,6 +20,7 @@ function parse(data, filename)
   end if
   if directoryOffset + directoryLength > len(data) then return error(1503, filename + ": PACK directory outside file") end if
   count = directoryLength / 64
+  if count > MAX_FILES_IN_PACK then return error(1506, filename + ": too many files in PACK archive") end if
   files = arrayutil.makeEmptyArray(count)
   i = 0
   while i < count
@@ -37,9 +43,8 @@ function load(filename)
 end function
 
 function find(archive, name)
-  wanted = bio.lower(name)
   for each item in archive.files
-    if bio.lower(item.name) == wanted then return item end if
+    if item.name == name then return item end if
   end for
   return void
 end function
@@ -52,4 +57,18 @@ end function
 
 function hasFile(archive, name)
   return find(archive, name) is not void
+end function
+
+function directoryRange(archive)
+  if len(archive.data) < 12 then return error(1507, archive.filename + ": PACK header is truncated") end if
+  return [bio.i32(archive.data, 4), bio.i32(archive.data, 8)]
+end function
+
+function directoryCrc(archive)
+  range = directoryRange(archive)
+  return crc.block(archive.data, range[0], range[1])
+end function
+
+function isOriginalPak0Directory(archive)
+  return archive.numFiles == PAK0_COUNT and directoryCrc(archive) == PAK0_CRC
 end function

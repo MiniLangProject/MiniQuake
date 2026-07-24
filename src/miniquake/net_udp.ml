@@ -5,10 +5,21 @@ import miniquake.native as native
 import miniquake.platform.win32 as win
 
 const MAX_UDP_PAYLOAD = 65507
+defaultBindAddress = "0.0.0.0"
 
 function open(port)
+  return openBound(port, defaultBindAddress)
+end function
+
+function configureBindAddress(address)
+  global defaultBindAddress
+  if address is void or address == "" then defaultBindAddress = "0.0.0.0" else defaultBindAddress = address end if
+  return defaultBindAddress
+end function
+
+function openBound(port, bindAddress)
   if port < 0 or port > 65535 then return error(3200, "UDP_OpenSocket: invalid port " + port) end if
-  handle = native.udpOpen(port)
+  handle = native.udpOpenBound(port, bindAddress)
   if handle == 0 then return error(3201, "UDP_OpenSocket: WSA error " + native.udpLastError()) end if
   actualPort = native.udpBoundPort(handle)
   if actualPort == 0 then
@@ -16,7 +27,9 @@ function open(port)
     native.udpClose(handle)
     return error(3202, "UDP_OpenSocket: getsockname failed with WSA error " + errorCode)
   end if
-  return t.UdpSocket(handle, actualPort, "0.0.0.0", true)
+  actualAddress = native.udpBoundAddress(handle)
+  if actualAddress is void or actualAddress == "" then actualAddress = bindAddress end if
+  return t.UdpSocket(handle, actualPort, "0.0.0.0", true, actualAddress, false)
 end function
 
 function close(socketValue)
@@ -35,6 +48,51 @@ function send(socketValue, address, port, payload)
   written = native.udpSend(socketValue.handle, address, port, payload, len(payload))
   if written < 0 then return error(3207, "UDP_Write: WSA error " + native.udpLastError()) end if
   return written
+end function
+
+function broadcast(socketValue, port, payload)
+  capable = try(makeBroadcastCapable(socketValue))
+  if capable is error then return capable end if
+  return send(socketValue, "255.255.255.255", port, payload)
+end function
+
+function makeBroadcastCapable(socketValue)
+  if socketValue is void or not socketValue.open then return error(3211, "UDP_Broadcast: socket is closed") end if
+  if socketValue.broadcast then return true end if
+  if native.udpEnableBroadcast(socketValue.handle) < 0 then return error(3212, "UDP_Broadcast: WSA error " + native.udpLastError()) end if
+  socketValue.broadcast = true
+  return true
+end function
+
+function peek(socketValue)
+  if socketValue is void or not socketValue.open then return error(3213, "UDP_Peek: socket is closed") end if
+  count = native.udpPeek(socketValue.handle)
+  if count < 0 then return error(3214, "UDP_Peek: WSA error " + native.udpLastError()) end if
+  return count
+end function
+
+function localAddress()
+  address = native.udpLocalAddress()
+  if address is void or address == "" then return "127.0.0.1" end if
+  return address
+end function
+
+function hostName()
+  value = native.udpHostName()
+  if value is void then return "" end if
+  return value
+end function
+
+function resolveName(name)
+  value = native.udpResolveName(name)
+  if value is void or value == "" then return error(3215, "UDP_GetAddrFromName: WSA error " + native.udpLastError()) end if
+  return value
+end function
+
+function reverseName(address)
+  value = native.udpReverseName(address)
+  if value is void or value == "" then return error(3216, "UDP_GetNameFromAddr: WSA error " + native.udpLastError()) end if
+  return value
 end function
 
 function receive(socketValue, capacity)

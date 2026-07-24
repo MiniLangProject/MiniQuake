@@ -2,17 +2,20 @@ package miniquake.quakec.builtins
 
 import miniquake.types as t
 import miniquake.constants as c
-import miniquake.byteio as bio
 import miniquake.native as native
 import miniquake.mathlib as math
 import miniquake.message as msg
 import miniquake.cvar as cvar
 import miniquake.cmd as cmd
+import miniquake.filesystem as filesystem
+import miniquake.byteio as bio
+import miniquake.format.sprite as sprite
 import miniquake.world_bsp as world
 import miniquake.server_collision as collision
 import miniquake.server_move as serverMove
 import miniquake.quakec.opcodes as op
 import miniquake.quakec.vm as qvm
+import miniquake.quakec.edict as qcedict
 
 activeContext = void
 
@@ -87,6 +90,16 @@ function parmString(machine, index)
   return stringAt(machine, parmWord(machine, index))
 end function
 
+function varString(machine, first)
+  text = ""
+  index = first
+  while index < machine.argCount
+    text = text + parmString(machine, index)
+    index = index + 1
+  end while
+  return text
+end function
+
 function internString(machine, text)
   return qvm.internString(machine, text)
 end function
@@ -112,9 +125,8 @@ function returnString(machine, text)
 end function
 
 function definitionOffset(definitions, name)
-  wanted = bio.lower(name)
   for each definition in definitions
-    if bio.lower(definition.name) == wanted then return definition.offset end if
+    if definition.name == name then return definition.offset end if
   end for
   return -1
 end function
@@ -204,39 +216,98 @@ function updateBounds(machine, entityIndex)
   origin = entityVector(machine, entityIndex, "origin")
   mins = entityVector(machine, entityIndex, "mins")
   maxs = entityVector(machine, entityIndex, "maxs")
-  setEntityVector(machine, entityIndex, "absmin", math.add(origin, mins))
-  setEntityVector(machine, entityIndex, "absmax", math.add(origin, maxs))
+  absMin = math.add(origin, mins)
+  absMax = math.add(origin, maxs)
+  flags = native.trunc(entityFloat(machine, entityIndex, "flags"))
+  if (flags & c.FL_ITEM) != 0 then
+    absMin.x = absMin.x - 15.0
+    absMin.y = absMin.y - 15.0
+    absMax.x = absMax.x + 15.0
+    absMax.y = absMax.y + 15.0
+  else
+    absMin.x = absMin.x - 1.0
+    absMin.y = absMin.y - 1.0
+    absMin.z = absMin.z - 1.0
+    absMax.x = absMax.x + 1.0
+    absMax.y = absMax.y + 1.0
+    absMax.z = absMax.z + 1.0
+  end if
+  setEntityVector(machine, entityIndex, "absmin", absMin)
+  setEntityVector(machine, entityIndex, "absmax", absMax)
   setEntityVector(machine, entityIndex, "size", math.subtract(maxs, mins))
 end function
 
-function allocateEdict(machine)
-  index = 1
-  while index < len(machine.edicts)
-    if machine.edictFree[index] then
-      machine.edictFree[index] = false
-      qvm.clearEntity(machine, index)
-      return index
-    end if
-    index = index + 1
-  end while
-  return error(2650, "ED_Alloc: no free edicts")
-end function
-
-function releaseEdict(machine, entityIndex)
-  if entityIndex <= 0 or entityIndex >= len(machine.edicts) then return false end if
-  qvm.clearEntity(machine, entityIndex)
-  machine.edictFree[entityIndex] = true
+function setMinMaxSize(machine, entityIndex, mins, maxs, rotate)
+  if mins.x > maxs.x or mins.y > maxs.y or mins.z > maxs.z then return error(2652, "PF_setsize: backwards mins/maxs") end if
+  // GLQuake's SetMinMaxSize forcibly disables rotation despite accepting the
+  // parameter, so the stored axis-aligned bounds are always the input bounds.
+  setEntityVector(machine, entityIndex, "mins", mins)
+  setEntityVector(machine, entityIndex, "maxs", maxs)
+  updateBounds(machine, entityIndex)
   return true
 end function
 
+function modelBounds(machine, modelName)
+  ctx = context()
+  zero = t.Vec3(0.0, 0.0, 0.0)
+  nameData = bytes(modelName)
+  if len(nameData) > 1 and nameData[0] == 42 and ctx.worldMap is not void then
+    submodel = toNumber(decode(slice(nameData, 1, len(nameData) - 1)))
+    if submodel is not void and submodel >= 0 and submodel < len(ctx.worldMap.models) then
+      model = ctx.worldMap.models[submodel]
+      return [model.mins, model.maxs]
+    end if
+    return [zero, zero]
+  end if
+  lower = bio.lower(modelName)
+  lowerData = bytes(lower)
+  if len(lowerData) >= 4 then
+    suffix = decode(slice(lowerData, len(lowerData) - 4, 4))
+    // Mod_LoadAliasModel in GLQuake explicitly uses this fixed FIXME box.
+    if suffix == ".mdl" then
+      return [t.Vec3(-16.0, -16.0, -16.0), t.Vec3(16.0, 16.0, 16.0)]
+    end if
+    if suffix == ".spr" then
+      if ctx.filesystem is void then return error(2668, "PF_setmodel: no filesystem for " + modelName) end if
+      data = filesystem.readFile(ctx.filesystem, modelName)
+      model = sprite.parse(data, modelName)
+      return sprite.spriteModelBounds(model)
+    end if
+  end if
+  return [zero, zero]
+end function
+
+function allocateEdict(machine)
+  ctx = context()
+  first = 1
+  if ctx is not void and ctx.server is not void then
+    first = ctx.server.maxClients + 1
+  end if
+  return qcedict.allocate(machine, first)
+end function
+
+function releaseEdict(machine, entityIndex)
+  return qcedict.free(machine, entityIndex)
+end function
+
 function precacheIndex(values, name)
-  wanted = bio.lower(name)
   index = 0
   while index < len(values)
-    if bio.lower(values[index]) == wanted then return index end if
+    if values[index] == name then return index end if
     index = index + 1
   end while
   return -1
+end function
+
+function activeEdictLimit(machine)
+  ctx = context()
+  if ctx is not void and ctx.edicts is not void then return ctx.edicts.numEdicts end if
+  return len(machine.edicts)
+end function
+
+function badPrecacheString(name)
+  data = bytes(name)
+  return len(data) == 0 or data[0] <= 32
 end function
 
 function appendConsole(text)
@@ -245,7 +316,7 @@ function appendConsole(text)
 end function
 
 function fixme(machine)
-  return true
+  return error(2650, "unimplemented builtin")
 end function
 
 function makeVectors(machine)
@@ -271,16 +342,8 @@ function setModel(machine)
   if modelIndex < 0 then return error(2651, "PF_setmodel: no precache for " + modelName) end if
   setEntityWord(machine, entityIndex, "model", parmWord(machine, 1))
   setEntityFloat(machine, entityIndex, "modelindex", modelIndex)
-  nameBytes = bytes(modelName)
-  if len(nameBytes) > 1 and nameBytes[0] == 42 then
-    submodel = toNumber(decode(slice(nameBytes, 1, len(nameBytes) - 1)))
-    if submodel is not void and submodel >= 0 and submodel < len(ctx.worldMap.models) then
-      model = ctx.worldMap.models[submodel]
-      setEntityVector(machine, entityIndex, "mins", model.mins)
-      setEntityVector(machine, entityIndex, "maxs", model.maxs)
-      updateBounds(machine, entityIndex)
-    end if
-  end if
+  bounds = modelBounds(machine, modelName)
+  setMinMaxSize(machine, entityIndex, bounds[0], bounds[1], true)
   return true
 end function
 
@@ -288,22 +351,24 @@ function setSize(machine)
   entityIndex = parmWord(machine, 0)
   mins = parmVector(machine, 1)
   maxs = parmVector(machine, 2)
-  if mins.x > maxs.x or mins.y > maxs.y or mins.z > maxs.z then return error(2652, "PF_setsize: backwards mins/maxs") end if
-  setEntityVector(machine, entityIndex, "mins", mins)
-  setEntityVector(machine, entityIndex, "maxs", maxs)
-  updateBounds(machine, entityIndex)
-  return true
+  return setMinMaxSize(machine, entityIndex, mins, maxs, false)
 end function
 
 function breakBuiltin(machine)
   appendConsole("break statement")
-  return true
+  // The C builtin deliberately writes through address -4 to break into a
+  // debugger.  MiniLang cannot reproduce memory corruption, but it must still
+  // abort QuakeC execution instead of returning to the calling mod.
+  return error(2670, "break statement")
 end function
 
 function randomBuiltin(machine)
   ctx = context()
-  ctx.randomSeed = (ctx.randomSeed * 1103515245 + 12345) & 0x7fffffff
-  returnFloat(machine, (ctx.randomSeed & 0xffff) / 65536.0)
+  // WinQuake was built with Microsoft C's rand().  Reproduce its 15-bit
+  // sequence instead of the unrelated ANSI/POSIX LCG previously used here.
+  ctx.randomSeed = (ctx.randomSeed * 214013 + 2531011) & 0xffffffff
+  value = (ctx.randomSeed >> 16) & 0x7fff
+  returnFloat(machine, value / 32767.0)
   return true
 end function
 
@@ -312,12 +377,12 @@ function soundBuiltin(machine)
   entityIndex = parmWord(machine, 0)
   channel = native.trunc(parmFloat(machine, 1))
   sample = parmString(machine, 2)
-  volume = parmFloat(machine, 3)
+  volumeByte = native.trunc(parmFloat(machine, 3) * 255.0)
   attenuation = parmFloat(machine, 4)
   if channel < 0 or channel > 7 then return error(2660, "SV_StartSound: bad channel " + channel) end if
-  if volume < 0.0 or volume > 1.0 then return error(2661, "SV_StartSound: bad volume " + volume) end if
+  if volumeByte < 0 or volumeByte > 255 then return error(2661, "SV_StartSound: bad volume " + volumeByte) end if
   if attenuation < 0.0 or attenuation > 4.0 then return error(2662, "SV_StartSound: bad attenuation " + attenuation) end if
-  ctx.soundEvents = ctx.soundEvents + [[entityIndex, channel, sample, volume, attenuation]]
+  ctx.soundEvents = ctx.soundEvents + [[entityIndex, channel, sample, volumeByte / 255.0, attenuation]]
   return true
 end function
 
@@ -327,13 +392,19 @@ function normalizeBuiltin(machine)
 end function
 
 function errorBuiltin(machine)
-  return error(2653, "QuakeC error: " + parmString(machine, 0))
+  text = varString(machine, 0)
+  appendConsole("======SERVER ERROR: " + text)
+  appendConsole(qcedict.ED_Print(machine, globalWord(machine, "self")))
+  return error(2653, "QuakeC error: " + text)
 end function
 
 function objectErrorBuiltin(machine)
   selfIndex = globalWord(machine, "self")
+  text = varString(machine, 0)
+  appendConsole("======OBJECT ERROR: " + text)
+  appendConsole(qcedict.ED_Print(machine, selfIndex))
   releaseEdict(machine, selfIndex)
-  return error(2654, "QuakeC object error: " + parmString(machine, 0))
+  return error(2654, "QuakeC object error: " + text)
 end function
 
 function vectorLengthBuiltin(machine)
@@ -345,7 +416,7 @@ function vectorYawBuiltin(machine)
   value = parmVector(machine, 0)
   yaw = 0.0
   if value.x != 0.0 or value.y != 0.0 then
-    yaw = math.atan2(value.y, value.x) * math.RAD_TO_DEG
+    yaw = native.trunc(math.atan2(value.y, value.x) * math.RAD_TO_DEG)
     if yaw < 0.0 then yaw = yaw + 360.0 end if
   end if
   returnFloat(machine, yaw)
@@ -380,7 +451,10 @@ function traceLineBuiltin(machine)
   if parmFloat(machine, 2) != 0.0 then moveType = c.MOVE_NOMONSTERS end if
   passedEntity = parmWord(machine, 3)
   zero = t.Vec3(0.0, 0.0, 0.0)
-  if ctx.server is void then
+  if ctx.server is void and ctx.worldMap is void then
+    plane = t.Plane(t.Vec3(0.0, 0.0, 0.0), 0.0, 0, 0)
+    setTraceGlobals(machine, t.Trace(false, false, true, false, 1.0, parmVector(machine, 1), plane, 0))
+  else if ctx.server is void then
     setTraceGlobals(machine, world.traceLine(ctx.worldMap, parmVector(machine, 0), parmVector(machine, 1)))
   else
     setTraceGlobals(machine, collision.move(ctx.server, parmVector(machine, 0), zero, zero, parmVector(machine, 1), moveType, passedEntity))
@@ -388,19 +462,69 @@ function traceLineBuiltin(machine)
   return true
 end function
 
+function newCheckClient(machine, current)
+  ctx = context()
+  if ctx.server is void or ctx.server.maxClients < 1 then return 0 end if
+  server = ctx.server
+  if current < 1 then current = 1 end if
+  if current > server.maxClients then current = server.maxClients end if
+  candidate = current + 1
+  if candidate > server.maxClients then candidate = 1 end if
+  while candidate != current
+    valid = candidate < len(machine.edicts) and not machine.edictFree[candidate]
+    if valid and entityFloat(machine, candidate, "health") <= 0.0 then valid = false end if
+    if valid and (native.trunc(entityFloat(machine, candidate, "flags")) & c.FL_NOTARGET) != 0 then valid = false end if
+    if valid then break end if
+    candidate = candidate + 1
+    if candidate > server.maxClients then candidate = 1 end if
+  end while
+  if candidate >= 0 and candidate < len(machine.edicts) and not machine.edictFree[candidate] then
+    if ctx.worldMap is void then
+      ctx.checkPvs = bytes()
+    else
+      targetView = math.add(entityVector(machine, candidate, "origin"), entityVector(machine, candidate, "view_ofs"))
+      targetLeaf = world.leafForPoint(ctx.worldMap, targetView)
+      ctx.checkPvs = world.leafPvs(ctx.worldMap, targetLeaf)
+    end if
+  else
+    ctx.checkPvs = bytes()
+  end if
+  return candidate
+end function
+
 function checkClientBuiltin(machine)
-  returnWord(machine, 1)
+  ctx = context()
+  if ctx.server is void or ctx.server.maxClients < 1 then returnWord(machine, 0); return true end if
+  server = ctx.server
+  if server.time - ctx.lastCheckTime >= 0.1 then
+    ctx.lastCheckClient = newCheckClient(machine, ctx.lastCheckClient)
+    ctx.lastCheckTime = server.time
+  end if
+
+  candidate = ctx.lastCheckClient
+  if candidate < 1 or candidate >= len(machine.edicts) or machine.edictFree[candidate] then returnWord(machine, 0); return true end if
+  if entityFloat(machine, candidate, "health") <= 0.0 then returnWord(machine, 0); return true end if
+  selfIndex = globalWord(machine, "self")
+  if selfIndex < 0 or selfIndex >= len(machine.edicts) or machine.edictFree[selfIndex] then returnWord(machine, 0); return true end if
+  selfView = math.add(entityVector(machine, selfIndex, "origin"), entityVector(machine, selfIndex, "view_ofs"))
+  selfLeaf = world.leafForPoint(ctx.worldMap, selfView)
+  if selfLeaf <= 0 or not world.leafVisible(ctx.checkPvs, selfLeaf) then returnWord(machine, 0); return true end if
+  returnWord(machine, candidate)
   return true
 end function
 
 function findBuiltin(machine)
-  ctx = context()
   start = parmWord(machine, 0) + 1
   offset = parmWord(machine, 1)
   match = parmString(machine, 2)
+  if offset < 0 or offset >= machine.program.entityFields then return error(2666, "PF_Find: field outside edict") end if
   index = start
-  while index < len(machine.edicts)
-    if not machine.edictFree[index] and stringAt(machine, machine.edicts[index][offset]) == match then returnWord(machine, index); return true end if
+  limit = activeEdictLimit(machine)
+  while index < limit
+    // PF_Find skips a null string_t before strcmp.  An unset field must not
+    // match a request for the empty string.
+    rawString = machine.edicts[index][offset]
+    if not machine.edictFree[index] and rawString != 0 and stringAt(machine, rawString) == match then returnWord(machine, index); return true end if
     index = index + 1
   end while
   returnWord(machine, 0)
@@ -409,8 +533,9 @@ end function
 
 function precacheSoundBuiltin(machine)
   ctx = context()
+  if ctx.server is not void and not ctx.server.loading then return error(2654, "PF_Precache_*: Precache can only be done in spawn functions") end if
   name = parmString(machine, 0)
-  if name == "" then return error(2655, "PF_precache_sound: empty name") end if
+  if badPrecacheString(name) then return error(2655, "PF_precache_sound: bad string") end if
   if precacheIndex(ctx.soundPrecache, name) < 0 then
     if len(ctx.soundPrecache) >= c.MAX_SOUNDS then return error(2656, "PF_precache_sound: overflow") end if
     ctx.soundPrecache = ctx.soundPrecache + [name]
@@ -421,8 +546,9 @@ end function
 
 function precacheModelBuiltin(machine)
   ctx = context()
+  if ctx.server is not void and not ctx.server.loading then return error(2654, "PF_Precache_*: Precache can only be done in spawn functions") end if
   name = parmString(machine, 0)
-  if name == "" then return error(2657, "PF_precache_model: empty name") end if
+  if badPrecacheString(name) then return error(2657, "PF_precache_model: bad string") end if
   if precacheIndex(ctx.modelPrecache, name) < 0 then
     if len(ctx.modelPrecache) >= c.MAX_MODELS then return error(2658, "PF_precache_model: overflow") end if
     ctx.modelPrecache = ctx.modelPrecache + [name]
@@ -447,12 +573,12 @@ function stuffCommandBuiltin(machine)
 end function
 
 function findRadiusBuiltin(machine)
-  ctx = context()
   origin = parmVector(machine, 0)
   radius = parmFloat(machine, 1)
   chain = 0
   index = 1
-  while index < len(machine.edicts)
+  limit = activeEdictLimit(machine)
+  while index < limit
     if not machine.edictFree[index] and entityFloat(machine, index, "solid") != c.SOLID_NOT then
       entityOrigin = entityVector(machine, index, "origin")
       mins = entityVector(machine, index, "mins")
@@ -470,10 +596,24 @@ function findRadiusBuiltin(machine)
 end function
 
 function broadcastPrintBuiltin(machine)
-  buffer = context().reliableDatagram
-  text = parmString(machine, 0)
-  msg.writeByte(buffer, c.SVC_PRINT)
-  msg.writeString(buffer, text)
+  ctx = context()
+  text = varString(machine, 0)
+  if ctx.server is void then
+    // Synthetic VM contexts have no client records, but retain a broadcast
+    // buffer so standalone QuakeC execution can still observe the message.
+    msg.writeByte(ctx.reliableDatagram, c.SVC_PRINT)
+    msg.writeString(ctx.reliableDatagram, text)
+  else
+    index = 0
+    while index < len(ctx.server.clients) and index < len(ctx.clientMessages)
+      client = ctx.server.clients[index]
+      if client.active and client.spawned then
+        msg.writeByte(ctx.clientMessages[index], c.SVC_PRINT)
+        msg.writeString(ctx.clientMessages[index], text)
+      end if
+      index = index + 1
+    end while
+  end if
   appendConsole(text)
   return true
 end function
@@ -483,12 +623,12 @@ function clientPrintBuiltin(machine)
   buffer = clientMessageBuffer(entityIndex)
   if buffer is void then appendConsole("tried to sprint to a non-client"); return true end if
   msg.writeByte(buffer, c.SVC_PRINT)
-  msg.writeString(buffer, parmString(machine, 1))
+  msg.writeString(buffer, varString(machine, 1))
   return true
 end function
 
 function debugPrintBuiltin(machine)
-  appendConsole(parmString(machine, 0))
+  appendConsole(varString(machine, 0))
   return true
 end function
 
@@ -507,20 +647,36 @@ end function
 function floatToStringBuiltin(machine)
   value = parmFloat(machine, 0)
   rounded = native.trunc(value)
-  if value == rounded then returnString(machine, "" + rounded) else returnString(machine, "" + value) end if
+  if value == rounded then returnString(machine, "" + rounded) else returnString(machine, fixedOneDecimal(value)) end if
   return true
+end function
+
+function fixedOneDecimal(value)
+  scaled = 0
+  if value >= 0.0 then scaled = floorNumber(value * 10.0 + 0.5) else scaled = ceilNumber(value * 10.0 - 0.5) end if
+  negative = scaled < 0
+  if negative then scaled = -scaled end if
+  whole = native.trunc(scaled / 10)
+  fraction = scaled % 10
+  text = "" + whole + "." + fraction
+  if negative then text = "-" + text end if
+  while len(bytes(text)) < 5
+    text = " " + text
+  end while
+  return text
 end function
 
 function vectorToStringBuiltin(machine)
   value = parmVector(machine, 0)
-  returnString(machine, "'" + value.x + " " + value.y + " " + value.z + "'")
+  returnString(machine, "'" + fixedOneDecimal(value.x) + " " + fixedOneDecimal(value.y) + " " + fixedOneDecimal(value.z) + "'")
   return true
 end function
 
 function activeEdictCount(machine)
   count = 0
   index = 0
-  while index < len(machine.edicts)
+  limit = activeEdictLimit(machine)
+  while index < limit
     if not machine.edictFree[index] then count = count + 1 end if
     index = index + 1
   end while
@@ -528,23 +684,23 @@ function activeEdictCount(machine)
 end function
 
 function coreDumpBuiltin(machine)
-  appendConsole("QuakeC edicts: " + activeEdictCount(machine))
+  appendConsole(qcedict.ED_PrintEdicts(machine))
   return true
 end function
 
 function traceOnBuiltin(machine)
-  appendConsole("QuakeC statement trace enabled")
+  machine.trace = true
   return true
 end function
 
 function traceOffBuiltin(machine)
-  appendConsole("QuakeC statement trace disabled")
+  machine.trace = false
   return true
 end function
 
 function entityPrintBuiltin(machine)
   entityIndex = parmWord(machine, 0)
-  appendConsole("edict " + entityIndex + " classname=" + entityString(machine, entityIndex, "classname"))
+  appendConsole(qcedict.ED_Print(machine, entityIndex))
   return true
 end function
 
@@ -552,6 +708,10 @@ function traceEntityMove(machine, entityIndex, start, finish)
   mins = entityVector(machine, entityIndex, "mins")
   maxs = entityVector(machine, entityIndex, "maxs")
   ctx = context()
+  if ctx.server is void and ctx.worldMap is void then
+    plane = t.Plane(t.Vec3(0.0, 0.0, 0.0), 0.0, 0, 0)
+    return t.Trace(false, false, true, false, 1.0, finish, plane, 0)
+  end if
   if ctx.server is void then return world.trace(ctx.worldMap, start, mins, maxs, finish) end if
   return collision.move(ctx.server, start, mins, maxs, finish, c.MOVE_NORMAL, entityIndex)
 end function
@@ -559,6 +719,11 @@ end function
 function walkMoveBuiltin(machine)
   ctx = context()
   entityIndex = globalWord(machine, "self")
+  flags = native.trunc(entityFloat(machine, entityIndex, "flags"))
+  if (flags & (c.FL_ONGROUND | c.FL_FLY | c.FL_SWIM)) == 0 then
+    returnFloat(machine, 0.0)
+    return true
+  end if
   yaw = parmFloat(machine, 0) * math.DEG_TO_RAD
   distance = parmFloat(machine, 1)
   movement = t.Vec3(native.cos(yaw) * distance, native.sin(yaw) * distance, 0.0)
@@ -603,11 +768,18 @@ function lightStyleBuiltin(machine)
   value = parmString(machine, 1)
   if style < 0 or style >= len(ctx.lightStyles) then return error(2664, "PF_lightstyle: bad style " + style) end if
   ctx.lightStyles[style] = value
-  for each buffer in ctx.clientMessages
-    msg.writeByte(buffer, c.SVC_LIGHTSTYLE)
-    msg.writeByte(buffer, style)
-    msg.writeString(buffer, value)
-  end for
+  if ctx.server is not void and ctx.server.active and not ctx.server.loading then
+    index = 0
+    while index < len(ctx.server.clients) and index < len(ctx.clientMessages)
+      client = ctx.server.clients[index]
+      if client.active or client.spawned then
+        msg.writeByte(ctx.clientMessages[index], c.SVC_LIGHTSTYLE)
+        msg.writeByte(ctx.clientMessages[index], style)
+        msg.writeString(ctx.clientMessages[index], value)
+      end if
+      index = index + 1
+    end while
+  end if
   return true
 end function
 
@@ -634,12 +806,12 @@ end function
 function checkBottomBuiltin(machine)
   ctx = context()
   entityIndex = parmWord(machine, 0)
-  if ctx.server is not void and collision.checkBottom(ctx.server, entityIndex) then returnFloat(machine, 1.0) else returnFloat(machine, 0.0) end if
+  if ctx.server is not void and ctx.server.worldModel is not void and collision.checkBottom(ctx.server, entityIndex) then returnFloat(machine, 1.0) else returnFloat(machine, 0.0) end if
   return true
 end function
 
 function pointContentsBuiltin(machine)
-  returnFloat(machine, world.pointContentsWorld(context().worldMap, parmVector(machine, 0)))
+  if context().worldMap is void then returnFloat(machine, c.CONTENTS_EMPTY) else returnFloat(machine, world.pointContentsWorld(context().worldMap, parmVector(machine, 0))) end if
   return true
 end function
 
@@ -670,7 +842,6 @@ function aimBuiltin(machine)
 
   bestDirection = forward
   bestDistance = cvar.variableValue(ctx.cvars, "sv_aim")
-  if bestDistance <= 0.0 then bestDistance = 0.93 end if
   bestEntity = 0
   runtime = ctx.server.machine.context.edicts
   candidate = 1
@@ -717,9 +888,9 @@ function localCommandBuiltin(machine)
 end function
 
 function nextEntityBuiltin(machine)
-  ctx = context()
   index = parmWord(machine, 0) + 1
-  while index < len(machine.edicts)
+  limit = activeEdictLimit(machine)
+  while index < limit
     if not machine.edictFree[index] then returnWord(machine, index); return true end if
     index = index + 1
   end while
@@ -766,10 +937,10 @@ function vectorAnglesBuiltin(machine)
   if value.x == 0.0 and value.y == 0.0 then
     if value.z > 0.0 then pitch = 90.0 else pitch = 270.0 end if
   else
-    yaw = math.atan2(value.y, value.x) * math.RAD_TO_DEG
+    yaw = native.trunc(math.atan2(value.y, value.x) * math.RAD_TO_DEG)
     if yaw < 0.0 then yaw = yaw + 360.0 end if
     forward = math.sqrt(value.x * value.x + value.y * value.y)
-    pitch = math.atan2(value.z, forward) * math.RAD_TO_DEG
+    pitch = native.trunc(math.atan2(value.z, forward) * math.RAD_TO_DEG)
     if pitch < 0.0 then pitch = pitch + 360.0 end if
   end if
   returnVector(machine, t.Vec3(pitch, yaw, 0.0))
@@ -851,9 +1022,15 @@ function precacheFileBuiltin(machine)
 end function
 
 function writeStaticBaseline(buffer, machine, entityIndex)
+  modelName = entityString(machine, entityIndex, "model")
+  modelIndex = 0
+  if modelName != "" then
+    modelIndex = precacheIndex(context().modelPrecache, modelName)
+    if modelIndex < 0 then return error(2667, "SV_ModelIndex: model was not precached: " + modelName) end if
+  end if
   origin = entityVector(machine, entityIndex, "origin")
   angles = entityVector(machine, entityIndex, "angles")
-  msg.writeByte(buffer, native.trunc(entityFloat(machine, entityIndex, "modelindex")))
+  msg.writeByte(buffer, modelIndex)
   msg.writeByte(buffer, native.trunc(entityFloat(machine, entityIndex, "frame")))
   msg.writeByte(buffer, native.trunc(entityFloat(machine, entityIndex, "colormap")))
   msg.writeByte(buffer, native.trunc(entityFloat(machine, entityIndex, "skin")))
@@ -873,12 +1050,21 @@ end function
 
 function changeLevelBuiltin(machine)
   ctx = context()
-  if ctx.changeLevel == "" then ctx.changeLevel = parmString(machine, 0) end if
+  if ctx.changeLevel == "" then
+    ctx.changeLevel = parmString(machine, 0)
+    if ctx.commands is not void then cmd.addText(ctx.commands, "changelevel " + ctx.changeLevel + "\n") end if
+  end if
   return true
 end function
 
 function cvarSetBuiltin(machine)
-  result = cvar.set(context().cvars, parmString(machine, 0), parmString(machine, 1))
+  ctx = context()
+  name = parmString(machine, 0)
+  if cvar.find(ctx.cvars, name) is void then
+    appendConsole("Cvar_Set: variable " + name + " not found")
+    return true
+  end if
+  result = cvar.set(ctx.cvars, name, parmString(machine, 1))
   if result is error then return result end if
   return true
 end function
@@ -888,7 +1074,7 @@ function centerPrintBuiltin(machine)
   buffer = clientMessageBuffer(entityIndex)
   if buffer is void then appendConsole("tried to centerprint to a non-client"); return true end if
   msg.writeByte(buffer, c.SVC_CENTERPRINT)
-  msg.writeString(buffer, parmString(machine, 1))
+  msg.writeString(buffer, varString(machine, 1))
   return true
 end function
 
@@ -1009,4 +1195,309 @@ function install(machine, contextValue)
     setSpawnParmsBuiltin,
   ]
   return machine
+end function
+
+// GLQuake pr_cmds.c entry points.  These names intentionally mirror the C
+// source so every target function has a concrete, searchable MiniLang pendant.
+function PF_VarString(machine, first)
+  return varString(machine, first)
+end function
+
+function PF_error(machine)
+  return errorBuiltin(machine)
+end function
+
+function PF_objerror(machine)
+  return objectErrorBuiltin(machine)
+end function
+
+function PF_makevectors(machine)
+  return makeVectors(machine)
+end function
+
+function PF_setorigin(machine)
+  return setOrigin(machine)
+end function
+
+function SetMinMaxSize(machine, entityIndex, mins, maxs, rotate)
+  return setMinMaxSize(machine, entityIndex, mins, maxs, rotate)
+end function
+
+function PF_setsize(machine)
+  return setSize(machine)
+end function
+
+function PF_setmodel(machine)
+  return setModel(machine)
+end function
+
+function PF_bprint(machine)
+  return broadcastPrintBuiltin(machine)
+end function
+
+function PF_sprint(machine)
+  return clientPrintBuiltin(machine)
+end function
+
+function PF_centerprint(machine)
+  return centerPrintBuiltin(machine)
+end function
+
+function PF_normalize(machine)
+  return normalizeBuiltin(machine)
+end function
+
+function PF_vlen(machine)
+  return vectorLengthBuiltin(machine)
+end function
+
+function PF_vectoyaw(machine)
+  return vectorYawBuiltin(machine)
+end function
+
+function PF_vectoangles(machine)
+  return vectorAnglesBuiltin(machine)
+end function
+
+function PF_random(machine)
+  return randomBuiltin(machine)
+end function
+
+function PF_particle(machine)
+  return particleBuiltin(machine)
+end function
+
+function PF_ambientsound(machine)
+  return ambientSoundBuiltin(machine)
+end function
+
+function PF_sound(machine)
+  return soundBuiltin(machine)
+end function
+
+function PF_break(machine)
+  return breakBuiltin(machine)
+end function
+
+function PF_traceline(machine)
+  return traceLineBuiltin(machine)
+end function
+
+function PF_TraceToss(machine)
+  return fixme(machine)
+end function
+
+function PF_checkpos(machine)
+  // The GLQuake function body is intentionally empty and is not installed in
+  // the stock builtin table (slot 5 remains PF_Fixme).
+  return true
+end function
+
+function PF_newcheckclient(machine, check)
+  return newCheckClient(machine, check)
+end function
+
+function PF_checkclient(machine)
+  return checkClientBuiltin(machine)
+end function
+
+function PF_stuffcmd(machine)
+  return stuffCommandBuiltin(machine)
+end function
+
+function PF_localcmd(machine)
+  return localCommandBuiltin(machine)
+end function
+
+function PF_cvar(machine)
+  return cvarBuiltin(machine)
+end function
+
+function PF_cvar_set(machine)
+  return cvarSetBuiltin(machine)
+end function
+
+function PF_findradius(machine)
+  return findRadiusBuiltin(machine)
+end function
+
+function PF_dprint(machine)
+  return debugPrintBuiltin(machine)
+end function
+
+function PF_ftos(machine)
+  return floatToStringBuiltin(machine)
+end function
+
+function PF_fabs(machine)
+  return absoluteBuiltin(machine)
+end function
+
+function PF_vtos(machine)
+  return vectorToStringBuiltin(machine)
+end function
+
+function PF_etos(machine)
+  return fixme(machine)
+end function
+
+function PF_Spawn(machine)
+  return spawnBuiltin(machine)
+end function
+
+function PF_Remove(machine)
+  return removeBuiltin(machine)
+end function
+
+function PF_Find(machine)
+  return findBuiltin(machine)
+end function
+
+function PR_CheckEmptyString(value)
+  if badPrecacheString(value) then return error(2669, "Bad string") end if
+  return true
+end function
+
+function PF_precache_file(machine)
+  return precacheFileBuiltin(machine)
+end function
+
+function PF_precache_sound(machine)
+  return precacheSoundBuiltin(machine)
+end function
+
+function PF_precache_model(machine)
+  return precacheModelBuiltin(machine)
+end function
+
+function PF_coredump(machine)
+  return coreDumpBuiltin(machine)
+end function
+
+function PF_traceon(machine)
+  return traceOnBuiltin(machine)
+end function
+
+function PF_traceoff(machine)
+  return traceOffBuiltin(machine)
+end function
+
+function PF_eprint(machine)
+  return entityPrintBuiltin(machine)
+end function
+
+function PF_walkmove(machine)
+  return walkMoveBuiltin(machine)
+end function
+
+function PF_droptofloor(machine)
+  return dropToFloorBuiltin(machine)
+end function
+
+function PF_lightstyle(machine)
+  return lightStyleBuiltin(machine)
+end function
+
+function PF_rint(machine)
+  return roundBuiltin(machine)
+end function
+
+function PF_floor(machine)
+  return floorBuiltin(machine)
+end function
+
+function PF_ceil(machine)
+  return ceilBuiltin(machine)
+end function
+
+function PF_checkbottom(machine)
+  return checkBottomBuiltin(machine)
+end function
+
+function PF_pointcontents(machine)
+  return pointContentsBuiltin(machine)
+end function
+
+function PF_nextent(machine)
+  return nextEntityBuiltin(machine)
+end function
+
+function PF_aim(machine)
+  return aimBuiltin(machine)
+end function
+
+function PF_changeyaw(machine)
+  return changeYawBuiltin(machine)
+end function
+
+function PF_changepitch(machine)
+  return fixme(machine)
+end function
+
+function WriteDest(machine)
+  return destinationBuffer(machine, native.trunc(parmFloat(machine, 0)))
+end function
+
+function PF_WriteByte(machine)
+  return writeByteBuiltin(machine)
+end function
+
+function PF_WriteChar(machine)
+  return writeCharBuiltin(machine)
+end function
+
+function PF_WriteShort(machine)
+  return writeShortBuiltin(machine)
+end function
+
+function PF_WriteLong(machine)
+  return writeLongBuiltin(machine)
+end function
+
+function PF_WriteAngle(machine)
+  return writeAngleBuiltin(machine)
+end function
+
+function PF_WriteCoord(machine)
+  return writeCoordBuiltin(machine)
+end function
+
+function PF_WriteString(machine)
+  return writeStringBuiltin(machine)
+end function
+
+function PF_WriteEntity(machine)
+  return writeEntityBuiltin(machine)
+end function
+
+function PF_makestatic(machine)
+  return makeStaticBuiltin(machine)
+end function
+
+function PF_setspawnparms(machine)
+  return setSpawnParmsBuiltin(machine)
+end function
+
+function PF_changelevel(machine)
+  return changeLevelBuiltin(machine)
+end function
+
+function PF_WaterMove(machine)
+  return fixme(machine)
+end function
+
+function PF_sin(machine)
+  return fixme(machine)
+end function
+
+function PF_cos(machine)
+  return fixme(machine)
+end function
+
+function PF_sqrt(machine)
+  return fixme(machine)
+end function
+
+function PF_Fixme(machine)
+  return fixme(machine)
 end function

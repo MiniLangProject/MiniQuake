@@ -1,0 +1,5 @@
+LIBRARY crc_oracle
+EXPORTS
+    CRC_Init
+    CRC_ProcessByte
+    CRC_Value

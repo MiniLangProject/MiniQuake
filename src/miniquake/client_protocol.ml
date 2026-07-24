@@ -10,7 +10,7 @@ function event(name, payload)
   return t.ProtocolEvent(name, payload)
 end function
 
-function readBaseline(reader)
+function CL_ParseBaseline(reader)
   model = msg.readByte(reader)
   frame = msg.readByte(reader)
   colormap = msg.readByte(reader)
@@ -26,11 +26,20 @@ function readBaseline(reader)
   return [model, frame, colormap, skin, origin, angles]
 end function
 
-function readFastUpdate(reader, lowBits)
+function readBaseline(reader)
+  return CL_ParseBaseline(reader)
+end function
+
+function CL_ParseUpdate(reader, lowBits)
   bits = lowBits
   if (bits & c.U_MOREBITS) != 0 then bits = bits | (msg.readByte(reader) << 8) end if
-  entityNumber = msg.readByte(reader)
-  if (bits & c.U_LONGENTITY) != 0 then entityNumber = msg.readUnsignedShort(reader) end if
+  entityNumber = 0
+  if (bits & c.U_LONGENTITY) != 0 then
+    entityNumber = msg.readUnsignedShort(reader)
+  else
+    entityNumber = msg.readByte(reader)
+  end if
+  if entityNumber < 0 or entityNumber >= c.MAX_EDICTS then return error(2107, "CL_EntityNum: invalid number " + entityNumber) end if
   model = void
   frame = void
   colormap = void
@@ -38,7 +47,10 @@ function readFastUpdate(reader, lowBits)
   effects = void
   origin = [void, void, void]
   angles = [void, void, void]
-  if (bits & c.U_MODEL) != 0 then model = msg.readByte(reader) end if
+  if (bits & c.U_MODEL) != 0 then
+    model = msg.readByte(reader)
+    if model < 0 or model >= c.MAX_MODELS then return error(2108, "CL_ParseModel: bad modnum " + model) end if
+  end if
   if (bits & c.U_FRAME) != 0 then frame = msg.readByte(reader) end if
   if (bits & c.U_COLORMAP) != 0 then colormap = msg.readByte(reader) end if
   if (bits & c.U_SKIN) != 0 then skin = msg.readByte(reader) end if
@@ -52,8 +64,11 @@ function readFastUpdate(reader, lowBits)
   return event("fast_update", [entityNumber, bits, model, frame, colormap, skin, effects, origin, angles])
 end function
 
-function readClientData(reader)
-  bits = msg.readUnsignedShort(reader)
+function readFastUpdate(reader, lowBits)
+  return CL_ParseUpdate(reader, lowBits)
+end function
+
+function CL_ParseClientdata(reader, bits)
   viewHeight = void
   idealPitch = void
   punch = [void, void, void]
@@ -83,9 +98,15 @@ function readClientData(reader)
   return event("svc_clientdata", [bits, viewHeight, idealPitch, punch, velocity, items, weaponFrame, armor, weapon, health, ammo, shells, nails, rockets, cells, activeWeapon])
 end function
 
-function readServerInfo(reader)
+function readClientData(reader)
+  bits = msg.readUnsignedShort(reader)
+  return CL_ParseClientdata(reader, bits)
+end function
+
+function CL_ParseServerInfo(reader)
   version = msg.readLong(reader)
   maxClients = msg.readByte(reader)
+  if maxClients < 1 or maxClients > c.MAX_CLIENTS then return error(2109, "Bad maxclients (" + maxClients + ") from server") end if
   gameType = msg.readByte(reader)
   levelName = msg.readString(reader)
 
@@ -100,6 +121,7 @@ function readServerInfo(reader)
     if name == "" then
       done = true
     else
+      if modelBuilder.count >= c.MAX_MODELS - 1 then return error(2104, "Server sent too many model precaches") end if
       arrays.pushArrayBuilder(modelBuilder, name)
     end if
   end while
@@ -111,6 +133,7 @@ function readServerInfo(reader)
     if name == "" then
       done = true
     else
+      if soundBuilder.count >= c.MAX_SOUNDS - 1 then return error(2105, "Server sent too many sound precaches") end if
       arrays.pushArrayBuilder(soundBuilder, name)
     end if
   end while
@@ -120,16 +143,26 @@ function readServerInfo(reader)
   return event("svc_serverinfo", [version, maxClients, gameType, levelName, models, sounds])
 end function
 
-function readSound(reader)
+function readServerInfo(reader)
+  return CL_ParseServerInfo(reader)
+end function
+
+function CL_ParseStartSoundPacket(reader)
   fieldMask = msg.readByte(reader)
   volume = 255
   attenuation = 1.0
-  if (fieldMask & 1) != 0 then volume = msg.readByte(reader) end if
-  if (fieldMask & 2) != 0 then attenuation = msg.readByte(reader) / 64.0 end if
+  if (fieldMask & c.SND_VOLUME) != 0 then volume = msg.readByte(reader) end if
+  if (fieldMask & c.SND_ATTENUATION) != 0 then attenuation = msg.readByte(reader) / 64.0 end if
   channel = msg.readShort(reader)
   sound = msg.readByte(reader)
+  entityNumber = channel >> 3
+  if entityNumber > c.MAX_EDICTS then return error(2106, "CL_ParseStartSoundPacket: ent = " + entityNumber) end if
   position = t.Vec3(msg.readCoord(reader), msg.readCoord(reader), msg.readCoord(reader))
   return event("svc_sound", [fieldMask, volume, attenuation, channel, sound, position])
+end function
+
+function readSound(reader)
+  return CL_ParseStartSoundPacket(reader)
 end function
 
 function readParticle(reader)
@@ -140,12 +173,20 @@ function readParticle(reader)
   return event("svc_particle", [origin, direction, count, color])
 end function
 
-function readStaticSound(reader)
+function CL_ParseStaticSound(reader)
   origin = t.Vec3(msg.readCoord(reader), msg.readCoord(reader), msg.readCoord(reader))
   sound = msg.readByte(reader)
   volume = msg.readByte(reader)
   attenuation = msg.readByte(reader)
   return event("svc_spawnstaticsound", [origin, sound, volume, attenuation])
+end function
+
+function readStaticSound(reader)
+  return CL_ParseStaticSound(reader)
+end function
+
+function CL_ParseStatic(reader)
+  return event("svc_spawnstatic", CL_ParseBaseline(reader))
 end function
 
 function parse(data)
@@ -211,7 +252,7 @@ function parse(data)
       origin = t.Vec3(msg.readCoord(reader), msg.readCoord(reader), msg.readCoord(reader))
       nextEvent = event("svc_damage", [save, take, origin])
     else if command == c.SVC_SPAWNSTATIC then
-      nextEvent = event("svc_spawnstatic", readBaseline(reader))
+      nextEvent = CL_ParseStatic(reader)
     else if command == c.SVC_SPAWNBASELINE then
       entityNumber = msg.readShort(reader)
       nextEvent = event("svc_spawnbaseline", [entityNumber, readBaseline(reader)])
@@ -243,6 +284,7 @@ function parse(data)
       return error(2101, "unknown server command " + command)
     end if
 
+    if nextEvent is error then return nextEvent end if
     if reader.badRead then
       return error(2102, "truncated server message after command " + command)
     end if
@@ -255,4 +297,8 @@ function parse(data)
   end while
 
   return t.ProtocolResult(arrays.finishArrayBuilder(events), reader.readCount)
+end function
+
+function CL_ParseServerMessage(data)
+  return parse(data)
 end function

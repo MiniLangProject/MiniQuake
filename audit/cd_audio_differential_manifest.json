@@ -1,0 +1,27 @@
+{
+  "schema": "miniquake.differential.v1",
+  "unit": "cd_audio",
+  "reference_execution": "patched-pinned-source-worktree",
+  "command": "py -3 tools/cd_audio_differential.py",
+  "inputs": {
+    "reference_source": "reference/quake/WinQuake/cd_win.c",
+    "reference_harness": "reference/harness/cd_audio_pinned_driver.c",
+    "instrumentation_patch": "reference/patches/cd_audio_pinned_oracle.patch",
+    "oracle_stub_header": "reference/harness/cd_audio_oracle_stubs.h",
+    "minilang_fixture": "tests/cd_audio_differential_fixture.ml",
+    "ported_module": "src/miniquake/sound/cd_audio.ml"
+  },
+  "pinned_commit": "bf4ac424ce754894ac8f1dae6a3981954bc9852d",
+  "events": 8,
+  "epsilon": 1e-5,
+  "functions": [
+    {"name": "CDAudio_Play", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:loop"]},
+    {"name": "CDAudio_Stop", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:active"]},
+    {"name": "CDAudio_Pause", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:active"]},
+    {"name": "CDAudio_Resume", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:paused"]},
+    {"name": "CD_f", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:remap-loop"]},
+    {"name": "CDAudio_Update", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:binary-volume"]},
+    {"name": "CDAudio_Init", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:ready"]},
+    {"name": "CDAudio_Shutdown", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:close"]}
+  ]
+}

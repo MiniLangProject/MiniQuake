@@ -1,0 +1,3 @@
+LIBRARY cl_tent_oracle
+EXPORTS
+  cl_tent_oracle_jsonl

@@ -26,6 +26,40 @@ function queued(state)
   return native.audioQueued()
 end function
 
+function reset(state)
+  if not state.opened then return false end if
+  return native.audioReset() != 0
+end function
+
+function position(state, sampleMask)
+  if not state.opened then return 0 end if
+  return native.audioPosition(sampleMask)
+end function
+
+function submitted(state)
+  if not state.opened then return 0 end if
+  return native.audioSubmitted()
+end function
+
+function completed(state)
+  if not state.opened then return 0 end if
+  return native.audioCompleted()
+end function
+
+function underruns(state)
+  return native.audioUnderruns()
+end function
+
+function headerState(state, index)
+  if not state.opened then return 0 end if
+  return native.audioHeaderState(index)
+end function
+
+function capacity(state)
+  if not state.opened then return 0 end if
+  return native.audioCapacity()
+end function
+
 function close(state)
   if state.opened then native.audioClose() end if
   state.opened = false

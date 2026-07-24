@@ -1,136 +1,90 @@
 # Portierungsstatus
 
-## Enthaltener Meilenstein
+## Port-Sweep
 
-- MiniLang-Basis, Binär-I/O, CRC, `sizebuf_t`, `MSG_*`, Cvars und Commands
-- PAK-/WAD2-Dateisystem sowie BSP-, MDL-, SPR-, `progs.dat`-, WAV- und DEM-Lader
-- QuakeC-VM, Edict-Grundlagen und ein wachsender Builtin-Satz
-- Protokoll 15, Signon, Baselines, Fast-Entity-Updates und Loopback
-- integrierter Host-, lokaler Server- und Clientpfad
-- Input, Spielerbewegung, BSP-Hull-Trace und Physikgrundlagen
-- texturierter BSP-Pfad, CPU-Lightmaps, Brush-Entities, Modelle, Sprites und Partikel
-- Console, qpic-basiertes WinQuake-Menü, Screen-/HUD-Grundlagen und View-Effekte
-- Software-Soundmixer, 128 Kanäle, Ambient-Loops und `waveOut`
-- Demo-Verifikation, Datagramm-Framing und Winsock-/UDP-Smoke-Test
-- Headless-, Runtime-, Render-, Soak- und Echtdaten-Prüfpfade
-- 15 Kern- und 22 Meilensteinprüfungen
+Der definierte GLQuake-1.09-/Windows-x64-Quellumfang ist vollständig
+zugeordnet. Alle Funktionen besitzen Differentialclaims; deren vollständiger
+branchweiser Agenten-Reaudit läuft:
 
-## Aktuelle Spielbarkeitsrevision
+- **63/63** zielrelevante logische C/H-Einheiten besitzen mindestens ein
+  bestehendes, sinnvolles MiniLang-Pendant.
+- **1069/1069** zielrelevante C-Funktionsdefinitionen besitzen einen
+  MiniLang-Codeort; es gibt keine Kandidaten und keine ungemappten
+  Zielfunktionen.
+- **9/9** zielrelevante Assemblerexporte besitzen einen Codeort.
+- **52/1069 (4,864359 %)** Zieldefinitionen zählen derzeit durch das
+  Vollreview-Gate als strikt bestätigt.
+- **6/63** logische Ziel-Einheiten sind derzeit hashgebunden und branchweise
+  semantisch vollständig reauditiert.
+- **16/16** Core- und **24/24** Milestone-Tests sind im aktuellen Testtreiber
+  verdrahtet und bestanden im letzten vollständigen Build.
 
-### Maus
+Die verbindlichen maschinellen Berichte sind:
 
-- WinQuakes `sensitivity * m_yaw/m_pitch`-Skalierung
-- optionales `m_filter`
-- Pitchgrenzen `-70..80`
-- Reset der Filterhistorie bei Capture-/Fokuswechsel
-- Zentrieren und Verwerfen der ersten nativen Cursorprobe
-- `_windowed_mouse` sowie Freigabe in Menü und Konsole
+- `audit/GLQUAKE_PORT_INVENTORY.json` und
+  `docs/GLQUAKE_PORT_INVENTORY.md` für Codeort- und Einheitenabdeckung
+- `audit/BEHAVIORAL_PARITY.json` und `docs/BEHAVIORAL_PARITY.md` für den
+  davon getrennten strikten Funktionsbeleg
+- `audit/SEMANTIC_AUDIT_PLAN.json`, `audit/SEMANTIC_PORT_REVIEW.json` und
+  `docs/SEMANTIC_PORT_REVIEW.md` für den 63-Einheiten-Vollreview
+- `audit/PORT_COVERAGE.json` und `ORIGINAL_FILE_COVERAGE.md` für den
+  vollständigen gepinnten WinQuake-Dateibaum
 
-### Kamera
+Die 850 nicht einzeln zugeordneten öffentlichen Header-Symbole sind rohe
+Makro-/Typdeklarationen. Sie ändern nicht die C/H-Einheitenquote: Header und
+zugehörige C-Datei werden bewusst als eine logische Portierungseinheit gezählt.
 
-- getrennte lokale, unquantisierte Blickwinkel
-- keine Rückschreibung eigener Protokoll-15-Ursprünge in den autoritativen Spieler
-- originale `oldz`-Treppenglättung mit 80 Einheiten/s und 12-Einheiten-Grenze
-- 1/32-BSP-Nudge
-- originaler `cl_bob` bleibt konfigurierbar erhalten
+## Enthaltener Zielumfang
 
-### Menü
+- PAK, WAD2, BSP29, MDL6, SPR1, `progs.dat` v6, WAV und DEM
+- Quake-Protokoll 15, Signon, Baselines, Fast Updates und Reliable Datagramme
+- QuakeC-VM, Edicts, Stock-Builtins, Host-, Client-, Server- und Physikpfade
+- originale v5-Savegames, Config-Archivierung, Demoaufnahme, Wiedergabe und
+  `timedemo`
+- GLQuake-Rendererpfade, Konsole, Statusbar, Menüs und View-Effekte
+- Software-Soundmixer, `waveOut` und OGG-Ersatz für CD-Tracknummern
+- Win32/WGL, Eingabe, UDP und Audio als begrenzte native Plattformbrücke
+- id1-, hipnotic- und rogue-Suchpfade; proprietäre Spieldaten werden nicht
+  eingecheckt
 
-- originale PAK-qpic-Ressourcen für Haupt-, Singleplayer-, Multiplayer-,
-  Optionen-, Hilfe- und Windows-Quit-Seite
-- animierte Menüpunkte und klassische Menü-Sounds
-- nearest-gefiltertes 320x200-Layout
-- originales 18-Aktionen-Tastenmenü mit Bind/Unbind/Key-Grab
-- Load/Save-, Setup- und Video-Seiten navigierbar; deren Backends sind noch offen
-- vollständige Netzwerkseiten funktional offen
+Ausgeschlossen bleiben WinQuake-Software-Rendering, IPX, Serial/Modem, VCR,
+physische CD-/MCI-Steuerung, Masterserver und NAT-Traversal.
 
-### Sound
+## Automatisierte Integrationsbelege
 
-- 128 Softwarekanäle
-- komplette Level-Sound-Precacheliste
-- View-Entity-Ausnahme von der Distanzdämpfung
-- bewegte Entity-Schallquellen
-- Wasser-/Wind-Ambientkanäle aus BSP-Leafwerten
-- WAVE-Cue-/LIST-Loopmarker
-- breiter Mix-Akkumulator mit einmaliger 16-Bit-Begrenzung
-- `_snd_mixahead`-gesteuerte Queue von drei bis sieben 512-Sample-Blöcken
-- zusätzliches Auffüllen nach dem OpenGL-Swap (`S_ExtraUpdate`-Pfad)
-- `waveOut`-Ring mit Suche nach jedem freien oder fertigen Header
-- Queue-Leerlauf- und Submit-Zähler für Diagnosen
-- CD-Audio/Musik weiterhin offen
+- Build und statische Verifikation mit dem Python-MiniLang-Compiler
+- Steam-Retailstart und 720 integrierte Frames für id1, hipnotic und rogue
+- bytegenaues Parse-/Serialize-Replay der zehn Retail-Demos
+- Save-/Load-, Config-, QuakeC-, Renderer-, Sound- und Protokoll-Fixtures
+- WGL/OpenGL-Smokes, Pixel-Readback und 120 integrierte Renderframes je Spiel
+- getrennte MiniQuake-Prozesse mit LAN-Suche, Protocol-15-Signon und
+  Crash-Reconnect
+- zwei gleichzeitig aktive Clients mit getrennten Loopback-LAN-Adressen,
+  unabhängigen DATA-/ACK-Verlusten, Reordering, 32-KiB/s-Limit je Richtung,
+  gemeinsamem Mapwechsel, isoliertem Timeout und Reconnect
+- 100.000-Frame-id1-Singleplayer-Soak sowie je 10.000 Frames für hipnotic und
+  rogue bei stabilen Heap-Bytes
 
-## Aktueller Gameplay-/Parity-Pass
+## Noch nicht als End-to-End-GLQuake-Abnahme belegt
 
-- stale lokale `svc_clientdata`-Boden-/Velocity-Rückkopplung entfernt
-- WinQuake-nähere Walk-/Step-/Wall-Friction- und Multi-Plane-FlyMove-Physik
-- BSP-Pusher für Türen, Plattformen und Züge mit Blockierungs-Rollback
-- Spielerzustand nach Pusherbewegung erneut aus dem QuakeC-Edict synchronisiert
-- `sv_move.c`-nahe Monsterbewegung (`MoveStep`, ChaseDir, CheckBottom, MoveToGoal)
-- `SU_WEAPON` und Weaponframe/Punch/Velocity im Clientdata-Paket
-- Erstperson-Waffenmodell mit eigener Depth-Range
-- Original-`gfx.wad`-Statusbar mit Zahlen, Faces, Waffen, Ammo, Items und Sigils
-- originales Customize-Controls-Menü mit funktionalem Bind/Unbind
-- systematischer Abgleich in `PORT_AUDIT.md` und `PARITY_TEST_PLAN.md`
+Die 100-%-Funktionsquote ist kein Ersatz für die noch ausstehenden
+prozessweiten Abnahmen:
 
-## Statisch verifiziert
+- MiniQuake-Client gegen historischen GLQuake-Server; die Gegenrichtung
+  GLQuake-Client gegen MiniQuake-Server ist grün. Das unveränderte historische
+  `GLQUAKE.EXE` stürzt im Serverbetrieb reproduzierbar vor Öffnung des
+  Listeners mit `0xC0000005` ab.
+- durchgehende instrumentierte Frame-Traces eines vollständigen
+  Referenzprozesses
+- Referenzscreenshots mit SSIM mindestens 0,99
+- 100.000-Frame-Soaks für Listen-, Dedicated- und Demo-Betrieb
 
-- offizieller MiniLang-Parser: 77 Dateien akzeptiert
-- Projekt-Linter: Package-, Import-, Block- und direkte Arity-Prüfungen bestanden
-- transitive Import-Alias-Eindeutigkeit pro Compile Unit
-- MiniLang-Extern-Deklarationen und DLL-Exporte stimmen überein
-- `miniquake_native.dll` ist eine AMD64-PE-DLL mit 81 Exporten
-- die native Boundary bleibt auf `src/miniquake/native.ml` beschränkt
-- keine Quake-Spieldaten werden verteilt
-- 15 Kern- und 22 Meilensteinprüfungen sind verdrahtet
+Alle 73 spielbaren Retail-Maps aus id1, hipnotic und rogue bestehen bereits
+Protocol-15-Signon, QuakeC-Spawn und Headless-Physikframes.
 
-## Unter Windows automatisiert bestätigt
+Setup-, Video- und Netzwerkmenüfunktionen sind im Port-Sweep enthalten. Noch
+offen ist deren prozessweite Abnahme zusammen mit realem Displaywechsel,
+Gamma/Controller und den oben genannten Resten der Netzwerk-Interop-Matrix.
 
-Der aktuelle Stand besteht:
-
-- vollständigen Build mit `MiniLangCompilerPy`
-- 15 Kern- und 22 Meilensteinprüfungen
-- Steam-Retaildaten mit 424 PAK-Dateien, `gfx.wad`, `progs.dat` und `start.bsp`
-- lokalen Protokoll-15-Handshake bis Signon 4 und QuakeC-Spawn
-- 720 integrierte Headless-Frames
-- BSP-Hull-Trace, Heapprüfung und sauberen Shutdown
-- Winsock-UDP-Loopback
-- WGL/OpenGL-Smoke mit erfolgreichem Pixel-Readback
-- 240 integrierte Frames des texturierten Hosts mit aktivem Audiopfad
-- 10.000-Frame-Soak nach stabilisierter Gameplay-Aufwärmphase
-
-## Manuell noch zu bestätigen
-
-- Maus-Look ohne Pitch-Sprung nach Start, Alt-Tab, Menü und Konsole
-- originales Menü-Artwork und Cursor-/Soundverhalten
-- kontinuierliche Effekt-, Loop- und Ambient-Audioausgabe
-- ruhige lokale Kamera ohne Protokollquantisierungs-Flimmern
-- interaktives Spiel in `start` und anschließend `e1m1`
-
-Der Self-Hosted-Compiler ist derzeit kein Abnahmekriterium: Sein Objekt-Linker
-bricht bei der großen Compile Unit mit einem unbekannten Patch-Target ab,
-während der Python-Referenzcompiler den bisherigen Stand erfolgreich erzeugt.
-
-## Bereits behobene Integrationsblocker
-
-- Standardbibliothek-Importroot und reservierter Importalias
-- Raw-Float-ABI und exakte 32-Bit-Integerbitmasken
-- quadratische Allokationen in Retail-Parsern
-- Signon-Folge `serverinfo -> prespawn -> spawn -> begin -> signon 4`
-- `gfx.wad:conchars`
-- PVS-Zeilenlänge als Integer-Shift
-- Headless-Rendererzugriff im Validator
-- Float-zu-Short-Konvertierung für `clc_move`
-- linearer Client-Protokoll-Eventbuilder für dichte Serverframes
-- korrekte `cstr`-Rückgabekonvertierung des Python-Referenzcompilers
-
-## Noch offen für vollständige 1:1-Parität
-
-- sämtliche QuakeC-Builtins und vollständige Edict-/Savegame-Semantik
-- alle Serverphysik-, Entity-Linking-, Trigger- und Pusher-Sonderfälle
-- vollständige Clientinterpolation, Temporary Entities und Effekte
-- vollständige Lightmap-, Dynamic-Light-, Sky-, Water- und Model-Darstellung
-- vollständige Console-, Scoreboard-, Intermission- und Menü-Backends
-- vollständige Soundparität einschließlich Musik/CD-Audio
-- UDP-Multiplayer, Verbindungsaufbau und zuverlässiger Datagrammtransport
-- Demo-Kompatibilität und deterministisches Timing über längere Läufe
-- historische IPX-/VCR-Pfade, sofern diese Parität gefordert ist
+Der Self-Hosted-Compiler bleibt wie festgelegt außerhalb des
+Funktionsparitäts-Gates.

@@ -1,0 +1,3 @@
+EXPORTS
+    sys_win_oracle_jsonl
+    sys_win_error_case

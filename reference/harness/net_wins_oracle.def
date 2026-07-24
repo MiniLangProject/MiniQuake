@@ -1,0 +1,3 @@
+EXPORTS
+    net_wins_oracle_jsonl
+    net_wins_error_case

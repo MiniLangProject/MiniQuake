@@ -1,7 +1,20 @@
+/*
+Copyright (C) 1996-1997 Id Software, Inc.
+Copyright (C) 2026 MiniQuake contributors
+
+MiniLang pendant for WinQuake/r_part.c.  The C free/active linked lists are
+represented by a bounded ParticleSystem whose active array retains list order.
+*/
+
 package miniquake.particles
 
 import miniquake.types as t
 import miniquake.mathlib as math
+import miniquake.native as native
+import miniquake.common as common
+import miniquake.message as msg
+import miniquake.array_util as arrays
+import miniquake.render.alias_normals as aliasNormals
 
 const PT_STATIC = 0
 const PT_GRAVITY = 1
@@ -11,194 +24,694 @@ const PT_EXPLODE = 4
 const PT_EXPLODE2 = 5
 const PT_BLOB = 6
 const PT_BLOB2 = 7
-const MAX_PARTICLES = 4096
+
+const MAX_PARTICLES = 2048
+const ABSOLUTE_MIN_PARTICLES = 512
+const NUM_VERTEX_NORMALS = 162
 
 ramp1 = [0x6f, 0x6d, 0x6b, 0x69, 0x67, 0x65, 0x63, 0x61]
 ramp2 = [0x6f, 0x6e, 0x6d, 0x6c, 0x6b, 0x6a, 0x68, 0x66]
 ramp3 = [0x6d, 0x6b, 6, 5, 4, 3]
 
-function pseudo(seed, span)
-  if span <= 0 then return 0 end if
-  value = (seed * 1103515245 + 12345) & 0x7fffffff
-  return value % span
-end function
+struct ParticleSystem
+  capacity
+  active
+  randomSeed
+  tracerCount
+  angularVelocities
+end struct
+
+compatRandomSeed = 1
+compatTracerCount = 0
+compatAngularVelocities = []
+canonicalVertexNormals = []
 
 function spawn(origin, velocity, dieTime, color, type)
-  return t.Particle(math.copy(origin), math.copy(velocity), dieTime, color, 0.0, type)
+  originCopy = t.Vec3(origin.x, origin.y, origin.z)
+  velocityCopy = t.Vec3(velocity.x, velocity.y, velocity.z)
+  return t.Particle(originCopy, velocityCopy, dieTime, color, 0.0, type)
 end function
 
-function appendLimited(target, source)
-  result = target
+function zeroVector()
+  return t.Vec3(0.0, 0.0, 0.0)
+end function
+
+function createSystem(capacity)
+  if capacity < ABSOLUTE_MIN_PARTICLES then capacity = ABSOLUTE_MIN_PARTICLES end if
+  return ParticleSystem(capacity, [], 1, 0, [])
+end function
+
+function R_InitParticles(arguments)
+  capacity = MAX_PARTICLES
   index = 0
-  while index < len(source) and len(result) < MAX_PARTICLES
-    result = result + [source[index]]
+  while index < len(arguments)
+    if arguments[index] == "-particles" then
+      if index + 1 >= len(arguments) then return error(3700, "-particles requires a count") end if
+      capacity = common.atoi(arguments[index + 1])
+      if capacity < ABSOLUTE_MIN_PARTICLES then capacity = ABSOLUTE_MIN_PARTICLES end if
+      break
+    end if
     index = index + 1
   end while
-  return result
+  return createSystem(capacity)
+end function
+
+function R_ClearParticles(system)
+  system.active = []
+  return system
+end function
+
+function R_SetRandomSeed(system, seed)
+  system.randomSeed = seed & 0xffffffff
+  return system.randomSeed
+end function
+
+// GLQuake's Win32 build uses the Microsoft C runtime rand() sequence.
+function R_Rand(system)
+  system.randomSeed = (system.randomSeed * 214013 + 2531011) & 0xffffffff
+  return (system.randomSeed >> 16) & 0x7fff
+end function
+
+function R_AllocParticle(system)
+  if len(system.active) >= system.capacity then return void end if
+  origin = zeroVector()
+  velocity = zeroVector()
+  particle = spawn(origin, velocity, 0.0, 0, PT_STATIC)
+  // r_part.c links every newly allocated particle at the active-list head.
+  previous = system.active
+  system.active = [particle] + previous
+  return particle
 end function
 
 function rampColor(values, ramp)
-  index = ramp
+  index = native.trunc(ramp)
   if index < 0 then index = 0 end if
   if index >= len(values) then return -1 end if
   return values[index]
 end function
 
-function update(particles, currentTime, deltaTime)
-  alive = []
-  gravity = 800.0
-  for each particle in particles
-    if particle.die >= currentTime then
-      particle.origin = math.multiplyAdd(particle.origin, deltaTime, particle.velocity)
-      keep = true
-      if particle.type == PT_FIRE then
-        particle.ramp = particle.ramp + deltaTime * 5.0
-        color = rampColor(ramp3, particle.ramp)
-        if color < 0 then keep = false else particle.color = color end if
-        particle.velocity.z = particle.velocity.z + gravity * 0.05 * deltaTime
-      else if particle.type == PT_EXPLODE then
-        particle.ramp = particle.ramp + deltaTime * 10.0
-        color = rampColor(ramp1, particle.ramp)
-        if color < 0 then keep = false else particle.color = color end if
-        particle.velocity = math.scale(particle.velocity, 1.0 + deltaTime * 4.0)
-        particle.velocity.z = particle.velocity.z - gravity * deltaTime
-      else if particle.type == PT_EXPLODE2 then
-        particle.ramp = particle.ramp + deltaTime * 15.0
-        color = rampColor(ramp2, particle.ramp)
-        if color < 0 then keep = false else particle.color = color end if
-        particle.velocity = math.scale(particle.velocity, 1.0 - deltaTime)
-        particle.velocity.z = particle.velocity.z - gravity * deltaTime
-      else if particle.type == PT_BLOB then
-        particle.velocity = math.scale(particle.velocity, 1.0 + deltaTime * 4.0)
-        particle.velocity.z = particle.velocity.z - gravity * deltaTime
-      else if particle.type == PT_BLOB2 then
-        particle.velocity = math.scale(particle.velocity, 1.0 - deltaTime * 4.0)
-        particle.velocity.z = particle.velocity.z - gravity * deltaTime
-      else if particle.type == PT_GRAVITY then
-        particle.velocity.z = particle.velocity.z - gravity * deltaTime
-      else if particle.type == PT_SLOW_GRAVITY then
-        particle.velocity.z = particle.velocity.z - gravity * 0.05 * deltaTime
-      end if
-      if keep then alive = alive + [particle] end if
-    end if
-  end for
-  return alive
+function R_DarkFieldParticles(system, entityOrigin, currentTime)
+  i = -16
+  while i < 16
+    j = -16
+    while j < 16
+      k = 0
+      while k < 32
+        particle = R_AllocParticle(system)
+        if particle is void then return system.active end if
+        particle.die = currentTime + 0.2 + (R_Rand(system) & 7) * 0.02
+        particle.color = 150 + (R_Rand(system) % 6)
+        particle.type = PT_SLOW_GRAVITY
+
+        direction = t.Vec3(j * 8.0, i * 8.0, k * 8.0)
+        particle.origin.x = entityOrigin.x + i + (R_Rand(system) & 3)
+        particle.origin.y = entityOrigin.y + j + (R_Rand(system) & 3)
+        particle.origin.z = entityOrigin.z + k + (R_Rand(system) & 3)
+        math.VectorNormalize(direction)
+        velocity = 50.0 + (R_Rand(system) & 63)
+        particle.velocity = math.VectorScale(direction, velocity)
+        k = k + 8
+      end while
+      j = j + 8
+    end while
+    i = i + 8
+  end while
+  return system.active
 end function
 
-function runEffect(origin, direction, count, color, dieTime)
-  if count == 255 then count = 1024 end if
-  if count > MAX_PARTICLES then count = MAX_PARTICLES end if
-  result = []
+function initializeAngularVelocities(system, count)
+  if len(system.angularVelocities) != 0 then return true end if
+  system.angularVelocities = []
   index = 0
   while index < count
-    jitterX = pseudo(index * 3 + color, 16) - 8
-    jitterY = pseudo(index * 5 + color, 16) - 8
-    jitterZ = pseudo(index * 7 + color, 16) - 8
-    position = t.Vec3(origin.x + jitterX, origin.y + jitterY, origin.z + jitterZ)
-    velocity = t.Vec3(
-      direction.x * 15.0 + jitterX,
-      direction.y * 15.0 + jitterY,
-      direction.z * 15.0 + jitterZ,
-    )
-    result = result + [spawn(position, velocity, dieTime + pseudo(index, 6) * 0.1, color + (pseudo(index, 8) & 7), PT_SLOW_GRAVITY)]
+    system.angularVelocities = system.angularVelocities + [
+      t.Vec3(
+        (R_Rand(system) & 255) * 0.01,
+        (R_Rand(system) & 255) * 0.01,
+        (R_Rand(system) & 255) * 0.01,
+      )
+    ]
     index = index + 1
   end while
-  return result
+  return true
 end function
 
-function pointEffect(origin, count, color, dieTime)
-  return runEffect(origin, t.Vec3(0.0, 0.0, 0.0), count, color, dieTime)
-end function
-
-function explosion(origin, currentTime)
-  result = []
+// r_avertexnormals belongs to the renderer rather than r_part.c, so callers
+// provide that canonical 162-vector table as the explicit dependency.
+function R_EntityParticles(system, entityOrigin, currentTime, vertexNormals)
+  count = len(vertexNormals)
+  if count > NUM_VERTEX_NORMALS then count = NUM_VERTEX_NORMALS end if
+  initializeAngularVelocities(system, count)
   index = 0
-  while index < 1024 and len(result) < MAX_PARTICLES
-    position = t.Vec3(
-      origin.x + pseudo(index * 11, 32) - 16,
-      origin.y + pseudo(index * 13, 32) - 16,
-      origin.z + pseudo(index * 17, 32) - 16,
+  while index < count
+    angular = system.angularVelocities[index]
+    yaw = currentTime * angular.x
+    pitch = currentTime * angular.y
+    roll = currentTime * angular.z
+    sy = math.sin(yaw)
+    cy = math.cos(yaw)
+    sp = math.sin(pitch)
+    cp = math.cos(pitch)
+    // The original calculates roll sine/cosine even though the values are
+    // unused; preserve the calls' floating-point side effects/order.
+    sr = math.sin(roll)
+    cr = math.cos(roll)
+    forward = t.Vec3(cp * cy, cp * sy, -sp)
+
+    particle = R_AllocParticle(system)
+    if particle is void then return system.active end if
+    particle.die = currentTime + 0.01
+    particle.color = 0x6f
+    particle.type = PT_EXPLODE
+    normal = vertexNormals[index]
+    particle.origin = t.Vec3(
+      entityOrigin.x + normal.x * 64.0 + forward.x * 16.0,
+      entityOrigin.y + normal.y * 64.0 + forward.y * 16.0,
+      entityOrigin.z + normal.z * 64.0 + forward.z * 16.0,
     )
-    velocity = t.Vec3(
-      pseudo(index * 19, 512) - 256,
-      pseudo(index * 23, 512) - 256,
-      pseudo(index * 29, 512) - 256,
-    )
-    type = PT_EXPLODE
-    if (index & 1) == 0 then type = PT_EXPLODE2 end if
-    particle = spawn(position, velocity, currentTime + 5.0, ramp1[0], type)
-    particle.ramp = pseudo(index, 4)
-    result = result + [particle]
     index = index + 1
   end while
-  return result
+  return system.active
 end function
 
-function explosion2(origin, colorStart, colorLength, currentTime)
-  if colorLength <= 0 then colorLength = 1 end if
-  result = []
+function R_ReadPointFile_f(system, text)
+  offset = 0
+  pointCount = 0
+  reading = true
+  while reading
+    first = common.parseToken(text, offset)
+    if first[2] then break end if
+    second = common.parseToken(text, first[1])
+    third = common.parseToken(text, second[1])
+    if second[2] or third[2] then break end if
+    offset = third[1]
+
+    particle = R_AllocParticle(system)
+    if particle is void then break end if
+    pointCount = pointCount + 1
+    particle.die = 99999.0
+    particle.color = (-pointCount) & 15
+    particle.type = PT_STATIC
+    particle.velocity = zeroVector()
+    particle.origin = t.Vec3(common.atof(first[0]), common.atof(second[0]), common.atof(third[0]))
+  end while
+  return pointCount
+end function
+
+function R_ParseParticleEffect(system, reader, currentTime)
+  origin = t.Vec3(msg.readCoord(reader), msg.readCoord(reader), msg.readCoord(reader))
+  direction = t.Vec3(
+    msg.readChar(reader) * 0.0625,
+    msg.readChar(reader) * 0.0625,
+    msg.readChar(reader) * 0.0625,
+  )
+  messageCount = msg.readByte(reader)
+  color = msg.readByte(reader)
+  count = messageCount
+  if messageCount == 255 then count = 1024 end if
+  return R_RunParticleEffect(system, origin, direction, color, count, currentTime)
+end function
+
+function randomExplosionVector(system, origin, particle)
+  // The C body assigns org[j] and vel[j] in the same loop.  The interleaved
+  // rand() order is observable in demos/effects and must not be regrouped.
+  particle.origin.x = origin.x + (R_Rand(system) % 32) - 16
+  particle.velocity.x = (R_Rand(system) % 512) - 256
+  particle.origin.y = origin.y + (R_Rand(system) % 32) - 16
+  particle.velocity.y = (R_Rand(system) % 512) - 256
+  particle.origin.z = origin.z + (R_Rand(system) % 32) - 16
+  particle.velocity.z = (R_Rand(system) % 512) - 256
+end function
+
+function R_ParticleExplosion(system, origin, currentTime)
   index = 0
-  while index < 512 and len(result) < MAX_PARTICLES
-    position = t.Vec3(origin.x + pseudo(index * 7, 32) - 16, origin.y + pseudo(index * 11, 32) - 16, origin.z + pseudo(index * 13, 32) - 16)
-    velocity = t.Vec3(pseudo(index * 17, 512) - 256, pseudo(index * 19, 512) - 256, pseudo(index * 23, 512) - 256)
-    result = result + [spawn(position, velocity, currentTime + 0.3, colorStart + (index % colorLength), PT_BLOB)]
+  while index < 1024
+    particle = R_AllocParticle(system)
+    if particle is void then return system.active end if
+    particle.die = currentTime + 5.0
+    particle.color = ramp1[0]
+    particle.ramp = R_Rand(system) & 3
+    particle.type = PT_EXPLODE2
+    if (index & 1) != 0 then particle.type = PT_EXPLODE end if
+    randomExplosionVector(system, origin, particle)
     index = index + 1
   end while
-  return result
+  return system.active
 end function
 
-function blobExplosion(origin, currentTime)
-  result = []
+function R_ParticleExplosion2(system, origin, colorStart, colorLength, currentTime)
+  if colorLength <= 0 then return error(3701, "R_ParticleExplosion2 colorLength must be positive") end if
+  colorMod = 0
   index = 0
-  while index < 1024 and len(result) < MAX_PARTICLES
-    position = t.Vec3(origin.x + pseudo(index * 7, 32) - 16, origin.y + pseudo(index * 11, 32) - 16, origin.z + pseudo(index * 13, 32) - 16)
-    velocity = t.Vec3(pseudo(index * 17, 512) - 256, pseudo(index * 19, 512) - 256, pseudo(index * 23, 512) - 256)
-    type = PT_BLOB
-    color = 66 + pseudo(index, 6)
-    if (index & 1) == 0 then type = PT_BLOB2; color = 150 + pseudo(index, 6) end if
-    result = result + [spawn(position, velocity, currentTime + 1.0 + pseudo(index, 9) * 0.05, color, type)]
+  while index < 512
+    particle = R_AllocParticle(system)
+    if particle is void then return system.active end if
+    particle.die = currentTime + 0.3
+    particle.color = colorStart + (colorMod % colorLength)
+    colorMod = colorMod + 1
+    particle.type = PT_BLOB
+    randomExplosionVector(system, origin, particle)
     index = index + 1
   end while
-  return result
+  return system.active
 end function
 
-function lavaSplash(origin, currentTime)
-  result = []
+function R_BlobExplosion(system, origin, currentTime)
+  index = 0
+  while index < 1024
+    particle = R_AllocParticle(system)
+    if particle is void then return system.active end if
+    particle.die = currentTime + 1.0 + (R_Rand(system) & 8) * 0.05
+    if (index & 1) != 0 then
+      particle.type = PT_BLOB
+      particle.color = 66 + (R_Rand(system) % 6)
+    else
+      particle.type = PT_BLOB2
+      particle.color = 150 + (R_Rand(system) % 6)
+    end if
+    randomExplosionVector(system, origin, particle)
+    index = index + 1
+  end while
+  return system.active
+end function
+
+function R_RunParticleEffect(system, origin, direction, color, count, currentTime)
+  index = 0
+  while index < count
+    particle = R_AllocParticle(system)
+    if particle is void then return system.active end if
+    if count == 1024 then
+      particle.die = currentTime + 5.0
+      particle.color = ramp1[0]
+      particle.ramp = R_Rand(system) & 3
+      particle.type = PT_EXPLODE2
+      if (index & 1) != 0 then particle.type = PT_EXPLODE end if
+      randomExplosionVector(system, origin, particle)
+    else
+      particle.die = currentTime + 0.1 * (R_Rand(system) % 5)
+      particle.color = (color & ~7) + (R_Rand(system) & 7)
+      particle.type = PT_SLOW_GRAVITY
+      particle.origin = t.Vec3(
+        origin.x + (R_Rand(system) & 15) - 8,
+        origin.y + (R_Rand(system) & 15) - 8,
+        origin.z + (R_Rand(system) & 15) - 8,
+      )
+      particle.velocity = math.VectorScale(direction, 15.0)
+    end if
+    index = index + 1
+  end while
+  return system.active
+end function
+
+function R_LavaSplash(system, origin, currentTime)
   i = -16
-  seed = 0
-  while i < 16 and len(result) < MAX_PARTICLES
+  while i < 16
     j = -16
-    while j < 16 and len(result) < MAX_PARTICLES
-      direction = math.normalize(t.Vec3(j * 8.0, i * 8.0, 256.0))
-      speed = 50.0 + pseudo(seed, 64)
-      position = t.Vec3(origin.x + i + pseudo(seed + 1, 8), origin.y + j + pseudo(seed + 2, 8), origin.z + pseudo(seed + 3, 64))
-      result = result + [spawn(position, math.scale(direction, speed), currentTime + 2.0 + pseudo(seed + 4, 32) * 0.02, 224 + pseudo(seed + 5, 8), PT_SLOW_GRAVITY)]
-      seed = seed + 1
+    while j < 16
+      particle = R_AllocParticle(system)
+      if particle is void then return system.active end if
+      particle.die = currentTime + 2.0 + (R_Rand(system) & 31) * 0.02
+      particle.color = 224 + (R_Rand(system) & 7)
+      particle.type = PT_SLOW_GRAVITY
+      direction = t.Vec3(
+        j * 8.0 + (R_Rand(system) & 7),
+        i * 8.0 + (R_Rand(system) & 7),
+        256.0,
+      )
+      particle.origin = t.Vec3(origin.x + direction.x, origin.y + direction.y, origin.z + (R_Rand(system) & 63))
+      math.VectorNormalize(direction)
+      velocity = 50.0 + (R_Rand(system) & 63)
+      particle.velocity = math.VectorScale(direction, velocity)
       j = j + 1
     end while
     i = i + 1
   end while
-  return result
+  return system.active
 end function
 
-function teleportSplash(origin, currentTime)
-  result = []
+function R_TeleportSplash(system, origin, currentTime)
   i = -16
-  seed = 0
-  while i < 16 and len(result) < MAX_PARTICLES
+  while i < 16
     j = -16
-    while j < 16 and len(result) < MAX_PARTICLES
+    while j < 16
       k = -24
-      while k < 32 and len(result) < MAX_PARTICLES
-        direction = math.normalize(t.Vec3(j * 8.0, i * 8.0, k * 8.0))
-        position = t.Vec3(origin.x + i + pseudo(seed, 4), origin.y + j + pseudo(seed + 1, 4), origin.z + k + pseudo(seed + 2, 4))
-        result = result + [spawn(position, math.scale(direction, 50.0 + pseudo(seed + 3, 64)), currentTime + 0.2 + pseudo(seed + 4, 8) * 0.02, 7 + pseudo(seed + 5, 8), PT_SLOW_GRAVITY)]
-        seed = seed + 1
+      while k < 32
+        particle = R_AllocParticle(system)
+        if particle is void then return system.active end if
+        particle.die = currentTime + 0.2 + (R_Rand(system) & 7) * 0.02
+        particle.color = 7 + (R_Rand(system) & 7)
+        particle.type = PT_SLOW_GRAVITY
+        direction = t.Vec3(j * 8.0, i * 8.0, k * 8.0)
+        particle.origin = t.Vec3(
+          origin.x + i + (R_Rand(system) & 3),
+          origin.y + j + (R_Rand(system) & 3),
+          origin.z + k + (R_Rand(system) & 3),
+        )
+        math.VectorNormalize(direction)
+        velocity = 50.0 + (R_Rand(system) & 63)
+        particle.velocity = math.VectorScale(direction, velocity)
         k = k + 4
       end while
       j = j + 4
     end while
     i = i + 4
   end while
+  return system.active
+end function
+
+function R_RocketTrail(system, start, finish, trailType, currentTime)
+  direction = math.VectorSubtract(finish, start)
+  length = math.VectorNormalize(direction)
+  decrement = 3.0
+  if trailType >= 128 then
+    decrement = 1.0
+    trailType = trailType - 128
+  end if
+
+  while length > 0.0
+    length = length - decrement
+    particle = R_AllocParticle(system)
+    if particle is void then return system.active end if
+    particle.velocity = zeroVector()
+    particle.die = currentTime + 2.0
+
+    if trailType == 0 then
+      particle.ramp = R_Rand(system) & 3
+      particle.color = ramp3[native.trunc(particle.ramp)]
+      particle.type = PT_FIRE
+      particle.origin = t.Vec3(
+        start.x + (R_Rand(system) % 6) - 3,
+        start.y + (R_Rand(system) % 6) - 3,
+        start.z + (R_Rand(system) % 6) - 3,
+      )
+    else if trailType == 1 then
+      particle.ramp = (R_Rand(system) & 3) + 2
+      particle.color = ramp3[native.trunc(particle.ramp)]
+      particle.type = PT_FIRE
+      particle.origin = t.Vec3(
+        start.x + (R_Rand(system) % 6) - 3,
+        start.y + (R_Rand(system) % 6) - 3,
+        start.z + (R_Rand(system) % 6) - 3,
+      )
+    else if trailType == 2 or trailType == 4 then
+      particle.type = PT_GRAVITY
+      particle.color = 67 + (R_Rand(system) & 3)
+      particle.origin = t.Vec3(
+        start.x + (R_Rand(system) % 6) - 3,
+        start.y + (R_Rand(system) % 6) - 3,
+        start.z + (R_Rand(system) % 6) - 3,
+      )
+      if trailType == 4 then length = length - 3.0 end if
+    else if trailType == 3 or trailType == 5 then
+      particle.die = currentTime + 0.5
+      particle.type = PT_STATIC
+      if trailType == 3 then
+        particle.color = 52 + ((system.tracerCount & 4) << 1)
+      else
+        particle.color = 230 + ((system.tracerCount & 4) << 1)
+      end if
+      system.tracerCount = system.tracerCount + 1
+      particle.origin = math.VectorCopy(start)
+      if (system.tracerCount & 1) != 0 then
+        particle.velocity.x = 30.0 * direction.y
+        particle.velocity.y = -30.0 * direction.x
+      else
+        particle.velocity.x = -30.0 * direction.y
+        particle.velocity.y = 30.0 * direction.x
+      end if
+    else if trailType == 6 then
+      particle.color = 152 + (R_Rand(system) & 3)
+      particle.type = PT_STATIC
+      particle.die = currentTime + 0.3
+      particle.origin = t.Vec3(
+        start.x + (R_Rand(system) & 15) - 8,
+        start.y + (R_Rand(system) & 15) - 8,
+        start.z + (R_Rand(system) & 15) - 8,
+      )
+    end if
+
+    // VectorAdd(start, vec, start) mutates the caller's start vector in C.
+    start.x = start.x + direction.x
+    start.y = start.y + direction.y
+    start.z = start.z + direction.z
+  end while
+  return system.active
+end function
+
+function particleDrawCommand(particle, viewOrigin, viewForward, scaledUp, scaledRight)
+  distance = math.DotProduct(math.VectorSubtract(particle.origin, viewOrigin), viewForward)
+  scale = 1.0
+  if distance >= 20.0 then scale = 1.0 + distance * 0.004 end if
+  upVertex = math.VectorMA(particle.origin, scale, scaledUp)
+  rightVertex = math.VectorMA(particle.origin, scale, scaledRight)
+  return ["particle", particle.color, math.VectorCopy(particle.origin), upVertex, rightVertex, scale]
+end function
+
+function updateParticlePhysics(particle, frameTime, gravity)
+  grav = frameTime * gravity * 0.05
+  time3 = frameTime * 15.0
+  time2 = frameTime * 10.0
+  time1 = frameTime * 5.0
+  dvel = 4.0 * frameTime
+
+  // VectorMA(p->org, frametime, p->vel, p->org) mutates the C particle in
+  // place.  Keep the same lifetime here: allocating a replacement Vec3 for
+  // every active particle creates thousands of short-lived objects and can
+  // trigger collection while a large active array is being traversed.
+  particle.origin.x = particle.origin.x + frameTime * particle.velocity.x
+  particle.origin.y = particle.origin.y + frameTime * particle.velocity.y
+  particle.origin.z = particle.origin.z + frameTime * particle.velocity.z
+  if particle.type == PT_FIRE then
+    particle.ramp = particle.ramp + time1
+    rampIndex = native.trunc(particle.ramp)
+    if particle.ramp >= 6.0 or rampIndex < 0 or rampIndex >= len(ramp3) then particle.die = -1.0 else particle.color = ramp3[rampIndex] end if
+    particle.velocity.z = particle.velocity.z + grav
+  else if particle.type == PT_EXPLODE then
+    particle.ramp = particle.ramp + time2
+    rampIndex = native.trunc(particle.ramp)
+    if particle.ramp >= 8.0 or rampIndex < 0 or rampIndex >= len(ramp1) then particle.die = -1.0 else particle.color = ramp1[rampIndex] end if
+    particle.velocity.x = particle.velocity.x + particle.velocity.x * dvel
+    particle.velocity.y = particle.velocity.y + particle.velocity.y * dvel
+    particle.velocity.z = particle.velocity.z + particle.velocity.z * dvel
+    particle.velocity.z = particle.velocity.z - grav
+  else if particle.type == PT_EXPLODE2 then
+    particle.ramp = particle.ramp + time3
+    rampIndex = native.trunc(particle.ramp)
+    if particle.ramp >= 8.0 or rampIndex < 0 or rampIndex >= len(ramp2) then particle.die = -1.0 else particle.color = ramp2[rampIndex] end if
+    particle.velocity.x = particle.velocity.x - particle.velocity.x * frameTime
+    particle.velocity.y = particle.velocity.y - particle.velocity.y * frameTime
+    particle.velocity.z = particle.velocity.z - particle.velocity.z * frameTime
+    particle.velocity.z = particle.velocity.z - grav
+  else if particle.type == PT_BLOB then
+    particle.velocity.x = particle.velocity.x + particle.velocity.x * dvel
+    particle.velocity.y = particle.velocity.y + particle.velocity.y * dvel
+    particle.velocity.z = particle.velocity.z + particle.velocity.z * dvel
+    particle.velocity.z = particle.velocity.z - grav
+  else if particle.type == PT_BLOB2 then
+    particle.velocity.x = particle.velocity.x - particle.velocity.x * dvel
+    particle.velocity.y = particle.velocity.y - particle.velocity.y * dvel
+    particle.velocity.z = particle.velocity.z - grav
+  else if particle.type == PT_GRAVITY or particle.type == PT_SLOW_GRAVITY then
+    particle.velocity.z = particle.velocity.z - grav
+  end if
+  return particle
+end function
+
+// Produces the fixed-function GLQuake command trace and advances particles in
+// the same draw-before-simulate order as R_DrawParticles.
+function R_DrawParticles(system, currentTime, oldTime, gravity, viewOrigin, viewForward, viewUp, viewRight)
+  commands = [
+    ["GL_Bind", "particletexture"],
+    ["glEnable", "GL_BLEND"],
+    ["glTexEnv", "GL_MODULATE"],
+    ["glBegin", "GL_TRIANGLES"],
+  ]
+  scaledUp = math.VectorScale(viewUp, 1.5)
+  scaledRight = math.VectorScale(viewRight, 1.5)
+  frameTime = currentTime - oldTime
+  alive = []
+  for each particle in system.active
+    if particle.die >= currentTime then
+      commands = commands + [particleDrawCommand(particle, viewOrigin, viewForward, scaledUp, scaledRight)]
+      updateParticlePhysics(particle, frameTime, gravity)
+      alive = alive + [particle]
+    end if
+  end for
+  system.active = alive
+  commands = commands + [
+    ["glEnd"],
+    ["glDisable", "GL_BLEND"],
+    ["glTexEnv", "GL_REPLACE"],
+  ]
+  return commands
+end function
+
+function compatibilitySystem()
+  global compatRandomSeed, compatTracerCount, compatAngularVelocities
+  return ParticleSystem(MAX_PARTICLES, [], compatRandomSeed, compatTracerCount, compatAngularVelocities)
+end function
+
+function compatibilitySystemWithActive(active)
+  global compatRandomSeed, compatTracerCount, compatAngularVelocities
+  return ParticleSystem(MAX_PARTICLES, active, compatRandomSeed, compatTracerCount, compatAngularVelocities)
+end function
+
+function canonicalEntityNormals()
+  global canonicalVertexNormals
+  if len(canonicalVertexNormals) == NUM_VERTEX_NORMALS then return canonicalVertexNormals end if
+  canonicalVertexNormals = arrays.makeEmptyArray(len(aliasNormals.normals))
+  index = 0
+  while index < len(aliasNormals.normals)
+    source = aliasNormals.normals[index]
+    canonicalVertexNormals[index] = t.Vec3(source[0], source[1], source[2])
+    index = index + 1
+  end while
+  return canonicalVertexNormals
+end function
+
+function finishCompatibility(system)
+  global compatRandomSeed, compatTracerCount, compatAngularVelocities
+  compatRandomSeed = system.randomSeed
+  compatTracerCount = system.tracerCount
+  compatAngularVelocities = system.angularVelocities
+  return system.active
+end function
+
+function resetRandom(seed)
+  global compatRandomSeed, compatTracerCount, compatAngularVelocities
+  compatRandomSeed = seed & 0xffffffff
+  compatTracerCount = 0
+  compatAngularVelocities = []
+  return compatRandomSeed
+end function
+
+function compatRand()
+  global compatRandomSeed
+  compatRandomSeed = (compatRandomSeed * 214013 + 2531011) & 0xffffffff
+  return (compatRandomSeed >> 16) & 0x7fff
+end function
+
+function appendLimited(target, source)
+  appendCount = len(source)
+  available = MAX_PARTICLES - len(target)
+  if appendCount > available then appendCount = available end if
+  if appendCount <= 0 then return target end if
+  result = arrays.makeEmptyArray(len(target) + appendCount)
+  index = 0
+  // R_AllocParticle links each new particle at active_particles' head.
+  // Preserve that ordering when the compatibility wrappers merge a newly
+  // spawned batch into the session-owned active array.
+  while index < appendCount
+    result[index] = source[index]
+    index = index + 1
+  end while
+  targetIndex = 0
+  while targetIndex < len(target)
+    result[index] = target[targetIndex]
+    targetIndex = targetIndex + 1
+    index = index + 1
+  end while
   return result
+end function
+
+function update(particles, currentTime, deltaTime)
+  capacity = MAX_PARTICLES
+  if len(particles) > capacity then capacity = len(particles) end if
+  randomSeed = compatRandomSeed
+  tracerCount = compatTracerCount
+  angularVelocities = compatAngularVelocities
+  system = ParticleSystem(capacity, particles, randomSeed, tracerCount, angularVelocities)
+  // Host_Frame advances effects even in a headless client/demo.  Building the
+  // complete GL command trace here used to allocate several copied Vec3s and
+  // an ever-growing nested array for every one of up to 2048 particles even
+  // though the result was discarded.  Besides quadratic allocation traffic,
+  // that could force a collection while the command array was only partially
+  // rooted.  Advance in the same draw-before-simulate order without producing
+  // renderer commands; R_DrawParticles remains the trace/render oracle.
+  activeCount = len(system.active)
+  survivorCount = 0
+  readIndex = 0
+  while readIndex < activeCount
+    particle = system.active[readIndex]
+    if particle.die >= currentTime then survivorCount = survivorCount + 1 end if
+    readIndex = readIndex + 1
+  end while
+  alive = arrays.makeEmptyArray(survivorCount)
+  readIndex = 0
+  writeIndex = 0
+  while readIndex < activeCount
+    particle = system.active[readIndex]
+    if particle.die >= currentTime then
+      updateParticlePhysics(particle, deltaTime, 800.0)
+      if writeIndex >= len(alive) then return error(3702, "particle survivor count changed during update") end if
+      alive[writeIndex] = particle
+      writeIndex = writeIndex + 1
+    end if
+    readIndex = readIndex + 1
+  end while
+  system.active = alive
+  return system.active
+end function
+
+function runEffect(origin, direction, count, color, currentTime)
+  system = compatibilitySystem()
+  R_RunParticleEffect(system, origin, direction, color, count, currentTime)
+  return finishCompatibility(system)
+end function
+
+function pointEffect(origin, count, color, currentTime)
+  return runEffect(origin, zeroVector(), count, color, currentTime)
+end function
+
+function explosion(origin, currentTime)
+  system = compatibilitySystem()
+  R_ParticleExplosion(system, origin, currentTime)
+  return finishCompatibility(system)
+end function
+
+function explosion2(origin, colorStart, colorLength, currentTime)
+  system = compatibilitySystem()
+  result = R_ParticleExplosion2(system, origin, colorStart, colorLength, currentTime)
+  if result is error then return result end if
+  return finishCompatibility(system)
+end function
+
+function blobExplosion(origin, currentTime)
+  system = compatibilitySystem()
+  R_BlobExplosion(system, origin, currentTime)
+  return finishCompatibility(system)
+end function
+
+function lavaSplash(origin, currentTime)
+  system = compatibilitySystem()
+  R_LavaSplash(system, origin, currentTime)
+  return finishCompatibility(system)
+end function
+
+function teleportSplash(origin, currentTime)
+  system = compatibilitySystem()
+  R_TeleportSplash(system, origin, currentTime)
+  return finishCompatibility(system)
+end function
+
+function rocketTrail(start, finish, trailType, currentTime)
+  system = compatibilitySystem()
+  R_RocketTrail(system, start, finish, trailType, currentTime)
+  return finishCompatibility(system)
+end function
+
+// CL_RelinkEntities shares r_part.c's single active/free particle pool with
+// temp entities.  These integration helpers operate on that existing pool so
+// saturation stops allocation (and random-number consumption) at the same
+// particle as the original linked-list implementation.
+function entityParticlesInto(active, entityOrigin, currentTime)
+  system = compatibilitySystemWithActive(active)
+  R_EntityParticles(system, entityOrigin, currentTime, canonicalEntityNormals())
+  return finishCompatibility(system)
+end function
+
+function rocketTrailInto(active, start, finish, trailType, currentTime)
+  system = compatibilitySystemWithActive(active)
+  R_RocketTrail(system, start, finish, trailType, currentTime)
+  return finishCompatibility(system)
 end function

@@ -1,0 +1,19 @@
+LIBRARY gl_mesh_oracle
+EXPORTS
+    StripLength
+    FanLength
+    BuildTris
+    GL_MakeAliasModelDisplayLists
+    mesh_setup_strip
+    mesh_setup_fan
+    mesh_make_display_lists
+    mesh_strip_vertex
+    mesh_strip_triangle
+    mesh_num_commands
+    mesh_num_order
+    mesh_command_int
+    mesh_command_float
+    mesh_order
+    mesh_header_poseverts
+    mesh_header_commands_nonzero
+    mesh_header_posedata_nonzero

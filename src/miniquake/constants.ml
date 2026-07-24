@@ -1,6 +1,16 @@
 package miniquake.constants
 
+// quakedef.h exposes numeric per-renderer versions. QUAKE_VERSION remains a
+// MiniQuake text alias for the original "%.2f" console formatting.
+const VERSION = 1.09
+const GLQUAKE_VERSION = 1.0
+const D3DQUAKE_VERSION = 0.01
+const WINQUAKE_VERSION = 0.996
+const LINUX_VERSION = 1.30
+const X11_VERSION = 1.10
 const QUAKE_VERSION = "1.09"
+const GAMENAME = "id1"
+const GAME_NAME = GAMENAME
 const PROTOCOL_VERSION = 15
 const BSP_VERSION = 29
 const PROG_VERSION = 6
@@ -15,6 +25,68 @@ const MAX_SOUNDS = 256
 const MAX_CLIENTS = 16
 const MAX_DLIGHTS = 32
 const MAX_VISEDICTS = 256
+const MAX_MOD_KNOWN = 512
+const MAX_SKINS = 32
+const MAX_ALIAS_VERTS = 1024
+const MAX_ALIAS_FRAMES = 256
+const MAX_ALIAS_TRIS = 2048
+const MAX_LBM_HEIGHT = 480
+const ALIAS_BASE_SIZE_RATIO = 0.09090909090909091
+const MAX_QPATH = 64
+const MAX_OSPATH = 128
+const CACHE_SIZE = 32
+const MINIMUM_MEMORY = 0x550000
+const MINIMUM_MEMORY_LEVELPAK = 0x650000
+const MAX_NUM_ARGVS = 50
+const PITCH = 0
+const YAW = 1
+const ROLL = 2
+const ON_EPSILON = 0.1
+const SAVEGAME_COMMENT_LENGTH = 39
+const MAX_STYLESTRING = 64
+const MAX_SCOREBOARD = 16
+const MAX_SCOREBOARDNAME = 32
+const SOUND_CHANNELS = 8
+
+// BSP29 disk ABI and design bounds from bspfile.h.  Some of these are tool
+// limits rather than runtime allocation sizes, but keeping the complete
+// format vocabulary here prevents parsers and gameplay code from replacing
+// meaningful on-disk values with unexplained literals.
+const MAX_MAP_HULLS = 4
+const MAX_MAP_MODELS = 256
+const MAX_MAP_BRUSHES = 4096
+const MAX_MAP_ENTITIES = 1024
+const MAX_MAP_ENTSTRING = 65536
+const MAX_MAP_PLANES = 32767
+const MAX_MAP_NODES = 32767
+const MAX_MAP_CLIPNODES = 32767
+const MAX_MAP_LEAFS = 8192
+const MAX_MAP_VERTS = 65535
+const MAX_MAP_FACES = 65535
+const MAX_MAP_MARKSURFACES = 65535
+const MAX_MAP_TEXINFO = 4096
+const MAX_MAP_EDGES = 256000
+const MAX_MAP_SURFEDGES = 512000
+const MAX_MAP_TEXTURES = 512
+const MAX_MAP_MIPTEX = 0x200000
+const MAX_MAP_LIGHTING = 0x100000
+const MAX_MAP_VISIBILITY = 0x100000
+const MAX_MAP_PORTALS = 65536
+const MAX_ENTITY_KEY = 32
+const MAX_ENTITY_VALUE = 1024
+const BSP_TOOL_VERSION = 2
+const MIP_LEVELS = 4
+const MAX_KEY = MAX_ENTITY_KEY
+const MAX_VALUE = MAX_ENTITY_VALUE
+const BSPVERSION = BSP_VERSION
+const TOOLVERSION = BSP_TOOL_VERSION
+const MIPLEVELS = MIP_LEVELS
+const PLANE_X = 0
+const PLANE_Y = 1
+const PLANE_Z = 2
+const PLANE_ANYX = 3
+const PLANE_ANYY = 4
+const PLANE_ANYZ = 5
 
 // Player color translation ranges from render.h.
 const TOP_RANGE = 16
@@ -26,6 +98,22 @@ const CONTENTS_WATER = -3
 const CONTENTS_SLIME = -4
 const CONTENTS_LAVA = -5
 const CONTENTS_SKY = -6
+const CONTENTS_ORIGIN = -7
+const CONTENTS_CLIP = -8
+const CONTENTS_CURRENT_0 = -9
+const CONTENTS_CURRENT_90 = -10
+const CONTENTS_CURRENT_180 = -11
+const CONTENTS_CURRENT_270 = -12
+const CONTENTS_CURRENT_UP = -13
+const CONTENTS_CURRENT_DOWN = -14
+
+const BSP_MAX_LIGHTMAPS = 4
+const MAXLIGHTMAPS = BSP_MAX_LIGHTMAPS
+const AMBIENT_WATER = 0
+const AMBIENT_SKY = 1
+const AMBIENT_SLIME = 2
+const AMBIENT_LAVA = 3
+const NUM_AMBIENTS = 4
 
 const DIST_EPSILON = 0.03125
 
@@ -45,6 +133,26 @@ const LUMP_EDGES = 12
 const LUMP_SURFEDGES = 13
 const LUMP_MODELS = 14
 const HEADER_LUMPS = 15
+
+// MDL6 and SPR1 disk ABI from modelgen.h and spritegn.h.
+const ALIAS_VERSION = 6
+const ALIAS_ONSEAM = 0x0020
+const ST_SYNC = 0
+const ST_RAND = 1
+const ALIAS_SINGLE = 0
+const ALIAS_GROUP = 1
+const ALIAS_SKIN_SINGLE = 0
+const ALIAS_SKIN_GROUP = 1
+const DT_FACES_FRONT = 0x0010
+const IDPOLYHEADER = 0x4f504449
+const SPR_VP_PARALLEL_UPRIGHT = 0
+const SPR_FACING_UPRIGHT = 1
+const SPR_VP_PARALLEL = 2
+const SPR_ORIENTED = 3
+const SPR_VP_PARALLEL_ORIENTED = 4
+const SPR_SINGLE = 0
+const SPR_GROUP = 1
+const IDSPRITEHEADER = 0x50534449
 
 const SVC_BAD = 0
 const SVC_NOP = 1
@@ -98,10 +206,25 @@ const U_SKIN = 4096
 const U_EFFECTS = 8192
 const U_LONGENTITY = 16384
 
+const SND_VOLUME = 1
+const SND_ATTENUATION = 2
+const SND_LOOPING = 4
+
 const EF_BRIGHTFIELD = 1
 const EF_MUZZLEFLASH = 2
 const EF_BRIGHTLIGHT = 4
 const EF_DIMLIGHT = 8
+
+// model_t.flags trail/rotation bits from gl_model.h.  These names do not
+// overlap the client EF_BRIGHT* namespace despite sharing low bit values.
+const EF_ROCKET = 1
+const EF_GRENADE = 2
+const EF_GIB = 4
+const EF_ROTATE = 8
+const EF_TRACER = 16
+const EF_ZOMGIB = 32
+const EF_TRACER2 = 64
+const EF_TRACER3 = 128
 
 const SU_VIEWHEIGHT = 1
 const SU_IDEALPITCH = 2
@@ -213,7 +336,12 @@ const SURF_DRAWSPRITE = 8
 const SURF_DRAWTURB = 16
 const SURF_DRAWTILED = 32
 const SURF_DRAWBACKGROUND = 64
+const SURF_UNDERWATER = 128
 const TEX_SPECIAL = 1
+const SIDE_FRONT = 0
+const SIDE_BACK = 1
+const SIDE_ON = 2
+const VERTEXSIZE = 7
 
 // Classic Quake gameplay/server constants.
 const MAX_LIGHTSTYLES = 64
@@ -260,6 +388,51 @@ const IT_SIGIL1 = 268435456
 const IT_SIGIL2 = 536870912
 const IT_SIGIL3 = 1073741824
 const IT_SIGIL4 = 2147483648
+
+const STAT_HEALTH = 0
+const STAT_FRAGS = 1
+const STAT_WEAPON = 2
+const STAT_AMMO = 3
+const STAT_ARMOR = 4
+const STAT_WEAPONFRAME = 5
+const STAT_SHELLS = 6
+const STAT_NAILS = 7
+const STAT_ROCKETS = 8
+const STAT_CELLS = 9
+const STAT_ACTIVEWEAPON = 10
+const STAT_TOTALSECRETS = 11
+const STAT_TOTALMONSTERS = 12
+const STAT_SECRETS = 13
+const STAT_MONSTERS = 14
+const MAX_CL_STATS = 32
+
+const RIT_SHELLS = 128
+const RIT_NAILS = 256
+const RIT_ROCKETS = 512
+const RIT_CELLS = 1024
+const RIT_AXE = 2048
+const RIT_LAVA_NAILGUN = 4096
+const RIT_LAVA_SUPER_NAILGUN = 8192
+const RIT_MULTI_GRENADE = 16384
+const RIT_MULTI_ROCKET = 32768
+const RIT_PLASMA_GUN = 65536
+const RIT_ARMOR1 = 8388608
+const RIT_ARMOR2 = 16777216
+const RIT_ARMOR3 = 33554432
+const RIT_LAVA_NAILS = 67108864
+const RIT_PLASMA_AMMO = 134217728
+const RIT_MULTI_ROCKETS = 268435456
+const RIT_SHIELD = 536870912
+const RIT_ANTIGRAV = 1073741824
+const RIT_SUPERHEALTH = 2147483648
+const HIT_PROXIMITY_GUN_BIT = 16
+const HIT_MJOLNIR_BIT = 7
+const HIT_LASER_CANNON_BIT = 23
+const HIT_PROXIMITY_GUN = 65536
+const HIT_MJOLNIR = 128
+const HIT_LASER_CANNON = 8388608
+const HIT_WETSUIT = 33554432
+const HIT_EMPATHY_SHIELDS = 67108864
 
 // Host timing and original movement defaults.
 const MINIMUM_FRAME_TIME = 0.001
@@ -309,6 +482,9 @@ const QC_GLOBAL_OTHER = 29
 const QC_GLOBAL_WORLD = 30
 const QC_GLOBAL_TIME = 31
 const QC_GLOBAL_FRAMETIME = 32
+const QC_MAX_PARMS = 8
+const QC_MAX_ENT_LEAFS = 16
+const MAX_ENT_LEAFS = QC_MAX_ENT_LEAFS
 
 // Win32 virtual-key values used by the MiniLang input layer.
 const VK_BACK = 8

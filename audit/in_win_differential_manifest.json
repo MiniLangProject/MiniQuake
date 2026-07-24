@@ -1,0 +1,42 @@
+{
+  "schema": "miniquake.differential.v1",
+  "unit": "in_win",
+  "reference_execution": "patched-pinned-source-worktree",
+  "command": "py -3 tools/in_win_differential.py",
+  "inputs": {
+    "reference_source": "reference/quake/WinQuake/in_win.c",
+    "reference_harness": "reference/harness/in_win_pinned_driver.c",
+    "instrumentation_patch": "reference/patches/in_win_pinned_oracle.patch",
+    "oracle_stub_header": "reference/harness/in_win_oracle_stubs.h",
+    "minilang_fixture": "tests/in_win_differential_fixture.ml",
+    "ported_module": "src/miniquake/input.ml"
+  },
+  "pinned_commit": "bf4ac424ce754894ac8f1dae6a3981954bc9852d",
+  "events": 28,
+  "epsilon": 1e-5,
+  "functions": [
+    {"name":"Force_CenterView_f","source_definitions":1,"classification":"reference-differential","evidence":["differential:pitch"]},
+    {"name":"IN_UpdateClipCursor","source_definitions":1,"classification":"reference-differential","evidence":["differential:active"]},
+    {"name":"IN_ShowMouse","source_definitions":1,"classification":"reference-differential","evidence":["differential:hidden"]},
+    {"name":"IN_HideMouse","source_definitions":1,"classification":"reference-differential","evidence":["differential:shown"]},
+    {"name":"IN_ActivateMouse","source_definitions":1,"classification":"reference-differential","evidence":["differential:win32"]},
+    {"name":"IN_SetQuakeMouseState","source_definitions":1,"classification":"reference-differential","evidence":["differential:enabled"]},
+    {"name":"IN_DeactivateMouse","source_definitions":1,"classification":"reference-differential","evidence":["differential:active"]},
+    {"name":"IN_RestoreOriginalMouseState","source_definitions":1,"classification":"reference-differential","evidence":["differential:reactivate"]},
+    {"name":"IN_InitDInput","source_definitions":1,"classification":"reference-differential","evidence":["differential:missing-dll"]},
+    {"name":"IN_StartupMouse","source_definitions":1,"classification":"reference-differential","evidence":["differential:classic"]},
+    {"name":"IN_Init","source_definitions":1,"classification":"reference-differential","evidence":["differential:register"]},
+    {"name":"IN_Shutdown","source_definitions":1,"classification":"reference-differential","evidence":["differential:release"]},
+    {"name":"IN_MouseEvent","source_definitions":1,"classification":"reference-differential","evidence":["differential:edges"]},
+    {"name":"IN_MouseMove","source_definitions":1,"classification":"reference-differential","evidence":["differential:delta"]},
+    {"name":"IN_Move","source_definitions":1,"classification":"reference-differential","evidence":["differential:active","differential:inactive"]},
+    {"name":"IN_Accumulate","source_definitions":1,"classification":"reference-differential","evidence":["differential:active"]},
+    {"name":"IN_ClearStates","source_definitions":1,"classification":"reference-differential","evidence":["differential:active"]},
+    {"name":"IN_StartupJoystick","source_definitions":1,"classification":"reference-differential","evidence":["differential:detected","differential:disabled"]},
+    {"name":"RawValuePointer","source_definitions":1,"classification":"reference-differential","evidence":["differential:x"]},
+    {"name":"Joy_AdvancedUpdate_f","source_definitions":1,"classification":"reference-differential","evidence":["differential:default","differential:advanced-relative"]},
+    {"name":"IN_Commands","source_definitions":1,"classification":"reference-differential","evidence":["differential:buttons-pov","differential:release-pov-change"]},
+    {"name":"IN_ReadJoystick","source_definitions":1,"classification":"reference-differential","evidence":["differential:warrior"]},
+    {"name":"IN_JoyMove","source_definitions":1,"classification":"reference-differential","evidence":["differential:default-axes","differential:warrior-curve"]}
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "schema": "miniquake.semantic-port-review.v1",
+  "unit": "alias_tables",
+  "reference_commit": "bf4ac424ce754894ac8f1dae6a3981954bc9852d",
+  "reviewer": "alias_viewmodel_parity",
+  "original_files": [
+    "anorm_dots.h",
+    "anorms.h"
+  ],
+  "minilang_modules": [
+    "src/miniquake/render/alias_normals.ml",
+    "src/miniquake/render/alias_mesh.ml"
+  ],
+  "original_sha256": {
+    "anorm_dots.h": "c0cb67c8e18719c96fdeabd8c476a9d5d9697ef84370850c28761e6654872ad6",
+    "anorms.h": "b66de52c4ca881cc975717339246c8ec0f181bb8b3c8fcc61684b206c721a320"
+  },
+  "minilang_sha256": {
+    "src/miniquake/render/alias_normals.ml": "c234f97888f5eada5c856ccf843936228486eceadcf4452818b2e047e57a6155",
+    "src/miniquake/render/alias_mesh.ml": "0b3a4313bc3f2f523461b10833756512c25e60524e7926cdfa66de0a70fbe401"
+  },
+  "function_review_scope": "all-target-functions",
+  "features": [
+    {
+      "name": "quantized alias vertex normals",
+      "status": "parity",
+      "original": [
+        "anorms.h:1"
+      ],
+      "minilang": [
+        "src/miniquake/render/alias_normals.ml:1",
+        "src/miniquake/render/alias_mesh.ml:333"
+      ],
+      "evidence": [
+        "py -3 tools/alias_tables_semantic.py",
+        "exact:162 ordered three-component normal vectors"
+      ]
+    },
+    {
+      "name": "yaw-quantized alias shade-dot lookup",
+      "status": "parity",
+      "original": [
+        "anorm_dots.h:1"
+      ],
+      "minilang": [
+        "src/miniquake/render/alias_normals.ml:168",
+        "src/miniquake/render/alias_mesh.ml:71"
+      ],
+      "evidence": [
+        "py -3 tools/alias_tables_semantic.py",
+        "exact:16 rows by 256 values including zero padding"
+      ]
+    }
+  ],
+  "commands": [
+    "py -3 tools/alias_tables_semantic.py"
+  ],
+  "open_findings": [],
+  "limitations": [
+    "This logical unit contains immutable numeric tables and no C function definitions; draw-time use is reviewed separately in gl_rmain."
+  ]
+}

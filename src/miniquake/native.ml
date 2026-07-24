@@ -23,28 +23,107 @@ extern function winTextPop() from "miniquake_native.dll" symbol "mq_win_text_pop
 extern function winHasFocus() from "miniquake_native.dll" symbol "mq_win_has_focus" returns i32
 extern function winClientWidth() from "miniquake_native.dll" symbol "mq_win_client_width" returns i32
 extern function winClientHeight() from "miniquake_native.dll" symbol "mq_win_client_height" returns i32
+extern function winWindowX() from "miniquake_native.dll" symbol "mq_win_window_x" returns i32
+extern function winWindowY() from "miniquake_native.dll" symbol "mq_win_window_y" returns i32
+extern function winIsMinimized() from "miniquake_native.dll" symbol "mq_win_is_minimized" returns i32
+extern function winDesktopWidth() from "miniquake_native.dll" symbol "mq_win_desktop_width" returns i32
+extern function winDesktopHeight() from "miniquake_native.dll" symbol "mq_win_desktop_height" returns i32
+extern function winDisplayModeCount() from "miniquake_native.dll" symbol "mq_win_display_mode_count" returns u32
+extern function winDisplayModeWidth(index as u32) from "miniquake_native.dll" symbol "mq_win_display_mode_width" returns i32
+extern function winDisplayModeHeight(index as u32) from "miniquake_native.dll" symbol "mq_win_display_mode_height" returns i32
+extern function winDisplayModeBpp(index as u32) from "miniquake_native.dll" symbol "mq_win_display_mode_bpp" returns i32
+extern function winDisplayModeFrequency(index as u32) from "miniquake_native.dll" symbol "mq_win_display_mode_frequency" returns i32
+extern function winTestDisplayMode(width as i32, height as i32, bpp as i32, frequency as i32) from "miniquake_native.dll" symbol "mq_win_test_display_mode" returns i32
+extern function winConfigureDisplayMode(width as i32, height as i32, bpp as i32, frequency as i32, fullscreen as i32, useCurrent as i32) from "miniquake_native.dll" symbol "mq_win_configure_display_mode" returns i32
+extern function winRestoreDisplayMode() from "miniquake_native.dll" symbol "mq_win_restore_display_mode" returns void
+extern function winGetGammaRamp(ramp as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_win_get_gamma_ramp" returns i32
+extern function winSetGammaRamp(ramp as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_win_set_gamma_ramp" returns i32
+extern function winContextReady() from "miniquake_native.dll" symbol "mq_win_context_ready" returns i32
+extern function winMakeCurrent() from "miniquake_native.dll" symbol "mq_win_make_current" returns i32
+extern function winActivate(active as i32, minimized as i32) from "miniquake_native.dll" symbol "mq_win_activate" returns void
 extern function winSetTitle(title as wstr) from "miniquake_native.dll" symbol "mq_win_set_title" returns void
 extern function winSetCursorCapture(enabled as i32) from "miniquake_native.dll" symbol "mq_win_set_cursor_capture" returns void
 extern function winMouseDx() from "miniquake_native.dll" symbol "mq_win_mouse_dx" returns i32
 extern function winMouseDy() from "miniquake_native.dll" symbol "mq_win_mouse_dy" returns i32
 extern function winMouseButtons() from "miniquake_native.dll" symbol "mq_win_mouse_buttons" returns i32
 extern function winMouseWheel() from "miniquake_native.dll" symbol "mq_win_mouse_wheel" returns i32
+extern function winInputEventPop() from "miniquake_native.dll" symbol "mq_win_input_event_pop" returns u32
+extern function winInputTestPush(eventType as u32, code as u32, value as i32) from "miniquake_native.dll" symbol "mq_win_input_test_push" returns void
+extern function winCursorShow(show as i32) from "miniquake_native.dll" symbol "mq_win_cursor_show" returns void
+extern function winCursorCenter() from "miniquake_native.dll" symbol "mq_win_cursor_center" returns i32
+extern function winUpdateClipCursor() from "miniquake_native.dll" symbol "mq_win_update_clip_cursor" returns i32
+extern function winJoyStartup() from "miniquake_native.dll" symbol "mq_win_joy_startup" returns i32
+extern function winJoyRead() from "miniquake_native.dll" symbol "mq_win_joy_read" returns i32
+extern function winJoyAxis(axis as u32) from "miniquake_native.dll" symbol "mq_win_joy_axis" returns u32
+extern function winJoyButtons() from "miniquake_native.dll" symbol "mq_win_joy_buttons" returns u32
+extern function winJoyPov() from "miniquake_native.dll" symbol "mq_win_joy_pov" returns u32
+extern function winJoyButtonCount() from "miniquake_native.dll" symbol "mq_win_joy_button_count" returns u32
+extern function winJoyHasPov() from "miniquake_native.dll" symbol "mq_win_joy_has_pov" returns i32
+extern function winJoyWarriorCurve(rawValue as i32) from "miniquake_native.dll" symbol "mq_win_joy_warrior_curve" returns i32
+extern function winJoyWarriorCurveF32(rawValue as i32) from "miniquake_native.dll" symbol "mq_win_joy_warrior_curve_f32" returns u32
 extern function winTicks() from "miniquake_native.dll" symbol "mq_win_ticks" returns u32
 extern function winSleep(milliseconds as u32) from "miniquake_native.dll" symbol "mq_win_sleep" returns void
+
+extern function sysCounter() from "miniquake_native.dll" symbol "mq_sys_counter" returns u64
+extern function sysFrequency() from "miniquake_native.dll" symbol "mq_sys_frequency" returns u64
+extern function processHandleCount() from "miniquake_native.dll" symbol "mq_process_handle_count" returns u32
+extern function sysMakeCodeWriteable(address as u64, length as u64) from "miniquake_native.dll" symbol "mq_sys_make_code_writeable" returns i32
+extern function sysConsoleAlloc() from "miniquake_native.dll" symbol "mq_sys_console_alloc" returns i32
+extern function sysConsoleFree() from "miniquake_native.dll" symbol "mq_sys_console_free" returns i32
+extern function sysConsoleEventPop() from "miniquake_native.dll" symbol "mq_sys_console_event_pop" returns u32
+extern function sysConsoleWrite(text as cstr) from "miniquake_native.dll" symbol "mq_sys_console_write" returns i32
+extern function sysSleepUntilInput(milliseconds as u32) from "miniquake_native.dll" symbol "mq_sys_sleep_until_input" returns void
+
+extern function conprocCreateEvent() from "miniquake_native.dll" symbol "mq_conproc_create_event" returns u64
+extern function conprocSetEvent(handle as u64) from "miniquake_native.dll" symbol "mq_conproc_set_event" returns i32
+extern function conprocCloseHandle(handle as u64) from "miniquake_native.dll" symbol "mq_conproc_close_handle" returns void
+extern function conprocWaitAny(first as u64, second as u64, milliseconds as u32) from "miniquake_native.dll" symbol "mq_conproc_wait_any" returns i32
+extern function conprocMap(handle as u64) from "miniquake_native.dll" symbol "mq_conproc_map" returns ptr
+extern function conprocUnmap(mapped as ptr) from "miniquake_native.dll" symbol "mq_conproc_unmap" returns i32
+extern function conprocReadI32(mapped as ptr, index as u32) from "miniquake_native.dll" symbol "mq_conproc_read_i32" returns i32
+extern function conprocWriteI32(mapped as ptr, index as u32, value as i32) from "miniquake_native.dll" symbol "mq_conproc_write_i32" returns void
+extern function conprocReadText(mapped as ptr, byteOffset as u32) from "miniquake_native.dll" symbol "mq_conproc_read_text" returns cstr
+extern function conprocWriteText(mapped as ptr, byteOffset as u32, text as cstr, capacity as u32) from "miniquake_native.dll" symbol "mq_conproc_write_text" returns i32
+extern function conprocScreenLines() from "miniquake_native.dll" symbol "mq_conproc_screen_lines" returns i32
+extern function conprocSetScreenSize(width as i32, height as i32) from "miniquake_native.dll" symbol "mq_conproc_set_screen_size" returns i32
+extern function conprocReadConsoleText(beginLine as i32, endLine as i32) from "miniquake_native.dll" symbol "mq_conproc_read_console_text" returns cstr
+extern function conprocWriteKey(character as i32, virtualKey as i32, scanCode as i32, shift as i32, down as i32) from "miniquake_native.dll" symbol "mq_conproc_write_key" returns i32
 
 extern function audioOpen(sampleRate as u32, channels as u32, bitsPerSample as u32) from "miniquake_native.dll" symbol "mq_audio_open" returns i32
 extern function audioSubmit(data as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_audio_submit" returns i32
 extern function audioClose() from "miniquake_native.dll" symbol "mq_audio_close" returns void
 extern function audioQueued() from "miniquake_native.dll" symbol "mq_audio_queued" returns u32
+extern function audioReset() from "miniquake_native.dll" symbol "mq_audio_reset" returns i32
+extern function audioPosition(sampleMask as u32) from "miniquake_native.dll" symbol "mq_audio_position" returns u32
+extern function audioSubmitted() from "miniquake_native.dll" symbol "mq_audio_submitted" returns u32
+extern function audioCompleted() from "miniquake_native.dll" symbol "mq_audio_completed" returns u32
+extern function audioUnderruns() from "miniquake_native.dll" symbol "mq_audio_underruns" returns u32
+extern function audioHeaderState(index as u32) from "miniquake_native.dll" symbol "mq_audio_header_state" returns u32
+extern function audioCapacity() from "miniquake_native.dll" symbol "mq_audio_capacity" returns u32
+extern function audioIsOpen() from "miniquake_native.dll" symbol "mq_audio_is_open" returns i32
+extern function oggOpen(data as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_ogg_open" returns u32
+extern function oggRate() from "miniquake_native.dll" symbol "mq_ogg_rate" returns u32
+extern function oggChannels() from "miniquake_native.dll" symbol "mq_ogg_channels" returns u32
+extern function oggFrames() from "miniquake_native.dll" symbol "mq_ogg_frames" returns u32
+extern function oggDecode(output as bytes, frameCapacity as u32) from "miniquake_native.dll" symbol "mq_ogg_decode" returns u32
+extern function oggClose() from "miniquake_native.dll" symbol "mq_ogg_close"
 
 extern function udpOpen(port as u32) from "miniquake_native.dll" symbol "mq_udp_open" returns u64
+extern function udpOpenBound(port as u32, address as cstr) from "miniquake_native.dll" symbol "mq_udp_open_bound" returns u64
 extern function udpClose(handle as u64) from "miniquake_native.dll" symbol "mq_udp_close" returns void
 extern function udpBoundPort(handle as u64) from "miniquake_native.dll" symbol "mq_udp_bound_port" returns u32
+extern function udpBoundAddress(handle as u64) from "miniquake_native.dll" symbol "mq_udp_bound_address" returns cstr
+extern function udpEnableBroadcast(handle as u64) from "miniquake_native.dll" symbol "mq_udp_enable_broadcast" returns i32
+extern function udpPeek(handle as u64) from "miniquake_native.dll" symbol "mq_udp_peek" returns i32
 extern function udpSend(handle as u64, address as cstr, port as u32, data as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_udp_send" returns i32
 extern function udpReceive(handle as u64, data as bytes, capacity as u32) from "miniquake_native.dll" symbol "mq_udp_receive" returns i32
 extern function udpLastAddress() from "miniquake_native.dll" symbol "mq_udp_last_address" returns cstr
 extern function udpLastPort() from "miniquake_native.dll" symbol "mq_udp_last_port" returns u32
 extern function udpLastError() from "miniquake_native.dll" symbol "mq_udp_last_error" returns i32
+extern function udpLocalAddress() from "miniquake_native.dll" symbol "mq_udp_local_address" returns cstr
+extern function udpHostName() from "miniquake_native.dll" symbol "mq_udp_host_name" returns cstr
+extern function udpResolveName(name as cstr) from "miniquake_native.dll" symbol "mq_udp_resolve_name" returns cstr
+extern function udpReverseName(address as cstr) from "miniquake_native.dll" symbol "mq_udp_reverse_name" returns cstr
 
 extern function glBegin(mode as u32) from "miniquake_native.dll" symbol "mq_gl_begin" returns void
 extern function glEnd() from "miniquake_native.dll" symbol "mq_gl_end" returns void
@@ -78,6 +157,7 @@ extern function glBindTexture(target as u32, texture as u32) from "miniquake_nat
 extern function glGenTextures(count as i32, textureIds as bytes) from "miniquake_native.dll" symbol "mq_gl_gen_textures" returns void
 extern function glDeleteTextures(count as i32, textureIds as bytes) from "miniquake_native.dll" symbol "mq_gl_delete_textures" returns void
 extern function glTexParameterI(target as u32, name as u32, value as i32) from "miniquake_native.dll" symbol "mq_gl_tex_parameter_i" returns void
+extern function glTexEnvI(target as u32, name as u32, value as i32) from "miniquake_native.dll" symbol "mq_gl_tex_env_i" returns void
 extern function glTexImage2D(target as u32, level as i32, internalFormat as i32, width as i32, height as i32, border as i32, format as u32, type as u32, pixels as bytes) from "miniquake_native.dll" symbol "mq_gl_tex_image_2d" returns void
 extern function glTexSubImage2D(target as u32, level as i32, xOffset as i32, yOffset as i32, width as i32, height as i32, format as u32, type as u32, pixels as bytes) from "miniquake_native.dll" symbol "mq_gl_tex_sub_image_2d" returns void
 extern function glReadPixels(x as i32, y as i32, width as i32, height as i32, format as u32, type as u32, pixels as bytes) from "miniquake_native.dll" symbol "mq_gl_read_pixels" returns void
@@ -85,6 +165,7 @@ extern function glGetString(name as u32) from "miniquake_native.dll" symbol "mq_
 extern function glGetError() from "miniquake_native.dll" symbol "mq_gl_get_error" returns u32
 extern function glFinish() from "miniquake_native.dll" symbol "mq_gl_finish" returns void
 extern function glFlush() from "miniquake_native.dll" symbol "mq_gl_flush" returns void
+extern function glDrawBuffer(mode as u32) from "miniquake_native.dll" symbol "mq_gl_draw_buffer" returns void
 
 function floatBits(value)
   // Avoid number -> text -> strtod.  MiniLang exposes the exact tagged word via
@@ -106,6 +187,10 @@ function trunc(value)
   // the native Quake-style truncation path.
   if value is int then return value end if
   return f32ToI32Trunc(floatBits(value))
+end function
+
+function floatText(value)
+  return f32ToText(floatBits(value))
 end function
 
 function sin(value)

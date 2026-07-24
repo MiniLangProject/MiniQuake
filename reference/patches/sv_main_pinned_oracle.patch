@@ -1,0 +1,15 @@
+diff --git a/WinQuake/sv_main.c b/WinQuake/sv_main.c
+index 2cc96ce..0000000 100644
+--- a/WinQuake/sv_main.c
++++ b/WinQuake/sv_main.c
+@@ -19,6 +19,10 @@ See the GNU General Public License for more details.
+ */
+ // sv_main.c -- server main program
+ 
++#ifdef MINIQUAKE_PINNED_ORACLE
++#include "sv_main_oracle_stubs.h"
++#else
+ #include "quakedef.h"
++#endif
+ 
+ server_t		sv;

@@ -1,0 +1,95 @@
+diff --git a/WinQuake/sys_win.c b/WinQuake/sys_win.c
+index 42b2cc9..0000000 100644
+--- a/WinQuake/sys_win.c
++++ b/WinQuake/sys_win.c
+@@ -19,11 +19,15 @@ See the GNU General Public License for more details.
+ */
+ // sys_win.c -- Win32 system interface code
+ 
++#ifdef MINIQUAKE_PINNED_ORACLE
++#include "sys_win_oracle_stubs.h"
++#else
+ #include "quakedef.h"
+ #include "winquake.h"
+ #include "errno.h"
+ #include "resource.h"
+ #include "conproc.h"
++#endif
+ 
+ #define MINIMUM_WIN_MEMORY		0x0880000
+ #define MAXIMUM_WIN_MEMORY		0x1000000
+@@ -420,7 +424,13 @@ void Sys_Error (char *error, ...)
+ 		DeinitConProc ();
+ 	}
+ 
++#ifdef MINIQUAKE_PINNED_ORACLE
++	if (mq_oracle_fatal_mode)
++		*(volatile int *)0 = 1;
++	mq_oracle_exit_code = 1;
++#else
+ 	exit (1);
++#endif
+ }
+ 
+ void Sys_Printf (char *fmt, ...)
+@@ -455,7 +465,11 @@ void Sys_Quit (void)
+ // shut down QHOST hooks if necessary
+ 	DeinitConProc ();
+ 
++#ifdef MINIQUAKE_PINNED_ORACLE
++	mq_oracle_exit_code = 0;
++#else
+ 	exit (0);
++#endif
+ }
+ 
+ 
+@@ -466,9 +480,18 @@ void Sys_Quit (void)
+ */
+ double Sys_FloatTime (void)
+ {
++#ifdef MINIQUAKE_PINNED_ORACLE
++	int					*sametimecount_ptr = &mq_oracle_sametimecount;
++	unsigned int		*oldtime_ptr = &mq_oracle_oldtime;
++	int					*first_ptr = &mq_oracle_first;
++#define sametimecount (*sametimecount_ptr)
++#define oldtime (*oldtime_ptr)
++#define first (*first_ptr)
++#else
+ 	static int			sametimecount;
+ 	static unsigned int	oldtime;
+ 	static int			first = 1;
++#endif
+ 	LARGE_INTEGER		PerformanceCount;
+ 	unsigned int		temp, t2;
+ 	double				time;
+@@ -523,6 +546,11 @@ double Sys_FloatTime (void)
+ 	Sys_PopFPCW ();
+ 
+     return curtime;
++#ifdef MINIQUAKE_PINNED_ORACLE
++#undef sametimecount
++#undef oldtime
++#undef first
++#endif
+ }
+ 
+ 
+@@ -885,6 +913,11 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
+ 
+ 		Host_Frame (time);
+ 		oldtime = newtime;
++#ifdef MINIQUAKE_PINNED_ORACLE
++		if (mq_oracle_stop_after_frame &&
++			mq_oracle_host_frame_calls >= mq_oracle_stop_after_frame)
++			break;
++#endif
+ 	}
+ 
+     /* return success of application */
+@@ -892,2 +925,5 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
+ }
+ 
++#ifdef MINIQUAKE_PINNED_ORACLE
++#include "sys_win_oracle_bridge.inc"
++#endif

@@ -1,0 +1,16 @@
+diff --git a/WinQuake/sv_move.c b/WinQuake/sv_move.c
+index 148cf7f..0000000 100644
+--- a/WinQuake/sv_move.c
++++ b/WinQuake/sv_move.c
+@@ -19,7 +19,11 @@ See the GNU General Public License for more details.
+ */
+ // sv_move.c -- monster movement
+ 
++#ifdef MINIQUAKE_PINNED_ORACLE
++#include "sv_move_oracle_stubs.h"
++#else
+ #include "quakedef.h"
++#endif
+ 
+ #define	STEPSIZE	18
+ 

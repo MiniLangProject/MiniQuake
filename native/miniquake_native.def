@@ -22,26 +22,103 @@ EXPORTS
   mq_win_has_focus
   mq_win_client_width
   mq_win_client_height
+  mq_win_window_x
+  mq_win_window_y
+  mq_win_is_minimized
+  mq_win_desktop_width
+  mq_win_desktop_height
+  mq_win_display_mode_count
+  mq_win_display_mode_width
+  mq_win_display_mode_height
+  mq_win_display_mode_bpp
+  mq_win_display_mode_frequency
+  mq_win_test_display_mode
+  mq_win_configure_display_mode
+  mq_win_restore_display_mode
+  mq_win_get_gamma_ramp
+  mq_win_set_gamma_ramp
+  mq_win_context_ready
+  mq_win_make_current
+  mq_win_activate
   mq_win_set_title
   mq_win_set_cursor_capture
   mq_win_mouse_dx
   mq_win_mouse_dy
   mq_win_mouse_buttons
   mq_win_mouse_wheel
+  mq_win_input_event_pop
+  mq_win_input_test_push
+  mq_win_cursor_show
+  mq_win_cursor_center
+  mq_win_update_clip_cursor
+  mq_win_joy_startup
+  mq_win_joy_read
+  mq_win_joy_axis
+  mq_win_joy_buttons
+  mq_win_joy_pov
+  mq_win_joy_button_count
+  mq_win_joy_has_pov
+  mq_win_joy_warrior_curve
+  mq_win_joy_warrior_curve_f32
   mq_win_ticks
   mq_win_sleep
+  mq_sys_counter
+  mq_sys_frequency
+  mq_process_handle_count
+  mq_sys_make_code_writeable
+  mq_sys_console_alloc
+  mq_sys_console_free
+  mq_sys_console_event_pop
+  mq_sys_console_write
+  mq_sys_sleep_until_input
+  mq_conproc_create_event
+  mq_conproc_set_event
+  mq_conproc_close_handle
+  mq_conproc_wait_any
+  mq_conproc_map
+  mq_conproc_unmap
+  mq_conproc_read_i32
+  mq_conproc_write_i32
+  mq_conproc_read_text
+  mq_conproc_write_text
+  mq_conproc_screen_lines
+  mq_conproc_set_screen_size
+  mq_conproc_read_console_text
+  mq_conproc_write_key
   mq_audio_open
   mq_audio_submit
   mq_audio_close
   mq_audio_queued
+  mq_audio_reset
+  mq_audio_position
+  mq_audio_submitted
+  mq_audio_completed
+  mq_audio_underruns
+  mq_audio_header_state
+  mq_audio_capacity
+  mq_audio_is_open
+  mq_ogg_open
+  mq_ogg_rate
+  mq_ogg_channels
+  mq_ogg_frames
+  mq_ogg_decode
+  mq_ogg_close
   mq_udp_open
+  mq_udp_open_bound
   mq_udp_close
   mq_udp_bound_port
+  mq_udp_bound_address
+  mq_udp_enable_broadcast
+  mq_udp_peek
   mq_udp_send
   mq_udp_receive
   mq_udp_last_address
   mq_udp_last_port
   mq_udp_last_error
+  mq_udp_local_address
+  mq_udp_host_name
+  mq_udp_resolve_name
+  mq_udp_reverse_name
   mq_gl_begin
   mq_gl_end
   mq_gl_vertex2
@@ -74,6 +151,7 @@ EXPORTS
   mq_gl_gen_textures
   mq_gl_delete_textures
   mq_gl_tex_parameter_i
+  mq_gl_tex_env_i
   mq_gl_tex_image_2d
   mq_gl_tex_sub_image_2d
   mq_gl_read_pixels
@@ -81,3 +159,4 @@ EXPORTS
   mq_gl_get_error
   mq_gl_finish
   mq_gl_flush
+  mq_gl_draw_buffer

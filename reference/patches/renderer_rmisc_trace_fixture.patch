@@ -1,0 +1,16 @@
+diff --git a/WinQuake/gl_rmisc.c b/WinQuake/gl_rmisc.c
+index e6c2c34..a766bef 100644
+--- a/WinQuake/gl_rmisc.c
++++ b/WinQuake/gl_rmisc.c
+@@ -19,7 +19,11 @@ See the GNU General Public License for more details.
+ */
+ // r_misc.c
+ 
++#ifdef MINIQUAKE_RENDERER_RMISC_TRACE_FIXTURE
++#include "mq_gl_rmisc_fixture.h"
++#else
+ #include "quakedef.h"
++#endif
+ 
+ 
+ 

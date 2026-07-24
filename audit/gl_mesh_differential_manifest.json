@@ -1,0 +1,23 @@
+{
+  "schema": "miniquake.differential.v1",
+  "unit": "gl_mesh",
+  "reference_execution": "patched-pinned-source-worktree",
+  "command": "py -3 tools/gl_mesh_differential.py",
+  "inputs": {
+    "reference_source": "reference/quake/WinQuake/gl_mesh.c",
+    "reference_harness": "reference/harness/gl_mesh_pinned_driver.c",
+    "instrumentation_patch": "reference/patches/gl_mesh_pinned_oracle.patch",
+    "oracle_stub_header": "reference/harness/gl_mesh_oracle_stubs.h",
+    "minilang_fixture": "tests/gl_mesh_differential_fixture.ml",
+    "ported_module": "src/miniquake/render/alias_mesh.ml"
+  },
+  "pinned_commit": "bf4ac424ce754894ac8f1dae6a3981954bc9852d",
+  "events": 4,
+  "epsilon": 1e-5,
+  "functions": [
+    {"name": "StripLength", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:chain"]},
+    {"name": "FanLength", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:chain"]},
+    {"name": "BuildTris", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:strip"]},
+    {"name": "GL_MakeAliasModelDisplayLists", "source_definitions": 1, "classification": "reference-differential", "evidence": ["differential:build"]}
+  ]
+}

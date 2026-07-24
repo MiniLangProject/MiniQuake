@@ -144,12 +144,78 @@ def verify_integrated_milestone(root: Path) -> dict[str, Any]:
         "src/miniquake/statusbar.ml",
         "src/miniquake/demo_player.ml",
         "src/miniquake/net_datagram.ml",
+        "src/miniquake/net_control.ml",
         "src/miniquake/net_udp.ml",
+        "src/miniquake/savegame.ml",
         "src/miniquake/runtime_validation.ml",
         "tests/core_tests.ml",
         "tests/milestone_tests.ml",
         "scripts/validate_real_game.ps1",
         "tools/ml_scope_lint.py",
+        "tools/network_matrix.py",
+        "tools/network_impairment_matrix.py",
+        "tools/network_multiclient_impairment_matrix.py",
+        "tools/retail_demo_matrix.py",
+        "tools/parity_oracle.py",
+        "tools/generate_behavioral_parity.py",
+        "tools/generate_semantic_review.py",
+        "tools/gl_draw_differential.py",
+        "tools/gl_model_differential.py",
+        "tools/menu_differential.py",
+        "tools/renderer_differential.py",
+        "tools/r_part_differential.py",
+        "tools/sbar_differential.py",
+        "tools/view_differential.py",
+        "tools/verify_dependencies.py",
+        "audit/renderer_differential_manifest.json",
+        "audit/gl_draw_differential_manifest.json",
+        "audit/gl_model_differential_manifest.json",
+        "audit/menu_differential_manifest.json",
+        "audit/r_part_differential_manifest.json",
+        "audit/sbar_differential_manifest.json",
+        "audit/view_differential_manifest.json",
+        "audit/SEMANTIC_AUDIT_PLAN.json",
+        "audit/SEMANTIC_PORT_REVIEW.json",
+        "docs/SEMANTIC_PORT_REVIEW.md",
+        "reference/fixtures/r_part/mq_r_part_fixture.c",
+        "reference/fixtures/r_part/mq_r_part_fixture.h",
+        "reference/fixtures/gl_model/mq_gl_model_fixture.c",
+        "reference/fixtures/menu/mq_menu_fixture.c",
+        "reference/fixtures/gl_draw/mq_gl_draw_fixture.c",
+        "reference/fixtures/sbar/mq_sbar_fixture.c",
+        "reference/fixtures/view/mq_view_fixture.c",
+        "reference/fixtures/renderer/mq_gl_warp_fixture.c",
+        "reference/fixtures/renderer/mq_gl_warp_fixture.h",
+        "reference/fixtures/renderer/mq_gl_rlight_fixture.c",
+        "reference/fixtures/renderer/mq_gl_rlight_fixture.h",
+        "reference/fixtures/renderer/mq_gl_refrag_fixture.c",
+        "reference/fixtures/renderer/mq_gl_refrag_fixture.h",
+        "reference/fixtures/renderer/mq_gl_rmisc_fixture.c",
+        "reference/fixtures/renderer/mq_gl_rmisc_fixture.h",
+        "reference/fixtures/renderer/mq_gl_rmain_fixture.c",
+        "reference/fixtures/renderer/mq_gl_rmain_redirect.h",
+        "reference/fixtures/renderer/mq_gl_rsurf_fixture.c",
+        "reference/fixtures/renderer/mq_gl_rsurf_fixture.h",
+        "reference/patches/renderer_rlight_trace_fixture.patch",
+        "reference/patches/renderer_refrag_trace_fixture.patch",
+        "reference/patches/renderer_rmisc_trace_fixture.patch",
+        "reference/patches/renderer_rmain_trace_fixture.patch",
+        "reference/patches/renderer_rsurf_trace_fixture.patch",
+        "reference/patches/renderer_trace_fixture.patch",
+        "reference/patches/renderer_warp_trace_fixture.patch",
+        "reference/patches/r_part_trace_fixture.patch",
+        "tests/r_part_differential_fixture.ml",
+        "tests/gl_model_differential_fixture.ml",
+        "tests/menu_differential_fixture.ml",
+        "tests/gl_draw_differential_fixture.ml",
+        "tests/sbar_differential_fixture.ml",
+        "tests/view_differential_fixture.ml",
+        "tests/renderer_rlight_trace_fixture.ml",
+        "tests/renderer_refrag_trace_fixture.ml",
+        "tests/renderer_rmisc_trace_fixture.ml",
+        "tests/renderer_rmain_trace_fixture.ml",
+        "tests/renderer_rsurf_trace_fixture.ml",
+        "tests/renderer_warp_trace_fixture.ml",
     ]
     missing = [name for name in required_files if not (root / name).is_file()]
     if missing:
@@ -164,6 +230,7 @@ def verify_integrated_milestone(root: Path) -> dict[str, Any]:
         "--soak",
         "--demo-verify",
         "--udp-smoke",
+        "--music-smoke",
     ]
     missing_commands = [command for command in required_commands if command not in main_text]
     if missing_commands:
@@ -200,36 +267,66 @@ def verify_port_audit(root: Path) -> dict[str, Any]:
         root / "PORT_AUDIT.md",
         root / "PARITY_TEST_PLAN.md",
         root / "ORIGINAL_FILE_COVERAGE.md",
-        root / "build" / "port-coverage.json",
+        root / "audit" / "PORT_COVERAGE.json",
+        root / "audit" / "GLQUAKE_PORT_INVENTORY.json",
+        root / "docs" / "GLQUAKE_PORT_INVENTORY.md",
+        root / "reference" / "quake.lock.json",
+        root / "third_party" / "stb.lock.json",
+        root / "docs" / "IMPLEMENTATION_PROGRESS.md",
+        root / "docs" / "PARITY_TRACE_SCHEMA.md",
     ]
     missing = [path.relative_to(root).as_posix() for path in required if not path.is_file()]
     if missing:
         raise SystemExit("port audit is incomplete: missing " + ", ".join(missing))
 
-    coverage = json.loads((root / "build" / "port-coverage.json").read_text(encoding="utf-8"))
+    coverage = json.loads((root / "audit" / "PORT_COVERAGE.json").read_text(encoding="utf-8"))
     entries = coverage.get("entries")
     declared_file_count = coverage.get("files")
-    if not isinstance(entries, list) or len(entries) != 195 or declared_file_count != 195:
+    reference_root = root / "reference" / "quake" / "WinQuake"
+    if not reference_root.is_dir():
         raise SystemExit(
-            "port coverage regression: expected 195 original C/header entries, got "
+            "pinned GLQuake reference is absent; run `git submodule update --init`"
+        )
+    pinned_files = {
+        path.relative_to(reference_root).as_posix()
+        for path in reference_root.rglob("*")
+        if path.is_file() and path.suffix.lower() in {".c", ".h"}
+    }
+    expected_count = len(pinned_files)
+    if (
+        not isinstance(entries, list)
+        or len(entries) != expected_count
+        or declared_file_count != expected_count
+    ):
+        raise SystemExit(
+            f"port coverage regression: expected {expected_count} pinned C/header entries, got "
             + str(0 if not isinstance(entries, list) else len(entries))
             + " (declared=" + str(declared_file_count) + ")"
         )
 
     allowed = {"PORTIERT", "TEILPORTIERT", "PLATTFORMBRÜCKE", "OFFEN", "NICHT ZIELRELEVANT"}
     status_counts: dict[str, int] = {name: 0 for name in sorted(allowed)}
-    original_names: set[str] = set()
+    original_paths: set[str] = set()
     for entry in entries:
         if not isinstance(entry, dict):
             raise SystemExit("port coverage regression: non-object entry")
         original = entry.get("original")
+        original_path = entry.get("path")
         status = entry.get("status")
         target = entry.get("miniquake")
         if not isinstance(original, str) or not original:
             raise SystemExit("port coverage regression: entry without original filename")
-        if original in original_names:
-            raise SystemExit("port coverage regression: duplicate original file " + original)
-        original_names.add(original)
+        if not isinstance(original_path, str) or not original_path:
+            raise SystemExit("port coverage regression: entry without original path")
+        if original_path in original_paths:
+            raise SystemExit(
+                "port coverage regression: duplicate original path " + original_path
+            )
+        if Path(original_path).name != original:
+            raise SystemExit(
+                "port coverage regression: path/name mismatch for " + original_path
+            )
+        original_paths.add(original_path)
         if status not in allowed:
             raise SystemExit("port coverage regression: invalid status for " + original + ": " + str(status))
         if not isinstance(target, str) or not target:
@@ -244,12 +341,177 @@ def verify_port_audit(root: Path) -> dict[str, Any]:
             + " actual="
             + str(status_counts)
         )
+    missing_paths = sorted(pinned_files - original_paths)
+    extra_paths = sorted(original_paths - pinned_files)
+    if missing_paths or extra_paths:
+        raise SystemExit(
+            "port coverage regression: pinned source mismatch; missing="
+            + str(missing_paths)
+            + " extra="
+            + str(extra_paths)
+        )
+
+    inventory = json.loads(
+        (root / "audit" / "GLQUAKE_PORT_INVENTORY.json").read_text(encoding="utf-8")
+    )
+    if inventory.get("schema") != 2 or not isinstance(inventory.get("units"), list):
+        raise SystemExit("function inventory regression: invalid schema or units")
+    units = inventory["units"]
+    summary = inventory.get("summary", {})
+    unit_names: set[str] = set()
+    inventoried_files: set[str] = set()
+    actual_function_counts = {
+        "located": 0,
+        "candidate": 0,
+        "unmapped": 0,
+        "excluded": 0,
+    }
+    actual_assembly_counts = {
+        "located": 0,
+        "candidate": 0,
+        "unmapped": 0,
+        "excluded": 0,
+    }
+    function_total = 0
+    target_function_total = 0
+    target_function_located = 0
+    target_assembly_total = 0
+    target_assembly_located = 0
+    target_units = 0
+    target_units_with_counterpart = 0
+    for unit in units:
+        if not isinstance(unit, dict) or not isinstance(unit.get("unit"), str):
+            raise SystemExit("function inventory regression: invalid logical unit")
+        unit_name = unit["unit"]
+        if unit_name in unit_names:
+            raise SystemExit(
+                "function inventory regression: duplicate logical unit " + unit_name
+            )
+        unit_names.add(unit_name)
+        scope = unit.get("scope")
+        modules = unit.get("minilang_modules")
+        if scope not in {"target", "excluded"} or not isinstance(modules, list):
+            raise SystemExit(
+                "function inventory regression: invalid scope/modules for " + unit_name
+            )
+        if scope == "target" and not modules:
+            raise SystemExit(
+                "function inventory regression: target unit without MiniLang pendant "
+                + unit_name
+            )
+        if scope == "target":
+            target_units += 1
+            target_units_with_counterpart += 1
+        for module in modules:
+            module_path = module.get("path") if isinstance(module, dict) else None
+            if not isinstance(module_path, str) or not (root / module_path).is_file():
+                raise SystemExit(
+                    "function inventory regression: stale module mapping in " + unit_name
+                )
+        for original in unit.get("original_files", []):
+            original_path = original.get("path") if isinstance(original, dict) else None
+            if not isinstance(original_path, str) or original_path in inventoried_files:
+                raise SystemExit(
+                    "function inventory regression: invalid/duplicate original in "
+                    + unit_name
+                )
+            inventoried_files.add(original_path)
+        functions = unit.get("functions")
+        if not isinstance(functions, list):
+            raise SystemExit(
+                "function inventory regression: functions missing from " + unit_name
+            )
+        function_total += len(functions)
+        for function in functions:
+            status = function.get("mapping_status") if isinstance(function, dict) else None
+            evidence = function.get("evidence") if isinstance(function, dict) else None
+            if status not in actual_function_counts or not isinstance(evidence, list):
+                raise SystemExit(
+                    "function inventory regression: invalid function mapping in "
+                    + unit_name
+                )
+            if status in {"located", "candidate"} and not evidence:
+                raise SystemExit(
+                    "function inventory regression: evidence-free code location in "
+                    + unit_name
+                )
+            actual_function_counts[status] += 1
+            if str(function.get("scope", "")).startswith("target"):
+                target_function_total += 1
+                if status == "located":
+                    target_function_located += 1
+        assembly_exports = unit.get("assembly_exports")
+        if not isinstance(assembly_exports, list):
+            raise SystemExit(
+                "function inventory regression: assembly exports missing from "
+                + unit_name
+            )
+        for export in assembly_exports:
+            status = export.get("mapping_status") if isinstance(export, dict) else None
+            evidence = export.get("evidence") if isinstance(export, dict) else None
+            if status not in actual_assembly_counts or not isinstance(evidence, list):
+                raise SystemExit(
+                    "function inventory regression: invalid assembly mapping in "
+                    + unit_name
+                )
+            if status in {"located", "candidate"} and not evidence:
+                raise SystemExit(
+                    "function inventory regression: evidence-free assembly code "
+                    "location in " + unit_name
+                )
+            actual_assembly_counts[status] += 1
+            if str(export.get("scope", "")).startswith("target"):
+                target_assembly_total += 1
+                if status == "located":
+                    target_assembly_located += 1
+    if len(units) != summary.get("logical_units"):
+        raise SystemExit("function inventory regression: logical unit count mismatch")
+    if function_total != summary.get("c_function_definitions"):
+        raise SystemExit("function inventory regression: C function count mismatch")
+    if actual_function_counts != summary.get("function_mapping_counts"):
+        raise SystemExit("function inventory regression: function status count mismatch")
+    if actual_assembly_counts != summary.get("assembly_export_counts"):
+        raise SystemExit(
+            "function inventory regression: assembly status count mismatch"
+        )
+    expected_summary = {
+        "target_units": target_units,
+        "target_units_with_minilang_counterpart": target_units_with_counterpart,
+        "target_c_function_definitions": target_function_total,
+        "target_c_function_definitions_located": target_function_located,
+        "target_assembly_exports": target_assembly_total,
+        "target_assembly_exports_located": target_assembly_located,
+    }
+    for key, expected in expected_summary.items():
+        if summary.get(key) != expected:
+            raise SystemExit(
+                "function inventory regression: "
+                + key
+                + " mismatch; expected "
+                + str(expected)
+            )
+    if any("behavioral_parity" in unit for unit in units):
+        raise SystemExit(
+            "function inventory regression: code-location inventory must not "
+            "duplicate the separate behavioral-parity state"
+        )
 
     return {
         "original_files": len(entries),
         "status_counts": status_counts,
-        "documents": [path.relative_to(root).as_posix() for path in required[:-1]],
-        "machine_report": required[-1].relative_to(root).as_posix(),
+        "documents": [path.relative_to(root).as_posix() for path in required[:3]],
+        "machine_report": required[3].relative_to(root).as_posix(),
+        "reference_lock": (root / "reference" / "quake.lock.json").relative_to(root).as_posix(),
+        "logical_units": len(units),
+        "c_functions": function_total,
+        "unmapped_target_functions": sum(
+            1
+            for unit in units
+            for function in unit["functions"]
+            if function.get("scope") == "target"
+            and function.get("mapping_status") == "unmapped"
+        ),
+        "function_inventory": "audit/GLQUAKE_PORT_INVENTORY.json",
     }
 
 
@@ -262,24 +524,41 @@ def verify_sky_initialization(root: Path) -> dict[str, Any]:
     checks below prevent that runtime type regression and retain GLQuake's
     texture allocation/filtering semantics.
     """
-    path = root / "src" / "miniquake" / "render" / "world.ml"
-    text = path.read_text(encoding="utf-8")
-    start = text.find("function R_InitSky(texture)")
-    end = text.find("\n// Internal package-state adapters", start)
-    if start < 0 or end < 0:
+    upload_path = root / "src" / "miniquake" / "render" / "world.ml"
+    pixel_path = root / "src" / "miniquake" / "render" / "gl_warp.ml"
+    upload_text = upload_path.read_text(encoding="utf-8")
+    pixel_text = pixel_path.read_text(encoding="utf-8")
+    upload_start = upload_text.find("function R_InitSky(texture)")
+    upload_end = upload_text.find("\n// Internal package-state adapters", upload_start)
+    pixel_start = pixel_text.find("function R_InitSkyPixels(texture, palette)")
+    pixel_end = pixel_text.find("\nfunction R_InitSky(texture, palette)", pixel_start)
+    if min(upload_start, upload_end, pixel_start, pixel_end) < 0:
         raise SystemExit("R_InitSky implementation is missing or cannot be delimited")
-    body = text[start:end]
-    required = {
-        "red integer average": "averageRed = native.trunc(red / count)",
-        "green integer average": "averageGreen = native.trunc(green / count)",
-        "blue integer average": "averageBlue = native.trunc(blue / count)",
+    upload_body = upload_text[upload_start:upload_end]
+    pixel_body = pixel_text[pixel_start:pixel_end]
+    required_pixels = {
+        "red integer average": "averageRed = native.trunc(red / (128 * 128))",
+        "green integer average": "averageGreen = native.trunc(green / (128 * 128))",
+        "blue integer average": "averageBlue = native.trunc(blue / (128 * 128))",
+        "transparent palette entry": "if color == 255 then alpha[offset + 3] = 0 end if",
+    }
+    required_upload = {
+        "delegated byte translation": "pixels = glWarp.R_InitSky(texture, rCompatRenderer.palette)",
         "solid internal format": "native.glTexImage2D(gl.GL_TEXTURE_2D, 0, 3, 128, 128",
         "alpha internal format": "native.glTexImage2D(gl.GL_TEXTURE_2D, 0, 4, 128, 128",
         "linear minification": "gl.textureParameter(gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR)",
         "linear magnification": "gl.textureParameter(gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)",
-        "transparent palette entry": "if source == 255 then alphaRgba[destination + 3] = 0 end if",
     }
-    missing = [label for label, fragment in required.items() if fragment not in body]
+    missing = [
+        label
+        for label, fragment in required_pixels.items()
+        if fragment not in pixel_body
+    ]
+    missing.extend(
+        label
+        for label, fragment in required_upload.items()
+        if fragment not in upload_body
+    )
     if missing:
         raise SystemExit("R_InitSky parity regression: missing " + ", ".join(missing))
     forbidden = {
@@ -287,11 +566,13 @@ def verify_sky_initialization(root: Path) -> dict[str, Any]:
         "texture-id/index confusion": "skytexturenum = texture.glId",
         "destructive sky texture recreation": "gl.deleteTexture(solidskytexture)",
     }
-    present = [label for label, fragment in forbidden.items() if fragment in body]
+    combined_body = pixel_body + upload_body
+    present = [label for label, fragment in forbidden.items() if fragment in combined_body]
     if present:
         raise SystemExit("R_InitSky parity regression: " + ", ".join(present))
     return {
-        "module": path.relative_to(root).as_posix(),
+        "module": pixel_path.relative_to(root).as_posix(),
+        "upload_module": upload_path.relative_to(root).as_posix(),
         "integer_average": True,
         "linear_filtering": True,
         "texture_ids_reused": True,
@@ -367,6 +648,23 @@ def main() -> int:
     if not (root / "COPYING").is_file():
         raise SystemExit("COPYING is missing")
 
+    run([sys.executable, str(root / "tools" / "verify_reference.py")], root)
+    run([sys.executable, str(root / "tools" / "verify_dependencies.py")], root)
+    run([sys.executable, str(root / "tools" / "generate_port_audit.py")], root)
+    run([sys.executable, str(root / "tools" / "generate_port_inventory.py")], root)
+    run(
+        [sys.executable, str(root / "tools" / "generate_behavioral_parity.py")],
+        root,
+    )
+    run(
+        [sys.executable, str(root / "tools" / "generate_semantic_review.py")],
+        root,
+    )
+    run(
+        [sys.executable, str(root / "tools" / "parity_oracle.py"), "self-test"],
+        root,
+    )
+
     metrics = source_metrics(root)
     build_toolchain = verify_build_toolchain(root)
     native_boundary = verify_native_boundary(root)
@@ -412,6 +710,7 @@ def main() -> int:
         "Native boundary: exclusive src/miniquake/native.ml import verified",
         f"Integrated milestone: host/server/client/render/audio/UDP + {integrated_milestone['core_tests'] + integrated_milestone['milestone_tests']} tests wired",
         f"Original source audit: {port_audit['original_files']} C/header files classified",
+        f"GL target inventory: {port_audit['logical_units']} logical units, {port_audit['c_functions']} C functions, {port_audit['unmapped_target_functions']} target functions unmapped",
         "GLQuake R_InitSky: integer averaging, palette alpha, texture reuse and linear filtering verified",
         "MiniLang compiler execution: not performed by this verifier",
     ]

@@ -22,8 +22,8 @@ end function
 function randomWord(server)
   if server is void or server.machine is void or server.machine.context is void then return 0 end if
   ctx = server.machine.context
-  ctx.randomSeed = (ctx.randomSeed * 1103515245 + 12345) & 0x7fffffff
-  return ctx.randomSeed
+  ctx.randomSeed = (ctx.randomSeed * 214013 + 2531011) & 0xffffffff
+  return (ctx.randomSeed >> 16) & 0x7fff
 end function
 
 // PF_changeyaw / SV_StepDirection share this exact angle update.
@@ -220,4 +220,45 @@ function moveToGoal(server, entityIndex, distance)
     return newChaseDirection(server, entityIndex, goal, distance)
   end if
   return true
+end function
+
+// --------------------------------------------------------------------------
+// sv_move.c public compatibility surface.  Keep these names one-for-one with
+// the original server movement unit; the lower-case spellings above remain
+// convenient internal helpers for existing MiniQuake callers.
+
+function SV_CheckBottom(server, entityIndex)
+  return collision.checkBottom(server, entityIndex)
+end function
+
+function SV_movestep(server, entityIndex, movement, relink)
+  return moveStep(server, entityIndex, movement, relink)
+end function
+
+function SV_StepDirection(server, entityIndex, yaw, distance)
+  return stepDirection(server, entityIndex, yaw, distance)
+end function
+
+function SV_FixCheckBottom(server, entityIndex)
+  fixCheckBottom(server, entityIndex)
+  return true
+end function
+
+function SV_NewChaseDir(server, actor, enemy, distance)
+  return newChaseDirection(server, actor, enemy, distance)
+end function
+
+function SV_CloseEnough(server, entityIndex, goalIndex, distance)
+  return closeEnough(server, entityIndex, goalIndex, distance)
+end function
+
+function SV_MoveToGoal(server, entityIndex, distance)
+  return moveToGoal(server, entityIndex, distance)
+end function
+
+// PF_changeyaw is declared in sv_move.c and implemented in pr_cmds.c.  This
+// explicit server hook completes the combined C/header pendant without
+// duplicating the QuakeC builtin.
+function SV_ChangeYaw(server, entityIndex)
+  return changeYaw(server, entityIndex)
 end function

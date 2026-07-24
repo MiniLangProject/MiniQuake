@@ -1,0 +1,16 @@
+diff --git a/WinQuake/snd_win.c b/WinQuake/snd_win.c
+index 11028c4..0000000 100644
+--- a/WinQuake/snd_win.c
++++ b/WinQuake/snd_win.c
+@@ -19,4 +19,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ */
++#ifdef MINIQUAKE_PINNED_ORACLE
++#include "snd_win_oracle_stubs.h"
++#define static
++#else
+ #include "quakedef.h"
+ #include "winquake.h"
++#endif
+ 
+ #define iDirectSoundCreate(a,b,c)	pDirectSoundCreate(a,b,c)
+ 

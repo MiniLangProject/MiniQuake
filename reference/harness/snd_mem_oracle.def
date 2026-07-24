@@ -1,0 +1,22 @@
+LIBRARY snd_mem_oracle
+EXPORTS
+    ResampleSfx
+    S_LoadSound
+    GetLittleShort
+    GetLittleLong
+    FindNextChunk
+    FindChunk
+    DumpChunks
+    GetWavinfo
+    snd_mem_fixture_reset
+    snd_mem_wave
+    snd_mem_wave_length
+    snd_mem_set_cursor
+    snd_mem_cursor_offset
+    snd_mem_set_chunks
+    snd_mem_chunk_offset
+    snd_mem_chunk_length
+    snd_mem_dump_count
+    snd_mem_resample
+    snd_mem_load
+    snd_mem_load_again

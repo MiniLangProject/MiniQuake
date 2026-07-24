@@ -1,0 +1,3 @@
+LIBRARY sv_move_oracle
+EXPORTS
+  sv_move_oracle_jsonl

@@ -1,0 +1,22 @@
+diff --git a/WinQuake/console.c b/WinQuake/console.c
+index cad58f8..0000000 100644
+--- a/WinQuake/console.c
++++ b/WinQuake/console.c
+@@ -19,13 +19,17 @@ You should have received a copy of the GNU General Public License
+ */
+ // console.c
+ 
++#ifdef MINIQUAKE_PINNED_ORACLE
++#include "console_oracle_stubs.h"
++#else
+ #ifdef NeXT
+ #include <libc.h>
+ #endif
+ #ifndef _MSC_VER
+ #include <unistd.h>
+ #endif
+ #include <fcntl.h>
+ #include "quakedef.h"
++#endif
+ 
+ int 		con_linewidth;

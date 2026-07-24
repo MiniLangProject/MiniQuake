@@ -12,19 +12,16 @@ function parseSingleFrame(data, offset)
   originY = bio.i32(data, offset + 4)
   width = bio.i32(data, offset + 8)
   height = bio.i32(data, offset + 12)
-  if width < 0 or height < 0 or offset + 16 + width * height > len(data) then return error(1851, "sprite frame pixels outside file") end if
+  if width <= 0 or height <= 0 or offset + 16 + width * height > len(data) then return error(1851, "sprite frame pixels outside file") end if
   frame = t.SpriteFrame(originX, originY, width, height, slice(data, offset + 16, width * height))
   return [frame, offset + 16 + width * height]
 end function
 
-function parseFrameSet(data, offset)
-  if offset + 4 > len(data) then return error(1852, "sprite frame type outside file") end if
-  group = bio.i32(data, offset)
-  offset = offset + 4
-  if group == 0 then
-    parsed = parseSingleFrame(data, offset)
-    return [t.SpriteFrameSet(false, [], [parsed[0]]), parsed[1]]
-  end if
+function Mod_LoadSpriteFrame(data, offset)
+  return parseSingleFrame(data, offset)
+end function
+
+function Mod_LoadSpriteGroup(data, offset)
   if offset + 4 > len(data) then return error(1853, "sprite group outside file") end if
   count = bio.i32(data, offset)
   offset = offset + 4
@@ -34,18 +31,32 @@ function parseFrameSet(data, offset)
   while i < count
     if offset + 4 > len(data) then return error(1855, "sprite interval outside file") end if
     intervals[i] = bio.f32(data, offset)
+    if intervals[i] <= 0.0 then return error(1860, "Mod_LoadSpriteGroup: interval<=0") end if
     offset = offset + 4
     i = i + 1
   end while
   frames = arrayutil.makeEmptyArray(count)
   i = 0
   while i < count
-    parsed = parseSingleFrame(data, offset)
+    parsed = Mod_LoadSpriteFrame(data, offset)
+    if parsed is error then return parsed end if
     frames[i] = parsed[0]
     offset = parsed[1]
     i = i + 1
   end while
   return [t.SpriteFrameSet(true, intervals, frames), offset]
+end function
+
+function parseFrameSet(data, offset)
+  if offset + 4 > len(data) then return error(1852, "sprite frame type outside file") end if
+  group = bio.i32(data, offset)
+  offset = offset + 4
+  if group == c.SPR_SINGLE then
+    parsed = Mod_LoadSpriteFrame(data, offset)
+    if parsed is error then return parsed end if
+    return [t.SpriteFrameSet(false, [], [parsed[0]]), parsed[1]]
+  end if
+  return Mod_LoadSpriteGroup(data, offset)
 end function
 
 function parse(data, filename)
@@ -60,17 +71,33 @@ function parse(data, filename)
   numFrames = bio.i32(data, 24)
   beamLength = bio.f32(data, 28)
   syncType = bio.i32(data, 32)
-  if numFrames < 0 then return error(1859, "invalid sprite frame count") end if
+  if width <= 0 or height <= 0 then return error(1859, "invalid sprite dimensions") end if
+  if numFrames < 1 then return error(1859, "Mod_LoadSpriteModel: Invalid # of frames: " + numFrames) end if
   frames = arrayutil.makeEmptyArray(numFrames)
   offset = 36
   i = 0
   while i < numFrames
     parsed = parseFrameSet(data, offset)
+    if parsed is error then return parsed end if
     frames[i] = parsed[0]
     offset = parsed[1]
     i = i + 1
   end while
   return t.SpriteModel(filename, data, version, type, boundingRadius, width, height, numFrames, beamLength, syncType, frames)
+end function
+
+function Mod_LoadSpriteModel(data, filename)
+  return parse(data, filename)
+end function
+
+function spriteFrameBounds(frame)
+  return [frame.originY, frame.originY - frame.height, frame.originX, frame.originX + frame.width]
+end function
+
+function spriteModelBounds(model)
+  halfWidth = model.width / 2.0
+  halfHeight = model.height / 2.0
+  return [t.Vec3(-halfWidth, -halfWidth, -halfHeight), t.Vec3(halfWidth, halfWidth, halfHeight)]
 end function
 
 function load(filename)

@@ -1,0 +1,16 @@
+diff --git a/WinQuake/gl_refrag.c b/WinQuake/gl_refrag.c
+index 6a062d8..ce8bfd1 100644
+--- a/WinQuake/gl_refrag.c
++++ b/WinQuake/gl_refrag.c
+@@ -19,7 +19,11 @@ See the GNU General Public License for more details.
+ */
+ // r_efrag.c
+ 
++#ifdef MINIQUAKE_RENDERER_REFRAG_TRACE_FIXTURE
++#include "mq_gl_refrag_fixture.h"
++#else
+ #include "quakedef.h"
++#endif
+ 
+ mnode_t	*r_pefragtopnode;
+ 

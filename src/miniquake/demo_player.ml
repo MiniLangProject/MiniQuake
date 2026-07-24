@@ -2,13 +2,122 @@ package miniquake.demo_player
 
 import miniquake.types as t
 import miniquake.client as client
+import miniquake.constants as c
 import miniquake.player_move as movement
 import miniquake.mathlib as math
 
 function create(recording)
   player = movement.create(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
   state = client.create(player)
-  return t.DemoPlayback(recording, state, 0, 0, 0, len(recording.messages) == 0, [])
+  state.demoPlayback = true
+  return t.DemoPlayback(
+    recording,
+    state,
+    0,
+    0,
+    0,
+    len(recording.messages) == 0,
+    [],
+    false,
+    0,
+    0.0,
+    -1,
+    false,
+    void,
+  )
+end function
+
+function CL_FinishTimeDemo(playback, hostFrameCount, realtime)
+  playback.timedemo = false
+  playback.client.timedemo = false
+  frames = (hostFrameCount - playback.startFrame) - 1
+  seconds = realtime - playback.startTime
+  if seconds == 0.0 then seconds = 1.0 end if
+  playback.finishResult = [frames, seconds, frames / seconds]
+  return playback.finishResult
+end function
+
+function CL_StopPlayback(playback, hostFrameCount, realtime)
+  if playback is void or playback.stopped then return false end if
+  playback.client.demoPlayback = false
+  playback.client.connected = false
+  playback.client.spawned = false
+  playback.complete = true
+  playback.stopped = true
+  if playback.timedemo then return CL_FinishTimeDemo(playback, hostFrameCount, realtime) end if
+  return true
+end function
+
+function CL_TimeDemo_f(playback, hostFrameCount)
+  if playback is void then return error(2020, "timedemo has no playback") end if
+  playback.timedemo = true
+  playback.client.timedemo = true
+  playback.startFrame = hostFrameCount
+  playback.startTime = 0.0
+  playback.lastFrame = -1
+  return true
+end function
+
+function CL_GetMessage(playback, hostFrameCount, realtime)
+  if playback is void or playback.stopped then return void end if
+  if playback.client.signon == c.SIGNONS then
+    if playback.timedemo then
+      if hostFrameCount == playback.lastFrame then return void end if
+      playback.lastFrame = hostFrameCount
+      if hostFrameCount == playback.startFrame + 1 then playback.startTime = realtime end if
+    else if playback.client.time <= playback.client.messageTimes[0] then
+      return void
+    end if
+  end if
+  if playback.index < 0 or playback.index >= len(playback.recording.messages) then
+    CL_StopPlayback(playback, hostFrameCount, realtime)
+    return void
+  end if
+  item = playback.recording.messages[playback.index]
+  playback.client.viewAngleSamples[1] = math.copy(playback.client.viewAngleSamples[0])
+  playback.client.viewAngleSamples[0] = math.copy(item.viewAngles)
+  // cl.viewangles is the camera input consumed by V_RenderView.  Demo headers
+  // replace it for every message; updating only the entity/player copies left
+  // timedemos facing the initial yaw while movement and events advanced.
+  playback.client.command.viewAngles = math.copy(item.viewAngles)
+  playback.client.player.viewAngles = math.copy(item.viewAngles)
+  playback.client.player.renderAngles = math.copy(item.viewAngles)
+  playback.index = playback.index + 1
+  return item
+end function
+
+function processMessage(playback, item)
+  parsed = try(client.parseMessage(playback.client, item.payload))
+  if parsed is error then
+    playback.errors = playback.errors + ["message " + (playback.index - 1) + ": " + parsed.message]
+    playback.complete = true
+    return parsed
+  end if
+  playback.eventCount = playback.eventCount + parsed
+  playback.payloadBytes = playback.payloadBytes + len(item.payload)
+  return parsed
+end function
+
+function stepFrame(playback, hostFrameCount, realtime, frameTime)
+  if playback is void or playback.stopped then return 0 end if
+  playback.client.oldTime = playback.client.time
+  playback.client.time = playback.client.time + frameTime
+  parsedEvents = 0
+  reading = true
+  while reading and not playback.stopped
+    item = CL_GetMessage(playback, hostFrameCount, realtime)
+    if item is void then
+      reading = false
+    else
+      parsed = processMessage(playback, item)
+      if parsed is error then return parsed end if
+      parsedEvents = parsedEvents + parsed
+    end if
+  end while
+  // CL_ReadFromServer owns relinking after all messages for the frame have
+  // been parsed.  The integrated host performs that common step for both DEM
+  // and live-network input, after synchronizing the renderer's MDL flags.
+  return parsedEvents
 end function
 
 function step(playback)
@@ -18,17 +127,14 @@ function step(playback)
     return 0
   end if
   item = playback.recording.messages[playback.index]
+  playback.client.viewAngleSamples[1] = math.copy(playback.client.viewAngleSamples[0])
+  playback.client.viewAngleSamples[0] = math.copy(item.viewAngles)
+  playback.client.command.viewAngles = math.copy(item.viewAngles)
   playback.client.player.viewAngles = math.copy(item.viewAngles)
   playback.client.player.renderAngles = math.copy(item.viewAngles)
-  parsed = try(client.parseMessage(playback.client, item.payload))
-  if parsed is error then
-    playback.errors = playback.errors + ["message " + playback.index + ": " + parsed.message]
-    playback.complete = true
-    return parsed
-  end if
-  playback.eventCount = playback.eventCount + parsed
-  playback.payloadBytes = playback.payloadBytes + len(item.payload)
   playback.index = playback.index + 1
+  parsed = processMessage(playback, item)
+  if parsed is error then return parsed end if
   if playback.index >= len(playback.recording.messages) then playback.complete = true end if
   return parsed
 end function

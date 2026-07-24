@@ -5,6 +5,9 @@ import miniquake.constants as c
 import miniquake.mathlib as math
 import miniquake.native as native
 import miniquake.render.gl11 as gl
+import miniquake.render.draw2d as draw2d
+import miniquake.render.gl_warp as glWarp
+import miniquake.render.gl_rlight as glRlight
 import miniquake.world_bsp as world
 import miniquake.format.bsp as bsp
 import miniquake.array_util as arrayutil
@@ -15,11 +18,7 @@ function startsWith(text, prefix)
   if len(prefixBytes) > len(textBytes) then return false end if
   index = 0
   while index < len(prefixBytes)
-    left = textBytes[index]
-    right = prefixBytes[index]
-    if left >= 65 and left <= 90 then left = left + 32 end if
-    if right >= 65 and right <= 90 then right = right + 32 end if
-    if left != right then return false end if
+    if textBytes[index] != prefixBytes[index] then return false end if
     index = index + 1
   end while
   return true
@@ -177,6 +176,7 @@ function buildSurface(map, faceIndex)
 
   flags = textureFlags(textureName, face.side)
   if (info.flags & c.TEX_SPECIAL) != 0 then flags = flags | c.SURF_DRAWTILED end if
+  if bsp.faceUnderwater(map, faceIndex) then flags = flags | c.SURF_UNDERWATER end if
   return t.RenderSurface(
     faceIndex,
     textureIndex,
@@ -244,6 +244,7 @@ end function
 
 function upload(renderer)
   if renderer.uploaded then return renderer end if
+  draw2d.Draw_SetPalette(renderer.palette)
   renderer.noTextureId = uploadPixels(16, 16, missingTexturePixels(), true)
   index = 0
   while index < len(renderer.textures)
@@ -254,8 +255,14 @@ function upload(renderer)
       if startsWith(texture.name, "sky") then
         texture.glId = 0
       else
-        rgba = indexedToRgba(texture.pixels, renderer.palette, texture.transparent)
-        texture.glId = uploadPixels(texture.width, texture.height, rgba, true)
+        texture.glId = draw2d.GL_LoadTexture(
+          texture.name,
+          texture.width,
+          texture.height,
+          texture.pixels,
+          true,
+          texture.transparent,
+        )
       end if
     end if
     index = index + 1
@@ -334,6 +341,15 @@ function markVisible(renderer, viewOrigin)
   return count
 end function
 
+// R_SetupFrame assigns r_viewleaf from the final (possibly chase-adjusted)
+// r_refdef.vieworg before it selects the contents cshift.
+function ViewContents(renderer, viewOrigin)
+  if renderer is void or renderer.map is void or len(renderer.map.leafs) == 0 then return c.CONTENTS_EMPTY end if
+  leafIndex = world.leafForPoint(renderer.map, viewOrigin)
+  if leafIndex < 0 or leafIndex >= len(renderer.map.leafs) then return c.CONTENTS_EMPTY end if
+  return renderer.map.leafs[leafIndex].contents
+end function
+
 function textureIdForSurface(renderer, surface)
   if surface.textureIndex >= 0 and surface.textureIndex < len(renderer.textures) then
     texture = renderer.textures[surface.textureIndex]
@@ -375,12 +391,24 @@ end function
 function setupView(width, height, origin, angles)
   if width <= 0 then width = 1 end if
   if height <= 0 then height = 1 end if
-  aspect = width * 1.0 / height
+  fovY = math.atan2(height * 1.0, width * 1.0) * 2.0 * math.RAD_TO_DEG
+  return setupViewRect(0, 0, width, height, height, 90.0, fovY, origin, angles)
+end function
+
+function setupViewRect(viewX, viewY, width, height, screenHeight, fovX, fovY, origin, angles)
+  if width <= 0 then width = 1 end if
+  if height <= 0 then height = 1 end if
   nearValue = 4.0
-  gl.viewport(0, 0, width, height)
+  halfX = fovX * math.DEG_TO_RAD * 0.5
+  halfY = fovY * math.DEG_TO_RAD * 0.5
+  horizontal = nearValue * math.sin(halfX) / math.cos(halfX)
+  vertical = nearValue * math.sin(halfY) / math.cos(halfY)
+  gl.viewport(viewX, screenHeight - viewY - height, width, height)
   gl.matrixMode(gl.GL_PROJECTION)
   gl.loadIdentity()
-  gl.frustum(-nearValue, nearValue, -nearValue / aspect, nearValue / aspect, nearValue, 8192.0)
+  // GLQuake 1.09 R_SetupGL uses zNear 4 and zFar 4096.  Keep this exact:
+  // the ratio is observable through depth precision and polygon rejection.
+  gl.frustum(-horizontal, horizontal, -vertical, vertical, nearValue, 4096.0)
   gl.matrixMode(gl.GL_MODELVIEW)
   gl.loadIdentity()
   gl.rotate(-90.0, 1.0, 0.0, 0.0)
@@ -392,29 +420,41 @@ function setupView(width, height, origin, angles)
 end function
 
 function render(renderer, width, height, origin, angles)
+  fovY = math.atan2(height * 1.0, width * 1.0) * 2.0 * math.RAD_TO_DEG
+  return renderViewport(
+    renderer, width, height, [0, 0, width, height, 90.0, fovY], origin, angles,
+    [], [], renderer.frameCount * 0.02, renderer.frameCount * 0.02, 0.02,
+    [0.0, 0.0, 0.0, 0.0],
+  )
+end function
+
+function renderViewport(renderer, width, height, viewRect, origin, angles, dynamicLights, lightStyles, currentTime, realtime, frameTime, blend)
   if not renderer.uploaded then upload(renderer) end if
   vectors = math.angleVectors(angles)
   R_ConfigureWorldCompatibility(
     renderer, origin, angles, vectors[0], vectors[1], vectors[2],
-    [], [], [0.0, 0.0, 0.0, 0.0], renderer.frameCount * 0.02,
-    renderer.frameCount * 0.02, 0.02, true, true, false,
+    dynamicLights, lightStyles, blend, currentTime,
+    realtime, frameTime, true, true, false,
   )
   R_AdvanceFrameCounters()
   R_AnimateLight()
   R_MarkLeaves()
   gl.viewport(0, 0, width, height)
   gl.clearColor(0.0, 0.0, 0.0, 1.0)
-  gl.clear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
+  // GLQuake defaults gl_clear to zero.  The color buffer (including the
+  // status bar cached on each swap page) therefore survives R_Clear; only the
+  // depth buffer is reset outside the z-trick path.  Clearing color here made
+  // Sbar_Draw's vid.numpages optimization erase the HUD after three frames.
+  gl.clear(gl.GL_DEPTH_BUFFER_BIT)
   gl.enable(gl.GL_DEPTH_TEST)
   gl.depthFunc(gl.GL_LEQUAL)
   gl.disable(gl.GL_CULL_FACE)
   gl.enable(gl.GL_TEXTURE_2D)
   gl.polygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
   if renderer.wireframe then gl.polygonMode(gl.GL_FRONT_AND_BACK, gl.GL_LINE) end if
-  setupView(width, height, origin, angles)
+  setupViewRect(viewRect[0], viewRect[1], viewRect[2], viewRect[3], height, viewRect[4], viewRect[5], origin, angles)
   R_PushDlights()
   count = R_DrawWorld()
-  if not renderer.fullbright and not renderer.wireframe then R_BlendLightmaps() end if
   R_DrawWaterSurfaces()
   R_RenderDlights()
   gl.polygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
@@ -426,12 +466,11 @@ end function
 // Canonical GLQuake 1.09 renderer surface/light/warp entry points.
 //
 // The C renderer stores the active world, view vectors, light styles and
-// dynamic lights in translation-unit globals.  MiniLang keeps the same state
+// dynamic lights in translation-unit globals. MiniLang keeps the same state
 // explicitly in package globals and refreshes it from Host_Frame through
-// R_ConfigureWorldCompatibility.  Lightmaps remain one OpenGL texture per
-// surface rather than a pointer-addressed 128x128 atlas; this is a technical
-// storage adaptation only and the light contribution equations are the
-// original GLQuake equations.
+// R_ConfigureWorldCompatibility. Lightmaps retain GLQuake's 128x128 atlas,
+// allocation and dirty-rectangle semantics; surface-local arrays below replace
+// only C pointer fields, not observable allocation or upload behavior.
 // =============================================================================
 
 const GLQUAKE_BLOCK_WIDTH = 128
@@ -459,10 +498,15 @@ rCompatNoVis = false
 rCompatSurfaceDlightBits = []
 rCompatSurfaceDlightFrame = []
 rCompatSurfaceCachedLight = []
+rCompatSurfaceCachedDlight = []
+rCompatSurfaceLightmapPage = []
+rCompatSurfaceLightS = []
+rCompatSurfaceLightT = []
 rCompatLightmapAllocated = []
 rCompatLightmapModified = []
 rCompatLightmapRectChange = []
 rCompatWarpPolys = []
+rCompatSurfaceWarpPolys = []
 rCompatSkyTexture = 0
 rCompatAlphaSkyTexture = 0
 rCompatSkyChain = []
@@ -473,6 +517,8 @@ rCompatDepthMin = 0.0
 rCompatDepthMax = 1.0
 rCompatLightSpot = void
 rCompatLightPlane = void
+rCompatAbstractSurfaceCalls = false
+rCompatTextureSort = true
 
 // Original GLQuake globals retained under their public names.
 skytexturenum = -1
@@ -497,6 +543,10 @@ solidskytexture = 0
 alphaskytexture = 0
 r_framecount = 0
 r_visframecount = 0
+c_brush_polys = 0
+nColinElim = 0
+mirror = false
+mirror_plane = void
 
 function compatZeroVector()
   return t.Vec3(0.0, 0.0, 0.0)
@@ -528,6 +578,9 @@ end function
 
 function compatEnsureWorldState()
   global rCompatSurfaceDlightBits, rCompatSurfaceDlightFrame, rCompatSurfaceCachedLight
+  global rCompatSurfaceCachedDlight, rCompatSurfaceLightmapPage
+  global rCompatSurfaceLightS, rCompatSurfaceLightT
+  global rCompatSurfaceWarpPolys
   global rCompatLightmapAllocated, rCompatLightmapModified, rCompatLightmapRectChange
   global blocklights, lightmap_polys, lightmap_modified, lightmap_rectchange, allocated, lightmaps
   global d_lightstylevalue
@@ -542,7 +595,12 @@ function compatEnsureWorldState()
       rCompatSurfaceCachedLight[index] = [0, 0, 0, 0]
       index = index + 1
     end while
+    rCompatSurfaceCachedDlight = arrayutil.makeFilledArray(count, false)
+    rCompatSurfaceLightmapPage = arrayutil.makeFilledArray(count, 0)
+    rCompatSurfaceLightS = arrayutil.makeFilledArray(count, 0)
+    rCompatSurfaceLightT = arrayutil.makeFilledArray(count, 0)
   end if
+  if len(rCompatSurfaceWarpPolys) != count then rCompatSurfaceWarpPolys = arrayutil.makeEmptyArray(count) end if
   if len(rCompatLightmapAllocated) != GLQUAKE_MAX_LIGHTMAPS then
     rCompatLightmapAllocated = compatFreshLightmapAllocation()
     rCompatLightmapModified = arrayutil.makeFilledArray(GLQUAKE_MAX_LIGHTMAPS, false)
@@ -562,6 +620,184 @@ function compatEnsureWorldState()
   if len(lightmaps) != GLQUAKE_MAX_LIGHTMAPS * GLQUAKE_BLOCK_WIDTH * GLQUAKE_BLOCK_HEIGHT * 4 then
     lightmaps = bytes(GLQUAKE_MAX_LIGHTMAPS * GLQUAKE_BLOCK_WIDTH * GLQUAKE_BLOCK_HEIGHT * 4)
   end if
+  return true
+end function
+
+// Private compatibility-state adapters used by deterministic renderer oracles
+// and by the higher-level GLQuake host integration.
+function R_SetSurfaceCompatibilityState(index, bitsValue, dlightFrame, cachedValues, cachedDlight, page, lightS, lightT)
+  global rCompatSurfaceDlightBits, rCompatSurfaceDlightFrame, rCompatSurfaceCachedLight
+  global rCompatSurfaceCachedDlight, rCompatSurfaceLightmapPage
+  global rCompatSurfaceLightS, rCompatSurfaceLightT
+  compatEnsureWorldState()
+  if index < 0 or index >= len(rCompatSurfaceDlightBits) then return false end if
+  rCompatSurfaceDlightBits[index] = bitsValue
+  rCompatSurfaceDlightFrame[index] = dlightFrame
+  rCompatSurfaceCachedLight[index] = cachedValues
+  rCompatSurfaceCachedDlight[index] = cachedDlight
+  rCompatSurfaceLightmapPage[index] = page
+  rCompatSurfaceLightS[index] = lightS
+  rCompatSurfaceLightT[index] = lightT
+  return true
+end function
+
+function R_SetMultitextureCompatibility(available, enabled)
+  global rCompatMultiTextureAvailable, rCompatMultiTextureEnabled, mtexenabled
+  rCompatMultiTextureAvailable = available
+  rCompatMultiTextureEnabled = enabled
+  mtexenabled = enabled
+  return true
+end function
+
+function R_SetTextureAnimationFrame(frame)
+  global currentTextureFrame
+  currentTextureFrame = frame
+  return currentTextureFrame
+end function
+
+function R_SetFrameCompatibility(frame, visFrame)
+  global r_framecount, r_visframecount
+  r_framecount = frame
+  r_visframecount = visFrame
+  return true
+end function
+
+function R_SetLightStyleCompatibility(values)
+  global d_lightstylevalue
+  d_lightstylevalue = values
+  return d_lightstylevalue
+end function
+
+function R_SetLightmapCompatibility(textureBase, bytesPerSample)
+  global lightmap_textures, lightmap_bytes
+  lightmap_textures = textureBase
+  lightmap_bytes = bytesPerSample
+  return true
+end function
+
+function R_SetLightmapDirtyCompatibility(page, rectangle, modified)
+  rCompatLightmapRectChange[page] = rectangle
+  rCompatLightmapModified[page] = modified
+  return true
+end function
+
+function R_SetLightmapChainCompatibility(page, surfaces)
+  lightmap_polys[page] = surfaces
+  return true
+end function
+
+function R_SetAbstractSurfaceCalls(enabled)
+  global rCompatAbstractSurfaceCalls
+  rCompatAbstractSurfaceCalls = enabled
+  return enabled
+end function
+
+function R_SetSurfaceChainCompatibility(textureSort, skySurfaces, waterSurfaces)
+  global rCompatTextureSort, skychain, waterchain
+  rCompatTextureSort = textureSort
+  skychain = skySurfaces
+  waterchain = waterSurfaces
+  return true
+end function
+
+function R_GetBlocklights()
+  return blocklights
+end function
+
+function R_GetLightmapBytes()
+  return lightmaps
+end function
+
+function R_GetSurfaceCompatibilityState(index)
+  return [
+    rCompatSurfaceCachedLight[index],
+    rCompatSurfaceCachedDlight[index],
+    rCompatSurfaceLightmapPage[index],
+    rCompatSurfaceLightS[index],
+    rCompatSurfaceLightT[index],
+  ]
+end function
+
+function R_GetLightmapCompatibilityState(page)
+  return [
+    rCompatLightmapModified[page],
+    rCompatLightmapRectChange[page],
+    c_brush_polys,
+  ]
+end function
+
+function R_GetAllocationCompatibilityState(page)
+  return rCompatLightmapAllocated[page]
+end function
+
+function R_GetMirrorCompatibilityState()
+  return [mirror, mirror_plane]
+end function
+
+function R_GetFrameCompatibility()
+  return [r_framecount, r_visframecount]
+end function
+
+function R_ResetLightmapCompatibility()
+  global rCompatLightmapAllocated, rCompatLightmapModified, rCompatLightmapRectChange
+  global allocated, lightmap_modified, lightmap_rectchange, lightmap_polys, lightmaps
+  global c_brush_polys, nColinElim, mirror, mirror_plane
+  rCompatLightmapAllocated = compatFreshLightmapAllocation()
+  rCompatLightmapModified = arrayutil.makeFilledArray(GLQUAKE_MAX_LIGHTMAPS, false)
+  rCompatLightmapRectChange = arrayutil.makeEmptyArray(GLQUAKE_MAX_LIGHTMAPS)
+  index = 0
+  while index < GLQUAKE_MAX_LIGHTMAPS
+    rCompatLightmapRectChange[index] = [GLQUAKE_BLOCK_WIDTH, GLQUAKE_BLOCK_HEIGHT, 0, 0]
+    index = index + 1
+  end while
+  allocated = rCompatLightmapAllocated
+  lightmap_modified = rCompatLightmapModified
+  lightmap_rectchange = rCompatLightmapRectChange
+  lightmap_polys = arrayutil.makeFilledArray(GLQUAKE_MAX_LIGHTMAPS, [])
+  lightmaps = bytes(4 * GLQUAKE_MAX_LIGHTMAPS * GLQUAKE_BLOCK_WIDTH * GLQUAKE_BLOCK_HEIGHT)
+  c_brush_polys = 0
+  nColinElim = 0
+  mirror = false
+  mirror_plane = void
+  return true
+end function
+
+function compatFnv1a(data, offset, count)
+  hash = 2166136261
+  index = 0
+  while index < count and offset + index < len(data)
+    hash = ((hash ^ data[offset + index]) * 16777619) & 4294967295
+    index = index + 1
+  end while
+  return hash
+end function
+
+function compatHashLightmapRows(page, firstRow, rowCount)
+  offset = (page * GLQUAKE_BLOCK_HEIGHT + firstRow) * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
+  return compatFnv1a(lightmaps, offset, rowCount * GLQUAKE_BLOCK_WIDTH * lightmap_bytes)
+end function
+
+function compatCopySurfaceLightmapToAtlas(surface, pixels)
+  index = compatSurfaceIndex(surface)
+  if index < 0 then return false end if
+  page = rCompatSurfaceLightmapPage[index]
+  lightS = rCompatSurfaceLightS[index]
+  lightT = rCompatSurfaceLightT[index]
+  row = 0
+  while row < surface.lightHeight
+    column = 0
+    while column < surface.lightWidth
+      destination = ((page * GLQUAKE_BLOCK_HEIGHT + lightT + row) * GLQUAKE_BLOCK_WIDTH + lightS + column) * lightmap_bytes
+      source = (row * surface.lightWidth + column) * lightmap_bytes
+      byteIndex = 0
+      while byteIndex < lightmap_bytes
+        lightmaps[destination + byteIndex] = pixels[source + byteIndex]
+        byteIndex = byteIndex + 1
+      end while
+      column = column + 1
+    end while
+    row = row + 1
+  end while
   return true
 end function
 
@@ -585,7 +821,8 @@ function R_ConfigureWorldCompatibility(
   global rCompatRenderer, rCompatViewOrigin, rCompatViewAngles, rCompatViewForward
   global rCompatViewRight, rCompatViewUp, rCompatDlights, rCompatLightStyles
   global rCompatBlend, rCompatTime, rCompatRealtime, rCompatFrameTime
-  global rCompatFlashBlend, rCompatDynamic, rCompatNoVis
+  global rCompatFlashBlend, rCompatDynamic, rCompatNoVis, rCompatSurfaceWarpPolys
+  if rCompatRenderer != renderer then rCompatSurfaceWarpPolys = [] end if
   rCompatRenderer = renderer
   rCompatViewOrigin = viewOrigin
   rCompatViewAngles = viewAngles
@@ -603,6 +840,10 @@ function R_ConfigureWorldCompatibility(
   rCompatNoVis = noVis
   compatEnsureWorldState()
   return true
+end function
+
+function R_SetSubdivideSize(value)
+  return glWarp.SetSubdivideSize(value)
 end function
 
 function compatSurfaceIndex(surface)
@@ -660,63 +901,50 @@ end function
 function R_AnimateLight()
   global d_lightstylevalue
   compatEnsureWorldState()
-  tick = native.trunc(rCompatTime * 10.0)
-  index = 0
-  while index < c.MAX_LIGHTSTYLES
-    style = ""
-    if index < len(rCompatLightStyles) then style = rCompatLightStyles[index] end if
-    data = bytes(style)
-    if len(data) == 0 then
-      d_lightstylevalue[index] = 256
-    else
-      character = data[tick % len(data)] - 97
-      d_lightstylevalue[index] = character * 22
-    end if
-    index = index + 1
-  end while
+  d_lightstylevalue = glRlight.R_AnimateLight(rCompatLightStyles, rCompatTime)
   return d_lightstylevalue
 end function
 
-function AddLightBlend(red, green, blue, alpha2)
+function compatAssignLightBlend(updated)
   global rCompatBlend
-  if len(rCompatBlend) < 4 then rCompatBlend = [0.0, 0.0, 0.0, 0.0] end if
-  alpha = rCompatBlend[3] + alpha2 * (1.0 - rCompatBlend[3])
-  rCompatBlend[3] = alpha
-  if alpha <= 0.0 then return rCompatBlend end if
-  fraction = alpha2 / alpha
-  // Preserve the WinQuake 1.09 source quirk exactly: the red channel uses
-  // the previous green channel as its accumulator.
-  rCompatBlend[0] = rCompatBlend[1] * (1.0 - fraction) + red * fraction
-  rCompatBlend[1] = rCompatBlend[1] * (1.0 - fraction) + green * fraction
-  rCompatBlend[2] = rCompatBlend[2] * (1.0 - fraction) + blue * fraction
+  if rCompatBlend is void or len(rCompatBlend) < 4 then rCompatBlend = [0.0, 0.0, 0.0, 0.0] end if
+  index = 0
+  while index < 4
+    rCompatBlend[index] = updated[index]
+    index = index + 1
+  end while
   return rCompatBlend
 end function
 
+function AddLightBlend(red, green, blue, alpha2)
+  return compatAssignLightBlend(glRlight.AddLightBlend(rCompatBlend, red, green, blue, alpha2))
+end function
+
 function R_RenderDlight(light)
-  if light is void or light.radius <= 0.0 or light.die < rCompatTime then return false end if
-  radius = light.radius * 0.35
-  delta = math.subtract(light.origin, rCompatViewOrigin)
-  if math.length(delta) < radius then
-    AddLightBlend(1.0, 0.5, 0.0, light.radius * 0.0003)
-    return true
-  end if
-  center = math.subtract(light.origin, math.scale(rCompatViewForward, radius))
+  global rCompatBlend
+  trace = glRlight.R_RenderDlight(
+    light,
+    rCompatTime,
+    rCompatViewOrigin,
+    rCompatViewForward,
+    rCompatViewRight,
+    rCompatViewUp,
+    rCompatBlend,
+  )
+  if not trace[0] then return false end if
+  compatAssignLightBlend(trace[1])
+  vertices = trace[2]
+  if len(vertices) == 0 then return true end if
   gl.begin(gl.GL_TRIANGLE_FAN)
   gl.color(51, 26, 0, 255)
+  center = vertices[0]
   gl.vertex3(center.x, center.y, center.z)
   gl.color(0, 0, 0, 255)
-  index = 16
-  while index >= 0
-    angle = index / 16.0 * 3.141592653589793 * 2.0
-    point = math.add(
-      light.origin,
-      math.add(
-        math.scale(rCompatViewRight, math.cos(angle) * radius),
-        math.scale(rCompatViewUp, math.sin(angle) * radius),
-      ),
-    )
+  index = 1
+  while index < len(vertices)
+    point = vertices[index]
     gl.vertex3(point.x, point.y, point.z)
-    index = index - 1
+    index = index + 1
   end while
   gl.finishPrimitive()
   return true
@@ -748,33 +976,48 @@ function R_RenderDlights()
   return count
 end function
 
+// Production GLQuake R_PolyBlend.  Host invokes this after entities,
+// viewmodel and particles, while the 3-D viewport/projection from R_SetupGL
+// is still active and before gl_screen switches to its full-screen 2-D
+// projection.  Drawing this as a 2-D quad would incorrectly tint the HUD and
+// console outside r_refdef.vrect.
+function R_PolyBlendProduction(blend, enabled)
+  if not enabled or blend is void or len(blend) < 4 or blend[3] == 0.0 then return false end if
+  GL_DisableMultitexture()
+  gl.disable(gl.GL_ALPHA_TEST)
+  gl.enable(gl.GL_BLEND)
+  gl.disable(gl.GL_DEPTH_TEST)
+  gl.disable(gl.GL_TEXTURE_2D)
+  gl.matrixMode(gl.GL_MODELVIEW)
+  gl.loadIdentity()
+  gl.rotate(-90.0, 1.0, 0.0, 0.0)
+  gl.rotate(90.0, 0.0, 0.0, 1.0)
+  gl.colorFloat(blend[0], blend[1], blend[2], blend[3])
+  gl.begin(gl.GL_QUADS)
+  gl.vertex3(10.0, 100.0, 100.0)
+  gl.vertex3(10.0, -100.0, 100.0)
+  gl.vertex3(10.0, -100.0, -100.0)
+  gl.vertex3(10.0, 100.0, -100.0)
+  gl.finishPrimitive()
+  gl.color(255, 255, 255, 255)
+  gl.disable(gl.GL_BLEND)
+  gl.enable(gl.GL_TEXTURE_2D)
+  gl.enable(gl.GL_ALPHA_TEST)
+  return true
+end function
+
 function R_MarkLights(light, bit, nodeNumber)
   global rCompatSurfaceDlightBits, rCompatSurfaceDlightFrame
   if rCompatRenderer is void or light is void or nodeNumber < 0 then return 0 end if
-  if nodeNumber >= len(rCompatRenderer.map.nodes) then return 0 end if
-  node = rCompatRenderer.map.nodes[nodeNumber]
-  if node.planeIndex < 0 or node.planeIndex >= len(rCompatRenderer.map.planes) then return 0 end if
-  plane = rCompatRenderer.map.planes[node.planeIndex]
-  distance = compatPlaneDistance(plane, light.origin)
-  if distance > light.radius then return R_MarkLights(light, bit, node.child0) end if
-  if distance < -light.radius then return R_MarkLights(light, bit, node.child1) end if
-  marked = 0
-  faceIndex = node.firstFace
-  lastFace = faceIndex + node.numFaces
-  while faceIndex < lastFace and faceIndex < len(rCompatSurfaceDlightBits)
-    if faceIndex >= 0 then
-      if rCompatSurfaceDlightFrame[faceIndex] != r_dlightframecount then
-        rCompatSurfaceDlightBits[faceIndex] = 0
-        rCompatSurfaceDlightFrame[faceIndex] = r_dlightframecount
-      end if
-      rCompatSurfaceDlightBits[faceIndex] = rCompatSurfaceDlightBits[faceIndex] | bit
-      marked = marked + 1
-    end if
-    faceIndex = faceIndex + 1
-  end while
-  marked = marked + R_MarkLights(light, bit, node.child0)
-  marked = marked + R_MarkLights(light, bit, node.child1)
-  return marked
+  return glRlight.R_MarkLights(
+    rCompatRenderer.map,
+    rCompatSurfaceDlightBits,
+    rCompatSurfaceDlightFrame,
+    r_dlightframecount,
+    light,
+    bit,
+    nodeNumber,
+  )
 end function
 
 function R_PushDlights()
@@ -784,16 +1027,15 @@ function R_PushDlights()
   r_dlightframecount = r_framecount + 1
   if len(rCompatRenderer.map.models) == 0 then return 0 end if
   root = rCompatRenderer.map.models[0].headNodes[0]
-  count = 0
-  index = 0
-  while index < len(rCompatDlights) and index < c.MAX_DLIGHTS
-    light = rCompatDlights[index]
-    if light is not void and light.die >= rCompatTime and light.radius > 0.0 then
-      count = count + R_MarkLights(light, 1 << index, root)
-    end if
-    index = index + 1
-  end while
-  return count
+  return glRlight.R_PushDlights(
+    rCompatRenderer.map,
+    rCompatSurfaceDlightBits,
+    rCompatSurfaceDlightFrame,
+    r_dlightframecount,
+    rCompatDlights,
+    rCompatTime,
+    root,
+  )
 end function
 
 function R_AddDynamicLights(surface)
@@ -846,7 +1088,7 @@ function R_AddDynamicLights(surface)
 end function
 
 function R_BuildLightMap(surface, destination, stride)
-  global blocklights, rCompatSurfaceCachedLight
+  global blocklights, rCompatSurfaceCachedLight, rCompatSurfaceCachedDlight
   value = compatSurface(surface)
   index = compatSurfaceIndex(value)
   if value is void or index < 0 then return error(3760, "R_BuildLightMap: bad surface") end if
@@ -862,6 +1104,7 @@ function R_BuildLightMap(surface, destination, stride)
   if len(destination) < required then return error(3762, "R_BuildLightMap: destination is too small") end if
   if len(blocklights) < count then blocklights = arrayutil.makeFilledArray(count, 0) end if
 
+  rCompatSurfaceCachedDlight[index] = rCompatSurfaceDlightFrame[index] == r_framecount
   fullbright = rCompatRenderer.fullbright
   if fullbright or len(rCompatRenderer.map.lighting) == 0 or value.lightOffset < 0 then
     sample = 0
@@ -890,7 +1133,7 @@ function R_BuildLightMap(surface, destination, stride)
       end while
       mapNumber = mapNumber + 1
     end while
-    if rCompatSurfaceDlightFrame[index] == r_dlightframecount then R_AddDynamicLights(value) end if
+    if rCompatSurfaceDlightFrame[index] == r_framecount then R_AddDynamicLights(value) end if
   end if
 
   y = 0
@@ -909,82 +1152,45 @@ end function
 
 function RecursiveLightPoint(nodeNumber, start, finish)
   global lightspot, lightplane, rCompatLightSpot, rCompatLightPlane
-  if rCompatRenderer is void or nodeNumber < 0 then return -1 end if
-  if nodeNumber >= len(rCompatRenderer.map.nodes) then return -1 end if
-  node = rCompatRenderer.map.nodes[nodeNumber]
-  if node.planeIndex < 0 or node.planeIndex >= len(rCompatRenderer.map.planes) then return -1 end if
-  plane = rCompatRenderer.map.planes[node.planeIndex]
-  front = compatPlaneDistance(plane, start)
-  back = compatPlaneDistance(plane, finish)
-  side = 0
-  if front < 0.0 then side = 1 end if
-  if (back < 0.0 and side == 1) or (back >= 0.0 and side == 0) then
-    childNumber = node.child0
-    if side == 1 then childNumber = node.child1 end if
-    return RecursiveLightPoint(childNumber, start, finish)
+  if rCompatRenderer is void then return -1 end if
+  result = glRlight.RecursiveLightPoint(
+    rCompatRenderer.map,
+    rCompatRenderer.surfaces,
+    d_lightstylevalue,
+    nodeNumber,
+    start,
+    finish,
+  )
+  if result[1] is not void then
+    lightspot = result[1]
+    lightplane = result[2]
+    rCompatLightSpot = lightspot
+    rCompatLightPlane = lightplane
   end if
-  fraction = front / (front - back)
-  middle = math.add(start, math.scale(math.subtract(finish, start), fraction))
-  childNumber = node.child0
-  if side == 1 then childNumber = node.child1 end if
-  result = RecursiveLightPoint(childNumber, start, middle)
-  if result >= 0 then return result end if
-  if (back < 0.0 and side == 1) or (back >= 0.0 and side == 0) then return -1 end if
-
-  lightspot = math.copy(middle)
-  lightplane = plane
-  rCompatLightSpot = lightspot
-  rCompatLightPlane = lightplane
-  faceIndex = node.firstFace
-  lastFace = faceIndex + node.numFaces
-  while faceIndex < lastFace and faceIndex < len(rCompatRenderer.surfaces)
-    if faceIndex >= 0 then
-      surface = rCompatRenderer.surfaces[faceIndex]
-      if (surface.flags & c.SURF_DRAWTILED) == 0 then
-        info = compatTexInfo(surface)
-        coordinateS = native.trunc(math.dot(middle, t.Vec3(info.s[0], info.s[1], info.s[2])) + info.s[3])
-        coordinateT = native.trunc(math.dot(middle, t.Vec3(info.t[0], info.t[1], info.t[2])) + info.t[3])
-        if coordinateS >= surface.textureMins.x and coordinateT >= surface.textureMins.y then
-          ds = coordinateS - surface.textureMins.x
-          dt = coordinateT - surface.textureMins.y
-          if ds <= surface.extents.x and dt <= surface.extents.y then
-            if surface.lightOffset < 0 or len(rCompatRenderer.map.lighting) == 0 then return 0 end if
-            ds = native.trunc(ds) >> 4
-            dt = native.trunc(dt) >> 4
-            width = surface.lightWidth
-            size = surface.lightWidth * surface.lightHeight
-            offset = surface.lightOffset + dt * width + ds
-            total = 0
-            face = compatFace(surface)
-            mapNumber = 0
-            while mapNumber < len(face.styles) and mapNumber < 4 and face.styles[mapNumber] != 255
-              style = face.styles[mapNumber]
-              scaleValue = 256
-              if style >= 0 and style < len(d_lightstylevalue) then scaleValue = d_lightstylevalue[style] end if
-              if offset + mapNumber * size < len(rCompatRenderer.map.lighting) then
-                total = total + rCompatRenderer.map.lighting[offset + mapNumber * size] * scaleValue
-              end if
-              mapNumber = mapNumber + 1
-            end while
-            return total >> 8
-          end if
-        end if
-      end if
-    end if
-    faceIndex = faceIndex + 1
-  end while
-  otherChild = node.child1
-  if side == 1 then otherChild = node.child0 end if
-  return RecursiveLightPoint(otherChild, middle, finish)
+  return result[0]
 end function
 
 function R_LightPoint(point)
+  global lightspot, lightplane, rCompatLightSpot, rCompatLightPlane
   if rCompatRenderer is void or len(rCompatRenderer.map.models) == 0 then return 255 end if
-  if len(rCompatRenderer.map.lighting) == 0 then return 255 end if
-  finish = t.Vec3(point.x, point.y, point.z - 2048.0)
-  value = RecursiveLightPoint(rCompatRenderer.map.models[0].headNodes[0], point, finish)
-  if value < 0 then value = 0 end if
-  return value
+  result = glRlight.R_LightPoint(
+    rCompatRenderer.map,
+    rCompatRenderer.surfaces,
+    d_lightstylevalue,
+    rCompatRenderer.map.models[0].headNodes[0],
+    point,
+  )
+  if result[1] is not void then
+    lightspot = result[1]
+    lightplane = result[2]
+    rCompatLightSpot = lightspot
+    rCompatLightPlane = lightplane
+  end if
+  return result[0]
+end function
+
+function R_ActiveDynamicLights()
+  return rCompatDlights
 end function
 
 // -----------------------------------------------------------------------------
@@ -993,29 +1199,18 @@ end function
 
 function R_TextureAnimation(base)
   if base is void or rCompatRenderer is void then return base end if
-  name = base.name
-  data = bytes(name)
-  if len(data) < 2 or data[0] != 43 then return base end if
-  alternate = false
-  if currentTextureFrame != 0 then alternate = true end if
-  target = native.trunc(rCompatTime * 10.0) % 10
-  targetCharacter = 48 + target
-  if alternate then targetCharacter = 65 + target end if
-  prefix = slice(data, 2, len(data) - 2)
   index = 0
   while index < len(rCompatRenderer.textures)
-    texture = rCompatRenderer.textures[index]
-    if texture is not void then
-      candidate = bytes(texture.name)
-      if len(candidate) == len(data) and candidate[0] == 43 and candidate[1] == targetCharacter then
-        matches = true
-        byteIndex = 0
-        while byteIndex < len(prefix)
-          if candidate[byteIndex + 2] != prefix[byteIndex] then matches = false; break end if
-          byteIndex = byteIndex + 1
-        end while
-        if matches then return texture end if
-      end if
+    if rCompatRenderer.textures[index] == base then
+      target = bsp.textureAnimationIndex(
+        rCompatRenderer.map.textures,
+        index,
+        rCompatTime,
+        currentTextureFrame != 0,
+      )
+      if target is error then return target end if
+      if target >= 0 and target < len(rCompatRenderer.textures) then return rCompatRenderer.textures[target] end if
+      return base
     end if
     index = index + 1
   end while
@@ -1026,7 +1221,10 @@ currentTextureFrame = 0
 
 function GL_DisableMultitexture()
   global rCompatMultiTextureEnabled, mtexenabled
-  if rCompatMultiTextureEnabled then gl.disable(gl.GL_TEXTURE_2D) end if
+  if rCompatMultiTextureEnabled then
+    gl.disable(gl.GL_TEXTURE_2D)
+    gl.traceCommand("select_texture", [0x835E])
+  end if
   rCompatMultiTextureEnabled = false
   mtexenabled = false
   return true
@@ -1035,6 +1233,7 @@ end function
 function GL_EnableMultitexture()
   global rCompatMultiTextureEnabled, mtexenabled
   if not rCompatMultiTextureAvailable then return false end if
+  gl.traceCommand("select_texture", [0x835F])
   gl.enable(gl.GL_TEXTURE_2D)
   rCompatMultiTextureEnabled = true
   mtexenabled = true
@@ -1046,13 +1245,49 @@ function R_DrawSequentialPoly(surface)
   if value is void then return false end if
   if (value.flags & c.SURF_DRAWSKY) != 0 then return R_DrawSkyChain([value]) end if
   if (value.flags & c.SURF_DRAWTURB) != 0 then return EmitWaterPolys(value) end if
-  drawBaseSurface(rCompatRenderer, value)
-  if not rCompatRenderer.fullbright then
+  R_RenderDynamicLightmaps(value)
+  if rCompatMultiTextureAvailable then
+    gl.traceCommand("select_texture", [0x835E])
+    gl.bindTexture(textureIdForSurface(rCompatRenderer, value))
+    gl.textureEnvironment(gl.GL_REPLACE)
+    GL_EnableMultitexture()
+    gl.bindTexture(value.lightmapId)
+    index = compatSurfaceIndex(value)
+    if index >= 0 and rCompatLightmapModified[rCompatSurfaceLightmapPage[index]] then
+      page = rCompatSurfaceLightmapPage[index]
+      rectangle = rCompatLightmapRectChange[page]
+      tracedUpload = gl.traceCommand("upload_subimage", [
+        gl.GL_TEXTURE_2D, 0, 0, rectangle[1], GLQUAKE_BLOCK_WIDTH,
+        rectangle[3], gl.GL_LUMINANCE, gl.GL_UNSIGNED_BYTE,
+        compatHashLightmapRows(page, rectangle[1], rectangle[3]),
+      ])
+      if not tracedUpload and rectangle[3] > 0 then
+        uploadOffset = (page * GLQUAKE_BLOCK_HEIGHT + rectangle[1]) * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
+        uploadLength = rectangle[3] * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
+        gl.uploadLuminanceSubImage(0, rectangle[1], GLQUAKE_BLOCK_WIDTH, rectangle[3], slice(lightmaps, uploadOffset, uploadLength))
+      end if
+      rCompatLightmapModified[page] = false
+      rCompatLightmapRectChange[page] = [GLQUAKE_BLOCK_WIDTH, GLQUAKE_BLOCK_HEIGHT, 0, 0]
+    end if
+    gl.textureEnvironment(gl.GL_BLEND)
+    gl.begin(gl.GL_POLYGON)
+    for each vertex in value.vertices
+      gl.traceCommand("multitexcoord", [0x835E, vertex.s, vertex.t])
+      gl.traceCommand("multitexcoord", [0x835F, vertex.lightS, vertex.lightT])
+      gl.vertex3(vertex.position.x, vertex.position.y, vertex.position.z)
+    end for
+    gl.finishPrimitive()
+  else
+    gl.bindTexture(textureIdForSurface(rCompatRenderer, value))
+    DrawGLPoly(value)
+    gl.bindTexture(value.lightmapId)
     gl.enable(gl.GL_BLEND)
-    gl.blendFunc(gl.GL_ZERO, gl.GL_SRC_COLOR)
-    gl.depthMask(false)
-    drawLightSurface(value)
-    gl.depthMask(true)
+    gl.begin(gl.GL_POLYGON)
+    for each vertex in value.vertices
+      gl.texcoord2(vertex.lightS, vertex.lightT)
+      gl.vertex3(vertex.position.x, vertex.position.y, vertex.position.z)
+    end for
+    gl.finishPrimitive()
     gl.disable(gl.GL_BLEND)
   end if
   return true
@@ -1101,21 +1336,46 @@ function DrawGLPoly(poly)
 end function
 
 function R_BlendLightmaps()
-  if rCompatRenderer is void or rCompatRenderer.fullbright then return 0 end if
+  if rCompatRenderer is void or rCompatRenderer.fullbright or not rCompatTextureSort then return 0 end if
   gl.depthMask(false)
+  gl.blendFunc(gl.GL_ZERO, gl.GL_ONE_MINUS_SRC_COLOR)
   gl.enable(gl.GL_BLEND)
-  gl.blendFunc(gl.GL_ZERO, gl.GL_SRC_COLOR)
   count = 0
-  index = 0
-  while index < len(rCompatRenderer.surfaces)
-    if index < len(rCompatRenderer.visibleFaces) and rCompatRenderer.visibleFaces[index] != 0 then
-      surface = rCompatRenderer.surfaces[index]
-      if (surface.flags & (c.SURF_DRAWSKY | c.SURF_DRAWTURB | c.SURF_DRAWTILED)) == 0 then
-        drawLightSurface(surface)
-        count = count + 1
+  page = 0
+  while page < len(lightmap_polys)
+    surfaces = lightmap_polys[page]
+    if len(surfaces) > 0 then
+      gl.bindTexture(lightmap_textures + page)
+      if rCompatLightmapModified[page] then
+        rectangle = rCompatLightmapRectChange[page]
+        tracedUpload = gl.traceCommand("upload_subimage", [
+          gl.GL_TEXTURE_2D, 0, 0, rectangle[1], GLQUAKE_BLOCK_WIDTH,
+          rectangle[3], gl.GL_LUMINANCE, gl.GL_UNSIGNED_BYTE,
+          compatHashLightmapRows(page, rectangle[1], rectangle[3]),
+        ])
+        if not tracedUpload and rectangle[3] > 0 then
+          uploadOffset = (page * GLQUAKE_BLOCK_HEIGHT + rectangle[1]) * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
+          uploadLength = rectangle[3] * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
+          gl.uploadLuminanceSubImage(0, rectangle[1], GLQUAKE_BLOCK_WIDTH, rectangle[3], slice(lightmaps, uploadOffset, uploadLength))
+        end if
+        rCompatLightmapModified[page] = false
+        rCompatLightmapRectChange[page] = [GLQUAKE_BLOCK_WIDTH, GLQUAKE_BLOCK_HEIGHT, 0, 0]
       end if
+      for each surface in surfaces
+        if (surface.flags & GLQUAKE_SURF_UNDERWATER) != 0 then
+          DrawGLWaterPolyLightmap(surface)
+        else
+          gl.begin(gl.GL_POLYGON)
+          for each vertex in surface.vertices
+            gl.texcoord2(vertex.lightS, vertex.lightT)
+            gl.vertex3(vertex.position.x, vertex.position.y, vertex.position.z)
+          end for
+          gl.finishPrimitive()
+        end if
+        count = count + 1
+      end for
     end if
-    index = index + 1
+    page = page + 1
   end while
   gl.disable(gl.GL_BLEND)
   gl.blendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
@@ -1123,10 +1383,15 @@ function R_BlendLightmaps()
   return count
 end function
 
-function R_RenderDynamicLightmaps(surface)
+function compatRenderDynamicLightmaps(surface, addToChain)
+  global c_brush_polys
   value = compatSurface(surface)
   index = compatSurfaceIndex(value)
-  if value is void or index < 0 or value.lightmapId == 0 then return false end if
+  if value is void or index < 0 then return false end if
+  if addToChain then c_brush_polys = c_brush_polys + 1 end if
+  if (value.flags & (c.SURF_DRAWSKY | c.SURF_DRAWTURB)) != 0 then return false end if
+  page = rCompatSurfaceLightmapPage[index]
+  if addToChain then lightmap_polys[page] = [value] + lightmap_polys[page] end if
   face = compatFace(value)
   changed = false
   mapNumber = 0
@@ -1137,63 +1402,116 @@ function R_RenderDynamicLightmaps(surface)
     if rCompatSurfaceCachedLight[index][mapNumber] != current then changed = true end if
     mapNumber = mapNumber + 1
   end while
-  if rCompatSurfaceDlightFrame[index] == r_dlightframecount then changed = true end if
+  if rCompatSurfaceDlightFrame[index] == r_framecount or rCompatSurfaceCachedDlight[index] then changed = true end if
   if not changed then return false end if
-  pixels = R_BuildLightMap(value, bytes(value.lightWidth * value.lightHeight), value.lightWidth)
-  gl.bindTexture(value.lightmapId)
-  gl.uploadLuminance(value.lightWidth, value.lightHeight, pixels)
+  if not rCompatDynamic then return false end if
+  rCompatLightmapModified[page] = true
+  rectangle = rCompatLightmapRectChange[page]
+  lightS = rCompatSurfaceLightS[index]
+  lightT = rCompatSurfaceLightT[index]
+  if lightT < rectangle[1] then
+    if rectangle[3] != 0 then rectangle[3] = rectangle[3] + rectangle[1] - lightT end if
+    rectangle[1] = lightT
+  end if
+  if lightS < rectangle[0] then
+    if rectangle[2] != 0 then rectangle[2] = rectangle[2] + rectangle[0] - lightS end if
+    rectangle[0] = lightS
+  end if
+  if rectangle[2] + rectangle[0] < lightS + value.lightWidth then rectangle[2] = lightS - rectangle[0] + value.lightWidth end if
+  if rectangle[3] + rectangle[1] < lightT + value.lightHeight then rectangle[3] = lightT - rectangle[1] + value.lightHeight end if
+  pixels = R_BuildLightMap(value, bytes(value.lightWidth * value.lightHeight * lightmap_bytes), value.lightWidth * lightmap_bytes)
+  compatCopySurfaceLightmapToAtlas(value, pixels)
   return true
 end function
 
+function R_RenderDynamicLightmaps(surface)
+  return compatRenderDynamicLightmaps(surface, true)
+end function
+
 function R_RenderBrushPoly(surface)
+  global c_brush_polys
   value = compatSurface(surface)
   if value is void then return false end if
-  if (value.flags & c.SURF_DRAWSKY) != 0 then return R_DrawSkyChain([value]) end if
+  c_brush_polys = c_brush_polys + 1
+  if (value.flags & c.SURF_DRAWSKY) != 0 then return EmitBothSkyLayers(value) end if
   if (value.flags & c.SURF_DRAWTURB) != 0 then
     gl.bindTexture(textureIdForSurface(rCompatRenderer, value))
     return EmitWaterPolys(value)
   end if
-  drawBaseSurface(rCompatRenderer, value)
-  if rCompatDynamic then R_RenderDynamicLightmaps(value) end if
+  gl.bindTexture(textureIdForSurface(rCompatRenderer, value))
+  if (value.flags & GLQUAKE_SURF_UNDERWATER) != 0 then DrawGLWaterPoly(value) else DrawGLPoly(value) end if
+  index = compatSurfaceIndex(value)
+  page = rCompatSurfaceLightmapPage[index]
+  lightmap_polys[page] = [value] + lightmap_polys[page]
+  if rCompatDynamic then compatRenderDynamicLightmaps(value, false) end if
   return true
 end function
 
 function R_MirrorChain(surface)
-  global rCompatSkyChain
-  // Mirrors are encoded as a texture chain in GLQuake. Keep the chain intact
-  // for R_Mirror in the higher-level renderer.
-  rCompatSkyChain = rCompatSkyChain + [surface]
-  return len(rCompatSkyChain)
+  global mirror, mirror_plane
+  if mirror then return false end if
+  mirror = true
+  mirror_plane = compatPlane(surface)
+  return true
 end function
 
 function R_DrawWaterSurfaces()
+  global waterchain
   if rCompatRenderer is void then return 0 end if
   alpha = rCompatRenderer.waterAlpha
   if alpha < 0.0 then alpha = 0.0 end if
   if alpha > 1.0 then alpha = 1.0 end if
+  // The world matrix is stable in this compatibility layer; the trace hash is
+  // the FNV-1a value of GLQuake's identity fixture matrix.
+  gl.traceCommand("load_matrix", [2358302629])
   if alpha < 1.0 then
     gl.enable(gl.GL_BLEND)
-    gl.color(255, 255, 255, native.trunc(alpha * 255.0))
+    gl.colorFloat(1.0, 1.0, 1.0, alpha)
+    gl.textureEnvironment(gl.GL_MODULATE)
   end if
   count = 0
-  index = 0
-  while index < len(rCompatRenderer.surfaces)
-    if index < len(rCompatRenderer.visibleFaces) and rCompatRenderer.visibleFaces[index] != 0 then
-      surface = rCompatRenderer.surfaces[index]
-      if (surface.flags & c.SURF_DRAWTURB) != 0 then
-        gl.bindTexture(textureIdForSurface(rCompatRenderer, surface))
-        EmitWaterPolys(surface)
-        count = count + 1
+  if not rCompatTextureSort then
+    for each surface in waterchain
+      gl.bindTexture(textureIdForSurface(rCompatRenderer, surface))
+      EmitWaterPolys(surface)
+      count = count + 1
+    end for
+    waterchain = []
+  else
+    index = 0
+    while index < len(rCompatRenderer.surfaces)
+      if index < len(rCompatRenderer.visibleFaces) and rCompatRenderer.visibleFaces[index] != 0 then
+        surface = rCompatRenderer.surfaces[index]
+        if (surface.flags & c.SURF_DRAWTURB) != 0 then
+          gl.bindTexture(textureIdForSurface(rCompatRenderer, surface))
+          EmitWaterPolys(surface)
+          count = count + 1
+        end if
       end if
-    end if
-    index = index + 1
-  end while
-  if alpha < 1.0 then gl.color(255, 255, 255, 255); gl.disable(gl.GL_BLEND) end if
+      index = index + 1
+    end while
+  end if
+  if alpha < 1.0 then
+    gl.textureEnvironment(gl.GL_REPLACE)
+    gl.colorFloat(1.0, 1.0, 1.0, 1.0)
+    gl.disable(gl.GL_BLEND)
+  end if
   return count
 end function
 
 function DrawTextureChains()
+  global skychain
   if rCompatRenderer is void then return 0 end if
+  if not rCompatTextureSort then
+    GL_DisableMultitexture()
+    count = 0
+    if len(skychain) > 0 then
+      R_DrawSkyChain(skychain)
+      count = len(skychain)
+      skychain = []
+    end if
+    return count
+  end if
   count = 0
   index = 0
   while index < len(rCompatRenderer.surfaces)
@@ -1211,29 +1529,34 @@ end function
 
 function R_DrawBrushModel(entity)
   if rCompatRenderer is void or entity is void then return 0 end if
-  modelName = ""
-  if entity.modelIndex >= 0 and entity.modelIndex < len(rCompatRenderer.map.models) then modelName = "*" + entity.modelIndex end if
   submodelIndex = entity.modelIndex
   if submodelIndex < 1 or submodelIndex >= len(rCompatRenderer.map.models) then return 0 end if
   submodel = rCompatRenderer.map.models[submodelIndex]
+  gl.colorFloat(1.0, 1.0, 1.0, 1.0)
   gl.pushMatrix()
   gl.translate(entity.origin.x, entity.origin.y, entity.origin.z)
   gl.rotate(entity.angles.y, 0.0, 0.0, 1.0)
-  gl.rotate(-entity.angles.x, 0.0, 1.0, 0.0)
+  // R_DrawBrushModel negates pitch before and after R_RotateForEntity in the
+  // original GLQuake source, so the observable brush-model rotation is +pitch.
+  gl.rotate(entity.angles.x, 0.0, 1.0, 0.0)
   gl.rotate(entity.angles.z, 1.0, 0.0, 0.0)
   faceIndex = submodel.firstFace
   lastFace = faceIndex + submodel.numFaces
   count = 0
   while faceIndex < lastFace and faceIndex < len(rCompatRenderer.surfaces)
-    if faceIndex >= 0 then R_RenderBrushPoly(rCompatRenderer.surfaces[faceIndex]); count = count + 1 end if
+    if faceIndex >= 0 then
+      if rCompatTextureSort then R_RenderBrushPoly(rCompatRenderer.surfaces[faceIndex]) else R_DrawSequentialPoly(rCompatRenderer.surfaces[faceIndex]) end if
+      count = count + 1
+    end if
     faceIndex = faceIndex + 1
   end while
-  if not rCompatRenderer.fullbright then R_BlendLightmaps() end if
+  R_BlendLightmaps()
   gl.popMatrix()
   return count
 end function
 
 function R_RecursiveWorldNode(nodeNumber)
+  global skychain, waterchain
   if rCompatRenderer is void or nodeNumber < 0 then return 0 end if
   if nodeNumber >= len(rCompatRenderer.map.nodes) then return 0 end if
   node = rCompatRenderer.map.nodes[nodeNumber]
@@ -1250,7 +1573,17 @@ function R_RecursiveWorldNode(nodeNumber)
   while faceIndex < lastFace and faceIndex < len(rCompatRenderer.surfaces)
     if faceIndex >= 0 and faceIndex < len(rCompatRenderer.visibleFaces) and rCompatRenderer.visibleFaces[faceIndex] != 0 then
       surface = rCompatRenderer.surfaces[faceIndex]
-      if (surface.flags & c.SURF_DRAWTURB) == 0 then R_RenderBrushPoly(surface); count = count + 1 end if
+      if rCompatTextureSort then
+        // Texture-chain insertion is represented by the visible surface list;
+        // DrawTextureChains consumes it after traversal.
+      else if (surface.flags & c.SURF_DRAWSKY) != 0 then
+        skychain = [surface] + skychain
+      else if (surface.flags & c.SURF_DRAWTURB) != 0 then
+        waterchain = [surface] + waterchain
+      else
+        R_DrawSequentialPoly(surface)
+        count = count + 1
+      end if
     end if
     faceIndex = faceIndex + 1
   end while
@@ -1259,9 +1592,15 @@ function R_RecursiveWorldNode(nodeNumber)
 end function
 
 function R_DrawWorld()
+  global lightmap_polys
   if rCompatRenderer is void or len(rCompatRenderer.map.models) == 0 then return 0 end if
+  gl.colorFloat(1.0, 1.0, 1.0, 1.0)
+  lightmap_polys = arrayutil.makeFilledArray(GLQUAKE_MAX_LIGHTMAPS, [])
   root = rCompatRenderer.map.models[0].headNodes[0]
-  return R_RecursiveWorldNode(root)
+  count = R_RecursiveWorldNode(root)
+  DrawTextureChains()
+  R_BlendLightmaps()
+  return count
 end function
 
 function R_MarkLeaves()
@@ -1281,7 +1620,7 @@ function AllocBlock(width, height, xOut, yOut)
     bestX = -1
     bestY = 0
     x = 0
-    while x <= GLQUAKE_BLOCK_WIDTH - width
+    while x < GLQUAKE_BLOCK_WIDTH - width
       best2 = 0
       column = 0
       while column < width
@@ -1311,6 +1650,7 @@ function AllocBlock(width, height, xOut, yOut)
 end function
 
 function BuildSurfaceDisplayList(surface)
+  global nColinElim
   value = compatSurface(surface)
   if value is void then return error(3764, "BuildSurfaceDisplayList: bad surface") end if
   // buildSurface reconstructed the exact edge loop and both texture coordinate
@@ -1326,7 +1666,11 @@ function BuildSurfaceDisplayList(surface)
     direction1 = math.normalize(math.subtract(current.position, previous.position))
     direction2 = math.normalize(math.subtract(next.position, previous.position))
     collinear = compatAbs(direction1.x - direction2.x) <= 0.001 and compatAbs(direction1.y - direction2.y) <= 0.001 and compatAbs(direction1.z - direction2.z) <= 0.001
-    if not collinear then arrayutil.pushArrayBuilder(output, current) end if
+    if not collinear then
+      arrayutil.pushArrayBuilder(output, current)
+    else
+      nColinElim = nColinElim + 1
+    end if
     index = index + 1
   end while
   vertices = arrayutil.finishArrayBuilder(output)
@@ -1338,25 +1682,42 @@ function GL_CreateSurfaceLightmap(surface)
   value = compatSurface(surface)
   if value is void then return error(3765, "GL_CreateSurfaceLightmap: bad surface") end if
   if (value.flags & (c.SURF_DRAWSKY | c.SURF_DRAWTURB)) != 0 then return 0 end if
-  pixels = R_BuildLightMap(value, bytes(value.lightWidth * value.lightHeight), value.lightWidth)
-  if value.lightmapId != 0 then gl.deleteTexture(value.lightmapId) end if
-  value.lightmapId = gl.generateTexture()
-  gl.bindTexture(value.lightmapId)
-  gl.textureParameter(gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR)
-  gl.textureParameter(gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)
-  gl.textureParameter(gl.GL_TEXTURE_WRAP_S, gl.GL_CLAMP)
-  gl.textureParameter(gl.GL_TEXTURE_WRAP_T, gl.GL_CLAMP)
-  gl.uploadLuminance(value.lightWidth, value.lightHeight, pixels)
-  return value.lightmapId
+  index = compatSurfaceIndex(value)
+  xOut = [0]
+  yOut = [0]
+  page = AllocBlock(value.lightWidth, value.lightHeight, xOut, yOut)
+  if page is error then return page end if
+  rCompatSurfaceLightmapPage[index] = page
+  rCompatSurfaceLightS[index] = xOut[0]
+  rCompatSurfaceLightT[index] = yOut[0]
+  value.lightmapId = lightmap_textures + page
+  // BuildSurfaceDisplayList in GLQuake stores lightmap coordinates in the
+  // shared 128x128 atlas, including the block allocated above.  buildSurface
+  // initially has only surface-local coordinates, so retaining those here
+  // samples unrelated atlas tiles and darkens most of the world.
+  face = compatFace(value)
+  if face is not void and face.texInfo >= 0 and face.texInfo < len(rCompatRenderer.map.texInfo) then
+    info = rCompatRenderer.map.texInfo[face.texInfo]
+    for each vertex in value.vertices
+      rawS = vertex.position.x * info.s[0] + vertex.position.y * info.s[1] + vertex.position.z * info.s[2] + info.s[3]
+      rawT = vertex.position.x * info.t[0] + vertex.position.y * info.t[1] + vertex.position.z * info.t[2] + info.t[3]
+      vertex.lightS = (rawS - value.textureMins.x + xOut[0] * 16.0 + 8.0) / (GLQUAKE_BLOCK_WIDTH * 16.0)
+      vertex.lightT = (rawT - value.textureMins.y + yOut[0] * 16.0 + 8.0) / (GLQUAKE_BLOCK_HEIGHT * 16.0)
+    end for
+  end if
+  pixels = R_BuildLightMap(value, bytes(value.lightWidth * value.lightHeight * lightmap_bytes), value.lightWidth * lightmap_bytes)
+  compatCopySurfaceLightmapToAtlas(value, pixels)
+  return page
 end function
 
 function GL_BuildLightmaps()
-  global r_framecount, lightmap_bytes, active_lightmaps
+  global r_framecount, lightmap_bytes, active_lightmaps, lightmap_textures
   if rCompatRenderer is void then return 0 end if
-  compatEnsureWorldState()
+  R_ResetLightmapCompatibility()
   r_framecount = 1
   lightmap_bytes = 1
   active_lightmaps = 0
+  if lightmap_textures == 0 then lightmap_textures = gl.reserveTextureNames(GLQUAKE_MAX_LIGHTMAPS) end if
   count = 0
   index = 0
   while index < len(rCompatRenderer.surfaces)
@@ -1366,6 +1727,21 @@ function GL_BuildLightmaps()
     count = count + 1
     index = index + 1
   end while
+  page = 0
+  while page < active_lightmaps
+    gl.bindTexture(lightmap_textures + page)
+    gl.textureParameter(gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR)
+    gl.textureParameter(gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)
+    pageOffset = page * GLQUAKE_BLOCK_WIDTH * GLQUAKE_BLOCK_HEIGHT * lightmap_bytes
+    pageLength = GLQUAKE_BLOCK_WIDTH * GLQUAKE_BLOCK_HEIGHT * lightmap_bytes
+    tracedUpload = gl.traceCommand("upload_lightmap", [
+      gl.GL_TEXTURE_2D, 0, lightmap_bytes, GLQUAKE_BLOCK_WIDTH,
+      GLQUAKE_BLOCK_HEIGHT, 0, gl.GL_LUMINANCE, gl.GL_UNSIGNED_BYTE,
+      compatFnv1a(lightmaps, pageOffset, pageLength),
+    ])
+    if not tracedUpload then gl.uploadLuminance(GLQUAKE_BLOCK_WIDTH, GLQUAKE_BLOCK_HEIGHT, slice(lightmaps, pageOffset, pageLength)) end if
+    page = page + 1
+  end while
   return count
 end function
 
@@ -1373,132 +1749,63 @@ end function
 // gl_warp.c
 // -----------------------------------------------------------------------------
 
-function compatVertexAt(vertices, index)
-  value = vertices[index]
-  if typeName(value) == "RenderVertex" then return value.position end if
-  if typeName(value) == "Vec3" then return value end if
-  if value is array and len(value) >= 3 then return t.Vec3(value[0], value[1], value[2]) end if
-  return compatZeroVector()
-end function
-
 function BoundPoly(numverts, vertices, minimums, maximums)
-  if minimums is void then minimums = t.Vec3(9999.0, 9999.0, 9999.0) end if
-  if maximums is void then maximums = t.Vec3(-9999.0, -9999.0, -9999.0) end if
-  index = 0
-  while index < numverts and index < len(vertices)
-    vertex = compatVertexAt(vertices, index)
-    if vertex.x < minimums.x then minimums.x = vertex.x end if
-    if vertex.y < minimums.y then minimums.y = vertex.y end if
-    if vertex.z < minimums.z then minimums.z = vertex.z end if
-    if vertex.x > maximums.x then maximums.x = vertex.x end if
-    if vertex.y > maximums.y then maximums.y = vertex.y end if
-    if vertex.z > maximums.z then maximums.z = vertex.z end if
-    index = index + 1
-  end while
+  source = vertices
+  if numverts < len(vertices) then source = arrayutil.copyArrayPrefix(vertices, numverts) end if
+  bounds = glWarp.BoundPoly(source)
+  sourceMinimums = bounds[0]
+  sourceMaximums = bounds[1]
+  if minimums is void then minimums = t.Vec3(0.0, 0.0, 0.0) end if
+  if maximums is void then maximums = t.Vec3(0.0, 0.0, 0.0) end if
+  minimums.x = sourceMinimums.x
+  minimums.y = sourceMinimums.y
+  minimums.z = sourceMinimums.z
+  maximums.x = sourceMaximums.x
+  maximums.y = sourceMaximums.y
+  maximums.z = sourceMaximums.z
   return [minimums, maximums]
-end function
-
-function compatInterpolateRenderVertex(first, second, fraction)
-  position = math.add(first.position, math.scale(math.subtract(second.position, first.position), fraction))
-  return t.RenderVertex(
-    position,
-    first.s + (second.s - first.s) * fraction,
-    first.t + (second.t - first.t) * fraction,
-    first.lightS + (second.lightS - first.lightS) * fraction,
-    first.lightT + (second.lightT - first.lightT) * fraction,
-  )
-end function
-
-function compatSubdivide(vertices, output, size)
-  if len(vertices) > 60 then return error(3766, "SubdividePolygon: numverts > 60") end if
-  minimums = t.Vec3(9999.0, 9999.0, 9999.0)
-  maximums = t.Vec3(-9999.0, -9999.0, -9999.0)
-  BoundPoly(len(vertices), vertices, minimums, maximums)
-  axis = 0
-  while axis < 3
-    minimum = minimums.x
-    maximum = maximums.x
-    if axis == 1 then minimum = minimums.y; maximum = maximums.y end if
-    if axis == 2 then minimum = minimums.z; maximum = maximums.z end if
-    middle = (minimum + maximum) * 0.5
-    middle = size * floorValue(middle / size + 0.5)
-    if maximum - middle >= 8.0 and middle - minimum >= 8.0 then
-      distances = arrayutil.makeEmptyArray(len(vertices) + 1)
-      index = 0
-      while index < len(vertices)
-        point = vertices[index].position
-        coordinate = point.x
-        if axis == 1 then coordinate = point.y end if
-        if axis == 2 then coordinate = point.z end if
-        distances[index] = coordinate - middle
-        index = index + 1
-      end while
-      distances[len(vertices)] = distances[0]
-      fronts = arrayutil.createArrayBuilder(len(vertices) + 4)
-      backs = arrayutil.createArrayBuilder(len(vertices) + 4)
-      index = 0
-      while index < len(vertices)
-        current = vertices[index]
-        next = vertices[(index + 1) % len(vertices)]
-        distance = distances[index]
-        nextDistance = distances[index + 1]
-        if distance >= 0.0 then arrayutil.pushArrayBuilder(fronts, current) end if
-        if distance <= 0.0 then arrayutil.pushArrayBuilder(backs, current) end if
-        if (distance > 0.0 and nextDistance < 0.0) or (distance < 0.0 and nextDistance > 0.0) then
-          fraction = distance / (distance - nextDistance)
-          split = compatInterpolateRenderVertex(current, next, fraction)
-          arrayutil.pushArrayBuilder(fronts, split)
-          arrayutil.pushArrayBuilder(backs, split)
-        end if
-        index = index + 1
-      end while
-      frontValues = arrayutil.finishArrayBuilder(fronts)
-      backValues = arrayutil.finishArrayBuilder(backs)
-      compatSubdivide(frontValues, output, size)
-      compatSubdivide(backValues, output, size)
-      return true
-    end if
-    axis = axis + 1
-  end while
-  arrayutil.pushArrayBuilder(output, vertices)
-  return true
 end function
 
 function SubdividePolygon(numverts, vertices)
   global rCompatWarpPolys
   source = vertices
   if numverts < len(vertices) then source = arrayutil.copyArrayPrefix(vertices, numverts) end if
-  builder = arrayutil.createArrayBuilder(8)
-  result = compatSubdivide(source, builder, 128.0)
-  if result is error then return result end if
-  rCompatWarpPolys = arrayutil.finishArrayBuilder(builder)
+  rCompatWarpPolys = glWarp.SubdividePolygon(source, glWarp.CurrentSubdivideSize())
   return rCompatWarpPolys
 end function
 
 function GL_SubdivideSurface(surface)
+  global rCompatSurfaceWarpPolys
   value = compatSurface(surface)
   if value is void then return error(3767, "GL_SubdivideSurface: bad surface") end if
-  return SubdividePolygon(len(value.vertices), value.vertices)
-end function
-
-function compatTurbulence(value)
-  return math.sin(value) * 8.0
+  info = compatTexInfo(value)
+  if info is void then return error(3770, "GL_SubdivideSurface: bad texinfo") end if
+  surfaceIndex = compatSurfaceIndex(value)
+  if surfaceIndex >= 0 and surfaceIndex < len(rCompatSurfaceWarpPolys) and rCompatSurfaceWarpPolys[surfaceIndex] is not void then
+    return rCompatSurfaceWarpPolys[surfaceIndex]
+  end if
+  polygons = glWarp.GL_SubdivideSurface(value.vertices, info.s, info.t, glWarp.CurrentSubdivideSize())
+  if polygons is error then return polygons end if
+  if surfaceIndex >= 0 and surfaceIndex < len(rCompatSurfaceWarpPolys) then rCompatSurfaceWarpPolys[surfaceIndex] = polygons end if
+  return polygons
 end function
 
 function EmitWaterPolys(surface)
   value = compatSurface(surface)
   if value is void then return false end if
+  if rCompatAbstractSurfaceCalls then
+    gl.traceCommand("emit_water", [value.flags])
+    return 1
+  end if
   polygons = GL_SubdivideSurface(value)
   if polygons is error then return polygons end if
-  for each vertices in polygons
+  traces = glWarp.EmitWaterPolys(polygons, rCompatRealtime)
+  for each commands in traces
     gl.begin(gl.GL_POLYGON)
-    for each vertex in vertices
-      originalS = vertex.s * 64.0
-      originalT = vertex.t * 64.0
-      warpedS = (originalS + compatTurbulence((originalT * 0.125 + rCompatRealtime) * 2.0 * 3.141592653589793 / 256.0)) / 64.0
-      warpedT = (originalT + compatTurbulence((originalS * 0.125 + rCompatRealtime) * 2.0 * 3.141592653589793 / 256.0)) / 64.0
-      gl.texcoord2(warpedS, warpedT)
-      gl.vertex3(vertex.position.x, vertex.position.y, vertex.position.z)
+    for each command in commands
+      point = command[2]
+      gl.texcoord2(command[0], command[1])
+      gl.vertex3(point.x, point.y, point.z)
     end for
     gl.finishPrimitive()
   end for
@@ -1510,18 +1817,13 @@ function EmitSkyPolys(surface)
   if value is void then return false end if
   polygons = GL_SubdivideSurface(value)
   if polygons is error then return polygons end if
-  for each vertices in polygons
+  traces = glWarp.EmitSkyPolys(polygons, rCompatViewOrigin, speedscale)
+  for each commands in traces
     gl.begin(gl.GL_POLYGON)
-    for each vertex in vertices
-      direction = math.subtract(vertex.position, rCompatViewOrigin)
-      direction.z = direction.z * 3.0
-      lengthValue = math.length(direction)
-      if lengthValue < 0.0001 then lengthValue = 1.0 end if
-      scaleValue = 378.0 / lengthValue
-      sValue = (speedscale + direction.x * scaleValue) / 128.0
-      tValue = (speedscale + direction.y * scaleValue) / 128.0
-      gl.texcoord2(sValue, tValue)
-      gl.vertex3(vertex.position.x, vertex.position.y, vertex.position.z)
+    for each command in commands
+      point = command[2]
+      gl.texcoord2(command[0], command[1])
+      gl.vertex3(point.x, point.y, point.z)
     end for
     gl.finishPrimitive()
   end for
@@ -1530,15 +1832,19 @@ end function
 
 function EmitBothSkyLayers(surface)
   global speedscale
+  value = compatSurface(surface)
+  if value is void then return false end if
+  if rCompatAbstractSurfaceCalls then
+    gl.traceCommand("emit_both_sky", [value.flags])
+    return 1
+  end if
   GL_DisableMultitexture()
   if solidskytexture != 0 then gl.bindTexture(solidskytexture) end if
-  speedscale = rCompatRealtime * 8.0
-  speedscale = speedscale - (native.trunc(speedscale) & -128)
+  speedscale = glWarp.WrappedSpeedScale(rCompatRealtime, 8.0)
   first = EmitSkyPolys(surface)
   gl.enable(gl.GL_BLEND)
   if alphaskytexture != 0 then gl.bindTexture(alphaskytexture) end if
-  speedscale = rCompatRealtime * 16.0
-  speedscale = speedscale - (native.trunc(speedscale) & -128)
+  speedscale = glWarp.WrappedSpeedScale(rCompatRealtime, 16.0)
   second = EmitSkyPolys(surface)
   gl.disable(gl.GL_BLEND)
   return first + second
@@ -1548,19 +1854,21 @@ function R_DrawSkyChain(chain)
   global speedscale
   if chain is void then return 0 end if
   if typeName(chain) == "RenderSurface" then chain = [chain] end if
+  if rCompatAbstractSurfaceCalls then
+    gl.traceCommand("draw_sky_chain", [len(chain)])
+    return len(chain)
+  end if
   GL_DisableMultitexture()
   count = 0
   if solidskytexture != 0 then gl.bindTexture(solidskytexture) end if
-  speedscale = rCompatRealtime * 8.0
-  speedscale = speedscale - (native.trunc(speedscale) & -128)
+  speedscale = glWarp.WrappedSpeedScale(rCompatRealtime, 8.0)
   for each surface in chain
     EmitSkyPolys(surface)
     count = count + 1
   end for
   gl.enable(gl.GL_BLEND)
   if alphaskytexture != 0 then gl.bindTexture(alphaskytexture) end if
-  speedscale = rCompatRealtime * 16.0
-  speedscale = speedscale - (native.trunc(speedscale) & -128)
+  speedscale = glWarp.WrappedSpeedScale(rCompatRealtime, 16.0)
   for each surface in chain
     EmitSkyPolys(surface)
   end for
@@ -1570,71 +1878,13 @@ end function
 
 function R_InitSky(texture)
   global solidskytexture, alphaskytexture, rCompatSkyTexture, rCompatAlphaSkyTexture
-  if texture is void or texture.width < 256 or texture.height < 128 or len(texture.pixels) < texture.width * texture.height then
-    return error(3768, "R_InitSky: invalid sky texture")
-  end if
   if rCompatRenderer is void or len(rCompatRenderer.palette) < 768 then
     return error(3769, "R_InitSky: palette is not initialized")
   end if
-
-  // gl_warp.c:R_InitSky uses a 128x128 RGBA buffer for each half of the
-  // 256x128 source texture.  Keep the conversion byte-exact, including the
-  // transparent palette entry 255 from d_8to24table.
-  solidRgba = bytes(128 * 128 * 4)
-  alphaRgba = bytes(128 * 128 * 4)
-  red = 0
-  green = 0
-  blue = 0
-  count = 0
-  y = 0
-  while y < 128
-    x = 0
-    while x < 128
-      source = texture.pixels[y * 256 + x + 128]
-      destination = (y * 128 + x) * 4
-      solidRgba[destination] = rCompatRenderer.palette[source * 3]
-      solidRgba[destination + 1] = rCompatRenderer.palette[source * 3 + 1]
-      solidRgba[destination + 2] = rCompatRenderer.palette[source * 3 + 2]
-      solidRgba[destination + 3] = 255
-      if source == 255 then solidRgba[destination + 3] = 0 end if
-      red = red + solidRgba[destination]
-      green = green + solidRgba[destination + 1]
-      blue = blue + solidRgba[destination + 2]
-      count = count + 1
-      x = x + 1
-    end while
-    y = y + 1
-  end while
-
-  // C performs integer division here. MiniLang '/' may produce a float when
-  // the quotient is not exact, so explicitly reproduce C's truncation before
-  // assigning the result to a byte buffer.
-  averageRed = native.trunc(red / count)
-  averageGreen = native.trunc(green / count)
-  averageBlue = native.trunc(blue / count)
-
-  y = 0
-  while y < 128
-    x = 0
-    while x < 128
-      source = texture.pixels[y * 256 + x]
-      destination = (y * 128 + x) * 4
-      if source == 0 then
-        alphaRgba[destination] = averageRed
-        alphaRgba[destination + 1] = averageGreen
-        alphaRgba[destination + 2] = averageBlue
-        alphaRgba[destination + 3] = 0
-      else
-        alphaRgba[destination] = rCompatRenderer.palette[source * 3]
-        alphaRgba[destination + 1] = rCompatRenderer.palette[source * 3 + 1]
-        alphaRgba[destination + 2] = rCompatRenderer.palette[source * 3 + 2]
-        alphaRgba[destination + 3] = 255
-        if source == 255 then alphaRgba[destination + 3] = 0 end if
-      end if
-      x = x + 1
-    end while
-    y = y + 1
-  end while
+  pixels = glWarp.R_InitSky(texture, rCompatRenderer.palette)
+  if pixels is error then return pixels end if
+  solidRgba = pixels[0]
+  alphaRgba = pixels[1]
 
   // Match GLQuake: allocate each texture once, reuse it on later maps, use
   // internal formats 3/4, and force linear filtering for both sky layers.

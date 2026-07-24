@@ -255,6 +255,31 @@ Write-Host "[MiniQuake] std import root: $StdImportRoot"
 if ($CompilerIsPython) {
   Write-Host "[MiniQuake] running MiniLang source preflight"
 
+  & $PythonExe @PythonPrefixArgs (Join-Path $Root "tools\verify_reference.py")
+  if ($LASTEXITCODE -ne 0) {
+    throw "Pinned GLQuake reference verification failed."
+  }
+
+  & $PythonExe @PythonPrefixArgs (Join-Path $Root "tools\verify_dependencies.py")
+  if ($LASTEXITCODE -ne 0) {
+    throw "Pinned third-party dependency verification failed."
+  }
+
+  & $PythonExe @PythonPrefixArgs (Join-Path $Root "tools\generate_port_audit.py")
+  if ($LASTEXITCODE -ne 0) {
+    throw "Pinned-source port audit is stale."
+  }
+
+  & $PythonExe @PythonPrefixArgs (Join-Path $Root "tools\generate_semantic_review.py")
+  if ($LASTEXITCODE -ne 0) {
+    throw "Semantic source-review audit is invalid."
+  }
+
+  & $PythonExe @PythonPrefixArgs (Join-Path $Root "tools\parity_oracle.py") "self-test"
+  if ($LASTEXITCODE -ne 0) {
+    throw "Parity oracle self-test failed."
+  }
+
   $StructuralLint = Join-Path $Root "tools\ml_lint.py"
   & $PythonExe @PythonPrefixArgs $StructuralLint $Root
   if ($LASTEXITCODE -ne 0) {
@@ -280,7 +305,16 @@ $Bridge = Join-Path $Root "native\miniquake_native.dll"
 if (-not (Test-Path -LiteralPath $Bridge -PathType Leaf)) {
   throw "Native bridge is missing: $Bridge"
 }
-Copy-Item -Force -LiteralPath $Bridge -Destination (Join-Path $Output "miniquake_native.dll")
+$OutputBridge = Join-Path $Output "miniquake_native.dll"
+$CopyBridge = $true
+if (Test-Path -LiteralPath $OutputBridge -PathType Leaf) {
+  $SourceBridgeHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Bridge).Hash
+  $OutputBridgeHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $OutputBridge).Hash
+  $CopyBridge = $SourceBridgeHash -ne $OutputBridgeHash
+}
+if ($CopyBridge) {
+  Copy-Item -Force -LiteralPath $Bridge -Destination $OutputBridge
+}
 
 $CommonArgs = @(
   "-I", $Source,
@@ -349,9 +383,9 @@ if (-not $SkipTests) {
 
     if ($null -ne $MilestoneTestExe) {
       Invoke-MiniQuakeTestBinary `
-        -Label "milestone tests" `
-        -Executable $MilestoneTestExe `
-        -ProgressHint "The last printed [NN/20] line identifies the active subsystem."
+      -Label "milestone tests" `
+      -Executable $MilestoneTestExe `
+      -ProgressHint "The last printed [NN/23] line identifies the active subsystem."
     }
   }
 }

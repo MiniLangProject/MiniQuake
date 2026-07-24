@@ -1,0 +1,305 @@
+{
+  "schema": "miniquake.gl-model.reference-differential.v1",
+  "command": "python tools/gl_model_differential.py",
+  "reference_execution": "direct-pinned-source-build",
+  "pinned_commit": "bf4ac424ce754894ac8f1dae6a3981954bc9852d",
+  "unit": "gl_model",
+  "reference_source": "reference/quake/WinQuake/gl_model.c",
+  "minilang_modules": [
+    "src/miniquake/model_registry.ml",
+    "src/miniquake/format/bsp.ml",
+    "src/miniquake/format/mdl.ml",
+    "src/miniquake/format/sprite.ml",
+    "src/miniquake/world_bsp.ml"
+  ],
+  "inputs": [
+    "reference/fixtures/gl_model/mq_gl_model_fixture.c",
+    "tests/gl_model_differential_fixture.ml"
+  ],
+  "events": 39,
+  "epsilon": 1e-5,
+  "fatal_processes": {
+    "expected_exit": 86,
+    "cases": [
+      "bsp-version",
+      "mdl-vertices",
+      "sprite-interval",
+      "lump-size"
+    ]
+  },
+  "functions": [
+    {
+      "name": "Mod_Init",
+      "source_line": 48,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:init"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_Extradata",
+      "source_line": 61,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:cache-touch"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_PointInLeaf",
+      "source_line": 81,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:bsp29"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_DecompressVis",
+      "source_line": 112,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:vis-rle"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LeafPVS",
+      "source_line": 156,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:vis-rle"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_ClearAll",
+      "source_line": 168,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:registry-cache"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_FindName",
+      "source_line": 184,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:registry-case"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_TouchModel",
+      "source_line": 217,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:cache-touch"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadModel",
+      "source_line": 237,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:registry-dispatch"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_ForName",
+      "source_line": 313,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:registry-dispatch"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadTextures",
+      "source_line": 339,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:bsp29", "exact:four-frame-regular-and-alternate-animation-links"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadLighting",
+      "source_line": 495,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:bsp29"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadVisibility",
+      "source_line": 512,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:bsp29"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadEntities",
+      "source_line": 529,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:bsp29"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadVertexes",
+      "source_line": 546,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:bsp29", "reference-fatal:lump-size"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadSubmodels",
+      "source_line": 574,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:bsp29", "exact:one-unit-bounds-spread"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadEdges",
+      "source_line": 610,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:bsp29"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadTexinfo",
+      "source_line": 637,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:bsp29"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "CalcSurfaceExtents",
+      "source_line": 705,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:bsp29"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadFaces",
+      "source_line": 757,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:bsp29", "exact:light-sample-and-underwater-flags"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_SetParent",
+      "source_line": 832,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:bsp29"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadNodes",
+      "source_line": 846,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:bsp29"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadLeafs",
+      "source_line": 893,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:bsp29"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadClipnodes",
+      "source_line": 947,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:bsp29"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_MakeHull0",
+      "source_line": 1001,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:bsp29"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadMarksurfaces",
+      "source_line": 1038,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:bsp29"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadSurfedges",
+      "source_line": 1067,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:bsp29"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadPlanes",
+      "source_line": 1091,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:bsp29", "exact:negative-normal-signbits"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "RadiusFromBounds",
+      "source_line": 1129,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:bounds"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadBrushModel",
+      "source_line": 1147,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:bsp29", "reference-fatal:bsp-version"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadAliasFrame",
+      "source_line": 1252,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:mdl6-frame"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadAliasGroup",
+      "source_line": 1288,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:mdl6-group"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_FloodFillSkin",
+      "source_line": 1360,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:mdl6-skin"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadAllSkins",
+      "source_line": 1411,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:mdl6"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadAliasModel",
+      "source_line": 1489,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:mdl6", "reference-fatal:mdl-vertices"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadSpriteFrame",
+      "source_line": 1655,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:spr1-group"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadSpriteGroup",
+      "source_line": 1698,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:spr1-group", "reference-fatal:sprite-interval"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_LoadSpriteModel",
+      "source_line": 1750,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:spr1"],
+      "classification": "reference-differential"
+    },
+    {
+      "name": "Mod_Print",
+      "source_line": 1828,
+      "source_definitions": 1,
+      "evidence": ["reference-differential:registry-print"],
+      "classification": "reference-differential"
+    }
+  ]
+}

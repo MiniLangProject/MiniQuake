@@ -1,0 +1,42 @@
+{
+  "schema": "miniquake.differential.v1",
+  "unit": "gl_screen",
+  "reference_execution": "patched-pinned-source-worktree",
+  "command": "py -3 tools/gl_screen_differential.py",
+  "inputs": {
+    "reference_source": "reference/quake/WinQuake/gl_screen.c",
+    "reference_harness": "reference/harness/gl_screen_pinned_driver.c",
+    "instrumentation_patch": "reference/patches/gl_screen_pinned_oracle.patch",
+    "oracle_stub_header": "reference/harness/gl_screen_oracle_stubs.h",
+    "minilang_fixture": "tests/gl_screen_differential_fixture.ml",
+    "ported_module": "src/miniquake/screen.ml"
+  },
+  "pinned_commit": "bf4ac424ce754894ac8f1dae6a3981954bc9852d",
+  "events": 23,
+  "epsilon": 1e-5,
+  "functions": [
+    {"name":"SCR_CenterPrint","source_definitions":1,"classification":"reference-differential","evidence":["differential:lines"]},
+    {"name":"SCR_DrawCenterString","source_definitions":1,"classification":"reference-differential","evidence":["differential:two-lines"]},
+    {"name":"SCR_CheckDrawCenterString","source_definitions":1,"classification":"reference-differential","evidence":["differential:visible"]},
+    {"name":"CalcFov","source_definitions":1,"classification":"reference-differential","evidence":["differential:classic"]},
+    {"name":"SCR_CalcRefdef","source_definitions":1,"classification":"reference-differential","evidence":["differential:windowed"]},
+    {"name":"SCR_SizeUp_f","source_definitions":1,"classification":"reference-differential","evidence":["differential:increment"]},
+    {"name":"SCR_SizeDown_f","source_definitions":1,"classification":"reference-differential","evidence":["differential:decrement"]},
+    {"name":"SCR_Init","source_definitions":1,"classification":"reference-differential","evidence":["differential:register"]},
+    {"name":"SCR_DrawRam","source_definitions":1,"classification":"reference-differential","evidence":["differential:thrash"]},
+    {"name":"SCR_DrawTurtle","source_definitions":1,"classification":"reference-differential","evidence":["differential:three-slow"]},
+    {"name":"SCR_DrawNet","source_definitions":1,"classification":"reference-differential","evidence":["differential:stalled"]},
+    {"name":"SCR_DrawPause","source_definitions":1,"classification":"reference-differential","evidence":["differential:paused"]},
+    {"name":"SCR_DrawLoading","source_definitions":1,"classification":"reference-differential","evidence":["differential:active"]},
+    {"name":"SCR_SetUpToDrawConsole","source_definitions":1,"classification":"reference-differential","evidence":["differential:forced"]},
+    {"name":"SCR_DrawConsole","source_definitions":1,"classification":"reference-differential","evidence":["differential:visible"]},
+    {"name":"SCR_ScreenShot_f","source_definitions":1,"classification":"reference-differential","evidence":["differential:tga"]},
+    {"name":"SCR_BeginLoadingPlaque","source_definitions":1,"classification":"reference-differential","evidence":["differential:connected"]},
+    {"name":"SCR_EndLoadingPlaque","source_definitions":1,"classification":"reference-differential","evidence":["differential:end"]},
+    {"name":"SCR_DrawNotifyString","source_definitions":1,"classification":"reference-differential","evidence":["differential:text"]},
+    {"name":"SCR_ModalMessage","source_definitions":1,"classification":"reference-differential","evidence":["differential:dedicated"]},
+    {"name":"SCR_BringDownConsole","source_definitions":1,"classification":"reference-differential","evidence":["differential:settled"]},
+    {"name":"SCR_TileClear","source_definitions":1,"classification":"reference-differential","evidence":["differential:border"]},
+    {"name":"SCR_UpdateScreen","source_definitions":1,"classification":"reference-differential","evidence":["differential:blocked"]}
+  ]
+}

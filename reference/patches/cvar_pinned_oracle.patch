@@ -1,0 +1,16 @@
+diff --git a/WinQuake/cvar.c b/WinQuake/cvar.c
+index b3b2dd7..0000000 100644
+--- a/WinQuake/cvar.c
++++ b/WinQuake/cvar.c
+@@ -19,7 +19,11 @@ See the GNU General Public License for more details.
+ */
+ // cvar.c -- dynamic variable tracking
+ 
++#ifdef MINIQUAKE_PINNED_ORACLE
++#include "cvar_oracle_stubs.h"
++#else
+ #include "quakedef.h"
++#endif
+ 
+ cvar_t	*cvar_vars;
+ char	*cvar_null_string = "";

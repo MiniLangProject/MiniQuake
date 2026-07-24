@@ -11,20 +11,40 @@ import miniquake.server as server
 import miniquake.client as client
 import miniquake.client_effects as clientEffects
 import miniquake.net_loop as netloop
+import miniquake.net_datagram as netDatagram
+import miniquake.net_main as netmain
+import miniquake.net_wins as netwins
 import miniquake.player_move as movement
 import miniquake.input as input
+import miniquake.keys as keys
 import miniquake.render.world as worldRenderer
 import miniquake.render.entities as entityRenderer
 import miniquake.render.particles as particleRenderer
+import miniquake.render.draw2d as draw2d
+import miniquake.statusbar as statusbar
 import miniquake.console as console
 import miniquake.menu as menu
 import miniquake.screen as screen
 import miniquake.view as view
+import miniquake.chase as chase
 import miniquake.sound.mixer as mixer
+import miniquake.sound.cd_audio as cdAudio
+import miniquake.savegame as savegame
+import miniquake.demo as demo
+import miniquake.demo_player as demoPlayer
+import miniquake.format.bsp as bsp
 import miniquake.particles as particles
 import miniquake.platform.win32 as win
+import miniquake.sys_win as sysWin
+import miniquake.gl_vidnt as glvid
 import miniquake.mathlib as math
 import miniquake.byteio as bio
+import miniquake.native as native
+import miniquake.message as msg
+import miniquake.sizebuf as sz
+import miniquake.array_util as arrayutil
+import miniquake.quakec.edict as qcedict
+import miniquake.quakec.vm as qcvm
 
 function commandNeverExists(name)
   return false
@@ -34,15 +54,34 @@ function registerCvar(registry, name, value, archive, serverFlag)
   return cvar.register(registry, cvar.create(name, value, archive, serverFlag), commandNeverExists)
 end function
 
-function createCvars()
+function createCvars(commandLine, registered)
   registry = cvar.createRegistry()
+  registeredValue = "0"
+  commandLineValue = "0"
+  if registered then
+    registeredValue = "1"
+    commandLineValue = commandLine.commandLine
+  end if
+  registerCvar(registry, "registered", registeredValue, false, false)
+  registerCvar(registry, "cmdline", commandLineValue, false, true)
   registerCvar(registry, "host_framerate", "0", false, false)
   registerCvar(registry, "host_maxfps", "72", false, false)
+  registerCvar(registry, "host_speeds", "0", false, false)
+  registerCvar(registry, "sys_ticrate", "0.05", false, false)
+  registerCvar(registry, "serverprofile", "0", false, false)
+  registerCvar(registry, "hostname", "UNNAMED", true, false)
+  registerCvar(registry, "net_messagetimeout", "300", false, false)
   registerCvar(registry, "developer", "0", false, false)
   registerCvar(registry, "skill", "1", false, true)
   registerCvar(registry, "deathmatch", "0", false, true)
   registerCvar(registry, "coop", "0", false, true)
+  registerCvar(registry, "teamplay", "0", false, true)
+  registerCvar(registry, "fraglimit", "0", false, true)
+  registerCvar(registry, "timelimit", "0", false, true)
   registerCvar(registry, "pausable", "1", false, true)
+  registerCvar(registry, "samelevel", "0", false, false)
+  registerCvar(registry, "noexit", "0", false, true)
+  registerCvar(registry, "temp1", "0", false, false)
   registerCvar(registry, "sv_gravity", "800", false, true)
   registerCvar(registry, "sv_maxspeed", "320", false, true)
   registerCvar(registry, "sv_accelerate", "10", false, true)
@@ -53,6 +92,8 @@ function createCvars()
   registerCvar(registry, "sensitivity", "3", true, false)
   registerCvar(registry, "m_pitch", "0.022", true, false)
   registerCvar(registry, "m_yaw", "0.022", true, false)
+  registerCvar(registry, "m_forward", "1", true, false)
+  registerCvar(registry, "m_side", "0.8", true, false)
   registerCvar(registry, "m_filter", "0", true, false)
   registerCvar(registry, "lookspring", "0", true, false)
   registerCvar(registry, "lookstrafe", "0", true, false)
@@ -60,17 +101,90 @@ function createCvars()
   registerCvar(registry, "cl_backspeed", "200", true, false)
   registerCvar(registry, "cl_sidespeed", "350", true, false)
   registerCvar(registry, "cl_upspeed", "200", true, false)
+  registerCvar(registry, "cl_movespeedkey", "2.0", false, false)
+  registerCvar(registry, "cl_yawspeed", "140", false, false)
+  registerCvar(registry, "cl_pitchspeed", "150", false, false)
+  registerCvar(registry, "cl_anglespeedkey", "1.5", false, false)
+  registerCvar(registry, "joystick", "0", true, false)
+  registerCvar(registry, "joyname", "joystick", false, false)
+  registerCvar(registry, "joyadvanced", "0", false, false)
+  registerCvar(registry, "joyadvaxisx", "0", false, false)
+  registerCvar(registry, "joyadvaxisy", "0", false, false)
+  registerCvar(registry, "joyadvaxisz", "0", false, false)
+  registerCvar(registry, "joyadvaxisr", "0", false, false)
+  registerCvar(registry, "joyadvaxisu", "0", false, false)
+  registerCvar(registry, "joyadvaxisv", "0", false, false)
+  registerCvar(registry, "joyforwardthreshold", ".15", false, false)
+  registerCvar(registry, "joysidethreshold", ".15", false, false)
+  registerCvar(registry, "joypitchthreshold", ".15", false, false)
+  registerCvar(registry, "joyyawthreshold", ".15", false, false)
+  registerCvar(registry, "joyforwardsensitivity", "-1.0", false, false)
+  registerCvar(registry, "joysidesensitivity", "-1.0", false, false)
+  registerCvar(registry, "joypitchsensitivity", "1.0", false, false)
+  registerCvar(registry, "joyyawsensitivity", "-1.0", false, false)
+  registerCvar(registry, "joywwhack1", "0.0", false, false)
+  registerCvar(registry, "joywwhack2", "0.0", false, false)
   registerCvar(registry, "r_fullbright", "0", false, false)
   registerCvar(registry, "r_wireframe", "0", false, false)
   registerCvar(registry, "r_wateralpha", "1", false, false)
   registerCvar(registry, "r_drawviewmodel", "1", false, false)
   registerCvar(registry, "r_drawentities", "1", false, false)
+  registerCvar(registry, "gl_subdivide_size", "128", true, false)
+  registerCvar(registry, "gl_nobind", "0", false, false)
+  registerCvar(registry, "gl_max_size", "1024", false, false)
+  registerCvar(registry, "gl_picmip", "0", false, false)
+  registerCvar(registry, "gl_polyblend", "1", false, false)
+  registerCvar(registry, "chase_back", "100", false, false)
+  registerCvar(registry, "chase_up", "16", false, false)
+  registerCvar(registry, "chase_right", "0", false, false)
+  registerCvar(registry, "chase_active", "0", false, false)
+  registerCvar(registry, "fov", "90", false, false)
+  registerCvar(registry, "scr_conspeed", "300", false, false)
+  registerCvar(registry, "con_notifytime", "3", false, false)
+  registerCvar(registry, "scr_centertime", "2", false, false)
+  registerCvar(registry, "showram", "1", false, false)
+  registerCvar(registry, "showturtle", "0", false, false)
+  registerCvar(registry, "showpause", "1", false, false)
+  registerCvar(registry, "scr_printspeed", "8", false, false)
+  registerCvar(registry, "gl_triplebuffer", "1", true, false)
+  registerCvar(registry, "vid_mode", "0", false, false)
+  registerCvar(registry, "vid_wait", "0", false, false)
+  registerCvar(registry, "vid_nopageflip", "0", true, false)
+  registerCvar(registry, "_vid_wait_override", "0", true, false)
+  registerCvar(registry, "_vid_default_mode", "0", true, false)
+  registerCvar(registry, "_vid_default_mode_win", "3", true, false)
+  registerCvar(registry, "vid_config_x", "800", true, false)
+  registerCvar(registry, "vid_config_y", "600", true, false)
+  registerCvar(registry, "vid_stretch_by_2", "1", true, false)
+  registerCvar(registry, "gl_ztrick", "1", false, false)
   registerCvar(registry, "cl_bob", "0.02", false, false)
   registerCvar(registry, "cl_bobcycle", "0.6", false, false)
   registerCvar(registry, "cl_bobup", "0.5", false, false)
+  registerCvar(registry, "lcd_x", "0", false, false)
+  registerCvar(registry, "lcd_yaw", "0", false, false)
+  registerCvar(registry, "scr_ofsx", "0", false, false)
+  registerCvar(registry, "scr_ofsy", "0", false, false)
+  registerCvar(registry, "scr_ofsz", "0", false, false)
+  registerCvar(registry, "cl_rollangle", "2", false, false)
+  registerCvar(registry, "cl_rollspeed", "200", false, false)
+  // Retain the early MiniQuake spellings as compatibility aliases.
   registerCvar(registry, "v_rollangle", "2", false, false)
   registerCvar(registry, "v_rollspeed", "200", false, false)
   registerCvar(registry, "v_kicktime", "0.5", false, false)
+  registerCvar(registry, "v_kickroll", "0.6", false, false)
+  registerCvar(registry, "v_kickpitch", "0.6", false, false)
+  registerCvar(registry, "v_centermove", "0.15", false, false)
+  registerCvar(registry, "v_centerspeed", "500", false, false)
+  registerCvar(registry, "v_iyaw_cycle", "2", false, false)
+  registerCvar(registry, "v_iroll_cycle", "0.5", false, false)
+  registerCvar(registry, "v_ipitch_cycle", "1", false, false)
+  registerCvar(registry, "v_iyaw_level", "0.3", false, false)
+  registerCvar(registry, "v_iroll_level", "0.1", false, false)
+  registerCvar(registry, "v_ipitch_level", "0.3", false, false)
+  registerCvar(registry, "v_idlescale", "0", false, false)
+  registerCvar(registry, "cl_crossx", "0", false, false)
+  registerCvar(registry, "cl_crossy", "0", false, false)
+  registerCvar(registry, "gl_cshiftpercent", "100", false, false)
   registerCvar(registry, "ambient_level", "0.3", false, false)
   registerCvar(registry, "ambient_fade", "100", false, false)
   registerCvar(registry, "volume", "0.7", true, false)
@@ -79,36 +193,64 @@ function createCvars()
   registerCvar(registry, "gamma", "1", true, false)
   registerCvar(registry, "viewsize", "100", true, false)
   registerCvar(registry, "_windowed_mouse", "1", true, false)
-  registerCvar(registry, "crosshair", "1", true, false)
+  registerCvar(registry, "crosshair", "0", true, false)
+  registerCvar(registry, "_cl_name", "player", true, false)
+  registerCvar(registry, "_cl_color", "0", true, false)
   return registry
+end function
+
+function Host_FindMaxClients(arguments)
+  dedicated = common.hasParm(arguments, "-dedicated")
+  listening = common.hasParm(arguments, "-listen")
+  if dedicated and listening then return error(3010, "Only one of -dedicated or -listen can be specified") end if
+  maximum = 1
+  if dedicated then maximum = common.integerOption(arguments, "-dedicated", 8) end if
+  if listening then maximum = common.integerOption(arguments, "-listen", 8) end if
+  if maximum < 1 then maximum = 8 end if
+  if maximum > c.MAX_CLIENTS then maximum = c.MAX_CLIENTS end if
+  return [maximum, dedicated, listening]
 end function
 
 function create(args)
   options = launch.parse(args)
   arguments = common.create(args)
-  filesystem = qfs.initialize(options.basedir, options.gameDirectory)
+  filesystem = qfs.initializeArguments(options.basedir, arguments)
   commands = cmd.create()
-  variables = createCvars()
+  variables = createCvars(arguments, filesystem.registered)
   input.resetBindings()
+  keys.Key_Init()
+  input.configurePlatform(
+    variables,
+    common.hasParm(arguments, "-nomouse"),
+    common.hasParm(arguments, "-nojoy"),
+    common.hasParm(arguments, "-dinput"),
+  )
+  input.IN_Init()
   if options.developer then cvar.set(variables, "developer", "1") end if
   cvar.set(variables, "skill", "" + options.skill)
   timing = t.HostTiming(0.0, 0.0, 0.0, 0, 0)
   network = netloop.createState()
   player = movement.create(t.Vec3(0.0, 0.0, 64.0), t.Vec3(0.0, 0.0, 0.0))
   localClient = client.create(player)
+  client.CL_SetStandardQuake(localClient, arguments.standardQuake)
   // The integrated loopback client shares the authoritative PlayerState with
   // the local server. Network snapshots must not be written back into it.
   localClient.localAuthoritative = true
-  maxClients = common.integerOption(arguments, "-listen", 1)
-  if options.dedicated and maxClients < 1 then maxClients = 1 end if
+  clientMode = try(Host_FindMaxClients(arguments))
+  maxClients = 1
+  if clientMode is not error then maxClients = clientMode[0] end if
   gameServer = server.create(maxClients)
+  if maxClients > 1 then cvar.set(variables, "deathmatch", "1") else cvar.set(variables, "deathmatch", "0") end if
   consoleState = console.create(1024)
+  consoleState.dedicated = options.dedicated
+  console.Con_Init(consoleState, filesystem, options.width, common.hasParm(arguments, "-condebug"))
   menuState = menu.create()
   viewState = view.create()
   soundMixer = mixer.create(filesystem, 22050)
   soundDisabled = options.noSound or options.headless or options.dedicated
   soundMixer.enabled = not soundDisabled
   quakeCEnabled = not launch.hasParm(options, "-noqc")
+  effectiveHeadless = options.headless or options.dedicated
   return t.GameSession(
     arguments,
     filesystem,
@@ -130,7 +272,7 @@ function create(args)
     options.width,
     options.height,
     options.fullscreen,
-    options.headless,
+    effectiveHeadless,
     options.maxFrames,
     0,
     false,
@@ -145,6 +287,22 @@ function create(args)
     soundDisabled,
     false,
     0,
+    0,
+    "",
+    void,
+    void,
+    false,
+    0,
+    0.0,
+    -1,
+    "",
+    [],
+    -1,
+    1.0,
+    false,
+    false,
+    [],
+    0.0,
     0,
   )
 end function
@@ -171,10 +329,15 @@ function filterTime(timing, newRealtime, maxFps, forcedFrameRate, timedemo)
     timing.filteredFrames = timing.filteredFrames + 1
     return false
   end if
-  if forcedFrameRate > 0.0 then timing.frameTime = forcedFrameRate else timing.frameTime = elapsed end if
+  if forcedFrameRate > 0.0 then
+    // host.c does not clamp an explicitly forced host_framerate.
+    timing.frameTime = forcedFrameRate
+  else
+    timing.frameTime = elapsed
+    if timing.frameTime > 0.1 then timing.frameTime = 0.1 end if
+    if timing.frameTime < 0.001 then timing.frameTime = 0.001 end if
+  end if
   timing.oldRealtime = timing.realtime
-  if timing.frameTime > 0.1 then timing.frameTime = 0.1 end if
-  if timing.frameTime < 0.001 then timing.frameTime = 0.001 end if
   timing.frameCount = timing.frameCount + 1
   return true
 end function
@@ -191,6 +354,17 @@ function cvarCommand(session, arguments)
   return true
 end function
 
+function flushServerCvarChanges(session)
+  changes = cvar.takeServerChanges(session.cvars)
+  if not session.server.active then return 0 end if
+  written = 0
+  for each change in changes
+    text = "\"" + change[0] + "\" changed to \"" + change[1] + "\"\n"
+    written = written + server.broadcastPrint(session.server, text)
+  end for
+  return written
+end function
+
 function findAlias(system, name)
   wanted = bio.lower(name)
   for each alias in system.aliases
@@ -200,55 +374,40 @@ function findAlias(system, name)
 end function
 
 function startMap(session, mapName)
-  if session.mixer is not void then mixer.stopAll(session.mixer) end if
-  if session.renderer is not void and session.renderer.uploaded then worldRenderer.destroy(session.renderer) end if
-  if session.entityRenderer is not void then entityRenderer.destroy(session.entityRenderer) end if
-  session.renderer = void
-  session.entityRenderer = void
-  if session.client.connected then client.disconnect(session.client) end if
-  if session.server.active then server.shutdown(session.server) end if
+  return transitionMap(session, mapName, false, false, false)
+end function
 
-  skill = cvar.variableValue(session.cvars, "skill")
-  session.server.deathmatch = cvar.variableValue(session.cvars, "deathmatch") != 0.0
-  session.server.coop = cvar.variableValue(session.cvars, "coop") != 0.0
-  if session.qcEnabled then
-    server.spawnRuntime(session.server, session.filesystem, mapName, skill, session.cvars, session.commands)
-  else
-    server.spawn(session.server, session.filesystem, mapName, skill)
+function changeLevel(session, mapName)
+  return transitionMap(session, mapName, true, true, false)
+end function
+
+function restartLevel(session, mapName)
+  // Host_Restart_f keeps the existing spawn_parms.  Only changelevel calls
+  // SV_SaveSpawnparms/SetChangeParms before SV_SpawnServer.
+  return transitionMap(session, mapName, true, false, false)
+end function
+
+function finishLocalMapConnection(session, preserveClients)
+  session.client.name = cvar.variableString(session.cvars, "_cl_name")
+  session.client.colors = native.trunc(cvar.variableValue(session.cvars, "_cl_color"))
+  if not preserveClients then
+    connected = try(client.connect(session.client, session.network))
+    if connected is error then return connected end if
+    serverSocket = netmain.NET_CheckNewConnections(session.network)
+    if serverSocket is void then return error(3000, "Host_Map: loopback server connection missing") end if
+    accepted = try(server.acceptLocal(session.server, serverSocket))
+    if accepted is error then return accepted end if
+  else if not session.client.connected then
+    return true
   end if
-  session.player.origin = math.copy(session.server.spawnPoint)
-  session.player.viewAngles = math.copy(session.server.spawnAngles)
-  session.player.renderAngles = math.copy(session.server.spawnAngles)
-  session.player.velocity = t.Vec3(0.0, 0.0, 0.0)
-  session.client.command.viewAngles = math.copy(session.player.viewAngles)
-  input.clear(session.client.command)
-  input.resetMouse()
-  view.reset(session.view, session.player.origin)
-  session.particles = []
-  session.temporaryEntities = []
-
-  // Headless validation and dedicated servers do not need the expensive
-  // render-surface and client-model copies.  The original host keeps renderer
-  // initialization behind the video boundary as well.
-  if not session.headless then
-    palette = qfs.readFile(session.filesystem, "gfx/palette.lmp")
-    session.renderer = worldRenderer.create(session.server.worldModel, palette)
-    session.entityRenderer = entityRenderer.create(session.filesystem, palette, session.server.modelPrecache)
-    if session.windowCreated then screen.initialize(session.console, session.menu, session.filesystem, palette) end if
-  end if
-  session.startMap = session.server.mapName
-
-  client.connect(session.client, session.network)
-  serverSocket = netloop.checkNewConnections(session.network)
-  if serverSocket is void then return error(3000, "Host_Map: loopback server connection missing") end if
-  server.acceptLocal(session.server, serverSocket)
 
   attempts = 0
   while session.client.signon < c.SIGNONS and attempts < 128
     client.sendReliable(session.client)
-    client.pump(session.client)
+    pumpClient(session)
     server.pumpClientMessages(session.server, session.player)
-    client.pump(session.client)
+    server.sendReliableMessages(session.server)
+    pumpClient(session)
     attempts = attempts + 1
   end while
   if session.client.signon != c.SIGNONS then return error(3001, "Host_Map: local signon stopped at " + session.client.signon) end if
@@ -271,21 +430,1182 @@ function startMap(session, mapName)
   return true
 end function
 
+function transitionMap(session, mapName, preserveClients, saveChangeParms, deferLocalConnection)
+  screen.SCR_SetIntermission(0, "", session.console, session.client.time)
+  loadingPlaque = screen.SCR_BeginLoadingPlaque(
+    session.console,
+    session.timing.realtime,
+    session.client.connected,
+    session.client.signon,
+  )
+  if loadingPlaque and session.windowCreated and session.renderer is not void then
+    screen.SCR_UpdateScreen(
+      session.console,
+      session.menu,
+      session.view,
+      session.player,
+      win.width(),
+      win.height(),
+      session.server.mapName,
+      false,
+      session.timing.realtime,
+      session.timing.frameTime,
+      session.cvars,
+      session.client.connected,
+      session.client.signon,
+      session.server.paused,
+      session.client.lastMessageTime,
+      session.demoPlayback is not void,
+      false,
+      true,
+      false,
+    )
+    glvid.GL_EndRendering()
+  end if
+  if session.mixer is not void then mixer.stopAll(session.mixer) end if
+  if session.renderer is not void and session.renderer.uploaded then worldRenderer.destroy(session.renderer) end if
+  if session.entityRenderer is not void then entityRenderer.destroy(session.entityRenderer) end if
+  session.renderer = void
+  session.entityRenderer = void
+  preserved = void
+  if preserveClients then
+    if not session.server.active then return error(3002, "Only the server may changelevel") end if
+    if saveChangeParms then
+      preserved = server.beginChangeLevel(session.server)
+    else
+      preserved = server.preserveClientConnections(session.server)
+      server.sendReconnect(session.server)
+    end if
+    if session.client.connected then client.reconnect(session.client) end if
+  else
+    if session.client.connected then client.disconnect(session.client) end if
+    if session.server.active then server.shutdown(session.server) end if
+  end if
+
+  skill = cvar.variableValue(session.cvars, "skill")
+  session.server.deathmatch = cvar.variableValue(session.cvars, "deathmatch") != 0.0
+  session.server.coop = cvar.variableValue(session.cvars, "coop") != 0.0
+  if session.qcEnabled then
+    server.spawnRuntime(session.server, session.filesystem, mapName, skill, session.cvars, session.commands)
+  else
+    server.spawn(session.server, session.filesystem, mapName, skill)
+  end if
+  if preserveClients then server.finishChangeLevel(session.server, preserved) end if
+  session.player.origin = math.copy(session.server.spawnPoint)
+  session.player.viewAngles = math.copy(session.server.spawnAngles)
+  session.player.renderAngles = math.copy(session.server.spawnAngles)
+  session.player.velocity = t.Vec3(0.0, 0.0, 0.0)
+  session.client.command.viewAngles = math.copy(session.player.viewAngles)
+  input.clear(session.client.command)
+  input.resetMouse()
+  view.V_ClearClientState(session.view)
+  session.particles = []
+  session.temporaryEntities = []
+  // Cvar_Set broadcasts only to clients that are active at the instant of the
+  // change. Spawn-time changes therefore must not leak to later connections.
+  cvar.takeServerChanges(session.cvars)
+
+  // Headless validation and dedicated servers do not need the expensive
+  // render-surface and client-model copies.  The original host keeps renderer
+  // initialization behind the video boundary as well.
+  if not session.headless then
+    palette = qfs.readFile(session.filesystem, "gfx/palette.lmp")
+    videoState = glvid.VID_State()
+    if videoState.initialized then palette = videoState.palette end if
+    session.renderer = worldRenderer.create(session.server.worldModel, palette)
+    session.entityRenderer = entityRenderer.create(session.filesystem, palette, session.server.modelPrecache)
+    if session.windowCreated then screen.initialize(session.console, session.menu, session.filesystem, palette, session.width, session.height, session.cvars) end if
+  end if
+  screen.SCR_EndLoadingPlaque(session.console)
+  session.startMap = session.server.mapName
+
+  if common.hasParm(session.arguments, "-dedicated") then
+    session.statusMessage = "map " + session.server.mapName + ": " + session.server.levelName
+    console.appendLine(session.console, session.statusMessage)
+    print session.statusMessage
+    return true
+  end if
+
+  if deferLocalConnection then return true end if
+  return finishLocalMapConnection(session, preserveClients)
+end function
+
+function writeConfiguration(session)
+  if session.filesystem is void then return false end if
+  text = keys.Key_WriteBindings() + cvar.archiveText(session.cvars)
+  written = try(qfs.writeText(session.filesystem, "config.cfg", text))
+  if written is error then
+    if cvar.variableValue(session.cvars, "developer") != 0.0 then print "couldn't write config.cfg: " + written.message end if
+    return false
+  end if
+  return true
+end function
+
+function Host_InitLocal(session)
+  mode = Host_FindMaxClients(session.arguments)
+  if mode is error then return mode end if
+  if session.server.maxClients != mode[0] and not session.server.active then
+    server.resizeClients(session.server, mode[0])
+  end if
+  if mode[0] > 1 then cvar.set(session.cvars, "deathmatch", "1") else cvar.set(session.cvars, "deathmatch", "0") end if
+  session.hostTime = 1.0
+  return true
+end function
+
+function Host_WriteConfiguration(session)
+  if not session.initialized or common.hasParm(session.arguments, "-dedicated") then return false end if
+  return writeConfiguration(session)
+end function
+
+function SV_ClientPrintf(clientValue, text)
+  return server.clientPrint(clientValue, text)
+end function
+
+function SV_BroadcastPrintf(session, text)
+  return server.broadcastPrint(session.server, text)
+end function
+
+function Host_ClientCommands(clientValue, text)
+  if clientValue is void or not clientValue.active then return false end if
+  msg.writeByte(clientValue.message, c.SVC_STUFFTEXT)
+  msg.writeString(clientValue.message, text)
+  return true
+end function
+
+function SV_DropClient(session, clientValue, crash)
+  if clientValue is void then return false end if
+  return server.dropClient(session.server, clientValue, crash)
+end function
+
+function Host_FlushPendingClientMessages(session, timeoutSeconds)
+  start = win.ticks() / 1000.0
+  count = 0
+  running = true
+  while running
+    count = 0
+    for each clientValue in session.server.clients
+      if clientValue.active and clientValue.socket is not void and clientValue.message.curSize > 0 then
+        if netmain.NET_CanSendMessage(clientValue.socket) then
+          netmain.NET_SendMessage(clientValue.socket, clientValue.message)
+          sz.clear(clientValue.message)
+        else
+          netmain.NET_GetMessage(clientValue.socket, session.client.incoming, netmain.net_messagetimeout)
+          count = count + 1
+        end if
+      end if
+    end for
+    if count == 0 or win.ticks() / 1000.0 - start > timeoutSeconds then
+      running = false
+    else
+      // Remote clients ACK concurrently. Yielding avoids monopolizing the
+      // process while retaining host.c's three-second upper bound.
+      win.sleep(1)
+    end if
+  end while
+  return count
+end function
+
+function Host_ShutdownServer(session, crash)
+  if not session.server.active then return false end if
+  // Mark inactive before disconnecting the local client, matching host.c and
+  // preventing re-entrant frame work while final messages are flushed.
+  session.server.active = false
+  if session.client.connected then client.disconnect(session.client) end if
+  // Flush score/name/final-print messages before the disconnect broadcast.
+  // A blocked reliable channel is polled for ACKs for at most three seconds,
+  // exactly as Host_ShutdownServer does in GLQuake.
+  pending = Host_FlushPendingClientMessages(session, 3.0)
+  if pending > 0 then print "Host_ShutdownServer: pending reliable messages for " + pending + " clients" end if
+  disconnectMessage = sz.alloc(4)
+  msg.writeByte(disconnectMessage, c.SVC_DISCONNECT)
+  failed = netmain.NET_SendToAll(session.server.clients, disconnectMessage, 5.0)
+  if failed > 0 then print "Host_ShutdownServer: NET_SendToAll failed for " + failed + " clients" end if
+  for each clientValue in session.server.clients
+    if clientValue.active then server.dropClient(session.server, clientValue, crash) end if
+  end for
+  server.shutdown(session.server)
+  return true
+end function
+
+function Host_ClearMemory(session)
+  if session.entityRenderer is not void or session.renderer is not void then destroyScene(session) end if
+  if session.client.connected then client.dropConnection(session.client) end if
+  if session.server.active then Host_ShutdownServer(session, true) else server.shutdown(session.server) end if
+  session.client.signon = c.SIGNON_NONE
+  session.client.spawned = false
+  session.client.entities = []
+  session.client.modelPrecache = [""]
+  session.client.soundPrecache = [""]
+  session.particles = []
+  session.temporaryEntities = []
+  session.demoPlayback = void
+  return true
+end function
+
+function Host_FilterTime(session, elapsedSeconds)
+  newRealtime = session.timing.realtime + elapsedSeconds
+  forced = cvar.variableValue(session.cvars, "host_framerate")
+  timedemo = session.timedemoActive or common.hasParm(session.arguments, "-timedemo")
+  return filterTime(session.timing, newRealtime, 72.0, forced, timedemo)
+end function
+
+function Host_GetConsoleCommands(session, inputLines)
+  count = 0
+  for each line in inputLines
+    if line != "" then
+      cmd.addText(session.commands, line + "\n")
+      count = count + 1
+    end if
+  end for
+  return count
+end function
+
+function Host_InitVCR(session)
+  // VCR network capture/playback is an explicit project exclusion.  Rejecting
+  // the original switches at initialization is deterministic and avoids
+  // silently pretending to record a compatible quake.vcr.
+  if common.hasParm(session.arguments, "-playback") or common.hasParm(session.arguments, "-record") then
+    return error(3011, "VCR network capture/playback is not supported")
+  end if
+  return true
+end function
+
+function Host_EndGame(session, message)
+  if cvar.variableValue(session.cvars, "developer") != 0.0 then print "Host_EndGame: " + message end if
+  if session.server.active then Host_ShutdownServer(session, false) end if
+  if common.hasParm(session.arguments, "-dedicated") then
+    session.running = false
+    return error(3012, "Host_EndGame: " + message)
+  end if
+  if session.demoNumber >= 0 and len(session.demoLoop) > 0 then nextDemo(session) else client.disconnect(session.client) end if
+  return error(3013, "Host_EndGame: " + message)
+end function
+
+function Host_Error(session, message)
+  if session.inError then
+    session.running = false
+    return error(3014, "Host_Error: recursively entered")
+  end if
+  session.inError = true
+  screen.SCR_EndLoadingPlaque(session.console)
+  print "Host_Error: " + message
+  if session.server.active then Host_ShutdownServer(session, false) end if
+  if session.client.connected then client.disconnect(session.client) end if
+  session.demoNumber = -1
+  if common.hasParm(session.arguments, "-dedicated") then session.running = false end if
+  session.inError = false
+  return error(3015, "Host_Error: " + message)
+end function
+
+function refreshSaveSlots(session)
+  items = []
+  loadable = []
+  index = 0
+  while index < 12
+    name = "s" + index + ".sav"
+    label = "--- UNUSED SLOT ---"
+    if qfs.fileExists(session.filesystem, name) then
+      source = try(qfs.readText(session.filesystem, name))
+      if source is not error then
+        inspected = try(savegame.inspectComment(source))
+        if inspected is not error and inspected != "" then label = inspected end if
+      end if
+    end if
+    items = items + [label]
+    loadable = loadable + [label != "--- UNUSED SLOT ---"]
+    index = index + 1
+  end while
+  menu.M_ScanSaves(session.menu, items, loadable)
+  return items
+end function
+
+function saveGame(session, requestedName)
+  if not session.server.active then return error(3712, "Not playing a local game.") end if
+  if screen.SCR_IntermissionMode() != 0 then return error(3715, "Can't save in intermission.") end if
+  if session.server.maxClients != 1 then return error(3713, "Can't save multiplayer games.") end if
+  for each clientValue in session.server.clients
+    if clientValue.active then
+      health = session.player.health
+      if session.server.machine is not void then
+        health = server.qcFloat(session.server.machine, clientValue.edictIndex, "health", health)
+      end if
+      if health <= 0.0 then return error(3714, "Can't savegame with a dead player.") end if
+    end if
+  end for
+  name = savegame.filename(requestedName)
+  if name is error then return name end if
+  text = savegame.serializeServer(session.server)
+  if text is error then return text end if
+  written = qfs.writeText(session.filesystem, name, text)
+  if written is error then return written end if
+  message = "Saved " + name
+  console.appendLine(session.console, message)
+  print message
+  return true
+end function
+
+function loadGame(session, requestedName)
+  name = savegame.filename(requestedName)
+  if name is error then return name end if
+  source = qfs.readText(session.filesystem, name)
+  if source is error then return source end if
+  saved = savegame.parse(source)
+  if saved is error then return saved end if
+  cvar.setValue(session.cvars, "skill", saved.skill)
+  // Host_Loadgame_f spawns the map, restores all globals/edicts, and only
+  // then establishes the local connection.  Deferring signon is essential:
+  // Host_Spawn_f must not run ClientConnect or PutClientInServer over the
+  // authoritative player state from the save.
+  started = transitionMap(session, saved.mapName, false, false, true)
+  if started is error then return started end if
+  restored = savegame.apply(session.server, saved)
+  if restored is error then return restored end if
+  server.syncQuakeCEdicts(session.server)
+  server.assignModelIndexes(session.server)
+  if len(session.server.clients) > 0 then
+    server.syncPlayerFromQuakeC(session.server, session.server.clients[0], session.player)
+  end if
+  session.client.command.viewAngles = math.copy(session.player.viewAngles)
+  view.V_ClearClientState(session.view)
+  session.server.paused = true
+  session.server.loadGame = true
+  if not common.hasParm(session.arguments, "-dedicated") then
+    connected = try(finishLocalMapConnection(session, false))
+    if connected is error then return connected end if
+  end if
+  message = "Loaded " + name
+  console.appendLine(session.console, message)
+  print message
+  return true
+end function
+
+function setPlayerFlag(session, flag, enabled)
+  if enabled then session.player.flags = session.player.flags | flag else session.player.flags = session.player.flags & ~flag end if
+  if session.server.machine is not void and len(session.server.clients) > 0 then
+    server.setQcEntityFloat(session.server, session.server.clients[0].edictIndex, "flags", session.player.flags)
+  end if
+  return enabled
+end function
+
+function playerFlagEnabled(session, flag)
+  return (session.player.flags & flag) != 0
+end function
+
+function pumpClient(session)
+  if session.demoRecording is not void then
+    return client.pumpRecording(session.client, session.demoRecording)
+  end if
+  return client.pump(session.client)
+end function
+
+function stopDemoRecording(session)
+  if session.demoRecording is void then return error(3722, "Not recording a demo.") end if
+  stopped = try(demo.CL_Stop_f(session.demoRecording, session.client.command.viewAngles))
+  if stopped is error then return stopped end if
+  written = try(qfs.writeBytes(session.filesystem, session.demoName, demo.serialize(session.demoRecording)))
+  if written is error then return written end if
+  session.demoRecording = void
+  session.demoName = ""
+  print "Completed demo"
+  return true
+end function
+
+function beginDemoRecording(session, arguments)
+  if session.demoRecording is not void then return error(3724, "Already recording a demo.") end if
+  plan = try(demo.CL_Record_f(arguments, session.client.connected))
+  if plan is error then return plan end if
+  name = plan[0]
+  recording = plan[1]
+  // Create the file before changing maps so write failures are reported at
+  // the same command boundary as GLQuake's CL_Record_f.
+  opened = try(qfs.writeBytes(session.filesystem, name, demo.serialize(recording)))
+  if opened is error then return opened end if
+  session.demoName = name
+  session.demoRecording = recording
+  print "recording to " + qfs.gamePath(session.filesystem, name) + "."
+  if len(arguments) >= 3 then
+    started = try(startMap(session, arguments[2]))
+    if started is error then
+      session.demoRecording = void
+      session.demoName = ""
+      return started
+    end if
+  end if
+  return true
+end function
+
+function destroyScene(session)
+  if session.entityRenderer is not void then entityRenderer.destroy(session.entityRenderer); session.entityRenderer = void end if
+  if session.renderer is not void and session.renderer.uploaded then worldRenderer.destroy(session.renderer) end if
+  session.renderer = void
+  return true
+end function
+
+function prepareDemoScene(session)
+  if len(session.client.modelPrecache) <= 1 then return error(3727, "demo has no world model") end if
+  modelName = session.client.modelPrecache[1]
+  mapData = qfs.readFile(session.filesystem, modelName)
+  if mapData is error then return mapData end if
+  worldModel = bsp.parse(mapData, modelName)
+  if worldModel is error then return worldModel end if
+  session.server.worldModel = worldModel
+  session.server.modelName = modelName
+  session.server.modelPrecache = session.client.modelPrecache
+  session.server.soundPrecache = session.client.soundPrecache
+  session.server.levelName = session.client.levelName
+  destroyScene(session)
+  if not session.headless then
+    palette = qfs.readFile(session.filesystem, "gfx/palette.lmp")
+    if palette is error then return palette end if
+    videoState = glvid.VID_State()
+    if videoState.initialized then palette = videoState.palette end if
+    session.renderer = worldRenderer.create(worldModel, palette)
+    session.entityRenderer = entityRenderer.create(session.filesystem, palette, session.client.modelPrecache)
+    if session.windowCreated then screen.initialize(session.console, session.menu, session.filesystem, palette, session.width, session.height, session.cvars) end if
+  end if
+  if session.mixer.enabled then
+    mixer.stopAll(session.mixer)
+    mixer.setListenerEntity(session.mixer, session.client.viewEntity)
+    mixer.precache(session.mixer, session.client.soundPrecache)
+  end if
+  return true
+end function
+
+function connectRemoteHost(session, hostName)
+  if session.demoRecording is not void then stopDemoRecording(session) end if
+  if session.demoPlayback is not void then finishDemoPlayback(session) end if
+  if session.client.connected then client.disconnect(session.client) end if
+  if session.server.active then server.shutdown(session.server) end if
+  destroyScene(session)
+  remoteClient = client.create(session.player)
+  remoteClient.name = cvar.variableString(session.cvars, "_cl_name")
+  remoteClient.colors = native.trunc(cvar.variableValue(session.cvars, "_cl_color"))
+  remoteClient.localAuthoritative = false
+  // Keep the control endpoint, not the ephemeral per-connection data port.
+  // Host_Reconnect_f reconnects to cls.servername in the original engine.
+  session.lastRemoteHost = hostName
+  connected = client.connectHost(remoteClient, session.network, hostName)
+  if connected is error then return connected end if
+  session.client = remoteClient
+  session.statusMessage = "connected to " + hostName
+  print session.statusMessage
+  return true
+end function
+
+function activeServerClients(session)
+  count = 0
+  for each serverClient in session.server.clients
+    if serverClient.active then count = count + 1 end if
+  end for
+  return count
+end function
+
+function configureNetworkQueries(session)
+  players = []
+  now = win.ticks() / 1000.0
+  for each serverClient in session.server.clients
+    if serverClient.active then
+      address = "LOCAL"
+      connectedSeconds = 0
+      if serverClient.socket is not void then
+        if serverClient.socket.transport == "udp" then address = serverClient.socket.address + ":" + serverClient.socket.port end if
+        connectedSeconds = native.trunc(now - serverClient.socket.connectTime)
+        if connectedSeconds < 0 then connectedSeconds = 0 end if
+      end if
+      frags = 0
+      if session.server.machine is not void then frags = native.trunc(server.qcFloat(session.server.machine, serverClient.edictIndex, "frags", 0.0)) end if
+      players = players + [[serverClient.name, serverClient.colors, frags, connectedSeconds, address]]
+    end if
+  end for
+  rules = []
+  for each variable in session.cvars.variables
+    if variable.server then rules = rules + [[variable.name, variable.string]] end if
+  end for
+  return netloop.configureQueryData(session.network, players, rules)
+end function
+
+function pumpNewConnections(session)
+  if session.network.listener is void or not session.server.active then return 0 end if
+  netloop.configureServer(
+    session.network,
+    cvar.variableString(session.cvars, "hostname"),
+    session.server.mapName,
+    activeServerClients(session),
+    session.server.maxClients,
+  )
+  configureNetworkQueries(session)
+  accepted = 0
+  iterations = 0
+  while iterations < session.server.maxClients
+    socket = try(netmain.NET_CheckNewConnections(session.network))
+    if socket is error then return socket end if
+    if socket is void then break end if
+    connected = try(server.acceptLocal(session.server, socket))
+    if connected is error then
+      netmain.NET_Close(socket)
+    else
+      accepted = accepted + 1
+    end if
+    iterations = iterations + 1
+  end while
+  return accepted
+end function
+
+function finishDemoPlayback(session)
+  if session.demoPlayback is void then return false end if
+  playback = session.demoPlayback
+  demoPlayer.CL_StopPlayback(playback, session.timing.frameCount, session.timing.realtime)
+  session.demoPlayback = void
+  session.client.connected = false
+  session.client.spawned = false
+  if playback.finishResult is not void then
+    print playback.finishResult[0] + " frames " + native.floatText(playback.finishResult[1]) + " seconds " + native.floatText(playback.finishResult[2]) + " fps"
+  end if
+  if session.timedemoActive then
+    session.timedemoActive = false
+  end if
+  if session.demoNumber >= 0 and len(session.demoLoop) > 0 then nextDemo(session) end if
+  return true
+end function
+
+function stepDemoPlayback(session)
+  playback = session.demoPlayback
+  if playback is void then return 0 end if
+  if playback.complete then finishDemoPlayback(session); return 0 end if
+  parsed = demoPlayer.stepFrame(playback, session.timing.frameCount, session.timing.realtime, session.timing.frameTime)
+  if parsed is error then finishDemoPlayback(session); return parsed end if
+  if playback.complete then finishDemoPlayback(session) end if
+  return parsed
+end function
+
+function playDemo(session, requestedName, timed)
+  name = demo.filename(requestedName)
+  if name is error then return name end if
+  source = qfs.readFile(session.filesystem, name)
+  if source is error then return source end if
+  recording = demo.CL_PlayDemo_f(source)
+  if recording is error then return recording end if
+  if session.demoRecording is not void then stopDemoRecording(session) end if
+  if session.client.connected then client.disconnect(session.client) end if
+  if session.server.active then server.shutdown(session.server) end if
+  destroyScene(session)
+  // CL_ClearState/R_ClearParticles clear transient client effects when a demo
+  // starts.  Session-owned arrays must not survive into the next recording in
+  // a demo loop.
+  session.particles = []
+  session.temporaryEntities = []
+  playback = demoPlayer.create(recording)
+  playback.client.connected = true
+  session.demoPlayback = playback
+  session.client = playback.client
+  session.player = playback.client.player
+  session.timedemoActive = timed
+  session.timedemoStartFrame = session.timing.frameCount
+  session.timedemoStartTime = session.timing.realtime
+  session.timedemoLastFrame = -1
+  if timed then demoPlayer.CL_TimeDemo_f(playback, session.timing.frameCount) end if
+  // Signon messages are consumed without frame pacing in CL_GetMessage.
+  while not playback.complete and playback.client.signon < c.SIGNONS
+    stepped = demoPlayer.stepFrame(playback, session.timing.frameCount, session.timing.realtime, 0.0)
+    if stepped is error then session.demoPlayback = void; return stepped end if
+  end while
+  if playback.complete then finishDemoPlayback(session); return error(3728, "demo ended during signon") end if
+  prepared = try(prepareDemoScene(session))
+  if prepared is error then session.demoPlayback = void; return prepared end if
+  print "Playing demo from " + name + "."
+  return true
+end function
+
+function networkCommandAddress(arguments)
+  if len(arguments) == 2 then return arguments[1] end if
+  if len(arguments) == 4 and arguments[2] == ":" then return arguments[1] + ":" + arguments[3] end if
+  return ""
+end function
+
+function Host_ForwardToServer(session, text)
+  if not session.client.connected or session.client.socket is void then return false end if
+  return client.sendString(session.client, text + "\n") >= 0
+end function
+
+function Host_Quit_f(session)
+  dedicated = common.hasParm(session.arguments, "-dedicated")
+  if not session.console.active and not dedicated then
+    setMenuActive(session, true)
+    menu.M_Menu_Quit_f(session.menu)
+    return true
+  end if
+  client.disconnect(session.client)
+  server.shutdown(session.server)
+  session.running = false
+  return true
+end function
+
+function Host_Status_f(session)
+  if not session.server.active then return Host_ForwardToServer(session, "status") end if
+  print "host:    " + cvar.variableString(session.cvars, "hostname")
+  print "version: " + c.QUAKE_VERSION
+  print "map:     " + session.server.mapName
+  active = activeServerClients(session)
+  print "players: " + active + " active (" + session.server.maxClients + " max)"
+  index = 0
+  while index < len(session.server.clients)
+    clientValue = session.server.clients[index]
+    if clientValue.active then
+      frags = 0
+      if session.server.machine is not void then frags = native.trunc(server.qcFloat(session.server.machine, clientValue.edictIndex, "frags", 0.0)) end if
+      seconds = 0
+      address = "LOCAL"
+      if clientValue.socket is not void then
+        seconds = native.trunc(win.ticks() / 1000.0 - clientValue.socket.connectTime)
+        if seconds < 0 then seconds = 0 end if
+        if clientValue.socket.transport == "udp" then address = clientValue.socket.address + ":" + clientValue.socket.port end if
+      end if
+      minutes = native.trunc(seconds / 60)
+      seconds = seconds - minutes * 60
+      hours = native.trunc(minutes / 60)
+      minutes = minutes - hours * 60
+      print "#" + (index + 1) + " " + clientValue.name + " " + frags + " " + hours + ":" + minutes + ":" + seconds
+      print "   " + address
+    end if
+    index = index + 1
+  end while
+  return true
+end function
+
+function Host_God_f(session)
+  return Host_ForwardToServer(session, "god")
+end function
+
+function Host_Notarget_f(session)
+  return Host_ForwardToServer(session, "notarget")
+end function
+
+function Host_Noclip_f(session)
+  return Host_ForwardToServer(session, "noclip")
+end function
+
+function Host_Fly_f(session)
+  return Host_ForwardToServer(session, "fly")
+end function
+
+function Host_Ping_f(session)
+  return Host_ForwardToServer(session, "ping")
+end function
+
+function Host_Map_f(session, arguments)
+  if len(arguments) < 2 then print "map <levelname> : start a new server"; return false end if
+  if session.demoRecording is not void then stopDemoRecording(session) end if
+  if session.demoPlayback is not void then finishDemoPlayback(session) end if
+  session.demoNumber = -1
+  session.server.serverFlags = 0
+  // host_cmd.c preserves every token following the map name in
+  // cls.spawnparms and includes it in the subsequent "spawn" command.
+  session.client.spawnParms = server.commandText(arguments, 2)
+  return startMap(session, arguments[1])
+end function
+
+function Host_Changelevel_f(session, arguments)
+  if len(arguments) != 2 then print "changelevel <levelname> : continue game on a new level"; return false end if
+  if session.demoPlayback is not void or not session.server.active then print "Only the server may changelevel"; return false end if
+  return changeLevel(session, arguments[1])
+end function
+
+function Host_Restart_f(session)
+  if session.demoPlayback is not void or not session.server.active then return false end if
+  return restartLevel(session, session.server.mapName)
+end function
+
+function Host_Reconnect_f(session)
+  screen.SCR_BeginLoadingPlaque(
+    session.console,
+    session.timing.realtime,
+    session.client.connected,
+    session.client.signon,
+  )
+  session.client.signon = c.SIGNON_NONE
+  session.client.spawned = false
+  return true
+end function
+
+function Host_Connect_f(session, arguments)
+  remoteName = networkCommandAddress(arguments)
+  if remoteName == "" then print "connect <server>"; return false end if
+  session.demoNumber = -1
+  connected = try(connectRemoteHost(session, remoteName))
+  if connected is error then print connected.message; return false end if
+  client.reconnect(session.client)
+  return true
+end function
+
+function Host_Savegame_f(session, arguments)
+  if len(arguments) != 2 then print "save <savename> : save a game"; return false end if
+  saved = try(saveGame(session, arguments[1]))
+  if saved is error then print saved.message; return false end if
+  return true
+end function
+
+function Host_Loadgame_f(session, arguments)
+  if len(arguments) != 2 then print "load <savename> : load a game"; return false end if
+  session.demoNumber = -1
+  loaded = try(loadGame(session, arguments[1]))
+  if loaded is error then print loaded.message; return false end if
+  return true
+end function
+
+function Host_Changelevel2_f(session, arguments)
+  // QUAKE2-only in GLQuake 1.09.  Retain the transition entry point while the
+  // target build deliberately omits .gip hub-state semantics.
+  return Host_Changelevel_f(session, arguments)
+end function
+
+function Host_Name_f(session, arguments)
+  if len(arguments) == 1 then print "\"name\" is \"" + cvar.variableString(session.cvars, "_cl_name") + "\""; return true end if
+  newName = server.commandText(arguments, 1)
+  newName = server.truncateBytes(newName, 15)
+  if cvar.variableString(session.cvars, "_cl_name") == newName then return true end if
+  cvar.set(session.cvars, "_cl_name", newName)
+  session.client.name = newName
+  if session.client.connected then return Host_ForwardToServer(session, "name \"" + newName + "\"") end if
+  return true
+end function
+
+function Host_Version_f()
+  print "Version " + c.QUAKE_VERSION
+  return true
+end function
+
+function Host_Please_f(session, arguments)
+  // IDGODS-only in the reference.  The state is retained for faithful
+  // privilege checks without enabling it automatically for public clients.
+  targetIndex = -1
+  if len(arguments) == 3 and arguments[1] == "#" then
+    value = toNumber(arguments[2])
+    if value is not void then targetIndex = native.trunc(value) - 1 end if
+  else if len(arguments) == 2 then
+    index = 0
+    while index < len(session.server.clients)
+      if session.server.clients[index].active and bio.equalInsensitive(session.server.clients[index].name, arguments[1]) then targetIndex = index; break end if
+      index = index + 1
+    end while
+  end if
+  if targetIndex < 0 or targetIndex >= len(session.server.clients) then return false end if
+  target = session.server.clients[targetIndex]
+  target.privileged = not target.privileged
+  if not target.privileged and session.server.machine is not void then
+    flags = native.trunc(server.qcFloat(session.server.machine, target.edictIndex, "flags", 0.0))
+    server.setQcEntityFloat(session.server, target.edictIndex, "flags", flags & ~(c.FL_GODMODE | c.FL_NOTARGET))
+    server.setQcEntityFloat(session.server, target.edictIndex, "movetype", c.MOVETYPE_WALK)
+  end if
+  return true
+end function
+
+function Host_Say(session, arguments, teamOnly)
+  if len(arguments) < 2 then return false end if
+  commandName = "say"
+  if teamOnly then commandName = "say_team" end if
+  if common.hasParm(session.arguments, "-dedicated") then
+    prefixData = bytes(1)
+    prefixData[0] = 1
+    prefix = decode(prefixData) + "<" + cvar.variableString(session.cvars, "hostname") + "> "
+    server.broadcastPrint(session.server, prefix + server.truncateBytes(server.commandText(arguments, 1), 62 - len(bytes(prefix))) + "\n")
+    return true
+  end if
+  return Host_ForwardToServer(session, commandName + " \"" + server.commandText(arguments, 1) + "\"")
+end function
+
+function Host_Say_f(session, arguments)
+  return Host_Say(session, arguments, false)
+end function
+
+function Host_Say_Team_f(session, arguments)
+  return Host_Say(session, arguments, true)
+end function
+
+function Host_Tell_f(session, arguments)
+  if len(arguments) < 3 then return false end if
+  return Host_ForwardToServer(session, "tell " + arguments[1] + " \"" + server.commandText(arguments, 2) + "\"")
+end function
+
+function Host_Color_f(session, arguments)
+  if len(arguments) == 1 then
+    colors = native.trunc(cvar.variableValue(session.cvars, "_cl_color"))
+    print "\"color\" is \"" + (colors >> 4) + " " + (colors & 15) + "\""
+    print "color <0-13> [0-13]"
+    return true
+  end if
+  top = toNumber(arguments[1])
+  if top is void then top = 0 end if
+  bottom = top
+  if len(arguments) >= 3 then bottom = toNumber(arguments[2]); if bottom is void then bottom = 0 end if end if
+  top = server.colorComponent(top)
+  bottom = server.colorComponent(bottom)
+  colors = top * 16 + bottom
+  cvar.setValue(session.cvars, "_cl_color", colors)
+  session.client.colors = colors
+  if session.client.connected then return Host_ForwardToServer(session, "color " + top + " " + bottom) end if
+  return true
+end function
+
+function Host_Kill_f(session)
+  return Host_ForwardToServer(session, "kill")
+end function
+
+function Host_Pause_f(session)
+  return Host_ForwardToServer(session, "pause")
+end function
+
+function Host_PreSpawn_f()
+  print "prespawn is not valid from the console"
+  return false
+end function
+
+function Host_Spawn_f()
+  print "spawn is not valid from the console"
+  return false
+end function
+
+function Host_Begin_f()
+  print "begin is not valid from the console"
+  return false
+end function
+
+function Host_Kick_f(session, arguments)
+  if session.server.active then return server.Host_Kick_f(session.server, void, arguments) end if
+  return Host_ForwardToServer(session, server.commandText(arguments, 0))
+end function
+
+function Host_Give_f(session, arguments)
+  return Host_ForwardToServer(session, server.commandText(arguments, 0))
+end function
+
+function FindViewthing(session)
+  for each item in session.server.edicts
+    // The original scans every edict without testing ent->free.  ED_Free
+    // deliberately leaves classname intact, so preserve that observable quirk.
+    if item is not void and item.className == "viewthing" then return item end if
+  end for
+  print "No viewthing on map"
+  return void
+end function
+
+function Host_Viewmodel_f(session, arguments)
+  if len(arguments) < 2 or session.entityRenderer is void then return false end if
+  item = FindViewthing(session)
+  if item is void then return false end if
+  if item.modelIndex < 0 or item.modelIndex >= len(session.entityRenderer.models) then return false end if
+  loaded = entityRenderer.loadModel(session.entityRenderer, arguments[1])
+  if loaded.kind == 0 then print "Can't load " + arguments[1]; return false end if
+  item.frame = 0
+  if session.server.machine is not void then server.setQcEntityFloat(session.server, item.number, "frame", 0.0) end if
+  session.entityRenderer.models[item.modelIndex] = loaded
+  return true
+end function
+
+function viewthingModel(session, item)
+  if session.entityRenderer is void then return void end if
+  if item.modelIndex < 0 or item.modelIndex >= len(session.entityRenderer.models) then return void end if
+  return session.entityRenderer.models[item.modelIndex]
+end function
+
+function Host_Viewframe_f(session, arguments)
+  if len(arguments) < 2 then return false end if
+  item = FindViewthing(session)
+  if item is void then return false end if
+  model = viewthingModel(session, item)
+  if model is void or model.aliasModel is void then return false end if
+  frame = toNumber(arguments[1])
+  if frame is void then frame = 0 end if
+  frame = native.trunc(frame)
+  if frame >= model.aliasModel.numFrames then frame = model.aliasModel.numFrames - 1 end if
+  item.frame = frame
+  if session.server.machine is not void then server.setQcEntityFloat(session.server, item.number, "frame", frame) end if
+  return true
+end function
+
+function PrintFrameName(model, frame)
+  if model is void or model.aliasModel is void then return "" end if
+  if frame < 0 or frame >= len(model.aliasModel.frames) then return "" end if
+  frameSet = model.aliasModel.frames[frame]
+  if len(frameSet.frames) == 0 then return "" end if
+  text = "frame " + frame + ": " + frameSet.frames[0].name
+  print text
+  return text
+end function
+
+function Host_Viewnext_f(session)
+  item = FindViewthing(session)
+  if item is void then return false end if
+  model = viewthingModel(session, item)
+  if model is void or model.aliasModel is void then return false end if
+  item.frame = item.frame + 1
+  if item.frame >= model.aliasModel.numFrames then item.frame = model.aliasModel.numFrames - 1 end if
+  if session.server.machine is not void then server.setQcEntityFloat(session.server, item.number, "frame", item.frame) end if
+  PrintFrameName(model, item.frame)
+  return true
+end function
+
+function Host_Viewprev_f(session)
+  item = FindViewthing(session)
+  if item is void then return false end if
+  model = viewthingModel(session, item)
+  if model is void or model.aliasModel is void then return false end if
+  item.frame = item.frame - 1
+  if item.frame < 0 then item.frame = 0 end if
+  if session.server.machine is not void then server.setQcEntityFloat(session.server, item.number, "frame", item.frame) end if
+  PrintFrameName(model, item.frame)
+  return true
+end function
+
+function nextDemo(session)
+  if len(session.demoLoop) == 0 or session.demoNumber < 0 then return false end if
+  if session.demoNumber >= len(session.demoLoop) then session.demoNumber = 0 end if
+  name = session.demoLoop[session.demoNumber]
+  session.demoNumber = session.demoNumber + 1
+  return cmd.addText(session.commands, "playdemo " + name + "\n")
+end function
+
+function Host_Startdemos_f(session, arguments)
+  if common.hasParm(session.arguments, "-dedicated") then
+    if not session.server.active then cmd.addText(session.commands, "map start\n") end if
+    return true
+  end if
+  count = len(arguments) - 1
+  if count > 8 then print "Max 8 demos in demoloop"; count = 8 end if
+  session.demoLoop = []
+  index = 1
+  while index <= count
+    session.demoLoop = session.demoLoop + [arguments[index]]
+    index = index + 1
+  end while
+  print count + " demo(s) in loop"
+  // +map / validation starts are authoritative.  quake.rc is executed before
+  // initialize() performs that direct map start in MiniQuake, so queuing
+  // playdemo here would otherwise run after the requested map and tear down
+  // the freshly spawned server.
+  if session.startMap != "" or session.headless then
+    session.demoNumber = -1
+    return true
+  end if
+  if not session.server.active and session.demoNumber != -1 and session.demoPlayback is void then
+    session.demoNumber = 0
+    return nextDemo(session)
+  end if
+  session.demoNumber = -1
+  return true
+end function
+
+function Host_Demos_f(session)
+  if common.hasParm(session.arguments, "-dedicated") then return false end if
+  // GLQuake resumes a stopped loop at slot one; CL_NextDemo wraps to zero if
+  // the second slot is empty.
+  if session.demoNumber == -1 then session.demoNumber = 1 end if
+  if session.demoPlayback is not void then return finishDemoPlayback(session) end if
+  if session.client.connected then client.disconnect(session.client) end if
+  return nextDemo(session)
+end function
+
+function Host_Stopdemo_f(session)
+  if common.hasParm(session.arguments, "-dedicated") or session.demoPlayback is void then return false end if
+  session.demoNumber = -1
+  finishDemoPlayback(session)
+  client.disconnect(session.client)
+  return true
+end function
+
+function Host_Edict_f(session, arguments)
+  if session.server.machine is void then print "No server running."; return false end if
+  if len(arguments) != 2 then print "edict <number>"; return false end if
+  value = toNumber(arguments[1])
+  if value is void then return false end if
+  output = try(qcedict.ED_Print(session.server.machine, native.trunc(value)))
+  if output is error then print output.message; return false end if
+  print output
+  return true
+end function
+
+function Host_Edicts_f(session)
+  if session.server.machine is void then print "No server running."; return false end if
+  index = 0
+  while index < session.server.machine.context.edicts.numEdicts
+    print qcedict.ED_PrintNum(session.server.machine, index)
+    index = index + 1
+  end while
+  return true
+end function
+
+function Host_EdictCount_f(session)
+  if session.server.machine is void then print "No server running."; return false end if
+  counts = qcedict.ED_Count(session.server.machine)
+  print "num_edicts:" + counts[0]
+  print "active    :" + counts[1]
+  print "view      :" + counts[2]
+  print "touch     :" + counts[3]
+  print "step      :" + counts[4]
+  return true
+end function
+
+function Host_Profile_f(session)
+  if session.server.machine is void then print "No server running."; return false end if
+  for each line in qcvm.PR_Profile_f(session.server.machine)
+    print line
+  end for
+  return true
+end function
+
+function Host_Mod_Print(session)
+  count = 0
+  index = 0
+  while index < len(session.client.modelPrecache)
+    name = session.client.modelPrecache[index]
+    if name != "" then
+      print index + " : " + name
+      count = count + 1
+    end if
+    index = index + 1
+  end while
+  return count
+end function
+
+function Host_FlushCache_f(session)
+  // Cache_Flush makes purgeable alias/sprite data get loaded again on demand.
+  // MiniQuake's GC-backed model cache has no hunk address to purge, so rebuild
+  // the entity-model registry from the authoritative precache list.
+  if session.entityRenderer is void then return true end if
+  palette = qfs.readFile(session.filesystem, "gfx/palette.lmp")
+  if palette is error then return palette end if
+  videoState = glvid.VID_State()
+  if videoState.initialized then palette = videoState.palette end if
+  entityRenderer.destroy(session.entityRenderer)
+  session.entityRenderer = entityRenderer.create(session.filesystem, palette, session.client.modelPrecache)
+  return true
+end function
+
+function Host_InitCommands()
+  return [
+    "status", "quit", "god", "notarget", "fly", "map", "restart",
+    "changelevel", "connect", "reconnect", "name", "noclip", "version",
+    "say", "say_team", "tell", "color", "kill", "pause", "spawn", "begin",
+    "prespawn", "kick", "ping", "load", "save", "give", "startdemos",
+    "demos", "stopdemo", "viewmodel", "viewframe", "viewnext", "viewprev",
+    "mcache", "flush", "edict", "edicts", "edictcount", "profile",
+  ]
+end function
+
+function Host_DispatchCommand(session, text, arguments)
+  name = bio.lower(arguments[0])
+  if name == "status" then return Host_Status_f(session) end if
+  if name == "quit" or name == "exit" then return Host_Quit_f(session) end if
+  if name == "god" then return Host_God_f(session) end if
+  if name == "notarget" then return Host_Notarget_f(session) end if
+  if name == "noclip" then return Host_Noclip_f(session) end if
+  if name == "fly" then return Host_Fly_f(session) end if
+  if name == "ping" then return Host_Ping_f(session) end if
+  if name == "map" then return Host_Map_f(session, arguments) end if
+  if name == "changelevel" then return Host_Changelevel_f(session, arguments) end if
+  if name == "changelevel2" then return Host_Changelevel2_f(session, arguments) end if
+  if name == "restart" then return Host_Restart_f(session) end if
+  if name == "reconnect" then return Host_Reconnect_f(session) end if
+  if name == "connect" then return Host_Connect_f(session, arguments) end if
+  if name == "save" then return Host_Savegame_f(session, arguments) end if
+  if name == "load" then return Host_Loadgame_f(session, arguments) end if
+  if name == "name" then return Host_Name_f(session, arguments) end if
+  if name == "version" then return Host_Version_f() end if
+  if name == "please" then return Host_Please_f(session, arguments) end if
+  if name == "say" then return Host_Say_f(session, arguments) end if
+  if name == "say_team" then return Host_Say_Team_f(session, arguments) end if
+  if name == "tell" then return Host_Tell_f(session, arguments) end if
+  if name == "color" then return Host_Color_f(session, arguments) end if
+  if name == "kill" then return Host_Kill_f(session) end if
+  if name == "pause" then return Host_Pause_f(session) end if
+  if name == "prespawn" then return Host_PreSpawn_f() end if
+  if name == "spawn" then return Host_Spawn_f() end if
+  if name == "begin" then return Host_Begin_f() end if
+  if name == "kick" then return Host_Kick_f(session, arguments) end if
+  if name == "give" then return Host_Give_f(session, arguments) end if
+  if name == "viewmodel" then return Host_Viewmodel_f(session, arguments) end if
+  if name == "viewframe" then return Host_Viewframe_f(session, arguments) end if
+  if name == "viewnext" then return Host_Viewnext_f(session) end if
+  if name == "viewprev" then return Host_Viewprev_f(session) end if
+  if name == "startdemos" then return Host_Startdemos_f(session, arguments) end if
+  if name == "demos" then return Host_Demos_f(session) end if
+  if name == "stopdemo" then return Host_Stopdemo_f(session) end if
+  if name == "edict" then return Host_Edict_f(session, arguments) end if
+  if name == "edicts" then return Host_Edicts_f(session) end if
+  if name == "edictcount" then return Host_EdictCount_f(session) end if
+  if name == "profile" then return Host_Profile_f(session) end if
+  if name == "mcache" then Host_Mod_Print(session); return true end if
+  if name == "flush" then return Host_FlushCache_f(session) end if
+  return void
+end function
+
 function executeCommand(session, text)
   arguments = cmd.tokenize(text)
   if len(arguments) == 0 then return false end if
   name = bio.lower(arguments[0])
 
-  alias = findAlias(session.commands, name)
-  if alias is not void then cmd.insertText(session.commands, alias.value + "\n"); return true end if
+  hostResult = Host_DispatchCommand(session, text, arguments)
+  if hostResult is not void then return hostResult end if
+
+  if name == "impulse" then
+    if len(arguments) >= 2 then input.IN_Impulse(arguments[1]) else input.IN_Impulse("") end if
+    return true
+  end if
+  if name == "force_centerview" then input.Force_CenterView_f(session.client.command); return true end if
+  if name == "centerview" then
+    view.V_StartPitchDrift(session.view, session.client.time, cvar.variableValue(session.cvars, "v_centerspeed"))
+    return true
+  end if
+  if name == "v_cshift" then view.V_cshift_f(session.view, arguments); return true end if
+  if name == "bf" then view.V_BonusFlash_f(session.view); return true end if
+  if name == "joyadvancedupdate" then input.Joy_AdvancedUpdate_f(); return true end if
+  if name == "gl_texturemode" then
+    message = draw2d.Draw_TextureMode_f(arguments)
+    print message
+    return message != "bad filter name"
+  end if
+  if name == "sizeup" then screen.SCR_SizeUp_f(session.cvars); return true end if
+  if name == "sizedown" then screen.SCR_SizeDown_f(session.cvars); return true end if
+  if name == "screenshot" then
+    if not session.windowCreated then print "SCR_ScreenShot_f: video is unavailable"; return false end if
+    shot = try(screen.SCR_ScreenShot_f(session.filesystem, 0, 0, win.width(), win.height()))
+    if shot is error then print shot.message; return false end if
+    print "Wrote " + shot
+    return true
+  end if
+  if name == "+showscores" then statusbar.Sbar_ShowScores(); return true end if
+  if name == "-showscores" then statusbar.Sbar_DontShowScores(); return true end if
+  inputButton = input.commandButton(name)
+  if inputButton is not void then
+    keynum = void
+    if bytes(name)[0] == 43 then keynum = -1 end if
+    if len(arguments) >= 2 then
+      parsedKey = toNumber(arguments[1])
+      if parsedKey is not void then keynum = native.trunc(parsedKey) end if
+    end if
+    return input.dispatchInputCommand(name, keynum, 0)
+  end if
+
   if name == "wait" then session.commands.wait = true; return true end if
-  if name == "echo" then print cmd.argsFrom(t.CommandSystem([], [], arguments, "", false), 1); return true end if
+  if name == "stuffcmds" then
+    // Cmd_StuffCmds_f inserts command-line +commands at the exact point where
+    // quake.rc requests them, ahead of the remaining startdemos command.
+    cmd.insertText(session.commands, common.stuffCommands(session.arguments))
+    return true
+  end if
+  if name == "echo" then print cmd.argsFrom(t.CommandSystem([], [], arguments, "", "", false), 1); return true end if
   if name == "exec" and len(arguments) >= 2 then
     script = try(qfs.readText(session.filesystem, arguments[1]))
     if script is error then print "couldn't exec " + arguments[1] else cmd.insertText(session.commands, script + "\n") end if
     return true
   end if
-  if name == "alias" and len(arguments) >= 3 then
+  if name == "alias" and len(arguments) == 1 then
+    print "Current alias commands:"
+    for each existingAlias in session.commands.aliases
+      print existingAlias.name + " : " + existingAlias.value
+    end for
+    return true
+  end if
+  if name == "alias" and len(arguments) >= 2 then
     value = ""
     index = 2
     while index < len(arguments)
@@ -293,7 +1613,8 @@ function executeCommand(session, text)
       value = value + arguments[index]
       index = index + 1
     end while
-    cmd.addAlias(session.commands, arguments[1], value)
+    aliased = try(cmd.addAlias(session.commands, arguments[1], value))
+    if aliased is error then print aliased.message; return false end if
     return true
   end if
   if name == "set" and len(arguments) >= 3 then
@@ -301,14 +1622,320 @@ function executeCommand(session, text)
     if variable is void then registerCvar(session.cvars, arguments[1], arguments[2], false, false) else cvar.set(session.cvars, arguments[1], arguments[2]) end if
     return true
   end if
-  if (name == "map" or name == "changelevel") and len(arguments) >= 2 then return startMap(session, arguments[1]) end if
-  if name == "restart" and session.server.active then return startMap(session, session.server.mapName) end if
+  if name == "save" then
+    if len(arguments) != 2 then print "save <savename> : save a game"; return false end if
+    saved = try(saveGame(session, arguments[1]))
+    if saved is error then print saved.message; return false end if
+    return true
+  end if
+  if name == "load" then
+    if len(arguments) != 2 then print "load <savename> : load a game"; return false end if
+    loaded = try(loadGame(session, arguments[1]))
+    if loaded is error then print loaded.message; return false end if
+    return true
+  end if
+  if name == "writeconfig" then
+    if writeConfiguration(session) then print "Wrote config.cfg"; return true end if
+    print "Couldn't write config.cfg"
+    return false
+  end if
+  if name == "record" then
+    recorded = try(beginDemoRecording(session, arguments))
+    if recorded is error then print recorded.message; return false end if
+    return true
+  end if
+  if name == "stop" then
+    stopped = try(stopDemoRecording(session))
+    if stopped is error then print stopped.message; return false end if
+    return true
+  end if
+  if name == "playdemo" then
+    if len(arguments) != 2 then print "playdemo <demoname> : plays a demo"; return false end if
+    played = try(playDemo(session, arguments[1], false))
+    if played is error then print played.message; return false end if
+    return true
+  end if
+  if name == "timedemo" then
+    if len(arguments) != 2 then print "timedemo <demoname> : gets demo speeds"; return false end if
+    played = try(playDemo(session, arguments[1], true))
+    if played is error then print played.message; return false end if
+    return true
+  end if
+  if name == "connect" then
+    remoteName = networkCommandAddress(arguments)
+    // COM_Parse tokenizes ':' as punctuation. Accept the unquoted address
+    // form produced by +connect on the command line as well.
+    if remoteName == "" then print "connect <server>"; return false end if
+    connected = try(connectRemoteHost(session, remoteName))
+    if connected is error then print connected.message; return false end if
+    return true
+  end if
+  if name == "reconnect" then
+    if client.reconnect(session.client) then return true end if
+    if session.lastRemoteHost == "" then print "No previous server."; return false end if
+    connected = try(connectRemoteHost(session, session.lastRemoteHost))
+    if connected is error then print connected.message; return false end if
+    return true
+  end if
+  if name == "listen" then
+    if len(arguments) == 1 then print "\"listen\" is \"" + netmain.listening + "\""; return true end if
+    requested = toNumber(arguments[1])
+    if requested is void then print "listen <0|1>"; return false end if
+    enabled = requested != 0
+    result = try(netmain.NET_Listen_f(session.network, enabled, netmain.net_hostport))
+    if result is error then print result.message; return false end if
+    return true
+  end if
+  if name == "maxplayers" then
+    if len(arguments) == 1 then print "\"maxplayers\" is \"" + session.server.maxClients + "\""; return true end if
+    requested = toNumber(arguments[1])
+    if requested is void then print "maxplayers <count>"; return false end if
+    changed = netmain.MaxPlayers_f(session.server.maxClients, c.MAX_CLIENTS, session.server.active, native.trunc(requested))
+    if changed[3] != "" then print changed[3] end if
+    if changed[0] != session.server.maxClients then
+      resized = try(server.resizeClients(session.server, changed[0]))
+      if resized is error then print resized.message; return false end if
+      netmain.NET_SetMaximumClients(resized)
+    end if
+    deathmatchText = "0"
+    if changed[2] then deathmatchText = "1" end if
+    cvar.set(session.cvars, "deathmatch", deathmatchText)
+    if changed[1] != netmain.listening then netmain.NET_Listen_f(session.network, changed[1], netmain.net_hostport) end if
+    return true
+  end if
+  if name == "port" then
+    if len(arguments) == 1 then print "\"port\" is \"" + netmain.net_hostport + "\""; return true end if
+    requested = toNumber(arguments[1])
+    if requested is void then print "port <number>"; return false end if
+    changed = try(netmain.NET_Port_f(session.network, native.trunc(requested)))
+    if changed is error then print changed.message; return false end if
+    return true
+  end if
+  if name == "slist" then
+    netmain.NET_Slist_f(session.network, false, true, netmain.net_hostport)
+    for each line in netmain.PrintSlistHeader()
+      print line
+    end for
+    while netmain.slistInProgress
+      netmain.NET_Poll()
+      win.sleep(1)
+    end while
+    for each line in netmain.PrintSlist()
+      print line
+    end for
+    for each line in netmain.PrintSlistTrailer()
+      print line
+    end for
+    return true
+  end if
+  if name == "net_stats" then
+    channels = void
+    if len(arguments) >= 2 then
+      channels = []
+      for each socket in session.network.remoteSockets
+        if socket.channel is not void and (arguments[1] == "*" or bio.lower(arguments[1]) == bio.lower(socket.address)) then
+          channels = channels + [socket.channel]
+        end if
+      end for
+    end if
+    print netDatagram.NET_Stats_f(
+      channels,
+      netmain.messagesSent,
+      netmain.messagesReceived,
+      netmain.unreliableMessagesSent,
+      netmain.unreliableMessagesReceived,
+    )
+    return true
+  end if
+  if name == "ban" then
+    result = netloop.NET_Ban_f(session.network, arguments)
+    if result != "" then print result end if
+    return true
+  end if
+  if name == "test" then
+    remoteName = networkCommandAddress(arguments)
+    if remoteName == "" then print "test <host>"; return false end if
+    result = try(netloop.Test_f(remoteName, session.server.maxClients, 2000))
+    if result is error then print result.message; return false end if
+    for each playerInfo in result
+      print playerInfo[1] + " frags:" + playerInfo[3] + " colors:" + playerInfo[2] + " time:" + playerInfo[4] + " " + playerInfo[5]
+    end for
+    return true
+  end if
+  if name == "test2" then
+    remoteName = networkCommandAddress(arguments)
+    if remoteName == "" then print "test2 <host>"; return false end if
+    result = try(netloop.Test2_f(remoteName, 2000))
+    if result is error then print result.message; return false end if
+    for each rule in result
+      print rule[0] + " " + rule[1]
+    end for
+    return true
+  end if
+  if name == "cd" then
+    if session.headless or common.hasParm(session.arguments, "-nocdaudio") then return false end if
+    cdState = cdAudio.ensure(session.mixer)
+    response = cdAudio.CD_f(cdState, arguments)
+    if response != "" then print response end if
+    return true
+  end if
+  if (name == "play" or name == "playvol" or name == "stopsound" or name == "soundlist" or name == "soundinfo") and (session.headless or common.hasParm(session.arguments, "-nosound")) then return false end if
+  if name == "play" then
+    played = try(mixer.play(session.mixer, arguments))
+    if played is error then print played.message; return false end if
+    return true
+  end if
+  if name == "playvol" then
+    played = try(mixer.playVol(session.mixer, arguments))
+    if played is error then print played.message; return false end if
+    return true
+  end if
+  if name == "stopsound" then mixer.stopAll(session.mixer); return true end if
+  if name == "soundlist" then
+    soundEntries = mixer.soundList(session.mixer)
+    for each soundEntry in soundEntries[0]
+      loopMarker = " "
+      if soundEntry[0] then loopMarker = "L" end if
+      print loopMarker + "(" + soundEntry[1] + "b) " + soundEntry[2] + " : " + soundEntry[3]
+    end for
+    print "Total resident: " + soundEntries[1]
+    return true
+  end if
+  if name == "soundinfo" then
+    for each soundField in mixer.soundInfo(session.mixer)
+      print soundField[0] + " " + soundField[1]
+    end for
+    return true
+  end if
+  if name == "map" and len(arguments) >= 2 then
+    if session.demoRecording is not void then stopDemoRecording(session) end if
+    if session.demoPlayback is not void then finishDemoPlayback(session) end if
+    return startMap(session, arguments[1])
+  end if
+  if name == "changelevel" and len(arguments) >= 2 then
+    if session.demoPlayback is not void or not session.server.active then print "Only the server may changelevel"; return false end if
+    return changeLevel(session, arguments[1])
+  end if
+  if name == "restart" and session.server.active then return changeLevel(session, session.server.mapName) end if
   if name == "disconnect" then client.disconnect(session.client); server.shutdown(session.server); return true end if
   if name == "quit" or name == "exit" then session.running = false; return true end if
   if name == "pause" then session.server.paused = not session.server.paused; return true end if
-  if name == "noclip" then session.player.noclip = not session.player.noclip; print "noclip " + session.player.noclip; return true end if
-  if name == "toggleconsole" then setConsoleActive(session, not session.console.active); return true end if
+  if name == "noclip" then
+    session.player.noclip = not session.player.noclip
+    if session.player.noclip then session.player.moveType = c.MOVETYPE_NOCLIP else session.player.moveType = c.MOVETYPE_WALK end if
+    if session.server.machine is not void and len(session.server.clients) > 0 then
+      server.setQcEntityFloat(session.server, session.server.clients[0].edictIndex, "movetype", session.player.moveType)
+    end if
+    print "noclip " + session.player.noclip
+    return true
+  end if
+  if name == "god" then
+    enabled = not playerFlagEnabled(session, c.FL_GODMODE)
+    setPlayerFlag(session, c.FL_GODMODE, enabled)
+    print "godmode " + enabled
+    return true
+  end if
+  if name == "notarget" then
+    enabled = not playerFlagEnabled(session, c.FL_NOTARGET)
+    setPlayerFlag(session, c.FL_NOTARGET, enabled)
+    print "notarget " + enabled
+    return true
+  end if
+  if name == "fly" then
+    if session.player.moveType == c.MOVETYPE_FLY then session.player.moveType = c.MOVETYPE_WALK else session.player.moveType = c.MOVETYPE_FLY end if
+    session.player.noclip = false
+    if session.server.machine is not void and len(session.server.clients) > 0 then
+      server.setQcEntityFloat(session.server, session.server.clients[0].edictIndex, "movetype", session.player.moveType)
+    end if
+    print "flymode " + (session.player.moveType == c.MOVETYPE_FLY)
+    return true
+  end if
+  if name == "name" then
+    if len(arguments) == 1 then print "\"" + cvar.variableString(session.cvars, "_cl_name") + "\""; return true end if
+    newName = arguments[1]
+    cvar.set(session.cvars, "_cl_name", newName)
+    session.client.name = newName
+    if len(session.server.clients) > 0 then session.server.clients[0].name = newName end if
+    return true
+  end if
+  if name == "color" then
+    if len(arguments) == 1 then print "" + cvar.variableValue(session.cvars, "_cl_color"); return true end if
+    top = toNumber(arguments[1])
+    if top is void then top = 0 end if
+    bottom = top
+    if len(arguments) >= 3 then bottom = toNumber(arguments[2]); if bottom is void then bottom = top end if end if
+    top = native.trunc(math.clamp(top, 0.0, 13.0))
+    bottom = native.trunc(math.clamp(bottom, 0.0, 13.0))
+    colors = (top << 4) | bottom
+    cvar.setValue(session.cvars, "_cl_color", colors)
+    session.client.colors = colors
+    if len(session.server.clients) > 0 then session.server.clients[0].colors = colors end if
+    return true
+  end if
+  if name == "kill" then
+    if session.server.machine is not void and len(session.server.clients) > 0 then
+      server.executeQcFunction(session.server, "ClientKill", session.server.clients[0].edictIndex, 0)
+      server.syncPlayerFromQuakeC(session.server, session.server.clients[0], session.player)
+    else
+      session.player.health = 0.0
+    end if
+    return true
+  end if
+  if name == "version" then print "Version " + c.QUAKE_VERSION; return true end if
+  if name == "vid_nummodes" then print glvid.VID_NumModes_f(); return true end if
+  if name == "vid_describecurrentmode" then print glvid.VID_DescribeCurrentMode_f(); return true end if
+  if name == "vid_describemode" then print glvid.VID_DescribeMode_f(arguments); return true end if
+  if name == "vid_describemodes" then
+    for each description in glvid.VID_DescribeModes_f()
+      print description
+    end for
+    return true
+  end if
+  if name == "toggleconsole" then
+    screen.SCR_EndLoadingPlaque(session.console)
+    destination = console.Con_ToggleConsole_f(session.console, session.client.connected)
+    if destination == "menu" then
+      setMenuActive(session, true)
+    else
+      setConsoleActive(session, destination == "console")
+    end if
+    return true
+  end if
   if name == "togglemenu" then setMenuActive(session, not session.menu.active); return true end if
+  if name == "menu_main" then setMenuActive(session, true); menu.M_Menu_Main_f(session.menu); return true end if
+  if name == "menu_singleplayer" then setMenuActive(session, true); menu.M_Menu_SinglePlayer_f(session.menu); return true end if
+  if name == "menu_load" then setMenuActive(session, true); menu.M_Menu_Load_f(session.menu); refreshSaveSlots(session); return true end if
+  if name == "menu_save" then
+    if menu.M_Menu_Save_f(session.menu, session.server.active, screen.SCR_IntermissionMode(), session.server.maxClients) then
+      setMenuActive(session, true)
+      menu.M_Menu_Save_f(session.menu, session.server.active, screen.SCR_IntermissionMode(), session.server.maxClients)
+      refreshSaveSlots(session)
+    end if
+    return true
+  end if
+  if name == "menu_multiplayer" then setMenuActive(session, true); menu.M_Menu_MultiPlayer_f(session.menu); return true end if
+  if name == "menu_setup" then setMenuActive(session, true); menu.M_Menu_Setup_f(session.menu, session.cvars); return true end if
+  if name == "menu_options" then setMenuActive(session, true); menu.M_Menu_Options_f(session.menu); return true end if
+  if name == "menu_keys" then setMenuActive(session, true); menu.M_Menu_Keys_f(session.menu); return true end if
+  if name == "menu_video" then setMenuActive(session, true); menu.M_Menu_Video_f(session.menu); return true end if
+  if name == "help" then setMenuActive(session, true); menu.M_Menu_Help_f(session.menu); return true end if
+  if name == "menu_quit" then setMenuActive(session, true); menu.M_Menu_Quit_f(session.menu); return true end if
+  if name == "messagemode" then
+    console.Con_MessageMode_f(session.console)
+    setMenuActive(session, false)
+    setConsoleActive(session, false)
+    keys.beginMessage(false)
+    return true
+  end if
+  if name == "messagemode2" then
+    console.Con_MessageMode2_f(session.console)
+    setMenuActive(session, false)
+    setConsoleActive(session, false)
+    keys.beginMessage(true)
+    return true
+  end if
+  if name == "clear" then return console.Con_Clear_f(session.console) end if
+  if name == "con_print" then return console.Con_Print_f(session.console, arguments) end if
   if name == "status" then
     print "map: " + session.server.mapName
     print "time: " + session.server.time
@@ -316,23 +1943,23 @@ function executeCommand(session, text)
     return true
   end if
   if name == "bind" then
-    if len(arguments) == 2 then
-      print "\"" + arguments[1] + "\" = \"" + input.commandForKey(arguments[1]) + "\""
-      return true
-    end if
-    if len(arguments) >= 3 then
-      value = arguments[2]
-      index = 3
-      while index < len(arguments)
-        value = value + " " + arguments[index]
-        index = index + 1
-      end while
-      return input.bindKey(arguments[1], value)
-    end if
-    return false
+    message = keys.Key_Bind_f(arguments)
+    if message != "" then print message end if
+    return len(arguments) == 2 or len(arguments) == 3
   end if
-  if name == "unbind" and len(arguments) >= 2 then return input.unbindKey(arguments[1]) end if
-  if name == "unbindall" then return input.unbindAll() end if
+  if name == "unbind" then
+    message = keys.Key_Unbind_f(arguments)
+    if message != "" then print message end if
+    return message == ""
+  end if
+  if name == "unbindall" then return keys.Key_Unbindall_f() end if
+  if name == "bindlist" then
+    listing = keys.Key_Bindlist_f()
+    if listing != "" then print listing end if
+    return true
+  end if
+  alias = findAlias(session.commands, name)
+  if alias is not void then cmd.insertText(session.commands, alias.value); return true end if
   if cvarCommand(session, arguments) then return true end if
   if cvar.variableValue(session.cvars, "developer") != 0.0 then print "Unknown command \"" + arguments[0] + "\"" end if
   return false
@@ -358,21 +1985,33 @@ function queueStartupCommands(session)
     if qfs.fileExists(session.filesystem, "default.cfg") then cmd.addText(session.commands, "exec default.cfg\n") end if
     if qfs.fileExists(session.filesystem, "config.cfg") then cmd.addText(session.commands, "exec config.cfg\n") end if
     if qfs.fileExists(session.filesystem, "autoexec.cfg") then cmd.addText(session.commands, "exec autoexec.cfg\n") end if
+    // A data set without quake.rc has no embedded stuffcmds command.
+    cmd.addText(session.commands, common.stuffCommands(session.arguments))
   end if
-  cmd.addText(session.commands, common.stuffCommands(session.arguments))
   return true
 end function
 
-function initialize(session)
+function Host_Init(session)
+  localInit = try(Host_InitLocal(session))
+  if localInit is error then return localInit end if
+  vcrInit = try(Host_InitVCR(session))
+  if vcrInit is error then return vcrInit end if
   print "MiniQuake " + c.QUAKE_VERSION + " / protocol " + c.PROTOCOL_VERSION
   print common.describe(session.arguments)
   print qfs.describe(session.filesystem)
   console.appendLine(session.console, "MiniQuake " + c.QUAKE_VERSION)
   if not session.headless then
-    fullscreenValue = 0
-    if session.fullscreen then fullscreenValue = 1 end if
-    win.create("MiniQuake", session.width, session.height, fullscreenValue)
+    palette = try(qfs.readFile(session.filesystem, "gfx/palette.lmp"))
+    if palette is error then return palette end if
+    video = try(glvid.VID_Init(session.arguments, session.cvars, palette, true))
+    if video is error then return video end if
+    // gl_vidnt.c owns focus-driven S_BlockSound/S_UnblockSound calls.
+    glvid.VID_SetSoundMixer(session.mixer)
+    session.width = video.width
+    session.height = video.height
+    session.fullscreen = video.modeState == glvid.MS_FULLDIB
     session.windowCreated = true
+    menu.M_SetVideoCallbacks(session.menu, glvid.VID_MenuDrawCallback, glvid.VID_MenuKeyCallback)
     updateMouseCapture(session)
   end if
 
@@ -385,15 +2024,45 @@ function initialize(session)
       print "sound disabled: " + opened.message
     else
       session.audioStarted = true
+      videoState = glvid.VID_State()
+      if videoState.soundBlocked and mixer.blockDepth(session.mixer) == 0 then mixer.block(session.mixer) end if
       // Menu feedback must be available before the first game event.  These
       // effects remain cached when the current level sound list is precached.
       mixer.precache(session.mixer, ["misc/menu1.wav", "misc/menu2.wav", "misc/menu3.wav"])
+      cdState = cdAudio.ensure(session.mixer)
+      if common.hasParm(session.arguments, "-nocdaudio") then
+        cdState.enabled = false
+        cdState.valid = false
+      end if
     end if
+  end if
+
+  requestedPort = common.integerOption(session.arguments, "-port", 26000)
+  udpDisabled = common.hasParm(session.arguments, "-nolan") or common.hasParm(session.arguments, "-noudp")
+  winsInitialized = try(netwins.WINS_Init(
+    cvar.variableString(session.cvars, "hostname"),
+    udpDisabled,
+    common.parmValue(session.arguments, "-ip", ""),
+    requestedPort,
+  ))
+  if winsInitialized is error then return winsInitialized end if
+  if winsInitialized != -1 then cvar.set(session.cvars, "hostname", netwins.configuredHostname) end if
+  netInitialized = try(netmain.NET_Init(
+    session.network,
+    session.server.maxClients,
+    common.hasParm(session.arguments, "-dedicated"),
+    common.hasParm(session.arguments, "-listen"),
+    requestedPort,
+    udpDisabled,
+  ))
+  if netInitialized is error then return netInitialized end if
+  if session.network.listener is not void then
+    print "UDP listening on port " + session.network.listener.port
   end if
 
   queueStartupCommands(session)
   executeCommandBuffer(session, 4096)
-  if not session.server.active then
+  if not session.server.active and session.demoPlayback is void and not session.client.connected then
     fallbackMap = session.startMap
     if fallbackMap == "" and qfs.fileExists(session.filesystem, "maps/start.bsp") then fallbackMap = "start" end if
     if fallbackMap != "" then startMap(session, fallbackMap) end if
@@ -404,8 +2073,31 @@ function initialize(session)
   return session
 end function
 
+function initialize(session)
+  return Host_Init(session)
+end function
+
 function consumeClientEvents(session)
   pending = client.consumeMessages(session.client)
+  for each item in pending
+    if item.command == "svc_cdtrack" and session.mixer.enabled and not common.hasParm(session.arguments, "-nocdaudio") then
+      track = item.payload[0]
+      if session.demoPlayback is not void and session.demoPlayback.recording.forcedTrack != -1 then
+        track = session.demoPlayback.recording.forcedTrack
+      else if session.demoRecording is not void and session.demoRecording.forcedTrack != -1 then
+        track = session.demoRecording.forcedTrack
+      end if
+      cdState = cdAudio.ensure(session.mixer)
+      played = try(cdAudio.CDAudio_Play(cdState, track, true))
+      if played is error and cvar.variableValue(session.cvars, "developer") != 0.0 then print played.message end if
+    else if item.command == "svc_centerprint" then
+      screen.SCR_CenterPrint(void, item.payload, session.client.time)
+    else if item.command == "svc_intermission" then
+      screen.SCR_SetIntermission(1, "", session.console, session.client.time)
+    else if item.command == "svc_finale" or item.command == "svc_cutscene" then
+      screen.SCR_SetIntermission(2, item.payload, session.console, session.client.time)
+    end if
+  end for
   result = clientEffects.process(
     pending,
     session.client,
@@ -416,18 +2108,59 @@ function consumeClientEvents(session)
     session.commands,
     session.particles,
     session.temporaryEntities,
-    session.client.serverTime,
+    session.client.time,
+    session.cvars,
   )
   session.particles = result[0]
   session.temporaryEntities = result[1]
   return len(pending)
 end function
 
+function synchronizeClientRelinkModels(session)
+  flags = arrayutil.makeFilledArray(len(session.client.modelPrecache), 0)
+  if session.entityRenderer is not void then
+    entityRenderer.synchronize(session.entityRenderer, session.client.modelPrecache)
+    index = 0
+    while index < len(flags) and index < len(session.entityRenderer.models)
+      model = session.entityRenderer.models[index]
+      if model is not void and model.aliasModel is not void then flags[index] = model.aliasModel.flags end if
+      index = index + 1
+    end while
+  end if
+  client.CL_SetModelFlags(flags)
+  client.CL_SetChaseActive(cvar.variableValue(session.cvars, "chase_active") != 0.0)
+  return len(flags)
+end function
+
+function consumeRelinkParticleEffects(session)
+  effects = client.CL_TakeRelinkParticleEffects()
+  for each item in effects
+    if item.command == "entity_particles" then
+      session.particles = particles.entityParticlesInto(session.particles, item.payload, session.client.time)
+    else if item.command == "rocket_trail" then
+      session.particles = particles.rocketTrailInto(
+        session.particles,
+        item.payload[0],
+        item.payload[1],
+        item.payload[2],
+        session.client.time,
+      )
+    end if
+  end for
+  return len(effects)
+end function
+
 function consumeQuakeCControl(session)
   count = 0
   for each line in session.server.diagnostics
-    console.append(session.console, line)
-    if cvar.variableValue(session.cvars, "developer") != 0.0 then print line end if
+    source = bytes(line)
+    if len(source) >= 10 and decode(slice(source, 0, 10)) == "SYS_PRINT:" then
+      sysLine = decode(slice(source, 10, len(source) - 10))
+      if common.hasParm(session.arguments, "-dedicated") then print sysLine end if
+    else
+      console.append(session.console, line)
+      if cvar.variableValue(session.cvars, "developer") != 0.0 then print line end if
+    end if
     count = count + 1
   end for
   session.server.diagnostics = []
@@ -440,7 +2173,7 @@ function consumeQuakeCControl(session)
   end for
   contextValue.consoleLines = []
   if contextValue.changeLevel != "" then
-    cmd.addText(session.commands, "map \"" + contextValue.changeLevel + "\"\n")
+    cmd.addText(session.commands, "changelevel \"" + contextValue.changeLevel + "\"\n")
     contextValue.changeLevel = ""
     count = count + 1
   end if
@@ -459,6 +2192,23 @@ function playMenuSound(session, name)
   result = try(mixer.localSound(session.mixer, name))
   if result is error then return false end if
   return result
+end function
+
+// console.c performs these two effects synchronously from Con_Print/Con_Printf.
+// MiniLang records them on ConsoleState so the host can invoke the production
+// audio and screen paths without creating a console<->host import cycle.
+function consumeConsoleSideEffects(session)
+  if session.console.talkSoundRequested then
+    session.console.talkSoundRequested = false
+    if session.mixer is not void and session.mixer.enabled then
+      played = try(mixer.localSound(session.mixer, "misc/talk.wav"))
+      if played is error and cvar.variableValue(session.cvars, "developer") != 0.0 then print played.message end if
+    end if
+  end if
+
+  forceScreen = session.console.updateRequested and session.client.signon != c.SIGNONS
+  session.console.updateRequested = false
+  return forceScreen
 end function
 
 function setMenuActive(session, active)
@@ -480,6 +2230,13 @@ function setMenuActive(session, active)
     end if
     menu.setActive(session.menu, false)
   end if
+  if active then
+    keys.setDestination(keys.KEY_MENU)
+  else if session.console.active then
+    keys.setDestination(keys.KEY_CONSOLE)
+  else
+    keys.setDestination(keys.KEY_GAME)
+  end if
   updateMouseCapture(session)
   return active
 end function
@@ -488,6 +2245,13 @@ function setConsoleActive(session, active)
   if active and session.menu.active then setMenuActive(session, false) end if
   console.setActive(session.console, active)
   session.consoleVisible = active
+  if active then
+    keys.setDestination(keys.KEY_CONSOLE)
+  else if session.menu.active then
+    keys.setDestination(keys.KEY_MENU)
+  else
+    keys.setDestination(keys.KEY_GAME)
+  end if
   updateMouseCapture(session)
   return active
 end function
@@ -507,7 +2271,6 @@ function adjustMenuOption(session, direction)
   else if selection == 6 then
     value = math.clamp(cvar.variableValue(session.cvars, "bgmvolume") + direction * 0.1, 0.0, 1.0)
     cvar.setValue(session.cvars, "bgmvolume", value)
-    session.menu.statusText = "CD MUSIC IS NOT IMPLEMENTED"
   else if selection == 7 then
     value = math.clamp(cvar.variableValue(session.cvars, "volume") + direction * 0.1, 0.0, 1.0)
     cvar.setValue(session.cvars, "volume", value)
@@ -543,37 +2306,41 @@ end function
 function executeMenuSelection(session)
   action = menu.selectedCommand(session.menu)
   if action == "menu_single" then
-    menu.setPage(session.menu, menu.PAGE_SINGLE)
+    menu.M_Menu_SinglePlayer_f(session.menu)
     playMenuSound(session, "misc/menu2.wav")
   else if action == "menu_multi" then
-    menu.setPage(session.menu, menu.PAGE_MULTI)
+    menu.M_Menu_MultiPlayer_f(session.menu)
     playMenuSound(session, "misc/menu2.wav")
   else if action == "menu_options" then
-    menu.setPage(session.menu, menu.PAGE_OPTIONS)
+    menu.M_Menu_Options_f(session.menu)
     playMenuSound(session, "misc/menu2.wav")
   else if action == "menu_help" then
-    menu.setPage(session.menu, menu.PAGE_HELP)
+    menu.M_Menu_Help_f(session.menu)
     playMenuSound(session, "misc/menu2.wav")
   else if action == "menu_quit" then
-    menu.setPage(session.menu, menu.PAGE_QUIT)
+    menu.M_Menu_Quit_f(session.menu)
     playMenuSound(session, "misc/menu2.wav")
   else if action == "new_game" then
     setMenuActive(session, false)
-    cmd.addText(session.commands, "map start\n")
+    cmd.addText(session.commands, "disconnect\nmaxplayers 1\nmap start\n")
   else if action == "load_game" then
-    menu.setPage(session.menu, menu.PAGE_LOAD)
+    menu.M_Menu_Load_f(session.menu)
+    refreshSaveSlots(session)
     playMenuSound(session, "misc/menu2.wav")
   else if action == "save_game" then
-    menu.setPage(session.menu, menu.PAGE_SAVE)
-    playMenuSound(session, "misc/menu2.wav")
+    if menu.M_Menu_Save_f(session.menu, session.server.active, screen.SCR_IntermissionMode(), session.server.maxClients) then
+      refreshSaveSlots(session)
+      playMenuSound(session, "misc/menu2.wav")
+    end if
   else if action == "join_game" or action == "host_game" then
-    menu.setStatus(session.menu, "NETWORK CONNECTION MENUS ARE STILL PENDING")
+    session.menu.joiningGame = action == "join_game"
+    menu.M_Menu_Net_f(session.menu)
     playMenuSound(session, "misc/menu2.wav")
   else if action == "player_setup" then
-    menu.setPage(session.menu, menu.PAGE_SETUP)
+    menu.M_Menu_Setup_f(session.menu, session.cvars)
     playMenuSound(session, "misc/menu2.wav")
   else if action == "customize_controls" then
-    menu.setPage(session.menu, menu.PAGE_KEYS)
+    menu.M_Menu_Keys_f(session.menu)
     playMenuSound(session, "misc/menu2.wav")
   else if action == "open_console" then
     setMenuActive(session, false)
@@ -583,7 +2350,7 @@ function executeMenuSelection(session)
     menu.setStatus(session.menu, "DEFAULT CONTROLS RESTORED")
     playMenuSound(session, "misc/menu2.wav")
   else if action == "video_options" then
-    menu.setPage(session.menu, menu.PAGE_VIDEO)
+    menu.M_Menu_Video_f(session.menu)
     playMenuSound(session, "misc/menu2.wav")
   else if action == "bind_selected" then
     command = menu.keyCommandAt(session.menu)
@@ -595,14 +2362,24 @@ function executeMenuSelection(session)
       playMenuSound(session, "misc/menu2.wav")
     end if
   else if action == "load_slot" then
-    menu.setStatus(session.menu, "SAVEGAME LOADING IS STILL PENDING")
-    playMenuSound(session, "misc/menu2.wav")
+    loaded = try(loadGame(session, "s" + session.menu.selection))
+    if loaded is error then
+      menu.setStatus(session.menu, loaded.message)
+      playMenuSound(session, "misc/menu3.wav")
+    else
+      setMenuActive(session, false)
+      playMenuSound(session, "misc/menu2.wav")
+    end if
   else if action == "save_slot" then
-    menu.setStatus(session.menu, "SAVEGAME WRITING IS STILL PENDING")
-    playMenuSound(session, "misc/menu2.wav")
-  else if action == "setup_option" then
-    menu.setStatus(session.menu, "PLAYER NAME/COLOR EDITING IS STILL PENDING")
-    playMenuSound(session, "misc/menu2.wav")
+    saved = try(saveGame(session, "s" + session.menu.selection))
+    if saved is error then
+      menu.setStatus(session.menu, saved.message)
+      playMenuSound(session, "misc/menu3.wav")
+    else
+      refreshSaveSlots(session)
+      menu.setStatus(session.menu, "GAME SAVED")
+      playMenuSound(session, "misc/menu2.wav")
+    end if
   else if action == "video_option" then
     menu.setStatus(session.menu, "USE -WINDOW -WIDTH -HEIGHT; RESTART REQUIRED")
     playMenuSound(session, "misc/menu2.wav")
@@ -615,6 +2392,83 @@ function executeMenuSelection(session)
   return action
 end function
 
+function handleExactMenuAction(session, result)
+  if result is array then
+    if len(result) == 0 then return false end if
+    if result[0] == "setup_accept" then
+      cvar.set(session.cvars, "hostname", result[1])
+      cvar.set(session.cvars, "_cl_name", result[2])
+      cvar.setValue(session.cvars, "_cl_color", ((result[3] & 15) << 4) | (result[4] & 15))
+      session.client.name = result[2]
+      session.client.colors = ((result[3] & 15) << 4) | (result[4] & 15)
+      if len(session.server.clients) > 0 then
+        session.server.clients[0].name = result[2]
+        session.server.clients[0].colors = session.client.colors
+      end if
+      menu.M_Menu_MultiPlayer_f(session.menu)
+      playMenuSound(session, "misc/menu2.wav")
+      return true
+    end if
+    if result[0] == "connect" then
+      if len(result) < 2 or result[1] == "" then
+        menu.setStatus(session.menu, "Enter a server address")
+        playMenuSound(session, "misc/menu3.wav")
+        return true
+      end if
+      changedPort = try(netmain.NET_Port_f(session.network, session.menu.lanPort))
+      if changedPort is error then
+        menu.setStatus(session.menu, changedPort.message)
+        playMenuSound(session, "misc/menu3.wav")
+        return true
+      end if
+      setMenuActive(session, false)
+      cmd.addText(session.commands, "connect \"" + result[1] + "\"\n")
+      playMenuSound(session, "misc/menu2.wav")
+      return true
+    end if
+    if result[0] == "begin_game" then
+      if session.server.active then cmd.addText(session.commands, "disconnect\n") end if
+      changedPort = try(netmain.NET_Port_f(session.network, session.menu.lanPort))
+      if changedPort is error then
+        menu.setStatus(session.menu, changedPort.message)
+        return true
+      end if
+      cmd.addText(session.commands, "listen 0\nmaxplayers " + result[2] + "\nmap " + result[1] + "\n")
+      setMenuActive(session, false)
+      playMenuSound(session, "misc/menu2.wav")
+      return true
+    end if
+    return false
+  end if
+
+  if result == "quit" then session.running = false; return true end if
+  if result == "search" then
+    changedPort = try(netmain.NET_Port_f(session.network, session.menu.lanPort))
+    if changedPort is error then menu.setStatus(session.menu, changedPort.message); return true end if
+    menu.M_Menu_Search_f(session.menu, session.network, session.menu.lanPort, session.timing.realtime)
+    playMenuSound(session, "misc/menu2.wav")
+    return true
+  end if
+  if result == "game_options" then
+    changedPort = try(netmain.NET_Port_f(session.network, session.menu.lanPort))
+    if changedPort is error then menu.setStatus(session.menu, changedPort.message); return true end if
+    maximumClients = session.server.maxClients
+    if maximumClients < 2 then maximumClients = 4 end if
+    menu.M_Menu_GameOptions_f(session.menu, maximumClients, session.gameDirectory)
+    playMenuSound(session, "misc/menu2.wav")
+    return true
+  end if
+  if result == "menu_single" or result == "menu_multi" or result == "menu_options" or result == "menu_help" or result == "menu_quit" or result == "new_game" or result == "load_game" or result == "save_game" or result == "player_setup" or result == "customize_controls" or result == "open_console" or result == "reset_defaults" or result == "video_options" or result == "bind_selected" or result == "load_slot" or result == "save_slot" or result == "video_option" or result == "adjust_option" or result == "help_next" then
+    executeMenuSelection(session)
+    return true
+  end if
+  if result == "close" then setMenuActive(session, false); return true end if
+  if result == "adjust" and session.menu.page == menu.PAGE_OPTIONS and session.menu.selection == 13 then updateMouseCapture(session) end if
+  if result == "none" then return false end if
+  playMenuSound(session, "misc/menu1.wav")
+  return true
+end function
+
 function discardTextInput()
   count = 0
   code = win.textPop()
@@ -625,89 +2479,114 @@ function discardTextInput()
   return count
 end function
 
+function handleMenuKey(session, key)
+  if session.menu.page == menu.PAGE_QUIT then
+    return handleExactMenuAction(session, menu.M_Quit_Key(session.menu, key))
+  end if
+
+  if session.menu.page == menu.PAGE_KEYS and session.menu.waitingForKey then
+    if key != keys.K_ESCAPE and key != 96 and key != 126 then
+      command = menu.keyCommandAt(session.menu)
+      if command != "" then keys.Key_SetBinding(key, command) end if
+      session.menu.waitingForKey = false
+      playMenuSound(session, "misc/menu1.wav")
+      return true
+    end if
+    session.menu.waitingForKey = false
+    playMenuSound(session, "misc/menu1.wav")
+    return true
+  end if
+
+  if session.menu.page == menu.PAGE_KEYS and (key == keys.K_BACKSPACE or key == keys.K_DEL) then
+    input.unbindCommand(menu.keyCommandAt(session.menu))
+    playMenuSound(session, "misc/menu2.wav")
+    return true
+  end if
+  if session.menu.active then
+    result = menu.M_Keydown(session.menu, key, session.cvars)
+    return handleExactMenuAction(session, result)
+  end if
+  if key == keys.K_UPARROW then menu.move(session.menu, -1); playMenuSound(session, "misc/menu1.wav"); return true end if
+  if key == keys.K_DOWNARROW then menu.move(session.menu, 1); playMenuSound(session, "misc/menu1.wav"); return true end if
+  if key == keys.K_LEFTARROW then
+    if session.menu.page == menu.PAGE_OPTIONS then
+      adjustMenuOption(session, -1)
+    else if session.menu.page == menu.PAGE_HELP then
+      menu.changeHelpPage(session.menu, -1)
+      playMenuSound(session, "misc/menu2.wav")
+    end if
+    return true
+  end if
+  if key == keys.K_RIGHTARROW then
+    if session.menu.page == menu.PAGE_OPTIONS then
+      adjustMenuOption(session, 1)
+    else if session.menu.page == menu.PAGE_HELP then
+      menu.changeHelpPage(session.menu, 1)
+      playMenuSound(session, "misc/menu2.wav")
+    end if
+    return true
+  end if
+  if key == keys.K_ENTER then executeMenuSelection(session); return true end if
+  return false
+end function
+
+function handleKeyResult(session, result)
+  if result[0] != "" then cmd.addText(session.commands, result[0]) end if
+  action = result[1]
+  key = result[2]
+  if action == "toggle_menu" then
+    setMenuActive(session, not session.menu.active)
+    if session.menu.active then playMenuSound(session, "misc/menu2.wav") end if
+    return true
+  end if
+  if action == "menu_escape" then
+    backResult = menu.back(session.menu)
+    if backResult == "close" then setMenuActive(session, false) else playMenuSound(session, "misc/menu1.wav") end if
+    return true
+  end if
+  if action == "menu_key" then return handleMenuKey(session, key) end if
+  return result[0] != ""
+end function
+
 function processConsoleInput(session)
   if not session.windowCreated then return 0 end if
   handled = 0
-  if win.keyPressed(c.VK_OEM_3) then
-    setConsoleActive(session, not session.console.active)
-    handled = handled + 1
-  end if
-
-  if win.keyPressed(c.VK_ESCAPE) then
-    if session.console.active then
-      setConsoleActive(session, false)
-    else if session.menu.active then
-      result = menu.back(session.menu)
-      if result == "close" then setMenuActive(session, false) else playMenuSound(session, "misc/menu1.wav") end if
+  if keys.destination() != keys.KEY_MESSAGE then
+    if session.menu.active then
+      keys.setDestination(keys.KEY_MENU)
+    else if session.console.active then
+      keys.setDestination(keys.KEY_CONSOLE)
     else
-      setMenuActive(session, true)
-      playMenuSound(session, "misc/menu2.wav")
+      keys.setDestination(keys.KEY_GAME)
     end if
-    handled = handled + 1
   end if
-
-  if session.menu.active then
-    if session.menu.page == menu.PAGE_QUIT then
-      if win.keyPressed(c.VK_Y) then session.running = false; handled = handled + 1 end if
-      if win.keyPressed(c.VK_N) then menu.back(session.menu); playMenuSound(session, "misc/menu1.wav"); handled = handled + 1 end if
-    else
-      if session.menu.page == menu.PAGE_KEYS and session.menu.waitingForKey then
-        keyName = input.firstPressedKey()
-        if keyName != "" and keyName != "ESCAPE" and keyName != "`" then
-          command = menu.keyCommandAt(session.menu)
-          if command != "" then input.bindKey(keyName, command) end if
-          session.menu.waitingForKey = false
-          playMenuSound(session, "misc/menu1.wav")
-          handled = handled + 1
-        end if
-      else if session.menu.page == menu.PAGE_KEYS and (win.keyPressed(c.VK_BACK) or win.keyPressed(c.VK_DELETE)) then
-        input.unbindCommand(menu.keyCommandAt(session.menu))
-        playMenuSound(session, "misc/menu2.wav")
-        handled = handled + 1
+  forcedConsole = not session.client.connected and session.demoPlayback is void
+  for each event in keys.PollEvents()
+    if event[0] == -1 then
+      if not event[1] then
+        keys.Key_ClearStates()
+        input.IN_ClearStates()
+        input.setMouseCapture(false)
       end if
-      if not session.menu.waitingForKey and win.keyPressed(c.VK_UP) then menu.move(session.menu, -1); playMenuSound(session, "misc/menu1.wav"); handled = handled + 1 end if
-      if not session.menu.waitingForKey and win.keyPressed(c.VK_DOWN) then menu.move(session.menu, 1); playMenuSound(session, "misc/menu1.wav"); handled = handled + 1 end if
-      if not session.menu.waitingForKey and win.keyPressed(c.VK_LEFT) then
-        if session.menu.page == menu.PAGE_OPTIONS then adjustMenuOption(session, -1) else if session.menu.page == menu.PAGE_HELP then menu.changeHelpPage(session.menu, -1); playMenuSound(session, "misc/menu2.wav") end if
-        handled = handled + 1
-      end if
-      if not session.menu.waitingForKey and win.keyPressed(c.VK_RIGHT) then
-        if session.menu.page == menu.PAGE_OPTIONS then adjustMenuOption(session, 1) else if session.menu.page == menu.PAGE_HELP then menu.changeHelpPage(session.menu, 1); playMenuSound(session, "misc/menu2.wav") end if
-        handled = handled + 1
-      end if
-      if not session.menu.waitingForKey and win.keyPressed(c.VK_RETURN) then executeMenuSelection(session); handled = handled + 1 end if
+      updateMouseCapture(session)
+      handled = handled + 1
+      continue
     end if
-    discardTextInput()
-    updateMouseCapture(session)
-    return handled
-  end if
-
-  if not session.console.active then
-    // Discard text produced while gameplay owns the keyboard so opening the
-    // console later cannot replay stale characters.
-    discardTextInput()
-    updateMouseCapture(session)
-    return handled
-  end if
-
+    result = keys.Key_Event(
+      event[0],
+      event[1],
+      session.console,
+      session.commands,
+      session.cvars,
+      forcedConsole,
+      session.demoPlayback is not void,
+    )
+    if handleKeyResult(session, result) then handled = handled + 1 end if
+  end for
+  // Key_Event derives printable ASCII from Quake's keyshift table. Drain the
+  // redundant WM_CHAR queue so it cannot replay characters on a later frame.
+  discardTextInput()
   updateMouseCapture(session)
-  if win.keyPressed(c.VK_BACK) then console.backspace(session.console); handled = handled + 1 end if
-  if win.keyPressed(c.VK_RETURN) then
-    text = console.takeInput(session.console)
-    if text != "" then
-      console.appendLine(session.console, "]" + text)
-      cmd.addText(session.commands, text + "\n")
-    end if
-    handled = handled + 1
-  end if
-  code = win.textPop()
-  while code >= 0
-    // WM_CHAR also reports return/backspace; those are handled as key events.
-    if code != 8 and code != 13 and code != 96 and code != 126 then
-      if console.appendCharacter(session.console, code) then handled = handled + 1 end if
-    end if
-    code = win.textPop()
-  end while
   return handled
 end function
 
@@ -718,97 +2597,237 @@ function updateTitle(session)
   win.setTitle(title)
 end function
 
-function frame(session, elapsedSeconds)
-  maxFps = cvar.variableValue(session.cvars, "host_maxfps")
-  forced = cvar.variableValue(session.cvars, "host_framerate")
-  newRealtime = session.timing.realtime + elapsedSeconds
-  if not filterTime(session.timing, newRealtime, maxFps, forced, common.hasParm(session.arguments, "-timedemo")) then return false end if
+function sendClientIntentions(session)
+  if session.demoPlayback is void and not session.client.connected then return 0 end if
+  command = session.client.command
+  if session.client.signon == c.SIGNONS then
+    pollButtonBindings = keys.destination() == keys.KEY_GAME and not session.console.active and not session.menu.active
+    deviceActive = not session.headless and session.windowCreated and win.hasFocus()
+    minimized = session.windowCreated and win.minimized()
+    input.buildOriginalMove(
+      command,
+      session.client.signon,
+      session.timing.frameTime * 1000.0,
+      cvar.variableValue(session.cvars, "sensitivity"),
+      cvar.variableValue(session.cvars, "m_yaw"),
+      cvar.variableValue(session.cvars, "m_pitch"),
+      cvar.variableValue(session.cvars, "m_filter") != 0.0,
+      cvar.variableValue(session.cvars, "cl_forwardspeed"),
+      cvar.variableValue(session.cvars, "cl_backspeed"),
+      cvar.variableValue(session.cvars, "cl_sidespeed"),
+      cvar.variableValue(session.cvars, "cl_upspeed"),
+      session.player.noclip,
+      pollButtonBindings,
+      deviceActive,
+      minimized,
+    )
+  end if
+  return client.CL_SendCmd(session.client, command)
+end function
+
+function Host_ServerFrame(session)
+  if not session.server.active then return false end if
+  sz.clear(session.server.datagram)
+  newConnections = pumpNewConnections(session)
+  if newConnections is error then return newConnections end if
+  timeout = cvar.variableValue(session.cvars, "net_messagetimeout")
+  netmain.NET_SetMessageTimeout(timeout)
+  server.dropTimedOutClients(session.server, timeout)
+  simulate = not session.server.paused
+  if session.server.maxClients == 1 and keys.destination() != keys.KEY_GAME then simulate = false end if
+  result = server.frameMode(session.server, session.player, session.timing.frameTime, session.cvars, simulate)
+  if result and simulate then session.simulatedFrames = session.simulatedFrames + 1 end if
+  flushServerCvarChanges(session)
+  return result
+end function
+
+function _Host_ServerFrame(session)
+  return Host_ServerFrame(session)
+end function
+
+function _Host_Frame(session, elapsedSeconds)
+  // The original advances the process-global MSVC rand stream before the
+  // frame-rate gate.  QuakeC PF_random and monster movement consume that same
+  // stream, so even filtered frames must perturb their next value.
+  if session.server.machine is not void and session.server.machine.context is not void then
+    contextValue = session.server.machine.context
+    session.server.randomSeed = contextValue.randomSeed
+  end if
+  session.server.randomSeed = (session.server.randomSeed * 214013 + 2531011) & 0xffffffff
+  if session.server.machine is not void and session.server.machine.context is not void then
+    session.server.machine.context.randomSeed = session.server.randomSeed
+  end if
+  if not Host_FilterTime(session, elapsedSeconds) then return false end if
+  session.frameTrace = ["filter"]
+  console.Con_SetRealtime(session.console, session.timing.realtime)
 
   executeCommandBuffer(session, 64)
-  client.sendReliable(session.client)
-  client.pump(session.client)
-
-  if session.client.spawned and session.server.active then
-    command = session.client.command
-    if not session.headless and not session.console.active and not session.menu.active and session.windowCreated and win.hasFocus() then
-      input.collectGame(
-        command,
-        session.timing.frameTime * 1000.0,
-        cvar.variableValue(session.cvars, "sensitivity"),
-        cvar.variableValue(session.cvars, "m_yaw"),
-        cvar.variableValue(session.cvars, "m_pitch"),
-        cvar.variableValue(session.cvars, "m_filter") != 0.0,
-        cvar.variableValue(session.cvars, "cl_forwardspeed"),
-        cvar.variableValue(session.cvars, "cl_backspeed"),
-        cvar.variableValue(session.cvars, "cl_sidespeed"),
-        cvar.variableValue(session.cvars, "cl_upspeed"),
-      )
-      client.sendMove(session.client, command)
-    else if not session.headless then
-      input.clear(command)
-      client.sendMove(session.client, command)
-    end if
-    server.frame(session.server, session.player, session.timing.frameTime, session.cvars)
-    session.simulatedFrames = session.simulatedFrames + 1
-    client.sendReliable(session.client)
-    client.pump(session.client)
+  session.frameTrace = session.frameTrace + ["commands"]
+  netmain.NET_Poll()
+  session.frameTrace = session.frameTrace + ["net_poll"]
+  flushServerCvarChanges(session)
+  timeout = cvar.variableValue(session.cvars, "net_messagetimeout")
+  netmain.NET_SetMessageTimeout(timeout)
+  if session.client.connected and netmain.NET_SocketTimedOut(session.client.socket, timeout) then
+    client.dropConnection(session.client)
+    session.statusMessage = "Server connection timed out."
+    console.appendLine(session.console, session.statusMessage)
+    print session.statusMessage
+  end if
+  if session.demoPlayback is not void then
+    sendClientIntentions(session)
+    session.frameTrace = session.frameTrace + ["demo_send"]
+    stepped = stepDemoPlayback(session)
+    if stepped is error then print stepped.message end if
+  else if session.server.active then
+    sendClientIntentions(session)
+    session.frameTrace = session.frameTrace + ["local_send"]
   end if
 
+  Host_GetConsoleCommands(session, [])
+  session.frameTrace = session.frameTrace + ["console"]
+  if session.server.active then
+    serverResult = try(Host_ServerFrame(session))
+    if serverResult is error then return Host_Error(session, serverResult.message) end if
+    session.frameTrace = session.frameTrace + ["server"]
+  else if session.demoPlayback is void then
+    sendClientIntentions(session)
+    session.frameTrace = session.frameTrace + ["remote_send"]
+  end if
+
+  session.hostTime = session.hostTime + session.timing.frameTime
+  session.frameTrace = session.frameTrace + ["host_time"]
+
+  if session.demoPlayback is void then
+    if session.client.connected then
+      session.client.oldTime = session.client.time
+      session.client.time = session.client.time + session.timing.frameTime
+    end if
+    readResult = try(pumpClient(session))
+    if readResult is error then return Host_Error(session, readResult.message) end if
+  end if
+  session.frameTrace = session.frameTrace + ["client_read"]
+
+  if not session.server.active and session.demoPlayback is void and session.client.signon == c.SIGNONS and session.server.worldModel is void then
+    prepared = try(prepareDemoScene(session))
+    if prepared is error then print prepared.message end if
+  end if
+  session.frameTrace = session.frameTrace + ["demo_scene"]
+
+  synchronizeClientRelinkModels(session)
+  client.CL_BeginRelinkParticles(session.particles)
+  client.CL_RelinkEntities(session.client)
+  session.particles = client.CL_EndRelinkParticles()
+  session.frameTrace = session.frameTrace + ["entity_relink"]
+  clientFrameTime = session.client.time - session.client.oldTime
+  consumeRelinkParticleEffects(session)
+  session.frameTrace = session.frameTrace + ["entity_effects"]
   consumeClientEvents(session)
-  client.CL_DecayLightsAt(session.client.serverTime, session.timing.frameTime)
-  client.CL_UpdateEntityDlights(session.client, session.client.serverTime)
+  session.frameTrace = session.frameTrace + ["client_events"]
+  forceConsoleUpdate = consumeConsoleSideEffects(session)
   consumeQuakeCControl(session)
-  console.clearExpiredCenter(session.console, session.client.serverTime)
-  session.particles = particles.update(session.particles, session.client.serverTime, session.timing.frameTime)
-  view.calculate(
+  session.frameTrace = session.frameTrace + ["qc_control"]
+  console.clearExpiredCenter(session.console, session.client.time)
+  session.frameTrace = session.frameTrace + ["centerprint"]
+  pitchDrift = input.consumePitchDriftRequests()
+  if pitchDrift[0] then view.V_StopPitchDrift(session.view, session.client.time) end if
+  if pitchDrift[1] then
+    view.V_StartPitchDrift(session.view, session.client.time, cvar.variableValue(session.cvars, "v_centerspeed"))
+  end if
+  view.V_RenderView(
     session.view,
     session.player,
-    session.client.command.viewAngles,
-    session.client.serverTime,
+    session.client,
+    session.cvars,
     session.timing.frameTime,
-    cvar.variableValue(session.cvars, "cl_bob"),
-    cvar.variableValue(session.cvars, "cl_bobcycle"),
-    cvar.variableValue(session.cvars, "cl_bobup"),
-    cvar.variableValue(session.cvars, "v_rollangle"),
-    cvar.variableValue(session.cvars, "v_rollspeed"),
-    cvar.variableValue(session.cvars, "v_kicktime"),
+    session.server.paused,
+    session.demoPlayback is not void,
+    screen.SCR_IntermissionMode(),
+      not session.client.connected and session.demoPlayback is void,
   )
-
-  if session.mixer.enabled then
-    session.mixer.masterVolume = cvar.variableValue(session.cvars, "volume")
-    mixer.updateListener(session.mixer, session.view.origin, session.view.forward, session.view.right)
-    mixer.setListenerEntity(session.mixer, session.client.viewEntity)
-    mixer.updateEntityOrigins(session.mixer, session.client.entities)
-    mixer.updateAmbient(
-      session.mixer,
-      session.server.worldModel,
+  chaseState = chase.syncCvars(chase.create(), session.cvars)
+  forcedConsole = not session.client.connected and session.demoPlayback is void
+  if chaseState.active and not session.server.paused and screen.SCR_IntermissionMode() == 0 and not forcedConsole then
+    chaseWorld = session.server.worldModel
+    if session.renderer is not void then chaseWorld = session.renderer.map end if
+    chased = chase.Chase_Update(
+      chaseState,
       session.view.origin,
-      session.timing.frameTime,
-      cvar.variableValue(session.cvars, "ambient_level"),
-      cvar.variableValue(session.cvars, "ambient_fade"),
+      session.client.command.viewAngles,
+      chaseWorld,
     )
-    mixer.update(session.mixer, session.timing.frameTime, cvar.variableValue(session.cvars, "_snd_mixahead"))
+    session.view.origin = chased[0]
+    session.view.angles = chased[1]
+    chaseVectors = math.angleVectors(session.view.angles)
+    session.view.forward = chaseVectors[0]
+    session.view.right = chaseVectors[1]
+    session.view.up = chaseVectors[2]
+    session.view.viewModelVisible = false
+  end if
+  session.frameTrace = session.frameTrace + ["view"]
+
+  // Before a world renderer exists, Con_Printf during signon still forces the
+  // 2D console update that the original calls directly.  With a renderer, the
+  // regular screen phase below consumes the request in the same frame.
+  if forceConsoleUpdate and session.renderer is void and session.windowCreated and not screen.SCR_ShouldSkipUpdate(session.timing.realtime) then
+    screen.SCR_UpdateScreen(
+      session.console,
+      session.menu,
+      session.view,
+      session.player,
+      win.width(),
+      win.height(),
+      session.server.mapName,
+      false,
+      session.timing.realtime,
+      session.timing.frameTime,
+      session.cvars,
+      session.client.connected,
+      session.client.signon,
+      session.server.paused,
+      session.client.lastMessageTime,
+      session.demoPlayback is not void,
+      false,
+      false,
+      keys.destination() == keys.KEY_CONSOLE,
+    )
+    glvid.GL_EndRendering()
   end if
 
-  if session.renderer is not void and session.windowCreated then
+  if session.renderer is not void and session.windowCreated and not screen.SCR_ShouldSkipUpdate(session.timing.realtime) then
+    screen.SCR_ConfigureClient(session.client)
     session.renderer.fullbright = cvar.variableValue(session.cvars, "r_fullbright") != 0.0
     session.renderer.wireframe = cvar.variableValue(session.cvars, "r_wireframe") != 0.0
     session.renderer.waterAlpha = cvar.variableValue(session.cvars, "r_wateralpha")
     width = win.width()
     height = win.height()
-    worldRenderer.render(session.renderer, width, height, session.view.origin, session.view.angles)
+    screenRefdef = screen.SCR_CalcRefdef(width, height, session.cvars, screen.SCR_IntermissionMode())
+    view.V_SetContentsColor(session.view, worldRenderer.ViewContents(session.renderer, session.view.origin))
+    view.V_CalcBlend(session.view, cvar.variableValue(session.cvars, "gl_cshiftpercent"))
+    worldRenderer.renderViewport(
+      session.renderer, width, height, screenRefdef, session.view.origin, session.view.angles,
+      client.CL_Dlights(), session.client.lightStyles, session.client.time,
+      session.timing.realtime, session.timing.frameTime, session.view.blend,
+    )
     if session.entityRenderer is not void then
       entityRenderer.synchronize(session.entityRenderer, session.client.modelPrecache)
       if cvar.variableValue(session.cvars, "r_drawentities") != 0.0 then
-        entityRenderer.render(session.entityRenderer, session.renderer, session.client.entities, session.client.viewEntity, session.view.right, session.view.up, session.client.serverTime)
+        entityRenderer.render(session.entityRenderer, session.renderer, session.client.entities, session.client.viewEntity, session.view.right, session.view.up, session.client.time)
       end if
       if cvar.variableValue(session.cvars, "r_drawviewmodel") != 0.0 then
-        entityRenderer.renderViewModel(session.entityRenderer, session.player, session.view, session.client.serverTime)
+        entityRenderer.renderViewModel(session.entityRenderer, session.player, session.view, session.client.time)
       end if
     end if
-    particleRenderer.render(session.particles, session.renderer.palette)
-    particleRenderer.renderTemporary(session.temporaryEntities, session.client.serverTime, session.renderer.palette)
-    screen.render(
+    particleRenderer.renderView(
+      session.particles, session.renderer.palette,
+      session.view.origin, session.view.forward, session.view.up, session.view.right,
+    )
+    particleRenderer.renderTemporary(session.temporaryEntities, session.client.time, session.renderer.palette)
+    worldRenderer.R_PolyBlendProduction(
+      session.view.blend,
+      cvar.variableValue(session.cvars, "gl_polyblend") != 0.0,
+    )
+    screen.SCR_UpdateScreen(
       session.console,
       session.menu,
       session.view,
@@ -818,9 +2837,18 @@ function frame(session, elapsedSeconds)
       session.server.mapName,
       cvar.variableValue(session.cvars, "crosshair") != 0.0,
       session.timing.realtime,
+      session.timing.frameTime,
       session.cvars,
+      session.client.connected,
+      session.client.signon,
+      session.server.paused,
+      session.client.lastMessageTime,
+      session.demoPlayback is not void,
+      false,
+      keys.destination() == keys.KEY_GAME,
+      keys.destination() == keys.KEY_CONSOLE,
     )
-    win.swap()
+    glvid.GL_EndRendering()
     // WinQuake performs S_ExtraUpdate around expensive rendering work.  A
     // second non-blocking top-up keeps waveOut fed when a frame takes longer
     // than one 512-sample block.
@@ -830,50 +2858,484 @@ function frame(session, elapsedSeconds)
     session.renderedFrames = session.renderedFrames + 1
     updateTitle(session)
   end if
+  session.frameTrace = session.frameTrace + ["screen"]
+  // Host_Frame decays client lights after SCR_UpdateScreen.  Relinking must
+  // first be allowed to clamp cl.time to the latest message, because timedemo
+  // particle/light integration uses that final cl.time-cl.oldtime interval.
+  client.CL_DecayLightsAt(session.client.time, clientFrameTime)
+  session.frameTrace = session.frameTrace + ["dlight_decay"]
+  // GLQuake draws every active particle before applying that frame's motion,
+  // ramp and gravity update inside R_DrawParticles.  Advancing before the
+  // renderer made explosions one simulation step too old and too dispersed.
+  // Headless modes still reach this common post-render update.
+  session.particles = particles.update(session.particles, session.client.time, clientFrameTime)
+  session.frameTrace = session.frameTrace + ["particles"]
+
+  if session.mixer.enabled then
+    session.mixer.masterVolume = cvar.variableValue(session.cvars, "volume")
+    requestedMusicVolume = cvar.variableValue(session.cvars, "bgmvolume")
+    cdState = cdAudio.ensure(session.mixer)
+    actualMusicVolume = cdAudio.CDAudio_Update(cdState, requestedMusicVolume)
+    if cdState.enabled then
+      if actualMusicVolume != requestedMusicVolume then cvar.setValue(session.cvars, "bgmvolume", actualMusicVolume) end if
+      session.mixer.musicVolume = actualMusicVolume
+    else
+      session.mixer.musicVolume = 0.0
+    end if
+    mixer.updateListener(session.mixer, session.view.origin, session.view.forward, session.view.right)
+    mixer.setListenerEntity(session.mixer, session.client.viewEntity)
+    mixer.updateEntityOrigins(session.mixer, session.client.entities)
+    if session.server.worldModel is not void then
+      mixer.updateAmbient(
+        session.mixer,
+        session.server.worldModel,
+        session.view.origin,
+        session.timing.frameTime,
+        cvar.variableValue(session.cvars, "ambient_level"),
+        cvar.variableValue(session.cvars, "ambient_fade"),
+      )
+    end if
+    mixer.update(session.mixer, session.timing.frameTime, cvar.variableValue(session.cvars, "_snd_mixahead"))
+  end if
+  session.frameTrace = session.frameTrace + ["audio"]
   return true
 end function
 
-function shutdown(session)
+function Host_Frame(session, elapsedSeconds)
+  if cvar.variableValue(session.cvars, "serverprofile") == 0.0 then return _Host_Frame(session, elapsedSeconds) end if
+  started = win.ticks()
+  result = _Host_Frame(session, elapsedSeconds)
+  finished = win.ticks()
+  session.profileTime = session.profileTime + (finished - started)
+  session.profileCount = session.profileCount + 1
+  if session.profileCount >= 1000 then
+    print "serverprofile: " + activeServerClients(session) + " clients " + native.trunc(session.profileTime / session.profileCount) + " msec"
+    session.profileTime = 0.0
+    session.profileCount = 0
+  end if
+  return result
+end function
+
+function frame(session, elapsedSeconds)
+  return Host_Frame(session, elapsedSeconds)
+end function
+
+function Host_Shutdown(session)
+  if session.shutdownStarted then
+    print "recursive shutdown"
+    return false
+  end if
+  session.shutdownStarted = true
+  if session.initialized and not session.headless and session.maxFrames == 0 then Host_WriteConfiguration(session) end if
+  if session.demoRecording is not void then
+    stopped = try(stopDemoRecording(session))
+    if stopped is error then print stopped.message end if
+  end if
+  if session.demoPlayback is not void then finishDemoPlayback(session) end if
   if session.entityRenderer is not void then entityRenderer.destroy(session.entityRenderer); session.entityRenderer = void end if
   if session.renderer is not void and session.renderer.uploaded then worldRenderer.destroy(session.renderer) end if
   session.renderer = void
   screen.shutdown(session.console, session.menu)
-  if session.audioStarted then mixer.close(session.mixer); session.audioStarted = false end if
-  if session.client.connected then client.disconnect(session.client) end if
-  if session.server.active then server.shutdown(session.server) end if
-  if session.windowCreated then input.setMouseCapture(false); win.destroy(); session.windowCreated = false end if
+  if session.audioStarted then
+    cdAudio.release(session.mixer)
+    mixer.close(session.mixer)
+    session.audioStarted = false
+  end if
+  if session.server.active then
+    Host_ShutdownServer(session, false)
+  else if session.client.connected then
+    client.disconnect(session.client)
+  end if
+  netmain.NET_Shutdown(session.network)
+  netwins.WINS_Shutdown()
+  input.IN_Shutdown()
+  if session.windowCreated then glvid.VID_Shutdown(); session.windowCreated = false end if
+  glvid.VID_SetSoundMixer(void)
   qfs.release(session.filesystem)
   session.running = false
   return true
+end function
+
+function shutdown(session)
+  return Host_Shutdown(session)
 end function
 
 function run(args)
   session = create(args)
   initialized = try(initialize(session))
   if initialized is error then print "Host_Init: " + initialized.message; shutdown(session); return 2 end if
-  if not session.server.active then
-    print "MiniQuake: no map started. Use -basedir PATH +map start"
+  if not session.server.active and session.demoPlayback is void and not session.client.connected then
+    print "MiniQuake: no map or demo started. Use +map start or +playdemo demo1"
     shutdown(session)
     return 2
   end if
 
+  useSystemLoop = sysWin.Sys_State().initialized
   lastTicks = win.ticks()
+  lastSystemTime = 0.0
+  if useSystemLoop then lastSystemTime = sysWin.Sys_FloatTime() end if
   while session.running
     if session.windowCreated then
-      if not win.poll() then session.running = false end if
+      if useSystemLoop then
+        if not sysWin.Sys_SendKeyEvents() then session.running = false end if
+      else
+        if not win.poll() then session.running = false end if
+      end if
+      input.IN_Accumulate()
       processConsoleInput(session)
     end if
-    now = win.ticks()
-    elapsedMs = now - lastTicks
-    lastTicks = now
-    if elapsedMs < 0 then elapsedMs = 0 end if
-    if elapsedMs > 250 then elapsedMs = 250 end if
-    frame(session, elapsedMs / 1000.0)
+    dedicated = common.hasParm(session.arguments, "-dedicated")
+    if useSystemLoop and dedicated then
+      consoleCommand = sysWin.Sys_ConsoleInput()
+      if consoleCommand is not void then cmd.addText(session.commands, consoleCommand + "\n") end if
+    end if
+    elapsedSeconds = 0.0
+    if useSystemLoop then
+      if session.windowCreated and (win.minimized() or not win.hasFocus()) then
+        waitTime = sysWin.NOT_FOCUS_SLEEP
+        if session.server.paused or win.minimized() then waitTime = sysWin.PAUSE_SLEEP end if
+        sysWin.SleepUntilInput(waitTime)
+      end if
+      systemNow = sysWin.Sys_FloatTime()
+      elapsedSeconds = systemNow - lastSystemTime
+      if dedicated then
+        ticrate = cvar.variableValue(session.cvars, "sys_ticrate")
+        while elapsedSeconds < ticrate and session.running
+          sysWin.Sys_Sleep()
+          systemNow = sysWin.Sys_FloatTime()
+          elapsedSeconds = systemNow - lastSystemTime
+        end while
+      end if
+      lastSystemTime = systemNow
+    else
+      now = win.ticks()
+      elapsedMs = now - lastTicks
+      if dedicated then
+        ticrateMs = cvar.variableValue(session.cvars, "sys_ticrate") * 1000.0
+        if ticrateMs < 1.0 then ticrateMs = 1.0 end if
+        while elapsedMs < ticrateMs and session.running
+          sleepMs = native.trunc(ticrateMs - elapsedMs)
+          if sleepMs < 1 then sleepMs = 1 end if
+          win.sleep(sleepMs)
+          now = win.ticks()
+          elapsedMs = now - lastTicks
+        end while
+      end if
+      lastTicks = now
+      elapsedSeconds = elapsedMs / 1000.0
+    end if
+    if elapsedSeconds < 0.0 then elapsedSeconds = 0.0 end if
+    if elapsedSeconds > 0.25 then elapsedSeconds = 0.25 end if
+    frame(session, elapsedSeconds)
     if session.maxFrames > 0 and session.timing.frameCount >= session.maxFrames then session.running = false end if
-    if session.windowCreated then win.sleep(1) else if elapsedMs == 0 then win.sleep(1) end if
+    if not useSystemLoop then
+      if session.windowCreated then win.sleep(1) else if elapsedSeconds == 0.0 then win.sleep(1) end if
+    end if
   end while
   shutdown(session)
   return 0
+end function
+
+function protocolQueueSnapshot(session)
+  queuedMessages = 0
+  queuedBytes = 0
+  if session.server.reliableDatagram.curSize > 0 then
+    queuedMessages = queuedMessages + 1
+    queuedBytes = queuedBytes + session.server.reliableDatagram.curSize
+  end if
+  for each serverClient in session.server.clients
+    if serverClient.active and serverClient.message.curSize > 0 then
+      queuedMessages = queuedMessages + 1
+      queuedBytes = queuedBytes + serverClient.message.curSize
+    end if
+  end for
+  if session.client.outgoing.curSize > 0 then
+    queuedMessages = queuedMessages + 1
+    queuedBytes = queuedBytes + session.client.outgoing.curSize
+  end if
+  if session.client.incoming.curSize > 0 then
+    queuedMessages = queuedMessages + 1
+    queuedBytes = queuedBytes + session.client.incoming.curSize
+  end if
+  return [queuedMessages, queuedBytes]
+end function
+
+function udpEndpointCount(session)
+  count = 0
+  if session.network.listener is not void and session.network.listener.open then count = count + 1 end if
+  for each socket in session.network.remoteSockets
+    if socket is not void and not socket.disconnected and socket.udp is not void and socket.udp.open then count = count + 1 end if
+  end for
+  return count
+end function
+
+function resourceSnapshot(session)
+  network = netmain.NET_QueueSnapshot()
+  protocol = protocolQueueSnapshot(session)
+  edicts = 0
+  if session.server.active then edicts = session.server.numEdicts end if
+  audioQueued = 0
+  if session.audioStarted then audioQueued = native.audioQueued() end if
+  heapHighWater = heap_bytes_used()
+  heapFree = heap_free_bytes()
+  return [
+    heap_count(),
+    heapHighWater,
+    heapHighWater - heapFree,
+    heapFree,
+    edicts,
+    len(session.client.entities),
+    activeServerClients(session),
+    network[0],
+    network[1],
+    network[3] + protocol[0],
+    network[4] + protocol[1],
+    network[5],
+    udpEndpointCount(session),
+    audioQueued,
+    len(session.mixer.channels),
+    native.processHandleCount(),
+    len(session.particles),
+    len(session.temporaryEntities),
+  ]
+end function
+
+function resourceHighWater(high, value)
+  updated = []
+  index = 0
+  while index < len(value)
+    maximum = high[index]
+    if value[index] > maximum then maximum = value[index] end if
+    updated = updated + [maximum]
+    index = index + 1
+  end while
+  return updated
+end function
+
+function resourceStable(before, after)
+  // The snapshot arrays and the last loop-local playback object are themselves
+  // visible to the tracing collector at the final checkpoint.  Their exact
+  // block count is an implementation detail, so use it only as a generous
+  // corruption guard and gate real growth on live bytes.  64 KiB over 100k
+  // frames is tight enough to catch an accumulating per-frame allocation while
+  // allowing the fixed measurement scaffolding to remain rooted.
+  heapStable = after[0] <= before[0] + 512 and after[2] <= before[2] + 65536
+  edictsStable = after[4] <= before[4]
+  entitiesStable = after[5] <= before[5]
+  clientsStable = after[6] == before[6]
+  socketsStable = after[7] == before[7] and after[8] == before[8]
+  queuesStable = after[9] <= before[9] and after[10] <= before[10] and after[11] <= before[11]
+  endpointsStable = after[12] == before[12]
+  audioStable = after[13] <= before[13] and after[14] <= before[14]
+  handlesStable = after[15] <= before[15]
+  return heapStable and edictsStable and entitiesStable and clientsStable and socketsStable and queuesStable and endpointsStable and audioStable and handlesStable
+end function
+
+function printResourceDelta(label, before, after, high)
+  print "  " + label + ": " + before + " -> " + after + " (max " + high + ")"
+  return true
+end function
+
+function printResourceSoak(mode, target, frameCount, before, after, high, cycles, demoMessages, stable)
+  print "MiniQuake long soak"
+  print "  mode=" + mode + " target=" + target + " frames=" + frameCount
+  printResourceDelta("heap live", before[0], after[0], high[0])
+  printResourceDelta("heap high-water bytes", before[1], after[1], high[1])
+  printResourceDelta("heap live bytes", before[2], after[2], high[2])
+  printResourceDelta("heap free bytes", before[3], after[3], high[3])
+  printResourceDelta("edicts", before[4], after[4], high[4])
+  printResourceDelta("client entities", before[5], after[5], high[5])
+  printResourceDelta("active clients", before[6], after[6], high[6])
+  printResourceDelta("active qsockets", before[7], after[7], high[7])
+  printResourceDelta("free qsockets", before[8], after[8], high[8])
+  printResourceDelta("network queued messages", before[9], after[9], high[9])
+  printResourceDelta("network queued bytes", before[10], after[10], high[10])
+  printResourceDelta("network poll procedures", before[11], after[11], high[11])
+  printResourceDelta("udp endpoints", before[12], after[12], high[12])
+  printResourceDelta("audio queued buffers", before[13], after[13], high[13])
+  printResourceDelta("audio channels", before[14], after[14], high[14])
+  printResourceDelta("process handles", before[15], after[15], high[15])
+  printResourceDelta("particles", before[16], after[16], high[16])
+  printResourceDelta("temporary entities", before[17], after[17], high[17])
+  print "  demo cycles=" + cycles + " messages=" + demoMessages
+  if stable then print "  result=PASS" else print "  result=FAIL" end if
+  return stable
+end function
+
+function soakFrameError(session, phase, frameIndex, frameError)
+  stage = "before-filter"
+  if len(session.frameTrace) > 0 then stage = session.frameTrace[len(session.frameTrace) - 1] end if
+  return error(3736, phase + " frame " + frameIndex + " [" + stage + "]: " + frameError.message)
+end function
+
+function runMeasuredFrames(session, frameCount)
+  gc_collect()
+  before = resourceSnapshot(session)
+  high = before
+  index = 0
+  checkpoint = 10000
+  while index < frameCount
+    frameResult = try(frame(session, 0.02))
+    if frameResult is error then return soakFrameError(session, "measured", index, frameResult) end if
+    index = index + 1
+    if index == checkpoint or index == frameCount then
+      gc_collect()
+      high = resourceHighWater(high, resourceSnapshot(session))
+      checkpoint = checkpoint + 10000
+    end if
+  end while
+  gc_collect()
+  after = resourceSnapshot(session)
+  high = resourceHighWater(high, after)
+  return [before, after, high]
+end function
+
+function runServerModeSoak(args, mode, target, frameCount)
+  session = create(args)
+  initialized = try(initialize(session))
+  if initialized is error then
+    shutdown(session)
+    return initialized
+  end if
+  if not session.server.active then shutdown(session); return error(3730, "long soak did not start a server") end if
+  warmup = 0
+  while warmup < 1200
+    frameResult = try(frame(session, 0.02))
+    if frameResult is error then
+      failure = soakFrameError(session, "warmup", warmup, frameResult)
+      shutdown(session)
+      return failure
+    end if
+    warmup = warmup + 1
+  end while
+  measured = try(runMeasuredFrames(session, frameCount))
+  if measured is error then shutdown(session); return measured end if
+  stable = resourceStable(measured[0], measured[1])
+  printResourceSoak(mode, target, frameCount, measured[0], measured[1], measured[2], 0, 0, stable)
+  shutdown(session)
+  if not stable then return error(3731, mode + " resource growth exceeded soak limits") end if
+  return true
+end function
+
+function restartSoakDemo(session, demoName)
+  if session.demoPlayback is not void then finishDemoPlayback(session) end if
+  return playDemo(session, demoName, false)
+end function
+
+function runDemoModeSoak(args, demoName, frameCount)
+  session = create(args)
+  initialized = try(initialize(session))
+  if initialized is error then
+    shutdown(session)
+    return initialized
+  end if
+  if session.demoPlayback is void then shutdown(session); return error(3732, "demo soak did not start playback") end if
+
+  // Exercise complete retail recordings before the baseline so all
+  // message families and persistent caches have already been encountered.
+  warmup = 0
+  warmCycles = 0
+  // Eight cycles also fill the bounded console-history ring.  Measuring
+  // before that one-time capacity is reached looks like a small-object leak
+  // even though old lines are replaced once the ring is full.
+  while warmCycles < 8 and warmup < 600000
+    if session.demoPlayback is void then
+      warmCycles = warmCycles + 1
+      if warmCycles < 8 then
+        restarted = try(restartSoakDemo(session, demoName))
+        if restarted is error then shutdown(session); return restarted end if
+      end if
+    else
+      frameResult = try(frame(session, 0.02))
+      if frameResult is error then
+        failure = soakFrameError(session, "demo warmup", warmup, frameResult)
+        shutdown(session)
+        return failure
+      end if
+      warmup = warmup + 1
+    end if
+  end while
+  if warmCycles < 8 then shutdown(session); return error(3733, "demo warmup did not complete eight cycles") end if
+  restarted = try(restartSoakDemo(session, demoName))
+  if restarted is error then shutdown(session); return restarted end if
+
+  gc_collect()
+  before = resourceSnapshot(session)
+  high = before
+  cycles = 0
+  demoMessages = 0
+  index = 0
+  checkpoint = 10000
+  while index < frameCount
+    playback = session.demoPlayback
+    if playback is void then
+      cycles = cycles + 1
+      restarted = try(restartSoakDemo(session, demoName))
+      if restarted is error then shutdown(session); return restarted end if
+      playback = session.demoPlayback
+    end if
+    messageIndex = playback.index
+    frameResult = try(frame(session, 0.02))
+    if frameResult is error then
+      failure = soakFrameError(session, "demo measured", index, frameResult)
+      shutdown(session)
+      return failure
+    end if
+    demoMessages = demoMessages + playback.index - messageIndex
+    index = index + 1
+    if index == checkpoint or index == frameCount then
+      gc_collect()
+      high = resourceHighWater(high, resourceSnapshot(session))
+      checkpoint = checkpoint + 10000
+    end if
+  end while
+
+  // Compare the same post-signon phase on both sides.  Otherwise an endpoint
+  // in the middle of a demo legitimately has a different entity graph.
+  restarted = try(restartSoakDemo(session, demoName))
+  if restarted is error then shutdown(session); return restarted end if
+  gc_collect()
+  after = resourceSnapshot(session)
+  high = resourceHighWater(high, after)
+  stable = resourceStable(before, after) and cycles > 0 and demoMessages > 0
+  printResourceSoak("demo", demoName, frameCount, before, after, high, cycles, demoMessages, stable)
+  shutdown(session)
+  if not stable then return error(3734, "demo resource growth exceeded soak limits") end if
+  return true
+end function
+
+function runLongSoak(baseDirectory, gameDirectory, mode, target, frameCount, port)
+  if mode == "listen" then
+    return runServerModeSoak([
+      "-basedir", baseDirectory,
+      "-game", gameDirectory,
+      "-headless",
+      "-nosound",
+      "-listen", "8",
+      "-port", "" + port,
+      "+map", target,
+    ], mode, target, frameCount)
+  end if
+  if mode == "dedicated" then
+    return runServerModeSoak([
+      "-basedir", baseDirectory,
+      "-game", gameDirectory,
+      "-dedicated", "8",
+      "-nosound",
+      "-port", "" + port,
+      "+map", target,
+    ], mode, target, frameCount)
+  end if
+  if mode == "demo" then
+    return runDemoModeSoak([
+      "-basedir", baseDirectory,
+      "-game", gameDirectory,
+      "-headless",
+      "-nosound",
+      "+playdemo", target,
+    ], target, frameCount)
+  end if
+  return error(3735, "unknown long soak mode " + mode)
 end function
 
 function soak(session, frameCount, frameTime)
@@ -940,7 +3402,9 @@ function runHeadlessFrames(args, frameCount)
   while index < frameCount
     frameResult = try(frame(session, 0.02))
     if frameResult is error then
-      print "Host_Frame " + index + ": " + frameResult.message
+      stage = "before-filter"
+      if len(session.frameTrace) > 0 then stage = session.frameTrace[len(session.frameTrace) - 1] end if
+      print "Host_Frame " + index + " [" + stage + "]: " + frameResult.message
       shutdown(session)
       return 3
     end if

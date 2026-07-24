@@ -1,0 +1,17 @@
+diff --git a/WinQuake/snd_mix.c b/WinQuake/snd_mix.c
+index 6b08ce1..0000000 100644
+--- a/WinQuake/snd_mix.c
++++ b/WinQuake/snd_mix.c
+@@ -19,7 +19,12 @@ See the GNU General Public License for more details.
+ */
+ // snd_mix.c -- portable code to mix sounds for snd_dma.c
+ 
++#ifdef MINIQUAKE_PINNED_ORACLE
++#include "snd_mix_oracle_stubs.h"
++#undef _WIN32
++#else
+ #include "quakedef.h"
++#endif
+ 
+ #ifdef _WIN32
+ #include "winquake.h"

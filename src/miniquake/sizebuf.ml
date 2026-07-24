@@ -2,10 +2,23 @@ package miniquake.sizebuf
 
 import miniquake.types as t
 import miniquake.byteio as bio
+import miniquake.memory as memory
 
 function alloc(maxSize)
   if maxSize < 0 then return error(1200, "negative size buffer") end if
   return t.SizeBuffer(bytes(maxSize), maxSize, 0, false, false)
+end function
+
+function allocHunk(startSize)
+  if startSize < 256 then startSize = 256 end if
+  return alloc(startSize)
+end function
+
+function allocHunkManaged(memoryState, startSize)
+  if startSize < 256 then startSize = 256 end if
+  block = memory.hunkAllocName(memoryState, startSize, "sizebuf")
+  buffer = t.SizeBuffer(block.data, startSize, 0, false, false)
+  return [buffer, block]
 end function
 
 function allocOverflowing(maxSize)
@@ -16,7 +29,13 @@ end function
 
 function clear(buffer)
   buffer.curSize = 0
-  buffer.overflowed = false
+  return buffer
+end function
+
+function free(buffer)
+  // SZ_Free did not release its hunk allocation in GLQuake 1.09; only the
+  // logical contents became empty.
+  buffer.curSize = 0
   return buffer
 end function
 
@@ -56,4 +75,29 @@ end function
 
 function dataSlice(buffer)
   return slice(buffer.data, 0, buffer.curSize)
+end function
+
+// Direct pendants for the size-buffer section of WinQuake/common.c.
+function SZ_Alloc(startSize)
+  return allocHunk(startSize)
+end function
+
+function SZ_Free(buffer)
+  return free(buffer)
+end function
+
+function SZ_Clear(buffer)
+  return clear(buffer)
+end function
+
+function SZ_GetSpace(buffer, count)
+  return getSpace(buffer, count)
+end function
+
+function SZ_Write(buffer, source, sourceOffset, count)
+  return write(buffer, source, sourceOffset, count)
+end function
+
+function SZ_Print(buffer, text)
+  return printText(buffer, text)
 end function

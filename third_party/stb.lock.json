@@ -1,0 +1,12 @@
+{
+  "name": "stb",
+  "repository": "https://github.com/nothings/stb.git",
+  "commit": "31c1ad37456438565541f4919958214b6e762fb4",
+  "tree": "506e3b566bd72e60049a644f0b6c777f73ff035f",
+  "files": {
+    "stb_vorbis.c": {
+      "size": 198374,
+      "sha256": "c8daf8d9f0dad818a1cb6c9194eeb4503b63b8cbf8c744efc12942f3d679f686"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+diff --git a/WinQuake/chase.c b/WinQuake/chase.c
+index 8f759bf..0000000 100644
+--- a/WinQuake/chase.c
++++ b/WinQuake/chase.c
+@@ -19,7 +19,11 @@ See the GNU General Public License for more details.
+ */
+ // chase.c -- chase camera code
+ 
++#ifdef MINIQUAKE_PINNED_ORACLE
++#include "chase_oracle_stubs.h"
++#else
+ #include "quakedef.h"
++#endif
+ 
+ cvar_t	chase_back = {"chase_back", "100"};
+ cvar_t	chase_up = {"chase_up", "16"};

@@ -88,6 +88,62 @@ function putF32(data, offset, value)
   return putU32(data, offset, native.floatBits(value))
 end function
 
+function shortSwap(value)
+  swapped = ((value & 255) << 8) | ((value >> 8) & 255)
+  if swapped >= 0x8000 then swapped = swapped - 0x10000 end if
+  return swapped
+end function
+
+function shortNoSwap(value)
+  return value
+end function
+
+function longSwap(value)
+  swapped = ((value & 255) << 24) |
+    (((value >> 8) & 255) << 16) |
+    (((value >> 16) & 255) << 8) |
+    ((value >> 24) & 255)
+  if swapped >= 0x80000000 then swapped = swapped - 0x100000000 end if
+  return swapped
+end function
+
+function longNoSwap(value)
+  return value
+end function
+
+function floatSwap(value)
+  return native.bitsFloat(longSwap(native.floatBits(value)) & 0xffffffff)
+end function
+
+function floatNoSwap(value)
+  return value
+end function
+
+// MiniQuake's supported release platform is little-endian Windows x64.
+function bigShort(value)
+  return shortSwap(value)
+end function
+
+function littleShort(value)
+  return shortNoSwap(value)
+end function
+
+function bigLong(value)
+  return longSwap(value)
+end function
+
+function littleLong(value)
+  return longNoSwap(value)
+end function
+
+function bigFloat(value)
+  return floatSwap(value)
+end function
+
+function littleFloat(value)
+  return floatNoSwap(value)
+end function
+
 function copyInto(destination, destinationOffset, source, sourceOffset, count)
   requireRange(destination, destinationOffset, count)
   requireRange(source, sourceOffset, count)

@@ -1,0 +1,16 @@
+diff --git a/WinQuake/pr_exec.c b/WinQuake/pr_exec.c
+index e8566d8..0000000 100644
+--- a/WinQuake/pr_exec.c
++++ b/WinQuake/pr_exec.c
+@@ -17,7 +17,11 @@ See the GNU General Public License for more details.
+ 
+ */
+ 
++#ifdef MINIQUAKE_PINNED_ORACLE
++#include "pr_exec_oracle_stubs.h"
++#else
+ #include "quakedef.h"
++#endif
+ 
+ 
+ /*

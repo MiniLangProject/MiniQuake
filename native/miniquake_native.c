@@ -55,10 +55,58 @@ typedef struct MQ_SOCKADDR_IN {
     mq_u8 sin_zero[8];
 } MQ_SOCKADDR_IN;
 
+typedef struct MQ_HOSTENT {
+    char *h_name;
+    char **h_aliases;
+    mq_i16 h_addrtype;
+    mq_i16 h_length;
+    char **h_addr_list;
+} MQ_HOSTENT;
+
 typedef struct MQ_POINT {
     LONG x;
     LONG y;
 } MQ_POINT;
+
+typedef struct MQ_COORD {
+    mq_i16 X;
+    mq_i16 Y;
+} MQ_COORD;
+
+typedef struct MQ_SMALL_RECT {
+    mq_i16 Left;
+    mq_i16 Top;
+    mq_i16 Right;
+    mq_i16 Bottom;
+} MQ_SMALL_RECT;
+
+typedef struct MQ_CONSOLE_SCREEN_BUFFER_INFO {
+    MQ_COORD dwSize;
+    MQ_COORD dwCursorPosition;
+    WORD wAttributes;
+    MQ_SMALL_RECT srWindow;
+    MQ_COORD dwMaximumWindowSize;
+} MQ_CONSOLE_SCREEN_BUFFER_INFO;
+
+typedef struct MQ_KEY_EVENT_RECORD {
+    BOOL bKeyDown;
+    WORD wRepeatCount;
+    WORD wVirtualKeyCode;
+    WORD wVirtualScanCode;
+    union {
+        WCHAR UnicodeChar;
+        CHAR AsciiChar;
+    } uChar;
+    DWORD dwControlKeyState;
+} MQ_KEY_EVENT_RECORD;
+
+typedef struct MQ_INPUT_RECORD {
+    WORD EventType;
+    union {
+        MQ_KEY_EVENT_RECORD KeyEvent;
+        mq_u8 padding[16];
+    } Event;
+} MQ_INPUT_RECORD;
 
 typedef struct MQ_RECT {
     LONG left;
@@ -123,6 +171,60 @@ typedef struct MQ_PIXELFORMATDESCRIPTOR {
     DWORD dwDamageMask;
 } MQ_PIXELFORMATDESCRIPTOR;
 
+typedef struct MQ_POINTL {
+    LONG x;
+    LONG y;
+} MQ_POINTL;
+
+typedef struct MQ_DEVMODEW {
+    WCHAR dmDeviceName[32];
+    WORD dmSpecVersion;
+    WORD dmDriverVersion;
+    WORD dmSize;
+    WORD dmDriverExtra;
+    DWORD dmFields;
+    union {
+        struct {
+            mq_i16 dmOrientation;
+            mq_i16 dmPaperSize;
+            mq_i16 dmPaperLength;
+            mq_i16 dmPaperWidth;
+            mq_i16 dmScale;
+            mq_i16 dmCopies;
+            mq_i16 dmDefaultSource;
+            mq_i16 dmPrintQuality;
+        } printer;
+        struct {
+            MQ_POINTL dmPosition;
+            DWORD dmDisplayOrientation;
+            DWORD dmDisplayFixedOutput;
+        } display;
+    } layout;
+    mq_i16 dmColor;
+    mq_i16 dmDuplex;
+    mq_i16 dmYResolution;
+    mq_i16 dmTTOption;
+    mq_i16 dmCollate;
+    WCHAR dmFormName[32];
+    WORD dmLogPixels;
+    DWORD dmBitsPerPel;
+    DWORD dmPelsWidth;
+    DWORD dmPelsHeight;
+    union {
+        DWORD dmDisplayFlags;
+        DWORD dmNup;
+    } flags;
+    DWORD dmDisplayFrequency;
+    DWORD dmICMMethod;
+    DWORD dmICMIntent;
+    DWORD dmMediaType;
+    DWORD dmDitherType;
+    DWORD dmReserved1;
+    DWORD dmReserved2;
+    DWORD dmPanningWidth;
+    DWORD dmPanningHeight;
+} MQ_DEVMODEW;
+
 typedef struct MQ_WAVEFORMATEX {
     WORD wFormatTag;
     WORD nChannels;
@@ -143,6 +245,61 @@ typedef struct MQ_WAVEHDR {
     struct MQ_WAVEHDR *lpNext;
     ULONG_PTR reserved;
 } MQ_WAVEHDR;
+
+typedef struct MQ_MMTIME {
+    UINT wType;
+    union {
+        DWORD ms;
+        DWORD sample;
+        DWORD cb;
+        DWORD ticks;
+        BYTE smpte[8];
+        DWORD midi[2];
+    } u;
+} MQ_MMTIME;
+
+typedef struct MQ_JOYINFOEX {
+    DWORD dwSize;
+    DWORD dwFlags;
+    DWORD dwXpos;
+    DWORD dwYpos;
+    DWORD dwZpos;
+    DWORD dwRpos;
+    DWORD dwUpos;
+    DWORD dwVpos;
+    DWORD dwButtons;
+    DWORD dwButtonNumber;
+    DWORD dwPOV;
+    DWORD dwReserved1;
+    DWORD dwReserved2;
+} MQ_JOYINFOEX;
+
+typedef struct MQ_JOYCAPSW {
+    WORD wMid;
+    WORD wPid;
+    WCHAR szPname[32];
+    UINT wXmin;
+    UINT wXmax;
+    UINT wYmin;
+    UINT wYmax;
+    UINT wZmin;
+    UINT wZmax;
+    UINT wNumButtons;
+    UINT wPeriodMin;
+    UINT wPeriodMax;
+    UINT wRmin;
+    UINT wRmax;
+    UINT wUmin;
+    UINT wUmax;
+    UINT wVmin;
+    UINT wVmax;
+    UINT wCaps;
+    UINT wMaxAxes;
+    UINT wNumAxes;
+    UINT wMaxButtons;
+    WCHAR szRegKey[32];
+    WCHAR szOEMVxD[260];
+} MQ_JOYCAPSW;
 
 /*
  * MiniLang v1 raw-value ABI used by nativeRawValue/nativeValueFromRaw.
@@ -175,11 +332,38 @@ MQ_DLLIMPORT double MQ_CDECL cos(double value);
 MQ_DLLIMPORT double MQ_CDECL sqrt(double value);
 MQ_DLLIMPORT float MQ_CDECL sqrtf(float value);
 MQ_DLLIMPORT double MQ_CDECL atan2(double y, double x);
+MQ_DLLIMPORT double MQ_CDECL pow(double base, double exponent);
 
 /* kernel32 */
 MQ_DLLIMPORT HMODULE MQ_WINAPI GetModuleHandleW(LPCWSTR name);
+MQ_DLLIMPORT HANDLE MQ_WINAPI GetCurrentProcess(void);
+MQ_DLLIMPORT BOOL MQ_WINAPI GetProcessHandleCount(HANDLE process, DWORD *handle_count);
 MQ_DLLIMPORT DWORD MQ_WINAPI GetTickCount(void);
 MQ_DLLIMPORT void MQ_WINAPI Sleep(DWORD milliseconds);
+MQ_DLLIMPORT HANDLE MQ_WINAPI CreateEventW(void *security, BOOL manual_reset, BOOL initial_state, LPCWSTR name);
+MQ_DLLIMPORT BOOL MQ_WINAPI SetEvent(HANDLE event_handle);
+MQ_DLLIMPORT BOOL MQ_WINAPI CloseHandle(HANDLE handle);
+MQ_DLLIMPORT DWORD MQ_WINAPI WaitForMultipleObjects(DWORD count, const HANDLE *handles, BOOL wait_all, DWORD milliseconds);
+MQ_DLLIMPORT LPVOID MQ_WINAPI MapViewOfFile(HANDLE mapping, DWORD access, DWORD offset_high, DWORD offset_low, mq_u64 bytes_to_map);
+MQ_DLLIMPORT BOOL MQ_WINAPI UnmapViewOfFile(LPCVOID address);
+MQ_DLLIMPORT HANDLE MQ_WINAPI GetStdHandle(DWORD identifier);
+MQ_DLLIMPORT BOOL MQ_WINAPI GetConsoleScreenBufferInfo(HANDLE output, MQ_CONSOLE_SCREEN_BUFFER_INFO *info);
+MQ_DLLIMPORT MQ_COORD MQ_WINAPI GetLargestConsoleWindowSize(HANDLE output);
+MQ_DLLIMPORT BOOL MQ_WINAPI SetConsoleWindowInfo(HANDLE output, BOOL absolute, const MQ_SMALL_RECT *window);
+MQ_DLLIMPORT BOOL MQ_WINAPI SetConsoleScreenBufferSize(HANDLE output, MQ_COORD size);
+MQ_DLLIMPORT BOOL MQ_WINAPI ReadConsoleOutputCharacterA(HANDLE output, char *text, DWORD length, MQ_COORD position, DWORD *read_count);
+MQ_DLLIMPORT BOOL MQ_WINAPI WriteConsoleInputA(HANDLE input, const MQ_INPUT_RECORD *records, DWORD length, DWORD *written);
+MQ_DLLIMPORT BOOL MQ_WINAPI QueryPerformanceCounter(mq_i64 *counter);
+MQ_DLLIMPORT BOOL MQ_WINAPI QueryPerformanceFrequency(mq_i64 *frequency);
+MQ_DLLIMPORT BOOL MQ_WINAPI VirtualProtect(LPVOID address, mq_u64 length, DWORD protection, DWORD *old_protection);
+MQ_DLLIMPORT BOOL MQ_WINAPI GetNumberOfConsoleInputEvents(HANDLE input, DWORD *event_count);
+MQ_DLLIMPORT BOOL MQ_WINAPI ReadConsoleInputA(HANDLE input, MQ_INPUT_RECORD *records, DWORD length, DWORD *read_count);
+MQ_DLLIMPORT DWORD MQ_WINAPI GetFileType(HANDLE file);
+MQ_DLLIMPORT BOOL MQ_WINAPI PeekNamedPipe(HANDLE pipe, LPVOID buffer, DWORD buffer_size, DWORD *bytes_read, DWORD *bytes_available, DWORD *bytes_left);
+MQ_DLLIMPORT BOOL MQ_WINAPI ReadFile(HANDLE file, LPVOID buffer, DWORD length, DWORD *read_count, LPVOID overlapped);
+MQ_DLLIMPORT BOOL MQ_WINAPI WriteFile(HANDLE file, LPCVOID buffer, DWORD length, DWORD *written, LPVOID overlapped);
+MQ_DLLIMPORT BOOL MQ_WINAPI AllocConsole(void);
+MQ_DLLIMPORT BOOL MQ_WINAPI FreeConsole(void);
 
 /* user32 */
 MQ_DLLIMPORT ATOM MQ_WINAPI RegisterClassExW(const MQ_WNDCLASSEXW *window_class);
@@ -207,11 +391,22 @@ MQ_DLLIMPORT HCURSOR MQ_WINAPI LoadCursorW(HINSTANCE instance, LPCWSTR cursor_na
 MQ_DLLIMPORT HICON MQ_WINAPI LoadIconW(HINSTANCE instance, LPCWSTR icon_name);
 MQ_DLLIMPORT HDC MQ_WINAPI GetDC(HWND window);
 MQ_DLLIMPORT mq_i32 MQ_WINAPI ReleaseDC(HWND window, HDC dc);
+MQ_DLLIMPORT HWND MQ_WINAPI SetCapture(HWND window);
+MQ_DLLIMPORT BOOL MQ_WINAPI ReleaseCapture(void);
+MQ_DLLIMPORT BOOL MQ_WINAPI ClipCursor(const MQ_RECT *rect);
+MQ_DLLIMPORT BOOL MQ_WINAPI EnumDisplaySettingsW(LPCWSTR device_name, DWORD mode_number, MQ_DEVMODEW *mode);
+MQ_DLLIMPORT LONG MQ_WINAPI ChangeDisplaySettingsW(MQ_DEVMODEW *mode, DWORD flags);
+MQ_DLLIMPORT BOOL MQ_WINAPI IsIconic(HWND window);
+MQ_DLLIMPORT BOOL MQ_WINAPI SetForegroundWindow(HWND window);
+MQ_DLLIMPORT mq_i32 MQ_WINAPI MessageBoxW(HWND window, LPCWSTR text, LPCWSTR caption, UINT flags);
+MQ_DLLIMPORT DWORD MQ_WINAPI MsgWaitForMultipleObjects(DWORD count, const HANDLE *handles, BOOL wait_all, DWORD milliseconds, DWORD wake_mask);
 
 /* gdi32 */
 MQ_DLLIMPORT mq_i32 MQ_WINAPI ChoosePixelFormat(HDC dc, const MQ_PIXELFORMATDESCRIPTOR *descriptor);
 MQ_DLLIMPORT BOOL MQ_WINAPI SetPixelFormat(HDC dc, mq_i32 format, const MQ_PIXELFORMATDESCRIPTOR *descriptor);
 MQ_DLLIMPORT BOOL MQ_WINAPI SwapBuffers(HDC dc);
+MQ_DLLIMPORT BOOL MQ_WINAPI GetDeviceGammaRamp(HDC dc, void *ramp);
+MQ_DLLIMPORT BOOL MQ_WINAPI SetDeviceGammaRamp(HDC dc, const void *ramp);
 
 /* opengl32 / WGL */
 MQ_DLLIMPORT HGLRC MQ_WINAPI wglCreateContext(HDC dc);
@@ -225,6 +420,10 @@ MQ_DLLIMPORT MMRESULT MQ_WINAPI waveOutUnprepareHeader(HWAVEOUT output, MQ_WAVEH
 MQ_DLLIMPORT MMRESULT MQ_WINAPI waveOutWrite(HWAVEOUT output, MQ_WAVEHDR *header, UINT size);
 MQ_DLLIMPORT MMRESULT MQ_WINAPI waveOutReset(HWAVEOUT output);
 MQ_DLLIMPORT MMRESULT MQ_WINAPI waveOutClose(HWAVEOUT output);
+MQ_DLLIMPORT MMRESULT MQ_WINAPI waveOutGetPosition(HWAVEOUT output, MQ_MMTIME *time, UINT size);
+MQ_DLLIMPORT UINT MQ_WINAPI joyGetNumDevs(void);
+MQ_DLLIMPORT MMRESULT MQ_WINAPI joyGetPosEx(UINT joystick_id, MQ_JOYINFOEX *info);
+MQ_DLLIMPORT MMRESULT MQ_WINAPI joyGetDevCapsW(ULONG_PTR joystick_id, MQ_JOYCAPSW *caps, UINT size);
 
 /* ws2_32 */
 MQ_DLLIMPORT mq_i32 MQ_WINAPI WSAStartup(WORD version, void *data);
@@ -235,11 +434,15 @@ MQ_DLLIMPORT mq_i32 MQ_WINAPI closesocket(SOCKET socket_value);
 MQ_DLLIMPORT mq_i32 MQ_WINAPI ioctlsocket(SOCKET socket_value, LONG command, mq_u32 *argument);
 MQ_DLLIMPORT mq_i32 MQ_WINAPI bind(SOCKET socket_value, const void *address, mq_i32 address_length);
 MQ_DLLIMPORT mq_i32 MQ_WINAPI getsockname(SOCKET socket_value, void *address, mq_i32 *address_length);
+MQ_DLLIMPORT mq_i32 MQ_WINAPI setsockopt(SOCKET socket_value, mq_i32 level, mq_i32 option_name, const char *option_value, mq_i32 option_length);
 MQ_DLLIMPORT mq_i32 MQ_WINAPI sendto(SOCKET socket_value, const char *data, mq_i32 length, mq_i32 flags, const void *address, mq_i32 address_length);
 MQ_DLLIMPORT mq_i32 MQ_WINAPI recvfrom(SOCKET socket_value, char *data, mq_i32 length, mq_i32 flags, void *address, mq_i32 *address_length);
 MQ_DLLIMPORT mq_u16 MQ_WINAPI htons(mq_u16 value);
 MQ_DLLIMPORT mq_u16 MQ_WINAPI ntohs(mq_u16 value);
 MQ_DLLIMPORT mq_u32 MQ_WINAPI inet_addr(const char *address);
+MQ_DLLIMPORT mq_i32 MQ_WINAPI gethostname(char *name, mq_i32 name_length);
+MQ_DLLIMPORT MQ_HOSTENT *MQ_WINAPI gethostbyname(const char *name);
+MQ_DLLIMPORT MQ_HOSTENT *MQ_WINAPI gethostbyaddr(const char *address, mq_i32 length, mq_i32 type);
 
 /* OpenGL 1.1 */
 MQ_DLLIMPORT void MQ_WINAPI glBegin(mq_u32 mode);
@@ -274,8 +477,10 @@ MQ_DLLIMPORT void MQ_WINAPI glBindTexture(mq_u32 target, mq_u32 texture);
 MQ_DLLIMPORT void MQ_WINAPI glGenTextures(mq_i32 count, mq_u32 *texture_ids);
 MQ_DLLIMPORT void MQ_WINAPI glDeleteTextures(mq_i32 count, const mq_u32 *texture_ids);
 MQ_DLLIMPORT void MQ_WINAPI glTexParameteri(mq_u32 target, mq_u32 name, mq_i32 value);
+MQ_DLLIMPORT void MQ_WINAPI glTexEnvi(mq_u32 target, mq_u32 name, mq_i32 value);
 MQ_DLLIMPORT void MQ_WINAPI glTexImage2D(mq_u32 target, mq_i32 level, mq_i32 internal_format, mq_i32 width, mq_i32 height, mq_i32 border, mq_u32 format, mq_u32 type, const void *pixels);
 MQ_DLLIMPORT void MQ_WINAPI glTexSubImage2D(mq_u32 target, mq_i32 level, mq_i32 x_offset, mq_i32 y_offset, mq_i32 width, mq_i32 height, mq_u32 format, mq_u32 type, const void *pixels);
+MQ_DLLIMPORT void MQ_WINAPI glDrawBuffer(mq_u32 mode);
 MQ_DLLIMPORT void MQ_WINAPI glReadPixels(mq_i32 x, mq_i32 y, mq_i32 width, mq_i32 height, mq_u32 format, mq_u32 type, void *pixels);
 MQ_DLLIMPORT const mq_u8 *MQ_WINAPI glGetString(mq_u32 name);
 MQ_DLLIMPORT mq_u32 MQ_WINAPI glGetError(void);
@@ -294,13 +499,28 @@ MQ_DLLIMPORT void MQ_WINAPI glFlush(void);
 #define MQ_WS_EX_APPWINDOW 0x00040000u
 #define MQ_CW_USEDEFAULT ((mq_i32)0x80000000u)
 #define MQ_SW_SHOW 5
+#define MQ_SW_SHOWNORMAL 1
+#define MQ_SW_SHOWMINNOACTIVE 7
 #define MQ_PM_REMOVE 0x0001u
 #define MQ_WM_DESTROY 0x0002u
+#define MQ_WM_MOVE 0x0003u
+#define MQ_WM_SIZE 0x0005u
+#define MQ_WM_KILLFOCUS 0x0008u
 #define MQ_WM_CLOSE 0x0010u
 #define MQ_WM_QUIT 0x0012u
+#define MQ_WM_ACTIVATEAPP 0x001Cu
 #define MQ_WM_KEYDOWN 0x0100u
+#define MQ_WM_KEYUP 0x0101u
 #define MQ_WM_CHAR 0x0102u
 #define MQ_WM_SYSKEYDOWN 0x0104u
+#define MQ_WM_SYSKEYUP 0x0105u
+#define MQ_WM_SYSCHAR 0x0106u
+#define MQ_WM_LBUTTONDOWN 0x0201u
+#define MQ_WM_LBUTTONUP 0x0202u
+#define MQ_WM_RBUTTONDOWN 0x0204u
+#define MQ_WM_RBUTTONUP 0x0205u
+#define MQ_WM_MBUTTONDOWN 0x0207u
+#define MQ_WM_MBUTTONUP 0x0208u
 #define MQ_WM_MOUSEWHEEL 0x020Au
 #define MQ_PFD_DOUBLEBUFFER 0x00000001u
 #define MQ_PFD_DRAW_TO_WINDOW 0x00000004u
@@ -312,26 +532,72 @@ MQ_DLLIMPORT void MQ_WINAPI glFlush(void);
 #define MQ_CALLBACK_NULL 0
 #define MQ_WHDR_DONE 0x00000001u
 #define MQ_WHDR_PREPARED 0x00000002u
+#define MQ_TIME_BYTES 4u
 #define MQ_VK_LBUTTON 0x01
 #define MQ_VK_RBUTTON 0x02
 #define MQ_VK_MBUTTON 0x04
+#define MQ_JOYERR_NOERROR 0
+#define MQ_JOYCAPS_HASPOV 0x0010u
+#define MQ_JOY_RETURNALL 0x000000FFu
+#define MQ_JOY_RETURNCENTERED 0x00000400u
+#define MQ_JOY_POVCENTERED 0x0000FFFFu
+#define MQ_INPUT_EVENT_KEY 1u
+#define MQ_INPUT_EVENT_MOUSE 2u
+#define MQ_INPUT_EVENT_WHEEL 3u
+#define MQ_INPUT_EVENT_FOCUS 4u
+#define MQ_INPUT_EVENT_SCAN_KEY 5u
+#define MQ_FILE_MAP_WRITE 0x0002u
+#define MQ_FILE_MAP_READ 0x0004u
+#define MQ_WAIT_OBJECT_0 0u
+#define MQ_WAIT_TIMEOUT 258u
+#define MQ_INFINITE 0xFFFFFFFFu
+#define MQ_STD_INPUT_HANDLE 0xFFFFFFF6u
+#define MQ_STD_OUTPUT_HANDLE 0xFFFFFFF5u
+#define MQ_FILE_TYPE_PIPE 0x0003u
+#define MQ_KEY_EVENT 0x0001u
 #define MQ_SM_CXSCREEN 0
 #define MQ_SM_CYSCREEN 1
+#define MQ_ENUM_CURRENT_SETTINGS 0xFFFFFFFFu
+#define MQ_CDS_FULLSCREEN 0x00000004u
+#define MQ_CDS_TEST 0x00000002u
+#define MQ_DISP_CHANGE_SUCCESSFUL 0
+#define MQ_DM_BITSPERPEL 0x00040000u
+#define MQ_DM_PELSWIDTH 0x00080000u
+#define MQ_DM_PELSHEIGHT 0x00100000u
+#define MQ_DM_DISPLAYFREQUENCY 0x00400000u
+#define MQ_SIZE_MINIMIZED 1u
+#define MQ_IDYES 6
+#define MQ_MB_YESNO 0x00000004u
+#define MQ_MB_ICONQUESTION 0x00000020u
+#define MQ_MB_SETFOREGROUND 0x00010000u
 #define MQ_IDC_ARROW ((LPCWSTR)(ULONG_PTR)32512u)
 #define MQ_IDI_APPLICATION ((LPCWSTR)(ULONG_PTR)32512u)
 #define MQ_AF_INET 2
 #define MQ_SOCK_DGRAM 2
 #define MQ_IPPROTO_UDP 17
+#define MQ_SOL_SOCKET 0xffff
+#define MQ_SO_BROADCAST 0x0020
+#define MQ_MSG_PEEK 0x0002
 #define MQ_FIONBIO ((LONG)0x8004667eu)
 #define MQ_INVALID_SOCKET ((SOCKET)~(SOCKET)0)
 #define MQ_SOCKET_ERROR (-1)
 #define MQ_WSAEWOULDBLOCK 10035
+#define MQ_WSAEMSGSIZE 10040
+#define MQ_WSAECONNRESET 10054
+#define MQ_WSAECONNREFUSED 10061
 #define MQ_INADDR_NONE 0xffffffffu
 
 int _fltused = 0;
 
 static const WCHAR mq_window_class_name[] = {
     'M','i','n','i','Q','u','a','k','e','W','i','n','d','o','w',0
+};
+static const WCHAR mq_quit_text[] = {
+    'A','r','e',' ','y','o','u',' ','s','u','r','e',' ','y','o','u',' ',
+    'w','a','n','t',' ','t','o',' ','q','u','i','t','?',0
+};
+static const WCHAR mq_quit_caption[] = {
+    'C','o','n','f','i','r','m',' ','E','x','i','t',0
 };
 
 static HWND mq_window = MQ_NULL;
@@ -340,16 +606,42 @@ static HGLRC mq_gl_context = MQ_NULL;
 static HINSTANCE mq_instance = MQ_NULL;
 static mq_i32 mq_class_registered = 0;
 static mq_i32 mq_running = 0;
+static mq_i32 mq_active_app = 0;
+static mq_i32 mq_minimized = 0;
+static mq_i32 mq_window_x_value = 0;
+static mq_i32 mq_window_y_value = 0;
+static mq_i32 mq_display_fullscreen = 0;
+static mq_i32 mq_display_use_current = 0;
+static mq_i32 mq_display_changed = 0;
+static mq_i32 mq_display_suspended = 0;
+static MQ_DEVMODEW mq_requested_display_mode;
+#define MQ_DISPLAY_MODE_CAPACITY 256
+static MQ_DEVMODEW mq_display_modes[MQ_DISPLAY_MODE_CAPACITY];
+static mq_u32 mq_display_mode_count_value = 0;
+static mq_u8 mq_original_gamma_ramp[1536];
+static mq_i32 mq_original_gamma_valid = 0;
 static mq_i32 mq_cursor_captured = 0;
 static mq_i32 mq_mouse_ready = 0;
 static mq_i32 mq_mouse_delta_x = 0;
 static mq_i32 mq_mouse_delta_y = 0;
 static mq_i32 mq_mouse_wheel_delta = 0;
+#define MQ_INPUT_QUEUE_CAPACITY 256
+static mq_u32 mq_input_queue[MQ_INPUT_QUEUE_CAPACITY];
+static mq_u32 mq_input_head = 0;
+static mq_u32 mq_input_tail = 0;
+static mq_u8 mq_virtual_key_down[256];
+static mq_u8 mq_virtual_key_scan[256];
+static mq_u8 mq_mouse_button_down[3];
 #define MQ_TEXT_QUEUE_CAPACITY 64
 static mq_u16 mq_text_queue[MQ_TEXT_QUEUE_CAPACITY];
 static mq_u32 mq_text_head = 0;
 static mq_u32 mq_text_tail = 0;
 static mq_u8 mq_key_pressed[256];
+static mq_i32 mq_joy_available = 0;
+static UINT mq_joy_id = 0;
+static mq_u32 mq_joy_button_count_value = 0;
+static mq_i32 mq_joy_has_pov_value = 0;
+static MQ_JOYINFOEX mq_joy_info;
 
 static HWAVEOUT mq_wave_output = MQ_NULL;
 #define MQ_AUDIO_BUFFER_COUNT 8
@@ -358,10 +650,20 @@ static mq_u8 mq_audio_data[MQ_AUDIO_BUFFER_COUNT][MQ_AUDIO_BUFFER_BYTES];
 static MQ_WAVEHDR mq_audio_headers[MQ_AUDIO_BUFFER_COUNT];
 static mq_u32 mq_audio_next_buffer = 0;
 static mq_u32 mq_audio_buffer_count = 0;
+static mq_u32 mq_audio_bytes_per_sample = 2;
+static mq_u32 mq_audio_submitted_count = 0;
+static mq_u32 mq_audio_completed_count = 0;
+static mq_u32 mq_audio_underrun_count = 0;
+static mq_u64 mq_audio_completed_bytes = 0;
 
 static mq_i32 mq_winsock_started = 0;
 static mq_u32 mq_udp_socket_count = 0;
 static char mq_udp_last_address_text[32] = "0.0.0.0";
+static char mq_udp_local_address_text[32] = "127.0.0.1";
+static char mq_udp_bound_address_text[32] = "0.0.0.0";
+static char mq_udp_host_name_text[256] = "";
+static char mq_udp_resolved_address_text[32] = "";
+static char mq_udp_reverse_name_text[256] = "";
 static mq_u32 mq_udp_last_port_value = 0;
 static mq_i32 mq_udp_last_error_value = 0;
 static mq_u8 mq_wsa_data[512];
@@ -399,6 +701,54 @@ static mq_i32 mq_center_mouse_cursor(void) {
     return SetCursorPos(center.x, center.y) != 0;
 }
 
+static mq_i32 mq_update_clip_cursor(void) {
+    MQ_RECT rectangle;
+    MQ_POINT upper_left;
+    MQ_POINT lower_right;
+    if (mq_window == MQ_NULL || !GetClientRect(mq_window, &rectangle)) {
+        return 0;
+    }
+    upper_left.x = rectangle.left;
+    upper_left.y = rectangle.top;
+    lower_right.x = rectangle.right;
+    lower_right.y = rectangle.bottom;
+    if (!ClientToScreen(mq_window, &upper_left) || !ClientToScreen(mq_window, &lower_right)) {
+        return 0;
+    }
+    rectangle.left = upper_left.x;
+    rectangle.top = upper_left.y;
+    rectangle.right = lower_right.x;
+    rectangle.bottom = lower_right.y;
+    return ClipCursor(&rectangle) != 0;
+}
+
+static void mq_push_input_event(mq_u32 type, mq_u32 code, mq_i32 value) {
+    mq_u32 next = (mq_input_head + 1u) % MQ_INPUT_QUEUE_CAPACITY;
+    mq_u32 packed = ((type & 0xFFu) << 24) | ((code & 0xFFFFu) << 8) | ((mq_u32)value & 0xFFu);
+    if (next == mq_input_tail) {
+        mq_input_tail = (mq_input_tail + 1u) % MQ_INPUT_QUEUE_CAPACITY;
+    }
+    mq_input_queue[mq_input_head] = packed;
+    mq_input_head = next;
+}
+
+static void mq_release_all_input_keys(void) {
+    mq_u32 index;
+    for (index = 0; index < 256u; ++index) {
+        if (mq_virtual_key_down[index]) {
+            mq_push_input_event(MQ_INPUT_EVENT_SCAN_KEY, mq_virtual_key_scan[index], 0);
+            mq_virtual_key_down[index] = 0;
+            mq_virtual_key_scan[index] = 0;
+        }
+    }
+    for (index = 0; index < 3u; ++index) {
+        if (mq_mouse_button_down[index]) {
+            mq_push_input_event(MQ_INPUT_EVENT_MOUSE, index, 0);
+            mq_mouse_button_down[index] = 0;
+        }
+    }
+}
+
 static void mq_copy_bytes(mq_u8 *destination, const mq_u8 *source, mq_u32 count) {
     mq_u32 i = 0;
     while (i < count) {
@@ -413,6 +763,20 @@ static void mq_zero_bytes(mq_u8 *destination, mq_u32 count) {
         destination[i] = 0;
         ++i;
     }
+}
+
+static void mq_copy_c_string(char *destination, mq_u32 capacity, const char *source) {
+    mq_u32 index = 0;
+    if (capacity == 0) {
+        return;
+    }
+    if (source != MQ_NULL) {
+        while (index + 1u < capacity && source[index] != 0) {
+            destination[index] = source[index];
+            ++index;
+        }
+    }
+    destination[index] = 0;
 }
 
 static mq_i32 mq_winsock_start(void) {
@@ -432,16 +796,20 @@ static mq_i32 mq_winsock_start(void) {
     return 1;
 }
 
-static void mq_udp_remember_address(const MQ_SOCKADDR_IN *address) {
-    const mq_u8 *octets = (const mq_u8 *)&address->sin_addr;
+static void mq_udp_format_address(char *destination, mq_u32 address) {
+    const mq_u8 *octets = (const mq_u8 *)&address;
     sprintf(
-        mq_udp_last_address_text,
+        destination,
         "%u.%u.%u.%u",
         (unsigned int)octets[0],
         (unsigned int)octets[1],
         (unsigned int)octets[2],
         (unsigned int)octets[3]
     );
+}
+
+static void mq_udp_remember_address(const MQ_SOCKADDR_IN *address) {
+    mq_udp_format_address(mq_udp_last_address_text, address->sin_addr);
     mq_udp_last_port_value = (mq_u32)ntohs(address->sin_port);
 }
 
@@ -452,8 +820,15 @@ static void mq_clear_input_events(void) {
     mq_mouse_ready = 0;
     mq_text_head = 0;
     mq_text_tail = 0;
+    mq_input_head = 0;
+    mq_input_tail = 0;
     for (i = 0; i < 256u; ++i) {
         mq_key_pressed[i] = 0;
+        mq_virtual_key_down[i] = 0;
+        mq_virtual_key_scan[i] = 0;
+    }
+    for (i = 0; i < 3u; ++i) {
+        mq_mouse_button_down[i] = 0;
     }
 }
 
@@ -466,10 +841,90 @@ static void mq_push_text(mq_u16 character) {
     mq_text_head = next;
 }
 
+static void mq_prepare_display_mode(
+    MQ_DEVMODEW *mode,
+    mq_i32 width,
+    mq_i32 height,
+    mq_i32 bpp,
+    mq_i32 frequency
+) {
+    memset(mode, 0, sizeof(*mode));
+    mode->dmSize = (WORD)sizeof(*mode);
+    mode->dmFields = MQ_DM_PELSWIDTH | MQ_DM_PELSHEIGHT;
+    mode->dmPelsWidth = (DWORD)width;
+    mode->dmPelsHeight = (DWORD)height;
+    if (bpp > 0) {
+        mode->dmFields |= MQ_DM_BITSPERPEL;
+        mode->dmBitsPerPel = (DWORD)bpp;
+    }
+    if (frequency > 0) {
+        mode->dmFields |= MQ_DM_DISPLAYFREQUENCY;
+        mode->dmDisplayFrequency = (DWORD)frequency;
+    }
+}
+
+static mq_i32 mq_apply_requested_display_mode(void) {
+    if (!mq_display_fullscreen || mq_display_use_current) {
+        return 1;
+    }
+    if (ChangeDisplaySettingsW(&mq_requested_display_mode, MQ_CDS_FULLSCREEN) != MQ_DISP_CHANGE_SUCCESSFUL) {
+        return 0;
+    }
+    mq_display_changed = 1;
+    mq_display_suspended = 0;
+    return 1;
+}
+
+static void mq_restore_requested_display_mode(void) {
+    if (mq_display_changed || mq_display_suspended) {
+        ChangeDisplaySettingsW(MQ_NULL, 0);
+    }
+    mq_display_changed = 0;
+    mq_display_suspended = 0;
+}
+
 static LRESULT MQ_WINAPI mq_window_proc(HWND window, UINT message, WPARAM w_param, LPARAM l_param) {
-    (void)l_param;
+    if (message == MQ_WM_MOVE) {
+        mq_window_x_value = (mq_i16)(l_param & 0xFFFF);
+        mq_window_y_value = (mq_i16)((l_param >> 16) & 0xFFFF);
+        if (mq_cursor_captured) {
+            mq_mouse_ready = 0;
+            mq_update_clip_cursor();
+        }
+    }
+    if (message == MQ_WM_SIZE) {
+        mq_minimized = ((mq_u32)w_param == MQ_SIZE_MINIMIZED);
+        if (!mq_minimized && mq_cursor_captured) {
+            mq_mouse_ready = 0;
+            mq_update_clip_cursor();
+        }
+    }
     if ((message == MQ_WM_KEYDOWN || message == MQ_WM_SYSKEYDOWN) && w_param < 256u) {
+        mq_u32 scan_code = ((mq_u32)l_param >> 16) & 0xFFu;
         mq_key_pressed[(mq_u32)w_param] = 1;
+        mq_virtual_key_down[(mq_u32)w_param] = 1;
+        mq_virtual_key_scan[(mq_u32)w_param] = (mq_u8)scan_code;
+        mq_push_input_event(MQ_INPUT_EVENT_SCAN_KEY, scan_code, 1);
+    }
+    if ((message == MQ_WM_KEYUP || message == MQ_WM_SYSKEYUP) && w_param < 256u) {
+        mq_u32 scan_code = ((mq_u32)l_param >> 16) & 0xFFu;
+        mq_virtual_key_down[(mq_u32)w_param] = 0;
+        mq_virtual_key_scan[(mq_u32)w_param] = 0;
+        mq_push_input_event(MQ_INPUT_EVENT_SCAN_KEY, scan_code, 0);
+    }
+    if (message == MQ_WM_SYSCHAR) {
+        /* Match gl_vidnt.c: suppress the Alt+Space system menu. */
+        return 0;
+    }
+    if (message == MQ_WM_LBUTTONDOWN || message == MQ_WM_RBUTTONDOWN || message == MQ_WM_MBUTTONDOWN) {
+        mq_u32 button = message == MQ_WM_LBUTTONDOWN ? 0u : (message == MQ_WM_RBUTTONDOWN ? 1u : 2u);
+        mq_mouse_button_down[button] = 1;
+        mq_push_input_event(MQ_INPUT_EVENT_MOUSE, button, 1);
+    }
+    if (message == MQ_WM_LBUTTONUP || message == MQ_WM_RBUTTONUP || message == MQ_WM_MBUTTONUP) {
+        mq_u32 button = message == MQ_WM_LBUTTONUP ? 0u : (message == MQ_WM_RBUTTONUP ? 1u : 2u);
+        mq_mouse_button_down[button] = 0;
+        mq_push_input_event(MQ_INPUT_EVENT_MOUSE, button, 0);
     }
     if (message == MQ_WM_CHAR) {
         mq_u16 character = (mq_u16)(w_param & 0xFFFFu);
@@ -479,8 +934,13 @@ static LRESULT MQ_WINAPI mq_window_proc(HWND window, UINT message, WPARAM w_para
         return 0;
     }
     if (message == MQ_WM_CLOSE) {
-        mq_running = 0;
-        DestroyWindow(window);
+        if (MessageBoxW(
+                window, mq_quit_text, mq_quit_caption,
+                MQ_MB_YESNO | MQ_MB_SETFOREGROUND | MQ_MB_ICONQUESTION
+            ) == MQ_IDYES) {
+            mq_running = 0;
+            DestroyWindow(window);
+        }
         return 0;
     }
     if (message == MQ_WM_DESTROY) {
@@ -494,6 +954,42 @@ static LRESULT MQ_WINAPI mq_window_proc(HWND window, UINT message, WPARAM w_para
             delta -= 0x10000;
         }
         mq_mouse_wheel_delta += delta / 120;
+        while (delta >= 120) {
+            mq_push_input_event(MQ_INPUT_EVENT_WHEEL, 0, 1);
+            delta -= 120;
+        }
+        while (delta <= -120) {
+            mq_push_input_event(MQ_INPUT_EVENT_WHEEL, 0, -1);
+            delta += 120;
+        }
+        return 0;
+    }
+    if (message == MQ_WM_ACTIVATEAPP) {
+        mq_active_app = w_param != 0;
+        mq_minimized = IsIconic(window) != 0;
+        if (w_param == 0) {
+            mq_release_all_input_keys();
+            mq_push_input_event(MQ_INPUT_EVENT_FOCUS, 0, 0);
+            mq_mouse_ready = 0;
+            if (mq_display_fullscreen && mq_display_changed) {
+                ChangeDisplaySettingsW(MQ_NULL, 0);
+                mq_display_changed = 0;
+                mq_display_suspended = 1;
+                ShowWindow(window, MQ_SW_SHOWMINNOACTIVE);
+            }
+        } else {
+            if (mq_display_fullscreen && mq_display_suspended) {
+                mq_apply_requested_display_mode();
+                ShowWindow(window, MQ_SW_SHOWNORMAL);
+                SetForegroundWindow(window);
+            }
+            mq_push_input_event(MQ_INPUT_EVENT_FOCUS, 0, 1);
+            mq_mouse_ready = 0;
+        }
+        return 0;
+    }
+    if (message == MQ_WM_KILLFOCUS && mq_display_fullscreen) {
+        ShowWindow(window, MQ_SW_SHOWMINNOACTIVE);
         return 0;
     }
     return DefWindowProcW(window, message, w_param, l_param);
@@ -582,6 +1078,140 @@ MQ_EXPORT const char *mq_ascii_char(mq_i32 value) {
     return output;
 }
 
+MQ_EXPORT mq_u32 mq_win_display_mode_count(void) {
+    MQ_DEVMODEW mode;
+    DWORD index = 0;
+    mq_display_mode_count_value = 0;
+    while (mq_display_mode_count_value < MQ_DISPLAY_MODE_CAPACITY) {
+        memset(&mode, 0, sizeof(mode));
+        mode.dmSize = (WORD)sizeof(mode);
+        if (!EnumDisplaySettingsW(MQ_NULL, index, &mode)) {
+            break;
+        }
+        if (mode.dmBitsPerPel >= 15u && mode.dmPelsWidth <= 10000u && mode.dmPelsHeight <= 10000u) {
+            mq_display_modes[mq_display_mode_count_value++] = mode;
+        }
+        ++index;
+    }
+    return mq_display_mode_count_value;
+}
+
+MQ_EXPORT mq_i32 mq_win_display_mode_width(mq_u32 index) {
+    return index < mq_display_mode_count_value ? (mq_i32)mq_display_modes[index].dmPelsWidth : 0;
+}
+
+MQ_EXPORT mq_i32 mq_win_display_mode_height(mq_u32 index) {
+    return index < mq_display_mode_count_value ? (mq_i32)mq_display_modes[index].dmPelsHeight : 0;
+}
+
+MQ_EXPORT mq_i32 mq_win_display_mode_bpp(mq_u32 index) {
+    return index < mq_display_mode_count_value ? (mq_i32)mq_display_modes[index].dmBitsPerPel : 0;
+}
+
+MQ_EXPORT mq_i32 mq_win_display_mode_frequency(mq_u32 index) {
+    return index < mq_display_mode_count_value ? (mq_i32)mq_display_modes[index].dmDisplayFrequency : 0;
+}
+
+MQ_EXPORT mq_i32 mq_win_test_display_mode(mq_i32 width, mq_i32 height, mq_i32 bpp, mq_i32 frequency) {
+    MQ_DEVMODEW mode;
+    if (width < 1 || height < 1) {
+        return 0;
+    }
+    mq_prepare_display_mode(&mode, width, height, bpp, frequency);
+    return ChangeDisplaySettingsW(&mode, MQ_CDS_TEST | MQ_CDS_FULLSCREEN) == MQ_DISP_CHANGE_SUCCESSFUL;
+}
+
+MQ_EXPORT mq_i32 mq_win_configure_display_mode(
+    mq_i32 width,
+    mq_i32 height,
+    mq_i32 bpp,
+    mq_i32 frequency,
+    mq_i32 fullscreen,
+    mq_i32 use_current
+) {
+    mq_restore_requested_display_mode();
+    mq_display_fullscreen = fullscreen != 0;
+    mq_display_use_current = use_current != 0;
+    mq_prepare_display_mode(&mq_requested_display_mode, width, height, bpp, frequency);
+    if (mq_display_fullscreen && !mq_display_use_current) {
+        return ChangeDisplaySettingsW(&mq_requested_display_mode, MQ_CDS_TEST | MQ_CDS_FULLSCREEN) == MQ_DISP_CHANGE_SUCCESSFUL;
+    }
+    return 1;
+}
+
+MQ_EXPORT void mq_win_restore_display_mode(void) {
+    mq_restore_requested_display_mode();
+    mq_display_fullscreen = 0;
+    mq_display_use_current = 0;
+}
+
+MQ_EXPORT mq_i32 mq_win_get_gamma_ramp(mq_u8 *ramp, mq_u32 byte_count) {
+    HDC dc;
+    BOOL result;
+    if (ramp == MQ_NULL || byte_count < 1536u) {
+        return 0;
+    }
+    dc = mq_window_dc != MQ_NULL ? mq_window_dc : GetDC(MQ_NULL);
+    if (dc == MQ_NULL) {
+        return 0;
+    }
+    result = GetDeviceGammaRamp(dc, ramp);
+    if (mq_window_dc == MQ_NULL) {
+        ReleaseDC(MQ_NULL, dc);
+    }
+    return result != 0;
+}
+
+MQ_EXPORT mq_i32 mq_win_set_gamma_ramp(const mq_u8 *ramp, mq_u32 byte_count) {
+    HDC dc;
+    BOOL result;
+    if (ramp == MQ_NULL || byte_count < 1536u) {
+        return 0;
+    }
+    dc = mq_window_dc != MQ_NULL ? mq_window_dc : GetDC(MQ_NULL);
+    if (dc == MQ_NULL) {
+        return 0;
+    }
+    if (!mq_original_gamma_valid) {
+        mq_original_gamma_valid = GetDeviceGammaRamp(dc, mq_original_gamma_ramp) != 0;
+    }
+    result = SetDeviceGammaRamp(dc, ramp);
+    if (mq_window_dc == MQ_NULL) {
+        ReleaseDC(MQ_NULL, dc);
+    }
+    return result != 0;
+}
+
+MQ_EXPORT mq_i32 mq_win_context_ready(void) {
+    return mq_window_dc != MQ_NULL && mq_gl_context != MQ_NULL;
+}
+
+MQ_EXPORT mq_i32 mq_win_make_current(void) {
+    return mq_window_dc != MQ_NULL && mq_gl_context != MQ_NULL && wglMakeCurrent(mq_window_dc, mq_gl_context);
+}
+
+MQ_EXPORT mq_i32 mq_win_window_x(void) { return mq_window_x_value; }
+MQ_EXPORT mq_i32 mq_win_window_y(void) { return mq_window_y_value; }
+MQ_EXPORT mq_i32 mq_win_is_minimized(void) { return mq_minimized; }
+MQ_EXPORT mq_i32 mq_win_desktop_width(void) { return GetSystemMetrics(MQ_SM_CXSCREEN); }
+MQ_EXPORT mq_i32 mq_win_desktop_height(void) { return GetSystemMetrics(MQ_SM_CYSCREEN); }
+
+MQ_EXPORT void mq_win_activate(mq_i32 active, mq_i32 minimized) {
+    mq_active_app = active != 0;
+    mq_minimized = minimized != 0;
+    if (!mq_active_app && mq_display_fullscreen && mq_display_changed) {
+        ChangeDisplaySettingsW(MQ_NULL, 0);
+        mq_display_changed = 0;
+        mq_display_suspended = 1;
+    } else if (mq_active_app && mq_display_fullscreen && mq_display_suspended) {
+        mq_apply_requested_display_mode();
+        if (mq_window != MQ_NULL) {
+            ShowWindow(mq_window, MQ_SW_SHOWNORMAL);
+            SetForegroundWindow(mq_window);
+        }
+    }
+}
+
 MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32 height, mq_i32 fullscreen) {
     MQ_WNDCLASSEXW window_class;
     MQ_PIXELFORMATDESCRIPTOR pixel_format;
@@ -600,9 +1230,13 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
     if (width < 1 || height < 1) {
         return MQ_NULL;
     }
+    if (fullscreen && !mq_apply_requested_display_mode()) {
+        return MQ_NULL;
+    }
 
     mq_instance = GetModuleHandleW(MQ_NULL);
     if (mq_instance == MQ_NULL) {
+        mq_restore_requested_display_mode();
         return MQ_NULL;
     }
 
@@ -620,6 +1254,7 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
         window_class.lpszClassName = mq_window_class_name;
         window_class.hIconSm = window_class.hIcon;
         if (RegisterClassExW(&window_class) == 0) {
+            mq_restore_requested_display_mode();
             return MQ_NULL;
         }
         mq_class_registered = 1;
@@ -630,8 +1265,10 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
         style = MQ_WS_POPUP | MQ_WS_VISIBLE;
         window_x = 0;
         window_y = 0;
-        window_width = GetSystemMetrics(MQ_SM_CXSCREEN);
-        window_height = GetSystemMetrics(MQ_SM_CYSCREEN);
+        /* The display mode may be a dual-head physical width while GLQuake's
+         * logical window is half that width (vmode_t.halfscreen). */
+        window_width = width;
+        window_height = height;
     } else {
         style = MQ_WS_OVERLAPPEDWINDOW | MQ_WS_VISIBLE;
         rectangle.left = 0;
@@ -641,8 +1278,13 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
         AdjustWindowRectEx(&rectangle, style, MQ_FALSE, ex_style);
         window_width = rectangle.right - rectangle.left;
         window_height = rectangle.bottom - rectangle.top;
-        window_x = MQ_CW_USEDEFAULT;
-        window_y = MQ_CW_USEDEFAULT;
+        window_x = (GetSystemMetrics(MQ_SM_CXSCREEN) - width) / 2;
+        window_y = (GetSystemMetrics(MQ_SM_CYSCREEN) - height) / 2;
+        if (window_x > window_y * 2) {
+            window_x >>= 1;
+        }
+        if (window_x < 0) window_x = 0;
+        if (window_y < 0) window_y = 0;
     }
 
     mq_window = CreateWindowExW(
@@ -660,6 +1302,7 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
         MQ_NULL
     );
     if (mq_window == MQ_NULL) {
+        mq_restore_requested_display_mode();
         return MQ_NULL;
     }
 
@@ -673,22 +1316,22 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
     pixel_format.nVersion = 1;
     pixel_format.dwFlags = MQ_PFD_DRAW_TO_WINDOW | MQ_PFD_SUPPORT_OPENGL | MQ_PFD_DOUBLEBUFFER;
     pixel_format.iPixelType = MQ_PFD_TYPE_RGBA;
-    pixel_format.cColorBits = 32;
+    pixel_format.cColorBits = 24;
     pixel_format.cRedBits = 0;
     pixel_format.cRedShift = 0;
     pixel_format.cGreenBits = 0;
     pixel_format.cGreenShift = 0;
     pixel_format.cBlueBits = 0;
     pixel_format.cBlueShift = 0;
-    pixel_format.cAlphaBits = 8;
+    pixel_format.cAlphaBits = 0;
     pixel_format.cAlphaShift = 0;
     pixel_format.cAccumBits = 0;
     pixel_format.cAccumRedBits = 0;
     pixel_format.cAccumGreenBits = 0;
     pixel_format.cAccumBlueBits = 0;
     pixel_format.cAccumAlphaBits = 0;
-    pixel_format.cDepthBits = 24;
-    pixel_format.cStencilBits = 8;
+    pixel_format.cDepthBits = 32;
+    pixel_format.cStencilBits = 0;
     pixel_format.cAuxBuffers = 0;
     pixel_format.iLayerType = MQ_PFD_MAIN_PLANE;
     pixel_format.bReserved = 0;
@@ -712,11 +1355,24 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
     UpdateWindow(mq_window);
     mq_clear_input_events();
     mq_running = 1;
+    mq_active_app = 1;
+    mq_minimized = 0;
     return mq_window;
 }
 
 MQ_EXPORT void mq_win_destroy(void) {
+    HDC gamma_dc;
     mq_win_set_cursor_capture(0);
+    if (mq_original_gamma_valid) {
+        gamma_dc = mq_window_dc != MQ_NULL ? mq_window_dc : GetDC(MQ_NULL);
+        if (gamma_dc != MQ_NULL) {
+            SetDeviceGammaRamp(gamma_dc, mq_original_gamma_ramp);
+            if (mq_window_dc == MQ_NULL) {
+                ReleaseDC(MQ_NULL, gamma_dc);
+            }
+        }
+        mq_original_gamma_valid = 0;
+    }
     if (mq_gl_context != MQ_NULL) {
         wglMakeCurrent(MQ_NULL, MQ_NULL);
         wglDeleteContext(mq_gl_context);
@@ -730,7 +1386,12 @@ MQ_EXPORT void mq_win_destroy(void) {
         DestroyWindow(mq_window);
         mq_window = MQ_NULL;
     }
+    mq_restore_requested_display_mode();
+    mq_display_fullscreen = 0;
+    mq_display_use_current = 0;
     mq_running = 0;
+    mq_active_app = 0;
+    mq_minimized = 0;
 }
 
 MQ_EXPORT mq_i32 mq_win_poll(void) {
@@ -833,13 +1494,17 @@ MQ_EXPORT void mq_win_set_title(const unsigned short *title) {
 MQ_EXPORT void mq_win_set_cursor_capture(mq_i32 enabled) {
     if (enabled && !mq_cursor_captured) {
         while (ShowCursor(MQ_FALSE) >= 0) { }
+        SetCapture(mq_window);
         mq_cursor_captured = 1;
         mq_mouse_ready = 0;
         mq_mouse_delta_x = 0;
         mq_mouse_delta_y = 0;
         mq_center_mouse_cursor();
+        mq_update_clip_cursor();
     } else if (!enabled && mq_cursor_captured) {
         while (ShowCursor(MQ_TRUE) < 0) { }
+        ClipCursor(MQ_NULL);
+        ReleaseCapture();
         mq_cursor_captured = 0;
         mq_mouse_ready = 0;
         mq_mouse_delta_x = 0;
@@ -873,12 +1538,372 @@ MQ_EXPORT mq_i32 mq_win_mouse_wheel(void) {
     return value;
 }
 
+MQ_EXPORT mq_u32 mq_win_input_event_pop(void) {
+    mq_u32 value;
+    if (mq_input_tail == mq_input_head) {
+        return 0;
+    }
+    value = mq_input_queue[mq_input_tail];
+    mq_input_tail = (mq_input_tail + 1u) % MQ_INPUT_QUEUE_CAPACITY;
+    return value;
+}
+
+MQ_EXPORT void mq_win_input_test_push(mq_u32 type, mq_u32 code, mq_i32 value) {
+    mq_push_input_event(type, code, value);
+}
+
+MQ_EXPORT void mq_win_cursor_show(mq_i32 show) {
+    if (show) {
+        while (ShowCursor(MQ_TRUE) < 0) { }
+    } else {
+        while (ShowCursor(MQ_FALSE) >= 0) { }
+    }
+}
+
+MQ_EXPORT mq_i32 mq_win_cursor_center(void) {
+    return mq_center_mouse_cursor();
+}
+
+MQ_EXPORT mq_i32 mq_win_update_clip_cursor(void) {
+    if (!mq_cursor_captured) {
+        return 0;
+    }
+    return mq_update_clip_cursor();
+}
+
+MQ_EXPORT mq_i32 mq_win_joy_startup(void) {
+    UINT device_count = joyGetNumDevs();
+    UINT index;
+    MQ_JOYCAPSW caps;
+    mq_joy_available = 0;
+    mq_joy_button_count_value = 0;
+    mq_joy_has_pov_value = 0;
+    if (device_count == 0) {
+        return 0;
+    }
+    for (index = 0; index < device_count; ++index) {
+        memset(&mq_joy_info, 0, (mq_u64)sizeof(mq_joy_info));
+        mq_joy_info.dwSize = (DWORD)sizeof(mq_joy_info);
+        mq_joy_info.dwFlags = MQ_JOY_RETURNCENTERED;
+        if (joyGetPosEx(index, &mq_joy_info) == MQ_JOYERR_NOERROR) {
+            mq_joy_id = index;
+            break;
+        }
+    }
+    if (index == device_count) {
+        return 0;
+    }
+    memset(&caps, 0, (mq_u64)sizeof(caps));
+    if (joyGetDevCapsW((ULONG_PTR)mq_joy_id, &caps, (UINT)sizeof(caps)) != MQ_JOYERR_NOERROR) {
+        return 0;
+    }
+    mq_joy_button_count_value = caps.wNumButtons;
+    if (mq_joy_button_count_value > 32u) {
+        mq_joy_button_count_value = 32u;
+    }
+    mq_joy_has_pov_value = (caps.wCaps & MQ_JOYCAPS_HASPOV) != 0;
+    mq_joy_available = 1;
+    return 1;
+}
+
+MQ_EXPORT mq_i32 mq_win_joy_read(void) {
+    if (!mq_joy_available) {
+        return 0;
+    }
+    memset(&mq_joy_info, 0, (mq_u64)sizeof(mq_joy_info));
+    mq_joy_info.dwSize = (DWORD)sizeof(mq_joy_info);
+    mq_joy_info.dwFlags = MQ_JOY_RETURNALL | MQ_JOY_RETURNCENTERED;
+    return joyGetPosEx(mq_joy_id, &mq_joy_info) == MQ_JOYERR_NOERROR;
+}
+
+MQ_EXPORT mq_u32 mq_win_joy_axis(mq_u32 axis) {
+    if (axis == 0u) return mq_joy_info.dwXpos;
+    if (axis == 1u) return mq_joy_info.dwYpos;
+    if (axis == 2u) return mq_joy_info.dwZpos;
+    if (axis == 3u) return mq_joy_info.dwRpos;
+    if (axis == 4u) return mq_joy_info.dwUpos;
+    if (axis == 5u) return mq_joy_info.dwVpos;
+    return 32768u;
+}
+
+MQ_EXPORT mq_u32 mq_win_joy_buttons(void) { return mq_joy_info.dwButtons; }
+MQ_EXPORT mq_u32 mq_win_joy_pov(void) { return mq_joy_info.dwPOV; }
+MQ_EXPORT mq_u32 mq_win_joy_button_count(void) { return mq_joy_button_count_value; }
+MQ_EXPORT mq_i32 mq_win_joy_has_pov(void) { return mq_joy_has_pov_value; }
+MQ_EXPORT mq_i32 mq_win_joy_warrior_curve(mq_i32 raw_value) {
+    double magnitude = (double)(raw_value < 0 ? -raw_value : raw_value);
+    double curved = 300.0 * pow(magnitude / 800.0, 1.3);
+    if (curved > 14000.0) curved = 14000.0;
+    return raw_value > 0 ? (mq_i32)curved : -(mq_i32)curved;
+}
+
+MQ_EXPORT mq_u32 mq_win_joy_warrior_curve_f32(mq_i32 raw_value) {
+    float magnitude = (float)(raw_value < 0 ? -raw_value : raw_value);
+    float curved = (float)(300.0 * pow((double)magnitude / 800.0, 1.3));
+    if (curved > 14000.0f) curved = 14000.0f;
+    if (raw_value <= 0) curved = -curved;
+    return mq_float_to_bits(curved);
+}
+
 MQ_EXPORT mq_u32 mq_win_ticks(void) {
     return GetTickCount();
 }
 
 MQ_EXPORT void mq_win_sleep(mq_u32 milliseconds) {
     Sleep(milliseconds);
+}
+
+MQ_EXPORT mq_u64 mq_sys_counter(void) {
+    mq_i64 counter = 0;
+    if (!QueryPerformanceCounter(&counter)) return 0;
+    return (mq_u64)counter;
+}
+
+MQ_EXPORT mq_u64 mq_sys_frequency(void) {
+    mq_i64 frequency = 0;
+    if (!QueryPerformanceFrequency(&frequency)) return 0;
+    return (mq_u64)frequency;
+}
+
+MQ_EXPORT mq_u32 mq_process_handle_count(void) {
+    DWORD handle_count = 0;
+    if (!GetProcessHandleCount(GetCurrentProcess(), &handle_count)) return 0;
+    return handle_count;
+}
+
+MQ_EXPORT mq_i32 mq_sys_make_code_writeable(mq_u64 address, mq_u64 length) {
+    DWORD old_protection = 0;
+    if (address == 0 || length == 0) return 0;
+    return VirtualProtect((LPVOID)(ULONG_PTR)address, length, 0x04u, &old_protection) != 0;
+}
+
+static mq_i32 mq_sys_owns_console = 0;
+
+MQ_EXPORT mq_i32 mq_sys_console_alloc(void) {
+    HANDLE output;
+    if (AllocConsole() != 0) {
+        mq_sys_owns_console = 1;
+        return 1;
+    }
+    /* MiniLang executables use the console subsystem and may already have the
+       equivalent of WinQuake's freshly allocated dedicated console. */
+    output = GetStdHandle(MQ_STD_OUTPUT_HANDLE);
+    return output != MQ_NULL && (ULONG_PTR)output != ~(mq_u64)0;
+}
+
+MQ_EXPORT mq_i32 mq_sys_console_free(void) {
+    if (!mq_sys_owns_console) return 1;
+    mq_sys_owns_console = 0;
+    return FreeConsole() != 0;
+}
+
+MQ_EXPORT mq_u32 mq_sys_console_event_pop(void) {
+    HANDLE input = GetStdHandle(MQ_STD_INPUT_HANDLE);
+    MQ_INPUT_RECORD record;
+    DWORD available = 0;
+    DWORD read_count = 0;
+    mq_u32 result;
+    /*
+     * A dedicated server normally receives KEY_EVENT records from a console,
+     * like the original sys_win.c.  Test harnesses and service wrappers
+     * commonly redirect stdin to a pipe, however.  Preserve the same
+     * character-at-a-time contract without ever blocking the host frame.
+     */
+    if (input == MQ_NULL || (ULONG_PTR)input == ~(mq_u64)0) return 0;
+    if (GetFileType(input) == MQ_FILE_TYPE_PIPE) {
+        mq_u8 character = 0;
+        if (!PeekNamedPipe(input, MQ_NULL, 0, MQ_NULL, &available, MQ_NULL) || available == 0) return 0;
+        if (!ReadFile(input, &character, 1, &read_count, MQ_NULL) || read_count != 1u) return 0;
+        if (character == 10u) character = 13u;
+        /* Sys_ConsoleInput intentionally consumes KEY_EVENT key-up records,
+           exactly as the original GLQuake sys_win.c does. */
+        return 0x80000000u | character;
+    }
+    if (!GetNumberOfConsoleInputEvents(input, &available) || available == 0) return 0;
+    if (!ReadConsoleInputA(input, &record, 1, &read_count) || read_count != 1u) return 0;
+    result = 0x80000000u;
+    if (record.EventType != MQ_KEY_EVENT) return result;
+    if (record.Event.KeyEvent.bKeyDown) result |= 0x00010000u;
+    result |= (mq_u8)record.Event.KeyEvent.uChar.AsciiChar;
+    return result;
+}
+
+MQ_EXPORT mq_i32 mq_sys_console_write(const char *text) {
+    HANDLE output = GetStdHandle(MQ_STD_OUTPUT_HANDLE);
+    DWORD length = 0;
+    DWORD written = 0;
+    if (output == MQ_NULL || text == MQ_NULL) return 0;
+    while (text[length] != 0) ++length;
+    return WriteFile(output, text, length, &written, MQ_NULL) != 0 && written == length;
+}
+
+MQ_EXPORT void mq_sys_sleep_until_input(mq_u32 milliseconds) {
+    MsgWaitForMultipleObjects(0, MQ_NULL, MQ_FALSE, milliseconds, 0x04FFu);
+}
+
+MQ_EXPORT mq_u64 mq_conproc_create_event(void) {
+    return (mq_u64)(ULONG_PTR)CreateEventW(MQ_NULL, MQ_FALSE, MQ_FALSE, MQ_NULL);
+}
+
+MQ_EXPORT mq_i32 mq_conproc_set_event(mq_u64 handle) {
+    if (handle == 0) return 0;
+    return SetEvent((HANDLE)(ULONG_PTR)handle) != 0;
+}
+
+MQ_EXPORT void mq_conproc_close_handle(mq_u64 handle) {
+    if (handle != 0) CloseHandle((HANDLE)(ULONG_PTR)handle);
+}
+
+MQ_EXPORT mq_i32 mq_conproc_wait_any(mq_u64 first, mq_u64 second, mq_u32 milliseconds) {
+    HANDLE handles[2];
+    DWORD result;
+    handles[0] = (HANDLE)(ULONG_PTR)first;
+    handles[1] = (HANDLE)(ULONG_PTR)second;
+    result = WaitForMultipleObjects(2, handles, MQ_FALSE, milliseconds);
+    if (result == MQ_WAIT_OBJECT_0) return 0;
+    if (result == MQ_WAIT_OBJECT_0 + 1u) return 1;
+    if (result == MQ_WAIT_TIMEOUT) return 2;
+    return -1;
+}
+
+MQ_EXPORT mq_ptr mq_conproc_map(mq_u64 handle) {
+    if (handle == 0) return MQ_NULL;
+    return MapViewOfFile((HANDLE)(ULONG_PTR)handle, MQ_FILE_MAP_READ | MQ_FILE_MAP_WRITE, 0, 0, 0);
+}
+
+MQ_EXPORT mq_i32 mq_conproc_unmap(mq_ptr mapped) {
+    return mapped != MQ_NULL && UnmapViewOfFile(mapped) != 0;
+}
+
+MQ_EXPORT mq_i32 mq_conproc_read_i32(mq_ptr mapped, mq_u32 index) {
+    const mq_i32 *values = (const mq_i32 *)mapped;
+    return values != MQ_NULL ? values[index] : 0;
+}
+
+MQ_EXPORT void mq_conproc_write_i32(mq_ptr mapped, mq_u32 index, mq_i32 value) {
+    mq_i32 *values = (mq_i32 *)mapped;
+    if (values != MQ_NULL) values[index] = value;
+}
+
+MQ_EXPORT const char *mq_conproc_read_text(mq_ptr mapped, mq_u32 byte_offset) {
+    if (mapped == MQ_NULL) return "";
+    return (const char *)((const mq_u8 *)mapped + byte_offset);
+}
+
+MQ_EXPORT mq_i32 mq_conproc_write_text(mq_ptr mapped, mq_u32 byte_offset, const char *text, mq_u32 capacity) {
+    char *destination;
+    mq_u32 index = 0;
+    if (mapped == MQ_NULL || text == MQ_NULL || capacity == 0) return 0;
+    destination = (char *)((mq_u8 *)mapped + byte_offset);
+    while (index + 1u < capacity && text[index] != 0) {
+        destination[index] = text[index];
+        ++index;
+    }
+    destination[index] = 0;
+    return 1;
+}
+
+MQ_EXPORT mq_i32 mq_conproc_screen_lines(void) {
+    MQ_CONSOLE_SCREEN_BUFFER_INFO info;
+    HANDLE output = GetStdHandle(MQ_STD_OUTPUT_HANDLE);
+    if (output == MQ_NULL || !GetConsoleScreenBufferInfo(output, &info)) return -1;
+    return (mq_i32)info.dwSize.Y;
+}
+
+MQ_EXPORT mq_i32 mq_conproc_set_screen_size(mq_i32 cx, mq_i32 cy) {
+    HANDLE output = GetStdHandle(MQ_STD_OUTPUT_HANDLE);
+    MQ_CONSOLE_SCREEN_BUFFER_INFO info;
+    MQ_COORD maximum;
+    if (output == MQ_NULL || cx < 1 || cy < 1) return 0;
+    maximum = GetLargestConsoleWindowSize(output);
+    if (cx > maximum.X) cx = maximum.X;
+    if (cy > maximum.Y) cy = maximum.Y;
+    if (!GetConsoleScreenBufferInfo(output, &info)) return 0;
+    info.srWindow.Left = 0;
+    info.srWindow.Right = info.dwSize.X - 1;
+    info.srWindow.Top = 0;
+    info.srWindow.Bottom = (mq_i16)(cy - 1);
+    if (cy < info.dwSize.Y) {
+        if (!SetConsoleWindowInfo(output, MQ_TRUE, &info.srWindow)) return 0;
+        info.dwSize.Y = (mq_i16)cy;
+        if (!SetConsoleScreenBufferSize(output, info.dwSize)) return 0;
+    } else if (cy > info.dwSize.Y) {
+        info.dwSize.Y = (mq_i16)cy;
+        if (!SetConsoleScreenBufferSize(output, info.dwSize)) return 0;
+        if (!SetConsoleWindowInfo(output, MQ_TRUE, &info.srWindow)) return 0;
+    }
+    if (!GetConsoleScreenBufferInfo(output, &info)) return 0;
+    info.srWindow.Left = 0;
+    info.srWindow.Right = (mq_i16)(cx - 1);
+    info.srWindow.Top = 0;
+    info.srWindow.Bottom = info.dwSize.Y - 1;
+    if (cx < info.dwSize.X) {
+        if (!SetConsoleWindowInfo(output, MQ_TRUE, &info.srWindow)) return 0;
+        info.dwSize.X = (mq_i16)cx;
+        if (!SetConsoleScreenBufferSize(output, info.dwSize)) return 0;
+    } else if (cx > info.dwSize.X) {
+        info.dwSize.X = (mq_i16)cx;
+        if (!SetConsoleScreenBufferSize(output, info.dwSize)) return 0;
+        if (!SetConsoleWindowInfo(output, MQ_TRUE, &info.srWindow)) return 0;
+    }
+    return 1;
+}
+
+MQ_EXPORT const char *mq_conproc_read_console_text(mq_i32 begin_line, mq_i32 end_line) {
+    static char output[65536];
+    HANDLE stdout_handle = GetStdHandle(MQ_STD_OUTPUT_HANDLE);
+    MQ_COORD position;
+    DWORD count;
+    DWORD read_count = 0;
+    if (stdout_handle == MQ_NULL || begin_line < 0 || end_line < begin_line) return "";
+    count = (DWORD)(80 * (end_line - begin_line + 1));
+    if (count >= (DWORD)sizeof(output)) count = (DWORD)sizeof(output) - 1u;
+    position.X = 0;
+    position.Y = (mq_i16)begin_line;
+    if (!ReadConsoleOutputCharacterA(stdout_handle, output, count, position, &read_count)) {
+        output[0] = 0;
+        return output;
+    }
+    output[read_count] = 0;
+    return output;
+}
+
+MQ_EXPORT mq_i32 mq_conproc_write_key(mq_i32 character, mq_i32 virtual_key, mq_i32 scan_code, mq_i32 shift, mq_i32 down) {
+    HANDLE stdin_handle = GetStdHandle(MQ_STD_INPUT_HANDLE);
+    MQ_INPUT_RECORD record;
+    DWORD written = 0;
+    if (stdin_handle == MQ_NULL) return 0;
+    memset(&record, 0, sizeof(record));
+    record.EventType = MQ_KEY_EVENT;
+    record.Event.KeyEvent.bKeyDown = down != 0;
+    record.Event.KeyEvent.wRepeatCount = 1;
+    record.Event.KeyEvent.wVirtualKeyCode = (WORD)virtual_key;
+    record.Event.KeyEvent.wVirtualScanCode = (WORD)scan_code;
+    record.Event.KeyEvent.uChar.AsciiChar = (CHAR)character;
+    record.Event.KeyEvent.dwControlKeyState = shift ? 0x80u : 0u;
+    return WriteConsoleInputA(stdin_handle, &record, 1, &written) != 0 && written == 1u;
+}
+
+static void mq_audio_reap_completed(void) {
+    mq_u32 i;
+    if (mq_wave_output == MQ_NULL) {
+        return;
+    }
+    for (i = 0; i < MQ_AUDIO_BUFFER_COUNT; ++i) {
+        MQ_WAVEHDR *header = &mq_audio_headers[i];
+        if ((header->dwFlags & MQ_WHDR_PREPARED) && (header->dwFlags & MQ_WHDR_DONE)) {
+            mq_audio_completed_bytes += (mq_u64)header->dwBufferLength;
+            ++mq_audio_completed_count;
+            waveOutUnprepareHeader(mq_wave_output, header, (UINT)sizeof(*header));
+            header->dwBufferLength = 0;
+            header->dwBytesRecorded = 0;
+            header->dwUser = 0;
+            header->dwFlags = 0;
+            if (mq_audio_buffer_count > 0) {
+                --mq_audio_buffer_count;
+            }
+        }
+    }
 }
 
 MQ_EXPORT mq_i32 mq_audio_open(mq_u32 sample_rate, mq_u32 channels, mq_u32 bits_per_sample) {
@@ -913,6 +1938,11 @@ MQ_EXPORT mq_i32 mq_audio_open(mq_u32 sample_rate, mq_u32 channels, mq_u32 bits_
     }
     mq_audio_next_buffer = 0;
     mq_audio_buffer_count = 0;
+    mq_audio_bytes_per_sample = bits_per_sample / 8u;
+    mq_audio_submitted_count = 0;
+    mq_audio_completed_count = 0;
+    mq_audio_underrun_count = 0;
+    mq_audio_completed_bytes = 0;
     return 1;
 }
 
@@ -922,6 +1952,11 @@ MQ_EXPORT mq_i32 mq_audio_submit(const void *data, mq_u32 byte_count) {
     mq_u32 selected = 0;
     if (mq_wave_output == MQ_NULL || data == MQ_NULL || byte_count == 0 || byte_count > MQ_AUDIO_BUFFER_BYTES) {
         return 0;
+    }
+
+    mq_audio_reap_completed();
+    if (mq_audio_submitted_count > 0 && mq_audio_buffer_count == 0) {
+        ++mq_audio_underrun_count;
     }
 
     /* Do not stall merely because the next ring slot is still active.  Windows
@@ -948,6 +1983,7 @@ MQ_EXPORT mq_i32 mq_audio_submit(const void *data, mq_u32 byte_count) {
     mq_copy_bytes((mq_u8 *)header->lpData, (const mq_u8 *)data, byte_count);
     header->dwBufferLength = byte_count;
     header->dwBytesRecorded = 0;
+    header->dwUser = byte_count;
     header->dwFlags = 0;
     header->dwLoops = 0;
     if (waveOutPrepareHeader(mq_wave_output, header, (UINT)sizeof(*header)) != 0) {
@@ -961,6 +1997,7 @@ MQ_EXPORT mq_i32 mq_audio_submit(const void *data, mq_u32 byte_count) {
     if (mq_audio_buffer_count < MQ_AUDIO_BUFFER_COUNT) {
         ++mq_audio_buffer_count;
     }
+    ++mq_audio_submitted_count;
     return 1;
 }
 
@@ -970,6 +2007,7 @@ MQ_EXPORT void mq_audio_close(void) {
         return;
     }
     waveOutReset(mq_wave_output);
+    mq_audio_reap_completed();
     for (i = 0; i < MQ_AUDIO_BUFFER_COUNT; ++i) {
         if (mq_audio_headers[i].dwFlags & MQ_WHDR_PREPARED) {
             waveOutUnprepareHeader(mq_wave_output, &mq_audio_headers[i], (UINT)sizeof(MQ_WAVEHDR));
@@ -982,25 +2020,96 @@ MQ_EXPORT void mq_audio_close(void) {
 }
 
 MQ_EXPORT mq_u32 mq_audio_queued(void) {
-    mq_u32 i;
-    mq_u32 queued = 0;
     if (mq_wave_output == MQ_NULL) {
         return 0;
     }
-    for (i = 0; i < MQ_AUDIO_BUFFER_COUNT; ++i) {
-        if ((mq_audio_headers[i].dwFlags & MQ_WHDR_PREPARED) && !(mq_audio_headers[i].dwFlags & MQ_WHDR_DONE)) {
-            ++queued;
-        }
-    }
-    return queued;
+    mq_audio_reap_completed();
+    return mq_audio_buffer_count;
 }
 
-MQ_EXPORT mq_u64 mq_udp_open(mq_u32 port) {
+MQ_EXPORT mq_i32 mq_audio_reset(void) {
+    if (mq_wave_output == MQ_NULL) {
+        return 0;
+    }
+    if (waveOutReset(mq_wave_output) != 0) {
+        return 0;
+    }
+    mq_audio_reap_completed();
+    return 1;
+}
+
+MQ_EXPORT mq_u32 mq_audio_position(mq_u32 sample_mask) {
+    MQ_MMTIME time_value;
+    mq_u64 byte_position = mq_audio_completed_bytes;
+    if (mq_wave_output != MQ_NULL) {
+        memset(&time_value, 0, sizeof(time_value));
+        time_value.wType = MQ_TIME_BYTES;
+        if (waveOutGetPosition(mq_wave_output, &time_value, (UINT)sizeof(time_value)) == 0 &&
+            time_value.wType == MQ_TIME_BYTES) {
+            byte_position = (mq_u64)time_value.u.cb;
+        }
+    }
+    if (mq_audio_bytes_per_sample == 0) {
+        return 0;
+    }
+    return (mq_u32)(byte_position / mq_audio_bytes_per_sample) & sample_mask;
+}
+
+MQ_EXPORT mq_u32 mq_audio_submitted(void) {
+    return mq_audio_submitted_count;
+}
+
+MQ_EXPORT mq_u32 mq_audio_completed(void) {
+    mq_audio_reap_completed();
+    return mq_audio_completed_count;
+}
+
+MQ_EXPORT mq_u32 mq_audio_underruns(void) {
+    return mq_audio_underrun_count;
+}
+
+MQ_EXPORT mq_u32 mq_audio_header_state(mq_u32 index) {
+    MQ_WAVEHDR *header;
+    if (index >= MQ_AUDIO_BUFFER_COUNT) {
+        return 0;
+    }
+    mq_audio_reap_completed();
+    header = &mq_audio_headers[index];
+    if ((header->dwFlags & MQ_WHDR_PREPARED) == 0) {
+        return 0;
+    }
+    if (header->dwFlags & MQ_WHDR_DONE) {
+        return 2;
+    }
+    return 1;
+}
+
+MQ_EXPORT mq_u32 mq_audio_capacity(void) {
+    return MQ_AUDIO_BUFFER_COUNT;
+}
+
+MQ_EXPORT mq_i32 mq_audio_is_open(void) {
+    return mq_wave_output != MQ_NULL;
+}
+
+MQ_EXPORT mq_u64 mq_udp_open_bound(mq_u32 port, const char *bind_address) {
     SOCKET socket_value;
     MQ_SOCKADDR_IN address;
     mq_u32 nonblocking = 1;
+    mq_u32 parsed_address = 0;
     if (port > 65535u || !mq_winsock_start()) {
         return 0;
+    }
+    if (bind_address != MQ_NULL && bind_address[0] != 0 &&
+        !(bind_address[0] == '0' && bind_address[1] == '.' &&
+          bind_address[2] == '0' && bind_address[3] == '.' &&
+          bind_address[4] == '0' && bind_address[5] == '.' &&
+          bind_address[6] == '0' && bind_address[7] == 0)) {
+        parsed_address = inet_addr(bind_address);
+        if (parsed_address == MQ_INADDR_NONE) {
+            mq_udp_last_error_value = -3;
+            return 0;
+        }
     }
     socket_value = socket(MQ_AF_INET, MQ_SOCK_DGRAM, MQ_IPPROTO_UDP);
     if (socket_value == MQ_INVALID_SOCKET) {
@@ -1015,7 +2124,7 @@ MQ_EXPORT mq_u64 mq_udp_open(mq_u32 port) {
     mq_zero_bytes((mq_u8 *)&address, (mq_u32)sizeof(address));
     address.sin_family = (mq_u16)MQ_AF_INET;
     address.sin_port = htons((mq_u16)port);
-    address.sin_addr = 0;
+    address.sin_addr = parsed_address;
     if (bind(socket_value, &address, (mq_i32)sizeof(address)) == MQ_SOCKET_ERROR) {
         mq_udp_last_error_value = WSAGetLastError();
         closesocket(socket_value);
@@ -1024,6 +2133,10 @@ MQ_EXPORT mq_u64 mq_udp_open(mq_u32 port) {
     ++mq_udp_socket_count;
     mq_udp_last_error_value = 0;
     return (mq_u64)socket_value;
+}
+
+MQ_EXPORT mq_u64 mq_udp_open(mq_u32 port) {
+    return mq_udp_open_bound(port, "0.0.0.0");
 }
 
 MQ_EXPORT void mq_udp_close(mq_u64 handle) {
@@ -1055,8 +2168,65 @@ MQ_EXPORT mq_u32 mq_udp_bound_port(mq_u64 handle) {
     return (mq_u32)ntohs(address.sin_port);
 }
 
+MQ_EXPORT const char *mq_udp_bound_address(mq_u64 handle) {
+    MQ_SOCKADDR_IN address;
+    mq_i32 address_length = (mq_i32)sizeof(address);
+    if (handle == 0) {
+        mq_udp_last_error_value = -1;
+        return "";
+    }
+    mq_zero_bytes((mq_u8 *)&address, (mq_u32)sizeof(address));
+    if (getsockname((SOCKET)handle, &address, &address_length) == MQ_SOCKET_ERROR) {
+        mq_udp_last_error_value = WSAGetLastError();
+        return "";
+    }
+    mq_udp_format_address(mq_udp_bound_address_text, address.sin_addr);
+    mq_udp_last_error_value = 0;
+    return mq_udp_bound_address_text;
+}
+
+MQ_EXPORT mq_i32 mq_udp_enable_broadcast(mq_u64 handle) {
+    mq_i32 enabled = 1;
+    if (handle == 0) {
+        mq_udp_last_error_value = -1;
+        return -1;
+    }
+    if (setsockopt((SOCKET)handle, MQ_SOL_SOCKET, MQ_SO_BROADCAST, (const char *)&enabled, (mq_i32)sizeof(enabled)) == MQ_SOCKET_ERROR) {
+        mq_udp_last_error_value = WSAGetLastError();
+        return -1;
+    }
+    mq_udp_last_error_value = 0;
+    return 0;
+}
+
+MQ_EXPORT mq_i32 mq_udp_peek(mq_u64 handle) {
+    char value;
+    mq_i32 result;
+    if (handle == 0) {
+        mq_udp_last_error_value = -1;
+        return -1;
+    }
+    result = recvfrom((SOCKET)handle, &value, 1, MQ_MSG_PEEK, MQ_NULL, MQ_NULL);
+    if (result == MQ_SOCKET_ERROR) {
+        mq_i32 error_code = WSAGetLastError();
+        if (error_code == MQ_WSAEMSGSIZE) {
+            mq_udp_last_error_value = 0;
+            return 1;
+        }
+        if (error_code == MQ_WSAEWOULDBLOCK || error_code == MQ_WSAECONNRESET || error_code == MQ_WSAECONNREFUSED) {
+            mq_udp_last_error_value = 0;
+            return 0;
+        }
+        mq_udp_last_error_value = error_code;
+        return -1;
+    }
+    mq_udp_last_error_value = 0;
+    return result;
+}
+
 MQ_EXPORT mq_i32 mq_udp_send(mq_u64 handle, const char *address_text, mq_u32 port, const void *data, mq_u32 byte_count) {
     MQ_SOCKADDR_IN address;
+    MQ_HOSTENT *host_entry;
     mq_u32 parsed_address;
     mq_i32 result;
     if (handle == 0 || address_text == MQ_NULL || data == MQ_NULL || byte_count > 65507u || port > 65535u) {
@@ -1064,9 +2234,19 @@ MQ_EXPORT mq_i32 mq_udp_send(mq_u64 handle, const char *address_text, mq_u32 por
         return -1;
     }
     parsed_address = inet_addr(address_text);
-    if (parsed_address == MQ_INADDR_NONE) {
-        mq_udp_last_error_value = -2;
-        return -1;
+    if (parsed_address == MQ_INADDR_NONE &&
+        !(address_text[0] == '2' && address_text[1] == '5' && address_text[2] == '5' && address_text[3] == '.' &&
+          address_text[4] == '2' && address_text[5] == '5' && address_text[6] == '5' && address_text[7] == '.' &&
+          address_text[8] == '2' && address_text[9] == '5' && address_text[10] == '5' && address_text[11] == '.' &&
+          address_text[12] == '2' && address_text[13] == '5' && address_text[14] == '5' && address_text[15] == 0)) {
+        host_entry = gethostbyname(address_text);
+        if (host_entry == MQ_NULL || host_entry->h_addrtype != MQ_AF_INET ||
+            host_entry->h_length != 4 || host_entry->h_addr_list == MQ_NULL ||
+            host_entry->h_addr_list[0] == MQ_NULL) {
+            mq_udp_last_error_value = -2;
+            return -1;
+        }
+        parsed_address = *(const mq_u32 *)host_entry->h_addr_list[0];
     }
     mq_zero_bytes((mq_u8 *)&address, (mq_u32)sizeof(address));
     address.sin_family = (mq_u16)MQ_AF_INET;
@@ -1074,7 +2254,12 @@ MQ_EXPORT mq_i32 mq_udp_send(mq_u64 handle, const char *address_text, mq_u32 por
     address.sin_addr = parsed_address;
     result = sendto((SOCKET)handle, (const char *)data, (mq_i32)byte_count, 0, &address, (mq_i32)sizeof(address));
     if (result == MQ_SOCKET_ERROR) {
-        mq_udp_last_error_value = WSAGetLastError();
+        mq_i32 error_code = WSAGetLastError();
+        if (error_code == MQ_WSAEWOULDBLOCK) {
+            mq_udp_last_error_value = 0;
+            return 0;
+        }
+        mq_udp_last_error_value = error_code;
         return -1;
     }
     mq_udp_last_error_value = 0;
@@ -1093,7 +2278,7 @@ MQ_EXPORT mq_i32 mq_udp_receive(mq_u64 handle, void *data, mq_u32 capacity) {
     result = recvfrom((SOCKET)handle, (char *)data, (mq_i32)capacity, 0, &address, &address_length);
     if (result == MQ_SOCKET_ERROR) {
         mq_i32 error_code = WSAGetLastError();
-        if (error_code == MQ_WSAEWOULDBLOCK) {
+        if (error_code == MQ_WSAEWOULDBLOCK || error_code == MQ_WSAECONNRESET || error_code == MQ_WSAECONNREFUSED) {
             mq_udp_last_error_value = 0;
             return 0;
         }
@@ -1108,6 +2293,86 @@ MQ_EXPORT mq_i32 mq_udp_receive(mq_u64 handle, void *data, mq_u32 capacity) {
 MQ_EXPORT const char *mq_udp_last_address(void) { return mq_udp_last_address_text; }
 MQ_EXPORT mq_u32 mq_udp_last_port(void) { return mq_udp_last_port_value; }
 MQ_EXPORT mq_i32 mq_udp_last_error(void) { return mq_udp_last_error_value; }
+MQ_EXPORT const char *mq_udp_local_address(void) {
+    char host_name[256];
+    MQ_HOSTENT *host_entry;
+    mq_u32 address;
+    if (!mq_winsock_start()) {
+        return mq_udp_local_address_text;
+    }
+    if (gethostname(host_name, (mq_i32)sizeof(host_name)) == MQ_SOCKET_ERROR) {
+        return mq_udp_local_address_text;
+    }
+    host_name[sizeof(host_name) - 1u] = 0;
+    host_entry = gethostbyname(host_name);
+    if (host_entry == MQ_NULL || host_entry->h_addrtype != MQ_AF_INET ||
+        host_entry->h_length != 4 || host_entry->h_addr_list == MQ_NULL ||
+        host_entry->h_addr_list[0] == MQ_NULL) {
+        return mq_udp_local_address_text;
+    }
+    address = *(const mq_u32 *)host_entry->h_addr_list[0];
+    mq_udp_format_address(mq_udp_local_address_text, address);
+    return mq_udp_local_address_text;
+}
+
+MQ_EXPORT const char *mq_udp_host_name(void) {
+    if (!mq_winsock_start()) {
+        return "";
+    }
+    if (gethostname(mq_udp_host_name_text, (mq_i32)sizeof(mq_udp_host_name_text)) == MQ_SOCKET_ERROR) {
+        mq_udp_last_error_value = WSAGetLastError();
+        mq_udp_host_name_text[0] = 0;
+        return mq_udp_host_name_text;
+    }
+    mq_udp_host_name_text[sizeof(mq_udp_host_name_text) - 1u] = 0;
+    mq_udp_last_error_value = 0;
+    return mq_udp_host_name_text;
+}
+
+MQ_EXPORT const char *mq_udp_resolve_name(const char *name) {
+    MQ_HOSTENT *host_entry;
+    mq_u32 address;
+    if (name == MQ_NULL || name[0] == 0 || !mq_winsock_start()) {
+        mq_udp_last_error_value = -1;
+        return "";
+    }
+    address = inet_addr(name);
+    if (address == MQ_INADDR_NONE) {
+        host_entry = gethostbyname(name);
+        if (host_entry == MQ_NULL || host_entry->h_addrtype != MQ_AF_INET ||
+            host_entry->h_length != 4 || host_entry->h_addr_list == MQ_NULL ||
+            host_entry->h_addr_list[0] == MQ_NULL) {
+            mq_udp_last_error_value = WSAGetLastError();
+            return "";
+        }
+        address = *(const mq_u32 *)host_entry->h_addr_list[0];
+    }
+    mq_udp_format_address(mq_udp_resolved_address_text, address);
+    mq_udp_last_error_value = 0;
+    return mq_udp_resolved_address_text;
+}
+
+MQ_EXPORT const char *mq_udp_reverse_name(const char *address_text) {
+    MQ_HOSTENT *host_entry;
+    mq_u32 address;
+    if (address_text == MQ_NULL || !mq_winsock_start()) {
+        mq_udp_last_error_value = -1;
+        return "";
+    }
+    address = inet_addr(address_text);
+    if (address == MQ_INADDR_NONE) {
+        mq_udp_last_error_value = -2;
+        return "";
+    }
+    host_entry = gethostbyaddr((const char *)&address, 4, MQ_AF_INET);
+    if (host_entry == MQ_NULL || host_entry->h_name == MQ_NULL) {
+        mq_udp_last_error_value = WSAGetLastError();
+        return "";
+    }
+    mq_copy_c_string(mq_udp_reverse_name_text, (mq_u32)sizeof(mq_udp_reverse_name_text), host_entry->h_name);
+    mq_udp_last_error_value = 0;
+    return mq_udp_reverse_name_text;
+}
 
 MQ_EXPORT void mq_gl_begin(mq_u32 mode) { glBegin(mode); }
 MQ_EXPORT void mq_gl_end(void) { glEnd(); }
@@ -1141,6 +2406,7 @@ MQ_EXPORT void mq_gl_bind_texture(mq_u32 target, mq_u32 texture) { glBindTexture
 MQ_EXPORT void mq_gl_gen_textures(mq_i32 count, void *texture_ids) { glGenTextures(count, (mq_u32 *)texture_ids); }
 MQ_EXPORT void mq_gl_delete_textures(mq_i32 count, const void *texture_ids) { glDeleteTextures(count, (const mq_u32 *)texture_ids); }
 MQ_EXPORT void mq_gl_tex_parameter_i(mq_u32 target, mq_u32 name, mq_i32 value) { glTexParameteri(target, name, value); }
+MQ_EXPORT void mq_gl_tex_env_i(mq_u32 target, mq_u32 name, mq_i32 value) { glTexEnvi(target, name, value); }
 MQ_EXPORT void mq_gl_tex_image_2d(mq_u32 target, mq_i32 level, mq_i32 internal_format, mq_i32 width, mq_i32 height, mq_i32 border, mq_u32 format, mq_u32 type, const void *pixels) { glTexImage2D(target, level, internal_format, width, height, border, format, type, pixels); }
 MQ_EXPORT void mq_gl_tex_sub_image_2d(mq_u32 target, mq_i32 level, mq_i32 x_offset, mq_i32 y_offset, mq_i32 width, mq_i32 height, mq_u32 format, mq_u32 type, const void *pixels) { glTexSubImage2D(target, level, x_offset, y_offset, width, height, format, type, pixels); }
 MQ_EXPORT void mq_gl_read_pixels(mq_i32 x, mq_i32 y, mq_i32 width, mq_i32 height, mq_u32 format, mq_u32 type, void *pixels) { glReadPixels(x, y, width, height, format, type, pixels); }
@@ -1148,3 +2414,4 @@ MQ_EXPORT const char *mq_gl_get_string(mq_u32 name) { return (const char *)glGet
 MQ_EXPORT mq_u32 mq_gl_get_error(void) { return glGetError(); }
 MQ_EXPORT void mq_gl_finish(void) { glFinish(); }
 MQ_EXPORT void mq_gl_flush(void) { glFlush(); }
+MQ_EXPORT void mq_gl_draw_buffer(mq_u32 mode) { glDrawBuffer(mode); }
