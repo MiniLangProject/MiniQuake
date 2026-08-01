@@ -1,0 +1,48 @@
+{
+  "schema": "MiniQuakeBP085089R7Hotfix/1",
+  "package_id": "BP-089",
+  "block_id": "BP-085-089",
+  "delivery_revision": "BP-085-089R7",
+  "delivery_parent": "BP-085-089R6",
+  "result_archive_sha256": "5a15b18f20b6d0ae867657c025ca7d0564aa09115b8580554ebd0f6a9fda2df1",
+  "failure": {
+    "scenario": "e1m2-064",
+    "process": "B",
+    "frames_written": 56,
+    "frames_requested": 64,
+    "frame": 56,
+    "host_frame": 57,
+    "last_stage": "trace_canonical",
+    "edict": 77,
+    "field": "origin",
+    "observed_type": "unknown",
+    "trace_a_frames": 64,
+    "common_prefix_frames": 56
+  },
+  "classification": "derived QuakeC Edict mirror allocation/GC lifetime; no host-frame semantic divergence observed before diagnostics",
+  "fix": {
+    "mirror": "stable_in_place",
+    "authoritative_high_water": "EdictRuntime.numEdicts",
+    "array_resize": "only_when_count_changes",
+    "nested_vectors": "mutated_in_place",
+    "baseline_identity": "stable",
+    "player_vectors": "mutated_in_place",
+    "savegame_sync": "explicit_saved_count"
+  },
+  "regression": {
+    "edicts": 227,
+    "passes": 80,
+    "gc_limit_bytes": 256,
+    "identity_checks": [
+      "QuakeEdict",
+      "origin",
+      "angles",
+      "velocity"
+    ],
+    "changing_qc_values": true,
+    "freed_tail_high_water": true,
+    "public_diagnostics_tests": 10
+  },
+  "contracts_unchanged": true,
+  "native_binary_changed": false
+}

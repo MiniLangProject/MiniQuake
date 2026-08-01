@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "project": "MiniQuake",
+  "block_id": "BP-070-074",
+  "parent_package_id": "BP-065-069R1",
+  "final_package_id": "BP-074",
+  "delivery_revision": "BP-070-074R2",
+  "core_assets_memory_status": "core_assets_memory_109_frozen_v1",
+  "core_assets_memory_fingerprint": "0x6c8d974d",
+  "steps": [
+    {
+      "package_id": "BP-070",
+      "title": "common parsing, byte order and CRC parity",
+      "patch": "patches/BP-070.diff",
+      "runtime_fixtures": 24,
+      "status": "candidate"
+    },
+    {
+      "package_id": "BP-071",
+      "title": "filesystem search paths and PACK archive parity",
+      "patch": "patches/BP-071.diff",
+      "runtime_fixtures": 24,
+      "status": "candidate"
+    },
+    {
+      "package_id": "BP-072",
+      "title": "WAD2 and graphics lump parity",
+      "patch": "patches/BP-072.diff",
+      "runtime_fixtures": 20,
+      "status": "candidate"
+    },
+    {
+      "package_id": "BP-073",
+      "title": "BSP, MDL, sprite and model registry parity",
+      "patch": "patches/BP-073.diff",
+      "runtime_fixtures": 24,
+      "status": "candidate"
+    },
+    {
+      "package_id": "BP-074",
+      "title": "zone, hunk, cache and core asset closure contract",
+      "patch": "patches/BP-074.diff",
+      "runtime_fixtures": 24,
+      "status": "candidate"
+    }
+  ],
+  "block_runtime_fixtures": 116,
+  "retail_evidence_files": 4,
+  "accepted_parent": {
+    "delivery_revision": "BP-065-069R1",
+    "status": "PASS",
+    "result_archive": "MiniQuake_BP-065-069R1_RESULTS_20260729-164203.zip",
+    "result_archive_sha256": "3420bcab8c2b36a7474992b130e09ebf6dfacc21d4980975f7d111da47d81927",
+    "required_steps": "16/16 PASS",
+    "trace_sha256": "93498af4da5b2fc4ccf2b6c8d07f444d7c22129fab37bd88654af2922fba938d",
+    "trace_rolling_hash": "d905b042",
+    "trace_byte_identity": "PASS",
+    "retail_audio_evidence_sha256": "896049a03f26b1db4ddc1550d35d1cacb5f7e0f0c900b0ee36393c8ab8bd0501",
+    "render_tga_sha256": "734e965e17c9a20af7c42184d3d8a3d7f2997e1321342976799ec7f4670af945",
+    "render_ssim": 1.0,
+    "network_client_report_sha256": "50534266c750fa20058c82ce48baca953b0107106dc24fd69c5854fc3364ba96",
+    "udp_loopback": "PASS"
+  },
+  "acceptance": {
+    "single_cumulative_build": true,
+    "installed_game_validation": true,
+    "headless_frames": 300,
+    "trace_frames": 128,
+    "retail_core_asset_evidence_processes": 2,
+    "retail_audio_evidence": true,
+    "render_evidence": true,
+    "network_evidence_process_pairs": 2,
+    "udp_loopback": true
+  },
+  "scope_boundary": {
+    "reference": "WinQuake/GLQuake 1.09 common, filesystem, asset formats and memory allocators",
+    "game_data": "external; never bundled",
+    "modern_safety": "bounds errors are controlled rather than reproducing undefined memory access",
+    "cache": "observable hunk/zone/cache semantics retained over MiniLang-managed storage"
+  },
+  "delivery_parent": "BP-070-074R1",
+  "r1_delivery_hotfix": {
+    "revision": "BP-070-074R1",
+    "parent": "BP-070-074",
+    "predecessor_result_sha256": "c1ef8340e2f58904e583f2c85a81a7b3f1d37a7b316f8905297a4f2bbd6bef8c",
+    "failure": "inherited BP-069 checker rejected downstream BP-074 identity",
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "engine_contracts_changed": false,
+    "fixture_count_changed": false,
+    "strict_historical_mode_preserved": true,
+    "downstream_flag": "--allow-downstream-package",
+    "status": "FAIL at BP-070 compile gate; superseded by R2",
+    "result_archive": "MiniQuake_BP-070-074R1_RESULTS_20260729-192646.zip",
+    "result_archive_sha256": "02cb2d978b35076623432cf46a8c56e9907e1430875b07b6ee401eb43387a1c9"
+  },
+  "r2_delivery_hotfix": {
+    "revision": "BP-070-074R2",
+    "parent": "BP-070-074R1",
+    "predecessor_result_sha256": "02cb2d978b35076623432cf46a8c56e9907e1430875b07b6ee401eb43387a1c9",
+    "failure": "BP-070 fixture imported miniquake.byteio as bio but called nonexistent uppercase C-style members",
+    "fixture_calls": "miniquake.common.ShortSwap/LongSwap/ShortNoSwap/LongNoSwap/FloatNoSwap",
+    "production_source_changed": true,
+    "native_source_changed": false,
+    "engine_contracts_changed": false,
+    "fixture_count_changed": false,
+    "status": "pending Windows revalidation"
+  }
+}

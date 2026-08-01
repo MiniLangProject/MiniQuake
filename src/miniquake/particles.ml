@@ -29,6 +29,10 @@ const MAX_PARTICLES = 2048
 const ABSOLUTE_MIN_PARTICLES = 512
 const NUM_VERTEX_NORMALS = 162
 
+function particleFloat(value)
+  return native.bitsFloat(native.floatBits(value))
+end function
+
 ramp1 = [0x6f, 0x6d, 0x6b, 0x69, 0x67, 0x65, 0x63, 0x61]
 ramp2 = [0x6f, 0x6e, 0x6d, 0x6c, 0x6b, 0x6a, 0x68, 0x66]
 ramp3 = [0x6d, 0x6b, 6, 5, 4, 3]
@@ -468,51 +472,53 @@ function particleDrawCommand(particle, viewOrigin, viewForward, scaledUp, scaled
 end function
 
 function updateParticlePhysics(particle, frameTime, gravity)
-  grav = frameTime * gravity * 0.05
-  time3 = frameTime * 15.0
-  time2 = frameTime * 10.0
-  time1 = frameTime * 5.0
-  dvel = 4.0 * frameTime
+  // r_part.c stores frametime and all particle fields as float.
+  frameTime = particleFloat(frameTime)
+  grav = particleFloat(particleFloat(frameTime * gravity) * 0.05)
+  time3 = particleFloat(frameTime * 15.0)
+  time2 = particleFloat(frameTime * 10.0)
+  time1 = particleFloat(frameTime * 5.0)
+  dvel = particleFloat(4.0 * frameTime)
 
   // VectorMA(p->org, frametime, p->vel, p->org) mutates the C particle in
   // place.  Keep the same lifetime here: allocating a replacement Vec3 for
   // every active particle creates thousands of short-lived objects and can
   // trigger collection while a large active array is being traversed.
-  particle.origin.x = particle.origin.x + frameTime * particle.velocity.x
-  particle.origin.y = particle.origin.y + frameTime * particle.velocity.y
-  particle.origin.z = particle.origin.z + frameTime * particle.velocity.z
+  particle.origin.x = particleFloat(particle.origin.x + frameTime * particle.velocity.x)
+  particle.origin.y = particleFloat(particle.origin.y + frameTime * particle.velocity.y)
+  particle.origin.z = particleFloat(particle.origin.z + frameTime * particle.velocity.z)
   if particle.type == PT_FIRE then
-    particle.ramp = particle.ramp + time1
+    particle.ramp = particleFloat(particle.ramp + time1)
     rampIndex = native.trunc(particle.ramp)
     if particle.ramp >= 6.0 or rampIndex < 0 or rampIndex >= len(ramp3) then particle.die = -1.0 else particle.color = ramp3[rampIndex] end if
-    particle.velocity.z = particle.velocity.z + grav
+    particle.velocity.z = particleFloat(particle.velocity.z + grav)
   else if particle.type == PT_EXPLODE then
-    particle.ramp = particle.ramp + time2
+    particle.ramp = particleFloat(particle.ramp + time2)
     rampIndex = native.trunc(particle.ramp)
     if particle.ramp >= 8.0 or rampIndex < 0 or rampIndex >= len(ramp1) then particle.die = -1.0 else particle.color = ramp1[rampIndex] end if
-    particle.velocity.x = particle.velocity.x + particle.velocity.x * dvel
-    particle.velocity.y = particle.velocity.y + particle.velocity.y * dvel
-    particle.velocity.z = particle.velocity.z + particle.velocity.z * dvel
-    particle.velocity.z = particle.velocity.z - grav
+    particle.velocity.x = particleFloat(particle.velocity.x + particle.velocity.x * dvel)
+    particle.velocity.y = particleFloat(particle.velocity.y + particle.velocity.y * dvel)
+    particle.velocity.z = particleFloat(particle.velocity.z + particle.velocity.z * dvel)
+    particle.velocity.z = particleFloat(particle.velocity.z - grav)
   else if particle.type == PT_EXPLODE2 then
-    particle.ramp = particle.ramp + time3
+    particle.ramp = particleFloat(particle.ramp + time3)
     rampIndex = native.trunc(particle.ramp)
     if particle.ramp >= 8.0 or rampIndex < 0 or rampIndex >= len(ramp2) then particle.die = -1.0 else particle.color = ramp2[rampIndex] end if
-    particle.velocity.x = particle.velocity.x - particle.velocity.x * frameTime
-    particle.velocity.y = particle.velocity.y - particle.velocity.y * frameTime
-    particle.velocity.z = particle.velocity.z - particle.velocity.z * frameTime
-    particle.velocity.z = particle.velocity.z - grav
+    particle.velocity.x = particleFloat(particle.velocity.x - particle.velocity.x * frameTime)
+    particle.velocity.y = particleFloat(particle.velocity.y - particle.velocity.y * frameTime)
+    particle.velocity.z = particleFloat(particle.velocity.z - particle.velocity.z * frameTime)
+    particle.velocity.z = particleFloat(particle.velocity.z - grav)
   else if particle.type == PT_BLOB then
-    particle.velocity.x = particle.velocity.x + particle.velocity.x * dvel
-    particle.velocity.y = particle.velocity.y + particle.velocity.y * dvel
-    particle.velocity.z = particle.velocity.z + particle.velocity.z * dvel
-    particle.velocity.z = particle.velocity.z - grav
+    particle.velocity.x = particleFloat(particle.velocity.x + particle.velocity.x * dvel)
+    particle.velocity.y = particleFloat(particle.velocity.y + particle.velocity.y * dvel)
+    particle.velocity.z = particleFloat(particle.velocity.z + particle.velocity.z * dvel)
+    particle.velocity.z = particleFloat(particle.velocity.z - grav)
   else if particle.type == PT_BLOB2 then
-    particle.velocity.x = particle.velocity.x - particle.velocity.x * dvel
-    particle.velocity.y = particle.velocity.y - particle.velocity.y * dvel
-    particle.velocity.z = particle.velocity.z - grav
+    particle.velocity.x = particleFloat(particle.velocity.x - particle.velocity.x * dvel)
+    particle.velocity.y = particleFloat(particle.velocity.y - particle.velocity.y * dvel)
+    particle.velocity.z = particleFloat(particle.velocity.z - grav)
   else if particle.type == PT_GRAVITY or particle.type == PT_SLOW_GRAVITY then
-    particle.velocity.z = particle.velocity.z - grav
+    particle.velocity.z = particleFloat(particle.velocity.z - grav)
   end if
   return particle
 end function
@@ -614,7 +620,7 @@ function appendLimited(target, source)
   return result
 end function
 
-function update(particles, currentTime, deltaTime)
+function updateWithGravity(particles, currentTime, deltaTime, gravity)
   capacity = MAX_PARTICLES
   if len(particles) > capacity then capacity = len(particles) end if
   randomSeed = compatRandomSeed
@@ -642,7 +648,7 @@ function update(particles, currentTime, deltaTime)
   while readIndex < activeCount
     particle = system.active[readIndex]
     if particle.die >= currentTime then
-      updateParticlePhysics(particle, deltaTime, 800.0)
+      updateParticlePhysics(particle, deltaTime, gravity)
       if writeIndex >= len(alive) then return error(3702, "particle survivor count changed during update") end if
       alive[writeIndex] = particle
       writeIndex = writeIndex + 1
@@ -651,6 +657,13 @@ function update(particles, currentTime, deltaTime)
   end while
   system.active = alive
   return system.active
+end function
+
+// Compatibility wrapper for callers that do not own the server cvar table.
+// The integrated Host_Frame path uses updateWithGravity and passes the current
+// sv_gravity value, matching R_DrawParticles' extern cvar dependency.
+function update(particles, currentTime, deltaTime)
+  return updateWithGravity(particles, currentTime, deltaTime, 800.0)
 end function
 
 function runEffect(origin, direction, count, color, currentTime)

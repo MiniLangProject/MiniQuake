@@ -1,0 +1,48 @@
+{
+  "schema": "MiniQuakeClientRenderClosureGolden/1",
+  "package_id": "BP-039",
+  "parent_package_id": "BP-038",
+  "sources": [
+    "cl_main.c",
+    "view.c",
+    "chase.c",
+    "cl_tent.c",
+    "r_part.c",
+    "gl_refrag.c",
+    "gl_rmain.c"
+  ],
+  "rows": [
+    {
+      "name": "contract_fingerprint",
+      "value": 2514662037
+    },
+    {
+      "name": "max_visedicts",
+      "value": 256
+    },
+    {
+      "name": "max_temp_entities",
+      "value": 64
+    },
+    {
+      "name": "beam_pool",
+      "value": 24
+    },
+    {
+      "name": "beam_step",
+      "value": 30
+    },
+    {
+      "name": "feature_bits",
+      "value": 15
+    },
+    {
+      "name": "fixtures",
+      "value": 24
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/client_render_closure_oracle.c",
+    "oracle_sha256": "3f2f16ab7af88bb9b2f1540cf5da798f64ae797f41a10f7f20f1745bff96dee2"
+  }
+}

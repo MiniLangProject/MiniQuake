@@ -1,0 +1,373 @@
+diff --git a/CHANGELOG_BP-087.md b/CHANGELOG_BP-087.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..09b0860d97758e4d3930dcf05902625d1d46cf7b
+--- /dev/null
++++ b/CHANGELOG_BP-087.md
+@@ -0,0 +1,5 @@
++# BP-087 — demo and savegame artifact evidence
++
++- Binds the three retail demo names and Quake savegame version 5 as explicit compatibility artifacts.
++- Adds 24 asset-free fixtures for demo framing, replay verification, CRCs and save summaries.
++- Adds two independent retail evidence runs that parse all three demos and perform an exact plus semantic live save/apply/reserialize roundtrip without collecting game data.
+diff --git a/audit/artifact_compat_golden.json b/audit/artifact_compat_golden.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..d5f5f56054a06b3fe9b53be1acdde06a076e6124
+--- /dev/null
++++ b/audit/artifact_compat_golden.json
+@@ -0,0 +1,14 @@
++{
++  "schema_version": 1,
++  "status": "artifact_compat_109_frozen_v1",
++  "fingerprint": "0x59531091",
++  "contract_text": "artifact-compat|demo-protocol15|retail-demos=3|save-version=5|save-roundtrip|deterministic-evidence",
++  "fixtures": 24,
++  "save_version": 5,
++  "retail_demos": [
++    "demo1.dem",
++    "demo2.dem",
++    "demo3.dem"
++  ],
++  "evidence_runs": 2
++}
+diff --git a/docs/BP-087_ARTIFACT_COMPAT_AUDIT.md b/docs/BP-087_ARTIFACT_COMPAT_AUDIT.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..d861051ad994a5e54a6ec7070d77e514ce7643b6
+--- /dev/null
++++ b/docs/BP-087_ARTIFACT_COMPAT_AUDIT.md
+@@ -0,0 +1,16 @@
++# BP-087 demo/save artifact audit
++
++The asset-free fixture suite binds Protocol-15 demo framing and Quake savegame
++version 5. The Windows retail evidence performs two independent runs:
++
++1. load `demo1.dem`, `demo2.dem` and `demo3.dem` through the Quake filesystem;
++2. parse every frame and verify the resulting client protocol stream;
++3. initialize a live map, advance 64 deterministic frames and serialize a
++   version-5 savegame;
++4. parse and apply that save to a fresh server on the same map;
++5. reserialize and require both exact bytes and matching global/edict hashes.
++
++Only textual evidence is collected. Demo, save, PAK and other game-data bytes
++are never copied into the result archive.
++
++Contract: `artifact_compat_109_frozen_v1`, fingerprint `0x59531091`.
+diff --git a/src/miniquake/artifact_compat.ml b/src/miniquake/artifact_compat.ml
+new file mode 100644
+index 0000000000000000000000000000000000000000..863f1277070071b9dcd9f28eb93c4c7b87fbb070
+--- /dev/null
++++ b/src/miniquake/artifact_compat.ml
+@@ -0,0 +1,59 @@
++/*
++Copyright (C) 1996-1997 Id Software, Inc.
++Copyright (C) 2026 MiniQuake contributors
++
++Demo/savegame compatibility evidence helpers.  The actual retail evidence is
++executed from a separate test executable so no user game data enters builds or
++result archives.
++*/
++
++package miniquake.artifact_compat
++
++import miniquake.crc as crc
++
++const STATUS = "artifact_compat_109_frozen_v1"
++const FINGERPRINT = 0x59531091
++const CONTRACT_TEXT = "artifact-compat|demo-protocol15|retail-demos=3|save-version=5|save-roundtrip|deterministic-evidence"
++const SAVEGAME_VERSION = 5
++const RETAIL_DEMO_COUNT = 3
++
++function retailDemoNames()
++  return ["demo1.dem", "demo2.dem", "demo3.dem"]
++end function
++
++function bytesEqual(left, right)
++  if left is not bytes or right is not bytes or len(left) != len(right) then return false end if
++  index = 0
++  while index < len(left)
++    if left[index] != right[index] then return false end if
++    index = index + 1
++  end while
++  return true
++end function
++
++function bytesCrc(data)
++  if data is not bytes then return -1 end if
++  return crc.block(data, 0, len(data))
++end function
++
++function demoSummary(recording, report, sourceBytes)
++  return [
++    recording.forcedTrack,
++    len(recording.messages),
++    report.ok,
++    report.eventCount,
++    report.payloadBytes,
++    report.signon,
++    report.entities,
++    len(sourceBytes),
++    bytesCrc(sourceBytes),
++  ]
++end function
++
++function saveSummary(saveBytes, mapName, timeValue, edictHash, globalsHash)
++  return [SAVEGAME_VERSION, mapName, timeValue, len(saveBytes), bytesCrc(saveBytes), edictHash, globalsHash]
++end function
++
++function contractVector()
++  return [STATUS, FINGERPRINT, SAVEGAME_VERSION, RETAIL_DEMO_COUNT, retailDemoNames()]
++end function
+diff --git a/tests/artifact_compat_tests.ml b/tests/artifact_compat_tests.ml
+new file mode 100644
+index 0000000000000000000000000000000000000000..c8bd0135a07f2a906ebd51eda5f41d658f62226b
+--- /dev/null
++++ b/tests/artifact_compat_tests.ml
+@@ -0,0 +1,92 @@
++import miniquake.artifact_compat as artifacts
++import miniquake.demo as demo
++import miniquake.demo_player as player
++import miniquake.types as t
++import miniquake.constants as c
++
++passed = 0
++failed = 0
++
++function bp087Check(condition, label)
++  global passed, failed
++  if condition then passed = passed + 1; return true end if
++  print "FAIL: " + label
++  failed = failed + 1
++  return false
++end function
++
++function bp087Equal(actual, expected, label)
++  return bp087Check(actual == expected, label + ": expected " + expected + ", got " + actual)
++end function
++
++function bp087SyntheticDemo()
++  payload = bytes(1)
++  payload[0] = c.SVC_NOP
++  message = t.DemoMessage(t.Vec3(1.0, 2.0, 3.0), payload)
++  return t.Demo(-1, [message], "-1\n")
++end function
++
++function main(args)
++  global passed, failed
++  print "[1/24] status"
++  bp087Equal(artifacts.STATUS, "artifact_compat_109_frozen_v1", "status")
++  print "[2/24] fingerprint"
++  bp087Equal(artifacts.FINGERPRINT, 0x59531091, "fingerprint")
++  print "[3/24] save version"
++  bp087Equal(artifacts.SAVEGAME_VERSION, 5, "save version")
++  print "[4/24] retail demo count"
++  bp087Equal(artifacts.RETAIL_DEMO_COUNT, 3, "demo count")
++  names = artifacts.retailDemoNames()
++  print "[5/24] demo1 name"
++  bp087Equal(names[0], "demo1.dem", "demo1")
++  print "[6/24] demo2 name"
++  bp087Equal(names[1], "demo2.dem", "demo2")
++  print "[7/24] demo3 name"
++  bp087Equal(names[2], "demo3.dem", "demo3")
++  print "[8/24] byte equality"
++  bp087Check(artifacts.bytesEqual(bytes([1, 2, 3]), bytes([1, 2, 3])), "byte equality")
++  print "[9/24] byte inequality"
++  bp087Check(not artifacts.bytesEqual(bytes([1, 2, 3]), bytes([1, 2, 4])), "byte inequality")
++  print "[10/24] byte length inequality"
++  bp087Check(not artifacts.bytesEqual(bytes([1]), bytes([1, 2])), "length inequality")
++  print "[11/24] CRC known"
++  bp087Equal(artifacts.bytesCrc(bytes("123456789")), 0x29b1, "CRC")
++
++  recording = bp087SyntheticDemo()
++  encoded = demo.serialize(recording)
++  decoded = demo.parse(encoded)
++  print "[12/24] demo forced track"
++  bp087Equal(decoded.forcedTrack, -1, "forced track")
++  print "[13/24] demo message count"
++  bp087Equal(len(decoded.messages), 1, "message count")
++  print "[14/24] demo angle x"
++  bp087Equal(decoded.messages[0].viewAngles.x, 1.0, "angle x")
++  print "[15/24] demo payload"
++  bp087Equal(decoded.messages[0].payload[0], c.SVC_NOP, "payload")
++  print "[16/24] demo reserialize"
++  bp087Check(artifacts.bytesEqual(encoded, demo.serialize(decoded)), "reserialize")
++  report = player.verify(decoded)
++  print "[17/24] demo verification"
++  bp087Check(report.ok, "verification")
++  print "[18/24] demo payload bytes"
++  bp087Equal(report.payloadBytes, 1, "payload bytes")
++  summary = artifacts.demoSummary(decoded, report, encoded)
++  print "[19/24] demo summary arity"
++  bp087Equal(len(summary), 9, "summary arity")
++  print "[20/24] demo summary CRC"
++  bp087Equal(summary[8], artifacts.bytesCrc(encoded), "summary CRC")
++
++  saveSummary = artifacts.saveSummary(bytes([1, 2, 3]), "start", 1.5, 0x1234, 0x5678)
++  print "[21/24] save summary version"
++  bp087Equal(saveSummary[0], 5, "summary version")
++  print "[22/24] save summary map"
++  bp087Equal(saveSummary[1], "start", "summary map")
++  print "[23/24] save summary hashes"
++  bp087Check(saveSummary[5] == 0x1234 and saveSummary[6] == 0x5678, "summary hashes")
++  print "[24/24] contract text"
++  bp087Check(len(bytes(artifacts.CONTRACT_TEXT)) > 32, "contract text")
++
++  if failed > 0 then print "MiniQuake BP-087 artifact compatibility tests failed: " + failed + "/24"; return 1 end if
++  print "MiniQuake BP-087 artifact compatibility tests passed: 24"
++  return 0
++end function
+diff --git a/tests/artifact_retail_evidence.ml b/tests/artifact_retail_evidence.ml
+new file mode 100644
+index 0000000000000000000000000000000000000000..5a5f0edb8721a0c5ccd5cdcf54b719491c6f251c
+--- /dev/null
++++ b/tests/artifact_retail_evidence.ml
+@@ -0,0 +1,82 @@
++import miniquake.artifact_compat as artifacts
++import miniquake.filesystem as qfs
++import miniquake.demo as demo
++import miniquake.demo_player as demoPlayer
++import miniquake.host as host
++import miniquake.savegame as savegame
++import miniquake.compat_trace as trace
++import miniquake.server as server
++
++function bp087Fail(message)
++  print "error=" + message
++  print "result=FAIL"
++  return 1
++end function
++
++function bp087RunFrames(session, count)
++  index = 0
++  while index < count
++    result = try(host.frame(session, 0.02))
++    if result is error then return result end if
++    index = index + 1
++  end while
++  return true
++end function
++
++function main(args)
++  if len(args) < 3 then
++    print "usage: MiniQuakeArtifactRetailEvidence.exe BASE GAME MAP"
++    return 2
++  end if
++  baseDirectory = args[0]
++  gameDirectory = args[1]
++  mapName = args[2]
++  print "MiniQuake BP-087 retail artifact evidence"
++  print "game=" + gameDirectory + " map=" + mapName
++
++  system = try(qfs.initialize(baseDirectory, gameDirectory))
++  if system is error then return bp087Fail(system.message) end if
++  for each demoName in artifacts.retailDemoNames()
++    source = try(qfs.readFile(system, demoName))
++    if source is error then qfs.release(system); return bp087Fail(demoName + ": " + source.message) end if
++    recording = try(demo.parse(source))
++    if recording is error then qfs.release(system); return bp087Fail(demoName + ": " + recording.message) end if
++    report = demoPlayer.verify(recording)
++    if not report.ok then qfs.release(system); return bp087Fail(demoName + ": protocol replay failed") end if
++    summary = artifacts.demoSummary(recording, report, source)
++    print "demo=" + demoName + " bytes=" + summary[7] + " crc=" + summary[8] + " messages=" + summary[1] + " events=" + summary[3] + " signon=" + summary[5] + " entities=" + summary[6]
++  end for
++  qfs.release(system)
++
++  sessionA = host.create(["-basedir", baseDirectory, "-game", gameDirectory, "-headless", "-nosound", "+map", mapName])
++  initializedA = try(host.initialize(sessionA))
++  if initializedA is error then host.shutdown(sessionA); return bp087Fail("save source init: " + initializedA.message) end if
++  ran = try(bp087RunFrames(sessionA, 64))
++  if ran is error then host.shutdown(sessionA); return bp087Fail("save source frames: " + ran.message) end if
++  saveA = try(savegame.serializeBytes(sessionA.server))
++  if saveA is error then host.shutdown(sessionA); return bp087Fail("save serialize: " + saveA.message) end if
++  parsed = try(savegame.parseBytes(saveA))
++  if parsed is error then host.shutdown(sessionA); return bp087Fail("save parse: " + parsed.message) end if
++  sourceEdicts = trace.serverEdictsHash(sessionA)
++  sourceGlobals = trace.globalsHash(sessionA)
++
++  sessionB = host.create(["-basedir", baseDirectory, "-game", gameDirectory, "-headless", "-nosound", "+map", mapName])
++  initializedB = try(host.initialize(sessionB))
++  if initializedB is error then host.shutdown(sessionA); host.shutdown(sessionB); return bp087Fail("save target init: " + initializedB.message) end if
++  applied = try(savegame.apply(sessionB.server, parsed))
++  if applied is error then host.shutdown(sessionA); host.shutdown(sessionB); return bp087Fail("save apply: " + applied.message) end if
++  server.syncQuakeCEdicts(sessionB.server)
++  server.assignModelIndexes(sessionB.server)
++  saveB = try(savegame.serializeBytes(sessionB.server))
++  if saveB is error then host.shutdown(sessionA); host.shutdown(sessionB); return bp087Fail("save reserialize: " + saveB.message) end if
++  targetEdicts = trace.serverEdictsHash(sessionB)
++  targetGlobals = trace.globalsHash(sessionB)
++  exact = artifacts.bytesEqual(saveA, saveB)
++  semantic = sourceEdicts == targetEdicts and sourceGlobals == targetGlobals and sessionA.server.mapName == sessionB.server.mapName
++  print "save=version5 bytes=" + len(saveA) + " crc=" + artifacts.bytesCrc(saveA) + " exact=" + exact + " semantic=" + semantic + " edicts=" + sourceEdicts + " globals=" + sourceGlobals
++  cleanA = host.shutdown(sessionA)
++  cleanB = host.shutdown(sessionB)
++  if not exact or not semantic or not cleanA or not cleanB then return bp087Fail("save roundtrip mismatch") end if
++  print "result=PASS"
++  return 0
++end function
+diff --git a/tools/check_compat_087.py b/tools/check_compat_087.py
+new file mode 100755
+index 0000000000000000000000000000000000000000..e2c2715e1c7c5b038a10925cfd94f382d1312b90
+--- /dev/null
++++ b/tools/check_compat_087.py
+@@ -0,0 +1,63 @@
++#!/usr/bin/env python3
++import argparse, json, pathlib, sys
++
++EXPECTED_STATUS = 'artifact_compat_109_frozen_v1'
++EXPECTED_FINGERPRINT = '0x59531091'
++EXPECTED_FIXTURES = 24
++
++def fnv1a32(data: bytes) -> int:
++    value = 0x811C9DC5
++    for byte in data:
++        value ^= byte
++        value = (value * 0x01000193) & 0xFFFFFFFF
++    return value
++
++def main() -> int:
++    ap = argparse.ArgumentParser()
++    ap.add_argument("--root", default=".")
++    ap.add_argument("--json", default="")
++    ns = ap.parse_args()
++    root = pathlib.Path(ns.root).resolve()
++    errors = []
++    golden_path = root / "audit/artifact_compat_golden.json"
++    module_path = root / "src/miniquake/artifact_compat.ml"
++    test_path = root / "tests/artifact_compat_tests.ml"
++    build_info_path = root / "src/miniquake/build_info.ml"
++    for path in [golden_path, module_path, test_path, build_info_path]:
++        if not path.is_file():
++            errors.append("missing file: " + str(path.relative_to(root)))
++    golden = {}
++    if golden_path.is_file():
++        golden = json.loads(golden_path.read_text(encoding="utf-8-sig"))
++    source = module_path.read_text(encoding="utf-8-sig") if module_path.is_file() else ""
++    test = test_path.read_text(encoding="utf-8-sig") if test_path.is_file() else ""
++    build_info = build_info_path.read_text(encoding="utf-8-sig") if build_info_path.is_file() else ""
++    contract_text = golden.get("contract_text", "")
++    calculated = f"0x{fnv1a32(contract_text.encode('utf-8')):08x}"
++    if golden.get("status") != EXPECTED_STATUS: errors.append("golden status differs")
++    if golden.get("fingerprint") != EXPECTED_FINGERPRINT: errors.append("golden fingerprint differs")
++    if calculated != EXPECTED_FINGERPRINT: errors.append(f"fingerprint calculation: expected {EXPECTED_FINGERPRINT}, got {calculated}")
++    if golden.get("fixtures") != EXPECTED_FIXTURES: errors.append("golden fixture count differs")
++    for text in [f'const STATUS = "{EXPECTED_STATUS}"', f'const FINGERPRINT = {EXPECTED_FINGERPRINT}']:
++        if text not in source: errors.append("missing module marker: " + text)
++    if 'MiniQuake BP-087 artifact compatibility tests passed: 24' not in test: errors.append("runtime success marker missing")
++    for text in ['const PACKAGE_ID = "BP-089"', 'const BLOCK_ID = "BP-085-089"']:
++        if text not in build_info: errors.append("missing build marker: " + text)
++    report = {
++        "schema_version": 1,
++        "package": "BP-087",
++        "status": "PASS" if not errors else "FAIL",
++        "errors": errors,
++        "contract_status": golden.get("status"),
++        "fingerprint": calculated,
++        "fixtures": EXPECTED_FIXTURES,
++    }
++    if ns.json:
++        pathlib.Path(ns.json).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
++    print("MiniQuake BP-087 artifact compat verification: " + report["status"])
++    if not errors: print(f"  status={EXPECTED_STATUS} fingerprint={EXPECTED_FINGERPRINT} fixtures={EXPECTED_FIXTURES}")
++    for error in errors: print("  [FAIL] " + error)
++    return 0 if not errors else 1
++
++if __name__ == "__main__":
++    sys.exit(main())

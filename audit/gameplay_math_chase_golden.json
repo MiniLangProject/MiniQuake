@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "package": "BP-075",
+  "fixtures": 22,
+  "angle_units": 65536,
+  "trace_distance": 4096,
+  "chase_back": 100,
+  "chase_up": 16,
+  "chase_right": 0,
+  "anglemod_negative": 359.000244140625,
+  "clear_destination": [-90, 20, 46],
+  "clear_impact": [4097, 2, 3]
+}

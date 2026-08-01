@@ -1,0 +1,306 @@
+{
+  "schema": "MiniQuakeProtocol15RuntimeEventsGolden/1",
+  "package_id": "BP-014R1",
+  "parent_package_id": "BP-014",
+  "protocol_version": 15,
+  "sources": [
+    "cl_tent.c",
+    "cl_parse.c",
+    "sv_main.c",
+    "host.c",
+    "pr_cmds.c",
+    "protocol.h"
+  ],
+  "vectors": [
+    {
+      "kind": "vector",
+      "name": "temp_point_spike",
+      "bytes": "1700500060fff000",
+      "length": 8
+    },
+    {
+      "kind": "vector",
+      "name": "temp_point_wrapped",
+      "bytes": "170b9eff0100ff7f",
+      "length": 8
+    },
+    {
+      "kind": "vector",
+      "name": "temp_beam_lightning",
+      "bytes": "17052c01500060fff0009eff0100ff7f",
+      "length": 16
+    },
+    {
+      "kind": "vector",
+      "name": "temp_beam_wrapped",
+      "bytes": "170dffff9eff0100ff7f500060fff000",
+      "length": 16
+    },
+    {
+      "kind": "vector",
+      "name": "temp_explosion2",
+      "bytes": "170c500060fff0001234",
+      "length": 10
+    },
+    {
+      "kind": "vector",
+      "name": "stop_sound",
+      "bytes": "106709",
+      "length": 3
+    },
+    {
+      "kind": "vector",
+      "name": "dynamic_sound_default",
+      "bytes": "0600620905500060fff000",
+      "length": 11
+    },
+    {
+      "kind": "vector",
+      "name": "dynamic_sound_options",
+      "bytes": "060380200f002c9eff0100ff7f",
+      "length": 13
+    },
+    {
+      "kind": "vector",
+      "name": "dynamic_sound_rounded_default",
+      "bytes": "06001a0005500060fff000",
+      "length": 11
+    },
+    {
+      "kind": "vector",
+      "name": "reconnect",
+      "bytes": "097265636f6e6e6563740a00",
+      "length": 12
+    }
+  ],
+  "cases": {
+    "temp_kind": [
+      {
+        "name": "type_0",
+        "value": 1
+      },
+      {
+        "name": "type_1",
+        "value": 1
+      },
+      {
+        "name": "type_2",
+        "value": 1
+      },
+      {
+        "name": "type_3",
+        "value": 1
+      },
+      {
+        "name": "type_4",
+        "value": 1
+      },
+      {
+        "name": "type_5",
+        "value": 2
+      },
+      {
+        "name": "type_6",
+        "value": 2
+      },
+      {
+        "name": "type_7",
+        "value": 1
+      },
+      {
+        "name": "type_8",
+        "value": 1
+      },
+      {
+        "name": "type_9",
+        "value": 2
+      },
+      {
+        "name": "type_10",
+        "value": 1
+      },
+      {
+        "name": "type_11",
+        "value": 1
+      },
+      {
+        "name": "type_12",
+        "value": 3
+      },
+      {
+        "name": "type_13",
+        "value": 2
+      }
+    ],
+    "temp_size": [
+      {
+        "name": "type_0",
+        "value": 8
+      },
+      {
+        "name": "type_1",
+        "value": 8
+      },
+      {
+        "name": "type_2",
+        "value": 8
+      },
+      {
+        "name": "type_3",
+        "value": 8
+      },
+      {
+        "name": "type_4",
+        "value": 8
+      },
+      {
+        "name": "type_5",
+        "value": 16
+      },
+      {
+        "name": "type_6",
+        "value": 16
+      },
+      {
+        "name": "type_7",
+        "value": 8
+      },
+      {
+        "name": "type_8",
+        "value": 8
+      },
+      {
+        "name": "type_9",
+        "value": 16
+      },
+      {
+        "name": "type_10",
+        "value": 8
+      },
+      {
+        "name": "type_11",
+        "value": 8
+      },
+      {
+        "name": "type_12",
+        "value": 10
+      },
+      {
+        "name": "type_13",
+        "value": 16
+      }
+    ],
+    "sound_scalar": [
+      {
+        "name": "qc_channel_2_9",
+        "value": 2
+      },
+      {
+        "name": "qc_volume_half",
+        "value": 127
+      },
+      {
+        "name": "rounded_default_mask",
+        "value": 0
+      },
+      {
+        "name": "client_volume_bits",
+        "value": 1056997505
+      },
+      {
+        "name": "client_attenuation_bits",
+        "value": 1056964608
+      },
+      {
+        "name": "static_volume_bits",
+        "value": 1056898815
+      },
+      {
+        "name": "static_attenuation_bits",
+        "value": 1117782016
+      },
+      {
+        "name": "center_x_bits",
+        "value": 3242065920
+      },
+      {
+        "name": "packed_300_7",
+        "value": 2407
+      }
+    ],
+    "timing": [
+      {
+        "name": "beam_end_bits",
+        "value": 1067030938
+      },
+      {
+        "name": "dlight_die_bits",
+        "value": 1069547520
+      },
+      {
+        "name": "beam_alive_equal",
+        "value": 1
+      },
+      {
+        "name": "beam_expired_after",
+        "value": 1
+      }
+    ],
+    "delivery": [
+      {
+        "name": "dynamic_exact_margin",
+        "value": 1
+      },
+      {
+        "name": "dynamic_above_margin",
+        "value": 0
+      },
+      {
+        "name": "keepalive_equal",
+        "value": 4
+      },
+      {
+        "name": "keepalive_above",
+        "value": 2
+      },
+      {
+        "name": "overflow_precedes_drop",
+        "value": 1
+      },
+      {
+        "name": "drop_waits_blocked",
+        "value": 2
+      },
+      {
+        "name": "drop_when_sendable",
+        "value": 3
+      },
+      {
+        "name": "max_beams",
+        "value": 24
+      }
+    ]
+  },
+  "constants": {
+    "SVC_SOUND": 6,
+    "SVC_STUFFTEXT": 9,
+    "SVC_STOPSOUND": 16,
+    "SVC_TEMP_ENTITY": 23,
+    "MAX_DATAGRAM": 1024,
+    "MAX_BEAMS": 24,
+    "MAX_EDICTS": 600
+  },
+  "reference": {
+    "oracle": "tools/oracle/protocol15_runtime_events_oracle.c",
+    "oracle_sha256": "658c11a68370bd184adb8c96b10ce7515256767f811c4737b35b99bc81ef8d8f"
+  },
+  "notes": [
+    "CL_ParseBeam replaces the same entity before searching the first free or strictly expired slot.",
+    "The retained fixed-slot beam state remains separate from the CL_UpdateTEnts active view; expired slots stay reusable but are not rendered.",
+    "Beam and dynamic-light expiry fields are IEEE-754 binary32 even though cl.time is double.",
+    "CL_ParseStartSoundPacket converts optional attenuation and mixer volume to binary32.",
+    "SV_StartSound accepts MAX_DATAGRAM-16 exactly and drops only larger cursize values.",
+    "SV_ConnectClient resets the sticky reliable-message overflow bit through memset semantics.",
+    "Keepalive NOPs use elapsed > 5, not elapsed >= 5, and reliable overflow precedes dropasap."
+  ]
+}

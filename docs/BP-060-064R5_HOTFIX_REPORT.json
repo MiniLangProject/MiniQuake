@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "revision": "BP-060-064R5",
+  "parent": "BP-060-064R4",
+  "predecessor_result": {
+    "archive": "MiniQuake_BP-060-064R4_RESULTS_20260729-094748.zip",
+    "sha256": "b3cd0e6fc922d25352da8911b8c5d5a006c7896e5db93cc14b14926d84dd95af",
+    "status": "FAIL only at render comparator CLI after all preceding runtime gates passed",
+    "compiled_targets": "65/65 PASS",
+    "network_platform_runtime_groups": "113/113 PASS",
+    "headless_runtime": "300 frames PASS",
+    "traces": "2 x 128 frames byte-identical",
+    "trace_sha256": "03656a0e9f3b13d4430014de3787053c204acdd1e7f2e33c292ee8ee2b47c8cc",
+    "render_captures": "A/B produced and byte-identical",
+    "render_tga_sha256": "9047f96e9bef8e06035119ff71ddfe7ad4dcad89b4740c66618252a13cd166fb",
+    "first_failure": "compare_render_evidence.py rejected --json-output"
+  },
+  "root_cause": "R4 runner used the trace-comparator option spelling --json-output for a render comparator that exposed --json-out only",
+  "corrections": [
+    "render comparator accepts --json-out and --json-output as aliases",
+    "R5 runner uses canonical --json-out",
+    "verifier binds comparator CLI compatibility and the R4 PASS boundary"
+  ],
+  "production_source_changed": false,
+  "native_source_changed": false,
+  "test_tool_changed": true,
+  "engine_contracts_changed": false,
+  "runtime_fixture_count_changed": false,
+  "network_platform_status": "network_platform_109_frozen_v1",
+  "network_platform_fingerprint": "0xb3ec7589",
+  "windows_acceptance": "pending"
+}

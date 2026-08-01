@@ -959,15 +959,26 @@ function IN_StartupMouse()
   return true
 end function
 
+// in_win.c::IN_ClearStates only clears the active mouse device state. Keep
+// this distinct from MiniQuake's full input reset, which is used at startup
+// and by deterministic evidence runs to clear command buttons as well.
+function IN_ClearDeviceStates()
+  global mouseAccumX, mouseAccumY, mouseOldButtonState
+  if mouseActive then
+    mouseAccumX = 0.0
+    mouseAccumY = 0.0
+    mouseOldButtonState = 0
+  end if
+  return true
+end function
+
 function IN_ClearStates()
-  global inImpulse, mouseAccumX, mouseAccumY, mouseOldButtonState
+  global inImpulse
   for each command in buttonCommands()
     resetButton(buttonForCommand(command))
   end for
   inImpulse = 0
-  mouseAccumX = 0.0
-  mouseAccumY = 0.0
-  mouseOldButtonState = 0
+  IN_ClearDeviceStates()
   resetMouse()
   return true
 end function
@@ -1108,7 +1119,9 @@ function filteredMouseDelta(filterEnabled)
   mouseAccumY = 0.0
   filteredX = mouseX
   filteredY = mouseY
-  if filterEnabled and mouseFilterReady then
+  // WinQuake averages the first filtered sample with the zero-initialized
+  // previous sample as well; there is no one-frame unfiltered warmup.
+  if filterEnabled then
     filteredX = (mouseX + oldMouseX) * 0.5
     filteredY = (mouseY + oldMouseY) * 0.5
   end if

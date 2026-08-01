@@ -1,0 +1,18 @@
+{
+  "fixtures": 22,
+  "loop_boundary_position": 2,
+  "output_channels": [
+    1,
+    2
+  ],
+  "overflow_sample": -512,
+  "package": "BP-057",
+  "paintbuffer_frames": 512,
+  "sample_widths": [
+    1,
+    2
+  ],
+  "schema": 1,
+  "signed_i32_accumulator": true,
+  "source": "WinQuake/snd_mix.c"
+}

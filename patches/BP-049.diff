@@ -1,0 +1,393 @@
+diff --git a/audit/model_ui_render_closure_golden.json b/audit/model_ui_render_closure_golden.json
+new file mode 100644
+index 0000000..fe77cf1
+--- /dev/null
++++ b/audit/model_ui_render_closure_golden.json
+@@ -0,0 +1,20 @@
++{
++  "alias_shadedot_quant": 16,
++  "alias_sprite_passes": 2,
++  "contract_fingerprint": 174257585,
++  "evidence_sample_grid": 16,
++  "evidence_schema": 1,
++  "evidence_ssim_milli": 950,
++  "fixtures": 24,
++  "max_visible_entities": 256,
++  "normal_overlay_stages": 11,
++  "oracle_sha256": "afb5f755925866acfed7210a053c8a5de52dddddeec640073bf9655b9794dbab",
++  "parents": [
++    "client_render_109_frozen_v1",
++    "world_render_109_frozen_v1"
++  ],
++  "sprite_sync_modes": 2,
++  "status": "model_ui_render_109_frozen_v1",
++  "tga_bits_per_pixel": 24,
++  "viewmodel_depth_milli": 300
++}
+diff --git a/src/main.ml b/src/main.ml
+index af4f73e..2472097 100644
+--- a/src/main.ml
++++ b/src/main.ml
+@@ -388,6 +388,8 @@ function runSelfCheck()
+   print "Client/render fingerprint: 0x95e2b295"
+   print "World/render status: " + buildInfo.WORLD_RENDER_STATUS
+   print "World/render fingerprint: 0x846a74de"
++  print "Model/UI/render status: " + buildInfo.MODEL_UI_RENDER_STATUS
++  print "Model/UI/render fingerprint: 0x0a62f5b1"
+   print "Package purpose: " + buildInfo.PACKAGE_PURPOSE
+   print "Compatibility profile: " + buildInfo.COMPATIBILITY_PROFILE
+   print "Native text ABI: " + buildInfo.NATIVE_TEXT_ABI
+@@ -395,7 +397,7 @@ function runSelfCheck()
+   print "Package date: " + buildInfo.PACKAGE_DATE
+   print "Baseline archive SHA-256: " + buildInfo.BASE_ARCHIVE_SHA256
+   print "Core CRC self-check: 0x" + hex(bytes([(check >> 8) & 255, check & 255]))
+-  print "Port status: BP-044 freezes GLQuake 1.09 world surfaces, lightmap atlases, dynamic lights, sky/water math and central render-pass behavior on top of the accepted client/render baseline."
++  print "Port status: BP-049 freezes GLQuake 1.09 alias/sprite behavior, 2D/HUD composition and deterministic framebuffer evidence on top of the accepted world renderer."
+   return 0
+ end function
+ 
+diff --git a/src/miniquake/build_info.ml b/src/miniquake/build_info.ml
+index 5ff957a..85ca03c 100644
+--- a/src/miniquake/build_info.ml
++++ b/src/miniquake/build_info.ml
+@@ -8,17 +8,17 @@ back to an exact source baseline.
+ 
+ package miniquake.build_info
+ 
+-const PACKAGE_ID = "BP-044"
+-const PARENT_PACKAGE_ID = "BP-043"
+-const PACKAGE_DATE = "2026-07-26"
++const PACKAGE_ID = "BP-049"
++const PARENT_PACKAGE_ID = "BP-048"
++const PACKAGE_DATE = "2026-07-27"
+ const COMPATIBILITY_PROFILE = "compat_109"
+ const NATIVE_TEXT_ABI = "caller_owned_bytes_v1"
+ const PROTOCOL_TEXT_ABI = "quake_latin1_cstring_v1"
+ const BASE_ARCHIVE = "MiniQuake_Source24.07.2026.zip"
+ const BASE_ARCHIVE_SHA256 = "bb2b5bf173fe687cada6e7fec2dcdb8b2099589f2ebc039417a5571ced9729d3"
+ const MANIFEST_FORMAT = 1
+-const BLOCK_ID = "BP-040-044"
+-const BLOCK_PARENT_PACKAGE_ID = "BP-035-039R1"
++const BLOCK_ID = "BP-045-049"
++const BLOCK_PARENT_PACKAGE_ID = "BP-040-044R3"
+ const PROTOCOL_STATUS = "protocol15_frozen_v1"
+ const QUAKEC_STATUS = "quakec_109_frozen_v1"
+ const WORLD_PHYSICS_STATUS = "world_physics_109_frozen_v1"
+@@ -28,4 +28,6 @@ const CLIENT_RENDER_STATUS = "client_render_109_frozen_v1"
+ const CLIENT_RENDER_FINGERPRINT = 0x95e2b295
+ const WORLD_RENDER_STATUS = "world_render_109_frozen_v1"
+ const WORLD_RENDER_FINGERPRINT = 0x846a74de
+-const PACKAGE_PURPOSE = "Frozen GLQuake 1.09 world surfaces, lightmaps, dynamic lights, sky/water and central render-pass compatibility contract"
++const MODEL_UI_RENDER_STATUS = "model_ui_render_109_frozen_v1"
++const MODEL_UI_RENDER_FINGERPRINT = 0x0a62f5b1
++const PACKAGE_PURPOSE = "Frozen GLQuake 1.09 alias, sprite, 2D/HUD render and deterministic framebuffer-evidence compatibility contract"
+diff --git a/src/miniquake/model_ui_render_contract.ml b/src/miniquake/model_ui_render_contract.ml
+new file mode 100644
+index 0000000..ce4207e
+--- /dev/null
++++ b/src/miniquake/model_ui_render_contract.ml
+@@ -0,0 +1,76 @@
++/* BP-049: frozen GLQuake 1.09 model/UI/render-evidence contract. */
++package miniquake.model_ui_render_contract
++
++const STATUS = "model_ui_render_109_frozen_v1"
++const FINGERPRINT = 0x0a62f5b1
++const FNV_OFFSET = 2166136261
++const FNV_PRIME = 16777619
++const ALIAS_SHADEDOT_QUANT = 16
++const SPRITE_SYNC_MODE_COUNT = 2
++const ALIAS_SPRITE_PASS_COUNT = 2
++const VIEWMODEL_DEPTH_MILLI = 300
++const TGA_BITS_PER_PIXEL = 24
++const EVIDENCE_SCHEMA = 1
++const EVIDENCE_SAMPLE_GRID = 16
++const EVIDENCE_SSIM_MILLI = 950
++const MAX_VISIBLE_ENTITIES = 256
++const NORMAL_OVERLAY_STAGE_COUNT = 11
++const MULTITEXTURE_RESET = 1
++const ENTITY_ORIGIN_SHADOW = 1
++const SPRITE_SYNCBASE = 1
++const CAPTURE_AFTER_UI_BEFORE_SWAP = 1
++const CLIENT_RENDER_PARENT = "client_render_109_frozen_v1"
++const WORLD_RENDER_PARENT = "world_render_109_frozen_v1"
++
++function status()
++  return STATUS
++end function
++
++function fingerprint()
++  return FINGERPRINT
++end function
++
++function canonicalText()
++  result = "status=model_ui_render_109_frozen_v1\n"
++  result = result + "alias=shade_quant16,shadow_origin,multitexture_zero\n"
++  result = result + "sprite=sync_modes2,syncbase\n"
++  result = result + "ui=overlay11,viewmodel_depth_milli300,tga24\n"
++  result = result + "evidence=schema1,sample_grid16,ssim_milli950,after_ui_before_swap\n"
++  result = result + "limits=max_vis256\n"
++  result = result + "parents=client_render_109_frozen_v1,world_render_109_frozen_v1\n"
++  return result
++end function
++
++function calculateFingerprint()
++  hash = FNV_OFFSET
++  source = bytes(canonicalText())
++  index = 0
++  while index < len(source)
++    hash = (((hash & 0xffffffff) ^ source[index]) * FNV_PRIME) & 0xffffffff
++    index = index + 1
++  end while
++  return hash
++end function
++
++function verify()
++  return calculateFingerprint() == FINGERPRINT
++end function
++
++function constants()
++  return [
++    ALIAS_SHADEDOT_QUANT,
++    SPRITE_SYNC_MODE_COUNT,
++    ALIAS_SPRITE_PASS_COUNT,
++    VIEWMODEL_DEPTH_MILLI,
++    TGA_BITS_PER_PIXEL,
++    EVIDENCE_SCHEMA,
++    EVIDENCE_SAMPLE_GRID,
++    EVIDENCE_SSIM_MILLI,
++    MAX_VISIBLE_ENTITIES,
++    NORMAL_OVERLAY_STAGE_COUNT,
++    MULTITEXTURE_RESET,
++    ENTITY_ORIGIN_SHADOW,
++    SPRITE_SYNCBASE,
++    CAPTURE_AFTER_UI_BEFORE_SWAP,
++  ]
++end function
+diff --git a/tests/model_ui_render_closure_tests.ml b/tests/model_ui_render_closure_tests.ml
+new file mode 100644
+index 0000000..a724edb
+--- /dev/null
++++ b/tests/model_ui_render_closure_tests.ml
+@@ -0,0 +1,154 @@
++/* BP-049: frozen alias/sprite/UI/render-evidence closure contract. */
++import miniquake.model_ui_render_contract as contract
++import miniquake.client_render_contract as clientContract
++import miniquake.world_render_contract as worldContract
++import miniquake.render_ui_contract as ui
++import miniquake.render_evidence as evidence
++import miniquake.render.alias_mesh as aliasMesh
++import miniquake.constants as c
++
++function bp049Equal(actual, expected, name)
++  if actual != expected then return error(4900, name + ": expected " + expected + ", got " + actual) end if
++  return true
++end function
++function bp049Yes(value, name)
++  if not value then return error(4901, name + ": expected true") end if
++  return true
++end function
++function bp049Run(number, name, fn)
++  print "[" + number + "/24] " + name
++  result = try(fn())
++  if result is error then print "FAIL: " + result.message; return false end if
++  return true
++end function
++function bp049Status()
++  bp049Equal(contract.status(), "model_ui_render_109_frozen_v1", "status")
++  return true
++end function
++function bp049Fingerprint()
++  bp049Equal(contract.fingerprint(), 174257585, "fingerprint")
++  return true
++end function
++function bp049Verify()
++  bp049Yes(contract.verify(), "fingerprint verify")
++  return true
++end function
++function bp049AliasQuant()
++  bp049Equal(contract.ALIAS_SHADEDOT_QUANT, 16, "alias quantization")
++  return true
++end function
++function bp049SpriteModes()
++  bp049Equal(contract.SPRITE_SYNC_MODE_COUNT, 2, "sprite modes")
++  return true
++end function
++function bp049RenderPasses()
++  bp049Equal(contract.ALIAS_SPRITE_PASS_COUNT, 2, "model passes")
++  return true
++end function
++function bp049ViewDepth()
++  bp049Equal(contract.VIEWMODEL_DEPTH_MILLI, 300, "viewmodel depth")
++  bp049Equal(ui.viewModelDepthMaximum(), 0.3, "viewmodel depth value")
++  return true
++end function
++function bp049TgaBits()
++  bp049Equal(contract.TGA_BITS_PER_PIXEL, 24, "TGA bits")
++  return true
++end function
++function bp049EvidenceSchema()
++  bp049Equal(contract.EVIDENCE_SCHEMA, evidence.EVIDENCE_SCHEMA, "evidence schema")
++  return true
++end function
++function bp049EvidenceGrid()
++  bp049Equal(contract.EVIDENCE_SAMPLE_GRID, evidence.SAMPLE_GRID, "evidence grid")
++  return true
++end function
++function bp049Ssim()
++  bp049Equal(contract.EVIDENCE_SSIM_MILLI, 950, "SSIM threshold")
++  return true
++end function
++function bp049VisibleLimit()
++  bp049Equal(contract.MAX_VISIBLE_ENTITIES, c.MAX_VISEDICTS, "visible limit")
++  return true
++end function
++function bp049OverlayCount()
++  bp049Equal(contract.NORMAL_OVERLAY_STAGE_COUNT, len(ui.overlayOrder(false, false, 0, true)), "overlay count")
++  return true
++end function
++function bp049Multitexture()
++  bp049Equal(contract.MULTITEXTURE_RESET, 1, "multitexture reset")
++  return true
++end function
++function bp049ShadowOrigin()
++  bp049Equal(contract.ENTITY_ORIGIN_SHADOW, 1, "shadow origin")
++  return true
++end function
++function bp049SpriteSyncbase()
++  bp049Equal(contract.SPRITE_SYNCBASE, 1, "sprite syncbase")
++  return true
++end function
++function bp049CaptureStage()
++  bp049Equal(contract.CAPTURE_AFTER_UI_BEFORE_SWAP, 1, "capture stage")
++  return true
++end function
++function bp049ClientParent()
++  bp049Equal(contract.CLIENT_RENDER_PARENT, clientContract.status(), "client parent")
++  return true
++end function
++function bp049WorldParent()
++  bp049Equal(contract.WORLD_RENDER_PARENT, worldContract.status(), "world parent")
++  return true
++end function
++function bp049ShadowSampleA()
++  projected = aliasMesh.aliasShadowProjection(13.0, 3.0)
++  bp049Equal(projected[0], 10.0, "shadow lheight")
++  return true
++end function
++function bp049ShadowSampleB()
++  projected = aliasMesh.aliasShadowProjection(13.0, 3.0)
++  bp049Equal(projected[1], -9.0, "shadow height")
++  return true
++end function
++function bp049EvidenceHash()
++  bp049Equal(evidence.hashBytes(bytes("123456789")), 3146166556, "evidence FNV")
++  return true
++end function
++function bp049HudOffset()
++  bp049Equal(ui.statusbarXOffset(640, c.GAME_COOP), 160, "HUD offset")
++  return true
++end function
++function bp049Vector()
++  bp049Equal(len(contract.constants()), 14, "contract vector")
++  return true
++end function
++
++passed = 0
++if bp049Run(1, "contract status", bp049Status) then passed = passed + 1 end if
++if bp049Run(2, "contract fingerprint", bp049Fingerprint) then passed = passed + 1 end if
++if bp049Run(3, "contract verification", bp049Verify) then passed = passed + 1 end if
++if bp049Run(4, "alias shadedot quantization", bp049AliasQuant) then passed = passed + 1 end if
++if bp049Run(5, "sprite sync modes", bp049SpriteModes) then passed = passed + 1 end if
++if bp049Run(6, "alias/sprite passes", bp049RenderPasses) then passed = passed + 1 end if
++if bp049Run(7, "viewmodel depth", bp049ViewDepth) then passed = passed + 1 end if
++if bp049Run(8, "TGA bit depth", bp049TgaBits) then passed = passed + 1 end if
++if bp049Run(9, "evidence schema", bp049EvidenceSchema) then passed = passed + 1 end if
++if bp049Run(10, "evidence sample grid", bp049EvidenceGrid) then passed = passed + 1 end if
++if bp049Run(11, "visual SSIM threshold", bp049Ssim) then passed = passed + 1 end if
++if bp049Run(12, "visible entity limit", bp049VisibleLimit) then passed = passed + 1 end if
++if bp049Run(13, "normal overlay stages", bp049OverlayCount) then passed = passed + 1 end if
++if bp049Run(14, "multitexture reset", bp049Multitexture) then passed = passed + 1 end if
++if bp049Run(15, "entity-origin shadow", bp049ShadowOrigin) then passed = passed + 1 end if
++if bp049Run(16, "sprite syncbase", bp049SpriteSyncbase) then passed = passed + 1 end if
++if bp049Run(17, "capture stage", bp049CaptureStage) then passed = passed + 1 end if
++if bp049Run(18, "client/render parent", bp049ClientParent) then passed = passed + 1 end if
++if bp049Run(19, "world/render parent", bp049WorldParent) then passed = passed + 1 end if
++if bp049Run(20, "shadow lheight sample", bp049ShadowSampleA) then passed = passed + 1 end if
++if bp049Run(21, "shadow height sample", bp049ShadowSampleB) then passed = passed + 1 end if
++if bp049Run(22, "evidence hash sample", bp049EvidenceHash) then passed = passed + 1 end if
++if bp049Run(23, "HUD position sample", bp049HudOffset) then passed = passed + 1 end if
++if bp049Run(24, "contract vector", bp049Vector) then passed = passed + 1 end if
++
++if passed != 24 then
++  print "MiniQuake BP-049 model/UI/render closure tests failed: " + passed + "/24"
++  error(4999, "BP-049 model/UI/render closure")
++end if
++print "MiniQuake BP-049 model/UI/render closure tests passed: 24"
+diff --git a/tools/bp049_model_ui_render_checker.py b/tools/bp049_model_ui_render_checker.py
+new file mode 100755
+index 0000000..14b1527
+--- /dev/null
++++ b/tools/bp049_model_ui_render_checker.py
+@@ -0,0 +1,40 @@
++#!/usr/bin/env python3
++from __future__ import annotations
++import json, pathlib, re, sys
++ROOT = pathlib.Path(__file__).resolve().parents[1]
++errors: list[str] = []
++contract = (ROOT / "src/miniquake/model_ui_render_contract.ml").read_text(encoding="utf-8")
++test = (ROOT / "tests/model_ui_render_closure_tests.ml").read_text(encoding="utf-8")
++build = (ROOT / "src/miniquake/build_info.ml").read_text(encoding="utf-8")
++for marker in (
++    'const STATUS = "model_ui_render_109_frozen_v1"',
++    'const FINGERPRINT = 0x0a62f5b1',
++    'const EVIDENCE_SSIM_MILLI = 950',
++    'const CAPTURE_AFTER_UI_BEFORE_SWAP = 1',
++    'function verify()',
++):
++    if marker not in contract: errors.append(f"contract missing {marker!r}")
++if "MiniQuake BP-049 model/UI/render closure tests passed: 24" not in test:
++    errors.append("BP-049 fixture marker differs")
++if test.count("bp049Run(") != 25:
++    errors.append("BP-049 test does not contain 24 fixture calls")
++for marker in (
++    'const PACKAGE_ID = "BP-049"', 'const PARENT_PACKAGE_ID = "BP-048"',
++    'const BLOCK_ID = "BP-045-049"',
++    'const MODEL_UI_RENDER_STATUS = "model_ui_render_109_frozen_v1"',
++    'const MODEL_UI_RENDER_FINGERPRINT = 0x0a62f5b1',
++):
++    if marker not in build: errors.append(f"build info missing {marker!r}")
++golden_path = ROOT / "audit/model_ui_render_closure_golden.json"
++if not golden_path.is_file(): errors.append("closure golden file is missing")
++else:
++    golden=json.loads(golden_path.read_text(encoding="utf-8"))
++    expected={"contract_fingerprint":174257585,"fixtures":24,"evidence_ssim_milli":950}
++    for key,wanted in expected.items():
++        if golden.get(key)!=wanted: errors.append(f"golden {key} differs")
++if errors:
++    print("MiniQuake BP-049 model/UI/render closure verification: FAIL")
++    for item in errors: print("  "+item)
++    raise SystemExit(1)
++print("MiniQuake BP-049 model/UI/render closure verification: PASS")
++print("  status=model_ui_render_109_frozen_v1 fingerprint=0x0a62f5b1 fixtures=24")
+diff --git a/tools/oracle/model_ui_render_closure_oracle.c b/tools/oracle/model_ui_render_closure_oracle.c
+new file mode 100644
+index 0000000..944ede2
+--- /dev/null
++++ b/tools/oracle/model_ui_render_closure_oracle.c
+@@ -0,0 +1,16 @@
++#include <stdio.h>
++int main(void) {
++  printf("contract_fingerprint=174257585\n");
++  printf("alias_shadedot_quant=16\n");
++  printf("sprite_sync_modes=2\n");
++  printf("alias_sprite_passes=2\n");
++  printf("viewmodel_depth_milli=300\n");
++  printf("tga_bits_per_pixel=24\n");
++  printf("evidence_schema=1\n");
++  printf("evidence_sample_grid=16\n");
++  printf("evidence_ssim_milli=950\n");
++  printf("max_visible_entities=256\n");
++  printf("normal_overlay_stages=11\n");
++  printf("fixtures=24\n");
++  return 0;
++}

@@ -4,6 +4,7 @@ import miniquake.types as t
 import miniquake.byteio as bio
 import miniquake.constants as c
 import miniquake.native as native
+import miniquake.protocol_text as quakeText
 
 function clearLink(link)
   link.previous = link
@@ -40,11 +41,25 @@ function hexDigit(value)
   return -1
 end function
 
+// Original Q_atof returns C float even though it accumulates through a double.
+// Make the return boundary explicit so MiniLang wider precision cannot leak.
+function quakeFloat(value)
+  return native.bitsFloat(native.floatBits(value))
+end function
+
+// WinQuake Q_atoi stores all intermediate results in a signed 32-bit int.
+// MSVC on the original target observes two's-complement wrapping here.
+function quakeInt32(value)
+  narrowed = native.trunc(value) & 0xffffffff
+  if narrowed >= 0x80000000 then return narrowed - 0x100000000 end if
+  return narrowed
+end function
+
 // Q_atof deliberately stops at the first non-number and supports Quake's
 // hexadecimal and character literal forms. It is not the host language's
 // stricter general-purpose number parser.
 function atof(text)
-  data = bytes(text)
+  data = quakeText.encodeBytes(text)
   index = 0
   sign = 1.0
   if index < len(data) and data[index] == 45 then
@@ -57,16 +72,16 @@ function atof(text)
     value = 0.0
     while index < len(data)
       digit = hexDigit(data[index])
-      if digit < 0 then return value * sign end if
+      if digit < 0 then return quakeFloat(value * sign) end if
       value = value * 16.0 + digit
       index = index + 1
     end while
-    return value * sign
+    return quakeFloat(value * sign)
   end if
 
   if index < len(data) and data[index] == 39 then
-    if index + 1 < len(data) then return sign * data[index + 1] end if
-    return 0.0
+    if index + 1 < len(data) then return quakeFloat(sign * data[index + 1]) end if
+    return quakeFloat(0.0)
   end if
 
   value = 0.0
@@ -83,16 +98,16 @@ function atof(text)
     value = value * 10.0 + current - 48
     total = total + 1
   end while
-  if decimal < 0 then return value * sign end if
+  if decimal < 0 then return quakeFloat(value * sign) end if
   while total > decimal
     value = value / 10.0
     total = total - 1
   end while
-  return value * sign
+  return quakeFloat(value * sign)
 end function
 
 function atoi(text)
-  data = bytes(text)
+  data = quakeText.encodeBytes(text)
   index = 0
   sign = 1
   if index < len(data) and data[index] == 45 then
@@ -105,26 +120,59 @@ function atoi(text)
     value = 0
     while index < len(data)
       digit = hexDigit(data[index])
-      if digit < 0 then return value * sign end if
-      value = (value << 4) + digit
+      if digit < 0 then return quakeInt32(value * sign) end if
+      value = quakeInt32((value << 4) + digit)
       index = index + 1
     end while
-    return value * sign
+    return quakeInt32(value * sign)
   end if
 
   if index < len(data) and data[index] == 39 then
-    if index + 1 < len(data) then return sign * data[index + 1] end if
+    if index + 1 < len(data) then return quakeInt32(sign * data[index + 1]) end if
     return 0
   end if
 
   value = 0
   while index < len(data)
     current = data[index]
-    if current < 48 or current > 57 then return value * sign end if
-    value = value * 10 + current - 48
+    if current < 48 or current > 57 then return quakeInt32(value * sign) end if
+    value = quakeInt32(value * 10 + current - 48)
     index = index + 1
   end while
-  return value * sign
+  return quakeInt32(value * sign)
+end function
+
+// C runtime atoi semantics used by host_cmd.c and view.c.  Unlike Quake's
+// Q_atoi above, this accepts only the initial decimal digit run after ASCII
+// whitespace and an optional sign; 0x and character-literal syntax are not
+// recognized.  The result is narrowed to WinQuake's signed 32-bit int.
+function cAtoi(text)
+  data = quakeText.encodeBytes(text)
+  index = 0
+  while index < len(data) and (data[index] == 32 or (data[index] >= 9 and data[index] <= 13))
+    index = index + 1
+  end while
+  sign = 1
+  if index < len(data) and data[index] == 45 then
+    sign = -1
+    index = index + 1
+  else if index < len(data) and data[index] == 43 then
+    index = index + 1
+  end if
+  value = 0
+  while index < len(data) and data[index] >= 48 and data[index] <= 57
+    value = quakeInt32(value * 10 + data[index] - 48)
+    index = index + 1
+  end while
+  return quakeInt32(value * sign)
+end function
+
+// C runtime atof semantics used by pr_edict.c and host_cmd.c save loading.
+// The main native bridge calls strtod and narrows the result to C float, so
+// signed zero, exponent syntax and the exact IEEE-754 binary32 boundary match
+// WinQuake instead of depending on MiniLang's general toNumber() conversion.
+function cAtof(text)
+  return native.bitsFloat(native.f32FromText(text))
 end function
 
 // MiniLang byte arrays replace Q_mem*'s untyped pointers.  These functions
@@ -162,18 +210,18 @@ function memCompare(first, second, count)
 end function
 
 function stringLength(text)
-  return len(bytes(text))
+  return len(quakeText.encodeBytes(text))
 end function
 
 function stringCopy(text)
-  return decode(bytes(text))
+  return quakeText.decodeBytes(quakeText.encodeBytes(text))
 end function
 
 function stringCopyCount(text, count)
   if count <= 0 then return "" end if
-  data = bytes(text)
-  if len(data) <= count then return text end if
-  return decode(slice(data, 0, count))
+  data = quakeText.encodeBytes(text)
+  if len(data) <= count then return quakeText.decodeBytes(data) end if
+  return quakeText.decodeBytes(slice(data, 0, count))
 end function
 
 function stringConcat(destination, source)
@@ -181,7 +229,7 @@ function stringConcat(destination, source)
 end function
 
 function stringLastIndex(text, character)
-  data = bytes(text)
+  data = quakeText.encodeBytes(text)
   index = len(data) - 1
   while index >= 0
     if data[index] == character then return index end if
@@ -191,8 +239,8 @@ function stringLastIndex(text, character)
 end function
 
 function stringCompareCount(first, second, count)
-  firstData = bytes(first)
-  secondData = bytes(second)
+  firstData = quakeText.encodeBytes(first)
+  secondData = quakeText.encodeBytes(second)
   index = 0
   while index < count
     firstValue = 0
@@ -207,8 +255,8 @@ function stringCompareCount(first, second, count)
 end function
 
 function stringCompare(first, second)
-  firstLength = len(bytes(first))
-  secondLength = len(bytes(second))
+  firstLength = len(quakeText.encodeBytes(first))
+  secondLength = len(quakeText.encodeBytes(second))
   count = firstLength
   if secondLength > count then count = secondLength end if
   return stringCompareCount(first, second, count + 1)
@@ -220,8 +268,8 @@ function upperAscii(value)
 end function
 
 function stringCompareInsensitiveCount(first, second, count)
-  firstData = bytes(first)
-  secondData = bytes(second)
+  firstData = quakeText.encodeBytes(first)
+  secondData = quakeText.encodeBytes(second)
   index = 0
   while index < count
     firstValue = 0
@@ -240,16 +288,16 @@ function stringCompareInsensitive(first, second)
 end function
 
 function substring(text, offset, count)
-  data = bytes(text)
+  data = quakeText.encodeBytes(text)
   if offset < 0 then offset = 0 end if
   if offset > len(data) then offset = len(data) end if
   if count < 0 then count = 0 end if
   if offset + count > len(data) then count = len(data) - offset end if
-  return decode(slice(data, offset, count))
+  return quakeText.decodeBytes(slice(data, offset, count))
 end function
 
 function skipPath(pathname)
-  data = bytes(pathname)
+  data = quakeText.encodeBytes(pathname)
   start = 0
   index = 0
   while index < len(data)
@@ -260,7 +308,7 @@ function skipPath(pathname)
 end function
 
 function stripExtension(pathname)
-  data = bytes(pathname)
+  data = quakeText.encodeBytes(pathname)
   index = 0
   while index < len(data) and data[index] != 46
     index = index + 1
@@ -269,7 +317,7 @@ function stripExtension(pathname)
 end function
 
 function fileExtension(pathname)
-  data = bytes(pathname)
+  data = quakeText.encodeBytes(pathname)
   index = 0
   while index < len(data) and data[index] != 46
     index = index + 1
@@ -281,7 +329,7 @@ function fileExtension(pathname)
 end function
 
 function fileBase(pathname)
-  data = bytes(pathname)
+  data = quakeText.encodeBytes(pathname)
   if len(data) == 0 then return "?model?" end if
   slash = -1
   dot = -1
@@ -293,12 +341,14 @@ function fileBase(pathname)
   end while
   if dot < slash then dot = len(data) end if
   count = dot - slash - 1
-  if count < 1 then return "?model?" end if
+  // WinQuake treats zero- and one-character basenames as unusable model
+  // tags and substitutes ?model?.
+  if count < 2 then return "?model?" end if
   return substring(pathname, slash + 1, count)
 end function
 
 function defaultExtension(pathname, extension)
-  data = bytes(pathname)
+  data = quakeText.encodeBytes(pathname)
   index = len(data) - 1
   while index > 0 and data[index] != 47
     if data[index] == 46 then return pathname end if
@@ -314,7 +364,7 @@ end function
 // COM_Parse returns a pointer to the remaining source.  Its MiniLang pendant
 // returns [token, nextOffset, eof], retaining punctuation and comment rules.
 function parseToken(text, startOffset)
-  data = bytes(text)
+  data = quakeText.encodeBytes(text)
   index = startOffset
   scanning = true
   while scanning
@@ -340,11 +390,11 @@ function parseToken(text, startOffset)
       index = index + 1
     end while
     if index < len(data) and data[index] == 34 then index = index + 1 end if
-    return [decode(slice(output, 0, count)), index, false]
+    return [quakeText.decodeBytes(slice(output, 0, count)), index, false]
   end if
 
   if punctuation(data[index]) then
-    token = decode(slice(data, index, 1))
+    token = quakeText.decodeBytes(slice(data, index, 1))
     return [token, index + 1, false]
   end if
 
@@ -354,7 +404,7 @@ function parseToken(text, startOffset)
     if count < len(output) then output[count] = data[index]; count = count + 1 end if
     index = index + 1
   end while
-  return [decode(slice(output, 0, count)), index, false]
+  return [quakeText.decodeBytes(slice(output, 0, count)), index, false]
 end function
 
 function memorySearch(data, count, search)
@@ -689,7 +739,8 @@ function LongSwap(value)
 end function
 
 function LongNoSwap(value)
-  return value
+  // The C parameter is a signed 32-bit int. Preserve that call boundary.
+  return quakeInt32(value)
 end function
 
 function FloatSwap(value)
@@ -704,7 +755,8 @@ function FloatSwap(value)
 end function
 
 function FloatNoSwap(value)
-  return value
+  // The C parameter and return type are both float, not host double.
+  return quakeFloat(value)
 end function
 
 function COM_SkipPath(pathname)

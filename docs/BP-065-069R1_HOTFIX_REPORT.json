@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "revision": "BP-065-069R1",
+  "parent": "BP-065-069",
+  "result_archive": "MiniQuake_BP-065-069_RESULTS_20260729-154632.zip",
+  "result_archive_sha256": "96934acd755555383271141db651f1304561366aec73c540b943e296ec9a2f39",
+  "classification": "fixture-only binary32 expectation and test-count correction",
+  "failures": [
+    "sound volume tenth-step",
+    "invert mouse"
+  ],
+  "expected_values": {
+    "volume": {
+      "string": "0.800000",
+      "float_bits": "0x3f4ccccd"
+    },
+    "m_pitch": {
+      "string": "-0.022000",
+      "float_bits": "0xbcb43958"
+    }
+  },
+  "bp068_fixtures": 24,
+  "block_fixtures": 112,
+  "production_source_changed": false,
+  "native_source_changed": false,
+  "engine_contracts_changed": false,
+  "frontend_status": "frontend_109_frozen_v1",
+  "frontend_fingerprint": "0x924251fa"
+}

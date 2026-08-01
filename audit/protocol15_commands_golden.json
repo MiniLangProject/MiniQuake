@@ -1,0 +1,143 @@
+{
+  "schema": "MiniQuakeProtocol15CommandsGolden/1",
+  "package": "BP-011",
+  "parent_package": "BP-010R1",
+  "reference": {
+    "engine": "WinQuake/GLQuake 1.09",
+    "source_units": [
+      "cl_main.c:CL_SignonReply",
+      "cl_parse.c:CL_ParseUpdate",
+      "host_cmd.c:Host_PreSpawn_f/Host_Spawn_f/Host_Begin_f",
+      "sv_main.c:SV_WriteEntitiesToClient",
+      "sv_user.c:SV_ReadClientMessage",
+      "protocol.h"
+    ],
+    "oracle_source": "tools/oracle/protocol15_commands_oracle.c",
+    "oracle_sha256": "9485e7f8ef4ec3812d1bd3f3d504d6ebc37b04b67af702c34e9fee37bedd583d",
+    "target": "Protocol 15 little-endian wire semantics"
+  },
+  "vectors": [
+    {
+      "name": "signon_reply_1",
+      "bytes": "04707265737061776e00",
+      "length": 10
+    },
+    {
+      "name": "signon_reply_2",
+      "bytes": "046e616d65202252616e676572220a0004636f6c6f7220342031330a0004737061776e20312032203300",
+      "length": 42
+    },
+    {
+      "name": "signon_reply_3",
+      "bytes": "04626567696e00",
+      "length": 7
+    },
+    {
+      "name": "signon_reply_4",
+      "bytes": "",
+      "length": 0
+    },
+    {
+      "name": "server_signon_markers_1_2_3",
+      "bytes": "190119021903",
+      "length": 6
+    },
+    {
+      "name": "clc_compound_stream",
+      "bytes": "0103000048410880c0c80085ff00800307046e616d65202252616e676572220a00",
+      "length": 33
+    },
+    {
+      "name": "clc_disconnect",
+      "bytes": "02",
+      "length": 1
+    },
+    {
+      "name": "clc_signed_eom",
+      "bytes": "ff",
+      "length": 1
+    },
+    {
+      "name": "fast_update_unchanged_short",
+      "bytes": "8001",
+      "length": 2
+    },
+    {
+      "name": "fast_update_effects_changed",
+      "bytes": "81200106",
+      "length": 4
+    },
+    {
+      "name": "fast_update_step_only",
+      "bytes": "a001",
+      "length": 2
+    },
+    {
+      "name": "fast_update_full_short",
+      "bytes": "ff3f07090806070a5a0008960040fc00e0",
+      "length": 17
+    },
+    {
+      "name": "fast_update_full_long",
+      "bytes": "ff7f2c01090806070a5a0008960040fc00e0",
+      "length": 18
+    },
+    {
+      "name": "svc_catalog_stream",
+      "bytes": "0102030240e20100040f00000005010006001100010800100018000700004841087072696e740a00096563686f20666978747572650a000a0740e00b0f00000001007374617274006d6170732f73746172742e6273700070726f67732f706c617965722e6d646c00006d6973632f6d656e75312e77617600000c006d000d0052616e676572000e0007000f0040785634120264000a0b0c0d0e0110110011004d1208001000180001fe0304051301022000280030001401020000080000100040180080160200010200000800001000401800801700380040004800180119011a63656e746572001b1c1d08001000180001ff401e1f66696e616c650020030321226375747363656e65008001",
+      "length": 268
+    }
+  ],
+  "svc_event_order": [
+    "svc_nop",
+    "svc_disconnect",
+    "svc_updatestat",
+    "svc_version",
+    "svc_setview",
+    "svc_sound",
+    "svc_time",
+    "svc_print",
+    "svc_stufftext",
+    "svc_setangle",
+    "svc_serverinfo",
+    "svc_lightstyle",
+    "svc_updatename",
+    "svc_updatefrags",
+    "svc_clientdata",
+    "svc_stopsound",
+    "svc_updatecolors",
+    "svc_particle",
+    "svc_damage",
+    "svc_spawnstatic",
+    "svc_spawnbaseline",
+    "svc_temp_entity",
+    "svc_setpause",
+    "svc_signonnum",
+    "svc_centerprint",
+    "svc_killedmonster",
+    "svc_foundsecret",
+    "svc_spawnstaticsound",
+    "svc_intermission",
+    "svc_finale",
+    "svc_cdtrack",
+    "svc_sellscreen",
+    "svc_cutscene",
+    "fast_update"
+  ],
+  "contracts": {
+    "client_signon_replies": {
+      "1": "prespawn",
+      "2": "name/color/spawn",
+      "3": "begin",
+      "4": "no wire output"
+    },
+    "server_signon_markers": [
+      1,
+      2,
+      3
+    ],
+    "signon_completion": "first fast entity update promotes client stage 3 to 4",
+    "client_command_reader": "signed MSG_ReadChar; 0xff is end-of-message",
+    "entity_update": "baseline-relative fields, effects-aware, short/long entity numbers, U_MOREBITS in original field order"
+  }
+}

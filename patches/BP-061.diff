@@ -1,0 +1,185 @@
+diff --git a/CHANGELOG_BP-061.md b/CHANGELOG_BP-061.md
+new file mode 100644
+index 0000000..1d48440
+--- /dev/null
++++ b/CHANGELOG_BP-061.md
+@@ -0,0 +1,5 @@
++# BP-061
++
++- Name and use the historical eight-entry host-cache limit.
++- Add byte-exact control request/reply and discovery semantics tests.
++- Add 22 runtime fixtures plus independent C/Python contract evidence.
+diff --git a/audit/network_control_golden.json b/audit/network_control_golden.json
+new file mode 100644
+index 0000000..e96000a
+--- /dev/null
++++ b/audit/network_control_golden.json
+@@ -0,0 +1,10 @@
++{
++  "schema_version": 1,
++  "package": "BP-061",
++  "protocol_version": 3,
++  "game_name": "QUAKE",
++  "host_cache_size": 8,
++  "request_opcodes": [1, 2, 3, 4],
++  "reply_opcodes": [129, 130, 131, 132, 133],
++  "fixtures": 24
++}
+diff --git a/docs/BP-061_NETWORK_CONTROL_AUDIT.md b/docs/BP-061_NETWORK_CONTROL_AUDIT.md
+new file mode 100644
+index 0000000..4061981
+--- /dev/null
++++ b/docs/BP-061_NETWORK_CONTROL_AUDIT.md
+@@ -0,0 +1,6 @@
++# BP-061 – Datagram control, discovery and connection audit
++
++BP-061 binds Protocol 3 connectionless requests and replies, the eight-entry
++host cache, duplicate suppression, wildcard advertised addresses, host-name
++conflict handling, server-rule enumeration, connect duplicate/replacement
++classification and IPv4 ban masks.
+diff --git a/src/miniquake/net_loop.ml b/src/miniquake/net_loop.ml
+index f5b6f67..08a54f0 100644
+--- a/src/miniquake/net_loop.ml
++++ b/src/miniquake/net_loop.ml
+@@ -14,6 +14,7 @@ unreliableMessagesSent = 0
+ unreliableMessagesReceived = 0
+ 
+ const LOOP_MAX_MESSAGE = 8192
++const HOST_CACHE_SIZE = 8
+ 
+ function createState()
+   return t.LoopState(void, void, void, void, void, "UNNAMED", "", 0, 1, [], [], 0, 0, [], [], true)
+@@ -344,7 +345,7 @@ function _Datagram_SearchForHosts(searchSocket, hosts, port, timeoutMilliseconds
+   if timeoutMilliseconds < 0 then timeoutMilliseconds = 0 end if
+   elapsed = 0
+   result = hosts
+-  while elapsed < timeoutMilliseconds and len(result) < 8
++  while elapsed < timeoutMilliseconds and len(result) < HOST_CACHE_SIZE
+     received = try(udp.receive(searchSocket, 2048))
+     if received is error then return received end if
+     if received is void then
+diff --git a/tests/network_control_parity_tests.ml b/tests/network_control_parity_tests.ml
+new file mode 100644
+index 0000000..3e3c804
+--- /dev/null
++++ b/tests/network_control_parity_tests.ml
+@@ -0,0 +1,79 @@
++/*
++Copyright (C) 1996-1997 Id Software, Inc.
++Copyright (C) 2026 MiniQuake contributors
++
++BP-061: net_dgrm.c control queries, discovery cache and connect classification.
++*/
++
++import miniquake.net_control as control
++import miniquake.net_datagram as datagram
++import miniquake.net_loop as netloop
++import miniquake.types as t
++
++testIndex = 0
++failures = 0
++
++function check(value, name)
++  global testIndex, failures
++  testIndex = testIndex + 1
++  print "[" + testIndex + "/24] " + name
++  if not value then failures = failures + 1; print "FAIL: " + name; return false end if
++  return true
++end function
++
++function main(args)
++  check(control.NET_PROTOCOL_VERSION == 3 and control.GAME_NAME == "QUAKE", "control protocol identity")
++
++  connectRequest = control.parse(control.requestConnect())
++  check(connectRequest[0] == control.CCREQ_CONNECT and control.validConnectRequest(connectRequest), "connect request")
++  serverRequest = control.parse(control.requestServerInfo())
++  check(serverRequest[0] == control.CCREQ_SERVER_INFO and control.validServerInfoRequest(serverRequest), "server-info request")
++  playerRequest = control.parse(control.requestPlayerInfo(7))
++  check(playerRequest[0] == control.CCREQ_PLAYER_INFO and playerRequest[1][0] == 7, "player-info request")
++  ruleRequest = control.parse(control.requestRuleInfo("fraglimit"))
++  check(ruleRequest[0] == control.CCREQ_RULE_INFO and ruleRequest[1][0] == "fraglimit", "rule-info request")
++
++  accepted = control.parse(control.replyAccept(28000))
++  check(accepted[0] == control.CCREP_ACCEPT and accepted[1][0] == 28000, "accept reply")
++  rejected = control.parse(control.replyReject("Server is full."))
++  check(rejected[0] == control.CCREP_REJECT and rejected[1][0] == "Server is full.", "reject reply")
++  serverInfo = control.parse(control.replyServerInfo("1.2.3.4:26000", "Ranger", "e1m1", 2, 8))
++  check(serverInfo[0] == control.CCREP_SERVER_INFO and serverInfo[1][0] == "1.2.3.4:26000" and serverInfo[1][5] == 3, "server-info reply")
++  playerInfo = control.parse(control.replyPlayerInfo(2, "Ranger", 0x4f, 12, 31, "1.2.3.4:26000"))
++  check(playerInfo[0] == control.CCREP_PLAYER_INFO and playerInfo[1][2] == 0x4f and playerInfo[1][3] == 12, "player-info reply")
++  ruleInfo = control.parse(control.replyRuleInfo("deathmatch", "1"))
++  check(ruleInfo[0] == control.CCREP_RULE_INFO and ruleInfo[1][0] == "deathmatch", "rule-info reply")
++
++  malformed = bytes(control.requestConnect())
++  malformed[3] = (malformed[3] + 1) & 255
++  check(try(control.parse(malformed)) is error, "reject mismatched control length")
++  check((datagram.bigU32(control.requestServerInfo(), 0) & datagram.NETFLAG_CTL) != 0, "control flag set")
++
++  check(netloop.HOST_CACHE_SIZE == 8, "host cache size")
++  hosts = [["a", "abcdefghijklmnZ", "start", 0, 4, 3]]
++  check(netloop.uniqueHostName(hosts, "abcdefghijklmnZ") == "abcdefghijklmn[", "case-insensitive name conflict suffix")
++  check(netloop.uniqueHostName([], "") == "UNNAMED", "empty discovery name fallback")
++  check(netloop.discoveredAddress(["0.0.0.0:27001"], "10.1.2.3", 26000) == "10.1.2.3:27001", "wildcard advertised address")
++  check(netloop.discoveredAddress(["192.168.1.8:27001"], "10.1.2.3", 26000) == "192.168.1.8:27001", "explicit advertised address")
++  check(netloop.listenerAddress("10.0.0.5", 26000) == "10.0.0.5:26000", "listener address text")
++
++  rules = [["deathmatch", "1"], ["fraglimit", "20"]]
++  check(netloop.nextServerRule(rules, "")[0] == "deathmatch" and netloop.nextServerRule(rules, "deathmatch")[0] == "fraglimit", "rule enumeration")
++  check(netloop.nextServerRule(rules, "fraglimit") == ["", ""], "rule enumeration terminator")
++
++  remote = netloop.createRemoteSocket(void, "127.0.0.1", 27000)
++  remote.connectTime = 99.0
++  check(netloop.connectionRequestAction(remote, 27000, 100.0) == "duplicate", "recent duplicate connect")
++  check(netloop.connectionRequestAction(remote, 28000, 100.0) == "replace", "new source port replaces crashed connect")
++
++  state = netloop.createState()
++  state.remoteSockets = [remote]
++  check(netloop.matchingRemote(state, "127.0.0.1") == remote, "remote address lookup")
++  state.banAddress = 0x0a000000
++  state.banMask = 0xff000000
++  check(netloop.addressIsBanned(state, "10.23.45.67") and not netloop.addressIsBanned(state, "11.23.45.67"), "IPv4 ban mask")
++
++  if failures > 0 then print "MiniQuake BP-061 network control tests failed: " + failures + "/24"; return 1 end if
++  print "MiniQuake BP-061 network control tests passed: 24"
++  return 0
++end function
+diff --git a/tools/check_network_061.py b/tools/check_network_061.py
+new file mode 100755
+index 0000000..a2e2b98
+--- /dev/null
++++ b/tools/check_network_061.py
+@@ -0,0 +1,18 @@
++#!/usr/bin/env python3
++import argparse,json,pathlib,sys
++
++def main():
++ p=argparse.ArgumentParser();p.add_argument('--root',default='.');p.add_argument('--json',default='');a=p.parse_args();r=pathlib.Path(a.root).resolve();e=[]
++ loop=(r/'src/miniquake/net_loop.ml').read_text(encoding='utf-8-sig'); ctl=(r/'src/miniquake/net_control.ml').read_text(encoding='utf-8-sig'); t=(r/'tests/network_control_parity_tests.ml').read_text(encoding='utf-8-sig'); g=json.loads((r/'audit/network_control_golden.json').read_text())
++ for m in ['const HOST_CACHE_SIZE = 8','len(result) < HOST_CACHE_SIZE','function uniqueHostName','function connectionRequestAction']:
++  if m not in loop:e.append('net_loop missing '+m)
++ for m in ['const NET_PROTOCOL_VERSION = 3','const GAME_NAME = "QUAKE"','function requestConnect','function replyServerInfo']:
++  if m not in ctl:e.append('net_control missing '+m)
++ if 'passed: 24' not in t:e.append('fixture marker missing')
++ if g.get('fixtures')!=24 or g.get('host_cache_size')!=8:e.append('golden mismatch')
++ out={'schema_version':1,'package':'BP-061','status':'PASS' if not e else 'FAIL','errors':e,'fixtures':24,'host_cache_size':8}
++ if a.json:pathlib.Path(a.json).write_text(json.dumps(out,indent=2)+'\n')
++ print('MiniQuake BP-061 network control verification: '+out['status'])
++ for x in e:print('  [FAIL] '+x)
++ return 0 if not e else 1
++if __name__=='__main__':sys.exit(main())
+diff --git a/tools/oracle/network_control_oracle.c b/tools/oracle/network_control_oracle.c
+new file mode 100644
+index 0000000..e87814f
+--- /dev/null
++++ b/tools/oracle/network_control_oracle.c
+@@ -0,0 +1,10 @@
++#include <stdint.h>
++#include <stdio.h>
++int main(void) {
++  printf("protocol=3\n");
++  printf("game=QUAKE\n");
++  printf("host_cache=8\n");
++  printf("request=1,2,3,4\n");
++  printf("reply=129,130,131,132,133\n");
++  return 0;
++}

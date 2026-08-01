@@ -352,7 +352,7 @@ function traceDrawBrushModel()
   setup[0].map.models = [baseModel, submodel]
   zero = t.Vec3(0.0, 0.0, 0.0)
   entity = t.ClientEntityState(
-    1, 1, 0, 0, 0, 0, zero, zero, 0.0, zero, zero, zero, zero, false, void
+    1, 1, 0, 0, 0, 0, zero, zero, 0.0, zero, zero, zero, zero, false, void, 0.0
   )
   gl.Trace_Begin()
   rsurf.R_DrawBrushModel(entity)

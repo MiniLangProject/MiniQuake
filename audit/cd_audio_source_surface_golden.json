@@ -1,0 +1,27 @@
+{
+  "backend": "virtual OGG/music backend",
+  "classification": "technical_equivalent",
+  "fixture_count": 20,
+  "mechanical_operations_out_of_profile": [
+    "physical tray eject",
+    "physical tray close",
+    "MCI device identifier"
+  ],
+  "observable_state_preserved": [
+    "valid",
+    "playing",
+    "looping",
+    "track",
+    "notification result",
+    "failure invalidation"
+  ],
+  "original_function_names": [
+    "CDAudio_Eject",
+    "CDAudio_CloseDoor",
+    "CDAudio_GetAudioDiskInfo",
+    "CDAudio_MessageHandler"
+  ],
+  "original_source": "cd_win.c",
+  "package": "BP-081",
+  "schema_version": 1
+}

@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "delivery_revision": "BP-085-089R4",
+  "delivery_parent": "BP-085-089R3",
+  "package_id": "BP-089",
+  "block_id": "BP-085-089",
+  "result_archive": "MiniQuake_BP-085-089R3_RESULTS_20260731-231328.zip",
+  "result_archive_sha256": "9713654070c733ff44f56fe98bee6e860e2717e162d2b706daed102316598703",
+  "failure_stage": "inherited BP-031 command/cvar preflight",
+  "failure_message": "missing cvar marker: negative = (raw & 0x80000000) != 0",
+  "classification": "preflight lineage mismatch",
+  "root_cause": "The historical BP-031 checker required the removed i32-scaled formatter after Cvar_SetValue moved to the accepted caller-owned MSVCRT %.6f bridge.",
+  "fix": {
+    "checker_flag": "--allow-downstream-package",
+    "historical_formatter": "historical_raw_word_formatter",
+    "downstream_formatter": "native_msvcrt_percent_f",
+    "required_export": "mqt_f32_to_fixed6",
+    "runtime_fixtures": 20,
+    "engine_source_changed": false,
+    "native_binary_changed": false
+  },
+  "contracts_unchanged": [
+    "host_lifecycle_109_frozen_v1",
+    "artifact_compat_109_frozen_v1",
+    "compat_109_release_candidate_v1"
+  ]
+}

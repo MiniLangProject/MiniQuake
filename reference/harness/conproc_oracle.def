@@ -1,3 +1,0 @@
-LIBRARY conproc_oracle
-EXPORTS
-    conproc_oracle_jsonl

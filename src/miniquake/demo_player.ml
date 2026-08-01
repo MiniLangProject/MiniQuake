@@ -5,6 +5,7 @@ import miniquake.client as client
 import miniquake.constants as c
 import miniquake.player_move as movement
 import miniquake.mathlib as math
+import miniquake.native as native
 
 function create(recording)
   player = movement.create(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
@@ -31,9 +32,12 @@ function CL_FinishTimeDemo(playback, hostFrameCount, realtime)
   playback.timedemo = false
   playback.client.timedemo = false
   frames = (hostFrameCount - playback.startFrame) - 1
-  seconds = realtime - playback.startTime
+  // CL_FinishTimeDemo stores the elapsed double clock in a C float before
+  // printing, and the frames/time division is a float expression as well.
+  seconds = native.bitsFloat(native.floatBits(realtime - playback.startTime))
   if seconds == 0.0 then seconds = 1.0 end if
-  playback.finishResult = [frames, seconds, frames / seconds]
+  fps = native.bitsFloat(native.floatBits(frames / seconds))
+  playback.finishResult = [frames, seconds, fps]
   return playback.finishResult
 end function
 

@@ -1,0 +1,59 @@
+{
+  "schema": "MiniQuakeDemoLifecycleGolden/1",
+  "package_id": "BP-032",
+  "parent_package_id": "BP-031",
+  "sources": [
+    "cl_demo.c"
+  ],
+  "rows": [
+    {
+      "kind": "case",
+      "name": "track_zero",
+      "value": 0
+    },
+    {
+      "kind": "case",
+      "name": "track_negative",
+      "value": -12
+    },
+    {
+      "kind": "case",
+      "name": "track_raw_A",
+      "value": 17
+    },
+    {
+      "kind": "case",
+      "name": "track_space_1",
+      "value": -159
+    },
+    {
+      "kind": "case",
+      "name": "demo_header_bytes",
+      "value": 16
+    },
+    {
+      "kind": "case",
+      "name": "timedemo_frames",
+      "value": 9
+    },
+    {
+      "kind": "case",
+      "name": "timedemo_seconds_bits",
+      "value": 1075838976
+    },
+    {
+      "kind": "case",
+      "name": "timedemo_fps_bits",
+      "value": 1080452710
+    },
+    {
+      "kind": "case",
+      "name": "fixture_count",
+      "value": 20
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/demo_lifecycle_oracle.c",
+    "oracle_sha256": "959a9ff0cd9df4973072b25da7885cf949796d6214e024d25def0f2d051ac1c6"
+  }
+}

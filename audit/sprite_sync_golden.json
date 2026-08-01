@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "component": "BP-046 sprite sync",
+  "rows": [
+    {
+      "name": "first_rand",
+      "value": 41
+    },
+    {
+      "name": "first_sync_bits",
+      "value": 983826760
+    },
+    {
+      "name": "second_rand",
+      "value": 18467
+    },
+    {
+      "name": "second_sync_bits",
+      "value": 1058031393
+    },
+    {
+      "name": "cycle_005",
+      "value": 0
+    },
+    {
+      "name": "cycle_015",
+      "value": 1
+    },
+    {
+      "name": "cycle_025",
+      "value": 0
+    },
+    {
+      "name": "sync_modes",
+      "value": 2
+    },
+    {
+      "name": "fixtures",
+      "value": 22
+    }
+  ]
+}

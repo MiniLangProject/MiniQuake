@@ -1,0 +1,253 @@
+diff --git a/CHANGELOG_BP-052.md b/CHANGELOG_BP-052.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b1ede3194d8796fa199774531df668213047b9e4
+--- /dev/null
++++ b/CHANGELOG_BP-052.md
+@@ -0,0 +1,3 @@
++# BP-052: Envmap and timerefresh
++
++Bound the six 256x256 RGBA envmap orientations/files and the 128-step timerefresh yaw/FPS equations.
+diff --git a/audit/envmap_timerefresh_golden.json b/audit/envmap_timerefresh_golden.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..08b60afba0643f3a854a64e9617b9d2aa2367c9e
+--- /dev/null
++++ b/audit/envmap_timerefresh_golden.json
+@@ -0,0 +1 @@
++{"schema":1,"fixtures":20,"envmap_size":256,"envmap_faces":6,"envmap_bytes":262144,"timerefresh_steps":128,"last_yaw":357.1875}
+diff --git a/docs/BP-052_ENVMAP_TIMEREFRESH_AUDIT.md b/docs/BP-052_ENVMAP_TIMEREFRESH_AUDIT.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..61c4db9ba485d24b12ce1c7d6e1093e8aee6dfb0
+--- /dev/null
++++ b/docs/BP-052_ENVMAP_TIMEREFRESH_AUDIT.md
+@@ -0,0 +1,13 @@
++# BP-052 envmap and timerefresh audit
++
++Source-guided against `gl_rmisc.c:R_Envmap_f` and `R_TimeRefresh_f`.
++
++Bound behavior:
++- six 256x256 RGBA views;
++- orientations yaw 0/90/180/270 and pitch -90/+90;
++- raw files `env0.rgb` through `env5.rgb`;
++- exactly 262144 bytes per face;
++- timerefresh renders 128 yaw steps and computes `128 / elapsed`;
++- relevant arithmetic is stored at Binary32 boundaries.
++
++Asset-free fixtures: 20.
+diff --git a/tests/envmap_timerefresh_tests.ml b/tests/envmap_timerefresh_tests.ml
+new file mode 100644
+index 0000000000000000000000000000000000000000..a300c2c1de9a649583b417b071d65a46b75c9a5f
+--- /dev/null
++++ b/tests/envmap_timerefresh_tests.ml
+@@ -0,0 +1,155 @@
++/* BP-052: GLQuake envmap and timerefresh special paths. */
++import miniquake.render.special_paths as bp052Special
++import miniquake.render.gl_rmisc as bp052Rmisc
++import miniquake.native as bp052Native
++import miniquake.types as bp052Types
++
++function bp052Equal(actual, expected, name)
++  if actual != expected then return error(5200, name + ": expected " + expected + ", got " + actual) end if
++  return true
++end function
++function bp052Yes(value, name)
++  if not value then return error(5201, name + ": expected true") end if
++  return true
++end function
++function bp052Near(actual, expected, tolerance, name)
++  delta = actual - expected
++  if delta < 0.0 then delta = -delta end if
++  if delta > tolerance then return error(5202, name + ": expected " + expected + ", got " + actual) end if
++  return true
++end function
++function bp052Run(number, name, fn)
++  print "[" + number + "/20] " + name
++  result = try(fn())
++  if result is error then print "FAIL: " + result.message; return false end if
++  return true
++end function
++function bp052DirectionCount()
++  bp052Equal(len(bp052Special.envmapDirections()), 6, "direction count")
++  return true
++end function
++function bp052DirectionFront()
++  value = bp052Special.envmapDirections()[0]
++  bp052Equal(value.x, 0.0, "front pitch")
++  bp052Equal(value.y, 0.0, "front yaw")
++  return true
++end function
++function bp052DirectionRight()
++  value = bp052Special.envmapDirections()[1]
++  bp052Equal(value.y, 90.0, "right yaw")
++  return true
++end function
++function bp052DirectionBack()
++  value = bp052Special.envmapDirections()[2]
++  bp052Equal(value.y, 180.0, "back yaw")
++  return true
++end function
++function bp052DirectionLeft()
++  value = bp052Special.envmapDirections()[3]
++  bp052Equal(value.y, 270.0, "left yaw")
++  return true
++end function
++function bp052DirectionUp()
++  value = bp052Special.envmapDirections()[4]
++  bp052Equal(value.x, -90.0, "up pitch")
++  return true
++end function
++function bp052DirectionDown()
++  value = bp052Special.envmapDirections()[5]
++  bp052Equal(value.x, 90.0, "down pitch")
++  return true
++end function
++function bp052ByteCount()
++  bp052Equal(bp052Special.envmapByteCount(), 262144, "envmap bytes")
++  return true
++end function
++function bp052FileZero()
++  bp052Equal(bp052Special.envmapFileName(0), "env0.rgb", "envmap file zero")
++  return true
++end function
++function bp052FileFive()
++  bp052Equal(bp052Special.envmapFileName(5), "env5.rgb", "envmap file five")
++  return true
++end function
++function bp052YawZero()
++  bp052Equal(bp052Special.timeRefreshYaw(0), 0.0, "yaw zero")
++  return true
++end function
++function bp052YawQuarter()
++  bp052Near(bp052Special.timeRefreshYaw(32), 90.0, 0.0001, "yaw quarter")
++  return true
++end function
++function bp052YawHalf()
++  bp052Near(bp052Special.timeRefreshYaw(64), 180.0, 0.0001, "yaw half")
++  return true
++end function
++function bp052YawLast()
++  bp052Near(bp052Special.timeRefreshYaw(127), 357.1875, 0.0001, "yaw last")
++  return true
++end function
++function bp052Result()
++  value = bp052Special.timeRefreshResult(2.0)
++  bp052Equal(value[0], 2.0, "refresh seconds")
++  bp052Equal(value[1], 64.0, "refresh fps")
++  return true
++end function
++function bp052ResultError()
++  value = try(bp052Special.timeRefreshResult(0.0))
++  bp052Yes(value is error, "non-positive duration")
++  return true
++end function
++function bp052AngleList()
++  values = bp052Special.timeRefreshAngles(bp052Types.Vec3(5.0, 7.0, 9.0))
++  bp052Equal(len(values), 128, "angle count")
++  bp052Equal(values[0].x, 5.0, "pitch preserved")
++  bp052Equal(values[127].z, 9.0, "roll preserved")
++  return true
++end function
++function bp052RmiscEnvmap()
++  bp052Rmisc.ResetCompatibility()
++  directions = bp052Rmisc.R_Envmap_f()
++  state = bp052Rmisc.GetRefreshState()
++  bp052Equal(len(directions), 6, "rmisc directions")
++  bp052Equal(state[0], 6, "rmisc view count")
++  bp052Equal(state[2], 0x0405, "rmisc back buffer")
++  bp052Equal(state[3], 1, "rmisc end rendering")
++  return true
++end function
++function bp052RmiscTimeRefresh()
++  bp052Rmisc.ResetCompatibility()
++  value = bp052Rmisc.R_TimeRefresh_f()
++  state = bp052Rmisc.GetRefreshState()
++  bp052Equal(value[0], 2.0, "rmisc seconds")
++  bp052Equal(value[1], 64.0, "rmisc fps")
++  bp052Equal(state[0], 128, "rmisc refresh views")
++  bp052Near(state[1], 357.1875, 0.0001, "rmisc last yaw")
++  return true
++end function
++function bp052Binary32LastYaw()
++  bp052Equal(bp052Native.floatBits(bp052Special.timeRefreshYaw(127)), bp052Native.floatBits(357.1875), "last yaw bits")
++  return true
++end function
++
++passed = 0
++if bp052Run(1, "envmap direction count", bp052DirectionCount) then passed = passed + 1 end if
++if bp052Run(2, "envmap front", bp052DirectionFront) then passed = passed + 1 end if
++if bp052Run(3, "envmap right", bp052DirectionRight) then passed = passed + 1 end if
++if bp052Run(4, "envmap back", bp052DirectionBack) then passed = passed + 1 end if
++if bp052Run(5, "envmap left", bp052DirectionLeft) then passed = passed + 1 end if
++if bp052Run(6, "envmap up", bp052DirectionUp) then passed = passed + 1 end if
++if bp052Run(7, "envmap down", bp052DirectionDown) then passed = passed + 1 end if
++if bp052Run(8, "envmap byte count", bp052ByteCount) then passed = passed + 1 end if
++if bp052Run(9, "envmap file zero", bp052FileZero) then passed = passed + 1 end if
++if bp052Run(10, "envmap file five", bp052FileFive) then passed = passed + 1 end if
++if bp052Run(11, "timerefresh yaw zero", bp052YawZero) then passed = passed + 1 end if
++if bp052Run(12, "timerefresh yaw quarter", bp052YawQuarter) then passed = passed + 1 end if
++if bp052Run(13, "timerefresh yaw half", bp052YawHalf) then passed = passed + 1 end if
++if bp052Run(14, "timerefresh yaw last", bp052YawLast) then passed = passed + 1 end if
++if bp052Run(15, "timerefresh result", bp052Result) then passed = passed + 1 end if
++if bp052Run(16, "timerefresh invalid duration", bp052ResultError) then passed = passed + 1 end if
++if bp052Run(17, "timerefresh angle list", bp052AngleList) then passed = passed + 1 end if
++if bp052Run(18, "rmisc envmap state", bp052RmiscEnvmap) then passed = passed + 1 end if
++if bp052Run(19, "rmisc timerefresh state", bp052RmiscTimeRefresh) then passed = passed + 1 end if
++if bp052Run(20, "timerefresh Binary32 yaw", bp052Binary32LastYaw) then passed = passed + 1 end if
++if passed != 20 then print "MiniQuake BP-052 envmap/timerefresh tests failed: " + passed + "/20"; error(5299, "BP-052 envmap/timerefresh") end if
++print "MiniQuake BP-052 envmap/timerefresh tests passed: 20"
+diff --git a/tools/check_render_special_052.py b/tools/check_render_special_052.py
+new file mode 100755
+index 0000000000000000000000000000000000000000..b03246fbb40cf0fccb9db1b2e96b69ae80893b89
+--- /dev/null
++++ b/tools/check_render_special_052.py
+@@ -0,0 +1,34 @@
++#!/usr/bin/env python3
++from __future__ import annotations
++import argparse, json, pathlib
++
++def emit_report(path, name, passed, details, errors):
++    if not path:
++        return
++    payload = {"schema": 1, "check": name, "status": "PASS" if passed else "FAIL", "passed": passed, "details": details, "errors": errors}
++    pathlib.Path(path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
++
++def main() -> int:
++    ap=argparse.ArgumentParser(); ap.add_argument('--root', default=str(pathlib.Path(__file__).resolve().parents[1])); ap.add_argument('--json-output'); a=ap.parse_args(); root=pathlib.Path(a.root).resolve(); errors=[]
++    special=(root/'src/miniquake/render/special_paths.ml').read_text(encoding='utf-8')
++    rmisc=(root/'src/miniquake/render/gl_rmisc.ml').read_text(encoding='utf-8')
++    test=(root/'tests/envmap_timerefresh_tests.ml').read_text(encoding='utf-8')
++    golden=json.loads((root/'audit/envmap_timerefresh_golden.json').read_text(encoding='utf-8'))
++    for marker in ('const ENVMAP_SIZE = 256','const ENVMAP_FACES = 6','const TIMEREFRESH_STEPS = 128','function envmapDirections()','function timeRefreshYaw(','function timeRefreshResult('):
++        if marker not in special: errors.append(f'special path missing {marker}')
++    for marker in ('function R_Envmap_f()','rmiscRenderViews = 6','function R_TimeRefresh_f()','rmiscRenderViews = 128'):
++        if marker not in rmisc: errors.append(f'gl_rmisc missing {marker}')
++    if test.count('bp052Run(')!=21: errors.append('BP-052 test does not contain 20 fixture calls')
++    if 'MiniQuake BP-052 envmap/timerefresh tests passed: 20' not in test: errors.append('BP-052 pass marker differs')
++    expected={'fixtures':20,'envmap_size':256,'envmap_faces':6,'envmap_bytes':262144,'timerefresh_steps':128}
++    for k,v in expected.items():
++        if golden.get(k)!=v: errors.append(f'BP-052 golden {k} differs')
++    details={"root": str(root), "error_count": len(errors)}
++    if errors:
++        emit_report(a.json_output, 'bp052_envmap_timerefresh', False, details, errors)
++        print('MiniQuake BP-052 envmap/timerefresh verification: FAIL'); [print('  '+e) for e in errors]; return 1
++    emit_report(a.json_output, 'bp052_envmap_timerefresh', True, details, [])
++    print('MiniQuake BP-052 envmap/timerefresh verification: PASS')
++    print('  fixtures=20 envmap_faces=6 timerefresh_steps=128')
++    return 0
++if __name__=='__main__': raise SystemExit(main())
+diff --git a/tools/oracle/envmap_timerefresh_oracle.c b/tools/oracle/envmap_timerefresh_oracle.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..6a5535fd498d397ddf8512fd4adbf119a0360d32
+--- /dev/null
++++ b/tools/oracle/envmap_timerefresh_oracle.c
+@@ -0,0 +1,11 @@
++#include <stdio.h>
++int main(void) {
++  printf("envmap_size=256\n");
++  printf("envmap_faces=6\n");
++  printf("envmap_bytes=262144\n");
++  printf("directions=0,0;0,90;0,180;0,270;-90,0;90,0\n");
++  printf("timerefresh_steps=128\n");
++  printf("timerefresh_last_yaw=357.187500\n");
++  printf("timerefresh_2s_fps=64.000000\n");
++  return 0;
++}

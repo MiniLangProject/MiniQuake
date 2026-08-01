@@ -1,3 +1,0 @@
-LIBRARY gl_vidnt_oracle
-EXPORTS
-    gl_vidnt_oracle_jsonl

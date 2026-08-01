@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "project": "MiniQuake",
+  "block_id": "BP-050-054",
+  "parent_package_id": "BP-045-049R3",
+  "final_package_id": "BP-054",
+  "delivery_revision": "BP-050-054R1",
+  "protocol_status": "protocol15_frozen_v1",
+  "quakec_status": "quakec_109_frozen_v1",
+  "world_physics_status": "world_physics_109_frozen_v1",
+  "host_lifecycle_status": "host_lifecycle_109_frozen_v1",
+  "client_render_status": "client_render_109_frozen_v1",
+  "client_render_fingerprint": "0x95e2b295",
+  "world_render_status": "world_render_109_frozen_v1",
+  "world_render_fingerprint": "0x846a74de",
+  "model_ui_render_status": "model_ui_render_109_frozen_v1",
+  "model_ui_render_fingerprint": "0x0a62f5b1",
+  "render_special_status": "render_special_109_frozen_v1",
+  "render_special_fingerprint": "0x2a3d8081",
+  "steps": [
+    {
+      "package_id": "BP-050",
+      "title": "mirror reflection and overlay parity",
+      "patch": "patches/BP-050.diff",
+      "runtime_fixtures": 22,
+      "status": "Windows runtime PASS in predecessor delivery; R1 regression pending"
+    },
+    {
+      "package_id": "BP-051",
+      "title": "clear, z-trick, finish and no-refresh parity",
+      "patch": "patches/BP-051.diff",
+      "runtime_fixtures": 20,
+      "status": "Windows runtime PASS in predecessor delivery; R1 regression pending"
+    },
+    {
+      "package_id": "BP-052",
+      "title": "envmap and timerefresh parity",
+      "patch": "patches/BP-052.diff",
+      "runtime_fixtures": 20,
+      "status": "Windows runtime PASS in predecessor delivery; R1 regression pending"
+    },
+    {
+      "package_id": "BP-053",
+      "title": "multi-scene render-evidence corpus",
+      "patch": "patches/BP-053.diff",
+      "runtime_fixtures": 18,
+      "status": "Windows runtime PASS in predecessor delivery; R1 regression pending"
+    },
+    {
+      "package_id": "BP-054",
+      "title": "special-render closure contract",
+      "patch": "patches/BP-054.diff",
+      "runtime_fixtures": 24,
+      "status": "23/24 Windows fixtures PASS; cvar test adapter corrected; R1 acceptance pending"
+    }
+  ],
+  "block_runtime_fixtures": 104,
+  "accepted_parent": {
+    "delivery_revision": "BP-045-049R3",
+    "status": "PASS",
+    "result_archive": "MiniQuake_BP-045-049R3_RESULTS_20260728-000010.zip",
+    "result_archive_sha256": "65bb521faf300fed61b7d03e15429896a31de27d934ee59459e251fac08bd2bf",
+    "headless_frames": 300,
+    "trace_frames": 128,
+    "trace_sha256": "b2589f2712b0aed42f31b1a35ebb4837c211391ba3e8d8888c422242d051af28",
+    "trace_rolling_hash": "d905b042",
+    "trace_byte_identity": "PASS",
+    "render_tga_sha256": "1325e6fd365c1e62fbf36c4fadcbe9110faa94778c4c14b43fa9efe56d35e154",
+    "render_pixel_hash": "55f9fc9c",
+    "render_sample_hash": "3ec42fe3",
+    "render_ssim": 1.0,
+    "render_identity": "PASS",
+    "udp_loopback": "PASS"
+  },
+  "acceptance": {
+    "build_once": true,
+    "continue_independent_tests": true,
+    "installed_game_validation": true,
+    "default_headless_frames": 300,
+    "default_trace_frames": 128,
+    "single_render_evidence_frame": 128,
+    "corpus_scenarios": 3,
+    "mini_pair_exact_identity": true,
+    "optional_original_ssim_floor": 0.95,
+    "udp_loopback": true
+  },
+  "scope_boundary": {
+    "original_glquake_reference_images": "external optional corpus; not bundled",
+    "current_visual_evidence": "three independent MiniQuake A/B exact pairs; optional Original GLQuake SSIM gate",
+    "modern_renderer_backend": "later block",
+    "frozen_parent_contracts": "unchanged"
+  },
+  "status": "R1 test-adapter hotfix implemented; Windows acceptance pending",
+  "delivery_parent": "BP-050-054",
+  "predecessor_delivery_result": {
+    "delivery_revision": "BP-050-054",
+    "result_archive": "MiniQuake_BP-050-054_RESULTS_20260728-083416.zip",
+    "result_archive_sha256": "4e2afe7a4266486fd3b60c6ed5d5e5c4995c34fa96234979b3dd11c2733d61e9",
+    "status": "PARTIAL PASS",
+    "steps": "129 PASS, 1 FAIL, 1 optional SKIPPED",
+    "failure": "BP-054 fixture 21/24 passed a non-struct commandLine value",
+    "game_validation": "PASS",
+    "headless_frames": 300,
+    "trace_frames": 128,
+    "trace_sha256": "bbfb59d8d0225a9a0401f3beb59a0422a57f898aebc35f239440e8cece742ad0",
+    "trace_rolling_hash": "d905b042",
+    "render_evidence": "PASS; single exact pair and three exact corpus pairs",
+    "udp_loopback": "PASS"
+  },
+  "delivery_hotfix_history": [
+    {
+      "revision": "BP-050-054R1",
+      "parent": "BP-050-054",
+      "result_archive_sha256": "4e2afe7a4266486fd3b60c6ed5d5e5c4995c34fa96234979b3dd11c2733d61e9",
+      "classification": "test-adapter defect",
+      "production_source_changed": false,
+      "native_source_changed": false,
+      "engine_contracts_changed": false,
+      "fixture_count_changed": false,
+      "windows_acceptance": "pending"
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "schema": "MiniQuakeQuakeCClosureGolden/1",
+  "package_id": "BP-024",
+  "parent_package_id": "BP-023",
+  "status": "quakec_109_frozen_v1",
+  "rows": [
+    {
+      "kind": "case",
+      "name": "version",
+      "value": 6
+    },
+    {
+      "kind": "case",
+      "name": "header_crc",
+      "value": 5927
+    },
+    {
+      "kind": "case",
+      "name": "opcode_count",
+      "value": 66
+    },
+    {
+      "kind": "case",
+      "name": "builtin_count",
+      "value": 79
+    },
+    {
+      "kind": "case",
+      "name": "fixme_count",
+      "value": 14
+    },
+    {
+      "kind": "case",
+      "name": "stack_depth",
+      "value": 32
+    },
+    {
+      "kind": "case",
+      "name": "localstack_size",
+      "value": 2048
+    },
+    {
+      "kind": "case",
+      "name": "builtin_fingerprint",
+      "value": 3093955141
+    },
+    {
+      "kind": "case",
+      "name": "contract_fingerprint",
+      "value": 3163147249
+    },
+    {
+      "kind": "case",
+      "name": "required_globals",
+      "value": 54
+    },
+    {
+      "kind": "case",
+      "name": "required_fields",
+      "value": 77
+    },
+    {
+      "kind": "case",
+      "name": "required_functions",
+      "value": 11
+    },
+    {
+      "kind": "case",
+      "name": "highest_stock_builtin",
+      "value": 78
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/quakec_closure_oracle.c",
+    "oracle_sha256": "47d2291754cd687344dd64746ba27ebc77152c3c5909820098b3682b65517207"
+  }
+}

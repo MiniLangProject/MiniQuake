@@ -109,8 +109,10 @@ function testRecordWriteStop()
   nested = demo.CL_Record_f(["record", "demos/route", "e1m1"], false)
   require(nested is not error, "original record command accepts game-relative subdirectories")
   equal(nested[0], "demos/route.dem", "nested demo filename")
-  badTrack = try(demo.CL_Record_f(["record", "bad", "e1m1", "1.5"], false))
-  require(badTrack is error, "non-integer track rejected")
+  decimalTrack = demo.CL_Record_f(["record", "decimal", "e1m1", "1.5"], false)
+  equal(decimalTrack[1].forcedTrack, 1, "C atoi consumes integer prefix")
+  alphaTrack = demo.CL_Record_f(["record", "alpha", "e1m1", "soundtrack"], false)
+  equal(alphaTrack[1].forcedTrack, 0, "C atoi returns zero without digits")
   return true
 end function
 

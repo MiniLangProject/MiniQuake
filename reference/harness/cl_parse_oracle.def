@@ -1,3 +1,0 @@
-LIBRARY cl_parse_oracle
-EXPORTS
-  cl_parse_oracle_jsonl

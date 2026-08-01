@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "delivery_revision": "BP-085-089R3",
+  "delivery_parent": "BP-085-089R2",
+  "package_id": "BP-089",
+  "block_id": "BP-085-089",
+  "result_archive_sha256": "f39e82b46494d815fe4fbafc361ddd4cf6d8d305222f9c9b29b64b0ccf4958f6",
+  "failure_stage": "inherited BP-022 QuakeC edict preflight",
+  "failure_message": "missing edict marker: negative = (rawWord & 0x80000000) != 0",
+  "classification": "preflight lineage mismatch",
+  "root_cause": "The historical checker required an implementation marker removed by the accepted MSVCRT %.6f text-bridge formatter.",
+  "fix": {
+    "checker_mode": "--allow-downstream-package",
+    "historical_formatter": "raw-word integer formatter",
+    "downstream_formatter": "native_msvcrt_percent_f",
+    "required_export": "mqt_f32_to_fixed6",
+    "engine_source_changed": false,
+    "native_binary_changed": false
+  },
+  "contracts_unchanged": [
+    "artifact_compat_109_frozen_v1",
+    "compat_109_release_candidate_v1",
+    "quakec_109_frozen_v1"
+  ],
+  "expected_runtime_fixtures": 112
+}

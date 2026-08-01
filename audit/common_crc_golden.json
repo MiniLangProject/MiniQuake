@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "package": "BP-070",
+  "fixtures": 24,
+  "atof_12_1_bits": "0x4141999a",
+  "atof_negative_zero_bits": "0x80000000",
+  "atoi_decimal_wrap": -2147483648,
+  "atoi_hex_wrap": -1,
+  "crc_123456789": "0x29b1",
+  "crc_subrange_234": "0x4148",
+  "filebase_short": "?model?",
+  "default_hidden": ".quake.cfg",
+  "text_abi": "quake_latin1_cstring_v1"
+}

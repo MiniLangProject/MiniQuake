@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "status": "artifact_compat_109_frozen_v1",
+  "fingerprint": "0x59531091",
+  "contract_text": "artifact-compat|demo-protocol15|retail-demos=3|save-version=5|save-roundtrip|deterministic-evidence",
+  "fixtures": 24,
+  "save_version": 5,
+  "retail_demos": [
+    "demo1.dem",
+    "demo2.dem",
+    "demo3.dem"
+  ],
+  "evidence_runs": 2,
+  "evidence_revision": "sequential_exact_fixed6_signedzero_v3",
+  "semantic_boundary": "parsed_save_domain",
+  "requires_stable_reserialize": true,
+  "live_vm_hashes_are_diagnostic": true,
+  "simultaneous_host_sessions": false,
+  "requires_exact_roundtrip": true,
+  "preserves_edict_high_water": true,
+  "fixed_six_formatter": "msvcrt_percent_f",
+  "fixed_six_large_positive": "4097.000000",
+  "fixed_six_large_negative": "-4097.000000",
+  "text_bridge_export": "mqt_f32_to_fixed6",
+  "preserves_signed_zero": true,
+  "float_parser": "msvcrt_strtod_f32"
+}

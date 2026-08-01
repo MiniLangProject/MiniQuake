@@ -1,0 +1,106 @@
+{
+  "schema": "MiniQuakeServerPhysicsGolden/1",
+  "package_id": "BP-028",
+  "parent_package_id": "BP-027",
+  "sources": [
+    "sv_phys.c",
+    "server.h",
+    "world.h"
+  ],
+  "rows": [
+    {
+      "kind": "case",
+      "name": "stop_epsilon_bits",
+      "value": 1036831949
+    },
+    {
+      "kind": "case",
+      "name": "step_size_bits",
+      "value": 1099956224
+    },
+    {
+      "kind": "case",
+      "name": "max_clip_planes",
+      "value": 5
+    },
+    {
+      "kind": "case",
+      "name": "fly_bumps",
+      "value": 4
+    },
+    {
+      "kind": "case",
+      "name": "push_overbounce_bits",
+      "value": 1065353216
+    },
+    {
+      "kind": "case",
+      "name": "bounce_overbounce_bits",
+      "value": 1069547520
+    },
+    {
+      "kind": "case",
+      "name": "default_gravity_bits",
+      "value": 1065353216
+    },
+    {
+      "kind": "case",
+      "name": "corpse_x_bits",
+      "value": 0
+    },
+    {
+      "kind": "case",
+      "name": "corpse_y_bits",
+      "value": 0
+    },
+    {
+      "kind": "case",
+      "name": "corpse_z_bits",
+      "value": 3250585600
+    },
+    {
+      "kind": "case",
+      "name": "movetype_follow_allowed",
+      "value": 0
+    },
+    {
+      "kind": "case",
+      "name": "movetype_bouncemissile_allowed",
+      "value": 0
+    },
+    {
+      "kind": "case",
+      "name": "q2_dispatch_enabled",
+      "value": 0
+    },
+    {
+      "kind": "case",
+      "name": "touch_is_strict_overlap",
+      "value": 0
+    },
+    {
+      "kind": "case",
+      "name": "pusher_relink_required",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "noclip_relink_required",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "fixture_count",
+      "value": 18
+    },
+    {
+      "kind": "case",
+      "name": "strict_quake1",
+      "value": 1
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/server_physics_oracle.c",
+    "oracle_sha256": "c01d5bc0b2f0a9b033ca280b9273887b79641870d2d05d84538ab1804d9e42d7"
+  }
+}

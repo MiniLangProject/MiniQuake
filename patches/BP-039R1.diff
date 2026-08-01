@@ -1,0 +1,152 @@
+diff --git a/audit/client_state_render_golden.json b/audit/client_state_render_golden.json
+index 9a0ab4f..a218107 100644
+--- a/audit/client_state_render_golden.json
++++ b/audit/client_state_render_golden.json
+@@ -24,6 +24,14 @@
+       "name": "dlight_decay_fbits",
+       "value": 1119092736
+     },
++    {
++      "name": "nolerp_time_fbits",
++      "value": 1073741824
++    },
++    {
++      "name": "nolerp_rotate_fbits",
++      "value": 1128791744
++    },
+     {
+       "name": "float_integer_boundary",
+       "value": 1266679808
+@@ -39,6 +47,6 @@
+   ],
+   "reference": {
+     "oracle": "tools/oracle/client_state_oracle.c",
+-    "oracle_sha256": "270f83082b965285988609df9d9708c0d1a2e09915290b24125bbfafe432dbfc"
++    "oracle_sha256": "190ef37ced777160974d584bedeec0b16db2a10f667ea7384ab5fc254e202975"
+   }
+ }
+diff --git a/tests/client_state_render_tests.ml b/tests/client_state_render_tests.ml
+index 30a120c..0c2fa13 100644
+--- a/tests/client_state_render_tests.ml
++++ b/tests/client_state_render_tests.ml
+@@ -255,7 +255,10 @@ function testRotateFlag()
+   client.CL_SetModelFlags([0, c.EF_ROTATE])
+   value.time = 1.0
+   client.CL_RelinkEntities(value)
+-  near(entity.angles.y, 100.0, 0.0001, "binary object rotation")
++  // CL_LerpPoint runs before bobjrotate. With noLerp enabled it snaps
++  // client.time to mtime[0] (2.0) before anglemod(100 * cl.time).
++  near(value.time, 2.0, 0.0, "no-lerp time snap")
++  near(entity.angles.y, 199.9951171875, 0.0001, "binary object rotation")
+   return true
+ end function
+ 
+diff --git a/tools/client_render_checker_common.py b/tools/client_render_checker_common.py
+index 7aef06d..6749521 100644
+--- a/tools/client_render_checker_common.py
++++ b/tools/client_render_checker_common.py
+@@ -15,6 +15,8 @@ CONFIG = {
+                 'function clientFloat(value)', 'function clientLerp(previous, current, fraction)',
+                 'function CL_ActiveVisibleEntities(client)', 'function CL_ViewEntityOrigin(client)',
+                 'interval = clientFloat(client.messageTimes[0] - client.messageTimes[1])',
++                'client.time = client.messageTimes[0]',
++                'binaryObjectRotation = clientFloat(math.anglemod(100.0 * client.time))',
+             ],
+             'src/miniquake/host.ml':['renderEntities = renderHandoff.submitEntities(visibleEntities, temporaryModels)'],
+         },
+@@ -70,12 +72,21 @@ def f32(value: float) -> float:
+ def fbits(value: float) -> int:
+     return struct.unpack('<I', struct.pack('<f', float(value)))[0]
+ 
++def quake_anglemod(value: float) -> float:
++    # mathlib.c receives a float parameter, performs the quantization with
++    # double constants, then stores the result back into a float.
++    a = f32(value)
++    quantized = int(a * (65536.0 / 360.0)) & 65535
++    return f32((360.0 / 65536.0) * quantized)
++
+ def rows(component: str):
+     if component == '035':
+         return [
+             {'name':'lerp_half_fbits','value':fbits((1.95 - 1.9) / f32(2.0 - 1.9))},
+             {'name':'angle_wrap_fbits','value':fbits(360.0)},
+             {'name':'dlight_decay_fbits','value':fbits(90.0)},
++            {'name':'nolerp_time_fbits','value':fbits(2.0)},
++            {'name':'nolerp_rotate_fbits','value':fbits(quake_anglemod(200.0))},
+             {'name':'float_integer_boundary','value':fbits(16777217.0)},
+             {'name':'max_visedicts','value':256},
+             {'name':'fixtures','value':20},
+@@ -173,6 +184,15 @@ def check_contract(root: Path, component: str):
+         text=test.read_text(encoding='utf-8-sig')
+         if c['success'] not in text: errors.append('runtime success marker/count differs')
+         if f'passed != {c["fixtures"]}' not in text: errors.append('runtime fixture guard differs')
++        if component == '035':
++            required = (
++                'near(value.time, 2.0, 0.0, "no-lerp time snap")',
++                'near(entity.angles.y, 199.9951171875, 0.0001, "binary object rotation")',
++            )
++            for marker in required:
++                if marker not in text: errors.append('missing BP-035 no-lerp rotation marker: '+marker)
++            stale = 'near(entity.angles.y, 100.0, 0.0001, "binary object rotation")'
++            if stale in text: errors.append('stale BP-035 pre-CL_LerpPoint rotation expectation remains')
+     return errors
+ 
+ def run_component(component: str, argv=None):
+diff --git a/tools/oracle/client_state_oracle.c b/tools/oracle/client_state_oracle.c
+index e69b588..aa03203 100644
+--- a/tools/oracle/client_state_oracle.c
++++ b/tools/oracle/client_state_oracle.c
+@@ -1,6 +1,50 @@
+ #include <stdint.h>
+ #include <stdio.h>
+ #include <string.h>
+-static uint32_t bits(float x){uint32_t u;memcpy(&u,&x,4);return u;}
+-static void row(const char*n,int64_t v){printf("{\"name\":\"%s\",\"value\":%lld}\n",n,(long long)v);}
+-int main(void){double newest=2.0;double oldest=1.9;double now=1.95;float f=(float)(newest-oldest);float frac=(float)((now-oldest)/(double)f);float d=10.0f-350.0f;if(d<-180)d+=360;float a=350.0f+0.5f*d;float r=100.0f-0.25f*40.0f;row("lerp_half_fbits",bits(frac));row("angle_wrap_fbits",bits(a));row("dlight_decay_fbits",bits(r));row("float_integer_boundary",bits(16777217.0f));row("max_visedicts",256);row("fixtures",20);return 0;}
++
++static uint32_t bits(float x) {
++    uint32_t u;
++    memcpy(&u, &x, sizeof(u));
++    return u;
++}
++
++static void row(const char *name, int64_t value) {
++    printf("{\"name\":\"%s\",\"value\":%lld}\n", name, (long long)value);
++}
++
++/* mathlib.c: anglemod(float a) */
++static float quake_anglemod(float a) {
++    a = (float)((360.0 / 65536.0) * ((int)(a * (65536.0 / 360.0)) & 65535));
++    return a;
++}
++
++int main(void) {
++    double newest = 2.0;
++    double oldest = 1.9;
++    double now = 1.95;
++    float f = (float)(newest - oldest);
++    float frac = (float)((now - oldest) / (double)f);
++    float d = 10.0f - 350.0f;
++    float a;
++    float r;
++    double cl_time = 1.0;
++    float bobjrotate;
++
++    if (d < -180.0f) d += 360.0f;
++    a = 350.0f + 0.5f * d;
++    r = 100.0f - 0.25f * 40.0f;
++
++    /* CL_LerpPoint: cl_nolerp snaps cl.time before CL_RelinkEntities computes bobjrotate. */
++    cl_time = newest;
++    bobjrotate = quake_anglemod((float)(100.0 * cl_time));
++
++    row("lerp_half_fbits", bits(frac));
++    row("angle_wrap_fbits", bits(a));
++    row("dlight_decay_fbits", bits(r));
++    row("nolerp_time_fbits", bits((float)cl_time));
++    row("nolerp_rotate_fbits", bits(bobjrotate));
++    row("float_integer_boundary", bits(16777217.0f));
++    row("max_visedicts", 256);
++    row("fixtures", 20);
++    return 0;
++}

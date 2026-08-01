@@ -1,0 +1,90 @@
+{
+  "schema": "MiniQuakeProtocol15ClosureGolden/1",
+  "package_id": "BP-019",
+  "parent_package_id": "BP-018",
+  "block_id": "BP-015-019",
+  "block_parent_package_id": "BP-014R1",
+  "protocol_status": "protocol15_frozen_v1",
+  "protocol_version": 15,
+  "sources": [
+    "protocol.h",
+    "common.c",
+    "cl_main.c",
+    "cl_parse.c",
+    "cl_demo.c",
+    "sv_main.c",
+    "sv_user.c",
+    "net_dgrm.c"
+  ],
+  "rows": [
+    {
+      "kind": "case",
+      "name": "protocol_version",
+      "value": 15
+    },
+    {
+      "kind": "case",
+      "name": "svc_valid_count",
+      "value": 33
+    },
+    {
+      "kind": "case",
+      "name": "svc_reserved_command",
+      "value": 21
+    },
+    {
+      "kind": "case",
+      "name": "clc_valid_count",
+      "value": 4
+    },
+    {
+      "kind": "case",
+      "name": "fast_update_mask",
+      "value": 32767
+    },
+    {
+      "kind": "case",
+      "name": "client_data_mask",
+      "value": 32511
+    },
+    {
+      "kind": "case",
+      "name": "sound_mask",
+      "value": 7
+    },
+    {
+      "kind": "case",
+      "name": "temporary_entity_count",
+      "value": 14
+    },
+    {
+      "kind": "case",
+      "name": "protocol_fingerprint",
+      "value": 217178410
+    },
+    {
+      "kind": "case",
+      "name": "max_msglen",
+      "value": 8000
+    },
+    {
+      "kind": "case",
+      "name": "max_datagram",
+      "value": 1024
+    },
+    {
+      "kind": "case",
+      "name": "max_edicts",
+      "value": 600
+    },
+    {
+      "kind": "case",
+      "name": "net_maxmessage",
+      "value": 8192
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/protocol15_closure_oracle.c",
+    "oracle_sha256": "caeda18f94bb64e6b07765b98c15f7957f1fde7a20aff2995aeeeea0d7bb08ce"
+  }
+}

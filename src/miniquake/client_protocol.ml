@@ -4,6 +4,8 @@ import miniquake.types as t
 import miniquake.constants as c
 import miniquake.message as msg
 import miniquake.temp_entities as temporary
+import miniquake.protocol_events as protocolEvents
+import miniquake.protocol_transients as transients
 import miniquake.array_util as arrays
 
 function event(name, payload)
@@ -152,10 +154,10 @@ function CL_ParseStartSoundPacket(reader)
   volume = 255
   attenuation = 1.0
   if (fieldMask & c.SND_VOLUME) != 0 then volume = msg.readByte(reader) end if
-  if (fieldMask & c.SND_ATTENUATION) != 0 then attenuation = msg.readByte(reader) / 64.0 end if
+  if (fieldMask & c.SND_ATTENUATION) != 0 then attenuation = transients.clientSoundAttenuation(msg.readByte(reader)) end if
   channel = msg.readShort(reader)
   sound = msg.readByte(reader)
-  entityNumber = channel >> 3
+  entityNumber = transients.soundEntity(channel)
   if entityNumber > c.MAX_EDICTS then return error(2106, "CL_ParseStartSoundPacket: ent = " + entityNumber) end if
   position = t.Vec3(msg.readCoord(reader), msg.readCoord(reader), msg.readCoord(reader))
   return event("svc_sound", [fieldMask, volume, attenuation, channel, sound, position])
@@ -168,7 +170,7 @@ end function
 function readParticle(reader)
   origin = t.Vec3(msg.readCoord(reader), msg.readCoord(reader), msg.readCoord(reader))
   direction = t.Vec3(msg.readChar(reader) * 0.0625, msg.readChar(reader) * 0.0625, msg.readChar(reader) * 0.0625)
-  count = msg.readByte(reader)
+  count = protocolEvents.particleCount(msg.readByte(reader))
   color = msg.readByte(reader)
   return event("svc_particle", [origin, direction, count, color])
 end function

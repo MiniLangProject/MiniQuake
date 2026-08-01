@@ -1,0 +1,90 @@
+{
+  "schema": "MiniQuakeQuakeCVMGolden/1",
+  "package_id": "BP-021",
+  "parent_package_id": "BP-020",
+  "sources": [
+    "pr_exec.c",
+    "pr_comp.h"
+  ],
+  "rows": [
+    {
+      "kind": "case",
+      "name": "opcode_count",
+      "value": 66
+    },
+    {
+      "kind": "case",
+      "name": "max_stack_depth",
+      "value": 32
+    },
+    {
+      "kind": "case",
+      "name": "localstack_size",
+      "value": 2048
+    },
+    {
+      "kind": "case",
+      "name": "binary32_add_bits",
+      "value": 1266679808
+    },
+    {
+      "kind": "case",
+      "name": "byte_strcmp_positive",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "byte_strcmp_negative",
+      "value": -1
+    },
+    {
+      "kind": "case",
+      "name": "negative_zero_truth",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "return_word_count",
+      "value": 3
+    },
+    {
+      "kind": "case",
+      "name": "max_call_parameters",
+      "value": 8
+    },
+    {
+      "kind": "case",
+      "name": "parameter_stride",
+      "value": 3
+    },
+    {
+      "kind": "case",
+      "name": "pointer_last_scalar_valid",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "pointer_vector_crosses",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "state_signed_zero_word",
+      "value": 2147483648
+    },
+    {
+      "kind": "case",
+      "name": "state_changed_word",
+      "value": 1080033280
+    },
+    {
+      "kind": "case",
+      "name": "state_nan_word",
+      "value": 2143289345
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/quakec_vm_oracle.c",
+    "oracle_sha256": "a394db50a0e60fa16bd74df74463cf7b059f81ffafe5030d9c4189de27ff611b"
+  }
+}

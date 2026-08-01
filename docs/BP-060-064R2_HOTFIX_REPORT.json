@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "delivery_revision": "BP-060-064R2",
+  "delivery_parent": "BP-060-064R1",
+  "engine_package": "BP-064",
+  "predecessor_result": {
+    "archive": "MiniQuake_BP-060-064_RESULTS_20260728-184449.zip",
+    "sha256": "bde52d9bcb2e7052c3dcac5ee62dbe49dd3acd6887cbeabfc54c1f8b4916c719",
+    "compiled_targets": "65/65",
+    "bp060": "20/20 PASS",
+    "first_failure": "BP-061 rule enumeration terminator: Cannot index void"
+  },
+  "root_cause": {
+    "end_of_list": "was represented as void instead of a command-only reply pair",
+    "unknown_previous": "was indistinguishable from end-of-list and would incorrectly receive a reply"
+  },
+  "correction": {
+    "end_of_list": ["", ""],
+    "unknown_previous": "internal no-reply error sentinel",
+    "listener": "catches sentinel and sends no packet",
+    "runtime_fixture_count": 24,
+    "live_output": true
+  },
+  "production_source_changed": true,
+  "native_source_changed": false,
+  "contract_status": "network_platform_109_frozen_v1",
+  "contract_fingerprint": "0xb3ec7589"
+}

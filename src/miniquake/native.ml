@@ -3,7 +3,8 @@ package miniquake.native
 extern function f32FromText(text as cstr) from "miniquake_native.dll" symbol "mq_f32_from_text" returns u32
 extern function f32FromRaw(rawValue as u64) from "miniquake_native.dll" symbol "mq_f32_from_ml_raw" returns u32
 extern function f32ToRaw(bits as u32) from "miniquake_native.dll" symbol "mq_f32_to_ml_raw" returns u64
-extern function f32ToText(bits as u32) from "miniquake_native.dll" symbol "mq_f32_to_text" returns cstr
+extern function f32ToTextRaw(bits as u32, output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_f32_to_text" returns u32
+extern function f32ToFixed6Raw(bits as u32, output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_f32_to_fixed6" returns u32
 extern function f32Sin(bits as u32) from "miniquake_native.dll" symbol "mq_f32_sin" returns u32
 extern function f32Cos(bits as u32) from "miniquake_native.dll" symbol "mq_f32_cos" returns u32
 extern function f32Sqrt(bits as u32) from "miniquake_native.dll" symbol "mq_f32_sqrt" returns u32
@@ -11,7 +12,7 @@ extern function f32Atan2(yBits as u32, xBits as u32) from "miniquake_native.dll"
 extern function f32ToI32Trunc(bits as u32) from "miniquake_native.dll" symbol "mq_f32_to_i32_trunc" returns i32
 extern function i32ToF32(value as i32) from "miniquake_native.dll" symbol "mq_i32_to_f32" returns u32
 extern function asciiCode(text as cstr) from "miniquake_native.dll" symbol "mq_ascii_code" returns i32
-extern function asciiChar(value as i32) from "miniquake_native.dll" symbol "mq_ascii_char" returns cstr
+extern function asciiCharRaw(value as i32, output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_ascii_char" returns u32
 
 extern function winCreate(title as wstr, width as i32, height as i32, fullscreen as i32) from "miniquake_native.dll" symbol "mq_win_create" returns ptr
 extern function winDestroy() from "miniquake_native.dll" symbol "mq_win_destroy" returns void
@@ -82,11 +83,11 @@ extern function conprocMap(handle as u64) from "miniquake_native.dll" symbol "mq
 extern function conprocUnmap(mapped as ptr) from "miniquake_native.dll" symbol "mq_conproc_unmap" returns i32
 extern function conprocReadI32(mapped as ptr, index as u32) from "miniquake_native.dll" symbol "mq_conproc_read_i32" returns i32
 extern function conprocWriteI32(mapped as ptr, index as u32, value as i32) from "miniquake_native.dll" symbol "mq_conproc_write_i32" returns void
-extern function conprocReadText(mapped as ptr, byteOffset as u32) from "miniquake_native.dll" symbol "mq_conproc_read_text" returns cstr
+extern function conprocReadTextRaw(mapped as ptr, byteOffset as u32, output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_conproc_read_text" returns u32
 extern function conprocWriteText(mapped as ptr, byteOffset as u32, text as cstr, capacity as u32) from "miniquake_native.dll" symbol "mq_conproc_write_text" returns i32
 extern function conprocScreenLines() from "miniquake_native.dll" symbol "mq_conproc_screen_lines" returns i32
 extern function conprocSetScreenSize(width as i32, height as i32) from "miniquake_native.dll" symbol "mq_conproc_set_screen_size" returns i32
-extern function conprocReadConsoleText(beginLine as i32, endLine as i32) from "miniquake_native.dll" symbol "mq_conproc_read_console_text" returns cstr
+extern function conprocReadConsoleTextRaw(beginLine as i32, endLine as i32, output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_conproc_read_console_text" returns u32
 extern function conprocWriteKey(character as i32, virtualKey as i32, scanCode as i32, shift as i32, down as i32) from "miniquake_native.dll" symbol "mq_conproc_write_key" returns i32
 
 extern function audioOpen(sampleRate as u32, channels as u32, bitsPerSample as u32) from "miniquake_native.dll" symbol "mq_audio_open" returns i32
@@ -112,18 +113,18 @@ extern function udpOpen(port as u32) from "miniquake_native.dll" symbol "mq_udp_
 extern function udpOpenBound(port as u32, address as cstr) from "miniquake_native.dll" symbol "mq_udp_open_bound" returns u64
 extern function udpClose(handle as u64) from "miniquake_native.dll" symbol "mq_udp_close" returns void
 extern function udpBoundPort(handle as u64) from "miniquake_native.dll" symbol "mq_udp_bound_port" returns u32
-extern function udpBoundAddress(handle as u64) from "miniquake_native.dll" symbol "mq_udp_bound_address" returns cstr
+extern function udpBoundAddressRaw(handle as u64, output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_udp_bound_address" returns u32
 extern function udpEnableBroadcast(handle as u64) from "miniquake_native.dll" symbol "mq_udp_enable_broadcast" returns i32
 extern function udpPeek(handle as u64) from "miniquake_native.dll" symbol "mq_udp_peek" returns i32
 extern function udpSend(handle as u64, address as cstr, port as u32, data as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_udp_send" returns i32
 extern function udpReceive(handle as u64, data as bytes, capacity as u32) from "miniquake_native.dll" symbol "mq_udp_receive" returns i32
-extern function udpLastAddress() from "miniquake_native.dll" symbol "mq_udp_last_address" returns cstr
+extern function udpLastAddressRaw(output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_udp_last_address" returns u32
 extern function udpLastPort() from "miniquake_native.dll" symbol "mq_udp_last_port" returns u32
 extern function udpLastError() from "miniquake_native.dll" symbol "mq_udp_last_error" returns i32
-extern function udpLocalAddress() from "miniquake_native.dll" symbol "mq_udp_local_address" returns cstr
-extern function udpHostName() from "miniquake_native.dll" symbol "mq_udp_host_name" returns cstr
-extern function udpResolveName(name as cstr) from "miniquake_native.dll" symbol "mq_udp_resolve_name" returns cstr
-extern function udpReverseName(address as cstr) from "miniquake_native.dll" symbol "mq_udp_reverse_name" returns cstr
+extern function udpLocalAddressRaw(output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_udp_local_address" returns u32
+extern function udpHostNameRaw(output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_udp_host_name" returns u32
+extern function udpResolveNameRaw(name as cstr, output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_udp_resolve_name" returns u32
+extern function udpReverseNameRaw(address as cstr, output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_udp_reverse_name" returns u32
 
 extern function glBegin(mode as u32) from "miniquake_native.dll" symbol "mq_gl_begin" returns void
 extern function glEnd() from "miniquake_native.dll" symbol "mq_gl_end" returns void
@@ -161,11 +162,92 @@ extern function glTexEnvI(target as u32, name as u32, value as i32) from "miniqu
 extern function glTexImage2D(target as u32, level as i32, internalFormat as i32, width as i32, height as i32, border as i32, format as u32, type as u32, pixels as bytes) from "miniquake_native.dll" symbol "mq_gl_tex_image_2d" returns void
 extern function glTexSubImage2D(target as u32, level as i32, xOffset as i32, yOffset as i32, width as i32, height as i32, format as u32, type as u32, pixels as bytes) from "miniquake_native.dll" symbol "mq_gl_tex_sub_image_2d" returns void
 extern function glReadPixels(x as i32, y as i32, width as i32, height as i32, format as u32, type as u32, pixels as bytes) from "miniquake_native.dll" symbol "mq_gl_read_pixels" returns void
-extern function glGetString(name as u32) from "miniquake_native.dll" symbol "mq_gl_get_string" returns cstr
+extern function glGetStringRaw(name as u32, output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_gl_get_string" returns u32
 extern function glGetError() from "miniquake_native.dll" symbol "mq_gl_get_error" returns u32
 extern function glFinish() from "miniquake_native.dll" symbol "mq_gl_finish" returns void
 extern function glFlush() from "miniquake_native.dll" symbol "mq_gl_flush" returns void
 extern function glDrawBuffer(mode as u32) from "miniquake_native.dll" symbol "mq_gl_draw_buffer" returns void
+
+// Win64-safe native text bridge.
+//
+// The MiniLang v1.0 runtime can pass caller-owned bytes reliably, while a
+// direct extern `returns cstr` may truncate a high-address DLL pointer. Native
+// string producers therefore return a byte count and write into a MiniLang
+// buffer owned by the caller.
+function nativeTextResult(buffer, count)
+  if count <= 0 then return "" end if
+  if count > len(buffer) then count = len(buffer) end if
+  decoded = decode(slice(buffer, 0, count))
+  if decoded is void then return "" end if
+  return decoded
+end function
+
+function f32ToText(bits)
+  output = bytes(64)
+  return nativeTextResult(output, f32ToTextRaw(bits, output, len(output)))
+end function
+
+// C printf("%f") boundary used by Cvar_SetValue, ED_Write and version-5
+// savegames.  The native bridge avoids i32 overflow for values such as the
+// stock Quake item bitmask 4097 and preserves negative zero exactly.
+function f32ToFixed6(bits)
+  output = bytes(96)
+  return nativeTextResult(output, f32ToFixed6Raw(bits, output, len(output)))
+end function
+
+function asciiChar(value)
+  output = bytes(2)
+  return nativeTextResult(output, asciiCharRaw(value, output, len(output)))
+end function
+
+function conprocReadText(mapped, byteOffset)
+  output = bytes(65532)
+  return nativeTextResult(output, conprocReadTextRaw(mapped, byteOffset, output, len(output)))
+end function
+
+function conprocReadConsoleText(beginLine, endLine)
+  if endLine < beginLine then return "" end if
+  capacity = 80 * (endLine - beginLine + 1)
+  if capacity < 1 then return "" end if
+  if capacity > 65535 then capacity = 65535 end if
+  output = bytes(capacity)
+  return nativeTextResult(output, conprocReadConsoleTextRaw(beginLine, endLine, output, capacity))
+end function
+
+function udpBoundAddress(handle)
+  output = bytes(64)
+  return nativeTextResult(output, udpBoundAddressRaw(handle, output, len(output)))
+end function
+
+function udpLastAddress()
+  output = bytes(64)
+  return nativeTextResult(output, udpLastAddressRaw(output, len(output)))
+end function
+
+function udpLocalAddress()
+  output = bytes(64)
+  return nativeTextResult(output, udpLocalAddressRaw(output, len(output)))
+end function
+
+function udpHostName()
+  output = bytes(256)
+  return nativeTextResult(output, udpHostNameRaw(output, len(output)))
+end function
+
+function udpResolveName(name)
+  output = bytes(256)
+  return nativeTextResult(output, udpResolveNameRaw(name, output, len(output)))
+end function
+
+function udpReverseName(address)
+  output = bytes(256)
+  return nativeTextResult(output, udpReverseNameRaw(address, output, len(output)))
+end function
+
+function glGetString(name)
+  output = bytes(4096)
+  return nativeTextResult(output, glGetStringRaw(name, output, len(output)))
+end function
 
 function floatBits(value)
   // Avoid number -> text -> strtod.  MiniLang exposes the exact tagged word via
@@ -191,6 +273,10 @@ end function
 
 function floatText(value)
   return f32ToText(floatBits(value))
+end function
+
+function fixedSixText(value)
+  return f32ToFixed6(floatBits(value))
 end function
 
 function sin(value)

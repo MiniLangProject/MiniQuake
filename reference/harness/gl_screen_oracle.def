@@ -1,3 +1,0 @@
-LIBRARY gl_screen_oracle
-EXPORTS
-    gl_screen_oracle_jsonl

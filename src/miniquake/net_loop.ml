@@ -14,6 +14,7 @@ unreliableMessagesSent = 0
 unreliableMessagesReceived = 0
 
 const LOOP_MAX_MESSAGE = 8192
+const HOST_CACHE_SIZE = 8
 
 function createState()
   return t.LoopState(void, void, void, void, void, "UNNAMED", "", 0, 1, [], [], 0, 0, [], [], true)
@@ -344,7 +345,7 @@ function _Datagram_SearchForHosts(searchSocket, hosts, port, timeoutMilliseconds
   if timeoutMilliseconds < 0 then timeoutMilliseconds = 0 end if
   elapsed = 0
   result = hosts
-  while elapsed < timeoutMilliseconds and len(result) < 8
+  while elapsed < timeoutMilliseconds and len(result) < HOST_CACHE_SIZE
     received = try(udp.receive(searchSocket, 2048))
     if received is error then return received end if
     if received is void then
@@ -404,10 +405,15 @@ function nextServerRule(rules, previous)
       if rules[index][0] == previous then found = index; break end if
       index = index + 1
     end while
-    if found < 0 then return void end if
+    // net_dgrm.c silently ignores a rule query whose previous cvar does not
+    // exist. Use an error value as an internal no-reply sentinel so the
+    // listener can distinguish it from the normal end-of-list marker.
+    if found < 0 then return error(3437, "unknown previous server rule") end if
     start = found + 1
   end if
-  if start >= len(rules) then return void end if
+  // After the final server cvar, Quake replies with CCREP_RULE_INFO and no
+  // strings. Represent that command-only reply as an empty name/value pair.
+  if start >= len(rules) then return ["", ""] end if
   return rules[start]
 end function
 
@@ -461,11 +467,14 @@ function pumpListener(state)
           processed = processed + 1
         end if
       else if parsed[0] == control.CCREQ_RULE_INFO then
-        rule = nextServerRule(state.serverRules, parsed[1][0])
-        response = void
-        if rule is void then response = control.replyRuleInfo("", "") else response = control.replyRuleInfo(rule[0], rule[1]) end if
-        udp.send(state.listener, received[1], received[2], response)
-        processed = processed + 1
+        rule = try(nextServerRule(state.serverRules, parsed[1][0]))
+        // An unknown previous cvar gets no reply. A valid end-of-list result
+        // is ["", ""] and emits the command-only enumeration terminator.
+        if rule is not error then
+          response = control.replyRuleInfo(rule[0], rule[1])
+          udp.send(state.listener, received[1], received[2], response)
+          processed = processed + 1
+        end if
       else if parsed[0] == control.CCREQ_CONNECT then
         if parsed[1][0] != control.GAME_NAME then
           // net_dgrm.c silently ignores requests for another game.
@@ -600,6 +609,9 @@ function pumpRemote(socket)
       result = try(datagram.Datagram_GetMessage(socket.channel, incoming[0], now))
       if result is error then return result end if
       if result[2] is bytes then udp.send(socket.udp, socket.address, socket.port, result[2]) end if
+      // result[3] is reserved for an immediate response such as the optional
+      // NAK extension.  Normal ACK progression is flushed once after the read
+      // loop, exactly like Datagram_GetMessage in net_dgrm.c.
       if result[3] is bytes then udp.send(socket.udp, socket.address, socket.port, result[3]) end if
       if result[0] > 0 then
         socket.messages = socket.messages + [result[1]]
@@ -610,6 +622,12 @@ function pumpRemote(socket)
     end if
     iterations = iterations + 1
   end while
+  pending = datagram.Datagram_FlushSendNext(socket.channel, now)
+  if pending is bytes then
+    sent = udp.send(socket.udp, socket.address, socket.port, pending)
+    if sent is error then return sent end if
+    socket.lastSendTime = now
+  end if
   socket.canSend = socket.channel.canSend
   return processed
 end function
@@ -724,19 +742,33 @@ function Datagram_CheckNewConnections(state)
   return _Datagram_CheckNewConnections(state)
 end function
 
-function _Datagram_Connect(state, host, timeoutMilliseconds)
+function resolveDatagramTarget(state, host, defaultPort)
   target = host
   wanted = bio.lower(host)
   for each cached in state.hostCache
     if bio.lower(cached[1]) == wanted then target = cached[0]; break end if
   end for
-  parsed = parseAddress(target, 26000)
+  return parseAddress(target, defaultPort)
+end function
+
+function _Datagram_ConnectPort(state, host, timeoutMilliseconds, defaultPort)
+  parsed = resolveDatagramTarget(state, host, defaultPort)
   if parsed is error then return parsed end if
   return connectRemote(state, parsed[0], parsed[1], timeoutMilliseconds)
 end function
 
+function Datagram_ConnectPort(state, host, timeoutMilliseconds, defaultPort)
+  return _Datagram_ConnectPort(state, host, timeoutMilliseconds, defaultPort)
+end function
+
+// Compatibility wrapper for callers that intentionally use the historical
+// default port.  Public NET_Connect passes the active net_hostport instead.
+function _Datagram_Connect(state, host, timeoutMilliseconds)
+  return _Datagram_ConnectPort(state, host, timeoutMilliseconds, 26000)
+end function
+
 function Datagram_Connect(state, host, timeoutMilliseconds)
-  return _Datagram_Connect(state, host, timeoutMilliseconds)
+  return Datagram_ConnectPort(state, host, timeoutMilliseconds, 26000)
 end function
 
 function Test_Poll(socket, expectedAddress, expectedPort, timeoutMilliseconds)

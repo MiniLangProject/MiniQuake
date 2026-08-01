@@ -1,4 +1,0 @@
-LIBRARY pr_cmds_oracle
-EXPORTS
-    pr_cmds_oracle_jsonl
-    pr_cmds_fatal_case

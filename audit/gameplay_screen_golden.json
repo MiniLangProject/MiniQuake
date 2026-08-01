@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "package": "BP-077",
+  "fixtures": 22,
+  "center_line_chars": 40,
+  "screenshot_slots": 100,
+  "loading_timeout_seconds": 60,
+  "tga_header_bytes": 18,
+  "tga_bytes_per_pixel": 3,
+  "normal_overlay_stages": 11,
+  "historical_screenshot_error": "SCR_ScreenShot_f: Couldn't create a PCX file",
+  "loading_stops_audio_before_gate": true
+}

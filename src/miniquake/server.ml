@@ -2,6 +2,7 @@ package miniquake.server
 
 import miniquake.types as t
 import miniquake.constants as c
+import miniquake.host_command_numbers as hostNumbers
 import miniquake.filesystem as qfs
 import miniquake.format.bsp as bsp
 import miniquake.format.progs as progs
@@ -11,6 +12,11 @@ import miniquake.quakec.builtins as qcbuiltins
 import miniquake.edict as edict
 import miniquake.sizebuf as sz
 import miniquake.message as msg
+import miniquake.protocol_update as protocolUpdate
+import miniquake.protocol_serverdata as serverData
+import miniquake.protocol_events as protocolEvents
+import miniquake.protocol_transients as transients
+import miniquake.protocol_delivery as delivery
 import miniquake.net_main as netmain
 import miniquake.cmd as cmd
 import miniquake.cvar as cvar
@@ -40,12 +46,14 @@ function createServerClient(index)
     false,
     index + 1,
     void,
-    sz.alloc(c.MAX_MSGLEN),
+    sz.allocOverflowing(c.MAX_MSGLEN),
     zeroSpawnParms(),
     input.createCommand(),
     arrayutil.makeFilledArray(16, 0.0),
     0,
-    -999999,
+    0,
+    0.0,
+    false,
   )
 end function
 
@@ -82,8 +90,8 @@ function create(maxClients)
     [""],
     [""],
     defaultLightStyles(),
-    sz.allocOverflowing(c.MAX_DATAGRAM),
-    sz.allocOverflowing(c.MAX_MSGLEN),
+    sz.alloc(c.MAX_DATAGRAM),
+    sz.alloc(c.MAX_DATAGRAM),
     sz.alloc(c.MAX_MSGLEN),
     void,
     t.Vec3(0.0, 0.0, 64.0),
@@ -93,6 +101,7 @@ function create(maxClients)
     false,
     0,
     0,
+    true,
     1,
     [],
   )
@@ -197,25 +206,47 @@ function buildModelPrecache(server)
   assignModelIndexes(server)
 end function
 
+function protocolBaseline(server, item)
+  modelIndexValue = 0
+  colormapValue = 0
+  if item.number > 0 and item.number <= server.maxClients then
+    colormapValue = item.number
+    modelIndexValue = modelIndex(server, "progs/player.mdl")
+    // The lightweight non-QuakeC spawn shell has not executed worldspawn's
+    // precaches yet. Its provisional signon intentionally skips player
+    // baselines; the production QuakeC spawn path must have player.mdl.
+    if modelIndexValue == 0 then
+      if server.machine is void or server.machine.context is void then return void end if
+      return error(2812, "SV_ModelIndex: model progs/player.mdl not precached")
+    end if
+  else
+    modelIndexValue = modelIndex(server, item.model)
+    if modelIndexValue == 0 and item.model != "" then
+      return error(2812, "SV_ModelIndex: model " + item.model + " not precached")
+    end if
+  end if
+  item.baseline = t.EntityBaseline(
+    modelIndexValue, native.trunc(item.frame), colormapValue, native.trunc(item.skin), 0,
+    math.copy(item.origin), math.copy(item.angles),
+  )
+  return item.baseline
+end function
+
 function writeBaseline(buffer, item)
-  base = edict.baseline(item)
-  msg.writeByte(buffer, base.modelIndex)
-  msg.writeByte(buffer, base.frame)
-  msg.writeByte(buffer, base.colormap)
-  msg.writeByte(buffer, base.skin)
-  msg.writeCoord(buffer, base.origin.x); msg.writeAngle(buffer, base.angles.x)
-  msg.writeCoord(buffer, base.origin.y); msg.writeAngle(buffer, base.angles.y)
-  msg.writeCoord(buffer, base.origin.z); msg.writeAngle(buffer, base.angles.z)
+  return serverData.writeBaseline(buffer, item.number, item.baseline)
 end function
 
 function appendBaselines(server)
-  for each item in server.edicts
-    if not item.free and item.number > server.maxClients and item.modelIndex != 0 then
-      msg.writeByte(server.signon, c.SVC_SPAWNBASELINE)
-      msg.writeShort(server.signon, item.number)
-      writeBaseline(server.signon, item)
+  entityNumber = 0
+  while entityNumber < server.numEdicts and entityNumber < len(server.edicts)
+    item = server.edicts[entityNumber]
+    if item is not void and not item.free and (entityNumber <= server.maxClients or item.modelIndex != 0) then
+      base = protocolBaseline(server, item)
+      if base is error then return base end if
+      if base is not void then serverData.writeBaseline(server.signon, entityNumber, base) end if
     end if
-  end for
+    entityNumber = entityNumber + 1
+  end while
   return server.signon.curSize
 end function
 
@@ -233,39 +264,25 @@ function soundIndex(server, name)
   return 0
 end function
 
-function writeBaselineValues(buffer, baseline)
-  msg.writeByte(buffer, baseline[0])
-  msg.writeByte(buffer, baseline[1])
-  msg.writeByte(buffer, baseline[2])
-  msg.writeByte(buffer, baseline[3])
-  origin = baseline[4]
-  angles = baseline[5]
-  msg.writeCoord(buffer, origin.x); msg.writeAngle(buffer, angles.x)
-  msg.writeCoord(buffer, origin.y); msg.writeAngle(buffer, angles.y)
-  msg.writeCoord(buffer, origin.z); msg.writeAngle(buffer, angles.z)
-  return true
-end function
-
 function appendQuakeCSignon(server, contextValue)
   staticCount = 0
   for each baseline in contextValue.staticEntities
-    msg.writeByte(server.signon, c.SVC_SPAWNSTATIC)
-    writeBaselineValues(server.signon, baseline)
+    protocolEvents.writeSpawnStatic(
+      server.signon,
+      baseline[0],
+      baseline[1],
+      baseline[2],
+      baseline[3],
+      baseline[4],
+      baseline[5],
+    )
     staticCount = staticCount + 1
   end for
   ambientCount = 0
   for each ambient in contextValue.staticSounds
     index = soundIndex(server, ambient[1])
     if index > 0 then
-      msg.writeByte(server.signon, c.SVC_SPAWNSTATICSOUND)
-      msg.writeCoord(server.signon, ambient[0].x)
-      msg.writeCoord(server.signon, ambient[0].y)
-      msg.writeCoord(server.signon, ambient[0].z)
-      msg.writeByte(server.signon, index)
-      volume = native.trunc(math.clamp(ambient[2], 0.0, 1.0) * 255.0)
-      attenuation = native.trunc(math.clamp(ambient[3], 0.0, 4.0) * 64.0)
-      msg.writeByte(server.signon, volume)
-      msg.writeByte(server.signon, attenuation)
+      protocolEvents.writeStaticSound(server.signon, ambient[0], index, ambient[2], ambient[3])
       ambientCount = ambientCount + 1
     else
       server.diagnostics = server.diagnostics + ["ambient sound was not precached: " + ambient[1]]
@@ -323,6 +340,8 @@ function spawn(server, filesystem, mapName, skill)
     client.sendSignon = false
     client.signonStage = 0
     client.socket = void
+    client.lastMessage = 0.0
+    client.dropAsap = false
     sz.clear(client.message)
   end for
   server.loading = false
@@ -337,41 +356,27 @@ function sendBuffer(client, buffer)
   return netmain.NET_SendMessage(client.socket, buffer)
 end function
 
+function serverProgsCrc(server)
+  if server.progs is not void then return progs.runtimeCrc(server.progs) end if
+  if server.machine is not void and server.machine.program is not void then return progs.runtimeCrc(server.machine.program) end if
+  return 0
+end function
+
+function serverGameType(server)
+  if not server.coop and server.deathmatch then return c.GAME_DEATHMATCH end if
+  return c.GAME_COOP
+end function
+
 function sendServerInfo(server, client)
-  buffer = sz.alloc(c.MAX_MSGLEN)
-  msg.writeByte(buffer, c.SVC_PRINT)
-  msg.writeString(buffer, "\nMiniQuake " + c.QUAKE_VERSION + " SERVER (protocol " + c.PROTOCOL_VERSION + ")\n")
-  msg.writeByte(buffer, c.SVC_SERVERINFO)
-  msg.writeLong(buffer, c.PROTOCOL_VERSION)
-  msg.writeByte(buffer, server.maxClients)
-  if server.deathmatch then msg.writeByte(buffer, c.GAME_DEATHMATCH) else msg.writeByte(buffer, c.GAME_COOP) end if
-  msg.writeString(buffer, server.levelName)
-  index = 1
-  while index < len(server.modelPrecache)
-    msg.writeString(buffer, server.modelPrecache[index])
-    index = index + 1
-  end while
-  msg.writeByte(buffer, 0)
-  index = 1
-  while index < len(server.soundPrecache)
-    msg.writeString(buffer, server.soundPrecache[index])
-    index = index + 1
-  end while
-  msg.writeByte(buffer, 0)
-  msg.writeByte(buffer, c.SVC_CDTRACK)
-  msg.writeByte(buffer, server.cdTrack)
-  msg.writeByte(buffer, server.cdTrack)
-  msg.writeByte(buffer, c.SVC_SETVIEW)
-  msg.writeShort(buffer, client.edictIndex)
-  msg.writeByte(buffer, c.SVC_SIGNONNUM)
-  msg.writeByte(buffer, c.SIGNON_SERVERINFO)
+  start = client.message.curSize
+  serverData.writeServerInfo(
+    client.message, serverProgsCrc(server), server.maxClients, serverGameType(server),
+    server.levelName, server.modelPrecache, server.soundPrecache, server.cdTrack, client.edictIndex,
+  )
   client.signonStage = c.SIGNON_SERVERINFO
-  sent = sendBuffer(client, buffer)
-  if sent == 0 then
-    if client.message.curSize + buffer.curSize > client.message.maxSize then return error(2804, "SV_SendServerinfo: client message overflow") end if
-    sz.write(client.message, buffer.data, 0, buffer.curSize)
-  end if
-  return sent
+  client.sendSignon = true
+  client.spawned = false
+  return client.message.curSize - start
 end function
 
 function globalSpawnParmOffset(machine, index)
@@ -400,6 +405,16 @@ function copySpawnParmsToGlobals(server, clientValue)
   return true
 end function
 
+function resetClientMessageForConnect(clientValue)
+  // SV_ConnectClient memset() resets both cursize and the sticky overflow bit,
+  // then reenables allowoverflow on the embedded client message. SZ_Clear by
+  // itself intentionally does not clear overflowed.
+  sz.clear(clientValue.message)
+  clientValue.message.allowOverflow = true
+  clientValue.message.overflowed = false
+  return clientValue.message
+end function
+
 function acceptLocal(server, socket)
   selected = void
   for each client in server.clients
@@ -413,8 +428,11 @@ function acceptLocal(server, socket)
   selected.socket = socket
   selected.name = "unconnected"
   selected.colors = 0
+  selected.oldFrags = 0
   selected.command = input.createCommand()
-  sz.clear(selected.message)
+  selected.lastMessage = win.ticks() / 1000.0
+  selected.dropAsap = false
+  resetClientMessageForConnect(selected)
   netmain.NET_ConnectionAccepted()
   if server.machine is not void and server.machine.context is not void then
     // A loadgame connection preserves the spawn parms restored from disk.
@@ -463,6 +481,8 @@ function preserveClientConnections(server)
       copyNumberArray(clientValue.pingTimes),
       clientValue.numPings,
       clientValue.oldFrags,
+      clientValue.lastMessage,
+      clientValue.dropAsap,
     ]]
   end for
   return snapshot
@@ -470,8 +490,7 @@ end function
 
 function sendReconnect(server)
   buffer = sz.alloc(128)
-  msg.writeByte(buffer, c.SVC_STUFFTEXT)
-  msg.writeString(buffer, "reconnect\n")
+  transients.writeReconnect(buffer)
   return netmain.NET_SendToAll(server.clients, buffer, 5.0)
 end function
 
@@ -502,6 +521,8 @@ function finishChangeLevel(server, snapshot)
       clientValue.pingTimes = saved[7]
       clientValue.numPings = saved[8]
       clientValue.oldFrags = saved[9]
+      clientValue.lastMessage = saved[10]
+      clientValue.dropAsap = saved[11]
       sz.clear(clientValue.message)
       sendServerInfo(server, clientValue)
       restored = restored + 1
@@ -512,12 +533,15 @@ function finishChangeLevel(server, snapshot)
 end function
 
 function writeSignonStage2(server, client)
-  buffer = sz.alloc(c.MAX_MSGLEN)
-  if server.signon.curSize > 0 then sz.write(buffer, server.signon.data, 0, server.signon.curSize) end if
-  msg.writeByte(buffer, c.SVC_SIGNONNUM)
-  msg.writeByte(buffer, c.SIGNON_PRESPAWN)
+  // Host_PreSpawn_f appends to client_t.message and merely marks sendsignon.
+  // It must not attempt an immediate NET_SendMessage from the command parser.
+  start = client.message.curSize
+  if server.signon.curSize > 0 then sz.write(client.message, server.signon.data, 0, server.signon.curSize) end if
+  msg.writeByte(client.message, c.SVC_SIGNONNUM)
+  msg.writeByte(client.message, c.SIGNON_PRESPAWN)
   client.signonStage = c.SIGNON_PRESPAWN
-  return sendBuffer(client, buffer)
+  client.sendSignon = true
+  return client.message.curSize - start
 end function
 
 function placeClient(server, client, player)
@@ -564,24 +588,19 @@ function writeSpawn(server, client, player)
       syncQuakeCEdicts(server)
     end if
   end if
-  buffer = sz.alloc(c.MAX_MSGLEN)
+  // Host_Spawn_f starts a fresh reliable client_t.message and leaves the
+  // actual send to SV_SendClientMessages.
+  sz.clear(client.message)
+  client.message.overflowed = false
+  buffer = client.message
   msg.writeByte(buffer, c.SVC_TIME)
   msg.writeFloat(buffer, server.time)
   index = 0
   while index < server.maxClients
     other = server.clients[index]
-    msg.writeByte(buffer, c.SVC_UPDATENAME)
-    msg.writeByte(buffer, index)
-    if other.active then msg.writeString(buffer, other.name) else msg.writeString(buffer, "") end if
-    msg.writeByte(buffer, c.SVC_UPDATEFRAGS)
-    msg.writeByte(buffer, index)
-    frags = 0
-    if server.machine is not void then frags = native.trunc(qcFloat(server.machine, other.edictIndex, "frags", 0.0)) end if
-    other.oldFrags = frags
-    msg.writeShort(buffer, frags)
-    msg.writeByte(buffer, c.SVC_UPDATECOLORS)
-    msg.writeByte(buffer, index)
-    msg.writeByte(buffer, other.colors)
+    scoreName = ""
+    if other.active then scoreName = other.name end if
+    protocolEvents.writeScoreState(buffer, index, scoreName, other.oldFrags, other.colors)
     index = index + 1
   end while
   index = 0
@@ -615,16 +634,17 @@ function writeSpawn(server, client, player)
   msg.writeByte(buffer, c.SVC_SIGNONNUM)
   msg.writeByte(buffer, c.SIGNON_SPAWN)
   client.signonStage = c.SIGNON_SPAWN
-  return sendBuffer(client, buffer)
+  client.sendSignon = true
+  return buffer.curSize
 end function
 
 function writeBegin(client)
-  buffer = sz.alloc(32)
-  msg.writeByte(buffer, c.SVC_SIGNONNUM)
-  msg.writeByte(buffer, c.SIGNON_ACTIVE)
+  // Host_Begin_f only marks the server-side client spawned.  Original Quake
+  // never emits svc_signonnum 4; the first fast entity update promotes the
+  // client from signon stage three to four.
   client.spawned = true
   client.signonStage = c.SIGNON_ACTIVE
-  return sendBuffer(client, buffer)
+  return true
 end function
 
 function clientPrint(clientValue, text)
@@ -663,16 +683,14 @@ function setClientFloat(server, clientValue, fieldName, value)
 end function
 
 function setClientName(server, clientValue, newName)
-  limited = truncateBytes(newName, 15)
+  limited = protocolEvents.truncatePlayerName(newName)
   previous = clientValue.name
   clientValue.name = limited
   if server.machine is not void then qcedict.setKeyValue(server.machine, clientValue.edictIndex, "netname", limited) end if
   if previous != "" and previous != "unconnected" and previous != limited then
     server.diagnostics = server.diagnostics + [previous + " renamed to " + limited]
   end if
-  msg.writeByte(server.reliableDatagram, c.SVC_UPDATENAME)
-  msg.writeByte(server.reliableDatagram, clientValue.edictIndex - 1)
-  msg.writeString(server.reliableDatagram, limited)
+  protocolEvents.writeUpdateName(server.reliableDatagram, clientValue.edictIndex - 1, limited)
   return limited
 end function
 
@@ -688,9 +706,7 @@ function setClientColors(server, clientValue, topValue, bottomValue)
   colors = top * 16 + bottom
   clientValue.colors = colors
   setClientFloat(server, clientValue, "team", bottom + 1)
-  msg.writeByte(server.reliableDatagram, c.SVC_UPDATECOLORS)
-  msg.writeByte(server.reliableDatagram, clientValue.edictIndex - 1)
-  msg.writeByte(server.reliableDatagram, colors)
+  protocolEvents.writeUpdateColors(server.reliableDatagram, clientValue.edictIndex - 1, colors)
   return colors
 end function
 
@@ -846,11 +862,8 @@ function Host_Color_f(server, clientValue, args)
     clientPrint(clientValue, "color <0-13> [0-13]\n")
     return true
   end if
-  top = toNumber(args[1])
-  if top is void then top = 0 end if
-  bottom = top
-  if len(args) >= 3 then bottom = toNumber(args[2]); if bottom is void then bottom = 0 end if end if
-  setClientColors(server, clientValue, top, bottom)
+  components = hostNumbers.colorArguments(args, 1)
+  setClientColors(server, clientValue, components[0], components[1])
   return true
 end function
 
@@ -897,8 +910,7 @@ function Host_Kick_f(server, sourceClient, args)
   targetIndex = -1
   messageStart = 2
   if len(args) > 2 and args[1] == "#" then
-    number = toNumber(args[2])
-    if number is not void then targetIndex = native.trunc(number) - 1 end if
+    targetIndex = hostNumbers.playerIndex(args[2])
     messageStart = 3
   else
     index = 0
@@ -928,8 +940,7 @@ function Host_Give_f(server, clientValue, args)
   if len(args) < 3 or not privilegedCommandAllowed(server, clientValue) then return false end if
   token = args[1]
   if token == "" then return false end if
-  value = toNumber(args[2])
-  if value is void then value = 0 end if
+  value = hostNumbers.integer(args[2])
   first = bytes(token)[0]
   if first >= 48 and first <= 57 then
     items = native.trunc(clientFloat(server, clientValue, "items", 0.0))
@@ -1032,18 +1043,15 @@ function readMove(server, reader, client)
 end function
 
 function dropClient(server, client, crashed)
+  wasConnected = client.active and client.socket is not void
+  if client.socket is not void and not crashed and netmain.NET_CanSendMessage(client.socket) then
+    protocolEvents.writeDisconnect(client.message)
+    netmain.NET_SendMessage(client.socket, client.message)
+  end if
   if not crashed and client.active and client.spawned and server.machine is not void then
     executeQcFunction(server, "ClientDisconnect", client.edictIndex, 0)
   end if
-  wasConnected = client.active and client.socket is not void
-  if client.socket is not void then
-    if not crashed then
-      buffer = sz.alloc(8)
-      msg.writeByte(buffer, c.SVC_DISCONNECT)
-      netmain.NET_SendUnreliableMessage(client.socket, buffer)
-    end if
-    netmain.NET_Close(client.socket)
-  end if
+  if client.socket is not void then netmain.NET_Close(client.socket) end if
   client.socket = void
   client.active = false
   client.spawned = false
@@ -1051,23 +1059,13 @@ function dropClient(server, client, crashed)
   client.signonStage = 0
   client.name = ""
   client.oldFrags = -999999
+  client.lastMessage = 0.0
+  client.dropAsap = false
   sz.clear(client.message)
   scoreIndex = client.edictIndex - 1
   if scoreIndex >= 0 and scoreIndex < server.maxClients then
-    // host.c appends the removal update directly to every remaining active
-    // client's reliable message, after the dropped client is marked inactive.
     for each peer in server.clients
-      if peer.active then
-        msg.writeByte(peer.message, c.SVC_UPDATENAME)
-        msg.writeByte(peer.message, scoreIndex)
-        msg.writeString(peer.message, "")
-        msg.writeByte(peer.message, c.SVC_UPDATEFRAGS)
-        msg.writeByte(peer.message, scoreIndex)
-        msg.writeShort(peer.message, 0)
-        msg.writeByte(peer.message, c.SVC_UPDATECOLORS)
-        msg.writeByte(peer.message, scoreIndex)
-        msg.writeByte(peer.message, 0)
-      end if
+      if peer.active then protocolEvents.writeScoreReset(peer.message, scoreIndex) end if
     end for
   end if
   if wasConnected then netmain.NET_ConnectionClosed() end if
@@ -1088,7 +1086,11 @@ end function
 function readClientMessage(server, client, data, player)
   reader = msg.beginReadingBytes(data)
   while msg.remaining(reader) > 0
-    command = msg.readByte(reader)
+    if not client.active or reader.badRead then return false end if
+    // SV_ReadClientMessage uses MSG_ReadChar, not MSG_ReadByte. A literal 0xff
+    // therefore has the same -1/end-of-message meaning as the C implementation.
+    command = msg.readChar(reader)
+    if command == -1 then return true end if
     if command == c.CLC_NOP then
       continue
     else if command == c.CLC_DISCONNECT then
@@ -1099,7 +1101,12 @@ function readClientMessage(server, client, data, player)
     else if command == c.CLC_STRINGCMD then
       executeStringCommand(server, client, msg.readString(reader), player)
     else
-      return error(2802, "SV_ReadClientMessage: unknown command " + command)
+      server.diagnostics = server.diagnostics + ["SV_ReadClientMessage: unknown command char " + command]
+      return false
+    end if
+    if reader.badRead then
+      server.diagnostics = server.diagnostics + ["SV_ReadClientMessage: badread"]
+      return false
     end if
   end while
   return true
@@ -1116,7 +1123,11 @@ function pumpClientMessages(server, player)
         continue
       end if
       while messageType > 0
-        readClientMessage(server, client, sz.dataSlice(destination), player)
+        parsed = try(readClientMessage(server, client, sz.dataSlice(destination), player))
+        if parsed is error or parsed == false then
+          if client.active then dropClient(server, client, false) end if
+          break
+        end if
         processed = processed + 1
         messageType = netmain.NET_GetMessage(client.socket, destination, netmain.net_messagetimeout)
         if messageType < 0 then dropClient(server, client, true); break end if
@@ -1126,79 +1137,222 @@ function pumpClientMessages(server, player)
   return processed
 end function
 
-function clampByte(value)
-  result = native.trunc(value)
-  if result < 0 then result = 0 end if
-  if result > 255 then result = 255 end if
-  return result
+function entityCenter(item)
+  return t.Vec3(
+    item.origin.x + 0.5 * (item.mins.x + item.maxs.x),
+    item.origin.y + 0.5 * (item.mins.y + item.maxs.y),
+    item.origin.z + 0.5 * (item.mins.z + item.maxs.z),
+  )
+end function
+
+function writeDamage(server, client, buffer)
+  entityIndex = client.edictIndex
+  if server.machine is void or server.machine.context is void then return false end if
+  damageTake = native.trunc(qcFloat(server.machine, entityIndex, "dmg_take", 0.0))
+  damageSave = native.trunc(qcFloat(server.machine, entityIndex, "dmg_save", 0.0))
+  if damageTake == 0 and damageSave == 0 then return false end if
+  inflictor = qcWord(server.machine, entityIndex, "dmg_inflictor", 0)
+  center = t.Vec3(0.0, 0.0, 0.0)
+  if inflictor >= 0 and inflictor < len(server.edicts) and server.edicts[inflictor] is not void then
+    center = entityCenter(server.edicts[inflictor])
+  end if
+  msg.writeByte(buffer, c.SVC_DAMAGE)
+  msg.writeByte(buffer, damageSave)
+  msg.writeByte(buffer, damageTake)
+  msg.writeCoord(buffer, center.x)
+  msg.writeCoord(buffer, center.y)
+  msg.writeCoord(buffer, center.z)
+  setQcEntityFloat(server, entityIndex, "dmg_take", 0.0)
+  setQcEntityFloat(server, entityIndex, "dmg_save", 0.0)
+  return true
+end function
+
+// SV_SetIdealPitch. This mirrors sv_user.c's six point traces and deliberately
+// truncates each sampled height delta to the original C int `step`.
+function setClientIdealPitch(server, client, player, pitchScale)
+  existing = 0.0
+  if server.machine is not void and server.machine.context is not void then
+    existing = qcFloat(server.machine, client.edictIndex, "idealpitch", 0.0)
+  end if
+  if (player.flags & c.FL_ONGROUND) == 0 or server.worldModel is void then return existing end if
+  radians = player.renderAngles.y * math.PI * 2.0 / 360.0
+  sine = math.sin(radians)
+  cosine = math.cos(radians)
+  heights = []
+  index = 0
+  while index < 6
+    top = t.Vec3(
+      player.origin.x + cosine * (index + 3) * 12.0,
+      player.origin.y + sine * (index + 3) * 12.0,
+      player.origin.z + player.viewHeight,
+    )
+    bottom = t.Vec3(top.x, top.y, top.z - 160.0)
+    trace = world.traceLine(server.worldModel, top, bottom)
+    if trace.allSolid or trace.fraction == 1.0 then
+      return existing
+    end if
+    heights = heights + [top.z + trace.fraction * (bottom.z - top.z)]
+    index = index + 1
+  end while
+
+  direction = 0
+  steps = 0
+  index = 1
+  while index < len(heights)
+    step = native.trunc(heights[index] - heights[index - 1])
+    if step <= -0.1 or step >= 0.1 then
+      if direction != 0 and (step - direction > 0.1 or step - direction < -0.1) then
+        return existing
+      end if
+      steps = steps + 1
+      direction = step
+    end if
+    index = index + 1
+  end while
+
+  value = existing
+  if direction == 0 then value = 0.0 else if steps >= 2 then value = -direction * pitchScale end if
+  if server.machine is not void and server.machine.context is not void then
+    setQcEntityFloat(server, client.edictIndex, "idealpitch", value)
+  end if
+  return value
+end function
+
+function writeFixAngle(server, client, player, buffer)
+  entityIndex = client.edictIndex
+  fixAngle = player.fixAngle
+  if server.machine is not void and server.machine.context is not void then
+    if qcFloat(server.machine, entityIndex, "fixangle", 0.0) != 0.0 then fixAngle = true end if
+  end if
+  if not fixAngle then return false end if
+  angles = player.renderAngles
+  if server.machine is not void and server.machine.context is not void then
+    angles = qcVector(server.machine, entityIndex, "angles", player.renderAngles)
+    setQcEntityFloat(server, entityIndex, "fixangle", 0.0)
+  end if
+  msg.writeByte(buffer, c.SVC_SETANGLE)
+  msg.writeAngle(buffer, angles.x)
+  msg.writeAngle(buffer, angles.y)
+  msg.writeAngle(buffer, angles.z)
+  player.fixAngle = false
+  return true
+end function
+
+function writeDamageAndAngle(server, client, player, buffer)
+  writeDamage(server, client, buffer)
+  writeFixAngle(server, client, player, buffer)
+  return true
+end function
+
+function clientItems(server, entityIndex, player)
+  items = native.trunc(player.items)
+  if server.machine is not void and server.machine.context is not void then
+    items = native.trunc(qcFloat(server.machine, entityIndex, "items", player.items))
+    items2Offset = vm.fieldOffset(server.machine, "items2")
+    if items2Offset >= 0 then
+      return items | (native.trunc(vm.entityFloat(server.machine, entityIndex, items2Offset)) << 23)
+    end if
+  end if
+  return items | (native.trunc(server.serverFlags) << 28)
+end function
+
+function clientWeaponModelIndex(server, entityIndex, fallback)
+  if server.machine is void or server.machine.context is void then return fallback end if
+  modelName = qcString(server.machine, entityIndex, "weaponmodel", "")
+  if modelName == "" then return 0 end if
+  value = modelIndex(server, modelName)
+  if value == 0 then return error(2812, "SV_ModelIndex: model " + modelName + " not precached") end if
+  return value
+end function
+
+// PlayerState keeps groundedness in `onGround`, while the original network
+// writer consumes FL_ONGROUND from ent->v.flags. Rebuild this mirrored bit for
+// PlayerState-only adapter paths so stale flags cannot drop or invent
+// SU_ONGROUND. QuakeC-backed paths still replace the value with QC flags.
+function playerProtocolFlags(player)
+  baseFlags = native.trunc(player.flags) & ~c.FL_ONGROUND
+  if player.onGround then return baseFlags | c.FL_ONGROUND end if
+  return baseFlags
+end function
+
+function protocolClientData(server, client, player)
+  entityIndex = client.edictIndex
+  viewHeight = player.viewHeight
+  idealPitch = 0.0
+  punch = player.punchAngle
+  velocity = player.velocity
+  flags = playerProtocolFlags(player)
+  waterLevel = player.waterLevel
+  weaponFrame = player.weaponFrame
+  armor = player.armor
+  health = player.health
+  currentAmmo = player.ammo
+  shells = player.shells
+  nails = player.nails
+  rockets = player.rockets
+  cells = player.cells
+  activeWeapon = player.activeWeapon
+  if server.machine is not void and server.machine.context is not void then
+    viewHeight = qcVector(server.machine, entityIndex, "view_ofs", t.Vec3(0.0, 0.0, player.viewHeight)).z
+    idealPitch = qcFloat(server.machine, entityIndex, "idealpitch", 0.0)
+    punch = qcVector(server.machine, entityIndex, "punchangle", player.punchAngle)
+    velocity = qcVector(server.machine, entityIndex, "velocity", player.velocity)
+    flags = native.trunc(qcFloat(server.machine, entityIndex, "flags", playerProtocolFlags(player)))
+    waterLevel = native.trunc(qcFloat(server.machine, entityIndex, "waterlevel", player.waterLevel))
+    weaponFrame = qcFloat(server.machine, entityIndex, "weaponframe", player.weaponFrame)
+    armor = qcFloat(server.machine, entityIndex, "armorvalue", player.armor)
+    health = qcFloat(server.machine, entityIndex, "health", player.health)
+    currentAmmo = qcFloat(server.machine, entityIndex, "currentammo", player.ammo)
+    shells = qcFloat(server.machine, entityIndex, "ammo_shells", player.shells)
+    nails = qcFloat(server.machine, entityIndex, "ammo_nails", player.nails)
+    rockets = qcFloat(server.machine, entityIndex, "ammo_rockets", player.rockets)
+    cells = qcFloat(server.machine, entityIndex, "ammo_cells", player.cells)
+    activeWeapon = qcFloat(server.machine, entityIndex, "weapon", player.activeWeapon)
+  end if
+  return t.ProtocolClientData(
+    viewHeight, idealPitch, punch, velocity, flags, waterLevel, weaponFrame, armor,
+    clientWeaponModelIndex(server, entityIndex, player.weapon), health, currentAmmo, shells, nails, rockets, cells,
+    clientItems(server, entityIndex, player), activeWeapon, server.standardQuake,
+  )
+end function
+
+function writeClientDataForClient(buffer, server, client, player)
+  result = serverData.writeClientData(buffer, protocolClientData(server, client, player))
+  return result[0]
 end function
 
 function writeClientDataWithFlags(buffer, player, serverFlags)
-  // SV_WriteClientdataToMessage.  SU_ITEMS is carried for protocol parity even
-  // though the 32-bit item word is always present, and SU_WEAPON is always set
-  // in stock Quake so the first-person model cannot disappear on zero/default
-  // transitions.
-  bits = c.SU_ITEMS | c.SU_WEAPON
-  if player.viewHeight != c.DEFAULT_VIEWHEIGHT then bits = bits | c.SU_VIEWHEIGHT end if
-  if player.onGround then bits = bits | c.SU_ONGROUND end if
-  if player.waterLevel >= 2 then bits = bits | c.SU_INWATER end if
-
-  punchValues = [player.punchAngle.x, player.punchAngle.y, player.punchAngle.z]
-  velocityValues = [player.velocity.x, player.velocity.y, player.velocity.z]
-  axis = 0
-  while axis < 3
-    if punchValues[axis] != 0.0 then bits = bits | (c.SU_PUNCH1 << axis) end if
-    if velocityValues[axis] != 0.0 then bits = bits | (c.SU_VELOCITY1 << axis) end if
-    axis = axis + 1
-  end while
-
-  if player.weaponFrame != 0 then bits = bits | c.SU_WEAPONFRAME end if
-  if player.armor != 0.0 then bits = bits | c.SU_ARMOR end if
-
-  msg.writeByte(buffer, c.SVC_CLIENTDATA)
-  msg.writeShort(buffer, bits)
-  if (bits & c.SU_VIEWHEIGHT) != 0 then msg.writeChar(buffer, native.trunc(player.viewHeight)) end if
-
-  axis = 0
-  while axis < 3
-    if (bits & (c.SU_PUNCH1 << axis)) != 0 then msg.writeChar(buffer, native.trunc(punchValues[axis])) end if
-    if (bits & (c.SU_VELOCITY1 << axis)) != 0 then msg.writeChar(buffer, native.trunc(velocityValues[axis] / 16.0)) end if
-    axis = axis + 1
-  end while
-
-  items = native.trunc(player.items) | ((native.trunc(serverFlags) & 15) << 28)
-  msg.writeLong(buffer, items)
-  if (bits & c.SU_WEAPONFRAME) != 0 then msg.writeByte(buffer, clampByte(player.weaponFrame)) end if
-  if (bits & c.SU_ARMOR) != 0 then msg.writeByte(buffer, clampByte(player.armor)) end if
-  msg.writeByte(buffer, clampByte(player.weapon))
-  msg.writeShort(buffer, native.trunc(player.health))
-  msg.writeByte(buffer, clampByte(player.ammo))
-  msg.writeByte(buffer, clampByte(player.shells))
-  msg.writeByte(buffer, clampByte(player.nails))
-  msg.writeByte(buffer, clampByte(player.rockets))
-  msg.writeByte(buffer, clampByte(player.cells))
-  msg.writeByte(buffer, clampByte(player.activeWeapon))
-  return bits
+  data = t.ProtocolClientData(
+    player.viewHeight, 0.0, player.punchAngle, player.velocity, playerProtocolFlags(player), player.waterLevel,
+    player.weaponFrame, player.armor, player.weapon, player.health, player.ammo,
+    player.shells, player.nails, player.rockets, player.cells,
+    native.trunc(player.items) | (native.trunc(serverFlags) << 28),
+    player.activeWeapon, true,
+  )
+  result = serverData.writeClientData(buffer, data)
+  return result[0]
 end function
 
 function writeClientData(buffer, player)
   return writeClientDataWithFlags(buffer, player, 0)
 end function
 
-function writePlayerUpdate(buffer, client, player)
-  bits = c.U_MOREBITS | c.U_ORIGIN1 | c.U_ORIGIN2 | c.U_ORIGIN3 | c.U_ANGLE1 | c.U_ANGLE2 | c.U_ANGLE3
-  msg.writeByte(buffer, (bits & 255) | c.U_SIGNAL)
-  msg.writeByte(buffer, (bits >> 8) & 255)
-  msg.writeByte(buffer, client.edictIndex)
-  msg.writeCoord(buffer, player.origin.x); msg.writeAngle(buffer, player.renderAngles.x)
-  msg.writeCoord(buffer, player.origin.y); msg.writeAngle(buffer, player.renderAngles.y)
-  msg.writeCoord(buffer, player.origin.z); msg.writeAngle(buffer, player.renderAngles.z)
+function writePlayerUpdate(server, buffer, client, player)
+  if client.edictIndex < 0 or client.edictIndex >= len(server.edicts) then
+    return error(2810, "SV_WriteEntitiesToClient: missing player edict")
+  end if
+  item = server.edicts[client.edictIndex]
+  if item is void then return error(2811, "SV_WriteEntitiesToClient: void player edict") end if
+  // The local PlayerState is authoritative between QC synchronization points.
+  // Reflect its transform before computing the same baseline delta used for all
+  // other entities; the player is still always represented by a fast update.
+  item.origin = math.copy(player.origin)
+  item.angles = math.copy(player.renderAngles)
+  item.moveType = player.moveType
+  return writeEntityUpdate(server, buffer, item)
 end function
 
-function absolute(value)
-  if value < 0.0 then return -value end if
-  return value
-end function
+
 
 function entityFloatValue(server, item, fieldName, fallback)
   if server.machine is not void and server.machine.context is not void then
@@ -1207,44 +1361,34 @@ function entityFloatValue(server, item, fieldName, fallback)
   return fallback
 end function
 
-function writeEntityUpdate(server, buffer, item)
-  base = item.baseline
-  modelValue = item.modelIndex
-  frameValue = native.trunc(entityFloatValue(server, item, "frame", item.frame))
-  colormapValue = native.trunc(entityFloatValue(server, item, "colormap", item.colormap))
-  skinValue = native.trunc(entityFloatValue(server, item, "skin", item.skin))
-  effectsValue = native.trunc(entityFloatValue(server, item, "effects", item.effects))
-  bits = 0
-  if absolute(item.origin.x - base.origin.x) > 0.1 then bits = bits | c.U_ORIGIN1 end if
-  if absolute(item.origin.y - base.origin.y) > 0.1 then bits = bits | c.U_ORIGIN2 end if
-  if absolute(item.origin.z - base.origin.z) > 0.1 then bits = bits | c.U_ORIGIN3 end if
-  if item.angles.x != base.angles.x then bits = bits | c.U_ANGLE1 end if
-  if item.angles.y != base.angles.y then bits = bits | c.U_ANGLE2 end if
-  if item.angles.z != base.angles.z then bits = bits | c.U_ANGLE3 end if
-  if item.moveType == c.MOVETYPE_STEP then bits = bits | c.U_NOLERP end if
-  if modelValue != base.modelIndex then bits = bits | c.U_MODEL end if
-  if frameValue != base.frame then bits = bits | c.U_FRAME end if
-  if colormapValue != base.colormap then bits = bits | c.U_COLORMAP end if
-  if skinValue != base.skin then bits = bits | c.U_SKIN end if
-  if effectsValue != 0 then bits = bits | c.U_EFFECTS end if
-  if item.number >= 256 then bits = bits | c.U_LONGENTITY end if
-  if bits >= 256 then bits = bits | c.U_MOREBITS end if
+function entityUpdateValues(server, item)
+  return [
+    item.modelIndex,
+    native.trunc(entityFloatValue(server, item, "frame", item.frame)),
+    native.trunc(entityFloatValue(server, item, "colormap", item.colormap)),
+    native.trunc(entityFloatValue(server, item, "skin", item.skin)),
+    native.trunc(entityFloatValue(server, item, "effects", item.effects)),
+  ]
+end function
 
-  msg.writeByte(buffer, (bits & 255) | c.U_SIGNAL)
-  if (bits & c.U_MOREBITS) != 0 then msg.writeByte(buffer, (bits >> 8) & 255) end if
-  if (bits & c.U_LONGENTITY) != 0 then msg.writeShort(buffer, item.number) else msg.writeByte(buffer, item.number) end if
-  if (bits & c.U_MODEL) != 0 then msg.writeByte(buffer, modelValue) end if
-  if (bits & c.U_FRAME) != 0 then msg.writeByte(buffer, frameValue) end if
-  if (bits & c.U_COLORMAP) != 0 then msg.writeByte(buffer, colormapValue) end if
-  if (bits & c.U_SKIN) != 0 then msg.writeByte(buffer, skinValue) end if
-  if (bits & c.U_EFFECTS) != 0 then msg.writeByte(buffer, effectsValue) end if
-  if (bits & c.U_ORIGIN1) != 0 then msg.writeCoord(buffer, item.origin.x) end if
-  if (bits & c.U_ANGLE1) != 0 then msg.writeAngle(buffer, item.angles.x) end if
-  if (bits & c.U_ORIGIN2) != 0 then msg.writeCoord(buffer, item.origin.y) end if
-  if (bits & c.U_ANGLE2) != 0 then msg.writeAngle(buffer, item.angles.y) end if
-  if (bits & c.U_ORIGIN3) != 0 then msg.writeCoord(buffer, item.origin.z) end if
-  if (bits & c.U_ANGLE3) != 0 then msg.writeAngle(buffer, item.angles.z) end if
-  return bits
+function entityUpdateBits(server, item)
+  values = entityUpdateValues(server, item)
+  return protocolUpdate.computeBits(
+    item.number, item.baseline, values[0], values[1], values[2], values[3], values[4],
+    item.origin, item.angles, item.moveType,
+  )
+end function
+
+function writeEntityUpdate(server, buffer, item)
+  values = entityUpdateValues(server, item)
+  bits = protocolUpdate.computeBits(
+    item.number, item.baseline, values[0], values[1], values[2], values[3], values[4],
+    item.origin, item.angles, item.moveType,
+  )
+  return protocolUpdate.writeFastUpdateBits(
+    buffer, bits, item.number, values[0], values[1], values[2], values[3], values[4],
+    item.origin, item.angles,
+  )
 end function
 
 function entityVisible(server, pvs, item, clientEdict)
@@ -1255,32 +1399,42 @@ function entityVisible(server, pvs, item, clientEdict)
 end function
 
 function appendDatagram(destination, source)
-  if source.curSize <= 0 then return true end if
-  if destination.curSize + source.curSize > destination.maxSize then return false end if
-  sz.write(destination, source.data, 0, source.curSize)
+  return serverData.appendDatagramIfFits(destination, source)
+end function
+
+function writePlannedEntityUpdate(server, buffer, item)
+  bits = entityUpdateBits(server, item)
+  if not protocolUpdate.canWrite(buffer, bits) then return false end if
+  writeEntityUpdate(server, buffer, item)
   return true
 end function
 
 function sendClientFrame(server, client, player)
   if not client.active or not client.spawned or client.socket is void then return 0 end if
   buffer = sz.alloc(c.MAX_DATAGRAM)
-  buffer.allowOverflow = true
   msg.writeByte(buffer, c.SVC_TIME)
   msg.writeFloat(buffer, server.time)
-  writeClientDataWithFlags(buffer, player, server.serverFlags)
-  writePlayerUpdate(buffer, client, player)
+  writeDamage(server, client, buffer)
+  setClientIdealPitch(server, client, player, 0.8)
+  writeFixAngle(server, client, player, buffer)
+  writeClientDataForClient(buffer, server, client, player)
+
+  if client.edictIndex < 0 or client.edictIndex >= len(server.edicts) then
+    return error(2810, "SV_WriteEntitiesToClient: missing player edict")
+  end if
+  playerEdict = server.edicts[client.edictIndex]
+  playerEdict.origin = math.copy(player.origin)
+  playerEdict.angles = math.copy(player.renderAngles)
+  playerEdict.moveType = player.moveType
 
   eye = math.add(player.origin, t.Vec3(0.0, 0.0, player.viewHeight))
   viewLeaf = world.leafForPoint(server.worldModel, eye)
   pvs = world.leafPvs(server.worldModel, viewLeaf)
   index = 1
-  while index < len(server.edicts)
+  while index < server.numEdicts and index < len(server.edicts)
     item = server.edicts[index]
-    if item is not void and not item.free and item.number != client.edictIndex and entityVisible(server, pvs, item, client.edictIndex) then
-      // Original Quake leaves a 16-byte safety margin. MiniQuake uses a larger
-      // bound because long entity numbers and all coordinate deltas can take 24.
-      if buffer.maxSize - buffer.curSize < 32 then break end if
-      writeEntityUpdate(server, buffer, item)
+    if item is not void and not item.free and entityVisible(server, pvs, item, client.edictIndex) then
+      if not writePlannedEntityUpdate(server, buffer, item) then break end if
     end if
     index = index + 1
   end while
@@ -1579,79 +1733,79 @@ function moveQcEntity(server, entityIndex, frameTime, gravity)
   return true
 end function
 
-function runNonClientPhysics(server, frameTime, registry)
-  if server.machine is void or server.machine.context is void then return 0 end if
+function physicsFrameParameters(registry)
   gravity = cvar.variableValue(registry, "sv_gravity")
   if gravity <= 0.0 then gravity = 800.0 end if
+  maxVelocity = cvar.variableValue(registry, "sv_maxvelocity")
+  if maxVelocity <= 0.0 then maxVelocity = 2000.0 end if
+  return [gravity, maxVelocity]
+end function
+
+function runWorldPhysicsWithRetouch(server, frameTime, registry, forceRetouch)
+  if server.machine is void or server.machine.context is void then return 0 end if
+  if server.machine.context.edicts.numEdicts <= 0 then return 0 end if
+  if server.machine.context.edicts.freeFlags[0] then return 0 end if
+  parameters = physicsFrameParameters(registry)
+  physics.SV_ForceRetouchEntity(server, 0, forceRetouch)
+  if physics.SV_Physics_NonClientEntity(server, 0, frameTime, parameters[0], parameters[1]) then return 1 end if
+  return 0
+end function
+
+function runNonClientPhysicsWithRetouch(server, frameTime, registry, forceRetouch)
+  if server.machine is void or server.machine.context is void then return 0 end if
+  parameters = physicsFrameParameters(registry)
+  gravity = parameters[0]
+  maxVelocity = parameters[1]
   moved = 0
   index = server.maxClients + 1
   while index < server.machine.context.edicts.numEdicts
     if not server.machine.context.edicts.freeFlags[index] then
-      if moveQcEntity(server, index, frameTime, gravity) then moved = moved + 1 end if
+      physics.SV_ForceRetouchEntity(server, index, forceRetouch)
+      if physics.SV_Physics_NonClientEntity(server, index, frameTime, gravity, maxVelocity) then moved = moved + 1 end if
     end if
     index = index + 1
   end while
   return moved
 end function
 
-function clampDirection(value)
-  result = native.trunc(value * 16.0)
-  if result > 127 then result = 127 end if
-  if result < -128 then result = -128 end if
-  return result
+function runNonClientPhysics(server, frameTime, registry)
+  forceRetouch = physics.SV_ForceRetouchValue(server)
+  moved = runWorldPhysicsWithRetouch(server, frameTime, registry, forceRetouch)
+  moved = moved + runNonClientPhysicsWithRetouch(server, frameTime, registry, forceRetouch)
+  physics.SV_FinishForceRetouch(server, forceRetouch)
+  return moved
 end function
 
 function queuedSoundOrigin(server, entityIndex)
-  if entityIndex < 0 or entityIndex >= len(server.edicts) then return t.Vec3(0.0, 0.0, 0.0) end if
+  if entityIndex < 0 or entityIndex >= len(server.edicts) then return error(2816, "SV_StartSound: bad entity " + entityIndex) end if
   item = server.edicts[entityIndex]
-  if item is void or item.free then return t.Vec3(0.0, 0.0, 0.0) end if
-  center = math.scale(math.add(item.mins, item.maxs), 0.5)
-  return math.add(item.origin, center)
+  if item is void then return error(2816, "SV_StartSound: bad entity " + entityIndex) end if
+  return transients.soundCenter(item.origin, item.mins, item.maxs)
 end function
 
 function writeQueuedSound(server, event)
-  if server.datagram.curSize > c.MAX_DATAGRAM - 16 then return false end if
-  entityIndex = event[0]
-  channel = event[1]
+  entityIndex = native.trunc(event[0])
+  channel = native.trunc(event[1])
   sample = event[2]
-  volume = native.trunc(math.clamp(event[3], 0.0, 1.0) * 255.0)
-  attenuation = math.clamp(event[4], 0.0, 4.0)
+  volume = native.trunc(event[3])
+  attenuation = transients.cFloat(event[4])
+  if volume < 0 or volume > 255 then return error(2813, "SV_StartSound: volume = " + volume) end if
+  if attenuation < 0.0 or attenuation > 4.0 then return error(2814, "SV_StartSound: attenuation = " + attenuation) end if
+  if channel < 0 or channel > 7 then return error(2815, "SV_StartSound: channel = " + channel) end if
+  if not transients.canWriteDynamicSound(server.datagram) then return false end if
   index = soundIndex(server, sample)
   if index == 0 then
     server.diagnostics = server.diagnostics + ["sound was not precached: " + sample]
     return false
   end if
-  fieldMask = 0
-  if volume != 255 then fieldMask = fieldMask | 1 end if
-  if attenuation != 1.0 then fieldMask = fieldMask | 2 end if
-  msg.writeByte(server.datagram, c.SVC_SOUND)
-  msg.writeByte(server.datagram, fieldMask)
-  if (fieldMask & 1) != 0 then msg.writeByte(server.datagram, volume) end if
-  if (fieldMask & 2) != 0 then msg.writeByte(server.datagram, native.trunc(attenuation * 64.0)) end if
-  msg.writeShort(server.datagram, (entityIndex << 3) | channel)
-  msg.writeByte(server.datagram, index)
   origin = queuedSoundOrigin(server, entityIndex)
-  msg.writeCoord(server.datagram, origin.x)
-  msg.writeCoord(server.datagram, origin.y)
-  msg.writeCoord(server.datagram, origin.z)
+  serverData.writeSound(server.datagram, entityIndex, channel, index, volume, attenuation, origin)
   return true
 end function
 
 function writeQueuedParticle(server, event)
-  if server.datagram.curSize > c.MAX_DATAGRAM - 16 then return false end if
-  origin = event[0]
-  direction = event[1]
-  count = event[2]
-  color = event[3]
-  msg.writeByte(server.datagram, c.SVC_PARTICLE)
-  msg.writeCoord(server.datagram, origin.x)
-  msg.writeCoord(server.datagram, origin.y)
-  msg.writeCoord(server.datagram, origin.z)
-  msg.writeChar(server.datagram, clampDirection(direction.x))
-  msg.writeChar(server.datagram, clampDirection(direction.y))
-  msg.writeChar(server.datagram, clampDirection(direction.z))
-  msg.writeByte(server.datagram, count)
-  msg.writeByte(server.datagram, color)
+  if not protocolEvents.canWriteTransient(server.datagram) then return false end if
+  protocolEvents.writeParticle(server.datagram, event[0], event[1], event[2], event[3])
   return true
 end function
 
@@ -1683,46 +1837,198 @@ function broadcastPrint(server, text)
 end function
 
 function updateReliableClientState(server)
-  if server.machine is void then return 0 end if
   changed = 0
-  index = 0
-  while index < len(server.clients)
-    clientValue = server.clients[index]
-    if clientValue.active then
-      frags = native.trunc(qcFloat(server.machine, clientValue.edictIndex, "frags", 0.0))
-      if frags != clientValue.oldFrags then
-        clientValue.oldFrags = frags
-        msg.writeByte(server.reliableDatagram, c.SVC_UPDATEFRAGS)
-        msg.writeByte(server.reliableDatagram, index)
-        msg.writeShort(server.reliableDatagram, frags)
-        changed = changed + 1
-      end if
+  sourceIndex = 0
+  while sourceIndex < len(server.clients)
+    sourceClient = server.clients[sourceIndex]
+    frags = 0.0
+    if server.machine is not void and server.machine.context is not void then
+      frags = qcFloat(server.machine, sourceClient.edictIndex, "frags", 0.0)
     end if
-    index = index + 1
+    if protocolEvents.fragChanged(sourceClient.oldFrags, frags) then
+      destinationIndex = 0
+      while destinationIndex < len(server.clients)
+        destination = server.clients[destinationIndex]
+        if destination.active then protocolEvents.writeUpdateFrags(destination.message, sourceIndex, frags) end if
+        destinationIndex = destinationIndex + 1
+      end while
+      sourceClient.oldFrags = protocolEvents.storedFrag(frags)
+      changed = changed + 1
+    end if
+    sourceIndex = sourceIndex + 1
   end while
   return changed
 end function
 
-function sendReliableMessages(server)
-  updateReliableClientState(server)
-  sent = 0
-  for each clientValue in server.clients
-    if clientValue.active and clientValue.socket is not void then
-      if server.reliableDatagram.curSize > 0 then
-        if sendBuffer(clientValue, server.reliableDatagram) > 0 then sent = sent + 1 end if
+function distributeReliableDatagram(server)
+  copied = 0
+  if server.reliableDatagram.curSize > 0 then
+    index = 0
+    while index < len(server.clients)
+      clientValue = server.clients[index]
+      if clientValue.active then
+        sz.write(clientValue.message, server.reliableDatagram.data, 0, server.reliableDatagram.curSize)
+        copied = copied + 1
       end if
-      if clientValue.message.curSize > 0 then
-        if sendBuffer(clientValue, clientValue.message) > 0 then sz.clear(clientValue.message); sent = sent + 1 end if
+      index = index + 1
+    end while
+  end if
+  sz.clear(server.reliableDatagram)
+  return copied
+end function
+
+function prepareReliableMessages(server)
+  updates = updateReliableClientState(server)
+  copies = distributeReliableDatagram(server)
+  return [updates, copies]
+end function
+
+function sendNopAt(server, clientValue, realtime)
+  buffer = sz.alloc(4)
+  msg.writeChar(buffer, c.SVC_NOP)
+  result = netmain.NET_SendUnreliableMessage(clientValue.socket, buffer)
+  if result == -1 then dropClient(server, clientValue, true) end if
+  clientValue.lastMessage = realtime
+  return result
+end function
+
+function processReliableClientAt(server, clientValue, realtime)
+  canSend = false
+  if clientValue.message.curSize > 0 or clientValue.dropAsap then
+    canSend = netmain.NET_CanSendMessage(clientValue.socket)
+  end if
+  plan = serverData.reliableDeliveryPlan(
+    clientValue.message.overflowed,
+    clientValue.message.curSize,
+    clientValue.dropAsap,
+    canSend,
+  )
+  if plan == serverData.RELIABLE_DROP_OVERFLOW then
+    dropClient(server, clientValue, true)
+    clientValue.message.overflowed = false
+    return -1
+  end if
+  if plan == serverData.RELIABLE_NONE or plan == serverData.RELIABLE_WAIT then return 0 end if
+  if plan == serverData.RELIABLE_DROP_ASAP then
+    dropClient(server, clientValue, false)
+    return -1
+  end if
+
+  result = netmain.NET_SendMessage(clientValue.socket, clientValue.message)
+  outcome = delivery.reliableSendOutcome(result)
+  if outcome == delivery.SEND_DROP then
+    dropClient(server, clientValue, true)
+    return -1
+  end if
+  if outcome == delivery.SEND_RETAIN then return 0 end if
+  sz.clear(clientValue.message)
+  clientValue.lastMessage = realtime
+  clientValue.sendSignon = false
+  return result
+end function
+
+// Reliable-only pump used by the explicit local signon loop. The full server
+// frame calls sendClientMessagesAt so spawned clients receive their unreliable
+// datagram before this reliable phase.
+function sendReliableMessagesAt(server, realtime)
+  prepareReliableMessages(server)
+  sent = 0
+  index = 0
+  while index < len(server.clients)
+    clientValue = server.clients[index]
+    if clientValue.active and clientValue.socket is not void then
+      if not clientValue.spawned and not clientValue.sendSignon then
+        if delivery.keepaliveDue(realtime - clientValue.lastMessage) then
+          result = sendNopAt(server, clientValue, realtime)
+          if result > 0 then sent = sent + 1 end if
+        end if
+      else
+        result = processReliableClientAt(server, clientValue, realtime)
+        if result > 0 then sent = sent + 1 end if
       end if
     end if
-  end for
-  sz.clear(server.reliableDatagram)
+    index = index + 1
+  end while
   return sent
+end function
+
+function sendReliableMessages(server)
+  return sendReliableMessagesAt(server, win.ticks() / 1000.0)
+end function
+
+function cleanupMuzzleFlashes(server)
+  cleaned = 0
+  index = 1
+  while index < server.numEdicts and index < len(server.edicts)
+    item = server.edicts[index]
+    if item is not void and not item.free then
+      effects = native.trunc(item.effects) & ~c.EF_MUZZLEFLASH
+      if effects != native.trunc(item.effects) then
+        item.effects = effects
+        if server.machine is not void and server.machine.context is not void then
+          setQcEntityFloat(server, index, "effects", effects)
+        end if
+        cleaned = cleaned + 1
+      end if
+    end if
+    index = index + 1
+  end while
+  return cleaned
+end function
+
+function sendClientMessagesAt(server, player, realtime)
+  prepareReliableMessages(server)
+  sent = 0
+  index = 0
+  while index < len(server.clients)
+    clientValue = server.clients[index]
+    if clientValue.active and clientValue.socket is not void then
+      initialPlan = serverData.initialDeliveryPlan(
+        clientValue.spawned,
+        clientValue.sendSignon,
+        realtime - clientValue.lastMessage,
+      )
+
+      if (initialPlan & serverData.PLAN_SEND_UNRELIABLE) != 0 then
+        frameResult = sendClientFrame(server, clientValue, player)
+        if frameResult == -1 then
+          dropClient(server, clientValue, true)
+          index = index + 1
+          continue
+        end if
+        if frameResult > 0 then sent = sent + 1 end if
+      end if
+
+      if clientValue.active and (initialPlan & serverData.PLAN_SEND_NOP) != 0 then
+        nopResult = sendNopAt(server, clientValue, realtime)
+        if nopResult > 0 then sent = sent + 1 end if
+        index = index + 1
+        continue
+      end if
+      if clientValue.active and (initialPlan & serverData.PLAN_WAIT_SIGNON) != 0 then
+        index = index + 1
+        continue
+      end if
+
+      if clientValue.active and (initialPlan & serverData.PLAN_RELIABLE_PHASE) != 0 then
+        reliableResult = processReliableClientAt(server, clientValue, realtime)
+        if reliableResult > 0 then sent = sent + 1 end if
+      end if
+    end if
+    index = index + 1
+  end while
+  cleanupMuzzleFlashes(server)
+  return sent
+end function
+
+function sendClientMessages(server, player)
+  return sendClientMessagesAt(server, player, win.ticks() / 1000.0)
 end function
 
 function frameMode(server, player, frameTime, registry, simulate)
   if not server.active then return false end if
   pumpClientMessages(server, player)
+  forceRetouch = 0.0
 
   if simulate then
   // SV_Physics ordering: StartFrame, client edicts in numerical order, then
@@ -1733,9 +2039,17 @@ function frameMode(server, player, frameTime, registry, simulate)
       if clientValue.active and clientValue.spawned then syncPlayerToQuakeC(server, clientValue, player) end if
     end for
     runQuakeCFrame(server, frameTime)
+    forceRetouch = physics.SV_ForceRetouchValue(server)
+    // SV_Physics begins with edict zero before the client slots.  The world
+    // normally has no scheduled think, but preserving this order is required
+    // for force_retouch and for maps or mods that do schedule one.
+    runWorldPhysicsWithRetouch(server, frameTime, registry, forceRetouch)
   end if
 
   for each clientValue in server.clients
+    if server.machine is not void and server.machine.context is not void then
+      physics.SV_ForceRetouchEntity(server, clientValue.edictIndex, forceRetouch)
+    end if
     if clientValue.active and clientValue.spawned then
       if server.machine is not void and server.machine.context is not void then
         syncPlayerFromQuakeC(server, clientValue, player)
@@ -1759,7 +2073,8 @@ function frameMode(server, player, frameTime, registry, simulate)
   end for
 
   if server.machine is not void and server.machine.context is not void then
-    runNonClientPhysics(server, frameTime, registry)
+    runNonClientPhysicsWithRetouch(server, frameTime, registry, forceRetouch)
+    physics.SV_FinishForceRetouch(server, forceRetouch)
     // Pushers are evaluated after clients in SV_Physics.  A door, lift or train
     // may therefore carry the player after PlayerPostThink.  Preserve that
     // authoritative edict position in the shared local PlayerState instead of
@@ -1778,10 +2093,7 @@ function frameMode(server, player, frameTime, registry, simulate)
     flushQuakeCEvents(server)
   end if
   end if
-  sendReliableMessages(server)
-  for each clientValue in server.clients
-    sendClientFrame(server, clientValue, player)
-  end for
+  sendClientMessages(server, player)
   sz.clear(server.datagram)
   return true
 end function
@@ -1907,12 +2219,118 @@ function qcString(machine, entityIndex, fieldName, fallback)
   return value
 end function
 
+function requireSynchronizedVector(value, entityIndex, fieldName)
+  if t.isVec3Value(value) then return value end if
+  return error(
+    2860,
+    "SV_SyncQuakeCEdict: edict " + entityIndex + " field " + fieldName +
+      " expected Vec3, got " + typeName(value),
+  )
+end function
+
+// The original server keeps edicts in one stable array and mutates their
+// fields in place.  Rebuilding every QuakeEdict and every nested Vec3 on each
+// frame creates avoidable allocation pressure and makes object lifetime depend
+// on expression-temporary GC roots.  Keep the derived MiniLang mirror stable:
+// allocate only when the high-water mark grows or a previously absent record
+// appears, then copy raw QuakeC words into the existing structs.
+function synchronizedVectorTarget(value, entityIndex, fieldName, x, y, z)
+  if t.isVec3Value(value) then return value end if
+  created = t.Vec3(x, y, z)
+  return requireSynchronizedVector(created, entityIndex, fieldName)
+end function
+
+function setSynchronizedVector(value, entityIndex, fieldName, x, y, z)
+  result = synchronizedVectorTarget(value, entityIndex, fieldName, x, y, z)
+  result.x = x
+  result.y = y
+  result.z = z
+  return result
+end function
+
+function syncQcVectorInto(machine, entityIndex, fieldName, target, x, y, z)
+  result = synchronizedVectorTarget(target, entityIndex, fieldName, x, y, z)
+  offset = vm.fieldOffset(machine, fieldName)
+  if offset >= 0 then
+    result.x = vm.entityFloat(machine, entityIndex, offset)
+    result.y = vm.entityFloat(machine, entityIndex, offset + 1)
+    result.z = vm.entityFloat(machine, entityIndex, offset + 2)
+  else
+    result.x = x
+    result.y = y
+    result.z = z
+  end if
+  return requireSynchronizedVector(result, entityIndex, fieldName)
+end function
+
+function resizeSynchronizedEdictArray(server, requiredCount)
+  if requiredCount < 0 or requiredCount > server.maxEdicts then
+    return error(2861, "SV_SyncQuakeCEdicts: invalid edict count " + requiredCount)
+  end if
+  if len(server.edicts) == requiredCount then return server.edicts end if
+
+  previous = server.edicts
+  resized = arrayutil.makeEmptyArray(requiredCount)
+  copyCount = len(previous)
+  if copyCount > requiredCount then copyCount = requiredCount end if
+  index = 0
+  while index < copyCount
+    resized[index] = previous[index]
+    index = index + 1
+  end while
+  server.edicts = resized
+  return resized
+end function
+
+function ensureSynchronizedBaseline(item, entityIndex)
+  baseline = item.baseline
+  if not t.isEntityBaselineValue(baseline) then
+    baseline = edict.emptyBaseline()
+    item.baseline = baseline
+  end if
+  baselineOrigin = synchronizedVectorTarget(
+    baseline.origin, entityIndex, "baseline.origin", 0.0, 0.0, 0.0
+  )
+  baselineAngles = synchronizedVectorTarget(
+    baseline.angles, entityIndex, "baseline.angles", 0.0, 0.0, 0.0
+  )
+  baseline.origin = baselineOrigin
+  baseline.angles = baselineAngles
+  return baseline
+end function
+
+function ensureSynchronizedEdict(server, entityIndex)
+  if entityIndex < 0 or entityIndex >= server.maxEdicts then
+    return error(2862, "SV_SyncQuakeCEdict: invalid edict " + entityIndex)
+  end if
+  if entityIndex >= len(server.edicts) then
+    resizeSynchronizedEdictArray(server, entityIndex + 1)
+  end if
+
+  item = server.edicts[entityIndex]
+  if item is void then
+    item = edict.create(entityIndex)
+    server.edicts[entityIndex] = item
+  else if not t.isQuakeEdictValue(item) then
+    return error(
+      2863,
+      "SV_SyncQuakeCEdict: edict " + entityIndex +
+        " expected QuakeEdict, got " + typeName(item),
+    )
+  end if
+  item.number = entityIndex
+  ensureSynchronizedBaseline(item, entityIndex)
+  return item
+end function
+
 function syncQuakeCEdict(server, entityIndex)
   machine = server.machine
   runtime = machine.context.edicts
-  item = edict.create(entityIndex)
+  item = ensureSynchronizedEdict(server, entityIndex)
   item.free = runtime.freeFlags[entityIndex]
+  if entityIndex < len(runtime.freeTimes) then item.freeTime = runtime.freeTimes[entityIndex] end if
   if item.free then return item end if
+
   item.className = qcString(machine, entityIndex, "classname", "")
   item.model = qcString(machine, entityIndex, "model", "")
   item.modelIndex = native.trunc(qcFloat(machine, entityIndex, "modelindex", 0.0))
@@ -1920,69 +2338,117 @@ function syncQuakeCEdict(server, entityIndex)
   item.skin = native.trunc(qcFloat(machine, entityIndex, "skin", 0.0))
   item.colormap = native.trunc(qcFloat(machine, entityIndex, "colormap", 0.0))
   item.effects = native.trunc(qcFloat(machine, entityIndex, "effects", 0.0))
-  item.origin = qcVector(machine, entityIndex, "origin", t.Vec3(0.0, 0.0, 0.0))
-  item.angles = qcVector(machine, entityIndex, "angles", t.Vec3(0.0, 0.0, 0.0))
-  item.velocity = qcVector(machine, entityIndex, "velocity", t.Vec3(0.0, 0.0, 0.0))
-  item.mins = qcVector(machine, entityIndex, "mins", t.Vec3(0.0, 0.0, 0.0))
-  item.maxs = qcVector(machine, entityIndex, "maxs", t.Vec3(0.0, 0.0, 0.0))
+
+  // Copy the VM's raw vector words into the already-rooted nested structs.
+  // After the first synchronization this hot path performs no Vec3 or Edict
+  // allocation, matching the stable edict storage of WinQuake.
+  origin = syncQcVectorInto(
+    machine, entityIndex, "origin", item.origin, 0.0, 0.0, 0.0
+  )
+  angles = syncQcVectorInto(
+    machine, entityIndex, "angles", item.angles, 0.0, 0.0, 0.0
+  )
+  velocity = syncQcVectorInto(
+    machine, entityIndex, "velocity", item.velocity, 0.0, 0.0, 0.0
+  )
+  mins = syncQcVectorInto(
+    machine, entityIndex, "mins", item.mins, 0.0, 0.0, 0.0
+  )
+  maxs = syncQcVectorInto(
+    machine, entityIndex, "maxs", item.maxs, 0.0, 0.0, 0.0
+  )
+  viewOffset = syncQcVectorInto(
+    machine, entityIndex, "view_ofs", item.viewOffset,
+    0.0, 0.0, c.DEFAULT_VIEWHEIGHT
+  )
+  item.origin = origin
+  item.angles = angles
+  item.velocity = velocity
+  item.mins = mins
+  item.maxs = maxs
+  item.viewOffset = viewOffset
+
   item.moveType = native.trunc(qcFloat(machine, entityIndex, "movetype", c.MOVETYPE_NONE))
   item.solid = native.trunc(qcFloat(machine, entityIndex, "solid", c.SOLID_NOT))
   item.flags = native.trunc(qcFloat(machine, entityIndex, "flags", 0.0))
   item.health = qcFloat(machine, entityIndex, "health", 0.0)
-  item.viewOffset = qcVector(machine, entityIndex, "view_ofs", t.Vec3(0.0, 0.0, c.DEFAULT_VIEWHEIGHT))
   item.onGround = (item.flags & c.FL_ONGROUND) != 0
   item.groundEntity = qcWord(machine, entityIndex, "groundentity", -1)
-  base = qcedict.baseline(machine, entityIndex)
-  item.baseline = t.EntityBaseline(
-    native.trunc(base[0]),
-    native.trunc(base[1]),
-    native.trunc(base[2]),
-    native.trunc(base[3]),
-    base[4],
-    base[5],
-  )
   return item
 end function
 
 function recomputeEdictCount(server)
   runtime = server.machine.context.edicts
-  highest = server.maxClients
-  index = server.maxClients + 1
-  while index < runtime.maxEdicts
-    if not runtime.freeFlags[index] then highest = index end if
-    index = index + 1
-  end while
-  runtime.numEdicts = highest + 1
-  server.numEdicts = runtime.numEdicts
-  return runtime.numEdicts
+  // ED_Alloc owns a monotonically non-decreasing num_edicts high-water mark.
+  // ED_Free never shrinks it.  Re-scanning freeFlags each frame used to trim
+  // trailing free slots and forced the derived array to be rebuilt, unlike the
+  // original stable sv.edicts storage.
+  count = runtime.numEdicts
+  if count < server.maxClients + 1 then count = server.maxClients + 1 end if
+  if count > runtime.maxEdicts then count = runtime.maxEdicts end if
+  runtime.numEdicts = count
+  server.numEdicts = count
+  return count
 end function
 
-function syncQuakeCEdicts(server)
-  recomputeEdictCount(server)
-  result = arrayutil.makeEmptyArray(server.numEdicts)
+function syncQuakeCEdictRange(server, count)
+  resizeSynchronizedEdictArray(server, count)
+  server.numEdicts = count
+
   index = 0
-  while index < server.numEdicts
-    result[index] = syncQuakeCEdict(server, index)
+  while index < count
+    synchronized = syncQuakeCEdict(server, index)
+    server.edicts[index] = synchronized
     index = index + 1
   end while
+
   // Client edicts are reserved before ED_LoadFromFile and initially have no
-  // classname. Keep their physical defaults ready for PutClientInServer.
+  // classname. Keep their physical defaults ready for PutClientInServer, but
+  // mutate the already-rooted vectors instead of replacing them each frame.
   index = 1
-  while index <= server.maxClients and index < len(result)
-    if result[index].className == "" then
-      result[index].className = "player"
-      result[index].mins = t.Vec3(c.PLAYER_MINS_X, c.PLAYER_MINS_Y, c.PLAYER_MINS_Z)
-      result[index].maxs = t.Vec3(c.PLAYER_MAXS_X, c.PLAYER_MAXS_Y, c.PLAYER_MAXS_Z)
-      result[index].moveType = c.MOVETYPE_WALK
-      result[index].solid = c.SOLID_SLIDEBOX
-      result[index].flags = c.FL_CLIENT
-      result[index].health = 100.0
-      result[index].viewOffset = t.Vec3(0.0, 0.0, c.DEFAULT_VIEWHEIGHT)
+  while index <= server.maxClients and index < count
+    clientEdict = server.edicts[index]
+    if clientEdict.className == "" then
+      clientEdict.className = "player"
+      playerMins = setSynchronizedVector(
+        clientEdict.mins, index, "player.mins",
+        c.PLAYER_MINS_X, c.PLAYER_MINS_Y, c.PLAYER_MINS_Z
+      )
+      playerMaxs = setSynchronizedVector(
+        clientEdict.maxs, index, "player.maxs",
+        c.PLAYER_MAXS_X, c.PLAYER_MAXS_Y, c.PLAYER_MAXS_Z
+      )
+      clientEdict.mins = playerMins
+      clientEdict.maxs = playerMaxs
+      clientEdict.moveType = c.MOVETYPE_WALK
+      clientEdict.solid = c.SOLID_SLIDEBOX
+      clientEdict.flags = c.FL_CLIENT
+      clientEdict.health = 100.0
+      playerViewOffset = setSynchronizedVector(
+        clientEdict.viewOffset, index, "player.view_ofs",
+        0.0, 0.0, c.DEFAULT_VIEWHEIGHT
+      )
+      clientEdict.viewOffset = playerViewOffset
+      server.edicts[index] = clientEdict
     end if
     index = index + 1
   end while
-  server.edicts = result
-  return len(result)
+  return count
+end function
+
+function syncQuakeCEdicts(server)
+  count = recomputeEdictCount(server)
+  return syncQuakeCEdictRange(server, count)
+end function
+
+function syncLoadedQuakeCEdicts(server, savedCount)
+  runtime = server.machine.context.edicts
+  if savedCount < server.maxClients + 1 or savedCount > runtime.maxEdicts then
+    return error(2864, "SV_SyncLoadedEdicts: invalid high-water mark " + savedCount)
+  end if
+  runtime.numEdicts = savedCount
+  server.numEdicts = savedCount
+  return syncQuakeCEdictRange(server, savedCount)
 end function
 
 function spawnRuntime(server, filesystem, mapName, skill, registry, commandSystem)
@@ -2077,7 +2543,8 @@ function syncPlayerToQuakeC(server, clientValue, player)
   setQcEntityVector(server, entityIndex, "movedir", player.moveDir)
   setQcEntityVector(server, entityIndex, "mins", player.mins)
   setQcEntityVector(server, entityIndex, "maxs", player.maxs)
-  setQcEntityVector(server, entityIndex, "view_ofs", t.Vec3(0.0, 0.0, player.viewHeight))
+  viewOffset = t.Vec3(0.0, 0.0, player.viewHeight)
+  setQcEntityVector(server, entityIndex, "view_ofs", viewOffset)
   setQcEntityFloat(server, entityIndex, "health", player.health)
   setQcEntityFloat(server, entityIndex, "movetype", player.moveType)
   setQcEntityFloat(server, entityIndex, "solid", c.SOLID_SLIDEBOX)
@@ -2114,37 +2581,76 @@ end function
 function syncPlayerFromQuakeC(server, clientValue, player)
   if server.machine is void then return false end if
   entityIndex = clientValue.edictIndex
-  player.origin = qcVector(server.machine, entityIndex, "origin", player.origin)
-  player.oldOrigin = qcVector(server.machine, entityIndex, "oldorigin", player.oldOrigin)
-  player.velocity = qcVector(server.machine, entityIndex, "velocity", player.velocity)
-  player.viewAngles = qcVector(server.machine, entityIndex, "v_angle", player.viewAngles)
-  player.renderAngles = qcVector(server.machine, entityIndex, "angles", player.renderAngles)
-  player.punchAngle = qcVector(server.machine, entityIndex, "punchangle", player.punchAngle)
-  player.moveDir = qcVector(server.machine, entityIndex, "movedir", player.moveDir)
-  player.mins = qcVector(server.machine, entityIndex, "mins", player.mins)
-  player.maxs = qcVector(server.machine, entityIndex, "maxs", player.maxs)
-  player.viewHeight = qcVector(server.machine, entityIndex, "view_ofs", t.Vec3(0.0, 0.0, player.viewHeight)).z
-  player.health = qcFloat(server.machine, entityIndex, "health", player.health)
-  player.armor = qcFloat(server.machine, entityIndex, "armorvalue", player.armor)
-  player.ammo = native.trunc(qcFloat(server.machine, entityIndex, "currentammo", player.ammo))
-  player.shells = native.trunc(qcFloat(server.machine, entityIndex, "ammo_shells", player.shells))
-  player.nails = native.trunc(qcFloat(server.machine, entityIndex, "ammo_nails", player.nails))
-  player.rockets = native.trunc(qcFloat(server.machine, entityIndex, "ammo_rockets", player.rockets))
-  player.cells = native.trunc(qcFloat(server.machine, entityIndex, "ammo_cells", player.cells))
-  player.items = native.trunc(qcFloat(server.machine, entityIndex, "items", player.items))
-  player.activeWeapon = native.trunc(qcFloat(server.machine, entityIndex, "weapon", player.activeWeapon))
-  player.weaponFrame = native.trunc(qcFloat(server.machine, entityIndex, "weaponframe", player.weaponFrame))
-  weaponModel = qcString(server.machine, entityIndex, "weaponmodel", "")
+  machine = server.machine
+
+  // PlayerState mirrors the same stable C edict words.  Mutate its existing
+  // Vec3 fields in place so repeated PlayerPreThink/PostThink synchronization
+  // cannot create transient nested objects that depend on expression roots.
+  origin = syncQcVectorInto(
+    machine, entityIndex, "origin", player.origin, 0.0, 0.0, 0.0
+  )
+  oldOrigin = syncQcVectorInto(
+    machine, entityIndex, "oldorigin", player.oldOrigin, 0.0, 0.0, 0.0
+  )
+  velocity = syncQcVectorInto(
+    machine, entityIndex, "velocity", player.velocity, 0.0, 0.0, 0.0
+  )
+  viewAngles = syncQcVectorInto(
+    machine, entityIndex, "v_angle", player.viewAngles, 0.0, 0.0, 0.0
+  )
+  renderAngles = syncQcVectorInto(
+    machine, entityIndex, "angles", player.renderAngles, 0.0, 0.0, 0.0
+  )
+  punchAngle = syncQcVectorInto(
+    machine, entityIndex, "punchangle", player.punchAngle, 0.0, 0.0, 0.0
+  )
+  moveDir = syncQcVectorInto(
+    machine, entityIndex, "movedir", player.moveDir, 0.0, 0.0, 0.0
+  )
+  mins = syncQcVectorInto(
+    machine, entityIndex, "mins", player.mins,
+    c.PLAYER_MINS_X, c.PLAYER_MINS_Y, c.PLAYER_MINS_Z
+  )
+  maxs = syncQcVectorInto(
+    machine, entityIndex, "maxs", player.maxs,
+    c.PLAYER_MAXS_X, c.PLAYER_MAXS_Y, c.PLAYER_MAXS_Z
+  )
+
+  player.origin = origin
+  player.oldOrigin = oldOrigin
+  player.velocity = velocity
+  player.viewAngles = viewAngles
+  player.renderAngles = renderAngles
+  player.punchAngle = punchAngle
+  player.moveDir = moveDir
+  player.mins = mins
+  player.maxs = maxs
+
+  viewOffset = vm.fieldOffset(machine, "view_ofs")
+  if viewOffset >= 0 then
+    player.viewHeight = vm.entityFloat(machine, entityIndex, viewOffset + 2)
+  end if
+  player.health = qcFloat(machine, entityIndex, "health", player.health)
+  player.armor = qcFloat(machine, entityIndex, "armorvalue", player.armor)
+  player.ammo = native.trunc(qcFloat(machine, entityIndex, "currentammo", player.ammo))
+  player.shells = native.trunc(qcFloat(machine, entityIndex, "ammo_shells", player.shells))
+  player.nails = native.trunc(qcFloat(machine, entityIndex, "ammo_nails", player.nails))
+  player.rockets = native.trunc(qcFloat(machine, entityIndex, "ammo_rockets", player.rockets))
+  player.cells = native.trunc(qcFloat(machine, entityIndex, "ammo_cells", player.cells))
+  player.items = native.trunc(qcFloat(machine, entityIndex, "items", player.items))
+  player.activeWeapon = native.trunc(qcFloat(machine, entityIndex, "weapon", player.activeWeapon))
+  player.weaponFrame = native.trunc(qcFloat(machine, entityIndex, "weaponframe", player.weaponFrame))
+  weaponModel = qcString(machine, entityIndex, "weaponmodel", "")
   if weaponModel == "" then player.weapon = 0 else player.weapon = modelIndex(server, weaponModel) end if
-  player.moveType = native.trunc(qcFloat(server.machine, entityIndex, "movetype", player.moveType))
-  player.flags = native.trunc(qcFloat(server.machine, entityIndex, "flags", player.flags))
+  player.moveType = native.trunc(qcFloat(machine, entityIndex, "movetype", player.moveType))
+  player.flags = native.trunc(qcFloat(machine, entityIndex, "flags", player.flags))
   player.onGround = (player.flags & c.FL_ONGROUND) != 0
-  player.groundEntity = qcWord(server.machine, entityIndex, "groundentity", player.groundEntity)
-  player.waterLevel = native.trunc(qcFloat(server.machine, entityIndex, "waterlevel", player.waterLevel))
-  player.waterType = native.trunc(qcFloat(server.machine, entityIndex, "watertype", player.waterType))
-  player.fixAngle = qcFloat(server.machine, entityIndex, "fixangle", 0.0) != 0.0
-  player.teleportTime = qcFloat(server.machine, entityIndex, "teleport_time", player.teleportTime)
-  player.deadFlag = native.trunc(qcFloat(server.machine, entityIndex, "deadflag", player.deadFlag))
+  player.groundEntity = qcWord(machine, entityIndex, "groundentity", player.groundEntity)
+  player.waterLevel = native.trunc(qcFloat(machine, entityIndex, "waterlevel", player.waterLevel))
+  player.waterType = native.trunc(qcFloat(machine, entityIndex, "watertype", player.waterType))
+  player.fixAngle = qcFloat(machine, entityIndex, "fixangle", 0.0) != 0.0
+  player.teleportTime = qcFloat(machine, entityIndex, "teleport_time", player.teleportTime)
+  player.deadFlag = native.trunc(qcFloat(machine, entityIndex, "deadflag", player.deadFlag))
   player.noclip = player.moveType == c.MOVETYPE_NOCLIP
   return true
 end function

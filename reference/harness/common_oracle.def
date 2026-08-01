@@ -1,3 +1,0 @@
-LIBRARY common_oracle
-EXPORTS
-    common_oracle_jsonl

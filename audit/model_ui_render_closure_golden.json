@@ -1,0 +1,20 @@
+{
+  "alias_shadedot_quant": 16,
+  "alias_sprite_passes": 2,
+  "contract_fingerprint": 174257585,
+  "evidence_sample_grid": 16,
+  "evidence_schema": 1,
+  "evidence_ssim_milli": 950,
+  "fixtures": 24,
+  "max_visible_entities": 256,
+  "normal_overlay_stages": 11,
+  "oracle_sha256": "afb5f755925866acfed7210a053c8a5de52dddddeec640073bf9655b9794dbab",
+  "parents": [
+    "client_render_109_frozen_v1",
+    "world_render_109_frozen_v1"
+  ],
+  "sprite_sync_modes": 2,
+  "status": "model_ui_render_109_frozen_v1",
+  "tga_bits_per_pixel": 24,
+  "viewmodel_depth_milli": 300
+}

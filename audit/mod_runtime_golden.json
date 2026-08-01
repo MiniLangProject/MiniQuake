@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "status": "mod_runtime_109_frozen_v1",
+  "fingerprint": "0x4649813d",
+  "contract_text": "mod-runtime|progs-v6|bsp-v29|id1-required|rogue-optional|hipnotic-optional|integrated-host",
+  "fixtures": 22,
+  "progs_version": 6,
+  "bsp_version": 29,
+  "required_games": [
+    "id1"
+  ],
+  "optional_games": [
+    "rogue",
+    "hipnotic"
+  ]
+}

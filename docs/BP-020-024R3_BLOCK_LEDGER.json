@@ -1,0 +1,205 @@
+{
+  "schema": "MiniQuakeBlackPortBlockLedger/1",
+  "block_id": "BP-020-024",
+  "parent_package_id": "BP-015-019R1",
+  "final_package_id": "BP-024R3",
+  "protocol_status": "protocol15_frozen_v1",
+  "quakec_status": "quakec_109_frozen_v1",
+  "steps": [
+    {
+      "package_id": "BP-020",
+      "title": "progs.dat ABI, semantic validation and runtime CRC",
+      "patch": "patches/BP-020.diff",
+      "runtime_fixture": "MiniQuakeQuakeCProgsTests.exe",
+      "fixture_count": 18,
+      "status": "R2 Windows 18/18 PASS; stock qcc storage and installed game validation confirmed"
+    },
+    {
+      "package_id": "BP-021",
+      "title": "QuakeC VM byte, Binary32, stack and pointer parity",
+      "patch": "patches/BP-021.diff",
+      "runtime_fixture": "MiniQuakeQuakeCVMTests.exe",
+      "fixture_count": 16,
+      "status": "R2 Windows 16/16 PASS"
+    },
+    {
+      "package_id": "BP-022",
+      "title": "Edict parsing, Epair semantics and save-text parity",
+      "patch": "patches/BP-022.diff",
+      "runtime_fixture": "MiniQuakeQuakeCEdictTests.exe",
+      "fixture_count": 22,
+      "status": "R2 Windows 21/22; exact-size Quake-byte ED_Write/save serializer implemented in R3; awaiting Windows acceptance"
+    },
+    {
+      "package_id": "BP-023",
+      "title": "Builtin table, temporary strings, random and formatting parity",
+      "patch": "patches/BP-023.diff",
+      "runtime_fixture": "MiniQuakeQuakeCBuiltinTests.exe",
+      "fixture_count": 22,
+      "status": "R2 Windows 22/22 PASS"
+    },
+    {
+      "package_id": "BP-024",
+      "title": "Stock QuakeC 1.09 closure and frozen compatibility contract",
+      "patch": "patches/BP-024.diff",
+      "runtime_fixture": "MiniQuakeQuakeCClosureTests.exe",
+      "fixture_count": 20,
+      "stock_fixture": "MiniQuakeQuakeCStockTests.exe",
+      "status": "R2 Windows 20/20 PASS; stock id1/progs.dat, game validation, 300 frames and deterministic traces PASS; awaiting cumulative R3 acceptance"
+    }
+  ],
+  "block_runtime_fixtures": 98,
+  "stock_runtime_gates": 1,
+  "acceptance": {
+    "build_once": true,
+    "continue_independent_tests": true,
+    "deterministic_trace_processes": 2,
+    "default_headless_frames": 300,
+    "default_trace_frames": 128,
+    "udp_loopback": true,
+    "stock_progs_dat": true,
+    "original_quake_binary_interop": "not required for this source-guided QuakeC block"
+  },
+  "accepted_parent": {
+    "delivery_revision": "BP-015-019R1",
+    "status": "PASS",
+    "result_archive": "MiniQuake_BP-015-019R1_RESULTS_20260725-182626.zip",
+    "result_archive_sha256": "f9653da642c897049302159a87528184f2381704d3b6ce965a0722c58608870b",
+    "acceptance_steps": "40/40 PASS",
+    "headless_frames": 300,
+    "trace_frames": 128,
+    "trace_sha256": "635b830d00997026fab868ab135e66062a367ef2855a103be38d96a7c04a3ddd",
+    "trace_rolling_hash": "58a7d245",
+    "udp_loopback": "PASS"
+  },
+  "logical_final_package_id": "BP-024",
+  "delivery_revision": "BP-020-024R3",
+  "revision_parent": "BP-020-024R2",
+  "initial_windows_result": {
+    "delivery_revision": "BP-020-024",
+    "result_archive": "MiniQuake_BP-020-024_RESULTS_20260725-201735.zip",
+    "result_archive_sha256": "91797f541fbcbe83bd304bcb1d3fcc02551ac6d2c51dce451abda5cc6ac1d5b8",
+    "status": "FAIL",
+    "build": "PASS; game plus 19 test executables compiled",
+    "independent_failures": [
+      "BASE core: stale large synthetic progs.dat omitted mandatory first NUL string",
+      "BP-021 VM fixture: builtin #1 was installed at array slot 0",
+      "BP-022 edict fixture/serialization: source literal -0.0 lost its raw sign and ED_Write hit a void concatenation boundary"
+    ],
+    "installed_game_validation": "FAIL exit 2; native stdout was not captured by the initial runner",
+    "parent_protocol_regressions": "all PASS"
+  },
+  "r1_corrections": {
+    "package_id": "BP-024R1",
+    "delivery_revision": "BP-020-024R1",
+    "source_changes": [
+      "accept qcc builtin functions with declared parameters and zero local storage",
+      "serialize QuakeC floats from raw words, including negative zero",
+      "use compiler-safe stepwise ED_Write and savegame quoted-pair formatting"
+    ],
+    "fixture_changes": [
+      "large synthetic progs.dat now contains the mandatory NUL string entry",
+      "builtin #1 test installs an explicit slot-zero placeholder",
+      "negative-zero fixture is constructed from raw word 0x80000000"
+    ],
+    "runner_changes": [
+      "stock progs.dat, installed game validation and runtime validation run as independent logged gates",
+      "native game-validation output is preserved in the result archive"
+    ],
+    "status": "implemented; partially confirmed by R1 Windows run; superseded by R2 for stock-qcc and ED_Write fixes"
+  },
+  "r1_windows_result": {
+    "delivery_revision": "BP-020-024R1",
+    "result_archive": "MiniQuake_BP-020-024R1_RESULTS_20260725-214138.zip",
+    "result_archive_sha256": "3936e942473029af1cdf2dad784919e45fc34c3ba8b91bdf06f2328f4e7468e1",
+    "status": "FAIL",
+    "acceptance_steps": "37/42 PASS",
+    "build": "PASS; game plus 19 test executables compiled",
+    "parent_protocol_regressions": "all PASS",
+    "bp020": "18/18 PASS",
+    "bp021": "16/16 PASS",
+    "bp022": "21/22; ED_Write void string concatenation",
+    "bp023": "22/22 PASS",
+    "bp024": "20/20 PASS",
+    "stock_progs": "FAIL: parameters exceed locals in function SUB_AttackFinished",
+    "game_validation": "FAIL at progs.dat for the same reason",
+    "headless_runtime": "FAIL at Host_Init for the same reason",
+    "trace_a": "0/128 frames; last_stage=before_filter; exit 3"
+  },
+  "r2_corrections": {
+    "package_id": "BP-024R2",
+    "delivery_revision": "BP-020-024R2",
+    "source_changes": [
+      "separate loader-level progs.dat validation from the explicit strict audit",
+      "remove the false parameterWords <= locals invariant and check the actual parameter destination in globals",
+      "serialize edict/global/save values before checked stepwise quoted-pair appends"
+    ],
+    "fixture_changes": [
+      "accept bytecode functions with parameters and zero locals when parameter storage is in range",
+      "reject only parameter destinations that extend beyond globals",
+      "verify exact ED_Write, ED_WriteGlobals and savegame output and reject void before concatenation"
+    ],
+    "protocol_freeze_changed": false,
+    "quakec_contract_fingerprint": "0xbc89cbf1",
+    "status": "implemented; all R2 production/runtime gates confirmed on Windows except BP-022 synthetic ED_Write fixture"
+  },
+  "r2_windows_result": {
+    "delivery_revision": "BP-020-024R2",
+    "result_archive": "MiniQuake_BP-020-024R2_RESULTS_20260725-224602.zip",
+    "result_archive_sha256": "fec22c41880ff1d34a66f0e254281e5d72777db5a19f0feb60f077deeedae060",
+    "status": "FAIL; 51/52 independent acceptance groups PASS",
+    "build": "PASS; game plus all 19 test executables compiled",
+    "base_core_and_milestones": "PASS",
+    "parent_protocol_regressions": "all PASS",
+    "bp020": "18/18 PASS",
+    "bp021": "16/16 PASS",
+    "bp022": "21/22; ED_Write raised Cannot stringify void for string concatenation",
+    "bp023": "22/22 PASS",
+    "bp024": "20/20 PASS",
+    "stock_progs": "PASS; 20940 statements, 2091 functions, 11471 globals, max builtin 78",
+    "game_validation": "PASS",
+    "headless_runtime": "300 frames PASS",
+    "deterministic_trace": "two 128-frame traces byte-identical",
+    "trace_sha256": "2efa7130b9dacabb1c463d35c903f1e8f8b3e24feeca27b649d1211a6fc62c17",
+    "trace_rolling_hash": "58a7d245",
+    "udp_loopback": "PASS"
+  },
+  "r3_corrections": {
+    "package_id": "BP-024R3",
+    "delivery_revision": "BP-020-024R3",
+    "source_changes": [
+      "replace growing ED_Write/ED_WriteGlobals strings with an exact-size two-pass Quake-byte serializer",
+      "share the serializer with savegame ED_Write and saveglobal output",
+      "preserve Quake one-byte text through quake_latin1_cstring_v1 and decode only the completed document",
+      "preserve original ED_WriteGlobals emission of eligible DEF_SAVEGLOBAL entries even when their stored value is zero"
+    ],
+    "fixture_changes": [
+      "preserve the existing 22 BP-022 fixtures while adding exact 0xe9 Quake-byte output checks",
+      "classify non-string ED_Write/savegame returns directly instead of failing inside assertion concatenation",
+      "retain cumulative appendQuotedPair coverage as an isolated compatibility helper",
+      "verify zero float, empty string and entity zero are emitted by ED_WriteGlobals and savegame output"
+    ],
+    "protocol_freeze_changed": false,
+    "quakec_contract_fingerprint": "0xbc89cbf1",
+    "status": "Windows accepted"
+  },
+  "r3_windows_result": {
+    "delivery_revision": "BP-020-024R3",
+    "result_archive": "MiniQuake_BP-020-024R3_RESULTS_20260725-233340.zip",
+    "result_archive_sha256": "d9fa5aa62854a8c9b5175c2d8aa789e49516c530ded3294b5f7a5515467e820f",
+    "status": "PASS",
+    "build": "PASS",
+    "bp020": "18/18 PASS",
+    "bp021": "16/16 PASS",
+    "bp022": "22/22 PASS",
+    "bp023": "22/22 PASS",
+    "bp024": "20/20 PASS",
+    "stock_progs": "PASS",
+    "game_validation": "PASS",
+    "headless_runtime": "300 frames PASS",
+    "trace_frames": 128,
+    "trace_sha256": "28fb377c9d694ed7ac14dac1d7110fa6fcb6cdcd2ffdf8a3c7cdbad3ffefe5cd",
+    "trace_rolling_hash": "58a7d245",
+    "udp_loopback": "PASS"
+  }
+}

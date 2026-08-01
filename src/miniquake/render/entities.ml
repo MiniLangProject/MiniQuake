@@ -11,6 +11,7 @@ import miniquake.array_util as arrayutil
 import miniquake.mathlib as math
 import miniquake.render.alias_mesh as aliasMesh
 import miniquake.render.draw2d as draw2d
+import miniquake.render_ui_contract as renderUiContract
 
 const MODEL_NONE = 0
 const MODEL_BRUSH = 1
@@ -263,7 +264,7 @@ function spriteFrameAndTexture(model, entity, time)
   frameSet = source.frames[frameIndex]
   if len(frameSet.frames) == 0 then return void end if
   groupIndex = 0
-  if frameSet.grouped then groupIndex = cycleIndex(frameSet.intervals, time, len(frameSet.frames)) end if
+  if frameSet.grouped then groupIndex = cycleIndex(frameSet.intervals, time + entity.syncBase, len(frameSet.frames)) end if
   frame = frameSet.frames[groupIndex]
   texture = 0
   if frameIndex < len(model.textureIds) then
@@ -309,6 +310,9 @@ function drawAlias(renderer, model, entity, time, viewModel)
   source = model.aliasModel
   frame = aliasFrame(source, entity.frame, time)
   if frame is void then return 0 end if
+  // R_DrawAliasModel starts from texture unit zero even when the world pass
+  // used multitexturing immediately before the entity pass.
+  worldRenderer.GL_DisableMultitexture()
   skin = entity.skin
   if skin < 0 or skin >= len(model.textureIds) then skin = 0 end if
   texture = 0
@@ -363,7 +367,7 @@ function drawAlias(renderer, model, entity, time, viewModel)
     gl.disable(gl.GL_TEXTURE_2D)
     gl.enable(gl.GL_BLEND)
     gl.color(0, 0, 0, 128)
-    aliasMesh.GL_DrawAliasShadow(source, frame)
+    aliasMesh.GL_DrawAliasShadowAtOrigin(source, frame, entity.origin.z)
     gl.enable(gl.GL_TEXTURE_2D)
     gl.disable(gl.GL_BLEND)
     gl.color(255, 255, 255, 255)
@@ -374,6 +378,8 @@ end function
 
 function drawSprite(renderer, model, entity, viewRight, viewUp, time)
   uploadSprite(renderer, model)
+  // R_DrawSpriteModel has the same texture-unit-zero precondition.
+  worldRenderer.GL_DisableMultitexture()
   selected = spriteFrameAndTexture(model, entity, time)
   if selected is void then return 0 end if
   frame = selected[0]
@@ -469,7 +475,7 @@ function drawBrush(worldRendererValue, model, entity)
   return submodel.numFaces
 end function
 
-function render(renderer, worldRendererValue, entities, viewEntity, viewRight, viewUp, time)
+function renderSubmitted(renderer, worldRendererValue, entities, hiddenEntityNumber, viewRight, viewUp, time)
   rendered = 0
   // R_DrawEntitiesOnList renders opaque alias/brush models first and performs
   // a second pass for alpha-tested sprites.  Keeping the passes separate is
@@ -477,7 +483,7 @@ function render(renderer, worldRendererValue, entities, viewEntity, viewRight, v
   index = 0
   while index < len(entities)
     entity = entities[index]
-    if entity is not void and entity.number != viewEntity and entity.modelIndex > 0 and entity.modelIndex < len(renderer.models) then
+    if entity is not void and (hiddenEntityNumber is void or entity.number != hiddenEntityNumber) and entity.modelIndex > 0 and entity.modelIndex < len(renderer.models) then
       model = renderer.models[entity.modelIndex]
       if model.kind == MODEL_BRUSH then
         drawBrush(worldRendererValue, model, entity)
@@ -492,7 +498,7 @@ function render(renderer, worldRendererValue, entities, viewEntity, viewRight, v
   index = 0
   while index < len(entities)
     entity = entities[index]
-    if entity is not void and entity.number != viewEntity and entity.modelIndex > 0 and entity.modelIndex < len(renderer.models) then
+    if entity is not void and (hiddenEntityNumber is void or entity.number != hiddenEntityNumber) and entity.modelIndex > 0 and entity.modelIndex < len(renderer.models) then
       model = renderer.models[entity.modelIndex]
       if model.kind == MODEL_SPRITE then
         drawSprite(renderer, model, entity, viewRight, viewUp, time)
@@ -503,6 +509,10 @@ function render(renderer, worldRendererValue, entities, viewEntity, viewRight, v
   end while
   renderer.renderedEntities = rendered
   return rendered
+end function
+
+function render(renderer, worldRendererValue, entities, viewEntity, viewRight, viewUp, time)
+  return renderSubmitted(renderer, worldRendererValue, entities, viewEntity, viewRight, viewUp, time)
 end function
 
 // R_DrawViewModel / V_CalcRefdef. The gun is a normal alias model drawn
@@ -518,6 +528,13 @@ function renderViewModel(renderer, player, view, time)
   if not view.viewModelVisible then return 0 end if
   gunOrigin = math.copy(view.gunOrigin)
   gunAngles = math.copy(view.gunAngles)
+  messageOrigin = math.copy(gunOrigin)
+  previousMessageOrigin = math.copy(gunOrigin)
+  messageAngles = math.copy(gunAngles)
+  previousMessageAngles = math.copy(gunAngles)
+  baselineOrigin = math.copy(gunOrigin)
+  baselineAngles = math.copy(gunAngles)
+  baseline = [player.weapon, player.weaponFrame, 0, 0, baselineOrigin, baselineAngles, 0]
   entity = t.ClientEntityState(
     0,
     player.weapon,
@@ -528,14 +545,15 @@ function renderViewModel(renderer, player, view, time)
     gunOrigin,
     gunAngles,
     time,
-    math.copy(gunOrigin),
-    math.copy(gunOrigin),
-    math.copy(gunAngles),
-    math.copy(gunAngles),
+    messageOrigin,
+    previousMessageOrigin,
+    messageAngles,
+    previousMessageAngles,
     true,
-    [player.weapon, player.weaponFrame, 0, 0, math.copy(gunOrigin), math.copy(gunAngles), 0],
+    baseline,
+    0.0,
   )
-  gl.depthRange(0.0, 0.3)
+  gl.depthRange(0.0, renderUiContract.viewModelDepthMaximum())
   result = drawAlias(renderer, model, entity, time, true)
   gl.depthRange(0.0, 1.0)
   return result

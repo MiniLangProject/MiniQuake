@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "revision": "BP-060-064R4",
+  "parent": "BP-060-064R3",
+  "predecessor_result": {
+    "archive": "MiniQuake_BP-060-064R3_RESULTS_20260729-082542.zip",
+    "sha256": "a382fdf0ed5faeefbc636e5623bfaa819829b3da0a78e1f038002e96ef2d7033",
+    "status": "FAIL in inherited BP-001R3 diagnostics, 5/10",
+    "core_tests": "16/16 PASS",
+    "milestone_tests": "24/24 PASS",
+    "first_failure": "player origin expected Vec3, got miniquake.types.Vec3"
+  },
+  "root_cause": "typeName returns package-qualified names for packaged structs; R3 guards accepted only the short Vec3 spelling",
+  "corrections": [
+    "shared concrete type-name matcher accepts short and package-qualified names",
+    "all deterministic Vec3 guards use the shared matcher",
+    "forced-GC fixture uses semantic Vec3 matching",
+    "remaining packaged-struct short-name comparisons in render compatibility paths normalized"
+  ],
+  "production_source_changed": true,
+  "native_source_changed": false,
+  "engine_contracts_changed": false,
+  "runtime_fixture_count_changed": false,
+  "diagnostics_fixture_count": 10,
+  "network_platform_status": "network_platform_109_frozen_v1",
+  "network_platform_fingerprint": "0xb3ec7589",
+  "windows_acceptance": "pending"
+}

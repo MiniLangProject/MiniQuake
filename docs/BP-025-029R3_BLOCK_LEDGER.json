@@ -1,0 +1,246 @@
+{
+  "schema": "MiniQuakeBlackPortBlockLedger/1",
+  "block_id": "BP-025-029",
+  "parent_package_id": "BP-024R3",
+  "final_package_id": "BP-029",
+  "delivery_revision": "BP-025-029R3",
+  "protocol_status": "protocol15_frozen_v1",
+  "quakec_status": "quakec_109_frozen_v1",
+  "world_physics_status": "world_physics_109_frozen_v1",
+  "world_physics_fingerprint": "0x2235d77c",
+  "steps": [
+    {
+      "package_id": "BP-025",
+      "title": "box hull and world-space trace parity",
+      "patch": "patches/BP-025.diff",
+      "runtime_fixtures": [
+        {
+          "executable": "MiniQuakeWorldHullTests.exe",
+          "count": 14
+        },
+        {
+          "executable": "MiniQuakeWorldTraceTests.exe",
+          "count": 10
+        }
+      ],
+      "status": "Windows accepted"
+    },
+    {
+      "package_id": "BP-026",
+      "title": "entity linking and collision filtering",
+      "patch": "patches/BP-026.diff",
+      "runtime_fixtures": [
+        {
+          "executable": "MiniQuakeWorldLinkTests.exe",
+          "count": 15
+        }
+      ],
+      "status": "Windows accepted"
+    },
+    {
+      "package_id": "BP-027",
+      "title": "monster stepping and chase movement",
+      "patch": "patches/BP-027.diff",
+      "runtime_fixtures": [
+        {
+          "executable": "MiniQuakeServerMoveTests.exe",
+          "count": 14
+        }
+      ],
+      "status": "Windows accepted"
+    },
+    {
+      "package_id": "BP-028",
+      "title": "strict server physics and client movement",
+      "patch": "patches/BP-028.diff",
+      "runtime_fixtures": [
+        {
+          "executable": "MiniQuakeServerPhysicsTests.exe",
+          "count": 18
+        },
+        {
+          "executable": "MiniQuakeSvUserMovementTests.exe",
+          "count": 16
+        }
+      ],
+      "status": "Windows accepted"
+    },
+    {
+      "package_id": "BP-029",
+      "title": "server-user path, integrated production dispatch and world/physics closure",
+      "patch": "patches/BP-029.diff",
+      "runtime_fixtures": [
+        {
+          "executable": "MiniQuakeServerUserTests.exe",
+          "count": 18
+        },
+        {
+          "executable": "MiniQuakeWorldPhysicsClosureTests.exe",
+          "count": 20
+        }
+      ],
+      "status": "Windows accepted"
+    }
+  ],
+  "block_runtime_fixtures": 125,
+  "production_integration": {
+    "shared_nonclient_dispatch": "physics.SV_Physics_NonClientEntity",
+    "world_entity_zero": true,
+    "force_retouch_order": "entity order; decrement once after frame",
+    "strict_profile": "unconditioned WinQuake/GLQuake 1.09"
+  },
+  "acceptance": {
+    "build_once": true,
+    "continue_independent_tests": true,
+    "deterministic_trace_processes": 2,
+    "default_headless_frames": 300,
+    "default_trace_frames": 128,
+    "udp_loopback": true,
+    "installed_game_validation": true
+  },
+  "accepted_parent": {
+    "delivery_revision": "BP-020-024R3",
+    "status": "PASS",
+    "result_archive": "MiniQuake_BP-020-024R3_RESULTS_20260725-233340.zip",
+    "result_archive_sha256": "d9fa5aa62854a8c9b5175c2d8aa789e49516c530ded3294b5f7a5515467e820f",
+    "headless_frames": 300,
+    "trace_frames": 128,
+    "trace_sha256": "28fb377c9d694ed7ac14dac1d7110fa6fcb6cdcd2ffdf8a3c7cdbad3ffefe5cd",
+    "trace_rolling_hash": "58a7d245",
+    "udp_loopback": "PASS"
+  },
+  "delivery_parent": "BP-025-029R2",
+  "delivery_hotfix": {
+    "revision": "BP-025-029R3",
+    "parent": "BP-025-029R2",
+    "result_archive": "MiniQuake_BP-025-029R2_RESULTS_20260726-101120.zip",
+    "result_archive_sha256": "b036b509ec770e20407eda763978f32cdda5009d5651369c2916ebe76e9365dc",
+    "corrections": [
+      "correct synthetic hull0 drawing-node child order to SOLID then EMPTY",
+      "bind wire byte 0x80 to signed MSG_ReadAngle result -180 degrees",
+      "normalize accepted client-command result after successful void-style dispatch",
+      "derive expected ping from the decoded Binary32 client timestamp",
+      "validate algorithmic box-hull node bounds through pointContentsFromNode rather than Hull.nodes"
+    ],
+    "production_source_changed": true,
+    "production_source_scope": "one command-dispatch acceptance normalization in src/miniquake/sv_user.ml",
+    "runtime_fixture_counts_changed": false,
+    "world_physics_fingerprint": "0x2235d77c",
+    "status": "awaiting Windows acceptance"
+  },
+  "delivery_hotfixes": [
+    {
+      "package_id": "BP-029R1",
+      "title": "test-entry import alias closure repair",
+      "patch": "patches/BP-029R1.diff",
+      "production_source_changed": false,
+      "runtime_fixture_counts_changed": false,
+      "changes": [
+        "renamed miniquake.world_bsp test alias from bsp to bspworld",
+        "renamed miniquake.server_move closure-test alias from movement to serverMovement",
+        "added transitive MiniLang import-alias closure verification"
+      ]
+    },
+    {
+      "package_id": "BP-029R2",
+      "title": "world-hull closure member repair",
+      "patch": "patches/BP-029R2.diff",
+      "production_source_changed": false,
+      "runtime_fixture_counts_changed": false,
+      "changes": [
+        "replaced nonexistent world_hull.pointContents with pointContentsFromNode",
+        "bound the closure fixture to start node zero",
+        "added a pre-codegen exported-member contract for the repaired call"
+      ]
+    },
+    {
+      "package_id": "BP-029R3",
+      "title": "Windows runtime parity fixture and command-dispatch repair",
+      "patch": "patches/BP-029R3.diff",
+      "production_source_changed": true,
+      "runtime_fixture_counts_changed": false,
+      "changes": [
+        "correct synthetic hull0 drawing-node child order to SOLID then EMPTY",
+        "bind wire byte 0x80 to signed MSG_ReadAngle result -180 degrees",
+        "normalize accepted client-command result after successful void-style dispatch",
+        "derive expected ping from the decoded Binary32 client timestamp",
+        "validate algorithmic box-hull node bounds through pointContentsFromNode rather than Hull.nodes"
+      ]
+    }
+  ],
+  "initial_delivery_result": {
+    "delivery_revision": "BP-025-029",
+    "status": "FAIL",
+    "result_archive": "MiniQuake_BP-025-029_RESULTS_20260726-010226.zip",
+    "result_archive_sha256": "40282cedd6a11449b85272e50bec3fba98f75eea0e73bd9c0b63e40db7710549",
+    "failure_stage": "single cumulative Windows build",
+    "first_failure": "world-trace-tests import alias bsp refers to multiple packages",
+    "compiled_before_failure": [
+      "MiniQuake.exe",
+      "MiniQuakeTests.exe",
+      "MiniQuakeMilestoneTests.exe",
+      "MiniQuakeCompatTraceTests.exe",
+      "MiniQuakeProtocol15WireTests.exe",
+      "MiniQuakeProtocol15CommandTests.exe",
+      "MiniQuakeProtocol15ServerDataTests.exe",
+      "MiniQuakeProtocol15EventTests.exe",
+      "MiniQuakeProtocol15RuntimeEventTests.exe",
+      "MiniQuakeProtocol15SignonTests.exe",
+      "MiniQuakeProtocol15DeliveryTests.exe",
+      "MiniQuakeProtocol15DatagramTests.exe",
+      "MiniQuakeProtocol15DemoTests.exe",
+      "MiniQuakeProtocol15ClosureTests.exe",
+      "MiniQuakeQuakeCProgsTests.exe",
+      "MiniQuakeQuakeCVMTests.exe",
+      "MiniQuakeQuakeCEdictTests.exe",
+      "MiniQuakeQuakeCBuiltinTests.exe",
+      "MiniQuakeQuakeCClosureTests.exe",
+      "MiniQuakeQuakeCStockTests.exe",
+      "MiniQuakeWorldHullTests.exe"
+    ]
+  },
+  "r1_delivery_result": {
+    "delivery_revision": "BP-025-029R1",
+    "status": "FAIL during final cumulative compile target",
+    "result_archive": "MiniQuake_BP-025-029R1_RESULTS_20260726-015350.zip",
+    "result_archive_sha256": "08f1dfb4ee1cd0e703b94177f02334a1a0a3f68cf152e6e8412b0b6ea02dd9af",
+    "static_verifier": "34/34 PASS",
+    "compiled_executables": "27/28",
+    "failure_target": "MiniQuakeWorldPhysicsClosureTests.exe",
+    "failure": "Undefined variable 'hull' while resolving nonexistent world_hull.pointContents member",
+    "runtime_gates": "not reached"
+  },
+  "r2_delivery_result": {
+    "delivery_revision": "BP-025-029R2",
+    "status": "FAIL; 63/67 independent groups passed",
+    "result_archive": "MiniQuake_BP-025-029R2_RESULTS_20260726-101120.zip",
+    "result_archive_sha256": "b036b509ec770e20407eda763978f32cdda5009d5651369c2916ebe76e9365dc",
+    "build": "PASS; all targets compiled",
+    "historical_protocol_quakec": "PASS",
+    "installed_game_validation": "PASS",
+    "headless_runtime": "300 frames PASS",
+    "trace_frames": 128,
+    "trace_sha256": "24830a3e183784de44a9c7261a42cc8e5aebf8fd1c8fdbafc32ea447ee0eba9f",
+    "trace_rolling_hash": "4d8fc98d",
+    "trace_byte_identity": "PASS",
+    "udp_loopback": "PASS",
+    "failures": [
+      "BP-025 translated brush fixture used reversed hull0 drawing-node children",
+      "BP-028 MSG_ReadAngle signed-byte fixture expected +180 instead of -180",
+      "BP-029 allowed command adapter used handler convenience return as acceptance result",
+      "BP-029 ping fixture skipped the protocol Binary32 decode boundary",
+      "BP-029 closure fixture accessed nonexistent Hull.nodes"
+    ]
+  },
+  "accepted_delivery_result": {
+    "status": "PASS",
+    "result_archive": "MiniQuake_BP-025-029R3_RESULTS_20260726-115205.zip",
+    "result_archive_sha256": "518b080fe6dbb69d10c5395a7d96ad0c9cbab585b0054a6e810ca762da88c556",
+    "headless_frames": 300,
+    "trace_frames": 128,
+    "trace_sha256": "24830a3e183784de44a9c7261a42cc8e5aebf8fd1c8fdbafc32ea447ee0eba9f",
+    "trace_rolling_hash": "4d8fc98d",
+    "udp_loopback": "PASS"
+  },
+  "status": "PASS; world_physics_109_frozen_v1 accepted on Windows"
+}

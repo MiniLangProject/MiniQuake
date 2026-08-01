@@ -132,6 +132,12 @@ function signedByte(value)
   return value
 end function
 
+function soundI32(value)
+  result = value & 0xffffffff
+  if result >= 0x80000000 then result = result - 0x100000000 end if
+  return result
+end function
+
 function clamp16(value)
   if value > 32767 then return 32767 end if
   if value < -32768 then return -32768 end if
@@ -155,7 +161,7 @@ function Snd_WriteLinearBlastStereo16(state)
   index = 0
   while index < state.linearCount
     sample = state.paintBuffer[state.linearSource + index]
-    value = (sample * state.transferVolume) >> 8
+    value = soundI32(sample * state.transferVolume) >> 8
     bio.putI16(state.dma.buffer, (state.linearOutput + index) * 2, clamp16(value))
     index = index + 1
   end while
@@ -196,7 +202,7 @@ function S_TransferPaintBuffer(state, endTime)
   transferVolume = native.trunc(state.volume * 256.0)
   written = 0
   while written < count
-    value = (state.paintBuffer[sourceIndex] * transferVolume) >> 8
+    value = soundI32(state.paintBuffer[sourceIndex] * transferVolume) >> 8
     value = clamp16(value)
     if state.dma.sampleBits == 16 then
       bio.putI16(state.dma.buffer, outputIndex * 2, value)
@@ -218,8 +224,8 @@ function SND_PaintChannelFrom8(state, channel, cache, count)
   index = 0
   while index < count
     source = cache.data[channel.position + index]
-    state.paintBuffer[index * 2] = state.paintBuffer[index * 2] + state.scaleTable[leftRow + source]
-    state.paintBuffer[index * 2 + 1] = state.paintBuffer[index * 2 + 1] + state.scaleTable[rightRow + source]
+    state.paintBuffer[index * 2] = soundI32(state.paintBuffer[index * 2] + state.scaleTable[leftRow + source])
+    state.paintBuffer[index * 2 + 1] = soundI32(state.paintBuffer[index * 2 + 1] + state.scaleTable[rightRow + source])
     index = index + 1
   end while
   channel.position = channel.position + count
@@ -230,10 +236,10 @@ function SND_PaintChannelFrom16(state, channel, cache, count)
   index = 0
   while index < count
     sample = bio.i16(cache.data, (channel.position + index) * 2)
-    left = (sample * channel.leftVolume) >> 8
-    right = (sample * channel.rightVolume) >> 8
-    state.paintBuffer[index * 2] = state.paintBuffer[index * 2] + left
-    state.paintBuffer[index * 2 + 1] = state.paintBuffer[index * 2 + 1] + right
+    left = soundI32(sample * channel.leftVolume) >> 8
+    right = soundI32(sample * channel.rightVolume) >> 8
+    state.paintBuffer[index * 2] = soundI32(state.paintBuffer[index * 2] + left)
+    state.paintBuffer[index * 2 + 1] = soundI32(state.paintBuffer[index * 2 + 1] + right)
     index = index + 1
   end while
   channel.position = channel.position + count

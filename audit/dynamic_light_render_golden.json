@@ -1,0 +1,50 @@
+{
+  "schema": "MiniQuakeDynamicLightRenderGolden/1",
+  "package_id": "BP-042",
+  "parent_package_id": "BP-041",
+  "sources": [
+    "gl_rmain.c",
+    "gl_rsurf.c",
+    "gl_rlight.c",
+    "gl_warp.c",
+    "gl_refrag.c"
+  ],
+  "rows": [
+    {
+      "name": "active_at_deadline",
+      "value": 1
+    },
+    {
+      "name": "expired_before_deadline",
+      "value": 0
+    },
+    {
+      "name": "zero_radius_inactive",
+      "value": 1
+    },
+    {
+      "name": "push_target_frame_delta",
+      "value": 1
+    },
+    {
+      "name": "max_dlight_bits",
+      "value": 32
+    },
+    {
+      "name": "brush_root_marking",
+      "value": 1
+    },
+    {
+      "name": "frame_order_push_animate_advance",
+      "value": 1
+    },
+    {
+      "name": "fixtures",
+      "value": 20
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/dynamic_light_render_oracle.c",
+    "oracle_sha256": "5d62cbebf8d4f342e7fbee9401762380d194eb5e43c7691fc26e8019df6f0071"
+  }
+}

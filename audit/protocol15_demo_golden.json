@@ -1,0 +1,77 @@
+{
+  "schema": "MiniQuakeProtocol15DemoGolden/1",
+  "package_id": "BP-018",
+  "parent_package_id": "BP-017",
+  "protocol_version": 15,
+  "sources": [
+    "cl_demo.c",
+    "cl_main.c",
+    "host.c"
+  ],
+  "rows": [
+    {
+      "kind": "case",
+      "name": "atoi_decimal_suffix",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "atoi_no_digits",
+      "value": 0
+    },
+    {
+      "kind": "case",
+      "name": "atoi_whitespace_sign",
+      "value": -12
+    },
+    {
+      "kind": "case",
+      "name": "atoi_plus",
+      "value": 7
+    },
+    {
+      "kind": "case",
+      "name": "isolated_nop_filtered",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "multi_byte_nop_retained",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "stop_disconnect_opcode",
+      "value": 2
+    },
+    {
+      "kind": "case",
+      "name": "max_message_accepted",
+      "value": 8000
+    },
+    {
+      "kind": "case",
+      "name": "timedemo_first_frame_excluded",
+      "value": 10
+    },
+    {
+      "kind": "case",
+      "name": "playback_whitespace_track",
+      "value": -1758
+    },
+    {
+      "kind": "case",
+      "name": "map_before_demo_open",
+      "value": 1
+    },
+    {
+      "kind": "vector",
+      "name": "single_frame",
+      "hex": "340a030000000000803f000020c00000b442010203"
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/protocol15_demo_oracle.c",
+    "oracle_sha256": "15ceb2120be675cb107053352e04efb69a371570d535cc1e940611bfcb96a2e7"
+  }
+}

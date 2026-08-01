@@ -13,6 +13,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See COPYING.
 */
 
 import miniquake.constants as c
+import miniquake.build_info as buildInfo
 import miniquake.crc as crc
 import miniquake.pak as pak
 import miniquake.wad as wad
@@ -29,6 +30,7 @@ import miniquake.map_viewer as viewer
 import miniquake.launch as launch
 import miniquake.game_validation as gameValidation
 import miniquake.runtime_validation as runtimeValidation
+import miniquake.compat_trace as compatTrace
 import miniquake.net_udp as udp
 import miniquake.host as host
 import miniquake.sys_win as sysWin
@@ -40,6 +42,7 @@ import std.fs as fs
 
 function printUsage()
   print "MiniQuake " + c.QUAKE_VERSION + " / protocol " + c.PROTOCOL_VERSION
+  print "package " + buildInfo.PACKAGE_ID + " / profile " + buildInfo.COMPATIBILITY_PROFILE
   print "usage: MiniQuake.exe [-basedir PATH] [-game DIR] [+map MAP] [options]"
   print "       MiniQuake.exe COMMAND [arguments]"
   print ""
@@ -65,10 +68,17 @@ function printUsage()
   print "                             validate assets plus integrated runtime"
   print "  --runtime-smoke BASE MAP [FRAMES] [-game DIR]"
   print "                             run fixed headless Host_Frame iterations"
+  print "  --compat-trace BASE MAP FRAMES PREFIX [-game DIR]"
+  print "                             write deterministic trace, snapshot and crash context"
+  print "  --compat-snapshot BASE MAP FRAME PREFIX [-game DIR]"
+  print "                             run to FRAME and write the same diagnostic artifact set"
+  print "  --compat-report FILE       recognize and summarize a compatibility artifact"
   print "  --validate-runtime BASE MAP [FRAMES] [-game DIR]"
   print "                             report signon, QuakeC, collision and heap checks"
   print "  --render-smoke BASE MAP [FRAMES] [-game DIR]"
   print "                             run the textured host and exit automatically"
+  print "  --render-evidence BASE MAP FRAME PREFIX [-game DIR]"
+  print "                             capture deterministic TGA after UI and before swap"
   print "  --soak BASE MAP [FRAMES] [-game DIR]"
   print "                             run GC/heap stability validation (default 10000)"
   print "  --long-soak MODE BASE TARGET [FRAMES] [-game DIR] [-port N]"
@@ -280,6 +290,27 @@ function runRuntimeValidationCommand(arguments)
   return 2
 end function
 
+function runCompatibilityTraceCommand(arguments)
+  frames = boundedInteger(arguments[3], 120, 1, 1000000)
+  result = try(compatTrace.run(arguments[1], gameOption(arguments), arguments[2], frames, arguments[4]))
+  if result is error then print "MiniQuake compatibility trace: " + result.message; return 3 end if
+  if compatTrace.printResult(result) then return 0 end if
+  return 3
+end function
+
+function runCompatibilitySnapshotCommand(arguments)
+  frames = boundedInteger(arguments[3], 1, 1, 1000000)
+  result = try(compatTrace.run(arguments[1], gameOption(arguments), arguments[2], frames, arguments[4]))
+  if result is error then print "MiniQuake compatibility snapshot: " + result.message; return 3 end if
+  if compatTrace.printResult(result) then return 0 end if
+  return 3
+end function
+
+function runCompatibilityReportCommand(path)
+  if compatTrace.inspect(path) then return 0 end if
+  return 2
+end function
+
 function runSoakCommand(arguments)
   frames = optionalFrameCount(arguments, 3, 10000, 2000000000)
   return host.runSoak(headlessArguments(arguments[1], arguments[2], gameOption(arguments)), frames)
@@ -309,6 +340,24 @@ function renderSmoke(arguments)
   ])
 end function
 
+function runRenderEvidenceCommand(arguments)
+  frames = boundedInteger(arguments[3], 128, 1, 1000000)
+  return host.runRenderEvidence([
+    "-basedir", arguments[1],
+    "-game", gameOption(arguments),
+    "-window",
+    "-nosound",
+    "-nolan",
+    "-nomouse",
+    "-nojoy",
+    "-noinput",
+    "-width", "640",
+    "-height", "480",
+    "-maxframes", "" + frames,
+    "+map", arguments[2],
+  ], frames, arguments[4])
+end function
+
 function runUdpSmoke(arguments)
   timeout = 1000
   if len(arguments) >= 2 then timeout = boundedInteger(arguments[1], timeout, 1, 60000) end if
@@ -330,8 +379,53 @@ end function
 function runSelfCheck()
   check = crc.block(bytes("123456789"), 0, 9)
   print "MiniQuake " + c.QUAKE_VERSION + " / protocol " + c.PROTOCOL_VERSION
+  print "Package: " + buildInfo.PACKAGE_ID
+  print "Parent package: " + buildInfo.PARENT_PACKAGE_ID
+  print "Block: " + buildInfo.BLOCK_ID
+  print "Block parent package: " + buildInfo.BLOCK_PARENT_PACKAGE_ID
+  print "Protocol status: " + buildInfo.PROTOCOL_STATUS
+  print "QuakeC status: " + buildInfo.QUAKEC_STATUS
+  print "World/physics status: " + buildInfo.WORLD_PHYSICS_STATUS
+  print "Host/lifecycle status: " + buildInfo.HOST_LIFECYCLE_STATUS
+  print "Host/lifecycle fingerprint: 0x8cbb709f"
+  print "Client/render status: " + buildInfo.CLIENT_RENDER_STATUS
+  print "Client/render fingerprint: 0x95e2b295"
+  print "World/render status: " + buildInfo.WORLD_RENDER_STATUS
+  print "World/render fingerprint: 0x846a74de"
+  print "Model/UI/render status: " + buildInfo.MODEL_UI_RENDER_STATUS
+  print "Model/UI/render fingerprint: 0x0a62f5b1"
+  print "Render-special status: " + buildInfo.RENDER_SPECIAL_STATUS
+  print "Render-special fingerprint: 0x2a3d8081"
+  print "Audio status: " + buildInfo.AUDIO_STATUS
+  print "Audio fingerprint: 0xdcf7a002"
+  print "Network/platform status: " + buildInfo.NETWORK_PLATFORM_STATUS
+  print "Network/platform fingerprint: 0xb3ec7589"
+  print "Frontend status: " + buildInfo.FRONTEND_STATUS
+  print "Frontend fingerprint: 0x924251fa"
+  print "Core assets/memory status: " + buildInfo.CORE_ASSETS_MEMORY_STATUS
+  print "Core assets/memory fingerprint: 0x6c8d974d"
+  print "Gameplay/presentation status: " + buildInfo.GAMEPLAY_PRESENTATION_STATUS
+  print "Gameplay/presentation fingerprint: 0xad91624c"
+  print "Black-port source status: " + buildInfo.BLACK_PORT_SOURCE_STATUS
+  print "Black-port source fingerprint: 0x309b0737"
+  print "Game profile status: " + buildInfo.GAME_PROFILE_STATUS
+  print "Game profile fingerprint: 0x7a03b68d"
+  print "Mod runtime status: " + buildInfo.MOD_RUNTIME_STATUS
+  print "Mod runtime fingerprint: 0x4649813d"
+  print "Artifact compatibility status: " + buildInfo.ARTIFACT_COMPAT_STATUS
+  print "Artifact compatibility fingerprint: 0x59531091"
+  print "Stability status: " + buildInfo.STABILITY_STATUS
+  print "Stability fingerprint: 0xd0e3c03f"
+  print "Compatibility release status: " + buildInfo.COMPAT_RELEASE_STATUS
+  print "Compatibility release fingerprint: 0x29b72a98"
+  print "Package purpose: " + buildInfo.PACKAGE_PURPOSE
+  print "Compatibility profile: " + buildInfo.COMPATIBILITY_PROFILE
+  print "Native text ABI: " + buildInfo.NATIVE_TEXT_ABI
+  print "Protocol text ABI: " + buildInfo.PROTOCOL_TEXT_ABI
+  print "Package date: " + buildInfo.PACKAGE_DATE
+  print "Baseline archive SHA-256: " + buildInfo.BASE_ARCHIVE_SHA256
   print "Core CRC self-check: 0x" + hex(bytes([(check >> 8) & 255, check & 255]))
-  print "Port status: integrated host/server/client/QuakeC/render/audio milestone; see PORT_STATUS.md for remaining parity work."
+  print "Port status: BP-089 is the cumulative compat_109 release candidate; original-binary interoperability and an external GLQuake visual reference remain explicit final gates."
   return 0
 end function
 
@@ -363,8 +457,12 @@ function main(args)
   if command == "--map-view" and len(args) == 3 then return viewer.runFromGame(args[1], args[2]) end if
   if command == "--validate-game" and len(args) >= 2 then return validateGame(args) end if
   if command == "--runtime-smoke" and len(args) >= 3 then return runtimeSmoke(args) end if
+  if command == "--compat-trace" and len(args) >= 5 then return runCompatibilityTraceCommand(args) end if
+  if command == "--compat-snapshot" and len(args) >= 5 then return runCompatibilitySnapshotCommand(args) end if
+  if command == "--compat-report" and len(args) == 2 then return runCompatibilityReportCommand(args[1]) end if
   if command == "--validate-runtime" and len(args) >= 3 then return runRuntimeValidationCommand(args) end if
   if command == "--render-smoke" and len(args) >= 3 then return renderSmoke(args) end if
+  if command == "--render-evidence" and len(args) >= 5 then return runRenderEvidenceCommand(args) end if
   if command == "--soak" and len(args) >= 3 then return runSoakCommand(args) end if
   if command == "--long-soak" and len(args) >= 4 then return runLongSoakCommand(args) end if
   if command == "--udp-smoke" and len(args) <= 2 then return runUdpSmoke(args) end if

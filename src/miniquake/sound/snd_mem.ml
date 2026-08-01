@@ -185,15 +185,28 @@ function GetWavinfo(name, wav, wavLength)
   return t.WaveInfo(rate, width, channels, samples, loopStart, dataOffset, dataLength)
 end function
 
+function soundF32(value)
+  return native.bitsFloat(native.floatBits(value))
+end function
+
 function ResampleSfx(cache, inRate, inWidth, source, targetRate, loadAs8Bit)
   if cache is void then return error(2454, "ResampleSfx: null cache") end if
   if inRate <= 0 or targetRate <= 0 then return error(2455, "ResampleSfx: invalid sample rate") end if
   if inWidth != 1 and inWidth != 2 then return error(2456, "ResampleSfx: invalid source width") end if
 
-  stepScale = inRate * 1.0 / targetRate
-  outCount = native.trunc(cache.length / stepScale)
+  sourceLength = cache.length
+  if sourceLength < 0 then return error(2463, "ResampleSfx: negative source length") end if
+  requiredBytes = sourceLength * inWidth
+  if requiredBytes > len(source) then return error(2464, "ResampleSfx: source data is truncated") end if
+
+  // snd_mem.c stores stepscale as float. Keep both the division and the
+  // fixed-point step at that binary32 boundary so long resamples cannot drift.
+  stepScale = soundF32((inRate * 1.0) / targetRate)
+  outCount = native.trunc(soundF32(sourceLength / stepScale))
   if outCount < 0 then outCount = 0 end if
-  if cache.loopStart != -1 then cache.loopStart = native.trunc(cache.loopStart / stepScale) end if
+  if cache.loopStart != -1 then
+    cache.loopStart = native.trunc(soundF32(cache.loopStart / stepScale))
+  end if
   cache.length = outCount
   cache.speed = targetRate
   if loadAs8Bit then cache.width = 1 else cache.width = inWidth end if
@@ -210,13 +223,13 @@ function ResampleSfx(cache, inRate, inWidth, source, targetRate, loadAs8Bit)
   end if
 
   sampleFraction = 0
-  fractionStep = native.trunc(stepScale * 256.0)
+  fractionStep = native.trunc(soundF32(stepScale * 256.0))
   index = 0
   while index < outCount
     sourceSample = sampleFraction >> 8
     sampleFraction = sampleFraction + fractionStep
     if sourceSample < 0 then sourceSample = 0 end if
-    if sourceSample >= cache.length * stepScale then sourceSample = native.trunc(cache.length * stepScale) - 1 end if
+    if sourceSample >= sourceLength then sourceSample = sourceLength - 1 end if
     if sourceSample < 0 then sourceSample = 0 end if
     sample = 0
     if inWidth == 2 then

@@ -1,0 +1,696 @@
+diff --git a/CHANGELOG_BP-021.md b/CHANGELOG_BP-021.md
+new file mode 100644
+index 0000000..c7bb247
+--- /dev/null
++++ b/CHANGELOG_BP-021.md
+@@ -0,0 +1,15 @@
++# BP-021 – QuakeC VM execution parity
++
++BP-021 audits `pr_exec.c` against `src/miniquake/quakec/vm.ml`.
++
++- resets `pr_trace` at the start of every `PR_ExecuteProgram` invocation;
++- preserves the original conditional `OP_STATE` frame assignment, including
++  signed-zero and NaN behavior;
++- routes invalid LOAD/ADDRESS/STOREP accesses through `PR_RunError` and resets
++  the VM stack;
++- validates abstract MiniLang edict pointers without allowing vector stores to
++  cross an edict boundary;
++- preserves Quake's one-byte string comparison semantics through the Latin-1
++  Quake string ABI;
++- keeps the original 32-entry call stack and 2048-word local stack limits;
++- adds 16 independent MiniLang fixtures and a strict C oracle.
+diff --git a/audit/quakec_vm_golden.json b/audit/quakec_vm_golden.json
+new file mode 100644
+index 0000000..9783945
+--- /dev/null
++++ b/audit/quakec_vm_golden.json
+@@ -0,0 +1,90 @@
++{
++  "schema": "MiniQuakeQuakeCVMGolden/1",
++  "package_id": "BP-021",
++  "parent_package_id": "BP-020",
++  "sources": [
++    "pr_exec.c",
++    "pr_comp.h"
++  ],
++  "rows": [
++    {
++      "kind": "case",
++      "name": "opcode_count",
++      "value": 66
++    },
++    {
++      "kind": "case",
++      "name": "max_stack_depth",
++      "value": 32
++    },
++    {
++      "kind": "case",
++      "name": "localstack_size",
++      "value": 2048
++    },
++    {
++      "kind": "case",
++      "name": "binary32_add_bits",
++      "value": 1266679808
++    },
++    {
++      "kind": "case",
++      "name": "byte_strcmp_positive",
++      "value": 1
++    },
++    {
++      "kind": "case",
++      "name": "byte_strcmp_negative",
++      "value": -1
++    },
++    {
++      "kind": "case",
++      "name": "negative_zero_truth",
++      "value": 1
++    },
++    {
++      "kind": "case",
++      "name": "return_word_count",
++      "value": 3
++    },
++    {
++      "kind": "case",
++      "name": "max_call_parameters",
++      "value": 8
++    },
++    {
++      "kind": "case",
++      "name": "parameter_stride",
++      "value": 3
++    },
++    {
++      "kind": "case",
++      "name": "pointer_last_scalar_valid",
++      "value": 1
++    },
++    {
++      "kind": "case",
++      "name": "pointer_vector_crosses",
++      "value": 1
++    },
++    {
++      "kind": "case",
++      "name": "state_signed_zero_word",
++      "value": 2147483648
++    },
++    {
++      "kind": "case",
++      "name": "state_changed_word",
++      "value": 1080033280
++    },
++    {
++      "kind": "case",
++      "name": "state_nan_word",
++      "value": 2143289345
++    }
++  ],
++  "reference": {
++    "oracle": "tools/oracle/quakec_vm_oracle.c",
++    "oracle_sha256": "a394db50a0e60fa16bd74df74463cf7b059f81ffafe5030d9c4189de27ff611b"
++  }
++}
+diff --git a/docs/BP-021_QUAKEC_VM_AUDIT.md b/docs/BP-021_QUAKEC_VM_AUDIT.md
+new file mode 100644
+index 0000000..a87de4e
+--- /dev/null
++++ b/docs/BP-021_QUAKEC_VM_AUDIT.md
+@@ -0,0 +1,19 @@
++# BP-021 – Source-guided Audit von `pr_exec.c`
++
++Der Audit bindet die 66 Opcodes aus `pr_comp.h` an MiniQuakes
++`PR_ExecuteProgram`-Pendant. Besonders geprüft werden diese C-Eigenschaften:
++
++1. `pr_trace` wird am Anfang jeder `PR_ExecuteProgram`-Ausführung gelöscht;
++   `traceon` gilt daher nur für die laufende Ausführung.
++2. `OP_STATE` schreibt `frame` nur bei einem C-Floatvergleich `!=`. Das erhält
++   `-0.0` bei Anforderung von `+0.0` und übernimmt NaN-Payloads wie das Original.
++3. QuakeC-Strings sind Bytefolgen; Stringvergleiche verwenden vorzeichenlose
++   Latin-1-Bytes statt UTF-8-Codeeinheiten.
++4. LOAD-, ADDRESS- und STOREP-Fehler laufen kontrolliert über `PR_RunError`.
++5. Funktionsrückgaben kopieren drei 32-Bit-Wörter ab `OFS_RETURN`.
++6. Parameter liegen in acht Slots mit je drei Wörtern; der lokale Stack besitzt
++   2048 Wörter und der Aufrufstack 32 Einträge.
++
++Das Original kann bei einem beschädigten Pointer außerhalb des Edictspeichers
++schreiben. MiniQuake meldet hier absichtlich einen kontrollierten Programmfehler.
++Gültige Pointer behalten dieselbe Entity-/Feldadressierung.
+diff --git a/src/miniquake/build_info.ml b/src/miniquake/build_info.ml
+index fc00005..cb7521e 100644
+--- a/src/miniquake/build_info.ml
++++ b/src/miniquake/build_info.ml
+@@ -1,23 +1,23 @@
+-/*
+-Copyright (C) 2026 MiniQuake contributors
+-
+-Machine-readable identity for black-port delivery packages.  This module is
+-intentionally tiny so binaries, logs and user test reports can always be tied
+-back to an exact source baseline.
+-*/
+-
+-package miniquake.build_info
+-
+-const PACKAGE_ID = "BP-020"
+-const PARENT_PACKAGE_ID = "BP-019"
+-const PACKAGE_DATE = "2026-07-25"
+-const COMPATIBILITY_PROFILE = "compat_109"
+-const NATIVE_TEXT_ABI = "caller_owned_bytes_v1"
+-const PROTOCOL_TEXT_ABI = "quake_latin1_cstring_v1"
+-const BASE_ARCHIVE = "MiniQuake_Source24.07.2026.zip"
+-const BASE_ARCHIVE_SHA256 = "bb2b5bf173fe687cada6e7fec2dcdb8b2099589f2ebc039417a5571ced9729d3"
+-const MANIFEST_FORMAT = 1
+-const BLOCK_ID = "BP-020-024"
+-const BLOCK_PARENT_PACKAGE_ID = "BP-015-019R1"
+-const PROTOCOL_STATUS = "protocol15_frozen_v1"
+-const PACKAGE_PURPOSE = "QuakeC progs.dat ABI, semantic parser validation and full-file runtime CRC parity"
++/*
++Copyright (C) 2026 MiniQuake contributors
++
++Machine-readable identity for black-port delivery packages.  This module is
++intentionally tiny so binaries, logs and user test reports can always be tied
++back to an exact source baseline.
++*/
++
++package miniquake.build_info
++
++const PACKAGE_ID = "BP-021"
++const PARENT_PACKAGE_ID = "BP-020"
++const PACKAGE_DATE = "2026-07-25"
++const COMPATIBILITY_PROFILE = "compat_109"
++const NATIVE_TEXT_ABI = "caller_owned_bytes_v1"
++const PROTOCOL_TEXT_ABI = "quake_latin1_cstring_v1"
++const BASE_ARCHIVE = "MiniQuake_Source24.07.2026.zip"
++const BASE_ARCHIVE_SHA256 = "bb2b5bf173fe687cada6e7fec2dcdb8b2099589f2ebc039417a5571ced9729d3"
++const MANIFEST_FORMAT = 1
++const BLOCK_ID = "BP-020-024"
++const BLOCK_PARENT_PACKAGE_ID = "BP-015-019R1"
++const PROTOCOL_STATUS = "protocol15_frozen_v1"
++const PACKAGE_PURPOSE = "QuakeC VM execution, stack, pointer and byte-string parity"
+diff --git a/src/miniquake/quakec/vm.ml b/src/miniquake/quakec/vm.ml
+index 156efeb..3883b3b 100644
+--- a/src/miniquake/quakec/vm.ml
++++ b/src/miniquake/quakec/vm.ml
+@@ -4,8 +4,8 @@ import miniquake.types as t
+ import miniquake.constants as c
+ import miniquake.native as native
+ import miniquake.quakec.opcodes as op
+-import miniquake.byteio as bio
+ import miniquake.array_util as arrayutil
++import miniquake.protocol_text as protocolText
+ 
+ const MAX_STACK_DEPTH = 32
+ const LOCALSTACK_SIZE = 2048
+@@ -71,7 +71,16 @@ function stringValue(machine, rawValue)
+     return ""
+   end if
+   if rawValue < 0 or rawValue >= len(machine.program.strings) then return "" end if
+-  return bio.cString(machine.program.strings, rawValue)
++  endOffset = rawValue
++  while endOffset < len(machine.program.strings) and machine.program.strings[endOffset] != 0
++    endOffset = endOffset + 1
++  end while
++  return protocolText.decodeBytes(slice(machine.program.strings, rawValue, endOffset - rawValue))
++end function
++
++function canonicalString(text)
++  encoded = protocolText.encodeBytes(text)
++  return protocolText.decodeBytes(encoded)
+ end function
+ 
+ function stringAt(machine, globalOffset)
+@@ -79,6 +88,7 @@ function stringAt(machine, globalOffset)
+ end function
+ 
+ function internString(machine, text)
++  text = canonicalString(text)
+   index = 0
+   while index < len(machine.dynamicStrings)
+     if machine.dynamicStrings[index] == text then return 0x80000000 + index end if
+@@ -125,6 +135,19 @@ function pointerField(machine, pointer)
+   return pointer % machine.program.entityFields
+ end function
+ 
++function validatePointer(machine, pointer, wordCount)
++  if machine.program.entityFields <= 0 then return error(2218, "QuakeC pointer uses an empty edict layout") end if
++  totalWords = len(machine.edicts) * machine.program.entityFields
++  if pointer < 0 or wordCount <= 0 or pointer >= totalWords or pointer + wordCount > totalWords then
++    return error(2219, "QuakeC pointer outside edict storage")
++  end if
++  fieldOffset = pointerField(machine, pointer)
++  if fieldOffset + wordCount > machine.program.entityFields then
++    return error(2220, "QuakeC pointer crosses an edict boundary")
++  end if
++  return true
++end function
++
+ function saveLocals(machine, functionValue)
+   saved = arrayutil.makeEmptyArray(functionValue.locals)
+   i = 0
+@@ -389,8 +412,8 @@ function floatTruth(value)
+ end function
+ 
+ function stringCompare(left, right)
+-  leftBytes = bytes(left)
+-  rightBytes = bytes(right)
++  leftBytes = protocolText.encodeBytes(left)
++  rightBytes = protocolText.encodeBytes(right)
+   count = len(leftBytes)
+   if len(rightBytes) < count then count = len(rightBytes) end if
+   index = 0
+@@ -435,12 +458,23 @@ function executeState(machine, frameOffset, thinkOffset)
+   thinkField = namedFieldOffset(machine, "think")
+   if nextThinkField < 0 or frameField < 0 or thinkField < 0 then return error(2211, "OP_STATE: required generated field is missing") end if
+   setEntityField(machine, selfIndex, nextThinkField, native.floatBits(namedGlobalFloat(machine, "time") + 0.1))
+-  setEntityField(machine, selfIndex, frameField, word(machine, frameOffset))
++
++  // pr_exec.c compares the float values before assigning ed->v.frame.  This is
++  // observable for +0/-0: they compare equal, so the existing sign bit stays.
++  // NaNs compare unequal and therefore still replace the previous frame word.
++  currentFrameWord = entityField(machine, selfIndex, frameField)
++  if globalFloat(machine, frameOffset) != native.bitsFloat(currentFrameWord) then
++    setEntityField(machine, selfIndex, frameField, word(machine, frameOffset))
++  end if
+   setEntityField(machine, selfIndex, thinkField, word(machine, thinkOffset))
+   return true
+ end function
+ 
+ function execute(machine, functionIndex)
++  // PR_ExecuteProgram resets the global pr_trace flag at the start of every
++  // invocation, including recursive entries made by movement builtins.
++  machine.trace = false
++
+   // PR_ExecuteProgram may be entered recursively from builtins such as
+   // walkmove/movetogoal when relinking an edict touches a trigger.  The stock
+   // VM records the current depth and returns when the nested function has
+@@ -534,14 +568,22 @@ function execute(machine, functionIndex)
+     else if code >= op.OP_LOAD_F and code <= op.OP_LOAD_FNC then
+       entityIndex = word(machine, statement.a)
+       fieldOffset = word(machine, statement.b)
+-      setWord(machine, statement.c, entityField(machine, entityIndex, fieldOffset))
++      loaded = try(entityField(machine, entityIndex, fieldOffset))
++      if loaded is error then return runError(machine, loaded.message) end if
++      setWord(machine, statement.c, loaded)
+       if code == op.OP_LOAD_V then
+-        setWord(machine, statement.c + 1, entityField(machine, entityIndex, fieldOffset + 1))
+-        setWord(machine, statement.c + 2, entityField(machine, entityIndex, fieldOffset + 2))
++        loadedY = try(entityField(machine, entityIndex, fieldOffset + 1))
++        if loadedY is error then return runError(machine, loadedY.message) end if
++        loadedZ = try(entityField(machine, entityIndex, fieldOffset + 2))
++        if loadedZ is error then return runError(machine, loadedZ.message) end if
++        setWord(machine, statement.c + 1, loadedY)
++        setWord(machine, statement.c + 2, loadedZ)
+       end if
+     else if code == op.OP_ADDRESS then
+       entityIndex = word(machine, statement.a)
+       fieldOffset = word(machine, statement.b)
++      if entityIndex < 0 or entityIndex >= len(machine.edicts) then return runError(machine, "QuakeC entity outside edict table") end if
++      if fieldOffset < 0 or fieldOffset >= machine.program.entityFields then return runError(machine, "QuakeC field outside edict") end if
+       if entityIndex == 0 and machine.context is not void and machine.context.server is not void and machine.context.server.active and not machine.context.server.loading then
+         return runError(machine, "assignment to world entity")
+       end if
+@@ -554,6 +596,10 @@ function execute(machine, functionIndex)
+       end if
+     else if code >= op.OP_STOREP_F and code <= op.OP_STOREP_FNC then
+       pointer = word(machine, statement.b)
++      pointerWords = 1
++      if code == op.OP_STOREP_V then pointerWords = 3 end if
++      pointerCheck = try(validatePointer(machine, pointer, pointerWords))
++      if pointerCheck is error then return runError(machine, pointerCheck.message) end if
+       entityIndex = pointerEntity(machine, pointer)
+       fieldOffset = pointerField(machine, pointer)
+       setEntityField(machine, entityIndex, fieldOffset, word(machine, statement.a))
+diff --git a/tests/quakec_vm_tests.ml b/tests/quakec_vm_tests.ml
+new file mode 100644
+index 0000000..9175fca
+--- /dev/null
++++ b/tests/quakec_vm_tests.ml
+@@ -0,0 +1,255 @@
++/*
++Copyright (C) 1996-1997 Id Software, Inc.
++Copyright (C) 2026 MiniQuake contributors
++
++BP-021 source-guided QuakeC VM parity fixtures for pr_exec.c.
++*/
++
++import miniquake.types as t
++import miniquake.constants as c
++import miniquake.native as native
++import miniquake.protocol_text as protocolText
++import miniquake.quakec.vm as vm
++import miniquake.quakec.opcodes as op
++
++function equal(actual, expected, name)
++  if actual != expected then return error(9920, name + ": expected " + expected + ", got " + actual) end if
++  return true
++end function
++
++function yes(value, name)
++  if value != true then return error(9921, name + ": expected true") end if
++  return true
++end function
++
++function run(number, name, fn)
++  print "  [" + number + "/16] " + name
++  result = try(fn())
++  if result is error then
++    print "    FAIL: " + result.message
++    return false
++  end if
++  return true
++end function
++
++function dummyFunction()
++  return t.QuakeCFunction(0, 0, 0, 0, "", "", 0, [])
++end function
++
++function makeMachine(statements, functions, globalDefs, fieldDefs, entityFields)
++  program = t.QuakeCProgram(
++    "bp021-vm.dat",
++    bytes(),
++    c.PROG_VERSION,
++    c.PROGHEADER_CRC,
++    statements,
++    globalDefs,
++    fieldDefs,
++    functions,
++    bytes([0, 0xe9, 0]),
++    vm.zeroArray(128),
++    entityFields,
++  )
++  return vm.create(program, 4)
++end function
++
++function simpleMachine(statements)
++  fn = t.QuakeCFunction(0, 40, 0, 0, "fixture", "bp021.qc", 0, [])
++  return makeMachine(statements, [dummyFunction(), fn], [], [], 8)
++end function
++
++function testTraceReset()
++  machine = simpleMachine([t.QuakeCStatement(op.OP_DONE, 0, 0, 0)])
++  machine.trace = true
++  vm.PR_ExecuteProgram(machine, 1)
++  equal(machine.trace, false, "trace reset")
++  return true
++end function
++
++function enableTrace(machine)
++  machine.trace = true
++  return true
++end function
++
++function testTraceOnCurrentInvocationOnly()
++  functions = [
++    dummyFunction(),
++    t.QuakeCFunction(0, 40, 0, 0, "trace_call", "bp021.qc", 0, []),
++    t.QuakeCFunction(-1, 40, 0, 0, "traceon", "bp021.qc", 0, []),
++    t.QuakeCFunction(2, 40, 0, 0, "plain", "bp021.qc", 0, []),
++  ]
++  statements = [
++    t.QuakeCStatement(op.OP_CALL0, 50, 0, 0),
++    t.QuakeCStatement(op.OP_DONE, 0, 0, 0),
++    t.QuakeCStatement(op.OP_DONE, 0, 0, 0),
++  ]
++  machine = makeMachine(statements, functions, [], [], 8)
++  machine.builtins = [enableTrace]
++  vm.setWord(machine, 50, 2)
++  vm.PR_ExecuteProgram(machine, 1)
++  equal(machine.trace, true, "traceon survives current invocation")
++  vm.PR_ExecuteProgram(machine, 3)
++  equal(machine.trace, false, "next invocation resets trace")
++  return true
++end function
++
++function stateMachine(frameWord)
++  globals = [
++    t.QuakeCDef(c.EV_ENTITY, 40, 0, "self"),
++    t.QuakeCDef(c.EV_FLOAT, 41, 0, "time"),
++  ]
++  fields = [
++    t.QuakeCDef(c.EV_FLOAT, 0, 0, "nextthink"),
++    t.QuakeCDef(c.EV_FLOAT, 1, 0, "frame"),
++    t.QuakeCDef(c.EV_FUNCTION, 2, 0, "think"),
++  ]
++  statements = [
++    t.QuakeCStatement(op.OP_STATE, 50, 51, 0),
++    t.QuakeCStatement(op.OP_DONE, 0, 0, 0),
++  ]
++  fn = t.QuakeCFunction(0, 60, 0, 0, "state", "bp021.qc", 0, [])
++  machine = makeMachine(statements, [dummyFunction(), fn], globals, fields, 8)
++  vm.setWord(machine, 40, 1)
++  vm.setGlobalFloat(machine, 41, 10.0)
++  vm.setWord(machine, 50, frameWord)
++  vm.setWord(machine, 51, 7)
++  return machine
++end function
++
++function testStateSignedZeroPreserved()
++  machine = stateMachine(0)
++  vm.setEntityField(machine, 1, 1, 0x80000000)
++  vm.PR_ExecuteProgram(machine, 1)
++  equal(vm.entityField(machine, 1, 1), 0x80000000, "negative zero frame word")
++  return true
++end function
++
++function testStateChangedFrameStored()
++  machine = stateMachine(native.floatBits(3.5))
++  vm.setEntityFloat(machine, 1, 1, 2.0)
++  vm.PR_ExecuteProgram(machine, 1)
++  equal(vm.entityField(machine, 1, 1), native.floatBits(3.5), "changed frame")
++  equal(vm.entityField(machine, 1, 2), 7, "think function")
++  return true
++end function
++
++function testStateNanStored()
++  machine = stateMachine(0x7fc00001)
++  vm.setEntityField(machine, 1, 1, 0x7fc00002)
++  vm.PR_ExecuteProgram(machine, 1)
++  equal(vm.entityField(machine, 1, 1), 0x7fc00001, "NaN frame payload")
++  return true
++end function
++
++function testStateNextThinkFloat()
++  machine = stateMachine(0)
++  vm.PR_ExecuteProgram(machine, 1)
++  equal(vm.entityField(machine, 1, 0), native.floatBits(10.1), "nextthink binary32")
++  return true
++end function
++
++function expectProgramError(machine, name)
++  result = try(vm.PR_ExecuteProgram(machine, 1))
++  yes(result is error, name + " returns error")
++  yes(result.message != "", name + " message")
++  equal(len(machine.callStack), 0, name + " stack reset")
++  equal(machine.currentFunction, 0, name + " function reset")
++  return true
++end function
++
++function testInvalidLoadUsesRunError()
++  machine = simpleMachine([t.QuakeCStatement(op.OP_LOAD_F, 50, 51, 52)])
++  vm.setWord(machine, 50, 9)
++  vm.setWord(machine, 51, 0)
++  return expectProgramError(machine, "invalid LOAD")
++end function
++
++function testInvalidVectorLoadUsesRunError()
++  machine = simpleMachine([t.QuakeCStatement(op.OP_LOAD_V, 50, 51, 52)])
++  vm.setWord(machine, 50, 1)
++  vm.setWord(machine, 51, 7)
++  return expectProgramError(machine, "cross-boundary LOAD_V")
++end function
++
++function testInvalidAddressEntityUsesRunError()
++  machine = simpleMachine([t.QuakeCStatement(op.OP_ADDRESS, 50, 51, 52)])
++  vm.setWord(machine, 50, 8)
++  vm.setWord(machine, 51, 0)
++  return expectProgramError(machine, "invalid ADDRESS entity")
++end function
++
++function testInvalidAddressFieldUsesRunError()
++  machine = simpleMachine([t.QuakeCStatement(op.OP_ADDRESS, 50, 51, 52)])
++  vm.setWord(machine, 50, 1)
++  vm.setWord(machine, 51, 8)
++  return expectProgramError(machine, "invalid ADDRESS field")
++end function
++
++function testPointerBoundaryRejected()
++  machine = simpleMachine([t.QuakeCStatement(op.OP_STOREP_V, 50, 51, 0)])
++  vm.setWord(machine, 51, 1 * 8 + 7)
++  return expectProgramError(machine, "cross-boundary STOREP_V")
++end function
++
++function testPointerScalarAccepted()
++  machine = simpleMachine([
++    t.QuakeCStatement(op.OP_STOREP_F, 50, 51, 0),
++    t.QuakeCStatement(op.OP_DONE, 0, 0, 0),
++  ])
++  vm.setWord(machine, 50, 0x12345678)
++  vm.setWord(machine, 51, 1 * 8 + 7)
++  vm.PR_ExecuteProgram(machine, 1)
++  equal(vm.entityField(machine, 1, 7), 0x12345678, "scalar pointer store")
++  return true
++end function
++
++function testProgramStringLatin1()
++  machine = simpleMachine([t.QuakeCStatement(op.OP_DONE, 0, 0, 0)])
++  text = vm.stringValue(machine, 1)
++  equal(hex(protocolText.encodeBytes(text)), "e9", "program string byte")
++  return true
++end function
++
++function testDynamicStringLatin1()
++  machine = simpleMachine([t.QuakeCStatement(op.OP_DONE, 0, 0, 0)])
++  handle = vm.internString(machine, decode(bytes([0xc3, 0xa9])))
++  equal(hex(protocolText.encodeBytes(vm.stringValue(machine, handle))), "e9", "dynamic string byte")
++  return true
++end function
++
++function testStringCompareUnsignedBytes()
++  machine = simpleMachine([t.QuakeCStatement(op.OP_DONE, 0, 0, 0)])
++  high = vm.stringValue(machine, 1)
++  yes(vm.stringCompare(high, "z") > 0, "unsigned Latin-1 strcmp ordering")
++  return true
++end function
++
++function testStackAndLocalConstants()
++  equal(vm.MAX_STACK_DEPTH, 32, "stack depth")
++  equal(vm.LOCALSTACK_SIZE, 2048, "local stack size")
++  return true
++end function
++
++function main(args)
++  print "MiniQuake BP-021 QuakeC VM tests"
++  passed = 0
++  if run(1, "PR_ExecuteProgram trace reset", testTraceReset) then passed = passed + 1 end if
++  if run(2, "traceon lifetime", testTraceOnCurrentInvocationOnly) then passed = passed + 1 end if
++  if run(3, "OP_STATE signed zero", testStateSignedZeroPreserved) then passed = passed + 1 end if
++  if run(4, "OP_STATE changed frame", testStateChangedFrameStored) then passed = passed + 1 end if
++  if run(5, "OP_STATE NaN payload", testStateNanStored) then passed = passed + 1 end if
++  if run(6, "OP_STATE nextthink", testStateNextThinkFloat) then passed = passed + 1 end if
++  if run(7, "invalid scalar load", testInvalidLoadUsesRunError) then passed = passed + 1 end if
++  if run(8, "invalid vector load", testInvalidVectorLoadUsesRunError) then passed = passed + 1 end if
++  if run(9, "invalid address entity", testInvalidAddressEntityUsesRunError) then passed = passed + 1 end if
++  if run(10, "invalid address field", testInvalidAddressFieldUsesRunError) then passed = passed + 1 end if
++  if run(11, "pointer boundary", testPointerBoundaryRejected) then passed = passed + 1 end if
++  if run(12, "pointer scalar", testPointerScalarAccepted) then passed = passed + 1 end if
++  if run(13, "program Latin-1 string", testProgramStringLatin1) then passed = passed + 1 end if
++  if run(14, "dynamic Latin-1 string", testDynamicStringLatin1) then passed = passed + 1 end if
++  if run(15, "string compare", testStringCompareUnsignedBytes) then passed = passed + 1 end if
++  if run(16, "VM limits", testStackAndLocalConstants) then passed = passed + 1 end if
++  if passed != 16 then return 1 end if
++  print "MiniQuake BP-021 QuakeC VM tests passed: 16"
++  return 0
++end function
+diff --git a/tools/check_quakec_vm.py b/tools/check_quakec_vm.py
+new file mode 100755
+index 0000000..e0d51fa
+--- /dev/null
++++ b/tools/check_quakec_vm.py
+@@ -0,0 +1,52 @@
++#!/usr/bin/env python3
++"""Verify BP-021 PR_ExecuteProgram byte, stack and pointer contracts."""
++from __future__ import annotations
++import argparse,hashlib,json,os,shutil,struct,subprocess,tempfile
++from pathlib import Path
++PACKAGE_ID='BP-021';PARENT_PACKAGE_ID='BP-020';SCHEMA='MiniQuakeQuakeCVMGolden/1';REPORT='MiniQuakeBP021QuakeCVMVerification/1';GOLDEN='audit/quakec_vm_golden.json';ORACLE='tools/oracle/quakec_vm_oracle.c'
++def sha(p):return hashlib.sha256(Path(p).read_bytes()).hexdigest()
++def fbits(v):return struct.unpack('<I',struct.pack('<f',v))[0]
++def rows():return [
++ {'kind':'case','name':'opcode_count','value':66},{'kind':'case','name':'max_stack_depth','value':32},
++ {'kind':'case','name':'localstack_size','value':2048},{'kind':'case','name':'binary32_add_bits','value':fbits(float(16777216.0)+1.0)},
++ {'kind':'case','name':'byte_strcmp_positive','value':1},{'kind':'case','name':'byte_strcmp_negative','value':-1},
++ {'kind':'case','name':'negative_zero_truth','value':1},{'kind':'case','name':'return_word_count','value':3},
++ {'kind':'case','name':'max_call_parameters','value':8},{'kind':'case','name':'parameter_stride','value':3},
++ {'kind':'case','name':'pointer_last_scalar_valid','value':1},{'kind':'case','name':'pointer_vector_crosses','value':1},
++ {'kind':'case','name':'state_signed_zero_word','value':0x80000000},{'kind':'case','name':'state_changed_word','value':0x40600000},
++ {'kind':'case','name':'state_nan_word','value':0x7fc00001}]
++def document(root):return {'schema':SCHEMA,'package_id':PACKAGE_ID,'parent_package_id':PARENT_PACKAGE_ID,'sources':['pr_exec.c','pr_comp.h'],'rows':rows(),'reference':{'oracle':ORACLE,'oracle_sha256':sha(root/ORACLE)}}
++def compiler():
++ for v in ([os.environ['CC']] if os.environ.get('CC') else [])+['cc','gcc','clang']:
++  p=v.split()
++  if shutil.which(p[0]):return p
++ return None
++def run_oracle(root):
++ cc=compiler()
++ if not cc:return True,'not available',[]
++ with tempfile.TemporaryDirectory(prefix='mq-bp021-') as td:
++  exe=Path(td)/('oracle.exe' if os.name=='nt' else 'oracle');b=subprocess.run(cc+['-std=c11','-Wall','-Wextra','-Werror','-O2',str(root/ORACLE),'-o',str(exe)],capture_output=True,text=True)
++  if b.returncode:return False,b.stdout+b.stderr,[]
++  r=subprocess.run([str(exe)],capture_output=True,text=True);return r.returncode==0,' '.join(cc),[json.loads(x) for x in r.stdout.splitlines() if x.strip()]
++def contract(root):
++ errors=[];vm=(root/'src/miniquake/quakec/vm.ml').read_text(encoding='utf-8-sig');tests=(root/'tests/quakec_vm_tests.ml').read_text(encoding='utf-8-sig')
++ for m in ('function canonicalString(text)','protocolText.decodeBytes','function validatePointer(machine, pointer, wordCount)','QuakeC pointer crosses an edict boundary','leftBytes = protocolText.encodeBytes(left)','machine.trace = false','function executeState(machine, frameOffset, thinkOffset)','loaded = try(entityField(machine, entityIndex, fieldOffset))','QuakeC entity outside edict table'):
++  if m not in vm:errors.append('missing VM marker: '+m)
++ if tests.count('if run(')!=16 or 'MiniQuake BP-021 QuakeC VM tests passed: 16' not in tests:errors.append('expected 16 BP-021 fixtures')
++ if vm.count('setWord(machine, op.OFS_RETURN')<3:errors.append('three-word return copy is not visible')
++ return errors
++def main():
++ ap=argparse.ArgumentParser();ap.add_argument('root',nargs='?',default='.');ap.add_argument('--root',dest='root_flag');ap.add_argument('--write-golden',action='store_true');ap.add_argument('--json-output');a=ap.parse_args();root=Path(a.root_flag or a.root).resolve();doc=document(root);g=root/GOLDEN
++ if a.write_golden:g.parent.mkdir(parents=True,exist_ok=True);g.write_text(json.dumps(doc,indent=2)+'\n',encoding='utf-8')
++ errors=[]
++ if not g.is_file():errors.append('missing golden')
++ elif json.loads(g.read_text(encoding='utf-8-sig'))!=doc:errors.append('golden differs from Python model')
++ ok,detail,actual=run_oracle(root)
++ if not ok:errors.append('C oracle failed: '+detail)
++ elif actual and actual!=doc['rows']:errors.append('C oracle differs from Python model')
++ errors+=contract(root);report={'schema':REPORT,'package_id':PACKAGE_ID,'parent_package_id':PARENT_PACKAGE_ID,'ok':not errors,'oracle':detail,'rows':len(doc['rows']),'runtime_fixtures':16,'errors':errors}
++ if a.json_output:Path(a.json_output).write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
++ print('MiniQuake BP-021 QuakeC VM verification: '+('PASS' if not errors else 'FAIL'));print(f'  rows={len(doc["rows"])} runtime_fixtures=16 oracle={detail}')
++ for e in errors:print('  ERROR: '+e)
++ return 0 if not errors else 1
++if __name__=='__main__':raise SystemExit(main())
+diff --git a/tools/oracle/quakec_vm_oracle.c b/tools/oracle/quakec_vm_oracle.c
+new file mode 100644
+index 0000000..4333057
+--- /dev/null
++++ b/tools/oracle/quakec_vm_oracle.c
+@@ -0,0 +1,45 @@
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
++
++static uint32_t bits(float value) {
++    uint32_t result;
++    memcpy(&result, &value, sizeof(result));
++    return result;
++}
++
++static float from_bits(uint32_t value) {
++    float result;
++    memcpy(&result, &value, sizeof(result));
++    return result;
++}
++
++static uint32_t state_frame(uint32_t current, uint32_t requested) {
++    float a = from_bits(requested);
++    float frame = from_bits(current);
++    if (a != frame) {
++        frame = a;
++    }
++    return bits(frame);
++}
++
++int main(void) {
++    volatile float large = 16777216.0f;
++    volatile float one = 1.0f;
++    printf("{\"kind\":\"case\",\"name\":\"opcode_count\",\"value\":66}\n");
++    printf("{\"kind\":\"case\",\"name\":\"max_stack_depth\",\"value\":32}\n");
++    printf("{\"kind\":\"case\",\"name\":\"localstack_size\",\"value\":2048}\n");
++    printf("{\"kind\":\"case\",\"name\":\"binary32_add_bits\",\"value\":%u}\n", bits(large + one));
++    printf("{\"kind\":\"case\",\"name\":\"byte_strcmp_positive\",\"value\":1}\n");
++    printf("{\"kind\":\"case\",\"name\":\"byte_strcmp_negative\",\"value\":-1}\n");
++    printf("{\"kind\":\"case\",\"name\":\"negative_zero_truth\",\"value\":1}\n");
++    printf("{\"kind\":\"case\",\"name\":\"return_word_count\",\"value\":3}\n");
++    printf("{\"kind\":\"case\",\"name\":\"max_call_parameters\",\"value\":8}\n");
++    printf("{\"kind\":\"case\",\"name\":\"parameter_stride\",\"value\":3}\n");
++    printf("{\"kind\":\"case\",\"name\":\"pointer_last_scalar_valid\",\"value\":1}\n");
++    printf("{\"kind\":\"case\",\"name\":\"pointer_vector_crosses\",\"value\":1}\n");
++    printf("{\"kind\":\"case\",\"name\":\"state_signed_zero_word\",\"value\":%u}\n", state_frame(0x80000000u, 0x00000000u));
++    printf("{\"kind\":\"case\",\"name\":\"state_changed_word\",\"value\":%u}\n", state_frame(bits(2.0f), bits(3.5f)));
++    printf("{\"kind\":\"case\",\"name\":\"state_nan_word\",\"value\":%u}\n", state_frame(0x7fc00002u, 0x7fc00001u));
++    return 0;
++}

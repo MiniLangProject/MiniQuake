@@ -1,6 +1,7 @@
 package miniquake.memory
 
 import miniquake.zone as zone
+import miniquake.protocol_text as quakeText
 
 const HUNK_SENTINEL = 0x1df001ed
 const HUNK_HEADER_SIZE = 16
@@ -58,9 +59,9 @@ function align16(value)
 end function
 
 function truncateName(name, count)
-  data = bytes(name)
-  if len(data) <= count then return name end if
-  return decode(slice(data, 0, count))
+  data = quakeText.encodeBytes(name)
+  if len(data) <= count then return quakeText.decodeBytes(data) end if
+  return quakeText.decodeBytes(slice(data, 0, count))
 end function
 
 function create(capacity)

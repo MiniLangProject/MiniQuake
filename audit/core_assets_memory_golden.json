@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "package": "BP-074",
+  "status": "core_assets_memory_109_frozen_v1",
+  "fingerprint": "0x6c8d974d",
+  "fixtures": 24,
+  "retail_evidence_files": 4,
+  "pak_entry_bytes": 64,
+  "pack_name_bytes": 56,
+  "max_pack_files": 2048,
+  "wad_name_bytes": 16,
+  "wad_lumpinfo_bytes": 32,
+  "bsp_version": 29,
+  "mdl_version": 6,
+  "sprite_version": 1,
+  "hunk_alignment": 16,
+  "zone_alignment": 8,
+  "hunk_name_bytes": 8,
+  "cache_name_bytes": 15,
+  "zone_dynamic_size": 49152
+}

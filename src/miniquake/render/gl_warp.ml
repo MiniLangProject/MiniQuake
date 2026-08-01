@@ -19,10 +19,17 @@ const TURBSCALE = 40.74366543152521
 // through the console instead of baking the default into generated polygons.
 gl_subdivide_size = DEFAULT_SUBDIVIDE_SIZE
 
+// gl_warp.c stores all polygon, direction, and texture-coordinate values in
+// float fields. Explicitly cross the IEEE-754 binary32 boundary at the same
+// assignments so the MiniLang backend cannot retain additional precision.
+function warpFloat(value)
+  return native.bitsFloat(native.floatBits(value))
+end function
+
 function SetSubdivideSize(value)
   global gl_subdivide_size
   if value <= 0.0 then value = DEFAULT_SUBDIVIDE_SIZE end if
-  gl_subdivide_size = value
+  gl_subdivide_size = warpFloat(value)
   return gl_subdivide_size
 end function
 
@@ -89,12 +96,18 @@ function BoundPoly(vertices)
 end function
 
 function interpolateVertex(first, second, fraction)
+  fraction = warpFloat(fraction)
+  position = t.Vec3(
+    warpFloat(first.position.x + (second.position.x - first.position.x) * fraction),
+    warpFloat(first.position.y + (second.position.y - first.position.y) * fraction),
+    warpFloat(first.position.z + (second.position.z - first.position.z) * fraction),
+  )
   return t.RenderVertex(
-    math.add(first.position, math.scale(math.subtract(second.position, first.position), fraction)),
-    first.s + (second.s - first.s) * fraction,
-    first.t + (second.t - first.t) * fraction,
-    first.lightS + (second.lightS - first.lightS) * fraction,
-    first.lightT + (second.lightT - first.lightT) * fraction,
+    position,
+    warpFloat(first.s + (second.s - first.s) * fraction),
+    warpFloat(first.t + (second.t - first.t) * fraction),
+    warpFloat(first.lightS + (second.lightS - first.lightS) * fraction),
+    warpFloat(first.lightT + (second.lightT - first.lightT) * fraction),
   )
 end function
 
@@ -109,8 +122,8 @@ function subdivideRecursive(vertices, output, subdivideSize)
     maximum = maximums.x
     if axis == 1 then minimum = minimums.y; maximum = maximums.y end if
     if axis == 2 then minimum = minimums.z; maximum = maximums.z end if
-    middle = (minimum + maximum) * 0.5
-    middle = subdivideSize * floorValue(middle / subdivideSize + 0.5)
+    middle = warpFloat((minimum + maximum) * 0.5)
+    middle = warpFloat(subdivideSize * floorValue(middle / subdivideSize + 0.5))
     if maximum - middle >= 8.0 and middle - minimum >= 8.0 then
       distances = arrayutil.makeEmptyArray(len(vertices) + 1)
       index = 0
@@ -119,7 +132,7 @@ function subdivideRecursive(vertices, output, subdivideSize)
         coordinate = point.x
         if axis == 1 then coordinate = point.y end if
         if axis == 2 then coordinate = point.z end if
-        distances[index] = coordinate - middle
+        distances[index] = warpFloat(coordinate - middle)
         index = index + 1
       end while
       distances[len(vertices)] = distances[0]
@@ -134,7 +147,7 @@ function subdivideRecursive(vertices, output, subdivideSize)
         if distance >= 0.0 then arrayutil.pushArrayBuilder(front, current) end if
         if distance <= 0.0 then arrayutil.pushArrayBuilder(back, current) end if
         if distance != 0.0 and nextDistance != 0.0 and ((distance > 0.0) != (nextDistance > 0.0)) then
-          split = interpolateVertex(current, next, distance / (distance - nextDistance))
+          split = interpolateVertex(current, next, warpFloat(distance / (distance - nextDistance)))
           arrayutil.pushArrayBuilder(front, split)
           arrayutil.pushArrayBuilder(back, split)
         end if
@@ -172,8 +185,8 @@ function SurfaceWarpVertices(vertices, sVector, tVector)
   while index < len(vertices)
     point = vertices[index].position
     // DotProduct in GL_SubdivideSurface intentionally excludes vecs[][3].
-    rawS = point.x * sVector[0] + point.y * sVector[1] + point.z * sVector[2]
-    rawT = point.x * tVector[0] + point.y * tVector[1] + point.z * tVector[2]
+    rawS = warpFloat(point.x * sVector[0] + point.y * sVector[1] + point.z * sVector[2])
+    rawT = warpFloat(point.x * tVector[0] + point.y * tVector[1] + point.z * tVector[2])
     result[index] = t.RenderVertex(math.copy(point), rawS, rawT, 0.0, 0.0)
     index = index + 1
   end while
@@ -185,10 +198,12 @@ function GL_SubdivideSurface(vertices, sVector, tVector, subdivideSize)
 end function
 
 function WaterTexCoords(originalS, originalT, realtime)
+  originalS = warpFloat(originalS)
+  originalT = warpFloat(originalT)
   sIndex = native.trunc((originalT * 0.125 + realtime) * TURBSCALE) & 255
   tIndex = native.trunc((originalS * 0.125 + realtime) * TURBSCALE) & 255
-  textureS = (originalS + turbsin[sIndex]) / 64.0
-  textureT = (originalT + turbsin[tIndex]) / 64.0
+  textureS = warpFloat((originalS + turbsin[sIndex]) / 64.0)
+  textureT = warpFloat((originalT + turbsin[tIndex]) / 64.0)
   return [textureS, textureT]
 end function
 
@@ -216,18 +231,24 @@ function EmitWaterPolys(polygons, realtime)
 end function
 
 function WrappedSpeedScale(realtime, speed)
-  value = realtime * speed
-  return value - (native.trunc(value) & -128)
+  value = warpFloat(realtime * speed)
+  return warpFloat(value - (native.trunc(value) & -128))
 end function
 
 function SkyTexCoords(position, viewOrigin, currentSpeedScale)
-  direction = math.subtract(position, viewOrigin)
-  direction.z = direction.z * 3.0
-  lengthValue = math.length(direction)
+  direction = t.Vec3(
+    warpFloat(position.x - viewOrigin.x),
+    warpFloat(position.y - viewOrigin.y),
+    warpFloat(position.z - viewOrigin.z),
+  )
+  direction.z = warpFloat(direction.z * 3.0)
+  lengthValue = warpFloat(math.length(direction))
   if lengthValue == 0.0 then return [0.0, 0.0] end if
-  scaleValue = 378.0 / lengthValue
-  textureS = (currentSpeedScale + direction.x * scaleValue) / 128.0
-  textureT = (currentSpeedScale + direction.y * scaleValue) / 128.0
+  scaleValue = warpFloat(378.0 / lengthValue)
+  direction.x = warpFloat(direction.x * scaleValue)
+  direction.y = warpFloat(direction.y * scaleValue)
+  textureS = warpFloat((warpFloat(currentSpeedScale) + direction.x) / 128.0)
+  textureT = warpFloat((warpFloat(currentSpeedScale) + direction.y) / 128.0)
   return [textureS, textureT]
 end function
 

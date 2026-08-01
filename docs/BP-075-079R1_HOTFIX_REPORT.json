@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "delivery_revision": "BP-075-079R1",
+  "delivery_parent": "BP-075-079",
+  "engine_package": "BP-079",
+  "classification": "inherited contract checker false positive",
+  "predecessor_result_archive": "MiniQuake_BP-075-079_RESULTS_20260730-143415.zip",
+  "predecessor_result_sha256": "78963a812a05fe9d4951eef1d1cb425757c3a63513c9a956481b36f5033a0384",
+  "failure": "BP-029 whole-file server.ml hash differed after unrelated BP-079 host-command changes",
+  "strict_historical_mode_preserved": true,
+  "downstream_mode": "historical_files_plus_server_sections",
+  "server_section_hashes": {
+    "runWorldPhysicsWithRetouch": "5b082bf6147659c213fe46e84679d44a73f11dcd2aac070ef51eaf66dd0ecc8b",
+    "runNonClientPhysicsWithRetouch": "24a05fed078529237192653250631835a9d22d6d6c9054abb0ea5121f13095a6",
+    "frameMode": "09549e467d9a73e0802fda2c71552348fe7470dd6a84766098d02c90cbf87921"
+  },
+  "production_source_changed": false,
+  "native_source_changed": false,
+  "world_physics_fingerprint_changed": false,
+  "gameplay_presentation_fingerprint_changed": false,
+  "runtime_fixture_count_changed": false,
+  "windows_acceptance": "pending",
+  "server_protected_sha256": "181db4de0fc6db19d9f067aea9d8ebd654c8e14a37c477be1640958c0cff3781"
+}

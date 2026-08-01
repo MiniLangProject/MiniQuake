@@ -1,0 +1,30 @@
+{
+  "schema": "MiniQuakeDeliveryHotfix/1",
+  "delivery_revision": "BP-070-074R5",
+  "delivery_parent": "BP-070-074R4",
+  "package_id": "BP-074",
+  "block_id": "BP-070-074",
+  "classification": "test fixture and result collection infrastructure",
+  "observed_failures": [
+    "animation base: expected +0fixture, got 4",
+    "COLLECT_RESULTS.ps1: Argument types do not match"
+  ],
+  "root_causes": [
+    "BP-073 fixture confused texture.name with the numeric animation metadata table",
+    "Windows PowerShell 5.1 could not reliably serialize the generic List[object] through @($SkippedBuildArtifacts)"
+  ],
+  "fixes": [
+    "check brush.textures[0].name separately",
+    "bind animations[0][0] to anim_total 4",
+    "use a native PowerShell object array for skipped collector artifacts"
+  ],
+  "parent_package_sha256": "1ac1e2bbf135ef30d3eeaf58dc1510b1d43d69628bc7b9ad023ebda82ba30839",
+  "production_source_changed": false,
+  "native_source_changed": false,
+  "engine_contracts_changed": false,
+  "fixture_count_changed": false,
+  "runtime_retest_required": true,
+  "collector_retest_required": true,
+  "contract_status": "core_assets_memory_109_frozen_v1",
+  "contract_fingerprint": "0x6c8d974d"
+}

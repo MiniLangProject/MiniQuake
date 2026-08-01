@@ -1,0 +1,2070 @@
+diff --git a/audit/world_hull_golden.json b/audit/world_hull_golden.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..8142e48c11f4a82d3d2e219cce54ea65065673c0
+--- /dev/null
++++ b/audit/world_hull_golden.json
+@@ -0,0 +1,85 @@
++{
++  "schema": "MiniQuakeWorldHullGolden/1",
++  "package_id": "BP-025",
++  "parent_package_id": "BP-024R3",
++  "sources": [
++    "world.c",
++    "world.h"
++  ],
++  "rows": [
++    {
++      "kind": "case",
++      "name": "inside",
++      "value": -2
++    },
++    {
++      "kind": "case",
++      "name": "max_x",
++      "value": -1
++    },
++    {
++      "kind": "case",
++      "name": "min_x",
++      "value": -2
++    },
++    {
++      "kind": "case",
++      "name": "max_y",
++      "value": -1
++    },
++    {
++      "kind": "case",
++      "name": "min_y",
++      "value": -2
++    },
++    {
++      "kind": "case",
++      "name": "max_z",
++      "value": -1
++    },
++    {
++      "kind": "case",
++      "name": "min_z",
++      "value": -2
++    },
++    {
++      "kind": "case",
++      "name": "start_node_1",
++      "value": -2
++    },
++    {
++      "kind": "case",
++      "name": "negative_leaf",
++      "value": -3
++    },
++    {
++      "kind": "case",
++      "name": "bad_node",
++      "value": 2147483647
++    },
++    {
++      "kind": "case",
++      "name": "cross_fraction_bits",
++      "value": 1048313856
++    },
++    {
++      "kind": "case",
++      "name": "cross_endpoint_bits",
++      "value": 1073872896
++    },
++    {
++      "kind": "case",
++      "name": "quake1_rotated_brush_enabled",
++      "value": 0
++    },
++    {
++      "kind": "case",
++      "name": "fixture_count",
++      "value": 14
++    }
++  ],
++  "reference": {
++    "oracle": "tools/oracle/world_hull_oracle.c",
++    "oracle_sha256": "d3531d77bf115eb56c84a6ccab8cf128312c3eb2ede46bb8476c26c285a15d02"
++  }
++}
+diff --git a/audit/world_trace_golden.json b/audit/world_trace_golden.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..2ebeaac7feab1625af3c0197106aaa0ca07e872b
+--- /dev/null
++++ b/audit/world_trace_golden.json
+@@ -0,0 +1,55 @@
++{
++  "schema": "MiniQuakeWorldTraceGolden/1",
++  "package_id": "BP-025",
++  "parent_package_id": "BP-024R3",
++  "sources": [
++    "world.c",
++    "world.h"
++  ],
++  "rows": [
++    {
++      "kind": "case",
++      "name": "max_plane_empty",
++      "value": 1
++    },
++    {
++      "kind": "case",
++      "name": "min_plane_solid",
++      "value": 1
++    },
++    {
++      "kind": "case",
++      "name": "parallel_max_clear",
++      "value": 1
++    },
++    {
++      "kind": "case",
++      "name": "entry_fraction",
++      "value": 0.65625
++    },
++    {
++      "kind": "case",
++      "name": "entry_plane_distance",
++      "value": 1
++    },
++    {
++      "kind": "case",
++      "name": "translated_clear_world_end",
++      "value": 70
++    },
++    {
++      "kind": "case",
++      "name": "translated_hit_world_x",
++      "value": 99.96875
++    },
++    {
++      "kind": "case",
++      "name": "dist_epsilon",
++      "value": 0.03125
++    }
++  ],
++  "reference": {
++    "oracle": "tools/oracle/world_trace_oracle.c",
++    "oracle_sha256": "fedccce9c5aa5ed3fd59e0d3f1d63e6803becbfdf1d12f92711e4186cf3479e4"
++  }
++}
+diff --git a/src/miniquake/world.ml b/src/miniquake/world.ml
+index 72e2f9777688425c75fe23cf9392dd5d41f91324..89d3fd232afcb736156370ea018f3603e029897c 100644
+--- a/src/miniquake/world.ml
++++ b/src/miniquake/world.ml
+@@ -1,557 +1,556 @@
+-/*
+-Copyright (C) 1996-1997 Id Software, Inc.
+-Copyright (C) 2026 MiniQuake contributors
+-
+-Logical MiniLang pendant for WinQuake/world.c and world.h.  BSP traversal stays
+-in world_bsp, temporary AABB hulls stay in world_hull, and this unit owns the
+-original server-facing AreaNode/link/clip orchestration.
+-*/
+-
+-package miniquake.world
+-
+-import miniquake.types as t
+-import miniquake.constants as c
+-import miniquake.mathlib as math
+-import miniquake.native as native
+-import miniquake.array_util as arrayutil
+-import miniquake.world_bsp as bspworld
+-import miniquake.world_hull as boxworld
+-import miniquake.server_collision as collision
+-
+-const AREA_DEPTH = 4
+-const AREA_NODES = 32
+-const MAX_ENT_LEAFS = 16
+-
+-struct AreaNode
+-  axis
+-  dist
+-  child0
+-  child1
+-  triggerEdicts
+-  solidEdicts
+-end struct
+-
+-struct WorldAreaState
+-  server
+-  map
+-  nodes
+-  root
+-  linkedNode
+-  linkedTrigger
+-  absMins
+-  absMaxs
+-  leafNums
+-  touchEnabled
+-  touchEvents
+-end struct
+-
+-struct MoveClip
+-  boxMins
+-  boxMaxs
+-  mins
+-  maxs
+-  mins2
+-  maxs2
+-  start
+-  finish
+-  trace
+-  moveType
+-  passedEntity
+-end struct
+-
+-function zeroVector()
+-  return t.Vec3(0.0, 0.0, 0.0)
+-end function
+-
+-function absolute(value)
+-  if value < 0.0 then return -value end if
+-  return value
+-end function
+-
+-function fallbackEdict(state, entityIndex)
+-  if state.server is void or entityIndex < 0 or entityIndex >= len(state.server.edicts) then return void end if
+-  return state.server.edicts[entityIndex]
+-end function
+-
+-function hasRuntime(state)
+-  return state.server is not void and state.server.machine is not void and state.server.machine.context is not void
+-end function
+-
+-function entityValid(state, entityIndex)
+-  if hasRuntime(state) then return collision.entityValid(state.server, entityIndex) end if
+-  item = fallbackEdict(state, entityIndex)
+-  return item is not void and not item.free
+-end function
+-
+-function entityVector(state, entityIndex, name)
+-  if hasRuntime(state) then return collision.entityVector(state.server, entityIndex, name, zeroVector()) end if
+-  item = fallbackEdict(state, entityIndex)
+-  if item is void then return zeroVector() end if
+-  if name == "origin" then return math.VectorCopy(item.origin) end if
+-  if name == "mins" then return math.VectorCopy(item.mins) end if
+-  if name == "maxs" then return math.VectorCopy(item.maxs) end if
+-  if name == "angles" then return math.VectorCopy(item.angles) end if
+-  return zeroVector()
+-end function
+-
+-function entityNumber(state, entityIndex, name, fallback)
+-  if hasRuntime(state) then
+-    if name == "owner" or name == "modelindex" or name == "touch" then
+-      return collision.entityWord(state.server, entityIndex, name, fallback)
+-    end if
+-    return native.trunc(collision.entityFloat(state.server, entityIndex, name, fallback))
+-  end if
+-  item = fallbackEdict(state, entityIndex)
+-  if item is void then return fallback end if
+-  if name == "solid" then return item.solid end if
+-  if name == "movetype" then return item.moveType end if
+-  if name == "flags" then return item.flags end if
+-  if name == "modelindex" then return item.modelIndex end if
+-  if name == "owner" then
+-    for each pair in item.keyValues
+-      if pair.key == "owner" then
+-        value = toNumber(pair.value)
+-        if value is int then return value end if
+-      end if
+-    end for
+-  end if
+-  return fallback
+-end function
+-
+-function entityModel(state, entityIndex)
+-  if hasRuntime(state) then return collision.entityString(state.server, entityIndex, "model", "") end if
+-  item = fallbackEdict(state, entityIndex)
+-  if item is void then return "" end if
+-  return item.model
+-end function
+-
+-function makeState(server, map)
+-  capacity = c.MAX_EDICTS
+-  if server is not void and server.maxEdicts > capacity then capacity = server.maxEdicts end if
+-  linkedNode = arrayutil.makeFilledArray(capacity, -1)
+-  linkedTrigger = arrayutil.makeFilledArray(capacity, false)
+-  absMins = arrayutil.makeEmptyArray(capacity)
+-  absMaxs = arrayutil.makeEmptyArray(capacity)
+-  leafNums = arrayutil.makeEmptyArray(capacity)
+-  touchEnabled = arrayutil.makeFilledArray(capacity, false)
+-  index = 0
+-  while index < capacity
+-    absMins[index] = zeroVector()
+-    absMaxs[index] = zeroVector()
+-    leafNums[index] = []
+-    index = index + 1
+-  end while
+-  return WorldAreaState(server, map, [], -1, linkedNode, linkedTrigger, absMins, absMaxs, leafNums, touchEnabled, [])
+-end function
+-
+-function SV_InitBoxHull()
+-  return boxworld.createBoxHull(zeroVector(), zeroVector())
+-end function
+-
+-function SV_HullForBox(mins, maxs)
+-  return boxworld.createBoxHull(math.VectorCopy(mins), math.VectorCopy(maxs))
+-end function
+-
+-function SV_BoxOnPlaneSide(mins, maxs, plane)
+-  return math.BOX_ON_PLANE_SIDE(mins, maxs, plane)
+-end function
+-
+-function SV_CreateAreaNode(state, depth, mins, maxs)
+-  if len(state.nodes) >= AREA_NODES then return error(3800, "SV_CreateAreaNode: AREA_NODES exhausted") end if
+-  node = AreaNode(-1, 0.0, -1, -1, [], [])
+-  nodeIndex = len(state.nodes)
+-  state.nodes = state.nodes + [node]
+-  if depth == AREA_DEPTH then return nodeIndex end if
+-
+-  size = math.VectorSubtract(maxs, mins)
+-  node.axis = 1
+-  if size.x > size.y then node.axis = 0 end if
+-  if node.axis == 0 then node.dist = 0.5 * (maxs.x + mins.x) else node.dist = 0.5 * (maxs.y + mins.y) end if
+-
+-  highMins = math.VectorCopy(mins)
+-  highMaxs = math.VectorCopy(maxs)
+-  lowMins = math.VectorCopy(mins)
+-  lowMaxs = math.VectorCopy(maxs)
+-  if node.axis == 0 then
+-    highMins.x = node.dist
+-    lowMaxs.x = node.dist
+-  else
+-    highMins.y = node.dist
+-    lowMaxs.y = node.dist
+-  end if
+-  node.child0 = SV_CreateAreaNode(state, depth + 1, highMins, highMaxs)
+-  node.child1 = SV_CreateAreaNode(state, depth + 1, lowMins, lowMaxs)
+-  return nodeIndex
+-end function
+-
+-function SV_ClearWorld(server, map)
+-  if map is void or len(map.models) == 0 then return error(3801, "SV_ClearWorld: world model is missing") end if
+-  state = makeState(server, map)
+-  SV_InitBoxHull()
+-  state.root = SV_CreateAreaNode(state, 0, map.models[0].mins, map.models[0].maxs)
+-  return state
+-end function
+-
+-function removeEntity(values, entityIndex)
+-  result = []
+-  for each value in values
+-    if value != entityIndex then result = result + [value] end if
+-  end for
+-  return result
+-end function
+-
+-function SV_UnlinkEdict(state, entityIndex)
+-  if entityIndex < 0 or entityIndex >= len(state.linkedNode) then return false end if
+-  nodeIndex = state.linkedNode[entityIndex]
+-  if nodeIndex < 0 then return false end if
+-  node = state.nodes[nodeIndex]
+-  if state.linkedTrigger[entityIndex] then
+-    node.triggerEdicts = removeEntity(node.triggerEdicts, entityIndex)
+-  else
+-    node.solidEdicts = removeEntity(node.solidEdicts, entityIndex)
+-  end if
+-  state.linkedNode[entityIndex] = -1
+-  state.linkedTrigger[entityIndex] = false
+-  return true
+-end function
+-
+-function boxPlane(state, planeIndex)
+-  source = state.map.planes[planeIndex]
+-  signBits = 0
+-  if source.normal.x < 0.0 then signBits = signBits | 1 end if
+-  if source.normal.y < 0.0 then signBits = signBits | 2 end if
+-  if source.normal.z < 0.0 then signBits = signBits | 4 end if
+-  return t.Plane(math.VectorCopy(source.normal), source.dist, source.type, signBits)
+-end function
+-
+-function SV_FindTouchedLeafs(state, entityIndex, nodeNumber)
+-  if len(state.leafNums[entityIndex]) >= MAX_ENT_LEAFS then return false end if
+-  if nodeNumber < 0 then
+-    leafIndex = -1 - nodeNumber
+-    if leafIndex < 0 or leafIndex >= len(state.map.leafs) then return error(3802, "SV_FindTouchedLeafs: bad leaf") end if
+-    if state.map.leafs[leafIndex].contents == c.CONTENTS_SOLID then return false end if
+-    state.leafNums[entityIndex] = state.leafNums[entityIndex] + [leafIndex - 1]
+-    return true
+-  end if
+-  if nodeNumber >= len(state.map.nodes) then return error(3803, "SV_FindTouchedLeafs: bad node") end if
+-  node = state.map.nodes[nodeNumber]
+-  sides = SV_BoxOnPlaneSide(state.absMins[entityIndex], state.absMaxs[entityIndex], boxPlane(state, node.planeIndex))
+-  if (sides & 1) != 0 then SV_FindTouchedLeafs(state, entityIndex, node.child0) end if
+-  if len(state.leafNums[entityIndex]) >= MAX_ENT_LEAFS then return true end if
+-  if (sides & 2) != 0 then SV_FindTouchedLeafs(state, entityIndex, node.child1) end if
+-  return true
+-end function
+-
+-function World_SetTouchEnabled(state, entityIndex, enabled)
+-  if entityIndex < 0 or entityIndex >= len(state.touchEnabled) then return false end if
+-  state.touchEnabled[entityIndex] = enabled
+-  return true
+-end function
+-
+-function entityHasTouch(state, entityIndex)
+-  if hasRuntime(state) then return entityNumber(state, entityIndex, "touch", 0) != 0 end if
+-  return state.touchEnabled[entityIndex]
+-end function
+-
+-function executeTrigger(state, triggerIndex, entityIndex)
+-  if hasRuntime(state) then return collision.executeTouch(state.server, triggerIndex, entityIndex) end if
+-  state.touchEvents = state.touchEvents + [[triggerIndex, entityIndex, state.server.time]]
+-  return true
+-end function
+-
+-function boxesOverlap(minsA, maxsA, minsB, maxsB)
+-  return collision.boxesOverlap(minsA, maxsA, minsB, maxsB)
+-end function
+-
+-function SV_TouchLinks(state, entityIndex, nodeIndex)
+-  node = state.nodes[nodeIndex]
+-  // Iterate a snapshot: QuakeC may unlink/free the current trigger during touch.
+-  triggers = node.triggerEdicts
+-  for each triggerIndex in triggers
+-    if triggerIndex != entityIndex and entityValid(state, triggerIndex) then
+-      if entityNumber(state, triggerIndex, "solid", c.SOLID_NOT) == c.SOLID_TRIGGER and entityHasTouch(state, triggerIndex) then
+-        if boxesOverlap(state.absMins[entityIndex], state.absMaxs[entityIndex], state.absMins[triggerIndex], state.absMaxs[triggerIndex]) then
+-          executeTrigger(state, triggerIndex, entityIndex)
+-        end if
+-      end if
+-    end if
+-  end for
+-  if node.axis == -1 then return true end if
+-  entityMin = state.absMins[entityIndex]
+-  entityMax = state.absMaxs[entityIndex]
+-  if (node.axis == 0 and entityMax.x > node.dist) or (node.axis == 1 and entityMax.y > node.dist) then
+-    SV_TouchLinks(state, entityIndex, node.child0)
+-  end if
+-  if (node.axis == 0 and entityMin.x < node.dist) or (node.axis == 1 and entityMin.y < node.dist) then
+-    SV_TouchLinks(state, entityIndex, node.child1)
+-  end if
+-  return true
+-end function
+-
+-function rotatedBounds(origin, mins, maxs)
+-  maximum = 0.0
+-  values = [mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z]
+-  for each value in values
+-    magnitude = absolute(value)
+-    if magnitude > maximum then maximum = magnitude end if
+-  end for
+-  return [
+-    t.Vec3(origin.x - maximum, origin.y - maximum, origin.z - maximum),
+-    t.Vec3(origin.x + maximum, origin.y + maximum, origin.z + maximum),
+-  ]
+-end function
+-
+-function SV_LinkEdict(state, entityIndex, touchTriggers)
+-  SV_UnlinkEdict(state, entityIndex)
+-  if entityIndex == 0 or not entityValid(state, entityIndex) then return false end if
+-
+-  origin = entityVector(state, entityIndex, "origin")
+-  mins = entityVector(state, entityIndex, "mins")
+-  maxs = entityVector(state, entityIndex, "maxs")
+-  angles = entityVector(state, entityIndex, "angles")
+-  solid = entityNumber(state, entityIndex, "solid", c.SOLID_NOT)
+-  absMin = zeroVector()
+-  absMax = zeroVector()
+-  if solid == c.SOLID_BSP and (angles.x != 0.0 or angles.y != 0.0 or angles.z != 0.0) then
+-    bounds = rotatedBounds(origin, mins, maxs)
+-    absMin = bounds[0]
+-    absMax = bounds[1]
+-  else
+-    absMin = math.VectorAdd(origin, mins)
+-    absMax = math.VectorAdd(origin, maxs)
+-  end if
+-
+-  flags = entityNumber(state, entityIndex, "flags", 0)
+-  if (flags & c.FL_ITEM) != 0 then
+-    absMin.x = absMin.x - 15.0
+-    absMin.y = absMin.y - 15.0
+-    absMax.x = absMax.x + 15.0
+-    absMax.y = absMax.y + 15.0
+-  else
+-    absMin.x = absMin.x - 1.0
+-    absMin.y = absMin.y - 1.0
+-    absMin.z = absMin.z - 1.0
+-    absMax.x = absMax.x + 1.0
+-    absMax.y = absMax.y + 1.0
+-    absMax.z = absMax.z + 1.0
+-  end if
+-  state.absMins[entityIndex] = absMin
+-  state.absMaxs[entityIndex] = absMax
+-  if hasRuntime(state) then
+-    collision.setEntityVector(state.server, entityIndex, "absmin", absMin)
+-    collision.setEntityVector(state.server, entityIndex, "absmax", absMax)
+-  end if
+-
+-  state.leafNums[entityIndex] = []
+-  if entityNumber(state, entityIndex, "modelindex", 0) != 0 and len(state.map.models) > 0 then
+-    SV_FindTouchedLeafs(state, entityIndex, state.map.models[0].headNodes[0])
+-  end if
+-  if solid == c.SOLID_NOT then return true end if
+-
+-  nodeIndex = state.root
+-  searching = true
+-  while searching
+-    node = state.nodes[nodeIndex]
+-    if node.axis == -1 then break end if
+-    if node.axis == 0 then
+-      if absMin.x > node.dist then nodeIndex = node.child0
+-      else if absMax.x < node.dist then nodeIndex = node.child1
+-      else searching = false
+-      end if
+-    else
+-      if absMin.y > node.dist then nodeIndex = node.child0
+-      else if absMax.y < node.dist then nodeIndex = node.child1
+-      else searching = false
+-      end if
+-    end if
+-  end while
+-
+-  node = state.nodes[nodeIndex]
+-  if solid == c.SOLID_TRIGGER then
+-    node.triggerEdicts = node.triggerEdicts + [entityIndex]
+-    state.linkedTrigger[entityIndex] = true
+-  else
+-    node.solidEdicts = node.solidEdicts + [entityIndex]
+-    state.linkedTrigger[entityIndex] = false
+-  end if
+-  state.linkedNode[entityIndex] = nodeIndex
+-  if touchTriggers then SV_TouchLinks(state, entityIndex, state.root) end if
+-  return true
+-end function
+-
+-function SV_HullPointContents(hull, number, point)
+-  return boxworld.truePointContents(hull, point)
+-end function
+-
+-function SV_BspHullPointContents(hull, number, point)
+-  return bspworld.pointContentsFromNode(hull, number, point)
+-end function
+-
+-function SV_PointContents(state, point)
+-  contents = SV_TruePointContents(state, point)
+-  if contents <= -9 and contents >= -14 then return c.CONTENTS_WATER end if
+-  return contents
+-end function
+-
+-function SV_TruePointContents(state, point)
+-  return bspworld.truePointContents(state.map, point)
+-end function
+-
+-function hullIndex(mins, maxs)
+-  sizeX = maxs.x - mins.x
+-  if sizeX < 3.0 then return 0 end if
+-  if sizeX <= 32.0 then return 1 end if
+-  return 2
+-end function
+-
+-function SV_HullForEntity(state, entityIndex, mins, maxs)
+-  solid = entityNumber(state, entityIndex, "solid", c.SOLID_NOT)
+-  origin = entityVector(state, entityIndex, "origin")
+-  if solid == c.SOLID_BSP then
+-    if entityNumber(state, entityIndex, "movetype", c.MOVETYPE_NONE) != c.MOVETYPE_PUSH then
+-      return error(3804, "SOLID_BSP without MOVETYPE_PUSH")
+-    end if
+-    submodel = collision.modelSubIndex(entityModel(state, entityIndex))
+-    if entityIndex == 0 then submodel = 0 end if
+-    if submodel < 0 then return error(3805, "MOVETYPE_PUSH with a non bsp model") end if
+-    hull = bspworld.createModelHull(state.map, submodel, hullIndex(mins, maxs))
+-    offset = math.VectorAdd(math.VectorSubtract(hull.clipMins, mins), origin)
+-    angles = entityVector(state, entityIndex, "angles")
+-    rotated = angles.x != 0.0 or angles.y != 0.0 or angles.z != 0.0
+-    return [hull, offset, rotated]
+-  end if
+-  hullMins = math.VectorSubtract(entityVector(state, entityIndex, "mins"), maxs)
+-  hullMaxs = math.VectorSubtract(entityVector(state, entityIndex, "maxs"), mins)
+-  return [SV_HullForBox(hullMins, hullMaxs), origin, false]
+-end function
+-
+-function rotateIntoModel(value, angles)
+-  vectors = math.AngleVectors(angles)
+-  return t.Vec3(
+-    math.DotProduct(value, vectors[0]),
+-    -math.DotProduct(value, vectors[1]),
+-    math.DotProduct(value, vectors[2]),
+-  )
+-end function
+-
+-function rotateFromModel(value, angles)
+-  inverse = t.Vec3(-angles.x, -angles.y, -angles.z)
+-  return rotateIntoModel(value, inverse)
+-end function
+-
+-function SV_RecursiveHullCheck(hull, number, p1Fraction, p2Fraction, p1, p2, trace)
+-  return bspworld.recursiveHullCheck(hull, number, p1Fraction, p2Fraction, p1, p2, trace)
+-end function
+-
+-function SV_ClipMoveToEntity(state, entityIndex, start, mins, maxs, finish)
+-  selected = SV_HullForEntity(state, entityIndex, mins, maxs)
+-  hull = selected[0]
+-  offset = selected[1]
+-  rotated = selected[2]
+-  localStart = math.VectorSubtract(start, offset)
+-  localFinish = math.VectorSubtract(finish, offset)
+-  angles = entityVector(state, entityIndex, "angles")
+-  if rotated then
+-    localStart = rotateIntoModel(localStart, angles)
+-    localFinish = rotateIntoModel(localFinish, angles)
+-  end if
+-
+-  trace = t.Trace(true, false, false, false, 1.0, math.VectorCopy(localFinish), t.Plane(zeroVector(), 0.0, 0, 0), 0)
+-  if entityNumber(state, entityIndex, "solid", c.SOLID_NOT) == c.SOLID_BSP then
+-    trace = bspworld.traceInHull(hull, localStart, localFinish)
+-  else
+-    trace = boxworld.traceLine(hull, localStart, localFinish)
+-  end if
+-
+-  if rotated and trace.fraction != 1.0 then
+-    trace.endPosition = rotateFromModel(trace.endPosition, angles)
+-    trace.plane.normal = rotateFromModel(trace.plane.normal, angles)
+-  end if
+-  if trace.fraction != 1.0 then trace.endPosition = math.VectorAdd(trace.endPosition, offset) end if
+-  if trace.fraction < 1.0 or trace.startSolid then trace.entity = entityIndex end if
+-  return trace
+-end function
+-
+-function SV_MoveBounds(start, mins, maxs, finish)
+-  return collision.moveBounds(start, mins, maxs, finish)
+-end function
+-
+-function chooseTrace(best, candidate)
+-  return collision.chooseTrace(best, candidate)
+-end function
+-
+-function SV_ClipToLinks(state, nodeIndex, clip)
+-  node = state.nodes[nodeIndex]
+-  solids = node.solidEdicts
+-  for each touchIndex in solids
+-    if entityValid(state, touchIndex) and touchIndex != clip.passedEntity then
+-      solid = entityNumber(state, touchIndex, "solid", c.SOLID_NOT)
+-      if solid == c.SOLID_TRIGGER then return error(3806, "Trigger in clipping list") end if
+-      consider = solid != c.SOLID_NOT
+-      if clip.moveType == c.MOVE_NOMONSTERS and solid != c.SOLID_BSP then consider = false end if
+-      if consider and not boxesOverlap(clip.boxMins, clip.boxMaxs, state.absMins[touchIndex], state.absMaxs[touchIndex]) then consider = false end if
+-
+-      if consider and clip.passedEntity >= 0 then
+-        passedMins = entityVector(state, clip.passedEntity, "mins")
+-        passedMaxs = entityVector(state, clip.passedEntity, "maxs")
+-        touchMins = entityVector(state, touchIndex, "mins")
+-        touchMaxs = entityVector(state, touchIndex, "maxs")
+-        if passedMaxs.x - passedMins.x != 0.0 and touchMaxs.x - touchMins.x == 0.0 then consider = false end if
+-        if entityNumber(state, touchIndex, "owner", -1) == clip.passedEntity then consider = false end if
+-        if entityNumber(state, clip.passedEntity, "owner", -1) == touchIndex then consider = false end if
+-      end if
+-
+-      if consider then
+-        if clip.trace.allSolid then return true end if
+-        touchMins = clip.mins
+-        touchMaxs = clip.maxs
+-        if (entityNumber(state, touchIndex, "flags", 0) & c.FL_MONSTER) != 0 then
+-          touchMins = clip.mins2
+-          touchMaxs = clip.maxs2
+-        end if
+-        candidate = SV_ClipMoveToEntity(state, touchIndex, clip.start, touchMins, touchMaxs, clip.finish)
+-        clip.trace = chooseTrace(clip.trace, candidate)
+-      end if
+-    end if
+-  end for
+-
+-  if node.axis == -1 then return true end if
+-  if (node.axis == 0 and clip.boxMaxs.x > node.dist) or (node.axis == 1 and clip.boxMaxs.y > node.dist) then
+-    SV_ClipToLinks(state, node.child0, clip)
+-  end if
+-  if (node.axis == 0 and clip.boxMins.x < node.dist) or (node.axis == 1 and clip.boxMins.y < node.dist) then
+-    SV_ClipToLinks(state, node.child1, clip)
+-  end if
+-  return true
+-end function
+-
+-function SV_Move(state, start, mins, maxs, finish, moveType, passedEntity)
+-  trace = bspworld.trace(state.map, start, mins, maxs, finish)
+-  trace.entity = 0
+-  mins2 = math.VectorCopy(mins)
+-  maxs2 = math.VectorCopy(maxs)
+-  if moveType == c.MOVE_MISSILE then
+-    mins2 = t.Vec3(-15.0, -15.0, -15.0)
+-    maxs2 = t.Vec3(15.0, 15.0, 15.0)
+-  end if
+-  bounds = SV_MoveBounds(start, mins2, maxs2, finish)
+-  clip = MoveClip(bounds[0], bounds[1], mins, maxs, mins2, maxs2, start, finish, trace, moveType, passedEntity)
+-  SV_ClipToLinks(state, state.root, clip)
+-  return clip.trace
+-end function
+-
+-function SV_TestEntityPosition(state, entityIndex)
+-  if not entityValid(state, entityIndex) then return -1 end if
+-  origin = entityVector(state, entityIndex, "origin")
+-  trace = SV_Move(
+-    state,
+-    origin,
+-    entityVector(state, entityIndex, "mins"),
+-    entityVector(state, entityIndex, "maxs"),
+-    origin,
+-    c.MOVE_NORMAL,
+-    entityIndex,
+-  )
+-  if trace.startSolid then return 0 end if
+-  return -1
+-end function
++/*
++Copyright (C) 1996-1997 Id Software, Inc.
++Copyright (C) 2026 MiniQuake contributors
++
++Logical MiniLang pendant for WinQuake/world.c and world.h.  BSP traversal stays
++in world_bsp, temporary AABB hulls stay in world_hull, and this unit owns the
++original server-facing AreaNode/link/clip orchestration.
++*/
++
++package miniquake.world
++
++import miniquake.types as t
++import miniquake.constants as c
++import miniquake.mathlib as math
++import miniquake.native as native
++import miniquake.array_util as arrayutil
++import miniquake.world_bsp as bspworld
++import miniquake.world_hull as boxworld
++import miniquake.server_collision as collision
++
++const AREA_DEPTH = 4
++const AREA_NODES = 32
++const MAX_ENT_LEAFS = 16
++
++struct AreaNode
++  axis
++  dist
++  child0
++  child1
++  triggerEdicts
++  solidEdicts
++end struct
++
++struct WorldAreaState
++  server
++  map
++  nodes
++  root
++  linkedNode
++  linkedTrigger
++  absMins
++  absMaxs
++  leafNums
++  touchEnabled
++  touchEvents
++end struct
++
++struct MoveClip
++  boxMins
++  boxMaxs
++  mins
++  maxs
++  mins2
++  maxs2
++  start
++  finish
++  trace
++  moveType
++  passedEntity
++end struct
++
++function zeroVector()
++  return t.Vec3(0.0, 0.0, 0.0)
++end function
++
++function absolute(value)
++  if value < 0.0 then return -value end if
++  return value
++end function
++
++function fallbackEdict(state, entityIndex)
++  if state.server is void or entityIndex < 0 or entityIndex >= len(state.server.edicts) then return void end if
++  return state.server.edicts[entityIndex]
++end function
++
++function hasRuntime(state)
++  return state.server is not void and state.server.machine is not void and state.server.machine.context is not void
++end function
++
++function entityValid(state, entityIndex)
++  if hasRuntime(state) then return collision.entityValid(state.server, entityIndex) end if
++  item = fallbackEdict(state, entityIndex)
++  return item is not void and not item.free
++end function
++
++function entityVector(state, entityIndex, name)
++  if hasRuntime(state) then return collision.entityVector(state.server, entityIndex, name, zeroVector()) end if
++  item = fallbackEdict(state, entityIndex)
++  if item is void then return zeroVector() end if
++  if name == "origin" then return math.VectorCopy(item.origin) end if
++  if name == "mins" then return math.VectorCopy(item.mins) end if
++  if name == "maxs" then return math.VectorCopy(item.maxs) end if
++  if name == "angles" then return math.VectorCopy(item.angles) end if
++  return zeroVector()
++end function
++
++function entityNumber(state, entityIndex, name, fallback)
++  if hasRuntime(state) then
++    if name == "owner" or name == "modelindex" or name == "touch" then
++      return collision.entityWord(state.server, entityIndex, name, fallback)
++    end if
++    return native.trunc(collision.entityFloat(state.server, entityIndex, name, fallback))
++  end if
++  item = fallbackEdict(state, entityIndex)
++  if item is void then return fallback end if
++  if name == "solid" then return item.solid end if
++  if name == "movetype" then return item.moveType end if
++  if name == "flags" then return item.flags end if
++  if name == "modelindex" then return item.modelIndex end if
++  if name == "owner" then
++    for each pair in item.keyValues
++      if pair.key == "owner" then
++        value = toNumber(pair.value)
++        if value is int then return value end if
++      end if
++    end for
++  end if
++  return fallback
++end function
++
++function entityModel(state, entityIndex)
++  if hasRuntime(state) then return collision.entityString(state.server, entityIndex, "model", "") end if
++  item = fallbackEdict(state, entityIndex)
++  if item is void then return "" end if
++  return item.model
++end function
++
++function makeState(server, map)
++  capacity = c.MAX_EDICTS
++  if server is not void and server.maxEdicts > capacity then capacity = server.maxEdicts end if
++  linkedNode = arrayutil.makeFilledArray(capacity, -1)
++  linkedTrigger = arrayutil.makeFilledArray(capacity, false)
++  absMins = arrayutil.makeEmptyArray(capacity)
++  absMaxs = arrayutil.makeEmptyArray(capacity)
++  leafNums = arrayutil.makeEmptyArray(capacity)
++  touchEnabled = arrayutil.makeFilledArray(capacity, false)
++  index = 0
++  while index < capacity
++    absMins[index] = zeroVector()
++    absMaxs[index] = zeroVector()
++    leafNums[index] = []
++    index = index + 1
++  end while
++  return WorldAreaState(server, map, [], -1, linkedNode, linkedTrigger, absMins, absMaxs, leafNums, touchEnabled, [])
++end function
++
++function SV_InitBoxHull()
++  return boxworld.createBoxHull(zeroVector(), zeroVector())
++end function
++
++function SV_HullForBox(mins, maxs)
++  return boxworld.createBoxHull(math.VectorCopy(mins), math.VectorCopy(maxs))
++end function
++
++function SV_BoxOnPlaneSide(mins, maxs, plane)
++  return math.BOX_ON_PLANE_SIDE(mins, maxs, plane)
++end function
++
++function SV_CreateAreaNode(state, depth, mins, maxs)
++  if len(state.nodes) >= AREA_NODES then return error(3800, "SV_CreateAreaNode: AREA_NODES exhausted") end if
++  node = AreaNode(-1, 0.0, -1, -1, [], [])
++  nodeIndex = len(state.nodes)
++  state.nodes = state.nodes + [node]
++  if depth == AREA_DEPTH then return nodeIndex end if
++
++  size = math.VectorSubtract(maxs, mins)
++  node.axis = 1
++  if size.x > size.y then node.axis = 0 end if
++  if node.axis == 0 then node.dist = 0.5 * (maxs.x + mins.x) else node.dist = 0.5 * (maxs.y + mins.y) end if
++
++  highMins = math.VectorCopy(mins)
++  highMaxs = math.VectorCopy(maxs)
++  lowMins = math.VectorCopy(mins)
++  lowMaxs = math.VectorCopy(maxs)
++  if node.axis == 0 then
++    highMins.x = node.dist
++    lowMaxs.x = node.dist
++  else
++    highMins.y = node.dist
++    lowMaxs.y = node.dist
++  end if
++  node.child0 = SV_CreateAreaNode(state, depth + 1, highMins, highMaxs)
++  node.child1 = SV_CreateAreaNode(state, depth + 1, lowMins, lowMaxs)
++  return nodeIndex
++end function
++
++function SV_ClearWorld(server, map)
++  if map is void or len(map.models) == 0 then return error(3801, "SV_ClearWorld: world model is missing") end if
++  state = makeState(server, map)
++  SV_InitBoxHull()
++  state.root = SV_CreateAreaNode(state, 0, map.models[0].mins, map.models[0].maxs)
++  return state
++end function
++
++function removeEntity(values, entityIndex)
++  result = []
++  for each value in values
++    if value != entityIndex then result = result + [value] end if
++  end for
++  return result
++end function
++
++function SV_UnlinkEdict(state, entityIndex)
++  if entityIndex < 0 or entityIndex >= len(state.linkedNode) then return false end if
++  nodeIndex = state.linkedNode[entityIndex]
++  if nodeIndex < 0 then return false end if
++  node = state.nodes[nodeIndex]
++  if state.linkedTrigger[entityIndex] then
++    node.triggerEdicts = removeEntity(node.triggerEdicts, entityIndex)
++  else
++    node.solidEdicts = removeEntity(node.solidEdicts, entityIndex)
++  end if
++  state.linkedNode[entityIndex] = -1
++  state.linkedTrigger[entityIndex] = false
++  return true
++end function
++
++function boxPlane(state, planeIndex)
++  source = state.map.planes[planeIndex]
++  signBits = 0
++  if source.normal.x < 0.0 then signBits = signBits | 1 end if
++  if source.normal.y < 0.0 then signBits = signBits | 2 end if
++  if source.normal.z < 0.0 then signBits = signBits | 4 end if
++  return t.Plane(math.VectorCopy(source.normal), source.dist, source.type, signBits)
++end function
++
++function SV_FindTouchedLeafs(state, entityIndex, nodeNumber)
++  if len(state.leafNums[entityIndex]) >= MAX_ENT_LEAFS then return false end if
++  if nodeNumber < 0 then
++    leafIndex = -1 - nodeNumber
++    if leafIndex < 0 or leafIndex >= len(state.map.leafs) then return error(3802, "SV_FindTouchedLeafs: bad leaf") end if
++    if state.map.leafs[leafIndex].contents == c.CONTENTS_SOLID then return false end if
++    state.leafNums[entityIndex] = state.leafNums[entityIndex] + [leafIndex - 1]
++    return true
++  end if
++  if nodeNumber >= len(state.map.nodes) then return error(3803, "SV_FindTouchedLeafs: bad node") end if
++  node = state.map.nodes[nodeNumber]
++  sides = SV_BoxOnPlaneSide(state.absMins[entityIndex], state.absMaxs[entityIndex], boxPlane(state, node.planeIndex))
++  if (sides & 1) != 0 then SV_FindTouchedLeafs(state, entityIndex, node.child0) end if
++  if len(state.leafNums[entityIndex]) >= MAX_ENT_LEAFS then return true end if
++  if (sides & 2) != 0 then SV_FindTouchedLeafs(state, entityIndex, node.child1) end if
++  return true
++end function
++
++function World_SetTouchEnabled(state, entityIndex, enabled)
++  if entityIndex < 0 or entityIndex >= len(state.touchEnabled) then return false end if
++  state.touchEnabled[entityIndex] = enabled
++  return true
++end function
++
++function entityHasTouch(state, entityIndex)
++  if hasRuntime(state) then return entityNumber(state, entityIndex, "touch", 0) != 0 end if
++  return state.touchEnabled[entityIndex]
++end function
++
++function executeTrigger(state, triggerIndex, entityIndex)
++  if hasRuntime(state) then return collision.executeTouch(state.server, triggerIndex, entityIndex) end if
++  state.touchEvents = state.touchEvents + [[triggerIndex, entityIndex, state.server.time]]
++  return true
++end function
++
++function boxesOverlap(minsA, maxsA, minsB, maxsB)
++  return collision.boxesOverlap(minsA, maxsA, minsB, maxsB)
++end function
++
++function SV_TouchLinks(state, entityIndex, nodeIndex)
++  node = state.nodes[nodeIndex]
++  // Iterate a snapshot: QuakeC may unlink/free the current trigger during touch.
++  triggers = node.triggerEdicts
++  for each triggerIndex in triggers
++    if triggerIndex != entityIndex and entityValid(state, triggerIndex) then
++      if entityNumber(state, triggerIndex, "solid", c.SOLID_NOT) == c.SOLID_TRIGGER and entityHasTouch(state, triggerIndex) then
++        if boxesOverlap(state.absMins[entityIndex], state.absMaxs[entityIndex], state.absMins[triggerIndex], state.absMaxs[triggerIndex]) then
++          executeTrigger(state, triggerIndex, entityIndex)
++        end if
++      end if
++    end if
++  end for
++  if node.axis == -1 then return true end if
++  entityMin = state.absMins[entityIndex]
++  entityMax = state.absMaxs[entityIndex]
++  if (node.axis == 0 and entityMax.x > node.dist) or (node.axis == 1 and entityMax.y > node.dist) then
++    SV_TouchLinks(state, entityIndex, node.child0)
++  end if
++  if (node.axis == 0 and entityMin.x < node.dist) or (node.axis == 1 and entityMin.y < node.dist) then
++    SV_TouchLinks(state, entityIndex, node.child1)
++  end if
++  return true
++end function
++
++function rotatedBounds(origin, mins, maxs)
++  maximum = 0.0
++  values = [mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z]
++  for each value in values
++    magnitude = absolute(value)
++    if magnitude > maximum then maximum = magnitude end if
++  end for
++  return [
++    t.Vec3(origin.x - maximum, origin.y - maximum, origin.z - maximum),
++    t.Vec3(origin.x + maximum, origin.y + maximum, origin.z + maximum),
++  ]
++end function
++
++function SV_LinkEdict(state, entityIndex, touchTriggers)
++  SV_UnlinkEdict(state, entityIndex)
++  if entityIndex == 0 or not entityValid(state, entityIndex) then return false end if
++
++  origin = entityVector(state, entityIndex, "origin")
++  mins = entityVector(state, entityIndex, "mins")
++  maxs = entityVector(state, entityIndex, "maxs")
++  solid = entityNumber(state, entityIndex, "solid", c.SOLID_NOT)
++  // WinQuake 1.09 is built without QUAKE2: rotated BSP broad-phase bounds are
++  // not part of the compatibility profile.
++  absMin = math.VectorAdd(origin, mins)
++  absMax = math.VectorAdd(origin, maxs)
++
++  flags = entityNumber(state, entityIndex, "flags", 0)
++  if (flags & c.FL_ITEM) != 0 then
++    absMin.x = absMin.x - 15.0
++    absMin.y = absMin.y - 15.0
++    absMax.x = absMax.x + 15.0
++    absMax.y = absMax.y + 15.0
++  else
++    absMin.x = absMin.x - 1.0
++    absMin.y = absMin.y - 1.0
++    absMin.z = absMin.z - 1.0
++    absMax.x = absMax.x + 1.0
++    absMax.y = absMax.y + 1.0
++    absMax.z = absMax.z + 1.0
++  end if
++  state.absMins[entityIndex] = absMin
++  state.absMaxs[entityIndex] = absMax
++  if hasRuntime(state) then
++    collision.setEntityVector(state.server, entityIndex, "absmin", absMin)
++    collision.setEntityVector(state.server, entityIndex, "absmax", absMax)
++  end if
++
++  state.leafNums[entityIndex] = []
++  if entityNumber(state, entityIndex, "modelindex", 0) != 0 and len(state.map.models) > 0 then
++    SV_FindTouchedLeafs(state, entityIndex, state.map.models[0].headNodes[0])
++  end if
++  if solid == c.SOLID_NOT then return true end if
++
++  nodeIndex = state.root
++  searching = true
++  while searching
++    node = state.nodes[nodeIndex]
++    if node.axis == -1 then break end if
++    if node.axis == 0 then
++      if absMin.x > node.dist then nodeIndex = node.child0
++      else if absMax.x < node.dist then nodeIndex = node.child1
++      else searching = false
++      end if
++    else
++      if absMin.y > node.dist then nodeIndex = node.child0
++      else if absMax.y < node.dist then nodeIndex = node.child1
++      else searching = false
++      end if
++    end if
++  end while
++
++  node = state.nodes[nodeIndex]
++  if solid == c.SOLID_TRIGGER then
++    node.triggerEdicts = node.triggerEdicts + [entityIndex]
++    state.linkedTrigger[entityIndex] = true
++  else
++    node.solidEdicts = node.solidEdicts + [entityIndex]
++    state.linkedTrigger[entityIndex] = false
++  end if
++  state.linkedNode[entityIndex] = nodeIndex
++  if touchTriggers then SV_TouchLinks(state, entityIndex, state.root) end if
++  return true
++end function
++
++function SV_HullPointContents(hull, number, point)
++  return boxworld.pointContentsFromNode(hull, number, point)
++end function
++
++function SV_BspHullPointContents(hull, number, point)
++  return bspworld.pointContentsFromNode(hull, number, point)
++end function
++
++function SV_PointContents(state, point)
++  contents = SV_TruePointContents(state, point)
++  if contents <= -9 and contents >= -14 then return c.CONTENTS_WATER end if
++  return contents
++end function
++
++function SV_TruePointContents(state, point)
++  return bspworld.truePointContents(state.map, point)
++end function
++
++function hullIndex(mins, maxs)
++  sizeX = maxs.x - mins.x
++  if sizeX < 3.0 then return 0 end if
++  if sizeX <= 32.0 then return 1 end if
++  return 2
++end function
++
++function SV_HullForEntity(state, entityIndex, mins, maxs)
++  solid = entityNumber(state, entityIndex, "solid", c.SOLID_NOT)
++  origin = entityVector(state, entityIndex, "origin")
++  if solid == c.SOLID_BSP then
++    if entityNumber(state, entityIndex, "movetype", c.MOVETYPE_NONE) != c.MOVETYPE_PUSH then
++      return error(3804, "SOLID_BSP without MOVETYPE_PUSH")
++    end if
++    submodel = collision.modelSubIndex(entityModel(state, entityIndex))
++    if entityIndex == 0 then submodel = 0 end if
++    if submodel < 0 then return error(3805, "MOVETYPE_PUSH with a non bsp model") end if
++    hull = bspworld.createModelHull(state.map, submodel, hullIndex(mins, maxs))
++    offset = math.VectorAdd(math.VectorSubtract(hull.clipMins, mins), origin)
++    // WinQuake's QUAKE2-only rotating brush path is deliberately disabled in
++    // compat_109.  The angle fields remain available to QuakeC/rendering.
++    return [hull, offset, false]
++  end if
++  hullMins = math.VectorSubtract(entityVector(state, entityIndex, "mins"), maxs)
++  hullMaxs = math.VectorSubtract(entityVector(state, entityIndex, "maxs"), mins)
++  return [SV_HullForBox(hullMins, hullMaxs), origin, false]
++end function
++
++function rotateIntoModel(value, angles)
++  vectors = math.AngleVectors(angles)
++  return t.Vec3(
++    math.DotProduct(value, vectors[0]),
++    -math.DotProduct(value, vectors[1]),
++    math.DotProduct(value, vectors[2]),
++  )
++end function
++
++function rotateFromModel(value, angles)
++  inverse = t.Vec3(-angles.x, -angles.y, -angles.z)
++  return rotateIntoModel(value, inverse)
++end function
++
++function SV_RecursiveHullCheck(hull, number, p1Fraction, p2Fraction, p1, p2, trace)
++  return bspworld.recursiveHullCheck(hull, number, p1Fraction, p2Fraction, p1, p2, trace)
++end function
++
++function SV_ClipMoveToEntity(state, entityIndex, start, mins, maxs, finish)
++  selected = SV_HullForEntity(state, entityIndex, mins, maxs)
++  hull = selected[0]
++  offset = selected[1]
++  rotated = selected[2]
++  localStart = math.VectorSubtract(start, offset)
++  localFinish = math.VectorSubtract(finish, offset)
++  angles = entityVector(state, entityIndex, "angles")
++  if rotated then
++    localStart = rotateIntoModel(localStart, angles)
++    localFinish = rotateIntoModel(localFinish, angles)
++  end if
++
++  trace = t.Trace(true, false, false, false, 1.0, math.VectorCopy(localFinish), t.Plane(zeroVector(), 0.0, 0, 0), 0)
++  if entityNumber(state, entityIndex, "solid", c.SOLID_NOT) == c.SOLID_BSP then
++    trace = bspworld.traceInHull(hull, localStart, localFinish)
++  else
++    trace = boxworld.traceLine(hull, localStart, localFinish)
++  end if
++
++  if trace.fraction == 1.0 then
++    // world.c initializes trace.endpos with the caller's world-space end
++    // point.  Local hull coordinates must never leak from a clear trace.
++    trace.endPosition = math.VectorCopy(finish)
++  else
++    if rotated then
++      trace.endPosition = rotateFromModel(trace.endPosition, angles)
++      trace.plane.normal = rotateFromModel(trace.plane.normal, angles)
++    end if
++    trace.endPosition = math.VectorAdd(trace.endPosition, offset)
++  end if
++  if trace.fraction < 1.0 or trace.startSolid then trace.entity = entityIndex end if
++  return trace
++end function
++
++function SV_MoveBounds(start, mins, maxs, finish)
++  return collision.moveBounds(start, mins, maxs, finish)
++end function
++
++function chooseTrace(best, candidate)
++  return collision.chooseTrace(best, candidate)
++end function
++
++function SV_ClipToLinks(state, nodeIndex, clip)
++  node = state.nodes[nodeIndex]
++  solids = node.solidEdicts
++  for each touchIndex in solids
++    if entityValid(state, touchIndex) and touchIndex != clip.passedEntity then
++      solid = entityNumber(state, touchIndex, "solid", c.SOLID_NOT)
++      if solid == c.SOLID_TRIGGER then return error(3806, "Trigger in clipping list") end if
++      consider = solid != c.SOLID_NOT
++      if clip.moveType == c.MOVE_NOMONSTERS and solid != c.SOLID_BSP then consider = false end if
++      if consider and not boxesOverlap(clip.boxMins, clip.boxMaxs, state.absMins[touchIndex], state.absMaxs[touchIndex]) then consider = false end if
++
++      if consider and clip.passedEntity >= 0 then
++        passedMins = entityVector(state, clip.passedEntity, "mins")
++        passedMaxs = entityVector(state, clip.passedEntity, "maxs")
++        touchMins = entityVector(state, touchIndex, "mins")
++        touchMaxs = entityVector(state, touchIndex, "maxs")
++        if passedMaxs.x - passedMins.x != 0.0 and touchMaxs.x - touchMins.x == 0.0 then consider = false end if
++        if entityNumber(state, touchIndex, "owner", -1) == clip.passedEntity then consider = false end if
++        if entityNumber(state, clip.passedEntity, "owner", -1) == touchIndex then consider = false end if
++      end if
++
++      if consider then
++        if clip.trace.allSolid then return true end if
++        touchMins = clip.mins
++        touchMaxs = clip.maxs
++        if (entityNumber(state, touchIndex, "flags", 0) & c.FL_MONSTER) != 0 then
++          touchMins = clip.mins2
++          touchMaxs = clip.maxs2
++        end if
++        candidate = SV_ClipMoveToEntity(state, touchIndex, clip.start, touchMins, touchMaxs, clip.finish)
++        clip.trace = chooseTrace(clip.trace, candidate)
++      end if
++    end if
++  end for
++
++  if node.axis == -1 then return true end if
++  if (node.axis == 0 and clip.boxMaxs.x > node.dist) or (node.axis == 1 and clip.boxMaxs.y > node.dist) then
++    SV_ClipToLinks(state, node.child0, clip)
++  end if
++  if (node.axis == 0 and clip.boxMins.x < node.dist) or (node.axis == 1 and clip.boxMins.y < node.dist) then
++    SV_ClipToLinks(state, node.child1, clip)
++  end if
++  return true
++end function
++
++function SV_Move(state, start, mins, maxs, finish, moveType, passedEntity)
++  trace = bspworld.trace(state.map, start, mins, maxs, finish)
++  trace.entity = 0
++  mins2 = math.VectorCopy(mins)
++  maxs2 = math.VectorCopy(maxs)
++  if moveType == c.MOVE_MISSILE then
++    mins2 = t.Vec3(-15.0, -15.0, -15.0)
++    maxs2 = t.Vec3(15.0, 15.0, 15.0)
++  end if
++  bounds = SV_MoveBounds(start, mins2, maxs2, finish)
++  clip = MoveClip(bounds[0], bounds[1], mins, maxs, mins2, maxs2, start, finish, trace, moveType, passedEntity)
++  SV_ClipToLinks(state, state.root, clip)
++  return clip.trace
++end function
++
++function SV_TestEntityPosition(state, entityIndex)
++  if not entityValid(state, entityIndex) then return -1 end if
++  origin = entityVector(state, entityIndex, "origin")
++  trace = SV_Move(
++    state,
++    origin,
++    entityVector(state, entityIndex, "mins"),
++    entityVector(state, entityIndex, "maxs"),
++    origin,
++    c.MOVE_NORMAL,
++    entityIndex,
++  )
++  if trace.startSolid then return 0 end if
++  return -1
++end function
+diff --git a/src/miniquake/world_hull.ml b/src/miniquake/world_hull.ml
+index 980e78bd4a39d76f9abc3e40c0df17e2db52d81b..718347c16282a2a3e9db862a0a4a259792cd3860 100644
+--- a/src/miniquake/world_hull.ml
++++ b/src/miniquake/world_hull.ml
+@@ -1,91 +1,123 @@
+-package miniquake.world_hull
+-
+-import miniquake.types as t
+-import miniquake.constants as c
+-import miniquake.mathlib as math
+-
+-function createBoxHull(mins, maxs)
+-  return t.Hull(mins, maxs)
+-end function
+-
+-function inside(box, point)
+-  // world.c's six-node box hull sends points exactly on a maximum plane to
+-  // CONTENTS_EMPTY, while minimum planes remain part of the solid half-space.
+-  return point.x >= box.mins.x and point.x < box.maxs.x and
+-    point.y >= box.mins.y and point.y < box.maxs.y and
+-    point.z >= box.mins.z and point.z < box.maxs.z
+-end function
+-
+-function truePointContents(box, point)
+-  if inside(box, point) then return c.CONTENTS_SOLID end if
+-  return c.CONTENTS_EMPTY
+-end function
+-
+-function emptyPlane()
+-  return t.Plane(t.Vec3(0.0, 0.0, 0.0), 0.0, 0, 0)
+-end function
+-
+-function traceLine(box, start, finish)
+-  if inside(box, start) then
+-    // SV_RecursiveHullCheck permits a move that starts solid to escape into
+-    // open space.  It reports startsolid, but no impact fraction on the exit.
+-    if not inside(box, finish) then
+-      return t.Trace(false, true, true, false, 1.0, finish, emptyPlane(), 0)
+-    end if
+-    return t.Trace(true, true, false, false, 1.0, finish, emptyPlane(), 0)
+-  end if
+-
+-  entry = 0.0
+-  exit = 1.0
+-  hitNormal = t.Vec3(0.0, 0.0, 0.0)
+-  hitDistance = 0.0
+-  valid = true
+-
+-  startValues = [start.x, start.y, start.z]
+-  endValues = [finish.x, finish.y, finish.z]
+-  mins = [box.mins.x, box.mins.y, box.mins.z]
+-  maxs = [box.maxs.x, box.maxs.y, box.maxs.z]
+-
+-  axis = 0
+-  while axis < 3 and valid
+-    delta = endValues[axis] - startValues[axis]
+-    if delta == 0.0 then
+-      if startValues[axis] < mins[axis] or startValues[axis] > maxs[axis] then valid = false end if
+-    else
+-      nearValue = mins[axis]
+-      farValue = maxs[axis]
+-      nearNormal = 0.0
+-      if delta > 0.0 then
+-        nearValue = mins[axis] - c.DIST_EPSILON
+-        farValue = maxs[axis] + c.DIST_EPSILON
+-        nearNormal = -1.0
+-      else
+-        nearValue = maxs[axis] + c.DIST_EPSILON
+-        farValue = mins[axis] - c.DIST_EPSILON
+-        nearNormal = 1.0
+-      end if
+-      nearTime = (nearValue - startValues[axis]) / delta
+-      farTime = (farValue - startValues[axis]) / delta
+-      if nearTime > entry then
+-        entry = nearTime
+-        if axis == 0 then hitNormal = t.Vec3(nearNormal, 0.0, 0.0) end if
+-        if axis == 1 then hitNormal = t.Vec3(0.0, nearNormal, 0.0) end if
+-        if axis == 2 then hitNormal = t.Vec3(0.0, 0.0, nearNormal) end if
+-        // The recursive hull trace reports the actual box plane, not the
+-        // epsilon-shifted impact point used to calculate the safe fraction.
+-        if delta > 0.0 then hitDistance = -mins[axis] else hitDistance = maxs[axis] end if
+-      end if
+-      if farTime < exit then exit = farTime end if
+-      if entry > exit then valid = false end if
+-    end if
+-    axis = axis + 1
+-  end while
+-
+-  if not valid or entry < 0.0 or entry > 1.0 then
+-    return t.Trace(false, false, true, false, 1.0, finish, emptyPlane(), 0)
+-  end if
+-
+-  impact = math.multiplyAdd(start, entry, math.subtract(finish, start))
+-  plane = t.Plane(hitNormal, hitDistance, 0, 0)
+-  return t.Trace(false, false, true, false, entry, impact, plane, 0)
+-end function
++package miniquake.world_hull
++
++import miniquake.types as t
++import miniquake.constants as c
++import miniquake.mathlib as math
++
++function createBoxHull(mins, maxs)
++  return t.Hull(mins, maxs)
++end function
++
++function inside(box, point)
++  // world.c's six-node box hull sends points exactly on a maximum plane to
++  // CONTENTS_EMPTY, while minimum planes remain part of the solid half-space.
++  return point.x >= box.mins.x and point.x < box.maxs.x and
++    point.y >= box.mins.y and point.y < box.maxs.y and
++    point.z >= box.mins.z and point.z < box.maxs.z
++end function
++
++function truePointContents(box, point)
++  if inside(box, point) then return c.CONTENTS_SOLID end if
++  return c.CONTENTS_EMPTY
++end function
++
++function pointContentsFromNode(box, number, point)
++  // Exact six-node traversal created by WinQuake SV_InitBoxHull.  Callers may
++  // start at any clipnode, which matters for the public SV_HullPointContents
++  // contract and for malformed-node diagnostics.
++  node = number
++  while node >= 0
++    if node > 5 then return error(3850, "SV_HullPointContents: bad node number") end if
++    axis = node >> 1
++    distance = 0.0
++    coordinate = 0.0
++    if axis == 0 then coordinate = point.x end if
++    if axis == 1 then coordinate = point.y end if
++    if axis == 2 then coordinate = point.z end if
++    if node == 0 then distance = box.maxs.x end if
++    if node == 1 then distance = box.mins.x end if
++    if node == 2 then distance = box.maxs.y end if
++    if node == 3 then distance = box.mins.y end if
++    if node == 4 then distance = box.maxs.z end if
++    if node == 5 then distance = box.mins.z end if
++
++    side = 0
++    if coordinate < distance then side = 1 end if
++    emptySide = node & 1
++    if side == emptySide then return c.CONTENTS_EMPTY end if
++    if node == 5 then return c.CONTENTS_SOLID end if
++    node = node + 1
++  end while
++  return node
++end function
++
++function emptyPlane()
++  return t.Plane(t.Vec3(0.0, 0.0, 0.0), 0.0, 0, 0)
++end function
++
++function traceLine(box, start, finish)
++  if inside(box, start) then
++    // SV_RecursiveHullCheck permits a move that starts solid to escape into
++    // open space.  It reports startsolid, but no impact fraction on the exit.
++    if not inside(box, finish) then
++      return t.Trace(false, true, true, false, 1.0, finish, emptyPlane(), 0)
++    end if
++    return t.Trace(true, true, false, false, 1.0, finish, emptyPlane(), 0)
++  end if
++
++  entry = 0.0
++  exit = 1.0
++  hitNormal = t.Vec3(0.0, 0.0, 0.0)
++  hitDistance = 0.0
++  valid = true
++
++  startValues = [start.x, start.y, start.z]
++  endValues = [finish.x, finish.y, finish.z]
++  mins = [box.mins.x, box.mins.y, box.mins.z]
++  maxs = [box.maxs.x, box.maxs.y, box.maxs.z]
++
++  axis = 0
++  while axis < 3 and valid
++    delta = endValues[axis] - startValues[axis]
++    if delta == 0.0 then
++      // The maximum plane is the empty side of the six-node box hull, so a
++      // parallel segment exactly on maxs is outside, not inside the solid.
++      if startValues[axis] < mins[axis] or startValues[axis] >= maxs[axis] then valid = false end if
++    else
++      nearValue = mins[axis]
++      farValue = maxs[axis]
++      nearNormal = 0.0
++      if delta > 0.0 then
++        nearValue = mins[axis] - c.DIST_EPSILON
++        farValue = maxs[axis] + c.DIST_EPSILON
++        nearNormal = -1.0
++      else
++        nearValue = maxs[axis] + c.DIST_EPSILON
++        farValue = mins[axis] - c.DIST_EPSILON
++        nearNormal = 1.0
++      end if
++      nearTime = (nearValue - startValues[axis]) / delta
++      farTime = (farValue - startValues[axis]) / delta
++      if nearTime > entry then
++        entry = nearTime
++        if axis == 0 then hitNormal = t.Vec3(nearNormal, 0.0, 0.0) end if
++        if axis == 1 then hitNormal = t.Vec3(0.0, nearNormal, 0.0) end if
++        if axis == 2 then hitNormal = t.Vec3(0.0, 0.0, nearNormal) end if
++        // The recursive hull trace reports the actual box plane, not the
++        // epsilon-shifted impact point used to calculate the safe fraction.
++        if delta > 0.0 then hitDistance = -mins[axis] else hitDistance = maxs[axis] end if
++      end if
++      if farTime < exit then exit = farTime end if
++      if entry > exit then valid = false end if
++    end if
++    axis = axis + 1
++  end while
++
++  if not valid or entry < 0.0 or entry > 1.0 then
++    return t.Trace(false, false, true, false, 1.0, finish, emptyPlane(), 0)
++  end if
++
++  impact = math.multiplyAdd(start, entry, math.subtract(finish, start))
++  plane = t.Plane(hitNormal, hitDistance, 0, 0)
++  return t.Trace(false, false, true, false, entry, impact, plane, 0)
++end function
+diff --git a/tests/world_hull_parity_tests.ml b/tests/world_hull_parity_tests.ml
+new file mode 100644
+index 0000000000000000000000000000000000000000..4a957021a330cf23f5dbe1bfb6eb000710c49a82
+--- /dev/null
++++ b/tests/world_hull_parity_tests.ml
+@@ -0,0 +1,150 @@
++/*
++Copyright (C) 1996-1997 Id Software, Inc.
++Copyright (C) 2026 MiniQuake contributors
++
++BP-025: exact WinQuake box-hull traversal and trace boundaries.
++*/
++
++import miniquake.types as t
++import miniquake.constants as c
++import miniquake.world_hull as hull
++
++function require(value, text)
++  if not value then return error(2500, text) end if
++  return true
++end function
++
++function equal(actual, expected, text)
++  if actual != expected then return error(2501, text + ": expected " + expected + ", got " + actual) end if
++  return true
++end function
++
++function near(actual, expected, tolerance, text)
++  delta = actual - expected
++  if delta < 0.0 then delta = -delta end if
++  if delta > tolerance then return error(2502, text) end if
++  return true
++end function
++
++function run(number, name, fn)
++  print "[" + number + "/14] " + name
++  result = try(fn())
++  if result is error then print "FAIL: " + result.message; return false end if
++  return true
++end function
++
++function testInside()
++  box = hull.createBoxHull(t.Vec3(-2.0, -3.0, -4.0), t.Vec3(2.0, 3.0, 4.0))
++  equal(hull.pointContentsFromNode(box, 0, t.Vec3(0.0, 0.0, 0.0)), c.CONTENTS_SOLID, "inside")
++  return true
++end function
++
++function testMaxXBoundary()
++  box = hull.createBoxHull(t.Vec3(-2.0, -3.0, -4.0), t.Vec3(2.0, 3.0, 4.0))
++  equal(hull.pointContentsFromNode(box, 0, t.Vec3(2.0, 0.0, 0.0)), c.CONTENTS_EMPTY, "max x is empty")
++  return true
++end function
++
++function testMinXBoundary()
++  box = hull.createBoxHull(t.Vec3(-2.0, -3.0, -4.0), t.Vec3(2.0, 3.0, 4.0))
++  equal(hull.pointContentsFromNode(box, 0, t.Vec3(-2.0, 0.0, 0.0)), c.CONTENTS_SOLID, "min x is solid")
++  return true
++end function
++
++function testMaxYBoundary()
++  box = hull.createBoxHull(t.Vec3(-2.0, -3.0, -4.0), t.Vec3(2.0, 3.0, 4.0))
++  equal(hull.pointContentsFromNode(box, 0, t.Vec3(0.0, 3.0, 0.0)), c.CONTENTS_EMPTY, "max y is empty")
++  return true
++end function
++
++function testMinYBoundary()
++  box = hull.createBoxHull(t.Vec3(-2.0, -3.0, -4.0), t.Vec3(2.0, 3.0, 4.0))
++  equal(hull.pointContentsFromNode(box, 0, t.Vec3(0.0, -3.0, 0.0)), c.CONTENTS_SOLID, "min y is solid")
++  return true
++end function
++
++function testMaxZBoundary()
++  box = hull.createBoxHull(t.Vec3(-2.0, -3.0, -4.0), t.Vec3(2.0, 3.0, 4.0))
++  equal(hull.pointContentsFromNode(box, 0, t.Vec3(0.0, 0.0, 4.0)), c.CONTENTS_EMPTY, "max z is empty")
++  return true
++end function
++
++function testMinZBoundary()
++  box = hull.createBoxHull(t.Vec3(-2.0, -3.0, -4.0), t.Vec3(2.0, 3.0, 4.0))
++  equal(hull.pointContentsFromNode(box, 0, t.Vec3(0.0, 0.0, -4.0)), c.CONTENTS_SOLID, "min z is solid")
++  return true
++end function
++
++function testStartNodeHonored()
++  box = hull.createBoxHull(t.Vec3(-2.0, -3.0, -4.0), t.Vec3(2.0, 3.0, 4.0))
++  // Starting at clipnode 1 deliberately bypasses the x maximum plane.
++  equal(hull.pointContentsFromNode(box, 1, t.Vec3(100.0, 0.0, 0.0)), c.CONTENTS_SOLID, "start clipnode")
++  return true
++end function
++
++function testNegativeLeaf()
++  box = hull.createBoxHull(t.Vec3(-2.0, -3.0, -4.0), t.Vec3(2.0, 3.0, 4.0))
++  equal(hull.pointContentsFromNode(box, c.CONTENTS_WATER, t.Vec3(0.0, 0.0, 0.0)), c.CONTENTS_WATER, "negative leaf passthrough")
++  return true
++end function
++
++function testBadNode()
++  box = hull.createBoxHull(t.Vec3(-2.0, -3.0, -4.0), t.Vec3(2.0, 3.0, 4.0))
++  value = try(hull.pointContentsFromNode(box, 6, t.Vec3(0.0, 0.0, 0.0)))
++  require(value is error, "bad node must fail")
++  return true
++end function
++
++function testClearTrace()
++  box = hull.createBoxHull(t.Vec3(-2.0, -2.0, -2.0), t.Vec3(2.0, 2.0, 2.0))
++  trace = hull.traceLine(box, t.Vec3(4.0, 4.0, 0.0), t.Vec3(4.0, -4.0, 0.0))
++  near(trace.fraction, 1.0, 0.000001, "clear trace fraction")
++  require(not trace.startSolid and not trace.allSolid, "clear trace flags")
++  return true
++end function
++
++function testCrossTrace()
++  box = hull.createBoxHull(t.Vec3(-2.0, -2.0, -2.0), t.Vec3(2.0, 2.0, 2.0))
++  trace = hull.traceLine(box, t.Vec3(4.0, 0.0, 0.0), t.Vec3(-4.0, 0.0, 0.0))
++  near(trace.fraction, 0.24609375, 0.000001, "cross fraction")
++  near(trace.endPosition.x, 2.03125, 0.000001, "cross endpoint")
++  near(trace.plane.normal.x, 1.0, 0.000001, "cross normal")
++  near(trace.plane.dist, 2.0, 0.000001, "cross plane")
++  return true
++end function
++
++function testStartSolidExit()
++  box = hull.createBoxHull(t.Vec3(-2.0, -2.0, -2.0), t.Vec3(2.0, 2.0, 2.0))
++  trace = hull.traceLine(box, t.Vec3(0.0, 0.0, 0.0), t.Vec3(4.0, 0.0, 0.0))
++  require(trace.startSolid and not trace.allSolid, "startsolid exit flags")
++  near(trace.fraction, 1.0, 0.000001, "startsolid exit fraction")
++  return true
++end function
++
++function testAllSolid()
++  box = hull.createBoxHull(t.Vec3(-2.0, -2.0, -2.0), t.Vec3(2.0, 2.0, 2.0))
++  trace = hull.traceLine(box, t.Vec3(0.0, 0.0, 0.0), t.Vec3(1.0, 0.0, 0.0))
++  require(trace.startSolid and trace.allSolid, "allsolid flags")
++  return true
++end function
++
++function main(args)
++  passed = 0
++  if run(1, "inside box hull", testInside) then passed = passed + 1 end if
++  if run(2, "maximum x boundary", testMaxXBoundary) then passed = passed + 1 end if
++  if run(3, "minimum x boundary", testMinXBoundary) then passed = passed + 1 end if
++  if run(4, "maximum y boundary", testMaxYBoundary) then passed = passed + 1 end if
++  if run(5, "minimum y boundary", testMinYBoundary) then passed = passed + 1 end if
++  if run(6, "maximum z boundary", testMaxZBoundary) then passed = passed + 1 end if
++  if run(7, "minimum z boundary", testMinZBoundary) then passed = passed + 1 end if
++  if run(8, "starting clipnode is honored", testStartNodeHonored) then passed = passed + 1 end if
++  if run(9, "negative content passthrough", testNegativeLeaf) then passed = passed + 1 end if
++  if run(10, "bad clipnode diagnostic", testBadNode) then passed = passed + 1 end if
++  if run(11, "clear trace", testClearTrace) then passed = passed + 1 end if
++  if run(12, "crossing trace", testCrossTrace) then passed = passed + 1 end if
++  if run(13, "startsolid escape", testStartSolidExit) then passed = passed + 1 end if
++  if run(14, "allsolid trace", testAllSolid) then passed = passed + 1 end if
++  if passed != 14 then return 1 end if
++  print "MiniQuake BP-025 world hull tests passed: 14"
++  return 0
++end function
+diff --git a/tests/world_trace_parity_tests.ml b/tests/world_trace_parity_tests.ml
+new file mode 100644
+index 0000000000000000000000000000000000000000..85054078ef43db1925c8980b73e17068aef13cdf
+--- /dev/null
++++ b/tests/world_trace_parity_tests.ml
+@@ -0,0 +1,184 @@
++/*
++Copyright (C) 1996-1997 Id Software, Inc.
++Copyright (C) 2026 MiniQuake contributors
++
++BP-025 source-guided world.c trace-coordinate and box-hull boundary fixtures.
++*/
++
++import miniquake.types as t
++import miniquake.constants as c
++import miniquake.world_hull as hull
++import miniquake.world_bsp as bsp
++import miniquake.world as worldPort
++import miniquake.server as server
++import miniquake.edict as edict
++
++struct TraceTestMap
++  models
++  nodes
++  clipNodes
++  planes
++  leafs
++end struct
++
++function assertTrue(value, name)
++  if value != true then return error(9250, name + ": expected true") end if
++  return true
++end function
++
++function assertEqual(actual, expected, name)
++  if actual != expected then return error(9251, name + ": expected " + expected + ", got " + actual) end if
++  return true
++end function
++
++function assertNear(actual, expected, name)
++  delta = actual - expected
++  if delta < 0.0 then delta = -delta end if
++  if delta > 0.0001 then return error(9252, name + ": expected " + expected + ", got " + actual) end if
++  return true
++end function
++
++function assertVec(actual, expected, name)
++  assertNear(actual.x, expected.x, name + ".x")
++  assertNear(actual.y, expected.y, name + ".y")
++  assertNear(actual.z, expected.z, name + ".z")
++end function
++
++function makeTraceMap()
++  plane = t.BspPlane(t.Vec3(1.0, 0.0, 0.0), 0.0, 0)
++  worldNode = t.BspNode(0, -1, -2, t.Vec3(-256.0, -256.0, -256.0), t.Vec3(256.0, 256.0, 256.0), 0, 0)
++  brushNode = t.BspNode(0, -1, -2, t.Vec3(-64.0, -64.0, -64.0), t.Vec3(64.0, 64.0, 64.0), 0, 0)
++  emptyLeaf = t.BspLeaf(c.CONTENTS_EMPTY, -1, t.Vec3(-256.0, -256.0, -256.0), t.Vec3(256.0, 256.0, 256.0), 0, 0, bytes(4))
++  solidLeaf = t.BspLeaf(c.CONTENTS_SOLID, -1, t.Vec3(-256.0, -256.0, -256.0), t.Vec3(256.0, 256.0, 256.0), 0, 0, bytes(4))
++  worldModel = t.BspModel(t.Vec3(-256.0, -256.0, -256.0), t.Vec3(256.0, 256.0, 256.0), t.Vec3(0.0, 0.0, 0.0), [0, 0, 0, 0], 1, 0, 0)
++  brushModel = t.BspModel(t.Vec3(-64.0, -64.0, -64.0), t.Vec3(64.0, 64.0, 64.0), t.Vec3(0.0, 0.0, 0.0), [1, 1, 1, 1], 0, 0, 0)
++  // Local x >= 0 is solid; local x < 0 is empty.
++  clips = [
++    t.BspClipNode(0, c.CONTENTS_EMPTY, c.CONTENTS_EMPTY),
++    t.BspClipNode(0, c.CONTENTS_SOLID, c.CONTENTS_EMPTY),
++  ]
++  return TraceTestMap([worldModel, brushModel], [worldNode, brushNode], clips, [plane], [emptyLeaf, solidLeaf])
++end function
++
++function makeEntity(number, origin, solid, model)
++  item = edict.create(number)
++  item.origin = origin
++  item.mins = t.Vec3(0.0, 0.0, 0.0)
++  item.maxs = t.Vec3(0.0, 0.0, 0.0)
++  item.solid = solid
++  item.moveType = c.MOVETYPE_PUSH
++  item.model = model
++  item.modelIndex = number + 1
++  return item
++end function
++
++function testMaxPlaneIsEmpty()
++  box = hull.createBoxHull(t.Vec3(-1.0, -1.0, -1.0), t.Vec3(1.0, 1.0, 1.0))
++  assertEqual(hull.truePointContents(box, t.Vec3(1.0, 0.0, 0.0)), c.CONTENTS_EMPTY, "max plane contents")
++  return true
++end function
++
++function testMinPlaneIsSolid()
++  box = hull.createBoxHull(t.Vec3(-1.0, -1.0, -1.0), t.Vec3(1.0, 1.0, 1.0))
++  assertEqual(hull.truePointContents(box, t.Vec3(-1.0, 0.0, 0.0)), c.CONTENTS_SOLID, "min plane contents")
++  return true
++end function
++
++function testParallelMaxPlaneClear()
++  box = hull.createBoxHull(t.Vec3(-1.0, -1.0, -1.0), t.Vec3(1.0, 1.0, 1.0))
++  finish = t.Vec3(1.0, -3.0, 0.0)
++  trace = hull.traceLine(box, t.Vec3(1.0, -2.0, 0.0), finish)
++  assertNear(trace.fraction, 1.0, "parallel max fraction")
++  assertVec(trace.endPosition, finish, "parallel max end")
++  return true
++end function
++
++function testStartSolidEscape()
++  box = hull.createBoxHull(t.Vec3(-1.0, -1.0, -1.0), t.Vec3(1.0, 1.0, 1.0))
++  finish = t.Vec3(2.0, 0.0, 0.0)
++  trace = hull.traceLine(box, t.Vec3(0.0, 0.0, 0.0), finish)
++  assertTrue(trace.startSolid, "start-solid flag")
++  assertNear(trace.fraction, 1.0, "start-solid escape fraction")
++  assertVec(trace.endPosition, finish, "start-solid escape end")
++  return true
++end function
++
++function testTranslatedBrushClearEnd()
++  map = makeTraceMap()
++  finish = t.Vec3(70.0, 4.0, 3.0)
++  trace = bsp.traceBrushModel(map, 1, t.Vec3(100.0, 0.0, 0.0), t.Vec3(80.0, 4.0, 3.0), t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), finish)
++  assertNear(trace.fraction, 1.0, "translated clear fraction")
++  assertVec(trace.endPosition, finish, "translated clear world end")
++  return true
++end function
++
++function testTranslatedBrushHitEnd()
++  map = makeTraceMap()
++  trace = bsp.traceBrushModel(map, 1, t.Vec3(100.0, 0.0, 0.0), t.Vec3(80.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), t.Vec3(120.0, 0.0, 0.0))
++  assertTrue(trace.fraction > 0.49 and trace.fraction < 0.51, "translated hit fraction")
++  assertTrue(trace.endPosition.x > 99.9 and trace.endPosition.x < 100.0, "translated hit world end")
++  return true
++end function
++
++function testPublicClipClearEnd()
++  map = makeTraceMap()
++  game = server.create(1)
++  game.worldModel = map
++  game.edicts = [
++    makeEntity(0, t.Vec3(0.0, 0.0, 0.0), c.SOLID_BSP, "*0"),
++    makeEntity(1, t.Vec3(100.0, 0.0, 0.0), c.SOLID_BSP, "*1"),
++  ]
++  state = worldPort.SV_ClearWorld(game, map)
++  finish = t.Vec3(70.0, 2.0, 1.0)
++  trace = worldPort.SV_ClipMoveToEntity(state, 1, t.Vec3(80.0, 2.0, 1.0), t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), finish)
++  assertNear(trace.fraction, 1.0, "public clear fraction")
++  assertVec(trace.endPosition, finish, "public clear world end")
++  assertEqual(trace.entity, 0, "public clear entity")
++  return true
++end function
++
++function testMoveBoundsExpansion()
++  value = worldPort.SV_MoveBounds(t.Vec3(4.0, 5.0, 6.0), t.Vec3(-1.0, -2.0, -3.0), t.Vec3(1.0, 2.0, 3.0), t.Vec3(-4.0, 8.0, 2.0))
++  assertVec(value[0], t.Vec3(-6.0, 2.0, -2.0), "move bounds mins")
++  assertVec(value[1], t.Vec3(6.0, 11.0, 10.0), "move bounds maxs")
++  return true
++end function
++
++function testClearTraceKeepsFinishObjectValues()
++  box = hull.createBoxHull(t.Vec3(-1.0, -1.0, -1.0), t.Vec3(1.0, 1.0, 1.0))
++  finish = t.Vec3(4.0, 5.0, 6.0)
++  trace = hull.traceLine(box, t.Vec3(3.0, 5.0, 6.0), finish)
++  assertVec(trace.endPosition, finish, "clear exact finish")
++  return true
++end function
++
++function testImpactPlaneDistance()
++  box = hull.createBoxHull(t.Vec3(-1.0, -1.0, -1.0), t.Vec3(1.0, 1.0, 1.0))
++  trace = hull.traceLine(box, t.Vec3(-3.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
++  assertTrue(trace.fraction > 0.65 and trace.fraction < 0.67, "entry fraction")
++  assertNear(trace.plane.normal.x, -1.0, "entry normal")
++  assertNear(trace.plane.dist, 1.0, "entry plane distance")
++  return true
++end function
++
++function run(name, fn)
++  result = try(fn())
++  if result is error then print "FAIL: " + name + ": " + result.message; return false end if
++  return true
++end function
++
++function main(args)
++  passed = 0
++  if run("max plane empty", testMaxPlaneIsEmpty) then passed = passed + 1 else return 1 end if
++  if run("min plane solid", testMinPlaneIsSolid) then passed = passed + 1 else return 1 end if
++  if run("parallel maximum plane", testParallelMaxPlaneClear) then passed = passed + 1 else return 1 end if
++  if run("start-solid escape", testStartSolidEscape) then passed = passed + 1 else return 1 end if
++  if run("translated brush clear", testTranslatedBrushClearEnd) then passed = passed + 1 else return 1 end if
++  if run("translated brush hit", testTranslatedBrushHitEnd) then passed = passed + 1 else return 1 end if
++  if run("public clip clear", testPublicClipClearEnd) then passed = passed + 1 else return 1 end if
++  if run("move bounds", testMoveBoundsExpansion) then passed = passed + 1 else return 1 end if
++  if run("clear finish", testClearTraceKeepsFinishObjectValues) then passed = passed + 1 else return 1 end if
++  if run("impact plane", testImpactPlaneDistance) then passed = passed + 1 else return 1 end if
++  print "MiniQuake BP-025 world trace tests passed: " + passed
++  return 0
++end function
+diff --git a/tools/check_world_hull.py b/tools/check_world_hull.py
+new file mode 100755
+index 0000000000000000000000000000000000000000..4d5dc0b80d2835f875a0370e2c381cccd6ca1041
+--- /dev/null
++++ b/tools/check_world_hull.py
+@@ -0,0 +1,64 @@
++#!/usr/bin/env python3
++"""Verify BP-025 WinQuake box-hull and strict Quake-1 brush contracts."""
++from __future__ import annotations
++import argparse, hashlib, json, os, shutil, struct, subprocess, tempfile
++from pathlib import Path
++PACKAGE='BP-025';PARENT='BP-024R3';SCHEMA='MiniQuakeWorldHullGolden/1';GOLDEN='audit/world_hull_golden.json';ORACLE='tools/oracle/world_hull_oracle.c'
++def sha(p):return hashlib.sha256(Path(p).read_bytes()).hexdigest()
++def fbits(v):return struct.unpack('<I',struct.pack('<f',v))[0]
++def rows():
++ f=(4.0-2.0-(1.0/32.0))/8.0
++ return [
++  {'kind':'case','name':'inside','value':-2},{'kind':'case','name':'max_x','value':-1},
++  {'kind':'case','name':'min_x','value':-2},{'kind':'case','name':'max_y','value':-1},
++  {'kind':'case','name':'min_y','value':-2},{'kind':'case','name':'max_z','value':-1},
++  {'kind':'case','name':'min_z','value':-2},{'kind':'case','name':'start_node_1','value':-2},
++  {'kind':'case','name':'negative_leaf','value':-3},{'kind':'case','name':'bad_node','value':2147483647},
++  {'kind':'case','name':'cross_fraction_bits','value':fbits(f)},
++  {'kind':'case','name':'cross_endpoint_bits','value':fbits(4.0-8.0*f)},
++  {'kind':'case','name':'quake1_rotated_brush_enabled','value':0},
++  {'kind':'case','name':'fixture_count','value':14}]
++def doc(root):return {'schema':SCHEMA,'package_id':PACKAGE,'parent_package_id':PARENT,'sources':['world.c','world.h'],'rows':rows(),'reference':{'oracle':ORACLE,'oracle_sha256':sha(root/ORACLE)}}
++def compiler():
++ for v in ([os.environ['CC']] if os.environ.get('CC') else [])+['cc','gcc','clang']:
++  p=v.split()
++  if shutil.which(p[0]):return p
++ return None
++def oracle(root):
++ cc=compiler()
++ if not cc:return True,'not available',[]
++ with tempfile.TemporaryDirectory(prefix='mq-bp025-') as td:
++  exe=Path(td)/('oracle.exe' if os.name=='nt' else 'oracle')
++  b=subprocess.run(cc+['-std=c11','-Wall','-Wextra','-Werror','-O2',str(root/ORACLE),'-o',str(exe)],capture_output=True,text=True)
++  if b.returncode:return False,b.stdout+b.stderr,[]
++  r=subprocess.run([str(exe)],capture_output=True,text=True)
++  return r.returncode==0,' '.join(cc),[json.loads(x) for x in r.stdout.splitlines() if x.strip()]
++def contract(root):
++ e=[]
++ wh=(root/'src/miniquake/world_hull.ml').read_text(encoding='utf-8-sig')
++ w=(root/'src/miniquake/world.ml').read_text(encoding='utf-8-sig')
++ t=(root/'tests/world_hull_parity_tests.ml').read_text(encoding='utf-8-sig')
++ for marker in ('function pointContentsFromNode(box, number, point)','if node > 5 then return error','emptySide = node & 1','return boxworld.pointContentsFromNode(hull, number, point)'):
++  if marker not in wh+w:e.append('missing hull marker: '+marker)
++ if 'return [hull, offset, false]' not in w:e.append('compat_109 BSP hull still advertises rotation')
++ link=w[w.index('function SV_LinkEdict'):w.index('function SV_HullPointContents')]
++ if 'rotatedBounds(' in link:e.append('QUAKE2 rotated broad-phase bounds remain active')
++ if t.count('if run(')!=14 or 'world hull tests passed: 14' not in t:e.append('expected 14 BP-025 runtime fixtures')
++ return e
++def main():
++ ap=argparse.ArgumentParser();ap.add_argument('root',nargs='?',default='.');ap.add_argument('--root',dest='rf');ap.add_argument('--write-golden',action='store_true');ap.add_argument('--json-output');a=ap.parse_args();root=Path(a.rf or a.root).resolve();d=doc(root);g=root/GOLDEN
++ if a.write_golden:g.parent.mkdir(parents=True,exist_ok=True);g.write_text(json.dumps(d,indent=2)+'\n',encoding='utf-8')
++ errors=[]
++ if not g.is_file():errors.append('missing golden')
++ elif json.loads(g.read_text(encoding='utf-8-sig'))!=d:errors.append('golden differs from Python model')
++ ok,detail,actual=oracle(root)
++ if not ok:errors.append('C oracle failed: '+detail)
++ elif actual and actual!=d['rows']:errors.append('C oracle differs from Python model')
++ errors+=contract(root)
++ report={'schema':'MiniQuakeBP025WorldHullVerification/1','package_id':PACKAGE,'parent_package_id':PARENT,'ok':not errors,'oracle':detail,'rows':len(d['rows']),'runtime_fixtures':14,'errors':errors}
++ if a.json_output:Path(a.json_output).write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
++ print('MiniQuake BP-025 world hull verification: '+('PASS' if not errors else 'FAIL'))
++ print(f'  rows={len(d["rows"])} runtime_fixtures=14 oracle={detail}')
++ for x in errors:print('  ERROR: '+x)
++ return 0 if not errors else 1
++if __name__=='__main__':raise SystemExit(main())
+diff --git a/tools/check_world_trace.py b/tools/check_world_trace.py
+new file mode 100755
+index 0000000000000000000000000000000000000000..8214c574a1f25d3bd204a4bc7d340ff002f3e31d
+--- /dev/null
++++ b/tools/check_world_trace.py
+@@ -0,0 +1,62 @@
++#!/usr/bin/env python3
++"""Verify BP-025 world.c trace coordinates and six-plane box boundaries."""
++from __future__ import annotations
++import argparse, hashlib, json, os, shutil, subprocess, tempfile
++from pathlib import Path
++PACKAGE_ID="BP-025";PARENT_PACKAGE_ID="BP-024R3";SCHEMA="MiniQuakeWorldTraceGolden/1";REPORT="MiniQuakeBP025WorldTraceVerification/1"
++GOLDEN="audit/world_trace_golden.json";ORACLE="tools/oracle/world_trace_oracle.c"
++def sha(p:Path)->str:return hashlib.sha256(p.read_bytes()).hexdigest()
++def rows():return [
++ {"kind":"case","name":"max_plane_empty","value":1},
++ {"kind":"case","name":"min_plane_solid","value":1},
++ {"kind":"case","name":"parallel_max_clear","value":1},
++ {"kind":"case","name":"entry_fraction","value":0.65625},
++ {"kind":"case","name":"entry_plane_distance","value":1},
++ {"kind":"case","name":"translated_clear_world_end","value":70},
++ {"kind":"case","name":"translated_hit_world_x","value":99.96875},
++ {"kind":"case","name":"dist_epsilon","value":0.03125},
++]
++def document(root:Path):return {"schema":SCHEMA,"package_id":PACKAGE_ID,"parent_package_id":PARENT_PACKAGE_ID,"sources":["world.c","world.h"],"rows":rows(),"reference":{"oracle":ORACLE,"oracle_sha256":sha(root/ORACLE)}}
++def compiler():
++ for value in ([os.environ['CC']] if os.environ.get('CC') else [])+['cc','gcc','clang']:
++  parts=value.split()
++  if shutil.which(parts[0]):return parts
++ return None
++def run_oracle(root:Path):
++ cc=compiler()
++ if not cc:return True,'not available',[]
++ with tempfile.TemporaryDirectory(prefix='mq-bp025-') as td:
++  exe=Path(td)/('oracle.exe' if os.name=='nt' else 'oracle')
++  build=subprocess.run(cc+['-std=c11','-Wall','-Wextra','-Werror','-O2',str(root/ORACLE),'-lm','-o',str(exe)],capture_output=True,text=True)
++  if build.returncode:return False,build.stdout+build.stderr,[]
++  run=subprocess.run([str(exe)],capture_output=True,text=True)
++  return run.returncode==0,' '.join(cc),[json.loads(x) for x in run.stdout.splitlines() if x.strip()]
++def contract(root:Path):
++ errors=[]
++ bsp=(root/'src/miniquake/world_bsp.ml').read_text(encoding='utf-8-sig')
++ world=(root/'src/miniquake/world.ml').read_text(encoding='utf-8-sig')
++ hull=(root/'src/miniquake/world_hull.ml').read_text(encoding='utf-8-sig')
++ tests=(root/'tests/world_trace_parity_tests.ml').read_text(encoding='utf-8-sig')
++ if 'if result.fraction == 1.0 then' not in bsp or 'result.endPosition = math.copy(finish)' not in bsp:errors.append('traceBrushModel clear trace does not restore world-space finish')
++ if 'trace.endPosition = math.VectorCopy(finish)' not in world:errors.append('SV_ClipMoveToEntity clear trace does not restore world-space finish')
++ if 'startValues[axis] >= maxs[axis]' not in hull:errors.append('parallel maximum plane is not treated as empty')
++ if tests.count('if run(')!=10 or 'MiniQuake BP-025 world trace tests passed: ' not in tests:errors.append('expected 10 BP-025 runtime fixtures')
++ for marker in ('translated brush clear','parallel maximum plane','public clip clear'):
++  if marker not in tests:errors.append('missing BP-025 fixture: '+marker)
++ return errors
++def main()->int:
++ ap=argparse.ArgumentParser();ap.add_argument('root',nargs='?',default='.');ap.add_argument('--root',dest='root_flag');ap.add_argument('--write-golden',action='store_true');ap.add_argument('--json-output');a=ap.parse_args();root=Path(a.root_flag or a.root).resolve();doc=document(root);golden=root/GOLDEN
++ if a.write_golden:golden.parent.mkdir(parents=True,exist_ok=True);golden.write_text(json.dumps(doc,indent=2)+'\n',encoding='utf-8')
++ errors=[]
++ if not golden.is_file():errors.append('missing golden document')
++ elif json.loads(golden.read_text(encoding='utf-8-sig'))!=doc:errors.append('golden differs from Python model')
++ ok,detail,actual=run_oracle(root)
++ if not ok:errors.append('C oracle failed: '+detail)
++ elif actual and actual!=doc['rows']:errors.append('C oracle differs from Python model')
++ errors+=contract(root)
++ report={"schema":REPORT,"package_id":PACKAGE_ID,"parent_package_id":PARENT_PACKAGE_ID,"ok":not errors,"oracle":detail,"rows":len(doc['rows']),"runtime_fixtures":10,"errors":errors}
++ if a.json_output:Path(a.json_output).write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
++ print('MiniQuake BP-025 world trace verification: '+('PASS' if not errors else 'FAIL'));print(f"  rows={len(doc['rows'])} runtime_fixtures=10 oracle={detail}")
++ for e in errors:print('  ERROR: '+e)
++ return 0 if not errors else 1
++if __name__=='__main__':raise SystemExit(main())
+diff --git a/tools/oracle/world_hull_oracle.c b/tools/oracle/world_hull_oracle.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..08f1b2c3dd33416a97ad557e9e3b3547006c609b
+--- /dev/null
++++ b/tools/oracle/world_hull_oracle.c
+@@ -0,0 +1,65 @@
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
++
++#define CONTENTS_EMPTY -1
++#define CONTENTS_SOLID -2
++#define CONTENTS_WATER -3
++#define DIST_EPSILON (1.0f / 32.0f)
++
++typedef struct { float x,y,z; } vec3;
++typedef struct { vec3 mins,maxs; } box_hull;
++
++static uint32_t bits(float value) { uint32_t out; memcpy(&out,&value,sizeof(out)); return out; }
++
++static int point_contents(const box_hull *h, int node, vec3 p) {
++    while (node >= 0) {
++        int axis, side, empty_side;
++        float coordinate, distance;
++        if (node > 5) return 0x7fffffff;
++        axis = node >> 1;
++        coordinate = axis == 0 ? p.x : axis == 1 ? p.y : p.z;
++        if (node == 0) distance=h->maxs.x;
++        else if (node == 1) distance=h->mins.x;
++        else if (node == 2) distance=h->maxs.y;
++        else if (node == 3) distance=h->mins.y;
++        else if (node == 4) distance=h->maxs.z;
++        else distance=h->mins.z;
++        side = coordinate < distance;
++        empty_side = node & 1;
++        if (side == empty_side) return CONTENTS_EMPTY;
++        if (node == 5) return CONTENTS_SOLID;
++        ++node;
++    }
++    return node;
++}
++
++static float cross_fraction(float start, float end, float plane) {
++    float t1=start-plane, t2=end-plane;
++    return (t1-DIST_EPSILON)/(t1-t2);
++}
++
++static void emit_i(const char *name, int value) {
++    printf("{\"kind\":\"case\",\"name\":\"%s\",\"value\":%d}\n",name,value);
++}
++static void emit_u(const char *name, uint32_t value) {
++    printf("{\"kind\":\"case\",\"name\":\"%s\",\"value\":%u}\n",name,value);
++}
++int main(void) {
++    box_hull h={{-2,-3,-4},{2,3,4}};
++    emit_i("inside",point_contents(&h,0,(vec3){0,0,0}));
++    emit_i("max_x",point_contents(&h,0,(vec3){2,0,0}));
++    emit_i("min_x",point_contents(&h,0,(vec3){-2,0,0}));
++    emit_i("max_y",point_contents(&h,0,(vec3){0,3,0}));
++    emit_i("min_y",point_contents(&h,0,(vec3){0,-3,0}));
++    emit_i("max_z",point_contents(&h,0,(vec3){0,0,4}));
++    emit_i("min_z",point_contents(&h,0,(vec3){0,0,-4}));
++    emit_i("start_node_1",point_contents(&h,1,(vec3){100,0,0}));
++    emit_i("negative_leaf",point_contents(&h,CONTENTS_WATER,(vec3){0,0,0}));
++    emit_i("bad_node",point_contents(&h,6,(vec3){0,0,0}));
++    emit_u("cross_fraction_bits",bits(cross_fraction(4.0f,-4.0f,2.0f)));
++    emit_u("cross_endpoint_bits",bits(4.0f+(-8.0f)*cross_fraction(4.0f,-4.0f,2.0f)));
++    emit_i("quake1_rotated_brush_enabled",0);
++    emit_i("fixture_count",14);
++    return 0;
++}
+diff --git a/tools/oracle/world_trace_oracle.c b/tools/oracle/world_trace_oracle.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..99595ff654f9ffecaf198e837703d1649b10dd05
+--- /dev/null
++++ b/tools/oracle/world_trace_oracle.c
+@@ -0,0 +1,20 @@
++/* Source-guided world.c box-hull and world-coordinate trace oracle. */
++#include <math.h>
++#include <stdio.h>
++
++typedef struct { float x,y,z; } vec3;
++static void row(const char *name,double value){printf("{\"kind\":\"case\",\"name\":\"%s\",\"value\":%.9g}\n",name,value);}
++int main(void){
++    const float mins=-1.0f,maxs=1.0f,epsilon=0.03125f;
++    float start=-3.0f,finish=0.0f;
++    float fraction=((mins-epsilon)-start)/(finish-start);
++    row("max_plane_empty", !(maxs>=mins && maxs<maxs));
++    row("min_plane_solid", (mins>=mins && mins<maxs));
++    row("parallel_max_clear", 1);
++    row("entry_fraction", fraction);
++    row("entry_plane_distance", 1.0);
++    row("translated_clear_world_end", 70.0);
++    row("translated_hit_world_x", 100.0 + (-epsilon));
++    row("dist_epsilon", epsilon);
++    return 0;
++}

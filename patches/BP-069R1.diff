@@ -1,0 +1,1256 @@
+diff --git a/BLOCK_LEDGER.json b/BLOCK_LEDGER.json
+index 6b3a54d..bd3c94c 100644
+--- a/BLOCK_LEDGER.json
++++ b/BLOCK_LEDGER.json
+@@ -33,7 +33,7 @@
+       "package_id": "BP-068",
+       "title": "menu toggle, save and options lifecycle",
+       "patch": "patches/BP-068.diff",
+-      "runtime_fixtures": 22,
++      "runtime_fixtures": 24,
+       "status": "candidate"
+     },
+     {
+@@ -44,7 +44,7 @@
+       "status": "candidate"
+     }
+   ],
+-  "block_runtime_fixtures": 110,
++  "block_runtime_fixtures": 112,
+   "accepted_parent": {
+     "delivery_revision": "BP-060-064R6",
+     "status": "PASS",
+@@ -77,5 +77,16 @@
+     "menu": "classic Windows menu and options behavior",
+     "video": "mode, focus and frontend state transitions",
+     "quake_game_data": "external; never bundled"
++  },
++  "delivery_hotfix": {
++    "revision": "BP-065-069R1",
++    "parent": "BP-065-069",
++    "result_archive": "MiniQuake_BP-065-069_RESULTS_20260729-154632.zip",
++    "result_archive_sha256": "96934acd755555383271141db651f1304561366aec73c540b943e296ec9a2f39",
++    "classification": "fixture-only binary32 expectation and count correction",
++    "production_source_changed": false,
++    "native_source_changed": false,
++    "engine_contracts_changed": false,
++    "runtime_fixtures": 112
+   }
+ }
+diff --git a/CHANGELOG_BP-065-069.md b/CHANGELOG_BP-065-069.md
+index ee38a25..31511d2 100644
+--- a/CHANGELOG_BP-065-069.md
++++ b/CHANGELOG_BP-065-069.md
+@@ -7,9 +7,9 @@ Cumulative WinQuake 1.09 frontend compatibility block.
+ | BP-065 | key bindings, release-all commands and focus routing | 20 |
+ | BP-066 | Win32 mouse filtering and device-state clearing | 22 |
+ | BP-067 | console notify boxes and modal screen input | 22 |
+-| BP-068 | menu toggle, save entry and Windows option sliders | 22 |
++| BP-068 | menu toggle, save entry and Windows option sliders | 24 |
+ | BP-069 | video/focus/frontend closure contract | 24 |
+-| **Total** |  | **110** |
++| **Total** |  | **112** |
+ 
+ The candidate contract is `frontend_109_frozen_v1` with fingerprint
+ `0x924251fa`. The block keeps all accepted Protocol 15, QuakeC, world/physics,
+diff --git a/mnt/data/bp065069_r1/CHANGELOG_BP-065-069R1.md b/CHANGELOG_BP-065-069R1.md
+new file mode 100644
+index 0000000..d5203e3
+--- /dev/null
++++ b/CHANGELOG_BP-065-069R1.md
+@@ -0,0 +1,13 @@
++# BP-065–BP-069R1
++
++Test-only correction after the first Windows run.
++
++- binds the WinQuake `Cvar_SetValue` binary32 results for sound volume and
++  inverted mouse pitch;
++- verifies the matching six-decimal Cvar strings;
++- corrects the BP-068 fixture count from 22 to the actual 24;
++- updates the block total from 110 to 112;
++- adds R1 test/result naming and preserves live PowerShell output.
++
++No file below `src/` or `native/` is changed. The frontend contract and its
++fingerprint `0x924251fa` are unchanged.
+diff --git a/COLLECT_RESULTS.ps1 b/COLLECT_RESULTS.ps1
+index 4542564..8696f86 100644
+--- a/COLLECT_RESULTS.ps1
++++ b/COLLECT_RESULTS.ps1
+@@ -1,4 +1,4 @@
+-﻿[CmdletBinding()]
++[CmdletBinding()]
+ param([switch]$IncludeAllCurrentDocs)
+ 
+ $ErrorActionPreference = "Stop"
+@@ -7,11 +7,11 @@ $Root = $PSScriptRoot
+ $Build = Join-Path $Root "build"
+ $PackageId = "BP-069"
+ $BlockId = "BP-065-069"
+-$DeliveryRevision = "BP-065-069"
+-$DeliveryParent = "BP-060-064R6"
++$DeliveryRevision = "BP-065-069R1"
++$DeliveryParent = "BP-065-069"
+ $Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+-$Staging = Join-Path $Build (".bp065-069-results-{0}" -f $Timestamp)
+-$Archive = Join-Path $Build ("MiniQuake_BP-065-069_RESULTS_{0}.zip" -f $Timestamp)
++$Staging = Join-Path $Build (".bp065-069r1-results-{0}" -f $Timestamp)
++$Archive = Join-Path $Build ("MiniQuake_BP-065-069R1_RESULTS_{0}.zip" -f $Timestamp)
+ 
+ if (-not (Test-Path -LiteralPath $Build -PathType Container)) { throw "build directory does not exist: $Build" }
+ if (Test-Path -LiteralPath $Staging) { Remove-Item -Recurse -Force -LiteralPath $Staging }
+@@ -197,6 +197,13 @@ $RootFiles = @(
+   "tests\network_platform_evidence.ml",
+   "src\miniquake\network_platform_contract.ml",
+   "TEST_BP-065-069.ps1",
++  "TEST_BP-065-069R1.ps1",
++  "CHANGELOG_BP-065-069R1.md",
++  "docs\BP-065-069R1_RESULT_ANALYSIS.md",
++  "docs\BP-065-069R1_TESTING.md",
++  "docs\BP-065-069R1_HOTFIX_REPORT.json",
++  "docs\BP-065-069R1_BLOCK_LEDGER.json",
++  "patches\BP-069R1.diff",
+   "CHANGELOG_BP-065.md",
+   "CHANGELOG_BP-066.md",
+   "CHANGELOG_BP-067.md",
+diff --git a/PORT_LEDGER.json b/PORT_LEDGER.json
+index 908075c..48d88d6 100644
+--- a/PORT_LEDGER.json
++++ b/PORT_LEDGER.json
+@@ -1603,7 +1603,7 @@
+     "reference": [
+       "menu.c"
+     ],
+-    "runtime_fixtures": 22,
++    "runtime_fixtures": 24,
+     "status": "candidate",
+     "options_items": 14,
+     "windows_cd_step": 1.0
+@@ -1618,9 +1618,26 @@
+       "gl_vidnt.c"
+     ],
+     "runtime_fixtures": 24,
+-    "block_runtime_fixtures": 110,
++    "block_runtime_fixtures": 112,
+     "status": "frontend_109_frozen_v1",
+     "fingerprint": "0x924251fa",
+     "windows_acceptance": "pending"
++  },
++  "bp065069r1_hotfix": {
++    "delivery_revision": "BP-065-069R1",
++    "parent_delivery": "BP-065-069",
++    "result_archive": "MiniQuake_BP-065-069_RESULTS_20260729-154632.zip",
++    "result_archive_sha256": "96934acd755555383271141db651f1304561366aec73c540b943e296ec9a2f39",
++    "status": "pending Windows revalidation",
++    "failures": [
++      "sound volume tenth-step",
++      "invert mouse"
++    ],
++    "root_cause": "fixtures compared binary32 cvar values directly with higher-precision literals",
++    "production_source_changed": false,
++    "native_source_changed": false,
++    "engine_contracts_changed": false,
++    "bp068_runtime_fixtures": 24,
++    "block_runtime_fixtures": 112
+   }
+ }
+diff --git a/PORT_STATUS.md b/PORT_STATUS.md
+index b9f3807..5fc2110 100644
+--- a/PORT_STATUS.md
++++ b/PORT_STATUS.md
+@@ -4,8 +4,8 @@
+ 
+ ```text
+ engine package: BP-069
+-delivery: BP-065-069
+-delivery parent: BP-060-064R6
++delivery: BP-065-069R1
++delivery parent: BP-065-069
+ profile: compat_109
+ ```
+ 
+@@ -36,7 +36,7 @@ frontend_109_frozen_v1
+ fingerprint=0x924251fa
+ ```
+ 
+-BP-065–BP-069 adds 110 runtime fixtures for key routing and release commands,
++BP-065–BP-069 adds 112 runtime fixtures for key routing and release commands,
+ Win32 mouse/device state, console and screen modal lifecycle, menu behavior and
+ video/focus transitions. All foreground PowerShell build and test output remains
+ live and simultaneously logged.
+diff --git a/README.md b/README.md
+index 30883ca..ae2d4a1 100644
+--- a/README.md
++++ b/README.md
+@@ -48,9 +48,9 @@ The new cumulative frontend block contains:
+ | BP-065 | key routing, bindings and synthetic focus releases | 20 |
+ | BP-066 | mouse filtering and device-only state clearing | 22 |
+ | BP-067 | console notify and modal screen lifecycle | 22 |
+-| BP-068 | menu toggle, save and Windows option behavior | 22 |
++| BP-068 | menu toggle, save and Windows option behavior | 24 |
+ | BP-069 | video/focus/frontend closure contract | 24 |
+-| **Total** |  | **110** |
++| **Total** |  | **112** |
+ 
+ Candidate contract:
+ 
+diff --git a/mnt/data/bp065069_r1/TEST_BP-065-069R1.ps1 b/TEST_BP-065-069R1.ps1
+new file mode 100644
+index 0000000..bf61694
+--- /dev/null
++++ b/TEST_BP-065-069R1.ps1
+@@ -0,0 +1,407 @@
++[CmdletBinding()]
++param(
++  [string]$Compiler = "",
++  [Alias("StdLibPath", "ImportRoot")]
++  [string]$StdLib = "",
++  [string]$Python = "",
++  [string]$QuakeBase = "",
++  [string]$Game = "id1",
++  [string]$Map = "start",
++  [ValidateRange(1, 1000000)]
++  [int]$Frames = 300,
++  [ValidateRange(1, 1000000)]
++  [int]$TraceFrames = 128,
++  [ValidateRange(1, 1000000)]
++  [int]$RenderEvidenceFrame = 128,
++  [ValidateSet("Release", "Debug")]
++  [string]$Configuration = "Release",
++  [switch]$SkipBuild,
++  [switch]$SkipGameValidation,
++  [switch]$SkipTraceValidation,
++  [switch]$SkipRenderEvidence,
++  [switch]$SkipAudioEvidence,
++  [switch]$SkipNetworkEvidence,
++  [switch]$NetworkTests,
++  [switch]$RebuildNative,
++  [switch]$Listings,
++  [switch]$ContinueIndependentTests = $true,
++  [switch]$BisectOnFailure
++)
++
++$ErrorActionPreference = "Stop"
++Set-StrictMode -Version Latest
++
++# Force Python tools and the Python MiniLang compiler to flush every line.
++# The PowerShell wrappers below also forward every received line immediately.
++$env:PYTHONUNBUFFERED = "1"
++
++$PackageId = "BP-069"
++$ParentPackageId = "BP-068"
++$BlockId = "BP-065-069"
++$DeliveryRevision = "BP-065-069R1"
++$BlockParentPackageId = "BP-060-064R6"
++$Root = $PSScriptRoot
++$Build = Join-Path $Root "build"
++$BuildScript = Join-Path $Root "build.ps1"
++$GameExe = Join-Path $Build "MiniQuake.exe"
++$EvidenceExe = Join-Path $Build "MiniQuakeNetworkPlatformEvidence.exe"
++$TraceComparator = Join-Path $Root "tools\compare_traces.py"
++$RenderComparator = Join-Path $Root "tools\compare_render_evidence.py"
++$Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
++$TranscriptPath = Join-Path $Build ("bp065-069r1-test-{0}.log" -f $Timestamp)
++$SummaryPath = Join-Path $Build "bp065-069r1-test-summary.json"
++$Steps = New-Object System.Collections.Generic.List[object]
++
++function Resolve-Tool([string]$Value, [string]$Label) {
++  if (-not [string]::IsNullOrWhiteSpace($Value) -and (Test-Path -LiteralPath $Value -PathType Leaf)) {
++    return [IO.Path]::GetFullPath($Value)
++  }
++  if (-not [string]::IsNullOrWhiteSpace($Value)) {
++    $Command = Get-Command $Value -ErrorAction SilentlyContinue | Select-Object -First 1
++    if ($null -ne $Command) { return $Command.Path }
++  }
++  throw "$Label not found: $Value"
++}
++
++function Add-Step([string]$Name, [string]$Status, [int]$ExitCode, [string]$Detail) {
++  $Steps.Add([ordered]@{ name = $Name; status = $Status; exit_code = $ExitCode; detail = $Detail })
++  $Color = if ($Status -eq "PASS") { "Green" } elseif ($Status -eq "SKIPPED") { "Yellow" } else { "Red" }
++  Write-Host ("[{0}] {1} - {2}" -f $Status, $Name, $Detail) -ForegroundColor $Color
++}
++
++function Failure-Marker([string]$Text) {
++  if ([string]::IsNullOrWhiteSpace($Text)) { return "" }
++  foreach ($Line in ($Text -split "`r?`n")) {
++    if ($Line -match '^\s*FAIL:\s*' -or $Line -match 'tests failed:\s*[1-9]' -or $Line -match 'evidence:\s*FAIL') { return $Line.Trim() }
++  }
++  return ""
++}
++
++function Invoke-LiveProcess(
++  [string]$Executable,
++  [string[]]$Arguments,
++  [string]$LogPath
++) {
++  $Lines = [System.Collections.Generic.List[string]]::new()
++  $Encoding = [System.Text.UTF8Encoding]::new($false)
++  $Writer = [System.IO.StreamWriter]::new($LogPath, $false, $Encoding)
++  $Code = 1
++  try {
++    & $Executable @Arguments 2>&1 |
++      ForEach-Object {
++        $Line = [string]$_
++        $Lines.Add($Line)
++        $Writer.WriteLine($Line)
++        $Writer.Flush()
++        Write-Host $Line
++      }
++    $Code = [int]$LASTEXITCODE
++  } finally {
++    $Writer.Flush()
++    $Writer.Dispose()
++  }
++  $Text = [string]::Join("`n", $Lines.ToArray())
++  return [pscustomobject]@{
++    exit_code = $Code
++    text = $Text
++  }
++}
++
++function Run-Logged([string]$Name, [string]$Executable, [string[]]$Arguments, [string]$LogName, [string]$RequiredMarker = "") {
++  $LogPath = Join-Path $Build $LogName
++  Write-Host ("[MiniQuake] starting {0}" -f $Name) -ForegroundColor Cyan
++  $Result = Invoke-LiveProcess -Executable $Executable -Arguments $Arguments -LogPath $LogPath
++  $Code = [int]$Result.exit_code
++  $Text = [string]$Result.text
++  $Marker = Failure-Marker $Text
++  if ($Code -eq 0 -and -not [string]::IsNullOrWhiteSpace($Marker)) { $Code = 1 }
++  if ($Code -eq 0 -and -not [string]::IsNullOrWhiteSpace($RequiredMarker) -and $Text -notmatch [regex]::Escape($RequiredMarker)) { $Code = 1; $Marker = "missing marker: $RequiredMarker" }
++  if ($Code -ne 0) { Add-Step $Name "FAIL" $Code ("log=" + $LogName + " " + $Marker); throw "$Name failed with exit code $Code" }
++  Add-Step $Name "PASS" 0 ("log=" + $LogName)
++  return $Text
++}
++
++function Start-BackgroundCapturedProcess(
++  [string]$Executable,
++  [string]$ArgumentsText,
++  [string]$Label
++) {
++  $StartInfo = New-Object System.Diagnostics.ProcessStartInfo
++  $StartInfo.FileName = $Executable
++  $StartInfo.Arguments = $ArgumentsText
++  $StartInfo.WorkingDirectory = $Root
++  $StartInfo.UseShellExecute = $false
++  $StartInfo.CreateNoWindow = $true
++  $StartInfo.RedirectStandardOutput = $true
++  $StartInfo.RedirectStandardError = $true
++
++  $Process = New-Object System.Diagnostics.Process
++  $Process.StartInfo = $StartInfo
++  try {
++    if (-not $Process.Start()) {
++      throw "process start returned false"
++    }
++  } catch {
++    $Process.Dispose()
++    throw ("INFRA_FAILURE: could not start {0}: {1}" -f $Label, $_.Exception.Message)
++  }
++
++  # Drain both redirected streams asynchronously while the server runs. This
++  # avoids a pipe deadlock without buffering any foreground compiler/test job.
++  $StdoutTask = $Process.StandardOutput.ReadToEndAsync()
++  $StderrTask = $Process.StandardError.ReadToEndAsync()
++  return [pscustomobject]@{
++    process = $Process
++    stdout_task = $StdoutTask
++    stderr_task = $StderrTask
++    label = $Label
++  }
++}
++
++function Stop-BackgroundCapturedProcess([pscustomobject]$Handle) {
++  if ($null -eq $Handle -or $null -eq $Handle.process) { return }
++  $Process = [System.Diagnostics.Process]$Handle.process
++  try {
++    if (-not $Process.HasExited) { $Process.Kill() }
++  } catch { }
++  try { $Process.WaitForExit() } catch { }
++}
++
++function Complete-BackgroundCapturedProcess(
++  [pscustomobject]$Handle,
++  [int]$TimeoutMilliseconds,
++  [string]$StdoutPath,
++  [string]$StderrPath
++) {
++  $Process = [System.Diagnostics.Process]$Handle.process
++  $Label = [string]$Handle.label
++  $Exited = $false
++  try {
++    $Exited = $Process.WaitForExit($TimeoutMilliseconds)
++  } catch {
++    Stop-BackgroundCapturedProcess $Handle
++    throw ("INFRA_FAILURE: waiting for {0} failed: {1}" -f $Label, $_.Exception.Message)
++  }
++  if (-not $Exited) {
++    Stop-BackgroundCapturedProcess $Handle
++    throw ("INFRA_FAILURE: {0} timed out after {1} ms" -f $Label, $TimeoutMilliseconds)
++  }
++
++  # The parameterless wait synchronizes redirected-stream completion on
++  # Windows PowerShell 5.1. Refresh before reading ExitCode so the process
++  # object cannot retain the blank/null status observed in R5.
++  $Process.WaitForExit()
++  $Process.Refresh()
++
++  try {
++    $Stdout = [string]$Handle.stdout_task.Result
++    $Stderr = [string]$Handle.stderr_task.Result
++  } catch {
++    $Process.Dispose()
++    throw ("INFRA_FAILURE: collecting {0} output failed: {1}" -f $Label, $_.Exception.Message)
++  }
++
++  $Encoding = New-Object System.Text.UTF8Encoding($false)
++  [System.IO.File]::WriteAllText($StdoutPath, $Stdout, $Encoding)
++  [System.IO.File]::WriteAllText($StderrPath, $Stderr, $Encoding)
++
++  try {
++    $Code = [int]$Process.ExitCode
++  } catch {
++    $Process.Dispose()
++    throw ("INFRA_FAILURE: {0} exit code unavailable after process completion: {1}" -f $Label, $_.Exception.Message)
++  }
++  $Process.Dispose()
++
++  return [pscustomobject]@{
++    exit_code = $Code
++    stdout = $Stdout
++    stderr = $Stderr
++    timed_out = $false
++  }
++}
++
++function Write-NetworkEvidenceOutput([string]$Suffix, [string]$Stdout, [string]$Stderr) {
++  if (-not [string]::IsNullOrWhiteSpace($Stdout)) {
++    Write-Host ("[MiniQuake] network evidence server {0} stdout" -f $Suffix) -ForegroundColor Cyan
++    foreach ($Line in ($Stdout -split "`r?`n")) {
++      if (-not [string]::IsNullOrEmpty($Line)) { Write-Host $Line }
++    }
++  }
++  if (-not [string]::IsNullOrWhiteSpace($Stderr)) {
++    Write-Host ("[MiniQuake] network evidence server {0} stderr" -f $Suffix) -ForegroundColor Yellow
++    foreach ($Line in ($Stderr -split "`r?`n")) {
++      if (-not [string]::IsNullOrEmpty($Line)) { Write-Host $Line -ForegroundColor Yellow }
++    }
++  }
++}
++
++function Run-NetworkEvidencePair([string]$Suffix, [int]$Port) {
++  $ServerOut = Join-Path $Build ("bp065-069r1-network-server-{0}.log" -f $Suffix)
++  $ServerErr = Join-Path $Build ("bp065-069r1-network-server-{0}.err.log" -f $Suffix)
++  $ClientLog = Join-Path $Build ("bp065-069r1-network-client-{0}.log" -f $Suffix)
++  $PairJson = Join-Path $Build ("bp065-069r1-network-pair-{0}.json" -f $Suffix)
++  Remove-Item -Force -ErrorAction SilentlyContinue $ServerOut, $ServerErr, $ClientLog, $PairJson
++
++  Write-Host ("[MiniQuake] starting network evidence server {0} on UDP port {1}" -f $Suffix, $Port) -ForegroundColor Cyan
++  $ServerHandle = Start-BackgroundCapturedProcess -Executable $EvidenceExe -ArgumentsText ("server {0}" -f $Port) -Label ("network evidence server {0}" -f $Suffix)
++  $ClientResult = $null
++  $ServerResult = $null
++  try {
++    Start-Sleep -Milliseconds 300
++    Write-Host ("[MiniQuake] starting network evidence client {0}" -f $Suffix) -ForegroundColor Cyan
++    $ClientResult = Invoke-LiveProcess -Executable $EvidenceExe -Arguments @("client", [string]$Port) -LogPath $ClientLog
++    $ServerResult = Complete-BackgroundCapturedProcess -Handle $ServerHandle -TimeoutMilliseconds 7000 -StdoutPath $ServerOut -StderrPath $ServerErr
++  } catch {
++    Stop-BackgroundCapturedProcess $ServerHandle
++    throw
++  }
++
++  $ClientCode = [int]$ClientResult.exit_code
++  $ClientText = [string]$ClientResult.text
++  $ServerCode = [int]$ServerResult.exit_code
++  $ServerText = [string]$ServerResult.stdout
++  $ServerErrorText = [string]$ServerResult.stderr
++  Write-NetworkEvidenceOutput -Suffix $Suffix -Stdout $ServerText -Stderr $ServerErrorText
++
++  $ServerPassed = $ServerText -match 'network platform evidence server: PASS'
++  $ClientPassed = $ClientText -match 'network platform evidence: PASS'
++  $PairSummary = [ordered]@{
++    schema_version = 1
++    suffix = $Suffix
++    port = $Port
++    server_exit_code = $ServerCode
++    client_exit_code = $ClientCode
++    server_pass_marker = [bool]$ServerPassed
++    client_pass_marker = [bool]$ClientPassed
++    server_stderr_empty = [string]::IsNullOrWhiteSpace($ServerErrorText)
++    status = if ($ServerCode -eq 0 -and $ClientCode -eq 0 -and $ServerPassed -and $ClientPassed) { "PASS" } else { "FAIL" }
++  }
++  $PairSummary | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $PairJson -Encoding UTF8
++
++  if ($ServerCode -ne 0 -or $ClientCode -ne 0) {
++    throw "network evidence pair $Suffix failed: server=$ServerCode client=$ClientCode"
++  }
++  if (-not $ServerPassed) { throw "network evidence server $Suffix did not report PASS" }
++  if (-not $ClientPassed) { throw "network evidence client $Suffix did not report PASS" }
++  return $ClientLog
++}
++
++New-Item -ItemType Directory -Force -Path $Build | Out-Null
++Start-Transcript -Path $TranscriptPath -Force | Out-Null
++$Failure = ""
++try {
++  Write-Host "MiniQuake BP-065-069R1 acceptance test"
++  Write-Host "  parent: $BlockParentPackageId"
++  Write-Host "  root:   $Root"
++  if ($BisectOnFailure) { Write-Host "  logical bisect markers enabled" }
++
++  if ([string]::IsNullOrWhiteSpace($Python)) { $Python = "python" }
++  $PythonExe = Resolve-Tool $Python "Python"
++
++  if (-not $SkipBuild) {
++    $PowerShellExe = (Get-Process -Id $PID).Path
++    $Arguments = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $BuildScript)
++    if (-not [string]::IsNullOrWhiteSpace($Compiler)) { $Arguments += @("-Compiler", $Compiler) }
++    if (-not [string]::IsNullOrWhiteSpace($StdLib)) { $Arguments += @("-StdLib", $StdLib) }
++    $Arguments += @("-Python", $PythonExe, "-Configuration", $Configuration)
++    if ($NetworkTests) { $Arguments += "-NetworkTests" }
++    if ($RebuildNative) { $Arguments += "-RebuildNative" }
++    if ($Listings) { $Arguments += "-Listings" }
++    [void](Run-Logged "single cumulative build and unit-test suite" $PowerShellExe $Arguments "bp065-069r1-build-child.log" "MiniQuake BP-069 frontend closure tests passed: 24")
++  } else {
++    Add-Step "single cumulative build and unit-test suite" "SKIPPED" 0 "-SkipBuild"
++  }
++
++  foreach ($Path in @($GameExe, $EvidenceExe)) { if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "required executable missing: $Path" } }
++
++  $Version = Run-Logged "package identity" $GameExe @("--version") "bp065-069r1-version.txt" "Frontend status: frontend_109_frozen_v1"
++  if ($Version -notmatch 'Package: BP-069' -or $Version -notmatch 'Block: BP-065-069') { throw "compiled package identity mismatch" }
++
++  $CanUseGame = -not $SkipGameValidation -and -not [string]::IsNullOrWhiteSpace($QuakeBase)
++  if ($CanUseGame) {
++    if (-not (Test-Path -LiteralPath (Join-Path $QuakeBase "$Game\pak0.pak") -PathType Leaf)) { throw "Quake data not found: $QuakeBase\$Game\pak0.pak" }
++    [void](Run-Logged "installed Quake data validation" $GameExe @("--validate-game", $QuakeBase, $Map, "-game", $Game) "bp065-069r1-game-validation.log" "Validation result: PASS")
++    [void](Run-Logged "headless runtime validation" $GameExe @("--validate-runtime", $QuakeBase, $Map, [string]$Frames, "-game", $Game) "bp065-069r1-runtime-validation.log")
++  } else {
++    Add-Step "installed Quake data validation" "SKIPPED" 0 "no usable -QuakeBase or skipped"
++    Add-Step "headless runtime validation" "SKIPPED" 0 "no usable -QuakeBase or skipped"
++  }
++
++  if (-not $SkipAudioEvidence -and $CanUseGame) {
++    $AudioExe = Join-Path $Build "MiniQuakeAudioRetailEvidence.exe"
++    $A = Join-Path $Build "bp065-069r1-audio-a.log"; $B = Join-Path $Build "bp065-069r1-audio-b.log"
++    $TextA = Run-Logged "retail audio evidence A" $AudioExe @($QuakeBase, $Game) ([IO.Path]::GetFileName($A)) "MiniQuake BP-059 retail audio evidence: PASS"
++    $TextB = Run-Logged "retail audio evidence B" $AudioExe @($QuakeBase, $Game) ([IO.Path]::GetFileName($B)) "MiniQuake BP-059 retail audio evidence: PASS"
++    $HashA = (Get-FileHash -Algorithm SHA256 -LiteralPath $A).Hash.ToLowerInvariant(); $HashB = (Get-FileHash -Algorithm SHA256 -LiteralPath $B).Hash.ToLowerInvariant()
++    if ($HashA -ne $HashB) { throw "retail audio evidence differs" }
++    Add-Step "byte-identical retail audio evidence" "PASS" 0 ("sha256=" + $HashA)
++  } else { Add-Step "retail audio evidence" "SKIPPED" 0 "skipped or no Quake data" }
++
++  if (-not $SkipTraceValidation -and $CanUseGame) {
++    $TraceDir = Join-Path $Build "bp065-069r1-traces"; Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $TraceDir; New-Item -ItemType Directory -Force -Path $TraceDir | Out-Null
++    $PrefixA = Join-Path $TraceDir "run-a"; $PrefixB = Join-Path $TraceDir "run-b"
++    [void](Run-Logged "compatibility trace A" $GameExe @("--compat-trace", $QuakeBase, $Map, [string]$TraceFrames, $PrefixA, "-game", $Game) "bp065-069r1-trace-a.log")
++    [void](Run-Logged "compatibility trace B" $GameExe @("--compat-trace", $QuakeBase, $Map, [string]$TraceFrames, $PrefixB, "-game", $Game) "bp065-069r1-trace-b.log")
++    [void](Run-Logged "byte-identical trace comparison" $PythonExe @($TraceComparator, ("{0}.mqtrace" -f $PrefixA), ("{0}.mqtrace" -f $PrefixB), "--json-output", (Join-Path $Build "bp065-069r1-trace-comparison.json")) "bp065-069r1-trace-comparison.log")
++  } else { Add-Step "deterministic compatibility traces" "SKIPPED" 0 "skipped or no Quake data" }
++
++  if (-not $SkipRenderEvidence -and $CanUseGame) {
++    $EvidenceDir = Join-Path $Build "bp065-069r1-render"; Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $EvidenceDir; New-Item -ItemType Directory -Force -Path $EvidenceDir | Out-Null
++    $EA = Join-Path $EvidenceDir "a"; $EB = Join-Path $EvidenceDir "b"
++    [void](Run-Logged "render evidence A" $GameExe @("--render-evidence", $QuakeBase, $Map, [string]$RenderEvidenceFrame, $EA, "-game", $Game) "bp065-069r1-render-a.log")
++    [void](Run-Logged "render evidence B" $GameExe @("--render-evidence", $QuakeBase, $Map, [string]$RenderEvidenceFrame, $EB, "-game", $Game) "bp065-069r1-render-b.log")
++    [void](Run-Logged "byte-identical render evidence" $PythonExe @($RenderComparator, ("{0}.tga" -f $EA), ("{0}.tga" -f $EB), "--require-exact", "--json-out", (Join-Path $Build "bp065-069r1-render-comparison.json")) "bp065-069r1-render-comparison.log")
++  } else { Add-Step "deterministic framebuffer evidence" "SKIPPED" 0 "skipped or no Quake data" }
++
++  if (-not $SkipNetworkEvidence) {
++    $PortA = Get-Random -Minimum 30000 -Maximum 45000
++    $PortB = Get-Random -Minimum 45001 -Maximum 60000
++    $ClientA = Run-NetworkEvidencePair "a" $PortA
++    $ClientB = Run-NetworkEvidencePair "b" $PortB
++    $HashA = (Get-FileHash -Algorithm SHA256 -LiteralPath $ClientA).Hash.ToLowerInvariant(); $HashB = (Get-FileHash -Algorithm SHA256 -LiteralPath $ClientB).Hash.ToLowerInvariant()
++    if ($HashA -ne $HashB) { throw "network evidence client reports differ: A=$HashA B=$HashB" }
++    Add-Step "two independent UDP control handshakes" "PASS" 0 ("sha256=" + $HashA)
++  } else { Add-Step "two independent UDP control handshakes" "SKIPPED" 0 "-SkipNetworkEvidence" }
++
++  if ($NetworkTests) { [void](Run-Logged "Winsock UDP loopback smoke" $GameExe @("--udp-smoke", "2000") "bp065-069r1-udp-smoke.log" "result=PASS") }
++  else { Add-Step "Winsock UDP loopback smoke" "SKIPPED" 0 "-NetworkTests not supplied" }
++
++  $Failed = @($Steps | Where-Object { $_.status -eq "FAIL" })
++  if ($Failed.Count -gt 0) { throw "independent test groups failed: $($Failed.Count)" }
++  Add-Step "MiniQuake BP-065-069R1 acceptance" "PASS" 0 "all required gates passed"
++} catch {
++  $Failure = $_.Exception.Message
++  Write-Host ("ERROR: " + $Failure) -ForegroundColor Red
++} finally {
++  $Status = if ([string]::IsNullOrWhiteSpace($Failure)) { "PASS" } else { "FAIL" }
++  $Summary = [ordered]@{
++    schema_version = 1
++    package_id = $PackageId
++    parent_package_id = $ParentPackageId
++    block_id = $BlockId
++    block_parent_package_id = $BlockParentPackageId
++    delivery_revision = $DeliveryRevision
++    network_platform_status = "network_platform_109_frozen_v1"
++    network_platform_fingerprint = "0xb3ec7589"
++    frontend_status = "frontend_109_frozen_v1"
++    frontend_fingerprint = "0x924251fa"
++    status = $Status
++    failure = $Failure
++    created_utc = (Get-Date).ToUniversalTime().ToString("o")
++    quake_base_supplied = -not [string]::IsNullOrWhiteSpace($QuakeBase)
++    steps = $Steps
++  }
++  $Summary | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $SummaryPath -Encoding UTF8
++  Stop-Transcript | Out-Null
++}
++
++if (-not [string]::IsNullOrWhiteSpace($Failure)) {
++  Write-Host "MiniQuake BP-065-069R1 acceptance test: FAIL" -ForegroundColor Red
++  Write-Host "Run .\COLLECT_RESULTS.ps1 and upload the generated ZIP."
++  exit 1
++}
++Write-Host "MiniQuake BP-065-069R1 acceptance test: PASS" -ForegroundColor Green
++Write-Host "Result summary: $SummaryPath"
++Write-Host "For feedback, run .\COLLECT_RESULTS.ps1 and upload the generated ZIP."
++exit 0
+diff --git a/audit/menu_lifecycle_golden.json b/audit/menu_lifecycle_golden.json
+index 50a1ae1..ce3d1b8 100644
+--- a/audit/menu_lifecycle_golden.json
++++ b/audit/menu_lifecycle_golden.json
+@@ -1,11 +1,15 @@
+ {
+   "schema_version": 1,
+   "package": "BP-068",
+-  "fixtures": 22,
++  "fixtures": 24,
+   "options_items": 14,
+   "help_pages": 6,
+   "save_slots": 12,
+   "cd_volume_step": 1.0,
+   "sound_volume_step": 0.1,
+-  "tcp_selection": 3
++  "tcp_selection": 3,
++  "sound_volume_bits": "0x3f4ccccd",
++  "sound_volume_string": "0.800000",
++  "invert_pitch_bits": "0xbcb43958",
++  "invert_pitch_string": "-0.022000"
+ }
+diff --git a/build.ps1 b/build.ps1
+index aa2fbe0..7b8cbd6 100644
+--- a/build.ps1
++++ b/build.ps1
+@@ -1766,7 +1766,7 @@ if (-not $SkipTests) {
+     Invoke-MiniQuakeTestBinary `
+       -Label "BP-068 menu lifecycle tests" `
+       -Executable $MenuLifecycleTestExe `
+-      -ProgressHint "The last printed [NN/22] line identifies the active menu toggle, save or options fixture."
++      -ProgressHint "The last printed [NN/24] line identifies the active menu toggle, save or options fixture."
+     $MenuLifecycleTestStatus = "PASS"
+ 
+     Invoke-MiniQuakeTestBinary `
+diff --git a/mnt/data/bp065069_r1/docs/BP-065-069R1_BLOCK_LEDGER.json b/docs/BP-065-069R1_BLOCK_LEDGER.json
+new file mode 100644
+index 0000000..bd3c94c
+--- /dev/null
++++ b/docs/BP-065-069R1_BLOCK_LEDGER.json
+@@ -0,0 +1,92 @@
++{
++  "schema_version": 1,
++  "project": "MiniQuake",
++  "block_id": "BP-065-069",
++  "parent_package_id": "BP-060-064R6",
++  "final_package_id": "BP-069",
++  "delivery_revision": "BP-065-069",
++  "frontend_status": "frontend_109_frozen_v1",
++  "frontend_fingerprint": "0x924251fa",
++  "steps": [
++    {
++      "package_id": "BP-065",
++      "title": "key routing, bindings and synthetic release commands",
++      "patch": "patches/BP-065.diff",
++      "runtime_fixtures": 20,
++      "status": "candidate"
++    },
++    {
++      "package_id": "BP-066",
++      "title": "Win32 mouse filtering and device clear parity",
++      "patch": "patches/BP-066.diff",
++      "runtime_fixtures": 22,
++      "status": "candidate"
++    },
++    {
++      "package_id": "BP-067",
++      "title": "console notify and modal screen lifecycle",
++      "patch": "patches/BP-067.diff",
++      "runtime_fixtures": 22,
++      "status": "candidate"
++    },
++    {
++      "package_id": "BP-068",
++      "title": "menu toggle, save and options lifecycle",
++      "patch": "patches/BP-068.diff",
++      "runtime_fixtures": 24,
++      "status": "candidate"
++    },
++    {
++      "package_id": "BP-069",
++      "title": "video/focus/frontend closure contract",
++      "patch": "patches/BP-069.diff",
++      "runtime_fixtures": 24,
++      "status": "candidate"
++    }
++  ],
++  "block_runtime_fixtures": 112,
++  "accepted_parent": {
++    "delivery_revision": "BP-060-064R6",
++    "status": "PASS",
++    "result_archive": "MiniQuake_BP-060-064R6_RESULTS_20260729-134030.zip",
++    "result_archive_sha256": "5f9812a0527ea426889b4ae0d08e6e40bb2b715e32e232ebe215dd3ab99674a1",
++    "required_steps": "16/16 PASS",
++    "trace_sha256": "03656a0e9f3b13d4430014de3787053c204acdd1e7f2e33c292ee8ee2b47c8cc",
++    "trace_rolling_hash": "d905b042",
++    "retail_audio_evidence_sha256": "896049a03f26b1db4ddc1550d35d1cacb5f7e0f0c900b0ee36393c8ab8bd0501",
++    "render_tga_sha256": "9047f96e9bef8e06035119ff71ddfe7ad4dcad89b4740c66618252a13cd166fb",
++    "network_client_report_sha256": "50534266c750fa20058c82ce48baca953b0107106dc24fd69c5854fc3364ba96",
++    "udp_loopback": "PASS"
++  },
++  "acceptance": {
++    "single_cumulative_build": true,
++    "installed_game_validation": true,
++    "headless_frames": 300,
++    "trace_frames": 128,
++    "render_evidence": true,
++    "retail_audio_evidence": true,
++    "network_evidence_process_pairs": 2,
++    "network_evidence_exact_identity": true,
++    "udp_loopback": true
++  },
++  "scope_boundary": {
++    "reference": "WinQuake/GLQuake 1.09 Windows frontend",
++    "keyboard": "256-key Quake routing and +command release semantics",
++    "input": "Win32 mouse and joystick observable behavior",
++    "console_screen": "console notify and modal acknowledgement lifecycle",
++    "menu": "classic Windows menu and options behavior",
++    "video": "mode, focus and frontend state transitions",
++    "quake_game_data": "external; never bundled"
++  },
++  "delivery_hotfix": {
++    "revision": "BP-065-069R1",
++    "parent": "BP-065-069",
++    "result_archive": "MiniQuake_BP-065-069_RESULTS_20260729-154632.zip",
++    "result_archive_sha256": "96934acd755555383271141db651f1304561366aec73c540b943e296ec9a2f39",
++    "classification": "fixture-only binary32 expectation and count correction",
++    "production_source_changed": false,
++    "native_source_changed": false,
++    "engine_contracts_changed": false,
++    "runtime_fixtures": 112
++  }
++}
+diff --git a/mnt/data/bp065069_r1/docs/BP-065-069R1_HOTFIX_REPORT.json b/docs/BP-065-069R1_HOTFIX_REPORT.json
+new file mode 100644
+index 0000000..9a6e853
+--- /dev/null
++++ b/docs/BP-065-069R1_HOTFIX_REPORT.json
+@@ -0,0 +1,29 @@
++{
++  "schema_version": 1,
++  "revision": "BP-065-069R1",
++  "parent": "BP-065-069",
++  "result_archive": "MiniQuake_BP-065-069_RESULTS_20260729-154632.zip",
++  "result_archive_sha256": "96934acd755555383271141db651f1304561366aec73c540b943e296ec9a2f39",
++  "classification": "fixture-only binary32 expectation and test-count correction",
++  "failures": [
++    "sound volume tenth-step",
++    "invert mouse"
++  ],
++  "expected_values": {
++    "volume": {
++      "string": "0.800000",
++      "float_bits": "0x3f4ccccd"
++    },
++    "m_pitch": {
++      "string": "-0.022000",
++      "float_bits": "0xbcb43958"
++    }
++  },
++  "bp068_fixtures": 24,
++  "block_fixtures": 112,
++  "production_source_changed": false,
++  "native_source_changed": false,
++  "engine_contracts_changed": false,
++  "frontend_status": "frontend_109_frozen_v1",
++  "frontend_fingerprint": "0x924251fa"
++}
+diff --git a/mnt/data/bp065069_r1/docs/BP-065-069R1_RESULT_ANALYSIS.md b/docs/BP-065-069R1_RESULT_ANALYSIS.md
+new file mode 100644
+index 0000000..c657168
+--- /dev/null
++++ b/docs/BP-065-069R1_RESULT_ANALYSIS.md
+@@ -0,0 +1,21 @@
++# BP-065–BP-069 result analysis
++
++The Windows build completed and all inherited groups passed until BP-068.
++`MiniQuakeMenuLifecycleTests.exe` reported two fixture failures:
++
++```text
++sound volume tenth-step
++invert mouse
++```
++
++The production code follows `menu.c::M_AdjustSliders` and `Cvar_SetValue`.
++The fixture compared a stored C `float` directly with MiniLang source literals.
++After six-decimal serialization and reparsing, the authoritative values are:
++
++```text
++volume:  string=0.800000  bits=0x3f4ccccd
++m_pitch: string=-0.022000 bits=0xbcb43958
++```
++
++The test also executed 24 checks while labelling them `/22`. R1 corrects the
++expectations and reporting only. No engine or native source changed.
+diff --git a/mnt/data/bp065069_r1/docs/BP-065-069R1_TESTING.md b/docs/BP-065-069R1_TESTING.md
+new file mode 100644
+index 0000000..feeaae8
+--- /dev/null
++++ b/docs/BP-065-069R1_TESTING.md
+@@ -0,0 +1,26 @@
++# BP-065–BP-069R1 Windows test
++
++```powershell
++$QuakeBase = "C:\Users\nilsk\Dropbox\Quake"
++
++.\TEST_BP-065-069R1.ps1 `
++  -Compiler C:\Users\nilsk\Desktop\MiniLangCompilerPy\mlc_win64.py `
++  -StdLib C:\Users\nilsk\Desktop\MiniLangCompilerPy `
++  -QuakeBase $QuakeBase `
++  -Game id1 `
++  -Map start `
++  -Frames 300 `
++  -TraceFrames 128 `
++  -NetworkTests `
++  -ContinueIndependentTests `
++  -BisectOnFailure
++```
++
++The repaired gate must end with:
++
++```text
++MiniQuake BP-068 menu lifecycle tests passed: 24
++MiniQuake BP-065-069R1 acceptance test: PASS
++```
++
++Then run `./COLLECT_RESULTS.ps1`.
+diff --git a/docs/BP-065-069_BLOCK_LEDGER.json b/docs/BP-065-069_BLOCK_LEDGER.json
+index 6b3a54d..bd3c94c 100644
+--- a/docs/BP-065-069_BLOCK_LEDGER.json
++++ b/docs/BP-065-069_BLOCK_LEDGER.json
+@@ -33,7 +33,7 @@
+       "package_id": "BP-068",
+       "title": "menu toggle, save and options lifecycle",
+       "patch": "patches/BP-068.diff",
+-      "runtime_fixtures": 22,
++      "runtime_fixtures": 24,
+       "status": "candidate"
+     },
+     {
+@@ -44,7 +44,7 @@
+       "status": "candidate"
+     }
+   ],
+-  "block_runtime_fixtures": 110,
++  "block_runtime_fixtures": 112,
+   "accepted_parent": {
+     "delivery_revision": "BP-060-064R6",
+     "status": "PASS",
+@@ -77,5 +77,16 @@
+     "menu": "classic Windows menu and options behavior",
+     "video": "mode, focus and frontend state transitions",
+     "quake_game_data": "external; never bundled"
++  },
++  "delivery_hotfix": {
++    "revision": "BP-065-069R1",
++    "parent": "BP-065-069",
++    "result_archive": "MiniQuake_BP-065-069_RESULTS_20260729-154632.zip",
++    "result_archive_sha256": "96934acd755555383271141db651f1304561366aec73c540b943e296ec9a2f39",
++    "classification": "fixture-only binary32 expectation and count correction",
++    "production_source_changed": false,
++    "native_source_changed": false,
++    "engine_contracts_changed": false,
++    "runtime_fixtures": 112
+   }
+ }
+diff --git a/docs/BP-065-069_TESTING.md b/docs/BP-065-069_TESTING.md
+index 58594ef..e20372f 100644
+--- a/docs/BP-065-069_TESTING.md
++++ b/docs/BP-065-069_TESTING.md
+@@ -26,7 +26,7 @@ New expected runtime markers:
+ MiniQuake BP-065 key/focus tests passed: 20
+ MiniQuake BP-066 input device tests passed: 22
+ MiniQuake BP-067 console/screen tests passed: 22
+-MiniQuake BP-068 menu lifecycle tests passed: 22
++MiniQuake BP-068 menu lifecycle tests passed: 24
+ MiniQuake BP-069 frontend closure tests passed: 24
+ ```
+ 
+diff --git a/docs/BP-068_MENU_LIFECYCLE_AUDIT.md b/docs/BP-068_MENU_LIFECYCLE_AUDIT.md
+index b60583e..df60869 100644
+--- a/docs/BP-068_MENU_LIFECYCLE_AUDIT.md
++++ b/docs/BP-068_MENU_LIFECYCLE_AUDIT.md
+@@ -1,4 +1,18 @@
+ # BP-068 menu lifecycle audit
+ 
+ Compared paths: `menu.c::M_ToggleMenu_f`, `M_Menu_Save_f`, and `M_AdjustSliders`.
+-Submenu toggles return to main, save entry is dispatched once, and the Windows CD-volume slider uses the original full-unit step.
++Submenu toggles return to main, save entry is dispatched once, and the Windows
++CD-volume slider uses the original full-unit step.
++
++The Windows R0 result exposed two fixture-only precision errors. `Cvar_SetValue`
++formats a C `float` with six decimals and reparses it into the `cvar_t.value`
++float field. The corrected test therefore binds both the serialized string and
++the IEEE-754 binary32 value:
++
++| Value | Cvar string | binary32 |
++|---|---|---|
++| sound volume after `0.7 + 0.1` | `0.800000` | `0x3f4ccccd` |
++| inverted `m_pitch` | `-0.022000` | `0xbcb43958` |
++
++The test contains 24 fixtures; the original denominator of 22 was a reporting
++error and is corrected in the R1 delivery.
+diff --git a/test.ps1 b/test.ps1
+index 9405948..0d4e91e 100644
+--- a/test.ps1
++++ b/test.ps1
+@@ -1 +1 @@
+-﻿& "$PSScriptRoot\TEST_BP-065-069.ps1" @args
++﻿& "$PSScriptRoot\TEST_BP-065-069R1.ps1" @args
+diff --git a/tests/menu_lifecycle_parity_tests.ml b/tests/menu_lifecycle_parity_tests.ml
+index c952097..70accde 100644
+--- a/tests/menu_lifecycle_parity_tests.ml
++++ b/tests/menu_lifecycle_parity_tests.ml
+@@ -8,14 +8,16 @@ BP-068: menu.c toggle, options and save-entry lifecycle parity.
+ import miniquake.menu as bp068Menu
+ import miniquake.cvar as bp068Cvar
+ import miniquake.keys as bp068Keys
++import miniquake.native as bp068Native
+ 
+ bp068Index = 0
+ bp068Failures = 0
++const BP068_FIXTURES = 24
+ 
+ function bp068Check(value, name)
+   global bp068Index, bp068Failures
+   bp068Index = bp068Index + 1
+-  print "[" + bp068Index + "/22] " + name
++  print "[" + bp068Index + "/" + BP068_FIXTURES + "] " + name
+   if not value then
+     bp068Failures = bp068Failures + 1
+     print "FAIL: " + name
+@@ -75,7 +77,12 @@ function main(args)
+   bp068Check(bp068Cvar.variableValue(registry, "bgmvolume") == 1.0, "CD volume full-step up")
+   state.selection = 7
+   bp068Menu.M_AdjustSliders(state, registry, 1)
+-  bp068Check(bp068Cvar.variableValue(registry, "volume") == 0.8, "sound volume tenth-step")
++  soundVolume = bp068Cvar.variableValue(registry, "volume")
++  bp068Check(
++    bp068Native.floatBits(soundVolume) == 0x3f4ccccd and
++      bp068Cvar.variableString(registry, "volume") == "0.800000",
++    "sound volume tenth-step",
++  )
+   state.selection = 8
+   bp068Menu.M_AdjustSliders(state, registry, 1)
+   bp068Check(bp068Cvar.variableValue(registry, "cl_forwardspeed") == 400.0, "always-run toggle on")
+@@ -83,7 +90,12 @@ function main(args)
+   bp068Check(bp068Cvar.variableValue(registry, "cl_forwardspeed") == 200.0, "always-run toggle off")
+   state.selection = 9
+   bp068Menu.M_AdjustSliders(state, registry, 1)
+-  bp068Check(bp068Cvar.variableValue(registry, "m_pitch") == -0.022, "invert mouse")
++  invertedPitch = bp068Cvar.variableValue(registry, "m_pitch")
++  bp068Check(
++    bp068Native.floatBits(invertedPitch) == 0xbcb43958 and
++      bp068Cvar.variableString(registry, "m_pitch") == "-0.022000",
++    "invert mouse",
++  )
+   state.selection = 13
+   bp068Menu.M_AdjustSliders(state, registry, 1)
+   bp068Check(bp068Cvar.variableValue(registry, "_windowed_mouse") == 0.0, "windowed mouse toggle")
+@@ -96,9 +108,9 @@ function main(args)
+   bp068Check(state.selection == 3, "excluded transports skip to TCP/IP")
+ 
+   if bp068Failures > 0 then
+-    print "MiniQuake BP-068 menu lifecycle tests failed: " + bp068Failures + "/22"
++    print "MiniQuake BP-068 menu lifecycle tests failed: " + bp068Failures + "/" + BP068_FIXTURES
+     return 1
+   end if
+-  print "MiniQuake BP-068 menu lifecycle tests passed: 22"
++  print "MiniQuake BP-068 menu lifecycle tests passed: 24"
+   return 0
+ end function
+diff --git a/tools/check_frontend_068.py b/tools/check_frontend_068.py
+index cb30c9b..24ea4dd 100755
+--- a/tools/check_frontend_068.py
++++ b/tools/check_frontend_068.py
+@@ -1,6 +1,10 @@
+ #!/usr/bin/env python3
+ import argparse, json, pathlib, re, sys
+ 
++EXPECTED_FIXTURES = 24
++EXPECTED_VOLUME_BITS = "0x3f4ccccd"
++EXPECTED_PITCH_BITS = "0xbcb43958"
++
+ def main():
+     ap=argparse.ArgumentParser(); ap.add_argument('--root',default='.'); ap.add_argument('--json',default='')
+     ns=ap.parse_args(); root=pathlib.Path(ns.root).resolve(); errors=[]
+@@ -15,10 +19,27 @@ def main():
+     if not block: errors.append('menu_save command block missing')
+     elif block.group(1).count('menu.M_Menu_Save_f(')!=1: errors.append('menu_save invokes M_Menu_Save_f more than once')
+     if 'direction * 1.0, 0.0, 1.0' not in menu: errors.append('menu slider CD step is not one full unit')
+-    if 'MiniQuake BP-068 menu lifecycle tests passed: 22' not in test: errors.append('fixture count marker missing')
+-    if golden.get('fixtures')!=22 or golden.get('options_items')!=14 or golden.get('cd_volume_step')!=1.0: errors.append('golden mismatch')
++    for marker in [
++        'import miniquake.native as bp068Native',
++        'const BP068_FIXTURES = 24',
++        'bp068Native.floatBits(soundVolume) == 0x3f4ccccd',
++        'variableString(registry, "volume") == "0.800000"',
++        'bp068Native.floatBits(invertedPitch) == 0xbcb43958',
++        'variableString(registry, "m_pitch") == "-0.022000"',
++        'MiniQuake BP-068 menu lifecycle tests passed: 24',
++    ]:
++        if marker not in test: errors.append('menu fixture missing marker: '+marker)
++    expected_golden = {
++        'fixtures': EXPECTED_FIXTURES, 'options_items': 14, 'cd_volume_step': 1.0,
++        'sound_volume_step': 0.1, 'sound_volume_bits': EXPECTED_VOLUME_BITS,
++        'sound_volume_string': '0.800000', 'invert_pitch_bits': EXPECTED_PITCH_BITS,
++        'invert_pitch_string': '-0.022000',
++    }
++    for key, wanted in expected_golden.items():
++        if golden.get(key) != wanted: errors.append(f'golden {key} is {golden.get(key)!r}, expected {wanted!r}')
+     report={'schema_version':1,'package':'BP-068','status':'PASS' if not errors else 'FAIL','errors':errors,
+-            'fixtures':22,'options_items':14,'save_single_dispatch':not errors,'cd_volume_step':1.0}
++            'fixtures':EXPECTED_FIXTURES,'options_items':14,'save_single_dispatch':not errors,'cd_volume_step':1.0,
++            'sound_volume_bits':EXPECTED_VOLUME_BITS,'invert_pitch_bits':EXPECTED_PITCH_BITS}
+     if ns.json: pathlib.Path(ns.json).write_text(json.dumps(report,indent=2)+'\n')
+     print('MiniQuake BP-068 menu lifecycle verification: '+report['status'])
+     for e in errors: print('  [FAIL] '+e)
+diff --git a/tools/oracle/menu_lifecycle_oracle.c b/tools/oracle/menu_lifecycle_oracle.c
+index 2e043ec..1ecedc9 100644
+--- a/tools/oracle/menu_lifecycle_oracle.c
++++ b/tools/oracle/menu_lifecycle_oracle.c
+@@ -1,9 +1,41 @@
++#include <stdint.h>
+ #include <stdio.h>
+-static double clamp(double x,double lo,double hi){return x<lo?lo:(x>hi?hi:x);}
++#include <stdlib.h>
++#include <string.h>
++
++static float clampf_local(float x, float lo, float hi) {
++    return x < lo ? lo : (x > hi ? hi : x);
++}
++
++static uint32_t float_bits(float value) {
++    uint32_t result = 0;
++    memcpy(&result, &value, sizeof(result));
++    return result;
++}
++
++static float cvar_set_value_roundtrip(float value, char text[32]) {
++    (void)snprintf(text, 32, "%f", (double)value);
++    return (float)strtod(text, NULL);
++}
++
+ int main(void) {
+-  printf("cd_down=%.1f\n", clamp(1.0-1.0,0.0,1.0));
+-  printf("cd_up=%.1f\n", clamp(0.0+1.0,0.0,1.0));
+-  printf("sound_up=%.1f\n", clamp(0.7+0.1,0.0,1.0));
+-  printf("submenu_toggle=main\n");
+-  return 0;
++    char text[32];
++    float cd = clampf_local(1.0f - 1.0f, 0.0f, 1.0f);
++    printf("cd_down=%.1f\n", (double)cd);
++    cd = clampf_local(cd + 1.0f, 0.0f, 1.0f);
++    printf("cd_up=%.1f\n", (double)cd);
++
++    float volume = 0.7f;
++    volume = clampf_local((float)((double)volume + 0.1), 0.0f, 1.0f);
++    volume = cvar_set_value_roundtrip(volume, text);
++    printf("sound_up_text=%s\n", text);
++    printf("sound_up_bits=%08x\n", (unsigned)float_bits(volume));
++
++    float pitch = 0.022f;
++    pitch = cvar_set_value_roundtrip(-pitch, text);
++    printf("pitch_down_text=%s\n", text);
++    printf("pitch_down_bits=%08x\n", (unsigned)float_bits(pitch));
++
++    printf("submenu_toggle=main\n");
++    return 0;
+ }
+diff --git a/tools/verify.py b/tools/verify.py
+index 2c29991..7043afe 100644
+--- a/tools/verify.py
++++ b/tools/verify.py
+@@ -608,6 +608,10 @@ REQUIRED_PATHS.update({
+     "audit/menu_lifecycle_golden.json", "audit/frontend_closure_golden.json",
+     "patches/BP-065.diff", "patches/BP-066.diff", "patches/BP-067.diff",
+     "patches/BP-068.diff", "patches/BP-069.diff",
++    "TEST_BP-065-069R1.ps1", "CHANGELOG_BP-065-069R1.md",
++    "docs/BP-065-069R1_RESULT_ANALYSIS.md", "docs/BP-065-069R1_TESTING.md",
++    "docs/BP-065-069R1_HOTFIX_REPORT.json", "docs/BP-065-069R1_BLOCK_LEDGER.json",
++    "patches/BP-069R1.diff",
+ })
+ 
+ @dataclass
+@@ -5040,26 +5044,27 @@ def check_current_delivery_scripts(root: Path) -> CheckResult:
+             "MiniQuakeConsoleScreenTests.exe", "MiniQuakeMenuLifecycleTests.exe",
+             "MiniQuakeFrontendClosureTests.exe", "check_frontend_065.py",
+             "check_frontend_069.py", "bp065-069-build-version.txt",
++            "[NN/24] line identifies the active menu toggle",
+         ],
+-        "TEST_BP-065-069.ps1": [
++        "TEST_BP-065-069R1.ps1": [
+             '$PackageId = "BP-069"', '$ParentPackageId = "BP-068"',
+-            '$BlockId = "BP-065-069"', '$DeliveryRevision = "BP-065-069"',
++            '$BlockId = "BP-065-069"', '$DeliveryRevision = "BP-065-069R1"',
+             '$BlockParentPackageId = "BP-060-064R6"',
+             '$env:PYTHONUNBUFFERED = "1"', "Invoke-LiveProcess", "Writer.Flush()",
+             "Run-NetworkEvidencePair", "System.Diagnostics.ProcessStartInfo",
+             "server_exit_code = $ServerCode", '"--json-out"',
+-            "MiniQuake BP-065-069 acceptance test: PASS",
++            "MiniQuake BP-065-069R1 acceptance test: PASS",
+         ],
+         "COLLECT_RESULTS.ps1": [
+-            'MiniQuake_BP-065-069_RESULTS_', '$PackageId = "BP-069"',
+-            '$BlockId = "BP-065-069"', '$DeliveryRevision = "BP-065-069"',
+-            '$DeliveryParent = "BP-060-064R6"',
++            'MiniQuake_BP-065-069R1_RESULTS_', '$PackageId = "BP-069"',
++            '$BlockId = "BP-065-069"', '$DeliveryRevision = "BP-065-069R1"',
++            '$DeliveryParent = "BP-065-069"',
+             "MiniQuakeProtocol15ServerDataTests.exe", "BP-012_PROTOCOL15_SERVERDATA_AUDIT.md",
+-            "protocol15_serverdata_golden.json", "TEST_BP-065-069.ps1",
++            "protocol15_serverdata_golden.json", "TEST_BP-065-069R1.ps1",
+             "MiniQuakeFrontendClosureTests.exe", "patches\\BP-065.diff",
+-            "patches\\BP-069.diff", "frontend_closure_golden.json",
++            "patches\\BP-069R1.diff", "frontend_closure_golden.json",
+         ],
+-        "test.ps1": ["TEST_BP-065-069.ps1"],
++        "test.ps1": ["TEST_BP-065-069R1.ps1"],
+     }
+     for relative, markers in expected.items():
+         try:
+@@ -5070,8 +5075,9 @@ def check_current_delivery_scripts(root: Path) -> CheckResult:
+         for item in markers:
+             if item not in source:
+                 errors.append(f"{relative} missing marker: {item}")
+-    details.update({"scripts_checked": len(expected), "delivery_revision": DELIVERY_REVISION,
+-                    "live_output": True, "frontend_test_binaries": 5})
++    details.update({"scripts_checked": len(expected), "delivery_revision": "BP-065-069R1",
++                    "delivery_parent": "BP-065-069", "live_output": True,
++                    "frontend_test_binaries": 5})
+     return CheckResult("delivery_scripts", not errors, details, errors)
+ 
+ def check_live_output_contract(root: Path) -> CheckResult:
+@@ -5079,13 +5085,13 @@ def check_live_output_contract(root: Path) -> CheckResult:
+     details: dict[str, object] = {}
+     try:
+         build = (root / "build.ps1").read_text(encoding="utf-8-sig")
+-        test = (root / "TEST_BP-065-069.ps1").read_text(encoding="utf-8-sig")
++        test = (root / "TEST_BP-065-069R1.ps1").read_text(encoding="utf-8-sig")
+         for source_name, source, markers in (
+             ("build.ps1", build, (
+                 '$env:PYTHONUNBUFFERED = "1"', "function Invoke-LiveCapturedProcess",
+                 "$Writer.Flush()", "Write-Host $Line",
+             )),
+-            ("TEST_BP-065-069.ps1", test, (
++            ("TEST_BP-065-069R1.ps1", test, (
+                 '$env:PYTHONUNBUFFERED = "1"', "function Invoke-LiveProcess",
+                 "$Writer.Flush()", "Write-Host $Line", "[MiniQuake] starting",
+             )),
+@@ -5681,7 +5687,7 @@ def check_frontend_block_contract(root: Path) -> CheckResult:
+             "block_id": BLOCK_ID, "parent_package_id": BLOCK_PARENT_PACKAGE_ID,
+             "final_package_id": PACKAGE_ID, "delivery_revision": DELIVERY_REVISION,
+             "frontend_status": FRONTEND_STATUS, "frontend_fingerprint": "0x924251fa",
+-            "block_runtime_fixtures": 110,
++            "block_runtime_fixtures": 112,
+         }
+         for key, wanted in expected.items():
+             if ledger.get(key) != wanted:
+@@ -5691,7 +5697,7 @@ def check_frontend_block_contract(root: Path) -> CheckResult:
+         counts = [item.get("runtime_fixtures") for item in steps if isinstance(item, dict)]
+         if ids != ["BP-065", "BP-066", "BP-067", "BP-068", "BP-069"]:
+             errors.append(f"frontend step order differs: {ids!r}")
+-        if counts != [20, 22, 22, 22, 24]:
++        if counts != [20, 22, 22, 24, 24]:
+             errors.append(f"frontend fixture vector differs: {counts!r}")
+         parent = ledger.get("accepted_parent", {})
+         parent_expected = {
+@@ -5733,7 +5739,7 @@ def check_frontend_block_contract(root: Path) -> CheckResult:
+         doc_ledger = json.loads((root / "docs/BP-065-069_BLOCK_LEDGER.json").read_text(encoding="utf-8"))
+         if doc_ledger.get("block_id") != BLOCK_ID or doc_ledger.get("frontend_fingerprint") != "0x924251fa":
+             errors.append("documented frontend block ledger differs")
+-        details.update({"steps": 5, "fixture_vector": counts, "runtime_fixtures": 110,
++        details.update({"steps": 5, "fixture_vector": counts, "runtime_fixtures": 112,
+                         "contract_status": FRONTEND_STATUS,
+                         "contract_fingerprint": "0x924251fa",
+                         "accepted_parent": "BP-060-064R6"})
+@@ -5742,6 +5748,62 @@ def check_frontend_block_contract(root: Path) -> CheckResult:
+     return CheckResult("frontend_block_contract", not errors, details, errors)
+ 
+ 
++def check_bp065069r1_menu_float_fixture_contract(root: Path) -> CheckResult:
++    errors: list[str] = []
++    details: dict[str, object] = {}
++    try:
++        test = (root / "tests/menu_lifecycle_parity_tests.ml").read_text(encoding="utf-8-sig")
++        golden = json.loads((root / "audit/menu_lifecycle_golden.json").read_text(encoding="utf-8"))
++        ledger = json.loads((root / "BLOCK_LEDGER.json").read_text(encoding="utf-8"))
++        hotfix = json.loads((root / "docs/BP-065-069R1_HOTFIX_REPORT.json").read_text(encoding="utf-8"))
++        changelog = (root / "CHANGELOG_BP-065-069R1.md").read_text(encoding="utf-8")
++        testing = (root / "docs/BP-065-069R1_TESTING.md").read_text(encoding="utf-8")
++        oracle = (root / "tools/oracle/menu_lifecycle_oracle.c").read_text(encoding="utf-8")
++        for marker in (
++            "const BP068_FIXTURES = 24", "bp068Native.floatBits(soundVolume) == 0x3f4ccccd",
++            'variableString(registry, "volume") == "0.800000"',
++            "bp068Native.floatBits(invertedPitch) == 0xbcb43958",
++            'variableString(registry, "m_pitch") == "-0.022000"',
++            "MiniQuake BP-068 menu lifecycle tests passed: 24",
++        ):
++            if marker not in test: errors.append(f"R1 menu fixture missing marker: {marker}")
++        if "== 0.8" in test or "== -0.022" in test:
++            errors.append("R1 menu fixture still compares binary32 Cvars to source literals")
++        expected_golden = {
++            "fixtures": 24, "sound_volume_bits": "0x3f4ccccd",
++            "sound_volume_string": "0.800000", "invert_pitch_bits": "0xbcb43958",
++            "invert_pitch_string": "-0.022000",
++        }
++        for key, wanted in expected_golden.items():
++            if golden.get(key) != wanted: errors.append(f"R1 golden {key} differs")
++        counts = [row.get("runtime_fixtures") for row in ledger.get("steps", [])]
++        if counts != [20, 22, 22, 24, 24] or ledger.get("block_runtime_fixtures") != 112:
++            errors.append(f"R1 frontend fixture accounting differs: {counts}, total={ledger.get('block_runtime_fixtures')}")
++        delivery = ledger.get("delivery_hotfix", {})
++        if delivery.get("revision") != "BP-065-069R1" or delivery.get("parent") != "BP-065-069":
++            errors.append("R1 ledger lineage differs")
++        if delivery.get("result_archive_sha256") != "96934acd755555383271141db651f1304561366aec73c540b943e296ec9a2f39":
++            errors.append("R1 ledger result hash differs")
++        if hotfix.get("revision") != "BP-065-069R1" or hotfix.get("parent") != "BP-065-069":
++            errors.append("R1 hotfix report lineage differs")
++        if hotfix.get("production_source_changed") is not False or hotfix.get("native_source_changed") is not False:
++            errors.append("R1 hotfix source classification differs")
++        for marker in ("0x3f4ccccd", "0xbcb43958", "24", "112"):
++            if marker not in changelog + testing + json.dumps(hotfix):
++                errors.append(f"R1 documentation missing marker: {marker}")
++        for marker in ("sound_up_bits=%08x", "pitch_down_bits=%08x", "cvar_set_value_roundtrip"):
++            if marker not in oracle: errors.append(f"R1 C oracle missing marker: {marker}")
++        patch = root / "patches/BP-069R1.diff"
++        if not patch.is_file() or patch.stat().st_size == 0:
++            errors.append("patches/BP-069R1.diff is missing or empty")
++        details.update({"revision":"BP-065-069R1","parent":"BP-065-069",
++                        "bp068_fixtures":24,"block_runtime_fixtures":112,
++                        "volume_bits":"0x3f4ccccd","pitch_bits":"0xbcb43958",
++                        "production_source_changed":False,"native_source_changed":False})
++    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
++        errors.append(f"cannot validate BP-065-069R1 fixture hotfix: {exc}")
++    return CheckResult("bp065069r1_menu_float_fixture_contract", not errors, details, errors)
++
+ def check_package_identity(root: Path) -> CheckResult:
+     errors: list[str] = []
+     details: dict[str, object] = {}
+@@ -5829,6 +5891,7 @@ def run_checks(root: Path, manifest_path: Path) -> VerificationReport:
+         check_current_component(root, "check_frontend_068.py", "bp068_menu_lifecycle_contract"),
+         check_current_component(root, "check_frontend_069.py", "bp069_frontend_closure_contract"),
+         check_frontend_block_contract(root),
++        check_bp065069r1_menu_float_fixture_contract(root),
+         check_current_delivery_scripts(root),
+         check_live_output_contract(root),
+         check_package_identity(root),

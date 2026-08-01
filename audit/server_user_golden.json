@@ -1,0 +1,111 @@
+{
+  "schema": "MiniQuakeServerUserGolden/1",
+  "package_id": "BP-029",
+  "parent_package_id": "BP-028",
+  "sources": [
+    "sv_user.c",
+    "client.h",
+    "protocol.h"
+  ],
+  "rows": [
+    {
+      "kind": "case",
+      "name": "status_casefold",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "status_prefix",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "name_casefold",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "say_team_prefix",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "map_not_whitelisted",
+      "value": 0
+    },
+    {
+      "kind": "case",
+      "name": "privileged_allowed_source",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "privileged_arbitrary_source",
+      "value": 2
+    },
+    {
+      "kind": "case",
+      "name": "waterjump_equal_time_kept",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "waterjump_later_cleared",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "frame_lower_bits",
+      "value": 0
+    },
+    {
+      "kind": "case",
+      "name": "frame_upper_bits",
+      "value": 1036831949
+    },
+    {
+      "kind": "case",
+      "name": "ping_quarter_bits",
+      "value": 1048576000
+    },
+    {
+      "kind": "case",
+      "name": "ping_tenth_bits",
+      "value": 1036831936
+    },
+    {
+      "kind": "case",
+      "name": "air_accel_cap_bits",
+      "value": 1106247680
+    },
+    {
+      "kind": "case",
+      "name": "ideal_pitch_scale_bits",
+      "value": 1061997773
+    },
+    {
+      "kind": "case",
+      "name": "max_forward",
+      "value": 6
+    },
+    {
+      "kind": "case",
+      "name": "move_command_bytes",
+      "value": 16
+    },
+    {
+      "kind": "case",
+      "name": "fixture_count",
+      "value": 18
+    },
+    {
+      "kind": "case",
+      "name": "strict_quake1",
+      "value": 1
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/server_user_oracle.c",
+    "oracle_sha256": "9ce9d0f185d4512f4859c03a9561155086180f356be8423d6aeef1742dfe6e47"
+  }
+}

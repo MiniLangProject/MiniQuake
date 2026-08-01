@@ -1,90 +1,112 @@
-# Portierungsstatus
+# MiniQuake port status
 
-## Port-Sweep
+## Current delivery: BP-085–BP-089R8
 
-Der definierte GLQuake-1.09-/Windows-x64-Quellumfang ist vollständig
-zugeordnet. Alle Funktionen besitzen Differentialclaims; deren vollständiger
-branchweiser Agenten-Reaudit läuft:
+R8 corrects the final listen-server soak classification: MiniQuake's sparse
+client entity prefix may legitimately catch up to WinQuake's existing server
+Edict high-water. The leak-sensitive heap, socket, endpoint, handle and queue
+gates remain unchanged and strict.
+The revised stability fingerprint is `0xd0e3c03f` and the policy is
+`server_high_water_plus_existing_static_offset`. Server Edict growth and any new static offset during the idle
+measurement remain failures.
 
-- **63/63** zielrelevante logische C/H-Einheiten besitzen mindestens ein
-  bestehendes, sinnvolles MiniLang-Pendant.
-- **1069/1069** zielrelevante C-Funktionsdefinitionen besitzen einen
-  MiniLang-Codeort; es gibt keine Kandidaten und keine ungemappten
-  Zielfunktionen.
-- **9/9** zielrelevante Assemblerexporte besitzen einen Codeort.
-- **52/1069 (4,864359 %)** Zieldefinitionen zählen derzeit durch das
-  Vollreview-Gate als strikt bestätigt.
-- **6/63** logische Ziel-Einheiten sind derzeit hashgebunden und branchweise
-  semantisch vollständig reauditiert.
-- **16/16** Core- und **24/24** Milestone-Tests sind im aktuellen Testtreiber
-  verdrahtet und bestanden im letzten vollständigen Build.
+Accepted Windows parent: **BP-080–BP-084R2**.
 
-Die verbindlichen maschinellen Berichte sind:
+The complete source inventory remains Windows-accepted (`1,094/1,094` target
+definitions classified). R7 removes the remaining allocation-dependent
+QuakeC-to-server mirror lifetime: the derived `GameServer.edicts` array, every
+`QuakeEdict`, its `EntityBaseline` and all nested vectors now keep stable
+identity across frames. QuakeC Binary32 words are copied into those existing
+objects in place. The authoritative `EdictRuntime.numEdicts` high-water mark is
+no longer reconstructed from free flags, so freeing the last Edict cannot
+shrink or rebuild the mirror. Savegame loading uses the same stable path with
+the explicitly stored high-water count.
 
-- `audit/GLQUAKE_PORT_INVENTORY.json` und
-  `docs/GLQUAKE_PORT_INVENTORY.md` für Codeort- und Einheitenabdeckung
-- `audit/BEHAVIORAL_PARITY.json` und `docs/BEHAVIORAL_PARITY.md` für den
-  davon getrennten strikten Funktionsbeleg
-- `audit/SEMANTIC_AUDIT_PLAN.json`, `audit/SEMANTIC_PORT_REVIEW.json` und
-  `docs/SEMANTIC_PORT_REVIEW.md` für den 63-Einheiten-Vollreview
-- `audit/PORT_COVERAGE.json` und `ORIGINAL_FILE_COVERAGE.md` für den
-  vollständigen gepinnten WinQuake-Dateibaum
+The strengthened diagnostics exercise 227 synchronized Edicts for 80 passes
+under a 256-byte periodic-GC limit, compare raw object identities, mutate live
+QuakeC values on every pass and verify that a freed tail keeps the C-compatible
+high-water mark.
 
-Die 850 nicht einzeln zugeordneten öffentlichen Header-Symbole sind rohe
-Makro-/Typdeklarationen. Sie ändern nicht die C/H-Einheitenquote: Header und
-zugehörige C-Datei werden bewusst als eine logische Portierungseinheit gezählt.
+| Step | Scope | Fixtures |
+|---|---|---:|
+| BP-085 | game/search-path profiles | 22 |
+| BP-086 | mod and mission-pack runtime | 22 |
+| BP-087 | demo/save artifacts | 24 |
+| BP-088 | host/listen stability | 20 |
+| BP-089 | cumulative release candidate | 24 |
+| **Total** |  | **112** |
 
-## Enthaltener Zielumfang
+Candidate:
 
-- PAK, WAD2, BSP29, MDL6, SPR1, `progs.dat` v6, WAV und DEM
-- Quake-Protokoll 15, Signon, Baselines, Fast Updates und Reliable Datagramme
-- QuakeC-VM, Edicts, Stock-Builtins, Host-, Client-, Server- und Physikpfade
-- originale v5-Savegames, Config-Archivierung, Demoaufnahme, Wiedergabe und
-  `timedemo`
-- GLQuake-Rendererpfade, Konsole, Statusbar, Menüs und View-Effekte
-- Software-Soundmixer, `waveOut` und OGG-Ersatz für CD-Tracknummern
-- Win32/WGL, Eingabe, UDP und Audio als begrenzte native Plattformbrücke
-- id1-, hipnotic- und rogue-Suchpfade; proprietäre Spieldaten werden nicht
-  eingecheckt
+```text
+compat_109_release_candidate_v1
+fingerprint=0x29b72a98
+```
 
-Ausgeschlossen bleiben WinQuake-Software-Rendering, IPX, Serial/Modem, VCR,
-physische CD-/MCI-Steuerung, Masterserver und NAT-Traversal.
+Explicitly pending external gates:
 
-## Automatisierte Integrationsbelege
+```text
+original_binary_interop
+external_glquake_visual_reference
+```
 
-- Build und statische Verifikation mit dem Python-MiniLang-Compiler
-- Steam-Retailstart und 720 integrierte Frames für id1, hipnotic und rogue
-- bytegenaues Parse-/Serialize-Replay der zehn Retail-Demos
-- Save-/Load-, Config-, QuakeC-, Renderer-, Sound- und Protokoll-Fixtures
-- WGL/OpenGL-Smokes, Pixel-Readback und 120 integrierte Renderframes je Spiel
-- getrennte MiniQuake-Prozesse mit LAN-Suche, Protocol-15-Signon und
-  Crash-Reconnect
-- zwei gleichzeitig aktive Clients mit getrennten Loopback-LAN-Adressen,
-  unabhängigen DATA-/ACK-Verlusten, Reordering, 32-KiB/s-Limit je Richtung,
-  gemeinsamem Mapwechsel, isoliertem Timeout und Reconnect
-- 100.000-Frame-id1-Singleplayer-Soak sowie je 10.000 Frames für hipnotic und
-  rogue bei stabilen Heap-Bytes
 
-## Noch nicht als End-to-End-GLQuake-Abnahme belegt
+## Current delivery: BP-080–BP-084R2
 
-Die 100-%-Funktionsquote ist kein Ersatz für die noch ausstehenden
-prozessweiten Abnahmen:
+Accepted Windows parent: **BP-075–BP-079R3**.
 
-- MiniQuake-Client gegen historischen GLQuake-Server; die Gegenrichtung
-  GLQuake-Client gegen MiniQuake-Server ist grün. Das unveränderte historische
-  `GLQUAKE.EXE` stürzt im Serverbetrieb reproduzierbar vor Öffnung des
-  Listeners mit `0xC0000005` ab.
-- durchgehende instrumentierte Frame-Traces eines vollständigen
-  Referenzprozesses
-- Referenzscreenshots mit SSIM mindestens 0,99
-- 100.000-Frame-Soaks für Listen-, Dedicated- und Demo-Betrieb
+R2 corrects global entry-helper symbol collisions after the R1 entrypoint-scope fix; the block closes source-function accounting for the selected
+WinQuake/GLQuake 1.09 `compat_109` profile and adds a deterministic four-map
+black-port corpus.
 
-Alle 73 spielbaren Retail-Maps aus id1, hipnotic und rogue bestehen bereits
-Protocol-15-Signon, QuakeC-Spawn und Headless-Physikframes.
+| Step | Scope | Fixtures |
+|---|---|---:|
+| BP-080 | `cvar.c` exact-name context adapters | 20 |
+| BP-081 | `cd_win.c` mechanical technical equivalents | 20 |
+| BP-082 | source-function inventory | 20 |
+| BP-083 | four-map deterministic corpus contract | 18 |
+| BP-084 | source-guided closure contract | 24 |
+| **Total** |  | **102** |
 
-Setup-, Video- und Netzwerkmenüfunktionen sind im Port-Sweep enthalten. Noch
-offen ist deren prozessweite Abnahme zusammen mit realem Displaywechsel,
-Gamma/Controller und den oben genannten Resten der Netzwerk-Interop-Matrix.
+Source inventory:
 
-Der Self-Hosted-Compiler bleibt wie festgelegt außerhalb des
-Funktionsparitäts-Gates.
+```text
+53 C translation units
+10 header/data units
+1,120 definitions discovered
+26 positive QUAKE2-only definitions excluded
+1,094 compat_109 target definitions
+1,081 exact-name MiniLang functions
+9 context adapters
+4 technical equivalents
+0 unclassified
+```
+
+Candidate contract:
+
+```text
+black_port_source_109_frozen_v1
+fingerprint=0x309b0737
+```
+
+This contract closes source accounting. It does not replace later Original
+binary interoperability, mod/mission-pack, long-soak or external visual
+reference gates.
+
+## Accepted compatibility contracts
+
+```text
+protocol15_frozen_v1
+quakec_109_frozen_v1
+world_physics_109_frozen_v1
+host_lifecycle_109_frozen_v1
+client_render_109_frozen_v1
+world_render_109_frozen_v1
+model_ui_render_109_frozen_v1
+render_special_109_frozen_v1
+audio_109_frozen_v1
+network_platform_109_frozen_v1
+frontend_109_frozen_v1
+core_assets_memory_109_frozen_v1
+gameplay_presentation_109_frozen_v1
+```

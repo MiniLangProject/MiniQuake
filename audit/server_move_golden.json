@@ -1,0 +1,70 @@
+{
+  "schema": "MiniQuakeServerMoveGolden/1",
+  "package_id": "BP-027",
+  "parent_package_id": "BP-026",
+  "sources": [
+    "sv_move.c",
+    "world.c"
+  ],
+  "rows": [
+    {
+      "kind": "case",
+      "name": "step_size",
+      "value": 18
+    },
+    {
+      "kind": "case",
+      "name": "direct_ne",
+      "value": 45
+    },
+    {
+      "kind": "case",
+      "name": "direct_nw",
+      "value": 135
+    },
+    {
+      "kind": "case",
+      "name": "direct_sw",
+      "value": 215
+    },
+    {
+      "kind": "case",
+      "name": "direct_se",
+      "value": 315
+    },
+    {
+      "kind": "case",
+      "name": "partialground_clears_onground",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "yaw_gate_low",
+      "value": 45
+    },
+    {
+      "kind": "case",
+      "name": "yaw_gate_high",
+      "value": 315
+    },
+    {
+      "kind": "case",
+      "name": "random_1",
+      "value": 38
+    },
+    {
+      "kind": "case",
+      "name": "random_2",
+      "value": 7719
+    },
+    {
+      "kind": "case",
+      "name": "fixture_count",
+      "value": 14
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/server_move_oracle.c",
+    "oracle_sha256": "102bdbda0cc207bc6e8b9b6bdbd2c41d8604b52fc074c7311862d3b6a208e7d1"
+  }
+}

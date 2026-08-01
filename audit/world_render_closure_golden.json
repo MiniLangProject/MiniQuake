@@ -1,0 +1,50 @@
+{
+  "schema": "MiniQuakeWorldRenderClosureGolden/1",
+  "package_id": "BP-044",
+  "parent_package_id": "BP-043",
+  "sources": [
+    "gl_rmain.c",
+    "gl_rsurf.c",
+    "gl_rlight.c",
+    "gl_warp.c",
+    "gl_refrag.c"
+  ],
+  "rows": [
+    {
+      "name": "contract_fingerprint",
+      "value": 2221569246
+    },
+    {
+      "name": "near_clip",
+      "value": 4
+    },
+    {
+      "name": "far_clip",
+      "value": 4096
+    },
+    {
+      "name": "stage_count",
+      "value": 7
+    },
+    {
+      "name": "viewport_full_width",
+      "value": 640
+    },
+    {
+      "name": "viewport_inset_width",
+      "value": 322
+    },
+    {
+      "name": "front_face_culling",
+      "value": 1
+    },
+    {
+      "name": "fixtures",
+      "value": 24
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/world_render_closure_oracle.c",
+    "oracle_sha256": "3a486c6fc18ebb102617e6b113bda0eb58d32df51d1fa1f4d689a8ecb3c4ce7b"
+  }
+}

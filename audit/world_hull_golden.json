@@ -1,0 +1,85 @@
+{
+  "schema": "MiniQuakeWorldHullGolden/1",
+  "package_id": "BP-025",
+  "parent_package_id": "BP-024R3",
+  "sources": [
+    "world.c",
+    "world.h"
+  ],
+  "rows": [
+    {
+      "kind": "case",
+      "name": "inside",
+      "value": -2
+    },
+    {
+      "kind": "case",
+      "name": "max_x",
+      "value": -1
+    },
+    {
+      "kind": "case",
+      "name": "min_x",
+      "value": -2
+    },
+    {
+      "kind": "case",
+      "name": "max_y",
+      "value": -1
+    },
+    {
+      "kind": "case",
+      "name": "min_y",
+      "value": -2
+    },
+    {
+      "kind": "case",
+      "name": "max_z",
+      "value": -1
+    },
+    {
+      "kind": "case",
+      "name": "min_z",
+      "value": -2
+    },
+    {
+      "kind": "case",
+      "name": "start_node_1",
+      "value": -2
+    },
+    {
+      "kind": "case",
+      "name": "negative_leaf",
+      "value": -3
+    },
+    {
+      "kind": "case",
+      "name": "bad_node",
+      "value": 2147483647
+    },
+    {
+      "kind": "case",
+      "name": "cross_fraction_bits",
+      "value": 1048313856
+    },
+    {
+      "kind": "case",
+      "name": "cross_endpoint_bits",
+      "value": 1073872896
+    },
+    {
+      "kind": "case",
+      "name": "quake1_rotated_brush_enabled",
+      "value": 0
+    },
+    {
+      "kind": "case",
+      "name": "fixture_count",
+      "value": 14
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/world_hull_oracle.c",
+    "oracle_sha256": "d3531d77bf115eb56c84a6ccab8cf128312c3eb2ede46bb8476c26c285a15d02"
+  }
+}

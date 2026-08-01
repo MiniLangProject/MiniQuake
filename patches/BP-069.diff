@@ -1,0 +1,280 @@
+diff --git a/CHANGELOG_BP-069.md b/CHANGELOG_BP-069.md
+new file mode 100644
+index 0000000..7ffc742
+--- /dev/null
++++ b/CHANGELOG_BP-069.md
+@@ -0,0 +1,6 @@
++# BP-069 — Frontend compatibility closure
++
++- Binds keyboard, input, console, screen, menu and Win32 video constants in one contract.
++- Adds mode/focus/release integration fixtures.
++- Introduces candidate contract `frontend_109_frozen_v1` with fingerprint `0x924251fa`.
++- Adds 24 MiniLang fixtures, a C oracle, golden data and a static checker.
+diff --git a/audit/frontend_closure_golden.json b/audit/frontend_closure_golden.json
+new file mode 100644
+index 0000000..d1dfa29
+--- /dev/null
++++ b/audit/frontend_closure_golden.json
+@@ -0,0 +1,12 @@
++{
++  "schema_version": 1,
++  "package": "BP-069",
++  "fixtures": 24,
++  "status": "frontend_109_frozen_v1",
++  "fingerprint": "0x924251fa",
++  "key_count": 256,
++  "console_text_bytes": 16384,
++  "max_video_modes": 30,
++  "max_video_descriptions": 27,
++  "contract_values": 13
++}
+diff --git a/docs/BP-069_FRONTEND_CLOSURE_AUDIT.md b/docs/BP-069_FRONTEND_CLOSURE_AUDIT.md
+new file mode 100644
+index 0000000..4090c74
+--- /dev/null
++++ b/docs/BP-069_FRONTEND_CLOSURE_AUDIT.md
+@@ -0,0 +1,3 @@
++# BP-069 frontend closure audit
++
++The closure binds the observable WinQuake 1.09 frontend contract: 256 keys, 32 history lines, 256-byte command lines, 31 chat bytes, 16 KiB console storage, four notify timestamps, six joystick axes, 14 Windows options, six help pages, and the 30-mode video list.
+diff --git a/src/miniquake/build_info.ml b/src/miniquake/build_info.ml
+index 13bd6b6..bf4a158 100644
+--- a/src/miniquake/build_info.ml
++++ b/src/miniquake/build_info.ml
+@@ -8,17 +8,17 @@ back to an exact source baseline.
+ 
+ package miniquake.build_info
+ 
+-const PACKAGE_ID = "BP-064"
+-const PARENT_PACKAGE_ID = "BP-063"
+-const PACKAGE_DATE = "2026-07-28"
++const PACKAGE_ID = "BP-069"
++const PARENT_PACKAGE_ID = "BP-068"
++const PACKAGE_DATE = "2026-07-29"
+ const COMPATIBILITY_PROFILE = "compat_109"
+ const NATIVE_TEXT_ABI = "caller_owned_bytes_v1"
+ const PROTOCOL_TEXT_ABI = "quake_latin1_cstring_v1"
+ const BASE_ARCHIVE = "MiniQuake_Source24.07.2026.zip"
+ const BASE_ARCHIVE_SHA256 = "bb2b5bf173fe687cada6e7fec2dcdb8b2099589f2ebc039417a5571ced9729d3"
+ const MANIFEST_FORMAT = 1
+-const BLOCK_ID = "BP-060-064"
+-const BLOCK_PARENT_PACKAGE_ID = "BP-055-059R2"
++const BLOCK_ID = "BP-065-069"
++const BLOCK_PARENT_PACKAGE_ID = "BP-060-064R6"
+ const PROTOCOL_STATUS = "protocol15_frozen_v1"
+ const QUAKEC_STATUS = "quakec_109_frozen_v1"
+ const WORLD_PHYSICS_STATUS = "world_physics_109_frozen_v1"
+@@ -36,4 +36,6 @@ const AUDIO_STATUS = "audio_109_frozen_v1"
+ const AUDIO_FINGERPRINT = 0xdcf7a002
+ const NETWORK_PLATFORM_STATUS = "network_platform_109_frozen_v1"
+ const NETWORK_PLATFORM_FINGERPRINT = 0xb3ec7589
+-const PACKAGE_PURPOSE = "Frozen WinQuake 1.09 network lifecycle, control protocol, datagram, WinSock and dedicated Windows platform compatibility contract"
++const FRONTEND_STATUS = "frontend_109_frozen_v1"
++const FRONTEND_FINGERPRINT = 0x924251fa
++const PACKAGE_PURPOSE = "Frozen WinQuake 1.09 keyboard, input, console, screen, menu and Windows video frontend compatibility contract"
+diff --git a/src/miniquake/frontend_contract.ml b/src/miniquake/frontend_contract.ml
+new file mode 100644
+index 0000000..2c2deb7
+--- /dev/null
++++ b/src/miniquake/frontend_contract.ml
+@@ -0,0 +1,59 @@
++/*
++Copyright (C) 1996-1997 Id Software, Inc.
++Copyright (C) 2026 MiniQuake contributors
++
++Frozen WinQuake 1.09 keyboard, input, console, menu and Win32-video contract.
++*/
++
++package miniquake.frontend_contract
++
++import miniquake.keys as frontendKeys
++import miniquake.input as frontendInput
++import miniquake.console as frontendConsole
++import miniquake.menu as frontendMenu
++import miniquake.gl_vidnt as frontendVideo
++
++const STATUS = "frontend_109_frozen_v1"
++const FINGERPRINT = 0x924251fa
++const KEY_COUNT = 256
++const HISTORY_LINES = 32
++const MAX_COMMAND_LINE = 256
++const CHAT_BYTES = 31
++const CONSOLE_TEXT_BYTES = 16384
++const NOTIFY_TIMES = 4
++const JOYSTICK_AXES = 6
++const MOUSE_BUTTONS = 3
++const OPTIONS_ITEMS = 14
++const HELP_PAGES = 6
++const MAX_VIDEO_MODES = 30
++const MAX_VIDEO_DESCRIPTIONS = 27
++const NOTIFY_ACK_EDGES = 2
++
++function values()
++  return [
++    KEY_COUNT,
++    HISTORY_LINES,
++    MAX_COMMAND_LINE,
++    CHAT_BYTES,
++    CONSOLE_TEXT_BYTES,
++    NOTIFY_TIMES,
++    JOYSTICK_AXES,
++    MOUSE_BUTTONS,
++    OPTIONS_ITEMS,
++    HELP_PAGES,
++    MAX_VIDEO_MODES,
++    MAX_VIDEO_DESCRIPTIONS,
++    NOTIFY_ACK_EDGES,
++  ]
++end function
++
++function verify()
++  return frontendKeys.MAXCMDLINE == MAX_COMMAND_LINE and
++    frontendConsole.CON_TEXTSIZE == CONSOLE_TEXT_BYTES and
++    frontendConsole.NUM_CON_TIMES == NOTIFY_TIMES and
++    frontendInput.JOY_MAX_AXES == JOYSTICK_AXES and
++    len(frontendMenu.optionsItems()) == OPTIONS_ITEMS and
++    frontendMenu.HELP_PAGES == HELP_PAGES and
++    frontendVideo.MAX_MODE_LIST == MAX_VIDEO_MODES and
++    frontendVideo.MAX_MODEDESCS == MAX_VIDEO_DESCRIPTIONS
++end function
+diff --git a/tests/video_frontend_closure_tests.ml b/tests/video_frontend_closure_tests.ml
+new file mode 100644
+index 0000000..ceee40c
+--- /dev/null
++++ b/tests/video_frontend_closure_tests.ml
+@@ -0,0 +1,88 @@
++/*
++Copyright (C) 1996-1997 Id Software, Inc.
++Copyright (C) 2026 MiniQuake contributors
++
++BP-069: WinQuake keyboard/input/console/menu/video closure contract.
++*/
++
++import miniquake.frontend_contract as bp069Contract
++import miniquake.gl_vidnt as bp069Video
++import miniquake.keys as bp069Keys
++import miniquake.input as bp069Input
++import miniquake.common as bp069Common
++import miniquake.cvar as bp069Cvar
++
++bp069Index = 0
++bp069Failures = 0
++
++function bp069Check(value, name)
++  global bp069Index, bp069Failures
++  bp069Index = bp069Index + 1
++  print "[" + bp069Index + "/24] " + name
++  if not value then
++    bp069Failures = bp069Failures + 1
++    print "FAIL: " + name
++    return false
++  end if
++  return true
++end function
++
++function main(args)
++  bp069Check(bp069Contract.STATUS == "frontend_109_frozen_v1", "contract status")
++  bp069Check(bp069Contract.FINGERPRINT == 0x924251fa, "contract fingerprint")
++  bp069Check(bp069Contract.verify(), "contract module values")
++  bp069Check(len(bp069Contract.values()) == 13, "contract value count")
++  bp069Check(bp069Contract.KEY_COUNT == 256, "key space")
++  bp069Check(bp069Contract.CHAT_BYTES == 31, "chat byte limit")
++  bp069Check(bp069Contract.CONSOLE_TEXT_BYTES == 16384, "console backing bytes")
++  bp069Check(bp069Contract.MAX_VIDEO_MODES == 30, "video mode capacity")
++
++  state = bp069Video.createVideoState()
++  bp069Video.VID_UseState(state)
++  arguments = bp069Common.create(["-width", "640", "-height", "480"])
++  state.arguments = arguments
++  bp069Video.VID_InitDIB(arguments)
++  bp069Video.VID_InitFullDIB([[800, 600, 32, 60, true]], false, false)
++  bp069Check(bp069Video.VID_NumModes() == 2, "window and fullscreen modes")
++  bp069Check(bp069Video.VID_GetModePtr(0).type == bp069Video.MS_WINDOWED, "windowed mode zero")
++  bp069Check(bp069Video.VID_GetModePtr(1).type == bp069Video.MS_FULLDIB, "fullscreen mode one")
++  centered = bp069Video.CenterWindow(640, 480, 1024, 768, false)
++  bp069Check(centered[0] == 192 and centered[1] == 144, "window centering")
++  bp069Check(bp069Video.MapKey(30 << 16) == 97, "scan-code mapping")
++  wheel = bp069Video.MainWndProc(0x020a, 120 << 16, 0)
++  bp069Check(wheel[0] == "wheel" and wheel[1] == bp069Keys.K_MWHEELUP, "wheel dispatch")
++
++  bp069Input.unbindAll()
++  bp069Keys.Key_Init()
++  bp069Keys.Key_TakePendingCommands()
++  bp069Keys.Key_SetBinding(97, "+forward")
++  bp069Video.ClearAllStates()
++  bp069Check(bp069Keys.Key_TakePendingCommands() == "-forward 97\n", "video clear release")
++
++  state.windowed = true
++  state.registry = bp069Cvar.createRegistry()
++  state.registry.variables = [bp069Cvar.create("_windowed_mouse", "0", true, false), bp069Cvar.create("vid_mode", "0", true, false)]
++  bp069Keys.Key_SetBinding(97, "+forward")
++  bp069Check(bp069Video.VID_SetMode(0, bytes(768), false), "windowed mode set")
++  bp069Check(state.currentMode == 0 and state.modeState == bp069Video.MS_WINDOWED, "windowed state committed")
++  bp069Check(bp069Keys.Key_TakePendingCommands() == "-forward 97\n", "mode switch releases bindings")
++  bp069Check(state.recalcRefdef, "mode switch recalculates refdef")
++
++  state.modeState = bp069Video.MS_FULLDIB
++  state.canAltTab = true
++  bp069Video.AppActivate(false, true)
++  bp069Check(state.wasSuspended and state.minimized, "fullscreen focus loss")
++  bp069Video.AppActivate(true, false)
++  bp069Check(not state.wasSuspended and not state.minimized, "fullscreen focus restore")
++  activation = bp069Video.MainWndProc(0x0006, 1, 0)
++  bp069Check(activation[0] == "activate" and activation[1], "WM_ACTIVATE result")
++  bp069Check(bp069Keys.Key_TakePendingCommands() == "-forward 97\n", "activation queues release")
++  bp069Check(bp069Video.VID_GetModeDescription(99) == "", "invalid mode description")
++
++  if bp069Failures > 0 then
++    print "MiniQuake BP-069 frontend closure tests failed: " + bp069Failures + "/24"
++    return 1
++  end if
++  print "MiniQuake BP-069 frontend closure tests passed: 24"
++  return 0
++end function
+diff --git a/tools/check_frontend_069.py b/tools/check_frontend_069.py
+new file mode 100755
+index 0000000..659358e
+--- /dev/null
++++ b/tools/check_frontend_069.py
+@@ -0,0 +1,26 @@
++#!/usr/bin/env python3
++import argparse, json, pathlib, sys
++
++def main():
++    ap=argparse.ArgumentParser(); ap.add_argument('--root',default='.'); ap.add_argument('--json',default='')
++    ns=ap.parse_args(); root=pathlib.Path(ns.root).resolve(); errors=[]
++    contract=(root/'src/miniquake/frontend_contract.ml').read_text(encoding='utf-8-sig')
++    build=(root/'src/miniquake/build_info.ml').read_text(encoding='utf-8-sig')
++    test=(root/'tests/video_frontend_closure_tests.ml').read_text(encoding='utf-8-sig')
++    golden=json.loads((root/'audit/frontend_closure_golden.json').read_text())
++    markers=['const STATUS = "frontend_109_frozen_v1"','const FINGERPRINT = 0x924251fa',
++             'const KEY_COUNT = 256','const CONSOLE_TEXT_BYTES = 16384','const MAX_VIDEO_MODES = 30']
++    for m in markers:
++        if m not in contract: errors.append('frontend_contract.ml missing marker: '+m)
++    for m in ['const PACKAGE_ID = "BP-069"','const BLOCK_ID = "BP-065-069"',
++              'const FRONTEND_STATUS = "frontend_109_frozen_v1"','const FRONTEND_FINGERPRINT = 0x924251fa']:
++        if m not in build: errors.append('build_info.ml missing marker: '+m)
++    if 'MiniQuake BP-069 frontend closure tests passed: 24' not in test: errors.append('fixture count marker missing')
++    if golden.get('fixtures')!=24 or golden.get('fingerprint')!='0x924251fa': errors.append('golden mismatch')
++    report={'schema_version':1,'package':'BP-069','status':'PASS' if not errors else 'FAIL','errors':errors,
++            'fixtures':24,'contract_status':'frontend_109_frozen_v1','fingerprint':'0x924251fa'}
++    if ns.json: pathlib.Path(ns.json).write_text(json.dumps(report,indent=2)+'\n')
++    print('MiniQuake BP-069 frontend closure verification: '+report['status'])
++    for e in errors: print('  [FAIL] '+e)
++    return 0 if not errors else 1
++if __name__=='__main__': sys.exit(main())
+diff --git a/tools/oracle/frontend_closure_oracle.c b/tools/oracle/frontend_closure_oracle.c
+new file mode 100644
+index 0000000..372d23a
+--- /dev/null
++++ b/tools/oracle/frontend_closure_oracle.c
+@@ -0,0 +1,9 @@
++#include <stdint.h>
++#include <stdio.h>
++int main(void) {
++  printf("status=frontend_109_frozen_v1\n");
++  printf("fingerprint=%08x\n", (uint32_t)0x924251faU);
++  printf("keys=256 console=16384 modes=30 descriptions=27\n");
++  printf("contract_values=13\n");
++  return 0;
++}

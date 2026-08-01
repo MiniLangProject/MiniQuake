@@ -1,6 +1,0 @@
-[submodule "reference/quake"]
-	path = reference/quake
-	url = https://github.com/id-software/quake.git
-[submodule "third_party/stb"]
-	path = third_party/stb
-	url = https://github.com/nothings/stb.git

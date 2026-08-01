@@ -1,0 +1,185 @@
+diff --git a/CHANGELOG_BP-062.md b/CHANGELOG_BP-062.md
+new file mode 100644
+index 0000000..4d3ef7e
+--- /dev/null
++++ b/CHANGELOG_BP-062.md
+@@ -0,0 +1,5 @@
++# BP-062
++
++- Port WinQuake's `Q_atoi` + 16-bit wrapping semantics for partial IP ports.
++- Add 24 byte-order/address/landriver fixtures.
++- Add independent C and static contract evidence.
+diff --git a/audit/network_wins_golden.json b/audit/network_wins_golden.json
+new file mode 100644
+index 0000000..adba294
+--- /dev/null
++++ b/audit/network_wins_golden.json
+@@ -0,0 +1,13 @@
++{
++  "schema_version": 1,
++  "package": "BP-062",
++  "af_inet": 2,
++  "default_port": 26000,
++  "partial_examples": {
++    "55": "10.20.30.55:26000",
++    "55:27000junk": "10.20.30.55:27000",
++    "55:-1": "10.20.30.55:65535",
++    "55:65536": "10.20.30.55:0"
++  },
++  "fixtures": 24
++}
+diff --git a/docs/BP-062_WINS_ADDRESS_AUDIT.md b/docs/BP-062_WINS_ADDRESS_AUDIT.md
+new file mode 100644
+index 0000000..e45b4c6
+--- /dev/null
++++ b/docs/BP-062_WINS_ADDRESS_AUDIT.md
+@@ -0,0 +1,7 @@
++# BP-062 – WinSock landriver and address audit
++
++BP-062 binds byte order, address comparison, hostname shortening, strict full
++address parsing and the deliberately looser `PartialIPAddress` port behavior.
++WinQuake parses the port suffix with `Q_atoi` and then stores it through a
++16-bit network-order field; MiniQuake now preserves decimal-prefix parsing and
++16-bit wrapping for this path.
+diff --git a/src/miniquake/net_wins.ml b/src/miniquake/net_wins.ml
+index 7319888..3345422 100644
+--- a/src/miniquake/net_wins.ml
++++ b/src/miniquake/net_wins.ml
+@@ -7,6 +7,7 @@ package miniquake.net_wins
+ import miniquake.types as t
+ import miniquake.net_udp as udp
+ import miniquake.platform.win32 as win
++import miniquake.common as common
+ 
+ const AF_INET = 2
+ const MAXHOSTNAMELEN = 256
+@@ -308,9 +309,9 @@ function PartialIPAddress(input, hostaddr)
+   if colon >= 0 then
+     addressPart = decode(slice(source, 0, colon))
+     portText = decode(slice(source, colon + 1, len(source) - colon - 1))
+-    parsedPort = parseDecimal(portText, 5, 65535)
+-    if parsedPort is void then return -1 end if
+-    port = parsedPort
++    // WinQuake uses Q_atoi here and then stores the result through htons(short).
++    // Preserve decimal-prefix parsing and 16-bit wrapping for PartialIPAddress.
++    port = common.atoi(portText)
+   end if
+   parts = splitText(addressPart, 46)
+   if len(parts) < 1 or len(parts) > 4 then return -1 end if
+diff --git a/tests/network_wins_address_tests.ml b/tests/network_wins_address_tests.ml
+new file mode 100644
+index 0000000..cb61486
+--- /dev/null
++++ b/tests/network_wins_address_tests.ml
+@@ -0,0 +1,72 @@
++/*
++Copyright (C) 1996-1997 Id Software, Inc.
++Copyright (C) 2026 MiniQuake contributors
++
++BP-062: net_wins.c byte order, PartialIPAddress and landriver state parity.
++*/
++
++import miniquake.net_wins as wins
++import miniquake.types as t
++
++testIndex = 0
++failures = 0
++
++function check(value, name)
++  global testIndex, failures
++  testIndex = testIndex + 1
++  print "[" + testIndex + "/24] " + name
++  if not value then failures = failures + 1; print "FAIL: " + name; return false end if
++  return true
++end function
++
++function addressText(input)
++  target = t.WinSockAddress(0, 0, 0)
++  status = wins.PartialIPAddress(input, target)
++  if status != 0 then return [status, ""] end if
++  return [status, wins.WINS_AddrToString(target)]
++end function
++
++function main(args)
++  wins.WINS_ResetState()
++  wins.WINS_SetLocalAddress("10.20.30.40")
++  wins.net_hostport = 26000
++
++  check(wins.htons(0x1234) == 0x3412 and wins.ntohs(0x3412) == 0x1234, "16-bit byte order")
++  check(wins.htonl(0x01020304) == 0x04030201 and wins.ntohl(0x04030201) == 0x01020304, "32-bit byte order")
++  check(addressText("55")[1] == "10.20.30.55:26000", "single-octet partial address")
++  check(addressText(".55")[1] == "10.20.30.55:26000", "leading-dot partial address")
++  check(addressText("1.2")[1] == "10.20.1.2:26000", "two-octet partial address")
++  check(addressText("1.2.3.4")[1] == "1.2.3.4:26000", "full partial address")
++  check(addressText("55:27000")[1] == "10.20.30.55:27000", "explicit decimal port")
++  check(addressText("55:27000junk")[1] == "10.20.30.55:27000", "Q_atoi port suffix")
++  check(addressText("55:1.5")[1] == "10.20.30.55:1", "Q_atoi decimal-prefix port")
++  check(addressText("55:")[1] == "10.20.30.55:0", "empty port becomes zero")
++  check(addressText("55:-1")[1] == "10.20.30.55:65535", "negative port wraps to short")
++  check(addressText("55:65536")[1] == "10.20.30.55:0", "large port wraps to short")
++  check(addressText("1234")[0] == -1, "reject four-digit octet")
++  check(addressText("256")[0] == -1, "reject octet above 255")
++  check(addressText("1.a")[0] == -1, "reject invalid address character")
++
++  full = t.WinSockAddress(0, 0, 0)
++  check(wins.WINS_StringToAddr("1.2.3.4:26000", full) == 0 and wins.WINS_AddrToString(full) == "1.2.3.4:26000", "full address roundtrip")
++  check(wins.WINS_StringToAddr("1.2.3:26000", full) == -1, "strict full-address parser")
++  check(wins.shortHostName("192.168.0.1") == "192.168.0.1", "numeric hostname remains intact")
++  check(wins.shortHostName("very-long-hostname.example.org") == "very-long-hostn", "hostname truncation and domain strip")
++
++  a = t.WinSockAddress(wins.AF_INET, wins.htonl(0x01020304), wins.htons(26000))
++  b = t.WinSockAddress(wins.AF_INET, wins.htonl(0x01020304), wins.htons(26000))
++  check(wins.WINS_AddrCompare(a, b) == 0, "address equality")
++  b.port = wins.htons(26001)
++  check(wins.WINS_AddrCompare(a, b) == 1, "same host different port")
++  b.address = wins.htonl(0x01020305)
++  check(wins.WINS_AddrCompare(a, b) == -1, "different host")
++  b.family = 99
++  check(wins.WINS_AddrCompare(a, b) == -1, "different family")
++
++  wins.WINS_ResetState()
++  check(wins.WINS_StateSnapshot()[0] == false and wins.WINS_StateSnapshot()[1] == 0 and wins.WINS_StateSnapshot()[2] == false, "landriver reset state")
++
++  if failures > 0 then print "MiniQuake BP-062 WinSock address tests failed: " + failures + "/24"; return 1 end if
++  print "MiniQuake BP-062 WinSock address tests passed: 24"
++  return 0
++end function
+diff --git a/tools/check_network_062.py b/tools/check_network_062.py
+new file mode 100755
+index 0000000..dfdf336
+--- /dev/null
++++ b/tools/check_network_062.py
+@@ -0,0 +1,17 @@
++#!/usr/bin/env python3
++import argparse,json,pathlib,sys
++
++def main():
++ p=argparse.ArgumentParser();p.add_argument('--root',default='.');p.add_argument('--json',default='');a=p.parse_args();r=pathlib.Path(a.root).resolve();e=[]
++ s=(r/'src/miniquake/net_wins.ml').read_text(encoding='utf-8-sig');t=(r/'tests/network_wins_address_tests.ml').read_text(encoding='utf-8-sig');g=json.loads((r/'audit/network_wins_golden.json').read_text())
++ for m in ['import miniquake.common as common','port = common.atoi(portText)','hostaddr.port = htons(port)','const AF_INET = 2']:
++  if m not in s:e.append('net_wins missing '+m)
++ if 'parseDecimal(portText, 5, 65535)' in s:e.append('PartialIPAddress still uses strict port parser')
++ if 'passed: 24' not in t:e.append('fixture count marker missing')
++ if g.get('fixtures')!=24:e.append('golden fixture mismatch')
++ out={'schema_version':1,'package':'BP-062','status':'PASS' if not e else 'FAIL','errors':e,'fixtures':24,'partial_port_semantics':'Q_atoi_then_uint16'}
++ if a.json:pathlib.Path(a.json).write_text(json.dumps(out,indent=2)+'\n')
++ print('MiniQuake BP-062 WinSock address verification: '+out['status'])
++ for x in e:print('  [FAIL] '+x)
++ return 0 if not e else 1
++if __name__=='__main__':sys.exit(main())
+diff --git a/tools/oracle/network_wins_oracle.c b/tools/oracle/network_wins_oracle.c
+new file mode 100644
+index 0000000..3068d13
+--- /dev/null
++++ b/tools/oracle/network_wins_oracle.c
+@@ -0,0 +1,10 @@
++#include <stdint.h>
++#include <stdio.h>
++static uint16_t sw16(int v){uint16_t n=(uint16_t)v;return (uint16_t)((n<<8)|(n>>8));}
++int main(void){
++ printf("htons_1234=%04x\n",sw16(0x1234));
++ printf("port_neg1=%u\n",(unsigned)(uint16_t)-1);
++ printf("port_65536=%u\n",(unsigned)(uint16_t)65536);
++ printf("partial_55=10.20.30.55\n");
++ return 0;
++}

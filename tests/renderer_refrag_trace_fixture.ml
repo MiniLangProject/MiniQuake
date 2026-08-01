@@ -15,7 +15,7 @@ function makeEntity(number)
   zero = t.Vec3(0.0, 0.0, 0.0)
   return t.ClientEntityState(
     number, 1, 0, 0, 0, 0, zero, zero, 0.0,
-    zero, zero, zero, zero, false, void
+    zero, zero, zero, zero, false, void, 0.0
   )
 end function
 

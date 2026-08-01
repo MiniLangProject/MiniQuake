@@ -1,0 +1,70 @@
+{
+  "schema": "MiniQuakeSavegameV5Golden/1",
+  "package_id": "BP-033",
+  "parent_package_id": "BP-032",
+  "sources": [
+    "host_cmd.c",
+    "pr_edict.c"
+  ],
+  "rows": [
+    {
+      "kind": "case",
+      "name": "savegame_version",
+      "value": 5
+    },
+    {
+      "kind": "case",
+      "name": "comment_length",
+      "value": 39
+    },
+    {
+      "kind": "case",
+      "name": "comment_fnv1a",
+      "value": 1922791129
+    },
+    {
+      "kind": "case",
+      "name": "spawn_0_1_bits",
+      "value": 1036831949
+    },
+    {
+      "kind": "case",
+      "name": "spawn_negative_zero_bits",
+      "value": 2147483648
+    },
+    {
+      "kind": "case",
+      "name": "skill_1_9_bits",
+      "value": 1072902963
+    },
+    {
+      "kind": "case",
+      "name": "legacy_skill_result",
+      "value": 2
+    },
+    {
+      "kind": "case",
+      "name": "time_bits",
+      "value": 1095075815
+    },
+    {
+      "kind": "case",
+      "name": "spawn_parms",
+      "value": 16
+    },
+    {
+      "kind": "case",
+      "name": "lightstyles",
+      "value": 64
+    },
+    {
+      "kind": "case",
+      "name": "fixture_count",
+      "value": 24
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/savegame_v5_oracle.c",
+    "oracle_sha256": "1c6ed28d03a14dc665ea4e9262d9ab21f9d469f83cc591d3b1b040dbafb7c5b3"
+  }
+}

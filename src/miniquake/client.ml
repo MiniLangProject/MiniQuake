@@ -6,7 +6,10 @@ import miniquake.sizebuf as sz
 import miniquake.net_main as netmain
 import miniquake.client_protocol as protocol
 import miniquake.protocol_write as writer
+import miniquake.protocol_signon as protocolSignon
+import miniquake.protocol_delivery as delivery
 import miniquake.mathlib as math
+import miniquake.native as native
 import miniquake.input as input
 import miniquake.array_util as arrayutil
 import miniquake.cvar as cvar
@@ -23,6 +26,7 @@ clDlights = []
 clDlightTime = 0.0
 clDlightOldTime = 0.0
 clModelFlags = []
+clModelSyncTypes = []
 clRelinkParticleEffects = []
 clChaseActive = false
 clRelinkParticlePool = []
@@ -34,6 +38,17 @@ clTranslations = []
 clStandardQuake = true
 clRegisteredCommands = []
 clDisconnectRequestedServerShutdown = false
+
+// client_state_t stores interpolation velocities, entity transforms and
+// dlight fields as C floats even though cl.time/mtime are doubles.
+function clientFloat(value)
+  return native.bitsFloat(native.floatBits(value))
+end function
+
+function clientLerp(previous, current, fraction)
+  delta = clientFloat(current - previous)
+  return clientFloat(previous + clientFloat(fraction * delta))
+end function
 
 function newDynamicLight()
   return t.DynamicLight(
@@ -139,12 +154,12 @@ end function
 function CL_DecayLights()
   global clDlights, clDlightOldTime, clDlightTime
   ensureDynamicLights()
-  elapsed = clDlightTime - clDlightOldTime
+  elapsed = clientFloat(clDlightTime - clDlightOldTime)
   index = 0
   while index < c.MAX_DLIGHTS
     light = clDlights[index]
     if light.die >= clDlightTime and light.radius != 0.0 then
-      light.radius = light.radius - elapsed * light.decay
+      light.radius = clientFloat(light.radius - clientFloat(elapsed * light.decay))
       if light.radius < 0.0 then light.radius = 0.0 end if
     end if
     index = index + 1
@@ -160,32 +175,33 @@ function CL_DecayLightsAt(currentTime, elapsed)
 end function
 
 function CL_LerpPoint(client)
-  interval = client.messageTimes[0] - client.messageTimes[1]
+  // f and frac are float locals in cl_main.c; mtime/time remain double.
+  interval = clientFloat(client.messageTimes[0] - client.messageTimes[1])
   if interval == 0.0 or client.noLerp or client.timedemo or client.localAuthoritative then
     client.time = client.messageTimes[0]
-    return 1.0
+    return clientFloat(1.0)
   end if
   if interval > 0.1 then
     client.messageTimes[1] = client.messageTimes[0] - 0.1
-    interval = 0.1
+    interval = clientFloat(0.1)
   end if
-  fraction = (client.time - client.messageTimes[1]) / interval
+  fraction = clientFloat((client.time - client.messageTimes[1]) / interval)
   if fraction < 0.0 then
     if fraction < -0.01 then client.time = client.messageTimes[1]; SetPal(1) end if
-    return 0.0
+    return clientFloat(0.0)
   end if
   if fraction > 1.0 then
     if fraction > 1.01 then client.time = client.messageTimes[0]; SetPal(2) end if
-    return 1.0
+    return clientFloat(1.0)
   end if
   SetPal(0)
   return fraction
 end function
 
 function interpolatedAngle(previous, current, fraction)
-  delta = current - previous
-  if delta > 180.0 then delta = delta - 360.0 else if delta < -180.0 then delta = delta + 360.0 end if
-  return previous + fraction * delta
+  delta = clientFloat(current - previous)
+  if delta > 180.0 then delta = clientFloat(delta - 360.0) else if delta < -180.0 then delta = clientFloat(delta + 360.0) end if
+  return clientLerp(previous, clientFloat(previous + delta), fraction)
 end function
 
 function CL_SetModelFlags(flags)
@@ -197,6 +213,34 @@ end function
 function CL_ModelFlags()
   global clModelFlags
   return clModelFlags
+end function
+
+function CL_SetModelSyncTypes(syncTypes)
+  global clModelSyncTypes
+  clModelSyncTypes = syncTypes
+  return len(clModelSyncTypes)
+end function
+
+function CL_ModelSyncTypes()
+  global clModelSyncTypes
+  return clModelSyncTypes
+end function
+
+function modelSyncTypeForIndex(modelIndex)
+  global clModelSyncTypes
+  if modelIndex < 0 or modelIndex >= len(clModelSyncTypes) then return c.ST_SYNC end if
+  return clModelSyncTypes[modelIndex]
+end function
+
+function CL_AssignModelSyncBase(entity, previousModelIndex)
+  if entity.modelIndex == previousModelIndex then return entity.syncBase end if
+  if entity.modelIndex <= 0 then entity.syncBase = 0.0; return entity.syncBase end if
+  if modelSyncTypeForIndex(entity.modelIndex) == c.ST_RAND then
+    entity.syncBase = clientFloat(particles.compatRand() / 32767.0)
+  else
+    entity.syncBase = 0.0
+  end if
+  return entity.syncBase
 end function
 
 function CL_SetChaseActive(active)
@@ -265,22 +309,22 @@ function addEntityEffectDlights(entity, currentTime)
     light.origin.z = light.origin.z + 16.0
     axes = math.angleVectors(entity.angles)
     light.origin = math.add(light.origin, math.scale(axes[0], 18.0))
-    light.radius = 200.0 + (nextDlightRandom() & 31)
+    light.radius = clientFloat(200.0 + (nextDlightRandom() & 31))
     light.minLight = 32.0
-    light.die = currentTime + 0.1
+    light.die = clientFloat(currentTime + 0.1)
   end if
   if (effects & c.EF_BRIGHTLIGHT) != 0 then
     light = CL_AllocDlight(entity.number)
     light.origin = math.copy(entity.origin)
     light.origin.z = light.origin.z + 16.0
-    light.radius = 400.0 + (nextDlightRandom() & 31)
-    light.die = currentTime + 0.001
+    light.radius = clientFloat(400.0 + (nextDlightRandom() & 31))
+    light.die = clientFloat(currentTime + 0.001)
   end if
   if (effects & c.EF_DIMLIGHT) != 0 then
     light = CL_AllocDlight(entity.number)
     light.origin = math.copy(entity.origin)
-    light.radius = 200.0 + (nextDlightRandom() & 31)
-    light.die = currentTime + 0.001
+    light.radius = clientFloat(200.0 + (nextDlightRandom() & 31))
+    light.die = clientFloat(currentTime + 0.001)
   end if
   return true
 end function
@@ -299,9 +343,9 @@ function CL_RelinkEntities(client)
     // prevents a collection between nested temporary Vec3 allocations from
     // leaving a partially initialized remote-player velocity.
     client.player.velocity = t.Vec3(
-      previousVelocity.x + (currentVelocity.x - previousVelocity.x) * fraction,
-      previousVelocity.y + (currentVelocity.y - previousVelocity.y) * fraction,
-      previousVelocity.z + (currentVelocity.z - previousVelocity.z) * fraction,
+      clientLerp(previousVelocity.x, currentVelocity.x, fraction),
+      clientLerp(previousVelocity.y, currentVelocity.y, fraction),
+      clientLerp(previousVelocity.z, currentVelocity.z, fraction),
     )
     if client.demoPlayback then
       interpolatedViewAngles = t.Vec3(
@@ -320,7 +364,7 @@ function CL_RelinkEntities(client)
 
   clRelinkParticleEffects = []
   client.visibleEntities = []
-  binaryObjectRotation = math.anglemod(100.0 * client.time)
+  binaryObjectRotation = clientFloat(math.anglemod(100.0 * client.time))
   index = 1
   while index < len(client.entities)
     entity = client.entities[index]
@@ -332,16 +376,20 @@ function CL_RelinkEntities(client)
       else
         oldOrigin = math.copy(entity.origin)
         entityFraction = fraction
-        delta = math.subtract(entity.messageOrigin, entity.previousMessageOrigin)
-        if delta.x > 100.0 or delta.x < -100.0 then entityFraction = 1.0 end if
-        if delta.y > 100.0 or delta.y < -100.0 then entityFraction = 1.0 end if
-        if delta.z > 100.0 or delta.z < -100.0 then entityFraction = 1.0 end if
-        if entity.forceLink then entityFraction = 1.0 end if
+        delta = t.Vec3(
+          clientFloat(entity.messageOrigin.x - entity.previousMessageOrigin.x),
+          clientFloat(entity.messageOrigin.y - entity.previousMessageOrigin.y),
+          clientFloat(entity.messageOrigin.z - entity.previousMessageOrigin.z),
+        )
+        if delta.x > 100.0 or delta.x < -100.0 then entityFraction = clientFloat(1.0) end if
+        if delta.y > 100.0 or delta.y < -100.0 then entityFraction = clientFloat(1.0) end if
+        if delta.z > 100.0 or delta.z < -100.0 then entityFraction = clientFloat(1.0) end if
+        if entity.forceLink then entityFraction = clientFloat(1.0) end if
         previousOrigin = entity.previousMessageOrigin
         entity.origin = t.Vec3(
-          previousOrigin.x + delta.x * entityFraction,
-          previousOrigin.y + delta.y * entityFraction,
-          previousOrigin.z + delta.z * entityFraction,
+          clientLerp(previousOrigin.x, entity.messageOrigin.x, entityFraction),
+          clientLerp(previousOrigin.y, entity.messageOrigin.y, entityFraction),
+          clientLerp(previousOrigin.z, entity.messageOrigin.z, entityFraction),
         )
         entity.angles = t.Vec3(
           interpolatedAngle(entity.previousMessageAngles.x, entity.messageAngles.x, entityFraction),
@@ -367,7 +415,7 @@ function CL_RelinkEntities(client)
           light = CL_AllocDlight(entity.number)
           light.origin = math.copy(entity.origin)
           light.radius = 200.0
-          light.die = client.time + 0.01
+          light.die = clientFloat(client.time + 0.01)
         else if (modelFlags & c.EF_GRENADE) != 0 then
           queueRelinkParticleEffect("rocket_trail", [oldOrigin, math.copy(entity.origin), 1])
         else if (modelFlags & c.EF_TRACER3) != 0 then
@@ -382,6 +430,43 @@ function CL_RelinkEntities(client)
     index = index + 1
   end while
   return client.visibleEntities
+end function
+
+// Return the exact entity list consumed by the renderer after CL_RelinkEntities.
+// WinQuake renders cl_visedicts rather than the entire sparse cl_entities array.
+// Keep this as a defensive view: invalid/cleared entries can never leak into a
+// modern backend even if a caller retained an older visibleEntities array.
+function CL_ActiveVisibleEntities(client)
+  active = []
+  for each entity in client.visibleEntities
+    if entity is not void and entity.modelIndex != 0 and len(active) < c.MAX_VISEDICTS then
+      active = active + [entity]
+    end if
+  end for
+  return active
+end function
+
+// gl_refrag.c removes stale efrags when a force-linked entity no longer has a
+// model.  The integrated renderer does not expose native efrag pointers, so
+// this source-guided list is the hand-off boundary for efrag-aware backends.
+function CL_ViewEntityOrigin(client)
+  index = client.viewEntity
+  if index >= 0 and index < len(client.entities) then
+    entity = client.entities[index]
+    if entity is not void then return math.copy(entity.origin) end if
+  end if
+  if client.player is not void then return math.copy(client.player.origin) end if
+  return t.Vec3(0.0, 0.0, 0.0)
+end function
+
+function CL_EfragRemovalCandidates(client)
+  candidates = []
+  for each entity in client.entities
+    if entity is not void and entity.modelIndex == 0 and entity.forceLink then
+      candidates = candidates + [entity]
+    end if
+  end for
+  return candidates
 end function
 
 function nextDlightRandom()
@@ -405,6 +490,15 @@ end function
 function createEntity(number)
   origin = t.Vec3(0.0, 0.0, 0.0)
   angles = t.Vec3(0.0, 0.0, 0.0)
+  entityOrigin = math.copy(origin)
+  entityAngles = math.copy(angles)
+  messageOrigin = math.copy(origin)
+  previousMessageOrigin = math.copy(origin)
+  messageAngles = math.copy(angles)
+  previousMessageAngles = math.copy(angles)
+  baselineOrigin = math.copy(origin)
+  baselineAngles = math.copy(angles)
+  baseline = [0, 0, 0, 0, baselineOrigin, baselineAngles, 0]
   return t.ClientEntityState(
     number,
     0,
@@ -412,15 +506,16 @@ function createEntity(number)
     0,
     0,
     0,
-    math.copy(origin),
-    math.copy(angles),
+    entityOrigin,
+    entityAngles,
     0.0,
-    math.copy(origin),
-    math.copy(origin),
-    math.copy(angles),
-    math.copy(angles),
+    messageOrigin,
+    previousMessageOrigin,
+    messageAngles,
+    previousMessageAngles,
     true,
-    [0, 0, 0, 0, math.copy(origin), math.copy(angles), 0],
+    baseline,
+    0.0,
   )
 end function
 
@@ -499,6 +594,7 @@ function CL_ClearState(client)
   client.levelName = ""
   client.modelPrecache = [""]
   client.soundPrecache = [""]
+  CL_SetModelSyncTypes([c.ST_SYNC])
   client.viewEntity = 0
   client.serverTime = 0.0
   client.time = 0.0
@@ -772,7 +868,7 @@ function sendReliable(client)
   if client.outgoing.curSize == 0 then return 0 end if
   if not netmain.NET_CanSendMessage(client.socket) then return 0 end if
   result = netmain.NET_SendMessage(client.socket, client.outgoing)
-  if result == 1 then sz.clear(client.outgoing) end if
+  if delivery.clearAfterSend(result) then sz.clear(client.outgoing) end if
   return result
 end function
 
@@ -821,6 +917,7 @@ end function
 function applyBaseline(client, number, baseline)
   entity = CL_EntityNum(client, number)
   if entity is error then return entity end if
+  previousModelIndex = entity.modelIndex
   entity.baseline = [
     baseline[0],
     baseline[1],
@@ -841,6 +938,7 @@ function applyBaseline(client, number, baseline)
   entity.messageAngles = math.copy(baseline[5])
   entity.previousMessageAngles = math.copy(baseline[5])
   entity.forceLink = true
+  CL_AssignModelSyncBase(entity, previousModelIndex)
   return entity
 end function
 
@@ -848,6 +946,7 @@ function applyFastUpdate(client, payload)
   number = payload[0]
   entity = CL_EntityNum(client, number)
   if entity is error then return entity end if
+  previousModelIndex = entity.modelIndex
   forceLink = entity.forceLink or entity.messageTime != client.messageTimes[1]
   entity.previousMessageOrigin = math.copy(entity.messageOrigin)
   entity.previousMessageAngles = math.copy(entity.messageAngles)
@@ -869,6 +968,7 @@ function applyFastUpdate(client, payload)
   if entity.colormap < 0 or entity.colormap > client.maxClients then
     return error(2917, "CL_ParseUpdate: colormap > maxclients")
   end if
+  CL_AssignModelSyncBase(entity, previousModelIndex)
   origin = payload[7]
   angles = payload[8]
   if origin[0] is not void then entity.messageOrigin.x = origin[0] end if
@@ -911,20 +1011,22 @@ function advanceSignon(client, stage)
 end function
 
 function CL_SignonReply(client)
-  if client.signon == c.SIGNON_SERVERINFO then
-    return sendString(client, "prespawn") >= 0
-  else if client.signon == c.SIGNON_PRESPAWN then
-    // CL_SignonReply writes all three commands into one reliable message.
-    queueString(client, "name \"" + client.name + "\"\n")
-    queueString(client, "color " + ((client.colors >> 4) & 15) + " " + (client.colors & 15) + "\n")
-    queueString(client, "spawn " + client.spawnParms)
-    return sendReliable(client) >= 0
-  else if client.signon == c.SIGNON_SPAWN then
-    return sendString(client, "begin") >= 0
-  else if client.signon == c.SIGNON_ACTIVE then
+  if client.signon == c.SIGNON_ACTIVE then
     client.spawned = true
     return true
   end if
+  if not client.connected or client.socket is void then return false end if
+  protocolSignon.writeClientReply(
+    client.outgoing,
+    client.signon,
+    client.name,
+    client.colors,
+    client.spawnParms,
+  )
+  // CL_SignonReply only appends to cls.message. CL_SendCmd performs the
+  // reliable transport phase on the following host frame. Keeping that
+  // boundary is observable when a socket is temporarily blocked and avoids
+  // sending a reply from inside CL_ParseServerMessage.
   return true
 end function
 
@@ -1170,11 +1272,18 @@ function readNetworkMessages(client, realtime)
   processed = 0
   messageType = netmain.NET_GetMessage(client.socket, client.incoming, netmain.net_messagetimeout)
   while messageType > 0
+    payload = sz.dataSlice(client.incoming)
+    // CL_GetMessage consumes isolated svc_nop keepalives internally.  They
+    // are neither returned to CL_ParseServerMessage nor written to demos.
+    if demo.isKeepalivePayload(payload) then
+      messageType = netmain.NET_GetMessage(client.socket, client.incoming, netmain.net_messagetimeout)
+      continue
+    end if
     // CL_ParseServerMessage aborts the host on an illegible or truncated
     // server message.  Do not discard the error object here: this is the
     // production network path, not merely the direct parser API exercised by
     // the protocol fixtures.
-    parsed = try(parseMessage(client, sz.dataSlice(client.incoming)))
+    parsed = try(parseMessage(client, payload))
     if parsed is error then return parsed end if
     if realtime < 0.0 then client.lastMessageTime = client.serverTime else client.lastMessageTime = realtime end if
     processed = processed + 1
@@ -1194,11 +1303,13 @@ function pumpRecording(client, recording)
   messageType = netmain.NET_GetMessage(client.socket, client.incoming, netmain.net_messagetimeout)
   while messageType > 0
     payload = sz.dataSlice(client.incoming)
-    // CL_GetMessage discards single-byte keepalives before CL_WriteDemoMessage.
-    if len(payload) != 1 or payload[0] != c.SVC_NOP then
-      written = demo.CL_WriteDemoMessage(recording, payload, client.command.viewAngles)
-      if written is error then return written end if
+    // The original CL_GetMessage loops until a non-keepalive packet arrives.
+    if demo.isKeepalivePayload(payload) then
+      messageType = netmain.NET_GetMessage(client.socket, client.incoming, netmain.net_messagetimeout)
+      continue
     end if
+    written = demo.CL_WriteDemoMessage(recording, payload, client.command.viewAngles)
+    if written is error then return written end if
     parsed = try(parseMessage(client, payload))
     if parsed is error then return parsed end if
     client.lastMessageTime = client.serverTime

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "delivery_revision": "BP-085-089R2",
+  "delivery_parent": "BP-085-089R1",
+  "status": "candidate",
+  "observed_failure": "normalized save parse: invalid savegame spawn parm 0: --2147.516352",
+  "root_cause": "signed i32 overflow in integer-scaled fixed-six formatter for Binary32 4097.0",
+  "fix": {
+    "formatter": "msvcrt_percent_f",
+    "format": "%.6f",
+    "text_bridge_export": "mqt_f32_to_fixed6",
+    "text_bridge_exports": 12,
+    "text_bridge_sha256": "3e6ea2aa37ca58bdfd821a1b9278d6411a90143c3b0c48b8f96bfa10a0c6bd7c",
+    "affected_paths": [
+      "src/miniquake/native.ml",
+      "src/miniquake/quakec/edict.ml",
+      "src/miniquake/cvar.ml",
+      "native/miniquake_text.c",
+      "native/miniquake_text.def",
+      "native/miniquake_text.dll"
+    ]
+  },
+  "contract_status": "artifact_compat_109_frozen_v1",
+  "contract_fingerprint": "0x59531091",
+  "evidence_revision": "sequential_exact_fixed6_v2",
+  "golden_values": {
+    "4097": "4097.000000",
+    "-4097": "-4097.000000",
+    "negative_zero": "-0.000000"
+  },
+  "runtime_status": "pending Windows acceptance"
+}

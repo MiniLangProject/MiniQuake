@@ -1,0 +1,52 @@
+{
+  "schema": "MiniQuakeViewStateGolden/1",
+  "package_id": "BP-036",
+  "parent_package_id": "BP-035",
+  "sources": [
+    "cl_main.c",
+    "view.c",
+    "chase.c",
+    "cl_tent.c",
+    "r_part.c",
+    "gl_refrag.c",
+    "gl_rmain.c"
+  ],
+  "rows": [
+    {
+      "name": "atoi_decimal_prefix",
+      "value": 12
+    },
+    {
+      "name": "atoi_negative_prefix",
+      "value": -7
+    },
+    {
+      "name": "atoi_invalid",
+      "value": 0
+    },
+    {
+      "name": "chase_dest_x_fbits",
+      "value": 3266576384
+    },
+    {
+      "name": "chase_dest_z_fbits",
+      "value": 1110966272
+    },
+    {
+      "name": "preserved_yaw_fbits",
+      "value": 1123418112
+    },
+    {
+      "name": "preserved_roll_fbits",
+      "value": 1088421888
+    },
+    {
+      "name": "fixtures",
+      "value": 22
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/view_state_oracle.c",
+    "oracle_sha256": "c80f21845b94a346d98f65335ff9a3c713141dc588dcfdc7174a6471037acd22"
+  }
+}

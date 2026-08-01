@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "component": "BP-045 alias model",
+  "rows": [
+    {
+      "name": "shadow_lheight_bits",
+      "value": 1092616192
+    },
+    {
+      "name": "shadow_height_bits",
+      "value": 3239051264
+    },
+    {
+      "name": "shade_row_0",
+      "value": 0
+    },
+    {
+      "name": "shade_row_90",
+      "value": 4
+    },
+    {
+      "name": "shade_row_180",
+      "value": 8
+    },
+    {
+      "name": "shade_row_270",
+      "value": 12
+    },
+    {
+      "name": "shade_row_360",
+      "value": 0
+    },
+    {
+      "name": "shade_row_negative",
+      "value": 12
+    },
+    {
+      "name": "clamp_low",
+      "value": 0
+    },
+    {
+      "name": "clamp_trunc",
+      "value": 12
+    },
+    {
+      "name": "clamp_high",
+      "value": 255
+    },
+    {
+      "name": "shadedot_quant",
+      "value": 16
+    },
+    {
+      "name": "shadow_uses_entity_origin",
+      "value": 1
+    },
+    {
+      "name": "multitexture_reset",
+      "value": 1
+    },
+    {
+      "name": "fixtures",
+      "value": 22
+    }
+  ]
+}

@@ -6,6 +6,7 @@ import miniquake.menu as menu
 import miniquake.render.draw2d as draw
 import miniquake.byteio as bio
 import miniquake.array_util as arrayutil
+import miniquake.render_ui_contract as renderUiContract
 
 const SBAR_HEIGHT = 24
 const STAT_MINUS = 10
@@ -450,8 +451,7 @@ function Sbar_Configure(state, fontTexture, player, clientState, width, height, 
 end function
 
 function sbarXOffset()
-  if sbarGameType == c.GAME_DEATHMATCH then return 0 end if
-  return native.trunc((sbarWidth - 320) / 2)
+  return renderUiContract.statusbarXOffset(sbarWidth, sbarGameType)
 end function
 
 function traceSbar(command)

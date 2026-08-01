@@ -1,0 +1,2088 @@
+{
+  "schema_version": 1,
+  "project": "MiniQuake",
+  "current_package": "BP-089",
+  "current_delivery_revision": "BP-085-089R8",
+  "delivery_parent": "BP-085-089R7",
+  "parent_package": "BP-088",
+  "compatibility_target": {
+    "reference": "WinQuake/GLQuake 1.09",
+    "profile": "compat_109",
+    "network_protocol": 15,
+    "savegame_version": 5,
+    "visual_target": ">95% similarity without requiring pixel identity"
+  },
+  "baseline": {
+    "archive": "MiniQuake_Source24.07.2026.zip",
+    "archive_sha256": "bb2b5bf173fe687cada6e7fec2dcdb8b2099589f2ebc039417a5571ced9729d3",
+    "tested_runtime_baseline_archive": "MiniQuake_BP000R1_TextBridgeFix_20260724.zip",
+    "tested_runtime_baseline_archive_sha256": "796619cd28adaa69d4c2142f92a350c7cf6e27278d0172a9807075fabd7ba3b0",
+    "main_native_exports": 160,
+    "buffered_text_exports": 11,
+    "logical_original_units_carried_forward": 63
+  },
+  "bp000r1_acceptance": {
+    "result_archive": "MiniQuake_BP-000R1_RESULTS_20260724-122402.zip",
+    "result_archive_sha256": "c7dd4963d21145c51ae839558032f51663b7a1dabd6a45ebd554b283b4006abc",
+    "status": "PASS",
+    "core_tests": "16/16 PASS",
+    "milestone_tests": "24/24 PASS",
+    "real_game_validation": "id1/start PASS",
+    "headless_runtime": "120 frames PASS",
+    "udp_loopback": "PASS"
+  },
+  "bp001_acceptance": {
+    "result_archive": "MiniQuake_BP-001_RESULTS_20260724-155921.zip",
+    "result_archive_sha256": "ff364f85b3394b11628e22aee805bf6d707d3b7dfb97a6cd5eaabed8640938eb",
+    "status": "FAIL",
+    "classification": "B0 build blocker in newly added diagnostics",
+    "first_diagnostic": "Expression temp overflow in compat_diagnostics.contextJson",
+    "second_diagnostic": "Expression temp overflow in compat_trace.canonicalFrame",
+    "runtime_reached": false
+  },
+  "bp001r1_acceptance": {
+    "result_archive": "MiniQuake_BP-001R1_RESULTS_20260724-172632.zip",
+    "result_archive_sha256": "5f0c9edf96187e3b4e310cc7a759308f0cbadb45645619a28003e66753caec81",
+    "status": "PARTIAL PASS; deterministic trace A failed",
+    "static_verification": "PASS",
+    "build": "PASS",
+    "core_tests": "16/16 PASS",
+    "milestone_tests": "24/24 PASS",
+    "diagnostics_tests": "8/8 PASS",
+    "real_game_validation": "id1/start PASS",
+    "headless_runtime": "120 frames PASS",
+    "udp_loopback": "PASS",
+    "trace_a": "FAIL after Host_Frame 0; header and frame_complete context written, no canonical frame row",
+    "classification": "B1 runtime blocker in newly added diagnostics; no engine-semantic failure observed",
+    "root_cause": "clientEntitiesHash/clientEntitiesJson dereferenced void slots in the intentionally sparse client entity table"
+  },
+  "bp080084r2_acceptance": {
+    "result_archive": "MiniQuake_BP-080-084R2_RESULTS_20260731-114042.zip",
+    "result_archive_sha256": "7d4969d9ed05877fbbcc7c071ea8d1d52f8d0892f3fa57a667df03d083503ef7",
+    "status": "PASS",
+    "source_functions": "1094/1094 classified",
+    "source_inventory_sha256": "31f437bb54a84fa690ff96011c50f8ca3e7dfabde05b4f450e58049eae5d8837",
+    "trace_sha256": "e91f4c9e32c8c9df39d7cb4ceaf83efaa78c51057516323da2ba6cc3412f0c7b",
+    "black_port_corpus": "start/e1m1/e1m2/e1m3, pairwise byte-identical",
+    "retail_core_assets": "A/B byte-identical",
+    "retail_audio": "A/B byte-identical",
+    "render_evidence": "byte-identical, SSIM 1.0",
+    "network_evidence": "2 UDP control pairs plus loopback PASS"
+  },
+  "package": {
+    "id": "BP-089",
+    "parent": "BP-088",
+    "block_id": "BP-085-089",
+    "block_parent": "BP-080-084R2",
+    "date": "2026-07-31",
+    "title": "compat_109 game-profile, artifact, stability and release-candidate closure",
+    "status": "Windows R8 acceptance pending",
+    "game_profile_status": "game_profile_109_frozen_v1",
+    "game_profile_fingerprint": "0x7a03b68d",
+    "mod_runtime_status": "mod_runtime_109_frozen_v1",
+    "mod_runtime_fingerprint": "0x4649813d",
+    "artifact_compat_status": "artifact_compat_109_frozen_v1",
+    "artifact_compat_fingerprint": "0x59531091",
+    "stability_status": "stability_109_frozen_v1",
+    "stability_fingerprint": "0xd0e3c03f",
+    "compat_release_status": "compat_109_release_candidate_v1",
+    "compat_release_fingerprint": "0x29b72a98",
+    "pending_external_gates": [
+      "original_binary_interop",
+      "external_glquake_visual_reference"
+    ],
+    "delivery_revision": "BP-085-089R8",
+    "delivery_parent": "BP-085-089R7",
+    "artifact_evidence_revision": "sequential_exact_fixed6_signedzero_v3",
+    "savegame_high_water_preserved": true,
+    "listen_soak_client_entity_policy": "server_high_water_plus_existing_static_offset"
+  },
+  "diagnostic_schemas": {
+    "trace": "MiniQuakeCompatTrace|schema=1",
+    "snapshot": "MiniQuakeSnapshot/1",
+    "crash_context": "MiniQuakeCrashContext/1",
+    "summary": "MiniQuakeTraceSummary/1",
+    "sparse_client_entities": "JSON null retains slot indexes; digest includes length/index/occupancy",
+    "trace_comparison": "schema_version=1 JSON; first differing line/frame/fields",
+    "external_input_policy": "headless sessions never poll live Win32 button bindings",
+    "typed_vector_failures": "precise subsystem/entity/field label before any .x/.y/.z access",
+    "snapshot_failure_split": "serialization and file-write errors reported separately"
+  },
+  "port_units": {
+    "total": 63,
+    "state": "All 1,094 selected compat_109 source definitions are classified and Windows-accepted. BP-085..089 add game profiles, mod runtime, retail artifacts and stability; external original-binary and GLQuake visual-reference gates remain explicit.",
+    "reclassified_units": [
+      {
+        "unit": 5,
+        "original": "cl_main.c/client.h",
+        "scope": "CL_SignonReply and signon completion",
+        "status": "BP-011 Windows-accepted; BP-015 signon queue/frame-boundary parity Windows block-specific fixtures PASS; R1 historical milestone revalidation pending"
+      },
+      {
+        "unit": 6,
+        "original": "cl_parse.c/protocol.h",
+        "scope": "complete SVC catalog and fast-update decoding",
+        "status": "BP-011 Windows-accepted; BP-018 demo/network message filtering and BP-019 closure Windows block-specific fixtures PASS; R1 historical milestone revalidation pending"
+      },
+      {
+        "unit": 7,
+        "original": "cl_tent.c/client.h/protocol.h",
+        "scope": "all temporary entities, fixed 24-slot beam pool, expiry and overflow diagnostic",
+        "status": "BP-014R1 beam retained-state/active-view hotfix Windows-accepted"
+      },
+      {
+        "unit": 26,
+        "original": "host.c/quakedef.h",
+        "scope": "signon orchestration plus graceful client drop and scoreboard reset",
+        "status": "BP-013 graceful drop Windows-accepted; BP-015/BP-016 signon and reliable scheduling Windows block-specific fixtures PASS; R1 historical milestone revalidation pending"
+      },
+      {
+        "unit": 27,
+        "original": "host_cmd.c/quakedef.h",
+        "scope": "prespawn/spawn/begin, name/color and scoreboard spawn semantics",
+        "status": "BP-011/BP-013 Windows-accepted; BP-015 prespawn/spawn/begin queue parity Windows block-specific fixtures PASS; R1 historical milestone revalidation pending"
+      },
+      {
+        "unit": 36,
+        "original": "pr_cmds.c/progs.h",
+        "scope": "PF_sound C-float/int argument conversion and shared dynamic-sound dispatch",
+        "status": "BP-014R1 dynamic-sound and runtime-event path Windows-accepted"
+      },
+      {
+        "unit": 41,
+        "original": "snd_dma.c/sound.h",
+        "scope": "dynamic/static sound scalar ABI received from Protocol-15 client parser",
+        "status": "BP-014R1 dynamic/static sound parser-to-mixer boundary Windows-accepted"
+      },
+      {
+        "unit": 45,
+        "original": "sv_main.c/server.h",
+        "scope": "fast updates, server payloads, particles, dynamic sound, reliable fanout, datagram planning and cleanup",
+        "status": "BP-014R1 server event/runtime layer Windows-accepted; BP-015/BP-016 server scheduling Windows block-specific fixtures PASS; R1 historical milestone revalidation pending"
+      },
+      {
+        "unit": 48,
+        "original": "sv_user.c/server.h",
+        "scope": "signed CLC command framing and malformed-message handling",
+        "status": "BP-011 signed CLC framing Windows-accepted; BP-019 CLC catalog frozen and block-specific Windows fixtures PASS; R1 historical milestone revalidation pending"
+      },
+      {
+        "unit": 57,
+        "original": "protocol.h",
+        "scope": "Protocol-15 constants, wire primitives, commands, fast updates, server payloads, static/runtime events and delivery boundaries",
+        "status": "Protocol 15 through BP-014R1 Windows-accepted; BP-015 through BP-019 closure/freeze Windows block-specific fixtures PASS; R1 historical milestone revalidation pending"
+      }
+    ],
+    "function_level_ledger": "Protocol 15 series BP-010 through BP-019"
+  },
+  "known_constraints": [
+    "the supplied baseline lacks third_party/stb/stb_vorbis.c",
+    "the main native bridge remains a statically verified prebuilt DLL",
+    "the buffered text bridge is fully reproducible from included source",
+    "the original 16-byte fast-update preflight can admit a theoretical 17/18-byte update; MiniQuake preserves the scheduling gate and adds an exact fit check to avoid memory corruption",
+    "BP-014R1 is the accepted Windows runtime parent for the cumulative BP-015-019 block",
+    "protocol15_frozen_v1 is a source-guided compatibility contract; original Quake binary client/server interoperability is not yet claimed",
+    "all cumulative block-specific Windows runtime gates passed; only the corrected historical milestone harness awaits BP-015-019R1 revalidation",
+    "the original GLQuake screenshot corpus is not bundled; BP-048 currently proves cross-process MiniQuake framebuffer determinism",
+    "the final >95% original-vs-MiniQuake image claim requires a separately captured external GLQuake reference corpus"
+  ],
+  "next_package": "BP-085-089R8 Windows acceptance; then continue external interop/visual gates or BP-090+",
+  "bp001r2_acceptance": {
+    "result_archive": "MiniQuake_BP-001R2_RESULTS_20260724-181843.zip",
+    "result_archive_sha256": "a6373b21653760800af9cc67fc969b07a7b7f385e409e5c5f9bced718262816c",
+    "status": "PARTIAL PASS; both traces complete, byte identity failed",
+    "static_verification": "PASS",
+    "build": "PASS",
+    "core_tests": "16/16 PASS",
+    "milestone_tests": "24/24 PASS",
+    "diagnostics_tests": "9/9 PASS",
+    "real_game_validation": "id1/start PASS",
+    "headless_runtime": "120 frames PASS",
+    "trace_a": "64/64 PASS, clean shutdown",
+    "trace_b": "64/64 PASS, clean shutdown",
+    "first_difference": "frame 15: player pitch -2.8125 degrees in A versus 0 in B; QuakeC and edict hashes diverge as consequences",
+    "classification": "D1 deterministic input contamination in the diagnostic/headless execution environment",
+    "root_cause_hypothesis": "host.sendClientIntentions continued polling live Win32 button bindings in headless mode; the pitch progression exactly matches cl_pitchspeed at the fixed 0.02 second step"
+  },
+  "bp001r3_acceptance": {
+    "result_archive": "MiniQuake_BP-001R3_RESULTS_20260724-191119.zip",
+    "result_archive_sha256": "59ae0c40c959287020ca9411fe3aca65241036027bc7586817172693c3ea7ff3",
+    "source_archive": "MiniQuake_BP001R3_InputIsolation_20260724.zip",
+    "source_archive_sha256": "6bff3638fd1f2ae7731db28b60cdb74cb837d3cd1769692f5a5dee522c820d7a",
+    "source_manifest_sha256": "f991999a147bdcd3ddd779d0f6ad5c24cfb5322a3ba3181ba321dd7389b5d61d",
+    "status": "PASS",
+    "steps": "17/17 PASS",
+    "build": "PASS",
+    "core_tests": "16/16 PASS",
+    "milestone_tests": "24/24 PASS",
+    "diagnostics_tests": "10/10 PASS",
+    "real_game_validation": "id1/start PASS",
+    "headless_runtime": "120 frames PASS",
+    "trace_a": "64/64 PASS",
+    "trace_b": "64/64 PASS",
+    "trace_sha256": "d77620a5f14a0ba2c5d983f3398b539a3dda6fc2cb27d4fe8131bbfa27b52918",
+    "trace_rolling_hash": "7f4939f9",
+    "trace_byte_identity": "PASS",
+    "snapshot_context_summary": "PASS",
+    "udp_loopback": "PASS",
+    "classification": "accepted deterministic diagnostics baseline"
+  },
+  "protocol15_evidence": {
+    "reference_units": [
+      "common.c:MSG_*",
+      "common.c:SZ_*",
+      "protocol.h",
+      "cl_input.c:CL_SendMove",
+      "sv_main.c:SV_CreateBaseline"
+    ],
+    "golden_schema": "MiniQuakeProtocol15Golden/1",
+    "golden_vectors": 13,
+    "oracle_source": "tools/oracle/protocol15_common_oracle.c",
+    "oracle_sha256": "34d1a2aecb72c829288dc8be09b071796960a24635d9f9ac7384818c6180ea39",
+    "python_model": "tools/check_protocol15_vectors.py",
+    "minilang_fixtures": 15,
+    "protocol_constants_checked": 18,
+    "safe_divergences": [
+      "truncated MSG_ReadFloat sets badRead and returns -1.0 instead of out-of-bounds C access",
+      "SZ_Print handles an empty buffer without reading data[-1]",
+      "trailing-NUL SZ_Print overflow safely restarts the complete string instead of writing before data[0] after clear",
+      "fatal Sys_Error paths propagate as MiniLang error values"
+    ],
+    "float_parameter_boundary": "C float conversion is applied before coord/angle scaling; integer caller 16777217 rounds to binary32 16777216",
+    "atomic_string_reservations": "MSG_WriteString and the no-terminator SZ_Print path reserve payload plus trailing NUL in one SZ_GetSpace operation, preserving overflow-clear semantics",
+    "atomic_reservation": "MSG_WriteString and the SZ_Print no-NUL path reserve payload plus terminator in one SZ_GetSpace operation"
+  },
+  "bp010_acceptance": {
+    "result_archive": "MiniQuake_BP-010_RESULTS_20260724-203941.zip",
+    "result_archive_sha256": "5f099c56ae95f5c7c604331fa316da045da1e7e3bb1776b31a20b236c7ee51f3",
+    "status": "FAIL before runtime",
+    "static_verification": "PASS",
+    "golden_vector_verification": "13/13 PASS; 18 constants PASS",
+    "build": "FAIL (MiniLang compiler exit code 2)",
+    "first_diagnostic": "Undefined variable 'value' in protocol_text.encodeBytes",
+    "latent_followup_found_during_review": "branch-local 'offset' merge in sizebuf.printText",
+    "runtime_tests": "NOT_REACHED",
+    "classification": "B0 build blocker in newly added BP-010 source; no engine-semantic runtime failure observed"
+  },
+  "bp010r1_acceptance": {
+    "result_archive": "MiniQuake_BP-010R1_RESULTS_20260724-220016.zip",
+    "result_archive_sha256": "0607115e74346ca472dee257598af39227d5b139d362f89584d5eb5fb9747418",
+    "status": "PASS",
+    "steps": "18/18 PASS",
+    "build": "PASS",
+    "core_tests": "16/16 PASS",
+    "milestone_tests": "24/24 PASS",
+    "diagnostics_tests": "10/10 PASS",
+    "protocol15_wire_tests": "15/15 PASS",
+    "real_game_validation": "id1/start PASS",
+    "headless_runtime": "120 frames PASS",
+    "traces": "two independent 64-frame traces byte-identical",
+    "trace_sha256": "0584b1e9b4d72dfab3b03b9ffdb877233ba979d35288836bd67762591bf27596",
+    "rolling_hash": "7f4939f9",
+    "udp_loopback": "PASS"
+  },
+  "bp011_acceptance": {
+    "result_archive": "MiniQuake_BP-011_RESULTS_20260724-231530.zip",
+    "result_archive_sha256": "9c1255139521c0ab4b09a7a95c616ad02598cb522dd4132e32fac6af8f9e34ec",
+    "status": "PASS",
+    "steps": "19/19 PASS",
+    "build": "PASS",
+    "core_tests": "16/16 PASS",
+    "milestone_tests": "24/24 PASS",
+    "diagnostics_tests": "10/10 PASS",
+    "protocol15_wire_tests": "15/15 PASS",
+    "protocol15_command_tests": "14/14 PASS",
+    "real_game_validation": "id1/start PASS",
+    "headless_runtime": "120 frames PASS",
+    "traces": "two independent 64-frame traces byte-identical",
+    "trace_sha256": "f60811d39320379d75abfeae2db1f2b4f426c91b782a0ca8cbb309fff0fe886c",
+    "rolling_hash": "2d302e1b",
+    "udp_loopback": "PASS"
+  },
+  "protocol15_serverdata_evidence": {
+    "reference_units": [
+      "sv_main.c:SV_SendServerinfo",
+      "sv_main.c:SV_StartSound",
+      "sv_main.c:SV_WriteClientdataToMessage",
+      "sv_main.c:SV_CreateBaseline",
+      "sv_main.c:SV_SendClientDatagram",
+      "sv_main.c:SV_UpdateToReliableMessages",
+      "sv_main.c:SV_SendClientMessages",
+      "sv_main.c:SV_CleanupEnts"
+    ],
+    "golden_schema": "MiniQuakeProtocol15ServerDataGolden/1",
+    "golden_vectors": 11,
+    "initial_delivery_cases": 6,
+    "reliable_delivery_cases": 8,
+    "datagram_cases": 5,
+    "fast_update_cases": 6,
+    "oracle_source": "tools/oracle/protocol15_serverdata_oracle.c",
+    "python_model": "tools/check_protocol15_serverdata.py",
+    "minilang_fixtures": 17,
+    "protocol_constants_checked": 28,
+    "safe_divergences": [
+      "the original 16-byte entity-update scheduling gate is retained but MiniQuake additionally requires the exact 17/18-byte update to fit",
+      "fatal Sys_Error paths propagate as controlled MiniLang error values"
+    ],
+    "playerstate_ground_adapter": "set/clear/integrated/sv_main/client-roundtrip coverage added in BP-012R1"
+  },
+  "bp012_acceptance": {
+    "result_archive": "MiniQuake_BP-012_RESULTS_20260725-002822.zip",
+    "result_archive_sha256": "220c23189a70cb98df6aada652a4bdacf8586d99801019b98cc5e00868000a1a",
+    "source_archive": "MiniQuake_BP012_Protocol15ServerData_20260724.zip",
+    "source_archive_sha256": "1a0a508afd4cdf327543d79208cac97151a4007080a285887b7236884d6deece",
+    "status": "FAIL after successful build and core tests",
+    "static_verification": "PASS",
+    "protocol15_wire_vectors": "13/13 PASS",
+    "protocol15_command_vectors": "14/14 PASS",
+    "protocol15_serverdata_vectors": "11/11 PASS",
+    "build": "all seven EXE targets PASS",
+    "core_tests": "16/16 PASS",
+    "milestone_tests": "FAIL at 19/24: clientdata onground expected true, got false",
+    "remaining_runtime_gates": "NOT_REACHED",
+    "classification": "P15-A1 PlayerState-to-clientdata adapter mirror defect"
+  },
+  "bp012r1_evidence": {
+    "original_reference": "sv_main.c:SV_WriteClientdataToMessage uses ent->v.flags & FL_ONGROUND",
+    "adapter_rule": "PlayerState.onGround mirrors FL_ONGROUND only when no authoritative QuakeC edict value is available",
+    "set_case": "covered",
+    "clear_case": "covered",
+    "integrated_writer": "covered",
+    "sv_main_writer": "covered",
+    "client_roundtrip": "covered",
+    "golden_payloads_changed": false
+  },
+  "bp012r1_acceptance": {
+    "result_archive": "MiniQuake_BP-012R1_RESULTS_20260725-010934(1).zip",
+    "result_archive_sha256": "9359b7f638131fa0b402c5676ee5202f6987f2f72dcfaa8b08979f46a7b1a575",
+    "status": "PASS",
+    "acceptance_steps": "20/20 PASS",
+    "build": "PASS",
+    "core_tests": "16/16 PASS",
+    "milestone_tests": "24/24 PASS",
+    "diagnostics_tests": "10/10 PASS",
+    "wire_tests": "15/15 PASS",
+    "command_update_tests": "14/14 PASS",
+    "serverdata_tests": "17/17 PASS",
+    "real_game_validation": "id1/start PASS",
+    "headless_runtime": "120 frames PASS",
+    "deterministic_trace_sha256": "2671e9da30a832692ad2478575e9398d0603f82d4e34119ad50b26b888658c51",
+    "rolling_hash": "2688e0a1",
+    "udp_loopback": "PASS"
+  },
+  "protocol15_event_evidence": {
+    "reference_units": [
+      "sv_main.c:SV_StartParticle",
+      "host.c:SV_DropClient",
+      "host_cmd.c:Host_Name_f",
+      "host_cmd.c:Host_Color_f",
+      "host_cmd.c:Host_Spawn_f",
+      "pr_cmds.c:PF_makestatic",
+      "pr_cmds.c:PF_ambientsound",
+      "r_part.c:R_ParseParticleEffect"
+    ],
+    "golden_schema": "MiniQuakeProtocol15EventsGolden/1",
+    "golden_vectors": 15,
+    "semantic_cases": 13,
+    "oracle_source": "tools/oracle/protocol15_events_oracle.c",
+    "python_model": "tools/check_protocol15_events.py",
+    "minilang_fixtures": 22,
+    "shared_writer_families": 8,
+    "safe_divergences": [
+      "controlled MiniLang errors replace fatal or memory-unsafe C failures without changing valid wire payloads"
+    ]
+  },
+  "bp013_acceptance": {
+    "result_archive": "MiniQuake_BP-013_RESULTS_20260725-021620.zip",
+    "result_archive_sha256": "41952ba5df59e99e8e80341895afb86ac9053b0ac19a48477742ac630cc8cc1a",
+    "source_archive": "MiniQuake_BP013_Protocol15Events_20260725.zip",
+    "source_archive_sha256": "e1348e90fda9fc628391a8cfd17b1425ea0826694e752b92d1f1b614c574b9bf",
+    "status": "PASS",
+    "acceptance_steps": "21/21 PASS",
+    "build": "PASS",
+    "core_tests": "16/16 PASS",
+    "milestone_tests": "24/24 PASS",
+    "diagnostics_tests": "10/10 PASS",
+    "wire_tests": "15/15 PASS",
+    "command_update_tests": "14/14 PASS",
+    "serverdata_tests": "17/17 PASS",
+    "event_tests": "22/22 PASS",
+    "real_game_validation": "id1/start PASS",
+    "headless_runtime": "120 frames PASS",
+    "deterministic_trace_sha256": "7fbda101eee416cc472f3fa645d931cf6b3f5e2fb09cc0208488e7b475309b37",
+    "rolling_hash": "2688e0a1",
+    "udp_loopback": "PASS"
+  },
+  "protocol15_runtime_event_evidence": {
+    "reference_units": [
+      "cl_tent.c:CL_ParseTEnt/CL_ParseBeam",
+      "cl_parse.c:CL_ParseStartSoundPacket/CL_ParseStaticSound",
+      "sv_main.c:SV_StartSound/SV_SendNop/SV_ConnectClient",
+      "pr_cmds.c:PF_sound",
+      "host.c/host_cmd.c:drop and reconnect boundaries"
+    ],
+    "golden_schema": "MiniQuakeProtocol15RuntimeEventsGolden/1",
+    "golden_vectors": 10,
+    "semantic_cases": 49,
+    "oracle_source": "tools/oracle/protocol15_runtime_events_oracle.c",
+    "python_model": "tools/check_protocol15_runtime_events.py",
+    "minilang_fixtures": 28,
+    "temporary_entity_types": 14,
+    "beam_slots": 24,
+    "safe_divergences": [
+      "controlled MiniLang errors replace fatal or memory-unsafe C failures without changing valid wire payloads",
+      "compact beam records retain explicit original slot numbers instead of exposing a fixed C beam_t array"
+    ],
+    "beam_state_view_contract": "retained 24-slot state separated from strict-expiry active view",
+    "bp014_windows_failure": "milestone 12 beam expiry expected 0 got 1",
+    "bp014r1_status": "hotfix implemented; Windows acceptance pending"
+  },
+  "bp014_acceptance": {
+    "result_archive": "MiniQuake_BP-014_RESULTS_20260725-103243.zip",
+    "result_archive_sha256": "b4e2c262fd6c433a1bff6fd705e914b0ab50af078002a851a11cae390771b1a1",
+    "source_archive": "MiniQuake_BP014_Protocol15RuntimeEvents_20260725.zip",
+    "source_archive_sha256": "0dc6a82f4d08b94f4d348615c32a33e4a1717e52f88a62821f8e8df02b06d149",
+    "status": "PARTIAL PASS; milestone tests failed at 12/24",
+    "static_verification": "PASS",
+    "protocol15_checkers": "wire, command/update, serverdata, events and runtime-events PASS",
+    "build": "all 9 EXE targets PASS",
+    "core_tests": "16/16 PASS",
+    "milestone_tests": "FAIL at 12/24 client effects",
+    "first_diagnostic": "beam expiry: expected 0, got 1",
+    "later_runtime_tests": "not reached",
+    "real_game_trace_udp": "not reached",
+    "classification": "P15-B1 adapter/state-model defect in newly changed beam path",
+    "root_cause": "retained fixed-slot beam state was returned as the active CL_UpdateTEnts view; expired same-entity ownership and active visibility require separate representations"
+  },
+  "bp014r1_acceptance": {
+    "result_archive": "MiniQuake_BP-014R1_RESULTS_20260725-155308.zip",
+    "result_archive_sha256": "5cd9f27fa4ea5996fdacaaa473d0943229a78063bffb3b6e6f21609f8f470d0d",
+    "status": "PASS",
+    "acceptance_steps": "22/22 PASS",
+    "build": "PASS",
+    "core_tests": "16/16 PASS",
+    "milestone_tests": "24/24 PASS",
+    "diagnostics_tests": "10/10 PASS",
+    "wire_tests": "15/15 PASS",
+    "command_update_tests": "14/14 PASS",
+    "serverdata_tests": "17/17 PASS",
+    "event_tests": "22/22 PASS",
+    "runtime_event_tests": "28/28 PASS",
+    "real_game_validation": "id1/start PASS",
+    "headless_runtime": "120 frames PASS",
+    "deterministic_trace_sha256": "f29015910ccba93d67e538dec986567ec30b4f6e42790ef946cdc935d1f49bd9",
+    "rolling_hash": "2688e0a1",
+    "udp_loopback": "PASS"
+  },
+  "bp015_signon_evidence": {
+    "reference_units": [
+      "cl_main.c:CL_SignonReply",
+      "cl_parse.c signon progression",
+      "host_cmd.c:Host_PreSpawn_f/Host_Spawn_f/Host_Begin_f",
+      "sv_main.c:SV_SendClientMessages"
+    ],
+    "golden_schema": "MiniQuakeProtocol15SignonGolden/1",
+    "vectors": 6,
+    "semantic_cases": 6,
+    "minilang_fixtures": 12,
+    "status": "Windows runtime fixtures PASS in first cumulative block run; R1 historical milestone revalidation pending"
+  },
+  "bp016_delivery_evidence": {
+    "reference_units": [
+      "cl_main.c:CL_SendCmd",
+      "sv_main.c:SV_SendClientMessages/SV_SendNop",
+      "host.c:SV_DropClient",
+      "net_main.c"
+    ],
+    "golden_schema": "MiniQuakeProtocol15DeliveryGolden/1",
+    "oracle_cases": 14,
+    "minilang_fixtures": 14,
+    "status": "Windows runtime fixtures PASS in first cumulative block run; R1 historical milestone revalidation pending"
+  },
+  "bp017_datagram_evidence": {
+    "reference_units": [
+      "net_dgrm.c",
+      "net.h",
+      "net_main.c"
+    ],
+    "golden_schema": "MiniQuakeProtocol15DatagramGolden/1",
+    "oracle_cases": 18,
+    "minilang_fixtures": 18,
+    "status": "Windows runtime fixtures PASS in first cumulative block run; R1 historical milestone revalidation pending"
+  },
+  "bp018_demo_evidence": {
+    "reference_units": [
+      "cl_demo.c",
+      "cl_main.c:CL_GetMessage",
+      "host.c record integration"
+    ],
+    "golden_schema": "MiniQuakeProtocol15DemoGolden/1",
+    "oracle_rows": 12,
+    "minilang_fixtures": 19,
+    "status": "Windows runtime fixtures PASS in first cumulative block run; R1 historical milestone revalidation pending"
+  },
+  "bp019_protocol15_closure": {
+    "block_id": "BP-015-019",
+    "parent_package_id": "BP-014R1",
+    "final_package_id": "BP-019",
+    "protocol_status": "protocol15_frozen_v1",
+    "protocol_fingerprint": "0x0cf1e12a",
+    "component_checkers": 9,
+    "authoritative_files": 15,
+    "new_runtime_fixtures": 78,
+    "closure_fixtures": 15,
+    "original_quake_binary_interop": "external future gate; not claimed",
+    "status": "Windows closure fixtures, headless runtime, deterministic traces and UDP PASS; R1 historical milestone revalidation pending"
+  },
+  "bp015019_acceptance": {
+    "result_archive": "MiniQuake_BP-015-019_RESULTS_20260725-173630.zip",
+    "result_archive_sha256": "60cecc48944c8da5faad037f7c1df33fe48ac82a9cabcd7dce52c06a03ba6e8f",
+    "status": "PARTIAL PASS; exactly one stale historical milestone assertion failed",
+    "independent_failures": 1,
+    "first_failure": "BASE milestone tests, [20/24] complete loopback signon: server consumes prespawn expected 1 got 0",
+    "build": "14/14 executable targets PASS",
+    "core_tests": "PASS",
+    "milestone_tests": "19/24 completed; stale immediate-signon-send expectation at test 20",
+    "parent_protocol_tests": "all PASS",
+    "bp015_signon": "12/12 PASS",
+    "bp016_delivery": "14/14 PASS",
+    "bp017_datagram": "18/18 PASS",
+    "bp018_demo": "19/19 PASS",
+    "bp019_closure": "15/15 PASS",
+    "real_game_validation": "id1/start PASS",
+    "headless_runtime": "300 frames PASS",
+    "trace_a": "128/128 PASS",
+    "trace_b": "128/128 PASS",
+    "trace_byte_identity": "PASS",
+    "trace_sha256": "635b830d00997026fab868ab135e66062a367ef2855a103be38d96a7c04a3ddd",
+    "trace_rolling_hash": "58a7d245",
+    "snapshot_context_summary": "PASS",
+    "udp_loopback": "PASS",
+    "classification": "stale test assumption; production signon queue/transport semantics are supported by original source and all BP-015 runtime fixtures"
+  },
+  "bp015019r1_hotfix": {
+    "delivery_revision": "BP-015-019R1",
+    "engine_package_id": "BP-019",
+    "parent_delivery": "BP-015-019",
+    "scope": "test-and-delivery-only",
+    "production_engine_files_changed": 0,
+    "protocol_freeze_changed": false,
+    "protocol_fingerprint": "0x0cf1e12a",
+    "changes": [
+      "historical loopback milestone explicitly crosses CL_SendCmd for every client signon reply",
+      "historical loopback milestone explicitly crosses the server reliable-send phase for queued signon payloads",
+      "negative pre-send assertions prove that parsers and command handlers do not transport data immediately",
+      "milestone_signon_phase_contract prevents regression to the stale immediate-send model",
+      "acceptance and result collection use the BP-015-019R1 delivery identity while retaining BP-019 executable identity"
+    ],
+    "status": "implemented; Windows acceptance pending"
+  },
+  "bp015019r1_acceptance": {
+    "result_archive": "MiniQuake_BP-015-019R1_RESULTS_20260725-182626.zip",
+    "result_archive_sha256": "f9653da642c897049302159a87528184f2381704d3b6ce965a0722c58608870b",
+    "status": "PASS",
+    "acceptance_steps": "40/40 PASS",
+    "build": "PASS",
+    "all_protocol_tests": "PASS",
+    "real_game_validation": "id1/start PASS",
+    "headless_runtime": "300 frames PASS",
+    "trace_a": "128/128 PASS",
+    "trace_b": "128/128 PASS",
+    "trace_byte_identity": "PASS",
+    "trace_sha256": "635b830d00997026fab868ab135e66062a367ef2855a103be38d96a7c04a3ddd",
+    "trace_rolling_hash": "58a7d245",
+    "snapshot_context_summary": "PASS",
+    "udp_loopback": "PASS"
+  },
+  "bp020_quakec_progs": {
+    "runtime_fixtures": 18,
+    "oracle_rows": 11,
+    "status": "R2 Windows 18/18 PASS; stock qcc parameter storage and runtime CRC confirmed"
+  },
+  "bp021_quakec_vm": {
+    "runtime_fixtures": 16,
+    "oracle_rows": 15,
+    "status": "R2 Windows 16/16 PASS"
+  },
+  "bp022_quakec_edicts": {
+    "runtime_fixtures": 22,
+    "oracle_rows": 12,
+    "status": "R2 Windows 21/22; exact-size shared Quake-byte serializer implemented in R3; Windows acceptance pending"
+  },
+  "bp023_quakec_builtins": {
+    "runtime_fixtures": 22,
+    "oracle_rows": 13,
+    "builtin_slots": 79,
+    "fixme_slots": 14,
+    "builtin_fingerprint": "0xb86a0245",
+    "status": "R2 Windows 22/22 PASS"
+  },
+  "bp024_quakec_closure": {
+    "block_id": "BP-020-024",
+    "parent_delivery": "BP-015-019R1",
+    "final_package_id": "BP-024R3",
+    "quakec_status": "quakec_109_frozen_v1",
+    "contract_fingerprint": "0xbc89cbf1",
+    "runtime_fixtures": 20,
+    "stock_progs_gate": true,
+    "required_globals": 54,
+    "required_fields": 77,
+    "required_functions": 11,
+    "status": "BP-020..024R3 fully Windows-accepted: 20/20 closure, stock id1/progs.dat, game validation, 300 frames, deterministic traces and UDP PASS"
+  },
+  "bp020024_initial_acceptance": {
+    "result_archive": "MiniQuake_BP-020-024_RESULTS_20260725-201735.zip",
+    "result_archive_sha256": "91797f541fbcbe83bd304bcb1d3fcc02551ac6d2c51dce451abda5cc6ac1d5b8",
+    "status": "FAIL",
+    "static_verification": "PASS",
+    "build": "PASS",
+    "base_core": "15/16; stale synthetic progs.dat fixture rejected by the new mandatory-NUL guard",
+    "base_milestones": "24/24 PASS",
+    "diagnostics_and_protocol_regressions": "all PASS",
+    "bp020": "18/18 PASS",
+    "bp021": "15/16; fixture installed builtin #1 in slot 0",
+    "bp022": "20/22; signed-zero literal boundary and ED_Write concatenation boundary",
+    "bp023": "22/22 PASS",
+    "bp024": "20/20 PASS",
+    "installed_game_validation": "FAIL exit 2; initial runner did not preserve native stdout",
+    "stock_gate": "not reached",
+    "trace_and_udp": "not reached"
+  },
+  "bp020024r1_hotfix": {
+    "delivery_revision": "BP-020-024R1",
+    "engine_package_id": "BP-024R1",
+    "parent_delivery": "BP-020-024",
+    "protocol_freeze_changed": false,
+    "quakec_contract_fingerprint": "0xbc89cbf1",
+    "production_changes": [
+      "format/progs accepts negative-first-statement qcc builtins whose declared parameter words exceed zero locals",
+      "edict/savegame serialization preserves the raw Binary32 sign bit and avoids inline void concatenation"
+    ],
+    "test_changes": [
+      "large synthetic progs fixture includes the required leading NUL string",
+      "VM trace fixture maps builtin #1 to array slot 1",
+      "negative zero is constructed from QuakeC word 0x80000000"
+    ],
+    "delivery_changes": [
+      "stock, installed-game and headless-runtime gates are independent and fully logged"
+    ],
+    "status": "partially confirmed; superseded by R2 for stock-qcc parameter storage and ED_Write"
+  },
+  "bp020024r1_acceptance": {
+    "result_archive": "MiniQuake_BP-020-024R1_RESULTS_20260725-214138.zip",
+    "result_archive_sha256": "3936e942473029af1cdf2dad784919e45fc34c3ba8b91bdf06f2328f4e7468e1",
+    "status": "FAIL",
+    "acceptance_steps": "37/42 PASS",
+    "build": "PASS",
+    "core_milestones_protocol": "all PASS",
+    "bp020": "18/18 PASS",
+    "bp021": "16/16 PASS",
+    "bp022": "21/22",
+    "bp023": "22/22 PASS",
+    "bp024": "20/20 PASS",
+    "stock_progs": "FAIL: parameters exceed locals in SUB_AttackFinished",
+    "game_validation": "FAIL at progs.dat",
+    "headless_runtime": "FAIL at Host_Init",
+    "trace_a": "0/128; before_filter; exit 3"
+  },
+  "bp020024r2_hotfix": {
+    "delivery_revision": "BP-020-024R2",
+    "engine_package_id": "BP-024R2",
+    "parent_delivery": "BP-020-024R1",
+    "protocol_freeze_changed": false,
+    "quakec_contract_fingerprint": "0xbc89cbf1",
+    "production_changes": [
+      "normal parse uses loadable-program checks while validateProgram remains the explicit strict audit",
+      "parameter storage is checked against globals instead of the unrelated locals count",
+      "edict/global/save text uses typed serialization and checked stepwise quoted-pair appends"
+    ],
+    "test_changes": [
+      "BP-020 covers bytecode parameters with locals zero, out-of-range parameter destinations and builtin signatures",
+      "BP-022 covers exact ED_Write/ED_WriteGlobals/savegame text and void rejection before concatenation"
+    ],
+    "status": "implemented; R2 Windows accepted all production/runtime gates; BP-022 synthetic ED_Write fixture remained 21/22"
+  },
+  "bp020024r2_acceptance": {
+    "result_archive": "MiniQuake_BP-020-024R2_RESULTS_20260725-224602.zip",
+    "result_archive_sha256": "fec22c41880ff1d34a66f0e254281e5d72777db5a19f0feb60f077deeedae060",
+    "status": "FAIL; one independent synthetic BP-022 fixture failed, 51/52 groups passed",
+    "build": "PASS; 19/19 executables",
+    "base_and_protocol": "all PASS",
+    "bp020": "18/18 PASS",
+    "bp021": "16/16 PASS",
+    "bp022": "21/22",
+    "bp023": "22/22 PASS",
+    "bp024": "20/20 PASS",
+    "stock_progs": "PASS",
+    "game_validation": "PASS",
+    "headless_runtime": "300 frames PASS",
+    "trace_frames": 128,
+    "trace_sha256": "2efa7130b9dacabb1c463d35c903f1e8f8b3e24feeca27b649d1211a6fc62c17",
+    "trace_rolling_hash": "58a7d245",
+    "udp_loopback": "PASS",
+    "failure": "ED_Write: Cannot stringify void for string concatenation"
+  },
+  "bp020024r3_hotfix": {
+    "delivery_revision": "BP-020-024R3",
+    "engine_package_id": "BP-024R3",
+    "parent_delivery": "BP-020-024R2",
+    "protocol_freeze_changed": false,
+    "quakec_contract_fingerprint": "0xbc89cbf1",
+    "production_changes": [
+      "two-pass exact-size Quake-byte serialization for ED_Write and ED_WriteGlobals",
+      "shared direct/savegame definition serializer",
+      "single final quake_latin1_cstring_v1 decode after byte-document completion",
+      "original ED_WriteGlobals emission of eligible zero-valued DEF_SAVEGLOBAL entries"
+    ],
+    "test_changes": [
+      "type-safe ED_Write result diagnostics",
+      "exact extended-byte 0xe9 output checks",
+      "cumulative appendQuotedPair check",
+      "zero float, empty string and entity-zero saveglobal checks"
+    ],
+    "status": "Windows-accepted in BP-020-024R3; all QuakeC fixtures and full runtime gates PASS"
+  },
+  "bp020024r3_acceptance": {
+    "result_archive": "MiniQuake_BP-020-024R3_RESULTS_20260725-233340.zip",
+    "result_archive_sha256": "d9fa5aa62854a8c9b5175c2d8aa789e49516c530ded3294b5f7a5515467e820f",
+    "status": "PASS",
+    "build": "PASS",
+    "base_protocol_quakec": "all PASS",
+    "stock_progs": "PASS",
+    "game_validation": "PASS",
+    "headless_runtime": "300 frames PASS",
+    "trace_frames": 128,
+    "trace_sha256": "28fb377c9d694ed7ac14dac1d7110fa6fcb6cdcd2ffdf8a3c7cdbad3ffefe5cd",
+    "trace_rolling_hash": "58a7d245",
+    "udp_loopback": "PASS"
+  },
+  "bp025029": {
+    "delivery_revision": "BP-025-029",
+    "engine_package_id": "BP-029",
+    "parent": "BP-024R3",
+    "protocol_status": "protocol15_frozen_v1",
+    "quakec_status": "quakec_109_frozen_v1",
+    "world_physics_status": "world_physics_109_frozen_v1",
+    "world_physics_fingerprint": "0x2235d77c",
+    "runtime_fixtures": 125,
+    "steps": {
+      "BP-025": "world hull and trace",
+      "BP-026": "linking and collision filters",
+      "BP-027": "monster movement",
+      "BP-028": "server physics and client movement",
+      "BP-029": "server user and cumulative closure"
+    },
+    "production_integration": "server.runNonClientPhysicsWithRetouch delegates world and non-client edicts to physics.SV_Physics_NonClientEntity",
+    "status": "implemented; R2 reached full runtime/trace/UDP gates with 63/67 groups; R3 acceptance pending"
+  },
+  "bp025029_initial_windows_result": {
+    "result_archive": "MiniQuake_BP-025-029_RESULTS_20260726-010226.zip",
+    "result_archive_sha256": "40282cedd6a11449b85272e50bec3fba98f75eea0e73bd9c0b63e40db7710549",
+    "status": "FAIL during cumulative build before new runtime fixtures",
+    "static_verifier": "32/32 PASS",
+    "compiled_executables_before_failure": 21,
+    "failure_target": "MiniQuakeWorldTraceTests.exe",
+    "failure": "import alias bsp refers to multiple packages: miniquake.format.bsp and miniquake.world_bsp",
+    "runtime_gates": "not reached"
+  },
+  "bp025029r1_hotfix": {
+    "delivery_revision": "BP-025-029R1",
+    "engine_package_id": "BP-029",
+    "parent_delivery": "BP-025-029",
+    "scope": "test-and-delivery-only",
+    "production_source_changed": false,
+    "changes": [
+      "world_bsp test alias bsp renamed to bspworld",
+      "server_move closure-test alias movement renamed to serverMovement",
+      "transitive explicit import-alias closure verifier added for all MiniLang entry points",
+      "R1-specific acceptance and result-collection scripts added"
+    ],
+    "world_physics_fingerprint": "0x2235d77c",
+    "status": "Windows preflight PASS; 27/28 targets compiled; final closure target exposed nonexistent world_hull.pointContents fixture call"
+  },
+  "bp025029r1_windows_result": {
+    "result_archive": "MiniQuake_BP-025-029R1_RESULTS_20260726-015350.zip",
+    "result_archive_sha256": "08f1dfb4ee1cd0e703b94177f02334a1a0a3f68cf152e6e8412b0b6ea02dd9af",
+    "status": "FAIL during final cumulative compile target",
+    "static_verifier": "34/34 PASS",
+    "compiled_executables": "27/28",
+    "failure_target": "MiniQuakeWorldPhysicsClosureTests.exe",
+    "failure": "tests/world_physics_closure_tests.ml called nonexistent miniquake.world_hull.pointContents",
+    "runtime_gates": "not reached"
+  },
+  "bp025029r2_hotfix": {
+    "delivery_revision": "BP-025-029R2",
+    "engine_package_id": "BP-029",
+    "parent_delivery": "BP-025-029R1",
+    "scope": "test-and-delivery-only",
+    "production_source_changed": false,
+    "changes": [
+      "closure test uses world_hull.pointContentsFromNode(box, 0, point)",
+      "box-hull closure statements expanded into independent lines",
+      "exported world_hull member contract added to tools/verify.py",
+      "R2-specific acceptance and collection metadata added"
+    ],
+    "world_physics_fingerprint": "0x2235d77c",
+    "status": "R2 Windows built and completed runtime/trace/UDP gates; four independent runtime groups exposed R3 corrections"
+  },
+  "bp025029r2_windows_result": {
+    "delivery_revision": "BP-025-029R2",
+    "status": "FAIL; 63/67 independent groups passed",
+    "result_archive": "MiniQuake_BP-025-029R2_RESULTS_20260726-101120.zip",
+    "result_archive_sha256": "b036b509ec770e20407eda763978f32cdda5009d5651369c2916ebe76e9365dc",
+    "build": "PASS; all targets compiled",
+    "historical_protocol_quakec": "PASS",
+    "installed_game_validation": "PASS",
+    "headless_runtime": "300 frames PASS",
+    "trace_frames": 128,
+    "trace_sha256": "24830a3e183784de44a9c7261a42cc8e5aebf8fd1c8fdbafc32ea447ee0eba9f",
+    "trace_rolling_hash": "4d8fc98d",
+    "trace_byte_identity": "PASS",
+    "udp_loopback": "PASS",
+    "failures": [
+      "BP-025 translated brush fixture used reversed hull0 drawing-node children",
+      "BP-028 MSG_ReadAngle signed-byte fixture expected +180 instead of -180",
+      "BP-029 allowed command adapter used handler convenience return as acceptance result",
+      "BP-029 ping fixture skipped the protocol Binary32 decode boundary",
+      "BP-029 closure fixture accessed nonexistent Hull.nodes"
+    ]
+  },
+  "bp025029r3_hotfix": {
+    "delivery_revision": "BP-025-029R3",
+    "engine_package_id": "BP-029",
+    "parent_delivery": "BP-025-029R2",
+    "scope": "one production adapter correction plus fixture/oracle parity repairs",
+    "production_source_changed": true,
+    "production_changes": [
+      "svuExecuteString treats a successfully dispatched whitelisted command as accepted, matching void Cmd_ExecuteString semantics"
+    ],
+    "test_oracle_changes": [
+      "translated brush fixture child order corrected for hull0 drawing nodes",
+      "MSG_ReadAngle byte 0x80 expectation corrected to -180 degrees",
+      "ping expectation passes through protocol Binary32 decode before double subtraction and float storage",
+      "box-hull closure validates algorithmic node 5/6 boundary instead of nonexistent Hull.nodes"
+    ],
+    "world_physics_fingerprint": "0x2235d77c",
+    "runtime_fixture_counts": 125,
+    "status": "implemented; awaiting Windows acceptance"
+  },
+  "bp025029r3_acceptance": {
+    "result_archive": "MiniQuake_BP-025-029R3_RESULTS_20260726-115205.zip",
+    "result_archive_sha256": "518b080fe6dbb69d10c5395a7d96ad0c9cbab585b0054a6e810ca762da88c556",
+    "status": "PASS",
+    "headless_runtime": "300 frames PASS",
+    "trace_frames": "128/128 twice, byte-identical",
+    "trace_sha256": "24830a3e183784de44a9c7261a42cc8e5aebf8fd1c8fdbafc32ea447ee0eba9f",
+    "trace_rolling_hash": "4d8fc98d",
+    "udp_loopback": "PASS",
+    "world_physics_status": "world_physics_109_frozen_v1"
+  },
+  "bp030_host_timing": {
+    "fixtures": 18,
+    "status": "implemented; Windows acceptance pending",
+    "original": [
+      "host.c",
+      "quakedef.h"
+    ]
+  },
+  "bp031_command_cvar": {
+    "fixtures": 20,
+    "status": "implemented; Windows acceptance pending",
+    "original": [
+      "cmd.c",
+      "cvar.c"
+    ]
+  },
+  "bp032_demo_lifecycle": {
+    "fixtures": 20,
+    "status": "implemented; Windows acceptance pending",
+    "original": [
+      "cl_demo.c"
+    ]
+  },
+  "bp033_savegame_v5": {
+    "fixtures": 24,
+    "status": "implemented; Windows acceptance pending",
+    "original": [
+      "host_cmd.c",
+      "pr_edict.c"
+    ],
+    "version": 5
+  },
+  "bp034_host_lifecycle_closure": {
+    "fixtures": 24,
+    "status": "implemented; Windows acceptance pending",
+    "contract_status": "host_lifecycle_109_frozen_v1",
+    "contract_fingerprint": "0x8cbb709f"
+  },
+  "bp030034_initial_acceptance": {
+    "result_archive": "MiniQuake_BP-030-034_RESULTS_20260726-134405.zip",
+    "result_archive_sha256": "1bf865b23206b74dc6ad0f3785bf7171cd9ffac3193bd86d3af6b674f4e1d4c9",
+    "status": "FAIL; only BP-030 host timing fixture 3/18 failed",
+    "build": "PASS",
+    "bp031_bp034": "PASS",
+    "installed_game_validation": "PASS",
+    "headless_runtime": "300 frames PASS",
+    "trace_sha256": "31647a08ecb3204cd58b71b4fc6f441f5ed814d6c27aa6813ac3e566bf1c4769",
+    "trace_rolling_hash": "0658dd48",
+    "trace_byte_identity": "PASS",
+    "udp_loopback": "PASS",
+    "root_cause": "fixture incorrectly expected 0.007+0.007 to remain below 1/72"
+  },
+  "bp030034r1_delivery": {
+    "delivery_revision": "BP-030-034R1",
+    "parent": "BP-030-034",
+    "production_source_changed": false,
+    "runtime_fixture_counts_changed": false,
+    "status": "awaiting Windows acceptance"
+  },
+  "bp030034r1_acceptance": {
+    "result_archive": "MiniQuake_BP-030-034R1_RESULTS_20260726-142334.zip",
+    "result_archive_sha256": "04e4653b8d1533d345ae24bfed8fdbbc8468e9800a91d25ef6c5b4a0a189b362",
+    "status": "PASS",
+    "headless_runtime": "300 frames PASS",
+    "trace_frames": 128,
+    "trace_sha256": "31647a08ecb3204cd58b71b4fc6f441f5ed814d6c27aa6813ac3e566bf1c4769",
+    "trace_rolling_hash": "0658dd48",
+    "trace_byte_identity": "PASS",
+    "udp_loopback": "PASS"
+  },
+  "bp035_client_state_render": {
+    "runtime_fixtures": 20,
+    "status": "implemented; BP-035-039R1 Windows acceptance pending"
+  },
+  "bp036_view_chase": {
+    "runtime_fixtures": 22,
+    "status": "implemented; BP-035-039R1 Windows acceptance pending"
+  },
+  "bp037_temp_beam_render": {
+    "runtime_fixtures": 22,
+    "status": "implemented; BP-035-039R1 Windows acceptance pending"
+  },
+  "bp038_particle_runtime": {
+    "runtime_fixtures": 22,
+    "status": "implemented; BP-035-039R1 Windows acceptance pending"
+  },
+  "bp039_client_render_closure": {
+    "runtime_fixtures": 24,
+    "status": "client_render_109_frozen_v1; accepted on Windows",
+    "fingerprint": "0x95e2b295"
+  },
+  "bp035039_initial_acceptance": {
+    "result_archive": "MiniQuake_BP-035-039_RESULTS_20260726-190144.zip",
+    "result_archive_sha256": "96a612797e6e59a09642600d91fd6ab4bce0bf2aa236aeb510169767809a4919",
+    "status": "FAIL; only BP-035 rotate fixture 18/20 failed",
+    "build": "PASS",
+    "bp036_bp039": "PASS",
+    "installed_game_validation": "PASS",
+    "headless_runtime": "300 frames PASS",
+    "trace_sha256": "e4c5334bf6aa4205b3a8d6c0c408a398a16bf042852703ea0bf29ba31c1919a1",
+    "trace_rolling_hash": "0658dd48",
+    "trace_byte_identity": "PASS",
+    "udp_loopback": "PASS",
+    "root_cause": "fixture ignored CL_LerpPoint no-lerp time snap before bobjrotate calculation"
+  },
+  "bp035039r1_delivery": {
+    "delivery_revision": "BP-035-039R1",
+    "parent": "BP-035-039",
+    "production_source_changed": false,
+    "runtime_fixture_counts_changed": false,
+    "status": "PASS; accepted on Windows"
+  },
+  "bp035039r1_acceptance": {
+    "result_archive": "MiniQuake_BP-035-039R1_RESULTS_20260726-213106.zip",
+    "result_archive_sha256": "2bdab8329975fbd2108c4cf644c70178769c0b713aceec2cfbc8d9a2a2bf613b",
+    "status": "PASS",
+    "headless_runtime": "300 frames PASS",
+    "trace_frames": 128,
+    "trace_sha256": "e4c5334bf6aa4205b3a8d6c0c408a398a16bf042852703ea0bf29ba31c1919a1",
+    "trace_rolling_hash": "0658dd48",
+    "trace_byte_identity": "PASS",
+    "udp_loopback": "PASS",
+    "client_render_status": "client_render_109_frozen_v1"
+  },
+  "bp040_world_surfaces": {
+    "runtime_fixtures": 20,
+    "status": "implemented; R2 Windows acceptance pending",
+    "original": [
+      "gl_rsurf.c",
+      "gl_rmain.c"
+    ]
+  },
+  "bp041_lightmap_atlas": {
+    "runtime_fixtures": 22,
+    "status": "implemented; R2 Windows acceptance pending",
+    "original": [
+      "gl_rsurf.c",
+      "gl_rmisc.c"
+    ]
+  },
+  "bp042_dynamic_lights": {
+    "runtime_fixtures": 20,
+    "status": "implemented; R2 Windows acceptance pending",
+    "original": [
+      "gl_rlight.c",
+      "gl_rmain.c",
+      "gl_rsurf.c"
+    ]
+  },
+  "bp043_sky_water": {
+    "runtime_fixtures": 22,
+    "status": "implemented; R2 Windows acceptance pending",
+    "original": [
+      "gl_warp.c",
+      "gl_warp_sin.h"
+    ]
+  },
+  "bp044_world_render_closure": {
+    "runtime_fixtures": 24,
+    "status": "implemented; R2 Windows acceptance pending",
+    "contract_status": "world_render_109_frozen_v1",
+    "contract_fingerprint": "0x846a74de",
+    "stage_order": [
+      "world",
+      "entities",
+      "dlights",
+      "particles",
+      "viewmodel",
+      "water",
+      "polyblend"
+    ]
+  },
+  "bp040044_initial_result": {
+    "result_archive": "MiniQuake_BP-040-044_RESULTS_20260727-071848.zip",
+    "result_archive_sha256": "4c847c6249f51bf68b1763cf83b27e6316ebc5963e29b8a5f368bc49e5eb3d89",
+    "status": "FAIL; game compile blocker before runtime",
+    "static_verification": "38/38 PASS",
+    "compiler_diagnostic": "Undefined global variable 'rCompatRenderer.lightmaps'",
+    "runtime_reached": false
+  },
+  "bp040044r1_hotfix": {
+    "delivery_revision": "BP-040-044R1",
+    "delivery_parent": "BP-040-044",
+    "production_source_changed": true,
+    "native_source_changed": false,
+    "runtime_fixture_counts_changed": false,
+    "world_render_fingerprint": "0x846a74de",
+    "status": "FAIL; game compiled, BP-041 test entry hit symbol-shadow arity collision"
+  },
+  "bp040044r1_result": {
+    "result_archive": "MiniQuake_BP-040-044R1_RESULTS_20260727-080437.zip",
+    "result_archive_sha256": "73ea957dacb8f106ccbc3c7b176b8167a882d95109ff98f3604703be7fe53754",
+    "status": "FAIL; test-entry compile blocker before runtime",
+    "static_verification": "39/39 PASS",
+    "compiled_targets": "39/43",
+    "game_compile": "PASS",
+    "compiler_diagnostic": "Function standard expects 0 args, got 2",
+    "failure_entry": "tests/lightmap_atlas_tests.ml",
+    "failure_location": "src/miniquake/filesystem.ml:70",
+    "runtime_reached": false
+  },
+  "bp040044r2_hotfix": {
+    "delivery_revision": "BP-040-044R2",
+    "delivery_parent": "BP-040-044R1",
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "runtime_fixture_counts_changed": false,
+    "renamed_helpers": [
+      "standard -> standardFixture",
+      "bits -> fixtureFloatBits"
+    ],
+    "entry_shadow_arity_guard": true,
+    "world_render_fingerprint": "0x846a74de",
+    "status": "awaiting Windows acceptance"
+  },
+  "bp040044r2_result": {
+    "delivery_revision": "BP-040-044R2",
+    "result_archive_sha256": "2678896b8071fe20d5f7a97fa86eb5cb5ad395a536be62ae464c697fc2f6d831",
+    "compiled_executables": "43/43",
+    "reported_script_steps": "84/84 PASS",
+    "suppressed_runtime_failure_groups": 5,
+    "real_game_runtime_reached": false,
+    "failure": "Quake base directory did not exist"
+  },
+  "bp040044r3_hotfix": {
+    "delivery_revision": "BP-040-044R3",
+    "delivery_parent": "BP-040-044R2",
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "runtime_fixture_counts_changed": false,
+    "corrected_fixture_groups": [
+      "BP-013 events",
+      "BP-014R1 runtime events",
+      "BP-015 signon",
+      "BP-018 demo",
+      "BP-043 sky/water"
+    ],
+    "runtime_failure_marker_guard": true,
+    "runtime_log_checker": "tools/check_runtime_test_log.py",
+    "world_render_fingerprint": "0x846a74de",
+    "status": "awaiting Windows acceptance with an existing Quake base directory"
+  },
+  "bp040044r3_acceptance": {
+    "result_archive": "MiniQuake_BP-040-044R3_RESULTS_20260727-181619.zip",
+    "result_archive_sha256": "ddb2345e4730c50a7072cd217bce8095e2e09dc64e96dd63c9116bc2a9da4534",
+    "status": "PASS",
+    "build": "PASS",
+    "all_independent_groups": "PASS",
+    "real_game_validation": "id1/start PASS",
+    "headless_runtime": "300 frames PASS",
+    "trace_frames": 128,
+    "trace_sha256": "a3c1c0019267d0c6b651c931b1044642b9ef0199cdf64156cef9e8e409a6ecfa",
+    "trace_rolling_hash": "0658dd48",
+    "trace_byte_identity": "PASS",
+    "udp_loopback": "PASS",
+    "world_render_status": "world_render_109_frozen_v1",
+    "world_render_fingerprint": "0x846a74de"
+  },
+  "bp045049_candidate": {
+    "status": "implemented; R2 runtime/trace PASS, exact render evidence failed; R3 input isolation pending Windows acceptance",
+    "fixtures": 110,
+    "steps": {
+      "BP-045": 22,
+      "BP-046": 22,
+      "BP-047": 24,
+      "BP-048": 18,
+      "BP-049": 24
+    },
+    "model_ui_render_status": "model_ui_render_109_frozen_v1",
+    "model_ui_render_fingerprint": "0x0a62f5b1",
+    "render_evidence": {
+      "capture_stage": "after_ui_before_swap",
+      "dimensions": "640x480",
+      "independent_processes": 2,
+      "current_gate": "exact MiniQuake-to-MiniQuake identity",
+      "future_original_glquake_ssim_floor": 0.95,
+      "original_reference_corpus_bundled": false
+    }
+  },
+  "bp045049r1_hotfix": {
+    "classification": "collector-only hotfix",
+    "result_archive_sha256": "0461fa3e618a3aa53824806a7225b58c63235ca3d3e537ee744f629840e4e6e5",
+    "serverdata_collector_markers_restored": 3,
+    "production_source_changed": false,
+    "model_ui_render_fingerprint": "0x0a62f5b1"
+  },
+  "bp045049r2_hotfix": {
+    "delivery_revision": "BP-045-049R2",
+    "delivery_parent": "BP-045-049R1",
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "summary_fixture": "bytes(text) prefix/suffix validation",
+    "requires_quake_base_for_acceptance": true,
+    "model_ui_render_fingerprint": "0x0a62f5b1",
+    "status": "awaiting Windows acceptance"
+  },
+  "bp045049r1_result": {
+    "result_archive": "MiniQuake_BP-045-049R1_RESULTS_20260727-221019.zip",
+    "result_archive_sha256": "2aef7b2b8eacd19f8c17c4883ade88644dc61a2a1232fb8b60bcd8720e9393a5",
+    "status": "FAIL; BP-048 summary fixture 17/18",
+    "steps": "96 PASS, 1 FAIL, 11 SKIPPED",
+    "quake_base_supplied": false,
+    "failure_marker": "FAIL: summary JSON: expected true"
+  },
+  "bp045049r2_result": {
+    "delivery_revision": "BP-045-049R2",
+    "result_archive": "MiniQuake_BP-045-049R2_RESULTS_20260727-231227.zip",
+    "result_archive_sha256": "e1feebede5c28fed87dc673c8d3b05363da230fe18afdb174fcb212861b8ad27",
+    "steps": "110 PASS, 1 FAIL",
+    "trace_sha256": "b2589f2712b0aed42f31b1a35ebb4837c211391ba3e8d8888c422242d051af28",
+    "trace_byte_identity": "PASS",
+    "render_exact": false,
+    "render_ssim": 0.7532948781615113,
+    "failure": "visible evidence sessions inherited live desktop input"
+  },
+  "bp045049r3_hotfix": {
+    "delivery_revision": "BP-045-049R3",
+    "parent_delivery": "BP-045-049R2",
+    "changes": [
+      "-noinput/-nomouse/-nojoy/-nolan evidence launch",
+      "per-frame live-input suppression",
+      "known input-state reset before capture"
+    ],
+    "production_source_changed": true,
+    "native_source_changed": false,
+    "engine_contracts_changed": false,
+    "status": "implemented; Windows acceptance pending"
+  },
+  "bp045049r3_acceptance": {
+    "delivery_revision": "BP-045-049R3",
+    "status": "PASS",
+    "result_archive": "MiniQuake_BP-045-049R3_RESULTS_20260728-000010.zip",
+    "result_archive_sha256": "65bb521faf300fed61b7d03e15429896a31de27d934ee59459e251fac08bd2bf",
+    "headless_frames": 300,
+    "trace_frames": 128,
+    "trace_sha256": "b2589f2712b0aed42f31b1a35ebb4837c211391ba3e8d8888c422242d051af28",
+    "trace_rolling_hash": "d905b042",
+    "trace_byte_identity": "PASS",
+    "render_tga_sha256": "1325e6fd365c1e62fbf36c4fadcbe9110faa94778c4c14b43fa9efe56d35e154",
+    "render_pixel_hash": "55f9fc9c",
+    "render_sample_hash": "3ec42fe3",
+    "render_ssim": 1.0,
+    "render_identity": "PASS",
+    "udp_loopback": "PASS"
+  },
+  "bp050_mirror_evidence": {
+    "fixtures": 22,
+    "mirror_texture_prefix": "window02_1",
+    "depth_split": 0.5
+  },
+  "bp051_render_clear_evidence": {
+    "fixtures": 20,
+    "ztrick_odd_depth_max": 0.49999
+  },
+  "bp052_envmap_timerefresh_evidence": {
+    "fixtures": 20,
+    "envmap_size": 256,
+    "envmap_faces": 6,
+    "timerefresh_steps": 128
+  },
+  "bp053_render_corpus_evidence": {
+    "fixtures": 18,
+    "scenarios": [
+      "start-064",
+      "start-128",
+      "e1m1-128"
+    ],
+    "exact_pair_required": true,
+    "external_original_ssim_floor": 0.95
+  },
+  "bp054_render_special_closure": {
+    "status": "render_special_109_frozen_v1",
+    "fingerprint": "0x2a3d8081",
+    "fixtures": 24,
+    "block_fixtures": 104,
+    "windows_acceptance": "pending"
+  },
+  "bp050054_acceptance": {
+    "result_archive": "MiniQuake_BP-050-054_RESULTS_20260728-083416.zip",
+    "result_archive_sha256": "4e2afe7a4266486fd3b60c6ed5d5e5c4995c34fa96234979b3dd11c2733d61e9",
+    "status": "PARTIAL PASS; one BP-054 fixture adapter failure",
+    "build": "PASS",
+    "new_groups": {
+      "BP-050": "22/22 PASS",
+      "BP-051": "20/20 PASS",
+      "BP-052": "20/20 PASS",
+      "BP-053": "18/18 PASS",
+      "BP-054": "23/24"
+    },
+    "real_game_validation": "PASS",
+    "headless_runtime": "300 frames PASS",
+    "trace": "128 frames x2 byte-identical; sha256=bbfb59d8d0225a9a0401f3beb59a0422a57f898aebc35f239440e8cece742ad0; rolling=d905b042",
+    "render_evidence": "single exact pair and three exact corpus pairs; SSIM 1.0",
+    "udp_loopback": "PASS",
+    "classification": "test-adapter defect only"
+  },
+  "bp050054r1_hotfix": {
+    "delivery_revision": "BP-050-054R1",
+    "parent_delivery": "BP-050-054",
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "engine_contracts_changed": false,
+    "correction": "BP-054 cvar fixture now passes common.create([]) CommandLine to host.createCvars",
+    "windows_acceptance": "pending"
+  },
+  "bp050054r1_acceptance": {
+    "delivery_revision": "BP-050-054R1",
+    "status": "PASS",
+    "result_archive": "MiniQuake_BP-050-054R1_RESULTS_20260728-102942.zip",
+    "result_archive_sha256": "7e42fa8be8beb31f23f948e567ff9e2fcbb9a62e9bcd2066ea70af9651795624",
+    "steps": "131/131 required gates PASS; one external Original GLQuake corpus gate optional",
+    "headless_frames": 300,
+    "trace_frames": 128,
+    "trace_sha256": "bbfb59d8d0225a9a0401f3beb59a0422a57f898aebc35f239440e8cece742ad0",
+    "trace_rolling_hash": "d905b042",
+    "trace_byte_identity": "PASS",
+    "render_tga_sha256": "9047f96e9bef8e06035119ff71ddfe7ad4dcad89b4740c66618252a13cd166fb",
+    "render_pixel_hash": "c7a836b5",
+    "render_sample_hash": "beaf7844",
+    "render_ssim": 1.0,
+    "render_corpus": {
+      "start-064": "c3793f6b54564a8c1783d8cf86592f5b77ba97ac1e02fbbfa79692f071fc9b9a",
+      "start-128": "9047f96e9bef8e06035119ff71ddfe7ad4dcad89b4740c66618252a13cd166fb",
+      "e1m1-128": "c5dc943f739a46215f138ffe2d64cfa630154f676d1d73d370ad5093dccb7d9e"
+    },
+    "udp_loopback": "PASS",
+    "render_special_status": "render_special_109_frozen_v1",
+    "render_special_fingerprint": "0x2a3d8081"
+  },
+  "bp055_audio_memory_evidence": {
+    "fixtures": 20,
+    "source": "snd_mem.c",
+    "binary32_resampling": true,
+    "retail_sounds": 2
+  },
+  "bp056_audio_dma_evidence": {
+    "fixtures": 22,
+    "source": "snd_dma.c",
+    "max_sfx": 512,
+    "max_channels": 128,
+    "exact_channel_replacement": true
+  },
+  "bp057_audio_mixer_evidence": {
+    "fixtures": 22,
+    "source": "snd_mix.c",
+    "paintbuffer_frames": 512,
+    "signed_i32_accumulator": true
+  },
+  "bp058_audio_win_evidence": {
+    "fixtures": 20,
+    "source": "snd_win.c",
+    "wav_buffers": 64,
+    "wav_buffer_size": 1024,
+    "secondary_buffer_size": 65536
+  },
+  "bp059_audio_closure": {
+    "status": "audio_109_frozen_v1",
+    "fingerprint": "0xdcf7a002",
+    "fixtures": 24,
+    "block_fixtures": 108,
+    "retail_evidence_sounds": [
+      "misc/menu1.wav",
+      "ambience/water1.wav"
+    ],
+    "windows_acceptance": "pending BP-055-059R2"
+  },
+  "bp055059r1_hotfix": {
+    "delivery_revision": "BP-055-059R1",
+    "parent_delivery": "BP-055-059",
+    "predecessor_result_sha256": "889f140434415275b149f68a484993d4bf1ca4aa1fe4083ffcc264032163916a",
+    "classification": "pre-build verifier lineage defect",
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "engine_contracts_changed": false,
+    "fixture_count_changed": false,
+    "status": "Windows acceptance pending"
+  },
+  "bp055059r1_result": {
+    "delivery_revision": "BP-055-059R1",
+    "result_archive": "MiniQuake_BP-055-059R1_RESULTS_20260728-140756.zip",
+    "result_archive_sha256": "b7849b4a333f77633eb5caf578fda683c40eff3b9384ebe6d0265a981d91df45",
+    "status": "FAIL; 117/121 steps PASS",
+    "build": "PASS",
+    "installed_game_validation": "PASS",
+    "headless_runtime": "300 frames PASS",
+    "failures": [
+      "BP-055 fmt offset fixture",
+      "BP-056 channel-zero fixture",
+      "BP-056 precache no-op fixture",
+      "BP-059 CD info text",
+      "BP-059 retail evidence SoundCache.channels"
+    ],
+    "trace_render_udp": "not reached after retail evidence A failure"
+  },
+  "bp055059r2_hotfix": {
+    "delivery_revision": "BP-055-059R2",
+    "parent_delivery": "BP-055-059R1",
+    "predecessor_result_sha256": "b7849b4a333f77633eb5caf578fda683c40eff3b9384ebe6d0265a981d91df45",
+    "production_source_changed": true,
+    "native_source_changed": false,
+    "engine_contracts_changed": false,
+    "fixture_count_changed": false,
+    "corrections": [
+      "FindChunk fixture establishes iffData=12 after RIFF/WAVE",
+      "channel zero uses lifetime selection and never same-entity override",
+      "S_ClearPrecache remains no-op",
+      "CD info uses six-decimal %f-equivalent formatting",
+      "retail evidence derives channels as stereo + 1"
+    ],
+    "status": "implemented; Windows acceptance pending"
+  },
+  "bp055059r2_acceptance": {
+    "result_archive": "MiniQuake_BP-055-059R2_RESULTS_20260728-155430.zip",
+    "result_archive_sha256": "7634070813d28b57ffdd0c18064e493187c4a0fc47259e55450aa7a75d3b32fd",
+    "status": "PASS",
+    "required_steps": "143/143 PASS",
+    "optional_original_render_corpus": "SKIPPED",
+    "trace_sha256": "f8aef48166ea9ffc3bfd864802238feec1b1e8a01dad27f3e55e3b47b20d99c1",
+    "trace_rolling_hash": "d905b042",
+    "audio_evidence_sha256": "9988060eb6c3bb7692338b97325d50c97c233473298194a39196795ec88d4337",
+    "udp_loopback": "PASS"
+  },
+  "delivery_hotfix": {
+    "revision": "BP-070-074R3",
+    "parent": "BP-070-074R2",
+    "classification": "test fixture: explicit post-registration shareware state",
+    "engine_source_changed": false,
+    "native_changed": false,
+    "test_changed": true,
+    "engine_contracts_changed": false
+  },
+  "bp060064_initial_result": {
+    "result_archive": "MiniQuake_BP-060-064_RESULTS_20260728-184449.zip",
+    "result_archive_sha256": "bde52d9bcb2e7052c3dcac5ee62dbe49dd3acd6887cbeabfc54c1f8b4916c719",
+    "status": "PARTIAL PASS",
+    "compiled_targets": "65/65",
+    "inherited_groups": "PASS through BP-059",
+    "bp060": "20/20 PASS",
+    "bp061": "19 fixtures passed; fixture 20 crashed before assertion",
+    "first_failure": "Cannot index void at network_control_parity_tests.ml:63",
+    "later_gates": "not reached"
+  },
+  "bp060064r1_hotfix": {
+    "delivery_revision": "BP-060-064R1",
+    "parent_delivery": "BP-060-064",
+    "scope": "unbuffered live build/test output",
+    "windows_execution": "not run separately",
+    "production_source_changed": false
+  },
+  "bp060064r2_hotfix": {
+    "delivery_revision": "BP-060-064R2",
+    "delivery_parent": "BP-060-064R1",
+    "live_output": true,
+    "production_source_changed": true,
+    "native_source_changed": false,
+    "rule_enumeration": {
+      "end_of_list": "empty name/value pair -> command-only reply",
+      "unknown_previous": "no reply"
+    },
+    "contract_status": "network_platform_109_frozen_v1",
+    "contract_fingerprint": "0xb3ec7589",
+    "windows_acceptance": "pending"
+  },
+  "bp060064r2_result": {
+    "delivery_revision": "BP-060-064R2",
+    "result_archive": "MiniQuake_BP-060-064R2_RESULTS_20260728-215240.zip",
+    "result_archive_sha256": "4c784f8afbd02624552c18339a1f8ab48c052c38dced9057ca044a12c8be4fef",
+    "status": "FAIL only at trace B frame 26",
+    "build": "65/65 PASS",
+    "all_unit_and_component_groups": "PASS",
+    "installed_game_validation": "PASS",
+    "headless_runtime": "300 frames PASS",
+    "retail_audio_evidence": "byte-identical",
+    "trace_a": "128/128 PASS",
+    "trace_a_sha256": "03656a0e9f3b13d4430014de3787053c204acdd1e7f2e33c292ee8ee2b47c8cc",
+    "trace_a_rolling_hash": "d905b042",
+    "trace_b": "26/128 FAIL at trace_canonical",
+    "trace_b_sha256": "a09230346fe487f787533300ade45ecc731680a60cccffd8cefcd582f9a1f3d5",
+    "trace_b_rolling_hash": "69e05234",
+    "first_error": "Cannot access member 'x' on non-struct value"
+  },
+  "bp060064r3_hotfix": {
+    "delivery_revision": "BP-060-064R3",
+    "parent_delivery": "BP-060-064R2",
+    "predecessor_result_sha256": "4c784f8afbd02624552c18339a1f8ab48c052c38dced9057ca044a12c8be4fef",
+    "root_cause": "strongly supported nested heap-constructor GC-rooting edge during per-frame QuakeEdict reconstruction",
+    "exact_offending_entity_captured": false,
+    "production_source_changed": true,
+    "native_source_changed": false,
+    "engine_contracts_changed": false,
+    "runtime_fixture_count_changed": false,
+    "diagnostics_fixture_count": "10 unchanged",
+    "contract_status": "network_platform_109_frozen_v1",
+    "contract_fingerprint": "0xb3ec7589",
+    "windows_acceptance": "pending"
+  },
+  "bp060064r3_result": {
+    "delivery_revision": "BP-060-064R3",
+    "result_archive": "MiniQuake_BP-060-064R3_RESULTS_20260729-082542.zip",
+    "result_archive_sha256": "a382fdf0ed5faeefbc636e5623bfaa819829b3da0a78e1f038002e96ef2d7033",
+    "status": "FAIL at BP-001R3 diagnostics 5/10",
+    "compiled_targets": "65/65",
+    "core_tests": "PASS",
+    "milestone_tests": "PASS",
+    "first_failure": "valid miniquake.types.Vec3 rejected by short-name-only guard",
+    "later_gates": "not reached"
+  },
+  "bp060064r4_hotfix": {
+    "delivery_revision": "BP-060-064R4",
+    "parent_delivery": "BP-060-064R3",
+    "predecessor_result_sha256": "a382fdf0ed5faeefbc636e5623bfaa819829b3da0a78e1f038002e96ef2d7033",
+    "root_cause": "package-qualified typeName output was not accepted by R3 Vec3 guards",
+    "production_source_changed": true,
+    "native_source_changed": false,
+    "engine_contracts_changed": false,
+    "runtime_fixture_count_changed": false,
+    "diagnostics_fixture_count": "10 unchanged",
+    "contract_status": "network_platform_109_frozen_v1",
+    "contract_fingerprint": "0xb3ec7589",
+    "windows_acceptance": "pending"
+  },
+  "bp060064r4_result": {
+    "delivery_revision": "BP-060-064R4",
+    "result_archive": "MiniQuake_BP-060-064R4_RESULTS_20260729-094748.zip",
+    "result_archive_sha256": "b3cd0e6fc922d25352da8911b8c5d5a006c7896e5db93cc14b14926d84dd95af",
+    "status": "FAIL only at render comparator CLI",
+    "compiled_targets": "65/65 PASS",
+    "all_unit_and_component_groups": "PASS",
+    "installed_game_validation": "PASS",
+    "headless_runtime": "300 frames PASS",
+    "retail_audio_evidence": "byte-identical",
+    "retail_audio_evidence_sha256": "896049a03f26b1db4ddc1550d35d1cacb5f7e0f0c900b0ee36393c8ab8bd0501",
+    "trace_a": "128/128 PASS",
+    "trace_b": "128/128 PASS",
+    "trace_sha256": "03656a0e9f3b13d4430014de3787053c204acdd1e7f2e33c292ee8ee2b47c8cc",
+    "trace_rolling_hash": "d905b042",
+    "render_a": "PASS",
+    "render_b": "PASS",
+    "render_tga_sha256": "9047f96e9bef8e06035119ff71ddfe7ad4dcad89b4740c66618252a13cd166fb",
+    "corrected_local_ssim": 1.0,
+    "first_error": "compare_render_evidence.py rejected --json-output",
+    "later_gates": "network evidence and UDP not reached"
+  },
+  "bp060064r5_hotfix": {
+    "delivery_revision": "BP-060-064R5",
+    "parent_delivery": "BP-060-064R4",
+    "predecessor_result_sha256": "b3cd0e6fc922d25352da8911b8c5d5a006c7896e5db93cc14b14926d84dd95af",
+    "root_cause": "CLI option mismatch --json-output versus --json-out",
+    "comparator_aliases": [
+      "--json-out",
+      "--json-output"
+    ],
+    "runner_option": "--json-out",
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "test_tool_changed": true,
+    "engine_contracts_changed": false,
+    "runtime_fixture_count_changed": false,
+    "contract_status": "network_platform_109_frozen_v1",
+    "contract_fingerprint": "0xb3ec7589",
+    "windows_acceptance": "pending"
+  },
+  "bp060064r5_result": {
+    "delivery_revision": "BP-060-064R5",
+    "result_archive": "MiniQuake_BP-060-064R5_RESULTS_20260729-103523.zip",
+    "result_archive_sha256": "24dc4cdf88b654944f78b2aefaab7437609e1614b3c2eccb54f16b93218c1fcb",
+    "status": "FAIL only in wrapper after first server/client evidence pair both reported PASS",
+    "compiled_targets": "65/65 PASS",
+    "all_runtime_groups": "PASS",
+    "game_validation": "PASS",
+    "headless_runtime": "300 frames PASS",
+    "trace_sha256": "03656a0e9f3b13d4430014de3787053c204acdd1e7f2e33c292ee8ee2b47c8cc",
+    "render_tga_sha256": "9047f96e9bef8e06035119ff71ddfe7ad4dcad89b4740c66618252a13cd166fb",
+    "server_stdout_sha256": "ce65b367cf2296d913e3691916d5c27926c040c7456e6bd39dd0ac8a53af3874",
+    "client_report_sha256": "50534266c750fa20058c82ce48baca953b0107106dc24fd69c5854fc3364ba96",
+    "first_failure": "network evidence pair a failed: server= client=0"
+  },
+  "bp060064r6_hotfix": {
+    "delivery_revision": "BP-060-064R6",
+    "parent_delivery": "BP-060-064R5",
+    "predecessor_result_sha256": "24dc4cdf88b654944f78b2aefaab7437609e1614b3c2eccb54f16b93218c1fcb",
+    "process_api": "System.Diagnostics.Process",
+    "async_stream_drain": true,
+    "typed_exit_code_after_refresh": true,
+    "pair_json_reports": true,
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "engine_contracts_changed": false,
+    "contract_status": "network_platform_109_frozen_v1",
+    "contract_fingerprint": "0xb3ec7589",
+    "windows_acceptance": "pending"
+  },
+  "bp060064r6_acceptance": {
+    "result_archive": "MiniQuake_BP-060-064R6_RESULTS_20260729-134030.zip",
+    "result_archive_sha256": "5f9812a0527ea426889b4ae0d08e6e40bb2b715e32e232ebe215dd3ab99674a1",
+    "status": "PASS",
+    "required_steps": "16/16 PASS",
+    "compiled_targets": "65/65 PASS",
+    "headless_frames": 300,
+    "trace_frames": 128,
+    "trace_sha256": "03656a0e9f3b13d4430014de3787053c204acdd1e7f2e33c292ee8ee2b47c8cc",
+    "trace_rolling_hash": "d905b042",
+    "trace_byte_identity": true,
+    "retail_audio_evidence_sha256": "896049a03f26b1db4ddc1550d35d1cacb5f7e0f0c900b0ee36393c8ab8bd0501",
+    "render_tga_sha256": "9047f96e9bef8e06035119ff71ddfe7ad4dcad89b4740c66618252a13cd166fb",
+    "render_ssim": 1.0,
+    "network_client_report_sha256": "50534266c750fa20058c82ce48baca953b0107106dc24fd69c5854fc3364ba96",
+    "network_process_pairs": "2/2 PASS",
+    "udp_loopback": "PASS"
+  },
+  "bp065_key_focus": {
+    "reference": [
+      "keys.c",
+      "gl_vidnt.c"
+    ],
+    "runtime_fixtures": 20,
+    "status": "candidate",
+    "focus_release_all": true,
+    "key_count": 256
+  },
+  "bp066_input_device": {
+    "reference": [
+      "in_win.c",
+      "input.h"
+    ],
+    "runtime_fixtures": 22,
+    "status": "candidate",
+    "first_filtered_sample_averages_zero": true,
+    "device_clear_separate": true
+  },
+  "bp067_console_screen": {
+    "reference": [
+      "console.c",
+      "gl_screen.c"
+    ],
+    "runtime_fixtures": 22,
+    "status": "candidate",
+    "notify_ack_edges": 2,
+    "nonblocking_adapter": true
+  },
+  "bp068_menu_lifecycle": {
+    "reference": [
+      "menu.c"
+    ],
+    "runtime_fixtures": 24,
+    "status": "candidate",
+    "options_items": 14,
+    "windows_cd_step": 1.0
+  },
+  "bp069_frontend_closure": {
+    "reference": [
+      "keys.c",
+      "in_win.c",
+      "console.c",
+      "menu.c",
+      "gl_screen.c",
+      "gl_vidnt.c"
+    ],
+    "runtime_fixtures": 24,
+    "block_runtime_fixtures": 112,
+    "status": "frontend_109_frozen_v1",
+    "fingerprint": "0x924251fa",
+    "windows_acceptance": "pending"
+  },
+  "bp065069r1_hotfix": {
+    "delivery_revision": "BP-065-069R1",
+    "parent_delivery": "BP-065-069",
+    "result_archive": "MiniQuake_BP-065-069_RESULTS_20260729-154632.zip",
+    "result_archive_sha256": "96934acd755555383271141db651f1304561366aec73c540b943e296ec9a2f39",
+    "status": "pending Windows revalidation",
+    "failures": [
+      "sound volume tenth-step",
+      "invert mouse"
+    ],
+    "root_cause": "fixtures compared binary32 cvar values directly with higher-precision literals",
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "engine_contracts_changed": false,
+    "bp068_runtime_fixtures": 24,
+    "block_runtime_fixtures": 112
+  },
+  "bp065069r1_acceptance": {
+    "delivery_revision": "BP-065-069R1",
+    "status": "PASS",
+    "result_archive": "MiniQuake_BP-065-069R1_RESULTS_20260729-164203.zip",
+    "result_archive_sha256": "3420bcab8c2b36a7474992b130e09ebf6dfacc21d4980975f7d111da47d81927",
+    "required_steps": "16/16 PASS",
+    "trace_sha256": "93498af4da5b2fc4ccf2b6c8d07f444d7c22129fab37bd88654af2922fba938d",
+    "trace_rolling_hash": "d905b042",
+    "trace_byte_identity": "PASS",
+    "retail_audio_evidence_sha256": "896049a03f26b1db4ddc1550d35d1cacb5f7e0f0c900b0ee36393c8ab8bd0501",
+    "render_tga_sha256": "734e965e17c9a20af7c42184d3d8a3d7f2997e1321342976799ec7f4670af945",
+    "render_ssim": 1.0,
+    "network_client_report_sha256": "50534266c750fa20058c82ce48baca953b0107106dc24fd69c5854fc3364ba96",
+    "udp_loopback": "PASS"
+  },
+  "bp070": {
+    "title": "common parsing, byte order and CRC parity",
+    "runtime_fixtures": 24,
+    "status": "accepted"
+  },
+  "bp071": {
+    "title": "filesystem search paths and PACK archive parity",
+    "runtime_fixtures": 24,
+    "status": "accepted"
+  },
+  "bp072": {
+    "title": "WAD2 and graphics lump parity",
+    "runtime_fixtures": 20,
+    "status": "accepted"
+  },
+  "bp073": {
+    "title": "BSP, MDL, sprite and model registry parity",
+    "runtime_fixtures": 24,
+    "status": "accepted"
+  },
+  "bp074": {
+    "title": "zone, hunk, cache and core asset closure contract",
+    "runtime_fixtures": 24,
+    "status": "accepted"
+  },
+  "bp070074_candidate": {
+    "status": "PASS",
+    "runtime_fixtures": 116,
+    "retail_evidence_files": 4,
+    "contract_status": "core_assets_memory_109_frozen_v1",
+    "contract_fingerprint": "0x6c8d974d",
+    "accepted_delivery": "BP-070-074R6",
+    "result_archive_sha256": "f3f3a15f52932699d744ea6691b6dcb6a4fdca5fe6b77cbc5d38cf114fd283a2",
+    "trace_sha256": "80695b98a91b7d52f91b35dcd220c3cc0962edb6851b0411832746f6f94d3486",
+    "trace_rolling_hash": "d905b042"
+  },
+  "bp070074r1_hotfix": {
+    "delivery_revision": "BP-070-074R1",
+    "parent_delivery": "BP-070-074",
+    "predecessor_result_sha256": "c1ef8340e2f58904e583f2c85a81a7b3f1d37a7b316f8905297a4f2bbd6bef8c",
+    "status": "pending Windows revalidation",
+    "root_cause": "inherited frontend checker coupled historical BP-069 identity to frozen semantics",
+    "fix": "strict historical mode retained; downstream mode validates frozen status/fingerprint while current identity is checked independently",
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "engine_contracts_changed": false,
+    "contract_fingerprint": "0x6c8d974d"
+  },
+  "bp070074r2_hotfix": {
+    "revision": "BP-070-074R2",
+    "parent": "BP-070-074R1",
+    "status": "FAIL at BP-071 fixture 10; superseded by R3",
+    "predecessor_result_archive": "MiniQuake_BP-070-074R1_RESULTS_20260729-192646.zip",
+    "predecessor_result_sha256": "02cb2d978b35076623432cf46a8c56e9907e1430875b07b6ee401eb43387a1c9",
+    "failure": "common_asset_parity_tests called nonexistent uppercase members on miniquake.byteio",
+    "production_source_changed": true,
+    "native_source_changed": false,
+    "contract_fingerprint_changed": false,
+    "fixture_count_changed": false,
+    "result_archive": "MiniQuake_BP-070-074R2_RESULTS_20260729-210721.zip",
+    "result_archive_sha256": "e0206af9dd6775f6e302d697ea3db05ea55e8e902e96f47b3f1e83cf6d0c703b",
+    "windows_build": "76/76 PASS",
+    "bp070_runtime": "24/24 PASS"
+  },
+  "bp070074r3_hotfix": {
+    "revision": "BP-070-074R3",
+    "parent": "BP-070-074R2",
+    "status": "collector failure after runtime test; superseded by R4",
+    "predecessor_result_archive": "MiniQuake_BP-070-074R2_RESULTS_20260729-210721.zip",
+    "predecessor_result_sha256": "e0206af9dd6775f6e302d697ea3db05ea55e8e902e96f47b3f1e83cf6d0c703b",
+    "failure": "shareware loose-subdirectory fixture expected post-COM_CheckRegistered behavior while leaving staticRegistered=true",
+    "root_cause": "qfs.create intentionally mirrors common.c startup static_registered=1; the synthetic fixture bypassed COM_CheckRegistered and did not enter shareware state",
+    "fix": "set system.staticRegistered=false before the restricted loose-file lookup; preserve production filesystem semantics",
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "contract_fingerprint_changed": false,
+    "fixture_count_changed": false
+  },
+  "bp070074r4_hotfix": {
+    "revision": "BP-070-074R4",
+    "parent": "BP-070-074R3",
+    "status": "BP-073 fixture failure and collector ArgumentException; superseded by R5",
+    "failure": "synthetic BP-071 fixture path under build was treated as bundled id1 data",
+    "fix": "safe build-artifact filter skips and records synthetic workspaces and game-data-shaped paths",
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "contract_fingerprint_changed": false,
+    "fixture_count_changed": false
+  },
+  "bp070074r5_hotfix": {
+    "revision": "BP-070-074R5",
+    "parent": "BP-070-074R4",
+    "status": "FAIL at BP-073 fixture 6; superseded by R6",
+    "failures": [
+      "BP-073 animation base expected +0fixture, got 4",
+      "COLLECT_RESULTS.ps1 ArgumentException: argument types do not match"
+    ],
+    "fixture_fix": "texture name checked on BspTexture.name; animation table anim_total checked as 4",
+    "collector_fix": "plain PowerShell object array replaces generic List[object] plus @($SkippedBuildArtifacts)",
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "contract_fingerprint_changed": false,
+    "fixture_count_changed": false,
+    "result_archive": "MiniQuake_BP-070-074R5_RESULTS_20260730-121742.zip",
+    "result_archive_sha256": "7cf42d4a9a8aed1ff532d944920c8d30bed9906a8f431366e26a3b08b20d655f",
+    "windows_build": "76/76 PASS",
+    "bp070_runtime": "24/24 PASS",
+    "bp071_runtime": "24/24 PASS",
+    "bp072_runtime": "20/20 PASS"
+  },
+  "bp070074r6_hotfix": {
+    "revision": "BP-070-074R6",
+    "parent": "BP-070-074R5",
+    "predecessor_result_sha256": "7cf42d4a9a8aed1ff532d944920c8d30bed9906a8f431366e26a3b08b20d655f",
+    "failure": "BSP submodel test expected unexpanded raw bounds",
+    "original_semantics": "Mod_LoadSubmodels subtracts 1 from mins and adds 1 to maxs on all axes",
+    "fixture_fix": "raw [-3,-4,0]..[2,1,12] loads as [-4,-5,-1]..[3,2,13]",
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "contract_fingerprint_changed": false,
+    "fixture_count_changed": false,
+    "status": "PASS; accepted Windows baseline",
+    "result_archive": "MiniQuake_BP-070-074R6_RESULTS_20260730-132228.zip",
+    "result_archive_sha256": "f3f3a15f52932699d744ea6691b6dcb6a4fdca5fe6b77cbc5d38cf114fd283a2",
+    "windows_targets": "76/76 PASS",
+    "runtime_fixtures": "116/116 PASS"
+  },
+  "bp070074r6_acceptance": {
+    "revision": "BP-070-074R6",
+    "status": "PASS",
+    "result_archive": "MiniQuake_BP-070-074R6_RESULTS_20260730-132228.zip",
+    "result_archive_sha256": "f3f3a15f52932699d744ea6691b6dcb6a4fdca5fe6b77cbc5d38cf114fd283a2",
+    "windows_targets": "76/76 PASS",
+    "runtime_fixtures": "116/116 PASS",
+    "retail_core_asset_evidence_sha256": "06eac1012b97d36116a8f605cd428b09bf81f2881c474eda049c5e50183ec20e",
+    "trace_sha256": "80695b98a91b7d52f91b35dcd220c3cc0962edb6851b0411832746f6f94d3486",
+    "trace_rolling_hash": "d905b042",
+    "render_ssim": 1.0,
+    "udp_loopback": "PASS"
+  },
+  "bp075": {
+    "title": "mathlib and chase-camera parity",
+    "runtime_fixtures": 22,
+    "status": "candidate"
+  },
+  "bp076": {
+    "title": "view, palette and refdef parity",
+    "runtime_fixtures": 22,
+    "status": "candidate"
+  },
+  "bp077": {
+    "title": "screen, loading and screenshot parity",
+    "runtime_fixtures": 22,
+    "status": "candidate"
+  },
+  "bp078": {
+    "title": "statusbar and scoreboard parity",
+    "runtime_fixtures": 22,
+    "status": "candidate"
+  },
+  "bp079": {
+    "title": "host-command and gameplay/presentation closure",
+    "runtime_fixtures": 24,
+    "status": "candidate"
+  },
+  "bp075079_candidate": {
+    "status": "Windows acceptance pending",
+    "runtime_fixtures": 112,
+    "contract_status": "gameplay_presentation_109_frozen_v1",
+    "contract_fingerprint": "0xad91624c",
+    "accepted_parent": "BP-070-074R6"
+  },
+  "bp075079r1_hotfix": {
+    "revision": "BP-075-079R1",
+    "parent": "BP-075-079",
+    "status": "FAIL in inherited BP-036 preflight; superseded by R2",
+    "predecessor_result_archive": "MiniQuake_BP-075-079_RESULTS_20260730-143415.zip",
+    "predecessor_result_sha256": "78963a812a05fe9d4951eef1d1cb425757c3a63513c9a956481b36f5033a0384",
+    "failure": "inherited BP-029 checker compared the complete downstream server.ml hash and rejected unrelated host-command changes",
+    "root_cause": "world/physics routines remained byte-identical; the historical whole-file golden was too broad for downstream packages",
+    "fix": "preserve strict historical whole-file mode and add downstream mode with eight exact files, a protected server.ml hash and three accepted server world/physics sections",
+    "server_protected_sha256": "181db4de0fc6db19d9f067aea9d8ebd654c8e14a37c477be1640958c0cff3781",
+    "server_sections": {
+      "runWorldPhysicsWithRetouch": "5b082bf6147659c213fe46e84679d44a73f11dcd2aac070ef51eaf66dd0ecc8b",
+      "runNonClientPhysicsWithRetouch": "24a05fed078529237192653250631835a9d22d6d6c9054abb0ea5121f13095a6",
+      "frameMode": "09549e467d9a73e0802fda2c71552348fe7470dd6a84766098d02c90cbf87921"
+    },
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "contract_fingerprint_changed": false,
+    "fixture_count_changed": false,
+    "result_archive": "MiniQuake_BP-075-079R1_RESULTS_20260730-153422.zip",
+    "result_archive_sha256": "de4b5325fe5e4506cf812f0775047afcb1927971f7ee9ffad1cc5f2a688919fb"
+  },
+  "bp075079r2_hotfix": {
+    "revision": "BP-075-079R2",
+    "parent": "BP-075-079R1",
+    "status": "Windows build 81/81; failed at inherited BP-036 runtime fixture; superseded by R3",
+    "predecessor_result_archive": "MiniQuake_BP-075-079R1_RESULTS_20260730-153422.zip",
+    "predecessor_result_sha256": "de4b5325fe5e4506cf812f0775047afcb1927971f7ee9ffad1cc5f2a688919fb",
+    "failure": "inherited BP-036 checker still required common.atoi after BP-076 correctly switched view.c semantics to common.cAtoi",
+    "root_cause": "historical checker marker and downstream source semantics were not separated",
+    "fix": "preserve strict historical BP-036 mode and add --allow-downstream-package requiring common.cAtoi for later packages",
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "contract_fingerprint_changed": false,
+    "fixture_count_changed": false,
+    "result_archive": "MiniQuake_BP-075-079R2_RESULTS_20260730-172927.zip",
+    "result_archive_sha256": "225397ce680774d4730f0b75929f52e05749c70a6ead246051e057a310b9916b"
+  },
+  "bp075079r3_hotfix": {
+    "revision": "BP-075-079R3",
+    "parent": "BP-075-079R2",
+    "status": "Windows acceptance pending",
+    "predecessor_result_archive": "MiniQuake_BP-075-079R2_RESULTS_20260730-172927.zip",
+    "predecessor_result_sha256": "225397ce680774d4730f0b75929f52e05749c70a6ead246051e057a310b9916b",
+    "failure": "BP-036 inherited runtime expectations did not follow the accepted downstream C atoi source semantics",
+    "fix": "downstream fixture expects 0 for hexadecimal and character forms; checker enforces source and runtime lineage",
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "contract_fingerprint_changed": false,
+    "fixture_count_changed": false
+  },
+  "current_block": "BP-080-084",
+  "accepted_parent": {
+    "delivery_revision": "BP-075-079R3",
+    "status": "PASS",
+    "result_archive": "MiniQuake_BP-075-079R3_RESULTS_20260730-213835.zip",
+    "result_archive_sha256": "f86256028a30ed0740e2c80cf120eccec0977a841f3babdc297e25ca7d01d167",
+    "trace_sha256": "2b420f8b9713f09bc1edc632af7e2b18820629f428209775c85a29a4d7d6b293",
+    "render_tga_sha256": "734e965e17c9a20af7c42184d3d8a3d7f2997e1321342976799ec7f4670af945",
+    "network_client_report_sha256": "50534266c750fa20058c82ce48baca953b0107106dc24fd69c5854fc3364ba96"
+  },
+  "black_port_source_candidate": {
+    "status": "black_port_source_109_frozen_v1",
+    "fingerprint": "0x309b0737",
+    "source_units": 53,
+    "header_units": 10,
+    "target_definitions": 1094,
+    "exact_name": 1081,
+    "context_adapter": 9,
+    "technical_equivalent": 4,
+    "missing": 0,
+    "corpus": [
+      "start",
+      "e1m1",
+      "e1m2",
+      "e1m3"
+    ],
+    "frames_per_scenario": 64,
+    "windows_acceptance": "pending"
+  },
+  "bp080084r1_hotfix": {
+    "revision": "BP-080-084R1",
+    "parent": "BP-080-084",
+    "status": "Windows build reached BP-081; superseded by R2",
+    "predecessor_result_archive": "MiniQuake_BP-080-084_RESULTS_20260731-081355.zip",
+    "predecessor_result_sha256": "b5ff4b1defbfffacf14e6d9e0b84102093b21f367f5065d1bcc873310cb7b51a",
+    "failure": "all five new executable test entries declared package plus main(args)",
+    "fix": "global top-level main(args) entries plus package-wide verifier gate",
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "contract_fingerprint_changed": false,
+    "fixture_count_changed": false,
+    "result_archive": "MiniQuake_BP-080-084R1_RESULTS_20260731-102759.zip",
+    "result_archive_sha256": "2412022204edd7715efb30ede6aae6b7777be01e89a97f8150603e5eff7e3ca5"
+  },
+  "bp080084r2_hotfix": {
+    "revision": "BP-080-084R2",
+    "parent": "BP-080-084R1",
+    "status": "Windows acceptance pending",
+    "predecessor_result_archive": "MiniQuake_BP-080-084R1_RESULTS_20260731-102759.zip",
+    "predecessor_result_sha256": "2412022204edd7715efb30ede6aae6b7777be01e89a97f8150603e5eff7e3ca5",
+    "failure": "global BP-081 check/2 shadowed miniquake.zone.check/1 in the merged import closure",
+    "fix": "prefix all five entry-helper namespaces and add closure collision verifier",
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "contract_fingerprint_changed": false,
+    "fixture_count_changed": false
+  },
+  "bp085089_acceptance": {
+    "result_archive": "MiniQuake_BP-085-089_RESULTS_20260731-133605.zip",
+    "result_archive_sha256": "cfaa061e9de12e13e9c38ba66f284eab8fb46986eebe5ddd27b2c3a0de777f87",
+    "status": "FAIL only at BP-087 retail save evidence",
+    "build_and_asset_free_tests": "PASS through BP-089",
+    "id1_rogue_hipnotic": "PASS",
+    "retail_demos": "demo1/demo2/demo3 PASS",
+    "save_failure": "byte and old live-hash mismatch followed by NET_FreeQSocket: not active",
+    "r1_fix": "sequential Host sessions, exact parsed-save roundtrip, preserved edict high-water mark and production load synchronization"
+  },
+  "current_delivery": {
+    "revision": "BP-085-089R8",
+    "parent": "BP-085-089R7",
+    "status": "candidate",
+    "purpose": "correct listen-server stability classification for sparse client entity high-water without weakening leak-sensitive gates",
+    "result_parent_archive_sha256": "73d687753608117190a7527ac7a84f7ef7a0d57755ebe6e5887574a272710560",
+    "stability_fingerprint": "0xd0e3c03f",
+    "client_entity_policy": "server_high_water_plus_existing_static_offset"
+  },
+  "artifact_evidence_revision": "sequential_exact_fixed6_signedzero_v3",
+  "fixed_six_formatter": "msvcrt_percent_f",
+  "bp085089r2_preflight": {
+    "result_archive": "MiniQuake_BP-085-089R2_RESULTS_20260731-213523.zip",
+    "result_archive_sha256": "f39e82b46494d815fe4fbafc361ddd4cf6d8d305222f9c9b29b64b0ccf4958f6",
+    "status": "FAIL in inherited BP-022 QuakeC edict preflight",
+    "failure": "historical raw-word formatter marker was required after migration to the accepted MSVCRT %.6f text bridge",
+    "r3_fix": "strict historical checker plus explicit downstream native-fixed-six mode; build selects downstream mode",
+    "production_source_changed": false,
+    "native_source_changed": false
+  },
+  "bp085089r3_preflight": {
+    "result_archive": "MiniQuake_BP-085-089R3_RESULTS_20260731-231328.zip",
+    "result_archive_sha256": "9713654070c733ff44f56fe98bee6e860e2717e162d2b706daed102316598703",
+    "status": "FAIL in inherited BP-031 command/cvar preflight",
+    "failure": "historical cvar fixed-six source marker was required after migration to the accepted MSVCRT %.6f text bridge",
+    "r4_fix": "strict historical checker plus explicit downstream native-fixed-six mode; build selects downstream mode",
+    "production_source_changed": false,
+    "native_source_changed": false
+  },
+  "bp085089r4_candidate": {
+    "revision": "BP-085-089R4",
+    "parent": "BP-085-089R3",
+    "status": "Windows acceptance pending",
+    "command_cvar_lineage": "historical_raw_word_formatter / native_msvcrt_percent_f",
+    "runtime_fixtures": 20,
+    "production_source_changed": false,
+    "native_source_changed": false
+  },
+  "artifact_float_parser": "msvcrt_strtod_f32",
+  "artifact_preserves_signed_zero": true,
+  "bp085089r4_runtime": {
+    "result_archive": "MiniQuake_BP-085-089R4_RESULTS_20260801-030559.zip",
+    "result_archive_sha256": "407953ec4856166f9717620b9cbc8feaab00fab01b5f83f8544798c253c368fb",
+    "status": "FAIL only in first BP-087 save roundtrip",
+    "first_byte_difference": {
+      "offset": 1299,
+      "left": 45,
+      "right": 48
+    },
+    "first_semantic_difference": "globals pair 31 value for v_forward_x",
+    "stable_second_roundtrip": true,
+    "r5_fix": "native C-atof/strtod Binary32 parser preserving signed zero"
+  },
+  "bp085089r5_candidate": {
+    "revision": "BP-085-089R5",
+    "parent": "BP-085-089R4",
+    "status": "Windows acceptance pending",
+    "save_float_parser": "msvcrt_strtod_f32",
+    "signed_zero_word": "0x80000000",
+    "contract_fingerprint_changed": false,
+    "native_binary_changed": false
+  },
+  "bp085089r5_runtime": {
+    "status": "PARTIAL PASS; trace B failed at canonical frame 81",
+    "build_and_tests": "PASS",
+    "id1_rogue_hipnotic": "PASS",
+    "retail_demo_save_evidence": "A/B byte-identical PASS",
+    "trace_a": "128/128 PASS rolling d905b042",
+    "trace_b": "81/128 FAIL: server edict 66 origin expected Vec3, got unknown",
+    "result_archive_sha256": "e869baa6928241d5fed8b145e3b2184cee844b5f94dfdfc6bc8ec523ba6f454e"
+  },
+  "bp085089r6_candidate": {
+    "status": "candidate",
+    "fix": "named GC roots for every QuakeC vector, baseline, Edict and player mirror transfer",
+    "forced_gc_regression": "96 Edicts x 6 mirror rebuilds with gc_limit=512",
+    "native_binary_changed": false,
+    "contract_fingerprint_changed": false
+  },
+  "bp085089r6_acceptance": {
+    "result_archive": "MiniQuake_BP-085-089R6_RESULTS_20260801-140719.zip",
+    "result_archive_sha256": "5a15b18f20b6d0ae867657c025ca7d0564aa09115b8580554ebd0f6a9fda2df1",
+    "status": "PARTIAL PASS; e1m2 corpus trace B failed",
+    "all_build_and_unit_tests": "PASS",
+    "id1_rogue_hipnotic": "PASS",
+    "retail_demo_save": "PASS",
+    "main_trace_pair": "PASS",
+    "corpus_start_e1m1": "PASS",
+    "corpus_e1m2_a": "64/64 PASS",
+    "corpus_e1m2_b": "56/64; server edict 77 origin expected Vec3, got unknown",
+    "classification": "allocation/GC-timing failure in derived per-frame QuakeC Edict mirror; host frame itself completed"
+  },
+  "bp085089r8_candidate": {
+    "revision": "BP-085-089R8",
+    "parent": "BP-085-089R7",
+    "status": "Windows acceptance pending",
+    "focus": "listen-server stability semantics for sparse client entity high-water",
+    "stability_fingerprint": "0xd0e3c03f",
+    "client_entity_policy": "server_high_water_plus_existing_static_offset",
+    "observed_case": {
+      "server_before": 67,
+      "server_after": 67,
+      "client_before": 66,
+      "client_after": 67,
+      "limit": 67
+    },
+    "server_edict_growth_rejected": true,
+    "production_source_changed": true,
+    "native_binary_changed": false
+  },
+  "bp085089r7_acceptance": {
+    "result_archive": "MiniQuake_BP-085-089R7_RESULTS_20260801-152720.zip",
+    "result_archive_sha256": "73d687753608117190a7527ac7a84f7ef7a0d57755ebe6e5887574a272710560",
+    "status": "PARTIAL PASS; only listen-server soak predicate failed",
+    "all_build_and_unit_tests": "PASS",
+    "id1_rogue_hipnotic": "PASS",
+    "retail_demo_save": "PASS",
+    "primary_trace_pair": "PASS",
+    "black_port_corpus": "start/e1m1/e1m2/e1m3 all A/B byte-identical",
+    "host_soak": "5000/5000 PASS",
+    "listen_soak": "5000 frames completed; server 67->67, client table 66->67; all leak-sensitive gates stable",
+    "classification": "false positive in client table zero-growth predicate"
+  }
+}

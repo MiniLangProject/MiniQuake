@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "delivery_revision": "BP-075-079R3",
+  "delivery_parent": "BP-075-079R2",
+  "engine_package": "BP-079",
+  "classification": "inherited runtime fixture lineage mismatch",
+  "predecessor_result_archive": "MiniQuake_BP-075-079R2_RESULTS_20260730-172927.zip",
+  "predecessor_result_sha256": "225397ce680774d4730f0b75929f52e05749c70a6ead246051e057a310b9916b",
+  "failure": "BP-036 runtime fixture still expected Quake Q_atoi values after BP-076 switched V_cshift_f to C atoi",
+  "root_cause": "R2 separated historical and downstream source markers but did not bind the inherited runtime expectations",
+  "historical_runtime_expectation": {
+    "hex": 32,
+    "character": 65
+  },
+  "downstream_runtime_expectation": {
+    "hex": 0,
+    "character": 0
+  },
+  "strict_historical_mode_preserved": true,
+  "downstream_flag": "--allow-downstream-package",
+  "production_source_changed": false,
+  "native_source_changed": false,
+  "client_render_fingerprint_changed": false,
+  "gameplay_presentation_fingerprint_changed": false,
+  "runtime_fixture_count_changed": false,
+  "windows_build_targets": "81/81 compiled in predecessor run",
+  "windows_acceptance": "pending"
+}

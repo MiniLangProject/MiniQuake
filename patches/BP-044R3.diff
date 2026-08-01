@@ -1,0 +1,2696 @@
+diff --git a/BLOCK_LEDGER.json b/BLOCK_LEDGER.json
+index 481d523..1e5dc69 100644
+--- a/BLOCK_LEDGER.json
++++ b/BLOCK_LEDGER.json
+@@ -4,7 +4,7 @@
+   "block_id": "BP-040-044",
+   "parent_package_id": "BP-035-039R1",
+   "final_package_id": "BP-044",
+-  "delivery_revision": "BP-040-044R2",
++  "delivery_revision": "BP-040-044R3",
+   "protocol_status": "protocol15_frozen_v1",
+   "quakec_status": "quakec_109_frozen_v1",
+   "world_physics_status": "world_physics_109_frozen_v1",
+@@ -19,35 +19,35 @@
+       "title": "world surface facing, texture chains and deferred water classification",
+       "patch": "patches/BP-040.diff",
+       "runtime_fixtures": 20,
+-      "status": "implemented; R2 Windows acceptance pending"
++      "status": "implemented; R3 Windows acceptance pending"
+     },
+     {
+       "package_id": "BP-041",
+       "title": "lightmap formats, row strides and shared atlas ownership",
+       "patch": "patches/BP-041.diff",
+       "runtime_fixtures": 22,
+-      "status": "implemented; R2 Windows acceptance pending"
++      "status": "implemented; R3 Windows acceptance pending"
+     },
+     {
+       "package_id": "BP-042",
+       "title": "dynamic-light frame ordering and movable brush marking",
+       "patch": "patches/BP-042.diff",
+       "runtime_fixtures": 20,
+-      "status": "implemented; R2 Windows acceptance pending"
++      "status": "implemented; R3 Windows acceptance pending"
+     },
+     {
+       "package_id": "BP-043",
+       "title": "Binary32 sky, water and subdivision math",
+       "patch": "patches/BP-043.diff",
+       "runtime_fixtures": 22,
+-      "status": "implemented; R2 Windows acceptance pending"
++      "status": "implemented; R3 Windows acceptance pending"
+     },
+     {
+       "package_id": "BP-044",
+       "title": "viewport, culling and central GLQuake world-render closure",
+       "patch": "patches/BP-044.diff",
+       "runtime_fixtures": 24,
+-      "status": "implemented; R2 Windows acceptance pending"
++      "status": "implemented; R3 Windows acceptance pending"
+     }
+   ],
+   "block_runtime_fixtures": 108,
+@@ -77,8 +77,8 @@
+     "modern_renderer_backend": "later backend block",
+     "protocol_quakec_physics_host_client_contracts": "unchanged"
+   },
+-  "status": "implemented; R2 Windows acceptance pending",
+-  "delivery_parent": "BP-040-044R1",
++  "status": "implemented; R3 Windows acceptance pending",
++  "delivery_parent": "BP-040-044R2",
+   "initial_delivery_result": {
+     "delivery_revision": "BP-040-044",
+     "status": "FAIL; static preflight passed, cumulative game compile failed",
+@@ -116,7 +116,7 @@
+     "first_failure": "Function standard expects 0 args, got 2 in filesystem.ml:70 while compiling lightmap_atlas_tests.ml",
+     "runtime_reached": false
+   },
+-  "delivery_hotfix": {
++  "r2_delivery_hotfix": {
+     "revision": "BP-040-044R2",
+     "parent": "BP-040-044R1",
+     "corrections": [
+@@ -130,5 +130,43 @@
+     "world_render_fingerprint": "0x846a74de",
+     "status": "awaiting Windows acceptance",
+     "patch": "patches/BP-044R2.diff"
++  },
++  "r2_delivery_result": {
++    "delivery_revision": "BP-040-044R2",
++    "status": "FAIL; 43/43 targets compiled and all 84 script steps were reported PASS, but the supplied Quake base directory did not exist; retrospective log scan found five suppressed fixture failures",
++    "result_archive": "MiniQuake_BP-040-044R2_RESULTS_20260727-105653.zip",
++    "result_archive_sha256": "2678896b8071fe20d5f7a97fa86eb5cb5ad395a536be62ae464c697fc2f6d831",
++    "static_verification": "41/41 PASS",
++    "build": "43/43 executable targets compiled",
++    "script_steps": "84/84 reported PASS",
++    "suppressed_runtime_failures": 5,
++    "suppressed_failure_groups": [
++      "BP-013 events",
++      "BP-014R1 runtime events",
++      "BP-015 signon",
++      "BP-018 demo",
++      "BP-043 sky/water"
++    ],
++    "quake_base": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Quake",
++    "quake_base_exists": false,
++    "real_game_runtime_reached": false
++  },
++  "delivery_hotfix": {
++    "revision": "BP-040-044R3",
++    "parent": "BP-040-044R2",
++    "corrections": [
++      "correct five source-guided runtime fixtures whose expectations or adapters differed from their production APIs",
++      "treat FAIL output and failed aggregate summaries as process failure even when a MiniLang test executable exits with zero",
++      "add an independent runtime-test log checker and bind it in build, acceptance and static verification",
++      "retain all production and native engine sources unchanged"
++    ],
++    "production_source_changed": false,
++    "native_source_changed": false,
++    "runtime_fixture_counts_changed": false,
++    "runtime_fixture_content_corrected": true,
++    "runtime_failure_marker_guard": true,
++    "world_render_fingerprint": "0x846a74de",
++    "status": "awaiting Windows acceptance with an existing Quake base directory",
++    "patch": "patches/BP-044R3.diff"
+   }
+ }
+diff --git a/CHANGELOG_BP-040-044R3.md b/CHANGELOG_BP-040-044R3.md
+new file mode 100644
+index 0000000..4ae872b
+--- /dev/null
++++ b/CHANGELOG_BP-040-044R3.md
+@@ -0,0 +1,51 @@
++# MiniQuake BP-040–BP-044R3
++
++Test-integrity hotfix for the BP-040–BP-044 world-render block.
++
++## Windows result addressed
++
++R2 compiled all 43 targets and reported 84/84 script steps as `PASS`, but the
++supplied Quake base directory did not exist, so installed-game and runtime
++acceptance were not reached. A retrospective scan of the collected UTF-16 test
++logs found five test programs that printed failures while returning process exit
++code 0.
++
++## Corrected fixtures
++
++- BP-013 event fixtures now pass `count` before `color` to the MiniLang
++  `writeParticle` API.
++- BP-014R1 beam fixture now expects the first expired slot to be reused and
++  verifies the replacement entity payload.
++- BP-015 signon fixture stores the client baseline in its canonical seven-value
++  array and keeps the server `EntityBaseline` struct separate.
++- BP-018 demo fixture uses two leading spaces for the bound GLQuake bytewise
++  result `-1758`; the C oracle and golden document were updated accordingly.
++- BP-043 no-split fixture uses a 16..48 polygon wholly inside one 128-unit
++  subdivision cell instead of a centered polygon crossing the zero planes.
++
++Fixture counts remain unchanged.
++
++## Hardened test result channel
++
++- Add `tools/check_runtime_test_log.py` with a self-test and encoding-aware log
++  reader.
++- `build.ps1` captures test output and fails on `FAIL:` or `tests failed: N/M`
++  markers even when the process exit code is zero.
++- `TEST_BP-040-044R3.ps1` applies the same rule to every independent test group,
++  records the first marker, and marks synthetic failures in its JSON summary.
++- The component checkers and global verifier bind all five corrected fixtures.
++
++## Compatibility impact
++
++No production source below `src/` and no native source or binary below `native/`
++changed. The following remain unchanged:
++
++```text
++protocol15_frozen_v1
++quakec_109_frozen_v1
++world_physics_109_frozen_v1
++host_lifecycle_109_frozen_v1
++client_render_109_frozen_v1
++world_render_109_frozen_v1
++world_render_fingerprint=0x846a74de
++```
+diff --git a/COLLECT_RESULTS.ps1 b/COLLECT_RESULTS.ps1
+index 95f9a31..85dc49c 100644
+--- a/COLLECT_RESULTS.ps1
++++ b/COLLECT_RESULTS.ps1
+@@ -7,9 +7,9 @@ param(
+ $ErrorActionPreference = "Stop"
+ Set-StrictMode -Version Latest
+ 
+-$PackageId = "BP-040-044R2"
++$PackageId = "BP-040-044R3"
+ $FinalPackageId = "BP-044"
+-$DeliveryParent = "BP-040-044R1"
++$DeliveryParent = "BP-040-044R2"
+ $BlockParentPackageId = "BP-035-039R1"
+ $ProtocolStatus = "protocol15_frozen_v1"
+ $QuakeCStatus = "quakec_109_frozen_v1"
+@@ -27,7 +27,7 @@ if ([string]::IsNullOrWhiteSpace($Output)) {
+ }
+ $Output = [System.IO.Path]::GetFullPath($Output)
+ 
+-$Staging = Join-Path $BuildDirectory (".bp040-044r2-results-{0}" -f $Timestamp)
++$Staging = Join-Path $BuildDirectory (".bp040-044r3-results-{0}" -f $Timestamp)
+ $AllowedExtensions = @(".log", ".json", ".txt", ".csv", ".mqtrace")
+ if ($IncludeScreenshots) { $AllowedExtensions += ".png" }
+ $ForbiddenExtensions = @(".pak", ".bsp", ".mdl", ".spr", ".wad", ".dem", ".sav", ".lmp", ".ogg", ".wav", ".dat")
+@@ -418,7 +418,13 @@ $RootFiles = @(
+   "docs\BP-040-044R1_RESULT_ANALYSIS.md",
+   "docs\BP-040-044R2_TESTING.md",
+   "docs\BP-040-044R2_BLOCK_LEDGER.json",
+-  "patches\BP-044R2.diff"
++  "patches\BP-044R2.diff",
++  "CHANGELOG_BP-040-044R3.md",
++  "TEST_BP-040-044R3.ps1",
++  "docs\BP-040-044R2_RESULT_ANALYSIS.md",
++  "docs\BP-040-044R3_TESTING.md",
++  "docs\BP-040-044R3_BLOCK_LEDGER.json",
++  "patches\BP-044R3.diff"
+ )
+ foreach ($Relative in $RootFiles) {
+   Add-SafeFile (Join-Path $Root $Relative) $Relative
+diff --git a/PORT_LEDGER.json b/PORT_LEDGER.json
+index 3b8b57d..1a33321 100644
+--- a/PORT_LEDGER.json
++++ b/PORT_LEDGER.json
+@@ -2,8 +2,8 @@
+   "schema_version": 1,
+   "project": "MiniQuake",
+   "current_package": "BP-044",
+-  "current_delivery_revision": "BP-040-044R2",
+-  "delivery_parent": "BP-040-044R1",
++  "current_delivery_revision": "BP-040-044R3",
++  "delivery_parent": "BP-040-044R2",
+   "parent_package": "BP-043",
+   "compatibility_target": {
+     "reference": "WinQuake/GLQuake 1.09",
+@@ -1062,5 +1062,32 @@
+     "entry_shadow_arity_guard": true,
+     "world_render_fingerprint": "0x846a74de",
+     "status": "awaiting Windows acceptance"
++  },
++  "bp040044r2_result": {
++    "delivery_revision": "BP-040-044R2",
++    "result_archive_sha256": "2678896b8071fe20d5f7a97fa86eb5cb5ad395a536be62ae464c697fc2f6d831",
++    "compiled_executables": "43/43",
++    "reported_script_steps": "84/84 PASS",
++    "suppressed_runtime_failure_groups": 5,
++    "real_game_runtime_reached": false,
++    "failure": "Quake base directory did not exist"
++  },
++  "bp040044r3_hotfix": {
++    "delivery_revision": "BP-040-044R3",
++    "delivery_parent": "BP-040-044R2",
++    "production_source_changed": false,
++    "native_source_changed": false,
++    "runtime_fixture_counts_changed": false,
++    "corrected_fixture_groups": [
++      "BP-013 events",
++      "BP-014R1 runtime events",
++      "BP-015 signon",
++      "BP-018 demo",
++      "BP-043 sky/water"
++    ],
++    "runtime_failure_marker_guard": true,
++    "runtime_log_checker": "tools/check_runtime_test_log.py",
++    "world_render_fingerprint": "0x846a74de",
++    "status": "awaiting Windows acceptance with an existing Quake base directory"
+   }
+ }
+diff --git a/PORT_STATUS.md b/PORT_STATUS.md
+index fa8e28d..f993d54 100644
+--- a/PORT_STATUS.md
++++ b/PORT_STATUS.md
+@@ -4,8 +4,8 @@
+ 
+ ```text
+ engine package: BP-044
+-delivery: BP-040-044R2
+-parent delivery: BP-040-044R1
++delivery: BP-040-044R3
++parent delivery: BP-040-044R2
+ block parent: BP-035-039R1
+ profile: compat_109
+ ```
+@@ -42,13 +42,20 @@ stopped while compiling the BP-041 lightmap test because its package-free
+ `standard()` helper shadowed the imported two-argument
+ `miniquake.filesystem.standard()` inside the merged entry closure.
+ 
+-R2 renames the fixture helper to `standardFixture`, proactively renames the
+-BP-043 `bits` helper, and adds a graph-wide entry-function shadow/arity check.
+-No production or native source changed, and the 108 world-render fixtures and
+-fingerprint remain unchanged.
++R2 renamed the fixture helper to `standardFixture`, proactively renamed the
++BP-043 `bits` helper, and added a graph-wide entry-function shadow/arity check.
++It compiled all 43 targets. Its real-game stages did not start because the
++supplied Quake base directory did not exist. Retrospective log inspection also
++found five inherited fixtures that printed failures while returning exit code
++zero.
++
++R3 corrects those five fixtures and hardens both build and acceptance runners:
++`FAIL:` and `tests failed: N/M` now override an accidental zero process exit
++code. No production or native source changed, and all compatibility contracts,
++108 world-render fixtures and fingerprint remain unchanged.
+ 
+ ## Next block
+ 
+-After a green BP-040–BP-044R2 result: BP-045–BP-049, covering alias/sprite
+-model rendering, 2D/HUD integration, image-based render evidence and remaining
+-renderer compatibility gaps.
++After a green BP-040–BP-044R3 result with an existing Quake base directory:
++BP-045–BP-049, covering alias/sprite model rendering, 2D/HUD integration,
++image-based render evidence and remaining renderer compatibility gaps.
+diff --git a/README.md b/README.md
+index 9c39a74..0557e80 100644
+--- a/README.md
++++ b/README.md
+@@ -11,7 +11,7 @@ MiniQuake verwendet die legal vorhandenen Daten einer installierten Quake-
+ Version.
+ 
+ 
+-## Paketstand: BP-040–BP-044R2 (Engine-Endstand BP-044)
++## Paketstand: BP-040–BP-044R3 (Engine-Endstand BP-044)
+ 
+ Die Windows-Abnahme von **BP-035–BP-039R1** ist vollständig grün. Die
+ akzeptierte Elternbasis erreichte 300 Headless-Frames, zwei byteidentische
+@@ -52,18 +52,22 @@ Contract-Fingerprint: 0x846a74de
+ ```
+ 
+ Die fünf logischen Teilpatches liegen unter `patches/BP-040.diff` bis
+-`patches/BP-044.diff`; der Compiler-Hotfix zusätzlich unter
+-`patches/BP-044R1.diff` und `patches/BP-044R2.diff`.
+-
+-Die erste BP-040–BP-044-Lieferung bestand alle 38 statischen Prüfungen, stoppte
+-aber vor der Runtime beim Kompilieren von `GL_BuildLightmaps`. R1 korrigierte
+-diese Produktionsgrenze; `MiniQuake.exe` und 38 weitere Ziele kompilierten.
+-Danach kollidierte der paketfreie BP-041-Testhelfer `standard()` in der
+-zusammengeführten Importclosure mit `miniquake.filesystem.standard(base, game)`.
+-R2 benennt den Helfer in `standardFixture()` um, vermeidet vorsorglich dieselbe
+-Namensklasse bei `bits()` und prüft alle Einstiegspunkte auf Shadowing mit
+-abweichender Funktionsarität. Produktionscode, Rendersemantik, 108 Fixtures und
+-Fingerprint bleiben gegenüber R1 unverändert.
++`patches/BP-044.diff`; die Lieferkorrekturen zusätzlich unter
++`patches/BP-044R1.diff`, `patches/BP-044R2.diff` und `patches/BP-044R3.diff`.
++
++Die erste Lieferung stoppte beim direkten Schreiben auf ein global verwurzeltes
++Rendererfeld. R1 beseitigte diese Compilergrenze. R2 behob zwei paketfreie
++Testhelfer, die importierte Funktionen überschatteten, und kompilierte alle 43
++Programme. Die R2-Abnahme erreichte die Echtdaten-/Tracephase jedoch nicht, weil
++der angegebene Quake-Pfad nicht existierte. Zusätzlich zeigte die nachträgliche
++Auswertung der eingesammelten Testlogs fünf historische Fixtures, die `FAIL:`
++ausgaben, aber wegen eines Prozess-Exitcodes 0 fälschlich als bestanden galten.
++
++R3 korrigiert diese fünf Fixtures und wertet `FAIL:` sowie `tests failed: N/M`
++nun unabhängig vom Exitcode als Fehler. Produktionscode, Rendersemantik, alle
++Fixturezahlen und der Fingerprint bleiben gegenüber R2 unverändert. Für die
++vollständige Abnahme muss ein tatsächlich vorhandener Quake-Basispfad angegeben
++werden.
+ 
+ ## Aktuelle Spielbarkeitsrevision
+ 
+@@ -266,16 +270,16 @@ filtert diese Einträge für `CL_UpdateTEnts`, Rendering und
+ `client_effects.pruneTemporary`. Die Runtime-Event-Suite umfasst nun 28
+ Fixtures; die bestehende Meilensteinfixture 12 bleibt unverändert.
+ 
+-## Build und Abnahme von BP-040–BP-044R2 unter Windows
++## Build und Abnahme von BP-040–BP-044R3 unter Windows
+ 
+ Empfohlen ist `MiniLangCompilerPy`. Das vollständige ZIP muss in einen neuen,
+-leeren Ordner entpackt werden. Die R2-Abnahme baut den vollständigen BP-044-
++leeren Ordner entpackt werden. Die R3-Abnahme baut den vollständigen BP-044-
+ Endstand einmal und führt alle unabhängigen Testgruppen weiter aus:
+ 
+ ```powershell
+-cd C:\Pfad\MiniQuake_BP-040-044R2
++cd C:\Pfad\MiniQuake_BP-040-044R3
+ 
+-.\TEST_BP-040-044R2.ps1 `
++.\TEST_BP-040-044R3.ps1 `
+   -Compiler C:\Pfad\MiniLangCompilerPy\mlc_win64.py `
+   -StdLib C:\Pfad\MiniLangCompilerPy `
+   -QuakeBase "C:\Program Files (x86)\Steam\steamapps\common\Quake" `
+@@ -304,7 +308,7 @@ MiniQuake BP-041 lightmap atlas tests passed: 22
+ MiniQuake BP-042 dynamic-light render tests passed: 20
+ MiniQuake BP-043 sky/water render tests passed: 22
+ MiniQuake BP-044 world-render closure tests passed: 24
+-MiniQuake BP-040-044R2 acceptance test: PASS
++MiniQuake BP-040-044R3 acceptance test: PASS
+ ```
+ 
+ Nützliche Buildschalter:
+@@ -349,7 +353,7 @@ Ohne Sound zur Isolation eines Grafikproblems:
+ Bevorzugt wird der Pakettest:
+ 
+ ```powershell
+-.\TEST_BP-040-044R2.ps1 `
++.\TEST_BP-040-044R3.ps1 `
+   -Compiler C:\Pfad\MiniLangCompilerPy\mlc_win64.py `
+   -StdLib C:\Pfad\MiniLangCompilerPy `
+   -QuakeBase "C:\Program Files (x86)\Steam\steamapps\common\Quake" `
+@@ -409,7 +413,7 @@ Weitere Einzelpfade:
+ .\build\MiniQuake.exe --udp-smoke 2000
+ ```
+ 
+-`TEST_BP-040-044R2.ps1` schreibt Blocksummary, statischen Bericht, Versionsausgabe,
++`TEST_BP-040-044R3.ps1` schreibt Blocksummary, statischen Bericht, Versionsausgabe,
+ Transcript, separate Stock-/Spiel-/Runtime-Logs, zwei unabhängige Trace-Sätze sowie einen direkten Snapshot-CLI-Lauf. Danach erzeugt
+ 
+ ```powershell
+@@ -478,17 +482,26 @@ Paketglobal-Memberwrite. R1 beseitigte diesen Fehler und kompilierte das Spiel
+ sowie 38 Testprogramme; beim BP-041-Einstieg kollidierte anschließend der
+ paketfreie Nullargument-Helfer `standard()` mit dem importierten
+ Zweiargument-Helfer aus `filesystem.ml`. R2 verwendet eindeutige Testhelfernamen
+-und bindet eine transitive Entry-Shadow-Arity-Prüfung. Der Kandidatenvertrag
+-`world_render_109_frozen_v1` und Fingerprint `0x846a74de` bleiben unverändert.
+-
+-Nach erfolgreicher R2-Windows-Abnahme folgen BP-045–BP-049 mit Alias-/Sprite-
++und bindet eine transitive Entry-Shadow-Arity-Prüfung.
++
++R2 kompilierte anschließend alle 43 Ziele. Der angegebene Quake-Pfad existierte
++auf dem Testsystem jedoch nicht, sodass Echtdaten-, Headless-, Trace- und
++UDP-Abnahme nicht erreicht wurden. Die nachträgliche Prüfung der gesammelten
++Testlogs zeigte zusätzlich fünf historische Fixtures, die Fehler ausgaben, aber
++mit Exitcode 0 endeten. R3 korrigiert diese Fixtures und behandelt `FAIL:` sowie
++`tests failed: N/M` in `build.ps1`, im Blocktest und im eigenständigen
++Logprüfer als echten Fehler. Produktions- und Native-Code bleiben unverändert.
++Der Kandidatenvertrag `world_render_109_frozen_v1` und Fingerprint
++`0x846a74de` bleiben ebenfalls unverändert.
++
++Nach erfolgreicher R3-Windows-Abnahme folgen BP-045–BP-049 mit Alias-/Sprite-
+ Modellen, 2D/HUD-Integration, bildbasierter Renderevidenz und den verbleibenden
+ Rendererlücken.
+ 
+ Der maschinenlesbare Stand steht in `PORT_LEDGER.json` und
+-`BLOCK_LEDGER.json`; die R1-Fehleranalyse und der aktuelle Testablauf in
+-`docs/BP-040-044R1_RESULT_ANALYSIS.md` und
+-`docs/BP-040-044R2_TESTING.md`.
++`BLOCK_LEDGER.json`; die R2-Ergebnisanalyse und der aktuelle Testablauf in
++`docs/BP-040-044R2_RESULT_ANALYSIS.md` und
++`docs/BP-040-044R3_TESTING.md`.
+ 
+ ## Lizenz
+ 
+diff --git a/TEST_BP-040-044R3.ps1 b/TEST_BP-040-044R3.ps1
+new file mode 100644
+index 0000000..2a1fc60
+--- /dev/null
++++ b/TEST_BP-040-044R3.ps1
+@@ -0,0 +1,1098 @@
++﻿[CmdletBinding()]
++param(
++  [string]$Compiler = "",
++
++  [Alias("StdLibPath", "ImportRoot")]
++  [string]$StdLib = "",
++
++  [string]$Python = "",
++
++  [string]$QuakeBase = "",
++  [string]$Game = "id1",
++  [string]$Map = "start",
++
++  [ValidateRange(1, 1000000)]
++  [int]$Frames = 300,
++
++  [ValidateRange(1, 1000000)]
++  [int]$TraceFrames = 128,
++
++  [ValidateSet("Release", "Debug")]
++  [string]$Configuration = "Release",
++
++  [switch]$SkipBuild,
++  [switch]$SkipGameValidation,
++  [switch]$SkipTraceValidation,
++  [switch]$NetworkTests,
++  [switch]$RebuildNative,
++  [switch]$Listings,
++  [switch]$ContinueIndependentTests = $true,
++  [switch]$BisectOnFailure
++)
++
++$ErrorActionPreference = "Stop"
++Set-StrictMode -Version Latest
++
++$PackageId = "BP-044"
++$ParentPackageId = "BP-043"
++$NativeTextAbi = "caller_owned_bytes_v1"
++$ProtocolTextAbi = "quake_latin1_cstring_v1"
++$BlockId = "BP-040-044"
++$BlockParentPackageId = "BP-035-039R1"
++$ProtocolStatus = "protocol15_frozen_v1"
++$QuakeCStatus = "quakec_109_frozen_v1"
++$WorldPhysicsStatus = "world_physics_109_frozen_v1"
++$HostLifecycleStatus = "host_lifecycle_109_frozen_v1"
++$ClientRenderStatus = "client_render_109_frozen_v1"
++$WorldRenderStatus = "world_render_109_frozen_v1"
++$DeliveryRevision = "BP-040-044R3"
++$Root = $PSScriptRoot
++$BuildDirectory = Join-Path $Root "build"
++$TraceDirectory = Join-Path $BuildDirectory "bp040-044r3-traces"
++$GameExe = Join-Path $BuildDirectory "MiniQuake.exe"
++$Verifier = Join-Path $Root "tools\verify.py"
++$TraceComparator = Join-Path $Root "tools\compare_traces.py"
++$RuntimeTestLogChecker = Join-Path $Root "tools\check_runtime_test_log.py"
++$ProtocolVectorChecker = Join-Path $Root "tools\check_protocol15_vectors.py"
++$ProtocolCommandChecker = Join-Path $Root "tools\check_protocol15_commands.py"
++$ProtocolServerDataChecker = Join-Path $Root "tools\check_protocol15_serverdata.py"
++$ProtocolEventChecker = Join-Path $Root "tools\check_protocol15_events.py"
++$ProtocolRuntimeEventChecker = Join-Path $Root "tools\check_protocol15_runtime_events.py"
++$ProtocolSignonChecker = Join-Path $Root "tools\check_protocol15_signon.py"
++$ProtocolDeliveryChecker = Join-Path $Root "tools\check_protocol15_delivery.py"
++$ProtocolDatagramChecker = Join-Path $Root "tools\check_protocol15_datagram.py"
++$ProtocolDemoChecker = Join-Path $Root "tools\check_protocol15_demo.py"
++$ProtocolClosureChecker = Join-Path $Root "tools\check_protocol15_closure.py"
++$QuakeCProgsChecker = Join-Path $Root "tools\check_quakec_progs.py"
++$QuakeCVMChecker = Join-Path $Root "tools\check_quakec_vm.py"
++$QuakeCEdictChecker = Join-Path $Root "tools\check_quakec_edict.py"
++$QuakeCBuiltinChecker = Join-Path $Root "tools\check_quakec_builtins.py"
++$QuakeCClosureChecker = Join-Path $Root "tools\check_quakec_closure.py"
++$WorldHullChecker = Join-Path $Root "tools\check_world_hull.py"
++$WorldTraceChecker = Join-Path $Root "tools\check_world_trace.py"
++$WorldLinkChecker = Join-Path $Root "tools\check_world_link.py"
++$ServerMoveChecker = Join-Path $Root "tools\check_server_move.py"
++$ServerPhysicsChecker = Join-Path $Root "tools\check_server_physics.py"
++$SvUserMovementChecker = Join-Path $Root "tools\check_sv_user_movement.py"
++$ServerUserChecker = Join-Path $Root "tools\check_server_user.py"
++$WorldPhysicsClosureChecker = Join-Path $Root "tools\check_world_physics_closure.py"
++$HostTimingChecker = Join-Path $Root "tools\check_host_timing.py"
++$CommandCvarChecker = Join-Path $Root "tools\check_command_cvar.py"
++$DemoLifecycleChecker = Join-Path $Root "tools\check_demo_lifecycle.py"
++$SavegameV5Checker = Join-Path $Root "tools\check_savegame_v5.py"
++$HostLifecycleClosureChecker = Join-Path $Root "tools\check_host_lifecycle_closure.py"
++$ClientStateRenderChecker = Join-Path $Root "tools\check_client_render_035.py"
++$ViewStateChecker = Join-Path $Root "tools\check_client_render_036.py"
++$TemporaryBeamChecker = Join-Path $Root "tools\check_client_render_037.py"
++$ParticleRuntimeChecker = Join-Path $Root "tools\check_client_render_038.py"
++$ClientRenderClosureChecker = Join-Path $Root "tools\check_client_render_039.py"
++$WorldSurfaceRenderChecker = Join-Path $Root "tools\check_world_render_040.py"
++$LightmapAtlasChecker = Join-Path $Root "tools\check_world_render_041.py"
++$DynamicLightRenderChecker = Join-Path $Root "tools\check_world_render_042.py"
++$SkyWaterRenderChecker = Join-Path $Root "tools\check_world_render_043.py"
++$WorldRenderClosureChecker = Join-Path $Root "tools\check_world_render_044.py"
++$BuildScript = Join-Path $Root "build.ps1"
++$Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
++$TranscriptPath = Join-Path $BuildDirectory ("bp040-044r3-test-{0}.log" -f $Timestamp)
++$SummaryPath = Join-Path $BuildDirectory "bp040-044r3-test-summary.json"
++$StaticReportPath = Join-Path $BuildDirectory "bp040-044r3-static-verification.json"
++$VersionPath = Join-Path $BuildDirectory "bp040-044r3-version.txt"
++$BuildChildLogPath = Join-Path $BuildDirectory "bp040-044r3-build-child.log"
++$TraceALogPath = Join-Path $BuildDirectory "bp040-044r3-trace-a.log"
++$TraceBLogPath = Join-Path $BuildDirectory "bp040-044r3-trace-b.log"
++$SnapshotCommandLogPath = Join-Path $BuildDirectory "bp040-044r3-snapshot-command.log"
++$TraceComparisonPath = Join-Path $BuildDirectory "bp040-044r3-trace-comparison.json"
++$TraceComparisonLogPath = Join-Path $BuildDirectory "bp040-044r3-trace-comparison.log"
++$ProtocolVectorReportPath = Join-Path $BuildDirectory "bp040-044r3-protocol15-vectors.json"
++$ProtocolVectorLogPath = Join-Path $BuildDirectory "bp040-044r3-protocol15-vectors.log"
++$ProtocolCommandReportPath = Join-Path $BuildDirectory "bp040-044r3-protocol15-commands.json"
++$ProtocolCommandLogPath = Join-Path $BuildDirectory "bp040-044r3-protocol15-commands.log"
++$ProtocolServerDataReportPath = Join-Path $BuildDirectory "bp040-044r3-protocol15-serverdata.json"
++$ProtocolServerDataLogPath = Join-Path $BuildDirectory "bp040-044r3-protocol15-serverdata.log"
++$ProtocolEventReportPath = Join-Path $BuildDirectory "bp040-044r3-protocol15-events.json"
++$ProtocolEventLogPath = Join-Path $BuildDirectory "bp040-044r3-protocol15-events.log"
++$ProtocolRuntimeEventReportPath = Join-Path $BuildDirectory "bp040-044r3-protocol15-runtime-events.json"
++$ProtocolRuntimeEventLogPath = Join-Path $BuildDirectory "bp040-044r3-protocol15-runtime-events.log"
++$ProtocolSignonReportPath = Join-Path $BuildDirectory "bp040-044r3-protocol15-signon.json"
++$ProtocolSignonLogPath = Join-Path $BuildDirectory "bp040-044r3-protocol15-signon.log"
++$ProtocolDeliveryReportPath = Join-Path $BuildDirectory "bp040-044r3-protocol15-delivery.json"
++$ProtocolDeliveryLogPath = Join-Path $BuildDirectory "bp040-044r3-protocol15-delivery.log"
++$ProtocolDatagramReportPath = Join-Path $BuildDirectory "bp040-044r3-protocol15-datagram.json"
++$ProtocolDatagramLogPath = Join-Path $BuildDirectory "bp040-044r3-protocol15-datagram.log"
++$ProtocolDemoReportPath = Join-Path $BuildDirectory "bp040-044r3-protocol15-demo.json"
++$ProtocolDemoLogPath = Join-Path $BuildDirectory "bp040-044r3-protocol15-demo.log"
++$ProtocolClosureReportPath = Join-Path $BuildDirectory "bp040-044r3-protocol15-closure.json"
++$ProtocolClosureLogPath = Join-Path $BuildDirectory "bp040-044r3-protocol15-closure.log"
++$QuakeCProgsReportPath = Join-Path $BuildDirectory "bp040-044r3-quakec-progs.json"
++$QuakeCProgsLogPath = Join-Path $BuildDirectory "bp040-044r3-quakec-progs.log"
++$QuakeCVMReportPath = Join-Path $BuildDirectory "bp040-044r3-quakec-vm.json"
++$QuakeCVMLogPath = Join-Path $BuildDirectory "bp040-044r3-quakec-vm.log"
++$QuakeCEdictReportPath = Join-Path $BuildDirectory "bp040-044r3-quakec-edict.json"
++$QuakeCEdictLogPath = Join-Path $BuildDirectory "bp040-044r3-quakec-edict.log"
++$QuakeCBuiltinReportPath = Join-Path $BuildDirectory "bp040-044r3-quakec-builtins.json"
++$QuakeCBuiltinLogPath = Join-Path $BuildDirectory "bp040-044r3-quakec-builtins.log"
++$QuakeCClosureReportPath = Join-Path $BuildDirectory "bp040-044r3-quakec-closure.json"
++$QuakeCClosureLogPath = Join-Path $BuildDirectory "bp040-044r3-quakec-closure.log"
++$WorldHullReportPath = Join-Path $BuildDirectory "bp040-044r3-world-hull.json"
++$WorldHullLogPath = Join-Path $BuildDirectory "bp040-044r3-world-hull.log"
++$WorldTraceReportPath = Join-Path $BuildDirectory "bp040-044r3-world-trace.json"
++$WorldTraceLogPath = Join-Path $BuildDirectory "bp040-044r3-world-trace.log"
++$WorldLinkReportPath = Join-Path $BuildDirectory "bp040-044r3-world-link.json"
++$WorldLinkLogPath = Join-Path $BuildDirectory "bp040-044r3-world-link.log"
++$ServerMoveReportPath = Join-Path $BuildDirectory "bp040-044r3-server-move.json"
++$ServerMoveLogPath = Join-Path $BuildDirectory "bp040-044r3-server-move.log"
++$ServerPhysicsReportPath = Join-Path $BuildDirectory "bp040-044r3-server-physics.json"
++$ServerPhysicsLogPath = Join-Path $BuildDirectory "bp040-044r3-server-physics.log"
++$SvUserMovementReportPath = Join-Path $BuildDirectory "bp040-044r3-sv-user-movement.json"
++$SvUserMovementLogPath = Join-Path $BuildDirectory "bp040-044r3-sv-user-movement.log"
++$ServerUserReportPath = Join-Path $BuildDirectory "bp040-044r3-server-user.json"
++$ServerUserLogPath = Join-Path $BuildDirectory "bp040-044r3-server-user.log"
++$WorldPhysicsClosureReportPath = Join-Path $BuildDirectory "bp040-044r3-world-physics-closure.json"
++$WorldPhysicsClosureLogPath = Join-Path $BuildDirectory "bp040-044r3-world-physics-closure.log"
++$HostTimingReportPath = Join-Path $BuildDirectory "bp040-044r3-host-timing.json"
++$HostTimingLogPath = Join-Path $BuildDirectory "bp040-044r3-host-timing.log"
++$CommandCvarReportPath = Join-Path $BuildDirectory "bp040-044r3-command-cvar.json"
++$CommandCvarLogPath = Join-Path $BuildDirectory "bp040-044r3-command-cvar.log"
++$DemoLifecycleReportPath = Join-Path $BuildDirectory "bp040-044r3-demo-lifecycle.json"
++$DemoLifecycleLogPath = Join-Path $BuildDirectory "bp040-044r3-demo-lifecycle.log"
++$SavegameV5ReportPath = Join-Path $BuildDirectory "bp040-044r3-savegame-v5.json"
++$SavegameV5LogPath = Join-Path $BuildDirectory "bp040-044r3-savegame-v5.log"
++$HostLifecycleClosureReportPath = Join-Path $BuildDirectory "bp040-044r3-host-lifecycle-closure.json"
++$HostLifecycleClosureLogPath = Join-Path $BuildDirectory "bp040-044r3-host-lifecycle-closure.log"
++$ClientStateRenderReportPath = Join-Path $BuildDirectory "bp040-044r3-client-state-render.json"
++$ClientStateRenderLogPath = Join-Path $BuildDirectory "bp040-044r3-client-state-render.log"
++$ViewStateReportPath = Join-Path $BuildDirectory "bp040-044r3-view-state.json"
++$ViewStateLogPath = Join-Path $BuildDirectory "bp040-044r3-view-state.log"
++$TemporaryBeamReportPath = Join-Path $BuildDirectory "bp040-044r3-temporary-beams.json"
++$TemporaryBeamLogPath = Join-Path $BuildDirectory "bp040-044r3-temporary-beams.log"
++$ParticleRuntimeReportPath = Join-Path $BuildDirectory "bp040-044r3-particle-runtime.json"
++$ParticleRuntimeLogPath = Join-Path $BuildDirectory "bp040-044r3-particle-runtime.log"
++$ClientRenderClosureReportPath = Join-Path $BuildDirectory "bp040-044r3-client-render-closure.json"
++$ClientRenderClosureLogPath = Join-Path $BuildDirectory "bp040-044r3-client-render-closure.log"
++$WorldSurfaceRenderReportPath = Join-Path $BuildDirectory "bp040-044r3-world-surfaces.json"
++$WorldSurfaceRenderLogPath = Join-Path $BuildDirectory "bp040-044r3-world-surfaces.log"
++$LightmapAtlasReportPath = Join-Path $BuildDirectory "bp040-044r3-lightmap-atlas.json"
++$LightmapAtlasLogPath = Join-Path $BuildDirectory "bp040-044r3-lightmap-atlas.log"
++$DynamicLightRenderReportPath = Join-Path $BuildDirectory "bp040-044r3-dynamic-lights.json"
++$DynamicLightRenderLogPath = Join-Path $BuildDirectory "bp040-044r3-dynamic-lights.log"
++$SkyWaterRenderReportPath = Join-Path $BuildDirectory "bp040-044r3-sky-water.json"
++$SkyWaterRenderLogPath = Join-Path $BuildDirectory "bp040-044r3-sky-water.log"
++$WorldRenderClosureReportPath = Join-Path $BuildDirectory "bp040-044r3-world-render-closure.json"
++$WorldRenderClosureLogPath = Join-Path $BuildDirectory "bp040-044r3-world-render-closure.log"
++$QuakeCStockLogPath = Join-Path $BuildDirectory "bp040-044r3-quakec-stock-tests.log"
++$GameValidationLogPath = Join-Path $BuildDirectory "bp040-044r3-game-validation.log"
++$RuntimeValidationLogPath = Join-Path $BuildDirectory "bp040-044r3-runtime-validation.log"
++$BisectReportPath = Join-Path $BuildDirectory "bp040-044r3-bisect-report.json"
++$IndependentFailures = New-Object System.Collections.ArrayList
++$Steps = New-Object System.Collections.ArrayList
++$OverallStatus = "FAIL"
++$FailureMessage = ""
++$TranscriptStarted = $false
++$TraceHash = ""
++$TraceRollingHash = ""
++
++New-Item -ItemType Directory -Force -Path $BuildDirectory | Out-Null
++
++function Add-StepResult {
++  param(
++    [string]$Name,
++    [string]$Status,
++    [int]$ExitCode,
++    [string]$Detail
++  )
++
++  [void]$Steps.Add([ordered]@{
++    name = $Name
++    status = $Status
++    exit_code = $ExitCode
++    detail = $Detail
++  })
++}
++
++function Resolve-PythonCommand {
++  if (-not [string]::IsNullOrWhiteSpace($Python)) {
++    if (Test-Path -LiteralPath $Python -PathType Leaf) {
++      $Resolved = [System.IO.Path]::GetFullPath($Python)
++    } else {
++      $Command = Get-Command $Python -ErrorAction SilentlyContinue | Select-Object -First 1
++      if ($null -eq $Command) { throw "Python interpreter not found: $Python" }
++      $Resolved = $Command.Path
++    }
++    if ([System.IO.Path]::GetFileNameWithoutExtension($Resolved) -ieq "py") {
++      return [ordered]@{ executable = $Resolved; prefix = @("-3") }
++    }
++    return [ordered]@{ executable = $Resolved; prefix = @() }
++  }
++
++  $Launcher = Get-Command "py" -ErrorAction SilentlyContinue | Select-Object -First 1
++  if ($null -ne $Launcher) {
++    return [ordered]@{ executable = $Launcher.Path; prefix = @("-3") }
++  }
++
++  $Command = Get-Command "python" -ErrorAction SilentlyContinue | Select-Object -First 1
++  if ($null -eq $Command) { throw "Python 3 was not found. Pass -Python PATH." }
++  return [ordered]@{ executable = $Command.Path; prefix = @() }
++}
++
++function Invoke-ExternalStep {
++  param(
++    [Parameter(Mandatory = $true)]
++    [string]$Name,
++
++    [Parameter(Mandatory = $true)]
++    [string]$Executable,
++
++    [Parameter(Mandatory = $true)]
++    [string[]]$Arguments,
++
++    [string]$Detail = "",
++    [string]$LogPath = ""
++  )
++
++  Write-Host "[MiniQuake/$PackageId] $Name"
++  if ([string]::IsNullOrWhiteSpace($LogPath)) {
++    & $Executable @Arguments
++  } else {
++    if (Test-Path -LiteralPath $LogPath -PathType Leaf) { Remove-Item -Force -LiteralPath $LogPath }
++    & $Executable @Arguments 2>&1 | Tee-Object -FilePath $LogPath
++  }
++  $ExitCode = [int]$LASTEXITCODE
++  if ($ExitCode -ne 0) {
++    $LogDetail = $Detail
++    if (-not [string]::IsNullOrWhiteSpace($LogPath)) {
++      $LogDetail = ($Detail + "; log=" + [System.IO.Path]::GetFileName($LogPath)).TrimStart([char[]]@(';', ' '))
++    }
++    Add-StepResult $Name "FAIL" $ExitCode $LogDetail
++    throw "$Name failed with exit code $ExitCode."
++  }
++  Add-StepResult $Name "PASS" 0 $Detail
++}
++
++function Get-RuntimeTestFailureMarker {
++  param([string]$Text)
++
++  if ([string]::IsNullOrWhiteSpace($Text)) { return "" }
++  $Patterns = @(
++    '(?im)^\s*FAIL:\s+.*$',
++    '(?im)^\s*MiniQuake\b.*\btests failed:\s*\d+/\d+\s*$',
++    '(?im)^\s*BP-\d+.*\btests failed:\s*\d+/\d+\s*$'
++  )
++  foreach ($Pattern in $Patterns) {
++    $Match = [regex]::Match($Text, $Pattern)
++    if ($Match.Success) { return $Match.Value.Trim() }
++  }
++  return ""
++}
++
++function Invoke-IndependentTest {
++  param(
++    [Parameter(Mandatory = $true)]
++    [string]$Package,
++    [Parameter(Mandatory = $true)]
++    [string]$Name,
++    [Parameter(Mandatory = $true)]
++    [string]$Executable,
++    [Parameter(Mandatory = $true)]
++    [string]$LogName,
++
++    [string[]]$Arguments = @()
++  )
++
++  $LogPath = Join-Path $BuildDirectory $LogName
++  Write-Host "[MiniQuake/$BlockId][$Package] $Name"
++  if (Test-Path -LiteralPath $LogPath -PathType Leaf) { Remove-Item -Force -LiteralPath $LogPath }
++  & $Executable @Arguments 2>&1 | Tee-Object -FilePath $LogPath
++  $ExitCode = [int]$LASTEXITCODE
++  $OutputText = ""
++  if (Test-Path -LiteralPath $LogPath -PathType Leaf) {
++    $OutputText = Get-Content -LiteralPath $LogPath -Raw
++  }
++  $FailureMarker = Get-RuntimeTestFailureMarker $OutputText
++  $SyntheticFailure = $false
++  if ($ExitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace($FailureMarker)) {
++    $ExitCode = 1
++    $SyntheticFailure = $true
++    Write-Host "ERROR: [$Package] $Name emitted a failure marker despite exit code 0: $FailureMarker" -ForegroundColor Red
++  }
++  if ($ExitCode -eq 0) {
++    Add-StepResult ("[" + $Package + "] " + $Name) "PASS" 0 ("log=" + [System.IO.Path]::GetFileName($LogPath))
++    return $true
++  }
++
++  [void]$IndependentFailures.Add([ordered]@{
++    package = $Package
++    name = $Name
++    executable = [System.IO.Path]::GetFileName($Executable)
++    exit_code = $ExitCode
++    log = [System.IO.Path]::GetFileName($LogPath)
++    failure_marker = $FailureMarker
++    synthetic_failure = $SyntheticFailure
++  })
++  $FailureDetail = "log=" + [System.IO.Path]::GetFileName($LogPath)
++  if (-not [string]::IsNullOrWhiteSpace($FailureMarker)) {
++    $FailureDetail = $FailureDetail + "; marker=" + $FailureMarker
++  }
++  Add-StepResult ("[" + $Package + "] " + $Name) "FAIL" $ExitCode $FailureDetail
++  Write-Host "ERROR: [$Package] $Name failed with exit code $ExitCode." -ForegroundColor Red
++  if (-not $ContinueIndependentTests) { throw "[$Package] $Name failed with exit code $ExitCode." }
++  return $false
++}
++
++function Require-File {
++  param([string]$Path, [string]$Label)
++  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
++    throw "$Label is missing: $Path"
++  }
++}
++
++function Read-JsonFile {
++  param([string]$Path)
++  Require-File $Path "JSON artifact"
++  return Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
++}
++
++try {
++  try {
++    Start-Transcript -LiteralPath $TranscriptPath -Force | Out-Null
++    $TranscriptStarted = $true
++  } catch {
++    Write-Warning "PowerShell transcript could not be started: $($_.Exception.Message)"
++  }
++
++  Write-Host "MiniQuake $DeliveryRevision cumulative world/render acceptance test"
++  Write-Host "  final package: $PackageId"
++  Write-Host "  parent:        $ParentPackageId"
++  Write-Host "  block parent:  $BlockParentPackageId"
++  Write-Host "  root:          $Root"
++  Write-Host "  configuration: $Configuration"
++
++  $PythonCommand = Resolve-PythonCommand
++  $PythonExe = $PythonCommand.executable
++  $PythonPrefix = @($PythonCommand.prefix)
++
++  Invoke-ExternalStep `
++    -Name "static package and diagnostics verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($Verifier, $Root, "--json-output", $StaticReportPath)) `
++    -Detail "manifest, packages, ABI, accepted BP-029R3 parent, frozen Protocol 15/QuakeC/world-physics and cumulative BP-030-034 host/lifecycle contracts"
++
++  Invoke-ExternalStep `
++    -Name "trace comparator self-test" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($TraceComparator, "--self-test")) `
++    -Detail "field-level first-divergence reporter"
++
++  Invoke-ExternalStep `
++    -Name "runtime-test log checker self-test" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($RuntimeTestLogChecker, "--self-test")) `
++    -Detail "FAIL markers override an accidental zero process exit code"
++
++  Invoke-ExternalStep `
++    -Name "Protocol 15 C/Python golden-vector verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolVectorChecker, $Root, "--json-output", $ProtocolVectorReportPath)) `
++    -Detail "13 inherited C-derived byte streams, 18 constants and MiniLang wire markers" `
++    -LogPath $ProtocolVectorLogPath
++
++  Invoke-ExternalStep `
++    -Name "Protocol 15 signon, command-stream and fast-update verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolCommandChecker, $Root, "--json-output", $ProtocolCommandReportPath)) `
++    -Detail "14 C-derived command/update byte streams, 57 constants and 34 SVC events" `
++    -LogPath $ProtocolCommandLogPath
++
++  Invoke-ExternalStep `
++    -Name "Protocol 15 serverinfo, sound, clientdata, baseline and packet-planning verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolServerDataChecker, "--root", $Root, "--json-output", $ProtocolServerDataReportPath)) `
++    -Detail "11 C-derived server payload vectors plus datagram, fast-update and client-delivery contracts" `
++    -LogPath $ProtocolServerDataLogPath
++
++  Invoke-ExternalStep `
++    -Name "Protocol 15 static-event, particle, scoreboard and graceful-drop verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolEventChecker, "--root", $Root, "--json-output", $ProtocolEventReportPath)) `
++    -Detail "15 C-derived event payload vectors, 13 semantic cases and 22 MiniLang runtime fixtures" `
++    -LogPath $ProtocolEventLogPath
++
++  Invoke-ExternalStep `
++    -Name "Protocol 15 temporary-entity, dynamic-sound and delivery-boundary verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolRuntimeEventChecker, "--root", $Root, "--json-output", $ProtocolRuntimeEventReportPath)) `
++    -Detail "10 C-derived runtime-event vectors, 49 semantic cases and 28 MiniLang runtime fixtures" `
++    -LogPath $ProtocolRuntimeEventLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-015 signon queue and stage verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolSignonChecker, "--root", $Root, "--json-output", $ProtocolSignonReportPath)) `
++    -Detail "source-guided signon stages 1-4 and queue boundaries" `
++    -LogPath $ProtocolSignonLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-016 reliable delivery scheduling verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolDeliveryChecker, "--root", $Root, "--json-output", $ProtocolDeliveryReportPath)) `
++    -Detail "blocked, retained, committed, keepalive and drop scheduling" `
++    -LogPath $ProtocolDeliveryLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-017 datagram ACK and retransmission verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolDatagramChecker, "--root", $Root, "--json-output", $ProtocolDatagramReportPath)) `
++    -Detail "fragmentation, deferred ACK flush, loss, duplicate and wrap cases" `
++    -LogPath $ProtocolDatagramLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-018 demo framing and playback verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolDemoChecker, "--root", $Root, "--json-output", $ProtocolDemoReportPath)) `
++    -Detail "recording atoi, frame ABI, keepalive filtering and timedemo semantics" `
++    -LogPath $ProtocolDemoLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-019 cumulative Protocol 15 closure and freeze verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolClosureChecker, "--root", $Root, "--json-output", $ProtocolClosureReportPath)) `
++    -Detail "nine component checkers, 15 authoritative files and frozen fingerprint" `
++    -LogPath $ProtocolClosureLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-020 QuakeC progs.dat ABI and runtime CRC verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($QuakeCProgsChecker, "--root", $Root, "--json-output", $QuakeCProgsReportPath)) `
++    -Detail "dprograms_t ABI, semantic parser guards, Latin-1 string table and full-file CRC" `
++    -LogPath $QuakeCProgsLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-021 QuakeC VM byte, stack and pointer verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($QuakeCVMChecker, "--root", $Root, "--json-output", $QuakeCVMReportPath)) `
++    -Detail "66 opcodes, Binary32 boundaries, stack/local limits and pointer validation" `
++    -LogPath $QuakeCVMLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-022 QuakeC edict and save-text verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($QuakeCEdictChecker, "--root", $Root, "--json-output", $QuakeCEdictReportPath)) `
++    -Detail "Epair parsing, Latin-1 text, EV_VOID width and exact save formatting" `
++    -LogPath $QuakeCEdictLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-023 QuakeC builtin-table and formatting verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($QuakeCBuiltinChecker, "--root", $Root, "--json-output", $QuakeCBuiltinReportPath)) `
++    -Detail "79 stock slots, 14 PF_Fixme entries, temp strings, random and numeric formatting" `
++    -LogPath $QuakeCBuiltinLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-024 cumulative QuakeC closure and freeze verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($QuakeCClosureChecker, "--root", $Root, "--allow-downstream-package", "--json-output", $QuakeCClosureReportPath)) `
++    -Detail "stock QuakeC 1.09 contract, required globals/fields/functions and frozen fingerprint" `
++    -LogPath $QuakeCClosureLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-025 box hull and recursive trace verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($WorldHullChecker, $Root, "--json-output", $WorldHullReportPath)) `
++    -Detail "six-node box hull, boundary classification and recursive trace parity" `
++    -LogPath $WorldHullLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-025 world-space trace coordinate verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($WorldTraceChecker, $Root, "--json-output", $WorldTraceReportPath)) `
++    -Detail "translated brush traces, impact planes and exact clear endpoints" `
++    -LogPath $WorldTraceLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-026 entity link and collision-filter verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($WorldLinkChecker, $Root, "--json-output", $WorldLinkReportPath)) `
++    -Detail "expanded absolute bounds, owner/point filters, trigger overlap and relinking" `
++    -LogPath $WorldLinkLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-027 monster movement and relink verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ServerMoveChecker, $Root, "--json-output", $ServerMoveReportPath)) `
++    -Detail "bottom checks, steps, partial ground, chase directions and MSVCRT random sequence" `
++    -LogPath $ServerMoveLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-028 server physics verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ServerPhysicsChecker, $Root, "--json-output", $ServerPhysicsReportPath)) `
++    -Detail "pushers, toss, gravity, relink order and strict WinQuake movetype dispatch" `
++    -LogPath $ServerPhysicsLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-028 client movement and angle verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($SvUserMovementChecker, $Root, "--json-output", $SvUserMovementReportPath)) `
++    -Detail "frame clamp, acceleration, waterjump, ideal pitch and usercmd parsing" `
++    -LogPath $SvUserMovementLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-029 server user and command-policy verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ServerUserChecker, $Root, "--json-output", $ServerUserReportPath)) `
++    -Detail "client command privilege order, ping Binary32, movement gates and ideal pitch" `
++    -LogPath $ServerUserLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-029 cumulative world/physics closure verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($WorldPhysicsClosureChecker, $Root, "--json-output", $WorldPhysicsClosureReportPath)) `
++    -Detail "seven component checkers and frozen world_physics_109_frozen_v1 fingerprint" `
++    -LogPath $WorldPhysicsClosureLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-030 host timing and frame-clock verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($HostTimingChecker, "--root", $Root, "--json-output", $HostTimingReportPath)) `
++    -Detail "Host_FilterTime, realtime/oldrealtime, clamp and Binary32 boundaries" `
++    -LogPath $HostTimingLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-031 command buffer, alias and cvar lifecycle verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($CommandCvarChecker, "--root", $Root, "--json-output", $CommandCvarReportPath)) `
++    -Detail "command ordering, aliases, Cvar_Command and Cvar_SetValue formatting" `
++    -LogPath $CommandCvarLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-032 demo recording, playback and timedemo verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($DemoLifecycleChecker, "--root", $Root, "--json-output", $DemoLifecycleReportPath)) `
++    -Detail "demo frame ABI, track parsing, recording gates and Binary32 angles" `
++    -LogPath $DemoLifecycleLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-033 savegame-v5 byte and parser verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($SavegameV5Checker, "--root", $Root, "--json-output", $SavegameV5ReportPath)) `
++    -Detail "version-5 layout, Quake one-byte text, comments, lightstyles and roundtrip" `
++    -LogPath $SavegameV5LogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-034 host lifecycle closure verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($HostLifecycleClosureChecker, "--root", $Root, "--json-output", $HostLifecycleClosureReportPath)) `
++    -Detail "map/changelevel/restart/disconnect/quit, shutdown and frozen lifecycle contract" `
++    -LogPath $HostLifecycleClosureLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-035 client state and render-handoff verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ClientStateRenderChecker, "--root", $Root, "--json-output", $ClientStateRenderReportPath)) `
++    -Detail "dlight pool, Binary32 interpolation, visible entity filtering and first-person handoff" `
++    -LogPath $ClientStateRenderLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-036 view and chase-camera verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ViewStateChecker, "--root", $Root, "--json-output", $ViewStateReportPath)) `
++    -Detail "cshift atoi semantics, view refdef and preserved chase yaw/roll" `
++    -LogPath $ViewStateLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-037 temporary beam model verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($TemporaryBeamChecker, "--root", $Root, "--json-output", $TemporaryBeamReportPath)) `
++    -Detail "30-unit beam segments, Quake model mapping, random roll and temporary entity caps" `
++    -LogPath $TemporaryBeamLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-038 particle runtime verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ParticleRuntimeChecker, "--root", $Root, "--json-output", $ParticleRuntimeReportPath)) `
++    -Detail "sv_gravity handoff, Binary32 storage and particle-type integration" `
++    -LogPath $ParticleRuntimeLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-039 cumulative client/render closure verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ClientRenderClosureChecker, "--root", $Root, "--json-output", $ClientRenderClosureReportPath)) `
++    -Detail "efrag frame accumulation, renderer submission and client_render_109_frozen_v1" `
++    -LogPath $ClientRenderClosureLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-040 world surface and texture-chain verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($WorldSurfaceRenderChecker, "--root", $Root, "--json-output", $WorldSurfaceRenderReportPath)) `
++    -Detail "world/brush culling, per-texture chains, sky classification and water deferral" `
++    -LogPath $WorldSurfaceRenderLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-041 lightmap format and atlas verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($LightmapAtlasChecker, "--root", $Root, "--json-output", $LightmapAtlasReportPath)) `
++    -Detail "luminance/RGBA formats, row strides and shared atlas texture ownership" `
++    -LogPath $LightmapAtlasLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-042 dynamic-light render verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($DynamicLightRenderChecker, "--root", $Root, "--json-output", $DynamicLightRenderReportPath)) `
++    -Detail "push-before-frame ordering, active-light boundaries and brush-model marking" `
++    -LogPath $DynamicLightRenderLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-043 sky/water Binary32 verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($SkyWaterRenderChecker, "--root", $Root, "--json-output", $SkyWaterRenderReportPath)) `
++    -Detail "water warp, sky coordinates, speed wrapping and polygon subdivision" `
++    -LogPath $SkyWaterRenderLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-044 cumulative world/render closure verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($WorldRenderClosureChecker, "--root", $Root, "--json-output", $WorldRenderClosureReportPath)) `
++    -Detail "viewport fudge, front-face culling, pass order and world_render_109_frozen_v1" `
++    -LogPath $WorldRenderClosureLogPath
++
++  if (-not $SkipBuild) {
++    $BuildArguments = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $BuildScript)
++    if (-not [string]::IsNullOrWhiteSpace($Compiler)) { $BuildArguments += @("-Compiler", $Compiler) }
++    if (-not [string]::IsNullOrWhiteSpace($StdLib)) { $BuildArguments += @("-StdLib", $StdLib) }
++    $BuildArguments += @("-Python", $PythonExe, "-Configuration", $Configuration, "-NoRunTests")
++    if ($RebuildNative) { $BuildArguments += "-RebuildNative" }
++    if ($Listings) { $BuildArguments += "-Listings" }
++
++    $PowerShellExe = (Get-Process -Id $PID).Path
++    Invoke-ExternalStep `
++      -Name "single cumulative build of game and all block test executables" `
++      -Executable $PowerShellExe `
++      -Arguments $BuildArguments `
++      -Detail "compile once with -NoRunTests; independent groups execute below" `
++      -LogPath $BuildChildLogPath
++  } else {
++    Add-StepResult "single cumulative build of game and all block test executables" "SKIPPED" 0 "-SkipBuild"
++  }
++
++  Require-File $GameExe "MiniQuake executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15WireTests.exe") "Protocol 15 wire test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15CommandTests.exe") "Protocol 15 command test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15ServerDataTests.exe") "Protocol 15 server-data test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15EventTests.exe") "Protocol 15 event test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15RuntimeEventTests.exe") "Protocol 15 runtime-event test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15SignonTests.exe") "Protocol 15 signon test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15DeliveryTests.exe") "Protocol 15 delivery test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15DatagramTests.exe") "Protocol 15 datagram test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15DemoTests.exe") "Protocol 15 demo test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15ClosureTests.exe") "Protocol 15 closure test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeQuakeCProgsTests.exe") "BP-020 QuakeC progs.dat test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeQuakeCVMTests.exe") "BP-021 QuakeC VM test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeQuakeCEdictTests.exe") "BP-022 QuakeC edict test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeQuakeCBuiltinTests.exe") "BP-023 QuakeC builtin test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeQuakeCClosureTests.exe") "BP-024 QuakeC closure test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeQuakeCStockTests.exe") "BP-024 stock progs.dat test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeWorldHullTests.exe") "BP-025 world hull test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeWorldTraceTests.exe") "BP-025 world trace test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeWorldLinkTests.exe") "BP-026 world link test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeServerMoveTests.exe") "BP-027 server movement test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeServerPhysicsTests.exe") "BP-028 server physics test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeSvUserMovementTests.exe") "BP-028 sv_user movement test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeServerUserTests.exe") "BP-029 server user test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeWorldPhysicsClosureTests.exe") "BP-029 world/physics closure test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeHostTimingTests.exe") "BP-030 host timing test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeCommandCvarTests.exe") "BP-031 command/cvar test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeDemoLifecycleTests.exe") "BP-032 demo lifecycle test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeSavegameV5Tests.exe") "BP-033 savegame v5 test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeHostLifecycleClosureTests.exe") "BP-034 host lifecycle closure test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeClientStateRenderTests.exe") "BP-035 client state/render test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeViewStateTests.exe") "BP-036 view state test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeTemporaryBeamTests.exe") "BP-037 temporary beam test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeParticleRuntimeTests.exe") "BP-038 particle runtime test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeClientRenderClosureTests.exe") "BP-039 client/render closure test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeWorldSurfaceRenderTests.exe") "BP-040 world surface test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeLightmapAtlasTests.exe") "BP-041 lightmap atlas test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeDynamicLightRenderTests.exe") "BP-042 dynamic-light render test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeSkyWaterRenderTests.exe") "BP-043 sky/water render test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeWorldRenderClosureTests.exe") "BP-044 world/render closure test executable"
++
++  foreach ($BridgeName in @("miniquake_native.dll", "miniquake_text.dll")) {
++    $SourceBridge = Join-Path (Join-Path $Root "native") $BridgeName
++    $BuiltBridge = Join-Path $BuildDirectory $BridgeName
++    Require-File $SourceBridge "Packaged native bridge"
++    Require-File $BuiltBridge "Built native bridge"
++    $SourceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $SourceBridge).Hash
++    $BuiltHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $BuiltBridge).Hash
++    if ($SourceHash -ne $BuiltHash) { throw "Built native bridge hash mismatch: $BridgeName" }
++  }
++  Add-StepResult "native bridge deployment" "PASS" 0 "main and buffered-text DLL hashes match package"
++
++  Write-Host "[MiniQuake/$PackageId] executable identity"
++  $VersionOutput = @(& $GameExe "--version" 2>&1)
++  $VersionExitCode = [int]$LASTEXITCODE
++  $VersionOutput | Set-Content -LiteralPath $VersionPath -Encoding UTF8
++  $VersionOutput | ForEach-Object { Write-Host $_ }
++  if ($VersionExitCode -ne 0) { throw "MiniQuake --version failed with exit code $VersionExitCode." }
++  $VersionText = $VersionOutput -join "`n"
++  foreach ($Marker in @(
++    "Package: $PackageId",
++    "Parent package: $ParentPackageId",
++    "Compatibility profile: compat_109",
++    "Native text ABI: $NativeTextAbi",
++    "Protocol text ABI: $ProtocolTextAbi",
++    "Block: $BlockId",
++    "Block parent package: $BlockParentPackageId",
++    "Protocol status: $ProtocolStatus",
++    "QuakeC status: $QuakeCStatus",
++    "World/physics status: $WorldPhysicsStatus",
++    "Host/lifecycle status: $HostLifecycleStatus",
++    "Client/render status: $ClientRenderStatus",
++    "World/render status: $WorldRenderStatus"
++  )) {
++    if ($VersionText -notmatch [regex]::Escape($Marker)) { throw "Executable identity marker missing: $Marker" }
++  }
++  Add-StepResult "executable identity" "PASS" 0 "Package: $PackageId; block: $BlockId; protocol: $ProtocolStatus; quakec: $QuakeCStatus; world/physics: $WorldPhysicsStatus; host/lifecycle: $HostLifecycleStatus"
++
++  $IndependentGroups = @(
++    [ordered]@{ package = "BASE"; name = "core tests"; exe = "MiniQuakeTests.exe"; log = "bp040-044r3-core-tests.log" },
++    [ordered]@{ package = "BASE"; name = "milestone tests"; exe = "MiniQuakeMilestoneTests.exe"; log = "bp040-044r3-milestone-tests.log" },
++    [ordered]@{ package = "BASE"; name = "deterministic diagnostics"; exe = "MiniQuakeCompatTraceTests.exe"; log = "bp040-044r3-diagnostics-tests.log" },
++    [ordered]@{ package = "BP-010R1"; name = "Protocol 15 wire"; exe = "MiniQuakeProtocol15WireTests.exe"; log = "bp040-044r3-wire-tests.log" },
++    [ordered]@{ package = "BP-011"; name = "Protocol 15 command/update"; exe = "MiniQuakeProtocol15CommandTests.exe"; log = "bp040-044r3-command-tests.log" },
++    [ordered]@{ package = "BP-012R1"; name = "Protocol 15 server data"; exe = "MiniQuakeProtocol15ServerDataTests.exe"; log = "bp040-044r3-serverdata-tests.log" },
++    [ordered]@{ package = "BP-013"; name = "Protocol 15 events"; exe = "MiniQuakeProtocol15EventTests.exe"; log = "bp040-044r3-event-tests.log" },
++    [ordered]@{ package = "BP-014R1"; name = "Protocol 15 runtime events"; exe = "MiniQuakeProtocol15RuntimeEventTests.exe"; log = "bp040-044r3-runtime-event-tests.log" },
++    [ordered]@{ package = "BP-015"; name = "signon queue and stages"; exe = "MiniQuakeProtocol15SignonTests.exe"; log = "bp040-044r3-signon-tests.log" },
++    [ordered]@{ package = "BP-016"; name = "reliable delivery scheduling"; exe = "MiniQuakeProtocol15DeliveryTests.exe"; log = "bp040-044r3-delivery-tests.log" },
++    [ordered]@{ package = "BP-017"; name = "datagram ACK and retransmission"; exe = "MiniQuakeProtocol15DatagramTests.exe"; log = "bp040-044r3-datagram-tests.log" },
++    [ordered]@{ package = "BP-018"; name = "demo framing and playback"; exe = "MiniQuakeProtocol15DemoTests.exe"; log = "bp040-044r3-demo-tests.log" },
++    [ordered]@{ package = "BP-019"; name = "cross-layer Protocol 15 closure and freeze"; exe = "MiniQuakeProtocol15ClosureTests.exe"; log = "bp040-044r3-protocol15-closure-tests.log" },
++    [ordered]@{ package = "BP-020"; name = "QuakeC progs.dat ABI and CRC"; exe = "MiniQuakeQuakeCProgsTests.exe"; log = "bp040-044r3-quakec-progs-tests.log" },
++    [ordered]@{ package = "BP-021"; name = "QuakeC VM byte and stack parity"; exe = "MiniQuakeQuakeCVMTests.exe"; log = "bp040-044r3-quakec-vm-tests.log" },
++    [ordered]@{ package = "BP-022"; name = "QuakeC edict and save-text parity"; exe = "MiniQuakeQuakeCEdictTests.exe"; log = "bp040-044r3-quakec-edict-tests.log" },
++    [ordered]@{ package = "BP-023"; name = "QuakeC builtin table and formatting"; exe = "MiniQuakeQuakeCBuiltinTests.exe"; log = "bp040-044r3-quakec-builtin-tests.log" },
++    [ordered]@{ package = "BP-024"; name = "frozen QuakeC contract closure"; exe = "MiniQuakeQuakeCClosureTests.exe"; log = "bp040-044r3-quakec-closure-tests.log" },
++    [ordered]@{ package = "BP-025"; name = "world hull parity"; exe = "MiniQuakeWorldHullTests.exe"; log = "bp040-044r3-world-hull-tests.log" },
++    [ordered]@{ package = "BP-025"; name = "world trace parity"; exe = "MiniQuakeWorldTraceTests.exe"; log = "bp040-044r3-world-trace-tests.log" },
++    [ordered]@{ package = "BP-026"; name = "world link and collision parity"; exe = "MiniQuakeWorldLinkTests.exe"; log = "bp040-044r3-world-link-tests.log" },
++    [ordered]@{ package = "BP-027"; name = "monster movement parity"; exe = "MiniQuakeServerMoveTests.exe"; log = "bp040-044r3-server-move-tests.log" },
++    [ordered]@{ package = "BP-028"; name = "server physics parity"; exe = "MiniQuakeServerPhysicsTests.exe"; log = "bp040-044r3-server-physics-tests.log" },
++    [ordered]@{ package = "BP-028"; name = "sv_user movement parity"; exe = "MiniQuakeSvUserMovementTests.exe"; log = "bp040-044r3-sv-user-movement-tests.log" },
++    [ordered]@{ package = "BP-029"; name = "server user parity"; exe = "MiniQuakeServerUserTests.exe"; log = "bp040-044r3-server-user-tests.log" },
++    [ordered]@{ package = "BP-029"; name = "frozen world and physics closure"; exe = "MiniQuakeWorldPhysicsClosureTests.exe"; log = "bp040-044r3-world-physics-closure-tests.log" },
++    [ordered]@{ package = "BP-030"; name = "host timing and frame clock"; exe = "MiniQuakeHostTimingTests.exe"; log = "bp040-044r3-host-timing-tests.log" },
++    [ordered]@{ package = "BP-031"; name = "command buffer and cvar lifecycle"; exe = "MiniQuakeCommandCvarTests.exe"; log = "bp040-044r3-command-cvar-tests.log" },
++    [ordered]@{ package = "BP-032"; name = "demo lifecycle"; exe = "MiniQuakeDemoLifecycleTests.exe"; log = "bp040-044r3-demo-lifecycle-tests.log" },
++    [ordered]@{ package = "BP-033"; name = "savegame v5"; exe = "MiniQuakeSavegameV5Tests.exe"; log = "bp040-044r3-savegame-v5-tests.log" },
++    [ordered]@{ package = "BP-034"; name = "host lifecycle closure"; exe = "MiniQuakeHostLifecycleClosureTests.exe"; log = "bp040-044r3-host-lifecycle-closure-tests.log" },
++    [ordered]@{ package = "BP-035"; name = "client state and render handoff"; exe = "MiniQuakeClientStateRenderTests.exe"; log = "bp040-044r3-client-state-render-tests.log" },
++    [ordered]@{ package = "BP-036"; name = "view state and chase camera"; exe = "MiniQuakeViewStateTests.exe"; log = "bp040-044r3-view-state-tests.log" },
++    [ordered]@{ package = "BP-037"; name = "temporary beam model entities"; exe = "MiniQuakeTemporaryBeamTests.exe"; log = "bp040-044r3-temporary-beam-tests.log" },
++    [ordered]@{ package = "BP-038"; name = "particle runtime parity"; exe = "MiniQuakeParticleRuntimeTests.exe"; log = "bp040-044r3-particle-runtime-tests.log" },
++    [ordered]@{ package = "BP-039"; name = "frozen client/render closure"; exe = "MiniQuakeClientRenderClosureTests.exe"; log = "bp040-044r3-client-render-closure-tests.log" },
++    [ordered]@{ package = "BP-040"; name = "world surfaces and texture chains"; exe = "MiniQuakeWorldSurfaceRenderTests.exe"; log = "bp040-044r3-world-surface-tests.log" },
++    [ordered]@{ package = "BP-041"; name = "lightmap formats and atlas ownership"; exe = "MiniQuakeLightmapAtlasTests.exe"; log = "bp040-044r3-lightmap-atlas-tests.log" },
++    [ordered]@{ package = "BP-042"; name = "dynamic-light frame and brush marking"; exe = "MiniQuakeDynamicLightRenderTests.exe"; log = "bp040-044r3-dynamic-light-render-tests.log" },
++    [ordered]@{ package = "BP-043"; name = "sky and water Binary32 rendering"; exe = "MiniQuakeSkyWaterRenderTests.exe"; log = "bp040-044r3-sky-water-render-tests.log" },
++    [ordered]@{ package = "BP-044"; name = "frozen world/render closure"; exe = "MiniQuakeWorldRenderClosureTests.exe"; log = "bp040-044r3-world-render-closure-tests.log" }
++  )
++  foreach ($Group in $IndependentGroups) {
++    $Path = Join-Path $BuildDirectory $Group.exe
++    Require-File $Path ("test executable for " + $Group.package)
++    [void](Invoke-IndependentTest -Package $Group.package -Name $Group.name -Executable $Path -LogName $Group.log)
++  }
++
++  $CanUseGameData = -not $SkipGameValidation -and -not [string]::IsNullOrWhiteSpace($QuakeBase)
++  if (-not $CanUseGameData) {
++    $Reason = if ($SkipGameValidation) { "-SkipGameValidation" } else { "no -QuakeBase supplied" }
++    Add-StepResult "[BP-024R3] stock progs.dat compatibility gate" "SKIPPED" 0 $Reason
++    Add-StepResult "[BP-029] installed Quake data validation" "SKIPPED" 0 $Reason
++    Add-StepResult "[BP-029] headless runtime validation" "SKIPPED" 0 $Reason
++  } else {
++    if (-not (Test-Path -LiteralPath $QuakeBase -PathType Container)) {
++      throw "Quake base directory does not exist: $QuakeBase"
++    }
++
++    # Run the focused stock progs.dat gate first. All three user-data gates
++    # are independent and retain complete native stdout/stderr logs even when
++    # one of them fails.
++    $StockExe = Join-Path $BuildDirectory "MiniQuakeQuakeCStockTests.exe"
++    [void](Invoke-IndependentTest -Package "BP-024R3" -Name "stock progs.dat compatibility gate" -Executable $StockExe -LogName ([System.IO.Path]::GetFileName($QuakeCStockLogPath)) -Arguments @($QuakeBase, $Game))
++    [void](Invoke-IndependentTest -Package "BP-029" -Name "installed Quake data validation" -Executable $GameExe -LogName ([System.IO.Path]::GetFileName($GameValidationLogPath)) -Arguments @("--validate-game", $QuakeBase, $Map, "-game", $Game))
++    [void](Invoke-IndependentTest -Package "BP-029" -Name "headless runtime validation" -Executable $GameExe -LogName ([System.IO.Path]::GetFileName($RuntimeValidationLogPath)) -Arguments @("--validate-runtime", $QuakeBase, $Map, [string]$Frames, "-game", $Game))
++  }
++
++  $CanTrace = -not $SkipTraceValidation -and -not [string]::IsNullOrWhiteSpace($QuakeBase)
++  if (-not $CanTrace) {
++    $Reason = if ($SkipTraceValidation) { "-SkipTraceValidation" } else { "no -QuakeBase supplied" }
++    Add-StepResult "deterministic compatibility trace A" "SKIPPED" 0 $Reason
++    Add-StepResult "deterministic compatibility trace B" "SKIPPED" 0 $Reason
++    Add-StepResult "byte-identical trace comparison" "SKIPPED" 0 $Reason
++    Add-StepResult "trace artifact schema validation" "SKIPPED" 0 $Reason
++    Add-StepResult "compatibility snapshot command" "SKIPPED" 0 $Reason
++  } else {
++    if (Test-Path -LiteralPath $TraceDirectory) { Remove-Item -Recurse -Force -LiteralPath $TraceDirectory }
++    New-Item -ItemType Directory -Force -Path $TraceDirectory | Out-Null
++    $PrefixA = Join-Path $TraceDirectory "run-a"
++    $PrefixB = Join-Path $TraceDirectory "run-b"
++
++    Invoke-ExternalStep `
++      -Name "deterministic compatibility trace A" `
++      -Executable $GameExe `
++      -Arguments @("--compat-trace", $QuakeBase, $Map, [string]$TraceFrames, $PrefixA, "-game", $Game) `
++      -Detail "fixed 0.02 second steps; game=$Game map=$Map frames=$TraceFrames" `
++      -LogPath $TraceALogPath
++    Invoke-ExternalStep `
++      -Name "deterministic compatibility trace B" `
++      -Executable $GameExe `
++      -Arguments @("--compat-trace", $QuakeBase, $Map, [string]$TraceFrames, $PrefixB, "-game", $Game) `
++      -Detail "independent second process with identical arguments" `
++      -LogPath $TraceBLogPath
++
++    $TraceA = $PrefixA + ".mqtrace"
++    $TraceB = $PrefixB + ".mqtrace"
++    $SnapshotA = $PrefixA + "-snapshot.json"
++    $ContextA = $PrefixA + "-context.json"
++    $SummaryAPath = $PrefixA + "-summary.json"
++    $SummaryBPath = $PrefixB + "-summary.json"
++    foreach ($Artifact in @($TraceA, $TraceB, $SnapshotA, $ContextA, $SummaryAPath, $SummaryBPath)) {
++      Require-File $Artifact "BP-029 trace artifact"
++    }
++
++    Write-Host "[MiniQuake/$PackageId] byte-identical trace comparison"
++    if (Test-Path -LiteralPath $TraceComparisonPath -PathType Leaf) { Remove-Item -Force -LiteralPath $TraceComparisonPath }
++    if (Test-Path -LiteralPath $TraceComparisonLogPath -PathType Leaf) { Remove-Item -Force -LiteralPath $TraceComparisonLogPath }
++    $ComparisonArguments = @($PythonPrefix + @($TraceComparator, $TraceA, $TraceB, "--json-output", $TraceComparisonPath))
++    & $PythonExe @ComparisonArguments 2>&1 | Tee-Object -FilePath $TraceComparisonLogPath
++    $ComparisonExitCode = [int]$LASTEXITCODE
++    $Comparison = Read-JsonFile $TraceComparisonPath
++    if ($ComparisonExitCode -ne 0 -or -not [bool]$Comparison.equal) {
++      $Detail = "run-a=$($Comparison.left.sha256) run-b=$($Comparison.right.sha256)"
++      if ($null -ne $Comparison.first_difference) {
++        $Detail = $Detail + " first_line=$($Comparison.first_difference.line_index)"
++        if ($null -ne $Comparison.first_difference.frame) {
++          $Detail = $Detail + " first_frame=$($Comparison.first_difference.frame)"
++        }
++      }
++      $Detail = $Detail + "; report=" + [System.IO.Path]::GetFileName($TraceComparisonPath)
++      Add-StepResult "byte-identical trace comparison" "FAIL" $ComparisonExitCode $Detail
++      throw "BP-029 deterministic traces differ. The first differing fields are recorded in $TraceComparisonPath."
++    }
++    $TraceHash = [string]$Comparison.left.sha256
++    $LineCount = [int]$Comparison.left.lines
++    if ($LineCount -ne ($TraceFrames + 1)) {
++      throw "Trace line count is $LineCount, expected $($TraceFrames + 1)."
++    }
++    Add-StepResult "byte-identical trace comparison" "PASS" 0 "sha256=$TraceHash lines=$LineCount report=$([System.IO.Path]::GetFileName($TraceComparisonPath))"
++
++    $SummaryA = Read-JsonFile $SummaryAPath
++    $SummaryB = Read-JsonFile $SummaryBPath
++    $Snapshot = Read-JsonFile $SnapshotA
++    $Context = Read-JsonFile $ContextA
++    if ($SummaryA.schema -ne "MiniQuakeTraceSummary/1" -or $SummaryB.schema -ne "MiniQuakeTraceSummary/1") {
++      throw "Unexpected trace summary schema."
++    }
++    if ($SummaryA.package -ne $PackageId -or $SummaryB.package -ne $PackageId) {
++      throw "Trace summary package marker mismatch."
++    }
++    if (-not $SummaryA.ok -or -not $SummaryB.ok) { throw "A trace summary reports failure." }
++    if ([int]$SummaryA.frames_written -ne $TraceFrames -or [int]$SummaryB.frames_written -ne $TraceFrames) {
++      throw "Trace summary frame count mismatch."
++    }
++    if ($SummaryA.rolling_hash -ne $SummaryB.rolling_hash) {
++      throw "Trace rolling hashes differ despite byte comparison."
++    }
++    if ($Snapshot.schema -ne "MiniQuakeSnapshot/1") { throw "Unexpected snapshot schema." }
++    if ($Context.schema -ne "MiniQuakeCrashContext/1") { throw "Unexpected crash-context schema." }
++    if ($Context.phase -ne "trace_complete") { throw "Final crash context phase is '$($Context.phase)', expected trace_complete." }
++    $TraceRollingHash = [string]$SummaryA.rolling_hash
++
++    foreach ($Artifact in @($TraceA, $SnapshotA, $ContextA, $SummaryAPath)) {
++      Invoke-ExternalStep `
++        -Name ("compatibility report " + [System.IO.Path]::GetFileName($Artifact)) `
++        -Executable $GameExe `
++        -Arguments @("--compat-report", $Artifact) `
++        -Detail "schema recognition"
++    }
++    Add-StepResult "trace artifact schema validation" "PASS" 0 "rolling_hash=$TraceRollingHash"
++
++    $SnapshotFrames = [int][Math]::Min($TraceFrames, 8)
++    $SnapshotPrefix = Join-Path $TraceDirectory "snapshot-command"
++    Invoke-ExternalStep `
++      -Name "compatibility snapshot command" `
++      -Executable $GameExe `
++      -Arguments @("--compat-snapshot", $QuakeBase, $Map, [string]$SnapshotFrames, $SnapshotPrefix, "-game", $Game) `
++      -Detail "direct --compat-snapshot CLI path; frames=$SnapshotFrames" `
++      -LogPath $SnapshotCommandLogPath
++    $SnapshotCommandPath = $SnapshotPrefix + "-snapshot.json"
++    $SnapshotCommandSummaryPath = $SnapshotPrefix + "-summary.json"
++    $SnapshotCommand = Read-JsonFile $SnapshotCommandPath
++    $SnapshotCommandSummary = Read-JsonFile $SnapshotCommandSummaryPath
++    if ($SnapshotCommand.schema -ne "MiniQuakeSnapshot/1") { throw "Direct snapshot command produced an unexpected schema." }
++    if ([int]$SnapshotCommand.frame -ne ($SnapshotFrames - 1)) { throw "Direct snapshot command stopped at frame $($SnapshotCommand.frame), expected $($SnapshotFrames - 1)." }
++    if (-not $SnapshotCommandSummary.ok -or [int]$SnapshotCommandSummary.frames_written -ne $SnapshotFrames) {
++      throw "Direct snapshot command summary reports failure or the wrong frame count."
++    }
++  }
++
++  if ($NetworkTests) {
++    Invoke-ExternalStep `
++      -Name "Winsock UDP loopback smoke" `
++      -Executable $GameExe `
++      -Arguments @("--udp-smoke", "2000") `
++      -Detail "2 second timeout"
++  } else {
++    Add-StepResult "Winsock UDP loopback smoke" "SKIPPED" 0 "use -NetworkTests"
++  }
++
++  if ($IndependentFailures.Count -gt 0) {
++    $First = $IndependentFailures[0]
++    throw ("Independent test groups failed: " + $IndependentFailures.Count + "; first=" + $First.package + " " + $First.name)
++  }
++
++  $OverallStatus = "PASS"
++} catch {
++  $FailureMessage = $_.Exception.Message
++  Write-Host "ERROR: $FailureMessage" -ForegroundColor Red
++} finally {
++  $BlockPackages = @("BP-040", "BP-041", "BP-042", "BP-043", "BP-044")
++  $FirstFailureIndex = -1
++  $FirstFailurePackage = ""
++  if ($IndependentFailures.Count -gt 0) {
++    $FirstFailurePackage = [string]$IndependentFailures[0].package
++    $FirstFailureIndex = [array]::IndexOf($BlockPackages, $FirstFailurePackage)
++    if ($FirstFailureIndex -lt 0) { $FirstFailureIndex = 0 }
++  }
++  $LogicalSteps = @()
++  for ($LogicalIndex = 0; $LogicalIndex -lt $BlockPackages.Count; $LogicalIndex++) {
++    $LogicalPackage = $BlockPackages[$LogicalIndex]
++    $OwnFailure = @($IndependentFailures | Where-Object { $_.package -eq $LogicalPackage })
++    $LogicalStatus = "PASS"
++    if ($OwnFailure.Count -gt 0) {
++      $LogicalStatus = "FAIL"
++    } elseif ($FirstFailureIndex -ge 0 -and $LogicalIndex -gt $FirstFailureIndex) {
++      # The independent fixture may have passed, but the cumulative dependency
++      # chain is not accepted after an earlier block failure.
++      $LogicalStatus = "BLOCKED"
++    } elseif ($FirstFailureIndex -eq 0 -and $FirstFailurePackage -notmatch "^BP-04[0-4]$") {
++      $LogicalStatus = "BLOCKED"
++    }
++    $LogicalSteps += [ordered]@{ package = $LogicalPackage; status = $LogicalStatus }
++  }
++  $Bisect = [ordered]@{
++    schema = "MiniQuakeLogicalBlockBisect/1"
++    block_id = $BlockId
++    requested = [bool]$BisectOnFailure
++    mode = "logical test-group checkpoint locator; no source rebuild is performed"
++    failures = @($IndependentFailures)
++    logical_steps = $LogicalSteps
++    first_failing_package = $FirstFailurePackage
++    suggested_patch = if ($FirstFailurePackage -match "^BP-04[0-9]$") { "patches/" + $FirstFailurePackage + ".diff" } else { "" }
++  }
++  $Bisect | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $BisectReportPath -Encoding UTF8
++
++  $Summary = [ordered]@{
++    schema_version = 1
++    package_id = $PackageId
++    parent_package_id = $ParentPackageId
++    block_id = $BlockId
++    delivery_revision = $DeliveryRevision
++    block_parent_package_id = $BlockParentPackageId
++    protocol_status = $ProtocolStatus
++    quakec_status = $QuakeCStatus
++    world_physics_status = $WorldPhysicsStatus
++    host_lifecycle_status = $HostLifecycleStatus
++    client_render_status = $ClientRenderStatus
++    world_render_status = $WorldRenderStatus
++    created_utc = (Get-Date).ToUniversalTime().ToString("o")
++    status = $OverallStatus
++    failure = $FailureMessage
++    configuration = $Configuration
++    quake_validation = [ordered]@{
++      base_supplied = -not [string]::IsNullOrWhiteSpace($QuakeBase)
++      game = $Game
++      map = $Map
++      frames = $Frames
++      trace_frames = $TraceFrames
++    }
++    deterministic_trace = [ordered]@{
++      sha256 = $TraceHash
++      rolling_hash = $TraceRollingHash
++    }
++    artifacts = [ordered]@{
++      transcript = [System.IO.Path]::GetFileName($TranscriptPath)
++      static_report = [System.IO.Path]::GetFileName($StaticReportPath)
++      version_output = [System.IO.Path]::GetFileName($VersionPath)
++      build_child_log = [System.IO.Path]::GetFileName($BuildChildLogPath)
++      trace_a_log = [System.IO.Path]::GetFileName($TraceALogPath)
++      trace_b_log = [System.IO.Path]::GetFileName($TraceBLogPath)
++      snapshot_command_log = [System.IO.Path]::GetFileName($SnapshotCommandLogPath)
++      trace_comparison = [System.IO.Path]::GetFileName($TraceComparisonPath)
++      trace_comparison_log = [System.IO.Path]::GetFileName($TraceComparisonLogPath)
++      protocol15_vector_report = [System.IO.Path]::GetFileName($ProtocolVectorReportPath)
++      protocol15_vector_log = [System.IO.Path]::GetFileName($ProtocolVectorLogPath)
++      protocol15_command_report = [System.IO.Path]::GetFileName($ProtocolCommandReportPath)
++      protocol15_command_log = [System.IO.Path]::GetFileName($ProtocolCommandLogPath)
++      protocol15_serverdata_report = [System.IO.Path]::GetFileName($ProtocolServerDataReportPath)
++      protocol15_serverdata_log = [System.IO.Path]::GetFileName($ProtocolServerDataLogPath)
++      protocol15_event_report = [System.IO.Path]::GetFileName($ProtocolEventReportPath)
++      protocol15_event_log = [System.IO.Path]::GetFileName($ProtocolEventLogPath)
++      protocol15_runtime_event_report = [System.IO.Path]::GetFileName($ProtocolRuntimeEventReportPath)
++      protocol15_runtime_event_log = [System.IO.Path]::GetFileName($ProtocolRuntimeEventLogPath)
++      protocol15_signon_report = [System.IO.Path]::GetFileName($ProtocolSignonReportPath)
++      protocol15_delivery_report = [System.IO.Path]::GetFileName($ProtocolDeliveryReportPath)
++      protocol15_datagram_report = [System.IO.Path]::GetFileName($ProtocolDatagramReportPath)
++      protocol15_demo_report = [System.IO.Path]::GetFileName($ProtocolDemoReportPath)
++      protocol15_closure_report = [System.IO.Path]::GetFileName($ProtocolClosureReportPath)
++      quakec_progs_report = [System.IO.Path]::GetFileName($QuakeCProgsReportPath)
++      quakec_vm_report = [System.IO.Path]::GetFileName($QuakeCVMReportPath)
++      quakec_edict_report = [System.IO.Path]::GetFileName($QuakeCEdictReportPath)
++      quakec_builtin_report = [System.IO.Path]::GetFileName($QuakeCBuiltinReportPath)
++      quakec_closure_report = [System.IO.Path]::GetFileName($QuakeCClosureReportPath)
++      world_hull_report = [System.IO.Path]::GetFileName($WorldHullReportPath)
++      world_trace_report = [System.IO.Path]::GetFileName($WorldTraceReportPath)
++      world_link_report = [System.IO.Path]::GetFileName($WorldLinkReportPath)
++      server_move_report = [System.IO.Path]::GetFileName($ServerMoveReportPath)
++      server_physics_report = [System.IO.Path]::GetFileName($ServerPhysicsReportPath)
++      sv_user_movement_report = [System.IO.Path]::GetFileName($SvUserMovementReportPath)
++      server_user_report = [System.IO.Path]::GetFileName($ServerUserReportPath)
++      world_physics_closure_report = [System.IO.Path]::GetFileName($WorldPhysicsClosureReportPath)
++      host_timing_report = [System.IO.Path]::GetFileName($HostTimingReportPath)
++      command_cvar_report = [System.IO.Path]::GetFileName($CommandCvarReportPath)
++      demo_lifecycle_report = [System.IO.Path]::GetFileName($DemoLifecycleReportPath)
++      savegame_v5_report = [System.IO.Path]::GetFileName($SavegameV5ReportPath)
++      host_lifecycle_closure_report = [System.IO.Path]::GetFileName($HostLifecycleClosureReportPath)
++      client_state_render_report = [System.IO.Path]::GetFileName($ClientStateRenderReportPath)
++      view_state_report = [System.IO.Path]::GetFileName($ViewStateReportPath)
++      temporary_beam_report = [System.IO.Path]::GetFileName($TemporaryBeamReportPath)
++      particle_runtime_report = [System.IO.Path]::GetFileName($ParticleRuntimeReportPath)
++      client_render_closure_report = [System.IO.Path]::GetFileName($ClientRenderClosureReportPath)
++      world_surface_report = [System.IO.Path]::GetFileName($WorldSurfaceRenderReportPath)
++      lightmap_atlas_report = [System.IO.Path]::GetFileName($LightmapAtlasReportPath)
++      dynamic_light_render_report = [System.IO.Path]::GetFileName($DynamicLightRenderReportPath)
++      sky_water_render_report = [System.IO.Path]::GetFileName($SkyWaterRenderReportPath)
++      world_render_closure_report = [System.IO.Path]::GetFileName($WorldRenderClosureReportPath)
++      quakec_stock_log = [System.IO.Path]::GetFileName($QuakeCStockLogPath)
++      game_validation_log = [System.IO.Path]::GetFileName($GameValidationLogPath)
++      runtime_validation_log = [System.IO.Path]::GetFileName($RuntimeValidationLogPath)
++      bisect_report = [System.IO.Path]::GetFileName($BisectReportPath)
++      trace_directory = "bp040-044r3-traces"
++      independent_failures = @($IndependentFailures)
++    }
++    steps = @($Steps)
++  }
++  $Summary | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $SummaryPath -Encoding UTF8
++
++  if ($TranscriptStarted) {
++    try { Stop-Transcript | Out-Null } catch { }
++  }
++}
++
++if ($OverallStatus -ne "PASS") {
++  Write-Host "MiniQuake $DeliveryRevision acceptance test: FAIL"
++  Write-Host "Run .\COLLECT_RESULTS.ps1 and upload the generated result archive."
++  exit 1
++}
++
++Write-Host "MiniQuake $DeliveryRevision acceptance test: PASS"
++Write-Host "Result summary: $SummaryPath"
++Write-Host "For feedback, run .\COLLECT_RESULTS.ps1 and upload the generated ZIP."
++exit 0
+diff --git a/audit/protocol15_demo_golden.json b/audit/protocol15_demo_golden.json
+index c566216..6524981 100644
+--- a/audit/protocol15_demo_golden.json
++++ b/audit/protocol15_demo_golden.json
+@@ -57,7 +57,7 @@
+     {
+       "kind": "case",
+       "name": "playback_whitespace_track",
+-      "value": -158
++      "value": -1758
+     },
+     {
+       "kind": "case",
+@@ -72,6 +72,6 @@
+   ],
+   "reference": {
+     "oracle": "tools/oracle/protocol15_demo_oracle.c",
+-    "oracle_sha256": "a973a959f1387b1c390302cf3f5cb83eba607475f0b0e1c4ebe1e93a0d34018d"
++    "oracle_sha256": "15ceb2120be675cb107053352e04efb69a371570d535cc1e940611bfcb96a2e7"
+   }
+ }
+diff --git a/build.ps1 b/build.ps1
+index 0dc0fd8..adc9f3f 100644
+--- a/build.ps1
++++ b/build.ps1
+@@ -396,6 +396,15 @@ if (-not $SkipPreflight -and $null -ne $PythonExe) {
+     throw "$PackageId diagnostics preflight failed. The source tree or manifest is inconsistent."
+   }
+ 
++  $RuntimeTestLogChecker = Join-Path $Root "tools\check_runtime_test_log.py"
++  if (-not (Test-Path -LiteralPath $RuntimeTestLogChecker -PathType Leaf)) {
++    throw "Runtime-test log checker is missing: $RuntimeTestLogChecker"
++  }
++  & $PythonExe @PythonPrefixArgs $RuntimeTestLogChecker --self-test
++  if ($LASTEXITCODE -ne 0) {
++    throw "$PackageId runtime-test log checker self-test failed."
++  }
++
+   $ProtocolVectorChecker = Join-Path $Root "tools\check_protocol15_vectors.py"
+   if (-not (Test-Path -LiteralPath $ProtocolVectorChecker -PathType Leaf)) {
+     throw "Protocol 15 vector checker is missing: $ProtocolVectorChecker"
+@@ -705,6 +714,22 @@ if (-not $NoRunTests) {
+   }
+ }
+ 
++function Get-RuntimeTestFailureMarker {
++  param([string]$Text)
++
++  if ([string]::IsNullOrWhiteSpace($Text)) { return "" }
++  $Patterns = @(
++    '(?im)^\s*FAIL:\s+.*$',
++    '(?im)^\s*MiniQuake\b.*\btests failed:\s*\d+/\d+\s*$',
++    '(?im)^\s*BP-\d+.*\btests failed:\s*\d+/\d+\s*$'
++  )
++  foreach ($Pattern in $Patterns) {
++    $Match = [regex]::Match($Text, $Pattern)
++    if ($Match.Success) { return $Match.Value.Trim() }
++  }
++  return ""
++}
++
+ function Invoke-MiniQuakeTestBinary {
+   param(
+     [Parameter(Mandatory = $true)]
+@@ -718,8 +743,15 @@ function Invoke-MiniQuakeTestBinary {
+   )
+ 
+   Write-Host "[MiniQuake] running $Label"
+-  & $Executable
++  $OutputLines = @(& $Executable 2>&1)
+   $ExitCode = [int]$LASTEXITCODE
++  foreach ($OutputLine in $OutputLines) { Write-Host ([string]$OutputLine) }
++  $OutputText = (($OutputLines | ForEach-Object { [string]$_ }) -join "`n")
++  $FailureMarker = Get-RuntimeTestFailureMarker $OutputText
++  if ($ExitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace($FailureMarker)) {
++    $ExitCode = 1
++    Write-Host "ERROR: MiniQuake $Label emitted a failure marker despite exit code 0: $FailureMarker" -ForegroundColor Red
++  }
+   $ExitUnsigned = [System.BitConverter]::ToUInt32(
+     [System.BitConverter]::GetBytes($ExitCode),
+     0
+diff --git a/docs/BP-040-044R2_RESULT_ANALYSIS.md b/docs/BP-040-044R2_RESULT_ANALYSIS.md
+new file mode 100644
+index 0000000..7be2c3c
+--- /dev/null
++++ b/docs/BP-040-044R2_RESULT_ANALYSIS.md
+@@ -0,0 +1,73 @@
++# BP-040–BP-044R2 Windows result analysis
++
++Result archive:
++
++```text
++MiniQuake_BP-040-044R2_RESULTS_20260727-105653.zip
++SHA-256: 2678896b8071fe20d5f7a97fa86eb5cb5ad395a536be62ae464c697fc2f6d831
++```
++
++## What completed
++
++The R2 compiler fixes were successful. The package passed all 41 static checks,
++compiled `MiniQuake.exe` and all 42 test executables, and the acceptance summary
++recorded 84/84 script steps as `PASS`.
++
++The requested installed-game stages did not start because the supplied path did
++not exist on that machine:
++
++```text
++C:\Program Files (x86)\Steam\steamapps\common\Quake
++```
++
++The summary therefore ended with:
++
++```text
++Quake base directory does not exist
++```
++
++No real-game validation, headless runtime, compatibility trace or UDP stage can
++be accepted from this result.
++
++## Suppressed runtime-test failures
++
++A retrospective scan of the collected per-test logs found five independent
++fixture failures that the R2 PowerShell harness had classified as `PASS` because
++the corresponding MiniLang executables returned process exit code 0:
++
++| Group | Runtime output | Classification |
++|---|---|---|
++| BP-013 events | particle count/color bytes reversed in two direct writer fixtures | fixture adapter error |
++| BP-014R1 runtime events | expired first beam slot expected as slot 1 instead of reusable slot 0 | fixture expectation error |
++| BP-015 signon | `ClientEntityState.baseline` populated with a struct instead of its canonical seven-element array | fixture adapter error |
++| BP-018 demo | one leading space used while the expected GLQuake arithmetic value requires two | fixture input error |
++| BP-043 sky/water | centered small polygon crosses both zero subdivision planes and therefore produces four polygons | fixture geometry error |
++
++The relevant logs contained both a `FAIL:` line and a later failed aggregate
++summary, followed by an unconditional success line. This is possible because a
++number of historical MiniLang tests call a standalone top-level `error(...)`
++without returning it from `main`; reaching the end of the program then yields
++process exit code 0.
++
++## R3 response
++
++R3 corrects the five fixtures without changing production or native code. It
++also makes runtime test output part of the acceptance contract:
++
++```text
++FAIL: ...
++MiniQuake ... tests failed: N/M
++BP-... tests failed: N/M
++```
++
++Any such marker now forces a failing result even if the executable reports exit
++code 0. The same guard exists in both `build.ps1` and
++`TEST_BP-040-044R3.ps1`, and is independently modeled by
++`tools/check_runtime_test_log.py`.
++
++The world-render contract and fingerprint remain unchanged:
++
++```text
++world_render_109_frozen_v1
++0x846a74de
++```
+diff --git a/docs/BP-040-044R3_BLOCK_LEDGER.json b/docs/BP-040-044R3_BLOCK_LEDGER.json
+new file mode 100644
+index 0000000..1e5dc69
+--- /dev/null
++++ b/docs/BP-040-044R3_BLOCK_LEDGER.json
+@@ -0,0 +1,172 @@
++{
++  "schema_version": 1,
++  "project": "MiniQuake",
++  "block_id": "BP-040-044",
++  "parent_package_id": "BP-035-039R1",
++  "final_package_id": "BP-044",
++  "delivery_revision": "BP-040-044R3",
++  "protocol_status": "protocol15_frozen_v1",
++  "quakec_status": "quakec_109_frozen_v1",
++  "world_physics_status": "world_physics_109_frozen_v1",
++  "host_lifecycle_status": "host_lifecycle_109_frozen_v1",
++  "client_render_status": "client_render_109_frozen_v1",
++  "client_render_fingerprint": "0x95e2b295",
++  "world_render_status": "world_render_109_frozen_v1",
++  "world_render_fingerprint": "0x846a74de",
++  "steps": [
++    {
++      "package_id": "BP-040",
++      "title": "world surface facing, texture chains and deferred water classification",
++      "patch": "patches/BP-040.diff",
++      "runtime_fixtures": 20,
++      "status": "implemented; R3 Windows acceptance pending"
++    },
++    {
++      "package_id": "BP-041",
++      "title": "lightmap formats, row strides and shared atlas ownership",
++      "patch": "patches/BP-041.diff",
++      "runtime_fixtures": 22,
++      "status": "implemented; R3 Windows acceptance pending"
++    },
++    {
++      "package_id": "BP-042",
++      "title": "dynamic-light frame ordering and movable brush marking",
++      "patch": "patches/BP-042.diff",
++      "runtime_fixtures": 20,
++      "status": "implemented; R3 Windows acceptance pending"
++    },
++    {
++      "package_id": "BP-043",
++      "title": "Binary32 sky, water and subdivision math",
++      "patch": "patches/BP-043.diff",
++      "runtime_fixtures": 22,
++      "status": "implemented; R3 Windows acceptance pending"
++    },
++    {
++      "package_id": "BP-044",
++      "title": "viewport, culling and central GLQuake world-render closure",
++      "patch": "patches/BP-044.diff",
++      "runtime_fixtures": 24,
++      "status": "implemented; R3 Windows acceptance pending"
++    }
++  ],
++  "block_runtime_fixtures": 108,
++  "acceptance": {
++    "build_once": true,
++    "continue_independent_tests": true,
++    "deterministic_trace_processes": 2,
++    "default_headless_frames": 300,
++    "default_trace_frames": 128,
++    "udp_loopback": true,
++    "installed_game_validation": true
++  },
++  "accepted_parent": {
++    "delivery_revision": "BP-035-039R1",
++    "status": "PASS",
++    "result_archive": "MiniQuake_BP-035-039R1_RESULTS_20260726-213106.zip",
++    "result_archive_sha256": "2bdab8329975fbd2108c4cf644c70178769c0b713aceec2cfbc8d9a2a2bf613b",
++    "headless_frames": 300,
++    "trace_frames": 128,
++    "trace_sha256": "e4c5334bf6aa4205b3a8d6c0c408a398a16bf042852703ea0bf29ba31c1919a1",
++    "trace_rolling_hash": "0658dd48",
++    "trace_byte_identity": "PASS",
++    "udp_loopback": "PASS"
++  },
++  "scope_boundary": {
++    "visual_golden_images": "later acceptance block",
++    "modern_renderer_backend": "later backend block",
++    "protocol_quakec_physics_host_client_contracts": "unchanged"
++  },
++  "status": "implemented; R3 Windows acceptance pending",
++  "delivery_parent": "BP-040-044R2",
++  "initial_delivery_result": {
++    "delivery_revision": "BP-040-044",
++    "status": "FAIL; static preflight passed, cumulative game compile failed",
++    "result_archive": "MiniQuake_BP-040-044_RESULTS_20260727-071848.zip",
++    "result_archive_sha256": "4c847c6249f51bf68b1763cf83b27e6316ebc5963e29b8a5f368bc49e5eb3d89",
++    "static_verification": "38/38 PASS",
++    "build": "FAIL while compiling MiniQuake.exe",
++    "compiler_exit_code": 2,
++    "first_failure": "Undefined global variable 'rCompatRenderer.lightmaps' in render/world.ml:1918",
++    "runtime_reached": false
++  },
++  "r1_delivery_hotfix": {
++    "revision": "BP-040-044R1",
++    "parent": "BP-040-044",
++    "corrections": [
++      "mutate the compatibility renderer through a local object reference in GL_BuildLightmaps",
++      "remove equivalent package-global-root member assignments from the canonical original renderer module",
++      "bind the compiler-safe renderer member-write contract in the verifier and BP-041 checker"
++    ],
++    "production_source_changed": true,
++    "native_source_changed": false,
++    "runtime_fixture_counts_changed": false,
++    "world_render_fingerprint": "0x846a74de",
++    "status": "Windows build progressed past game; lightmap test-entry compile blocker remained",
++    "patch": "patches/BP-044R1.diff"
++  },
++  "r1_delivery_result": {
++    "delivery_revision": "BP-040-044R1",
++    "status": "FAIL; static preflight and game compile passed, BP-041 test entry failed to compile",
++    "result_archive": "MiniQuake_BP-040-044R1_RESULTS_20260727-080437.zip",
++    "result_archive_sha256": "73ea957dacb8f106ccbc3c7b176b8167a882d95109ff98f3604703be7fe53754",
++    "static_verification": "39/39 PASS",
++    "build": "39/43 executable targets compiled",
++    "compiler_exit_code": 2,
++    "first_failure": "Function standard expects 0 args, got 2 in filesystem.ml:70 while compiling lightmap_atlas_tests.ml",
++    "runtime_reached": false
++  },
++  "r2_delivery_hotfix": {
++    "revision": "BP-040-044R2",
++    "parent": "BP-040-044R1",
++    "corrections": [
++      "rename the package-free BP-041 standard helper to standardFixture",
++      "rename the BP-043 bits helper to fixtureFloatBits to avoid future internal-helper shadowing",
++      "reject entry-function/imported-internal-function arity shadowing across every merged MiniLang import closure"
++    ],
++    "production_source_changed": false,
++    "native_source_changed": false,
++    "runtime_fixture_counts_changed": false,
++    "world_render_fingerprint": "0x846a74de",
++    "status": "awaiting Windows acceptance",
++    "patch": "patches/BP-044R2.diff"
++  },
++  "r2_delivery_result": {
++    "delivery_revision": "BP-040-044R2",
++    "status": "FAIL; 43/43 targets compiled and all 84 script steps were reported PASS, but the supplied Quake base directory did not exist; retrospective log scan found five suppressed fixture failures",
++    "result_archive": "MiniQuake_BP-040-044R2_RESULTS_20260727-105653.zip",
++    "result_archive_sha256": "2678896b8071fe20d5f7a97fa86eb5cb5ad395a536be62ae464c697fc2f6d831",
++    "static_verification": "41/41 PASS",
++    "build": "43/43 executable targets compiled",
++    "script_steps": "84/84 reported PASS",
++    "suppressed_runtime_failures": 5,
++    "suppressed_failure_groups": [
++      "BP-013 events",
++      "BP-014R1 runtime events",
++      "BP-015 signon",
++      "BP-018 demo",
++      "BP-043 sky/water"
++    ],
++    "quake_base": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Quake",
++    "quake_base_exists": false,
++    "real_game_runtime_reached": false
++  },
++  "delivery_hotfix": {
++    "revision": "BP-040-044R3",
++    "parent": "BP-040-044R2",
++    "corrections": [
++      "correct five source-guided runtime fixtures whose expectations or adapters differed from their production APIs",
++      "treat FAIL output and failed aggregate summaries as process failure even when a MiniLang test executable exits with zero",
++      "add an independent runtime-test log checker and bind it in build, acceptance and static verification",
++      "retain all production and native engine sources unchanged"
++    ],
++    "production_source_changed": false,
++    "native_source_changed": false,
++    "runtime_fixture_counts_changed": false,
++    "runtime_fixture_content_corrected": true,
++    "runtime_failure_marker_guard": true,
++    "world_render_fingerprint": "0x846a74de",
++    "status": "awaiting Windows acceptance with an existing Quake base directory",
++    "patch": "patches/BP-044R3.diff"
++  }
++}
+diff --git a/docs/BP-040-044R3_TESTING.md b/docs/BP-040-044R3_TESTING.md
+new file mode 100644
+index 0000000..6072432
+--- /dev/null
++++ b/docs/BP-040-044R3_TESTING.md
+@@ -0,0 +1,89 @@
++# BP-040–BP-044R3 Windows acceptance
++
++Extract the complete source archive into a new, empty directory. Do not overlay
++R3 on an older MiniQuake tree.
++
++Use a Quake base directory that actually exists on the test machine and contains
++`id1/pak0.pak` and, for the registered game, `id1/pak1.pak`.
++
++```powershell
++Test-Path "C:\Actual\Path\To\Quake\id1\pak0.pak"
++```
++
++The command must print `True` before running full acceptance.
++
++```powershell
++.\TEST_BP-040-044R3.ps1 `
++  -Compiler C:\Users\nilsk\Desktop\MiniLangCompilerPy\mlc_win64.py `
++  -StdLib C:\Users\nilsk\Desktop\MiniLangCompilerPy `
++  -QuakeBase "C:\Actual\Path\To\Quake" `
++  -Game id1 `
++  -Map start `
++  -Frames 300 `
++  -TraceFrames 128 `
++  -NetworkTests `
++  -ContinueIndependentTests `
++  -BisectOnFailure
++```
++
++## Early gates
++
++The preflight must include:
++
++```text
++[PASS] minilang_entry_function_shadow_arity
++[PASS] bp040044r1_renderer_member_write_contract
++[PASS] bp040044r2_entry_symbol_shadow_contract
++[PASS] bp040044r3_runtime_test_integrity_contract
++MiniQuake runtime-test log checker self-test: PASS
++```
++
++The cumulative build must create all 43 executables.
++
++## Corrected historical fixtures
++
++These inherited groups must now be genuinely green, not merely return exit code
++0:
++
++```text
++MiniQuake BP-013 Protocol 15 event tests passed: 22
++MiniQuake BP-014R1 Protocol 15 runtime-event tests passed: 28
++MiniQuake BP-015 Protocol 15 signon tests passed: 12
++MiniQuake BP-018 Protocol 15 demo tests passed: 19
++MiniQuake BP-043 sky/water render tests passed: 22
++```
++
++A line beginning with `FAIL:` or a summary containing `tests failed: N/M` is now
++reported as a failed independent test group even if the executable returns 0.
++
++The five world-render groups must end with:
++
++```text
++MiniQuake BP-040 world surface tests passed: 20
++MiniQuake BP-041 lightmap atlas tests passed: 22
++MiniQuake BP-042 dynamic-light render tests passed: 20
++MiniQuake BP-043 sky/water render tests passed: 22
++MiniQuake BP-044 world-render closure tests passed: 24
++```
++
++Full acceptance also requires installed-game validation, 300 headless frames,
++two independent byte-identical 128-frame traces, a direct snapshot and Winsock
++UDP loopback.
++
++Expected final line:
++
++```text
++MiniQuake BP-040-044R3 acceptance test: PASS
++```
++
++After either success or failure:
++
++```powershell
++.\COLLECT_RESULTS.ps1
++```
++
++Expected result name:
++
++```text
++build\MiniQuake_BP-040-044R3_RESULTS_YYYYMMDD-HHMMSS.zip
++```
+diff --git a/scripts/validate_real_game.ps1 b/scripts/validate_real_game.ps1
+index 5fa49cc..7ad8d09 100644
+--- a/scripts/validate_real_game.ps1
++++ b/scripts/validate_real_game.ps1
+@@ -19,7 +19,7 @@ $ErrorActionPreference = "Stop"
+ Set-StrictMode -Version Latest
+ 
+ $Root = Split-Path -Parent $PSScriptRoot
+-$TestScript = Join-Path $Root "TEST_BP-040-044R2.ps1"
++$TestScript = Join-Path $Root "TEST_BP-040-044R3.ps1"
+ $PowerShellExecutable = (Get-Process -Id $PID).Path
+ $Arguments = @(
+   "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $TestScript,
+diff --git a/tests/protocol15_demo_tests.ml b/tests/protocol15_demo_tests.ml
+index 5d5b9fe..ae42e0f 100644
+--- a/tests/protocol15_demo_tests.ml
++++ b/tests/protocol15_demo_tests.ml
+@@ -311,7 +311,7 @@ function testDeterministicCorpus()
+ end function
+ 
+ function testTrackHeaderPlaybackArithmetic()
+-  whitespace = demo.parse(bytes(" 2\n"))
++  whitespace = demo.parse(bytes("  2\n"))
+   equal(whitespace.forcedTrack, -1758, "GLQuake bytewise whitespace arithmetic")
+   negative = demo.parse(bytes("-12\n"))
+   equal(negative.forcedTrack, -12, "negative playback track")
+diff --git a/tests/protocol15_event_tests.ml b/tests/protocol15_event_tests.ml
+index bfd071b..3a1ad29 100644
+--- a/tests/protocol15_event_tests.ml
++++ b/tests/protocol15_event_tests.ml
+@@ -132,8 +132,8 @@ function testParticleBasic()
+     buffer,
+     t.Vec3(10.0, -20.0, 30.0),
+     t.Vec3(1.0, -2.0, 0.0625),
+-    7,
+     20,
++    7,
+   )
+   assertHex(buffer, "12500060fff00010e0011407", "particle_basic")
+   return true
+@@ -145,8 +145,8 @@ function testParticleClamp()
+     buffer,
+     t.Vec3(-12.25, 0.125, 4095.875),
+     t.Vec3(100.0, -100.0, -7.999),
+-    300,
+     255,
++    300,
+   )
+   assertHex(buffer, "129eff0100ff7f7f8081ff2c", "particle_clamped")
+   assertEqual(events.particleDirectionByte(100.0), 127, "particle high clamp")
+diff --git a/tests/protocol15_runtime_event_tests.ml b/tests/protocol15_runtime_event_tests.ml
+index 2355596..c5582f0 100644
+--- a/tests/protocol15_runtime_event_tests.ml
++++ b/tests/protocol15_runtime_event_tests.ml
+@@ -236,7 +236,8 @@ function testCompactBeamSameEntitySlot()
+ 
+   other = beamValue(c.TE_LIGHTNING2, 7)
+   second = transients.updateCompactBeamListResult(initial[0], other, 1.0)
+-  assertEqual(second[2], 1, "second beam slot after expired first")
++  assertEqual(second[2], 0, "expired first beam slot reused")
++  assertEqual(second[0][0][0].entity, 7, "reused slot stores new entity")
+ 
+   replacement = beamValue(c.TE_LIGHTNING3, 42)
+   replaced = transients.updateCompactBeamListResult(second[0], replacement, 2.0)
+diff --git a/tests/protocol15_signon_e2e_tests.ml b/tests/protocol15_signon_e2e_tests.ml
+index d12bb00..8c6d642 100644
+--- a/tests/protocol15_signon_e2e_tests.ml
++++ b/tests/protocol15_signon_e2e_tests.ml
+@@ -235,10 +235,12 @@ function testFastUpdateCompletesSignon()
+   localClient = pair[2]
+   entity = client.CL_EntityNum(localClient, 1)
+   if entity is error then return entity end if
+-  baseline = t.EntityBaseline(0, 0, 0, 0, 0, t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
+-  entity.baseline = baseline
++  baselineOrigin = t.Vec3(0.0, 0.0, 0.0)
++  baselineAngles = t.Vec3(0.0, 0.0, 0.0)
++  entity.baseline = [0, 0, 0, 0, baselineOrigin, baselineAngles, 0]
++  serverBaseline = t.EntityBaseline(0, 0, 0, 0, 0, baselineOrigin, baselineAngles)
+   packet = sz.alloc(64)
+-  update.writeFastUpdate(packet, 1, baseline, 0, 0, 0, 0, 0, t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), c.MOVETYPE_NONE)
++  update.writeFastUpdate(packet, 1, serverBaseline, 0, 0, 0, 0, 0, t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), c.MOVETYPE_NONE)
+   assertEqual(netmain.NET_SendUnreliableMessage(pair[5], packet), 1, "first fast update sent")
+   result = client.CL_ReadFromServer(localClient, 0.0, 1.3)
+   if result is error then return result end if
+diff --git a/tests/sky_water_render_tests.ml b/tests/sky_water_render_tests.ml
+index 686393e..09678b0 100644
+--- a/tests/sky_water_render_tests.ml
++++ b/tests/sky_water_render_tests.ml
+@@ -138,7 +138,13 @@ function testSubdivideVertexLimit()
+ end function
+ 
+ function testSmallPolygonNoSplit()
+-  equal(len(warp.SubdividePolygon(quad(16.0), 128.0)), 1, "small polygon")
++  polygon = [
++    vertex(16.0, 16.0, 0.0, 16.0, 16.0),
++    vertex(48.0, 16.0, 0.0, 48.0, 16.0),
++    vertex(48.0, 48.0, 0.0, 48.0, 48.0),
++    vertex(16.0, 48.0, 0.0, 16.0, 48.0),
++  ]
++  equal(len(warp.SubdividePolygon(polygon, 128.0)), 1, "small polygon")
+   return true
+ end function
+ 
+diff --git a/tools/check_protocol15_demo.py b/tools/check_protocol15_demo.py
+index fd6e71b..bffb268 100644
+--- a/tools/check_protocol15_demo.py
++++ b/tools/check_protocol15_demo.py
+@@ -40,7 +40,7 @@ def rows():
+       {"kind":"case","name":"stop_disconnect_opcode","value":2},
+       {"kind":"case","name":"max_message_accepted","value":8000},
+       {"kind":"case","name":"timedemo_first_frame_excluded","value":10},
+-      {"kind":"case","name":"playback_whitespace_track","value":playback_track(' 2\n')},
++      {"kind":"case","name":"playback_whitespace_track","value":playback_track('  2\n')},
+       {"kind":"case","name":"map_before_demo_open","value":1},
+       {"kind":"vector","name":"single_frame","hex":frame.hex()},
+     ]
+@@ -88,6 +88,10 @@ def contract(root:Path):
+         errors.append('CL_Record_f map transition is not ordered before demo open')
+     if 'MiniQuake BP-018 Protocol 15 demo tests passed: 19' not in tests:
+         errors.append('missing BP-018 runtime success marker')
++    if 'whitespace = demo.parse(bytes("  2\\n"))' not in tests:
++        errors.append('BP-018 whitespace arithmetic fixture must use two leading spaces')
++    if 'equal(whitespace.forcedTrack, -1758, "GLQuake bytewise whitespace arithmetic")' not in tests:
++        errors.append('BP-018 whitespace arithmetic expectation differs from GLQuake bytewise parsing')
+     if tests.count('if run(')!=19:errors.append('expected 19 BP-018 runtime fixtures')
+     return errors
+ 
+diff --git a/tools/check_protocol15_events.py b/tools/check_protocol15_events.py
+index 229fb4b..41f11b4 100644
+--- a/tools/check_protocol15_events.py
++++ b/tools/check_protocol15_events.py
+@@ -379,6 +379,12 @@ def source_contract(root: Path) -> tuple[list[str], dict[str, Any]]:
+         if forbidden in texts.get("server", "") or forbidden in texts.get("builtins", ""):
+             errors.append(f"ambient sound remains clamped: {forbidden}")
+ 
++    test_text = texts.get("tests", "")
++    if not re.search(r'events\.writeParticle\(\s*buffer,\s*t\.Vec3\(10\.0, -20\.0, 30\.0\),\s*t\.Vec3\(1\.0, -2\.0, 0\.0625\),\s*20,\s*7,\s*\)', test_text):
++        errors.append("BP-013 particle_basic fixture does not pass count before color to writeParticle")
++    if not re.search(r'events\.writeParticle\(\s*buffer,\s*t\.Vec3\(-12\.25, 0\.125, 4095\.875\),\s*t\.Vec3\(100\.0, -100\.0, -7\.999\),\s*255,\s*300,\s*\)', test_text):
++        errors.append("BP-013 particle_clamped fixture does not pass count before color to writeParticle")
++
+     fixture_numbers = [int(value) for value in re.findall(r'runTest\("(\d+)"', texts.get("tests", ""))]
+     if fixture_numbers != list(range(1, 23)):
+         errors.append(f"fixture numbering differs: {fixture_numbers!r}")
+diff --git a/tools/check_protocol15_runtime_events.py b/tools/check_protocol15_runtime_events.py
+index 3bea489..b07844e 100644
+--- a/tools/check_protocol15_runtime_events.py
++++ b/tools/check_protocol15_runtime_events.py
+@@ -433,6 +433,12 @@ def source_contract(root: Path) -> tuple[list[str], dict[str, Any]]:
+         elif forbidden in body:
+             errors.append(f"{paths[key]}:{function} retains forbidden duplicate/unsafe logic: {forbidden}")
+ 
++    tests_text = texts.get("tests", "")
++    if 'assertEqual(second[2], 0, "expired first beam slot reused")' not in tests_text:
++        errors.append("BP-014 expired beam fixture must reuse slot zero for a different entity")
++    if 'assertEqual(second[0][0][0].entity, 7, "reused slot stores new entity")' not in tests_text:
++        errors.append("BP-014 expired beam fixture does not verify replacement payload ownership")
++
+     fixture_numbers = [int(value) for value in re.findall(r'runTest\("(\d+)"', texts.get("tests", ""))]
+     if fixture_numbers != list(range(1, 29)):
+         errors.append(f"fixture numbering differs: {fixture_numbers!r}")
+diff --git a/tools/check_protocol15_signon.py b/tools/check_protocol15_signon.py
+index c64b6c0..2ea0e67 100644
+--- a/tools/check_protocol15_signon.py
++++ b/tools/check_protocol15_signon.py
+@@ -85,6 +85,10 @@ def source_contract(root: Path) -> list[str]:
+     texts = [signon, client, server, server, tests]
+     for (name, marker), text in zip(required.items(), texts):
+         if marker not in text: errors.append(f"missing {name}: {marker}")
++    if 'entity.baseline = [0, 0, 0, 0, baselineOrigin, baselineAngles, 0]' not in tests:
++        errors.append("BP-015 fast-update fixture must use the canonical ClientEntityState baseline array")
++    if 'serverBaseline = t.EntityBaseline(' not in tests or 'update.writeFastUpdate(packet, 1, serverBaseline,' not in tests:
++        errors.append("BP-015 fast-update fixture must keep the server baseline struct separate from the client baseline array")
+     if "return sendReliable(client) >= 0" in client: errors.append("CL_SignonReply still sends from parser")
+     if "return sendBuffer(client, buffer)" in server[server.find("function writeSignonStage2"):server.find("function placeClient")]:
+         errors.append("Host_PreSpawn_f still performs immediate transport")
+diff --git a/tools/check_runtime_test_log.py b/tools/check_runtime_test_log.py
+new file mode 100755
+index 0000000..b7a0cf9
+--- /dev/null
++++ b/tools/check_runtime_test_log.py
+@@ -0,0 +1,122 @@
++#!/usr/bin/env python3
++"""Detect MiniQuake runtime-test failures even when an executable exits with 0.
++
++Several historical MiniLang test entrypoints printed ``FAIL:`` and a failed
++summary after a caught error, then reached the end of the program and returned
++0.  The acceptance harness must therefore treat the textual result contract as
++part of the process status.
++"""
++from __future__ import annotations
++
++import argparse
++import json
++import re
++import sys
++from pathlib import Path
++
++FAILURE_PATTERNS: tuple[re.Pattern[str], ...] = (
++    re.compile(r"^\s*FAIL:\s+.*$", re.IGNORECASE | re.MULTILINE),
++    re.compile(
++        r"^\s*MiniQuake\b.*\btests failed:\s*\d+/\d+\s*$",
++        re.IGNORECASE | re.MULTILINE,
++    ),
++    re.compile(
++        r"^\s*BP-\d+.*\btests failed:\s*\d+/\d+\s*$",
++        re.IGNORECASE | re.MULTILINE,
++    ),
++)
++
++
++def first_failure_marker(text: str) -> str:
++    """Return the earliest recognized failure marker or an empty string."""
++    matches: list[re.Match[str]] = []
++    for pattern in FAILURE_PATTERNS:
++        match = pattern.search(text)
++        if match is not None:
++            matches.append(match)
++    if not matches:
++        return ""
++    earliest = min(matches, key=lambda item: item.start())
++    return earliest.group(0).strip()
++
++
++def self_test() -> None:
++    clean = "[1/2] alpha\n[2/2] beta\nMiniQuake tests passed: 2\n"
++    assert first_failure_marker(clean) == ""
++    assert first_failure_marker("  FAIL: boom\n") == "FAIL: boom"
++    assert (
++        first_failure_marker("MiniQuake BP-018 Protocol 15 demo tests failed: 18/19\n")
++        == "MiniQuake BP-018 Protocol 15 demo tests failed: 18/19"
++    )
++    assert (
++        first_failure_marker("BP-043 sky/water tests failed: 21/22\n")
++        == "BP-043 sky/water tests failed: 21/22"
++    )
++    # The earliest marker is reported, so diagnostics point at the first
++    # observable failure rather than a later aggregate summary.
++    text = "FAIL: first\nMiniQuake tests failed: 0/1\n"
++    assert first_failure_marker(text) == "FAIL: first"
++
++
++def read_text(path: Path) -> str:
++    data = path.read_bytes()
++    for encoding in ("utf-8-sig", "utf-16", "utf-8", "cp1252"):
++        try:
++            return data.decode(encoding)
++        except UnicodeError:
++            continue
++    return data.decode("utf-8", errors="replace")
++
++
++def main(argv: list[str] | None = None) -> int:
++    parser = argparse.ArgumentParser()
++    parser.add_argument("paths", nargs="*", type=Path)
++    parser.add_argument("--self-test", action="store_true")
++    parser.add_argument("--json-output", type=Path)
++    parser.add_argument("--quiet", action="store_true")
++    args = parser.parse_args(argv)
++
++    if args.self_test:
++        self_test()
++        if not args.quiet:
++            print("MiniQuake runtime-test log checker self-test: PASS")
++
++    results: list[dict[str, object]] = []
++    failed = False
++    for path in args.paths:
++        if not path.is_file():
++            marker = f"log file does not exist: {path}"
++            results.append({"path": str(path), "ok": False, "failure_marker": marker})
++            failed = True
++            if not args.quiet:
++                print(f"FAIL: {marker}")
++            continue
++        marker = first_failure_marker(read_text(path))
++        ok = marker == ""
++        results.append({"path": str(path), "ok": ok, "failure_marker": marker})
++        failed = failed or not ok
++        if not args.quiet:
++            print(f"{path}: {'PASS' if ok else 'FAIL'}")
++            if marker:
++                print(f"  marker={marker}")
++
++    if args.json_output is not None:
++        args.json_output.parent.mkdir(parents=True, exist_ok=True)
++        args.json_output.write_text(
++            json.dumps(
++                {
++                    "schema": "MiniQuakeRuntimeTestLogCheck/1",
++                    "ok": not failed,
++                    "files": results,
++                },
++                indent=2,
++            )
++            + "\n",
++            encoding="utf-8",
++        )
++
++    return 1 if failed else 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/tools/oracle/protocol15_demo_oracle.c b/tools/oracle/protocol15_demo_oracle.c
+index ac38229..d6f0236 100644
+--- a/tools/oracle/protocol15_demo_oracle.c
++++ b/tools/oracle/protocol15_demo_oracle.c
+@@ -47,7 +47,7 @@ int main(void) {
+     case_row("stop_disconnect_opcode",2);
+     case_row("max_message_accepted",8000);
+     case_row("timedemo_first_frame_excluded",10);
+-    case_row("playback_whitespace_track",playback_track(" 2\n"));
++    case_row("playback_whitespace_track",playback_track("  2\n"));
+     case_row("map_before_demo_open",1);
+     vector_row("single_frame",hex);
+     return 0;
+diff --git a/tools/verify.py b/tools/verify.py
+index c8847fb..b8818ff 100644
+--- a/tools/verify.py
++++ b/tools/verify.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""Self-contained MiniQuake BP-044 / BP-040-044R2 world-render delivery verifier.
++"""Self-contained MiniQuake BP-044 / BP-040-044R3 world-render delivery verifier.
+ 
+ The verifier uses only the Python standard library so the exact source archive
+ can be checked before MiniLang compilation. It preserves the accepted Protocol
+@@ -25,8 +25,8 @@ PACKAGE_ID = "BP-044"
+ PARENT_PACKAGE_ID = "BP-043"
+ BLOCK_ID = "BP-040-044"
+ BLOCK_PARENT_PACKAGE_ID = "BP-035-039R1"
+-DELIVERY_REVISION = "BP-040-044R2"
+-DELIVERY_PARENT = "BP-040-044R1"
++DELIVERY_REVISION = "BP-040-044R3"
++DELIVERY_PARENT = "BP-040-044R2"
+ PROTOCOL_STATUS = "protocol15_frozen_v1"
+ QUAKEC_STATUS = "quakec_109_frozen_v1"
+ WORLD_PHYSICS_STATUS = "world_physics_109_frozen_v1"
+@@ -393,6 +393,10 @@ REQUIRED_PATHS.update({
+     "CHANGELOG_BP-040-044R2.md", "TEST_BP-040-044R2.ps1",
+     "docs/BP-040-044R1_RESULT_ANALYSIS.md", "docs/BP-040-044R2_TESTING.md",
+     "docs/BP-040-044R2_BLOCK_LEDGER.json", "patches/BP-044R2.diff",
++    "CHANGELOG_BP-040-044R3.md", "TEST_BP-040-044R3.ps1",
++    "docs/BP-040-044R2_RESULT_ANALYSIS.md", "docs/BP-040-044R3_TESTING.md",
++    "docs/BP-040-044R3_BLOCK_LEDGER.json", "patches/BP-044R3.diff",
++    "tools/check_runtime_test_log.py",
+ })
+ 
+ 
+@@ -1367,26 +1371,34 @@ def check_delivery_scripts(root: Path) -> CheckResult:
+             "check_world_render_040.py", "check_world_render_044.py",
+             "MiniQuakeWorldSurfaceRenderTests.exe", "MiniQuakeWorldRenderClosureTests.exe",
+             "bp040-044-build-version.txt", "world_render_closure=",
++            "Get-RuntimeTestFailureMarker", "check_runtime_test_log.py",
++            "emitted a failure marker despite exit code 0",
+         ],
+-        "TEST_BP-040-044R2.ps1": [
++        "TEST_BP-040-044R3.ps1": [
+             '$PackageId = "BP-044"', '$ParentPackageId = "BP-043"',
+             '$BlockId = "BP-040-044"', '$BlockParentPackageId = "BP-035-039R1"',
+-            '$DeliveryRevision = "BP-040-044R2"',
++            '$DeliveryRevision = "BP-040-044R3"',
+             '$WorldRenderStatus = "world_render_109_frozen_v1"',
+             "ContinueIndependentTests", "BisectOnFailure", "Invoke-IndependentTest",
++            "Get-RuntimeTestFailureMarker", "check_runtime_test_log.py",
++            "failure_marker", "synthetic_failure",
+             "check_world_render_040.py", "check_world_render_044.py",
+             "MiniQuakeWorldRenderClosureTests.exe", "--compat-trace",
+-            "bp040-044r2-game-validation.log", "bp040-044r2-runtime-validation.log",
+-            "byte-identical trace comparison", "bp040-044r2-bisect-report.json",
++            "bp040-044r3-game-validation.log", "bp040-044r3-runtime-validation.log",
++            "byte-identical trace comparison", "bp040-044r3-bisect-report.json",
+             "MiniQuake $DeliveryRevision acceptance test: PASS",
+         ],
+         "COLLECT_RESULTS.ps1": [
+-            "BP-040-044R2", "BP-040-044R1", "BP-044", "BP-035-039R1", WORLD_RENDER_STATUS,
++            "BP-040-044R3", "BP-040-044R2", "BP-044", "BP-035-039R1", WORLD_RENDER_STATUS,
+             "MiniQuakeWorldSurfaceRenderTests.exe", "MiniQuakeWorldRenderClosureTests.exe",
+             "world_render_closure_golden.json", "BP-044_WORLD_RENDER_CLOSURE_AUDIT.md",
+-            "patches\\BP-044R2.diff", ".mqtrace", "ForbiddenExtensions", "Compress-Archive",
++            r"patches\BP-044R3.diff", ".mqtrace", "ForbiddenExtensions", "Compress-Archive",
++        ],
++        "scripts/validate_real_game.ps1": ["TEST_BP-040-044R3.ps1", "TraceFrames", "Frames"],
++        "tools/check_runtime_test_log.py": [
++            "FAILURE_PATTERNS", "first_failure_marker", "--self-test",
++            "MiniQuake runtime-test log checker self-test: PASS",
+         ],
+-        "scripts/validate_real_game.ps1": ["TEST_BP-040-044R2.ps1", "TraceFrames", "Frames"],
+         "tools/check_world_render_040.py": ["run_component", "040"],
+         "tools/check_world_render_041.py": ["run_component", "041"],
+         "tools/check_world_render_042.py": ["run_component", "042"],
+@@ -1409,7 +1421,7 @@ def check_delivery_scripts(root: Path) -> CheckResult:
+         for stale in stale_names:
+             if stale in text:
+                 errors.append(f"{relative} still references stale tool: {stale}")
+-    for relative in ("build.ps1", "TEST_BP-040-044R2.ps1", "COLLECT_RESULTS.ps1", "scripts/validate_real_game.ps1"):
++    for relative in ("build.ps1", "TEST_BP-040-044R3.ps1", "COLLECT_RESULTS.ps1", "scripts/validate_real_game.ps1"):
+         script = (root / relative).read_text(encoding="utf-8-sig")
+         if re.search(r',\s*\)', script):
+             errors.append(f"{relative} contains a PowerShell trailing comma before a closing parenthesis")
+@@ -3272,8 +3284,8 @@ def check_bp025029r3_runtime_hotfix_contract(root: Path) -> CheckResult:
+ 
+         details.update({
+             "engine_package_id": PACKAGE_ID,
+-            "delivery_revision": DELIVERY_REVISION,
+-            "delivery_parent": DELIVERY_PARENT,
++            "delivery_revision": "BP-040-044R2",
++            "delivery_parent": "BP-040-044R1",
+             "r2_acceptance_groups": "63/67",
+             "r2_trace_sha256": r2_result.get("trace_sha256"),
+             "r2_trace_rolling_hash": r2_result.get("trace_rolling_hash"),
+@@ -3519,9 +3531,9 @@ def check_client_render_block_contract(root: Path) -> CheckResult:
+         if values.get("fixtures") != 24:
+             errors.append("BP-039 client/render closure fixture count differs from 24")
+         contract = (root / "src/miniquake/client_render_contract.ml").read_text(encoding="utf-8")
++        collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
+         if CLIENT_RENDER_STATUS not in contract or "0x95e2b295" not in contract.lower():
+             errors.append("client/render status or fingerprint is missing from contract source")
+-        collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
+         if re.search(r'"patches\\BP-034R1\.diff",\s*\)', collector):
+             errors.append("collector contains the already reported trailing-comma syntax error")
+         details.update({
+@@ -3579,7 +3591,7 @@ def check_world_render_block_contract(root: Path) -> CheckResult:
+             patch = root / "patches" / f"{package}.diff"
+             if not patch.is_file() or patch.stat().st_size == 0:
+                 errors.append(f"logical block patch is missing or empty: patches/{package}.diff")
+-        for revision in ("BP-044R1.diff", "BP-044R2.diff"):
++        for revision in ("BP-044R1.diff", "BP-044R2.diff", "BP-044R3.diff"):
+             patch = root / "patches" / revision
+             if not patch.is_file() or patch.stat().st_size == 0:
+                 errors.append(f"logical hotfix patch is missing or empty: patches/{revision}")
+@@ -3599,13 +3611,24 @@ def check_world_render_block_contract(root: Path) -> CheckResult:
+         if r1_result.get("compiler_exit_code") != 2 or r1_result.get("runtime_reached") is not False:
+             errors.append("BP-040-044R1 test-entry compile boundary is not recorded exactly")
+ 
++        r2_hotfix = ledger.get("r2_delivery_hotfix", {})
++        if r2_hotfix.get("revision") != "BP-040-044R2" or r2_hotfix.get("parent") != "BP-040-044R1":
++            errors.append("BP-040-044R2 hotfix lineage differs")
++        r2_result = ledger.get("r2_delivery_result", {})
++        if r2_result.get("result_archive_sha256") != "2678896b8071fe20d5f7a97fa86eb5cb5ad395a536be62ae464c697fc2f6d831":
++            errors.append("BP-040-044R2 result archive hash differs")
++        if r2_result.get("suppressed_runtime_failures") != 5 or r2_result.get("real_game_runtime_reached") is not False:
++            errors.append("BP-040-044R2 result boundary or suppressed-failure count differs")
++
+         hotfix = ledger.get("delivery_hotfix", {})
+         if hotfix.get("revision") != DELIVERY_REVISION or hotfix.get("parent") != DELIVERY_PARENT:
+-            errors.append("BP-040-044R2 hotfix lineage differs")
++            errors.append("BP-040-044R3 hotfix lineage differs")
+         if hotfix.get("world_render_fingerprint") != "0x846a74de":
+-            errors.append("BP-040-044R2 hotfix changed the world/render fingerprint")
++            errors.append("BP-040-044R3 hotfix changed the world/render fingerprint")
+         if hotfix.get("production_source_changed") is not False or hotfix.get("native_source_changed") is not False:
+-            errors.append("BP-040-044R2 must remain a test/delivery-only hotfix")
++            errors.append("BP-040-044R3 must remain a test/delivery-only hotfix")
++        if hotfix.get("runtime_failure_marker_guard") is not True:
++            errors.append("BP-040-044R3 does not bind the runtime failure-marker guard")
+ 
+         golden = json.loads((root / "audit/world_render_closure_golden.json").read_text(encoding="utf-8"))
+         rows = golden.get("rows") if isinstance(golden.get("rows"), list) else []
+@@ -3623,6 +3646,8 @@ def check_world_render_block_contract(root: Path) -> CheckResult:
+             "contract_fingerprint": values.get("contract_fingerprint"),
+             "accepted_parent_trace": accepted.get("trace_sha256"),
+             "r1_compiled_targets": r1_result.get("build"),
++            "r2_compiled_targets": r2_result.get("build"),
++            "r2_suppressed_runtime_failures": r2_result.get("suppressed_runtime_failures"),
+         })
+     except (OSError, json.JSONDecodeError, subprocess.SubprocessError) as exc:
+         errors.append(f"cannot validate world/render block contract: {exc}")
+@@ -3749,7 +3774,6 @@ def check_bp040044r2_entry_symbol_shadow_contract(root: Path) -> CheckResult:
+         testing = (root / "docs/BP-040-044R2_TESTING.md").read_text(encoding="utf-8")
+         changelog = (root / "CHANGELOG_BP-040-044R2.md").read_text(encoding="utf-8")
+         test_script = (root / "TEST_BP-040-044R2.ps1").read_text(encoding="utf-8-sig")
+-        collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
+         lightmap = (root / "tests/lightmap_atlas_tests.ml").read_text(encoding="utf-8")
+         sky_water = (root / "tests/sky_water_render_tests.ml").read_text(encoding="utf-8")
+         ledger = json.loads((root / "BLOCK_LEDGER.json").read_text(encoding="utf-8"))
+@@ -3782,13 +3806,6 @@ def check_bp040044r2_entry_symbol_shadow_contract(root: Path) -> CheckResult:
+         ):
+             if text not in test_script:
+                 errors.append(f"R2 test script is missing marker: {text}")
+-        for text in (
+-            '$PackageId = "BP-040-044R2"',
+-            '$DeliveryParent = "BP-040-044R1"',
+-            "patches\\BP-044R2.diff",
+-        ):
+-            if text not in collector:
+-                errors.append(f"R2 collector is missing marker: {text}")
+ 
+         if "function standardFixture()" not in lightmap or "standardFixture()" not in lightmap:
+             errors.append("BP-041 fixture does not use standardFixture()")
+@@ -3802,15 +3819,11 @@ def check_bp040044r2_entry_symbol_shadow_contract(root: Path) -> CheckResult:
+         r1_result = ledger.get("r1_delivery_result", {})
+         if r1_result.get("result_archive_sha256") != "73ea957dacb8f106ccbc3c7b176b8167a882d95109ff98f3604703be7fe53754":
+             errors.append("BLOCK_LEDGER.json has inconsistent R1 result evidence")
+-        hotfix = ledger.get("delivery_hotfix", {})
++        hotfix = ledger.get("r2_delivery_hotfix", {})
+         if hotfix.get("revision") != "BP-040-044R2" or hotfix.get("parent") != "BP-040-044R1":
+             errors.append("BLOCK_LEDGER.json has inconsistent R2 hotfix lineage")
+         if hotfix.get("production_source_changed") is not False or hotfix.get("native_source_changed") is not False:
+             errors.append("BLOCK_LEDGER.json does not classify R2 as delivery-only")
+-        if port_ledger.get("current_delivery_revision") != "BP-040-044R2":
+-            errors.append("PORT_LEDGER.json has inconsistent R2 delivery revision")
+-        if port_ledger.get("delivery_parent") != "BP-040-044R1":
+-            errors.append("PORT_LEDGER.json has inconsistent R2 delivery parent")
+         port_hotfix = port_ledger.get("bp040044r2_hotfix", {})
+         if port_hotfix.get("entry_shadow_arity_guard") is not True:
+             errors.append("PORT_LEDGER.json does not bind the R2 entry-shadow arity guard")
+@@ -3820,8 +3833,8 @@ def check_bp040044r2_entry_symbol_shadow_contract(root: Path) -> CheckResult:
+ 
+         details.update({
+             "engine_package_id": PACKAGE_ID,
+-            "delivery_revision": DELIVERY_REVISION,
+-            "delivery_parent": DELIVERY_PARENT,
++            "delivery_revision": "BP-040-044R2",
++            "delivery_parent": "BP-040-044R1",
+             "r1_result_sha256": r1_result.get("result_archive_sha256"),
+             "r1_compiled_executables": "39/43",
+             "production_source_changed": False,
+@@ -3834,6 +3847,173 @@ def check_bp040044r2_entry_symbol_shadow_contract(root: Path) -> CheckResult:
+     return CheckResult("bp040044r2_entry_symbol_shadow_contract", not errors, details, errors)
+ 
+ 
++def check_bp040044r3_runtime_test_integrity_contract(root: Path) -> CheckResult:
++    """Bind the R2 evidence, five corrected fixtures and zero-exit failure guard."""
++    errors: list[str] = []
++    details: dict[str, object] = {}
++    try:
++        analysis = (root / "docs/BP-040-044R2_RESULT_ANALYSIS.md").read_text(encoding="utf-8")
++        testing = (root / "docs/BP-040-044R3_TESTING.md").read_text(encoding="utf-8")
++        changelog = (root / "CHANGELOG_BP-040-044R3.md").read_text(encoding="utf-8")
++        test_script = (root / "TEST_BP-040-044R3.ps1").read_text(encoding="utf-8-sig")
++        build_script = (root / "build.ps1").read_text(encoding="utf-8-sig")
++        collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
++        runtime_checker = root / "tools/check_runtime_test_log.py"
++        demo_test = (root / "tests/protocol15_demo_tests.ml").read_text(encoding="utf-8")
++        event_test = (root / "tests/protocol15_event_tests.ml").read_text(encoding="utf-8")
++        runtime_event_test = (root / "tests/protocol15_runtime_event_tests.ml").read_text(encoding="utf-8")
++        signon_test = (root / "tests/protocol15_signon_e2e_tests.ml").read_text(encoding="utf-8")
++        sky_test = (root / "tests/sky_water_render_tests.ml").read_text(encoding="utf-8")
++        demo_golden = json.loads((root / "audit/protocol15_demo_golden.json").read_text(encoding="utf-8"))
++        ledger = json.loads((root / "BLOCK_LEDGER.json").read_text(encoding="utf-8"))
++        port_ledger = json.loads((root / "PORT_LEDGER.json").read_text(encoding="utf-8"))
++
++        evidence_markers = (
++            "2678896b8071fe20d5f7a97fa86eb5cb5ad395a536be62ae464c697fc2f6d831",
++            "all 42 test executables", "84/84", "Quake base directory does not exist", "five independent",
++            "BP-013 events", "BP-014R1 runtime events", "BP-015 signon",
++            "BP-018 demo", "BP-043 sky/water",
++        )
++        for marker in evidence_markers:
++            if marker not in analysis:
++                errors.append(f"R3 predecessor analysis is missing evidence marker: {marker}")
++
++        for marker in (
++            "TEST_BP-040-044R3.ps1",
++            "MiniQuake BP-040-044R3 acceptance test: PASS",
++            "bp040044r3_runtime_test_integrity_contract",
++            "MiniQuake runtime-test log checker self-test: PASS",
++            "id1/pak0.pak",
++        ):
++            if marker not in testing:
++                errors.append(f"R3 testing guide is missing marker: {marker}")
++        for marker in (
++            "count` before `color", "first expired slot", "seven-value",
++            "two leading spaces", "16..48", "check_runtime_test_log.py",
++            "No production source", "0x846a74de",
++        ):
++            if marker not in changelog:
++                errors.append(f"R3 changelog is missing marker: {marker}")
++
++        fixture_markers = {
++            "BP-018 demo": (
++                demo_test,
++                ('whitespace = demo.parse(bytes("  2\\n"))',
++                 'equal(whitespace.forcedTrack, -1758, "GLQuake bytewise whitespace arithmetic")'),
++            ),
++            "BP-013 events": (
++                event_test,
++                ('t.Vec3(1.0, -2.0, 0.0625),\n    20,\n    7,',
++                 't.Vec3(100.0, -100.0, -7.999),\n    255,\n    300,'),
++            ),
++            "BP-014R1 runtime events": (
++                runtime_event_test,
++                ('assertEqual(second[2], 0, "expired first beam slot reused")',
++                 'assertEqual(second[0][0][0].entity, 7, "reused slot stores new entity")'),
++            ),
++            "BP-015 signon": (
++                signon_test,
++                ('entity.baseline = [0, 0, 0, 0, baselineOrigin, baselineAngles, 0]',
++                 'serverBaseline = t.EntityBaseline(',
++                 'update.writeFastUpdate(packet, 1, serverBaseline,'),
++            ),
++            "BP-043 sky/water": (
++                sky_test,
++                ('vertex(16.0, 16.0, 0.0, 16.0, 16.0)',
++                 'vertex(48.0, 48.0, 0.0, 48.0, 48.0)',
++                 'len(warp.SubdividePolygon(polygon, 128.0)), 1, "small polygon"'),
++            ),
++        }
++        for group, (source, markers) in fixture_markers.items():
++            for marker in markers:
++                if marker not in source:
++                    errors.append(f"{group} corrected fixture marker is missing: {marker}")
++        if 'SubdividePolygon(quad(16.0), 128.0)' in sky_test:
++            errors.append("BP-043 still uses the centered polygon that crosses zero split planes")
++
++        rows = demo_golden.get("rows") if isinstance(demo_golden.get("rows"), list) else []
++        demo_values = {row.get("name"): row.get("value") for row in rows if isinstance(row, dict)}
++        if demo_values.get("playback_whitespace_track") != -1758:
++            errors.append("Protocol-15 demo golden whitespace value differs from -1758")
++
++        runner_markers = (
++            "Get-RuntimeTestFailureMarker", "FAIL:", "tests failed:",
++            "emitted a failure marker despite exit code 0",
++        )
++        for relative, source in (("build.ps1", build_script), ("TEST_BP-040-044R3.ps1", test_script)):
++            for marker in runner_markers:
++                if marker not in source:
++                    errors.append(f"{relative} is missing runtime failure-marker guard: {marker}")
++        for marker in ("failure_marker", "synthetic_failure", "Get-Content -LiteralPath $LogPath -Raw"):
++            if marker not in test_script:
++                errors.append(f"R3 acceptance summary guard is missing marker: {marker}")
++        for marker in (
++            '$PackageId = "BP-040-044R3"', '$DeliveryParent = "BP-040-044R2"',
++            "docs\\BP-040-044R2_RESULT_ANALYSIS.md", "patches\\BP-044R3.diff",
++        ):
++            if marker not in collector:
++                errors.append(f"R3 collector is missing marker: {marker}")
++
++        completed = subprocess.run(
++            [sys.executable, str(runtime_checker), "--self-test", "--quiet"],
++            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
++            timeout=30, check=False,
++        )
++        if completed.returncode != 0:
++            errors.append(f"runtime-test log checker self-test failed: {completed.stdout.strip()}")
++
++        r2_result = ledger.get("r2_delivery_result", {})
++        if r2_result.get("result_archive_sha256") != "2678896b8071fe20d5f7a97fa86eb5cb5ad395a536be62ae464c697fc2f6d831":
++            errors.append("BLOCK_LEDGER.json R2 result hash differs")
++        if r2_result.get("build") != "43/43 executable targets compiled":
++            errors.append("BLOCK_LEDGER.json R2 compiled-target count differs")
++        if r2_result.get("script_steps") != "84/84 reported PASS":
++            errors.append("BLOCK_LEDGER.json R2 reported step count differs")
++        if r2_result.get("suppressed_runtime_failures") != 5:
++            errors.append("BLOCK_LEDGER.json R2 suppressed-failure count differs")
++        if r2_result.get("quake_base_exists") is not False or r2_result.get("real_game_runtime_reached") is not False:
++            errors.append("BLOCK_LEDGER.json R2 missing-game-path boundary differs")
++        hotfix = ledger.get("delivery_hotfix", {})
++        if hotfix.get("revision") != DELIVERY_REVISION or hotfix.get("parent") != DELIVERY_PARENT:
++            errors.append("BLOCK_LEDGER.json R3 hotfix lineage differs")
++        if hotfix.get("runtime_failure_marker_guard") is not True:
++            errors.append("BLOCK_LEDGER.json does not bind the R3 runtime log guard")
++        if hotfix.get("production_source_changed") is not False or hotfix.get("native_source_changed") is not False:
++            errors.append("BLOCK_LEDGER.json does not classify R3 as test/delivery-only")
++
++        port_result = port_ledger.get("bp040044r2_result", {})
++        if port_result.get("suppressed_runtime_failure_groups") != 5:
++            errors.append("PORT_LEDGER.json R2 suppressed-failure evidence differs")
++        port_hotfix = port_ledger.get("bp040044r3_hotfix", {})
++        if port_hotfix.get("runtime_failure_marker_guard") is not True:
++            errors.append("PORT_LEDGER.json does not bind the R3 runtime log guard")
++        if port_hotfix.get("world_render_fingerprint") != "0x846a74de":
++            errors.append("PORT_LEDGER.json R3 hotfix changed the world/render fingerprint")
++
++        patch_path = root / "patches/BP-044R3.diff"
++        if not patch_path.is_file() or patch_path.stat().st_size == 0:
++            errors.append("patches/BP-044R3.diff is missing or empty")
++        else:
++            patch_text = patch_path.read_text(encoding="utf-8", errors="replace")
++            if re.search(r"^diff --git a/(src|native)/", patch_text, flags=re.M):
++                errors.append("BP-044R3 hotfix patch changes production or native sources")
++
++        details.update({
++            "delivery_revision": DELIVERY_REVISION,
++            "delivery_parent": DELIVERY_PARENT,
++            "r2_result_sha256": r2_result.get("result_archive_sha256"),
++            "compiled_targets": r2_result.get("build"),
++            "reported_steps": r2_result.get("script_steps"),
++            "corrected_fixture_groups": len(fixture_markers),
++            "runtime_log_guard": True,
++            "production_source_changed": False,
++            "native_source_changed": False,
++            "world_render_fingerprint": "0x846a74de",
++        })
++    except (OSError, json.JSONDecodeError, subprocess.SubprocessError) as exc:
++        errors.append(f"cannot validate BP-040-044R3 runtime-test integrity contract: {exc}")
++    return CheckResult("bp040044r3_runtime_test_integrity_contract", not errors, details, errors)
++
+ def check_package_identity(root: Path) -> CheckResult:
+     errors: list[str] = []
+     details: dict[str, object] = {}
+@@ -3935,6 +4115,7 @@ def run_checks(root: Path, manifest_path: Path) -> VerificationReport:
+         check_world_render_block_contract(root),
+         check_bp040044r1_renderer_member_write_contract(root),
+         check_bp040044r2_entry_symbol_shadow_contract(root),
++        check_bp040044r3_runtime_test_integrity_contract(root),
+         check_milestone_signon_phase_contract(root),
+         check_no_game_data(root),
+         check_delivery_scripts(root),
+diff --git a/tools/world_render_checker_common.py b/tools/world_render_checker_common.py
+index ab0afd8..d955fa1 100644
+--- a/tools/world_render_checker_common.py
++++ b/tools/world_render_checker_common.py
+@@ -156,6 +156,17 @@ def check_contract(root: Path, component: str):
+         text=test.read_text(encoding='utf-8-sig')
+         if c['success'] not in text: errors.append('runtime success marker/count differs')
+         if f'passed != {c["fixtures"]}' not in text: errors.append('runtime fixture guard differs')
++    if component=='043':
++        small_markers = [
++            'vertex(16.0, 16.0, 0.0, 16.0, 16.0)',
++            'vertex(48.0, 48.0, 0.0, 48.0, 48.0)',
++            'len(warp.SubdividePolygon(polygon, 128.0)), 1, "small polygon"',
++        ]
++        for marker in small_markers:
++            if marker not in text:
++                errors.append('BP-043 small-polygon fixture crosses a subdivision plane or lacks its no-split assertion: '+marker)
++        if 'SubdividePolygon(quad(16.0), 128.0)' in text:
++            errors.append('BP-043 centered small polygon is split at the zero subdivision plane')
+     if component=='044':
+         host=(root/'src/miniquake/host.ml').read_text(encoding='utf-8-sig')
+         order=['particleRenderer.renderView(', 'entityRenderer.renderViewModel(', 'worldRenderer.R_DrawWaterSurfaces()', 'worldRenderer.R_PolyBlendProduction(']

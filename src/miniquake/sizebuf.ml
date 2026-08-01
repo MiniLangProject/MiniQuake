@@ -3,6 +3,7 @@ package miniquake.sizebuf
 import miniquake.types as t
 import miniquake.byteio as bio
 import miniquake.memory as memory
+import miniquake.protocol_text as protocolText
 
 function alloc(maxSize)
   if maxSize < 0 then return error(1200, "negative size buffer") end if
@@ -62,15 +63,42 @@ function writeBytes(buffer, source)
   return write(buffer, source, 0, len(source))
 end function
 
+function writeEncodedCStringAt(buffer, encoded, count, offset)
+  if count > 0 then bio.copyInto(buffer.data, offset, encoded, 0, count) end if
+  buffer.data[offset + count] = 0
+  return offset + count
+end function
+
 function printText(buffer, text)
-  encoded = bytes(text)
-  if buffer.curSize > 0 and buffer.data[buffer.curSize - 1] == 0 then
-    buffer.curSize = buffer.curSize - 1
+  // SZ_Print consumes the same raw one-byte C string representation as
+  // MSG_WriteString. Stop at embedded NUL and never leak UTF-8 multibyte data
+  // into the command or network buffers.
+  encoded = protocolText.encodeBytes(text)
+  count = len(encoded)
+  replacesTerminator = buffer.curSize > 0 and buffer.data[buffer.curSize - 1] == 0
+
+  if replacesTerminator and buffer.curSize + count <= buffer.maxSize then
+    // Original valid path: reserve strlen bytes, then copy strlen+1 starting one
+    // byte earlier so the old terminator is replaced.
+    offset = getSpace(buffer, count) - 1
+    return writeEncodedCStringAt(buffer, encoded, count, offset)
+  else if replacesTerminator and buffer.curSize + count > buffer.maxSize then
+    // The original clears the buffer in SZ_GetSpace and then subtracts one from
+    // the returned base pointer. That writes before data[0]. Define this invalid
+    // overflow edge as a safe restart containing the complete new C string.
+    if not buffer.allowOverflow then return error(1202, "SZ_GetSpace overflow") end if
+    if count + 1 > buffer.maxSize then return error(1203, "SZ_GetSpace request exceeds buffer") end if
+    clear(buffer)
+    buffer.overflowed = true
+    offset = getSpace(buffer, count + 1)
+    return writeEncodedCStringAt(buffer, encoded, count, offset)
+  else
+    // Original no-terminator path reserves strlen+1 atomically. This matters at
+    // an overflow boundary; splitting payload and NUL into two reservations is
+    // not equivalent.
+    offset = getSpace(buffer, count + 1)
+    return writeEncodedCStringAt(buffer, encoded, count, offset)
   end if
-  writeBytes(buffer, encoded)
-  offset = getSpace(buffer, 1)
-  buffer.data[offset] = 0
-  return offset
 end function
 
 function dataSlice(buffer)

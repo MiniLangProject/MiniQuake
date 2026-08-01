@@ -9,6 +9,7 @@ import miniquake.console as console
 import miniquake.cmd as cmd
 import miniquake.client as clientRuntime
 import miniquake.cvar as cvar
+import miniquake.protocol_transients as transients
 
 function appendParticles(current, spawned)
   return particleSystem.appendLimited(current, spawned)
@@ -55,7 +56,7 @@ function processTemporary(value, mixer, currentParticles, currentTemporary, curr
     light = clientRuntime.CL_AllocDlightAt(0, currentTime)
     light.origin = math.copy(value.origin)
     light.radius = 350.0
-    light.die = currentTime + 0.5
+    light.die = transients.dynamicLightDieTime(currentTime)
     light.decay = 300.0
     safeSound(mixer, -1, 0, "weapons/r_exp3.wav", value.origin, 1.0, 1.0)
   else if type == c.TE_TAREXPLOSION then
@@ -72,32 +73,33 @@ function processTemporary(value, mixer, currentParticles, currentTemporary, curr
     light = clientRuntime.CL_AllocDlightAt(0, currentTime)
     light.origin = math.copy(value.origin)
     light.radius = 350.0
-    light.die = currentTime + 0.5
+    light.die = transients.dynamicLightDieTime(currentTime)
     light.decay = 300.0
     safeSound(mixer, -1, 0, "weapons/r_exp3.wav", value.origin, 1.0, 1.0)
   else if type == c.TE_LIGHTNING1 or type == c.TE_LIGHTNING2 or type == c.TE_LIGHTNING3 or type == c.TE_BEAM then
-    // Keep active beams as [wire payload, expiry].  The renderer draws these in
-    // world space without moving their authoritative endpoints into C.
-    kept = []
-    for each beam in currentTemporary
-      if beam[0].entity != value.entity then kept = kept + [beam] end if
-    end for
-    currentTemporary = kept + [[value, currentTime + 0.2]]
+    // Keep active beams as [wire payload, expiry], but retain the original
+    // fixed 24-slot replacement/allocation order from CL_ParseBeam.
+    currentTemporary = transients.updateCompactBeamList(currentTemporary, value, currentTime)
   end if
   currentParticles = appendParticles(currentParticles, spawned)
   return [currentParticles, currentTemporary]
 end function
 
+// Retained state mirrors the original fixed cl_beams[MAX_BEAMS] array.  Expired
+// entries are kept because CL_ParseBeam first searches by entity before it
+// searches for a free or expired slot.
+function retainTemporarySlots(currentTemporary)
+  return transients.normalizeCompactBeamList(currentTemporary)
+end function
+
+// Active view mirrors CL_UpdateTEnts: an expired beam is not rendered or
+// exposed to callers, while the retained state above still remembers its slot.
 function pruneTemporary(currentTemporary, currentTime)
-  alive = []
-  for each item in currentTemporary
-    if len(item) >= 2 and item[1] >= currentTime then alive = alive + [item] end if
-  end for
-  return alive
+  return transients.activeCompactBeamList(currentTemporary, currentTime)
 end function
 
 function process(events, client, player, mixer, viewState, consoleState, commandSystem, currentParticles, currentTemporary, currentTime, registry)
-  currentTemporary = pruneTemporary(currentTemporary, currentTime)
+  currentTemporary = retainTemporarySlots(currentTemporary)
   for each item in events
     name = item.command
     payload = item.payload
@@ -109,18 +111,18 @@ function process(events, client, player, mixer, viewState, consoleState, command
       cmd.addText(commandSystem, payload)
     else if name == "svc_sound" then
       packed = payload[3]
-      entityNumber = packed >> 3
-      channelNumber = packed & 7
+      entityNumber = transients.soundEntity(packed)
+      channelNumber = transients.soundChannel(packed)
       soundIndex = payload[4]
       if soundIndex > 0 and soundIndex < len(client.soundPrecache) then
-        safeSound(mixer, entityNumber, channelNumber, client.soundPrecache[soundIndex], payload[5], payload[1] / 255.0, payload[2])
+        safeSound(mixer, entityNumber, channelNumber, client.soundPrecache[soundIndex], payload[5], transients.clientSoundVolume(payload[1]), transients.cFloat(payload[2]))
       end if
     else if name == "svc_stopsound" then
-      if mixer is not void then sound.stopSound(mixer, payload >> 3, payload & 7) end if
+      if mixer is not void then sound.stopSound(mixer, transients.soundEntity(payload), transients.soundChannel(payload)) end if
     else if name == "svc_spawnstaticsound" then
       soundIndex = payload[1]
       if soundIndex > 0 and soundIndex < len(client.soundPrecache) then
-        if mixer is not void then sound.staticSound(mixer, client.soundPrecache[soundIndex], payload[0], payload[2] / 255.0, payload[3]) end if
+        if mixer is not void then sound.staticSound(mixer, client.soundPrecache[soundIndex], payload[0], transients.staticSoundVolume(payload[2]), transients.staticSoundAttenuation(payload[3])) end if
       end if
     else if name == "svc_particle" then
       currentParticles = appendParticles(currentParticles, particleSystem.runEffect(payload[0], payload[1], payload[2], payload[3], currentTime))

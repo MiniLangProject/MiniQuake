@@ -1,0 +1,689 @@
+diff --git a/audit/protocol15_delivery_golden.json b/audit/protocol15_delivery_golden.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..70412a55403607ab4bd496ec40306b5f5c2a8bec
+--- /dev/null
++++ b/audit/protocol15_delivery_golden.json
+@@ -0,0 +1,88 @@
++{
++  "schema": "MiniQuakeProtocol15DeliveryGolden/1",
++  "package_id": "BP-016",
++  "parent_package_id": "BP-015",
++  "protocol_version": 15,
++  "sources": [
++    "cl_main.c",
++    "sv_main.c",
++    "host.c",
++    "net_main.c"
++  ],
++  "cases": [
++    {
++      "kind": "case",
++      "name": "send_failed",
++      "value": 1
++    },
++    {
++      "kind": "case",
++      "name": "send_blocked",
++      "value": 2
++    },
++    {
++      "kind": "case",
++      "name": "send_committed",
++      "value": 3
++    },
++    {
++      "kind": "case",
++      "name": "spawned_plan",
++      "value": 9
++    },
++    {
++      "kind": "case",
++      "name": "signon_wait_equal",
++      "value": 4
++    },
++    {
++      "kind": "case",
++      "name": "signon_nop_above",
++      "value": 2
++    },
++    {
++      "kind": "case",
++      "name": "signon_requested",
++      "value": 8
++    },
++    {
++      "kind": "case",
++      "name": "overflow_first",
++      "value": 1
++    },
++    {
++      "kind": "case",
++      "name": "drop_blocked",
++      "value": 2
++    },
++    {
++      "kind": "case",
++      "name": "drop_sendable",
++      "value": 3
++    },
++    {
++      "kind": "case",
++      "name": "reliable_send",
++      "value": 4
++    },
++    {
++      "kind": "case",
++      "name": "empty_none",
++      "value": 0
++    },
++    {
++      "kind": "case",
++      "name": "keepalive_equal",
++      "value": 0
++    },
++    {
++      "kind": "case",
++      "name": "keepalive_above",
++      "value": 1
++    }
++  ],
++  "reference": {
++    "oracle": "tools/oracle/protocol15_delivery_oracle.c",
++    "oracle_sha256": "ccc04eb15bb95e9b76477c6b7410be8f0c0cde6904b6ea3af0c3c77707ef8c5a"
++  }
++}
+diff --git a/build.ps1 b/build.ps1
+index 1fccce6d25589dbc8683fe6f33753c96bdce60d1..1f9404baed583a2fec33f74fe123a1d320f31969 100644
+--- a/build.ps1
++++ b/build.ps1
+@@ -26,8 +26,8 @@ $Root = $PSScriptRoot
+ $Output = Join-Path $Root "build"
+ $Source = Join-Path $Root "src"
+ $Parent = Split-Path -Parent $Root
+-$PackageId = "BP-015"
+-$ParentPackageId = "BP-014R1"
++$PackageId = "BP-016"
++$ParentPackageId = "BP-015"
+ $NativeTextAbi = "caller_owned_bytes_v1"
+ $ProtocolTextAbi = "quake_latin1_cstring_v1"
+ 
+@@ -317,7 +317,8 @@ $PackageBuildArtifacts = @(
+   "MiniQuakeProtocol15ServerDataTests.exe",
+   "MiniQuakeProtocol15EventTests.exe",
+   "MiniQuakeProtocol15RuntimeEventTests.exe",
+-  "MiniQuakeProtocol15SignonTests.exe"
++  "MiniQuakeProtocol15SignonTests.exe",
++  "MiniQuakeProtocol15DeliveryTests.exe"
+ )
+ foreach ($ArtifactName in $PackageBuildArtifacts) {
+   foreach ($Candidate in @(
+@@ -408,6 +409,15 @@ if (-not $SkipPreflight -and $null -ne $PythonExe) {
+   if ($LASTEXITCODE -ne 0) {
+     throw "$PackageId Protocol 15 signon preflight failed."
+   }
++
++  $ProtocolDeliveryChecker = Join-Path $Root "tools\check_protocol15_delivery.py"
++  if (-not (Test-Path -LiteralPath $ProtocolDeliveryChecker -PathType Leaf)) {
++    throw "Protocol 15 delivery checker is missing: $ProtocolDeliveryChecker"
++  }
++  & $PythonExe @PythonPrefixArgs $ProtocolDeliveryChecker --root $Root
++  if ($LASTEXITCODE -ne 0) {
++    throw "$PackageId Protocol 15 reliable/unreliable delivery preflight failed."
++  }
+ } elseif ($SkipPreflight) {
+   Write-Warning "$PackageId diagnostics preflight was explicitly skipped."
+ } else {
+@@ -483,7 +493,7 @@ if (-not $NoRunTests) {
+   Write-Host "[MiniQuake] checking executable package identity"
+   $VersionOutput = @(& $GameExe "--version" 2>&1)
+   $VersionExitCode = [int]$LASTEXITCODE
+-  $VersionOutput | Set-Content -LiteralPath (Join-Path $Output "bp015-build-version.txt") -Encoding UTF8
++  $VersionOutput | Set-Content -LiteralPath (Join-Path $Output "bp016-build-version.txt") -Encoding UTF8
+   $VersionOutput | ForEach-Object { Write-Host $_ }
+   if ($VersionExitCode -ne 0) {
+     throw "MiniQuake --version failed with exit code $VersionExitCode."
+@@ -538,6 +548,7 @@ $ProtocolServerDataTestStatus = "SKIPPED"
+ $ProtocolEventTestStatus = "SKIPPED"
+ $ProtocolRuntimeEventTestStatus = "SKIPPED"
+ $ProtocolSignonTestStatus = "SKIPPED"
++$ProtocolDeliveryTestStatus = "SKIPPED"
+ $NetworkTestStatus = "SKIPPED"
+ 
+ if (-not $SkipTests) {
+@@ -589,6 +600,11 @@ if (-not $SkipTests) {
+   Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\protocol15_signon_e2e_tests.ml") -OutputFile $ProtocolSignonTestExe -CompilerArguments $CommonArgs -Label "protocol15-signon-tests"
+   $ProtocolSignonTestStatus = "COMPILED"
+ 
++  $ProtocolDeliveryTestExe = Join-Path $Output "MiniQuakeProtocol15DeliveryTests.exe"
++  Write-Host "[MiniQuake] compiling $ProtocolDeliveryTestExe"
++  Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\protocol15_delivery_tests.ml") -OutputFile $ProtocolDeliveryTestExe -CompilerArguments $CommonArgs -Label "protocol15-delivery-tests"
++  $ProtocolDeliveryTestStatus = "COMPILED"
++
+   if (-not $NoRunTests) {
+     Invoke-MiniQuakeTestBinary `
+       -Label "core tests" `
+@@ -646,6 +662,13 @@ if (-not $SkipTests) {
+       -Executable $ProtocolSignonTestExe `
+       -ProgressHint "The last printed [NN/12] line identifies the active signon queue or stage-transition fixture."
+     $ProtocolSignonTestStatus = "PASS"
++
++
++    Invoke-MiniQuakeTestBinary `
++      -Label "BP-016 Protocol 15 delivery tests" `
++      -Executable $ProtocolDeliveryTestExe `
++      -ProgressHint "The last printed [NN/14] line identifies the active reliable/unreliable scheduling fixture."
++    $ProtocolDeliveryTestStatus = "PASS"
+   }
+ }
+ 
+@@ -662,6 +685,6 @@ if ($NetworkTests -and -not $NoRunTests) {
+   $NetworkTestStatus = "COMPILED-NOT-RUN"
+ }
+ 
+-Write-Host "[MiniQuake] test summary: core=$CoreTestStatus milestone=$MilestoneTestStatus diagnostics=$DiagnosticsTestStatus protocol15=$ProtocolTestStatus protocol15_commands=$ProtocolCommandTestStatus protocol15_serverdata=$ProtocolServerDataTestStatus protocol15_events=$ProtocolEventTestStatus protocol15_runtime_events=$ProtocolRuntimeEventTestStatus protocol15_signon=$ProtocolSignonTestStatus network=$NetworkTestStatus"
++Write-Host "[MiniQuake] test summary: core=$CoreTestStatus milestone=$MilestoneTestStatus diagnostics=$DiagnosticsTestStatus protocol15=$ProtocolTestStatus protocol15_commands=$ProtocolCommandTestStatus protocol15_serverdata=$ProtocolServerDataTestStatus protocol15_events=$ProtocolEventTestStatus protocol15_runtime_events=$ProtocolRuntimeEventTestStatus protocol15_signon=$ProtocolSignonTestStatus protocol15_delivery=$ProtocolDeliveryTestStatus network=$NetworkTestStatus"
+ Write-Host "[MiniQuake] build completed: $GameExe"
+ exit 0
+diff --git a/src/main.ml b/src/main.ml
+index a13b685e7bd9dcf0159e7c37b1b8a2eaf7622b7c..350410a02dea2620dd9205423c0c014fd5e71085 100644
+--- a/src/main.ml
++++ b/src/main.ml
+@@ -368,7 +368,7 @@ function runSelfCheck()
+   print "Package date: " + buildInfo.PACKAGE_DATE
+   print "Baseline archive SHA-256: " + buildInfo.BASE_ARCHIVE_SHA256
+   print "Core CRC self-check: 0x" + hex(bytes([(check >> 8) & 255, check & 255]))
+-  print "Port status: BP-015 Protocol 15 signon queue and stage-transition parity; see PORT_STATUS.md and PORT_LEDGER.json."
++  print "Port status: BP-016 Protocol 15 reliable and unreliable delivery scheduling parity; see PORT_STATUS.md and PORT_LEDGER.json."
+   return 0
+ end function
+ 
+diff --git a/src/miniquake/build_info.ml b/src/miniquake/build_info.ml
+index 6e233a889fe85870e51d7e2283d1363d8d10c779..965caa7caef64356546c323e970c7b11b453617e 100644
+--- a/src/miniquake/build_info.ml
++++ b/src/miniquake/build_info.ml
+@@ -8,8 +8,8 @@ back to an exact source baseline.
+ 
+ package miniquake.build_info
+ 
+-const PACKAGE_ID = "BP-015"
+-const PARENT_PACKAGE_ID = "BP-014R1"
++const PACKAGE_ID = "BP-016"
++const PARENT_PACKAGE_ID = "BP-015"
+ const PACKAGE_DATE = "2026-07-25"
+ const COMPATIBILITY_PROFILE = "compat_109"
+ const NATIVE_TEXT_ABI = "caller_owned_bytes_v1"
+@@ -17,4 +17,4 @@ const PROTOCOL_TEXT_ABI = "quake_latin1_cstring_v1"
+ const BASE_ARCHIVE = "MiniQuake_Source24.07.2026.zip"
+ const BASE_ARCHIVE_SHA256 = "bb2b5bf173fe687cada6e7fec2dcdb8b2099589f2ebc039417a5571ced9729d3"
+ const MANIFEST_FORMAT = 1
+-const PACKAGE_PURPOSE = "Protocol 15 end-to-end signon queue and stage-transition parity"
++const PACKAGE_PURPOSE = "Protocol 15 reliable and unreliable delivery scheduling parity"
+diff --git a/src/miniquake/client.ml b/src/miniquake/client.ml
+index fd4b49f4b0aaa194aff072f7a56bd89613c9895a..1f59fee535f62e59c5777ab1ecb796c142235455 100644
+--- a/src/miniquake/client.ml
++++ b/src/miniquake/client.ml
+@@ -7,6 +7,7 @@ import miniquake.net_main as netmain
+ import miniquake.client_protocol as protocol
+ import miniquake.protocol_write as writer
+ import miniquake.protocol_signon as protocolSignon
++import miniquake.protocol_delivery as delivery
+ import miniquake.mathlib as math
+ import miniquake.input as input
+ import miniquake.array_util as arrayutil
+@@ -773,7 +774,7 @@ function sendReliable(client)
+   if client.outgoing.curSize == 0 then return 0 end if
+   if not netmain.NET_CanSendMessage(client.socket) then return 0 end if
+   result = netmain.NET_SendMessage(client.socket, client.outgoing)
+-  if result == 1 then sz.clear(client.outgoing) end if
++  if delivery.clearAfterSend(result) then sz.clear(client.outgoing) end if
+   return result
+ end function
+ 
+diff --git a/src/miniquake/protocol_delivery.ml b/src/miniquake/protocol_delivery.ml
+new file mode 100644
+index 0000000000000000000000000000000000000000..498fdaaf28ae2683eea9d74803cf765d04c9307c
+--- /dev/null
++++ b/src/miniquake/protocol_delivery.ml
+@@ -0,0 +1,40 @@
++/*
++Copyright (C) 1996-1997 Id Software, Inc.
++Copyright (C) 2026 MiniQuake contributors
++
++Protocol-15 reliable/unreliable scheduling helpers shared by client and server.
++The normal WinQuake drivers return -1 or 1 after NET_CanSendMessage succeeds,
++but modern backends are permitted to return 0 for a transient race.  A zero
++result must retain the queued message; only a committed send clears it.
++*/
++
++package miniquake.protocol_delivery
++
++const SEND_DROP = 1
++const SEND_RETAIN = 2
++const SEND_COMMIT = 3
++
++function reliableSendOutcome(result)
++  if result < 0 then return SEND_DROP end if
++  if result == 0 then return SEND_RETAIN end if
++  return SEND_COMMIT
++end function
++
++function clientReliablePlan(connected, messageSize, canSend)
++  if not connected then return SEND_DROP end if
++  if messageSize <= 0 then return 0 end if
++  if not canSend then return SEND_RETAIN end if
++  return SEND_COMMIT
++end function
++
++function keepaliveDue(elapsed)
++  return elapsed > 5.0
++end function
++
++function reliableWorkPending(messageSize, dropAsap)
++  return messageSize > 0 or dropAsap
++end function
++
++function clearAfterSend(result)
++  return reliableSendOutcome(result) == SEND_COMMIT
++end function
+diff --git a/src/miniquake/server.ml b/src/miniquake/server.ml
+index 8e137fdc6b291b55063042647a026640b90fb313..50b7510470e3c3488d00b06ac55ab6e8fd165ca6 100644
+--- a/src/miniquake/server.ml
++++ b/src/miniquake/server.ml
+@@ -15,6 +15,7 @@ import miniquake.protocol_update as protocolUpdate
+ import miniquake.protocol_serverdata as serverData
+ import miniquake.protocol_events as protocolEvents
+ import miniquake.protocol_transients as transients
++import miniquake.protocol_delivery as delivery
+ import miniquake.net_main as netmain
+ import miniquake.cmd as cmd
+ import miniquake.cvar as cvar
+@@ -1890,7 +1891,12 @@ function processReliableClientAt(server, clientValue, realtime)
+   end if
+ 
+   result = netmain.NET_SendMessage(clientValue.socket, clientValue.message)
+-  if result == -1 then dropClient(server, clientValue, true) end if
++  outcome = delivery.reliableSendOutcome(result)
++  if outcome == delivery.SEND_DROP then
++    dropClient(server, clientValue, true)
++    return -1
++  end if
++  if outcome == delivery.SEND_RETAIN then return 0 end if
+   sz.clear(clientValue.message)
+   clientValue.lastMessage = realtime
+   clientValue.sendSignon = false
+@@ -1908,7 +1914,7 @@ function sendReliableMessagesAt(server, realtime)
+     clientValue = server.clients[index]
+     if clientValue.active and clientValue.socket is not void then
+       if not clientValue.spawned and not clientValue.sendSignon then
+-        if realtime - clientValue.lastMessage > 5.0 then
++        if delivery.keepaliveDue(realtime - clientValue.lastMessage) then
+           result = sendNopAt(server, clientValue, realtime)
+           if result > 0 then sent = sent + 1 end if
+         end if
+diff --git a/tests/protocol15_delivery_tests.ml b/tests/protocol15_delivery_tests.ml
+new file mode 100644
+index 0000000000000000000000000000000000000000..66149ed5d9e03d9c2ad6a161db3e395e1f123b67
+--- /dev/null
++++ b/tests/protocol15_delivery_tests.ml
+@@ -0,0 +1,249 @@
++/* BP-016 Protocol-15 reliable/unreliable delivery and failure-order fixtures. */
++
++import miniquake.types as t
++import miniquake.constants as c
++import miniquake.sizebuf as sz
++import miniquake.message as msg
++import miniquake.protocol_delivery as delivery
++import miniquake.protocol_serverdata as planning
++import miniquake.protocol_transients as transients
++import miniquake.client as client
++import miniquake.server as server
++import miniquake.net_loop as netloop
++import miniquake.net_main as netmain
++import miniquake.player_move as movement
++
++function equal(actual, expected, name)
++  if actual != expected then return error(9600, name + ": expected " + expected + ", got " + actual) end if
++  return true
++end function
++function yes(value, name)
++  if not value then return error(9601, name + ": expected true") end if
++  return true
++end function
++function no(value, name)
++  if value then return error(9602, name + ": expected false") end if
++  return true
++end function
++function run(number, name, fn)
++  print "  [" + number + "/14] " + name
++  result = try(fn())
++  if result is error then print "    FAIL: " + result.message; return false end if
++  return true
++end function
++
++function player()
++  return movement.createPlayer(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
++end function
++
++function pair()
++  network = netloop.createState()
++  netmain.NET_Init(network, 2, false, false, 26000, true)
++  a = netmain.NET_Connect(network, "local", 1)
++  b = netmain.NET_CheckNewConnections(network)
++  if a is void or b is void then return error(9603, "loop pair missing") end if
++  return [network, a, b]
++end function
++
++function closePair(value)
++  if value[2] is not void then netmain.NET_Close(value[2]) end if
++  if value[1] is not void then netmain.NET_Close(value[1]) end if
++  netmain.NET_Shutdown(value[0])
++  return true
++end function
++
++function testOutcomeClassification()
++  equal(delivery.reliableSendOutcome(-1), delivery.SEND_DROP, "negative result")
++  equal(delivery.reliableSendOutcome(0), delivery.SEND_RETAIN, "zero result")
++  equal(delivery.reliableSendOutcome(1), delivery.SEND_COMMIT, "positive result")
++  return true
++end function
++
++function testClientPlans()
++  equal(delivery.clientReliablePlan(false, 10, true), delivery.SEND_DROP, "disconnected")
++  equal(delivery.clientReliablePlan(true, 0, true), 0, "empty")
++  equal(delivery.clientReliablePlan(true, 10, false), delivery.SEND_RETAIN, "blocked")
++  equal(delivery.clientReliablePlan(true, 10, true), delivery.SEND_COMMIT, "sendable")
++  return true
++end function
++
++function testKeepaliveStrictBoundary()
++  no(delivery.keepaliveDue(5.0), "exactly five seconds")
++  yes(delivery.keepaliveDue(5.000001), "strictly above five seconds")
++  return true
++end function
++
++function testInitialDeliveryPlans()
++  equal(planning.initialDeliveryPlan(true, false, 0.0), planning.PLAN_SEND_UNRELIABLE | planning.PLAN_RELIABLE_PHASE, "spawned plan")
++  equal(planning.initialDeliveryPlan(false, false, 5.0), planning.PLAN_WAIT_SIGNON, "signon exact keepalive")
++  equal(planning.initialDeliveryPlan(false, false, 5.1), planning.PLAN_SEND_NOP, "signon keepalive")
++  equal(planning.initialDeliveryPlan(false, true, 0.0), planning.PLAN_RELIABLE_PHASE, "requested signon")
++  return true
++end function
++
++function testReliableOrdering()
++  equal(planning.reliableDeliveryPlan(true, 1, true, true), planning.RELIABLE_DROP_OVERFLOW, "overflow first")
++  equal(planning.reliableDeliveryPlan(false, 0, true, false), planning.RELIABLE_WAIT, "drop waits blocked")
++  equal(planning.reliableDeliveryPlan(false, 0, true, true), planning.RELIABLE_DROP_ASAP, "drop when sendable")
++  equal(planning.reliableDeliveryPlan(false, 1, false, true), planning.RELIABLE_SEND, "normal reliable")
++  return true
++end function
++
++function testBlockedClientQueue()
++  value = pair()
++  if value is error then return value end if
++  localClient = client.create(player())
++  localClient.connected = true
++  localClient.socket = value[1]
++  client.queueString(localClient, "status")
++  value[1].canSend = false
++  equal(client.sendReliable(localClient), 0, "blocked client send")
++  yes(localClient.outgoing.curSize > 0, "blocked client queue retained")
++  value[1].canSend = true
++  equal(client.sendReliable(localClient), 1, "unblocked client send")
++  equal(localClient.outgoing.curSize, 0, "committed client queue cleared")
++  closePair(value)
++  return true
++end function
++
++function testBlockedServerQueue()
++  value = pair()
++  if value is error then return value end if
++  game = server.create(1)
++  target = game.clients[0]
++  target.active = true
++  target.spawned = true
++  target.socket = value[2]
++  target.sendSignon = true
++  msg.writeByte(target.message, c.SVC_PRINT); msg.writeString(target.message, "queued")
++  value[2].canSend = false
++  equal(server.processReliableClientAt(game, target, 1.0), 0, "blocked server send")
++  yes(target.message.curSize > 0, "blocked server queue retained")
++  yes(target.sendSignon, "blocked sendsignon retained")
++  value[2].canSend = true
++  equal(server.processReliableClientAt(game, target, 1.1), 1, "unblocked server send")
++  equal(target.message.curSize, 0, "committed server queue cleared")
++  no(target.sendSignon, "committed sendsignon cleared")
++  closePair(value)
++  return true
++end function
++
++function testReliableBroadcastAccumulatesDuringSignon()
++  game = server.create(1)
++  target = game.clients[0]
++  target.active = true
++  target.spawned = false
++  target.sendSignon = false
++  msg.writeByte(game.reliableDatagram, c.SVC_SETPAUSE); msg.writeByte(game.reliableDatagram, 1)
++  server.prepareReliableMessages(game)
++  equal(target.message.curSize, 2, "reliable bytes accumulate")
++  equal(game.reliableDatagram.curSize, 0, "broadcast source cleared")
++  return true
++end function
++
++function testReconnectPayload()
++  buffer = sz.alloc(32)
++  transients.writeReconnect(buffer)
++  equal(hex(sz.dataSlice(buffer)), "097265636f6e6e6563740a00", "reconnect payload")
++  return true
++end function
++
++function testNopPayloadAndTimestamp()
++  value = pair()
++  if value is error then return value end if
++  game = server.create(1)
++  target = game.clients[0]
++  target.active = true
++  target.socket = value[2]
++  equal(server.sendNopAt(game, target, 7.0), 1, "nop send")
++  equal(target.lastMessage, 7.0, "nop updates last_message")
++  incoming = sz.alloc(8)
++  equal(netmain.NET_GetMessage(value[1], incoming, 1.0), 2, "nop is unreliable")
++  equal(hex(sz.dataSlice(incoming)), "01", "svc_nop payload")
++  closePair(value)
++  return true
++end function
++
++function testDropAsapWaitsThenDrops()
++  value = pair()
++  if value is error then return value end if
++  game = server.create(1)
++  target = game.clients[0]
++  target.active = true
++  target.socket = value[2]
++  target.dropAsap = true
++  value[2].canSend = false
++  equal(server.processReliableClientAt(game, target, 1.0), 0, "dropasap blocked")
++  yes(target.active, "blocked dropasap remains active")
++  value[2].canSend = true
++  equal(server.processReliableClientAt(game, target, 1.1), -1, "dropasap executes")
++  no(target.active, "dropasap client inactive")
++  netmain.NET_Shutdown(value[0])
++  return true
++end function
++
++function testOverflowPrecedesDropAsap()
++  game = server.create(1)
++  target = game.clients[0]
++  target.active = true
++  target.dropAsap = true
++  target.message.overflowed = true
++  // No socket is required: overflow must be selected before can-send/dropasap.
++  equal(server.processReliableClientAt(game, target, 1.0), -1, "overflow drop result")
++  no(target.active, "overflow crashed client")
++  no(target.message.overflowed, "overflow flag reset after drop")
++  return true
++end function
++
++function testEmptyReliableNoWork()
++  no(delivery.reliableWorkPending(0, false), "empty no work")
++  yes(delivery.reliableWorkPending(1, false), "bytes are work")
++  yes(delivery.reliableWorkPending(0, true), "dropasap is work")
++  return true
++end function
++
++function testCommittedMessageRoundTrip()
++  value = pair()
++  if value is error then return value end if
++  game = server.create(1)
++  target = game.clients[0]
++  target.active = true
++  target.spawned = true
++  target.socket = value[2]
++  msg.writeByte(target.message, c.SVC_PRINT); msg.writeString(target.message, "hello")
++  equal(server.processReliableClientAt(game, target, 2.0), 1, "server reliable commit")
++  incoming = sz.alloc(32)
++  equal(netmain.NET_GetMessage(value[1], incoming, 1.0), 1, "client receives reliable")
++  equal(hex(sz.dataSlice(incoming)), "0868656c6c6f00", "reliable payload preserved")
++  closePair(value)
++  return true
++end function
++
++function testSendOutcomeClearContract()
++  no(delivery.clearAfterSend(-1), "failed send does not commit")
++  no(delivery.clearAfterSend(0), "blocked send does not commit")
++  yes(delivery.clearAfterSend(1), "successful send commits")
++  return true
++end function
++
++passed = 0
++if run(1, "send-result classification", testOutcomeClassification) then passed = passed + 1 end if
++if run(2, "client reliable plans", testClientPlans) then passed = passed + 1 end if
++if run(3, "strict keepalive boundary", testKeepaliveStrictBoundary) then passed = passed + 1 end if
++if run(4, "initial delivery plans", testInitialDeliveryPlans) then passed = passed + 1 end if
++if run(5, "overflow/drop/send ordering", testReliableOrdering) then passed = passed + 1 end if
++if run(6, "blocked client queue retention", testBlockedClientQueue) then passed = passed + 1 end if
++if run(7, "blocked server queue retention", testBlockedServerQueue) then passed = passed + 1 end if
++if run(8, "reliable accumulation during signon", testReliableBroadcastAccumulatesDuringSignon) then passed = passed + 1 end if
++if run(9, "reconnect payload", testReconnectPayload) then passed = passed + 1 end if
++if run(10, "keepalive NOP payload", testNopPayloadAndTimestamp) then passed = passed + 1 end if
++if run(11, "dropasap waits then drops", testDropAsapWaitsThenDrops) then passed = passed + 1 end if
++if run(12, "overflow precedes dropasap", testOverflowPrecedesDropAsap) then passed = passed + 1 end if
++if run(13, "committed reliable roundtrip", testCommittedMessageRoundTrip) then passed = passed + 1 end if
++if run(14, "send outcome clear contract", testSendOutcomeClearContract) then passed = passed + 1 end if
++
++if passed != 14 then
++  print "MiniQuake BP-016 Protocol 15 delivery tests failed: " + passed + "/14"
++  error(9699, "BP-016 Protocol 15 delivery fixtures failed")
++end if
++print "MiniQuake BP-016 Protocol 15 delivery tests passed: 14"
+diff --git a/tools/check_protocol15_delivery.py b/tools/check_protocol15_delivery.py
+new file mode 100755
+index 0000000000000000000000000000000000000000..13e0a3f7f935e660b05bd82da3801b8114d7c8f1
+--- /dev/null
++++ b/tools/check_protocol15_delivery.py
+@@ -0,0 +1,64 @@
++#!/usr/bin/env python3
++"""Verify BP-016 reliable/unreliable scheduling and send-result contracts."""
++from __future__ import annotations
++import argparse, hashlib, json, os, shutil, subprocess, tempfile
++from pathlib import Path
++PACKAGE_ID="BP-016"; PARENT_PACKAGE_ID="BP-015"
++SCHEMA="MiniQuakeProtocol15DeliveryGolden/1"; REPORT="MiniQuakeBP016Protocol15DeliveryVerification/1"
++GOLDEN="audit/protocol15_delivery_golden.json"; ORACLE="tools/oracle/protocol15_delivery_oracle.c"
++def sha(p:Path)->str:return hashlib.sha256(p.read_bytes()).hexdigest()
++def outcome(r:int)->int:return 1 if r<0 else (2 if r==0 else 3)
++def initial(spawned:bool,signon:bool,elapsed:float)->int:
++    if spawned:return 9
++    if not signon:return 2 if elapsed>5.0 else 4
++    return 8
++def reliable(overflow:bool,size:int,drop:bool,can:bool)->int:
++    if overflow:return 1
++    if size<=0 and not drop:return 0
++    if not can:return 2
++    if drop:return 3
++    return 4
++def cases():
++    values=[("send_failed",outcome(-1)),("send_blocked",outcome(0)),("send_committed",outcome(1)),
++      ("spawned_plan",initial(True,False,0)),("signon_wait_equal",initial(False,False,5.0)),
++      ("signon_nop_above",initial(False,False,5.000001)),("signon_requested",initial(False,True,0)),
++      ("overflow_first",reliable(True,1,True,True)),("drop_blocked",reliable(False,0,True,False)),
++      ("drop_sendable",reliable(False,0,True,True)),("reliable_send",reliable(False,1,False,True)),
++      ("empty_none",reliable(False,0,False,True)),("keepalive_equal",int(5.0>5.0)),
++      ("keepalive_above",int(5.000001>5.0))]
++    return [{"kind":"case","name":n,"value":v} for n,v in values]
++def document(root:Path):return {"schema":SCHEMA,"package_id":PACKAGE_ID,"parent_package_id":PARENT_PACKAGE_ID,
++ "protocol_version":15,"sources":["cl_main.c","sv_main.c","host.c","net_main.c"],"cases":cases(),
++ "reference":{"oracle":ORACLE,"oracle_sha256":sha(root/ORACLE)}}
++def oracle(root:Path):
++    cc=next((shutil.which(x) for x in (os.environ.get("CC",""),"cc","gcc","clang") if x and shutil.which(x.split()[0])),None)
++    if not cc:return True,"not available",[]
++    with tempfile.TemporaryDirectory(prefix="mq-bp016-") as td:
++      exe=Path(td)/("oracle.exe" if os.name=="nt" else "oracle")
++      b=subprocess.run([cc,"-std=c11","-Wall","-Wextra","-Werror","-O2",str(root/ORACLE),"-o",str(exe)],capture_output=True,text=True)
++      if b.returncode:return False,b.stdout+b.stderr,[]
++      r=subprocess.run([str(exe)],capture_output=True,text=True)
++      return (r.returncode==0,cc,[json.loads(x) for x in r.stdout.splitlines() if x.strip()])
++def contract(root:Path):
++    e=[]; delivery=(root/'src/miniquake/protocol_delivery.ml').read_text(); server=(root/'src/miniquake/server.ml').read_text(); client=(root/'src/miniquake/client.ml').read_text(); tests=(root/'tests/protocol15_delivery_tests.ml').read_text()
++    for marker in ('SEND_DROP','SEND_RETAIN','SEND_COMMIT','function keepaliveDue'): 
++      if marker not in delivery:e.append('missing delivery marker '+marker)
++    if 'if outcome == delivery.SEND_RETAIN then return 0 end if' not in server:e.append('server does not retain zero-result send')
++    if 'delivery.clearAfterSend(result)' not in client:e.append('client not bound to shared send outcome')
++    if 'MiniQuake BP-016 Protocol 15 delivery tests passed: 14' not in tests:e.append('missing runtime success marker')
++    return e
++def main():
++ p=argparse.ArgumentParser();p.add_argument('root',nargs='?',default='.');p.add_argument('--root',dest='rf');p.add_argument('--write-golden',action='store_true');p.add_argument('--json-output');a=p.parse_args();root=Path(a.rf or a.root).resolve();doc=document(root);gp=root/GOLDEN
++ if a.write_golden:gp.parent.mkdir(exist_ok=True);gp.write_text(json.dumps(doc,indent=2)+'\n')
++ errs=[]
++ if not gp.is_file():errs.append('missing golden')
++ elif json.loads(gp.read_text(encoding='utf-8-sig'))!=doc:errs.append('golden differs from Python model')
++ ok,detail,rows=oracle(root)
++ if not ok:errs.append('C oracle failed: '+detail)
++ elif rows and rows!=doc['cases']:errs.append('C oracle differs from Python cases')
++ errs+=contract(root);rep={"schema":REPORT,"package_id":PACKAGE_ID,"parent_package_id":PARENT_PACKAGE_ID,"ok":not errs,"cases":len(doc['cases']),"oracle":detail,"errors":errs}
++ if a.json_output:Path(a.json_output).write_text(json.dumps(rep,indent=2)+'\n')
++ print('MiniQuake BP-016 Protocol 15 delivery verification: '+('PASS' if not errs else 'FAIL'));print(f"  cases={len(doc['cases'])} oracle={detail}")
++ for x in errs:print('  ERROR: '+x)
++ return 0 if not errs else 1
++if __name__=='__main__':raise SystemExit(main())
+diff --git a/tools/oracle/protocol15_delivery_oracle.c b/tools/oracle/protocol15_delivery_oracle.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..6b4fa770e542862576a4566df306fb0a4f12965f
+--- /dev/null
++++ b/tools/oracle/protocol15_delivery_oracle.c
+@@ -0,0 +1,36 @@
++/* Source-guided reliable-delivery ordering oracle from sv_main.c/cl_main.c. */
++#include <stdio.h>
++
++static int outcome(int result) { return result < 0 ? 1 : (result == 0 ? 2 : 3); }
++static int initial_plan(int spawned, int sendsignon, double elapsed) {
++    if (spawned) return 1 | 8;
++    if (!sendsignon) return elapsed > 5.0 ? 2 : 4;
++    return 8;
++}
++static int reliable_plan(int overflowed, int size, int dropasap, int cansend) {
++    if (overflowed) return 1;
++    if (size <= 0 && !dropasap) return 0;
++    if (!cansend) return 2;
++    if (dropasap) return 3;
++    return 4;
++}
++static void row(const char *name, int value) {
++    printf("{\"kind\":\"case\",\"name\":\"%s\",\"value\":%d}\n", name, value);
++}
++int main(void) {
++    row("send_failed", outcome(-1));
++    row("send_blocked", outcome(0));
++    row("send_committed", outcome(1));
++    row("spawned_plan", initial_plan(1,0,0.0));
++    row("signon_wait_equal", initial_plan(0,0,5.0));
++    row("signon_nop_above", initial_plan(0,0,5.000001));
++    row("signon_requested", initial_plan(0,1,0.0));
++    row("overflow_first", reliable_plan(1,1,1,1));
++    row("drop_blocked", reliable_plan(0,0,1,0));
++    row("drop_sendable", reliable_plan(0,0,1,1));
++    row("reliable_send", reliable_plan(0,1,0,1));
++    row("empty_none", reliable_plan(0,0,0,1));
++    row("keepalive_equal", 5.0 > 5.0);
++    row("keepalive_above", 5.000001 > 5.0);
++    return 0;
++}

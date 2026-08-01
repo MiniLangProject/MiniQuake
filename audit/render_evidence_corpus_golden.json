@@ -1,0 +1,1 @@
+{"schema":1,"fixtures":18,"width":640,"height":480,"scenarios":[["start-064","start",64],["start-128","start",128],["e1m1-128","e1m1",128]],"exact_pair_required":true,"original_ssim_minimum":0.95}

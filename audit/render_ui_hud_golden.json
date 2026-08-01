@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "component": "BP-047 render UI/HUD",
+  "rows": [
+    {
+      "name": "sbar_coop_640",
+      "value": 160
+    },
+    {
+      "name": "sbar_dm_640",
+      "value": 0
+    },
+    {
+      "name": "normal_overlay_stages",
+      "value": 11
+    },
+    {
+      "name": "set2d_stages",
+      "value": 11
+    },
+    {
+      "name": "tga_1x1",
+      "value": 21
+    },
+    {
+      "name": "tga_640x480",
+      "value": 921618
+    },
+    {
+      "name": "viewmodel_depth_milli",
+      "value": 300
+    },
+    {
+      "name": "sbar_lines_100",
+      "value": 48
+    },
+    {
+      "name": "sbar_lines_110",
+      "value": 24
+    },
+    {
+      "name": "sbar_lines_120",
+      "value": 0
+    },
+    {
+      "name": "fixtures",
+      "value": 24
+    }
+  ]
+}

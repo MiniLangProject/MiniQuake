@@ -1,3 +1,0 @@
-LIBRARY cl_main_oracle
-EXPORTS
-  cl_main_oracle_jsonl

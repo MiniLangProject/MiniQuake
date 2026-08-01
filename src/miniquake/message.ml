@@ -4,14 +4,18 @@ import miniquake.types as t
 import miniquake.byteio as bio
 import miniquake.sizebuf as sz
 import miniquake.native as native
+import miniquake.protocol_text as protocolText
 
 function integerArgument(value, operation)
   // The original MSG_WriteChar/Byte/Short/Long functions take an int. C therefore
   // truncates Quake's float usercmd fields before the byte-wise masks and shifts.
-  // MiniLang keeps int and float distinct, so reproduce that conversion here at
-  // the protocol boundary instead of letting a bitwise operation yield void.
+  // qboolean is also an int in the original ABI.
   if value is int then return value end if
   if value is float then return native.trunc(value) end if
+  if value is bool then
+    if value then return 1 end if
+    return 0
+  end if
   return error(1301, operation + ": numeric argument required")
 end function
 
@@ -39,29 +43,56 @@ function writeLong(buffer, value)
   bio.putI32(buffer.data, offset, integer)
 end function
 
+function floatArgument(value, operation)
+  // MSG_WriteFloat/Coord/Angle receive a C float. MiniLang integers therefore
+  // also have to cross an IEEE-754 binary32 call boundary before any scaling
+  // or truncation takes place.
+  if value is int or value is float then
+    return native.bitsFloat(native.floatBits(value))
+  end if
+  if value is bool then
+    if value then return 1.0 end if
+    return 0.0
+  end if
+  return error(1303, operation + ": numeric argument required")
+end function
+
 function writeFloat(buffer, value)
+  rounded = floatArgument(value, "MSG_WriteFloat")
   offset = sz.getSpace(buffer, 4)
-  bio.putF32(buffer.data, offset, value)
+  bio.putF32(buffer.data, offset, rounded)
+end function
+
+function writeStringBytes(buffer, data)
+  if data is not bytes then return error(1302, "MSG_WriteString requires bytes") end if
+  count = 0
+  while count < len(data) and data[count] != 0
+    count = count + 1
+  end while
+
+  // common.c performs one SZ_Write of Q_strlen(s)+1 bytes. Keeping payload and
+  // terminator in one reservation is observable when an overflow-enabled buffer
+  // has room for the payload but not for its trailing NUL.
+  offset = sz.getSpace(buffer, count + 1)
+  if count > 0 then bio.copyInto(buffer.data, offset, data, 0, count) end if
+  buffer.data[offset + count] = 0
+  return buffer
 end function
 
 function writeString(buffer, text)
-  if text is void then
-    writeByte(buffer, 0)
-    return true
-  end if
-  encoded = bytes(text)
-  sz.writeBytes(buffer, encoded)
-  writeByte(buffer, 0)
+  return writeStringBytes(buffer, protocolText.encodeBytes(text))
 end function
 
 function writeCoord(buffer, value)
-  writeShort(buffer, native.trunc(value * 8.0))
+  rounded = floatArgument(value, "MSG_WriteCoord")
+  writeShort(buffer, native.trunc(rounded * 8.0))
 end function
 
 function writeAngle(buffer, value)
-  // common.c casts the angle before multiplying, rather than casting the
-  // fully-scaled result.
-  writeByte(buffer, native.trunc((native.trunc(value) * 256) / 360) & 255)
+  // common.c converts the function argument to float first, then casts the
+  // angle itself before multiplying by 256/360.
+  rounded = floatArgument(value, "MSG_WriteAngle")
+  writeByte(buffer, native.trunc((native.trunc(rounded) * 256) / 360) & 255)
 end function
 
 function beginReading(buffer)
@@ -131,7 +162,7 @@ function readFloat(reader)
   return bio.f32(reader.data, offset)
 end function
 
-function readString(reader)
+function readStringBytes(reader)
   output = bytes(2047)
   count = 0
   while count < len(output)
@@ -140,7 +171,11 @@ function readString(reader)
     output[count] = value & 255
     count = count + 1
   end while
-  return decode(slice(output, 0, count))
+  return slice(output, 0, count)
+end function
+
+function readString(reader)
+  return protocolText.decodeBytes(readStringBytes(reader))
 end function
 
 function readCoord(reader)

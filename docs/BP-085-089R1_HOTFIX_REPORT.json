@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "delivery_revision": "BP-085-089R1",
+  "delivery_parent": "BP-085-089",
+  "engine_package_id": "BP-089",
+  "result_archive_sha256": "cfaa061e9de12e13e9c38ba66f284eab8fb46986eebe5ddd27b2c3a0de777f87",
+  "failure": {
+    "component": "BP-087 retail demo/save evidence",
+    "demos": "PASS",
+    "save_first_pass_exact": false,
+    "old_semantic_check": false,
+    "cleanup_error": "NET_FreeQSocket: not active"
+  },
+  "root_causes": [
+    "two complete Host sessions shared process-global NET/QSocket state",
+    "save load synchronization recomputed and trimmed the saved sv.num_edicts high-water mark",
+    "complete live VM hashes were incorrectly treated as Quake-v5 save semantics"
+  ],
+  "fix": {
+    "evidence_revision": "sequential_exact_v1",
+    "host_sessions": "strictly sequential",
+    "semantic_boundary": "parsed_save_domain",
+    "first_pass_byte_identity": "required",
+    "normalized_second_roundtrip": "exact required",
+    "preserves_edict_high_water": true,
+    "relinks_non_free_edicts": true,
+    "production_load_path_fixed": true,
+    "live_vm_hashes": "diagnostic only"
+  },
+  "contracts_changed": false,
+  "artifact_status": "artifact_compat_109_frozen_v1",
+  "artifact_fingerprint": "0x59531091"
+}

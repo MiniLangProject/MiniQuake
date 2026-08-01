@@ -1,0 +1,50 @@
+{
+  "schema": "MiniQuakeWorldSurfaceGolden/1",
+  "package_id": "BP-040",
+  "parent_package_id": "BP-039",
+  "sources": [
+    "gl_rmain.c",
+    "gl_rsurf.c",
+    "gl_rlight.c",
+    "gl_warp.c",
+    "gl_refrag.c"
+  ],
+  "rows": [
+    {
+      "name": "world_front_positive",
+      "value": 1
+    },
+    {
+      "name": "world_front_negative",
+      "value": 0
+    },
+    {
+      "name": "world_back_negative",
+      "value": 1
+    },
+    {
+      "name": "underwater_bypass",
+      "value": 1
+    },
+    {
+      "name": "brush_epsilon_milli",
+      "value": 10
+    },
+    {
+      "name": "texture_head_insertion",
+      "value": 1
+    },
+    {
+      "name": "translucent_water_deferred",
+      "value": 1
+    },
+    {
+      "name": "fixtures",
+      "value": 20
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/world_surface_render_oracle.c",
+    "oracle_sha256": "01e4e3e675183cf42b172404a9d6bef449b02f7ed84790235a1c27a754e41453"
+  }
+}

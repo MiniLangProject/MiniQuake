@@ -287,6 +287,10 @@ function SND_PickChannel(system, entityNumber, entityChannel)
   return target
 end function
 
+function soundF32(value)
+  return native.bitsFloat(native.floatBits(value))
+end function
+
 function SND_Spatialize(system, channel)
   if channel.entityNumber == system.listenerEntity then
     channel.leftVolume = channel.masterVolume
@@ -295,10 +299,10 @@ function SND_Spatialize(system, channel)
   end if
 
   source = math.subtract(channel.origin, system.listenerOrigin)
-  distance = math.length(source)
-  if distance > 0.0 then source = math.scale(source, 1.0 / distance) end if
-  distance = distance * channel.distanceMultiplier
-  dot = math.dot(system.listenerRight, source)
+  distance = soundF32(math.length(source))
+  if distance > 0.0 then source = math.scale(source, soundF32(1.0 / distance)) end if
+  distance = soundF32(distance * channel.distanceMultiplier)
+  dot = soundF32(math.dot(system.listenerRight, source))
   rightScale = 1.0
   leftScale = 1.0
   if system.mixState.dma.channels == 1 then
@@ -309,9 +313,11 @@ function SND_Spatialize(system, channel)
     leftScale = 1.0 - dot
   end if
 
-  channel.rightVolume = native.trunc(channel.masterVolume * (1.0 - distance) * rightScale)
+  rightValue = soundF32(soundF32(channel.masterVolume * soundF32(1.0 - distance)) * rightScale)
+  channel.rightVolume = native.trunc(rightValue)
   if channel.rightVolume < 0 then channel.rightVolume = 0 end if
-  channel.leftVolume = native.trunc(channel.masterVolume * (1.0 - distance) * leftScale)
+  leftValue = soundF32(soundF32(channel.masterVolume * soundF32(1.0 - distance)) * leftScale)
+  channel.leftVolume = native.trunc(leftValue)
   if channel.leftVolume < 0 then channel.leftVolume = 0 end if
   return [channel.leftVolume, channel.rightVolume]
 end function
@@ -329,8 +335,8 @@ function S_StartSound(system, entityNumber, entityChannel, descriptor, origin, v
 
   sndmix.resetChannel(target)
   target.origin = math.copy(origin)
-  target.distanceMultiplier = attenuation / SOUND_NOMINAL_CLIP_DISTANCE
-  target.masterVolume = native.trunc(volume * 255.0)
+  target.distanceMultiplier = soundF32(soundF32(attenuation) / SOUND_NOMINAL_CLIP_DISTANCE)
+  target.masterVolume = native.trunc(soundF32(soundF32(volume) * 255.0))
   target.entityNumber = entityNumber
   target.entityChannel = entityChannel
   SND_Spatialize(system, target)

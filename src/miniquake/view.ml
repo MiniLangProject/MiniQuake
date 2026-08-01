@@ -5,6 +5,7 @@ import miniquake.constants as c
 import miniquake.mathlib as math
 import miniquake.cvar as cvar
 import miniquake.native as native
+import miniquake.common as common
 import std.math as stdmath
 
 const PI = 3.141592653589793
@@ -276,12 +277,14 @@ function V_ParseDamage(state, armor, blood, source, entityOrigin, entityAngles, 
 end function
 
 function V_cshift_f(state, arguments)
+  // view.c uses atoi(Cmd_Argv(...)) for every component.  In particular,
+  // decimal suffixes are truncated and malformed/empty values become zero;
+  // MiniLang's generic toNumber would otherwise accept a wider syntax.
   values = [0.0, 0.0, 0.0, 0.0]
   index = 0
   while index < 4
     if index + 1 < len(arguments) then
-      parsed = toNumber(arguments[index + 1])
-      if parsed is not void then values[index] = parsed end if
+      values[index] = common.cAtoi(arguments[index + 1])
     end if
     index = index + 1
   end while

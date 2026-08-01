@@ -441,7 +441,7 @@ function NET_Connect(state, host, timeoutMilliseconds)
     if hostCacheCount != 1 then return void end if
     target = hostcache[0][0]
   end if
-  result = netloop.Datagram_Connect(state, target, timeoutMilliseconds)
+  result = netloop.Datagram_ConnectPort(state, target, timeoutMilliseconds, net_hostport)
   if result is not error and result is not void then
     tracked = NET_TrackSocket(result)
     if tracked is error then return tracked end if

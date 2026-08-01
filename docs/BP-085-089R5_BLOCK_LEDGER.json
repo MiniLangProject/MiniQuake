@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "project": "MiniQuake",
+  "block_id": "BP-085-089",
+  "parent_delivery": "BP-080-084R2",
+  "final_package_id": "BP-089",
+  "delivery_revision": "BP-085-089R5",
+  "steps": [
+    {
+      "package_id": "BP-085",
+      "title": "game/search-path profile closure",
+      "patch": "patches/BP-085.diff",
+      "runtime_fixtures": 22,
+      "status": "candidate"
+    },
+    {
+      "package_id": "BP-086",
+      "title": "mod and mission-pack runtime compatibility",
+      "patch": "patches/BP-086.diff",
+      "runtime_fixtures": 22,
+      "status": "candidate"
+    },
+    {
+      "package_id": "BP-087",
+      "title": "demo and savegame artifact compatibility",
+      "patch": "patches/BP-087.diff",
+      "runtime_fixtures": 24,
+      "status": "candidate"
+    },
+    {
+      "package_id": "BP-088",
+      "title": "long-run resource stability",
+      "patch": "patches/BP-088.diff",
+      "runtime_fixtures": 20,
+      "status": "candidate"
+    },
+    {
+      "package_id": "BP-089",
+      "title": "cumulative compat_109 release candidate",
+      "patch": "patches/BP-089.diff",
+      "runtime_fixtures": 24,
+      "status": "candidate"
+    }
+  ],
+  "block_runtime_fixtures": 112,
+  "accepted_parent": {
+    "delivery_revision": "BP-080-084R2",
+    "status": "PASS",
+    "result_archive_sha256": "7d4969d9ed05877fbbcc7c071ea8d1d52f8d0892f3fa57a667df03d083503ef7",
+    "trace_sha256": "e91f4c9e32c8c9df39d7cb4ceaf83efaa78c51057516323da2ba6cc3412f0c7b",
+    "source_inventory_sha256": "31f437bb54a84fa690ff96011c50f8ca3e7dfabde05b4f450e58049eae5d8837",
+    "source_target_functions": 1094,
+    "source_missing_functions": 0
+  },
+  "contracts": {
+    "game_profile": {
+      "status": "game_profile_109_frozen_v1",
+      "fingerprint": "0x7a03b68d"
+    },
+    "mod_runtime": {
+      "status": "mod_runtime_109_frozen_v1",
+      "fingerprint": "0x4649813d"
+    },
+    "artifact_compat": {
+      "status": "artifact_compat_109_frozen_v1",
+      "fingerprint": "0x59531091",
+      "evidence_revision": "sequential_exact_fixed6_signedzero_v3",
+      "semantic_boundary": "parsed_save_domain",
+      "stable_reserialize_required": true,
+      "exact_roundtrip_required": true,
+      "preserves_edict_high_water": true,
+      "sequential_host_sessions": true,
+      "fixed_six_formatter": "msvcrt_percent_f",
+      "fixed_six_large_positive": "4097.000000",
+      "fixed_six_large_negative": "-4097.000000",
+      "text_bridge_export": "mqt_f32_to_fixed6",
+      "preserves_signed_zero": true,
+      "float_parser": "msvcrt_strtod_f32"
+    },
+    "stability": {
+      "status": "stability_109_frozen_v1",
+      "fingerprint": "0x6c131501"
+    },
+    "release_candidate": {
+      "status": "compat_109_release_candidate_v1",
+      "fingerprint": "0x29b72a98"
+    }
+  },
+  "release_matrix": {
+    "accepted_contracts": [
+      "protocol15_frozen_v1",
+      "quakec_109_frozen_v1",
+      "world_physics_109_frozen_v1",
+      "host_lifecycle_109_frozen_v1",
+      "client_render_109_frozen_v1",
+      "world_render_109_frozen_v1",
+      "model_ui_render_109_frozen_v1",
+      "render_special_109_frozen_v1",
+      "audio_109_frozen_v1",
+      "network_platform_109_frozen_v1",
+      "frontend_109_frozen_v1",
+      "core_assets_memory_109_frozen_v1",
+      "gameplay_presentation_109_frozen_v1",
+      "black_port_source_109_frozen_v1",
+      "game_profile_109_frozen_v1",
+      "mod_runtime_109_frozen_v1",
+      "artifact_compat_109_frozen_v1",
+      "stability_109_frozen_v1"
+    ],
+    "pending_external_gates": [
+      "original_binary_interop",
+      "external_glquake_visual_reference"
+    ]
+  },
+  "evidence": {
+    "required_game": "id1",
+    "optional_games": [
+      "rogue",
+      "hipnotic"
+    ],
+    "retail_demos": 3,
+    "artifact_runs": 2,
+    "host_soak_frames": 5000,
+    "listen_soak_frames": 5000,
+    "black_port_maps": 4
+  },
+  "delivery_parent": "BP-085-089R4",
+  "block_parent_delivery": "BP-080-084R2",
+  "hotfixes": [
+    {
+      "revision": "BP-085-089R1",
+      "status": "FAIL in retail artifact evidence; superseded by R2",
+      "failure_source": "BP-087 retail artifact evidence",
+      "fix": "sequential Host sessions, exact parsed-save roundtrip, preserved edict high-water mark and production load synchronization",
+      "result_archive_sha256": "169be14543a5defb984fb52e3390b8eb1b0c546d72d17cc24c74085f5104ed2a"
+    },
+    {
+      "revision": "BP-085-089R2",
+      "status": "FAIL in inherited BP-022 preflight; superseded by R3",
+      "failure_source": "historical QuakeC edict source checker",
+      "root_cause": "integer-scaled six-decimal formatting overflowed signed i32 for ordinary Quake value 4097.0",
+      "fix": "MSVCRT-compatible %.6f text bridge, updated QuakeC/Cvar/savegame writers and explicit 4097 regression evidence",
+      "result_archive_sha256": "f39e82b46494d815fe4fbafc361ddd4cf6d8d305222f9c9b29b64b0ccf4958f6"
+    },
+    {
+      "revision": "BP-085-089R3",
+      "status": "FAIL in inherited BP-031 preflight; superseded by R4",
+      "failure_source": "historical command/cvar source checker",
+      "root_cause": "historical checker required the removed i32-scaled formatter after migration to MSVCRT %.6f",
+      "fix": "strict historical BP-022 lineage fixed; R3 then exposed the equivalent BP-031 lineage mismatch",
+      "result_archive_sha256": "9713654070c733ff44f56fe98bee6e860e2717e162d2b706daed102316598703"
+    },
+    {
+      "revision": "BP-085-089R4",
+      "status": "FAIL in BP-087 retail save evidence; superseded by R5",
+      "failure_source": "first Quake-v5 save load",
+      "root_cause": "toNumber normalized -0.000000 to positive zero before Binary32 storage",
+      "fix": "native C-atof/strtod parser for scalar and vector save/edict values",
+      "production_source_changed": false,
+      "native_source_changed": false,
+      "runtime_fixtures": 20,
+      "patch": "patches/BP-089R4.diff",
+      "result_archive_sha256": "407953ec4856166f9717620b9cbc8feaab00fab01b5f83f8544798c253c368fb"
+    },
+    {
+      "revision": "BP-085-089R5",
+      "status": "candidate",
+      "failure_source": "BP-087 signed-zero save roundtrip",
+      "root_cause": "general MiniLang numeric parsing discarded the IEEE-754 negative-zero sign",
+      "fix": "common.cAtof via native strtod and Binary32 for savegame/edict scalar and vector parsing",
+      "production_source_changed": true,
+      "native_binary_changed": false,
+      "runtime_fixtures": 24,
+      "patch": "patches/BP-089R5.diff"
+    }
+  ]
+}

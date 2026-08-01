@@ -1,0 +1,3688 @@
+diff --git a/BLOCK_LEDGER.json b/BLOCK_LEDGER.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..3595ab6ae21e0defa7ea38a2990579689c2ba213
+--- /dev/null
++++ b/BLOCK_LEDGER.json
+@@ -0,0 +1,59 @@
++{
++  "schema": "MiniQuakeBlackPortBlockLedger/1",
++  "block_id": "BP-015-019",
++  "parent_package_id": "BP-014R1",
++  "final_package_id": "BP-019",
++  "protocol_status": "protocol15_frozen_v1",
++  "steps": [
++    {
++      "package_id": "BP-015",
++      "title": "Protocol 15 signon queue and stages 1-4",
++      "patch": "patches/BP-015.diff",
++      "runtime_fixture": "MiniQuakeProtocol15SignonTests.exe",
++      "fixture_count": 12,
++      "status": "implemented"
++    },
++    {
++      "package_id": "BP-016",
++      "title": "Reliable and unreliable delivery scheduling",
++      "patch": "patches/BP-016.diff",
++      "runtime_fixture": "MiniQuakeProtocol15DeliveryTests.exe",
++      "fixture_count": 14,
++      "status": "implemented"
++    },
++    {
++      "package_id": "BP-017",
++      "title": "Datagram fragmentation, ACK and retransmission",
++      "patch": "patches/BP-017.diff",
++      "runtime_fixture": "MiniQuakeProtocol15DatagramTests.exe",
++      "fixture_count": 18,
++      "status": "implemented"
++    },
++    {
++      "package_id": "BP-018",
++      "title": "Demo framing, recording and playback",
++      "patch": "patches/BP-018.diff",
++      "runtime_fixture": "MiniQuakeProtocol15DemoTests.exe",
++      "fixture_count": 19,
++      "status": "implemented"
++    },
++    {
++      "package_id": "BP-019",
++      "title": "Cross-layer Protocol 15 closure and freeze",
++      "patch": "patches/BP-019.diff",
++      "runtime_fixture": "MiniQuakeProtocol15ClosureTests.exe",
++      "fixture_count": 15,
++      "status": "implemented"
++    }
++  ],
++  "block_runtime_fixtures": 78,
++  "acceptance": {
++    "build_once": true,
++    "continue_independent_tests": true,
++    "deterministic_trace_processes": 2,
++    "default_headless_frames": 300,
++    "default_trace_frames": 128,
++    "udp_loopback": true,
++    "original_quake_binary_interop": "external future gate; not claimed by this source-only block"
++  }
++}
+diff --git a/CHANGELOG_BP-015-019.md b/CHANGELOG_BP-015-019.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..74d62e64038b39f8c16d990035eec49b011bcb14
+--- /dev/null
++++ b/CHANGELOG_BP-015-019.md
+@@ -0,0 +1,26 @@
++# Changelog BP-015–BP-019 – kumulativer Protocol-15-Abschlussblock
++
++Elternbasis: **BP-014R1**, unter Windows vollständig angenommen.
++Finales Paket: **BP-019**.
++
++Der Block führt fünf logisch getrennte, aufeinander aufbauende Schritte in
++nur einer Lieferung zusammen:
++
++| Schritt | Thema | neue Fixtures |
++|---|---|---:|
++| BP-015 | Signon-Queue und Stufen 1–4 | 12 |
++| BP-016 | Reliable-/Unreliable-Planung | 14 |
++| BP-017 | Datagramm, ACK, Fragmentierung und Retransmission | 18 |
++| BP-018 | Demo-Framing, Aufnahme und Wiedergabe | 19 |
++| BP-019 | Cross-Layer-Abschluss und Protocol-Freeze | 15 |
++| **Summe** |  | **78** |
++
++Der kumulative Test baut den Endstand einmal, führt alle unabhängigen
++Testprogramme weiter aus und erzeugt bei Fehlern eine logische Zuordnung zum
++ersten betroffenen Teilpaket. Die fünf Teilpatches liegen unter `patches/`.
++
++`protocol15_frozen_v1` bedeutet: Die anhand des vorliegenden Original-C-Codes
++abgedeckte Protocol-15-Implementierung wird nach einer grünen Windows-Abnahme
++als stabiler Contract behandelt. Das ist **kein** Claim einer bereits
++abgeschlossenen Original-Binary-Interopmatrix; solche Mehrprozessläufe bleiben
++ein späteres externes Gate.
+diff --git a/CHANGELOG_BP-015.md b/CHANGELOG_BP-015.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..faaac804a758d8459305c3ee00cbdf9d24847565
+--- /dev/null
++++ b/CHANGELOG_BP-015.md
+@@ -0,0 +1,23 @@
++# Changelog BP-015 – Protocol-15-Signon
++
++Elternstand: **BP-014R1**
++
++## Änderungen
++
++- `CL_SignonReply` schreibt seine Antwort ausschließlich in den zuverlässigen
++  Clientpuffer; der Transport erfolgt erst in `CL_SendCmd`.
++- `Host_PreSpawn_f` hängt Server-Signon und `svc_signonnum 2` an
++  `client_t.message` an und setzt `sendsignon`, statt im Commandparser zu senden.
++- `Host_Spawn_f` beginnt mit einem frischen zuverlässigen Clientpuffer, erzeugt
++  den Spawnpayload und überlässt das Senden `SV_SendClientMessages`.
++- Stufe 4 bleibt ein lokaler Zustandsübergang durch das erste Fast-Entity-Update;
++  es gibt weiterhin kein synthetisches `svc_signonnum 4`.
++- Die Farbausgabe folgt der C-`int`-Konvertierung, bevor Top-/Bottomcolor
++  aufgeteilt werden.
++
++## Evidenz
++
++- C-Oracle: `tools/oracle/protocol15_signon_oracle.c`
++- Goldenmodell: `audit/protocol15_signon_golden.json`
++- MiniLang-Laufzeitfixtures: **12**
++- Teilpatch: `patches/BP-015.diff`
+diff --git a/CHANGELOG_BP-016.md b/CHANGELOG_BP-016.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..287166ee8cc28758642eddd1f6041ff8eb332c1d
+--- /dev/null
++++ b/CHANGELOG_BP-016.md
+@@ -0,0 +1,21 @@
++# Changelog BP-016 – Reliable-/Unreliable-Planung
++
++Elternstand: **BP-015**
++
++## Änderungen
++
++- Neue gemeinsame Entscheidungsschicht `protocol_delivery.ml`.
++- Negative Sendresultate trennen den Client, `0` behält den Puffer für einen
++  späteren Versuch, nur ein positiver Commit leert die zuverlässige Nachricht.
++- Client und Server verwenden dieselbe Commit-/Retain-/Drop-Semantik.
++- Der Signon-Keepalive bleibt bei exakt fünf Sekunden aus und wird erst für
++  `elapsed > 5.0` erzeugt.
++- Overflow, `dropasap`, blockierte Sockets, Signonanforderung und normale
++  Reliable-Nachrichten besitzen getrennte Planungsfälle.
++
++## Evidenz
++
++- C-Oracle: `tools/oracle/protocol15_delivery_oracle.c`
++- Goldenmodell: `audit/protocol15_delivery_golden.json`
++- MiniLang-Laufzeitfixtures: **14**
++- Teilpatch: `patches/BP-016.diff`
+diff --git a/CHANGELOG_BP-017.md b/CHANGELOG_BP-017.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c44da5d85608f1cab825ce3b824ac66a3b91a0a6
+--- /dev/null
++++ b/CHANGELOG_BP-017.md
+@@ -0,0 +1,23 @@
++# Changelog BP-017 – Datagramm, ACK und Retransmission
++
++Elternstand: **BP-016**
++
++## Änderungen
++
++- Ein passendes ACK markiert `sendNext`, erzeugt aber nicht mehr innerhalb der
++  reinen Kanalroutine sofort das nächste Wirepaket.
++- `Datagram_FlushSendNext` sendet den nächsten Fragmentblock nach dem
++  vollständig abgearbeiteten Receive-Loop, wie `net_dgrm.c`.
++- `Datagram_CanSendMessage` ist im reinen MiniLang-Kanal jetzt frei von
++  versteckten Seiteneffekten.
++- `net_loop.pumpRemote` verarbeitet alle bereits anstehenden Pakete und flusht
++  anschließend genau ein markiertes Folgefragment.
++- Sequenz-Wrap, exakte Fragmentgrenzen, Duplikat-ACK, Paketlücken,
++  Retransmission nach `> 1s` und Receive-Overflow sind gebunden.
++
++## Evidenz
++
++- C-Oracle: `tools/oracle/protocol15_datagram_oracle.c`
++- Goldenmodell: `audit/protocol15_datagram_golden.json`
++- MiniLang-Laufzeitfixtures: **18**
++- Teilpatch: `patches/BP-017.diff`
+diff --git a/CHANGELOG_BP-018.md b/CHANGELOG_BP-018.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..dad839a33ad886e5536ba66b9cf07bf36171d1ea
+--- /dev/null
++++ b/CHANGELOG_BP-018.md
+@@ -0,0 +1,22 @@
++# Changelog BP-018 – Demo-Framing und Wiedergabe
++
++Elternstand: **BP-017**
++
++## Änderungen
++
++- `record <name> <map> <track>` verwendet für den Track die originale
++  C-`atoi`-Semantik statt `toNumber`.
++- Isolierte `svc_nop`-Keepalives werden wie in `CL_GetMessage` intern
++  übersprungen und weder geparst noch in Demos geschrieben.
++- Mehrbyte-Payloads, die mit `svc_nop` beginnen, bleiben vollständig erhalten.
++- Beim Record-Befehl erfolgt der optionale Mapwechsel vor dem Öffnen der
++  Demodatei, entsprechend `CL_Record_f`.
++- Demoheader, little-endian Framegröße, drei Viewangles, `MAX_MSGLEN`,
++  `svc_disconnect` beim Stoppen und Timedemo-Grenzen sind gebunden.
++
++## Evidenz
++
++- C-Oracle: `tools/oracle/protocol15_demo_oracle.c`
++- Goldenmodell: `audit/protocol15_demo_golden.json`
++- MiniLang-Laufzeitfixtures: **19**
++- Teilpatch: `patches/BP-018.diff`
+diff --git a/CHANGELOG_BP-019.md b/CHANGELOG_BP-019.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..410ec2eee8d29d0b7ad1a84382f482baabc62280
+--- /dev/null
++++ b/CHANGELOG_BP-019.md
+@@ -0,0 +1,27 @@
++# Changelog BP-019 – Protocol-15-Abschluss und Freeze
++
++Elternstand: **BP-018**
++
++## Änderungen
++
++- Neue kanonische Metadaten in `protocol15_freeze.ml`:
++  33 gültige SVC-Kommandos, vier CLC-Kommandos, 14 Temporary-Entity-Typen,
++  Fast-Update-, Clientdata- und Soundmasken.
++- Der geprüfte Contract besitzt den Fingerprint `0x0cf1e12a` und den Status
++  `protocol15_frozen_v1`.
++- Eine Cross-Layer-Fixture transportiert eine mehrfragmentige Nachricht durch
++  Datagramm, Demo-Serialisierung und Clientparser.
++- Weitere Fixtures binden Signon, reservierte Befehle, Sequence-Wrap,
++  Keepalive/Disconnect, deterministische Wiederholung und Größenlimits.
++- `tools/check_protocol15_closure.py` führt alle neun Protocol-Komponenten-
++  Checker zusammen und bindet Hashes der 15 autoritativen Dateien.
++- Historische Komponentenchecker wurden paketunabhängig wiederverwendbar
++  gemacht; die finale Paketidentität bleibt Aufgabe des Gesamtverifiers.
++
++## Evidenz
++
++- C-Oracle: `tools/oracle/protocol15_closure_oracle.c`
++- Goldenmodell: `audit/protocol15_closure_golden.json`
++- Freeze-Dokument: `audit/protocol15_freeze.json`
++- MiniLang-Laufzeitfixtures: **15**
++- Teilpatch: `patches/BP-019.diff`
+diff --git a/COLLECT_RESULTS.ps1 b/COLLECT_RESULTS.ps1
+index ddb48962c2e4c70d143601a6d0d9e1ae84e1acc2..71b3e5006f7e57ade66524259135d9914156fee3 100644
+--- a/COLLECT_RESULTS.ps1
++++ b/COLLECT_RESULTS.ps1
+@@ -7,7 +7,10 @@ param(
+ $ErrorActionPreference = "Stop"
+ Set-StrictMode -Version Latest
+ 
+-$PackageId = "BP-014R1"
++$PackageId = "BP-015-019"
++$FinalPackageId = "BP-019"
++$BlockParentPackageId = "BP-014R1"
++$ProtocolStatus = "protocol15_frozen_v1"
+ $Root = $PSScriptRoot
+ $BuildDirectory = Join-Path $Root "build"
+ $Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+@@ -18,7 +21,7 @@ if ([string]::IsNullOrWhiteSpace($Output)) {
+ }
+ $Output = [System.IO.Path]::GetFullPath($Output)
+ 
+-$Staging = Join-Path $BuildDirectory (".bp014r1-results-{0}" -f $Timestamp)
++$Staging = Join-Path $BuildDirectory (".bp015-019-results-{0}" -f $Timestamp)
+ $AllowedExtensions = @(".log", ".json", ".txt", ".csv", ".mqtrace")
+ if ($IncludeScreenshots) { $AllowedExtensions += ".png" }
+ $ForbiddenExtensions = @(".pak", ".bsp", ".mdl", ".spr", ".wad", ".dem", ".sav", ".lmp", ".ogg", ".wav", ".dat")
+@@ -54,7 +57,10 @@ New-Item -ItemType Directory -Force -Path $Staging | Out-Null
+ 
+ $Metadata = [ordered]@{
+   schema_version = 1
+-  package_id = $PackageId
++  package_id = $FinalPackageId
++  block_id = $PackageId
++  block_parent_package_id = $BlockParentPackageId
++  protocol_status = $ProtocolStatus
+   collected_utc = (Get-Date).ToUniversalTime().ToString("o")
+   os_version = [Environment]::OSVersion.VersionString
+   is_64_bit_os = [Environment]::Is64BitOperatingSystem
+@@ -77,6 +83,11 @@ $ExpectedBuildArtifacts = @(
+   "MiniQuakeProtocol15ServerDataTests.exe",
+   "MiniQuakeProtocol15EventTests.exe",
+   "MiniQuakeProtocol15RuntimeEventTests.exe",
++  "MiniQuakeProtocol15SignonTests.exe",
++  "MiniQuakeProtocol15DeliveryTests.exe",
++  "MiniQuakeProtocol15DatagramTests.exe",
++  "MiniQuakeProtocol15DemoTests.exe",
++  "MiniQuakeProtocol15ClosureTests.exe",
+   "miniquake_native.dll",
+   "miniquake_text.dll"
+ )
+@@ -116,6 +127,13 @@ $RootFiles = @(
+   "CHANGELOG_BP-013.md",
+   "CHANGELOG_BP-014.md",
+   "CHANGELOG_BP-014R1.md",
++  "CHANGELOG_BP-015.md",
++  "CHANGELOG_BP-016.md",
++  "CHANGELOG_BP-017.md",
++  "CHANGELOG_BP-018.md",
++  "CHANGELOG_BP-019.md",
++  "CHANGELOG_BP-015-019.md",
++  "BLOCK_LEDGER.json",
+   "PORT_LEDGER.json",
+   "PORT_STATUS.md",
+   "SOURCE_MANIFEST.sha256",
+@@ -144,11 +162,29 @@ $RootFiles = @(
+   "docs\BP-014_RESULT_ANALYSIS.md",
+   "docs\BP-014R1_TESTING.md",
+   "docs\BP-014_PROTOCOL15_RUNTIME_EVENT_AUDIT.md",
++  "docs\BP-014R1_ACCEPTANCE_ANALYSIS.md",
++  "docs\BP-015_SIGNON_AUDIT.md",
++  "docs\BP-016_DELIVERY_AUDIT.md",
++  "docs\BP-017_DATAGRAM_AUDIT.md",
++  "docs\BP-018_DEMO_AUDIT.md",
++  "docs\BP-019_PROTOCOL15_CLOSURE_AUDIT.md",
++  "docs\BP-015-019_TESTING.md",
+   "audit\protocol15_wire_golden.json",
+   "audit\protocol15_commands_golden.json",
+   "audit\protocol15_serverdata_golden.json",
+   "audit\protocol15_events_golden.json",
+   "audit\protocol15_runtime_events_golden.json",
++  "audit\protocol15_signon_golden.json",
++  "audit\protocol15_delivery_golden.json",
++  "audit\protocol15_datagram_golden.json",
++  "audit\protocol15_demo_golden.json",
++  "audit\protocol15_closure_golden.json",
++  "audit\protocol15_freeze.json",
++  "patches\BP-015.diff",
++  "patches\BP-016.diff",
++  "patches\BP-017.diff",
++  "patches\BP-018.diff",
++  "patches\BP-019.diff",
+   "docs\BP-001_TRACE_FORMAT.md",
+   "docs\BP-001_RESULT_ANALYSIS.md",
+   "docs\BP-001R1_RESULT_ANALYSIS.md",
+@@ -195,7 +231,7 @@ if (Test-Path -LiteralPath $Output) { Remove-Item -Force -LiteralPath $Output }
+ Compress-Archive -Path (Join-Path $Staging "*") -DestinationPath $Output -CompressionLevel Optimal
+ Remove-Item -Recurse -Force -LiteralPath $Staging
+ 
+-Write-Host "MiniQuake $PackageId result archive created:"
++Write-Host "MiniQuake $PackageId cumulative result archive created:"
+ Write-Host "  $Output"
+ Write-Host "No executables, DLLs or Quake game-data files were copied; their hashes are recorded instead."
+ exit 0
+diff --git a/PORT_LEDGER.json b/PORT_LEDGER.json
+index 99c5aa6859bb32b9159aad9dc0a556291900b063..5ac97d85a78090d9ec90ab79d658535436f09f33 100644
+--- a/PORT_LEDGER.json
++++ b/PORT_LEDGER.json
+@@ -1,8 +1,8 @@
+ {
+   "schema_version": 1,
+   "project": "MiniQuake",
+-  "current_package": "BP-014R1",
+-  "parent_package": "BP-014",
++  "current_package": "BP-019",
++  "parent_package": "BP-018",
+   "compatibility_target": {
+     "reference": "WinQuake/GLQuake 1.09",
+     "profile": "compat_109",
+@@ -55,38 +55,36 @@
+     "root_cause": "clientEntitiesHash/clientEntitiesJson dereferenced void slots in the intentionally sparse client entity table"
+   },
+   "package": {
+-    "id": "BP-014R1",
+-    "parent": "BP-014",
++    "id": "BP-019",
++    "parent": "BP-018",
++    "block_id": "BP-015-019",
++    "block_parent": "BP-014R1",
+     "date": "2026-07-25",
+-    "title": "Protocol 15 beam retained-state and active-view parity hotfix",
+-    "status": "implemented; Windows acceptance pending",
++    "title": "Cumulative Protocol 15 signon, delivery, datagram, demo and closure block",
++    "status": "implemented; cumulative Windows acceptance pending",
+     "engine_semantics_changed": true,
+     "serialized_diagnostics_schema_changed": false,
+     "protocol_text_abi": "quake_latin1_cstring_v1",
++    "protocol_status": "protocol15_frozen_v1",
+     "completed_items": [
+-      "retain normalized compact beam slots after expiry for CL_ParseBeam same-entity priority",
+-      "provide a separate active beam view matching CL_UpdateTEnts expiry filtering",
+-      "keep endTime equality active and filter only strict expiry",
+-      "bind client_effects.process to retained state instead of destructively pruning slot ownership",
+-      "preserve the independent milestone beam-expiry reproducer unchanged",
+-      "add a 28th runtime-event fixture for retained state, active view and same-entity reuse"
++      "BP-015 queues original signon replies and server signon payloads at the original host-frame boundaries",
++      "BP-016 centralizes reliable send retention, commit, drop and strict keepalive scheduling",
++      "BP-017 closes datagram fragmentation, ACK, deferred next-fragment flush, retransmission, duplicate and wrap behavior",
++      "BP-018 closes demo record/playback framing, C atoi track parsing and isolated keepalive filtering",
++      "BP-019 adds a cross-layer closure corpus, frozen Protocol-15 catalog and deterministic fingerprint",
++      "the cumulative block builds once, continues independent fixtures and records a logical first-failure checkpoint"
+     ],
+     "evidence": {
+-      "bp014_windows_result": "static/oracles/build/core PASS; milestone FAIL at 12/24 on beam expiry",
+-      "runtime_event_wire_vectors": "10/10 unchanged",
+-      "semantic_cases": "49/49 unchanged",
+-      "minilang_runtime_fixtures": "28 pending Windows",
+-      "beam_state_view_contract": "static PASS pending final package validation",
+-      "independent_milestone_reproducer": "retained unchanged"
++      "parent_runtime": "BP-014R1 Windows accepted: 22/22 gates, 16/16 core, 24/24 milestone and deterministic trace/UDP PASS",
++      "new_runtime_fixtures": "78 pending Windows block acceptance",
++      "component_oracles": "signon, delivery, datagram, demo and closure C oracles agree with bound golden data",
++      "protocol_fingerprint": "0x0cf1e12a",
++      "original_binary_interop": "not claimed by this source-only block; remains an external future gate"
+     },
+     "acceptance_commands": [
+       "python tools/verify.py .",
+-      "python tools/check_protocol15_vectors.py .",
+-      "python tools/check_protocol15_commands.py .",
+-      "python tools/check_protocol15_serverdata.py --root .",
+-      "python tools/check_protocol15_events.py --root .",
+-      "python tools/check_protocol15_runtime_events.py --root .",
+-      ".\\TEST_BP-014R1.ps1 -Compiler <mlc_win64.py> -StdLib <compiler-root> -QuakeBase <quake-root> -TraceFrames 64 -NetworkTests",
++      "python tools/check_protocol15_closure.py --root .",
++      ".\\TEST_BP-015-019.ps1 -Compiler <mlc_win64.py> -StdLib <compiler-root> -QuakeBase <quake-root> -Frames 300 -TraceFrames 128 -NetworkTests -ContinueIndependentTests -BisectOnFailure",
+       ".\\COLLECT_RESULTS.ps1"
+     ]
+   },
+@@ -101,67 +99,67 @@
+   },
+   "port_units": {
+     "total": 63,
+-    "state": "BP-013 Windows-accepted; BP-014 built/core-tested but exposed a client-effects beam active-view defect; BP-014R1 state/view hotfix implemented, Windows acceptance pending",
++    "state": "BP-014R1 is Windows-accepted; BP-015 through BP-019 are implemented as one cumulative Protocol-15 closure block and await Windows block acceptance",
+     "reclassified_units": [
+       {
+         "unit": 5,
+         "original": "cl_main.c/client.h",
+         "scope": "CL_SignonReply and signon completion",
+-        "status": "BP-011 implemented and Windows-accepted"
++        "status": "BP-011 Windows-accepted; BP-015 signon queue/frame-boundary parity implemented, block acceptance pending"
+       },
+       {
+         "unit": 6,
+         "original": "cl_parse.c/protocol.h",
+         "scope": "complete SVC catalog and fast-update decoding",
+-        "status": "BP-011 implemented and Windows-accepted"
++        "status": "BP-011 Windows-accepted; BP-018 demo/network message filtering and BP-019 closure implemented, block acceptance pending"
+       },
+       {
+         "unit": 7,
+         "original": "cl_tent.c/client.h/protocol.h",
+         "scope": "all temporary entities, fixed 24-slot beam pool, expiry and overflow diagnostic",
+-        "status": "BP-014 runtime-event layer built/core-tested; BP-014R1 retained-state/active-view hotfix pending Windows acceptance"
++        "status": "BP-014R1 beam retained-state/active-view hotfix Windows-accepted"
+       },
+       {
+         "unit": 26,
+         "original": "host.c/quakedef.h",
+         "scope": "signon orchestration plus graceful client drop and scoreboard reset",
+-        "status": "BP-013 graceful-drop parity Windows-accepted; BP-014 reconnect/keepalive ordering built/core-tested; BP-014R1 beam hotfix pending Windows acceptance"
++        "status": "BP-013 graceful drop Windows-accepted; BP-015/BP-016 signon and reliable scheduling implemented, block acceptance pending"
+       },
+       {
+         "unit": 27,
+         "original": "host_cmd.c/quakedef.h",
+         "scope": "prespawn/spawn/begin, name/color and scoreboard spawn semantics",
+-        "status": "BP-011 signon Windows-accepted; BP-013 name/color/old_frags parity Windows-accepted; BP-014R1 beam hotfix pending Windows acceptance"
++        "status": "BP-011/BP-013 Windows-accepted; BP-015 prespawn/spawn/begin queue parity implemented, block acceptance pending"
+       },
+       {
+         "unit": 36,
+         "original": "pr_cmds.c/progs.h",
+         "scope": "PF_sound C-float/int argument conversion and shared dynamic-sound dispatch",
+-        "status": "BP-014 built/core-tested; BP-014R1 beam hotfix pending Windows acceptance"
++        "status": "BP-014R1 dynamic-sound and runtime-event path Windows-accepted"
+       },
+       {
+         "unit": 41,
+         "original": "snd_dma.c/sound.h",
+         "scope": "dynamic/static sound scalar ABI received from Protocol-15 client parser",
+-        "status": "BP-014 parser/mixer boundary built/core-tested; BP-014R1 beam hotfix pending Windows acceptance"
++        "status": "BP-014R1 dynamic/static sound parser-to-mixer boundary Windows-accepted"
+       },
+       {
+         "unit": 45,
+         "original": "sv_main.c/server.h",
+         "scope": "fast updates, server payloads, particles, dynamic sound, reliable fanout, datagram planning and cleanup",
+-        "status": "BP-013 event layer Windows-accepted; BP-014 dynamic-sound/delivery layer built/core-tested; BP-014R1 beam hotfix pending Windows acceptance"
++        "status": "BP-014R1 server event/runtime layer Windows-accepted; BP-015/BP-016 server scheduling implemented, block acceptance pending"
+       },
+       {
+         "unit": 48,
+         "original": "sv_user.c/server.h",
+         "scope": "signed CLC command framing and malformed-message handling",
+-        "status": "BP-011 implemented and Windows-accepted"
++        "status": "BP-011 signed CLC framing Windows-accepted; BP-019 CLC catalog frozen pending block acceptance"
+       },
+       {
+         "unit": 57,
+         "original": "protocol.h",
+         "scope": "Protocol-15 constants, wire primitives, commands, fast updates, server payloads, static/runtime events and delivery boundaries",
+-        "status": "Protocol 15 through BP-013 Windows-accepted; BP-014 runtime-event wire/oracle layer verified; BP-014R1 beam view hotfix pending Windows acceptance"
++        "status": "Protocol 15 through BP-014R1 Windows-accepted; BP-015 through BP-019 closure/freeze implemented, block acceptance pending"
+       }
+     ],
+     "function_level_ledger": "Protocol 15 series BP-010 through BP-019"
+@@ -170,14 +168,12 @@
+     "the supplied baseline lacks third_party/stb/stb_vorbis.c",
+     "the main native bridge remains a statically verified prebuilt DLL",
+     "the buffered text bridge is fully reproducible from included source",
+-    "BP-013 is the accepted Windows runtime baseline for Protocol-15 static events, scoreboard fanout and graceful drop",
+     "the original 16-byte fast-update preflight can admit a theoretical 17/18-byte update; MiniQuake preserves the scheduling gate and adds an exact fit check to avoid memory corruption",
+-    "BP-012 completed compilation and core tests but exposed a PlayerState FL_ONGROUND mirror defect before later runtime gates",
+-    "BP-012R1 changes only the PlayerState/no-QC clientdata adapter; QuakeC ent->v.flags remains authoritative when available",
+-    "BP-014 completed all static/oracle checks, all nine builds and 16/16 core tests but failed milestone 12 because retained beam state was exposed as the active effect view",
+-    "BP-014R1 changes only the compact beam state/view adapter; Protocol 15 wire vectors and all 49 runtime-event oracle cases are unchanged"
++    "BP-014R1 is the accepted Windows runtime parent for the cumulative BP-015-019 block",
++    "protocol15_frozen_v1 is a source-guided compatibility contract; original Quake binary client/server interoperability is not yet claimed",
++    "the cumulative block has been statically verified and oracle-checked locally, but its MiniLang Windows runtime acceptance is pending"
+   ],
+-  "next_package": "BP-015 after BP-014R1 Windows acceptance: final Protocol-15 end-to-end signon/reliable/demo and multiprocess packet corpus audit",
++  "next_package": "BP-020 through BP-024 after BP-015-019 Windows acceptance: QuakeC VM, edicts, builtins and progs.dat compatibility block",
+   "bp001r2_acceptance": {
+     "result_archive": "MiniQuake_BP-001R2_RESULTS_20260724-181843.zip",
+     "result_archive_sha256": "a6373b21653760800af9cc67fc969b07a7b7f385e409e5c5f9bced718262816c",
+@@ -444,5 +440,85 @@
+     "real_game_trace_udp": "not reached",
+     "classification": "P15-B1 adapter/state-model defect in newly changed beam path",
+     "root_cause": "retained fixed-slot beam state was returned as the active CL_UpdateTEnts view; expired same-entity ownership and active visibility require separate representations"
++  },
++  "bp014r1_acceptance": {
++    "result_archive": "MiniQuake_BP-014R1_RESULTS_20260725-155308.zip",
++    "result_archive_sha256": "5cd9f27fa4ea5996fdacaaa473d0943229a78063bffb3b6e6f21609f8f470d0d",
++    "status": "PASS",
++    "acceptance_steps": "22/22 PASS",
++    "build": "PASS",
++    "core_tests": "16/16 PASS",
++    "milestone_tests": "24/24 PASS",
++    "diagnostics_tests": "10/10 PASS",
++    "wire_tests": "15/15 PASS",
++    "command_update_tests": "14/14 PASS",
++    "serverdata_tests": "17/17 PASS",
++    "event_tests": "22/22 PASS",
++    "runtime_event_tests": "28/28 PASS",
++    "real_game_validation": "id1/start PASS",
++    "headless_runtime": "120 frames PASS",
++    "deterministic_trace_sha256": "f29015910ccba93d67e538dec986567ec30b4f6e42790ef946cdc935d1f49bd9",
++    "rolling_hash": "2688e0a1",
++    "udp_loopback": "PASS"
++  },
++  "bp015_signon_evidence": {
++    "reference_units": [
++      "cl_main.c:CL_SignonReply",
++      "cl_parse.c signon progression",
++      "host_cmd.c:Host_PreSpawn_f/Host_Spawn_f/Host_Begin_f",
++      "sv_main.c:SV_SendClientMessages"
++    ],
++    "golden_schema": "MiniQuakeProtocol15SignonGolden/1",
++    "vectors": 6,
++    "semantic_cases": 6,
++    "minilang_fixtures": 12,
++    "status": "implemented; Windows block acceptance pending"
++  },
++  "bp016_delivery_evidence": {
++    "reference_units": [
++      "cl_main.c:CL_SendCmd",
++      "sv_main.c:SV_SendClientMessages/SV_SendNop",
++      "host.c:SV_DropClient",
++      "net_main.c"
++    ],
++    "golden_schema": "MiniQuakeProtocol15DeliveryGolden/1",
++    "oracle_cases": 14,
++    "minilang_fixtures": 14,
++    "status": "implemented; Windows block acceptance pending"
++  },
++  "bp017_datagram_evidence": {
++    "reference_units": [
++      "net_dgrm.c",
++      "net.h",
++      "net_main.c"
++    ],
++    "golden_schema": "MiniQuakeProtocol15DatagramGolden/1",
++    "oracle_cases": 18,
++    "minilang_fixtures": 18,
++    "status": "implemented; Windows block acceptance pending"
++  },
++  "bp018_demo_evidence": {
++    "reference_units": [
++      "cl_demo.c",
++      "cl_main.c:CL_GetMessage",
++      "host.c record integration"
++    ],
++    "golden_schema": "MiniQuakeProtocol15DemoGolden/1",
++    "oracle_rows": 12,
++    "minilang_fixtures": 19,
++    "status": "implemented; Windows block acceptance pending"
++  },
++  "bp019_protocol15_closure": {
++    "block_id": "BP-015-019",
++    "parent_package_id": "BP-014R1",
++    "final_package_id": "BP-019",
++    "protocol_status": "protocol15_frozen_v1",
++    "protocol_fingerprint": "0x0cf1e12a",
++    "component_checkers": 9,
++    "authoritative_files": 15,
++    "new_runtime_fixtures": 78,
++    "closure_fixtures": 15,
++    "original_quake_binary_interop": "external future gate; not claimed",
++    "status": "implemented; Windows block acceptance pending"
+   }
+ }
+diff --git a/PORT_STATUS.md b/PORT_STATUS.md
+index 60a3ed4601feed5795b9c76d7b2522b747d0db25..323ca48acfbcca945c1eb309aca0e887e5af85eb 100644
+--- a/PORT_STATUS.md
++++ b/PORT_STATUS.md
+@@ -1,50 +1,62 @@
+-# MiniQuake Black-Port-Status – BP-014R1
++# MiniQuake Black-Port-Status – Block BP-015–BP-019
+ 
+ ## Bestätigte Elternbasis
+ 
+-BP-013 ist unter Windows vollständig angenommen:
++BP-014R1 ist unter Windows vollständig angenommen:
+ 
+-- 21/21 Abnahmeschritte PASS,
++- 22/22 Abnahmeschritte PASS,
+ - vollständiger Release-Build,
+ - 16 Core-, 24 Milestone-, 10 Diagnose-, 15 Wire-, 14 Command-/Update-,
+-  17 Serverdaten- und 22 Eventfixtures PASS,
++  17 Serverdaten-, 22 Event- und 28 Runtime-Eventfixtures PASS,
+ - `id1/start`, 120 Headless-Frames und UDP-Loopback PASS,
+ - zwei unabhängige 64-Frame-Traces byteidentisch,
+-- Trace SHA-256 `7fbda101eee416cc472f3fa645d931cf6b3f5e2fb09cc0208488e7b475309b37`,
++- Trace SHA-256 `f29015910ccba93d67e538dec986567ec30b4f6e42790ef946cdc935d1f49bd9`,
+ - Rolling Hash `2688e0a1`.
+ 
+-## BP-014-Windowsbefund
++## Kumulativer Block
+ 
+-BP-014 bestand Paketprüfung, alle fünf Protocol-15-Checker, die Kompilierung
+-sämtlicher neun EXE-Ziele und 16/16 Core-Tests. Der Lauf stoppte bei:
++| Paket | Schwerpunkt | neue Fixtures | lokaler Status |
++|---|---|---:|---|
++| BP-015 | Signon-Queue und Stufen 1–4 | 12 | implementiert |
++| BP-016 | Reliable-/Unreliable-Planung | 14 | implementiert |
++| BP-017 | Datagramm, ACK, Fragmentierung, Retransmission | 18 | implementiert |
++| BP-018 | Demo-Framing, Aufnahme und Wiedergabe | 19 | implementiert |
++| BP-019 | Cross-Layer-Abschluss und Protocol-Freeze | 15 | implementiert |
++| **Summe** |  | **78** | Windows-Abnahme offen |
++
++## Protocol-15-Freeze
++
++Der source-guided Contract besitzt den Status:
+ 
+ ```text
+-[12/24] client effects
+-FAIL: beam expiry: expected 0, got 1
++protocol15_frozen_v1
+ ```
+ 
+-Die späteren Testprogramme, Echtdatenläufe, Traces und UDP-Prüfung wurden wegen
+-des frühen Meilensteinabbruchs nicht erreicht.
++Gebunden sind 33 gültige SVC-Kommandos, vier CLC-Kommandos, 14
++Temporary-Entity-Typen, die vollständigen Fast-Update-, Clientdata- und
++Soundmasken sowie der Fingerprint:
+ 
+-## Umfang von BP-014R1
++```text
++0x0cf1e12a
++```
+ 
+-BP-014R1 trennt die beiden originalen Beam-Sichten:
++`audit/protocol15_freeze.json` enthält SHA-256-Werte der 15 autoritativen
++MiniLang-Dateien. Die neun Komponentenchecker von BP-010R1 bis BP-018 und der
++BP-019-Closure-Checker bilden die statische Evidenz.
+ 
+-- erhaltener 24-Slot-Zustand für `CL_ParseBeam` und Same-Entity-Ersetzung,
+-- aktive, nach Ablaufzeit gefilterte Sicht für `CL_UpdateTEnts`, Rendering und
+-  `client_effects.pruneTemporary`,
+-- Gleichheit `endTime == currentTime` bleibt aktiv,
+-- nur `endTime < currentTime` gilt als abgelaufen,
+-- die unveränderte Meilensteinfixture 12 bleibt das End-to-End-Gate,
+-- die Runtime-Event-Suite wächst von 27 auf 28 Fixtures.
++## Abnahmebedingung
+ 
+-Protocol-15-Wirebytes, 10 Runtime-Event-Vektoren und 49 semantische Oraclefälle
+-bleiben unverändert.
++Der Block ist angenommen, wenn:
+ 
+-## Abnahmebedingung
++- alle bisherigen Elternregressionen bestehen,
++- die neuen Testprogramme 12/12, 14/14, 18/18, 19/19 und 15/15 melden,
++- `id1/start` und 300 Headless-Frames bestehen,
++- zwei unabhängige 128-Frame-Traces byteidentisch sind,
++- Snapshot, Context und Summary gültig sind,
++- der Winsock-UDP-Loopback besteht.
++
++Die fünf logischen Teilpatches liegen unter `patches/`. Ein Original-Quake-
++Binärinterop in getrennten Prozessen bleibt ein späteres externes Gate und wird
++mit diesem source-only Block noch nicht behauptet.
+ 
+-BP-014R1 ist angenommen, wenn alle bisherigen Gates, der neue
+-`protocol15_beam_state_view_contract`, 28 Runtime-Eventfixtures, `id1/start`,
+-120 Headless-Frames, zwei byteidentische 64-Frame-Traces und UDP-Loopback
+-bestehen. Danach folgt BP-015 mit dem abschließenden Protocol-15-End-to-End-
+-Audit und Mehrprozess-/Demo-Paketkorpus.
++Nach einer grünen Abnahme folgt der QuakeC-/Edict-Block BP-020–BP-024.
+diff --git a/README.md b/README.md
+index 63a3d29229f4c94177a6f690b6a9c80d4a02763f..3e0d56d7d656d68e328a3256f5461c75d3ddcfbb 100644
+--- a/README.md
++++ b/README.md
+@@ -10,35 +10,36 @@ Quake-Spieldaten (`pak0.pak`, Maps, Sounds, Grafiken usw.) sind nicht enthalten.
+ MiniQuake verwendet die legal vorhandenen Daten einer installierten Quake-
+ Version.
+ 
+-## Paketstand: BP-014R1
+-
+-`BP-014R1` ist ein enger Hotfix auf dem BP-014-Quellstand. Die Windows-
+-Abnahme von BP-014 bestätigte Paketprüfung, sämtliche Protocol-15-Oracles, die
+-Kompilierung aller neun EXE-Ziele und 16/16 Core-Tests. Sie stoppte im
+-bestehenden Meilensteintest 12:
+-
+-```text
+-[12/24] client effects
+-FAIL: beam expiry: expected 0, got 1
+-```
+-
+-Die Ursache war eine Vermischung zweier originaler Beam-Sichten. Der feste
+-24-Slot-Zustand muss abgelaufene Einträge für die Same-Entity-Priorität von
+-`CL_ParseBeam` erhalten. `CL_UpdateTEnts` und die öffentlich verwendete aktive
+-Effektliste dürfen solche Einträge dagegen nicht mehr ausgeben.
+-
+-BP-014R1 trennt deshalb:
+-
+-- `retainTemporarySlots`: erhaltener, normalisierter 24-Slot-Zustand,
+-- `activeCompactBeamList`: nur bei `endTime >= currentTime` aktive Beams,
+-- `pruneTemporary`: aktive Sicht für Rendering und externe Aufrufer,
+-- `process`: arbeitet weiterhin mit dem erhaltenen Slotzustand.
+-
+-Die bestehende Meilensteinfixture bleibt unverändert. Eine neue 28. Runtime-
+-Event-Fixture prüft Ablaufgleichheit, unsichtbare abgelaufene Beams, erhaltene
+-Slotbelegung und Same-Entity-Ersetzung nach dem Ablauf. Wirevektoren und die 49
+-BP-014-Oraclefälle bleiben unverändert. Bis zur Windows-Abnahme von BP-014R1
+-bleibt BP-013 die vollständig bestätigte Runtime-Baseline.
++## Paketstand: kumulativer Block BP-015–BP-019
++
++Die Windows-Abnahme von **BP-014R1** ist vollständig grün: 22/22 Gates,
++16/16 Core-, 24/24 Milestone- und sämtliche bisherigen Protocol-15-Fixtures,
++`id1/start`, 120 Headless-Frames, zwei byteidentische 64-Frame-Traces und der
++UDP-Loopback sind bestätigt. Die Referenz besitzt den Tracehash
++`f29015910ccba93d67e538dec986567ec30b4f6e42790ef946cdc935d1f49bd9`.
++
++Der aktuelle Download enthält fünf logisch getrennte Schritte in einem
++vollständigen Endstand **BP-019**:
++
++| Schritt | Inhalt | neue Fixtures |
++|---|---|---:|
++| BP-015 | Signon-Queue und Stufen 1–4 | 12 |
++| BP-016 | Reliable-/Unreliable-Planung | 14 |
++| BP-017 | Datagramm, ACK, Fragmentierung und Retransmission | 18 |
++| BP-018 | Demo-Framing, Aufnahme und Wiedergabe | 19 |
++| BP-019 | Cross-Layer-Abschluss und Protocol-Freeze | 15 |
++| **Summe** |  | **78** |
++
++Der source-guided Protocol-15-Contract trägt den Status
++`protocol15_frozen_v1` und den Fingerprint `0x0cf1e12a`. Er bindet 33 gültige
++SVC-Kommandos, vier CLC-Kommandos, 14 Temporary-Entity-Typen sowie die
++vollständigen Fast-Update-, Clientdata- und Soundmasken. Die 15 autoritativen
++MiniLang-Dateien sind in `audit/protocol15_freeze.json` gehasht.
++
++Die fünf Teilpatches liegen unter `patches/`; `BLOCK_LEDGER.json` ordnet
++Fixtures, Elternstände und Testprogramme zu. Der Block behauptet bewusst noch
++keine abgeschlossene Original-Quake-Binärinteropmatrix. Diese bleibt ein
++späteres externes Mehrprozess-Gate.
+ 
+ Die ursprüngliche Quellbasis bleibt:
+ 
+@@ -246,21 +247,26 @@ filtert diese Einträge für `CL_UpdateTEnts`, Rendering und
+ `client_effects.pruneTemporary`. Die Runtime-Event-Suite umfasst nun 28
+ Fixtures; die bestehende Meilensteinfixture 12 bleibt unverändert.
+ 
+-## Build und BP-014R1-Abnahme unter Windows
++## Build und Abnahme des Blocks BP-015–BP-019 unter Windows
+ 
+-Empfohlen ist `MiniLangCompilerPy`. Die vollständige Abnahme lautet:
++Empfohlen ist `MiniLangCompilerPy`. Das vollständige ZIP muss in einen neuen,
++leeren Ordner entpackt werden. Die Blockabnahme baut BP-019 einmal und führt
++die unabhängigen Testgruppen anschließend weiter aus:
+ 
+ ```powershell
+-cd C:\Pfad\MiniQuake_BP-014R1
++cd C:\Pfad\MiniQuake_BP-015-019
+ 
+-.\TEST_BP-014R1.ps1 `
++.\TEST_BP-015-019.ps1 `
+   -Compiler C:\Pfad\MiniLangCompilerPy\mlc_win64.py `
+   -StdLib C:\Pfad\MiniLangCompilerPy `
+   -QuakeBase "C:\Program Files (x86)\Steam\steamapps\common\Quake" `
++  -Game id1 `
+   -Map start `
+-  -Frames 120 `
+-  -TraceFrames 64 `
+-  -NetworkTests
++  -Frames 300 `
++  -TraceFrames 128 `
++  -NetworkTests `
++  -ContinueIndependentTests `
++  -BisectOnFailure
+ ```
+ 
+ Nur bauen und alle assetfreien Tests ausführen:
+@@ -271,18 +277,15 @@ Nur bauen und alle assetfreien Tests ausführen:
+   -StdLib C:\Pfad\MiniLangCompilerPy
+ ```
+ 
+-Das erwartete Testende enthält:
++Das erwartete Testende enthält zusätzlich zu allen Elternregressionen:
+ 
+ ```text
+-MiniQuake core tests passed: 16
+-MiniQuake milestone tests passed: 24
+-MiniQuake BP-001R3 diagnostics tests passed: 10
+-MiniQuake BP-010R1 Protocol 15 wire tests passed: 15
+-MiniQuake BP-011 Protocol 15 command tests passed: 14
+-MiniQuake BP-012R1 Protocol 15 server-data tests passed: 17
+-MiniQuake BP-013 Protocol 15 event tests passed: 22
+-MiniQuake BP-014R1 Protocol 15 runtime-event tests passed: 28
+-[MiniQuake] test summary: core=PASS milestone=PASS diagnostics=PASS protocol15=PASS protocol15_commands=PASS protocol15_serverdata=PASS protocol15_events=PASS protocol15_runtime_events=PASS ...
++MiniQuake BP-015 Protocol 15 signon tests passed: 12
++MiniQuake BP-016 Protocol 15 delivery tests passed: 14
++MiniQuake BP-017 Protocol 15 datagram tests passed: 18
++MiniQuake BP-018 Protocol 15 demo tests passed: 19
++MiniQuake BP-019 Protocol 15 closure tests passed: 15
++MiniQuake BP-015-019 acceptance test: PASS
+ ```
+ 
+ Nützliche Buildschalter:
+@@ -327,11 +330,13 @@ Ohne Sound zur Isolation eines Grafikproblems:
+ Bevorzugt wird der Pakettest:
+ 
+ ```powershell
+-.\TEST_BP-014R1.ps1 `
++.\TEST_BP-015-019.ps1 `
+   -Compiler C:\Pfad\MiniLangCompilerPy\mlc_win64.py `
+   -StdLib C:\Pfad\MiniLangCompilerPy `
+   -QuakeBase "C:\Program Files (x86)\Steam\steamapps\common\Quake" `
+-  -TraceFrames 64
++  -Frames 300 `
++  -TraceFrames 128 `
++  -NetworkTests
+ ```
+ 
+ Der Wrapper ist ebenfalls vorhanden:
+@@ -385,7 +390,7 @@ Weitere Einzelpfade:
+ .\build\MiniQuake.exe --udp-smoke 2000
+ ```
+ 
+-`TEST_BP-014R1.ps1` schreibt Testsummary, statischen Bericht, Versionsausgabe,
++`TEST_BP-015-019.ps1` schreibt Blocksummary, statischen Bericht, Versionsausgabe,
+ Transcript, zwei unabhängige Trace-Sätze sowie einen direkten Snapshot-CLI-Lauf. Danach erzeugt
+ 
+ ```powershell
+@@ -399,25 +404,24 @@ Binärdateien. EXE- und DLL-Hashes werden nur in Metadaten festgehalten.
+ 
+ ```powershell
+ python .\tools\verify.py .
++python .\tools\check_protocol15_closure.py --root .
+ ```
+ 
+-Der BP-014R1-Verifier kontrolliert Manifest, Package-/Dateipfadkonsistenz, lokale
+-Imports, beide nativen ABIs und DLL-Exporttabellen, AMD64-PE-Merkmale, die
+-bestätigte deterministische Diagnosebasis, das Protocol-15-String- und
+-SizeBuffer-Contract, vier Golden-Dokumente, Oracle-Hashes, 15 Wirefixtures,
+-14 Command-/Updatefixtures, 17 Serverdatenfixtures, 22 Eventfixtures, 27 Runtime-Eventfixtures, den
+-PlayerState-Ground-Adapter sowie Signon-, Fast-Update-, Serverdaten-,
+-Scoreboard-, Disconnect-, Temporary-Entity-, Sound-, Beam- und Delivery-Verträge, Lieferskripte,
+-Paketidentität und das Fehlen von Quake-Spieldaten. Er verwendet nur die
+-Python-Standardbibliothek. Beide Vektorsätze lassen sich zusätzlich direkt
+-prüfen:
++Der BP-019-Verifier kontrolliert Manifest, Package-/Dateipfadkonsistenz, lokale
++Imports, beide nativen ABIs, AMD64-PE-Merkmale, sämtliche übernommenen
++Protocol-15-Verträge und den kumulativen Freeze. Der Closure-Checker führt die
++neun Komponentenchecker von Wiregrundlagen bis Demoframing zusammen, baut das
++C-Oracle, vergleicht die 13 Abschlusszeilen und bindet die Hashes der 15
++autoritativen Protocol-Dateien.
++
++Die fünf neuen Teilchecker lassen sich separat ausführen:
+ 
+ ```powershell
+-python .\tools\check_protocol15_vectors.py .
+-python .\tools\check_protocol15_commands.py .
+-python .\tools\check_protocol15_serverdata.py --root .
+-python .\tools\check_protocol15_events.py --root .
+-python .\tools\check_protocol15_runtime_events.py --root .
++python .\tools\check_protocol15_signon.py --root .
++python .\tools\check_protocol15_delivery.py --root .
++python .\tools\check_protocol15_datagram.py --root .
++python .\tools\check_protocol15_demo.py --root .
++python .\tools\check_protocol15_closure.py --root .
+ ```
+ 
+ ## Native Bridges neu bauen
+@@ -445,22 +449,20 @@ Warnung aus.
+ 
+ ## Evidenzstand und nächste Pakete
+ 
+-BP-013 ist die angenommene Event-, Scoreboard-, Drop- und Determinismusbaseline.
+-Das Windows-Ergebnisarchiv bestätigt 21/21 Gates sowie den Tracehash
+-`7fbda101eee416cc472f3fa645d931cf6b3f5e2fb09cc0208488e7b475309b37`.
+-
+-BP-014 bestand statische Prüfung, alle Oracle-/Checker-Stufen, den vollständigen
+-Build und 16/16 Core-Tests. Der erste Laufzeitfehler lag in Meilenstein 12 und
+-ist als Trennung zwischen erhaltenem Beam-Slot-Zustand und aktiver Beam-Sicht in
+-BP-014R1 korrigiert. Die lokale Evidenz umfasst unveränderte 10 Wirevektoren,
+-49 semantische Fälle, 28 MiniLang-Fixtures, den neuen
+-`protocol15_beam_state_view_contract`, Paket- und Reproduzierbarkeitsprüfungen.
+-Die Windows-Laufzeitabnahme von BP-014R1 steht noch aus.
+-
+-Nach einer grünen BP-014R1-Abnahme folgt BP-015 mit einem abschließenden
+-Protocol-15-End-to-End-Audit über Signon-, Reliable-, Demo- und
+-Mehrprozess-Paketkorpora. Der maschinenlesbare Stand steht in
+-`PORT_LEDGER.json`; Testdetails in `docs/BP-014R1_TESTING.md`.
++BP-014R1 ist die bestätigte Elternbasis des Blocks. Die lokale BP-015–BP-019-
++Evidenz umfasst fünf C-Oracles, fünf unabhängige Pythonmodelle, 78 neue
++MiniLang-Fixtures, neun wiederverwendete Komponentenchecker, einen Cross-Layer-
++Roundtrip über Datagramm, Demo und Parser sowie den Freeze-Fingerprint
++`0x0cf1e12a`.
++
++Die Windows-Abnahme des kumulativen Blocks steht noch aus. Nach einem grünen
++Lauf wird Protocol 15 im `compat_109`-Profil als stabiler Contract behandelt;
++Änderungen erfolgen dann nur noch bei einem reproduzierbaren
++Kompatibilitätsbefund. Der nächste Entwicklungsblock ist BP-020–BP-024 für
++QuakeC, Edicts, VM-Opcodes und Builtins.
++
++Der maschinenlesbare Stand steht in `PORT_LEDGER.json` und
++`BLOCK_LEDGER.json`; Testdetails in `docs/BP-015-019_TESTING.md`.
+ 
+ ## Lizenz
+ 
+diff --git a/TEST_BP-015-019.ps1 b/TEST_BP-015-019.ps1
+new file mode 100644
+index 0000000000000000000000000000000000000000..151bc9e2e9c62f5e3ca26e1aa56c81a44539a95c
+--- /dev/null
++++ b/TEST_BP-015-019.ps1
+@@ -0,0 +1,669 @@
++﻿[CmdletBinding()]
++param(
++  [string]$Compiler = "",
++
++  [Alias("StdLibPath", "ImportRoot")]
++  [string]$StdLib = "",
++
++  [string]$Python = "",
++
++  [string]$QuakeBase = "",
++  [string]$Game = "id1",
++  [string]$Map = "start",
++
++  [ValidateRange(1, 1000000)]
++  [int]$Frames = 300,
++
++  [ValidateRange(1, 1000000)]
++  [int]$TraceFrames = 128,
++
++  [ValidateSet("Release", "Debug")]
++  [string]$Configuration = "Release",
++
++  [switch]$SkipBuild,
++  [switch]$SkipGameValidation,
++  [switch]$SkipTraceValidation,
++  [switch]$NetworkTests,
++  [switch]$RebuildNative,
++  [switch]$Listings,
++  [switch]$ContinueIndependentTests = $true,
++  [switch]$BisectOnFailure
++)
++
++$ErrorActionPreference = "Stop"
++Set-StrictMode -Version Latest
++
++$PackageId = "BP-019"
++$ParentPackageId = "BP-018"
++$NativeTextAbi = "caller_owned_bytes_v1"
++$ProtocolTextAbi = "quake_latin1_cstring_v1"
++$BlockId = "BP-015-019"
++$BlockParentPackageId = "BP-014R1"
++$ProtocolStatus = "protocol15_frozen_v1"
++$Root = $PSScriptRoot
++$BuildDirectory = Join-Path $Root "build"
++$TraceDirectory = Join-Path $BuildDirectory "bp015-019-traces"
++$GameExe = Join-Path $BuildDirectory "MiniQuake.exe"
++$Verifier = Join-Path $Root "tools\verify.py"
++$TraceComparator = Join-Path $Root "tools\compare_traces.py"
++$ProtocolVectorChecker = Join-Path $Root "tools\check_protocol15_vectors.py"
++$ProtocolCommandChecker = Join-Path $Root "tools\check_protocol15_commands.py"
++$ProtocolServerDataChecker = Join-Path $Root "tools\check_protocol15_serverdata.py"
++$ProtocolEventChecker = Join-Path $Root "tools\check_protocol15_events.py"
++$ProtocolRuntimeEventChecker = Join-Path $Root "tools\check_protocol15_runtime_events.py"
++$ProtocolSignonChecker = Join-Path $Root "tools\check_protocol15_signon.py"
++$ProtocolDeliveryChecker = Join-Path $Root "tools\check_protocol15_delivery.py"
++$ProtocolDatagramChecker = Join-Path $Root "tools\check_protocol15_datagram.py"
++$ProtocolDemoChecker = Join-Path $Root "tools\check_protocol15_demo.py"
++$ProtocolClosureChecker = Join-Path $Root "tools\check_protocol15_closure.py"
++$BuildScript = Join-Path $Root "build.ps1"
++$Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
++$TranscriptPath = Join-Path $BuildDirectory ("bp015-019-test-{0}.log" -f $Timestamp)
++$SummaryPath = Join-Path $BuildDirectory "bp015-019-test-summary.json"
++$StaticReportPath = Join-Path $BuildDirectory "bp015-019-static-verification.json"
++$VersionPath = Join-Path $BuildDirectory "bp015-019-version.txt"
++$BuildChildLogPath = Join-Path $BuildDirectory "bp015-019-build-child.log"
++$TraceALogPath = Join-Path $BuildDirectory "bp015-019-trace-a.log"
++$TraceBLogPath = Join-Path $BuildDirectory "bp015-019-trace-b.log"
++$SnapshotCommandLogPath = Join-Path $BuildDirectory "bp015-019-snapshot-command.log"
++$TraceComparisonPath = Join-Path $BuildDirectory "bp015-019-trace-comparison.json"
++$TraceComparisonLogPath = Join-Path $BuildDirectory "bp015-019-trace-comparison.log"
++$ProtocolVectorReportPath = Join-Path $BuildDirectory "bp015-019-protocol15-vectors.json"
++$ProtocolVectorLogPath = Join-Path $BuildDirectory "bp015-019-protocol15-vectors.log"
++$ProtocolCommandReportPath = Join-Path $BuildDirectory "bp015-019-protocol15-commands.json"
++$ProtocolCommandLogPath = Join-Path $BuildDirectory "bp015-019-protocol15-commands.log"
++$ProtocolServerDataReportPath = Join-Path $BuildDirectory "bp015-019-protocol15-serverdata.json"
++$ProtocolServerDataLogPath = Join-Path $BuildDirectory "bp015-019-protocol15-serverdata.log"
++$ProtocolEventReportPath = Join-Path $BuildDirectory "bp015-019-protocol15-events.json"
++$ProtocolEventLogPath = Join-Path $BuildDirectory "bp015-019-protocol15-events.log"
++$ProtocolRuntimeEventReportPath = Join-Path $BuildDirectory "bp015-019-protocol15-runtime-events.json"
++$ProtocolRuntimeEventLogPath = Join-Path $BuildDirectory "bp015-019-protocol15-runtime-events.log"
++$ProtocolSignonReportPath = Join-Path $BuildDirectory "bp015-019-protocol15-signon.json"
++$ProtocolSignonLogPath = Join-Path $BuildDirectory "bp015-019-protocol15-signon.log"
++$ProtocolDeliveryReportPath = Join-Path $BuildDirectory "bp015-019-protocol15-delivery.json"
++$ProtocolDeliveryLogPath = Join-Path $BuildDirectory "bp015-019-protocol15-delivery.log"
++$ProtocolDatagramReportPath = Join-Path $BuildDirectory "bp015-019-protocol15-datagram.json"
++$ProtocolDatagramLogPath = Join-Path $BuildDirectory "bp015-019-protocol15-datagram.log"
++$ProtocolDemoReportPath = Join-Path $BuildDirectory "bp015-019-protocol15-demo.json"
++$ProtocolDemoLogPath = Join-Path $BuildDirectory "bp015-019-protocol15-demo.log"
++$ProtocolClosureReportPath = Join-Path $BuildDirectory "bp015-019-protocol15-closure.json"
++$ProtocolClosureLogPath = Join-Path $BuildDirectory "bp015-019-protocol15-closure.log"
++$BisectReportPath = Join-Path $BuildDirectory "bp015-019-bisect-report.json"
++$IndependentFailures = New-Object System.Collections.ArrayList
++$Steps = New-Object System.Collections.ArrayList
++$OverallStatus = "FAIL"
++$FailureMessage = ""
++$TranscriptStarted = $false
++$TraceHash = ""
++$TraceRollingHash = ""
++
++New-Item -ItemType Directory -Force -Path $BuildDirectory | Out-Null
++
++function Add-StepResult {
++  param(
++    [string]$Name,
++    [string]$Status,
++    [int]$ExitCode,
++    [string]$Detail
++  )
++
++  [void]$Steps.Add([ordered]@{
++    name = $Name
++    status = $Status
++    exit_code = $ExitCode
++    detail = $Detail
++  })
++}
++
++function Resolve-PythonCommand {
++  if (-not [string]::IsNullOrWhiteSpace($Python)) {
++    if (Test-Path -LiteralPath $Python -PathType Leaf) {
++      $Resolved = [System.IO.Path]::GetFullPath($Python)
++    } else {
++      $Command = Get-Command $Python -ErrorAction SilentlyContinue | Select-Object -First 1
++      if ($null -eq $Command) { throw "Python interpreter not found: $Python" }
++      $Resolved = $Command.Path
++    }
++    if ([System.IO.Path]::GetFileNameWithoutExtension($Resolved) -ieq "py") {
++      return [ordered]@{ executable = $Resolved; prefix = @("-3") }
++    }
++    return [ordered]@{ executable = $Resolved; prefix = @() }
++  }
++
++  $Launcher = Get-Command "py" -ErrorAction SilentlyContinue | Select-Object -First 1
++  if ($null -ne $Launcher) {
++    return [ordered]@{ executable = $Launcher.Path; prefix = @("-3") }
++  }
++
++  $Command = Get-Command "python" -ErrorAction SilentlyContinue | Select-Object -First 1
++  if ($null -eq $Command) { throw "Python 3 was not found. Pass -Python PATH." }
++  return [ordered]@{ executable = $Command.Path; prefix = @() }
++}
++
++function Invoke-ExternalStep {
++  param(
++    [Parameter(Mandatory = $true)]
++    [string]$Name,
++
++    [Parameter(Mandatory = $true)]
++    [string]$Executable,
++
++    [Parameter(Mandatory = $true)]
++    [string[]]$Arguments,
++
++    [string]$Detail = "",
++    [string]$LogPath = ""
++  )
++
++  Write-Host "[MiniQuake/$PackageId] $Name"
++  if ([string]::IsNullOrWhiteSpace($LogPath)) {
++    & $Executable @Arguments
++  } else {
++    if (Test-Path -LiteralPath $LogPath -PathType Leaf) { Remove-Item -Force -LiteralPath $LogPath }
++    & $Executable @Arguments 2>&1 | Tee-Object -FilePath $LogPath
++  }
++  $ExitCode = [int]$LASTEXITCODE
++  if ($ExitCode -ne 0) {
++    $LogDetail = $Detail
++    if (-not [string]::IsNullOrWhiteSpace($LogPath)) {
++      $LogDetail = ($Detail + "; log=" + [System.IO.Path]::GetFileName($LogPath)).TrimStart([char[]]@(';', ' '))
++    }
++    Add-StepResult $Name "FAIL" $ExitCode $LogDetail
++    throw "$Name failed with exit code $ExitCode."
++  }
++  Add-StepResult $Name "PASS" 0 $Detail
++}
++
++function Invoke-IndependentTest {
++  param(
++    [Parameter(Mandatory = $true)]
++    [string]$Package,
++    [Parameter(Mandatory = $true)]
++    [string]$Name,
++    [Parameter(Mandatory = $true)]
++    [string]$Executable,
++    [Parameter(Mandatory = $true)]
++    [string]$LogName
++  )
++
++  $LogPath = Join-Path $BuildDirectory $LogName
++  Write-Host "[MiniQuake/$BlockId][$Package] $Name"
++  if (Test-Path -LiteralPath $LogPath -PathType Leaf) { Remove-Item -Force -LiteralPath $LogPath }
++  & $Executable 2>&1 | Tee-Object -FilePath $LogPath
++  $ExitCode = [int]$LASTEXITCODE
++  if ($ExitCode -eq 0) {
++    Add-StepResult ("[" + $Package + "] " + $Name) "PASS" 0 ("log=" + [System.IO.Path]::GetFileName($LogPath))
++    return $true
++  }
++
++  [void]$IndependentFailures.Add([ordered]@{
++    package = $Package
++    name = $Name
++    executable = [System.IO.Path]::GetFileName($Executable)
++    exit_code = $ExitCode
++    log = [System.IO.Path]::GetFileName($LogPath)
++  })
++  Add-StepResult ("[" + $Package + "] " + $Name) "FAIL" $ExitCode ("log=" + [System.IO.Path]::GetFileName($LogPath))
++  Write-Host "ERROR: [$Package] $Name failed with exit code $ExitCode." -ForegroundColor Red
++  if (-not $ContinueIndependentTests) { throw "[$Package] $Name failed with exit code $ExitCode." }
++  return $false
++}
++
++function Require-File {
++  param([string]$Path, [string]$Label)
++  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
++    throw "$Label is missing: $Path"
++  }
++}
++
++function Read-JsonFile {
++  param([string]$Path)
++  Require-File $Path "JSON artifact"
++  return Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
++}
++
++try {
++  try {
++    Start-Transcript -LiteralPath $TranscriptPath -Force | Out-Null
++    $TranscriptStarted = $true
++  } catch {
++    Write-Warning "PowerShell transcript could not be started: $($_.Exception.Message)"
++  }
++
++  Write-Host "MiniQuake $BlockId cumulative acceptance test"
++  Write-Host "  final package: $PackageId"
++  Write-Host "  parent:        $ParentPackageId"
++  Write-Host "  block parent:  $BlockParentPackageId"
++  Write-Host "  root:          $Root"
++  Write-Host "  configuration: $Configuration"
++
++  $PythonCommand = Resolve-PythonCommand
++  $PythonExe = $PythonCommand.executable
++  $PythonPrefix = @($PythonCommand.prefix)
++
++  Invoke-ExternalStep `
++    -Name "static package and diagnostics verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($Verifier, $Root, "--json-output", $StaticReportPath)) `
++    -Detail "manifest, packages, ABI, accepted BP-014R1 parent and cumulative BP-015-019 Protocol 15 contracts"
++
++  Invoke-ExternalStep `
++    -Name "trace comparator self-test" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($TraceComparator, "--self-test")) `
++    -Detail "field-level first-divergence reporter"
++
++  Invoke-ExternalStep `
++    -Name "Protocol 15 C/Python golden-vector verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolVectorChecker, $Root, "--json-output", $ProtocolVectorReportPath)) `
++    -Detail "13 inherited C-derived byte streams, 18 constants and MiniLang wire markers" `
++    -LogPath $ProtocolVectorLogPath
++
++  Invoke-ExternalStep `
++    -Name "Protocol 15 signon, command-stream and fast-update verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolCommandChecker, $Root, "--json-output", $ProtocolCommandReportPath)) `
++    -Detail "14 C-derived command/update byte streams, 57 constants and 34 SVC events" `
++    -LogPath $ProtocolCommandLogPath
++
++  Invoke-ExternalStep `
++    -Name "Protocol 15 serverinfo, sound, clientdata, baseline and packet-planning verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolServerDataChecker, "--root", $Root, "--json-output", $ProtocolServerDataReportPath)) `
++    -Detail "11 C-derived server payload vectors plus datagram, fast-update and client-delivery contracts" `
++    -LogPath $ProtocolServerDataLogPath
++
++  Invoke-ExternalStep `
++    -Name "Protocol 15 static-event, particle, scoreboard and graceful-drop verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolEventChecker, "--root", $Root, "--json-output", $ProtocolEventReportPath)) `
++    -Detail "15 C-derived event payload vectors, 13 semantic cases and 22 MiniLang runtime fixtures" `
++    -LogPath $ProtocolEventLogPath
++
++  Invoke-ExternalStep `
++    -Name "Protocol 15 temporary-entity, dynamic-sound and delivery-boundary verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolRuntimeEventChecker, "--root", $Root, "--json-output", $ProtocolRuntimeEventReportPath)) `
++    -Detail "10 C-derived runtime-event vectors, 49 semantic cases and 28 MiniLang runtime fixtures" `
++    -LogPath $ProtocolRuntimeEventLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-015 signon queue and stage verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolSignonChecker, "--root", $Root, "--json-output", $ProtocolSignonReportPath)) `
++    -Detail "source-guided signon stages 1-4 and queue boundaries" `
++    -LogPath $ProtocolSignonLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-016 reliable delivery scheduling verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolDeliveryChecker, "--root", $Root, "--json-output", $ProtocolDeliveryReportPath)) `
++    -Detail "blocked, retained, committed, keepalive and drop scheduling" `
++    -LogPath $ProtocolDeliveryLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-017 datagram ACK and retransmission verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolDatagramChecker, "--root", $Root, "--json-output", $ProtocolDatagramReportPath)) `
++    -Detail "fragmentation, deferred ACK flush, loss, duplicate and wrap cases" `
++    -LogPath $ProtocolDatagramLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-018 demo framing and playback verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolDemoChecker, "--root", $Root, "--json-output", $ProtocolDemoReportPath)) `
++    -Detail "recording atoi, frame ABI, keepalive filtering and timedemo semantics" `
++    -LogPath $ProtocolDemoLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-019 cumulative Protocol 15 closure and freeze verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolClosureChecker, "--root", $Root, "--json-output", $ProtocolClosureReportPath)) `
++    -Detail "nine component checkers, 15 authoritative files and frozen fingerprint" `
++    -LogPath $ProtocolClosureLogPath
++
++  if (-not $SkipBuild) {
++    $BuildArguments = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $BuildScript)
++    if (-not [string]::IsNullOrWhiteSpace($Compiler)) { $BuildArguments += @("-Compiler", $Compiler) }
++    if (-not [string]::IsNullOrWhiteSpace($StdLib)) { $BuildArguments += @("-StdLib", $StdLib) }
++    $BuildArguments += @("-Python", $PythonExe, "-Configuration", $Configuration, "-NoRunTests")
++    if ($RebuildNative) { $BuildArguments += "-RebuildNative" }
++    if ($Listings) { $BuildArguments += "-Listings" }
++
++    $PowerShellExe = (Get-Process -Id $PID).Path
++    Invoke-ExternalStep `
++      -Name "single cumulative build of game and all block test executables" `
++      -Executable $PowerShellExe `
++      -Arguments $BuildArguments `
++      -Detail "compile once with -NoRunTests; independent groups execute below" `
++      -LogPath $BuildChildLogPath
++  } else {
++    Add-StepResult "single cumulative build of game and all block test executables" "SKIPPED" 0 "-SkipBuild"
++  }
++
++  Require-File $GameExe "MiniQuake executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15WireTests.exe") "Protocol 15 wire test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15CommandTests.exe") "Protocol 15 command test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15ServerDataTests.exe") "Protocol 15 server-data test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15EventTests.exe") "Protocol 15 event test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15RuntimeEventTests.exe") "Protocol 15 runtime-event test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15SignonTests.exe") "Protocol 15 signon test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15DeliveryTests.exe") "Protocol 15 delivery test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15DatagramTests.exe") "Protocol 15 datagram test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15DemoTests.exe") "Protocol 15 demo test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15ClosureTests.exe") "Protocol 15 closure test executable"
++
++  foreach ($BridgeName in @("miniquake_native.dll", "miniquake_text.dll")) {
++    $SourceBridge = Join-Path (Join-Path $Root "native") $BridgeName
++    $BuiltBridge = Join-Path $BuildDirectory $BridgeName
++    Require-File $SourceBridge "Packaged native bridge"
++    Require-File $BuiltBridge "Built native bridge"
++    $SourceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $SourceBridge).Hash
++    $BuiltHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $BuiltBridge).Hash
++    if ($SourceHash -ne $BuiltHash) { throw "Built native bridge hash mismatch: $BridgeName" }
++  }
++  Add-StepResult "native bridge deployment" "PASS" 0 "main and buffered-text DLL hashes match package"
++
++  Write-Host "[MiniQuake/$PackageId] executable identity"
++  $VersionOutput = @(& $GameExe "--version" 2>&1)
++  $VersionExitCode = [int]$LASTEXITCODE
++  $VersionOutput | Set-Content -LiteralPath $VersionPath -Encoding UTF8
++  $VersionOutput | ForEach-Object { Write-Host $_ }
++  if ($VersionExitCode -ne 0) { throw "MiniQuake --version failed with exit code $VersionExitCode." }
++  $VersionText = $VersionOutput -join "`n"
++  foreach ($Marker in @(
++    "Package: $PackageId",
++    "Parent package: $ParentPackageId",
++    "Compatibility profile: compat_109",
++    "Native text ABI: $NativeTextAbi",
++    "Protocol text ABI: $ProtocolTextAbi",
++    "Block: $BlockId",
++    "Block parent package: $BlockParentPackageId",
++    "Protocol status: $ProtocolStatus"
++  )) {
++    if ($VersionText -notmatch [regex]::Escape($Marker)) { throw "Executable identity marker missing: $Marker" }
++  }
++  Add-StepResult "executable identity" "PASS" 0 "Package: $PackageId; block: $BlockId; protocol: $ProtocolStatus"
++
++  $IndependentGroups = @(
++    [ordered]@{ package = "BASE"; name = "core tests"; exe = "MiniQuakeTests.exe"; log = "bp015-019-core-tests.log" },
++    [ordered]@{ package = "BASE"; name = "milestone tests"; exe = "MiniQuakeMilestoneTests.exe"; log = "bp015-019-milestone-tests.log" },
++    [ordered]@{ package = "BASE"; name = "deterministic diagnostics"; exe = "MiniQuakeCompatTraceTests.exe"; log = "bp015-019-diagnostics-tests.log" },
++    [ordered]@{ package = "BP-010R1"; name = "Protocol 15 wire"; exe = "MiniQuakeProtocol15WireTests.exe"; log = "bp015-019-wire-tests.log" },
++    [ordered]@{ package = "BP-011"; name = "Protocol 15 command/update"; exe = "MiniQuakeProtocol15CommandTests.exe"; log = "bp015-019-command-tests.log" },
++    [ordered]@{ package = "BP-012R1"; name = "Protocol 15 server data"; exe = "MiniQuakeProtocol15ServerDataTests.exe"; log = "bp015-019-serverdata-tests.log" },
++    [ordered]@{ package = "BP-013"; name = "Protocol 15 events"; exe = "MiniQuakeProtocol15EventTests.exe"; log = "bp015-019-event-tests.log" },
++    [ordered]@{ package = "BP-014R1"; name = "Protocol 15 runtime events"; exe = "MiniQuakeProtocol15RuntimeEventTests.exe"; log = "bp015-019-runtime-event-tests.log" },
++    [ordered]@{ package = "BP-015"; name = "signon queue and stages"; exe = "MiniQuakeProtocol15SignonTests.exe"; log = "bp015-019-signon-tests.log" },
++    [ordered]@{ package = "BP-016"; name = "reliable delivery scheduling"; exe = "MiniQuakeProtocol15DeliveryTests.exe"; log = "bp015-019-delivery-tests.log" },
++    [ordered]@{ package = "BP-017"; name = "datagram ACK and retransmission"; exe = "MiniQuakeProtocol15DatagramTests.exe"; log = "bp015-019-datagram-tests.log" },
++    [ordered]@{ package = "BP-018"; name = "demo framing and playback"; exe = "MiniQuakeProtocol15DemoTests.exe"; log = "bp015-019-demo-tests.log" },
++    [ordered]@{ package = "BP-019"; name = "cross-layer closure and freeze"; exe = "MiniQuakeProtocol15ClosureTests.exe"; log = "bp015-019-closure-tests.log" }
++  )
++  foreach ($Group in $IndependentGroups) {
++    $Path = Join-Path $BuildDirectory $Group.exe
++    Require-File $Path ("test executable for " + $Group.package)
++    [void](Invoke-IndependentTest -Package $Group.package -Name $Group.name -Executable $Path -LogName $Group.log)
++  }
++
++  $CanUseGameData = -not $SkipGameValidation -and -not [string]::IsNullOrWhiteSpace($QuakeBase)
++  if (-not $CanUseGameData) {
++    $Reason = if ($SkipGameValidation) { "-SkipGameValidation" } else { "no -QuakeBase supplied" }
++    Add-StepResult "installed Quake data validation" "SKIPPED" 0 $Reason
++    Add-StepResult "headless runtime validation" "SKIPPED" 0 $Reason
++  } else {
++    if (-not (Test-Path -LiteralPath $QuakeBase -PathType Container)) {
++      throw "Quake base directory does not exist: $QuakeBase"
++    }
++    Invoke-ExternalStep `
++      -Name "installed Quake data validation" `
++      -Executable $GameExe `
++      -Arguments @("--validate-game", $QuakeBase, $Map, "-game", $Game) `
++      -Detail "game=$Game map=$Map"
++    Invoke-ExternalStep `
++      -Name "headless runtime validation" `
++      -Executable $GameExe `
++      -Arguments @("--validate-runtime", $QuakeBase, $Map, [string]$Frames, "-game", $Game) `
++      -Detail "game=$Game map=$Map frames=$Frames"
++  }
++
++  $CanTrace = -not $SkipTraceValidation -and -not [string]::IsNullOrWhiteSpace($QuakeBase)
++  if (-not $CanTrace) {
++    $Reason = if ($SkipTraceValidation) { "-SkipTraceValidation" } else { "no -QuakeBase supplied" }
++    Add-StepResult "deterministic compatibility trace A" "SKIPPED" 0 $Reason
++    Add-StepResult "deterministic compatibility trace B" "SKIPPED" 0 $Reason
++    Add-StepResult "byte-identical trace comparison" "SKIPPED" 0 $Reason
++    Add-StepResult "trace artifact schema validation" "SKIPPED" 0 $Reason
++    Add-StepResult "compatibility snapshot command" "SKIPPED" 0 $Reason
++  } else {
++    if (Test-Path -LiteralPath $TraceDirectory) { Remove-Item -Recurse -Force -LiteralPath $TraceDirectory }
++    New-Item -ItemType Directory -Force -Path $TraceDirectory | Out-Null
++    $PrefixA = Join-Path $TraceDirectory "run-a"
++    $PrefixB = Join-Path $TraceDirectory "run-b"
++
++    Invoke-ExternalStep `
++      -Name "deterministic compatibility trace A" `
++      -Executable $GameExe `
++      -Arguments @("--compat-trace", $QuakeBase, $Map, [string]$TraceFrames, $PrefixA, "-game", $Game) `
++      -Detail "fixed 0.02 second steps; game=$Game map=$Map frames=$TraceFrames" `
++      -LogPath $TraceALogPath
++    Invoke-ExternalStep `
++      -Name "deterministic compatibility trace B" `
++      -Executable $GameExe `
++      -Arguments @("--compat-trace", $QuakeBase, $Map, [string]$TraceFrames, $PrefixB, "-game", $Game) `
++      -Detail "independent second process with identical arguments" `
++      -LogPath $TraceBLogPath
++
++    $TraceA = $PrefixA + ".mqtrace"
++    $TraceB = $PrefixB + ".mqtrace"
++    $SnapshotA = $PrefixA + "-snapshot.json"
++    $ContextA = $PrefixA + "-context.json"
++    $SummaryAPath = $PrefixA + "-summary.json"
++    $SummaryBPath = $PrefixB + "-summary.json"
++    foreach ($Artifact in @($TraceA, $TraceB, $SnapshotA, $ContextA, $SummaryAPath, $SummaryBPath)) {
++      Require-File $Artifact "BP-019 trace artifact"
++    }
++
++    Write-Host "[MiniQuake/$PackageId] byte-identical trace comparison"
++    if (Test-Path -LiteralPath $TraceComparisonPath -PathType Leaf) { Remove-Item -Force -LiteralPath $TraceComparisonPath }
++    if (Test-Path -LiteralPath $TraceComparisonLogPath -PathType Leaf) { Remove-Item -Force -LiteralPath $TraceComparisonLogPath }
++    $ComparisonArguments = @($PythonPrefix + @($TraceComparator, $TraceA, $TraceB, "--json-output", $TraceComparisonPath))
++    & $PythonExe @ComparisonArguments 2>&1 | Tee-Object -FilePath $TraceComparisonLogPath
++    $ComparisonExitCode = [int]$LASTEXITCODE
++    $Comparison = Read-JsonFile $TraceComparisonPath
++    if ($ComparisonExitCode -ne 0 -or -not [bool]$Comparison.equal) {
++      $Detail = "run-a=$($Comparison.left.sha256) run-b=$($Comparison.right.sha256)"
++      if ($null -ne $Comparison.first_difference) {
++        $Detail = $Detail + " first_line=$($Comparison.first_difference.line_index)"
++        if ($null -ne $Comparison.first_difference.frame) {
++          $Detail = $Detail + " first_frame=$($Comparison.first_difference.frame)"
++        }
++      }
++      $Detail = $Detail + "; report=" + [System.IO.Path]::GetFileName($TraceComparisonPath)
++      Add-StepResult "byte-identical trace comparison" "FAIL" $ComparisonExitCode $Detail
++      throw "BP-019 deterministic traces differ. The first differing fields are recorded in $TraceComparisonPath."
++    }
++    $TraceHash = [string]$Comparison.left.sha256
++    $LineCount = [int]$Comparison.left.lines
++    if ($LineCount -ne ($TraceFrames + 1)) {
++      throw "Trace line count is $LineCount, expected $($TraceFrames + 1)."
++    }
++    Add-StepResult "byte-identical trace comparison" "PASS" 0 "sha256=$TraceHash lines=$LineCount report=$([System.IO.Path]::GetFileName($TraceComparisonPath))"
++
++    $SummaryA = Read-JsonFile $SummaryAPath
++    $SummaryB = Read-JsonFile $SummaryBPath
++    $Snapshot = Read-JsonFile $SnapshotA
++    $Context = Read-JsonFile $ContextA
++    if ($SummaryA.schema -ne "MiniQuakeTraceSummary/1" -or $SummaryB.schema -ne "MiniQuakeTraceSummary/1") {
++      throw "Unexpected trace summary schema."
++    }
++    if ($SummaryA.package -ne $PackageId -or $SummaryB.package -ne $PackageId) {
++      throw "Trace summary package marker mismatch."
++    }
++    if (-not $SummaryA.ok -or -not $SummaryB.ok) { throw "A trace summary reports failure." }
++    if ([int]$SummaryA.frames_written -ne $TraceFrames -or [int]$SummaryB.frames_written -ne $TraceFrames) {
++      throw "Trace summary frame count mismatch."
++    }
++    if ($SummaryA.rolling_hash -ne $SummaryB.rolling_hash) {
++      throw "Trace rolling hashes differ despite byte comparison."
++    }
++    if ($Snapshot.schema -ne "MiniQuakeSnapshot/1") { throw "Unexpected snapshot schema." }
++    if ($Context.schema -ne "MiniQuakeCrashContext/1") { throw "Unexpected crash-context schema." }
++    if ($Context.phase -ne "trace_complete") { throw "Final crash context phase is '$($Context.phase)', expected trace_complete." }
++    $TraceRollingHash = [string]$SummaryA.rolling_hash
++
++    foreach ($Artifact in @($TraceA, $SnapshotA, $ContextA, $SummaryAPath)) {
++      Invoke-ExternalStep `
++        -Name ("compatibility report " + [System.IO.Path]::GetFileName($Artifact)) `
++        -Executable $GameExe `
++        -Arguments @("--compat-report", $Artifact) `
++        -Detail "schema recognition"
++    }
++    Add-StepResult "trace artifact schema validation" "PASS" 0 "rolling_hash=$TraceRollingHash"
++
++    $SnapshotFrames = [int][Math]::Min($TraceFrames, 8)
++    $SnapshotPrefix = Join-Path $TraceDirectory "snapshot-command"
++    Invoke-ExternalStep `
++      -Name "compatibility snapshot command" `
++      -Executable $GameExe `
++      -Arguments @("--compat-snapshot", $QuakeBase, $Map, [string]$SnapshotFrames, $SnapshotPrefix, "-game", $Game) `
++      -Detail "direct --compat-snapshot CLI path; frames=$SnapshotFrames" `
++      -LogPath $SnapshotCommandLogPath
++    $SnapshotCommandPath = $SnapshotPrefix + "-snapshot.json"
++    $SnapshotCommandSummaryPath = $SnapshotPrefix + "-summary.json"
++    $SnapshotCommand = Read-JsonFile $SnapshotCommandPath
++    $SnapshotCommandSummary = Read-JsonFile $SnapshotCommandSummaryPath
++    if ($SnapshotCommand.schema -ne "MiniQuakeSnapshot/1") { throw "Direct snapshot command produced an unexpected schema." }
++    if ([int]$SnapshotCommand.frame -ne ($SnapshotFrames - 1)) { throw "Direct snapshot command stopped at frame $($SnapshotCommand.frame), expected $($SnapshotFrames - 1)." }
++    if (-not $SnapshotCommandSummary.ok -or [int]$SnapshotCommandSummary.frames_written -ne $SnapshotFrames) {
++      throw "Direct snapshot command summary reports failure or the wrong frame count."
++    }
++  }
++
++  if ($NetworkTests) {
++    Invoke-ExternalStep `
++      -Name "Winsock UDP loopback smoke" `
++      -Executable $GameExe `
++      -Arguments @("--udp-smoke", "2000") `
++      -Detail "2 second timeout"
++  } else {
++    Add-StepResult "Winsock UDP loopback smoke" "SKIPPED" 0 "use -NetworkTests"
++  }
++
++  if ($IndependentFailures.Count -gt 0) {
++    $First = $IndependentFailures[0]
++    throw ("Independent test groups failed: " + $IndependentFailures.Count + "; first=" + $First.package + " " + $First.name)
++  }
++
++  $OverallStatus = "PASS"
++} catch {
++  $FailureMessage = $_.Exception.Message
++  Write-Host "ERROR: $FailureMessage" -ForegroundColor Red
++} finally {
++  $BlockPackages = @("BP-015", "BP-016", "BP-017", "BP-018", "BP-019")
++  $FirstFailureIndex = -1
++  $FirstFailurePackage = ""
++  if ($IndependentFailures.Count -gt 0) {
++    $FirstFailurePackage = [string]$IndependentFailures[0].package
++    $FirstFailureIndex = [array]::IndexOf($BlockPackages, $FirstFailurePackage)
++    if ($FirstFailureIndex -lt 0) { $FirstFailureIndex = 0 }
++  }
++  $LogicalSteps = @()
++  for ($LogicalIndex = 0; $LogicalIndex -lt $BlockPackages.Count; $LogicalIndex++) {
++    $LogicalPackage = $BlockPackages[$LogicalIndex]
++    $OwnFailure = @($IndependentFailures | Where-Object { $_.package -eq $LogicalPackage })
++    $LogicalStatus = "PASS"
++    if ($OwnFailure.Count -gt 0) {
++      $LogicalStatus = "FAIL"
++    } elseif ($FirstFailureIndex -ge 0 -and $LogicalIndex -gt $FirstFailureIndex) {
++      # The independent fixture may have passed, but the cumulative dependency
++      # chain is not accepted after an earlier block failure.
++      $LogicalStatus = "BLOCKED"
++    } elseif ($FirstFailureIndex -eq 0 -and $FirstFailurePackage -notmatch "^BP-01[5-9]$") {
++      $LogicalStatus = "BLOCKED"
++    }
++    $LogicalSteps += [ordered]@{ package = $LogicalPackage; status = $LogicalStatus }
++  }
++  $Bisect = [ordered]@{
++    schema = "MiniQuakeLogicalBlockBisect/1"
++    block_id = $BlockId
++    requested = [bool]$BisectOnFailure
++    mode = "logical test-group checkpoint locator; no source rebuild is performed"
++    failures = @($IndependentFailures)
++    logical_steps = $LogicalSteps
++    first_failing_package = $FirstFailurePackage
++    suggested_patch = if ($FirstFailurePackage -match "^BP-01[5-9]$") { "patches/" + $FirstFailurePackage + ".diff" } else { "" }
++  }
++  $Bisect | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $BisectReportPath -Encoding UTF8
++
++  $Summary = [ordered]@{
++    schema_version = 1
++    package_id = $PackageId
++    parent_package_id = $ParentPackageId
++    block_id = $BlockId
++    block_parent_package_id = $BlockParentPackageId
++    protocol_status = $ProtocolStatus
++    created_utc = (Get-Date).ToUniversalTime().ToString("o")
++    status = $OverallStatus
++    failure = $FailureMessage
++    configuration = $Configuration
++    quake_validation = [ordered]@{
++      base_supplied = -not [string]::IsNullOrWhiteSpace($QuakeBase)
++      game = $Game
++      map = $Map
++      frames = $Frames
++      trace_frames = $TraceFrames
++    }
++    deterministic_trace = [ordered]@{
++      sha256 = $TraceHash
++      rolling_hash = $TraceRollingHash
++    }
++    artifacts = [ordered]@{
++      transcript = [System.IO.Path]::GetFileName($TranscriptPath)
++      static_report = [System.IO.Path]::GetFileName($StaticReportPath)
++      version_output = [System.IO.Path]::GetFileName($VersionPath)
++      build_child_log = [System.IO.Path]::GetFileName($BuildChildLogPath)
++      trace_a_log = [System.IO.Path]::GetFileName($TraceALogPath)
++      trace_b_log = [System.IO.Path]::GetFileName($TraceBLogPath)
++      snapshot_command_log = [System.IO.Path]::GetFileName($SnapshotCommandLogPath)
++      trace_comparison = [System.IO.Path]::GetFileName($TraceComparisonPath)
++      trace_comparison_log = [System.IO.Path]::GetFileName($TraceComparisonLogPath)
++      protocol15_vector_report = [System.IO.Path]::GetFileName($ProtocolVectorReportPath)
++      protocol15_vector_log = [System.IO.Path]::GetFileName($ProtocolVectorLogPath)
++      protocol15_command_report = [System.IO.Path]::GetFileName($ProtocolCommandReportPath)
++      protocol15_command_log = [System.IO.Path]::GetFileName($ProtocolCommandLogPath)
++      protocol15_serverdata_report = [System.IO.Path]::GetFileName($ProtocolServerDataReportPath)
++      protocol15_serverdata_log = [System.IO.Path]::GetFileName($ProtocolServerDataLogPath)
++      protocol15_event_report = [System.IO.Path]::GetFileName($ProtocolEventReportPath)
++      protocol15_event_log = [System.IO.Path]::GetFileName($ProtocolEventLogPath)
++      protocol15_runtime_event_report = [System.IO.Path]::GetFileName($ProtocolRuntimeEventReportPath)
++      protocol15_runtime_event_log = [System.IO.Path]::GetFileName($ProtocolRuntimeEventLogPath)
++      protocol15_signon_report = [System.IO.Path]::GetFileName($ProtocolSignonReportPath)
++      protocol15_delivery_report = [System.IO.Path]::GetFileName($ProtocolDeliveryReportPath)
++      protocol15_datagram_report = [System.IO.Path]::GetFileName($ProtocolDatagramReportPath)
++      protocol15_demo_report = [System.IO.Path]::GetFileName($ProtocolDemoReportPath)
++      protocol15_closure_report = [System.IO.Path]::GetFileName($ProtocolClosureReportPath)
++      bisect_report = [System.IO.Path]::GetFileName($BisectReportPath)
++      trace_directory = "bp015-019-traces"
++      independent_failures = @($IndependentFailures)
++    }
++    steps = @($Steps)
++  }
++  $Summary | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $SummaryPath -Encoding UTF8
++
++  if ($TranscriptStarted) {
++    try { Stop-Transcript | Out-Null } catch { }
++  }
++}
++
++if ($OverallStatus -ne "PASS") {
++  Write-Host "MiniQuake $BlockId acceptance test: FAIL"
++  Write-Host "Run .\COLLECT_RESULTS.ps1 and upload the generated result archive."
++  exit 1
++}
++
++Write-Host "MiniQuake $BlockId acceptance test: PASS"
++Write-Host "Result summary: $SummaryPath"
++Write-Host "For feedback, run .\COLLECT_RESULTS.ps1 and upload the generated ZIP."
++exit 0
+diff --git a/audit/protocol15_closure_golden.json b/audit/protocol15_closure_golden.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..7b7e914598180fadfcab14ebad5607d8bf4686b4
+--- /dev/null
++++ b/audit/protocol15_closure_golden.json
+@@ -0,0 +1,90 @@
++{
++  "schema": "MiniQuakeProtocol15ClosureGolden/1",
++  "package_id": "BP-019",
++  "parent_package_id": "BP-018",
++  "block_id": "BP-015-019",
++  "block_parent_package_id": "BP-014R1",
++  "protocol_status": "protocol15_frozen_v1",
++  "protocol_version": 15,
++  "sources": [
++    "protocol.h",
++    "common.c",
++    "cl_main.c",
++    "cl_parse.c",
++    "cl_demo.c",
++    "sv_main.c",
++    "sv_user.c",
++    "net_dgrm.c"
++  ],
++  "rows": [
++    {
++      "kind": "case",
++      "name": "protocol_version",
++      "value": 15
++    },
++    {
++      "kind": "case",
++      "name": "svc_valid_count",
++      "value": 33
++    },
++    {
++      "kind": "case",
++      "name": "svc_reserved_command",
++      "value": 21
++    },
++    {
++      "kind": "case",
++      "name": "clc_valid_count",
++      "value": 4
++    },
++    {
++      "kind": "case",
++      "name": "fast_update_mask",
++      "value": 32767
++    },
++    {
++      "kind": "case",
++      "name": "client_data_mask",
++      "value": 32511
++    },
++    {
++      "kind": "case",
++      "name": "sound_mask",
++      "value": 7
++    },
++    {
++      "kind": "case",
++      "name": "temporary_entity_count",
++      "value": 14
++    },
++    {
++      "kind": "case",
++      "name": "protocol_fingerprint",
++      "value": 217178410
++    },
++    {
++      "kind": "case",
++      "name": "max_msglen",
++      "value": 8000
++    },
++    {
++      "kind": "case",
++      "name": "max_datagram",
++      "value": 1024
++    },
++    {
++      "kind": "case",
++      "name": "max_edicts",
++      "value": 600
++    },
++    {
++      "kind": "case",
++      "name": "net_maxmessage",
++      "value": 8192
++    }
++  ],
++  "reference": {
++    "oracle": "tools/oracle/protocol15_closure_oracle.c",
++    "oracle_sha256": "caeda18f94bb64e6b07765b98c15f7957f1fde7a20aff2995aeeeea0d7bb08ce"
++  }
++}
+diff --git a/audit/protocol15_freeze.json b/audit/protocol15_freeze.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..41e478971ba71c499ff9af3a6c73ab74d25cf8c2
+--- /dev/null
++++ b/audit/protocol15_freeze.json
+@@ -0,0 +1,77 @@
++{
++  "schema": "MiniQuakeProtocol15Freeze/1",
++  "block_id": "BP-015-019",
++  "package_id": "BP-019",
++  "protocol_status": "protocol15_frozen_v1",
++  "protocol_version": 15,
++  "protocol_fingerprint": 217178410,
++  "coverage": {
++    "valid_svc_commands": 33,
++    "valid_clc_commands": 4,
++    "temporary_entity_types": 14,
++    "component_checkers": 9,
++    "runtime_fixtures_bp015_019": 78
++  },
++  "authoritative_files": [
++    {
++      "path": "src/miniquake/constants.ml",
++      "sha256": "f1ae3f28aa19ab28c992983ceb1046fa9897d05b8905e43195de5d2b824e8ecc"
++    },
++    {
++      "path": "src/miniquake/sizebuf.ml",
++      "sha256": "0b41aa7512f64a947b2a16a5aff313c481230e07d4863911d3485a8a694cf080"
++    },
++    {
++      "path": "src/miniquake/message.ml",
++      "sha256": "ecff5fdb03b182c7b454c54fd4348cf60402ab6e15c424a43b6bea128f8e6e75"
++    },
++    {
++      "path": "src/miniquake/protocol_text.ml",
++      "sha256": "83a7d475f2a15ded25f3fb35c4b6af6bd8cfac5e8ed77fd8d2201ba5b4851fba"
++    },
++    {
++      "path": "src/miniquake/protocol_write.ml",
++      "sha256": "448f2c8365bce1057ba43778d795f998586bcfc29eaf72be5e4a231109ce6cc9"
++    },
++    {
++      "path": "src/miniquake/protocol_signon.ml",
++      "sha256": "46a398d78d7bb19b0051c0f82ee33d5db045a7488d1d28a9381cd2ded3ae2724"
++    },
++    {
++      "path": "src/miniquake/protocol_delivery.ml",
++      "sha256": "817dbe7646adcc8196d5093832f7cffe446cd923a4a3d48b513b5f4d7ca85df6"
++    },
++    {
++      "path": "src/miniquake/protocol_update.ml",
++      "sha256": "a741f7d1ab39381eb26306209c32b51d0369321e4fb537a6118228c084b49dbb"
++    },
++    {
++      "path": "src/miniquake/protocol_serverdata.ml",
++      "sha256": "5e0ee92f883a7ecb64517b548ba6619d5dc3ccbba2ee95590ed7806f89f68afd"
++    },
++    {
++      "path": "src/miniquake/protocol_events.ml",
++      "sha256": "ccf55059d968765ece0a620770768c0c2c5ddee5bc533de16cff97a921753f43"
++    },
++    {
++      "path": "src/miniquake/protocol_transients.ml",
++      "sha256": "af88006eb71d30d1a95ac44009bade3d9e430b745055631d371d9ab5ac0ece53"
++    },
++    {
++      "path": "src/miniquake/protocol15_freeze.ml",
++      "sha256": "2d08eb161fc3347f6ca5f19d98bccbd1780425a2cc595c9a7a04eeb37c429dfc"
++    },
++    {
++      "path": "src/miniquake/client_protocol.ml",
++      "sha256": "e1bbb747078ba48fb9f547b9c59fa973967e86e363556cb637b0cf68ed9934d6"
++    },
++    {
++      "path": "src/miniquake/net_datagram.ml",
++      "sha256": "642f08bbbedd10baba6b288a3ca9979d20943c054e08858e57cf63d80b5e8f61"
++    },
++    {
++      "path": "src/miniquake/demo.ml",
++      "sha256": "93d11fc57fc7cf08c3d3b9280825e5e31bd2daadffd1443019c26414542b41db"
++    }
++  ]
++}
+diff --git a/build.ps1 b/build.ps1
+index 31e615dafdece63892953a8dccd72501b5f03dcc..6663043d340b92ac003b446399cdf11c7863bb95 100644
+--- a/build.ps1
++++ b/build.ps1
+@@ -26,10 +26,13 @@ $Root = $PSScriptRoot
+ $Output = Join-Path $Root "build"
+ $Source = Join-Path $Root "src"
+ $Parent = Split-Path -Parent $Root
+-$PackageId = "BP-018"
+-$ParentPackageId = "BP-017"
++$PackageId = "BP-019"
++$ParentPackageId = "BP-018"
+ $NativeTextAbi = "caller_owned_bytes_v1"
+ $ProtocolTextAbi = "quake_latin1_cstring_v1"
++$BlockId = "BP-015-019"
++$BlockParentPackageId = "BP-014R1"
++$ProtocolStatus = "protocol15_frozen_v1"
+ 
+ function Resolve-CommandOrFile {
+   param(
+@@ -306,7 +309,7 @@ New-Item -ItemType Directory -Force -Path $Output | Out-Null
+ 
+ # Remove all package targets before the first compile.  If the game target
+ # fails, executables and compile logs from the parent package cannot be mistaken
+-# for current BP-014R1 products by the result collector.
++# for current BP-019 products by the result collector.
+ $PackageBuildArtifacts = @(
+   "MiniQuake.exe",
+   "MiniQuakeTests.exe",
+@@ -320,7 +323,8 @@ $PackageBuildArtifacts = @(
+   "MiniQuakeProtocol15SignonTests.exe",
+   "MiniQuakeProtocol15DeliveryTests.exe",
+   "MiniQuakeProtocol15DatagramTests.exe",
+-  "MiniQuakeProtocol15DemoTests.exe"
++  "MiniQuakeProtocol15DemoTests.exe",
++  "MiniQuakeProtocol15ClosureTests.exe"
+ )
+ foreach ($ArtifactName in $PackageBuildArtifacts) {
+   foreach ($Candidate in @(
+@@ -438,6 +442,15 @@ if (-not $SkipPreflight -and $null -ne $PythonExe) {
+   if ($LASTEXITCODE -ne 0) {
+     throw "$PackageId Protocol 15 demo framing/recording/playback preflight failed."
+   }
++
++  $ProtocolClosureChecker = Join-Path $Root "tools\check_protocol15_closure.py"
++  if (-not (Test-Path -LiteralPath $ProtocolClosureChecker -PathType Leaf)) {
++    throw "Protocol 15 closure checker is missing: $ProtocolClosureChecker"
++  }
++  & $PythonExe @PythonPrefixArgs $ProtocolClosureChecker --root $Root
++  if ($LASTEXITCODE -ne 0) {
++    throw "$PackageId cumulative Protocol 15 closure/freeze preflight failed."
++  }
+ } elseif ($SkipPreflight) {
+   Write-Warning "$PackageId diagnostics preflight was explicitly skipped."
+ } else {
+@@ -513,7 +526,7 @@ if (-not $NoRunTests) {
+   Write-Host "[MiniQuake] checking executable package identity"
+   $VersionOutput = @(& $GameExe "--version" 2>&1)
+   $VersionExitCode = [int]$LASTEXITCODE
+-  $VersionOutput | Set-Content -LiteralPath (Join-Path $Output "bp018-build-version.txt") -Encoding UTF8
++  $VersionOutput | Set-Content -LiteralPath (Join-Path $Output "bp019-build-version.txt") -Encoding UTF8
+   $VersionOutput | ForEach-Object { Write-Host $_ }
+   if ($VersionExitCode -ne 0) {
+     throw "MiniQuake --version failed with exit code $VersionExitCode."
+@@ -530,6 +543,15 @@ if (-not $NoRunTests) {
+   if (-not (($VersionOutput -join "`n") -match [regex]::Escape("Protocol text ABI: $ProtocolTextAbi"))) {
+     throw "Compiled executable does not identify Protocol text ABI $ProtocolTextAbi."
+   }
++  if (-not (($VersionOutput -join "`n") -match [regex]::Escape("Block: $BlockId"))) {
++    throw "Compiled executable does not identify block $BlockId."
++  }
++  if (-not (($VersionOutput -join "`n") -match [regex]::Escape("Block parent package: $BlockParentPackageId"))) {
++    throw "Compiled executable does not identify block parent $BlockParentPackageId."
++  }
++  if (-not (($VersionOutput -join "`n") -match [regex]::Escape("Protocol status: $ProtocolStatus"))) {
++    throw "Compiled executable does not identify Protocol status $ProtocolStatus."
++  }
+ }
+ 
+ function Invoke-MiniQuakeTestBinary {
+@@ -571,6 +593,7 @@ $ProtocolSignonTestStatus = "SKIPPED"
+ $ProtocolDeliveryTestStatus = "SKIPPED"
+ $ProtocolDatagramTestStatus = "SKIPPED"
+ $ProtocolDemoTestStatus = "SKIPPED"
++$ProtocolClosureTestStatus = "SKIPPED"
+ $NetworkTestStatus = "SKIPPED"
+ 
+ if (-not $SkipTests) {
+@@ -637,6 +660,11 @@ if (-not $SkipTests) {
+   Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\protocol15_demo_tests.ml") -OutputFile $ProtocolDemoTestExe -CompilerArguments $CommonArgs -Label "protocol15-demo-tests"
+   $ProtocolDemoTestStatus = "COMPILED"
+ 
++  $ProtocolClosureTestExe = Join-Path $Output "MiniQuakeProtocol15ClosureTests.exe"
++  Write-Host "[MiniQuake] compiling $ProtocolClosureTestExe"
++  Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\protocol15_closure_tests.ml") -OutputFile $ProtocolClosureTestExe -CompilerArguments $CommonArgs -Label "protocol15-closure-tests"
++  $ProtocolClosureTestStatus = "COMPILED"
++
+   if (-not $NoRunTests) {
+     Invoke-MiniQuakeTestBinary `
+       -Label "core tests" `
+@@ -715,6 +743,13 @@ if (-not $SkipTests) {
+       -Executable $ProtocolDemoTestExe `
+       -ProgressHint "The last printed [NN/19] line identifies the active demo framing, recording, keepalive or timedemo fixture."
+     $ProtocolDemoTestStatus = "PASS"
++
++
++    Invoke-MiniQuakeTestBinary `
++      -Label "BP-019 Protocol 15 closure tests" `
++      -Executable $ProtocolClosureTestExe `
++      -ProgressHint "The last printed [NN/15] line identifies the active cross-layer Protocol 15 closure fixture."
++    $ProtocolClosureTestStatus = "PASS"
+   }
+ }
+ 
+@@ -731,6 +766,6 @@ if ($NetworkTests -and -not $NoRunTests) {
+   $NetworkTestStatus = "COMPILED-NOT-RUN"
+ }
+ 
+-Write-Host "[MiniQuake] test summary: core=$CoreTestStatus milestone=$MilestoneTestStatus diagnostics=$DiagnosticsTestStatus protocol15=$ProtocolTestStatus protocol15_commands=$ProtocolCommandTestStatus protocol15_serverdata=$ProtocolServerDataTestStatus protocol15_events=$ProtocolEventTestStatus protocol15_runtime_events=$ProtocolRuntimeEventTestStatus protocol15_signon=$ProtocolSignonTestStatus protocol15_delivery=$ProtocolDeliveryTestStatus protocol15_datagram=$ProtocolDatagramTestStatus protocol15_demo=$ProtocolDemoTestStatus network=$NetworkTestStatus"
++Write-Host "[MiniQuake] test summary: core=$CoreTestStatus milestone=$MilestoneTestStatus diagnostics=$DiagnosticsTestStatus protocol15=$ProtocolTestStatus protocol15_commands=$ProtocolCommandTestStatus protocol15_serverdata=$ProtocolServerDataTestStatus protocol15_events=$ProtocolEventTestStatus protocol15_runtime_events=$ProtocolRuntimeEventTestStatus protocol15_signon=$ProtocolSignonTestStatus protocol15_delivery=$ProtocolDeliveryTestStatus protocol15_datagram=$ProtocolDatagramTestStatus protocol15_demo=$ProtocolDemoTestStatus protocol15_closure=$ProtocolClosureTestStatus network=$NetworkTestStatus"
+ Write-Host "[MiniQuake] build completed: $GameExe"
+ exit 0
+diff --git a/docs/BP-014R1_ACCEPTANCE_ANALYSIS.md b/docs/BP-014R1_ACCEPTANCE_ANALYSIS.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..de6c1acddee8e1d4bc96f5177073020e180ec88c
+--- /dev/null
++++ b/docs/BP-014R1_ACCEPTANCE_ANALYSIS.md
+@@ -0,0 +1,27 @@
++# BP-014R1 – bestätigte Windows-Elternbasis
++
++Das Ergebnisarchiv `MiniQuake_BP-014R1_RESULTS_20260725-155308.zip` bestätigt:
++
++- Paket und Manifest: PASS
++- vollständiger Release-Build: PASS
++- Core: 16/16
++- Milestones: 24/24
++- deterministische Diagnosefixtures: 10/10
++- Protocol-Wire: 15/15
++- Command/Fast-Update: 14/14
++- Serverdaten: 17/17
++- Events: 22/22
++- Runtime-Events einschließlich Beam-State/View: 28/28
++- `id1/start`: PASS
++- 120 Headless-Frames: PASS
++- zwei unabhängige 64-Frame-Traces: byteidentisch
++- UDP-Loopback: PASS
++
++Deterministische Referenz:
++
++```text
++Trace SHA-256: f29015910ccba93d67e538dec986567ec30b4f6e42790ef946cdc935d1f49bd9
++Rolling Hash:  2688e0a1
++```
++
++Damit ist BP-014R1 die verbindliche Elternbasis des Blocks BP-015–BP-019.
+diff --git a/docs/BP-015-019_TESTING.md b/docs/BP-015-019_TESTING.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..e2712a1170e09a8ecccacc34713416dcbad46333
+--- /dev/null
++++ b/docs/BP-015-019_TESTING.md
+@@ -0,0 +1,52 @@
++# BP-015–BP-019 – Windows-Abnahme
++
++Das vollständige ZIP in einen **neuen, leeren Ordner** entpacken.
++
++```powershell
++.\TEST_BP-015-019.ps1 `
++  -Compiler C:\Users\nilsk\Desktop\MiniLangCompilerPy\mlc_win64.py `
++  -StdLib C:\Users\nilsk\Desktop\MiniLangCompilerPy `
++  -QuakeBase "C:\Program Files (x86)\Steam\steamapps\common\Quake" `
++  -Game id1 `
++  -Map start `
++  -Frames 300 `
++  -TraceFrames 128 `
++  -NetworkTests `
++  -ContinueIndependentTests `
++  -BisectOnFailure
++```
++
++Der Endstand BP-019 wird einmal gebaut. Danach laufen die unabhängigen
++Testprogramme weiter, auch wenn eine einzelne Gruppe fehlschlägt. Das logische
++Bisecting ordnet den ersten Fehler BP-015 bis BP-019 zu und verweist auf den
++passenden Teilpatch; es führt bewusst keinen zweiten Compilerlauf aus.
++
++Erwartete neue Erfolgsmeldungen:
++
++```text
++MiniQuake BP-015 Protocol 15 signon tests passed: 12
++MiniQuake BP-016 Protocol 15 delivery tests passed: 14
++MiniQuake BP-017 Protocol 15 datagram tests passed: 18
++MiniQuake BP-018 Protocol 15 demo tests passed: 19
++MiniQuake BP-019 Protocol 15 closure tests passed: 15
++MiniQuake BP-015-019 acceptance test: PASS
++```
++
++Zusätzlich müssen sämtliche Elternregressionen, 300 Headless-Frames, zwei
++untereinander byteidentische 128-Frame-Traces, Snapshot/Context/Summary und der
++UDP-Loopback bestehen.
++
++Nach jedem Lauf, auch nach einem Fehler:
++
++```powershell
++.\COLLECT_RESULTS.ps1
++```
++
++Das Ergebnisarchiv heißt ungefähr:
++
++```text
++build\MiniQuake_BP-015-019_RESULTS_YYYYMMDD-HHMMSS.zip
++```
++
++Es enthält Logs, Reports, Traces und Metadaten, aber keine Quake-Spieldaten und
++keine ausführbaren Binärdateien.
+diff --git a/docs/BP-015_SIGNON_AUDIT.md b/docs/BP-015_SIGNON_AUDIT.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..15d34d53bd1340ee1dc787cfb1c208dc365d5158
+--- /dev/null
++++ b/docs/BP-015_SIGNON_AUDIT.md
+@@ -0,0 +1,24 @@
++# BP-015 – Signon-Audit
++
++## Originalpfade
++
++- `cl_main.c:CL_SignonReply`
++- `cl_parse.c` – Signonnum und erstes Fast Update
++- `host_cmd.c:Host_PreSpawn_f`, `Host_Spawn_f`, `Host_Begin_f`
++- `sv_main.c:SV_SendClientMessages`
++- `protocol.h`
++
++## Gebundene Semantik
++
++1. Stufe 1 queueiert `prespawn`.
++2. Stufe 2 queueiert `name`, `color` und `spawn`.
++3. Stufe 3 queueiert `begin`.
++4. Stufe 4 schreibt keine Nachricht; das erste Fast Update aktiviert den Client.
++5. Client- und Server-Commandparser senden nicht selbst, sondern füllen den
++   jeweiligen Reliable-Puffer.
++6. Blockierte Verbindungen behalten die komplette Signon-Nachricht.
++7. `Host_Spawn_f` startet mit einem frischen Clientmessage-Puffer.
++
++Die sechs Goldenvektoren und sechs Semantikfälle stehen in
++`audit/protocol15_signon_golden.json`; zwölf Laufzeitfixtures prüfen Writer,
++Parser, Queuegrenzen und Transportphase.
+diff --git a/docs/BP-016_DELIVERY_AUDIT.md b/docs/BP-016_DELIVERY_AUDIT.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..5b932c166a41718547c46f355a60cb8357fcb855
+--- /dev/null
++++ b/docs/BP-016_DELIVERY_AUDIT.md
+@@ -0,0 +1,29 @@
++# BP-016 – Delivery-Audit
++
++## Originalpfade
++
++- `cl_main.c:CL_SendCmd`
++- `sv_main.c:SV_SendClientMessages`, `SV_SendNop`
++- `host.c:SV_DropClient`
++- `net_main.c`
++
++## Zustände
++
++`protocol_delivery.ml` unterscheidet:
++
++```text
++SEND_DROP   – fataler Sendefehler oder ungültige Verbindung
++SEND_RETAIN – blockiert beziehungsweise temporär nicht committed
++SEND_COMMIT – Wire-Send wurde übernommen; Puffer darf geleert werden
++```
++
++Die Prüfung bindet insbesondere:
++
++- kein Leeren bei Sendresultat `0`,
++- Overflow vor `dropasap`,
++- blockierter Drop bleibt pending,
++- Signon-Keepalive erst bei streng mehr als fünf Sekunden,
++- normale Reliable-Nachricht, Signonanforderung und Keepalive bleiben getrennt,
++- Client und Server verwenden denselben Commitvertrag.
++
++14 Oraclefälle und 14 MiniLang-Fixtures bilden die Grenze ab.
+diff --git a/docs/BP-017_DATAGRAM_AUDIT.md b/docs/BP-017_DATAGRAM_AUDIT.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..79d910b014cd975097c411a81ca4839b82a275b9
+--- /dev/null
++++ b/docs/BP-017_DATAGRAM_AUDIT.md
+@@ -0,0 +1,27 @@
++# BP-017 – Datagramm-Audit
++
++## Originalpfade
++
++- `net_dgrm.c`
++- `net.h`
++- `net_main.c`
++
++## Wesentliche Korrektur
++
++Ein ACK für ein Reliable-Fragment darf im reinen Kanalmodell nicht sofort ein
++Folgepaket erzeugen, das der Transport unbemerkt verliert. Es setzt `sendNext`.
++Der Socketbesitzer verarbeitet zunächst den Receive-Loop und flusht danach mit
++`Datagram_FlushSendNext` das nächste Fragment.
++
++## Gebundene Grenzen
++
++- 32-Bit-Sequenz-Wrap,
++- 1024-Byte-Fragmentgrenze und End-of-message-Bit,
++- maximal acht Fragmente für `NET_MAXMESSAGE`,
++- ACK, Duplikat-ACK und erneutes ACK bei doppelten Daten,
++- Retransmission erst bei streng mehr als einer Sekunde,
++- Unreliable-Paketlücken,
++- Receive-Overflow,
++- nebenwirkungsfreie `CanSendMessage`-Abfrage.
++
++Das Goldenmodell enthält 18 Fälle; die MiniLang-Suite ebenfalls 18 Fixtures.
+diff --git a/docs/BP-018_DEMO_AUDIT.md b/docs/BP-018_DEMO_AUDIT.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..600a473daa80101d26735ba7c024a06988fdbbe5
+--- /dev/null
++++ b/docs/BP-018_DEMO_AUDIT.md
+@@ -0,0 +1,22 @@
++# BP-018 – Demo-Audit
++
++## Originalpfade
++
++- `cl_demo.c`
++- `cl_main.c:CL_GetMessage`
++- `host.c` – Record-Commandintegration
++
++## Gebundene Semantik
++
++- erste Zeile: C-`atoi`-kompatibler CD-Track,
++- pro Frame: little-endian 32-Bit-Länge, drei Binary32-Viewangles, Payload,
++- Payload bis einschließlich `MAX_MSGLEN`,
++- isoliertes `svc_nop` wird vor Parser und Recorder verworfen,
++- compound NOP-Payload bleibt erhalten,
++- `CL_Stop_f` schreibt `svc_disconnect`,
++- optionaler Mapwechsel erfolgt vor dem Öffnen der Demodatei,
++- Timedemo schließt den ersten Startframe aus,
++- abgeschnittene und übergroße Frames werden kontrolliert abgelehnt.
++
++Das Oracle bindet elf Semantikzeilen und einen vollständigen Framevektor;
++19 MiniLang-Fixtures prüfen Roundtrip und Fehlergrenzen.
+diff --git a/docs/BP-019_PROTOCOL15_CLOSURE_AUDIT.md b/docs/BP-019_PROTOCOL15_CLOSURE_AUDIT.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ebdaf9ae872862cbf84439314c0aad69e99c1110
+--- /dev/null
++++ b/docs/BP-019_PROTOCOL15_CLOSURE_AUDIT.md
+@@ -0,0 +1,42 @@
++# BP-019 – Protocol-15-Abschlussaudit
++
++## Freeze-Contract
++
++| Bestandteil | Wert |
++|---|---:|
++| Protocol-Version | 15 |
++| gültige `svc_*`-Kommandos | 33 |
++| gültige `clc_*`-Kommandos | 4 |
++| Fast-Update-Maske | `0x7fff` |
++| Clientdata-Maske | `0x7eff` |
++| Soundmaske | `0x0007` |
++| Temporary-Entity-Typen | 14 |
++| Contract-Fingerprint | `0x0cf1e12a` |
++| Status | `protocol15_frozen_v1` |
++
++`audit/protocol15_freeze.json` enthält zusätzlich SHA-256-Werte der 15
++autoritativen MiniLang-Dateien. Eine unbeabsichtigte Änderung dieser Schicht
++wird dadurch im Closure-Checker sichtbar.
++
++## Cross-Layer-Test
++
++Eine Nachricht größer als `MAX_DATAGRAM` wird:
++
++1. aus `svc_time`, langem `svc_print` und Fast Entity Update aufgebaut,
++2. zuverlässig in zwei Datagrammfragmente zerlegt,
++3. per ACK vollständig rekonstruiert,
++4. als Quake-Demoframe serialisiert,
++5. wieder gelesen und durch den Clientparser ausgewertet.
++
++Der Test verlangt Byteidentität an der Datagrammgrenze und die erwartete
++Ereignisreihenfolge nach Demo- und Parserroundtrip. Weitere Fixtures binden
++Signon, reservierte Befehle, Sequence-Wrap, NOP/Disconnect, Wiederholungs-
++Determinismus und die relevanten Größenlimits.
++
++## Bedeutung des Freeze
++
++Nach einer grünen Windows-Abnahme wird Protocol 15 im definierten
++`compat_109`-Profil nur noch geändert, wenn ein reproduzierbarer
++Kompatibilitätsfehler oder eine fehlende Originalsemantik nachgewiesen wird.
++Der Freeze ist source-guided. Ein Original-Quake-Binärinterop über mehrere
++Prozesse ist als späteres externes Gate ausdrücklich noch nicht behauptet.
+diff --git a/scripts/validate_real_game.ps1 b/scripts/validate_real_game.ps1
+index a970e380f7c505c7394e66069e68239d7289e32d..9d39526ab329927cc765f7774570abfb6a590b4e 100644
+--- a/scripts/validate_real_game.ps1
++++ b/scripts/validate_real_game.ps1
+@@ -5,20 +5,21 @@ param(
+ 
+   [string]$Map = "start",
+   [string]$Game = "id1",
+-  [int]$Frames = 720,
+-  [int]$TraceFrames = 64,
++  [int]$Frames = 300,
++  [int]$TraceFrames = 128,
+   [string]$Compiler = "",
+   [string]$StdLib = "",
+   [string]$Python = "",
+   [switch]$SkipBuild,
+-  [switch]$NetworkTests
++  [switch]$NetworkTests,
++  [switch]$BisectOnFailure
+ )
+ 
+ $ErrorActionPreference = "Stop"
+ Set-StrictMode -Version Latest
+ 
+ $Root = Split-Path -Parent $PSScriptRoot
+-$TestScript = Join-Path $Root "TEST_BP-014R1.ps1"
++$TestScript = Join-Path $Root "TEST_BP-015-019.ps1"
+ $PowerShellExecutable = (Get-Process -Id $PID).Path
+ $Arguments = @(
+   "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $TestScript,
+@@ -33,6 +34,7 @@ if (-not [string]::IsNullOrWhiteSpace($StdLib)) { $Arguments += @("-StdLib", $St
+ if (-not [string]::IsNullOrWhiteSpace($Python)) { $Arguments += @("-Python", $Python) }
+ if ($SkipBuild) { $Arguments += "-SkipBuild" }
+ if ($NetworkTests) { $Arguments += "-NetworkTests" }
++if ($BisectOnFailure) { $Arguments += "-BisectOnFailure" }
+ 
+ & $PowerShellExecutable @Arguments
+ $ExitCode = [int]$LASTEXITCODE
+diff --git a/src/main.ml b/src/main.ml
+index 575a728ccc84c16f2ab053be5ac4a19ca2695e14..2a4928c2dd1b8a0f2fc5ac5147ccc9382b5d9b44 100644
+--- a/src/main.ml
++++ b/src/main.ml
+@@ -361,6 +361,9 @@ function runSelfCheck()
+   print "MiniQuake " + c.QUAKE_VERSION + " / protocol " + c.PROTOCOL_VERSION
+   print "Package: " + buildInfo.PACKAGE_ID
+   print "Parent package: " + buildInfo.PARENT_PACKAGE_ID
++  print "Block: " + buildInfo.BLOCK_ID
++  print "Block parent package: " + buildInfo.BLOCK_PARENT_PACKAGE_ID
++  print "Protocol status: " + buildInfo.PROTOCOL_STATUS
+   print "Package purpose: " + buildInfo.PACKAGE_PURPOSE
+   print "Compatibility profile: " + buildInfo.COMPATIBILITY_PROFILE
+   print "Native text ABI: " + buildInfo.NATIVE_TEXT_ABI
+@@ -368,7 +371,7 @@ function runSelfCheck()
+   print "Package date: " + buildInfo.PACKAGE_DATE
+   print "Baseline archive SHA-256: " + buildInfo.BASE_ARCHIVE_SHA256
+   print "Core CRC self-check: 0x" + hex(bytes([(check >> 8) & 255, check & 255]))
+-  print "Port status: BP-018 Protocol 15 demo framing, recording and playback parity; see PORT_STATUS.md and PORT_LEDGER.json."
++  print "Port status: BP-019 closes block BP-015-019 and freezes the audited Protocol 15 contract; see PORT_STATUS.md, BLOCK_LEDGER.json and PORT_LEDGER.json."
+   return 0
+ end function
+ 
+diff --git a/src/miniquake/build_info.ml b/src/miniquake/build_info.ml
+index f236bffdcb53f638455008686434a8ce2b2534dd..6e3856a6dbcf3c2a8727b89b8a5175cf499482af 100644
+--- a/src/miniquake/build_info.ml
++++ b/src/miniquake/build_info.ml
+@@ -8,8 +8,8 @@ back to an exact source baseline.
+ 
+ package miniquake.build_info
+ 
+-const PACKAGE_ID = "BP-018"
+-const PARENT_PACKAGE_ID = "BP-017"
++const PACKAGE_ID = "BP-019"
++const PARENT_PACKAGE_ID = "BP-018"
+ const PACKAGE_DATE = "2026-07-25"
+ const COMPATIBILITY_PROFILE = "compat_109"
+ const NATIVE_TEXT_ABI = "caller_owned_bytes_v1"
+@@ -17,4 +17,7 @@ const PROTOCOL_TEXT_ABI = "quake_latin1_cstring_v1"
+ const BASE_ARCHIVE = "MiniQuake_Source24.07.2026.zip"
+ const BASE_ARCHIVE_SHA256 = "bb2b5bf173fe687cada6e7fec2dcdb8b2099589f2ebc039417a5571ced9729d3"
+ const MANIFEST_FORMAT = 1
+-const PACKAGE_PURPOSE = "Protocol 15 demo framing, recording and playback parity"
++const BLOCK_ID = "BP-015-019"
++const BLOCK_PARENT_PACKAGE_ID = "BP-014R1"
++const PROTOCOL_STATUS = "protocol15_frozen_v1"
++const PACKAGE_PURPOSE = "Protocol 15 cumulative closure, source-guided parity audit and frozen compatibility contract"
+diff --git a/src/miniquake/protocol15_freeze.ml b/src/miniquake/protocol15_freeze.ml
+new file mode 100644
+index 0000000000000000000000000000000000000000..9f15c8e8e2495150222590a96b6ae17e1645ff49
+--- /dev/null
++++ b/src/miniquake/protocol15_freeze.ml
+@@ -0,0 +1,138 @@
++/*
++Copyright (C) 1996-1997 Id Software, Inc.
++Copyright (C) 2026 MiniQuake contributors
++
++Protocol-15 closure metadata.  BP-019 freezes the observable WinQuake 1.09
++wire contract after the source-guided BP-010..BP-018 audit.  This module does
++not replace the production writers/parsers; it gives tests and diagnostics one
++canonical catalog and fingerprint for the constants that define the protocol.
++*/
++
++package miniquake.protocol15_freeze
++
++import miniquake.constants as c
++
++const STATUS = "protocol15_frozen_v1"
++const PROTOCOL_VERSION = 15
++const SVC_VALID_COUNT = 33
++const CLC_VALID_COUNT = 4
++const FAST_UPDATE_MASK = 0x7fff
++const CLIENT_DATA_MASK = 0x7eff
++const SOUND_MASK = 0x0007
++const TEMP_ENTITY_COUNT = 14
++const FINGERPRINT = 0x0cf1e12a
++
++function validSvcCommands()
++  return [
++    1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
++    11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
++    22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
++    32, 33, 34,
++  ]
++end function
++
++function validClcCommands()
++  return [1, 2, 3, 4]
++end function
++
++function fastUpdateBits()
++  return [
++    c.U_MOREBITS, c.U_ORIGIN1, c.U_ORIGIN2, c.U_ORIGIN3,
++    c.U_ANGLE2, c.U_NOLERP, c.U_FRAME, c.U_SIGNAL,
++    c.U_ANGLE1, c.U_ANGLE3, c.U_MODEL, c.U_COLORMAP,
++    c.U_SKIN, c.U_EFFECTS, c.U_LONGENTITY,
++  ]
++end function
++
++function clientDataBits()
++  return [
++    c.SU_VIEWHEIGHT, c.SU_IDEALPITCH,
++    c.SU_PUNCH1, c.SU_PUNCH2, c.SU_PUNCH3,
++    c.SU_VELOCITY1, c.SU_VELOCITY2, c.SU_VELOCITY3,
++    c.SU_ITEMS, c.SU_ONGROUND, c.SU_INWATER,
++    c.SU_WEAPONFRAME, c.SU_ARMOR, c.SU_WEAPON,
++  ]
++end function
++
++function soundBits()
++  return [c.SND_VOLUME, c.SND_ATTENUATION, c.SND_LOOPING]
++end function
++
++function temporaryEntityTypes()
++  return [
++    c.TE_SPIKE, c.TE_SUPERSPIKE, c.TE_GUNSHOT, c.TE_EXPLOSION,
++    c.TE_TAREXPLOSION, c.TE_LIGHTNING1, c.TE_LIGHTNING2,
++    c.TE_WIZSPIKE, c.TE_KNIGHTSPIKE, c.TE_LIGHTNING3,
++    c.TE_LAVASPLASH, c.TE_TELEPORT, c.TE_EXPLOSION2, c.TE_BEAM,
++  ]
++end function
++
++function contains(values, wanted)
++  for each value in values
++    if value == wanted then return true end if
++  end for
++  return false
++end function
++
++function isValidSvc(command)
++  return contains(validSvcCommands(), command)
++end function
++
++function isReservedSvc(command)
++  return command == c.SVC_BAD or command == c.SVC_SPAWNBINARY
++end function
++
++function isValidClc(command)
++  return contains(validClcCommands(), command)
++end function
++
++function combineMask(values)
++  result = 0
++  for each value in values
++    result = result | value
++  end for
++  return result
++end function
++
++function fingerprintValue(current, value)
++  return ((current ^ (value & 0xffffffff)) * 16777619) & 0xffffffff
++end function
++
++function fingerprintValues(current, values)
++  result = current
++  for each value in values
++    result = fingerprintValue(result, value)
++  end for
++  return result
++end function
++
++function protocolFingerprint()
++  result = 2166136261
++  result = fingerprintValue(result, c.PROTOCOL_VERSION)
++  result = fingerprintValue(result, 0x535643)
++  result = fingerprintValues(result, validSvcCommands())
++  result = fingerprintValue(result, 0x434c43)
++  result = fingerprintValues(result, validClcCommands())
++  result = fingerprintValue(result, 0x55424954)
++  result = fingerprintValues(result, fastUpdateBits())
++  result = fingerprintValue(result, 0x53554249)
++  result = fingerprintValues(result, clientDataBits())
++  result = fingerprintValue(result, 0x534e44)
++  result = fingerprintValues(result, soundBits())
++  result = fingerprintValue(result, 0x5445)
++  result = fingerprintValues(result, temporaryEntityTypes())
++  return result
++end function
++
++function coverageSummary()
++  return [
++    c.PROTOCOL_VERSION,
++    len(validSvcCommands()),
++    len(validClcCommands()),
++    combineMask(fastUpdateBits()),
++    combineMask(clientDataBits()),
++    combineMask(soundBits()),
++    len(temporaryEntityTypes()),
++    protocolFingerprint(),
++  ]
++end function
+diff --git a/tests/protocol15_closure_tests.ml b/tests/protocol15_closure_tests.ml
+new file mode 100644
+index 0000000000000000000000000000000000000000..ca76e0005c594e8cd2ec54ee3107baff77098128
+--- /dev/null
++++ b/tests/protocol15_closure_tests.ml
+@@ -0,0 +1,332 @@
++/*
++Copyright (C) 1996-1997 Id Software, Inc.
++Copyright (C) 2026 MiniQuake contributors
++
++BP-019 closure fixtures stitch the source-guided Protocol-15 layers together:
++wire primitives, command catalogs, signon, reliable scheduling, datagram
++fragmentation, demo framing and client parsing.  Component suites remain the
++fine-grained oracle; this file is the final cross-layer freeze gate.
++*/
++
++import miniquake.types as t
++import miniquake.constants as c
++import miniquake.sizebuf as sz
++import miniquake.message as msg
++import miniquake.protocol15_freeze as freeze
++import miniquake.protocol_signon as signon
++import miniquake.protocol_delivery as delivery
++import miniquake.protocol_update as update
++import miniquake.client_protocol as protocol
++import miniquake.net_datagram as datagram
++import miniquake.demo as demo
++
++function equal(actual, expected, name)
++  if actual != expected then return error(9900, name + ": expected " + expected + ", got " + actual) end if
++  return true
++end function
++
++function yes(value, name)
++  if value != true then return error(9901, name + ": expected true") end if
++  return true
++end function
++
++function no(value, name)
++  if value != false then return error(9902, name + ": expected false") end if
++  return true
++end function
++
++function run(number, name, fn)
++  print "  [" + number + "/15] " + name
++  result = try(fn())
++  if result is error then
++    print "    FAIL: " + result.message
++    return false
++  end if
++  return true
++end function
++
++function baseline()
++  return t.EntityBaseline(
++    1, 0, 0, 0, 0,
++    t.Vec3(0.0, 0.0, 0.0),
++    t.Vec3(0.0, 0.0, 0.0),
++  )
++end function
++
++function testFreezeIdentity()
++  equal(freeze.STATUS, "protocol15_frozen_v1", "freeze status")
++  equal(freeze.PROTOCOL_VERSION, c.PROTOCOL_VERSION, "protocol version")
++  equal(freeze.protocolFingerprint(), freeze.FINGERPRINT, "protocol fingerprint")
++  equal(freeze.FINGERPRINT, 217178410, "golden fingerprint")
++  return true
++end function
++
++function testSvcCatalog()
++  values = freeze.validSvcCommands()
++  equal(len(values), 33, "SVC count")
++  equal(values[0], c.SVC_NOP, "first valid SVC")
++  equal(values[19], c.SVC_SPAWNSTATIC, "pre-gap SVC")
++  equal(values[20], c.SVC_SPAWNBASELINE, "post-gap SVC")
++  equal(values[32], c.SVC_CUTSCENE, "last valid SVC")
++  index = 0
++  while index < len(values)
++    yes(freeze.isValidSvc(values[index]), "valid SVC " + index)
++    index = index + 1
++  end while
++  no(freeze.isValidSvc(c.SVC_BAD), "svc_bad invalid")
++  no(freeze.isValidSvc(c.SVC_SPAWNBINARY), "svc_spawnbinary invalid")
++  yes(freeze.isReservedSvc(c.SVC_BAD), "svc_bad reserved")
++  yes(freeze.isReservedSvc(c.SVC_SPAWNBINARY), "svc_spawnbinary reserved")
++  return true
++end function
++
++function testClcCatalog()
++  values = freeze.validClcCommands()
++  equal(len(values), 4, "CLC count")
++  index = 0
++  while index < len(values)
++    equal(values[index], index + 1, "CLC ordering " + index)
++    yes(freeze.isValidClc(values[index]), "valid CLC " + index)
++    index = index + 1
++  end while
++  no(freeze.isValidClc(c.CLC_BAD), "clc_bad invalid")
++  no(freeze.isValidClc(5), "unknown CLC invalid")
++  return true
++end function
++
++function testBitMasks()
++  equal(freeze.combineMask(freeze.fastUpdateBits()), 0x7fff, "fast update mask")
++  equal(freeze.combineMask(freeze.clientDataBits()), 0x7eff, "client data mask")
++  equal(freeze.combineMask(freeze.soundBits()), 0x0007, "sound mask")
++  equal(freeze.FAST_UPDATE_MASK, 0x7fff, "frozen fast update mask")
++  equal(freeze.CLIENT_DATA_MASK, 0x7eff, "frozen client data mask")
++  equal(freeze.SOUND_MASK, 7, "frozen sound mask")
++  return true
++end function
++
++function testTemporaryEntityCatalog()
++  values = freeze.temporaryEntityTypes()
++  equal(len(values), 14, "temporary entity count")
++  index = 0
++  while index < len(values)
++    equal(values[index], index, "temporary entity ordering " + index)
++    index = index + 1
++  end while
++  equal(values[13], c.TE_BEAM, "last temporary entity")
++  return true
++end function
++
++function testReservedServerCommands()
++  yes(try(protocol.parse(bytes([c.SVC_BAD]))) is error, "svc_bad rejected")
++  yes(try(protocol.parse(bytes([c.SVC_SPAWNBINARY]))) is error, "spawnbinary rejected")
++  yes(try(protocol.parse(bytes([35]))) is error, "unknown SVC rejected")
++  return true
++end function
++
++function testSignonWireSequence()
++  buffer = sz.alloc(1024)
++  first = signon.writeClientReply(buffer, c.SIGNON_SERVERINFO, "player", 0x4f, "")
++  second = signon.writeClientReply(buffer, c.SIGNON_PRESPAWN, "player", 0x4f, "spawn-parms")
++  third = signon.writeClientReply(buffer, c.SIGNON_SPAWN, "player", 0x4f, "")
++  fourth = signon.writeClientReply(buffer, c.SIGNON_ACTIVE, "player", 0x4f, "")
++  yes(first > 0, "stage one queued")
++  yes(second > first, "stage two compound reply")
++  yes(third > 0, "stage three queued")
++  equal(fourth, 0, "stage four local only")
++  data = sz.dataSlice(buffer)
++  equal(data[0], c.CLC_STRINGCMD, "first signon command")
++  parsed = msg.beginReadingBytes(data)
++  commands = 0
++  while msg.remaining(parsed) > 0
++    equal(msg.readChar(parsed), c.CLC_STRINGCMD, "signon CLC opcode")
++    text = msg.readString(parsed)
++    yes(len(bytes(text)) > 0, "signon command text")
++    commands = commands + 1
++  end while
++  equal(commands, 5, "queued signon command count")
++  return true
++end function
++
++function testDeliveryBoundaries()
++  equal(delivery.clientReliablePlan(true, 1, false), delivery.SEND_RETAIN, "blocked client retains")
++  equal(delivery.clientReliablePlan(true, 1, true), delivery.SEND_COMMIT, "sendable client commits")
++  equal(delivery.reliableSendOutcome(-1), delivery.SEND_DROP, "negative send drops")
++  equal(delivery.reliableSendOutcome(0), delivery.SEND_RETAIN, "zero send retains")
++  equal(delivery.reliableSendOutcome(1), delivery.SEND_COMMIT, "positive send commits")
++  no(delivery.keepaliveDue(5.0), "exact five seconds")
++  yes(delivery.keepaliveDue(5.0001), "above five seconds")
++  return true
++end function
++
++function testFastUpdateSignal()
++  buffer = sz.alloc(64)
++  item = baseline()
++  bits = update.writeFastUpdate(
++    buffer, 1, item, 1, 0, 0, 0, 0,
++    t.Vec3(0.0, 0.0, 0.0),
++    t.Vec3(0.0, 0.0, 0.0),
++    c.MOVETYPE_NONE,
++  )
++  equal(bits, 0, "unchanged update bits")
++  equal(hex(sz.dataSlice(buffer)), "8001", "signal-only update")
++  parsed = protocol.parse(sz.dataSlice(buffer))
++  equal(parsed.events[0].command, "fast_update", "fast update parser")
++  equal(parsed.events[0].payload[0], 1, "fast update entity")
++  return true
++end function
++
++function buildClosureMessage()
++  buffer = sz.alloc(2048)
++  msg.writeByte(buffer, c.SVC_TIME)
++  msg.writeFloat(buffer, 12.5)
++  msg.writeByte(buffer, c.SVC_PRINT)
++  msg.writeString(buffer, decode(bytes(1050, 65)))
++  item = baseline()
++  update.writeFastUpdate(
++    buffer, 1, item, 1, 0, 0, 0, 0,
++    t.Vec3(0.0, 0.0, 0.0),
++    t.Vec3(0.0, 0.0, 0.0),
++    c.MOVETYPE_NONE,
++  )
++  return sz.dataSlice(buffer)
++end function
++
++function transferReliable(payload)
++  sender = datagram.createChannel()
++  receiver = datagram.createChannel()
++  packet = datagram.Datagram_SendMessage(sender, payload, 1.0)
++  complete = void
++  fragments = 0
++  while packet is bytes
++    fragments = fragments + 1
++    received = datagram.Datagram_GetMessage(receiver, packet, 1.0 + fragments * 0.1)
++    if received is error then return received end if
++    if received[0] == 1 then complete = received[1] end if
++    if received[2] is bytes then
++      acked = datagram.Datagram_GetMessage(sender, received[2], 1.0 + fragments * 0.1 + 0.01)
++      if acked is error then return acked end if
++    end if
++    packet = datagram.Datagram_FlushSendNext(sender, 1.0 + fragments * 0.1 + 0.01)
++  end while
++  return [complete, fragments, sender.canSend]
++end function
++
++function testDatagramDemoParserClosure()
++  original = buildClosureMessage()
++  yes(len(original) > datagram.MAX_DATAGRAM, "closure message fragments")
++  transferred = transferReliable(original)
++  if transferred is error then return transferred end if
++  yes(transferred[0] is bytes, "reliable message completed")
++  equal(transferred[1], 2, "reliable fragment count")
++  yes(transferred[2], "sender released after final ACK")
++  equal(hex(transferred[0]), hex(original), "datagram payload identity")
++
++  recording = t.Demo(-1, [], "-1\n")
++  demo.CL_WriteDemoMessage(recording, transferred[0], t.Vec3(1.0, 2.0, 3.0))
++  replay = demo.parse(demo.serialize(recording))
++  equal(len(replay.messages), 1, "demo message count")
++  parsed = protocol.parse(replay.messages[0].payload)
++  equal(len(parsed.events), 3, "cross-layer event count")
++  equal(parsed.events[0].command, "svc_time", "cross-layer time")
++  equal(parsed.events[1].command, "svc_print", "cross-layer print")
++  equal(len(bytes(parsed.events[1].payload)), 1050, "cross-layer long string")
++  equal(parsed.events[2].command, "fast_update", "cross-layer update")
++  return true
++end function
++
++function testDemoKeepaliveAndDisconnect()
++  yes(demo.isKeepalivePayload(bytes([c.SVC_NOP])), "isolated keepalive")
++  no(demo.isKeepalivePayload(bytes([c.SVC_NOP, c.SVC_NOP])), "compound payload retained")
++  recording = t.Demo(-1, [], "-1\n")
++  stopped = demo.CL_Stop_f(recording, t.Vec3(0.0, 0.0, 0.0))
++  yes(stopped is not error, "demo stop succeeds")
++  equal(hex(recording.messages[0].payload), "02", "demo stop disconnect")
++  return true
++end function
++
++function testSequenceWrap()
++  channel = datagram.createChannel()
++  channel.sendSequence = 0xffffffff
++  packet = datagram.reliable(channel, bytes([1]), true)
++  equal(datagram.decodePacket(packet).sequence, 0xffffffff, "wire wrap sequence")
++  equal(channel.sendSequence, 0, "next sequence wraps")
++  equal(datagram.previousSequence(0), 0xffffffff, "previous sequence wraps")
++  return true
++end function
++
++function closureScenarioHex()
++  payload = buildClosureMessage()
++  transferred = transferReliable(payload)
++  if transferred is error then return transferred end if
++  recording = t.Demo(7, [], "7\n")
++  demo.CL_WriteDemoMessage(recording, transferred[0], t.Vec3(4.0, 5.0, 6.0))
++  return hex(demo.serialize(recording))
++end function
++
++function testDeterministicClosureScenario()
++  first = closureScenarioHex()
++  if first is error then return first end if
++  second = closureScenarioHex()
++  if second is error then return second end if
++  equal(first, second, "independent closure scenario")
++  return true
++end function
++
++function testCoverageSummary()
++  summary = freeze.coverageSummary()
++  equal(len(summary), 8, "summary fields")
++  equal(summary[0], 15, "summary protocol")
++  equal(summary[1], 33, "summary SVC")
++  equal(summary[2], 4, "summary CLC")
++  equal(summary[3], 0x7fff, "summary U mask")
++  equal(summary[4], 0x7eff, "summary SU mask")
++  equal(summary[5], 7, "summary sound mask")
++  equal(summary[6], 14, "summary TE")
++  equal(summary[7], freeze.FINGERPRINT, "summary fingerprint")
++  return true
++end function
++
++function testProtocolLimits()
++  equal(c.MAX_MSGLEN, 8000, "MAX_MSGLEN")
++  equal(c.MAX_DATAGRAM, 1024, "MAX_DATAGRAM")
++  equal(c.MAX_EDICTS, 600, "MAX_EDICTS")
++  equal(datagram.NET_MAXMESSAGE, 8192, "NET_MAXMESSAGE")
++  return true
++end function
++
++function testFingerprintMutationSensitivity()
++  original = freeze.protocolFingerprint()
++  changed = freeze.fingerprintValue(original, c.SVC_CUTSCENE + 1)
++  if changed == original then return error(9903, "fingerprint ignored mutation") end if
++  equal(freeze.protocolFingerprint(), original, "fingerprint remains stable")
++  return true
++end function
++
++function testLimitsAndFingerprint()
++  testProtocolLimits()
++  testFingerprintMutationSensitivity()
++  return true
++end function
++
++passed = 0
++if run(1, "freeze identity and fingerprint", testFreezeIdentity) then passed = passed + 1 end if
++if run(2, "complete SVC catalog", testSvcCatalog) then passed = passed + 1 end if
++if run(3, "complete CLC catalog", testClcCatalog) then passed = passed + 1 end if
++if run(4, "Protocol 15 bit masks", testBitMasks) then passed = passed + 1 end if
++if run(5, "temporary-entity catalog", testTemporaryEntityCatalog) then passed = passed + 1 end if
++if run(6, "reserved server commands", testReservedServerCommands) then passed = passed + 1 end if
++if run(7, "signon command sequence", testSignonWireSequence) then passed = passed + 1 end if
++if run(8, "reliable delivery boundaries", testDeliveryBoundaries) then passed = passed + 1 end if
++if run(9, "fast-update signal", testFastUpdateSignal) then passed = passed + 1 end if
++if run(10, "datagram-demo-parser closure", testDatagramDemoParserClosure) then passed = passed + 1 end if
++if run(11, "demo keepalive and disconnect", testDemoKeepaliveAndDisconnect) then passed = passed + 1 end if
++if run(12, "datagram sequence wrap", testSequenceWrap) then passed = passed + 1 end if
++if run(13, "deterministic closure scenario", testDeterministicClosureScenario) then passed = passed + 1 end if
++if run(14, "coverage summary", testCoverageSummary) then passed = passed + 1 end if
++if run(15, "limits and fingerprint sensitivity", testLimitsAndFingerprint) then passed = passed + 1 end if
++
++if passed != 15 then
++  print "MiniQuake BP-019 Protocol 15 closure tests failed: " + passed + "/15"
++  error(9999, "BP-019 Protocol 15 closure fixtures failed")
++end if
++print "MiniQuake BP-019 Protocol 15 closure tests passed: 15"
+diff --git a/tools/check_protocol15_closure.py b/tools/check_protocol15_closure.py
+new file mode 100755
+index 0000000000000000000000000000000000000000..cfab5308acaa641aa2800ae6036951a0ae069185
+--- /dev/null
++++ b/tools/check_protocol15_closure.py
+@@ -0,0 +1,339 @@
++#!/usr/bin/env python3
++"""Verify the cumulative BP-015..BP-019 Protocol 15 closure and freeze."""
++from __future__ import annotations
++
++import argparse
++import hashlib
++import json
++import os
++import re
++import shutil
++import subprocess
++import tempfile
++from pathlib import Path
++
++PACKAGE_ID = "BP-019"
++PARENT_PACKAGE_ID = "BP-018"
++BLOCK_ID = "BP-015-019"
++BLOCK_PARENT = "BP-014R1"
++SCHEMA = "MiniQuakeProtocol15ClosureGolden/1"
++REPORT = "MiniQuakeBP019Protocol15ClosureVerification/1"
++GOLDEN = "audit/protocol15_closure_golden.json"
++FREEZE = "audit/protocol15_freeze.json"
++ORACLE = "tools/oracle/protocol15_closure_oracle.c"
++STATUS = "protocol15_frozen_v1"
++RUNTIME_FIXTURES = 15
++
++AUTHORITATIVE_FILES = [
++    "src/miniquake/constants.ml",
++    "src/miniquake/sizebuf.ml",
++    "src/miniquake/message.ml",
++    "src/miniquake/protocol_text.ml",
++    "src/miniquake/protocol_write.ml",
++    "src/miniquake/protocol_signon.ml",
++    "src/miniquake/protocol_delivery.ml",
++    "src/miniquake/protocol_update.ml",
++    "src/miniquake/protocol_serverdata.ml",
++    "src/miniquake/protocol_events.ml",
++    "src/miniquake/protocol_transients.ml",
++    "src/miniquake/protocol15_freeze.ml",
++    "src/miniquake/client_protocol.ml",
++    "src/miniquake/net_datagram.ml",
++    "src/miniquake/demo.ml",
++]
++
++COMPONENT_CHECKERS = [
++    ("BP-010R1", "tools/check_protocol15_vectors.py"),
++    ("BP-011", "tools/check_protocol15_commands.py"),
++    ("BP-012R1", "tools/check_protocol15_serverdata.py"),
++    ("BP-013", "tools/check_protocol15_events.py"),
++    ("BP-014R1", "tools/check_protocol15_runtime_events.py"),
++    ("BP-015", "tools/check_protocol15_signon.py"),
++    ("BP-016", "tools/check_protocol15_delivery.py"),
++    ("BP-017", "tools/check_protocol15_datagram.py"),
++    ("BP-018", "tools/check_protocol15_demo.py"),
++]
++
++
++def sha(path: Path) -> str:
++    return hashlib.sha256(path.read_bytes()).hexdigest()
++
++
++def values() -> dict[str, list[int]]:
++    return {
++        "svc": list(range(1, 21)) + list(range(22, 35)),
++        "clc": list(range(1, 5)),
++        "update": [1 << i for i in range(15)],
++        "client": [1, 2, 4, 8, 16, 32, 64, 128, 512, 1024, 2048, 4096, 8192, 16384],
++        "sound": [1, 2, 4],
++        "temp": list(range(14)),
++    }
++
++
++def fingerprint() -> int:
++    groups = values()
++    sequence = [15, 0x535643, *groups["svc"], 0x434C43, *groups["clc"],
++                0x55424954, *groups["update"], 0x53554249, *groups["client"],
++                0x534E44, *groups["sound"], 0x5445, *groups["temp"]]
++    result = 2166136261
++    for value in sequence:
++        result = ((result ^ (value & 0xFFFFFFFF)) * 16777619) & 0xFFFFFFFF
++    return result
++
++
++def rows() -> list[dict[str, object]]:
++    groups = values()
++    pairs = [
++        ("protocol_version", 15),
++        ("svc_valid_count", len(groups["svc"])),
++        ("svc_reserved_command", 21),
++        ("clc_valid_count", len(groups["clc"])),
++        ("fast_update_mask", sum(groups["update"])),
++        ("client_data_mask", sum(groups["client"])),
++        ("sound_mask", sum(groups["sound"])),
++        ("temporary_entity_count", len(groups["temp"])),
++        ("protocol_fingerprint", fingerprint()),
++        ("max_msglen", 8000),
++        ("max_datagram", 1024),
++        ("max_edicts", 600),
++        ("net_maxmessage", 8192),
++    ]
++    return [{"kind": "case", "name": name, "value": value} for name, value in pairs]
++
++
++def document(root: Path) -> dict[str, object]:
++    return {
++        "schema": SCHEMA,
++        "package_id": PACKAGE_ID,
++        "parent_package_id": PARENT_PACKAGE_ID,
++        "block_id": BLOCK_ID,
++        "block_parent_package_id": BLOCK_PARENT,
++        "protocol_status": STATUS,
++        "protocol_version": 15,
++        "sources": ["protocol.h", "common.c", "cl_main.c", "cl_parse.c", "cl_demo.c",
++                    "sv_main.c", "sv_user.c", "net_dgrm.c"],
++        "rows": rows(),
++        "reference": {"oracle": ORACLE, "oracle_sha256": sha(root / ORACLE)},
++    }
++
++
++def freeze_document(root: Path) -> dict[str, object]:
++    return {
++        "schema": "MiniQuakeProtocol15Freeze/1",
++        "block_id": BLOCK_ID,
++        "package_id": PACKAGE_ID,
++        "protocol_status": STATUS,
++        "protocol_version": 15,
++        "protocol_fingerprint": fingerprint(),
++        "coverage": {
++            "valid_svc_commands": 33,
++            "valid_clc_commands": 4,
++            "temporary_entity_types": 14,
++            "component_checkers": len(COMPONENT_CHECKERS),
++            "runtime_fixtures_bp015_019": 12 + 14 + 18 + 19 + RUNTIME_FIXTURES,
++        },
++        "authoritative_files": [
++            {"path": relative, "sha256": sha(root / relative)}
++            for relative in AUTHORITATIVE_FILES
++        ],
++    }
++
++
++def compiler() -> list[str] | None:
++    candidates: list[str] = []
++    if os.environ.get("CC"):
++        candidates.append(os.environ["CC"])
++    candidates += ["cc", "gcc", "clang"]
++    for candidate in candidates:
++        parts = candidate.split()
++        if shutil.which(parts[0]):
++            return parts
++    return None
++
++
++def run_oracle(root: Path) -> tuple[bool, str, list[dict[str, object]]]:
++    cc = compiler()
++    if not cc:
++        return True, "not available", []
++    with tempfile.TemporaryDirectory(prefix="mq-bp019-") as directory:
++        executable = Path(directory) / ("oracle.exe" if os.name == "nt" else "oracle")
++        build = subprocess.run(
++            cc + ["-std=c11", "-Wall", "-Wextra", "-Werror", "-O2",
++                  str(root / ORACLE), "-o", str(executable)],
++            capture_output=True,
++            text=True,
++        )
++        if build.returncode:
++            return False, build.stdout + build.stderr, []
++        run = subprocess.run([str(executable)], capture_output=True, text=True)
++        parsed = [json.loads(line) for line in run.stdout.splitlines() if line.strip()]
++        return run.returncode == 0, " ".join(cc), parsed
++
++
++def run_components(root: Path) -> tuple[list[dict[str, object]], list[str]]:
++    outcomes: list[dict[str, object]] = []
++    errors: list[str] = []
++    for package, relative in COMPONENT_CHECKERS:
++        path = root / relative
++        if not path.is_file():
++            errors.append(f"missing component checker: {relative}")
++            outcomes.append({"package": package, "checker": relative, "status": "MISSING"})
++            continue
++        # BP-010R1 and BP-011 predate the shared --root flag and accept
++        # the source root as their positional argument.  All later checkers
++        # accept both forms.  Keeping this compatibility table makes the
++        # cumulative closure checker reusable without rewriting historical
++        # component tools.
++        if relative in (
++            "tools/check_protocol15_vectors.py",
++            "tools/check_protocol15_commands.py",
++        ):
++            command = [os.sys.executable, str(path), str(root)]
++        else:
++            command = [os.sys.executable, str(path), "--root", str(root)]
++        run = subprocess.run(
++            command,
++            capture_output=True,
++            text=True,
++        )
++        status = "PASS" if run.returncode == 0 else "FAIL"
++        outcomes.append({
++            "package": package,
++            "checker": relative,
++            "status": status,
++            "exit_code": run.returncode,
++            "output_sha256": hashlib.sha256((run.stdout + run.stderr).encode("utf-8")).hexdigest(),
++        })
++        if run.returncode != 0:
++            errors.append(f"component checker failed: {package} {relative}")
++    return outcomes, errors
++
++
++def contract(root: Path) -> list[str]:
++    errors: list[str] = []
++    module = (root / "src/miniquake/protocol15_freeze.ml").read_text(encoding="utf-8-sig")
++    tests = (root / "tests/protocol15_closure_tests.ml").read_text(encoding="utf-8-sig")
++    build = (root / "src/miniquake/build_info.ml").read_text(encoding="utf-8-sig")
++    main = (root / "src/main.ml").read_text(encoding="utf-8-sig")
++    block = (root / "BLOCK_LEDGER.json")
++
++    markers = [
++        'const STATUS = "protocol15_frozen_v1"',
++        "const SVC_VALID_COUNT = 33",
++        "const CLC_VALID_COUNT = 4",
++        "const FAST_UPDATE_MASK = 0x7fff",
++        "const CLIENT_DATA_MASK = 0x7eff",
++        "const TEMP_ENTITY_COUNT = 14",
++        "const FINGERPRINT = 0x0cf1e12a",
++        "function protocolFingerprint()",
++        "function coverageSummary()",
++    ]
++    for marker in markers:
++        if marker not in module:
++            errors.append("freeze module is missing: " + marker)
++    if "MiniQuake BP-019 Protocol 15 closure tests passed: 15" not in tests:
++        errors.append("closure runtime success marker is missing")
++    if tests.count("if run(") != RUNTIME_FIXTURES:
++        errors.append(f"expected {RUNTIME_FIXTURES} closure runtime fixtures")
++    for marker in ("buildClosureMessage", "transferReliable", "datagram-demo-parser closure"):
++        if marker not in tests:
++            errors.append("cross-layer closure fixture is missing: " + marker)
++    for marker in (
++        'const PACKAGE_ID = "BP-019"',
++        'const PARENT_PACKAGE_ID = "BP-018"',
++        'const BLOCK_ID = "BP-015-019"',
++        'const BLOCK_PARENT_PACKAGE_ID = "BP-014R1"',
++        'const PROTOCOL_STATUS = "protocol15_frozen_v1"',
++    ):
++        if marker not in build:
++            errors.append("build identity is missing: " + marker)
++    for marker in ("buildInfo.BLOCK_ID", "buildInfo.PROTOCOL_STATUS"):
++        if marker not in main:
++            errors.append("version output is missing: " + marker)
++    if not block.is_file():
++        errors.append("BLOCK_LEDGER.json is missing")
++    return errors
++
++
++def main() -> int:
++    parser = argparse.ArgumentParser()
++    parser.add_argument("root", nargs="?", default=".")
++    parser.add_argument("--root", dest="root_flag")
++    parser.add_argument("--write-golden", action="store_true")
++    parser.add_argument("--write-freeze", action="store_true")
++    parser.add_argument("--skip-components", action="store_true")
++    parser.add_argument("--json-output")
++    parser.add_argument("--require-c-oracle", action="store_true")
++    parser.add_argument("--self-test", action="store_true")
++    args = parser.parse_args()
++    root = Path(args.root_flag or args.root).resolve()
++
++    if args.self_test:
++        expected = 0x0CF1E12A
++        ok = fingerprint() == expected and len(values()["svc"]) == 33
++        print("MiniQuake BP-019 Protocol 15 closure checker self-test: " + ("PASS" if ok else "FAIL"))
++        return 0 if ok else 1
++
++    expected_golden = document(root)
++    expected_freeze = freeze_document(root)
++    golden_path = root / GOLDEN
++    freeze_path = root / FREEZE
++    if args.write_golden:
++        golden_path.parent.mkdir(parents=True, exist_ok=True)
++        golden_path.write_text(json.dumps(expected_golden, indent=2) + "\n", encoding="utf-8")
++    if args.write_freeze:
++        freeze_path.parent.mkdir(parents=True, exist_ok=True)
++        freeze_path.write_text(json.dumps(expected_freeze, indent=2) + "\n", encoding="utf-8")
++
++    errors: list[str] = []
++    if not golden_path.is_file():
++        errors.append("missing closure golden document")
++    elif json.loads(golden_path.read_text(encoding="utf-8-sig")) != expected_golden:
++        errors.append("closure golden differs from Python model")
++    if not freeze_path.is_file():
++        errors.append("missing Protocol 15 freeze document")
++    elif json.loads(freeze_path.read_text(encoding="utf-8-sig")) != expected_freeze:
++        errors.append("Protocol 15 freeze hashes differ from authoritative sources")
++
++    oracle_ok, oracle_detail, actual = run_oracle(root)
++    if not oracle_ok:
++        errors.append("C oracle failed: " + oracle_detail)
++    elif args.require_c_oracle and not actual:
++        errors.append("C oracle was required but no C compiler is available")
++    elif actual and actual != expected_golden["rows"]:
++        errors.append("C oracle differs from Python model")
++
++    components: list[dict[str, object]] = []
++    if not args.skip_components:
++        components, component_errors = run_components(root)
++        errors += component_errors
++    errors += contract(root)
++
++    report = {
++        "schema": REPORT,
++        "package_id": PACKAGE_ID,
++        "parent_package_id": PARENT_PACKAGE_ID,
++        "block_id": BLOCK_ID,
++        "protocol_status": STATUS,
++        "ok": not errors,
++        "oracle": oracle_detail,
++        "rows": len(expected_golden["rows"]),
++        "runtime_fixtures": RUNTIME_FIXTURES,
++        "component_checkers": components,
++        "authoritative_files": len(AUTHORITATIVE_FILES),
++        "protocol_fingerprint": fingerprint(),
++        "errors": errors,
++    }
++    if args.json_output:
++        Path(args.json_output).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
++
++    print("MiniQuake BP-019 Protocol 15 closure verification: " + ("PASS" if not errors else "FAIL"))
++    print(f"  rows={len(expected_golden['rows'])} runtime_fixtures={RUNTIME_FIXTURES} "
++          f"components={len(components)} fingerprint=0x{fingerprint():08x} oracle={oracle_detail}")
++    for error in errors:
++        print("  ERROR: " + error)
++    return 0 if not errors else 1
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/tools/check_protocol15_delivery.py b/tools/check_protocol15_delivery.py
+index 13e0a3f7f935e660b05bd82da3801b8114d7c8f1..5dbbbf568ea96dda317c11fb7ea9247faeee9bdd 100755
+--- a/tools/check_protocol15_delivery.py
++++ b/tools/check_protocol15_delivery.py
+@@ -41,7 +41,7 @@ def oracle(root:Path):
+       return (r.returncode==0,cc,[json.loads(x) for x in r.stdout.splitlines() if x.strip()])
+ def contract(root:Path):
+     e=[]; delivery=(root/'src/miniquake/protocol_delivery.ml').read_text(); server=(root/'src/miniquake/server.ml').read_text(); client=(root/'src/miniquake/client.ml').read_text(); tests=(root/'tests/protocol15_delivery_tests.ml').read_text()
+-    for marker in ('SEND_DROP','SEND_RETAIN','SEND_COMMIT','function keepaliveDue'): 
++    for marker in ('SEND_DROP','SEND_RETAIN','SEND_COMMIT','function keepaliveDue'):
+       if marker not in delivery:e.append('missing delivery marker '+marker)
+     if 'if outcome == delivery.SEND_RETAIN then return 0 end if' not in server:e.append('server does not retain zero-result send')
+     if 'delivery.clearAfterSend(result)' not in client:e.append('client not bound to shared send outcome')
+diff --git a/tools/check_protocol15_events.py b/tools/check_protocol15_events.py
+index ceff828d3ff91708f66579a67e70affc70866ef9..229fb4b618c3025b5ea7452ddae898c81a7dc8db 100644
+--- a/tools/check_protocol15_events.py
++++ b/tools/check_protocol15_events.py
+@@ -343,9 +343,13 @@ def source_contract(root: Path) -> tuple[list[str], dict[str, Any]]:
+             'bp013-protocol15-events.json',
+             'MiniQuakeProtocol15EventTests.exe',
+         ],
++        # Component checkers validate their protocol implementation, not the
++        # identity of the cumulative package that happens to contain it.
++        # Final package lineage is enforced by tools/verify.py and BP-019.
+         "build_info": [
+-            'const PACKAGE_ID = "BP-014R1"',
+-            'const PARENT_PACKAGE_ID = "BP-014"',
++            'const COMPATIBILITY_PROFILE = "compat_109"',
++            'const NATIVE_TEXT_ABI = "caller_owned_bytes_v1"',
++            'const PROTOCOL_TEXT_ABI = "quake_latin1_cstring_v1"',
+         ],
+     }
+     for key, markers in required.items():
+diff --git a/tools/check_protocol15_runtime_events.py b/tools/check_protocol15_runtime_events.py
+index 3a914b63696c1e030064858f8c690bf2b904c0f5..3bea48977951983135e20af47cffdd3c4427ced9 100644
+--- a/tools/check_protocol15_runtime_events.py
++++ b/tools/check_protocol15_runtime_events.py
+@@ -381,9 +381,13 @@ def source_contract(root: Path) -> tuple[list[str], dict[str, Any]]:
+             "bp014r1-protocol15-runtime-events.json",
+             "MiniQuakeProtocol15RuntimeEventTests.exe",
+         ],
++        # Component checkers validate their protocol implementation, not the
++        # identity of the cumulative package that happens to contain it.
++        # Final package lineage is enforced by tools/verify.py and BP-019.
+         "build_info": [
+-            'const PACKAGE_ID = "BP-014R1"',
+-            'const PARENT_PACKAGE_ID = "BP-014"',
++            'const COMPATIBILITY_PROFILE = "compat_109"',
++            'const NATIVE_TEXT_ABI = "caller_owned_bytes_v1"',
++            'const PROTOCOL_TEXT_ABI = "quake_latin1_cstring_v1"',
+         ],
+     }
+     for key, markers in required.items():
+diff --git a/tools/oracle/protocol15_closure_oracle.c b/tools/oracle/protocol15_closure_oracle.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..bd701d805bf86191206c07535769c0ab151989fc
+--- /dev/null
++++ b/tools/oracle/protocol15_closure_oracle.c
+@@ -0,0 +1,80 @@
++/* Source-guided Protocol 15 closure oracle for MiniQuake BP-019. */
++#include <stdint.h>
++#include <stdio.h>
++
++#define PROTOCOL_VERSION 15u
++#define MAX_MSGLEN 8000u
++#define MAX_DATAGRAM 1024u
++#define MAX_EDICTS 600u
++#define NET_MAXMESSAGE 8192u
++
++static const uint32_t svc[] = {
++    1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,
++    22,23,24,25,26,27,28,29,30,31,32,33,34
++};
++static const uint32_t clc[] = {1,2,3,4};
++static const uint32_t update_bits[] = {
++    1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192,16384
++};
++static const uint32_t client_bits[] = {
++    1,2,4,8,16,32,64,128,512,1024,2048,4096,8192,16384
++};
++static const uint32_t sound_bits[] = {1,2,4};
++static const uint32_t temporary_entities[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13};
++
++static uint32_t mask(const uint32_t *values, size_t count) {
++    uint32_t result = 0;
++    size_t i;
++    for (i = 0; i < count; ++i) result |= values[i];
++    return result;
++}
++
++static uint32_t hash_value(uint32_t current, uint32_t value) {
++    return (current ^ value) * UINT32_C(16777619);
++}
++
++static uint32_t hash_values(uint32_t current, const uint32_t *values, size_t count) {
++    size_t i;
++    for (i = 0; i < count; ++i) current = hash_value(current, values[i]);
++    return current;
++}
++
++static uint32_t fingerprint(void) {
++    uint32_t result = UINT32_C(2166136261);
++    result = hash_value(result, PROTOCOL_VERSION);
++    result = hash_value(result, UINT32_C(0x535643));
++    result = hash_values(result, svc, sizeof(svc) / sizeof(svc[0]));
++    result = hash_value(result, UINT32_C(0x434c43));
++    result = hash_values(result, clc, sizeof(clc) / sizeof(clc[0]));
++    result = hash_value(result, UINT32_C(0x55424954));
++    result = hash_values(result, update_bits, sizeof(update_bits) / sizeof(update_bits[0]));
++    result = hash_value(result, UINT32_C(0x53554249));
++    result = hash_values(result, client_bits, sizeof(client_bits) / sizeof(client_bits[0]));
++    result = hash_value(result, UINT32_C(0x534e44));
++    result = hash_values(result, sound_bits, sizeof(sound_bits) / sizeof(sound_bits[0]));
++    result = hash_value(result, UINT32_C(0x5445));
++    result = hash_values(result, temporary_entities, sizeof(temporary_entities) / sizeof(temporary_entities[0]));
++    return result;
++}
++
++static void row(const char *name, uint64_t value) {
++    printf("{\"kind\":\"case\",\"name\":\"%s\",\"value\":%llu}\n",
++           name, (unsigned long long)value);
++}
++
++int main(void) {
++    row("protocol_version", PROTOCOL_VERSION);
++    row("svc_valid_count", sizeof(svc) / sizeof(svc[0]));
++    row("svc_reserved_command", 21u);
++    row("clc_valid_count", sizeof(clc) / sizeof(clc[0]));
++    row("fast_update_mask", mask(update_bits, sizeof(update_bits) / sizeof(update_bits[0])));
++    row("client_data_mask", mask(client_bits, sizeof(client_bits) / sizeof(client_bits[0])));
++    row("sound_mask", mask(sound_bits, sizeof(sound_bits) / sizeof(sound_bits[0])));
++    row("temporary_entity_count", sizeof(temporary_entities) / sizeof(temporary_entities[0]));
++    row("protocol_fingerprint", fingerprint());
++    row("max_msglen", MAX_MSGLEN);
++    row("max_datagram", MAX_DATAGRAM);
++    row("max_edicts", MAX_EDICTS);
++    row("net_maxmessage", NET_MAXMESSAGE);
++    return 0;
++}
+diff --git a/tools/verify.py b/tools/verify.py
+index 7f3fb9ef42df88c3e0cc1f19f214efc00001d833..d1dd633e1e481d5d4060a4c7bd9ea24b2525eab7 100644
+--- a/tools/verify.py
++++ b/tools/verify.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""Self-contained MiniQuake BP-014R1 source/package and Protocol 15 verifier.
++"""Self-contained MiniQuake BP-019 cumulative source/package and Protocol 15 verifier.
+ 
+ The verifier deliberately uses only the Python standard library so the exact
+ source archive can be checked before MiniLang compilation. It verifies the
+@@ -22,8 +22,11 @@ from dataclasses import asdict, dataclass, field
+ from pathlib import Path, PurePosixPath
+ from typing import Iterable
+ 
+-PACKAGE_ID = "BP-014R1"
+-PARENT_PACKAGE_ID = "BP-014"
++PACKAGE_ID = "BP-019"
++PARENT_PACKAGE_ID = "BP-018"
++BLOCK_ID = "BP-015-019"
++BLOCK_PARENT_PACKAGE_ID = "BP-014R1"
++PROTOCOL_STATUS = "protocol15_frozen_v1"
+ MANIFEST_NAME = "SOURCE_MANIFEST.sha256"
+ EXCLUDED_DIR_NAMES = {".git", "__pycache__", ".pytest_cache", "build"}
+ EXCLUDED_RELATIVE_DIRS = {PurePosixPath("native/build"), PurePosixPath("native/text_build")}
+@@ -139,6 +142,49 @@ REQUIRED_PATHS = {
+     "audit/protocol15_serverdata_golden.json",
+     "audit/protocol15_events_golden.json",
+     "audit/protocol15_runtime_events_golden.json",
++    "BLOCK_LEDGER.json",
++    "CHANGELOG_BP-015.md",
++    "CHANGELOG_BP-016.md",
++    "CHANGELOG_BP-017.md",
++    "CHANGELOG_BP-018.md",
++    "CHANGELOG_BP-019.md",
++    "CHANGELOG_BP-015-019.md",
++    "TEST_BP-015-019.ps1",
++    "docs/BP-014R1_ACCEPTANCE_ANALYSIS.md",
++    "docs/BP-015_SIGNON_AUDIT.md",
++    "docs/BP-016_DELIVERY_AUDIT.md",
++    "docs/BP-017_DATAGRAM_AUDIT.md",
++    "docs/BP-018_DEMO_AUDIT.md",
++    "docs/BP-019_PROTOCOL15_CLOSURE_AUDIT.md",
++    "docs/BP-015-019_TESTING.md",
++    "src/miniquake/protocol_delivery.ml",
++    "src/miniquake/protocol15_freeze.ml",
++    "tests/protocol15_signon_e2e_tests.ml",
++    "tests/protocol15_delivery_tests.ml",
++    "tests/protocol15_datagram_tests.ml",
++    "tests/protocol15_demo_tests.ml",
++    "tests/protocol15_closure_tests.ml",
++    "tools/check_protocol15_signon.py",
++    "tools/check_protocol15_delivery.py",
++    "tools/check_protocol15_datagram.py",
++    "tools/check_protocol15_demo.py",
++    "tools/check_protocol15_closure.py",
++    "tools/oracle/protocol15_signon_oracle.c",
++    "tools/oracle/protocol15_delivery_oracle.c",
++    "tools/oracle/protocol15_datagram_oracle.c",
++    "tools/oracle/protocol15_demo_oracle.c",
++    "tools/oracle/protocol15_closure_oracle.c",
++    "audit/protocol15_signon_golden.json",
++    "audit/protocol15_delivery_golden.json",
++    "audit/protocol15_datagram_golden.json",
++    "audit/protocol15_demo_golden.json",
++    "audit/protocol15_closure_golden.json",
++    "audit/protocol15_freeze.json",
++    "patches/BP-015.diff",
++    "patches/BP-016.diff",
++    "patches/BP-017.diff",
++    "patches/BP-018.diff",
++    "patches/BP-019.diff",
+ }
+ 
+ 
+@@ -844,109 +890,67 @@ def check_windows_paths(root: Path) -> CheckResult:
+ 
+ 
+ def check_delivery_scripts(root: Path) -> CheckResult:
++    """Verify the cumulative block entry points and result feedback channel."""
+     errors: list[str] = []
+     stale_names = [
+-        "verify_reference.py",
+-        "verify_dependencies.py",
+-        "generate_port_audit.py",
+-        "generate_semantic_review.py",
+-        "parity_oracle.py",
+-        "ml_lint.py",
+-        "ml_scope_lint.py",
+-        "retail_demo_matrix.py",
++        "verify_reference.py", "verify_dependencies.py", "generate_port_audit.py",
++        "generate_semantic_review.py", "parity_oracle.py", "ml_lint.py",
++        "ml_scope_lint.py", "retail_demo_matrix.py",
+     ]
+     build_text = (root / "build.ps1").read_text(encoding="utf-8-sig")
+     for stale in stale_names:
+         if stale in build_text:
+             errors.append(f"build.ps1 still references unavailable tool: {stale}")
+     if re.search(r"Tee-Object[^\n]*-Append", build_text, flags=re.I):
+-        errors.append("build.ps1 uses unsupported Tee-Object -Append; compiler output must be appended explicitly")
++        errors.append("build.ps1 uses unsupported Tee-Object -Append")
+ 
+     expected_markers = {
+         "build.ps1": [
+-            PACKAGE_ID, PARENT_PACKAGE_ID, "caller_owned_bytes_v1", "quake_latin1_cstring_v1",
+-            "tools\\verify.py", "check_protocol15_vectors.py", "check_protocol15_commands.py",
+-            "check_protocol15_serverdata.py", "check_protocol15_events.py",
+-            "check_protocol15_runtime_events.py", "MiniQuakeCompatTraceTests.exe",
+-            "MiniQuakeProtocol15WireTests.exe", "MiniQuakeProtocol15CommandTests.exe",
+-            "MiniQuakeProtocol15ServerDataTests.exe", "MiniQuakeProtocol15EventTests.exe",
+-            "MiniQuakeProtocol15RuntimeEventTests.exe", "protocol15-wire-tests",
+-            "protocol15-command-tests", "protocol15-serverdata-tests", "protocol15-event-tests",
+-            "protocol15-runtime-event-tests", "compile-{0}.log", "ForEach-Object", "Add-Content",
+-            ".partial.exe", "exit_code=", "protocol15_commands=", "protocol15_serverdata=",
+-            "protocol15_events=", "protocol15_runtime_events=",
++            '$PackageId = "BP-019"', '$ParentPackageId = "BP-018"',
++            '$BlockId = "BP-015-019"', '$BlockParentPackageId = "BP-014R1"',
++            '$ProtocolStatus = "protocol15_frozen_v1"',
++            "caller_owned_bytes_v1", "quake_latin1_cstring_v1", "tools\\verify.py",
++            "check_protocol15_signon.py", "check_protocol15_delivery.py",
++            "check_protocol15_datagram.py", "check_protocol15_demo.py",
++            "check_protocol15_closure.py", "MiniQuakeProtocol15SignonTests.exe",
++            "MiniQuakeProtocol15DeliveryTests.exe", "MiniQuakeProtocol15DatagramTests.exe",
++            "MiniQuakeProtocol15DemoTests.exe", "MiniQuakeProtocol15ClosureTests.exe",
++            "protocol15-signon-tests", "protocol15-delivery-tests",
++            "protocol15-datagram-tests", "protocol15-demo-tests",
++            "protocol15-closure-tests", "compile-{0}.log", ".partial.exe",
++            "bp019-build-version.txt", "protocol15_closure=",
+         ],
+-        "TEST_BP-014R1.ps1": [
+-            PACKAGE_ID, PARENT_PACKAGE_ID, "quake_latin1_cstring_v1",
+-            "check_protocol15_vectors.py", "check_protocol15_commands.py",
+-            "check_protocol15_serverdata.py", "check_protocol15_events.py",
+-            "check_protocol15_runtime_events.py", "bp014r1-protocol15-vectors.json",
+-            "bp014r1-protocol15-commands.json", "bp014r1-protocol15-serverdata.json",
+-            "bp014r1-protocol15-events.json", "bp014r1-protocol15-runtime-events.json",
+-            "--compat-trace", "byte-identical trace comparison", "bp014r1-build-child.log",
+-            "bp014r1-trace-a.log", "compare_traces.py", "bp014r1-trace-comparison.json",
+-            "MiniQuakeProtocol15WireTests.exe", "MiniQuakeProtocol15CommandTests.exe",
+-            "MiniQuakeProtocol15ServerDataTests.exe", "MiniQuakeProtocol15EventTests.exe",
+-            "MiniQuakeProtocol15RuntimeEventTests.exe", "COLLECT_RESULTS.ps1",
++        "TEST_BP-015-019.ps1": [
++            '$PackageId = "BP-019"', '$ParentPackageId = "BP-018"',
++            '$BlockId = "BP-015-019"', '$BlockParentPackageId = "BP-014R1"',
++            '$ProtocolStatus = "protocol15_frozen_v1"', "ContinueIndependentTests",
++            "BisectOnFailure", "Invoke-IndependentTest", "BLOCKED",
++            "check_protocol15_signon.py", "check_protocol15_delivery.py",
++            "check_protocol15_datagram.py", "check_protocol15_demo.py",
++            "check_protocol15_closure.py", "MiniQuakeProtocol15SignonTests.exe",
++            "MiniQuakeProtocol15DeliveryTests.exe", "MiniQuakeProtocol15DatagramTests.exe",
++            "MiniQuakeProtocol15DemoTests.exe", "MiniQuakeProtocol15ClosureTests.exe",
++            "--compat-trace", "byte-identical trace comparison",
++            "bp015-019-bisect-report.json", "COLLECT_RESULTS.ps1",
++            "MiniQuake $BlockId acceptance test: PASS",
+         ],
+-        "TEST_BP-014.ps1": ["TEST_BP-014R1.ps1", "superseded", "SkipBuild", "Listings"],
+-        "TEST_BP-013.ps1": [
+-            "BP-013", "BP-012R1", "check_protocol15_events.py",
+-            "MiniQuakeProtocol15EventTests.exe", "byte-identical trace comparison",
+-        ],
+-        "TEST_BP-012R1.ps1": [
+-            "BP-012R1", "BP-012", "quake_latin1_cstring_v1",
+-            "check_protocol15_vectors.py", "check_protocol15_commands.py",
+-            "check_protocol15_serverdata.py", "bp012r1-protocol15-vectors.json",
+-            "bp012r1-protocol15-commands.json", "bp012r1-protocol15-serverdata.json",
+-            "--compat-trace", "byte-identical trace comparison", "bp012r1-build-child.log",
+-            "bp012r1-trace-a.log", "compare_traces.py", "bp012r1-trace-comparison.json",
+-            "MiniQuakeProtocol15WireTests.exe", "MiniQuakeProtocol15CommandTests.exe",
+-            "MiniQuakeProtocol15ServerDataTests.exe", "COLLECT_RESULTS.ps1",
+-        ],
+-        "TEST_BP-012.ps1": ["TEST_BP-012R1.ps1", "superseded", "SkipBuild", "Listings"],
+-        "TEST_BP-011.ps1": [
+-            "BP-011", "BP-010R1", "check_protocol15_commands.py",
+-            "MiniQuakeProtocol15CommandTests.exe", "byte-identical trace comparison",
+-        ],
+-        "TEST_BP-010R1.ps1": ["BP-010R1", "check_protocol15_vectors.py", "MiniQuakeProtocol15WireTests.exe"],
+-        "TEST_BP-010.ps1": ["TEST_BP-010R1.ps1", "superseded", "SkipBuild", "Listings"],
+-        "TEST_BP-001R3.ps1": ["TEST_BP-010R1.ps1", "superseded", "SkipBuild", "Listings"],
+-        "TEST_BP-001R2.ps1": ["TEST_BP-010R1.ps1", "superseded", "SkipBuild", "Listings"],
+-        "TEST_BP-001R1.ps1": ["TEST_BP-010R1.ps1", "superseded", "SkipBuild", "Listings"],
+-        "TEST_BP-001.ps1": ["TEST_BP-010R1.ps1", "superseded", "SkipBuild", "Listings"],
+         "COLLECT_RESULTS.ps1": [
+-            PACKAGE_ID, ".mqtrace", "ForbiddenExtensions", "Compress-Archive",
++            'BP-015-019', 'BP-019', ".mqtrace", "ForbiddenExtensions", "Compress-Archive",
+             "build_artifacts_present", "partial_build_artifacts",
+-            "MiniQuakeCompatTraceTests.exe", "MiniQuakeProtocol15WireTests.exe",
+-            "MiniQuakeProtocol15CommandTests.exe", "MiniQuakeProtocol15ServerDataTests.exe",
+-            "MiniQuakeProtocol15EventTests.exe", "MiniQuakeProtocol15RuntimeEventTests.exe",
+-            "BP-013_ACCEPTANCE_ANALYSIS.md", "BP-014_TESTING.md",
+-            "BP-014_RESULT_ANALYSIS.md", "BP-014R1_TESTING.md",
+-            "CHANGELOG_BP-014R1.md", "BP-014_PROTOCOL15_RUNTIME_EVENT_AUDIT.md",
+-            "protocol15_events_golden.json", "protocol15_runtime_events_golden.json",
++            "MiniQuakeProtocol15SignonTests.exe", "MiniQuakeProtocol15DeliveryTests.exe",
++            "MiniQuakeProtocol15DatagramTests.exe", "MiniQuakeProtocol15DemoTests.exe",
++            "MiniQuakeProtocol15ClosureTests.exe", "BLOCK_LEDGER.json",
++            "protocol15_freeze.json", "BP-019_PROTOCOL15_CLOSURE_AUDIT.md",
+         ],
+-        "scripts/validate_real_game.ps1": ["TEST_BP-014R1.ps1", "TraceFrames"],
++        "scripts/validate_real_game.ps1": ["TEST_BP-015-019.ps1", "TraceFrames", "Frames"],
+         "tools/compare_traces.py": ["first_difference", "--json-output", "--self-test", "sha256"],
+-        "tools/check_protocol15_vectors.py": [
+-            "protocol15_common_oracle.c", "--require-c-oracle", "--json-output",
+-            "--self-test", "MiniQuakeProtocol15Golden/1",
+-        ],
+-        "tools/check_protocol15_commands.py": [
+-            "protocol15_commands_oracle.c", "--require-c-oracle", "--json-output",
+-            "--self-test", "MiniQuakeProtocol15CommandsGolden/1",
+-        ],
+-        "tools/check_protocol15_serverdata.py": [
+-            "protocol15_serverdata_oracle.c", "--require-c-oracle", "--json-output",
+-            "--self-test", "MiniQuakeProtocol15ServerDataGolden/1",
+-        ],
+-        "tools/check_protocol15_events.py": [
+-            "protocol15_events_oracle.c", "--require-c-oracle", "--json-output",
+-            "--self-test", "MiniQuakeProtocol15EventsGolden/1",
+-        ],
+-        "tools/check_protocol15_runtime_events.py": [
+-            "protocol15_runtime_events_oracle.c", "--require-c-oracle", "--json-output",
+-            "--self-test", "MiniQuakeProtocol15RuntimeEventsGolden/1",
++        "tools/check_protocol15_signon.py": ["protocol15_signon_oracle.c", "BP-015", "vectors", "cases"],
++        "tools/check_protocol15_delivery.py": ["protocol15_delivery_oracle.c", "BP-016", "cases"],
++        "tools/check_protocol15_datagram.py": ["protocol15_datagram_oracle.c", "BP-017", "runtime_fixtures"],
++        "tools/check_protocol15_demo.py": ["protocol15_demo_oracle.c", "BP-018", "runtime_fixtures"],
++        "tools/check_protocol15_closure.py": [
++            "protocol15_closure_oracle.c", "BP-019", "protocol15_frozen_v1",
++            "COMPONENT_CHECKERS", "--write-freeze", "--skip-components", "--self-test",
+         ],
+         "native/build_text_bridge.py": ["/timestamp:0", "/Brepro", "miniquake_text.dll"],
+     }
+@@ -961,8 +965,7 @@ def check_delivery_scripts(root: Path) -> CheckResult:
+                 errors.append(f"{relative} is missing required marker: {marker}")
+ 
+     return CheckResult(
+-        "delivery_scripts",
+-        not errors,
++        "delivery_scripts", not errors,
+         {"scripts_checked": len(expected_markers), "stale_tool_names_checked": len(stale_names)},
+         errors,
+     )
+@@ -1873,7 +1876,7 @@ def check_protocol15_runtime_event_contract(root: Path) -> CheckResult:
+         golden = json.loads(golden_path.read_text(encoding="utf-8"))
+         if golden.get("schema") != "MiniQuakeProtocol15RuntimeEventsGolden/1":
+             errors.append("BP-014R1 runtime-event golden document has an unexpected schema")
+-        if golden.get("package_id") != PACKAGE_ID or golden.get("parent_package_id") != PARENT_PACKAGE_ID:
++        if golden.get("package_id") != "BP-014R1" or golden.get("parent_package_id") != "BP-014":
+             errors.append("BP-014R1 runtime-event golden package lineage is inconsistent")
+         vectors = golden.get("vectors") if isinstance(golden.get("vectors"), list) else []
+         cases = golden.get("cases") if isinstance(golden.get("cases"), dict) else {}
+@@ -2102,6 +2105,85 @@ def check_protocol15_lexical_scope_contract(root: Path) -> CheckResult:
+         errors.append(f"cannot validate BP-010R1 lexical scope contract: {exc}")
+     return CheckResult("protocol15_lexical_scope_contract", not errors, details, errors)
+ 
++def check_protocol15_closure_contract(root: Path) -> CheckResult:
++    """Bind the cumulative BP-015..BP-019 block and frozen source fingerprint."""
++    errors: list[str] = []
++    warnings: list[str] = []
++    details: dict[str, object] = {}
++    try:
++        freeze_path = root / "audit/protocol15_freeze.json"
++        golden_path = root / "audit/protocol15_closure_golden.json"
++        checker_path = root / "tools/check_protocol15_closure.py"
++        ledger_path = root / "BLOCK_LEDGER.json"
++        tests_path = root / "tests/protocol15_closure_tests.ml"
++        module_path = root / "src/miniquake/protocol15_freeze.ml"
++
++        freeze_doc = json.loads(freeze_path.read_text(encoding="utf-8"))
++        golden = json.loads(golden_path.read_text(encoding="utf-8"))
++        ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
++        if freeze_doc.get("schema") != "MiniQuakeProtocol15Freeze/1":
++            errors.append("Protocol 15 freeze document has an unexpected schema")
++        if freeze_doc.get("protocol_status") != PROTOCOL_STATUS:
++            errors.append("Protocol 15 freeze status differs from package identity")
++        if freeze_doc.get("protocol_fingerprint") != 0x0CF1E12A:
++            errors.append("Protocol 15 freeze fingerprint differs from 0x0cf1e12a")
++        if golden.get("package_id") != PACKAGE_ID or golden.get("parent_package_id") != PARENT_PACKAGE_ID:
++            errors.append("BP-019 closure golden package lineage is inconsistent")
++        rows = golden.get("rows") if isinstance(golden.get("rows"), list) else []
++        if len(rows) != 13:
++            errors.append(f"BP-019 closure row count is {len(rows)}, expected 13")
++        if ledger.get("block_id") != BLOCK_ID or ledger.get("parent_package_id") != BLOCK_PARENT_PACKAGE_ID:
++            errors.append("BLOCK_LEDGER.json has inconsistent block lineage")
++        steps = ledger.get("steps") if isinstance(ledger.get("steps"), list) else []
++        ids = [item.get("package_id") for item in steps if isinstance(item, dict)]
++        if ids != ["BP-015", "BP-016", "BP-017", "BP-018", "BP-019"]:
++            errors.append(f"BLOCK_LEDGER.json step order differs: {ids!r}")
++
++        tests = tests_path.read_text(encoding="utf-8")
++        if tests.count("if run(") != 15:
++            errors.append("BP-019 closure fixture count is not 15")
++        for marker in (
++            "MiniQuake BP-019 Protocol 15 closure tests passed: 15",
++            "datagram-demo-parser closure", "deterministic closure scenario",
++            "limits and fingerprint sensitivity",
++        ):
++            if marker not in tests:
++                errors.append(f"BP-019 closure fixtures omit marker: {marker}")
++
++        module = module_path.read_text(encoding="utf-8")
++        for marker in (
++            'const STATUS = "protocol15_frozen_v1"', "const SVC_VALID_COUNT = 33",
++            "const CLC_VALID_COUNT = 4", "const FAST_UPDATE_MASK = 0x7fff",
++            "const CLIENT_DATA_MASK = 0x7eff", "const SOUND_MASK = 0x0007",
++            "const TEMP_ENTITY_COUNT = 14", "const FINGERPRINT = 0x0cf1e12a",
++            "function protocolFingerprint()", "function coverageSummary()",
++        ):
++            if marker not in module:
++                errors.append(f"protocol15_freeze.ml is missing marker: {marker}")
++
++        for package in ("BP-015", "BP-016", "BP-017", "BP-018", "BP-019"):
++            patch = root / "patches" / f"{package}.diff"
++            if not patch.is_file() or patch.stat().st_size == 0:
++                errors.append(f"logical block patch is missing or empty: patches/{package}.diff")
++
++        completed = subprocess.run(
++            [sys.executable, str(checker_path), "--root", str(root), "--skip-components"],
++            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
++            timeout=90, check=False,
++        )
++        details["closure_checker_exit_code"] = completed.returncode
++        if completed.returncode != 0:
++            errors.append("tools/check_protocol15_closure.py failed: " + completed.stdout.strip())
++        details.update({
++            "golden_rows": len(rows), "runtime_fixtures": tests.count("if run("),
++            "component_steps": len(steps), "authoritative_files": len(freeze_doc.get("authoritative_files", [])),
++            "protocol_fingerprint": freeze_doc.get("protocol_fingerprint"),
++        })
++    except (OSError, json.JSONDecodeError, subprocess.SubprocessError) as exc:
++        errors.append(f"cannot validate BP-019 Protocol 15 closure contract: {exc}")
++    return CheckResult("protocol15_closure_contract", not errors, details, errors, warnings)
++
++
+ def check_no_game_data(root: Path) -> CheckResult:
+     errors: list[str] = []
+     scanned = 0
+@@ -2196,84 +2278,63 @@ def check_protocol15_player_ground_adapter_contract(root: Path) -> CheckResult:
+     return CheckResult("protocol15_player_ground_adapter_contract", not errors, details, errors)
+ 
+ def check_package_identity(root: Path) -> CheckResult:
+-    path = root / "src/miniquake/build_info.ml"
+     errors: list[str] = []
+     details: dict[str, object] = {}
+     try:
+-        text = path.read_text(encoding="utf-8")
+-        match = re.search(r'^const\s+PACKAGE_ID\s*=\s*"([^"]+)"\s*$', text, flags=re.M)
+-        if not match:
+-            errors.append("build_info.ml does not define PACKAGE_ID")
+-        else:
+-            details["package_id"] = match.group(1)
+-            if match.group(1) != PACKAGE_ID:
+-                errors.append(f"build_info.ml package is {match.group(1)!r}, expected {PACKAGE_ID!r}")
+-        parent_match = re.search(r'^const\s+PARENT_PACKAGE_ID\s*=\s*"([^"]+)"\s*$', text, flags=re.M)
+-        if not parent_match:
+-            errors.append("build_info.ml does not define PARENT_PACKAGE_ID")
+-        else:
+-            details["parent_package_id"] = parent_match.group(1)
+-            if parent_match.group(1) != PARENT_PACKAGE_ID:
+-                errors.append(f"build_info.ml parent package is {parent_match.group(1)!r}, expected {PARENT_PACKAGE_ID!r}")
++        text = (root / "src/miniquake/build_info.ml").read_text(encoding="utf-8")
++        expected = {
++            "PACKAGE_ID": PACKAGE_ID,
++            "PARENT_PACKAGE_ID": PARENT_PACKAGE_ID,
++            "BLOCK_ID": BLOCK_ID,
++            "BLOCK_PARENT_PACKAGE_ID": BLOCK_PARENT_PACKAGE_ID,
++            "PROTOCOL_STATUS": PROTOCOL_STATUS,
++            "COMPATIBILITY_PROFILE": "compat_109",
++            "NATIVE_TEXT_ABI": "caller_owned_bytes_v1",
++            "PROTOCOL_TEXT_ABI": "quake_latin1_cstring_v1",
++        }
++        for name, wanted in expected.items():
++            match = re.search(rf'^const\s+{name}\s*=\s*"([^"]+)"\s*$', text, flags=re.M)
++            if not match:
++                errors.append(f"build_info.ml does not define {name}")
++            else:
++                details[name.lower()] = match.group(1)
++                if match.group(1) != wanted:
++                    errors.append(f"build_info.ml {name} is {match.group(1)!r}, expected {wanted!r}")
+         purpose_match = re.search(r'^const\s+PACKAGE_PURPOSE\s*=\s*"([^"]+)"\s*$', text, flags=re.M)
+         if not purpose_match:
+             errors.append("build_info.ml does not define PACKAGE_PURPOSE")
+         else:
+             purpose = purpose_match.group(1)
+-            required_purpose_terms = ("Protocol 15", "beam", "retained-state", "active-view", "parity", "hotfix")
+-            for term in required_purpose_terms:
++            for term in ("Protocol 15", "cumulative", "closure", "parity", "frozen", "compatibility"):
+                 if term not in purpose:
+                     errors.append(f"build_info.ml package purpose is missing: {term}")
+-        text_abi_match = re.search(r'^const\s+NATIVE_TEXT_ABI\s*=\s*"([^"]+)"\s*$', text, flags=re.M)
+-        if not text_abi_match:
+-            errors.append("build_info.ml does not define NATIVE_TEXT_ABI")
+-        else:
+-            details["native_text_abi"] = text_abi_match.group(1)
+-            if text_abi_match.group(1) != "caller_owned_bytes_v1":
+-                errors.append("build_info.ml uses an unexpected native text ABI")
+-        protocol_abi_match = re.search(r'^const\s+PROTOCOL_TEXT_ABI\s*=\s*"([^"]+)"\s*$', text, flags=re.M)
+-        if not protocol_abi_match:
+-            errors.append("build_info.ml does not define PROTOCOL_TEXT_ABI")
+-        else:
+-            details["protocol_text_abi"] = protocol_abi_match.group(1)
+-            if protocol_abi_match.group(1) != "quake_latin1_cstring_v1":
+-                errors.append("build_info.ml uses an unexpected Protocol text ABI")
++
+         main_text = (root / "src/main.ml").read_text(encoding="utf-8")
+-        if "import miniquake.build_info as buildInfo" not in main_text:
+-            errors.append("src/main.ml does not import miniquake.build_info as buildInfo")
+-        if "buildInfo.PACKAGE_ID" not in main_text:
+-            errors.append("src/main.ml does not print/use the package identity")
+-        if "buildInfo.PARENT_PACKAGE_ID" not in main_text:
+-            errors.append("src/main.ml does not print/use the parent package identity")
+-        if "buildInfo.PACKAGE_PURPOSE" not in main_text:
+-            errors.append("src/main.ml does not print/use the package purpose")
+-        if "buildInfo.NATIVE_TEXT_ABI" not in main_text:
+-            errors.append("src/main.ml does not print/use the native text ABI")
+-        if "buildInfo.PROTOCOL_TEXT_ABI" not in main_text:
+-            errors.append("src/main.ml does not print/use the Protocol text ABI")
+-        build_text = (root / "build.ps1").read_text(encoding="utf-8")
+-        if f'$PackageId = "{PACKAGE_ID}"' not in build_text:
+-            errors.append("build.ps1 package identity is absent or inconsistent")
+-        if f'$ParentPackageId = "{PARENT_PACKAGE_ID}"' not in build_text:
+-            errors.append("build.ps1 parent package identity is absent or inconsistent")
+-        if '$ProtocolTextAbi = "quake_latin1_cstring_v1"' not in build_text:
+-            errors.append("build.ps1 Protocol text ABI is absent or inconsistent")
+         for marker in (
+-            '$PackageBuildArtifacts = @(',
+-            'MiniQuakeProtocol15WireTests.exe',
+-            'MiniQuakeProtocol15CommandTests.exe',
+-            'MiniQuakeProtocol15ServerDataTests.exe',
+-            'MiniQuakeProtocol15EventTests.exe',
+-            'MiniQuakeProtocol15RuntimeEventTests.exe',
++            "import miniquake.build_info as buildInfo", "buildInfo.PACKAGE_ID",
++            "buildInfo.PARENT_PACKAGE_ID", "buildInfo.BLOCK_ID",
++            "buildInfo.BLOCK_PARENT_PACKAGE_ID", "buildInfo.PROTOCOL_STATUS",
++            "buildInfo.PACKAGE_PURPOSE", "buildInfo.NATIVE_TEXT_ABI",
++            "buildInfo.PROTOCOL_TEXT_ABI",
++        ):
++            if marker not in main_text:
++                errors.append(f"src/main.ml does not print/use identity marker: {marker}")
++
++        build_text = (root / "build.ps1").read_text(encoding="utf-8-sig")
++        for marker in (
++            f'$PackageId = "{PACKAGE_ID}"', f'$ParentPackageId = "{PARENT_PACKAGE_ID}"',
++            f'$BlockId = "{BLOCK_ID}"', f'$BlockParentPackageId = "{BLOCK_PARENT_PACKAGE_ID}"',
++            f'$ProtocolStatus = "{PROTOCOL_STATUS}"',
++            '$ProtocolTextAbi = "quake_latin1_cstring_v1"', '$PackageBuildArtifacts = @(',
++            'MiniQuakeProtocol15ClosureTests.exe',
+             'Get-ChildItem -LiteralPath $Output -File -Filter "compile-*.log"',
+         ):
+             if marker not in build_text:
+-                errors.append(f"build.ps1 is missing stale-artifact cleanup marker: {marker}")
++                errors.append(f"build.ps1 identity/artifact marker is missing: {marker}")
+     except OSError as exc:
+         errors.append(f"cannot read package identity files: {exc}")
+     return CheckResult("package_identity", not errors, details, errors)
+ 
+-
+ def run_checks(root: Path, manifest_path: Path) -> VerificationReport:
+     checks = [
+         check_required_paths(root),
+@@ -2300,6 +2361,7 @@ def run_checks(root: Path, manifest_path: Path) -> VerificationReport:
+         check_protocol15_event_contract(root),
+         check_protocol15_runtime_event_contract(root),
+         check_protocol15_beam_state_view_contract(root),
++        check_protocol15_closure_contract(root),
+         check_no_game_data(root),
+         check_delivery_scripts(root),
+         check_package_identity(root),

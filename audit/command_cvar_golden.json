@@ -1,0 +1,50 @@
+{
+  "schema": "MiniQuakeCommandCvarGolden/1",
+  "package_id": "BP-031",
+  "parent_package_id": "BP-030",
+  "sources": [
+    "cmd.c",
+    "cvar.c"
+  ],
+  "rows": [
+    {
+      "kind": "case",
+      "name": "stored_value_bits",
+      "value": 1036831949
+    },
+    {
+      "kind": "case",
+      "name": "setvalue_1_25",
+      "value": "1.250000"
+    },
+    {
+      "kind": "case",
+      "name": "setvalue_negative_zero",
+      "value": "-0.000000"
+    },
+    {
+      "kind": "case",
+      "name": "command_buffer_size",
+      "value": 8192
+    },
+    {
+      "kind": "case",
+      "name": "max_alias_name",
+      "value": 32
+    },
+    {
+      "kind": "case",
+      "name": "max_args",
+      "value": 80
+    },
+    {
+      "kind": "case",
+      "name": "fixture_count",
+      "value": 20
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/command_cvar_oracle.c",
+    "oracle_sha256": "73d30c8d0008ab967412d8296e90a4f9a6f412c7ad27147feefb54d6a6fde2e6"
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "status": "stability_109_frozen_v1",
+  "fingerprint": "0xd0e3c03f",
+  "contract_text": "stability|host-soak=5000|listen-soak=5000|gc-resource-plateau|client-entities<=server-highwater+baseline-static-offset|clean-shutdown|live-output",
+  "fixtures": 20,
+  "host_soak_frames": 5000,
+  "listen_soak_frames": 5000,
+  "modes": [
+    "host",
+    "listen"
+  ],
+  "live_block_allowance": 512,
+  "live_byte_allowance": 65536,
+  "client_entity_policy": "server_high_water_plus_existing_static_offset",
+  "server_edict_limit": 600,
+  "client_entity_absolute_limit": 728,
+  "server_edict_growth_during_idle_soak": "rejected",
+  "client_entity_cases": [
+    {
+      "name": "r7_listen_catch_up",
+      "server_before": 67,
+      "server_after": 67,
+      "entities_before": 66,
+      "entities_after": 67,
+      "expected_limit": 67,
+      "stable": true
+    },
+    {
+      "name": "dynamic_overflow",
+      "server_before": 67,
+      "server_after": 67,
+      "entities_before": 66,
+      "entities_after": 68,
+      "expected_limit": 67,
+      "stable": false
+    },
+    {
+      "name": "existing_static_offset",
+      "server_before": 90,
+      "server_after": 90,
+      "entities_before": 96,
+      "entities_after": 96,
+      "expected_limit": 96,
+      "stable": true
+    },
+    {
+      "name": "new_static_growth_rejected",
+      "server_before": 90,
+      "server_after": 90,
+      "entities_before": 96,
+      "entities_after": 97,
+      "expected_limit": 96,
+      "stable": false
+    },
+    {
+      "name": "server_high_water_growth_rejected",
+      "server_before": 67,
+      "server_after": 68,
+      "entities_before": 66,
+      "entities_after": 67,
+      "expected_limit": 68,
+      "stable": false
+    }
+  ]
+}

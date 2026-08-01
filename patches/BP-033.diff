@@ -1,0 +1,736 @@
+diff --git a/CHANGELOG_BP-033.md b/CHANGELOG_BP-033.md
+new file mode 100644
+index 0000000..3309eea
+--- /dev/null
++++ b/CHANGELOG_BP-033.md
+@@ -0,0 +1,7 @@
++# BP-033 – Savegame-v5 byte and load/store parity
++
++- Makes raw Quake one-byte text the authoritative `.sav` file boundary.
++- Uses `quake_latin1_cstring_v1` for comments, map names, lightstyles and entity/global text.
++- Loads spawn parameters, the legacy skill temporary and saved server time through IEEE-754 binary32, matching `fscanf("%f")`.
++- Routes host save/load and save-slot inspection through byte I/O instead of UTF-8 text I/O.
++- Adds 24 asset-free runtime fixtures plus a strict C/Python oracle.
+diff --git a/audit/savegame_v5_golden.json b/audit/savegame_v5_golden.json
+new file mode 100644
+index 0000000..2448ae7
+--- /dev/null
++++ b/audit/savegame_v5_golden.json
+@@ -0,0 +1,65 @@
++{
++  "schema": "MiniQuakeSavegameV5Golden/1",
++  "package_id": "BP-033",
++  "parent_package_id": "BP-032",
++  "sources": [
++    "host_cmd.c",
++    "pr_edict.c"
++  ],
++  "rows": [
++    {
++      "kind": "case",
++      "name": "savegame_version",
++      "value": 5
++    },
++    {
++      "kind": "case",
++      "name": "comment_length",
++      "value": 39
++    },
++    {
++      "kind": "case",
++      "name": "comment_fnv1a",
++      "value": 1922791129
++    },
++    {
++      "kind": "case",
++      "name": "spawn_0_1_bits",
++      "value": 1036831949
++    },
++    {
++      "kind": "case",
++      "name": "skill_1_9_bits",
++      "value": 1072902963
++    },
++    {
++      "kind": "case",
++      "name": "legacy_skill_result",
++      "value": 2
++    },
++    {
++      "kind": "case",
++      "name": "time_bits",
++      "value": 1095075815
++    },
++    {
++      "kind": "case",
++      "name": "spawn_parms",
++      "value": 16
++    },
++    {
++      "kind": "case",
++      "name": "lightstyles",
++      "value": 64
++    },
++    {
++      "kind": "case",
++      "name": "fixture_count",
++      "value": 24
++    }
++  ],
++  "reference": {
++    "oracle": "tools/oracle/savegame_v5_oracle.c",
++    "oracle_sha256": "b781a3dd6b8e4e5a5a4e55786155f26a1c5f7035efc22042c6477ec4052574c7"
++  }
++}
+diff --git a/docs/BP-033_SAVEGAME_V5_AUDIT.md b/docs/BP-033_SAVEGAME_V5_AUDIT.md
+new file mode 100644
+index 0000000..03339b0
+--- /dev/null
++++ b/docs/BP-033_SAVEGAME_V5_AUDIT.md
+@@ -0,0 +1,19 @@
++# BP-033 savegame-v5 audit
++
++Reference paths: `host_cmd.c::Host_Savegame_f`, `Host_Loadgame_f`, `Host_SavegameComment`, and `pr_edict.c::ED_Write*`.
++
++The WinQuake v5 format is a byte-oriented line stream:
++
++1. version `5`
++2. fixed 39-byte comment
++3. 16 `%f` spawn parameters
++4. legacy float-compatible skill line
++5. map name
++6. `%f` server time
++7. 64 lightstyle lines
++8. global block
++9. one block per edict
++
++MiniQuake now writes and reads this stream through `bytes`, using the same reversible U+0000..U+00FF mapping as Protocol 15. This avoids UTF-8 expansion of bytes `0x80..0xff`. Numeric values read by original `fscanf("%f")` pass through a binary32 boundary before use.
++
++Safety deviations remain deliberate: path traversal and directory separators are rejected, malformed files return controlled errors, and the fixed comment copy is bounded rather than reproducing the original unchecked `memcpy`.
+diff --git a/src/miniquake/host.ml b/src/miniquake/host.ml
+index c64482d..6619e5f 100644
+--- a/src/miniquake/host.ml
++++ b/src/miniquake/host.ml
+@@ -700,9 +700,9 @@ function refreshSaveSlots(session)
+     name = "s" + index + ".sav"
+     label = "--- UNUSED SLOT ---"
+     if qfs.fileExists(session.filesystem, name) then
+-      source = try(qfs.readText(session.filesystem, name))
++      source = try(qfs.readFile(session.filesystem, name))
+       if source is not error then
+-        inspected = try(savegame.inspectComment(source))
++        inspected = try(savegame.inspectCommentBytes(source))
+         if inspected is not error and inspected != "" then label = inspected end if
+       end if
+     end if
+@@ -729,9 +729,9 @@ function saveGame(session, requestedName)
+   end for
+   name = savegame.filename(requestedName)
+   if name is error then return name end if
+-  text = savegame.serializeServer(session.server)
+-  if text is error then return text end if
+-  written = qfs.writeText(session.filesystem, name, text)
++  data = savegame.serializeBytes(session.server)
++  if data is error then return data end if
++  written = qfs.writeBytes(session.filesystem, name, data)
+   if written is error then return written end if
+   message = "Saved " + name
+   console.appendLine(session.console, message)
+@@ -742,9 +742,9 @@ end function
+ function loadGame(session, requestedName)
+   name = savegame.filename(requestedName)
+   if name is error then return name end if
+-  source = qfs.readText(session.filesystem, name)
++  source = qfs.readFile(session.filesystem, name)
+   if source is error then return source end if
+-  saved = savegame.parse(source)
++  saved = savegame.parseBytes(source)
+   if saved is error then return saved end if
+   cvar.setValue(session.cvars, "skill", saved.skill)
+   // Host_Loadgame_f spawns the map, restores all globals/edicts, and only
+diff --git a/src/miniquake/savegame.ml b/src/miniquake/savegame.ml
+index 713adb0..5a6806c 100644
+--- a/src/miniquake/savegame.ml
++++ b/src/miniquake/savegame.ml
+@@ -7,6 +7,7 @@ import miniquake.format.bsp as bsp
+ import miniquake.quakec.vm as vm
+ import miniquake.quakec.edict as qcedict
+ import miniquake.array_util as arrayutil
++import miniquake.protocol_text as protocolText
+ 
+ const SAVEGAME_VERSION = 5
+ const SAVEGAME_COMMENT_LENGTH = 39
+@@ -68,7 +69,10 @@ end function
+ 
+ function paddedComment(levelName, killed, total)
+   output = arrayutil.makeFilledArray(SAVEGAME_COMMENT_LENGTH, 32)
+-  level = bytes(levelName)
++  // Savegames are Quake byte streams, not UTF-8 text files.  Use the same
++  // reversible one-byte mapping as Protocol 15 so extended level names keep
++  // their original bytes.
++  level = protocolText.encodeBytes(levelName)
+   count = len(level)
+   if count > SAVEGAME_COMMENT_LENGTH then count = SAVEGAME_COMMENT_LENGTH end if
+   index = 0
+@@ -84,7 +88,7 @@ function paddedComment(levelName, killed, total)
+   while len(bytes(totalText)) < 3
+     totalText = " " + totalText
+   end while
+-  kills = bytes("kills:" + killedText + "/" + totalText)
++  kills = protocolText.encodeBytes("kills:" + killedText + "/" + totalText)
+   index = 0
+   while index < len(kills) and 22 + index < SAVEGAME_COMMENT_LENGTH
+     output[22 + index] = kills[index]
+@@ -95,7 +99,7 @@ function paddedComment(levelName, killed, total)
+     if output[index] == 32 then output[index] = 95 end if
+     index = index + 1
+   end while
+-  return decode(bytes(output))
++  return protocolText.decodeBytes(bytes(output))
+ end function
+ 
+ function namedGlobalFloat(machine, name)
+@@ -139,13 +143,30 @@ function serializeServer(server)
+   return text
+ end function
+ 
++// fopen(..., "w") writes the one-byte Quake text stream verbatim.  Keep
++// the in-memory string API for tests and command code, but make byte I/O the
++// authoritative savegame boundary.
++function serializeBytes(server)
++  text = serializeServer(server)
++  if text is error then return text end if
++  return protocolText.encodeBytes(text)
++end function
++
++function encodeText(text)
++  return protocolText.encodeBytes(text)
++end function
++
++function decodeText(data)
++  return protocolText.decodeBytes(data)
++end function
++
+ function readLine(data, offset)
+   if offset < 0 or offset > len(data) then return error(3702, "savegame line offset outside file") end if
+   finish = offset
+   while finish < len(data) and data[finish] != 10 and data[finish] != 13
+     finish = finish + 1
+   end while
+-  line = decode(slice(data, offset, finish - offset))
++  line = protocolText.decodeBytes(slice(data, offset, finish - offset))
+   while finish < len(data) and (data[finish] == 10 or data[finish] == 13)
+     finish = finish + 1
+   end while
+@@ -159,8 +180,16 @@ function numberLine(data, offset, label)
+   return [value, line[1]]
+ end function
+ 
+-function parse(text)
+-  data = bytes(text)
++function floatLine(data, offset, label)
++  parsed = numberLine(data, offset, label)
++  // fscanf("%f") stores every spawn parameter, skill temporary and saved
++  // server time through an IEEE-754 binary32 object before Quake uses it.
++  value = native.bitsFloat(native.floatBits(parsed[0]))
++  return [value, parsed[1]]
++end function
++
++function parseBytes(data)
++  if data is not bytes then return error(3712, "savegame parser requires bytes") end if
+   cursor = 0
+   versionLine = numberLine(data, cursor, "version")
+   version = native.trunc(versionLine[0])
+@@ -172,18 +201,18 @@ function parse(text)
+   spawnParms = arrayutil.makeEmptyArray(c.NUM_SPAWN_PARMS)
+   index = 0
+   while index < c.NUM_SPAWN_PARMS
+-    valueLine = numberLine(data, cursor, "spawn parm " + index)
++    valueLine = floatLine(data, cursor, "spawn parm " + index)
+     spawnParms[index] = valueLine[0]
+     cursor = valueLine[1]
+     index = index + 1
+   end while
+-  skillLine = numberLine(data, cursor, "skill")
++  skillLine = floatLine(data, cursor, "skill")
+   skill = native.trunc(skillLine[0] + 0.1)
+   cursor = skillLine[1]
+   mapLine = readLine(data, cursor)
+   mapName = mapLine[0]
+   cursor = mapLine[1]
+-  timeLine = numberLine(data, cursor, "time")
++  timeLine = floatLine(data, cursor, "time")
+   time = timeLine[0]
+   cursor = timeLine[1]
+   lightStyles = arrayutil.makeEmptyArray(c.MAX_LIGHTSTYLES)
+@@ -195,7 +224,7 @@ function parse(text)
+     index = index + 1
+   end while
+   if cursor >= len(data) then return error(3705, "savegame has no globals or edicts") end if
+-  blocks = bsp.parseEntities(decode(slice(data, cursor, len(data) - cursor)))
++  blocks = bsp.parseEntities(protocolText.decodeBytes(slice(data, cursor, len(data) - cursor)))
+   if len(blocks) < 1 then return error(3706, "savegame has no global block") end if
+   entityCount = len(blocks) - 1
+   entities = arrayutil.makeEmptyArray(entityCount)
+@@ -207,6 +236,12 @@ function parse(text)
+   return t.SaveGame(version, comment, spawnParms, skill, mapName, time, lightStyles, blocks[0], entities)
+ end function
+ 
++function parse(text)
++  encoded = protocolText.encodeBytes(text)
++  if encoded is error then return encoded end if
++  return parseBytes(encoded)
++end function
++
+ function apply(server, saved)
+   if server.machine is void or server.machine.context is void then return error(3707, "loadgame requires a spawned QuakeC server") end if
+   machine = server.machine
+@@ -248,23 +283,28 @@ function apply(server, saved)
+ end function
+ 
+ function displayComment(comment)
+-  data = bytes(comment)
++  data = protocolText.encodeBytes(comment)
+   index = 0
+   while index < len(data)
+     if data[index] == 95 then data[index] = 32 end if
+     index = index + 1
+   end while
+-  return decode(data)
++  return protocolText.decodeBytes(data)
+ end function
+ 
+-function inspectComment(text)
+-  data = bytes(text)
++function inspectCommentBytes(data)
+   versionLine = numberLine(data, 0, "version")
+   if native.trunc(versionLine[0]) != SAVEGAME_VERSION then return "" end if
+   commentLine = readLine(data, versionLine[1])
+   return displayComment(commentLine[0])
+ end function
+ 
++function inspectComment(text)
++  encoded = protocolText.encodeBytes(text)
++  if encoded is error then return "" end if
++  return inspectCommentBytes(encoded)
++end function
++
+ function hasSuffixInsensitive(text, suffix)
+   left = bytes(text)
+   right = bytes(suffix)
+@@ -306,6 +346,16 @@ function SaveGamestate(server)
+   return serializeServer(server)
+ end function
+ 
++function SaveGamestateBytes(server)
++  return serializeBytes(server)
++end function
++
++function LoadGamestateBytes(server, data)
++  saved = parseBytes(data)
++  if saved is error then return saved end if
++  return apply(server, saved)
++end function
++
+ function LoadGamestate(server, text)
+   saved = parse(text)
+   if saved is error then return saved end if
+diff --git a/tests/savegame_v5_parity_tests.ml b/tests/savegame_v5_parity_tests.ml
+new file mode 100644
+index 0000000..d58d8bd
+--- /dev/null
++++ b/tests/savegame_v5_parity_tests.ml
+@@ -0,0 +1,236 @@
++/* BP-033: WinQuake savegame version-5 framing and byte-boundary parity. */
++
++import miniquake.savegame as save
++import miniquake.constants as c
++import miniquake.native as native
++import miniquake.protocol_text as protocolText
++import miniquake.format.bsp as bsp
++
++function yes(value, name)
++  if not value then return error(3300, name + ": expected true") end if
++  return true
++end function
++
++function equal(actual, expected, name)
++  if actual != expected then return error(3301, name + ": expected " + expected + ", got " + actual) end if
++  return true
++end function
++
++function run(number, name, fn)
++  print "[" + number + "/24] " + name
++  result = try(fn())
++  if result is error then print "FAIL: " + result.message; return false end if
++  return true
++end function
++
++function latin1(value)
++  return protocolText.decodeBytes(bytes(1, value))
++end function
++
++function sampleText()
++  extended = latin1(0xe9)
++  text = "5\n"
++  text = text + "Start_________________kills:__2/__9\n"
++  index = 0
++  while index < c.NUM_SPAWN_PARMS
++    if index == 0 then
++      text = text + "0.100000001\n"
++    else
++      text = text + "0.000000\n"
++    end if
++    index = index + 1
++  end while
++  text = text + "1.900000\n"
++  text = text + "st" + extended + "rt\n"
++  text = text + "12.3456789\n"
++  index = 0
++  while index < c.MAX_LIGHTSTYLES
++    if index == 1 then text = text + extended + "\n" else text = text + "m\n" end if
++    index = index + 1
++  end while
++  text = text + "{\n\"serverflags\" \"3\"\n}\n"
++  text = text + "{\n\"classname\" \"worldspawn\"\n\"message\" \"caf" + extended + "\"\n}\n"
++  return text
++end function
++
++function parsedSample()
++  return save.parseBytes(save.encodeText(sampleText()))
++end function
++
++function testVersionConstant()
++  equal(save.SAVEGAME_VERSION, 5, "save version")
++  return true
++end function
++
++function testCommentLength()
++  value = save.paddedComment("Start", 2, 9)
++  equal(len(protocolText.encodeBytes(value)), save.SAVEGAME_COMMENT_LENGTH, "comment bytes")
++  return true
++end function
++
++function testCommentSpaces()
++  value = save.paddedComment("The Slipgate Complex", 2, 9)
++  yes(save.displayComment(value) != value, "underscores converted for display")
++  return true
++end function
++
++function testCommentKills()
++  value = save.paddedComment("Start", 2, 9)
++  data = protocolText.encodeBytes(value)
++  suffix = protocolText.decodeBytes(slice(data, 22, 15))
++  equal(suffix, "kills:__2/__9__", "kill summary")
++  return true
++end function
++
++function testExtendedCommentByte()
++  value = save.paddedComment("caf" + latin1(0xe9), 0, 0)
++  data = protocolText.encodeBytes(value)
++  equal(data[3], 0xe9, "extended comment byte")
++  return true
++end function
++
++function testDisplayComment()
++  equal(save.displayComment("A_B_C"), "A B C", "display comment")
++  return true
++end function
++
++function testFilenameExtension()
++  equal(save.filename("quick"), "quick.sav", "default extension")
++  return true
++end function
++
++function testFilenameExistingExtension()
++  equal(save.filename("quick.SAV"), "quick.SAV", "existing extension")
++  return true
++end function
++
++function testFilenameParentRejected()
++  value = try(save.filename("../quick"))
++  yes(value is error, "parent path")
++  return true
++end function
++
++function testFilenameSeparatorRejected()
++  value = try(save.filename("dir/quick"))
++  yes(value is error, "directory separator")
++  return true
++end function
++
++function testByteRoundtrip()
++  data = bytes(4)
++  data[0] = 0x41; data[1] = 0x80; data[2] = 0xe9; data[3] = 0xff
++  equal(hex(save.encodeText(save.decodeText(data))), hex(data), "save byte roundtrip")
++  return true
++end function
++
++function testParsedVersion()
++  equal(parsedSample().version, 5, "parsed version")
++  return true
++end function
++
++function testParsedComment()
++  equal(parsedSample().comment, "Start_________________kills:__2/__9", "parsed comment")
++  return true
++end function
++
++function testSpawnCount()
++  equal(len(parsedSample().spawnParms), c.NUM_SPAWN_PARMS, "spawn parm count")
++  return true
++end function
++
++function testSpawnFloatBoundary()
++  value = parsedSample().spawnParms[0]
++  equal(native.floatBits(value), native.floatBits(0.100000001), "spawn binary32")
++  return true
++end function
++
++function testLegacySkillRounding()
++  equal(parsedSample().skill, 2, "1.06 float skill compatibility")
++  return true
++end function
++
++function testExtendedMapName()
++  equal(parsedSample().mapName, "st" + latin1(0xe9) + "rt", "map byte text")
++  return true
++end function
++
++function testSavedTimeFloatBoundary()
++  value = parsedSample().time
++  equal(native.floatBits(value), native.floatBits(12.3456789), "saved time binary32")
++  return true
++end function
++
++function testLightStyleCount()
++  equal(len(parsedSample().lightStyles), c.MAX_LIGHTSTYLES, "lightstyle count")
++  return true
++end function
++
++function testExtendedLightStyle()
++  equal(parsedSample().lightStyles[1], latin1(0xe9), "lightstyle byte")
++  return true
++end function
++
++function testGlobalBlock()
++  equal(bsp.entityValue(parsedSample().globalState, "serverflags"), "3", "global block")
++  return true
++end function
++
++function testEntityBlock()
++  saved = parsedSample()
++  equal(len(saved.entities), 1, "entity count")
++  equal(bsp.entityValue(saved.entities[0], "classname"), "worldspawn", "entity classname")
++  equal(bsp.entityValue(saved.entities[0], "message"), "caf" + latin1(0xe9), "entity byte value")
++  return true
++end function
++
++function testInvalidVersion()
++  data = save.encodeText(sampleText())
++  data[0] = 54
++  value = try(save.parseBytes(data))
++  yes(value is error, "invalid version")
++  return true
++end function
++
++function testInspectBytes()
++  text = "5\nA_B_C\n"
++  equal(save.inspectCommentBytes(save.encodeText(text)), "A B C", "inspect comment bytes")
++  return true
++end function
++
++function main(args)
++  tests = [
++    ["version constant", testVersionConstant],
++    ["comment length", testCommentLength],
++    ["comment spaces", testCommentSpaces],
++    ["comment kills", testCommentKills],
++    ["extended comment", testExtendedCommentByte],
++    ["display comment", testDisplayComment],
++    ["filename extension", testFilenameExtension],
++    ["filename existing", testFilenameExistingExtension],
++    ["filename parent", testFilenameParentRejected],
++    ["filename separator", testFilenameSeparatorRejected],
++    ["byte roundtrip", testByteRoundtrip],
++    ["parsed version", testParsedVersion],
++    ["parsed comment", testParsedComment],
++    ["spawn count", testSpawnCount],
++    ["spawn float", testSpawnFloatBoundary],
++    ["legacy skill", testLegacySkillRounding],
++    ["map bytes", testExtendedMapName],
++    ["saved time", testSavedTimeFloatBoundary],
++    ["lightstyle count", testLightStyleCount],
++    ["lightstyle bytes", testExtendedLightStyle],
++    ["global block", testGlobalBlock],
++    ["entity block", testEntityBlock],
++    ["invalid version", testInvalidVersion],
++    ["inspect bytes", testInspectBytes],
++  ]
++  passed = 0
++  index = 0
++  while index < len(tests)
++    if run(index + 1, tests[index][0], tests[index][1]) then passed = passed + 1 end if
++    index = index + 1
++  end while
++  if passed != 24 then return 1 end if
++  print "MiniQuake BP-033 savegame v5 tests passed: 24"
++  return 0
++end function
+diff --git a/tools/check_savegame_v5.py b/tools/check_savegame_v5.py
+new file mode 100755
+index 0000000..7176ee6
+--- /dev/null
++++ b/tools/check_savegame_v5.py
+@@ -0,0 +1,88 @@
++#!/usr/bin/env python3
++"""Verify BP-033 WinQuake savegame-v5 byte and parsing contracts."""
++from __future__ import annotations
++import argparse, hashlib, json, os, shutil, struct, subprocess, tempfile
++from pathlib import Path
++P='BP-033'; PAR='BP-032'; G='audit/savegame_v5_golden.json'; O='tools/oracle/savegame_v5_oracle.c'
++def sha(path): return hashlib.sha256(Path(path).read_bytes()).hexdigest()
++def f32(value): return struct.unpack('<f', struct.pack('<f', value))[0]
++def fbits(value): return struct.unpack('<I', struct.pack('<f', value))[0]
++def fnv(data):
++    h=2166136261
++    for value in data: h=((h^value)*16777619)&0xffffffff
++    return h
++def comment(level,killed,total):
++    out=bytearray(b' '*39); raw=level[:39]; out[:len(raw)]=raw
++    kills=f'kills:{killed:3d}/{total:3d}'.encode('latin1'); out[22:22+len(kills)]=kills
++    return bytes(95 if value==32 else value for value in out)
++def rows():
++    return [
++      {'kind':'case','name':'savegame_version','value':5},
++      {'kind':'case','name':'comment_length','value':39},
++      {'kind':'case','name':'comment_fnv1a','value':fnv(comment(b'Start',2,9))},
++      {'kind':'case','name':'spawn_0_1_bits','value':fbits(0.100000001)},
++      {'kind':'case','name':'skill_1_9_bits','value':fbits(1.9)},
++      {'kind':'case','name':'legacy_skill_result','value':int(f32(f32(1.9)+f32(0.1)))},
++      {'kind':'case','name':'time_bits','value':fbits(12.3456789)},
++      {'kind':'case','name':'spawn_parms','value':16},
++      {'kind':'case','name':'lightstyles','value':64},
++      {'kind':'case','name':'fixture_count','value':24},
++    ]
++def doc(root): return {'schema':'MiniQuakeSavegameV5Golden/1','package_id':P,'parent_package_id':PAR,'sources':['host_cmd.c','pr_edict.c'],'rows':rows(),'reference':{'oracle':O,'oracle_sha256':sha(root/O)}}
++def compiler():
++    for value in ([os.environ['CC']] if os.environ.get('CC') else [])+['cc','gcc','clang']:
++        command=value.split()
++        if shutil.which(command[0]): return command
++    return None
++def oracle(root):
++    cc=compiler()
++    if not cc:return True,'not available',[]
++    with tempfile.TemporaryDirectory(prefix='mq-bp033-') as td:
++        exe=Path(td)/('oracle.exe' if os.name=='nt' else 'oracle')
++        built=subprocess.run(cc+['-std=c11','-Wall','-Wextra','-Werror','-O2',str(root/O),'-o',str(exe)],capture_output=True,text=True)
++        if built.returncode:return False,built.stdout+built.stderr,[]
++        run=subprocess.run([str(exe)],capture_output=True,text=True)
++        return run.returncode==0,' '.join(cc),[json.loads(line) for line in run.stdout.splitlines() if line.strip()]
++def contract(root):
++    errors=[]
++    save=(root/'src/miniquake/savegame.ml').read_text(encoding='utf-8-sig')
++    host=(root/'src/miniquake/host.ml').read_text(encoding='utf-8-sig')
++    test=(root/'tests/savegame_v5_parity_tests.ml').read_text(encoding='utf-8-sig')
++    for marker in (
++      'import miniquake.protocol_text as protocolText',
++      'function serializeBytes(server)',
++      'function parseBytes(data)',
++      'function floatLine(data, offset, label)',
++      'native.bitsFloat(native.floatBits(parsed[0]))',
++      'function inspectCommentBytes(data)',
++      'protocolText.decodeBytes(slice(data, cursor, len(data) - cursor))',
++    ):
++        if marker not in save: errors.append('missing savegame marker: '+marker)
++    for marker in (
++      'savegame.serializeBytes(session.server)',
++      'qfs.writeBytes(session.filesystem, name, data)',
++      'qfs.readFile(session.filesystem, name)',
++      'savegame.parseBytes(source)',
++      'savegame.inspectCommentBytes(source)',
++    ):
++        if marker not in host: errors.append('missing host savegame marker: '+marker)
++    if 'savegame v5 tests passed: 24' not in test: errors.append('expected 24 BP-033 fixtures')
++    return errors
++def main():
++    parser=argparse.ArgumentParser(); parser.add_argument('root',nargs='?',default='.'); parser.add_argument('--root',dest='root_flag'); parser.add_argument('--write-golden',action='store_true'); parser.add_argument('--json-output')
++    args=parser.parse_args(); root=Path(args.root_flag or args.root).resolve(); expected=doc(root); golden=root/G
++    if args.write_golden: golden.parent.mkdir(parents=True,exist_ok=True); golden.write_text(json.dumps(expected,indent=2)+'\n',encoding='utf-8')
++    errors=[]
++    if not golden.is_file(): errors.append('missing golden')
++    elif json.loads(golden.read_text(encoding='utf-8-sig')) != expected: errors.append('golden differs from Python model')
++    ok,detail,actual=oracle(root)
++    if not ok: errors.append('C oracle failed: '+detail)
++    elif actual and actual != expected['rows']: errors.append('C oracle differs from Python model')
++    errors += contract(root)
++    result={'schema':'MiniQuakeBP033SavegameV5Verification/1','package_id':P,'parent_package_id':PAR,'ok':not errors,'oracle':detail,'rows':len(expected['rows']),'runtime_fixtures':24,'errors':errors}
++    if args.json_output: Path(args.json_output).write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')
++    print('MiniQuake BP-033 savegame v5 verification: '+('PASS' if not errors else 'FAIL'))
++    print(f'  rows={len(expected["rows"])} runtime_fixtures=24 oracle={detail}')
++    for error in errors: print('  ERROR: '+error)
++    return 0 if not errors else 1
++if __name__=='__main__': raise SystemExit(main())
+diff --git a/tools/oracle/savegame_v5_oracle.c b/tools/oracle/savegame_v5_oracle.c
+new file mode 100644
+index 0000000..cc12f2a
+--- /dev/null
++++ b/tools/oracle/savegame_v5_oracle.c
+@@ -0,0 +1,57 @@
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
++
++#define SAVEGAME_VERSION 5
++#define SAVEGAME_COMMENT_LENGTH 39
++
++static uint32_t fbits(float value) {
++    uint32_t bits;
++    memcpy(&bits, &value, sizeof(bits));
++    return bits;
++}
++
++static uint32_t fnv1a(const unsigned char *data, size_t length) {
++    uint32_t hash = 2166136261u;
++    size_t index;
++    for (index = 0; index < length; ++index) {
++        hash ^= data[index];
++        hash *= 16777619u;
++    }
++    return hash;
++}
++
++static void save_comment(char *text, const char *level, int killed, int total) {
++    char kills[20];
++    int index;
++    for (index = 0; index < SAVEGAME_COMMENT_LENGTH; ++index) text[index] = ' ';
++    {
++        size_t count = strlen(level);
++        if (count > SAVEGAME_COMMENT_LENGTH) count = SAVEGAME_COMMENT_LENGTH;
++        memcpy(text, level, count);
++    }
++    sprintf(kills, "kills:%3i/%3i", killed, total);
++    memcpy(text + 22, kills, strlen(kills));
++    for (index = 0; index < SAVEGAME_COMMENT_LENGTH; ++index) if (text[index] == ' ') text[index] = '_';
++    text[SAVEGAME_COMMENT_LENGTH] = 0;
++}
++
++static void row(const char *name, unsigned long long value) {
++    printf("{\"kind\":\"case\",\"name\":\"%s\",\"value\":%llu}\n", name, value);
++}
++
++int main(void) {
++    char comment[SAVEGAME_COMMENT_LENGTH + 1];
++    save_comment(comment, "Start", 2, 9);
++    row("savegame_version", SAVEGAME_VERSION);
++    row("comment_length", SAVEGAME_COMMENT_LENGTH);
++    row("comment_fnv1a", fnv1a((const unsigned char *)comment, SAVEGAME_COMMENT_LENGTH));
++    row("spawn_0_1_bits", fbits((float)0.100000001));
++    row("skill_1_9_bits", fbits((float)1.9));
++    row("legacy_skill_result", (unsigned int)((float)1.9 + 0.1f));
++    row("time_bits", fbits((float)12.3456789));
++    row("spawn_parms", 16);
++    row("lightstyles", 64);
++    row("fixture_count", 24);
++    return 0;
++}

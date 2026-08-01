@@ -1,0 +1,349 @@
+diff --git a/src/miniquake/render/gl_warp.ml b/src/miniquake/render/gl_warp.ml
+index f9c5152..8f7ceb2 100644
+--- a/src/miniquake/render/gl_warp.ml
++++ b/src/miniquake/render/gl_warp.ml
+@@ -19,10 +19,17 @@ const TURBSCALE = 40.74366543152521
+ // through the console instead of baking the default into generated polygons.
+ gl_subdivide_size = DEFAULT_SUBDIVIDE_SIZE
+ 
++// gl_warp.c stores all polygon, direction, and texture-coordinate values in
++// float fields. Explicitly cross the IEEE-754 binary32 boundary at the same
++// assignments so the MiniLang backend cannot retain additional precision.
++function warpFloat(value)
++  return native.bitsFloat(native.floatBits(value))
++end function
++
+ function SetSubdivideSize(value)
+   global gl_subdivide_size
+   if value <= 0.0 then value = DEFAULT_SUBDIVIDE_SIZE end if
+-  gl_subdivide_size = value
++  gl_subdivide_size = warpFloat(value)
+   return gl_subdivide_size
+ end function
+ 
+@@ -89,12 +96,18 @@ function BoundPoly(vertices)
+ end function
+ 
+ function interpolateVertex(first, second, fraction)
++  fraction = warpFloat(fraction)
++  position = t.Vec3(
++    warpFloat(first.position.x + (second.position.x - first.position.x) * fraction),
++    warpFloat(first.position.y + (second.position.y - first.position.y) * fraction),
++    warpFloat(first.position.z + (second.position.z - first.position.z) * fraction),
++  )
+   return t.RenderVertex(
+-    math.add(first.position, math.scale(math.subtract(second.position, first.position), fraction)),
+-    first.s + (second.s - first.s) * fraction,
+-    first.t + (second.t - first.t) * fraction,
+-    first.lightS + (second.lightS - first.lightS) * fraction,
+-    first.lightT + (second.lightT - first.lightT) * fraction,
++    position,
++    warpFloat(first.s + (second.s - first.s) * fraction),
++    warpFloat(first.t + (second.t - first.t) * fraction),
++    warpFloat(first.lightS + (second.lightS - first.lightS) * fraction),
++    warpFloat(first.lightT + (second.lightT - first.lightT) * fraction),
+   )
+ end function
+ 
+@@ -109,8 +122,8 @@ function subdivideRecursive(vertices, output, subdivideSize)
+     maximum = maximums.x
+     if axis == 1 then minimum = minimums.y; maximum = maximums.y end if
+     if axis == 2 then minimum = minimums.z; maximum = maximums.z end if
+-    middle = (minimum + maximum) * 0.5
+-    middle = subdivideSize * floorValue(middle / subdivideSize + 0.5)
++    middle = warpFloat((minimum + maximum) * 0.5)
++    middle = warpFloat(subdivideSize * floorValue(middle / subdivideSize + 0.5))
+     if maximum - middle >= 8.0 and middle - minimum >= 8.0 then
+       distances = arrayutil.makeEmptyArray(len(vertices) + 1)
+       index = 0
+@@ -119,7 +132,7 @@ function subdivideRecursive(vertices, output, subdivideSize)
+         coordinate = point.x
+         if axis == 1 then coordinate = point.y end if
+         if axis == 2 then coordinate = point.z end if
+-        distances[index] = coordinate - middle
++        distances[index] = warpFloat(coordinate - middle)
+         index = index + 1
+       end while
+       distances[len(vertices)] = distances[0]
+@@ -134,7 +147,7 @@ function subdivideRecursive(vertices, output, subdivideSize)
+         if distance >= 0.0 then arrayutil.pushArrayBuilder(front, current) end if
+         if distance <= 0.0 then arrayutil.pushArrayBuilder(back, current) end if
+         if distance != 0.0 and nextDistance != 0.0 and ((distance > 0.0) != (nextDistance > 0.0)) then
+-          split = interpolateVertex(current, next, distance / (distance - nextDistance))
++          split = interpolateVertex(current, next, warpFloat(distance / (distance - nextDistance)))
+           arrayutil.pushArrayBuilder(front, split)
+           arrayutil.pushArrayBuilder(back, split)
+         end if
+@@ -172,8 +185,8 @@ function SurfaceWarpVertices(vertices, sVector, tVector)
+   while index < len(vertices)
+     point = vertices[index].position
+     // DotProduct in GL_SubdivideSurface intentionally excludes vecs[][3].
+-    rawS = point.x * sVector[0] + point.y * sVector[1] + point.z * sVector[2]
+-    rawT = point.x * tVector[0] + point.y * tVector[1] + point.z * tVector[2]
++    rawS = warpFloat(point.x * sVector[0] + point.y * sVector[1] + point.z * sVector[2])
++    rawT = warpFloat(point.x * tVector[0] + point.y * tVector[1] + point.z * tVector[2])
+     result[index] = t.RenderVertex(math.copy(point), rawS, rawT, 0.0, 0.0)
+     index = index + 1
+   end while
+@@ -185,10 +198,12 @@ function GL_SubdivideSurface(vertices, sVector, tVector, subdivideSize)
+ end function
+ 
+ function WaterTexCoords(originalS, originalT, realtime)
++  originalS = warpFloat(originalS)
++  originalT = warpFloat(originalT)
+   sIndex = native.trunc((originalT * 0.125 + realtime) * TURBSCALE) & 255
+   tIndex = native.trunc((originalS * 0.125 + realtime) * TURBSCALE) & 255
+-  textureS = (originalS + turbsin[sIndex]) / 64.0
+-  textureT = (originalT + turbsin[tIndex]) / 64.0
++  textureS = warpFloat((originalS + turbsin[sIndex]) / 64.0)
++  textureT = warpFloat((originalT + turbsin[tIndex]) / 64.0)
+   return [textureS, textureT]
+ end function
+ 
+@@ -216,18 +231,24 @@ function EmitWaterPolys(polygons, realtime)
+ end function
+ 
+ function WrappedSpeedScale(realtime, speed)
+-  value = realtime * speed
+-  return value - (native.trunc(value) & -128)
++  value = warpFloat(realtime * speed)
++  return warpFloat(value - (native.trunc(value) & -128))
+ end function
+ 
+ function SkyTexCoords(position, viewOrigin, currentSpeedScale)
+-  direction = math.subtract(position, viewOrigin)
+-  direction.z = direction.z * 3.0
+-  lengthValue = math.length(direction)
++  direction = t.Vec3(
++    warpFloat(position.x - viewOrigin.x),
++    warpFloat(position.y - viewOrigin.y),
++    warpFloat(position.z - viewOrigin.z),
++  )
++  direction.z = warpFloat(direction.z * 3.0)
++  lengthValue = warpFloat(math.length(direction))
+   if lengthValue == 0.0 then return [0.0, 0.0] end if
+-  scaleValue = 378.0 / lengthValue
+-  textureS = (currentSpeedScale + direction.x * scaleValue) / 128.0
+-  textureT = (currentSpeedScale + direction.y * scaleValue) / 128.0
++  scaleValue = warpFloat(378.0 / lengthValue)
++  direction.x = warpFloat(direction.x * scaleValue)
++  direction.y = warpFloat(direction.y * scaleValue)
++  textureS = warpFloat((warpFloat(currentSpeedScale) + direction.x) / 128.0)
++  textureT = warpFloat((warpFloat(currentSpeedScale) + direction.y) / 128.0)
+   return [textureS, textureT]
+ end function
+ 
+diff --git a/tests/sky_water_render_tests.ml b/tests/sky_water_render_tests.ml
+new file mode 100644
+index 0000000..287b3ad
+--- /dev/null
++++ b/tests/sky_water_render_tests.ml
+@@ -0,0 +1,208 @@
++/* BP-043: GLQuake sky/water binary32 math and subdivision boundaries. */
++
++import miniquake.render.gl_warp as warp
++import miniquake.types as t
++import miniquake.native as native
++
++function yes(value, name)
++  if not value then return error(4300, name + ": expected true") end if
++  return true
++end function
++
++function equal(actual, expected, name)
++  if actual != expected then return error(4301, name + ": expected " + expected + ", got " + actual) end if
++  return true
++end function
++
++function bits(value)
++  return native.floatBits(value)
++end function
++
++function run(number, name, fn)
++  print "[" + number + "/22] " + name
++  result = try(fn())
++  if result is error then print "FAIL: " + result.message; return false end if
++  return true
++end function
++
++function vertex(x, y, z, s, tt)
++  return t.RenderVertex(t.Vec3(x, y, z), s, tt, 0.0, 0.0)
++end function
++
++function quad(size)
++  return [
++    vertex(-size, -size, 0.0, -size, -size),
++    vertex(size, -size, 0.0, size, -size),
++    vertex(size, size, 0.0, size, size),
++    vertex(-size, size, 0.0, -size, size),
++  ]
++end function
++
++function testWarpFloatBoundary()
++  equal(bits(warp.warpFloat(16777217.0)), 0x4b800000, "float boundary")
++  return true
++end function
++
++function testSubdivideDefault()
++  equal(bits(warp.SetSubdivideSize(0.0)), bits(128.0), "default subdivide")
++  return true
++end function
++
++function testSubdivideFloatStorage()
++  equal(bits(warp.SetSubdivideSize(16777217.0)), 0x4b800000, "subdivide float")
++  return true
++end function
++
++function testWaterOneS()
++  value = warp.WaterTexCoords(64.0, 32.0, 0.25)
++  equal(bits(value[0]), 0x3f636ab6, "water one s")
++  return true
++end function
++
++function testWaterOneT()
++  value = warp.WaterTexCoords(64.0, 32.0, 0.25)
++  equal(bits(value[1]), 0x3f1d906d, "water one t")
++  return true
++end function
++
++function testWaterTwoS()
++  value = warp.WaterTexCoords(-17.25, 93.5, 123.75)
++  equal(bits(value[0]), 0xbe9f8f9b, "water two s")
++  return true
++end function
++
++function testWaterTwoT()
++  value = warp.WaterTexCoords(-17.25, 93.5, 123.75)
++  equal(bits(value[1]), 0x3fc7d9f0, "water two t")
++  return true
++end function
++
++function testSolidSpeedWrap()
++  equal(bits(warp.WrappedSpeedScale(20.0, 8.0)), 0x42000000, "solid speed")
++  return true
++end function
++
++function testAlphaSpeedWrap()
++  equal(bits(warp.WrappedSpeedScale(20.0, 16.0)), 0x42800000, "alpha speed")
++  return true
++end function
++
++function testNegativeSpeedWrap()
++  equal(bits(warp.WrappedSpeedScale(-1.25, 8.0)), 0x42ec0000, "negative speed")
++  return true
++end function
++
++function testSkyGeneralS()
++  value = warp.SkyTexCoords(t.Vec3(64.0, 32.0, 16.0), t.Vec3(3.0, -2.0, 1.0), 32.0)
++  equal(bits(value[0]), 0x401ac5d2, "sky general s")
++  return true
++end function
++
++function testSkyGeneralT()
++  value = warp.SkyTexCoords(t.Vec3(64.0, 32.0, 16.0), t.Vec3(3.0, -2.0, 1.0), 32.0)
++  equal(bits(value[1]), 0x3fbab28e, "sky general t")
++  return true
++end function
++
++function testSkyAxis()
++  value = warp.SkyTexCoords(t.Vec3(1.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), 0.0)
++  equal(bits(value[0]), 0x403d0000, "sky x axis")
++  equal(bits(value[1]), 0, "sky x axis t")
++  return true
++end function
++
++function testSkyZeroDirection()
++  value = warp.SkyTexCoords(t.Vec3(1.0, 2.0, 3.0), t.Vec3(1.0, 2.0, 3.0), 10.0)
++  equal(value[0], 0.0, "zero sky s")
++  equal(value[1], 0.0, "zero sky t")
++  return true
++end function
++
++function testSurfaceVectorsIgnoreOffset()
++  values = warp.SurfaceWarpVertices([vertex(2.0, 3.0, 4.0, 0.0, 0.0)], [1.0, 2.0, 3.0, 999.0], [4.0, 5.0, 6.0, 999.0])
++  equal(values[0].s, 20.0, "surface s")
++  equal(values[0].t, 47.0, "surface t")
++  return true
++end function
++
++function testSubdivideVertexLimit()
++  values = []
++  index = 0
++  while index < 61
++    values = values + [vertex(index, 0.0, 0.0, 0.0, 0.0)]
++    index = index + 1
++  end while
++  result = try(warp.SubdividePolygon(values, 128.0))
++  yes(result is error, "vertex limit")
++  return true
++end function
++
++function testSmallPolygonNoSplit()
++  equal(len(warp.SubdividePolygon(quad(16.0), 128.0)), 1, "small polygon")
++  return true
++end function
++
++function testLargePolygonSplits()
++  yes(len(warp.SubdividePolygon(quad(128.0), 128.0)) > 1, "large polygon split")
++  return true
++end function
++
++function testInvalidSkySize()
++  texture = t.BspTexture("bad", 128, 128, [0, 0, 0, 0], bytes(128 * 128))
++  yes(try(warp.R_InitSky(texture, bytes(768))) is error, "sky size")
++  return true
++end function
++
++function testInvalidSkyPalette()
++  texture = t.BspTexture("bad", 256, 128, [0, 0, 0, 0], bytes(256 * 128))
++  yes(try(warp.R_InitSky(texture, bytes(767))) is error, "sky palette")
++  return true
++end function
++
++function testSkyTransparentAverage()
++  palette = bytes(768)
++  palette[3] = 10; palette[4] = 20; palette[5] = 30
++  pixels = bytes(256 * 128, 1)
++  pixels[0] = 0
++  texture = t.BspTexture("sky", 256, 128, [0, 0, 0, 0], pixels)
++  result = warp.R_InitSky(texture, palette)
++  equal(result[1][0], 10, "average red")
++  equal(result[1][1], 20, "average green")
++  equal(result[1][2], 30, "average blue")
++  equal(result[1][3], 0, "average alpha")
++  return true
++end function
++
++function testLayerSpeeds()
++  result = warp.EmitBothSkyLayers([quad(16.0)], t.Vec3(0.0, 0.0, 0.0), 20.0)
++  equal(bits(result[0]), 0x42000000, "solid layer speed")
++  equal(bits(result[2]), 0x42800000, "alpha layer speed")
++  return true
++end function
++
++passed = 0
++if run(1, "binary32 warp storage", testWarpFloatBoundary) then passed = passed + 1 end if
++if run(2, "default subdivision cvar", testSubdivideDefault) then passed = passed + 1 end if
++if run(3, "subdivision binary32 cvar", testSubdivideFloatStorage) then passed = passed + 1 end if
++if run(4, "water coordinates one S", testWaterOneS) then passed = passed + 1 end if
++if run(5, "water coordinates one T", testWaterOneT) then passed = passed + 1 end if
++if run(6, "water coordinates two S", testWaterTwoS) then passed = passed + 1 end if
++if run(7, "water coordinates two T", testWaterTwoT) then passed = passed + 1 end if
++if run(8, "solid sky speed wrapping", testSolidSpeedWrap) then passed = passed + 1 end if
++if run(9, "alpha sky speed wrapping", testAlphaSpeedWrap) then passed = passed + 1 end if
++if run(10, "negative sky speed wrapping", testNegativeSpeedWrap) then passed = passed + 1 end if
++if run(11, "sky coordinate S", testSkyGeneralS) then passed = passed + 1 end if
++if run(12, "sky coordinate T", testSkyGeneralT) then passed = passed + 1 end if
++if run(13, "sky axis coordinate", testSkyAxis) then passed = passed + 1 end if
++if run(14, "zero sky direction", testSkyZeroDirection) then passed = passed + 1 end if
++if run(15, "surface texture vectors", testSurfaceVectorsIgnoreOffset) then passed = passed + 1 end if
++if run(16, "subdivision vertex limit", testSubdivideVertexLimit) then passed = passed + 1 end if
++if run(17, "small polygon subdivision", testSmallPolygonNoSplit) then passed = passed + 1 end if
++if run(18, "large polygon subdivision", testLargePolygonSplits) then passed = passed + 1 end if
++if run(19, "sky texture dimensions", testInvalidSkySize) then passed = passed + 1 end if
++if run(20, "sky palette length", testInvalidSkyPalette) then passed = passed + 1 end if
++if run(21, "sky transparent average", testSkyTransparentAverage) then passed = passed + 1 end if
++if run(22, "two-layer sky speeds", testLayerSpeeds) then passed = passed + 1 end if
++
++if passed != 22 then error(4399, "BP-043 sky/water tests failed: " + passed + "/22") end if
++print "MiniQuake BP-043 sky/water render tests passed: 22"

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "package": "BP-071",
+  "fixtures": 24,
+  "pack_magic": "PACK",
+  "entry_size": 64,
+  "name_size": 56,
+  "max_files": 2048,
+  "pak0_count": 339,
+  "pak0_crc": 32981,
+  "load_file_nul": true,
+  "case_sensitive_pack_lookup": true,
+  "quake_text_abi": "quake_latin1_cstring_v1"
+}

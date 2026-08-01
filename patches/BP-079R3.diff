@@ -1,0 +1,1422 @@
+diff --git a/BLOCK_LEDGER.json b/BLOCK_LEDGER.json
+index 008be33102bb8d23fb574216f462adab636df3ef..5351f17378aee03423776a906ca3a5a3ad4ca5d8 100644
+--- a/BLOCK_LEDGER.json
++++ b/BLOCK_LEDGER.json
+@@ -4,7 +4,7 @@
+   "block_id": "BP-075-079",
+   "parent_package_id": "BP-070-074R6",
+   "final_package_id": "BP-079",
+-  "delivery_revision": "BP-075-079R2",
++  "delivery_revision": "BP-075-079R3",
+   "core_assets_memory_status": "core_assets_memory_109_frozen_v1",
+   "core_assets_memory_fingerprint": "0x6c8d974d",
+   "steps": [
+@@ -75,7 +75,7 @@
+     "game_data": "external; never bundled",
+     "pixel_similarity": "inherited deterministic evidence; original-image corpus remains external"
+   },
+-  "delivery_parent": "BP-075-079R1",
++  "delivery_parent": "BP-075-079R2",
+   "r1_delivery_hotfix": {
+     "revision": "BP-070-074R1",
+     "parent": "BP-070-074",
+@@ -213,7 +213,7 @@
+   "bp075079r2_delivery_hotfix": {
+     "revision": "BP-075-079R2",
+     "parent": "BP-075-079R1",
+-    "status": "Windows acceptance pending",
++    "status": "Windows build 81/81; inherited tests through BP-035 PASS; failed at BP-036 cshift atoi fixture; superseded by R3",
+     "predecessor_result_archive": "MiniQuake_BP-075-079R1_RESULTS_20260730-153422.zip",
+     "predecessor_result_sha256": "de4b5325fe5e4506cf812f0775047afcb1927971f7ee9ffad1cc5f2a688919fb",
+     "failure": "BP-036 inherited checker required the historical Q_atoi marker in a downstream BP-079 source tree",
+@@ -223,6 +223,26 @@
+     "production_source_changed": false,
+     "native_source_changed": false,
+     "contract_fingerprint_changed": false,
+-    "fixture_count_changed": false
++    "fixture_count_changed": false,
++    "result_archive": "MiniQuake_BP-075-079R2_RESULTS_20260730-172927.zip",
++    "result_archive_sha256": "225397ce680774d4730f0b75929f52e05749c70a6ead246051e057a310b9916b",
++    "windows_build": "81/81 targets compiled",
++    "first_runtime_failure": "BP-036 fixture 12/22"
++  },
++  "bp075079r3_delivery_hotfix": {
++    "revision": "BP-075-079R3",
++    "parent": "BP-075-079R2",
++    "status": "Windows acceptance pending",
++    "predecessor_result_archive": "MiniQuake_BP-075-079R2_RESULTS_20260730-172927.zip",
++    "predecessor_result_sha256": "225397ce680774d4730f0b75929f52e05749c70a6ead246051e057a310b9916b",
++    "failure": "inherited BP-036 runtime fixture expected Q_atoi values 32/65 after downstream V_cshift_f changed to C atoi",
++    "fix": "bind downstream inherited runtime expectations to 0/0 while preserving strict historical 32/65 mode",
++    "strict_historical_mode_preserved": true,
++    "downstream_flag": "--allow-downstream-package",
++    "production_source_changed": false,
++    "native_source_changed": false,
++    "contract_fingerprint_changed": false,
++    "fixture_count_changed": false,
++    "runtime_fixture_count": "BP-036 remains 22; block remains 112"
+   }
+ }
+diff --git a/CHANGELOG_BP-075-079R3.md b/CHANGELOG_BP-075-079R3.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..fdba59973308cb4a0d8ff6776958c8f235502e63
+--- /dev/null
++++ b/CHANGELOG_BP-075-079R3.md
+@@ -0,0 +1,16 @@
++# MiniQuake BP-075–BP-079R3
++
++## Fixed
++
++- Updated the inherited BP-036 runtime fixture to match the source-correct C-runtime `atoi` behavior introduced by BP-076.
++- `0x20` and `'A` now correctly produce zero in the downstream `V_cshift_f` regression test.
++- Extended the shared BP-036 checker so downstream mode validates both the production parser and the inherited runtime expectations.
++- Strict historical mode still requires the original BP-036 `Q_atoi` source and 32/65 fixture values.
++- Added R3-specific live Windows runner, collector metadata, result analysis and delivery ledger.
++
++## Unchanged
++
++- No file under `src/` or `native/` changed.
++- BP-036 remains 22 fixtures; BP-075–BP-079 remains 112 fixtures.
++- `client_render_109_frozen_v1` remains `0x95e2b295`.
++- `gameplay_presentation_109_frozen_v1` remains `0xad91624c`.
+diff --git a/COLLECT_RESULTS.ps1 b/COLLECT_RESULTS.ps1
+index 14562d97444247c6fea1bca03066963b666d56dc..0ae62e0b99bbe900ec0d738ecb79846b6c239672 100644
+--- a/COLLECT_RESULTS.ps1
++++ b/COLLECT_RESULTS.ps1
+@@ -7,11 +7,11 @@ $Root = $PSScriptRoot
+ $Build = Join-Path $Root "build"
+ $PackageId = "BP-079"
+ $BlockId = "BP-075-079"
+-$DeliveryRevision = "BP-075-079R2"
+-$DeliveryParent = "BP-075-079R1"
++$DeliveryRevision = "BP-075-079R3"
++$DeliveryParent = "BP-075-079R2"
+ $Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+-$Staging = Join-Path $Build (".bp075-079r2-results-{0}" -f $Timestamp)
+-$Archive = Join-Path $Build ("MiniQuake_BP-075-079R2_RESULTS_{0}.zip" -f $Timestamp)
++$Staging = Join-Path $Build (".bp075-079r3-results-{0}" -f $Timestamp)
++$Archive = Join-Path $Build ("MiniQuake_BP-075-079R3_RESULTS_{0}.zip" -f $Timestamp)
+ 
+ if (-not (Test-Path -LiteralPath $Build -PathType Container)) { throw "build directory does not exist: $Build" }
+ if (Test-Path -LiteralPath $Staging) { Remove-Item -Recurse -Force -LiteralPath $Staging }
+@@ -76,6 +76,13 @@ $RootFiles = @(
+   "COLLECT_RESULTS.ps1",
+   "test.ps1",
+   "TEST_BP-075-079.ps1",
++  "TEST_BP-075-079R3.ps1",
++  "CHANGELOG_BP-075-079R3.md",
++  "docs\BP-075-079R3_TESTING.md",
++  "docs\BP-075-079R3_RESULT_ANALYSIS.md",
++  "docs\BP-075-079R3_HOTFIX_REPORT.json",
++  "docs\BP-075-079R3_BLOCK_LEDGER.json",
++  "patches\BP-079R3.diff",
+   "TEST_BP-075-079R2.ps1",
+   "CHANGELOG_BP-075-079R2.md",
+   "docs\BP-075-079R2_TESTING.md",
+diff --git a/PORT_LEDGER.json b/PORT_LEDGER.json
+index 69bc181cd48476aa9d89a49e3f2f01d2579cb065..a0d54adb63a8ba57881ee49186f87bec606da8bd 100644
+--- a/PORT_LEDGER.json
++++ b/PORT_LEDGER.json
+@@ -2,8 +2,8 @@
+   "schema_version": 1,
+   "project": "MiniQuake",
+   "current_package": "BP-079",
+-  "current_delivery_revision": "BP-075-079R2",
+-  "delivery_parent": "BP-075-079R1",
++  "current_delivery_revision": "BP-075-079R3",
++  "delivery_parent": "BP-075-079R2",
+   "parent_package": "BP-078",
+   "compatibility_target": {
+     "reference": "WinQuake/GLQuake 1.09",
+@@ -63,11 +63,11 @@
+     "block_parent": "BP-070-074R6",
+     "date": "2026-07-30",
+     "title": "WinQuake gameplay and presentation closure",
+-    "status": "Windows acceptance pending (R2 inherited BP-036 checker lineage correction)",
++    "status": "Windows acceptance pending (R3 inherited BP-036 runtime fixture lineage correction)",
+     "gameplay_presentation_status": "gameplay_presentation_109_frozen_v1",
+     "gameplay_presentation_fingerprint": "0xad91624c",
+-    "delivery_revision": "BP-075-079R2",
+-    "delivery_parent": "BP-075-079R1"
++    "delivery_revision": "BP-075-079R3",
++    "delivery_parent": "BP-075-079R2"
+   },
+   "diagnostic_schemas": {
+     "trace": "MiniQuakeCompatTrace|schema=1",
+@@ -1842,7 +1842,7 @@
+   "bp075079r2_hotfix": {
+     "revision": "BP-075-079R2",
+     "parent": "BP-075-079R1",
+-    "status": "Windows acceptance pending",
++    "status": "Windows build 81/81; failed at inherited BP-036 runtime fixture; superseded by R3",
+     "predecessor_result_archive": "MiniQuake_BP-075-079R1_RESULTS_20260730-153422.zip",
+     "predecessor_result_sha256": "de4b5325fe5e4506cf812f0775047afcb1927971f7ee9ffad1cc5f2a688919fb",
+     "failure": "inherited BP-036 checker still required common.atoi after BP-076 correctly switched view.c semantics to common.cAtoi",
+@@ -1851,6 +1851,21 @@
+     "production_source_changed": false,
+     "native_source_changed": false,
+     "contract_fingerprint_changed": false,
++    "fixture_count_changed": false,
++    "result_archive": "MiniQuake_BP-075-079R2_RESULTS_20260730-172927.zip",
++    "result_archive_sha256": "225397ce680774d4730f0b75929f52e05749c70a6ead246051e057a310b9916b"
++  },
++  "bp075079r3_hotfix": {
++    "revision": "BP-075-079R3",
++    "parent": "BP-075-079R2",
++    "status": "Windows acceptance pending",
++    "predecessor_result_archive": "MiniQuake_BP-075-079R2_RESULTS_20260730-172927.zip",
++    "predecessor_result_sha256": "225397ce680774d4730f0b75929f52e05749c70a6ead246051e057a310b9916b",
++    "failure": "BP-036 inherited runtime expectations did not follow the accepted downstream C atoi source semantics",
++    "fix": "downstream fixture expects 0 for hexadecimal and character forms; checker enforces source and runtime lineage",
++    "production_source_changed": false,
++    "native_source_changed": false,
++    "contract_fingerprint_changed": false,
+     "fixture_count_changed": false
+   }
+ }
+diff --git a/README.md b/README.md
+index 3785a6d9375e1fa78577c6e94259396a630b5f44..faf3843112ce6fb261872cbe89f6fc5d0a18c030 100644
+--- a/README.md
++++ b/README.md
+@@ -9,7 +9,7 @@ gameplay_presentation_109_frozen_v1
+ fingerprint=0xad91624c
+ ```
+ 
+-Run the Windows acceptance with `TEST_BP-075-079R2.ps1`; see `docs/BP-075-079R2_TESTING.md`. Output is streamed live and the package contains no Quake game data.
++Run the Windows acceptance with `TEST_BP-075-079R3.ps1`; see `docs/BP-075-079R3_TESTING.md`. Output is streamed live and the package contains no Quake game data.
+ 
+ ---
+ 
+diff --git a/TEST_BP-075-079R3.ps1 b/TEST_BP-075-079R3.ps1
+new file mode 100644
+index 0000000000000000000000000000000000000000..c9cf4fc6b8e8e32e075c152906e8120e18970d6c
+--- /dev/null
++++ b/TEST_BP-075-079R3.ps1
+@@ -0,0 +1,429 @@
++﻿[CmdletBinding()]
++param(
++  [string]$Compiler = "",
++  [Alias("StdLibPath", "ImportRoot")]
++  [string]$StdLib = "",
++  [string]$Python = "",
++  [string]$QuakeBase = "",
++  [string]$Game = "id1",
++  [string]$Map = "start",
++  [ValidateRange(1, 1000000)]
++  [int]$Frames = 300,
++  [ValidateRange(1, 1000000)]
++  [int]$TraceFrames = 128,
++  [ValidateRange(1, 1000000)]
++  [int]$RenderEvidenceFrame = 128,
++  [ValidateSet("Release", "Debug")]
++  [string]$Configuration = "Release",
++  [switch]$SkipBuild,
++  [switch]$SkipGameValidation,
++  [switch]$SkipTraceValidation,
++  [switch]$SkipRenderEvidence,
++  [switch]$SkipAudioEvidence,
++  [switch]$SkipNetworkEvidence,
++  [switch]$NetworkTests,
++  [switch]$RebuildNative,
++  [switch]$Listings,
++  [switch]$ContinueIndependentTests = $true,
++  [switch]$BisectOnFailure
++)
++
++$ErrorActionPreference = "Stop"
++Set-StrictMode -Version Latest
++
++# Force Python tools and the Python MiniLang compiler to flush every line.
++# The PowerShell wrappers below also forward every received line immediately.
++$env:PYTHONUNBUFFERED = "1"
++
++$PackageId = "BP-079"
++$ParentPackageId = "BP-078"
++$BlockId = "BP-075-079"
++$DeliveryRevision = "BP-075-079R3"
++$DeliveryParent = "BP-075-079R2"
++$BlockParentPackageId = "BP-070-074R6"
++$Root = $PSScriptRoot
++$Build = Join-Path $Root "build"
++$BuildScript = Join-Path $Root "build.ps1"
++$GameExe = Join-Path $Build "MiniQuake.exe"
++$EvidenceExe = Join-Path $Build "MiniQuakeNetworkPlatformEvidence.exe"
++$CoreAssetEvidenceExe = Join-Path $Build "MiniQuakeCoreAssetRetailEvidence.exe"
++$TraceComparator = Join-Path $Root "tools\compare_traces.py"
++$RenderComparator = Join-Path $Root "tools\compare_render_evidence.py"
++$Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
++$TranscriptPath = Join-Path $Build ("bp075-079r3-test-{0}.log" -f $Timestamp)
++$SummaryPath = Join-Path $Build "bp075-079r3-test-summary.json"
++$Steps = New-Object System.Collections.Generic.List[object]
++
++function Resolve-Tool([string]$Value, [string]$Label) {
++  if (-not [string]::IsNullOrWhiteSpace($Value) -and (Test-Path -LiteralPath $Value -PathType Leaf)) {
++    return [IO.Path]::GetFullPath($Value)
++  }
++  if (-not [string]::IsNullOrWhiteSpace($Value)) {
++    $Command = Get-Command $Value -ErrorAction SilentlyContinue | Select-Object -First 1
++    if ($null -ne $Command) { return $Command.Path }
++  }
++  throw "$Label not found: $Value"
++}
++
++function Add-Step([string]$Name, [string]$Status, [int]$ExitCode, [string]$Detail) {
++  $Steps.Add([ordered]@{ name = $Name; status = $Status; exit_code = $ExitCode; detail = $Detail })
++  $Color = if ($Status -eq "PASS") { "Green" } elseif ($Status -eq "SKIPPED") { "Yellow" } else { "Red" }
++  Write-Host ("[{0}] {1} - {2}" -f $Status, $Name, $Detail) -ForegroundColor $Color
++}
++
++function Failure-Marker([string]$Text) {
++  if ([string]::IsNullOrWhiteSpace($Text)) { return "" }
++  foreach ($Line in ($Text -split "`r?`n")) {
++    if ($Line -match '^\s*FAIL:\s*' -or $Line -match 'tests failed:\s*[1-9]' -or $Line -match 'evidence:\s*FAIL') { return $Line.Trim() }
++  }
++  return ""
++}
++
++function Invoke-LiveProcess(
++  [string]$Executable,
++  [string[]]$Arguments,
++  [string]$LogPath
++) {
++  $Lines = [System.Collections.Generic.List[string]]::new()
++  $Encoding = [System.Text.UTF8Encoding]::new($false)
++  $Writer = [System.IO.StreamWriter]::new($LogPath, $false, $Encoding)
++  $Code = 1
++  try {
++    & $Executable @Arguments 2>&1 |
++      ForEach-Object {
++        $Line = [string]$_
++        $Lines.Add($Line)
++        $Writer.WriteLine($Line)
++        $Writer.Flush()
++        Write-Host $Line
++      }
++    $Code = [int]$LASTEXITCODE
++  } finally {
++    $Writer.Flush()
++    $Writer.Dispose()
++  }
++  $Text = [string]::Join("`n", $Lines.ToArray())
++  return [pscustomobject]@{
++    exit_code = $Code
++    text = $Text
++  }
++}
++
++function Run-Logged([string]$Name, [string]$Executable, [string[]]$Arguments, [string]$LogName, [string]$RequiredMarker = "") {
++  $LogPath = Join-Path $Build $LogName
++  Write-Host ("[MiniQuake] starting {0}" -f $Name) -ForegroundColor Cyan
++  $Result = Invoke-LiveProcess -Executable $Executable -Arguments $Arguments -LogPath $LogPath
++  $Code = [int]$Result.exit_code
++  $Text = [string]$Result.text
++  $Marker = Failure-Marker $Text
++  if ($Code -eq 0 -and -not [string]::IsNullOrWhiteSpace($Marker)) { $Code = 1 }
++  if ($Code -eq 0 -and -not [string]::IsNullOrWhiteSpace($RequiredMarker) -and $Text -notmatch [regex]::Escape($RequiredMarker)) { $Code = 1; $Marker = "missing marker: $RequiredMarker" }
++  if ($Code -ne 0) { Add-Step $Name "FAIL" $Code ("log=" + $LogName + " " + $Marker); throw "$Name failed with exit code $Code" }
++  Add-Step $Name "PASS" 0 ("log=" + $LogName)
++  return $Text
++}
++
++function Start-BackgroundCapturedProcess(
++  [string]$Executable,
++  [string]$ArgumentsText,
++  [string]$Label
++) {
++  $StartInfo = New-Object System.Diagnostics.ProcessStartInfo
++  $StartInfo.FileName = $Executable
++  $StartInfo.Arguments = $ArgumentsText
++  $StartInfo.WorkingDirectory = $Root
++  $StartInfo.UseShellExecute = $false
++  $StartInfo.CreateNoWindow = $true
++  $StartInfo.RedirectStandardOutput = $true
++  $StartInfo.RedirectStandardError = $true
++
++  $Process = New-Object System.Diagnostics.Process
++  $Process.StartInfo = $StartInfo
++  try {
++    if (-not $Process.Start()) {
++      throw "process start returned false"
++    }
++  } catch {
++    $Process.Dispose()
++    throw ("INFRA_FAILURE: could not start {0}: {1}" -f $Label, $_.Exception.Message)
++  }
++
++  # Drain both redirected streams asynchronously while the server runs. This
++  # avoids a pipe deadlock without buffering any foreground compiler/test job.
++  $StdoutTask = $Process.StandardOutput.ReadToEndAsync()
++  $StderrTask = $Process.StandardError.ReadToEndAsync()
++  return [pscustomobject]@{
++    process = $Process
++    stdout_task = $StdoutTask
++    stderr_task = $StderrTask
++    label = $Label
++  }
++}
++
++function Stop-BackgroundCapturedProcess([pscustomobject]$Handle) {
++  if ($null -eq $Handle -or $null -eq $Handle.process) { return }
++  $Process = [System.Diagnostics.Process]$Handle.process
++  try {
++    if (-not $Process.HasExited) { $Process.Kill() }
++  } catch { }
++  try { $Process.WaitForExit() } catch { }
++}
++
++function Complete-BackgroundCapturedProcess(
++  [pscustomobject]$Handle,
++  [int]$TimeoutMilliseconds,
++  [string]$StdoutPath,
++  [string]$StderrPath
++) {
++  $Process = [System.Diagnostics.Process]$Handle.process
++  $Label = [string]$Handle.label
++  $Exited = $false
++  try {
++    $Exited = $Process.WaitForExit($TimeoutMilliseconds)
++  } catch {
++    Stop-BackgroundCapturedProcess $Handle
++    throw ("INFRA_FAILURE: waiting for {0} failed: {1}" -f $Label, $_.Exception.Message)
++  }
++  if (-not $Exited) {
++    Stop-BackgroundCapturedProcess $Handle
++    throw ("INFRA_FAILURE: {0} timed out after {1} ms" -f $Label, $TimeoutMilliseconds)
++  }
++
++  # The parameterless wait synchronizes redirected-stream completion on
++  # Windows PowerShell 5.1. Refresh before reading ExitCode so the process
++  # object cannot retain the blank/null status observed in R5.
++  $Process.WaitForExit()
++  $Process.Refresh()
++
++  try {
++    $Stdout = [string]$Handle.stdout_task.Result
++    $Stderr = [string]$Handle.stderr_task.Result
++  } catch {
++    $Process.Dispose()
++    throw ("INFRA_FAILURE: collecting {0} output failed: {1}" -f $Label, $_.Exception.Message)
++  }
++
++  $Encoding = New-Object System.Text.UTF8Encoding($false)
++  [System.IO.File]::WriteAllText($StdoutPath, $Stdout, $Encoding)
++  [System.IO.File]::WriteAllText($StderrPath, $Stderr, $Encoding)
++
++  try {
++    $Code = [int]$Process.ExitCode
++  } catch {
++    $Process.Dispose()
++    throw ("INFRA_FAILURE: {0} exit code unavailable after process completion: {1}" -f $Label, $_.Exception.Message)
++  }
++  $Process.Dispose()
++
++  return [pscustomobject]@{
++    exit_code = $Code
++    stdout = $Stdout
++    stderr = $Stderr
++    timed_out = $false
++  }
++}
++
++function Write-NetworkEvidenceOutput([string]$Suffix, [string]$Stdout, [string]$Stderr) {
++  if (-not [string]::IsNullOrWhiteSpace($Stdout)) {
++    Write-Host ("[MiniQuake] network evidence server {0} stdout" -f $Suffix) -ForegroundColor Cyan
++    foreach ($Line in ($Stdout -split "`r?`n")) {
++      if (-not [string]::IsNullOrEmpty($Line)) { Write-Host $Line }
++    }
++  }
++  if (-not [string]::IsNullOrWhiteSpace($Stderr)) {
++    Write-Host ("[MiniQuake] network evidence server {0} stderr" -f $Suffix) -ForegroundColor Yellow
++    foreach ($Line in ($Stderr -split "`r?`n")) {
++      if (-not [string]::IsNullOrEmpty($Line)) { Write-Host $Line -ForegroundColor Yellow }
++    }
++  }
++}
++
++function Run-NetworkEvidencePair([string]$Suffix, [int]$Port) {
++  $ServerOut = Join-Path $Build ("bp075-079r3-network-server-{0}.log" -f $Suffix)
++  $ServerErr = Join-Path $Build ("bp075-079r3-network-server-{0}.err.log" -f $Suffix)
++  $ClientLog = Join-Path $Build ("bp075-079r3-network-client-{0}.log" -f $Suffix)
++  $PairJson = Join-Path $Build ("bp075-079r3-network-pair-{0}.json" -f $Suffix)
++  Remove-Item -Force -ErrorAction SilentlyContinue $ServerOut, $ServerErr, $ClientLog, $PairJson
++
++  Write-Host ("[MiniQuake] starting network evidence server {0} on UDP port {1}" -f $Suffix, $Port) -ForegroundColor Cyan
++  $ServerHandle = Start-BackgroundCapturedProcess -Executable $EvidenceExe -ArgumentsText ("server {0}" -f $Port) -Label ("network evidence server {0}" -f $Suffix)
++  $ClientResult = $null
++  $ServerResult = $null
++  try {
++    Start-Sleep -Milliseconds 300
++    Write-Host ("[MiniQuake] starting network evidence client {0}" -f $Suffix) -ForegroundColor Cyan
++    $ClientResult = Invoke-LiveProcess -Executable $EvidenceExe -Arguments @("client", [string]$Port) -LogPath $ClientLog
++    $ServerResult = Complete-BackgroundCapturedProcess -Handle $ServerHandle -TimeoutMilliseconds 7000 -StdoutPath $ServerOut -StderrPath $ServerErr
++  } catch {
++    Stop-BackgroundCapturedProcess $ServerHandle
++    throw
++  }
++
++  $ClientCode = [int]$ClientResult.exit_code
++  $ClientText = [string]$ClientResult.text
++  $ServerCode = [int]$ServerResult.exit_code
++  $ServerText = [string]$ServerResult.stdout
++  $ServerErrorText = [string]$ServerResult.stderr
++  Write-NetworkEvidenceOutput -Suffix $Suffix -Stdout $ServerText -Stderr $ServerErrorText
++
++  $ServerPassed = $ServerText -match 'network platform evidence server: PASS'
++  $ClientPassed = $ClientText -match 'network platform evidence: PASS'
++  $PairSummary = [ordered]@{
++    schema_version = 1
++    suffix = $Suffix
++    port = $Port
++    server_exit_code = $ServerCode
++    client_exit_code = $ClientCode
++    server_pass_marker = [bool]$ServerPassed
++    client_pass_marker = [bool]$ClientPassed
++    server_stderr_empty = [string]::IsNullOrWhiteSpace($ServerErrorText)
++    status = if ($ServerCode -eq 0 -and $ClientCode -eq 0 -and $ServerPassed -and $ClientPassed) { "PASS" } else { "FAIL" }
++  }
++  $PairSummary | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $PairJson -Encoding UTF8
++
++  if ($ServerCode -ne 0 -or $ClientCode -ne 0) {
++    throw "network evidence pair $Suffix failed: server=$ServerCode client=$ClientCode"
++  }
++  if (-not $ServerPassed) { throw "network evidence server $Suffix did not report PASS" }
++  if (-not $ClientPassed) { throw "network evidence client $Suffix did not report PASS" }
++  return $ClientLog
++}
++
++New-Item -ItemType Directory -Force -Path $Build | Out-Null
++Start-Transcript -Path $TranscriptPath -Force | Out-Null
++$Failure = ""
++try {
++  Write-Host "MiniQuake BP-075-079R3 acceptance test"
++  Write-Host "  parent: $BlockParentPackageId"
++  Write-Host "  root:   $Root"
++  if ($BisectOnFailure) { Write-Host "  logical bisect markers enabled" }
++
++  if ([string]::IsNullOrWhiteSpace($Python)) { $Python = "python" }
++  $PythonExe = Resolve-Tool $Python "Python"
++
++  if (-not $SkipBuild) {
++    $PowerShellExe = (Get-Process -Id $PID).Path
++    $Arguments = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $BuildScript)
++    if (-not [string]::IsNullOrWhiteSpace($Compiler)) { $Arguments += @("-Compiler", $Compiler) }
++    if (-not [string]::IsNullOrWhiteSpace($StdLib)) { $Arguments += @("-StdLib", $StdLib) }
++    $Arguments += @("-Python", $PythonExe, "-Configuration", $Configuration)
++    if ($NetworkTests) { $Arguments += "-NetworkTests" }
++    if ($RebuildNative) { $Arguments += "-RebuildNative" }
++    if ($Listings) { $Arguments += "-Listings" }
++    [void](Run-Logged "single cumulative build and unit-test suite" $PowerShellExe $Arguments "bp075-079r3-build-child.log" "MiniQuake BP-079 gameplay/presentation closure tests passed: 24")
++  } else {
++    Add-Step "single cumulative build and unit-test suite" "SKIPPED" 0 "-SkipBuild"
++  }
++
++  foreach ($Path in @($GameExe, $EvidenceExe, $CoreAssetEvidenceExe)) { if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "required executable missing: $Path" } }
++
++  $Version = Run-Logged "package identity" $GameExe @("--version") "bp075-079r3-version.txt" "Gameplay/presentation status: gameplay_presentation_109_frozen_v1"
++  if ($Version -notmatch 'Package: BP-079' -or $Version -notmatch 'Block: BP-075-079') { throw "compiled package identity mismatch" }
++  if ($Version -notmatch 'Core assets/memory status: core_assets_memory_109_frozen_v1' -or $Version -notmatch 'Core assets/memory fingerprint: 0x6c8d974d') { throw "compiled core assets/memory identity mismatch" }
++  if ($Version -notmatch 'Gameplay/presentation status: gameplay_presentation_109_frozen_v1' -or $Version -notmatch 'Gameplay/presentation fingerprint: 0xad91624c') { throw "compiled gameplay/presentation identity mismatch" }
++
++  $CanUseGame = -not $SkipGameValidation -and -not [string]::IsNullOrWhiteSpace($QuakeBase)
++  if ($CanUseGame) {
++    if (-not (Test-Path -LiteralPath (Join-Path $QuakeBase "$Game\pak0.pak") -PathType Leaf)) { throw "Quake data not found: $QuakeBase\$Game\pak0.pak" }
++    [void](Run-Logged "installed Quake data validation" $GameExe @("--validate-game", $QuakeBase, $Map, "-game", $Game) "bp075-079r3-game-validation.log" "Validation result: PASS")
++    [void](Run-Logged "headless runtime validation" $GameExe @("--validate-runtime", $QuakeBase, $Map, [string]$Frames, "-game", $Game) "bp075-079r3-runtime-validation.log")
++  } else {
++    Add-Step "installed Quake data validation" "SKIPPED" 0 "no usable -QuakeBase or skipped"
++    Add-Step "headless runtime validation" "SKIPPED" 0 "no usable -QuakeBase or skipped"
++  }
++
++  if ($CanUseGame) {
++    $CoreA = Join-Path $Build "bp075-079r3-core-assets-a.log"
++    $CoreB = Join-Path $Build "bp075-079r3-core-assets-b.log"
++    [void](Run-Logged "retail core asset evidence A" $CoreAssetEvidenceExe @($QuakeBase, $Game) ([IO.Path]::GetFileName($CoreA)) "result=PASS")
++    [void](Run-Logged "retail core asset evidence B" $CoreAssetEvidenceExe @($QuakeBase, $Game) ([IO.Path]::GetFileName($CoreB)) "result=PASS")
++    $CoreHashA = (Get-FileHash -Algorithm SHA256 -LiteralPath $CoreA).Hash.ToLowerInvariant()
++    $CoreHashB = (Get-FileHash -Algorithm SHA256 -LiteralPath $CoreB).Hash.ToLowerInvariant()
++    if ($CoreHashA -ne $CoreHashB) { throw "retail core asset evidence differs: A=$CoreHashA B=$CoreHashB" }
++    Add-Step "byte-identical retail core asset evidence" "PASS" 0 ("sha256=" + $CoreHashA)
++  } else {
++    Add-Step "retail core asset evidence" "SKIPPED" 0 "no usable -QuakeBase"
++  }
++
++  if (-not $SkipAudioEvidence -and $CanUseGame) {
++    $AudioExe = Join-Path $Build "MiniQuakeAudioRetailEvidence.exe"
++    $A = Join-Path $Build "bp075-079r3-audio-a.log"; $B = Join-Path $Build "bp075-079r3-audio-b.log"
++    $TextA = Run-Logged "retail audio evidence A" $AudioExe @($QuakeBase, $Game) ([IO.Path]::GetFileName($A)) "MiniQuake BP-059 retail audio evidence: PASS"
++    $TextB = Run-Logged "retail audio evidence B" $AudioExe @($QuakeBase, $Game) ([IO.Path]::GetFileName($B)) "MiniQuake BP-059 retail audio evidence: PASS"
++    $HashA = (Get-FileHash -Algorithm SHA256 -LiteralPath $A).Hash.ToLowerInvariant(); $HashB = (Get-FileHash -Algorithm SHA256 -LiteralPath $B).Hash.ToLowerInvariant()
++    if ($HashA -ne $HashB) { throw "retail audio evidence differs" }
++    Add-Step "byte-identical retail audio evidence" "PASS" 0 ("sha256=" + $HashA)
++  } else { Add-Step "retail audio evidence" "SKIPPED" 0 "skipped or no Quake data" }
++
++  if (-not $SkipTraceValidation -and $CanUseGame) {
++    $TraceDir = Join-Path $Build "bp075-079r3-traces"; Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $TraceDir; New-Item -ItemType Directory -Force -Path $TraceDir | Out-Null
++    $PrefixA = Join-Path $TraceDir "run-a"; $PrefixB = Join-Path $TraceDir "run-b"
++    [void](Run-Logged "compatibility trace A" $GameExe @("--compat-trace", $QuakeBase, $Map, [string]$TraceFrames, $PrefixA, "-game", $Game) "bp075-079r3-trace-a.log")
++    [void](Run-Logged "compatibility trace B" $GameExe @("--compat-trace", $QuakeBase, $Map, [string]$TraceFrames, $PrefixB, "-game", $Game) "bp075-079r3-trace-b.log")
++    [void](Run-Logged "byte-identical trace comparison" $PythonExe @($TraceComparator, ("{0}.mqtrace" -f $PrefixA), ("{0}.mqtrace" -f $PrefixB), "--json-output", (Join-Path $Build "bp075-079r3-trace-comparison.json")) "bp075-079r3-trace-comparison.log")
++  } else { Add-Step "deterministic compatibility traces" "SKIPPED" 0 "skipped or no Quake data" }
++
++  if (-not $SkipRenderEvidence -and $CanUseGame) {
++    $EvidenceDir = Join-Path $Build "bp075-079r3-render"; Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $EvidenceDir; New-Item -ItemType Directory -Force -Path $EvidenceDir | Out-Null
++    $EA = Join-Path $EvidenceDir "a"; $EB = Join-Path $EvidenceDir "b"
++    [void](Run-Logged "render evidence A" $GameExe @("--render-evidence", $QuakeBase, $Map, [string]$RenderEvidenceFrame, $EA, "-game", $Game) "bp075-079r3-render-a.log")
++    [void](Run-Logged "render evidence B" $GameExe @("--render-evidence", $QuakeBase, $Map, [string]$RenderEvidenceFrame, $EB, "-game", $Game) "bp075-079r3-render-b.log")
++    [void](Run-Logged "byte-identical render evidence" $PythonExe @($RenderComparator, ("{0}.tga" -f $EA), ("{0}.tga" -f $EB), "--require-exact", "--json-out", (Join-Path $Build "bp075-079r3-render-comparison.json")) "bp075-079r3-render-comparison.log")
++  } else { Add-Step "deterministic framebuffer evidence" "SKIPPED" 0 "skipped or no Quake data" }
++
++  if (-not $SkipNetworkEvidence) {
++    $PortA = Get-Random -Minimum 30000 -Maximum 45000
++    $PortB = Get-Random -Minimum 45001 -Maximum 60000
++    $ClientA = Run-NetworkEvidencePair "a" $PortA
++    $ClientB = Run-NetworkEvidencePair "b" $PortB
++    $HashA = (Get-FileHash -Algorithm SHA256 -LiteralPath $ClientA).Hash.ToLowerInvariant(); $HashB = (Get-FileHash -Algorithm SHA256 -LiteralPath $ClientB).Hash.ToLowerInvariant()
++    if ($HashA -ne $HashB) { throw "network evidence client reports differ: A=$HashA B=$HashB" }
++    Add-Step "two independent UDP control handshakes" "PASS" 0 ("sha256=" + $HashA)
++  } else { Add-Step "two independent UDP control handshakes" "SKIPPED" 0 "-SkipNetworkEvidence" }
++
++  if ($NetworkTests) { [void](Run-Logged "Winsock UDP loopback smoke" $GameExe @("--udp-smoke", "2000") "bp075-079r3-udp-smoke.log" "result=PASS") }
++  else { Add-Step "Winsock UDP loopback smoke" "SKIPPED" 0 "-NetworkTests not supplied" }
++
++  $Failed = @($Steps | Where-Object { $_.status -eq "FAIL" })
++  if ($Failed.Count -gt 0) { throw "independent test groups failed: $($Failed.Count)" }
++  Add-Step "MiniQuake BP-075-079 acceptance" "PASS" 0 "all required gates passed"
++} catch {
++  $Failure = $_.Exception.Message
++  Write-Host ("ERROR: " + $Failure) -ForegroundColor Red
++} finally {
++  $Status = if ([string]::IsNullOrWhiteSpace($Failure)) { "PASS" } else { "FAIL" }
++  $Summary = [ordered]@{
++    schema_version = 1
++    package_id = $PackageId
++    parent_package_id = $ParentPackageId
++    block_id = $BlockId
++    block_parent_package_id = $BlockParentPackageId
++    delivery_revision = $DeliveryRevision
++    delivery_parent = $DeliveryParent
++    network_platform_status = "network_platform_109_frozen_v1"
++    network_platform_fingerprint = "0xb3ec7589"
++    frontend_status = "frontend_109_frozen_v1"
++    frontend_fingerprint = "0x924251fa"
++    core_assets_memory_status = "core_assets_memory_109_frozen_v1"
++    core_assets_memory_fingerprint = "0x6c8d974d"
++    gameplay_presentation_status = "gameplay_presentation_109_frozen_v1"
++    gameplay_presentation_fingerprint = "0xad91624c"
++    status = $Status
++    failure = $Failure
++    created_utc = (Get-Date).ToUniversalTime().ToString("o")
++    quake_base_supplied = -not [string]::IsNullOrWhiteSpace($QuakeBase)
++    steps = $Steps
++  }
++  $Summary | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $SummaryPath -Encoding UTF8
++  Stop-Transcript | Out-Null
++}
++
++if (-not [string]::IsNullOrWhiteSpace($Failure)) {
++  Write-Host "MiniQuake BP-075-079R3 acceptance test: FAIL" -ForegroundColor Red
++  Write-Host "Run .\COLLECT_RESULTS.ps1 and upload the generated ZIP."
++  exit 1
++}
++Write-Host "MiniQuake BP-075-079R3 acceptance test: PASS" -ForegroundColor Green
++Write-Host "Result summary: $SummaryPath"
++Write-Host "For feedback, run .\COLLECT_RESULTS.ps1 and upload the generated ZIP."
++exit 0
+diff --git a/docs/BP-075-079R3_BLOCK_LEDGER.json b/docs/BP-075-079R3_BLOCK_LEDGER.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..5351f17378aee03423776a906ca3a5a3ad4ca5d8
+--- /dev/null
++++ b/docs/BP-075-079R3_BLOCK_LEDGER.json
+@@ -0,0 +1,248 @@
++{
++  "schema_version": 1,
++  "project": "MiniQuake",
++  "block_id": "BP-075-079",
++  "parent_package_id": "BP-070-074R6",
++  "final_package_id": "BP-079",
++  "delivery_revision": "BP-075-079R3",
++  "core_assets_memory_status": "core_assets_memory_109_frozen_v1",
++  "core_assets_memory_fingerprint": "0x6c8d974d",
++  "steps": [
++    {
++      "package_id": "BP-075",
++      "title": "mathlib and chase-camera parity",
++      "patch": "patches/BP-075.diff",
++      "runtime_fixtures": 22,
++      "status": "candidate"
++    },
++    {
++      "package_id": "BP-076",
++      "title": "view, palette and refdef parity",
++      "patch": "patches/BP-076.diff",
++      "runtime_fixtures": 22,
++      "status": "candidate"
++    },
++    {
++      "package_id": "BP-077",
++      "title": "screen, loading and screenshot parity",
++      "patch": "patches/BP-077.diff",
++      "runtime_fixtures": 22,
++      "status": "candidate"
++    },
++    {
++      "package_id": "BP-078",
++      "title": "statusbar and scoreboard parity",
++      "patch": "patches/BP-078.diff",
++      "runtime_fixtures": 22,
++      "status": "candidate"
++    },
++    {
++      "package_id": "BP-079",
++      "title": "host-command and gameplay/presentation closure",
++      "patch": "patches/BP-079.diff",
++      "runtime_fixtures": 24,
++      "status": "candidate"
++    }
++  ],
++  "block_runtime_fixtures": 112,
++  "retail_evidence_files": 4,
++  "accepted_parent": {
++    "delivery_revision": "BP-070-074R6",
++    "status": "PASS",
++    "result_archive": "MiniQuake_BP-070-074R6_RESULTS_20260730-132228.zip",
++    "result_archive_sha256": "f3f3a15f52932699d744ea6691b6dcb6a4fdca5fe6b77cbc5d38cf114fd283a2",
++    "trace_sha256": "80695b98a91b7d52f91b35dcd220c3cc0962edb6851b0411832746f6f94d3486",
++    "trace_rolling_hash": "d905b042",
++    "retail_core_asset_evidence_sha256": "06eac1012b97d36116a8f605cd428b09bf81f2881c474eda049c5e50183ec20e",
++    "retail_audio_evidence_sha256": "896049a03f26b1db4ddc1550d35d1cacb5f7e0f0c900b0ee36393c8ab8bd0501",
++    "render_tga_sha256": "734e965e17c9a20af7c42184d3d8a3d7f2997e1321342976799ec7f4670af945",
++    "network_client_report_sha256": "50534266c750fa20058c82ce48baca953b0107106dc24fd69c5854fc3364ba96",
++    "udp_loopback": "PASS"
++  },
++  "acceptance": {
++    "single_cumulative_build": true,
++    "installed_game_validation": true,
++    "headless_frames": 300,
++    "trace_frames": 128,
++    "retail_core_asset_evidence": true,
++    "retail_audio_evidence": true,
++    "render_evidence": true,
++    "network_evidence_process_pairs": 2,
++    "udp_loopback": true
++  },
++  "scope_boundary": {
++    "reference": "WinQuake/GLQuake 1.09 gameplay and presentation surface",
++    "game_data": "external; never bundled",
++    "pixel_similarity": "inherited deterministic evidence; original-image corpus remains external"
++  },
++  "delivery_parent": "BP-075-079R2",
++  "r1_delivery_hotfix": {
++    "revision": "BP-070-074R1",
++    "parent": "BP-070-074",
++    "predecessor_result_sha256": "c1ef8340e2f58904e583f2c85a81a7b3f1d37a7b316f8905297a4f2bbd6bef8c",
++    "failure": "inherited BP-069 checker rejected downstream BP-074 identity",
++    "production_source_changed": false,
++    "native_source_changed": false,
++    "engine_contracts_changed": false,
++    "fixture_count_changed": false,
++    "strict_historical_mode_preserved": true,
++    "downstream_flag": "--allow-downstream-package",
++    "status": "FAIL at BP-070 compile gate; superseded by R2",
++    "result_archive": "MiniQuake_BP-070-074R1_RESULTS_20260729-192646.zip",
++    "result_archive_sha256": "02cb2d978b35076623432cf46a8c56e9907e1430875b07b6ee401eb43387a1c9"
++  },
++  "r2_delivery_hotfix": {
++    "revision": "BP-070-074R2",
++    "parent": "BP-070-074R1",
++    "predecessor_result_sha256": "02cb2d978b35076623432cf46a8c56e9907e1430875b07b6ee401eb43387a1c9",
++    "failure": "BP-070 fixture imported miniquake.byteio as bio but called nonexistent uppercase C-style members",
++    "fixture_calls": "miniquake.common.ShortSwap/LongSwap/ShortNoSwap/LongNoSwap/FloatNoSwap",
++    "production_source_changed": true,
++    "native_source_changed": false,
++    "engine_contracts_changed": false,
++    "fixture_count_changed": false,
++    "status": "FAIL at BP-071 fixture 10; superseded by R3",
++    "result_archive": "MiniQuake_BP-070-074R2_RESULTS_20260729-210721.zip",
++    "result_archive_sha256": "e0206af9dd6775f6e302d697ea3db05ea55e8e902e96f47b3f1e83cf6d0c703b",
++    "windows_build": "76/76 targets compiled",
++    "bp070_runtime": "24/24 PASS"
++  },
++  "r3_delivery_hotfix": {
++    "revision": "BP-070-074R3",
++    "parent": "BP-070-074R2",
++    "predecessor_result_archive": "MiniQuake_BP-070-074R2_RESULTS_20260729-210721.zip",
++    "predecessor_result_sha256": "e0206af9dd6775f6e302d697ea3db05ea55e8e902e96f47b3f1e83cf6d0c703b",
++    "failure": "BP-071 shareware loose-subdirectory fixture left FileSystem.staticRegistered at its startup value true",
++    "fix": "fixture explicitly enters the post-COM_CheckRegistered shareware state before resolving a loose subdirectory path",
++    "production_source_changed": false,
++    "native_source_changed": false,
++    "engine_contracts_changed": false,
++    "fixture_count_changed": false,
++    "status": "Windows test reached result collection; collector failed on synthetic build fixture; superseded by R4"
++  },
++  "r4_delivery_hotfix": {
++    "revision": "BP-070-074R4",
++    "parent": "BP-070-074R3",
++    "failure": "COLLECT_RESULTS.ps1 rejected build\\bp071_fs\\id1\\latin.txt as id1 content",
++    "root_cause": "the BP-071/BP-072 runtime suites intentionally create synthetic id1 trees under build; the collector applied its strict source-data rule to ephemeral test artifacts",
++    "fix": "skip and record synthetic/game-data-shaped build artifacts while preserving strict rejection for source/docs inputs",
++    "production_source_changed": false,
++    "native_source_changed": false,
++    "engine_contracts_changed": false,
++    "fixture_count_changed": false,
++    "result_collection_rerun_required": true,
++    "runtime_retest_required": false,
++    "status": "Windows run reached BP-073; model fixture and collector failed; superseded by R5"
++  },
++  "r5_delivery_hotfix": {
++    "revision": "BP-070-074R5",
++    "parent": "BP-070-074R4",
++    "failure": "BP-073 expected a texture name in the numeric animation metadata table; R4 collector raised a Windows PowerShell 5.1 ArgumentException",
++    "root_cause": "fixture confused BspTexture.name with sequenceTextureAnimations metadata; collector converted a generic List[object] through @($SkippedBuildArtifacts)",
++    "fix": "assert the base texture name separately, bind anim_total=4, and serialize skipped artifacts from a native object array",
++    "production_source_changed": false,
++    "native_source_changed": false,
++    "engine_contracts_changed": false,
++    "fixture_count_changed": false,
++    "runtime_retest_required": true,
++    "collector_retest_required": true,
++    "status": "Windows build 76/76; BP-070/BP-071/BP-072 PASS; failed at BP-073 fixture 6; superseded by R6",
++    "result_archive": "MiniQuake_BP-070-074R5_RESULTS_20260730-121742.zip",
++    "result_archive_sha256": "7cf42d4a9a8aed1ff532d944920c8d30bed9906a8f431366e26a3b08b20d655f",
++    "windows_build": "76/76 targets compiled",
++    "bp070_runtime": "24/24 PASS",
++    "bp071_runtime": "24/24 PASS",
++    "bp072_runtime": "20/20 PASS"
++  },
++  "r6_delivery_hotfix": {
++    "revision": "BP-070-074R6",
++    "parent": "BP-070-074R5",
++    "predecessor_result_sha256": "7cf42d4a9a8aed1ff532d944920c8d30bed9906a8f431366e26a3b08b20d655f",
++    "failure": "BP-073 expected raw BSP submodel bounds after Mod_LoadSubmodels",
++    "fix": "bind original one-unit minimum/maximum spread and corrected registry bounds",
++    "production_source_changed": false,
++    "native_source_changed": false,
++    "engine_contracts_changed": false,
++    "fixture_count_changed": false,
++    "status": "PASS; accepted Windows baseline",
++    "result_archive": "MiniQuake_BP-070-074R6_RESULTS_20260730-132228.zip",
++    "result_archive_sha256": "f3f3a15f52932699d744ea6691b6dcb6a4fdca5fe6b77cbc5d38cf114fd283a2",
++    "windows_targets": "76/76 PASS",
++    "runtime_fixtures": "116/116 PASS",
++    "retail_core_asset_evidence_sha256": "06eac1012b97d36116a8f605cd428b09bf81f2881c474eda049c5e50183ec20e",
++    "trace_sha256": "80695b98a91b7d52f91b35dcd220c3cc0962edb6851b0411832746f6f94d3486",
++    "trace_rolling_hash": "d905b042",
++    "render_ssim": 1.0,
++    "udp_loopback": "PASS"
++  },
++  "gameplay_presentation_status": "gameplay_presentation_109_frozen_v1",
++  "gameplay_presentation_fingerprint": "0xad91624c",
++  "accepted_core_assets_memory_block": {
++    "delivery_revision": "BP-070-074R6",
++    "status": "PASS",
++    "result_archive_sha256": "f3f3a15f52932699d744ea6691b6dcb6a4fdca5fe6b77cbc5d38cf114fd283a2",
++    "runtime_fixtures": 116,
++    "retail_evidence_files": 4,
++    "contract_status": "core_assets_memory_109_frozen_v1",
++    "contract_fingerprint": "0x6c8d974d",
++    "trace_sha256": "80695b98a91b7d52f91b35dcd220c3cc0962edb6851b0411832746f6f94d3486",
++    "trace_rolling_hash": "d905b042"
++  },
++  "bp075079r1_delivery_hotfix": {
++    "revision": "BP-075-079R1",
++    "parent": "BP-075-079",
++    "status": "FAIL in inherited BP-036 preflight; superseded by R2",
++    "predecessor_result_archive": "MiniQuake_BP-075-079_RESULTS_20260730-143415.zip",
++    "predecessor_result_sha256": "78963a812a05fe9d4951eef1d1cb425757c3a63513c9a956481b36f5033a0384",
++    "failure": "inherited BP-029 checker compared the complete downstream server.ml hash and rejected unrelated host-command changes",
++    "root_cause": "world/physics routines remained byte-identical; the historical whole-file golden was too broad for downstream packages",
++    "fix": "preserve strict historical whole-file mode and add downstream mode with eight exact files, a protected server.ml hash and three accepted server world/physics sections",
++    "server_protected_sha256": "181db4de0fc6db19d9f067aea9d8ebd654c8e14a37c477be1640958c0cff3781",
++    "server_sections": {
++      "runWorldPhysicsWithRetouch": "5b082bf6147659c213fe46e84679d44a73f11dcd2aac070ef51eaf66dd0ecc8b",
++      "runNonClientPhysicsWithRetouch": "24a05fed078529237192653250631835a9d22d6d6c9054abb0ea5121f13095a6",
++      "frameMode": "09549e467d9a73e0802fda2c71552348fe7470dd6a84766098d02c90cbf87921"
++    },
++    "production_source_changed": false,
++    "native_source_changed": false,
++    "contract_fingerprint_changed": false,
++    "fixture_count_changed": false,
++    "result_archive": "MiniQuake_BP-075-079R1_RESULTS_20260730-153422.zip",
++    "result_archive_sha256": "de4b5325fe5e4506cf812f0775047afcb1927971f7ee9ffad1cc5f2a688919fb"
++  },
++  "bp075079r2_delivery_hotfix": {
++    "revision": "BP-075-079R2",
++    "parent": "BP-075-079R1",
++    "status": "Windows build 81/81; inherited tests through BP-035 PASS; failed at BP-036 cshift atoi fixture; superseded by R3",
++    "predecessor_result_archive": "MiniQuake_BP-075-079R1_RESULTS_20260730-153422.zip",
++    "predecessor_result_sha256": "de4b5325fe5e4506cf812f0775047afcb1927971f7ee9ffad1cc5f2a688919fb",
++    "failure": "BP-036 inherited checker required the historical Q_atoi marker in a downstream BP-079 source tree",
++    "strict_historical_mode_preserved": true,
++    "downstream_flag": "--allow-downstream-package",
++    "downstream_view_parser": "common.cAtoi",
++    "production_source_changed": false,
++    "native_source_changed": false,
++    "contract_fingerprint_changed": false,
++    "fixture_count_changed": false,
++    "result_archive": "MiniQuake_BP-075-079R2_RESULTS_20260730-172927.zip",
++    "result_archive_sha256": "225397ce680774d4730f0b75929f52e05749c70a6ead246051e057a310b9916b",
++    "windows_build": "81/81 targets compiled",
++    "first_runtime_failure": "BP-036 fixture 12/22"
++  },
++  "bp075079r3_delivery_hotfix": {
++    "revision": "BP-075-079R3",
++    "parent": "BP-075-079R2",
++    "status": "Windows acceptance pending",
++    "predecessor_result_archive": "MiniQuake_BP-075-079R2_RESULTS_20260730-172927.zip",
++    "predecessor_result_sha256": "225397ce680774d4730f0b75929f52e05749c70a6ead246051e057a310b9916b",
++    "failure": "inherited BP-036 runtime fixture expected Q_atoi values 32/65 after downstream V_cshift_f changed to C atoi",
++    "fix": "bind downstream inherited runtime expectations to 0/0 while preserving strict historical 32/65 mode",
++    "strict_historical_mode_preserved": true,
++    "downstream_flag": "--allow-downstream-package",
++    "production_source_changed": false,
++    "native_source_changed": false,
++    "contract_fingerprint_changed": false,
++    "fixture_count_changed": false,
++    "runtime_fixture_count": "BP-036 remains 22; block remains 112"
++  }
++}
+diff --git a/docs/BP-075-079R3_HOTFIX_REPORT.json b/docs/BP-075-079R3_HOTFIX_REPORT.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..48720d3c033f2d8540028a6149a1c8dacf5567e1
+--- /dev/null
++++ b/docs/BP-075-079R3_HOTFIX_REPORT.json
+@@ -0,0 +1,28 @@
++{
++  "schema_version": 1,
++  "delivery_revision": "BP-075-079R3",
++  "delivery_parent": "BP-075-079R2",
++  "engine_package": "BP-079",
++  "classification": "inherited runtime fixture lineage mismatch",
++  "predecessor_result_archive": "MiniQuake_BP-075-079R2_RESULTS_20260730-172927.zip",
++  "predecessor_result_sha256": "225397ce680774d4730f0b75929f52e05749c70a6ead246051e057a310b9916b",
++  "failure": "BP-036 runtime fixture still expected Quake Q_atoi values after BP-076 switched V_cshift_f to C atoi",
++  "root_cause": "R2 separated historical and downstream source markers but did not bind the inherited runtime expectations",
++  "historical_runtime_expectation": {
++    "hex": 32,
++    "character": 65
++  },
++  "downstream_runtime_expectation": {
++    "hex": 0,
++    "character": 0
++  },
++  "strict_historical_mode_preserved": true,
++  "downstream_flag": "--allow-downstream-package",
++  "production_source_changed": false,
++  "native_source_changed": false,
++  "client_render_fingerprint_changed": false,
++  "gameplay_presentation_fingerprint_changed": false,
++  "runtime_fixture_count_changed": false,
++  "windows_build_targets": "81/81 compiled in predecessor run",
++  "windows_acceptance": "pending"
++}
+diff --git a/docs/BP-075-079R3_RESULT_ANALYSIS.md b/docs/BP-075-079R3_RESULT_ANALYSIS.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..34e7564bd17232718fda1bf03b205a5df8764e6f
+--- /dev/null
++++ b/docs/BP-075-079R3_RESULT_ANALYSIS.md
+@@ -0,0 +1,38 @@
++# BP-075–BP-079R3 result analysis
++
++## Failure boundary
++
++The BP-075–BP-079R2 Windows build produced all 81 native targets and completed every inherited runtime group through BP-035. The first failure was the inherited BP-036 view-state test:
++
++```text
++[12/22] cshift atoi
++FAIL: hex atoi: expected 32., got 0
++```
++
++Result archive SHA-256:
++
++```text
++225397ce680774d4730f0b75929f52e05749c70a6ead246051e057a310b9916b
++```
++
++## Cause
++
++BP-076 intentionally corrected `V_cshift_f` to use the C runtime `atoi` semantics of the original `view.c`. The current production source and the new BP-076 fixture therefore correctly map `0x20` and `'A` to zero. The inherited BP-036 runtime fixture still expected Quake `Q_atoi` values 32 and 65.
++
++The R2 checker separated historical and downstream source markers, but did not also separate the inherited runtime expectations.
++
++## R3 correction
++
++The downstream BP-036 runtime fixture now expects:
++
++```text
++C atoi("0x20") = 0
++C atoi("'A")   = 0
++```
++
++The shared checker now validates both source and runtime lineage:
++
++- strict historical mode requires the old `Q_atoi` source marker and the historical 32/65 fixture values;
++- downstream mode requires `common.cAtoi` and the 0/0 fixture values, and rejects stale historical expectations.
++
++No file under `src/` or `native/` changed. The gameplay/presentation fingerprint remains `0xad91624c` and all fixture counts remain unchanged.
+diff --git a/docs/BP-075-079R3_TESTING.md b/docs/BP-075-079R3_TESTING.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..2599cd62ac85f306704b66955edcb4ecd8ff7fe4
+--- /dev/null
++++ b/docs/BP-075-079R3_TESTING.md
+@@ -0,0 +1,58 @@
++# BP-075–BP-079R3 Windows acceptance
++
++Extract the package into a new, empty directory. Output is streamed live and flushed to the build logs.
++
++```powershell
++$QuakeBase = "C:\Users\nilsk\Dropbox\Quake"
++Test-Path "$QuakeBase\id1\pak0.pak"
++
++.\TEST_BP-075-079R3.ps1 `
++  -Compiler C:\Users\nilsk\Desktop\MiniLang\MiniLangCompilerPy\mlc_win64.py `
++  -StdLib C:\Users\nilsk\Desktop\MiniLang\MiniLangCompilerPy `
++  -QuakeBase $QuakeBase `
++  -Game id1 `
++  -Map start `
++  -Frames 300 `
++  -TraceFrames 128 `
++  -NetworkTests `
++  -ContinueIndependentTests `
++  -BisectOnFailure
++```
++
++The repaired inherited gate is:
++
++```text
++[12/22] cshift atoi
++MiniQuake BP-036 view state tests passed: 22
++```
++
++The downstream preflight report must include:
++
++```text
++MiniQuake BP-036 client/render verification: PASS
++downstream_package=true
++view_number_parser=c_atoi
++runtime_view_expectation=c_atoi
++```
++
++The five current block groups must then pass:
++
++```text
++MiniQuake BP-075 math/chase tests passed: 22
++MiniQuake BP-076 view/palette tests passed: 22
++MiniQuake BP-077 screen/loading tests passed: 22
++MiniQuake BP-078 statusbar/scoreboard tests passed: 22
++MiniQuake BP-079 gameplay/presentation closure tests passed: 24
++```
++
++Expected final line:
++
++```text
++MiniQuake BP-075-079R3 acceptance test: PASS
++```
++
++Collect results with:
++
++```powershell
++.\COLLECT_RESULTS.ps1
++```
+diff --git a/test.ps1 b/test.ps1
+index 8020dcdfec0a85d0d8c14ac0ca584566b760d0d5..52221d05a9194ace007bfeaba3d35bef61565cda 100644
+--- a/test.ps1
++++ b/test.ps1
+@@ -4,5 +4,5 @@ param(
+   [object[]]$RemainingArguments
+ )
+ 
+-& (Join-Path $PSScriptRoot "TEST_BP-075-079R2.ps1") @RemainingArguments
++& (Join-Path $PSScriptRoot "TEST_BP-075-079R3.ps1") @RemainingArguments
+ exit $LASTEXITCODE
+diff --git a/tests/view_state_parity_tests.ml b/tests/view_state_parity_tests.ml
+index 7c5058def99f853f2039f3d61eb70162d0e7914f..02e388d75395eb8705093c37409ebbe159a021c9 100644
+--- a/tests/view_state_parity_tests.ml
++++ b/tests/view_state_parity_tests.ml
+@@ -123,8 +123,8 @@ function testCshiftAtoi()
+   view.V_cshift_f(state, ["v_cshift", "12.75", "-7junk", "0x20", "'A"])
+   equal(state.emptyCshift[0], 12.0, "decimal truncation")
+   equal(state.emptyCshift[1], -7.0, "trailing text")
+-  equal(state.emptyCshift[2], 32.0, "hex atoi")
+-  equal(state.emptyCshift[3], 65.0, "character atoi")
++  equal(state.emptyCshift[2], 0.0, "hex rejected by CRT atoi")
++  equal(state.emptyCshift[3], 0.0, "character rejected by CRT atoi")
+   return true
+ end function
+ 
+diff --git a/tools/client_render_checker_common.py b/tools/client_render_checker_common.py
+index 60cff1e848ec787117a7cd06d50d867478ad8385..0c634299ce57e5dd42f9f35ed8549fd646c40f43 100644
+--- a/tools/client_render_checker_common.py
++++ b/tools/client_render_checker_common.py
+@@ -206,6 +206,26 @@ def check_contract(root: Path, component: str, allow_downstream_package: bool =
+                 if marker not in text: errors.append('missing BP-035 no-lerp rotation marker: '+marker)
+             stale = 'near(entity.angles.y, 100.0, 0.0001, "binary object rotation")'
+             if stale in text: errors.append('stale BP-035 pre-CL_LerpPoint rotation expectation remains')
++        if component == '036':
++            historical_runtime = (
++                'equal(state.emptyCshift[2], 32.0, "hex atoi")',
++                'equal(state.emptyCshift[3], 65.0, "character atoi")',
++            )
++            downstream_runtime = (
++                'equal(state.emptyCshift[2], 0.0, "hex rejected by CRT atoi")',
++                'equal(state.emptyCshift[3], 0.0, "character rejected by CRT atoi")',
++            )
++            if allow_downstream_package:
++                for marker in downstream_runtime:
++                    if marker not in text:
++                        errors.append('downstream BP-036 runtime fixture missing C atoi expectation: '+marker)
++                for marker in historical_runtime:
++                    if marker in text:
++                        errors.append('stale historical BP-036 runtime expectation remains: '+marker)
++            else:
++                for marker in historical_runtime:
++                    if marker not in text:
++                        errors.append('historical BP-036 runtime expectation differs: '+marker)
+     return errors
+ 
+ def run_component(component: str, argv=None):
+@@ -225,7 +245,7 @@ def run_component(component: str, argv=None):
+     if not ok: errors.append('C oracle failed: '+detail)
+     elif actual and actual != doc['rows']: errors.append('C oracle differs from Python model')
+     errors += check_contract(root,component,args.allow_downstream_package)
+-    report={'schema':f'MiniQuakeBP{component}Verification/1','package_id':c['package'],'parent_package_id':c['parent'],'ok':not errors,'oracle':detail,'rows':len(doc['rows']),'runtime_fixtures':c['fixtures'],'downstream_package':bool(args.allow_downstream_package),'view_number_parser':('c_atoi' if component == '036' and args.allow_downstream_package else ('q_atoi' if component == '036' else 'not_applicable')),'errors':errors}
++    report={'schema':f'MiniQuakeBP{component}Verification/1','package_id':c['package'],'parent_package_id':c['parent'],'ok':not errors,'oracle':detail,'rows':len(doc['rows']),'runtime_fixtures':c['fixtures'],'downstream_package':bool(args.allow_downstream_package),'view_number_parser':('c_atoi' if component == '036' and args.allow_downstream_package else ('q_atoi' if component == '036' else 'not_applicable')),'runtime_view_expectation':('c_atoi' if component == '036' and args.allow_downstream_package else ('q_atoi' if component == '036' else 'not_applicable')),'errors':errors}
+     if args.json_output: Path(args.json_output).write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
+     print(f'MiniQuake {c["package"]} client/render verification: '+('PASS' if not errors else 'FAIL'))
+     print(f'  rows={len(doc["rows"])} runtime_fixtures={c["fixtures"]} oracle={detail}')
+diff --git a/tools/verify.py b/tools/verify.py
+index 8368faea843cdca57d117f177afc48d3a12a945c..c69e4cdd34214fa379534049d77baf97364684b5 100644
+--- a/tools/verify.py
++++ b/tools/verify.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""Self-contained MiniQuake BP-079 / BP-075-079R2 gameplay-presentation verifier.
++"""Self-contained MiniQuake BP-079 / BP-075-079R3 gameplay-presentation verifier.
+ 
+ The verifier uses only the Python standard library. It preserves every accepted
+ parent contract and validates math/chase, view/palette, screen/loading,
+@@ -25,8 +25,8 @@ PACKAGE_ID = "BP-079"
+ PARENT_PACKAGE_ID = "BP-078"
+ BLOCK_ID = "BP-075-079"
+ BLOCK_PARENT_PACKAGE_ID = "BP-070-074R6"
+-DELIVERY_REVISION = "BP-075-079R2"
+-DELIVERY_PARENT = "BP-075-079R1"
++DELIVERY_REVISION = "BP-075-079R3"
++DELIVERY_PARENT = "BP-075-079R2"
+ PROTOCOL_STATUS = "protocol15_frozen_v1"
+ QUAKEC_STATUS = "quakec_109_frozen_v1"
+ WORLD_PHYSICS_STATUS = "world_physics_109_frozen_v1"
+@@ -689,6 +689,10 @@ REQUIRED_PATHS.update({
+     "docs/BP-075-079R2_TESTING.md", "docs/BP-075-079R2_RESULT_ANALYSIS.md",
+     "docs/BP-075-079R2_HOTFIX_REPORT.json", "docs/BP-075-079R2_BLOCK_LEDGER.json",
+     "patches/BP-079R2.diff",
++    "TEST_BP-075-079R3.ps1", "CHANGELOG_BP-075-079R3.md",
++    "docs/BP-075-079R3_TESTING.md", "docs/BP-075-079R3_RESULT_ANALYSIS.md",
++    "docs/BP-075-079R3_HOTFIX_REPORT.json", "docs/BP-075-079R3_BLOCK_LEDGER.json",
++    "patches/BP-079R3.diff",
+ })
+ 
+ @dataclass
+@@ -5125,28 +5129,28 @@ def check_current_delivery_scripts(root: Path) -> CheckResult:
+             r'if ($Checker.Path -eq "tools\check_client_render_036.py")',
+             "--allow-downstream-package",
+         ],
+-        "TEST_BP-075-079R2.ps1": [
++        "TEST_BP-075-079R3.ps1": [
+             '$PackageId = "BP-079"', '$ParentPackageId = "BP-078"',
+-            '$BlockId = "BP-075-079"', '$DeliveryRevision = "BP-075-079R2"',
+-            '$BlockParentPackageId = "BP-070-074R6"',
++            '$BlockId = "BP-075-079"', '$DeliveryRevision = "BP-075-079R3"',
++            '$DeliveryParent = "BP-075-079R2"', '$BlockParentPackageId = "BP-070-074R6"',
+             '$env:PYTHONUNBUFFERED = "1"', "Invoke-LiveProcess", "$Writer.Flush()",
+             "MiniQuakeCoreAssetRetailEvidence.exe", "retail core asset evidence A",
+             "Gameplay/presentation status: gameplay_presentation_109_frozen_v1",
+-            "MiniQuake BP-075-079R2 acceptance test: PASS",
+-            "bp075-079r2-test-summary.json",
++            "MiniQuake BP-075-079R3 acceptance test: PASS",
++            "bp075-079r3-test-summary.json",
+         ],
+         "COLLECT_RESULTS.ps1": [
+-            'MiniQuake_BP-075-079R2_RESULTS_', '$PackageId = "BP-079"',
+-            '$BlockId = "BP-075-079"', '$DeliveryRevision = "BP-075-079R2"',
+-            '$DeliveryParent = "BP-075-079R1"', '$SkippedBuildArtifacts = @()',
++            'MiniQuake_BP-075-079R3_RESULTS_', '$PackageId = "BP-079"',
++            '$BlockId = "BP-075-079"', '$DeliveryRevision = "BP-075-079R3"',
++            '$DeliveryParent = "BP-075-079R2"', '$SkippedBuildArtifacts = @()',
+             'skipped_build_artifacts = $SkippedBuildArtifacts',
+             "MiniQuakeProtocol15ServerDataTests.exe", "BP-012_PROTOCOL15_SERVERDATA_AUDIT.md",
+             "protocol15_serverdata_golden.json", "MiniQuakeGameplayPresentationClosureTests.exe",
+-            r"patches\BP-075.diff", r"patches\BP-079.diff", r"patches\BP-079R1.diff", r"patches\BP-079R2.diff",
++            r"patches\BP-075.diff", r"patches\BP-079.diff", r"patches\BP-079R1.diff", r"patches\BP-079R2.diff", r"patches\BP-079R3.diff",
+             "gameplay_presentation_golden.json", "BP-070-074R6_ACCEPTANCE_ANALYSIS.md",
+-            "BP-075-079R2_RESULT_ANALYSIS.md", "BP-075-079R2_HOTFIX_REPORT.json",
++            "BP-075-079R2_RESULT_ANALYSIS.md", "BP-075-079R3_RESULT_ANALYSIS.md", "BP-075-079R3_HOTFIX_REPORT.json",
+         ],
+-        "test.ps1": ["TEST_BP-075-079R2.ps1"],
++        "test.ps1": ["TEST_BP-075-079R3.ps1"],
+     }
+     for relative, markers in expected.items():
+         try:
+@@ -5173,13 +5177,13 @@ def check_live_output_contract(root: Path) -> CheckResult:
+     details: dict[str, object] = {}
+     try:
+         build = (root / "build.ps1").read_text(encoding="utf-8-sig")
+-        test = (root / "TEST_BP-075-079R2.ps1").read_text(encoding="utf-8-sig")
++        test = (root / "TEST_BP-075-079R3.ps1").read_text(encoding="utf-8-sig")
+         for source_name, source, markers in (
+             ("build.ps1", build, (
+                 '$env:PYTHONUNBUFFERED = "1"', "function Invoke-LiveCapturedProcess",
+                 "$Writer.Flush()", "Write-Host $Line",
+             )),
+-            ("TEST_BP-075-079R2.ps1", test, (
++            ("TEST_BP-075-079R3.ps1", test, (
+                 '$env:PYTHONUNBUFFERED = "1"', "function Invoke-LiveProcess",
+                 "$Writer.Flush()", "Write-Host $Line", "[MiniQuake] starting",
+             )),
+@@ -5914,7 +5918,7 @@ def check_bp070074r2_common_endian_contract(root: Path) -> CheckResult:
+         port_record = port.get("bp070074r2_hotfix", {})
+         if port_record.get("revision") != "BP-070-074R2" or port_record.get("parent") != "BP-070-074R1":
+             errors.append("PORT_LEDGER R2 lineage differs")
+-        if port.get("current_delivery_revision") not in ("BP-070-074R2", "BP-070-074R3", "BP-070-074R4", "BP-070-074R5", "BP-070-074R6", "BP-075-079", "BP-075-079R1", "BP-075-079R2"):
++        if port.get("current_delivery_revision") not in ("BP-070-074R2", "BP-070-074R3", "BP-070-074R4", "BP-070-074R5", "BP-070-074R6", "BP-075-079", "BP-075-079R1", "BP-075-079R2", "BP-075-079R3"):
+             errors.append("PORT_LEDGER current delivery does not preserve the R2 lineage")
+ 
+         for marker in (result_hash, "Undefined variable 'bio'", "LongNoSwap", "FloatNoSwap"):
+@@ -5993,7 +5997,7 @@ def check_bp070074r3_shareware_fixture_contract(root: Path) -> CheckResult:
+         port_record = port.get("bp070074r3_hotfix", {})
+         if port_record.get("revision") != "BP-070-074R3" or port_record.get("parent") != "BP-070-074R2":
+             errors.append("PORT_LEDGER R3 lineage differs")
+-        if port.get("current_delivery_revision") not in ("BP-070-074R3", "BP-070-074R4", "BP-070-074R5", "BP-070-074R6", "BP-075-079", "BP-075-079R1", "BP-075-079R2"):
++        if port.get("current_delivery_revision") not in ("BP-070-074R3", "BP-070-074R4", "BP-070-074R5", "BP-070-074R6", "BP-075-079", "BP-075-079R1", "BP-075-079R2", "BP-075-079R3"):
+             errors.append("PORT_LEDGER current delivery does not preserve the R3 lineage")
+         for marker in (result_hash, "shareware loose restriction", "staticRegistered", "COM_CheckRegistered"):
+             if marker not in analysis:
+@@ -6034,7 +6038,7 @@ def check_bp070074r4_collector_synthetic_workspace_contract(root: Path) -> Check
+             errors.append("BLOCK_LEDGER R4 source-change classification differs")
+         if port.get("bp070074r4_hotfix", {}).get("parent") != "BP-070-074R3":
+             errors.append("PORT_LEDGER R4 lineage differs")
+-        if port.get("current_delivery_revision") not in ("BP-070-074R4", "BP-070-074R5", "BP-070-074R6", "BP-075-079", "BP-075-079R1", "BP-075-079R2"):
++        if port.get("current_delivery_revision") not in ("BP-070-074R4", "BP-070-074R5", "BP-070-074R6", "BP-075-079", "BP-075-079R1", "BP-075-079R2", "BP-075-079R3"):
+             errors.append("PORT_LEDGER no longer preserves R4 lineage")
+         if hotfix.get("delivery_revision") != "BP-070-074R4" or hotfix.get("delivery_parent") != "BP-070-074R3":
+             errors.append("R4 hotfix report lineage differs")
+@@ -6109,7 +6113,7 @@ def check_bp070074r5_model_fixture_collector_contract(root: Path) -> CheckResult
+         record = ledger.get("r5_delivery_hotfix", {})
+         if record.get("production_source_changed") is not False or record.get("native_source_changed") is not False:
+             errors.append("BLOCK_LEDGER R5 source-change classification differs")
+-        if port.get("current_delivery_revision") not in ("BP-070-074R5", "BP-070-074R6", "BP-075-079", "BP-075-079R1", "BP-075-079R2"):
++        if port.get("current_delivery_revision") not in ("BP-070-074R5", "BP-070-074R6", "BP-075-079", "BP-075-079R1", "BP-075-079R2", "BP-075-079R3"):
+             errors.append("PORT_LEDGER current delivery is not R5/R6")
+         if port.get("bp070074r5_hotfix", {}).get("parent") != "BP-070-074R4":
+             errors.append("PORT_LEDGER R5 lineage differs")
+@@ -6218,6 +6222,9 @@ def check_bp070074r6_submodel_bounds_fixture_contract(root: Path) -> CheckResult
+         elif current_revision == "BP-075-079R2":
+             if current_parent != "BP-075-079R1":
+                 errors.append("PORT_LEDGER R2 parent does not preserve the BP-075-079R1 delivery lineage")
++        elif current_revision == "BP-075-079R3":
++            if current_parent != "BP-075-079R2":
++                errors.append("PORT_LEDGER R3 parent does not preserve the BP-075-079R2 delivery lineage")
+         else:
+             errors.append("PORT_LEDGER current delivery does not preserve accepted R6 lineage")
+         if port.get("bp070074r6_hotfix", {}).get("parent") != "BP-070-074R5":
+@@ -6311,7 +6318,7 @@ def check_gameplay_presentation_block_contract(root: Path) -> CheckResult:
+         ledger = json.loads((root / "BLOCK_LEDGER.json").read_text(encoding="utf-8"))
+         expected = {
+             "block_id": "BP-075-079", "parent_package_id": "BP-070-074R6",
+-            "final_package_id": "BP-079", "delivery_revision": "BP-075-079R2",
++            "final_package_id": "BP-079", "delivery_revision": "BP-075-079R3",
+             "gameplay_presentation_status": GAMEPLAY_PRESENTATION_STATUS,
+             "gameplay_presentation_fingerprint": "0xad91624c",
+             "block_runtime_fixtures": 112,
+@@ -6454,7 +6461,7 @@ def check_bp075079r1_world_physics_lineage_contract(root: Path) -> CheckResult:
+             if hotfix.get(key) is not False:
+                 errors.append(f"R1 hotfix classification {key} differs")
+ 
+-        if ledger.get("delivery_revision") not in ("BP-075-079R1", "BP-075-079R2"):
++        if ledger.get("delivery_revision") not in ("BP-075-079R1", "BP-075-079R2", "BP-075-079R3"):
+             errors.append("BLOCK_LEDGER no longer preserves R1/R2 delivery lineage")
+         if ledger.get("delivery_revision") == "BP-075-079R1" and ledger.get("delivery_parent") != "BP-075-079":
+             errors.append("BLOCK_LEDGER historical R1 parent differs")
+@@ -6465,7 +6472,7 @@ def check_bp075079r1_world_physics_lineage_contract(root: Path) -> CheckResult:
+             errors.append("BLOCK_LEDGER R1 server sections differ")
+         if record.get("server_protected_sha256") != "181db4de0fc6db19d9f067aea9d8ebd654c8e14a37c477be1640958c0cff3781":
+             errors.append("BLOCK_LEDGER R1 protected server hash differs")
+-        if port.get("current_delivery_revision") not in ("BP-075-079R1", "BP-075-079R2"):
++        if port.get("current_delivery_revision") not in ("BP-075-079R1", "BP-075-079R2", "BP-075-079R3"):
+             errors.append("PORT_LEDGER no longer preserves R1/R2 delivery lineage")
+         if port.get("current_delivery_revision") == "BP-075-079R1" and port.get("delivery_parent") != "BP-075-079":
+             errors.append("PORT_LEDGER historical R1 parent differs")
+@@ -6556,6 +6563,8 @@ def check_bp075079r2_view_lineage_contract(root: Path) -> CheckResult:
+                     errors.append("downstream BP-036 report fixture/vector counts differ")
+                 if report.get("view_number_parser") != "c_atoi":
+                     errors.append("downstream BP-036 report parser differs")
++                if report.get("runtime_view_expectation") != "c_atoi":
++                    errors.append("downstream BP-036 report runtime expectation differs")
+ 
+         strict = subprocess.run(
+             [sys.executable, str(checker_path), "--root", str(root)],
+@@ -6584,13 +6593,13 @@ def check_bp075079r2_view_lineage_contract(root: Path) -> CheckResult:
+             errors.append("R2 hotfix no longer preserves strict historical mode")
+ 
+         record = ledger.get("bp075079r2_delivery_hotfix", {})
+-        if ledger.get("delivery_revision") != "BP-075-079R2" or ledger.get("delivery_parent") != "BP-075-079R1":
+-            errors.append("BLOCK_LEDGER R2 delivery lineage differs")
++        if ledger.get("delivery_revision") != "BP-075-079R3" or ledger.get("delivery_parent") != "BP-075-079R2":
++            errors.append("BLOCK_LEDGER current delivery no longer preserves R2 -> R3 lineage")
+         if record.get("predecessor_result_sha256") != result_hash or record.get("downstream_flag") != "--allow-downstream-package":
+             errors.append("BLOCK_LEDGER R2 hotfix record differs")
+         port_record = port.get("bp075079r2_hotfix", {})
+-        if port.get("current_delivery_revision") != "BP-075-079R2" or port.get("delivery_parent") != "BP-075-079R1":
+-            errors.append("PORT_LEDGER R2 delivery lineage differs")
++        if port.get("current_delivery_revision") != "BP-075-079R3" or port.get("delivery_parent") != "BP-075-079R2":
++            errors.append("PORT_LEDGER current delivery no longer preserves R2 -> R3 lineage")
+         if port_record.get("predecessor_result_sha256") != result_hash:
+             errors.append("PORT_LEDGER R2 predecessor result hash differs")
+ 
+@@ -6634,6 +6643,138 @@ def check_bp075079r2_view_lineage_contract(root: Path) -> CheckResult:
+         errors.append(f"cannot validate BP-075-079R2 inherited view-contract hotfix: {exc}")
+     return CheckResult("bp075079r2_view_lineage_contract", not errors, details, errors)
+ 
++
++def check_bp075079r3_view_runtime_lineage_contract(root: Path) -> CheckResult:
++    errors: list[str] = []
++    details: dict[str, object] = {}
++    result_hash = "225397ce680774d4730f0b75929f52e05749c70a6ead246051e057a310b9916b"
++    try:
++        checker_path = root / "tools/check_client_render_036.py"
++        shared = (root / "tools/client_render_checker_common.py").read_text(encoding="utf-8-sig")
++        test = (root / "tests/view_state_parity_tests.ml").read_text(encoding="utf-8-sig")
++        analysis = (root / "docs/BP-075-079R3_RESULT_ANALYSIS.md").read_text(encoding="utf-8")
++        testing = (root / "docs/BP-075-079R3_TESTING.md").read_text(encoding="utf-8")
++        changelog = (root / "CHANGELOG_BP-075-079R3.md").read_text(encoding="utf-8")
++        hotfix = json.loads((root / "docs/BP-075-079R3_HOTFIX_REPORT.json").read_text(encoding="utf-8"))
++        ledger = json.loads((root / "BLOCK_LEDGER.json").read_text(encoding="utf-8"))
++        port = json.loads((root / "PORT_LEDGER.json").read_text(encoding="utf-8"))
++
++        downstream_runtime = (
++            'equal(state.emptyCshift[2], 0.0, "hex rejected by CRT atoi")',
++            'equal(state.emptyCshift[3], 0.0, "character rejected by CRT atoi")',
++        )
++        historical_runtime = (
++            'equal(state.emptyCshift[2], 32.0, "hex atoi")',
++            'equal(state.emptyCshift[3], 65.0, "character atoi")',
++        )
++        for marker in downstream_runtime:
++            if marker not in test:
++                errors.append(f"R3 downstream BP-036 fixture missing marker: {marker}")
++        for marker in historical_runtime:
++            if marker in test:
++                errors.append(f"R3 fixture still contains historical Q_atoi expectation: {marker}")
++        for marker in ("historical_runtime", "downstream_runtime", "runtime_view_expectation"):
++            if marker not in shared:
++                errors.append(f"shared BP-036 checker missing R3 runtime-lineage marker: {marker}")
++
++        with tempfile.TemporaryDirectory(prefix="miniquake-bp075079r3-") as temporary:
++            report_path = Path(temporary) / "bp075079r3-view-downstream.json"
++            downstream = subprocess.run(
++                [sys.executable, str(checker_path), "--root", str(root),
++                 "--allow-downstream-package", "--json-output", str(report_path)],
++                capture_output=True, text=True,
++            )
++            if downstream.returncode != 0:
++                errors.append("R3 downstream BP-036 checker failed: " + (downstream.stdout + downstream.stderr).strip())
++            else:
++                report = json.loads(report_path.read_text(encoding="utf-8"))
++                if report.get("downstream_package") is not True:
++                    errors.append("R3 downstream report does not identify downstream mode")
++                if report.get("view_number_parser") != "c_atoi":
++                    errors.append("R3 downstream report parser differs")
++                if report.get("runtime_view_expectation") != "c_atoi":
++                    errors.append("R3 downstream report runtime expectation differs")
++                if report.get("runtime_fixtures") != 22:
++                    errors.append("R3 downstream report fixture count differs")
++
++        strict = subprocess.run(
++            [sys.executable, str(checker_path), "--root", str(root)],
++            capture_output=True, text=True,
++        )
++        strict_text = strict.stdout + strict.stderr
++        if strict.returncode == 0:
++            errors.append("strict historical BP-036 mode unexpectedly accepts the downstream R3 runtime fixture")
++        if "historical BP-036" not in strict_text:
++            errors.append("strict historical BP-036 rejection reason changed")
++
++        if hotfix.get("delivery_revision") != "BP-075-079R3" or hotfix.get("delivery_parent") != "BP-075-079R2":
++            errors.append("R3 hotfix report lineage differs")
++        if hotfix.get("predecessor_result_sha256") != result_hash:
++            errors.append("R3 predecessor result hash differs")
++        for key in (
++            "production_source_changed", "native_source_changed",
++            "client_render_fingerprint_changed", "gameplay_presentation_fingerprint_changed",
++            "runtime_fixture_count_changed",
++        ):
++            if hotfix.get(key) is not False:
++                errors.append(f"R3 hotfix classification {key} differs")
++        if hotfix.get("strict_historical_mode_preserved") is not True:
++            errors.append("R3 hotfix no longer preserves strict historical mode")
++
++        record = ledger.get("bp075079r3_delivery_hotfix", {})
++        if ledger.get("delivery_revision") != "BP-075-079R3" or ledger.get("delivery_parent") != "BP-075-079R2":
++            errors.append("BLOCK_LEDGER R3 delivery lineage differs")
++        if record.get("predecessor_result_sha256") != result_hash or record.get("downstream_flag") != "--allow-downstream-package":
++            errors.append("BLOCK_LEDGER R3 hotfix record differs")
++        port_record = port.get("bp075079r3_hotfix", {})
++        if port.get("current_delivery_revision") != "BP-075-079R3" or port.get("delivery_parent") != "BP-075-079R2":
++            errors.append("PORT_LEDGER R3 delivery lineage differs")
++        if port_record.get("predecessor_result_sha256") != result_hash:
++            errors.append("PORT_LEDGER R3 predecessor result hash differs")
++
++        for required in (result_hash, "expected 32., got 0", "81 native targets", "runtime expectations"):
++            if required.lower() not in analysis.lower():
++                errors.append(f"R3 result analysis missing marker: {required}")
++        for required in (
++            "runtime_view_expectation=c_atoi",
++            "MiniQuake BP-036 view state tests passed: 22",
++            "MiniQuake BP-075-079R3 acceptance test: PASS",
++        ):
++            if required not in testing:
++                errors.append(f"R3 testing guide missing marker: {required}")
++        for required in ("inherited bp-036 runtime fixture", "strict historical mode", "no file under `src/` or `native/` changed"):
++            if required not in changelog.lower():
++                errors.append(f"R3 changelog missing marker: {required}")
++
++        patch = root / "patches/BP-079R3.diff"
++        if not patch.is_file() or patch.stat().st_size == 0:
++            errors.append("patches/BP-079R3.diff is missing or empty")
++        else:
++            patch_text = patch.read_text(encoding="utf-8", errors="replace")
++            for required in ("tests/view_state_parity_tests.ml", "tools/client_render_checker_common.py", "TEST_BP-075-079R3.ps1"):
++                if required not in patch_text:
++                    errors.append(f"BP-079R3 patch missing {required}")
++            if re.search(r"^diff --git a/(src|native)/", patch_text, flags=re.M):
++                errors.append("BP-079R3 patch unexpectedly changes engine or native source")
++
++        details.update({
++            "delivery_revision": "BP-075-079R3",
++            "delivery_parent": "BP-075-079R2",
++            "predecessor_result_sha256": result_hash,
++            "windows_targets_compiled": 81,
++            "failure_group": "BP-036",
++            "failure_fixture": 12,
++            "downstream_hex_value": 0,
++            "downstream_character_value": 0,
++            "strict_historical_mode_rejects_current": strict.returncode != 0,
++            "runtime_fixtures": 22,
++            "production_source_changed": False,
++            "native_source_changed": False,
++        })
++    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
++        errors.append(f"cannot validate BP-075-079R3 inherited view-runtime hotfix: {exc}")
++    return CheckResult("bp075079r3_view_runtime_lineage_contract", not errors, details, errors)
++
+ def check_package_identity(root: Path) -> CheckResult:
+     errors: list[str] = []
+     details: dict[str, object] = {}
+@@ -6732,6 +6873,7 @@ def run_checks(root: Path, manifest_path: Path) -> VerificationReport:
+         check_gameplay_presentation_block_contract(root),
+         check_bp075079r1_world_physics_lineage_contract(root),
+         check_bp075079r2_view_lineage_contract(root),
++        check_bp075079r3_view_runtime_lineage_contract(root),
+         check_current_delivery_scripts(root),
+         check_live_output_contract(root),
+         check_package_identity(root),

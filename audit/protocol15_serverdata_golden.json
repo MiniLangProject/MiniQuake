@@ -1,0 +1,288 @@
+{
+  "schema": "MiniQuakeProtocol15ServerDataGolden/1",
+  "package": "BP-012R1",
+  "parent_package": "BP-012",
+  "source_reference": "WinQuake 1.09 sv_main.c/common.c/protocol.h",
+  "vectors": [
+    {
+      "name": "serverinfo_coop",
+      "bytes": "08020a56455253494f4e20312e3039205345525645522028353932372043524329000b0f000000010054686520536c69706761746520436f6d706c6578006d6170732f65316d312e6273700070726f67732f706c617965722e6d646c00006d6973632f6d656e75312e77617600002002020501001901",
+      "length": 118
+    },
+    {
+      "name": "serverinfo_deathmatch",
+      "bytes": "08020a56455253494f4e20312e303920534552564552202831323334352043524329000b0f0000000401506c616365206f662054776f20446561746873006d6170732f646d312e6273700000002000000504001901",
+      "length": 85
+    },
+    {
+      "name": "sound_default",
+      "bytes": "06001a0005500060fff000",
+      "length": 11
+    },
+    {
+      "name": "sound_custom",
+      "bytes": "060380206709ff9eff0100ff7f",
+      "length": 13
+    },
+    {
+      "name": "sound_float_parameter_rounding",
+      "bytes": "06001a0005500060fff000",
+      "length": 11
+    },
+    {
+      "name": "clientdata_minimal",
+      "bytes": "0f004278563412036400281932056402",
+      "length": 16,
+      "bits": 16896
+    },
+    {
+      "name": "clientdata_full_standard",
+      "bytes": "0fff7e1efb0101fefe0303674523f12cff01ecff2cff00ff8004",
+      "length": 26,
+      "bits": 32511
+    },
+    {
+      "name": "clientdata_missionpack",
+      "bytes": "0f0042010080000450000c0d0e0f1007",
+      "length": 16,
+      "bits": 16896
+    },
+    {
+      "name": "clientdata_missionpack_zero",
+      "bytes": "0f0042010080000450000c0d0e0f10",
+      "length": 15,
+      "bits": 16896
+    },
+    {
+      "name": "baseline_world",
+      "bytes": "160000010200049eff400100c0ff7fff",
+      "length": 16
+    },
+    {
+      "name": "baseline_player",
+      "bytes": "16010002030105500000a00020f00040",
+      "length": 16
+    }
+  ],
+  "initial_delivery_cases": [
+    {
+      "name": "spawned",
+      "spawned": true,
+      "send_signon": false,
+      "elapsed": 0.0,
+      "plan": 9
+    },
+    {
+      "name": "spawned_signon_flag",
+      "spawned": true,
+      "send_signon": true,
+      "elapsed": 9.0,
+      "plan": 9
+    },
+    {
+      "name": "signon_requested",
+      "spawned": false,
+      "send_signon": true,
+      "elapsed": 0.0,
+      "plan": 8
+    },
+    {
+      "name": "wait_before_five",
+      "spawned": false,
+      "send_signon": false,
+      "elapsed": 4.999,
+      "plan": 4
+    },
+    {
+      "name": "wait_at_five",
+      "spawned": false,
+      "send_signon": false,
+      "elapsed": 5.0,
+      "plan": 4
+    },
+    {
+      "name": "nop_after_five",
+      "spawned": false,
+      "send_signon": false,
+      "elapsed": 5.001,
+      "plan": 2
+    }
+  ],
+  "reliable_delivery_cases": [
+    {
+      "name": "overflow",
+      "overflowed": true,
+      "message_size": 1,
+      "drop_asap": false,
+      "can_send": true,
+      "plan": 1
+    },
+    {
+      "name": "empty",
+      "overflowed": false,
+      "message_size": 0,
+      "drop_asap": false,
+      "can_send": false,
+      "plan": 0
+    },
+    {
+      "name": "blocked_message",
+      "overflowed": false,
+      "message_size": 1,
+      "drop_asap": false,
+      "can_send": false,
+      "plan": 2
+    },
+    {
+      "name": "blocked_dropasap",
+      "overflowed": false,
+      "message_size": 0,
+      "drop_asap": true,
+      "can_send": false,
+      "plan": 2
+    },
+    {
+      "name": "dropasap_empty",
+      "overflowed": false,
+      "message_size": 0,
+      "drop_asap": true,
+      "can_send": true,
+      "plan": 3
+    },
+    {
+      "name": "dropasap_message",
+      "overflowed": false,
+      "message_size": 4,
+      "drop_asap": true,
+      "can_send": true,
+      "plan": 3
+    },
+    {
+      "name": "send_one",
+      "overflowed": false,
+      "message_size": 1,
+      "drop_asap": false,
+      "can_send": true,
+      "plan": 4
+    },
+    {
+      "name": "send_full",
+      "overflowed": false,
+      "message_size": 8192,
+      "drop_asap": false,
+      "can_send": true,
+      "plan": 4
+    }
+  ],
+  "datagram_cases": [
+    {
+      "name": "empty_source",
+      "destination_size": 8,
+      "source_size": 0,
+      "max_size": 16,
+      "append": true
+    },
+    {
+      "name": "strictly_below",
+      "destination_size": 8,
+      "source_size": 7,
+      "max_size": 16,
+      "append": true
+    },
+    {
+      "name": "equal_rejected",
+      "destination_size": 8,
+      "source_size": 8,
+      "max_size": 16,
+      "append": false
+    },
+    {
+      "name": "above_rejected",
+      "destination_size": 9,
+      "source_size": 8,
+      "max_size": 16,
+      "append": false
+    },
+    {
+      "name": "empty_equal_rejected",
+      "destination_size": 16,
+      "source_size": 0,
+      "max_size": 16,
+      "append": false
+    }
+  ],
+  "fast_update_cases": [
+    {
+      "name": "remaining_15_unchanged",
+      "remaining": 15,
+      "bits": 0,
+      "encoded_size": 2,
+      "can_write": false
+    },
+    {
+      "name": "remaining_16_unchanged",
+      "remaining": 16,
+      "bits": 0,
+      "encoded_size": 2,
+      "can_write": true
+    },
+    {
+      "name": "remaining_16_full_short",
+      "remaining": 16,
+      "bits": 16255,
+      "encoded_size": 17,
+      "can_write": false
+    },
+    {
+      "name": "remaining_17_full_short",
+      "remaining": 17,
+      "bits": 16255,
+      "encoded_size": 17,
+      "can_write": true
+    },
+    {
+      "name": "remaining_17_full_long",
+      "remaining": 17,
+      "bits": 32639,
+      "encoded_size": 18,
+      "can_write": false
+    },
+    {
+      "name": "remaining_18_full_long",
+      "remaining": 18,
+      "bits": 32639,
+      "encoded_size": 18,
+      "can_write": true
+    }
+  ],
+  "constants": {
+    "PROTOCOL_VERSION": 15,
+    "SVC_PRINT": 8,
+    "SVC_SERVERINFO": 11,
+    "SVC_CDTRACK": 32,
+    "SVC_SETVIEW": 5,
+    "SVC_SIGNONNUM": 25,
+    "SVC_SOUND": 6,
+    "SVC_SPAWNBASELINE": 22,
+    "SVC_CLIENTDATA": 15,
+    "SND_VOLUME": 1,
+    "SND_ATTENUATION": 2,
+    "SU_VIEWHEIGHT": 1,
+    "SU_IDEALPITCH": 2,
+    "SU_ITEMS": 512,
+    "SU_ONGROUND": 1024,
+    "SU_INWATER": 2048,
+    "SU_WEAPONFRAME": 4096,
+    "SU_ARMOR": 8192,
+    "SU_WEAPON": 16384,
+    "PLAN_SEND_UNRELIABLE": 1,
+    "PLAN_SEND_NOP": 2,
+    "PLAN_WAIT_SIGNON": 4,
+    "PLAN_RELIABLE_PHASE": 8,
+    "RELIABLE_NONE": 0,
+    "RELIABLE_DROP_OVERFLOW": 1,
+    "RELIABLE_WAIT": 2,
+    "RELIABLE_DROP_ASAP": 3,
+    "RELIABLE_SEND": 4
+  }
+}

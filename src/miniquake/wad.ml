@@ -11,6 +11,7 @@ package miniquake.wad
 import miniquake.types as t
 import miniquake.byteio as bio
 import miniquake.array_util as arrayutil
+import miniquake.protocol_text as quakeText
 import std.fs as fs
 
 const CMP_NONE = 0
@@ -32,7 +33,11 @@ const WAD_LUMPINFO_SIZE = 32
 // at 16 bytes, and NUL-pads the rest.  Returning the fixed buffer preserves
 // the exact lumpinfo_t name representation and is safe for in-place callers.
 function W_CleanupName(input)
-  source = bytes(input)
+  source = input
+  if input is not bytes then
+    source = quakeText.encodeBytes(input)
+    if source is error then return source end if
+  end if
   output = bytes(WAD_NAME_LENGTH)
   index = 0
   while index < WAD_NAME_LENGTH and index < len(source)
@@ -51,7 +56,7 @@ function cleanupNameText(input)
   while length < WAD_NAME_LENGTH and cleaned[length] != 0
     length = length + 1
   end while
-  return decode(slice(cleaned, 0, length))
+  return quakeText.decodeBytes(slice(cleaned, 0, length))
 end function
 
 // SwapPic performs the two LittleLong conversions from the original.  The

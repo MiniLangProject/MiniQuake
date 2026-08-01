@@ -6,6 +6,7 @@ import miniquake.message as msg
 import miniquake.mathlib as math
 import miniquake.native as native
 import miniquake.sound.mixer as sound
+import miniquake.protocol_transients as transients
 
 const MAX_BEAMS = 24
 
@@ -50,20 +51,20 @@ function parseType(reader, type)
   origin = t.Vec3(0.0, 0.0, 0.0)
   endPosition = t.Vec3(0.0, 0.0, 0.0)
   entity = 0
+  kind = transients.tempKind(type)
+  if kind is error then return kind end if
 
-  if type == c.TE_LIGHTNING1 or type == c.TE_LIGHTNING2 or type == c.TE_LIGHTNING3 or type == c.TE_BEAM then
+  if kind == transients.TEMP_KIND_BEAM then
     entity = msg.readShort(reader)
     origin = readPosition(reader)
     endPosition = readPosition(reader)
-  else if type == c.TE_SPIKE or type == c.TE_SUPERSPIKE or type == c.TE_GUNSHOT or type == c.TE_EXPLOSION or type == c.TE_TAREXPLOSION or type == c.TE_WIZSPIKE or type == c.TE_KNIGHTSPIKE or type == c.TE_LAVASPLASH or type == c.TE_TELEPORT then
+  else if kind == transients.TEMP_KIND_POINT then
     origin = readPosition(reader)
-  else if type == c.TE_EXPLOSION2 then
+  else
     origin = readPosition(reader)
     colorStart = msg.readByte(reader)
     colorLength = msg.readByte(reader)
     entity = (colorStart << 8) | colorLength
-  else
-    return error(2360, "CL_ParseTEnt: bad type " + type)
   end if
 
   return t.TemporaryEntity(type, origin, endPosition, entity)
@@ -142,7 +143,7 @@ end function
 function setBeam(beam, entity, model, start, finish, currentTime)
   beam.entity = entity
   beam.model = model
-  beam.endTime = currentTime + 0.2
+  beam.endTime = transients.beamEndTime(currentTime)
   beam.start = math.copy(start)
   beam.endPosition = math.copy(finish)
   return beam
@@ -208,7 +209,7 @@ function appendExplosionLight(state, origin, currentTime)
   light = allocateTempDlight(state, currentTime)
   light.origin = math.copy(origin)
   light.radius = 350.0
-  light.die = currentTime + 0.5
+  light.die = transients.dynamicLightDieTime(currentTime)
   light.decay = 300.0
   return light
 end function
@@ -290,7 +291,7 @@ function CL_UpdateTEnts(state, currentTime, viewEntity, viewOrigin)
   beamIndex = 0
   while beamIndex < MAX_BEAMS
     beam = state.beams[beamIndex]
-    if beam.model != "" and beam.endTime >= currentTime then
+    if beam.model != "" and transients.beamAlive(beam.endTime, currentTime) then
       if beam.entity == viewEntity then beam.start = math.copy(viewOrigin) end if
       distance = math.subtract(beam.endPosition, beam.start)
       yaw = 0.0

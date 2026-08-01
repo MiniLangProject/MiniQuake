@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "delivery_revision": "BP-085-089R6",
+  "delivery_parent": "BP-085-089R5",
+  "package_id": "BP-089",
+  "block_id": "BP-085-089",
+  "result_archive": "MiniQuake_BP-085-089R5_RESULTS_20260801-113442.zip",
+  "result_archive_sha256": "e869baa6928241d5fed8b145e3b2184cee844b5f94dfdfc6bc8ec523ba6f454e",
+  "confirmed_pass": {
+    "build_and_unit_tests": true,
+    "id1_rogue_hipnotic": true,
+    "retail_demos": 3,
+    "savegame_first_pass_exact": true,
+    "savegame_semantic": true,
+    "savegame_stable_exact": true,
+    "savegame_stable_semantic": true,
+    "trace_a_frames": 128
+  },
+  "failure": {
+    "stage": "compatibility trace B canonical frame",
+    "frame": 81,
+    "frames_written": 81,
+    "message": "server edict 66 origin expected Vec3, got unknown",
+    "trace_a_rolling_hash": "d905b042",
+    "trace_b_rolling_hash": "9fbb6630"
+  },
+  "classification": "native GC rooting defect in QuakeC-to-server heap-value handoff",
+  "confidence": "high; final confirmation requires the R6 Windows run",
+  "fix": {
+    "root_returned_vectors_before_field_write": true,
+    "root_returned_edict_before_array_write": true,
+    "root_entity_baseline_before_field_write": true,
+    "root_player_vectors_before_field_write": true,
+    "typed_sync_errors": true,
+    "forced_gc_sync_regression": {
+      "edicts": 96,
+      "mirror_passes": 6,
+      "gc_limit_bytes": 512,
+      "public_diagnostics_test_count": 10
+    },
+    "inherited_checker_lineage": {
+      "protocol15_serverdata": "historical direct baseline copy or complete GC-rooted equivalent",
+      "world_physics": "three frozen physics sections plus five exact R6 GC-root function hashes",
+      "historical_modes_preserved": true
+    }
+  },
+  "contract_fingerprints_changed": false,
+  "native_binaries_changed": false
+}

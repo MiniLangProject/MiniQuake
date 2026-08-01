@@ -1,0 +1,333 @@
+diff --git a/CHANGELOG_BP-081.md b/CHANGELOG_BP-081.md
+new file mode 100644
+index 0000000..4da4b06
+--- /dev/null
++++ b/CHANGELOG_BP-081.md
+@@ -0,0 +1,5 @@
++# BP-081 — cd_win.c mechanical surface
++
++- Adds the four remaining original `CDAudio_*` names.
++- Maps physical MCI tray/media operations to observable virtual-media state transitions.
++- Preserves notification, loop, failure and validity behavior through 20 fixtures.
+diff --git a/audit/cd_audio_source_surface_golden.json b/audit/cd_audio_source_surface_golden.json
+new file mode 100644
+index 0000000..abb77aa
+--- /dev/null
++++ b/audit/cd_audio_source_surface_golden.json
+@@ -0,0 +1,27 @@
++{
++  "backend": "virtual OGG/music backend",
++  "classification": "technical_equivalent",
++  "fixture_count": 20,
++  "mechanical_operations_out_of_profile": [
++    "physical tray eject",
++    "physical tray close",
++    "MCI device identifier"
++  ],
++  "observable_state_preserved": [
++    "valid",
++    "playing",
++    "looping",
++    "track",
++    "notification result",
++    "failure invalidation"
++  ],
++  "original_function_names": [
++    "CDAudio_Eject",
++    "CDAudio_CloseDoor",
++    "CDAudio_GetAudioDiskInfo",
++    "CDAudio_MessageHandler"
++  ],
++  "original_source": "cd_win.c",
++  "package": "BP-081",
++  "schema_version": 1
++}
+diff --git a/docs/BP-081_CD_AUDIO_SOURCE_SURFACE_AUDIT.md b/docs/BP-081_CD_AUDIO_SOURCE_SURFACE_AUDIT.md
+new file mode 100644
+index 0000000..6fd2fc9
+--- /dev/null
++++ b/docs/BP-081_CD_AUDIO_SOURCE_SURFACE_AUDIT.md
+@@ -0,0 +1,6 @@
++# BP-081 cd_win.c audit
++
++Physical MCI tray operations do not exist in the modern OGG-backed audio path.
++The four remaining names are represented as technical equivalents that preserve
++observable state: media validity, playback, looping, notification result and
++failure invalidation. No physical drive operation is claimed.
+diff --git a/src/miniquake/sound/cd_audio.ml b/src/miniquake/sound/cd_audio.ml
+index b03d164..4b32e72 100644
+--- a/src/miniquake/sound/cd_audio.ml
++++ b/src/miniquake/sound/cd_audio.ml
+@@ -218,7 +218,7 @@ function CD_f(state, arguments)
+     return ""
+   end if
+   if command == "remap" then return remapCommand(state, arguments) end if
+-  if command == "close" then return "" end if
++  if command == "close" then CDAudio_CloseDoor(state); return "" end if
+   if not state.valid then
+     state.lastMessage = "No CD in player."
+     return state.lastMessage
+@@ -234,10 +234,74 @@ function CD_f(state, arguments)
+   if command == "pause" then CDAudio_Pause(state); return "" end if
+   if command == "resume" then CDAudio_Resume(state); return "" end if
+   if command == "eject" then
+-    if state.playing then CDAudio_Stop(state) end if
+-    state.valid = false
++    CDAudio_Eject(state)
+     return ""
+   end if
+   if command == "info" then return infoText(state) end if
+   return "cd <on|off|reset|remap|play|loop|stop|pause|resume|eject|close|info> [track]"
+ end function
++
++// ---------------------------------------------------------------------------
++// WinQuake cd_win.c source-surface technical equivalents.
++//
++// Physical MCI tray and media-notification operations do not exist in the
++// modern OGG backend. These adapters preserve all game-observable state
++// transitions and the original public names while documenting the mechanical
++// drive operation as a technical equivalent.
++// ---------------------------------------------------------------------------
++
++const MCI_NOTIFY_SUCCESSFUL = 1
++const MCI_NOTIFY_SUPERSEDED = 2
++const MCI_NOTIFY_ABORTED = 4
++const MCI_NOTIFY_FAILURE = 8
++
++function CDAudio_Eject(state)
++  if state.playing then CDAudio_Stop(state) end if
++  state.valid = false
++  state.lastMessage = "CDAudio: media ejected"
++  return true
++end function
++
++function CDAudio_CloseDoor(state)
++  state.lastMessage = "CDAudio: close door acknowledged by virtual media backend"
++  return true
++end function
++
++function CDAudio_GetAudioDiskInfo(state)
++  state.valid = false
++  if not state.initialized or state.maxTrack < 1 then
++    state.lastMessage = "CDAudio: no music tracks"
++    return -1
++  end if
++  state.valid = true
++  state.lastMessage = ""
++  return 0
++end function
++
++function CDAudio_MessageHandler(state, notification, deviceMatches)
++  if not deviceMatches then return 1 end if
++
++  if notification == MCI_NOTIFY_SUCCESSFUL then
++    if state.playing then
++      state.playing = false
++      if state.looping then CDAudio_Play(state, state.track, true) end if
++    end if
++    return 0
++  end if
++
++  if notification == MCI_NOTIFY_ABORTED or
++      notification == MCI_NOTIFY_SUPERSEDED then
++    return 0
++  end if
++
++  if notification == MCI_NOTIFY_FAILURE then
++    CDAudio_Stop(state)
++    state.valid = false
++    state.lastMessage = "MCI_NOTIFY_FAILURE"
++    return 0
++  end if
++
++  state.lastMessage = "Unexpected MM_MCINOTIFY type (" + notification + ")"
++  return 1
++end function
++
+diff --git a/tests/cd_audio_source_surface_tests.ml b/tests/cd_audio_source_surface_tests.ml
+new file mode 100644
+index 0000000..afcdbff
+--- /dev/null
++++ b/tests/cd_audio_source_surface_tests.ml
+@@ -0,0 +1,118 @@
++package miniquake.tests.cd_audio_source_surface
++
++import miniquake.sound.cd_audio as cd
++
++failures = 0
++checks = 0
++
++function check(condition, label)
++  global failures, checks
++  checks = checks + 1
++  if not condition then
++    failures = failures + 1
++    print "FAIL: " + label
++  end if
++end function
++
++function equal(actual, expected, label)
++  check(actual == expected, label + ": expected " + expected + ", got " + actual)
++end function
++
++function main(args)
++  global failures, checks
++  state = cd.create(void, 12)
++
++  print "[1/20] initialization"
++  equal(cd.CDAudio_Init(state), 0, "init result")
++  check(state.initialized and state.enabled and state.valid, "init flags")
++
++  print "[2/20] disk info"
++  equal(cd.CDAudio_GetAudioDiskInfo(state), 0, "disk info")
++  equal(state.maxTrack, 12, "max track")
++
++  print "[3/20] close door"
++  check(cd.CDAudio_CloseDoor(state), "close door")
++  check(len(bytes(state.lastMessage)) > 0, "close door message")
++
++  print "[4/20] play"
++  state.volume = 1.0
++  check(cd.CDAudio_Play(state, 3, false), "play")
++  equal(state.track, 3, "play track")
++
++  print "[5/20] successful completion"
++  equal(cd.CDAudio_MessageHandler(state, cd.MCI_NOTIFY_SUCCESSFUL, true), 0, "notify success")
++  check(not state.playing, "success clears playing")
++
++  print "[6/20] looping completion"
++  check(cd.CDAudio_Play(state, 4, true), "loop play")
++  equal(cd.CDAudio_MessageHandler(state, cd.MCI_NOTIFY_SUCCESSFUL, true), 0, "loop notify")
++  check(state.playing and state.looping, "loop restarts")
++
++  print "[7/20] superseded notification"
++  equal(cd.CDAudio_MessageHandler(state, cd.MCI_NOTIFY_SUPERSEDED, true), 0, "superseded")
++
++  print "[8/20] aborted notification"
++  equal(cd.CDAudio_MessageHandler(state, cd.MCI_NOTIFY_ABORTED, true), 0, "aborted")
++
++  print "[9/20] foreign device"
++  equal(cd.CDAudio_MessageHandler(state, cd.MCI_NOTIFY_SUCCESSFUL, false), 1, "foreign device")
++
++  print "[10/20] unknown notification"
++  equal(cd.CDAudio_MessageHandler(state, 99, true), 1, "unknown notify")
++  check(len(bytes(state.lastMessage)) > 0, "unknown message")
++
++  print "[11/20] failure notification"
++  state.valid = true
++  state.playing = true
++  equal(cd.CDAudio_MessageHandler(state, cd.MCI_NOTIFY_FAILURE, true), 0, "failure notify")
++  check(not state.valid and not state.playing, "failure state")
++
++  print "[12/20] disk revalidation"
++  equal(cd.CDAudio_GetAudioDiskInfo(state), 0, "revalidate")
++  check(state.valid, "revalidated")
++
++  print "[13/20] eject"
++  state.playing = true
++  check(cd.CDAudio_Eject(state), "eject")
++  check(not state.valid and not state.playing, "eject state")
++
++  print "[14/20] play rejected without media"
++  check(not cd.CDAudio_Play(state, 1, false), "invalid media reject")
++
++  print "[15/20] close command"
++  cd.CD_f(state, ["cd", "close"])
++  check(len(bytes(state.lastMessage)) > 0, "close command")
++
++  print "[16/20] reset command"
++  cd.CD_f(state, ["cd", "reset"])
++  check(state.valid and state.enabled, "reset state")
++
++  print "[17/20] eject command"
++  cd.CD_f(state, ["cd", "eject"])
++  check(not state.valid, "eject command state")
++
++  print "[18/20] invalid disk info"
++  empty = cd.create(void, 1)
++  empty.maxTrack = 0
++  empty.initialized = true
++  equal(cd.CDAudio_GetAudioDiskInfo(empty), -1, "empty media")
++  check(not empty.valid, "empty invalid")
++
++  print "[19/20] identity remap"
++  remap = cd.identityRemap()
++  equal(remap[0], 0, "remap zero")
++  equal(remap[99], 99, "remap ninety-nine")
++
++  print "[20/20] shutdown"
++  state.valid = true
++  state.playing = true
++  check(cd.CDAudio_Shutdown(state), "shutdown")
++  check(not state.playing, "shutdown stops")
++
++  if failures > 0 then
++    print "MiniQuake BP-081 CD audio source-surface tests failed: " + failures + "/" + checks
++    return 1
++  end if
++  print "MiniQuake BP-081 CD audio source-surface tests passed: 20"
++  return 0
++end function
+diff --git a/tools/check_source_081.py b/tools/check_source_081.py
+new file mode 100755
+index 0000000..dd66369
+--- /dev/null
++++ b/tools/check_source_081.py
+@@ -0,0 +1,57 @@
++#!/usr/bin/env python3
++import argparse, json, pathlib, re, sys
++
++NAMES = [
++    "CDAudio_Eject", "CDAudio_CloseDoor", "CDAudio_GetAudioDiskInfo",
++    "CDAudio_MessageHandler",
++]
++
++def main():
++    ap = argparse.ArgumentParser()
++    ap.add_argument("--root", default=".")
++    ap.add_argument("--json", default="")
++    ns = ap.parse_args()
++    root = pathlib.Path(ns.root).resolve()
++    errors = []
++    source = (root / "src/miniquake/sound/cd_audio.ml").read_text(encoding="utf-8-sig")
++    test = (root / "tests/cd_audio_source_surface_tests.ml").read_text(encoding="utf-8-sig")
++    golden = json.loads((root / "audit/cd_audio_source_surface_golden.json").read_text())
++
++    for name in NAMES:
++        count = len(re.findall(rf"(?m)^\s*function\s+{re.escape(name)}\s*\(", source))
++        if count != 1:
++            errors.append(f"{name}: expected one technical-equivalent function, found {count}")
++    for marker in [
++        "const MCI_NOTIFY_SUCCESSFUL = 1",
++        "const MCI_NOTIFY_SUPERSEDED = 2",
++        "const MCI_NOTIFY_ABORTED = 4",
++        "const MCI_NOTIFY_FAILURE = 8",
++        "if not deviceMatches then return 1 end if",
++        "state.valid = false",
++    ]:
++        if marker not in source:
++            errors.append("missing source marker: " + marker)
++    if golden.get("original_function_names") != NAMES:
++        errors.append("golden technical-equivalent list differs")
++    if golden.get("fixture_count") != 20:
++        errors.append("golden fixture_count must be 20")
++    if "MiniQuake BP-081 CD audio source-surface tests passed: 20" not in test:
++        errors.append("runtime success marker missing")
++
++    report = {
++        "schema_version": 1,
++        "package": "BP-081",
++        "status": "PASS" if not errors else "FAIL",
++        "errors": errors,
++        "technical_equivalents": len(NAMES),
++        "fixtures": 20,
++    }
++    if ns.json:
++        pathlib.Path(ns.json).write_text(json.dumps(report, indent=2) + "\n")
++    print("MiniQuake BP-081 CD audio source-surface verification: " + report["status"])
++    for error in errors:
++        print("  [FAIL] " + error)
++    return 0 if not errors else 1
++
++if __name__ == "__main__":
++    sys.exit(main())

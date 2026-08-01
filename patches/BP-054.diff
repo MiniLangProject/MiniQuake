@@ -1,0 +1,3097 @@
+diff --git a/BLOCK_LEDGER.json b/BLOCK_LEDGER.json
+index 70cd6e4f6944f9d7c78d28a1a2d1ef0f4a7cd1f7..6709e8f18a142188bec0654edffa5ce6d63a9f71 100644
+--- a/BLOCK_LEDGER.json
++++ b/BLOCK_LEDGER.json
+@@ -1,10 +1,10 @@
+ {
+   "schema_version": 1,
+   "project": "MiniQuake",
+-  "block_id": "BP-045-049",
+-  "parent_package_id": "BP-040-044R3",
+-  "final_package_id": "BP-049",
+-  "delivery_revision": "BP-045-049R3",
++  "block_id": "BP-050-054",
++  "parent_package_id": "BP-045-049R3",
++  "final_package_id": "BP-054",
++  "delivery_revision": "BP-050-054",
+   "protocol_status": "protocol15_frozen_v1",
+   "quakec_status": "quakec_109_frozen_v1",
+   "world_physics_status": "world_physics_109_frozen_v1",
+@@ -15,149 +15,80 @@
+   "world_render_fingerprint": "0x846a74de",
+   "model_ui_render_status": "model_ui_render_109_frozen_v1",
+   "model_ui_render_fingerprint": "0x0a62f5b1",
++  "render_special_status": "render_special_109_frozen_v1",
++  "render_special_fingerprint": "0x2a3d8081",
+   "steps": [
+     {
+-      "package_id": "BP-045",
+-      "title": "alias shadedot, shadow origin and texture-unit parity",
+-      "patch": "patches/BP-045.diff",
++      "package_id": "BP-050",
++      "title": "mirror reflection and overlay parity",
++      "patch": "patches/BP-050.diff",
+       "runtime_fixtures": 22,
+-      "status": "R2 Windows runtime PASS; R3 exact framebuffer acceptance pending"
++      "status": "implemented; Windows acceptance pending"
+     },
+     {
+-      "package_id": "BP-046",
+-      "title": "sprite synchronization and random syncbase parity",
+-      "patch": "patches/BP-046.diff",
+-      "runtime_fixtures": 22,
+-      "status": "R2 Windows runtime PASS; R3 exact framebuffer acceptance pending"
++      "package_id": "BP-051",
++      "title": "clear, z-trick, finish and no-refresh parity",
++      "patch": "patches/BP-051.diff",
++      "runtime_fixtures": 20,
++      "status": "implemented; Windows acceptance pending"
+     },
+     {
+-      "package_id": "BP-047",
+-      "title": "2D, HUD, statusbar and screenshot layout parity",
+-      "patch": "patches/BP-047.diff",
+-      "runtime_fixtures": 24,
+-      "status": "R2 Windows runtime PASS; R3 exact framebuffer acceptance pending"
++      "package_id": "BP-052",
++      "title": "envmap and timerefresh parity",
++      "patch": "patches/BP-052.diff",
++      "runtime_fixtures": 20,
++      "status": "implemented; Windows acceptance pending"
+     },
+     {
+-      "package_id": "BP-048",
+-      "title": "deterministic framebuffer evidence and comparison",
+-      "patch": "patches/BP-048.diff",
++      "package_id": "BP-053",
++      "title": "multi-scene render-evidence corpus",
++      "patch": "patches/BP-053.diff",
+       "runtime_fixtures": 18,
+-      "status": "R2 asset-free/runtime PASS; R3 visible-input isolation awaiting Windows acceptance"
++      "status": "implemented; Windows acceptance pending"
+     },
+     {
+-      "package_id": "BP-049",
+-      "title": "model/UI/render closure contract",
+-      "patch": "patches/BP-049.diff",
++      "package_id": "BP-054",
++      "title": "special-render closure contract",
++      "patch": "patches/BP-054.diff",
+       "runtime_fixtures": 24,
+-      "status": "R2 Windows runtime PASS; R3 exact framebuffer acceptance pending"
++      "status": "implemented; Windows acceptance pending"
+     }
+   ],
+-  "block_runtime_fixtures": 110,
++  "block_runtime_fixtures": 104,
++  "accepted_parent": {
++    "delivery_revision": "BP-045-049R3",
++    "status": "PASS",
++    "result_archive": "MiniQuake_BP-045-049R3_RESULTS_20260728-000010.zip",
++    "result_archive_sha256": "65bb521faf300fed61b7d03e15429896a31de27d934ee59459e251fac08bd2bf",
++    "headless_frames": 300,
++    "trace_frames": 128,
++    "trace_sha256": "b2589f2712b0aed42f31b1a35ebb4837c211391ba3e8d8888c422242d051af28",
++    "trace_rolling_hash": "d905b042",
++    "trace_byte_identity": "PASS",
++    "render_tga_sha256": "1325e6fd365c1e62fbf36c4fadcbe9110faa94778c4c14b43fa9efe56d35e154",
++    "render_pixel_hash": "55f9fc9c",
++    "render_sample_hash": "3ec42fe3",
++    "render_ssim": 1.0,
++    "render_identity": "PASS",
++    "udp_loopback": "PASS"
++  },
+   "acceptance": {
+     "build_once": true,
+     "continue_independent_tests": true,
+     "installed_game_validation": true,
+     "default_headless_frames": 300,
+     "default_trace_frames": 128,
+-    "deterministic_trace_processes": 2,
+-    "render_evidence_processes": 2,
+-    "default_render_evidence_frame": 128,
+-    "render_evidence_exact_identity": true,
+-    "visual_ssim_floor_for_future_original_corpus": 0.95,
++    "single_render_evidence_frame": 128,
++    "corpus_scenarios": 3,
++    "mini_pair_exact_identity": true,
++    "optional_original_ssim_floor": 0.95,
+     "udp_loopback": true
+   },
+-  "accepted_parent": {
+-    "delivery_revision": "BP-040-044R3",
+-    "status": "PASS",
+-    "result_archive": "MiniQuake_BP-040-044R3_RESULTS_20260727-181619.zip",
+-    "result_archive_sha256": "ddb2345e4730c50a7072cd217bce8095e2e09dc64e96dd63c9116bc2a9da4534",
+-    "headless_frames": 300,
+-    "trace_frames": 128,
+-    "trace_sha256": "a3c1c0019267d0c6b651c931b1044642b9ef0199cdf64156cef9e8e409a6ecfa",
+-    "trace_rolling_hash": "0658dd48",
+-    "trace_byte_identity": "PASS",
+-    "udp_loopback": "PASS"
+-  },
+   "scope_boundary": {
+-    "original_glquake_reference_images": "not bundled; future external corpus",
+-    "current_visual_evidence": "MiniQuake cross-process exact determinism",
+-    "modern_renderer_backend": "later backend block",
+-    "protocol_quakec_physics_host_contracts": "unchanged"
+-  },
+-  "status": "implemented; BP-045-049R3 Windows acceptance pending",
+-  "delivery_hotfix": {
+-    "revision": "BP-045-049R3",
+-    "parent": "BP-045-049R2",
+-    "result_archive": "MiniQuake_BP-045-049R2_RESULTS_20260727-231227.zip",
+-    "result_archive_sha256": "e1feebede5c28fed87dc673c8d3b05363da230fe18afdb174fcb212861b8ad27",
+-    "failure_check": "byte-identical render evidence comparison",
+-    "trace_equal": true,
+-    "render_ssim": 0.7532948781615113,
+-    "production_source_changed": true,
+-    "native_source_changed": false,
+-    "engine_contracts_changed": false
+-  },
+-  "r1_result": {
+-    "delivery_revision": "BP-045-049R1",
+-    "result_archive": "MiniQuake_BP-045-049R1_RESULTS_20260727-221019.zip",
+-    "result_archive_sha256": "2aef7b2b8eacd19f8c17c4883ade88644dc61a2a1232fb8b60bcd8720e9393a5",
+-    "status": "FAIL; BP-048 summary fixture 17/18",
+-    "steps": "96 PASS, 1 FAIL, 11 SKIPPED",
+-    "quake_base_supplied": false,
+-    "production_runtime_reached": false
++    "original_glquake_reference_images": "external optional corpus; not bundled",
++    "current_visual_evidence": "three independent MiniQuake A/B exact pairs; optional Original GLQuake SSIM gate",
++    "modern_renderer_backend": "later block",
++    "frozen_parent_contracts": "unchanged"
+   },
+-  "delivery_hotfix_history": [
+-    {
+-      "revision": "BP-045-049R1",
+-      "parent": "BP-045-049",
+-      "result_archive": "MiniQuake_BP-045-049_RESULTS_20260727-211658.zip",
+-      "result_archive_sha256": "0461fa3e618a3aa53824806a7225b58c63235ca3d3e537ee744f629840e4e6e5",
+-      "failure_check": "minilang_serverdata_contract",
+-      "missing_collector_markers": [
+-        "MiniQuakeProtocol15ServerDataTests.exe",
+-        "BP-012_PROTOCOL15_SERVERDATA_AUDIT.md",
+-        "protocol15_serverdata_golden.json"
+-      ],
+-      "production_source_changed": false,
+-      "native_source_changed": false,
+-      "engine_contracts_changed": false
+-    },
+-    {
+-      "revision": "BP-045-049R2",
+-      "parent": "BP-045-049R1",
+-      "result_archive_sha256": "2aef7b2b8eacd19f8c17c4883ade88644dc61a2a1232fb8b60bcd8720e9393a5",
+-      "failure_check": "BP-048 summary schema fixture",
+-      "production_source_changed": false,
+-      "native_source_changed": false,
+-      "engine_contracts_changed": false
+-    },
+-    {
+-      "revision": "BP-045-049R3",
+-      "parent": "BP-045-049R2",
+-      "result_archive": "MiniQuake_BP-045-049R2_RESULTS_20260727-231227.zip",
+-      "result_archive_sha256": "e1feebede5c28fed87dc673c8d3b05363da230fe18afdb174fcb212861b8ad27",
+-      "failure_check": "byte-identical render evidence comparison",
+-      "trace_equal": true,
+-      "render_ssim": 0.7532948781615113,
+-      "production_source_changed": true,
+-      "native_source_changed": false,
+-      "engine_contracts_changed": false
+-    }
+-  ],
+-  "r2_result": {
+-    "delivery_revision": "BP-045-049R2",
+-    "result_archive": "MiniQuake_BP-045-049R2_RESULTS_20260727-231227.zip",
+-    "result_archive_sha256": "e1feebede5c28fed87dc673c8d3b05363da230fe18afdb174fcb212861b8ad27",
+-    "status": "FAIL; 110 PASS, 1 render-evidence comparison FAIL",
+-    "trace_sha256": "b2589f2712b0aed42f31b1a35ebb4837c211391ba3e8d8888c422242d051af28",
+-    "trace_rolling_hash": "d905b042",
+-    "trace_byte_identity": "PASS",
+-    "render_a_pixel_hash": "3a409255",
+-    "render_b_pixel_hash": "6dc1f987",
+-    "render_ssim": 0.7532948781615113,
+-    "render_exact": false,
+-    "game_validation": "PASS",
+-    "headless_frames": 300,
+-    "udp_loopback": "PASS"
+-  }
++  "status": "implemented; BP-050-054 Windows acceptance pending"
+ }
+diff --git a/CHANGELOG_BP-050-054.md b/CHANGELOG_BP-050-054.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..4ee141bf308fd34a67ab3ee12a1f6a73548bc226
+--- /dev/null
++++ b/CHANGELOG_BP-050-054.md
+@@ -0,0 +1,9 @@
++# BP-050-BP-054 cumulative changelog
++
++- BP-050: mirror reflection, mirror scene and overlay parity.
++- BP-051: clear, z-trick, finish and no-refresh parity.
++- BP-052: envmap and timerefresh parity.
++- BP-053: deterministic three-scene framebuffer corpus and optional Original GLQuake comparison.
++- BP-054: frozen special-render contract candidate.
++
++No Quake game assets or original screenshots are included.
+diff --git a/CHANGELOG_BP-054.md b/CHANGELOG_BP-054.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..bc2c4e920b024029ed38ee231fe3640515907a4b
+--- /dev/null
++++ b/CHANGELOG_BP-054.md
+@@ -0,0 +1,3 @@
++# BP-054: Special-render closure
++
++Added `render_special_109_frozen_v1`, fingerprint `0x2a3d8081`, 24 closure fixtures and cumulative delivery infrastructure.
+diff --git a/COLLECT_RESULTS.ps1 b/COLLECT_RESULTS.ps1
+index 3a55e5996788d5742f7251c23f26d87d714e7942..bfeb6c4f1bf45a39469879e5f87362ba240e08d7 100644
+--- a/COLLECT_RESULTS.ps1
++++ b/COLLECT_RESULTS.ps1
+@@ -5,13 +5,13 @@ $ErrorActionPreference = "Stop"
+ Set-StrictMode -Version Latest
+ $Root = $PSScriptRoot
+ $Build = Join-Path $Root "build"
+-$PackageId = "BP-049"
+-$BlockId = "BP-045-049"
+-$DeliveryRevision = "BP-045-049R3"
+-$DeliveryParent = "BP-045-049R2"
++$PackageId = "BP-054"
++$BlockId = "BP-050-054"
++$DeliveryRevision = "BP-050-054"
++$DeliveryParent = "BP-045-049R3"
+ $Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+-$Staging = Join-Path $Build (".bp045-049r3-results-{0}" -f $Timestamp)
+-$Archive = Join-Path $Build ("MiniQuake_BP-045-049R3_RESULTS_{0}.zip" -f $Timestamp)
++$Staging = Join-Path $Build (".bp050-054-results-{0}" -f $Timestamp)
++$Archive = Join-Path $Build ("MiniQuake_BP-050-054_RESULTS_{0}.zip" -f $Timestamp)
+ 
+ if (-not (Test-Path -LiteralPath $Build -PathType Container)) { throw "build directory does not exist: $Build" }
+ if (Test-Path -LiteralPath $Staging) { Remove-Item -Recurse -Force -LiteralPath $Staging }
+@@ -59,6 +59,13 @@ $RootFiles = @(
+   "TEST_BP-045-049R1.ps1",
+   "TEST_BP-045-049R2.ps1",
+   "TEST_BP-045-049R3.ps1",
++  "CHANGELOG_BP-050.md",
++  "CHANGELOG_BP-051.md",
++  "CHANGELOG_BP-052.md",
++  "CHANGELOG_BP-053.md",
++  "CHANGELOG_BP-054.md",
++  "CHANGELOG_BP-050-054.md",
++  "TEST_BP-050-054.ps1",
+   "build.ps1",
+   "COLLECT_RESULTS.ps1",
+   "test.ps1",
+@@ -82,6 +89,14 @@ $RootFiles = @(
+   "docs\BP-047_RENDER_UI_HUD_AUDIT.md",
+   "docs\BP-048_RENDER_EVIDENCE_AUDIT.md",
+   "docs\BP-049_MODEL_UI_RENDER_CLOSURE_AUDIT.md",
++  "docs\BP-045-049R3_ACCEPTANCE_ANALYSIS.md",
++  "docs\BP-050_MIRROR_SPECIAL_AUDIT.md",
++  "docs\BP-051_RENDER_CLEAR_SPECIAL_AUDIT.md",
++  "docs\BP-052_ENVMAP_TIMEREFRESH_AUDIT.md",
++  "docs\BP-053_RENDER_EVIDENCE_CORPUS_AUDIT.md",
++  "docs\BP-054_RENDER_SPECIAL_CLOSURE_AUDIT.md",
++  "docs\BP-050-054_TESTING.md",
++  "docs\BP-050-054_BLOCK_LEDGER.json",
+   "patches\BP-045.diff",
+   "patches\BP-046.diff",
+   "patches\BP-047.diff",
+@@ -90,19 +105,35 @@ $RootFiles = @(
+   "patches\BP-049R1.diff",
+   "patches\BP-049R2.diff",
+   "patches\BP-049R3.diff",
++  "patches\BP-050.diff",
++  "patches\BP-051.diff",
++  "patches\BP-052.diff",
++  "patches\BP-053.diff",
++  "patches\BP-054.diff",
+   "tools\bp045_alias_model_checker.py",
+   "tools\bp046_sprite_sync_checker.py",
+   "tools\bp047_render_ui_checker.py",
+   "tools\bp048_render_evidence_checker.py",
+   "tools\bp049_model_ui_render_checker.py",
+   "tools\compare_render_evidence.py",
++  "tools\compare_render_corpus.py",
++  "tools\check_render_special_050.py",
++  "tools\check_render_special_051.py",
++  "tools\check_render_special_052.py",
++  "tools\check_render_special_053.py",
++  "tools\check_render_special_054.py",
+   "tools\verify.py",
+   "audit\alias_model_render_golden.json",
+   "audit\sprite_sync_golden.json",
+   "audit\render_ui_hud_golden.json",
+   "audit\render_evidence_golden.json",
+   "audit\model_ui_render_closure_golden.json",
+-  "audit\protocol15_serverdata_golden.json"
++  "audit\protocol15_serverdata_golden.json",
++  "audit\mirror_special_golden.json",
++  "audit\render_clear_special_golden.json",
++  "audit\envmap_timerefresh_golden.json",
++  "audit\render_evidence_corpus_golden.json",
++  "audit\render_special_closure_golden.json"
+ )
+ foreach ($Relative in $RootFiles) { Copy-SafeFile (Join-Path $Root $Relative) $Relative }
+ 
+@@ -113,6 +144,11 @@ $BinaryNames = @(
+   "MiniQuakeRenderUiHudTests.exe",
+   "MiniQuakeRenderEvidenceTests.exe",
+   "MiniQuakeModelUiRenderClosureTests.exe",
++  "MiniQuakeMirrorSpecialRenderTests.exe",
++  "MiniQuakeRenderClearSpecialTests.exe",
++  "MiniQuakeEnvmapTimeRefreshTests.exe",
++  "MiniQuakeRenderEvidenceCorpusTests.exe",
++  "MiniQuakeRenderSpecialClosureTests.exe",
+   "MiniQuakeProtocol15ServerDataTests.exe",
+   "miniquake_native.dll",
+   "miniquake_text.dll"
+diff --git a/PORT_LEDGER.json b/PORT_LEDGER.json
+index cbb47c5f8d16b1f11757c12975c352dd86cd3bc9..f02bdec64a52fd1722b51231ac73073d558c3146 100644
+--- a/PORT_LEDGER.json
++++ b/PORT_LEDGER.json
+@@ -1,10 +1,10 @@
+ {
+   "schema_version": 1,
+   "project": "MiniQuake",
+-  "current_package": "BP-049",
+-  "current_delivery_revision": "BP-045-049R3",
+-  "delivery_parent": "BP-045-049R2",
+-  "parent_package": "BP-043",
++  "current_package": "BP-054",
++  "current_delivery_revision": "BP-050-054",
++  "delivery_parent": "BP-045-049R3",
++  "parent_package": "BP-053",
+   "compatibility_target": {
+     "reference": "WinQuake/GLQuake 1.09",
+     "profile": "compat_109",
+@@ -57,13 +57,13 @@
+     "root_cause": "clientEntitiesHash/clientEntitiesJson dereferenced void slots in the intentionally sparse client entity table"
+   },
+   "package": {
+-    "id": "BP-049",
+-    "parent": "BP-048",
+-    "block_id": "BP-045-049",
+-    "block_parent": "BP-040-044R3",
+-    "date": "2026-07-27",
+-    "title": "GLQuake alias, sprite, 2D/HUD and deterministic framebuffer-evidence closure",
+-    "status": "implemented; BP-045-049R3 Windows acceptance pending",
++    "id": "BP-054",
++    "parent": "BP-053",
++    "block_id": "BP-050-054",
++    "block_parent": "BP-045-049R3",
++    "date": "2026-07-28",
++    "title": "GLQuake mirror, special clear, envmap, timerefresh and render-evidence corpus closure",
++    "status": "implemented; Windows acceptance pending",
+     "protocol_status": "protocol15_frozen_v1",
+     "quakec_status": "quakec_109_frozen_v1",
+     "world_physics_status": "world_physics_109_frozen_v1",
+@@ -71,7 +71,8 @@
+     "client_render_status": "client_render_109_frozen_v1",
+     "world_render_status": "world_render_109_frozen_v1",
+     "model_ui_render_status": "model_ui_render_109_frozen_v1",
+-    "model_ui_render_fingerprint": "0x0a62f5b1"
++    "render_special_status": "render_special_109_frozen_v1",
++    "render_special_fingerprint": "0x2a3d8081"
+   },
+   "diagnostic_schemas": {
+     "trace": "MiniQuakeCompatTrace|schema=1",
+@@ -160,7 +161,7 @@
+     "the original GLQuake screenshot corpus is not bundled; BP-048 currently proves cross-process MiniQuake framebuffer determinism",
+     "the final >95% original-vs-MiniQuake image claim requires a separately captured external GLQuake reference corpus"
+   ],
+-  "next_package": "BP-050-054 after BP-045-049R3 Windows acceptance",
++  "next_package": "BP-055-BP-059 after BP-050-054 acceptance",
+   "bp001r2_acceptance": {
+     "result_archive": "MiniQuake_BP-001R2_RESULTS_20260724-181843.zip",
+     "result_archive_sha256": "a6373b21653760800af9cc67fc969b07a7b7f385e409e5c5f9bced718262816c",
+@@ -1178,5 +1179,54 @@
+     "native_source_changed": false,
+     "engine_contracts_changed": false,
+     "status": "implemented; Windows acceptance pending"
++  },
++  "bp045049r3_acceptance": {
++    "delivery_revision": "BP-045-049R3",
++    "status": "PASS",
++    "result_archive": "MiniQuake_BP-045-049R3_RESULTS_20260728-000010.zip",
++    "result_archive_sha256": "65bb521faf300fed61b7d03e15429896a31de27d934ee59459e251fac08bd2bf",
++    "headless_frames": 300,
++    "trace_frames": 128,
++    "trace_sha256": "b2589f2712b0aed42f31b1a35ebb4837c211391ba3e8d8888c422242d051af28",
++    "trace_rolling_hash": "d905b042",
++    "trace_byte_identity": "PASS",
++    "render_tga_sha256": "1325e6fd365c1e62fbf36c4fadcbe9110faa94778c4c14b43fa9efe56d35e154",
++    "render_pixel_hash": "55f9fc9c",
++    "render_sample_hash": "3ec42fe3",
++    "render_ssim": 1.0,
++    "render_identity": "PASS",
++    "udp_loopback": "PASS"
++  },
++  "bp050_mirror_evidence": {
++    "fixtures": 22,
++    "mirror_texture_prefix": "window02_1",
++    "depth_split": 0.5
++  },
++  "bp051_render_clear_evidence": {
++    "fixtures": 20,
++    "ztrick_odd_depth_max": 0.49999
++  },
++  "bp052_envmap_timerefresh_evidence": {
++    "fixtures": 20,
++    "envmap_size": 256,
++    "envmap_faces": 6,
++    "timerefresh_steps": 128
++  },
++  "bp053_render_corpus_evidence": {
++    "fixtures": 18,
++    "scenarios": [
++      "start-064",
++      "start-128",
++      "e1m1-128"
++    ],
++    "exact_pair_required": true,
++    "external_original_ssim_floor": 0.95
++  },
++  "bp054_render_special_closure": {
++    "status": "render_special_109_frozen_v1",
++    "fingerprint": "0x2a3d8081",
++    "fixtures": 24,
++    "block_fixtures": 104,
++    "windows_acceptance": "pending"
+   }
+ }
+diff --git a/PORT_STATUS.md b/PORT_STATUS.md
+index 9ef5eda628c894cb0122e0dfe95d87d7652df6ab..971a5eb7d4b66b018d26bb1764112fea88bb946e 100644
+--- a/PORT_STATUS.md
++++ b/PORT_STATUS.md
+@@ -3,30 +3,13 @@
+ ## Current delivery
+ 
+ ```text
+-engine package: BP-049
+-delivery: BP-045-049R3
+-delivery parent: BP-045-049R2
+-block parent: BP-040-044R3
++engine package: BP-054
++delivery: BP-050-054
++block parent: BP-045-049R3
+ profile: compat_109
+ ```
+ 
+-The R2 Windows run completed 110 of 111 steps. Installed `id1/start`, 300
+-headless frames, two byte-identical 128-frame traces and UDP loopback passed.
+-Only the two visible 640×480 evidence captures differed:
+-
+-```text
+-result_sha256=e1feebede5c28fed87dc673c8d3b05363da230fe18afdb174fcb212861b8ad27
+-trace_sha256=b2589f2712b0aed42f31b1a35ebb4837c211391ba3e8d8888c422242d051af28
+-trace_identity=PASS
+-render_a_pixel_hash=3a409255
+-render_b_pixel_hash=6dc1f987
+-render_ssim=0.7532948781615113
+-```
+-
+-The captures contained different ammunition and view/weapon state. R3 keeps a
+-real OpenGL window but suppresses asynchronous keyboard, mouse and joystick
+-input through `-noinput -nomouse -nojoy`, clears input state before capture and
+-blocks live polling on every evidence frame.
++BP-045-BP-049R3 is Windows-accepted with 112/112 steps, two byte-identical 128-frame traces, two byte-identical visible 640x480 captures (SSIM 1.0), and UDP loopback PASS.
+ 
+ ## Accepted compatibility contracts
+ 
+@@ -37,18 +20,18 @@ world_physics_109_frozen_v1
+ host_lifecycle_109_frozen_v1
+ client_render_109_frozen_v1
+ world_render_109_frozen_v1
++model_ui_render_109_frozen_v1
+ ```
+ 
+ ## Candidate in this delivery
+ 
+ ```text
+-model_ui_render_109_frozen_v1
+-fingerprint=0x0a62f5b1
++render_special_109_frozen_v1
++fingerprint=0x2a3d8081
+ ```
+ 
+-R3 must still prove two byte-identical visible captures with SSIM 1.0. Native
+-code and all frozen fingerprints are unchanged.
++BP-050-BP-054 adds mirrors, R_Clear/z-trick/no-refresh/finish parity, envmap/timerefresh equations, and a three-scenario deterministic framebuffer corpus. External Original GLQuake captures remain optional and are not bundled.
+ 
+ ## Next block
+ 
+-After a green BP-045–BP-049R3 Windows result: BP-050–BP-054.
++After a green BP-050-BP-054 Windows result: BP-055-BP-059.
+diff --git a/README.md b/README.md
+index dcfa81d50f456250b801edd135e987dcae5f744a..f52f8ef66f39216b129a0491c981dfcda613f5cd 100644
+--- a/README.md
++++ b/README.md
+@@ -11,32 +11,19 @@ MiniQuake verwendet die legal vorhandenen Daten einer installierten Quake-
+ Version.
+ 
+ 
+-## Paketstand: BP-045–BP-049R3 (Engine-Endstand BP-049)
++## Paketstand: BP-050-BP-054 (Engine-Endstand BP-054)
+ 
+-Die R1-Lieferrevision behebt ausschließlich den Ergebnis-Collector: Die
+-historischen BP-012R1-Serverdatenartefakte werden wieder im Rückkanal erhalten.
+-
+-Die R2-Lieferrevision korrigierte die einzige im R1-Windows-Lauf gefundene
+-BP-048-Testfixture. Der vollständige R2-Lauf bestand anschließend 110 von 111
+-Schritten, einschließlich Echtdaten, 300 Headless-Frames, byteidentischem
+-Doppeltrace und UDP-Loopback. Nur die beiden sichtbaren Framebuffer-Captures
+-waren verschieden (`SSIM=0.7532948782`). Die Bilder zeigten unterschiedliche
+-Munitions- und Viewzustände, obwohl die Headless-Traces identisch waren.
+-
+-R3 isoliert deshalb den sichtbaren Evidence-Pfad vom asynchronen Desktop-Input:
+-`--render-evidence` verwendet `-nolan -nomouse -nojoy -noinput`; der Host leert
+-Key-, Button- und Commandzustände und deaktiviert Live-Button- sowie
+-Maus-/Joystick-Polling. Native Code und die eingefrorenen Engineverträge bleiben
+-unverändert.
+-
+-Die Windows-Abnahme von **BP-040–BP-044R3** ist vollständig grün. Die
+-akzeptierte Elternbasis erreichte 300 Headless-Frames, zwei byteidentische
+-128-Frame-Traces und UDP-Loopback:
++BP-045-BP-049R3 ist vollständig unter Windows angenommen. Der Lauf bestand
++112/112 Schritte, installierte `id1/start`-Daten, 300 Headless-Frames, zwei
++byteidentische 128-Frame-Traces, zwei byteidentische sichtbare 640x480-Captures
++mit SSIM 1.0 und den UDP-Loopback.
+ 
+ ```text
+-trace_sha256=a3c1c0019267d0c6b651c931b1044642b9ef0199cdf64156cef9e8e409a6ecfa
+-rolling_hash=0658dd48
+-results_sha256=ddb2345e4730c50a7072cd217bce8095e2e09dc64e96dd63c9116bc2a9da4534
++parent_result_sha256=65bb521faf300fed61b7d03e15429896a31de27d934ee59459e251fac08bd2bf
++parent_trace_sha256=b2589f2712b0aed42f31b1a35ebb4837c211391ba3e8d8888c422242d051af28
++parent_rolling_hash=d905b042
++parent_render_tga_sha256=1325e6fd365c1e62fbf36c4fadcbe9110faa94778c4c14b43fa9efe56d35e154
++parent_render_ssim=1.0
+ ```
+ 
+ Damit sind diese Verträge bestätigt:
+@@ -48,37 +35,32 @@ world_physics_109_frozen_v1
+ host_lifecycle_109_frozen_v1
+ client_render_109_frozen_v1
+ world_render_109_frozen_v1
++model_ui_render_109_frozen_v1
+ ```
+ 
+-Der neue kumulative Block schließt Alias-/Sprite-Modelle, 2D/HUD-Komposition
+-und reproduzierbare Framebuffer-Evidenz enger an GLQuake 1.09 an:
++Der neue kumulative Block bearbeitet die GLQuake-Sonderpfade und erweitert den
++bildbasierten Nachweis:
+ 
+ | Schritt | Inhalt | Fixtures |
+ |---|---|---:|
+-| BP-045 | Alias-Shading, Multitexture-Reset und Entity-Origin-Schatten | 22 |
+-| BP-046 | Sprite-Synchronisation und `syncBase` | 22 |
+-| BP-047 | 2D-Zustand, HUD, Statusbar, Viewmodel-Depth und TGA | 24 |
+-| BP-048 | deterministischer Framebuffer-Capture und Bildvergleich | 18 |
+-| BP-049 | Model-/UI-/Render-Abschlussvertrag | 24 |
+-| **Gesamt** |  | **110** |
++| BP-050 | Mirrors, reflektierte Szene und Overlay | 22 |
++| BP-051 | `R_Clear`, Z-Trick, `gl_finish` und `r_norefresh` | 20 |
++| BP-052 | Envmap und Timerefresh | 20 |
++| BP-053 | deterministischer Drei-Szenen-Framebuffer-Korpus | 18 |
++| BP-054 | Special-Render-Abschlussvertrag | 24 |
++| **Gesamt** |  | **104** |
+ 
+ Der neue Kandidatenvertrag lautet:
+ 
+ ```text
+-model_ui_render_109_frozen_v1
+-Contract-Fingerprint: 0x0a62f5b1
++render_special_109_frozen_v1
++Contract-Fingerprint: 0x2a3d8081
+ ```
+ 
+-Die fünf logischen Teilpatches liegen unter `patches/BP-045.diff` bis
+-`patches/BP-049.diff`.
+-
+-BP-048 nimmt zwei unabhängige 640×480-TGA-Bilder **nach der vollständigen UI-
+-Komposition und vor dem Buffer-Swap** auf. Der Pakettest fordert für diese zwei
+-MiniQuake-Prozesse Byteidentität und SSIM 1.0. Der enthaltene Comparator kann
+-später auch einen externen Original-GLQuake-Korpus mit einer vorgesehenen
+-SSIM-Untergrenze von 0,95 auswerten. Ein solcher Originalbildkorpus ist nicht
+-enthalten; die endgültige >95%-Aussage wird deshalb noch nicht allein durch
+-diesen Block beansprucht.
++Der MiniQuake-Korpus verlangt für `start` bei Frame 64 und 128 sowie `e1m1`
++bei Frame 128 jeweils zwei byteidentische sichtbare Captures. Optional kann ein
++externer Original-GLQuake-Korpus übergeben werden; dann muss jede Szene SSIM
++>= 0,95 erreichen. Originalbilder und Quake-Spieldaten sind nicht enthalten.
+ 
+ ## Aktuelle Spielbarkeitsrevision
+ 
+@@ -281,6 +263,42 @@ filtert diese Einträge für `CL_UpdateTEnts`, Rendering und
+ `client_effects.pruneTemporary`. Die Runtime-Event-Suite umfasst nun 28
+ Fixtures; die bestehende Meilensteinfixture 12 bleibt unverändert.
+ 
++## Build und Abnahme von BP-050-BP-054 unter Windows
++
++Das vollständige ZIP in einen neuen, leeren Ordner entpacken:
++
++```powershell
++$QuakeBase = "C:\Pfad\zu\Quake"
++Test-Path "$QuakeBase\id1\pak0.pak"  # muss True liefern
++
++.\TEST_BP-050-054.ps1 `
++  -Compiler C:\Pfad\MiniLangCompilerPy\mlc_win64.py `
++  -StdLib C:\Pfad\MiniLangCompilerPy `
++  -QuakeBase $QuakeBase `
++  -Game id1 `
++  -Map start `
++  -Frames 300 `
++  -TraceFrames 128 `
++  -RenderEvidenceFrame 128 `
++  -NetworkTests `
++  -ContinueIndependentTests `
++  -BisectOnFailure
++```
++
++Ein optionaler Original-GLQuake-Bildkorpus kann mit
++`-OriginalRenderReference C:\Pfad\zu\OriginalCaptures` ergänzt werden.
++
++Erwartete neue Marker:
++
++```text
++MiniQuake BP-050 mirror special-render tests passed: 22
++MiniQuake BP-051 render-clear special tests passed: 20
++MiniQuake BP-052 envmap/timerefresh tests passed: 20
++MiniQuake BP-053 render-evidence corpus tests passed: 18
++MiniQuake BP-054 render-special closure tests passed: 24
++MiniQuake BP-050-054 acceptance test: PASS
++```
++
+ ## Build und Abnahme von BP-045–BP-049R2 unter Windows
+ 
+ R2 korrigiert ausschließlich die BP-048-Summary-Fixture: JSON wird nun über
+@@ -469,23 +487,14 @@ Warnung aus.
+ 
+ ## Evidenzstand und nächste Pakete
+ 
+-BP-040–BP-044R3 ist die bestätigte Elternbasis. Protocol 15, QuakeC,
+-Welt/Physik, Host/Lifecycle, Client/Renderer und Welt-Renderer bleiben
+-unverändert eingefroren.
+-
+-BP-045 bis BP-049 ergänzen 110 neue Fixtures sowie einen reproduzierbaren
+-Framebuffer-Rückkanal. Die aktuelle Bildabnahme beweist zunächst exakte
+-MiniQuake-zu-MiniQuake-Deterministik auf demselben Testsystem. Ein externer
+-Original-GLQuake-Golden-Korpus und dessen messbare >95%-Abnahme bleiben ein
+-separater Folgeschritt.
+-
+-Nach erfolgreicher BP-045–BP-049R3-Windows-Abnahme folgen BP-050–BP-054 mit verbleibenden
+-Rendererkompatibilitätslücken, Originalbild-Korpus-Orchestrierung und der
+-sauberen Trennung eines modernen Renderbackends vom `compat_109`-Pfad.
++BP-045-BP-049R3 ist die bestätigte Elternbasis. BP-050-BP-054 erweitert die
++GLQuake-Kompatibilität um Mirrors, Z-Trick/Clear-Sonderpfade, Envmap,
++Timerefresh und einen Drei-Szenen-Evidenzkorpus. Der optionale Originalvergleich
++verwendet eine SSIM-Untergrenze von 0,95, ohne Referenzbilder einzubetten.
+ 
+-Der maschinenlesbare Stand steht in `PORT_LEDGER.json` und
+-`BLOCK_LEDGER.json`; der aktuelle Testablauf in
+-`docs/BP-045-049R3_TESTING.md`.
++Nach erfolgreicher Windows-Abnahme folgt BP-055-BP-059. Der
++maschinenlesbare Stand steht in `PORT_LEDGER.json` und `BLOCK_LEDGER.json`;
++der aktuelle Testablauf in `docs/BP-050-054_TESTING.md`.
+ 
+ ## Lizenz
+ 
+diff --git a/TEST_BP-050-054.ps1 b/TEST_BP-050-054.ps1
+new file mode 100644
+index 0000000000000000000000000000000000000000..b34e7d47b05eb32034def3fc518a216428ada67f
+--- /dev/null
++++ b/TEST_BP-050-054.ps1
+@@ -0,0 +1,1296 @@
++﻿[CmdletBinding()]
++param(
++  [string]$Compiler = "",
++
++  [Alias("StdLibPath", "ImportRoot")]
++  [string]$StdLib = "",
++
++  [string]$Python = "",
++
++  [string]$QuakeBase = "",
++  [string]$Game = "id1",
++  [string]$Map = "start",
++
++  [ValidateRange(1, 1000000)]
++  [int]$Frames = 300,
++
++  [ValidateRange(1, 1000000)]
++  [int]$TraceFrames = 128,
++
++  [ValidateRange(1, 1000000)]
++  [int]$RenderEvidenceFrame = 128,
++
++  [string]$OriginalRenderReference = "",
++
++  [ValidateSet("Release", "Debug")]
++  [string]$Configuration = "Release",
++
++  [switch]$SkipBuild,
++  [switch]$SkipGameValidation,
++  [switch]$SkipTraceValidation,
++  [switch]$SkipRenderEvidence,
++  [switch]$SkipRenderCorpus,
++  [switch]$NetworkTests,
++  [switch]$RebuildNative,
++  [switch]$Listings,
++  [switch]$ContinueIndependentTests = $true,
++  [switch]$BisectOnFailure
++)
++
++$ErrorActionPreference = "Stop"
++Set-StrictMode -Version Latest
++
++$PackageId = "BP-054"
++$ParentPackageId = "BP-053"
++$NativeTextAbi = "caller_owned_bytes_v1"
++$ProtocolTextAbi = "quake_latin1_cstring_v1"
++$BlockId = "BP-050-054"
++$BlockParentPackageId = "BP-045-049R3"
++$ProtocolStatus = "protocol15_frozen_v1"
++$QuakeCStatus = "quakec_109_frozen_v1"
++$WorldPhysicsStatus = "world_physics_109_frozen_v1"
++$HostLifecycleStatus = "host_lifecycle_109_frozen_v1"
++$ClientRenderStatus = "client_render_109_frozen_v1"
++$WorldRenderStatus = "world_render_109_frozen_v1"
++$ModelUiRenderStatus = "model_ui_render_109_frozen_v1"
++$RenderSpecialStatus = "render_special_109_frozen_v1"
++$DeliveryRevision = "BP-050-054"
++$Root = $PSScriptRoot
++$BuildDirectory = Join-Path $Root "build"
++$TraceDirectory = Join-Path $BuildDirectory "bp050-054-traces"
++$GameExe = Join-Path $BuildDirectory "MiniQuake.exe"
++$Verifier = Join-Path $Root "tools\verify.py"
++$TraceComparator = Join-Path $Root "tools\compare_traces.py"
++$RuntimeTestLogChecker = Join-Path $Root "tools\check_runtime_test_log.py"
++$ProtocolVectorChecker = Join-Path $Root "tools\check_protocol15_vectors.py"
++$ProtocolCommandChecker = Join-Path $Root "tools\check_protocol15_commands.py"
++$ProtocolServerDataChecker = Join-Path $Root "tools\check_protocol15_serverdata.py"
++$ProtocolEventChecker = Join-Path $Root "tools\check_protocol15_events.py"
++$ProtocolRuntimeEventChecker = Join-Path $Root "tools\check_protocol15_runtime_events.py"
++$ProtocolSignonChecker = Join-Path $Root "tools\check_protocol15_signon.py"
++$ProtocolDeliveryChecker = Join-Path $Root "tools\check_protocol15_delivery.py"
++$ProtocolDatagramChecker = Join-Path $Root "tools\check_protocol15_datagram.py"
++$ProtocolDemoChecker = Join-Path $Root "tools\check_protocol15_demo.py"
++$ProtocolClosureChecker = Join-Path $Root "tools\check_protocol15_closure.py"
++$QuakeCProgsChecker = Join-Path $Root "tools\check_quakec_progs.py"
++$QuakeCVMChecker = Join-Path $Root "tools\check_quakec_vm.py"
++$QuakeCEdictChecker = Join-Path $Root "tools\check_quakec_edict.py"
++$QuakeCBuiltinChecker = Join-Path $Root "tools\check_quakec_builtins.py"
++$QuakeCClosureChecker = Join-Path $Root "tools\check_quakec_closure.py"
++$WorldHullChecker = Join-Path $Root "tools\check_world_hull.py"
++$WorldTraceChecker = Join-Path $Root "tools\check_world_trace.py"
++$WorldLinkChecker = Join-Path $Root "tools\check_world_link.py"
++$ServerMoveChecker = Join-Path $Root "tools\check_server_move.py"
++$ServerPhysicsChecker = Join-Path $Root "tools\check_server_physics.py"
++$SvUserMovementChecker = Join-Path $Root "tools\check_sv_user_movement.py"
++$ServerUserChecker = Join-Path $Root "tools\check_server_user.py"
++$WorldPhysicsClosureChecker = Join-Path $Root "tools\check_world_physics_closure.py"
++$HostTimingChecker = Join-Path $Root "tools\check_host_timing.py"
++$CommandCvarChecker = Join-Path $Root "tools\check_command_cvar.py"
++$DemoLifecycleChecker = Join-Path $Root "tools\check_demo_lifecycle.py"
++$SavegameV5Checker = Join-Path $Root "tools\check_savegame_v5.py"
++$HostLifecycleClosureChecker = Join-Path $Root "tools\check_host_lifecycle_closure.py"
++$ClientStateRenderChecker = Join-Path $Root "tools\check_client_render_035.py"
++$ViewStateChecker = Join-Path $Root "tools\check_client_render_036.py"
++$TemporaryBeamChecker = Join-Path $Root "tools\check_client_render_037.py"
++$ParticleRuntimeChecker = Join-Path $Root "tools\check_client_render_038.py"
++$ClientRenderClosureChecker = Join-Path $Root "tools\check_client_render_039.py"
++$WorldSurfaceRenderChecker = Join-Path $Root "tools\check_world_render_040.py"
++$LightmapAtlasChecker = Join-Path $Root "tools\check_world_render_041.py"
++$DynamicLightRenderChecker = Join-Path $Root "tools\check_world_render_042.py"
++$SkyWaterRenderChecker = Join-Path $Root "tools\check_world_render_043.py"
++$WorldRenderClosureChecker = Join-Path $Root "tools\check_world_render_044.py"
++$AliasModelChecker = Join-Path $Root "tools\bp045_alias_model_checker.py"
++$SpriteSyncChecker = Join-Path $Root "tools\bp046_sprite_sync_checker.py"
++$RenderUiHudChecker = Join-Path $Root "tools\bp047_render_ui_checker.py"
++$RenderEvidenceChecker = Join-Path $Root "tools\bp048_render_evidence_checker.py"
++$ModelUiRenderChecker = Join-Path $Root "tools\bp049_model_ui_render_checker.py"
++$MirrorSpecialChecker = Join-Path $Root "tools\check_render_special_050.py"
++$RenderClearSpecialChecker = Join-Path $Root "tools\check_render_special_051.py"
++$EnvmapTimeRefreshChecker = Join-Path $Root "tools\check_render_special_052.py"
++$RenderEvidenceCorpusChecker = Join-Path $Root "tools\check_render_special_053.py"
++$RenderSpecialClosureChecker = Join-Path $Root "tools\check_render_special_054.py"
++$RenderEvidenceComparator = Join-Path $Root "tools\compare_render_evidence.py"
++$RenderCorpusComparator = Join-Path $Root "tools\compare_render_corpus.py"
++$BuildScript = Join-Path $Root "build.ps1"
++$Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
++$TranscriptPath = Join-Path $BuildDirectory ("bp050-054-test-{0}.log" -f $Timestamp)
++$SummaryPath = Join-Path $BuildDirectory "bp050-054-test-summary.json"
++$StaticReportPath = Join-Path $BuildDirectory "bp050-054-static-verification.json"
++$VersionPath = Join-Path $BuildDirectory "bp050-054-version.txt"
++$BuildChildLogPath = Join-Path $BuildDirectory "bp050-054-build-child.log"
++$TraceALogPath = Join-Path $BuildDirectory "bp050-054-trace-a.log"
++$TraceBLogPath = Join-Path $BuildDirectory "bp050-054-trace-b.log"
++$SnapshotCommandLogPath = Join-Path $BuildDirectory "bp050-054-snapshot-command.log"
++$TraceComparisonPath = Join-Path $BuildDirectory "bp050-054-trace-comparison.json"
++$TraceComparisonLogPath = Join-Path $BuildDirectory "bp050-054-trace-comparison.log"
++$ProtocolVectorReportPath = Join-Path $BuildDirectory "bp050-054-protocol15-vectors.json"
++$ProtocolVectorLogPath = Join-Path $BuildDirectory "bp050-054-protocol15-vectors.log"
++$ProtocolCommandReportPath = Join-Path $BuildDirectory "bp050-054-protocol15-commands.json"
++$ProtocolCommandLogPath = Join-Path $BuildDirectory "bp050-054-protocol15-commands.log"
++$ProtocolServerDataReportPath = Join-Path $BuildDirectory "bp050-054-protocol15-serverdata.json"
++$ProtocolServerDataLogPath = Join-Path $BuildDirectory "bp050-054-protocol15-serverdata.log"
++$ProtocolEventReportPath = Join-Path $BuildDirectory "bp050-054-protocol15-events.json"
++$ProtocolEventLogPath = Join-Path $BuildDirectory "bp050-054-protocol15-events.log"
++$ProtocolRuntimeEventReportPath = Join-Path $BuildDirectory "bp050-054-protocol15-runtime-events.json"
++$ProtocolRuntimeEventLogPath = Join-Path $BuildDirectory "bp050-054-protocol15-runtime-events.log"
++$ProtocolSignonReportPath = Join-Path $BuildDirectory "bp050-054-protocol15-signon.json"
++$ProtocolSignonLogPath = Join-Path $BuildDirectory "bp050-054-protocol15-signon.log"
++$ProtocolDeliveryReportPath = Join-Path $BuildDirectory "bp050-054-protocol15-delivery.json"
++$ProtocolDeliveryLogPath = Join-Path $BuildDirectory "bp050-054-protocol15-delivery.log"
++$ProtocolDatagramReportPath = Join-Path $BuildDirectory "bp050-054-protocol15-datagram.json"
++$ProtocolDatagramLogPath = Join-Path $BuildDirectory "bp050-054-protocol15-datagram.log"
++$ProtocolDemoReportPath = Join-Path $BuildDirectory "bp050-054-protocol15-demo.json"
++$ProtocolDemoLogPath = Join-Path $BuildDirectory "bp050-054-protocol15-demo.log"
++$ProtocolClosureReportPath = Join-Path $BuildDirectory "bp050-054-protocol15-closure.json"
++$ProtocolClosureLogPath = Join-Path $BuildDirectory "bp050-054-protocol15-closure.log"
++$QuakeCProgsReportPath = Join-Path $BuildDirectory "bp050-054-quakec-progs.json"
++$QuakeCProgsLogPath = Join-Path $BuildDirectory "bp050-054-quakec-progs.log"
++$QuakeCVMReportPath = Join-Path $BuildDirectory "bp050-054-quakec-vm.json"
++$QuakeCVMLogPath = Join-Path $BuildDirectory "bp050-054-quakec-vm.log"
++$QuakeCEdictReportPath = Join-Path $BuildDirectory "bp050-054-quakec-edict.json"
++$QuakeCEdictLogPath = Join-Path $BuildDirectory "bp050-054-quakec-edict.log"
++$QuakeCBuiltinReportPath = Join-Path $BuildDirectory "bp050-054-quakec-builtins.json"
++$QuakeCBuiltinLogPath = Join-Path $BuildDirectory "bp050-054-quakec-builtins.log"
++$QuakeCClosureReportPath = Join-Path $BuildDirectory "bp050-054-quakec-closure.json"
++$QuakeCClosureLogPath = Join-Path $BuildDirectory "bp050-054-quakec-closure.log"
++$WorldHullReportPath = Join-Path $BuildDirectory "bp050-054-world-hull.json"
++$WorldHullLogPath = Join-Path $BuildDirectory "bp050-054-world-hull.log"
++$WorldTraceReportPath = Join-Path $BuildDirectory "bp050-054-world-trace.json"
++$WorldTraceLogPath = Join-Path $BuildDirectory "bp050-054-world-trace.log"
++$WorldLinkReportPath = Join-Path $BuildDirectory "bp050-054-world-link.json"
++$WorldLinkLogPath = Join-Path $BuildDirectory "bp050-054-world-link.log"
++$ServerMoveReportPath = Join-Path $BuildDirectory "bp050-054-server-move.json"
++$ServerMoveLogPath = Join-Path $BuildDirectory "bp050-054-server-move.log"
++$ServerPhysicsReportPath = Join-Path $BuildDirectory "bp050-054-server-physics.json"
++$ServerPhysicsLogPath = Join-Path $BuildDirectory "bp050-054-server-physics.log"
++$SvUserMovementReportPath = Join-Path $BuildDirectory "bp050-054-sv-user-movement.json"
++$SvUserMovementLogPath = Join-Path $BuildDirectory "bp050-054-sv-user-movement.log"
++$ServerUserReportPath = Join-Path $BuildDirectory "bp050-054-server-user.json"
++$ServerUserLogPath = Join-Path $BuildDirectory "bp050-054-server-user.log"
++$WorldPhysicsClosureReportPath = Join-Path $BuildDirectory "bp050-054-world-physics-closure.json"
++$WorldPhysicsClosureLogPath = Join-Path $BuildDirectory "bp050-054-world-physics-closure.log"
++$HostTimingReportPath = Join-Path $BuildDirectory "bp050-054-host-timing.json"
++$HostTimingLogPath = Join-Path $BuildDirectory "bp050-054-host-timing.log"
++$CommandCvarReportPath = Join-Path $BuildDirectory "bp050-054-command-cvar.json"
++$CommandCvarLogPath = Join-Path $BuildDirectory "bp050-054-command-cvar.log"
++$DemoLifecycleReportPath = Join-Path $BuildDirectory "bp050-054-demo-lifecycle.json"
++$DemoLifecycleLogPath = Join-Path $BuildDirectory "bp050-054-demo-lifecycle.log"
++$SavegameV5ReportPath = Join-Path $BuildDirectory "bp050-054-savegame-v5.json"
++$SavegameV5LogPath = Join-Path $BuildDirectory "bp050-054-savegame-v5.log"
++$HostLifecycleClosureReportPath = Join-Path $BuildDirectory "bp050-054-host-lifecycle-closure.json"
++$HostLifecycleClosureLogPath = Join-Path $BuildDirectory "bp050-054-host-lifecycle-closure.log"
++$ClientStateRenderReportPath = Join-Path $BuildDirectory "bp050-054-client-state-render.json"
++$ClientStateRenderLogPath = Join-Path $BuildDirectory "bp050-054-client-state-render.log"
++$ViewStateReportPath = Join-Path $BuildDirectory "bp050-054-view-state.json"
++$ViewStateLogPath = Join-Path $BuildDirectory "bp050-054-view-state.log"
++$TemporaryBeamReportPath = Join-Path $BuildDirectory "bp050-054-temporary-beams.json"
++$TemporaryBeamLogPath = Join-Path $BuildDirectory "bp050-054-temporary-beams.log"
++$ParticleRuntimeReportPath = Join-Path $BuildDirectory "bp050-054-particle-runtime.json"
++$ParticleRuntimeLogPath = Join-Path $BuildDirectory "bp050-054-particle-runtime.log"
++$ClientRenderClosureReportPath = Join-Path $BuildDirectory "bp050-054-client-render-closure.json"
++$ClientRenderClosureLogPath = Join-Path $BuildDirectory "bp050-054-client-render-closure.log"
++$WorldSurfaceRenderReportPath = Join-Path $BuildDirectory "bp050-054-world-surfaces.json"
++$WorldSurfaceRenderLogPath = Join-Path $BuildDirectory "bp050-054-world-surfaces.log"
++$LightmapAtlasReportPath = Join-Path $BuildDirectory "bp050-054-lightmap-atlas.json"
++$LightmapAtlasLogPath = Join-Path $BuildDirectory "bp050-054-lightmap-atlas.log"
++$DynamicLightRenderReportPath = Join-Path $BuildDirectory "bp050-054-dynamic-lights.json"
++$DynamicLightRenderLogPath = Join-Path $BuildDirectory "bp050-054-dynamic-lights.log"
++$SkyWaterRenderReportPath = Join-Path $BuildDirectory "bp050-054-sky-water.json"
++$SkyWaterRenderLogPath = Join-Path $BuildDirectory "bp050-054-sky-water.log"
++$WorldRenderClosureReportPath = Join-Path $BuildDirectory "bp050-054-world-render-closure.json"
++$WorldRenderClosureLogPath = Join-Path $BuildDirectory "bp050-054-world-render-closure.log"
++$AliasModelReportPath = Join-Path $BuildDirectory "bp050-054-alias-model.json"
++$AliasModelLogPath = Join-Path $BuildDirectory "bp050-054-alias-model.log"
++$SpriteSyncReportPath = Join-Path $BuildDirectory "bp050-054-sprite-sync.json"
++$SpriteSyncLogPath = Join-Path $BuildDirectory "bp050-054-sprite-sync.log"
++$RenderUiHudReportPath = Join-Path $BuildDirectory "bp050-054-render-ui-hud.json"
++$RenderUiHudLogPath = Join-Path $BuildDirectory "bp050-054-render-ui-hud.log"
++$RenderEvidenceReportPath = Join-Path $BuildDirectory "bp050-054-render-evidence.json"
++$RenderEvidenceLogPath = Join-Path $BuildDirectory "bp050-054-render-evidence.log"
++$ModelUiRenderReportPath = Join-Path $BuildDirectory "bp050-054-model-ui-render.json"
++$ModelUiRenderLogPath = Join-Path $BuildDirectory "bp050-054-model-ui-render.log"
++$MirrorSpecialReportPath = Join-Path $BuildDirectory "bp050-054-mirror-special.json"
++$MirrorSpecialLogPath = Join-Path $BuildDirectory "bp050-054-mirror-special.log"
++$RenderClearSpecialReportPath = Join-Path $BuildDirectory "bp050-054-render-clear-special.json"
++$RenderClearSpecialLogPath = Join-Path $BuildDirectory "bp050-054-render-clear-special.log"
++$EnvmapTimeRefreshReportPath = Join-Path $BuildDirectory "bp050-054-envmap-timerefresh.json"
++$EnvmapTimeRefreshLogPath = Join-Path $BuildDirectory "bp050-054-envmap-timerefresh.log"
++$RenderEvidenceCorpusReportPath = Join-Path $BuildDirectory "bp050-054-render-evidence-corpus.json"
++$RenderEvidenceCorpusLogPath = Join-Path $BuildDirectory "bp050-054-render-evidence-corpus.log"
++$RenderSpecialClosureReportPath = Join-Path $BuildDirectory "bp050-054-render-special-closure.json"
++$RenderSpecialClosureLogPath = Join-Path $BuildDirectory "bp050-054-render-special-closure.log"
++$EvidenceCorpusDirectory = Join-Path $BuildDirectory "bp050-054-evidence-corpus"
++$EvidenceCorpusComparisonPath = Join-Path $BuildDirectory "bp050-054-evidence-corpus-comparison.json"
++$EvidenceCorpusComparisonLogPath = Join-Path $BuildDirectory "bp050-054-evidence-corpus-comparison.log"
++$EvidenceDirectory = Join-Path $BuildDirectory "bp050-054-evidence"
++$EvidenceALogPath = Join-Path $BuildDirectory "bp050-054-evidence-a.log"
++$EvidenceBLogPath = Join-Path $BuildDirectory "bp050-054-evidence-b.log"
++$EvidenceComparisonPath = Join-Path $BuildDirectory "bp050-054-evidence-comparison.json"
++$EvidenceComparisonLogPath = Join-Path $BuildDirectory "bp050-054-evidence-comparison.log"
++$QuakeCStockLogPath = Join-Path $BuildDirectory "bp050-054-quakec-stock-tests.log"
++$GameValidationLogPath = Join-Path $BuildDirectory "bp050-054-game-validation.log"
++$RuntimeValidationLogPath = Join-Path $BuildDirectory "bp050-054-runtime-validation.log"
++$BisectReportPath = Join-Path $BuildDirectory "bp050-054-bisect-report.json"
++$IndependentFailures = New-Object System.Collections.ArrayList
++$Steps = New-Object System.Collections.ArrayList
++$OverallStatus = "FAIL"
++$FailureMessage = ""
++$TranscriptStarted = $false
++$TraceHash = ""
++$TraceRollingHash = ""
++$EvidenceHash = ""
++$EvidencePixelHash = ""
++$EvidenceSampleHash = ""
++$EvidenceSsim = 0.0
++
++New-Item -ItemType Directory -Force -Path $BuildDirectory | Out-Null
++
++# A full acceptance run must exercise installed assets, deterministic traces and
++# the real framebuffer capture. Asset-free runs remain possible only when all
++# three corresponding gates are skipped explicitly.
++$RequiresQuakeBase = (-not $SkipGameValidation) -or (-not $SkipTraceValidation) -or (-not $SkipRenderEvidence)
++if ($RequiresQuakeBase) {
++  if ([string]::IsNullOrWhiteSpace($QuakeBase)) {
++    throw "A valid -QuakeBase is required for acceptance. Pass the directory containing id1\pak0.pak, or explicitly use -SkipGameValidation -SkipTraceValidation -SkipRenderEvidence for an asset-free diagnostic run."
++  }
++  if (-not (Test-Path -LiteralPath $QuakeBase -PathType Container)) {
++    throw "Quake base directory does not exist: $QuakeBase"
++  }
++  $RequiredPak = Join-Path $QuakeBase "id1\pak0.pak"
++  if (-not (Test-Path -LiteralPath $RequiredPak -PathType Leaf)) {
++    throw "Quake base does not contain id1\pak0.pak: $QuakeBase"
++  }
++}
++
++function Add-StepResult {
++  param(
++    [string]$Name,
++    [string]$Status,
++    [int]$ExitCode,
++    [string]$Detail
++  )
++
++  [void]$Steps.Add([ordered]@{
++    name = $Name
++    status = $Status
++    exit_code = $ExitCode
++    detail = $Detail
++  })
++}
++
++function Resolve-PythonCommand {
++  if (-not [string]::IsNullOrWhiteSpace($Python)) {
++    if (Test-Path -LiteralPath $Python -PathType Leaf) {
++      $Resolved = [System.IO.Path]::GetFullPath($Python)
++    } else {
++      $Command = Get-Command $Python -ErrorAction SilentlyContinue | Select-Object -First 1
++      if ($null -eq $Command) { throw "Python interpreter not found: $Python" }
++      $Resolved = $Command.Path
++    }
++    if ([System.IO.Path]::GetFileNameWithoutExtension($Resolved) -ieq "py") {
++      return [ordered]@{ executable = $Resolved; prefix = @("-3") }
++    }
++    return [ordered]@{ executable = $Resolved; prefix = @() }
++  }
++
++  $Launcher = Get-Command "py" -ErrorAction SilentlyContinue | Select-Object -First 1
++  if ($null -ne $Launcher) {
++    return [ordered]@{ executable = $Launcher.Path; prefix = @("-3") }
++  }
++
++  $Command = Get-Command "python" -ErrorAction SilentlyContinue | Select-Object -First 1
++  if ($null -eq $Command) { throw "Python 3 was not found. Pass -Python PATH." }
++  return [ordered]@{ executable = $Command.Path; prefix = @() }
++}
++
++function Invoke-ExternalStep {
++  param(
++    [Parameter(Mandatory = $true)]
++    [string]$Name,
++
++    [Parameter(Mandatory = $true)]
++    [string]$Executable,
++
++    [Parameter(Mandatory = $true)]
++    [string[]]$Arguments,
++
++    [string]$Detail = "",
++    [string]$LogPath = ""
++  )
++
++  Write-Host "[MiniQuake/$PackageId] $Name"
++  if ([string]::IsNullOrWhiteSpace($LogPath)) {
++    & $Executable @Arguments
++  } else {
++    if (Test-Path -LiteralPath $LogPath -PathType Leaf) { Remove-Item -Force -LiteralPath $LogPath }
++    & $Executable @Arguments 2>&1 | Tee-Object -FilePath $LogPath
++  }
++  $ExitCode = [int]$LASTEXITCODE
++  if ($ExitCode -ne 0) {
++    $LogDetail = $Detail
++    if (-not [string]::IsNullOrWhiteSpace($LogPath)) {
++      $LogDetail = ($Detail + "; log=" + [System.IO.Path]::GetFileName($LogPath)).TrimStart([char[]]@(';', ' '))
++    }
++    Add-StepResult $Name "FAIL" $ExitCode $LogDetail
++    throw "$Name failed with exit code $ExitCode."
++  }
++  Add-StepResult $Name "PASS" 0 $Detail
++}
++
++function Get-RuntimeTestFailureMarker {
++  param([string]$Text)
++
++  if ([string]::IsNullOrWhiteSpace($Text)) { return "" }
++  $Patterns = @(
++    '(?im)^\s*FAIL:\s+.*$',
++    '(?im)^\s*MiniQuake\b.*\btests failed:\s*\d+/\d+\s*$',
++    '(?im)^\s*BP-\d+.*\btests failed:\s*\d+/\d+\s*$'
++  )
++  foreach ($Pattern in $Patterns) {
++    $Match = [regex]::Match($Text, $Pattern)
++    if ($Match.Success) { return $Match.Value.Trim() }
++  }
++  return ""
++}
++
++function Invoke-IndependentTest {
++  param(
++    [Parameter(Mandatory = $true)]
++    [string]$Package,
++    [Parameter(Mandatory = $true)]
++    [string]$Name,
++    [Parameter(Mandatory = $true)]
++    [string]$Executable,
++    [Parameter(Mandatory = $true)]
++    [string]$LogName,
++
++    [string[]]$Arguments = @()
++  )
++
++  $LogPath = Join-Path $BuildDirectory $LogName
++  Write-Host "[MiniQuake/$BlockId][$Package] $Name"
++  if (Test-Path -LiteralPath $LogPath -PathType Leaf) { Remove-Item -Force -LiteralPath $LogPath }
++  & $Executable @Arguments 2>&1 | Tee-Object -FilePath $LogPath
++  $ExitCode = [int]$LASTEXITCODE
++  $OutputText = ""
++  if (Test-Path -LiteralPath $LogPath -PathType Leaf) {
++    $OutputText = Get-Content -LiteralPath $LogPath -Raw
++  }
++  $FailureMarker = Get-RuntimeTestFailureMarker $OutputText
++  $SyntheticFailure = $false
++  if ($ExitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace($FailureMarker)) {
++    $ExitCode = 1
++    $SyntheticFailure = $true
++    Write-Host "ERROR: [$Package] $Name emitted a failure marker despite exit code 0: $FailureMarker" -ForegroundColor Red
++  }
++  if ($ExitCode -eq 0) {
++    Add-StepResult ("[" + $Package + "] " + $Name) "PASS" 0 ("log=" + [System.IO.Path]::GetFileName($LogPath))
++    return $true
++  }
++
++  [void]$IndependentFailures.Add([ordered]@{
++    package = $Package
++    name = $Name
++    executable = [System.IO.Path]::GetFileName($Executable)
++    exit_code = $ExitCode
++    log = [System.IO.Path]::GetFileName($LogPath)
++    failure_marker = $FailureMarker
++    synthetic_failure = $SyntheticFailure
++  })
++  $FailureDetail = "log=" + [System.IO.Path]::GetFileName($LogPath)
++  if (-not [string]::IsNullOrWhiteSpace($FailureMarker)) {
++    $FailureDetail = $FailureDetail + "; marker=" + $FailureMarker
++  }
++  Add-StepResult ("[" + $Package + "] " + $Name) "FAIL" $ExitCode $FailureDetail
++  Write-Host "ERROR: [$Package] $Name failed with exit code $ExitCode." -ForegroundColor Red
++  if (-not $ContinueIndependentTests) { throw "[$Package] $Name failed with exit code $ExitCode." }
++  return $false
++}
++
++function Require-File {
++  param([string]$Path, [string]$Label)
++  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
++    throw "$Label is missing: $Path"
++  }
++}
++
++function Read-JsonFile {
++  param([string]$Path)
++  Require-File $Path "JSON artifact"
++  return Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
++}
++
++try {
++  try {
++    Start-Transcript -LiteralPath $TranscriptPath -Force | Out-Null
++    $TranscriptStarted = $true
++  } catch {
++    Write-Warning "PowerShell transcript could not be started: $($_.Exception.Message)"
++  }
++
++  Write-Host "MiniQuake $DeliveryRevision cumulative special-render/evidence acceptance test"
++  Write-Host "  final package: $PackageId"
++  Write-Host "  parent:        $ParentPackageId"
++  Write-Host "  block parent:  $BlockParentPackageId"
++  Write-Host "  root:          $Root"
++  Write-Host "  configuration: $Configuration"
++
++  $PythonCommand = Resolve-PythonCommand
++  $PythonExe = $PythonCommand.executable
++  $PythonPrefix = @($PythonCommand.prefix)
++
++  Invoke-ExternalStep `
++    -Name "static package and diagnostics verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($Verifier, $Root, "--json-output", $StaticReportPath)) `
++    -Detail "manifest, packages, ABI, all accepted parent contracts and cumulative BP-050-054 special-render/evidence contracts"
++
++  Invoke-ExternalStep `
++    -Name "trace comparator self-test" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($TraceComparator, "--self-test")) `
++    -Detail "field-level first-divergence reporter"
++
++  Invoke-ExternalStep `
++    -Name "runtime-test log checker self-test" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($RuntimeTestLogChecker, "--self-test")) `
++    -Detail "FAIL markers override an accidental zero process exit code"
++
++  Invoke-ExternalStep `
++    -Name "Protocol 15 C/Python golden-vector verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolVectorChecker, $Root, "--json-output", $ProtocolVectorReportPath)) `
++    -Detail "13 inherited C-derived byte streams, 18 constants and MiniLang wire markers" `
++    -LogPath $ProtocolVectorLogPath
++
++  Invoke-ExternalStep `
++    -Name "Protocol 15 signon, command-stream and fast-update verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolCommandChecker, $Root, "--json-output", $ProtocolCommandReportPath)) `
++    -Detail "14 C-derived command/update byte streams, 57 constants and 34 SVC events" `
++    -LogPath $ProtocolCommandLogPath
++
++  Invoke-ExternalStep `
++    -Name "Protocol 15 serverinfo, sound, clientdata, baseline and packet-planning verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolServerDataChecker, "--root", $Root, "--json-output", $ProtocolServerDataReportPath)) `
++    -Detail "11 C-derived server payload vectors plus datagram, fast-update and client-delivery contracts" `
++    -LogPath $ProtocolServerDataLogPath
++
++  Invoke-ExternalStep `
++    -Name "Protocol 15 static-event, particle, scoreboard and graceful-drop verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolEventChecker, "--root", $Root, "--json-output", $ProtocolEventReportPath)) `
++    -Detail "15 C-derived event payload vectors, 13 semantic cases and 22 MiniLang runtime fixtures" `
++    -LogPath $ProtocolEventLogPath
++
++  Invoke-ExternalStep `
++    -Name "Protocol 15 temporary-entity, dynamic-sound and delivery-boundary verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolRuntimeEventChecker, "--root", $Root, "--json-output", $ProtocolRuntimeEventReportPath)) `
++    -Detail "10 C-derived runtime-event vectors, 49 semantic cases and 28 MiniLang runtime fixtures" `
++    -LogPath $ProtocolRuntimeEventLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-015 signon queue and stage verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolSignonChecker, "--root", $Root, "--json-output", $ProtocolSignonReportPath)) `
++    -Detail "source-guided signon stages 1-4 and queue boundaries" `
++    -LogPath $ProtocolSignonLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-016 reliable delivery scheduling verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolDeliveryChecker, "--root", $Root, "--json-output", $ProtocolDeliveryReportPath)) `
++    -Detail "blocked, retained, committed, keepalive and drop scheduling" `
++    -LogPath $ProtocolDeliveryLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-017 datagram ACK and retransmission verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolDatagramChecker, "--root", $Root, "--json-output", $ProtocolDatagramReportPath)) `
++    -Detail "fragmentation, deferred ACK flush, loss, duplicate and wrap cases" `
++    -LogPath $ProtocolDatagramLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-018 demo framing and playback verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolDemoChecker, "--root", $Root, "--json-output", $ProtocolDemoReportPath)) `
++    -Detail "recording atoi, frame ABI, keepalive filtering and timedemo semantics" `
++    -LogPath $ProtocolDemoLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-019 cumulative Protocol 15 closure and freeze verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolClosureChecker, "--root", $Root, "--json-output", $ProtocolClosureReportPath)) `
++    -Detail "nine component checkers, 15 authoritative files and frozen fingerprint" `
++    -LogPath $ProtocolClosureLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-020 QuakeC progs.dat ABI and runtime CRC verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($QuakeCProgsChecker, "--root", $Root, "--json-output", $QuakeCProgsReportPath)) `
++    -Detail "dprograms_t ABI, semantic parser guards, Latin-1 string table and full-file CRC" `
++    -LogPath $QuakeCProgsLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-021 QuakeC VM byte, stack and pointer verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($QuakeCVMChecker, "--root", $Root, "--json-output", $QuakeCVMReportPath)) `
++    -Detail "66 opcodes, Binary32 boundaries, stack/local limits and pointer validation" `
++    -LogPath $QuakeCVMLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-022 QuakeC edict and save-text verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($QuakeCEdictChecker, "--root", $Root, "--json-output", $QuakeCEdictReportPath)) `
++    -Detail "Epair parsing, Latin-1 text, EV_VOID width and exact save formatting" `
++    -LogPath $QuakeCEdictLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-023 QuakeC builtin-table and formatting verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($QuakeCBuiltinChecker, "--root", $Root, "--json-output", $QuakeCBuiltinReportPath)) `
++    -Detail "79 stock slots, 14 PF_Fixme entries, temp strings, random and numeric formatting" `
++    -LogPath $QuakeCBuiltinLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-024 cumulative QuakeC closure and freeze verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($QuakeCClosureChecker, "--root", $Root, "--allow-downstream-package", "--json-output", $QuakeCClosureReportPath)) `
++    -Detail "stock QuakeC 1.09 contract, required globals/fields/functions and frozen fingerprint" `
++    -LogPath $QuakeCClosureLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-025 box hull and recursive trace verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($WorldHullChecker, $Root, "--json-output", $WorldHullReportPath)) `
++    -Detail "six-node box hull, boundary classification and recursive trace parity" `
++    -LogPath $WorldHullLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-025 world-space trace coordinate verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($WorldTraceChecker, $Root, "--json-output", $WorldTraceReportPath)) `
++    -Detail "translated brush traces, impact planes and exact clear endpoints" `
++    -LogPath $WorldTraceLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-026 entity link and collision-filter verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($WorldLinkChecker, $Root, "--json-output", $WorldLinkReportPath)) `
++    -Detail "expanded absolute bounds, owner/point filters, trigger overlap and relinking" `
++    -LogPath $WorldLinkLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-027 monster movement and relink verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ServerMoveChecker, $Root, "--json-output", $ServerMoveReportPath)) `
++    -Detail "bottom checks, steps, partial ground, chase directions and MSVCRT random sequence" `
++    -LogPath $ServerMoveLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-028 server physics verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ServerPhysicsChecker, $Root, "--json-output", $ServerPhysicsReportPath)) `
++    -Detail "pushers, toss, gravity, relink order and strict WinQuake movetype dispatch" `
++    -LogPath $ServerPhysicsLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-028 client movement and angle verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($SvUserMovementChecker, $Root, "--json-output", $SvUserMovementReportPath)) `
++    -Detail "frame clamp, acceleration, waterjump, ideal pitch and usercmd parsing" `
++    -LogPath $SvUserMovementLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-029 server user and command-policy verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ServerUserChecker, $Root, "--json-output", $ServerUserReportPath)) `
++    -Detail "client command privilege order, ping Binary32, movement gates and ideal pitch" `
++    -LogPath $ServerUserLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-029 cumulative world/physics closure verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($WorldPhysicsClosureChecker, $Root, "--json-output", $WorldPhysicsClosureReportPath)) `
++    -Detail "seven component checkers and frozen world_physics_109_frozen_v1 fingerprint" `
++    -LogPath $WorldPhysicsClosureLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-030 host timing and frame-clock verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($HostTimingChecker, "--root", $Root, "--json-output", $HostTimingReportPath)) `
++    -Detail "Host_FilterTime, realtime/oldrealtime, clamp and Binary32 boundaries" `
++    -LogPath $HostTimingLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-031 command buffer, alias and cvar lifecycle verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($CommandCvarChecker, "--root", $Root, "--json-output", $CommandCvarReportPath)) `
++    -Detail "command ordering, aliases, Cvar_Command and Cvar_SetValue formatting" `
++    -LogPath $CommandCvarLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-032 demo recording, playback and timedemo verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($DemoLifecycleChecker, "--root", $Root, "--json-output", $DemoLifecycleReportPath)) `
++    -Detail "demo frame ABI, track parsing, recording gates and Binary32 angles" `
++    -LogPath $DemoLifecycleLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-033 savegame-v5 byte and parser verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($SavegameV5Checker, "--root", $Root, "--json-output", $SavegameV5ReportPath)) `
++    -Detail "version-5 layout, Quake one-byte text, comments, lightstyles and roundtrip" `
++    -LogPath $SavegameV5LogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-034 host lifecycle closure verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($HostLifecycleClosureChecker, "--root", $Root, "--json-output", $HostLifecycleClosureReportPath)) `
++    -Detail "map/changelevel/restart/disconnect/quit, shutdown and frozen lifecycle contract" `
++    -LogPath $HostLifecycleClosureLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-035 client state and render-handoff verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ClientStateRenderChecker, "--root", $Root, "--json-output", $ClientStateRenderReportPath)) `
++    -Detail "dlight pool, Binary32 interpolation, visible entity filtering and first-person handoff" `
++    -LogPath $ClientStateRenderLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-036 view and chase-camera verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ViewStateChecker, "--root", $Root, "--json-output", $ViewStateReportPath)) `
++    -Detail "cshift atoi semantics, view refdef and preserved chase yaw/roll" `
++    -LogPath $ViewStateLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-037 temporary beam model verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($TemporaryBeamChecker, "--root", $Root, "--json-output", $TemporaryBeamReportPath)) `
++    -Detail "30-unit beam segments, Quake model mapping, random roll and temporary entity caps" `
++    -LogPath $TemporaryBeamLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-038 particle runtime verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ParticleRuntimeChecker, "--root", $Root, "--json-output", $ParticleRuntimeReportPath)) `
++    -Detail "sv_gravity handoff, Binary32 storage and particle-type integration" `
++    -LogPath $ParticleRuntimeLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-039 cumulative client/render closure verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ClientRenderClosureChecker, "--root", $Root, "--json-output", $ClientRenderClosureReportPath)) `
++    -Detail "efrag frame accumulation, renderer submission and client_render_109_frozen_v1" `
++    -LogPath $ClientRenderClosureLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-040 world surface and texture-chain verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($WorldSurfaceRenderChecker, "--root", $Root, "--json-output", $WorldSurfaceRenderReportPath)) `
++    -Detail "world/brush culling, per-texture chains, sky classification and water deferral" `
++    -LogPath $WorldSurfaceRenderLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-041 lightmap format and atlas verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($LightmapAtlasChecker, "--root", $Root, "--json-output", $LightmapAtlasReportPath)) `
++    -Detail "luminance/RGBA formats, row strides and shared atlas texture ownership" `
++    -LogPath $LightmapAtlasLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-042 dynamic-light render verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($DynamicLightRenderChecker, "--root", $Root, "--json-output", $DynamicLightRenderReportPath)) `
++    -Detail "push-before-frame ordering, active-light boundaries and brush-model marking" `
++    -LogPath $DynamicLightRenderLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-043 sky/water Binary32 verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($SkyWaterRenderChecker, "--root", $Root, "--json-output", $SkyWaterRenderReportPath)) `
++    -Detail "water warp, sky coordinates, speed wrapping and polygon subdivision" `
++    -LogPath $SkyWaterRenderLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-044 cumulative world/render closure verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($WorldRenderClosureChecker, "--root", $Root, "--json-output", $WorldRenderClosureReportPath)) `
++    -Detail "viewport fudge, front-face culling, pass order and world_render_109_frozen_v1" `
++    -LogPath $WorldRenderClosureLogPath
++
++
++  foreach ($CurrentChecker in @(
++    [ordered]@{ Name = "BP-045 alias model verification"; Path = $AliasModelChecker; Log = $AliasModelLogPath },
++    [ordered]@{ Name = "BP-046 sprite synchronization verification"; Path = $SpriteSyncChecker; Log = $SpriteSyncLogPath },
++    [ordered]@{ Name = "BP-047 2D/HUD integration verification"; Path = $RenderUiHudChecker; Log = $RenderUiHudLogPath },
++    [ordered]@{ Name = "BP-048 render evidence verification"; Path = $RenderEvidenceChecker; Log = $RenderEvidenceLogPath },
++    [ordered]@{ Name = "BP-049 model/UI/render closure verification"; Path = $ModelUiRenderChecker; Log = $ModelUiRenderLogPath }
++  )) {
++    Invoke-ExternalStep -Name $CurrentChecker.Name -Executable $PythonExe -Arguments @($PythonPrefix + @($CurrentChecker.Path)) -Detail "source-guided component contract" -LogPath $CurrentChecker.Log
++  }
++  Invoke-ExternalStep -Name "render evidence comparator self-test" -Executable $PythonExe -Arguments @($PythonPrefix + @($RenderEvidenceComparator, "--self-test")) -Detail "TGA parser, exact comparison and SSIM" -LogPath (Join-Path $BuildDirectory "bp050-054-evidence-comparator-selftest.log")
++
++  foreach ($SpecialChecker in @(
++    [ordered]@{ Name = "BP-050 mirror special-render verification"; Path = $MirrorSpecialChecker; Report = $MirrorSpecialReportPath; Log = $MirrorSpecialLogPath },
++    [ordered]@{ Name = "BP-051 render-clear special verification"; Path = $RenderClearSpecialChecker; Report = $RenderClearSpecialReportPath; Log = $RenderClearSpecialLogPath },
++    [ordered]@{ Name = "BP-052 envmap/timerefresh verification"; Path = $EnvmapTimeRefreshChecker; Report = $EnvmapTimeRefreshReportPath; Log = $EnvmapTimeRefreshLogPath },
++    [ordered]@{ Name = "BP-053 render-evidence corpus verification"; Path = $RenderEvidenceCorpusChecker; Report = $RenderEvidenceCorpusReportPath; Log = $RenderEvidenceCorpusLogPath },
++    [ordered]@{ Name = "BP-054 render-special closure verification"; Path = $RenderSpecialClosureChecker; Report = $RenderSpecialClosureReportPath; Log = $RenderSpecialClosureLogPath }
++  )) {
++    Invoke-ExternalStep -Name $SpecialChecker.Name -Executable $PythonExe -Arguments @($PythonPrefix + @($SpecialChecker.Path, "--root", $Root, "--json-output", $SpecialChecker.Report)) -Detail "source-guided special-render component contract" -LogPath $SpecialChecker.Log
++  }
++
++  Invoke-ExternalStep -Name "render evidence corpus comparator self-test" -Executable $PythonExe -Arguments @($PythonPrefix + @($RenderCorpusComparator, "--self-test")) -Detail "multi-scene exact-pair and optional original SSIM gate" -LogPath (Join-Path $BuildDirectory "bp050-054-evidence-corpus-comparator-selftest.log")
++
++  if (-not $SkipBuild) {
++    $BuildArguments = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $BuildScript)
++    if (-not [string]::IsNullOrWhiteSpace($Compiler)) { $BuildArguments += @("-Compiler", $Compiler) }
++    if (-not [string]::IsNullOrWhiteSpace($StdLib)) { $BuildArguments += @("-StdLib", $StdLib) }
++    $BuildArguments += @("-Python", $PythonExe, "-Configuration", $Configuration, "-NoRunTests")
++    if ($RebuildNative) { $BuildArguments += "-RebuildNative" }
++    if ($Listings) { $BuildArguments += "-Listings" }
++
++    $PowerShellExe = (Get-Process -Id $PID).Path
++    Invoke-ExternalStep `
++      -Name "single cumulative build of game and all block test executables" `
++      -Executable $PowerShellExe `
++      -Arguments $BuildArguments `
++      -Detail "compile once with -NoRunTests; independent groups execute below" `
++      -LogPath $BuildChildLogPath
++  } else {
++    Add-StepResult "single cumulative build of game and all block test executables" "SKIPPED" 0 "-SkipBuild"
++  }
++
++  Require-File $GameExe "MiniQuake executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15WireTests.exe") "Protocol 15 wire test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15CommandTests.exe") "Protocol 15 command test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15ServerDataTests.exe") "Protocol 15 server-data test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15EventTests.exe") "Protocol 15 event test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15RuntimeEventTests.exe") "Protocol 15 runtime-event test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15SignonTests.exe") "Protocol 15 signon test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15DeliveryTests.exe") "Protocol 15 delivery test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15DatagramTests.exe") "Protocol 15 datagram test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15DemoTests.exe") "Protocol 15 demo test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15ClosureTests.exe") "Protocol 15 closure test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeQuakeCProgsTests.exe") "BP-020 QuakeC progs.dat test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeQuakeCVMTests.exe") "BP-021 QuakeC VM test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeQuakeCEdictTests.exe") "BP-022 QuakeC edict test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeQuakeCBuiltinTests.exe") "BP-023 QuakeC builtin test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeQuakeCClosureTests.exe") "BP-024 QuakeC closure test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeQuakeCStockTests.exe") "BP-024 stock progs.dat test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeWorldHullTests.exe") "BP-025 world hull test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeWorldTraceTests.exe") "BP-025 world trace test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeWorldLinkTests.exe") "BP-026 world link test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeServerMoveTests.exe") "BP-027 server movement test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeServerPhysicsTests.exe") "BP-028 server physics test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeSvUserMovementTests.exe") "BP-028 sv_user movement test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeServerUserTests.exe") "BP-029 server user test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeWorldPhysicsClosureTests.exe") "BP-029 world/physics closure test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeHostTimingTests.exe") "BP-030 host timing test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeCommandCvarTests.exe") "BP-031 command/cvar test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeDemoLifecycleTests.exe") "BP-032 demo lifecycle test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeSavegameV5Tests.exe") "BP-033 savegame v5 test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeHostLifecycleClosureTests.exe") "BP-034 host lifecycle closure test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeClientStateRenderTests.exe") "BP-035 client state/render test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeViewStateTests.exe") "BP-036 view state test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeTemporaryBeamTests.exe") "BP-037 temporary beam test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeParticleRuntimeTests.exe") "BP-038 particle runtime test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeClientRenderClosureTests.exe") "BP-039 client/render closure test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeWorldSurfaceRenderTests.exe") "BP-040 world surface test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeLightmapAtlasTests.exe") "BP-041 lightmap atlas test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeDynamicLightRenderTests.exe") "BP-042 dynamic-light render test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeSkyWaterRenderTests.exe") "BP-043 sky/water render test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeWorldRenderClosureTests.exe") "BP-044 world/render closure test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeAliasModelTests.exe") "BP-045 alias model test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeSpriteSyncTests.exe") "BP-046 sprite sync test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeRenderUiHudTests.exe") "BP-047 2D/HUD test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeRenderEvidenceTests.exe") "BP-048 render evidence test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeModelUiRenderClosureTests.exe") "BP-049 closure test executable"
++
++  foreach ($BridgeName in @("miniquake_native.dll", "miniquake_text.dll")) {
++    $SourceBridge = Join-Path (Join-Path $Root "native") $BridgeName
++    $BuiltBridge = Join-Path $BuildDirectory $BridgeName
++    Require-File $SourceBridge "Packaged native bridge"
++    Require-File $BuiltBridge "Built native bridge"
++    $SourceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $SourceBridge).Hash
++    $BuiltHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $BuiltBridge).Hash
++    if ($SourceHash -ne $BuiltHash) { throw "Built native bridge hash mismatch: $BridgeName" }
++  }
++  Add-StepResult "native bridge deployment" "PASS" 0 "main and buffered-text DLL hashes match package"
++
++  Write-Host "[MiniQuake/$PackageId] executable identity"
++  $VersionOutput = @(& $GameExe "--version" 2>&1)
++  $VersionExitCode = [int]$LASTEXITCODE
++  $VersionOutput | Set-Content -LiteralPath $VersionPath -Encoding UTF8
++  $VersionOutput | ForEach-Object { Write-Host $_ }
++  if ($VersionExitCode -ne 0) { throw "MiniQuake --version failed with exit code $VersionExitCode." }
++  $VersionText = $VersionOutput -join "`n"
++  foreach ($Marker in @(
++    "Package: $PackageId",
++    "Parent package: $ParentPackageId",
++    "Compatibility profile: compat_109",
++    "Native text ABI: $NativeTextAbi",
++    "Protocol text ABI: $ProtocolTextAbi",
++    "Block: $BlockId",
++    "Block parent package: $BlockParentPackageId",
++    "Protocol status: $ProtocolStatus",
++    "QuakeC status: $QuakeCStatus",
++    "World/physics status: $WorldPhysicsStatus",
++    "Host/lifecycle status: $HostLifecycleStatus",
++    "Client/render status: $ClientRenderStatus",
++    "World/render status: $WorldRenderStatus",
++    "Model/UI/render status: $ModelUiRenderStatus",
++    "Model/UI/render fingerprint: 0x0a62f5b1",
++    "Render-special status: $RenderSpecialStatus",
++    "Render-special fingerprint: 0x2a3d8081"
++  )) {
++    if ($VersionText -notmatch [regex]::Escape($Marker)) { throw "Executable identity marker missing: $Marker" }
++  }
++  Add-StepResult "executable identity" "PASS" 0 "Package: $PackageId; block: $BlockId; model/UI/render: $ModelUiRenderStatus"
++
++  $IndependentGroups = @(
++    [ordered]@{ package = "BASE"; name = "core tests"; exe = "MiniQuakeTests.exe"; log = "bp050-054-core-tests.log" },
++    [ordered]@{ package = "BASE"; name = "milestone tests"; exe = "MiniQuakeMilestoneTests.exe"; log = "bp050-054-milestone-tests.log" },
++    [ordered]@{ package = "BASE"; name = "deterministic diagnostics"; exe = "MiniQuakeCompatTraceTests.exe"; log = "bp050-054-diagnostics-tests.log" },
++    [ordered]@{ package = "BP-010R1"; name = "Protocol 15 wire"; exe = "MiniQuakeProtocol15WireTests.exe"; log = "bp050-054-wire-tests.log" },
++    [ordered]@{ package = "BP-011"; name = "Protocol 15 command/update"; exe = "MiniQuakeProtocol15CommandTests.exe"; log = "bp050-054-command-tests.log" },
++    [ordered]@{ package = "BP-012R1"; name = "Protocol 15 server data"; exe = "MiniQuakeProtocol15ServerDataTests.exe"; log = "bp050-054-serverdata-tests.log" },
++    [ordered]@{ package = "BP-013"; name = "Protocol 15 events"; exe = "MiniQuakeProtocol15EventTests.exe"; log = "bp050-054-event-tests.log" },
++    [ordered]@{ package = "BP-014R1"; name = "Protocol 15 runtime events"; exe = "MiniQuakeProtocol15RuntimeEventTests.exe"; log = "bp050-054-runtime-event-tests.log" },
++    [ordered]@{ package = "BP-015"; name = "signon queue and stages"; exe = "MiniQuakeProtocol15SignonTests.exe"; log = "bp050-054-signon-tests.log" },
++    [ordered]@{ package = "BP-016"; name = "reliable delivery scheduling"; exe = "MiniQuakeProtocol15DeliveryTests.exe"; log = "bp050-054-delivery-tests.log" },
++    [ordered]@{ package = "BP-017"; name = "datagram ACK and retransmission"; exe = "MiniQuakeProtocol15DatagramTests.exe"; log = "bp050-054-datagram-tests.log" },
++    [ordered]@{ package = "BP-018"; name = "demo framing and playback"; exe = "MiniQuakeProtocol15DemoTests.exe"; log = "bp050-054-demo-tests.log" },
++    [ordered]@{ package = "BP-019"; name = "cross-layer Protocol 15 closure and freeze"; exe = "MiniQuakeProtocol15ClosureTests.exe"; log = "bp050-054-protocol15-closure-tests.log" },
++    [ordered]@{ package = "BP-020"; name = "QuakeC progs.dat ABI and CRC"; exe = "MiniQuakeQuakeCProgsTests.exe"; log = "bp050-054-quakec-progs-tests.log" },
++    [ordered]@{ package = "BP-021"; name = "QuakeC VM byte and stack parity"; exe = "MiniQuakeQuakeCVMTests.exe"; log = "bp050-054-quakec-vm-tests.log" },
++    [ordered]@{ package = "BP-022"; name = "QuakeC edict and save-text parity"; exe = "MiniQuakeQuakeCEdictTests.exe"; log = "bp050-054-quakec-edict-tests.log" },
++    [ordered]@{ package = "BP-023"; name = "QuakeC builtin table and formatting"; exe = "MiniQuakeQuakeCBuiltinTests.exe"; log = "bp050-054-quakec-builtin-tests.log" },
++    [ordered]@{ package = "BP-024"; name = "frozen QuakeC contract closure"; exe = "MiniQuakeQuakeCClosureTests.exe"; log = "bp050-054-quakec-closure-tests.log" },
++    [ordered]@{ package = "BP-025"; name = "world hull parity"; exe = "MiniQuakeWorldHullTests.exe"; log = "bp050-054-world-hull-tests.log" },
++    [ordered]@{ package = "BP-025"; name = "world trace parity"; exe = "MiniQuakeWorldTraceTests.exe"; log = "bp050-054-world-trace-tests.log" },
++    [ordered]@{ package = "BP-026"; name = "world link and collision parity"; exe = "MiniQuakeWorldLinkTests.exe"; log = "bp050-054-world-link-tests.log" },
++    [ordered]@{ package = "BP-027"; name = "monster movement parity"; exe = "MiniQuakeServerMoveTests.exe"; log = "bp050-054-server-move-tests.log" },
++    [ordered]@{ package = "BP-028"; name = "server physics parity"; exe = "MiniQuakeServerPhysicsTests.exe"; log = "bp050-054-server-physics-tests.log" },
++    [ordered]@{ package = "BP-028"; name = "sv_user movement parity"; exe = "MiniQuakeSvUserMovementTests.exe"; log = "bp050-054-sv-user-movement-tests.log" },
++    [ordered]@{ package = "BP-029"; name = "server user parity"; exe = "MiniQuakeServerUserTests.exe"; log = "bp050-054-server-user-tests.log" },
++    [ordered]@{ package = "BP-029"; name = "frozen world and physics closure"; exe = "MiniQuakeWorldPhysicsClosureTests.exe"; log = "bp050-054-world-physics-closure-tests.log" },
++    [ordered]@{ package = "BP-030"; name = "host timing and frame clock"; exe = "MiniQuakeHostTimingTests.exe"; log = "bp050-054-host-timing-tests.log" },
++    [ordered]@{ package = "BP-031"; name = "command buffer and cvar lifecycle"; exe = "MiniQuakeCommandCvarTests.exe"; log = "bp050-054-command-cvar-tests.log" },
++    [ordered]@{ package = "BP-032"; name = "demo lifecycle"; exe = "MiniQuakeDemoLifecycleTests.exe"; log = "bp050-054-demo-lifecycle-tests.log" },
++    [ordered]@{ package = "BP-033"; name = "savegame v5"; exe = "MiniQuakeSavegameV5Tests.exe"; log = "bp050-054-savegame-v5-tests.log" },
++    [ordered]@{ package = "BP-034"; name = "host lifecycle closure"; exe = "MiniQuakeHostLifecycleClosureTests.exe"; log = "bp050-054-host-lifecycle-closure-tests.log" },
++    [ordered]@{ package = "BP-035"; name = "client state and render handoff"; exe = "MiniQuakeClientStateRenderTests.exe"; log = "bp050-054-client-state-render-tests.log" },
++    [ordered]@{ package = "BP-036"; name = "view state and chase camera"; exe = "MiniQuakeViewStateTests.exe"; log = "bp050-054-view-state-tests.log" },
++    [ordered]@{ package = "BP-037"; name = "temporary beam model entities"; exe = "MiniQuakeTemporaryBeamTests.exe"; log = "bp050-054-temporary-beam-tests.log" },
++    [ordered]@{ package = "BP-038"; name = "particle runtime parity"; exe = "MiniQuakeParticleRuntimeTests.exe"; log = "bp050-054-particle-runtime-tests.log" },
++    [ordered]@{ package = "BP-039"; name = "frozen client/render closure"; exe = "MiniQuakeClientRenderClosureTests.exe"; log = "bp050-054-client-render-closure-tests.log" },
++    [ordered]@{ package = "BP-040"; name = "world surfaces and texture chains"; exe = "MiniQuakeWorldSurfaceRenderTests.exe"; log = "bp050-054-world-surface-tests.log" },
++    [ordered]@{ package = "BP-041"; name = "lightmap formats and atlas ownership"; exe = "MiniQuakeLightmapAtlasTests.exe"; log = "bp050-054-lightmap-atlas-tests.log" },
++    [ordered]@{ package = "BP-042"; name = "dynamic-light frame and brush marking"; exe = "MiniQuakeDynamicLightRenderTests.exe"; log = "bp050-054-dynamic-light-render-tests.log" },
++    [ordered]@{ package = "BP-043"; name = "sky and water Binary32 rendering"; exe = "MiniQuakeSkyWaterRenderTests.exe"; log = "bp050-054-sky-water-render-tests.log" },
++    [ordered]@{ package = "BP-044"; name = "frozen world/render closure"; exe = "MiniQuakeWorldRenderClosureTests.exe"; log = "bp050-054-world-render-closure-tests.log" },
++    [ordered]@{ package = "BP-045"; name = "alias model and shadow parity"; exe = "MiniQuakeAliasModelTests.exe"; log = "bp050-054-alias-model-tests.log" },
++    [ordered]@{ package = "BP-046"; name = "sprite synchronization parity"; exe = "MiniQuakeSpriteSyncTests.exe"; log = "bp050-054-sprite-sync-tests.log" },
++    [ordered]@{ package = "BP-047"; name = "2D and HUD integration parity"; exe = "MiniQuakeRenderUiHudTests.exe"; log = "bp050-054-render-ui-hud-tests.log" },
++    [ordered]@{ package = "BP-048"; name = "deterministic render evidence"; exe = "MiniQuakeRenderEvidenceTests.exe"; log = "bp050-054-render-evidence-tests.log" },
++    [ordered]@{ package = "BP-049"; name = "frozen model/UI/render closure"; exe = "MiniQuakeModelUiRenderClosureTests.exe"; log = "bp050-054-model-ui-render-closure-tests.log" },
++    [ordered]@{ package = "BP-050"; name = "mirror special-render parity"; exe = "MiniQuakeMirrorSpecialRenderTests.exe"; log = "bp050-054-mirror-special-tests.log" },
++    [ordered]@{ package = "BP-051"; name = "clear, z-trick and no-refresh parity"; exe = "MiniQuakeRenderClearSpecialTests.exe"; log = "bp050-054-render-clear-special-tests.log" },
++    [ordered]@{ package = "BP-052"; name = "envmap and timerefresh parity"; exe = "MiniQuakeEnvmapTimeRefreshTests.exe"; log = "bp050-054-envmap-timerefresh-tests.log" },
++    [ordered]@{ package = "BP-053"; name = "render-evidence corpus contract"; exe = "MiniQuakeRenderEvidenceCorpusTests.exe"; log = "bp050-054-render-evidence-corpus-tests.log" },
++    [ordered]@{ package = "BP-054"; name = "frozen special-render closure"; exe = "MiniQuakeRenderSpecialClosureTests.exe"; log = "bp050-054-render-special-closure-tests.log" }
++  )
++  foreach ($Group in $IndependentGroups) {
++    $Path = Join-Path $BuildDirectory $Group.exe
++    Require-File $Path ("test executable for " + $Group.package)
++    [void](Invoke-IndependentTest -Package $Group.package -Name $Group.name -Executable $Path -LogName $Group.log)
++  }
++
++  $CanUseGameData = -not $SkipGameValidation -and -not [string]::IsNullOrWhiteSpace($QuakeBase)
++  if (-not $CanUseGameData) {
++    $Reason = if ($SkipGameValidation) { "-SkipGameValidation" } else { "no -QuakeBase supplied" }
++    Add-StepResult "[BP-024R3] stock progs.dat compatibility gate" "SKIPPED" 0 $Reason
++    Add-StepResult "[BP-029] installed Quake data validation" "SKIPPED" 0 $Reason
++    Add-StepResult "[BP-029] headless runtime validation" "SKIPPED" 0 $Reason
++  } else {
++    if (-not (Test-Path -LiteralPath $QuakeBase -PathType Container)) {
++      throw "Quake base directory does not exist: $QuakeBase"
++    }
++
++    # Run the focused stock progs.dat gate first. All three user-data gates
++    # are independent and retain complete native stdout/stderr logs even when
++    # one of them fails.
++    $StockExe = Join-Path $BuildDirectory "MiniQuakeQuakeCStockTests.exe"
++    [void](Invoke-IndependentTest -Package "BP-024R3" -Name "stock progs.dat compatibility gate" -Executable $StockExe -LogName ([System.IO.Path]::GetFileName($QuakeCStockLogPath)) -Arguments @($QuakeBase, $Game))
++    [void](Invoke-IndependentTest -Package "BP-029" -Name "installed Quake data validation" -Executable $GameExe -LogName ([System.IO.Path]::GetFileName($GameValidationLogPath)) -Arguments @("--validate-game", $QuakeBase, $Map, "-game", $Game))
++    [void](Invoke-IndependentTest -Package "BP-029" -Name "headless runtime validation" -Executable $GameExe -LogName ([System.IO.Path]::GetFileName($RuntimeValidationLogPath)) -Arguments @("--validate-runtime", $QuakeBase, $Map, [string]$Frames, "-game", $Game))
++  }
++
++  $CanTrace = -not $SkipTraceValidation -and -not [string]::IsNullOrWhiteSpace($QuakeBase)
++  if (-not $CanTrace) {
++    $Reason = if ($SkipTraceValidation) { "-SkipTraceValidation" } else { "no -QuakeBase supplied" }
++    Add-StepResult "deterministic compatibility trace A" "SKIPPED" 0 $Reason
++    Add-StepResult "deterministic compatibility trace B" "SKIPPED" 0 $Reason
++    Add-StepResult "byte-identical trace comparison" "SKIPPED" 0 $Reason
++    Add-StepResult "trace artifact schema validation" "SKIPPED" 0 $Reason
++    Add-StepResult "compatibility snapshot command" "SKIPPED" 0 $Reason
++  } else {
++    if (Test-Path -LiteralPath $TraceDirectory) { Remove-Item -Recurse -Force -LiteralPath $TraceDirectory }
++    New-Item -ItemType Directory -Force -Path $TraceDirectory | Out-Null
++    $PrefixA = Join-Path $TraceDirectory "run-a"
++    $PrefixB = Join-Path $TraceDirectory "run-b"
++
++    Invoke-ExternalStep `
++      -Name "deterministic compatibility trace A" `
++      -Executable $GameExe `
++      -Arguments @("--compat-trace", $QuakeBase, $Map, [string]$TraceFrames, $PrefixA, "-game", $Game) `
++      -Detail "fixed 0.02 second steps; game=$Game map=$Map frames=$TraceFrames" `
++      -LogPath $TraceALogPath
++    Invoke-ExternalStep `
++      -Name "deterministic compatibility trace B" `
++      -Executable $GameExe `
++      -Arguments @("--compat-trace", $QuakeBase, $Map, [string]$TraceFrames, $PrefixB, "-game", $Game) `
++      -Detail "independent second process with identical arguments" `
++      -LogPath $TraceBLogPath
++
++    $TraceA = $PrefixA + ".mqtrace"
++    $TraceB = $PrefixB + ".mqtrace"
++    $SnapshotA = $PrefixA + "-snapshot.json"
++    $ContextA = $PrefixA + "-context.json"
++    $SummaryAPath = $PrefixA + "-summary.json"
++    $SummaryBPath = $PrefixB + "-summary.json"
++    foreach ($Artifact in @($TraceA, $TraceB, $SnapshotA, $ContextA, $SummaryAPath, $SummaryBPath)) {
++      Require-File $Artifact "BP-029 trace artifact"
++    }
++
++    Write-Host "[MiniQuake/$PackageId] byte-identical trace comparison"
++    if (Test-Path -LiteralPath $TraceComparisonPath -PathType Leaf) { Remove-Item -Force -LiteralPath $TraceComparisonPath }
++    if (Test-Path -LiteralPath $TraceComparisonLogPath -PathType Leaf) { Remove-Item -Force -LiteralPath $TraceComparisonLogPath }
++    $ComparisonArguments = @($PythonPrefix + @($TraceComparator, $TraceA, $TraceB, "--json-output", $TraceComparisonPath))
++    & $PythonExe @ComparisonArguments 2>&1 | Tee-Object -FilePath $TraceComparisonLogPath
++    $ComparisonExitCode = [int]$LASTEXITCODE
++    $Comparison = Read-JsonFile $TraceComparisonPath
++    if ($ComparisonExitCode -ne 0 -or -not [bool]$Comparison.equal) {
++      $Detail = "run-a=$($Comparison.left.sha256) run-b=$($Comparison.right.sha256)"
++      if ($null -ne $Comparison.first_difference) {
++        $Detail = $Detail + " first_line=$($Comparison.first_difference.line_index)"
++        if ($null -ne $Comparison.first_difference.frame) {
++          $Detail = $Detail + " first_frame=$($Comparison.first_difference.frame)"
++        }
++      }
++      $Detail = $Detail + "; report=" + [System.IO.Path]::GetFileName($TraceComparisonPath)
++      Add-StepResult "byte-identical trace comparison" "FAIL" $ComparisonExitCode $Detail
++      throw "BP-029 deterministic traces differ. The first differing fields are recorded in $TraceComparisonPath."
++    }
++    $TraceHash = [string]$Comparison.left.sha256
++    $LineCount = [int]$Comparison.left.lines
++    if ($LineCount -ne ($TraceFrames + 1)) {
++      throw "Trace line count is $LineCount, expected $($TraceFrames + 1)."
++    }
++    Add-StepResult "byte-identical trace comparison" "PASS" 0 "sha256=$TraceHash lines=$LineCount report=$([System.IO.Path]::GetFileName($TraceComparisonPath))"
++
++    $SummaryA = Read-JsonFile $SummaryAPath
++    $SummaryB = Read-JsonFile $SummaryBPath
++    $Snapshot = Read-JsonFile $SnapshotA
++    $Context = Read-JsonFile $ContextA
++    if ($SummaryA.schema -ne "MiniQuakeTraceSummary/1" -or $SummaryB.schema -ne "MiniQuakeTraceSummary/1") {
++      throw "Unexpected trace summary schema."
++    }
++    if ($SummaryA.package -ne $PackageId -or $SummaryB.package -ne $PackageId) {
++      throw "Trace summary package marker mismatch."
++    }
++    if (-not $SummaryA.ok -or -not $SummaryB.ok) { throw "A trace summary reports failure." }
++    if ([int]$SummaryA.frames_written -ne $TraceFrames -or [int]$SummaryB.frames_written -ne $TraceFrames) {
++      throw "Trace summary frame count mismatch."
++    }
++    if ($SummaryA.rolling_hash -ne $SummaryB.rolling_hash) {
++      throw "Trace rolling hashes differ despite byte comparison."
++    }
++    if ($Snapshot.schema -ne "MiniQuakeSnapshot/1") { throw "Unexpected snapshot schema." }
++    if ($Context.schema -ne "MiniQuakeCrashContext/1") { throw "Unexpected crash-context schema." }
++    if ($Context.phase -ne "trace_complete") { throw "Final crash context phase is '$($Context.phase)', expected trace_complete." }
++    $TraceRollingHash = [string]$SummaryA.rolling_hash
++
++    foreach ($Artifact in @($TraceA, $SnapshotA, $ContextA, $SummaryAPath)) {
++      Invoke-ExternalStep `
++        -Name ("compatibility report " + [System.IO.Path]::GetFileName($Artifact)) `
++        -Executable $GameExe `
++        -Arguments @("--compat-report", $Artifact) `
++        -Detail "schema recognition"
++    }
++    Add-StepResult "trace artifact schema validation" "PASS" 0 "rolling_hash=$TraceRollingHash"
++
++    $SnapshotFrames = [int][Math]::Min($TraceFrames, 8)
++    $SnapshotPrefix = Join-Path $TraceDirectory "snapshot-command"
++    Invoke-ExternalStep `
++      -Name "compatibility snapshot command" `
++      -Executable $GameExe `
++      -Arguments @("--compat-snapshot", $QuakeBase, $Map, [string]$SnapshotFrames, $SnapshotPrefix, "-game", $Game) `
++      -Detail "direct --compat-snapshot CLI path; frames=$SnapshotFrames" `
++      -LogPath $SnapshotCommandLogPath
++    $SnapshotCommandPath = $SnapshotPrefix + "-snapshot.json"
++    $SnapshotCommandSummaryPath = $SnapshotPrefix + "-summary.json"
++    $SnapshotCommand = Read-JsonFile $SnapshotCommandPath
++    $SnapshotCommandSummary = Read-JsonFile $SnapshotCommandSummaryPath
++    if ($SnapshotCommand.schema -ne "MiniQuakeSnapshot/1") { throw "Direct snapshot command produced an unexpected schema." }
++    if ([int]$SnapshotCommand.frame -ne ($SnapshotFrames - 1)) { throw "Direct snapshot command stopped at frame $($SnapshotCommand.frame), expected $($SnapshotFrames - 1)." }
++    if (-not $SnapshotCommandSummary.ok -or [int]$SnapshotCommandSummary.frames_written -ne $SnapshotFrames) {
++      throw "Direct snapshot command summary reports failure or the wrong frame count."
++    }
++  }
++
++  $CanRenderEvidence = -not $SkipRenderEvidence -and $CanUseGameData
++  if (-not $CanRenderEvidence) {
++    $Reason = if ($SkipRenderEvidence) { "-SkipRenderEvidence" } else { "no usable -QuakeBase supplied" }
++    Add-StepResult "deterministic render evidence A" "SKIPPED" 0 $Reason
++    Add-StepResult "deterministic render evidence B" "SKIPPED" 0 $Reason
++    Add-StepResult "byte-identical render evidence comparison" "SKIPPED" 0 $Reason
++  } else {
++    if (Test-Path -LiteralPath $EvidenceDirectory) { Remove-Item -Recurse -Force -LiteralPath $EvidenceDirectory }
++    New-Item -ItemType Directory -Force -Path $EvidenceDirectory | Out-Null
++    $EvidenceAPrefix = Join-Path $EvidenceDirectory "run-a"
++    $EvidenceBPrefix = Join-Path $EvidenceDirectory "run-b"
++    Invoke-ExternalStep -Name "deterministic render evidence A" -Executable $GameExe -Arguments @("--render-evidence", $QuakeBase, $Map, [string]$RenderEvidenceFrame, $EvidenceAPrefix, "-game", $Game) -Detail "after UI before swap" -LogPath $EvidenceALogPath
++    Invoke-ExternalStep -Name "deterministic render evidence B" -Executable $GameExe -Arguments @("--render-evidence", $QuakeBase, $Map, [string]$RenderEvidenceFrame, $EvidenceBPrefix, "-game", $Game) -Detail "independent second process" -LogPath $EvidenceBLogPath
++    Invoke-ExternalStep -Name "byte-identical render evidence comparison" -Executable $PythonExe -Arguments @($PythonPrefix + @($RenderEvidenceComparator, ($EvidenceAPrefix + ".tga"), ($EvidenceBPrefix + ".tga"), "--require-exact", "--min-ssim", "1.0", "--json-out", $EvidenceComparisonPath)) -Detail "exact deterministic 640x480 framebuffer identity" -LogPath $EvidenceComparisonLogPath
++    $EvidenceA = Read-JsonFile ($EvidenceAPrefix + "-summary.json")
++    $EvidenceB = Read-JsonFile ($EvidenceBPrefix + "-summary.json")
++    if (-not $EvidenceA.ok -or -not $EvidenceB.ok) { throw "Render evidence summary reports failure or an all-black framebuffer." }
++    if ([int]$EvidenceA.width -ne 640 -or [int]$EvidenceA.height -ne 480) { throw "Render evidence dimensions differ from 640x480." }
++    if ($EvidenceA.pixel_hash -ne $EvidenceB.pixel_hash -or $EvidenceA.sample_hash -ne $EvidenceB.sample_hash) { throw "Render evidence hashes differ." }
++    $EvidenceComparison = Read-JsonFile $EvidenceComparisonPath
++    $EvidenceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath ($EvidenceAPrefix + ".tga")).Hash.ToLowerInvariant()
++    $EvidencePixelHash = [string]$EvidenceA.pixel_hash
++    $EvidenceSampleHash = [string]$EvidenceA.sample_hash
++    $EvidenceSsim = [double]$EvidenceComparison.ssim
++  }
++
++  $CanRenderCorpus = -not $SkipRenderCorpus -and $CanUseGameData
++  if (-not $CanRenderCorpus) {
++    $Reason = if ($SkipRenderCorpus) { "-SkipRenderCorpus" } else { "no usable -QuakeBase supplied" }
++    Add-StepResult "deterministic multi-scene render evidence corpus" "SKIPPED" 0 $Reason
++    Add-StepResult "optional Original GLQuake corpus comparison" "SKIPPED" 0 $Reason
++  } else {
++    if (Test-Path -LiteralPath $EvidenceCorpusDirectory) { Remove-Item -Recurse -Force -LiteralPath $EvidenceCorpusDirectory }
++    New-Item -ItemType Directory -Force -Path $EvidenceCorpusDirectory | Out-Null
++    $CorpusScenarios = @(
++      [ordered]@{ name = "start-064"; map = "start"; frame = 64 },
++      [ordered]@{ name = "start-128"; map = "start"; frame = 128 },
++      [ordered]@{ name = "e1m1-128"; map = "e1m1"; frame = 128 }
++    )
++    foreach ($Scenario in $CorpusScenarios) {
++      $ScenarioPrefixA = Join-Path $EvidenceCorpusDirectory ($Scenario.name + "-a")
++      $ScenarioPrefixB = Join-Path $EvidenceCorpusDirectory ($Scenario.name + "-b")
++      $ScenarioLogA = Join-Path $BuildDirectory ("bp050-054-corpus-" + $Scenario.name + "-a.log")
++      $ScenarioLogB = Join-Path $BuildDirectory ("bp050-054-corpus-" + $Scenario.name + "-b.log")
++      Invoke-ExternalStep -Name ("render corpus " + $Scenario.name + " A") -Executable $GameExe -Arguments @("--render-evidence", $QuakeBase, $Scenario.map, [string]$Scenario.frame, $ScenarioPrefixA, "-game", $Game) -Detail "deterministic visible capture" -LogPath $ScenarioLogA
++      Invoke-ExternalStep -Name ("render corpus " + $Scenario.name + " B") -Executable $GameExe -Arguments @("--render-evidence", $QuakeBase, $Scenario.map, [string]$Scenario.frame, $ScenarioPrefixB, "-game", $Game) -Detail "independent deterministic visible capture" -LogPath $ScenarioLogB
++    }
++    $CorpusArguments = @($RenderCorpusComparator, "--mini-dir", $EvidenceCorpusDirectory, "--json-out", $EvidenceCorpusComparisonPath)
++    if (-not [string]::IsNullOrWhiteSpace($OriginalRenderReference)) {
++      if (-not (Test-Path -LiteralPath $OriginalRenderReference -PathType Container)) { throw "Original render reference directory does not exist: $OriginalRenderReference" }
++      $CorpusArguments += @("--original-dir", $OriginalRenderReference)
++    }
++    Invoke-ExternalStep -Name "deterministic multi-scene render evidence corpus" -Executable $PythonExe -Arguments @($PythonPrefix + $CorpusArguments) -Detail "three exact A/B pairs; optional Original GLQuake SSIM >= 0.95" -LogPath $EvidenceCorpusComparisonLogPath
++    if ([string]::IsNullOrWhiteSpace($OriginalRenderReference)) {
++      Add-StepResult "optional Original GLQuake corpus comparison" "SKIPPED" 0 "no -OriginalRenderReference supplied; exact MiniQuake corpus still required"
++    } else {
++      Add-StepResult "optional Original GLQuake corpus comparison" "PASS" 0 ("reference=" + $OriginalRenderReference)
++    }
++  }
++
++  if ($NetworkTests) {
++    Invoke-ExternalStep `
++      -Name "Winsock UDP loopback smoke" `
++      -Executable $GameExe `
++      -Arguments @("--udp-smoke", "2000") `
++      -Detail "2 second timeout"
++  } else {
++    Add-StepResult "Winsock UDP loopback smoke" "SKIPPED" 0 "use -NetworkTests"
++  }
++
++  if ($IndependentFailures.Count -gt 0) {
++    $First = $IndependentFailures[0]
++    throw ("Independent test groups failed: " + $IndependentFailures.Count + "; first=" + $First.package + " " + $First.name)
++  }
++
++  $OverallStatus = "PASS"
++} catch {
++  $FailureMessage = $_.Exception.Message
++  Write-Host "ERROR: $FailureMessage" -ForegroundColor Red
++} finally {
++  $BlockPackages = @("BP-050", "BP-051", "BP-052", "BP-053", "BP-054")
++  $FirstFailureIndex = -1
++  $FirstFailurePackage = ""
++  if ($IndependentFailures.Count -gt 0) {
++    $FirstFailurePackage = [string]$IndependentFailures[0].package
++    $FirstFailureIndex = [array]::IndexOf($BlockPackages, $FirstFailurePackage)
++    if ($FirstFailureIndex -lt 0) { $FirstFailureIndex = 0 }
++  }
++  $LogicalSteps = @()
++  for ($LogicalIndex = 0; $LogicalIndex -lt $BlockPackages.Count; $LogicalIndex++) {
++    $LogicalPackage = $BlockPackages[$LogicalIndex]
++    $OwnFailure = @($IndependentFailures | Where-Object { $_.package -eq $LogicalPackage })
++    $LogicalStatus = "PASS"
++    if ($OwnFailure.Count -gt 0) {
++      $LogicalStatus = "FAIL"
++    } elseif ($FirstFailureIndex -ge 0 -and $LogicalIndex -gt $FirstFailureIndex) {
++      # The independent fixture may have passed, but the cumulative dependency
++      # chain is not accepted after an earlier block failure.
++      $LogicalStatus = "BLOCKED"
++    } elseif ($FirstFailureIndex -eq 0 -and $FirstFailurePackage -notmatch "^BP-05[0-4]$") {
++      $LogicalStatus = "BLOCKED"
++    }
++    $LogicalSteps += [ordered]@{ package = $LogicalPackage; status = $LogicalStatus }
++  }
++  $Bisect = [ordered]@{
++    schema = "MiniQuakeLogicalBlockBisect/1"
++    block_id = $BlockId
++    requested = [bool]$BisectOnFailure
++    mode = "logical test-group checkpoint locator; no source rebuild is performed"
++    failures = @($IndependentFailures)
++    logical_steps = $LogicalSteps
++    first_failing_package = $FirstFailurePackage
++    suggested_patch = if ($FirstFailurePackage -match "^BP-05[0-4]$") { "patches/" + $FirstFailurePackage + ".diff" } else { "" }
++  }
++  $Bisect | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $BisectReportPath -Encoding UTF8
++
++  $Summary = [ordered]@{
++    schema_version = 1
++    package_id = $PackageId
++    parent_package_id = $ParentPackageId
++    block_id = $BlockId
++    delivery_revision = $DeliveryRevision
++    block_parent_package_id = $BlockParentPackageId
++    protocol_status = $ProtocolStatus
++    quakec_status = $QuakeCStatus
++    world_physics_status = $WorldPhysicsStatus
++    host_lifecycle_status = $HostLifecycleStatus
++    client_render_status = $ClientRenderStatus
++    world_render_status = $WorldRenderStatus
++    model_ui_render_status = $ModelUiRenderStatus
++    render_special_status = $RenderSpecialStatus
++    created_utc = (Get-Date).ToUniversalTime().ToString("o")
++    status = $OverallStatus
++    failure = $FailureMessage
++    configuration = $Configuration
++    quake_validation = [ordered]@{
++      base_supplied = -not [string]::IsNullOrWhiteSpace($QuakeBase)
++      game = $Game
++      map = $Map
++      frames = $Frames
++      trace_frames = $TraceFrames
++      render_evidence_frame = $RenderEvidenceFrame
++      original_render_reference_supplied = -not [string]::IsNullOrWhiteSpace($OriginalRenderReference)
++    }
++    deterministic_trace = [ordered]@{
++      sha256 = $TraceHash
++      rolling_hash = $TraceRollingHash
++    }
++    render_evidence = [ordered]@{
++      tga_sha256 = $EvidenceHash
++      pixel_hash = $EvidencePixelHash
++      sample_hash = $EvidenceSampleHash
++      ssim = $EvidenceSsim
++      capture_stage = "after_ui_before_swap"
++    }
++    artifacts = [ordered]@{
++      transcript = [System.IO.Path]::GetFileName($TranscriptPath)
++      static_report = [System.IO.Path]::GetFileName($StaticReportPath)
++      version_output = [System.IO.Path]::GetFileName($VersionPath)
++      build_child_log = [System.IO.Path]::GetFileName($BuildChildLogPath)
++      trace_a_log = [System.IO.Path]::GetFileName($TraceALogPath)
++      trace_b_log = [System.IO.Path]::GetFileName($TraceBLogPath)
++      snapshot_command_log = [System.IO.Path]::GetFileName($SnapshotCommandLogPath)
++      trace_comparison = [System.IO.Path]::GetFileName($TraceComparisonPath)
++      trace_comparison_log = [System.IO.Path]::GetFileName($TraceComparisonLogPath)
++      protocol15_vector_report = [System.IO.Path]::GetFileName($ProtocolVectorReportPath)
++      protocol15_vector_log = [System.IO.Path]::GetFileName($ProtocolVectorLogPath)
++      protocol15_command_report = [System.IO.Path]::GetFileName($ProtocolCommandReportPath)
++      protocol15_command_log = [System.IO.Path]::GetFileName($ProtocolCommandLogPath)
++      protocol15_serverdata_report = [System.IO.Path]::GetFileName($ProtocolServerDataReportPath)
++      protocol15_serverdata_log = [System.IO.Path]::GetFileName($ProtocolServerDataLogPath)
++      protocol15_event_report = [System.IO.Path]::GetFileName($ProtocolEventReportPath)
++      protocol15_event_log = [System.IO.Path]::GetFileName($ProtocolEventLogPath)
++      protocol15_runtime_event_report = [System.IO.Path]::GetFileName($ProtocolRuntimeEventReportPath)
++      protocol15_runtime_event_log = [System.IO.Path]::GetFileName($ProtocolRuntimeEventLogPath)
++      protocol15_signon_report = [System.IO.Path]::GetFileName($ProtocolSignonReportPath)
++      protocol15_delivery_report = [System.IO.Path]::GetFileName($ProtocolDeliveryReportPath)
++      protocol15_datagram_report = [System.IO.Path]::GetFileName($ProtocolDatagramReportPath)
++      protocol15_demo_report = [System.IO.Path]::GetFileName($ProtocolDemoReportPath)
++      protocol15_closure_report = [System.IO.Path]::GetFileName($ProtocolClosureReportPath)
++      quakec_progs_report = [System.IO.Path]::GetFileName($QuakeCProgsReportPath)
++      quakec_vm_report = [System.IO.Path]::GetFileName($QuakeCVMReportPath)
++      quakec_edict_report = [System.IO.Path]::GetFileName($QuakeCEdictReportPath)
++      quakec_builtin_report = [System.IO.Path]::GetFileName($QuakeCBuiltinReportPath)
++      quakec_closure_report = [System.IO.Path]::GetFileName($QuakeCClosureReportPath)
++      world_hull_report = [System.IO.Path]::GetFileName($WorldHullReportPath)
++      world_trace_report = [System.IO.Path]::GetFileName($WorldTraceReportPath)
++      world_link_report = [System.IO.Path]::GetFileName($WorldLinkReportPath)
++      server_move_report = [System.IO.Path]::GetFileName($ServerMoveReportPath)
++      server_physics_report = [System.IO.Path]::GetFileName($ServerPhysicsReportPath)
++      sv_user_movement_report = [System.IO.Path]::GetFileName($SvUserMovementReportPath)
++      server_user_report = [System.IO.Path]::GetFileName($ServerUserReportPath)
++      world_physics_closure_report = [System.IO.Path]::GetFileName($WorldPhysicsClosureReportPath)
++      host_timing_report = [System.IO.Path]::GetFileName($HostTimingReportPath)
++      command_cvar_report = [System.IO.Path]::GetFileName($CommandCvarReportPath)
++      demo_lifecycle_report = [System.IO.Path]::GetFileName($DemoLifecycleReportPath)
++      savegame_v5_report = [System.IO.Path]::GetFileName($SavegameV5ReportPath)
++      host_lifecycle_closure_report = [System.IO.Path]::GetFileName($HostLifecycleClosureReportPath)
++      client_state_render_report = [System.IO.Path]::GetFileName($ClientStateRenderReportPath)
++      view_state_report = [System.IO.Path]::GetFileName($ViewStateReportPath)
++      temporary_beam_report = [System.IO.Path]::GetFileName($TemporaryBeamReportPath)
++      particle_runtime_report = [System.IO.Path]::GetFileName($ParticleRuntimeReportPath)
++      client_render_closure_report = [System.IO.Path]::GetFileName($ClientRenderClosureReportPath)
++      world_surface_report = [System.IO.Path]::GetFileName($WorldSurfaceRenderReportPath)
++      lightmap_atlas_report = [System.IO.Path]::GetFileName($LightmapAtlasReportPath)
++      dynamic_light_render_report = [System.IO.Path]::GetFileName($DynamicLightRenderReportPath)
++      sky_water_render_report = [System.IO.Path]::GetFileName($SkyWaterRenderReportPath)
++      world_render_closure_report = [System.IO.Path]::GetFileName($WorldRenderClosureReportPath)
++      alias_model_report = [System.IO.Path]::GetFileName($AliasModelReportPath)
++      sprite_sync_report = [System.IO.Path]::GetFileName($SpriteSyncReportPath)
++      render_ui_hud_report = [System.IO.Path]::GetFileName($RenderUiHudReportPath)
++      render_evidence_report = [System.IO.Path]::GetFileName($RenderEvidenceReportPath)
++      model_ui_render_report = [System.IO.Path]::GetFileName($ModelUiRenderReportPath)
++      render_evidence_comparison = [System.IO.Path]::GetFileName($EvidenceComparisonPath)
++      render_evidence_corpus_comparison = [System.IO.Path]::GetFileName($EvidenceCorpusComparisonPath)
++      render_evidence_corpus_directory = "bp050-054-evidence-corpus"
++      mirror_special_report = [System.IO.Path]::GetFileName($MirrorSpecialReportPath)
++      render_clear_special_report = [System.IO.Path]::GetFileName($RenderClearSpecialReportPath)
++      envmap_timerefresh_report = [System.IO.Path]::GetFileName($EnvmapTimeRefreshReportPath)
++      render_evidence_corpus_report = [System.IO.Path]::GetFileName($RenderEvidenceCorpusReportPath)
++      render_special_closure_report = [System.IO.Path]::GetFileName($RenderSpecialClosureReportPath)
++      render_evidence_directory = "bp050-054-evidence"
++      quakec_stock_log = [System.IO.Path]::GetFileName($QuakeCStockLogPath)
++      game_validation_log = [System.IO.Path]::GetFileName($GameValidationLogPath)
++      runtime_validation_log = [System.IO.Path]::GetFileName($RuntimeValidationLogPath)
++      bisect_report = [System.IO.Path]::GetFileName($BisectReportPath)
++      trace_directory = "bp050-054-traces"
++      independent_failures = @($IndependentFailures)
++    }
++    steps = @($Steps)
++  }
++  $Summary | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $SummaryPath -Encoding UTF8
++
++  if ($TranscriptStarted) {
++    try { Stop-Transcript | Out-Null } catch { }
++  }
++}
++
++if ($OverallStatus -ne "PASS") {
++  Write-Host "MiniQuake $DeliveryRevision acceptance test: FAIL"
++  Write-Host "Run .\COLLECT_RESULTS.ps1 and upload the generated result archive."
++  exit 1
++}
++
++Write-Host "MiniQuake $DeliveryRevision acceptance test: PASS"
++Write-Host "Result summary: $SummaryPath"
++Write-Host "For feedback, run .\COLLECT_RESULTS.ps1 and upload the generated ZIP."
++exit 0
+diff --git a/audit/render_special_closure_golden.json b/audit/render_special_closure_golden.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..0ea2d0e9a38bb24cd4e2f0818bfbcefcc5328793
+--- /dev/null
++++ b/audit/render_special_closure_golden.json
+@@ -0,0 +1 @@
++{"schema":1,"fixtures":24,"total_block_fixtures":104,"status":"render_special_109_frozen_v1","fingerprint":708673665,"special_stage_count":12,"original_reference_external":true}
+diff --git a/build.ps1 b/build.ps1
+index e039d007cb589c94095cf464896b823dced63a53..fef855f4eb9be2cdbdf321baeafce871ae82c4df 100644
+--- a/build.ps1
++++ b/build.ps1
+@@ -26,12 +26,12 @@ $Root = $PSScriptRoot
+ $Output = Join-Path $Root "build"
+ $Source = Join-Path $Root "src"
+ $Parent = Split-Path -Parent $Root
+-$PackageId = "BP-049"
+-$ParentPackageId = "BP-048"
++$PackageId = "BP-054"
++$ParentPackageId = "BP-053"
+ $NativeTextAbi = "caller_owned_bytes_v1"
+ $ProtocolTextAbi = "quake_latin1_cstring_v1"
+-$BlockId = "BP-045-049"
+-$BlockParentPackageId = "BP-040-044R3"
++$BlockId = "BP-050-054"
++$BlockParentPackageId = "BP-045-049R3"
+ $ProtocolStatus = "protocol15_frozen_v1"
+ $QuakeCStatus = "quakec_109_frozen_v1"
+ $WorldPhysicsStatus = "world_physics_109_frozen_v1"
+@@ -39,6 +39,7 @@ $HostLifecycleStatus = "host_lifecycle_109_frozen_v1"
+ $ClientRenderStatus = "client_render_109_frozen_v1"
+ $WorldRenderStatus = "world_render_109_frozen_v1"
+ $ModelUiRenderStatus = "model_ui_render_109_frozen_v1"
++$RenderSpecialStatus = "render_special_109_frozen_v1"
+ 
+ function Resolve-CommandOrFile {
+   param(
+@@ -364,7 +365,12 @@ $PackageBuildArtifacts = @(
+   "MiniQuakeSpriteSyncTests.exe",
+   "MiniQuakeRenderUiHudTests.exe",
+   "MiniQuakeRenderEvidenceTests.exe",
+-  "MiniQuakeModelUiRenderClosureTests.exe"
++  "MiniQuakeModelUiRenderClosureTests.exe",
++  "MiniQuakeMirrorSpecialRenderTests.exe",
++  "MiniQuakeRenderClearSpecialTests.exe",
++  "MiniQuakeEnvmapTimeRefreshTests.exe",
++  "MiniQuakeRenderEvidenceCorpusTests.exe",
++  "MiniQuakeRenderSpecialClosureTests.exe"
+ )
+ foreach ($ArtifactName in $PackageBuildArtifacts) {
+   foreach ($Candidate in @(
+@@ -620,6 +626,24 @@ if (-not $SkipPreflight -and $null -ne $PythonExe) {
+   }
+   & $PythonExe @PythonPrefixArgs (Join-Path $Root "tools\compare_render_evidence.py") --self-test
+   if ($LASTEXITCODE -ne 0) { throw "$PackageId render evidence comparator self-test failed." }
++
++  $RenderSpecialCheckers = @(
++    [ordered]@{ Name = "BP-050 mirror special render"; Path = "tools\check_render_special_050.py" },
++    [ordered]@{ Name = "BP-051 render clear special"; Path = "tools\check_render_special_051.py" },
++    [ordered]@{ Name = "BP-052 envmap/timerefresh"; Path = "tools\check_render_special_052.py" },
++    [ordered]@{ Name = "BP-053 render-evidence corpus"; Path = "tools\check_render_special_053.py" },
++    [ordered]@{ Name = "BP-054 render-special closure"; Path = "tools\check_render_special_054.py" }
++  )
++  foreach ($Checker in $RenderSpecialCheckers) {
++    $CheckerPath = Join-Path $Root $Checker.Path
++    if (-not (Test-Path -LiteralPath $CheckerPath -PathType Leaf)) {
++      throw ($Checker.Name + " checker is missing: " + $CheckerPath)
++    }
++    & $PythonExe @PythonPrefixArgs $CheckerPath --root $Root
++    if ($LASTEXITCODE -ne 0) { throw ($PackageId + " " + $Checker.Name + " preflight failed.") }
++  }
++  & $PythonExe @PythonPrefixArgs (Join-Path $Root "tools\compare_render_corpus.py") --root $Root --self-test
++  if ($LASTEXITCODE -ne 0) { throw "$PackageId render-evidence corpus comparator self-test failed." }
+ } elseif ($SkipPreflight) {
+   Write-Warning "$PackageId diagnostics preflight was explicitly skipped."
+ } else {
+@@ -695,7 +719,7 @@ if (-not $NoRunTests) {
+   Write-Host "[MiniQuake] checking executable package identity"
+   $VersionOutput = @(& $GameExe "--version" 2>&1)
+   $VersionExitCode = [int]$LASTEXITCODE
+-  $VersionOutput | Set-Content -LiteralPath (Join-Path $Output "bp045-049-build-version.txt") -Encoding UTF8
++  $VersionOutput | Set-Content -LiteralPath (Join-Path $Output "bp050-054-build-version.txt") -Encoding UTF8
+   $VersionOutput | ForEach-Object { Write-Host $_ }
+   if ($VersionExitCode -ne 0) {
+     throw "MiniQuake --version failed with exit code $VersionExitCode."
+@@ -739,6 +763,9 @@ if (-not $NoRunTests) {
+   if (-not (($VersionOutput -join "`n") -match [regex]::Escape("Model/UI/render status: $ModelUiRenderStatus"))) {
+     throw "Compiled executable does not identify model/UI/render status $ModelUiRenderStatus."
+   }
++  if (-not (($VersionOutput -join "`n") -match [regex]::Escape("Render-special status: $RenderSpecialStatus"))) {
++    throw "Compiled executable does not identify render-special status $RenderSpecialStatus."
++  }
+ }
+ 
+ function Get-RuntimeTestFailureMarker {
+@@ -838,6 +865,11 @@ $SpriteSyncTestStatus = "SKIPPED"
+ $RenderUiHudTestStatus = "SKIPPED"
+ $RenderEvidenceTestStatus = "SKIPPED"
+ $ModelUiRenderClosureTestStatus = "SKIPPED"
++$MirrorSpecialTestStatus = "SKIPPED"
++$RenderClearSpecialTestStatus = "SKIPPED"
++$EnvmapTimeRefreshTestStatus = "SKIPPED"
++$RenderEvidenceCorpusTestStatus = "SKIPPED"
++$RenderSpecialClosureTestStatus = "SKIPPED"
+ $NetworkTestStatus = "SKIPPED"
+ 
+ if (-not $SkipTests) {
+@@ -1079,6 +1111,31 @@ if (-not $SkipTests) {
+   Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\model_ui_render_closure_tests.ml") -OutputFile $ModelUiRenderClosureTestExe -CompilerArguments $CommonArgs -Label "model-ui-render-closure-tests"
+   $ModelUiRenderClosureTestStatus = "COMPILED"
+ 
++  $MirrorSpecialTestExe = Join-Path $Output "MiniQuakeMirrorSpecialRenderTests.exe"
++  Write-Host "[MiniQuake] compiling $MirrorSpecialTestExe"
++  Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\mirror_special_render_tests.ml") -OutputFile $MirrorSpecialTestExe -CompilerArguments $CommonArgs -Label "mirror-special-render-tests"
++  $MirrorSpecialTestStatus = "COMPILED"
++
++  $RenderClearSpecialTestExe = Join-Path $Output "MiniQuakeRenderClearSpecialTests.exe"
++  Write-Host "[MiniQuake] compiling $RenderClearSpecialTestExe"
++  Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\render_clear_special_tests.ml") -OutputFile $RenderClearSpecialTestExe -CompilerArguments $CommonArgs -Label "render-clear-special-tests"
++  $RenderClearSpecialTestStatus = "COMPILED"
++
++  $EnvmapTimeRefreshTestExe = Join-Path $Output "MiniQuakeEnvmapTimeRefreshTests.exe"
++  Write-Host "[MiniQuake] compiling $EnvmapTimeRefreshTestExe"
++  Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\envmap_timerefresh_tests.ml") -OutputFile $EnvmapTimeRefreshTestExe -CompilerArguments $CommonArgs -Label "envmap-timerefresh-tests"
++  $EnvmapTimeRefreshTestStatus = "COMPILED"
++
++  $RenderEvidenceCorpusTestExe = Join-Path $Output "MiniQuakeRenderEvidenceCorpusTests.exe"
++  Write-Host "[MiniQuake] compiling $RenderEvidenceCorpusTestExe"
++  Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\render_evidence_corpus_tests.ml") -OutputFile $RenderEvidenceCorpusTestExe -CompilerArguments $CommonArgs -Label "render-evidence-corpus-tests"
++  $RenderEvidenceCorpusTestStatus = "COMPILED"
++
++  $RenderSpecialClosureTestExe = Join-Path $Output "MiniQuakeRenderSpecialClosureTests.exe"
++  Write-Host "[MiniQuake] compiling $RenderSpecialClosureTestExe"
++  Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\render_special_closure_tests.ml") -OutputFile $RenderSpecialClosureTestExe -CompilerArguments $CommonArgs -Label "render-special-closure-tests"
++  $RenderSpecialClosureTestStatus = "COMPILED"
++
+   if (-not $NoRunTests) {
+     Invoke-MiniQuakeTestBinary `
+       -Label "core tests" `
+@@ -1364,6 +1421,37 @@ if (-not $SkipTests) {
+       -Executable $ModelUiRenderClosureTestExe `
+       -ProgressHint "The last printed [NN/24] line identifies the active frozen model/UI/render fixture."
+     $ModelUiRenderClosureTestStatus = "PASS"
++
++
++    Invoke-MiniQuakeTestBinary `
++      -Label "BP-050 mirror special-render tests" `
++      -Executable $MirrorSpecialTestExe `
++      -ProgressHint "The last printed [NN/22] line identifies the active mirror reflection or entity-handoff fixture."
++    $MirrorSpecialTestStatus = "PASS"
++
++    Invoke-MiniQuakeTestBinary `
++      -Label "BP-051 render-clear special tests" `
++      -Executable $RenderClearSpecialTestExe `
++      -ProgressHint "The last printed [NN/20] line identifies the active clear, z-trick, finish or norefresh fixture."
++    $RenderClearSpecialTestStatus = "PASS"
++
++    Invoke-MiniQuakeTestBinary `
++      -Label "BP-052 envmap/timerefresh tests" `
++      -Executable $EnvmapTimeRefreshTestExe `
++      -ProgressHint "The last printed [NN/20] line identifies the active envmap or timerefresh fixture."
++    $EnvmapTimeRefreshTestStatus = "PASS"
++
++    Invoke-MiniQuakeTestBinary `
++      -Label "BP-053 render-evidence corpus tests" `
++      -Executable $RenderEvidenceCorpusTestExe `
++      -ProgressHint "The last printed [NN/18] line identifies the active corpus schema or threshold fixture."
++    $RenderEvidenceCorpusTestStatus = "PASS"
++
++    Invoke-MiniQuakeTestBinary `
++      -Label "BP-054 render-special closure tests" `
++      -Executable $RenderSpecialClosureTestExe `
++      -ProgressHint "The last printed [NN/24] line identifies the active frozen special-render fixture."
++    $RenderSpecialClosureTestStatus = "PASS"
+   }
+ }
+ 
+@@ -1380,6 +1468,6 @@ if ($NetworkTests -and -not $NoRunTests) {
+   $NetworkTestStatus = "COMPILED-NOT-RUN"
+ }
+ 
+-Write-Host "[MiniQuake] test summary: core=$CoreTestStatus milestone=$MilestoneTestStatus diagnostics=$DiagnosticsTestStatus protocol15=$ProtocolTestStatus protocol15_commands=$ProtocolCommandTestStatus protocol15_serverdata=$ProtocolServerDataTestStatus protocol15_events=$ProtocolEventTestStatus protocol15_runtime_events=$ProtocolRuntimeEventTestStatus protocol15_signon=$ProtocolSignonTestStatus protocol15_delivery=$ProtocolDeliveryTestStatus protocol15_datagram=$ProtocolDatagramTestStatus protocol15_demo=$ProtocolDemoTestStatus protocol15_closure=$ProtocolClosureTestStatus quakec_progs=$QuakeCProgsTestStatus quakec_vm=$QuakeCVMTestStatus quakec_edicts=$QuakeCEdictTestStatus quakec_builtins=$QuakeCBuiltinTestStatus quakec_closure=$QuakeCClosureTestStatus quakec_stock=$QuakeCStockTestStatus world_hull=$WorldHullTestStatus world_trace=$WorldTraceTestStatus world_link=$WorldLinkTestStatus server_move=$ServerMoveTestStatus server_physics=$ServerPhysicsTestStatus sv_user_movement=$SvUserMovementTestStatus server_user=$ServerUserTestStatus world_physics_closure=$WorldPhysicsClosureTestStatus host_timing=$HostTimingTestStatus command_cvar=$CommandCvarTestStatus demo_lifecycle=$DemoLifecycleTestStatus savegame_v5=$SavegameV5TestStatus host_lifecycle_closure=$HostLifecycleClosureTestStatus client_state_render=$ClientStateRenderTestStatus view_state=$ViewStateTestStatus temporary_beams=$TemporaryBeamTestStatus particle_runtime=$ParticleRuntimeTestStatus client_render_closure=$ClientRenderClosureTestStatus world_surfaces=$WorldSurfaceRenderTestStatus lightmap_atlas=$LightmapAtlasTestStatus dynamic_light_render=$DynamicLightRenderTestStatus sky_water=$SkyWaterRenderTestStatus world_render_closure=$WorldRenderClosureTestStatus alias_model=$AliasModelTestStatus sprite_sync=$SpriteSyncTestStatus render_ui_hud=$RenderUiHudTestStatus render_evidence=$RenderEvidenceTestStatus model_ui_render_closure=$ModelUiRenderClosureTestStatus network=$NetworkTestStatus"
++Write-Host "[MiniQuake] test summary: core=$CoreTestStatus milestone=$MilestoneTestStatus diagnostics=$DiagnosticsTestStatus protocol15=$ProtocolTestStatus protocol15_commands=$ProtocolCommandTestStatus protocol15_serverdata=$ProtocolServerDataTestStatus protocol15_events=$ProtocolEventTestStatus protocol15_runtime_events=$ProtocolRuntimeEventTestStatus protocol15_signon=$ProtocolSignonTestStatus protocol15_delivery=$ProtocolDeliveryTestStatus protocol15_datagram=$ProtocolDatagramTestStatus protocol15_demo=$ProtocolDemoTestStatus protocol15_closure=$ProtocolClosureTestStatus quakec_progs=$QuakeCProgsTestStatus quakec_vm=$QuakeCVMTestStatus quakec_edicts=$QuakeCEdictTestStatus quakec_builtins=$QuakeCBuiltinTestStatus quakec_closure=$QuakeCClosureTestStatus quakec_stock=$QuakeCStockTestStatus world_hull=$WorldHullTestStatus world_trace=$WorldTraceTestStatus world_link=$WorldLinkTestStatus server_move=$ServerMoveTestStatus server_physics=$ServerPhysicsTestStatus sv_user_movement=$SvUserMovementTestStatus server_user=$ServerUserTestStatus world_physics_closure=$WorldPhysicsClosureTestStatus host_timing=$HostTimingTestStatus command_cvar=$CommandCvarTestStatus demo_lifecycle=$DemoLifecycleTestStatus savegame_v5=$SavegameV5TestStatus host_lifecycle_closure=$HostLifecycleClosureTestStatus client_state_render=$ClientStateRenderTestStatus view_state=$ViewStateTestStatus temporary_beams=$TemporaryBeamTestStatus particle_runtime=$ParticleRuntimeTestStatus client_render_closure=$ClientRenderClosureTestStatus world_surfaces=$WorldSurfaceRenderTestStatus lightmap_atlas=$LightmapAtlasTestStatus dynamic_light_render=$DynamicLightRenderTestStatus sky_water=$SkyWaterRenderTestStatus world_render_closure=$WorldRenderClosureTestStatus alias_model=$AliasModelTestStatus sprite_sync=$SpriteSyncTestStatus render_ui_hud=$RenderUiHudTestStatus render_evidence=$RenderEvidenceTestStatus model_ui_render_closure=$ModelUiRenderClosureTestStatus mirror_special=$MirrorSpecialTestStatus render_clear_special=$RenderClearSpecialTestStatus envmap_timerefresh=$EnvmapTimeRefreshTestStatus render_evidence_corpus=$RenderEvidenceCorpusTestStatus render_special_closure=$RenderSpecialClosureTestStatus network=$NetworkTestStatus"
+ Write-Host "[MiniQuake] build completed: $GameExe"
+ exit 0
+diff --git a/docs/BP-045-049R3_ACCEPTANCE_ANALYSIS.md b/docs/BP-045-049R3_ACCEPTANCE_ANALYSIS.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c56ea8c4612f03d358062028fcba0ba98ae562a0
+--- /dev/null
++++ b/docs/BP-045-049R3_ACCEPTANCE_ANALYSIS.md
+@@ -0,0 +1,21 @@
++# BP-045-BP-049R3 Windows acceptance
++
++The user-returned archive `MiniQuake_BP-045-049R3_RESULTS_20260728-000010.zip` completed the full Windows acceptance run.
++
++- Status: PASS
++- Steps: 112/112 PASS
++- Installed `id1/start`: PASS
++- Headless runtime: 300 frames PASS
++- Compatibility traces: two independent 128-frame traces, byte-identical
++- Trace SHA-256: `b2589f2712b0aed42f31b1a35ebb4837c211391ba3e8d8888c422242d051af28`
++- Rolling hash: `d905b042`
++- Visible framebuffer evidence: two independent 640x480 captures, byte-identical
++- Evidence TGA SHA-256: `1325e6fd365c1e62fbf36c4fadcbe9110faa94778c4c14b43fa9efe56d35e154`
++- Pixel hash: `55f9fc9c`
++- Sample hash: `3ec42fe3`
++- Evidence SSIM: `1.0`
++- Capture stage: `after_ui_before_swap`
++- UDP loopback: PASS
++- Result archive SHA-256: `65bb521faf300fed61b7d03e15429896a31de27d934ee59459e251fac08bd2bf`
++
++This accepts `model_ui_render_109_frozen_v1` with fingerprint `0x0a62f5b1` as the parent contract for BP-050-BP-054.
+diff --git a/docs/BP-050-054_BLOCK_LEDGER.json b/docs/BP-050-054_BLOCK_LEDGER.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..6709e8f18a142188bec0654edffa5ce6d63a9f71
+--- /dev/null
++++ b/docs/BP-050-054_BLOCK_LEDGER.json
+@@ -0,0 +1,94 @@
++{
++  "schema_version": 1,
++  "project": "MiniQuake",
++  "block_id": "BP-050-054",
++  "parent_package_id": "BP-045-049R3",
++  "final_package_id": "BP-054",
++  "delivery_revision": "BP-050-054",
++  "protocol_status": "protocol15_frozen_v1",
++  "quakec_status": "quakec_109_frozen_v1",
++  "world_physics_status": "world_physics_109_frozen_v1",
++  "host_lifecycle_status": "host_lifecycle_109_frozen_v1",
++  "client_render_status": "client_render_109_frozen_v1",
++  "client_render_fingerprint": "0x95e2b295",
++  "world_render_status": "world_render_109_frozen_v1",
++  "world_render_fingerprint": "0x846a74de",
++  "model_ui_render_status": "model_ui_render_109_frozen_v1",
++  "model_ui_render_fingerprint": "0x0a62f5b1",
++  "render_special_status": "render_special_109_frozen_v1",
++  "render_special_fingerprint": "0x2a3d8081",
++  "steps": [
++    {
++      "package_id": "BP-050",
++      "title": "mirror reflection and overlay parity",
++      "patch": "patches/BP-050.diff",
++      "runtime_fixtures": 22,
++      "status": "implemented; Windows acceptance pending"
++    },
++    {
++      "package_id": "BP-051",
++      "title": "clear, z-trick, finish and no-refresh parity",
++      "patch": "patches/BP-051.diff",
++      "runtime_fixtures": 20,
++      "status": "implemented; Windows acceptance pending"
++    },
++    {
++      "package_id": "BP-052",
++      "title": "envmap and timerefresh parity",
++      "patch": "patches/BP-052.diff",
++      "runtime_fixtures": 20,
++      "status": "implemented; Windows acceptance pending"
++    },
++    {
++      "package_id": "BP-053",
++      "title": "multi-scene render-evidence corpus",
++      "patch": "patches/BP-053.diff",
++      "runtime_fixtures": 18,
++      "status": "implemented; Windows acceptance pending"
++    },
++    {
++      "package_id": "BP-054",
++      "title": "special-render closure contract",
++      "patch": "patches/BP-054.diff",
++      "runtime_fixtures": 24,
++      "status": "implemented; Windows acceptance pending"
++    }
++  ],
++  "block_runtime_fixtures": 104,
++  "accepted_parent": {
++    "delivery_revision": "BP-045-049R3",
++    "status": "PASS",
++    "result_archive": "MiniQuake_BP-045-049R3_RESULTS_20260728-000010.zip",
++    "result_archive_sha256": "65bb521faf300fed61b7d03e15429896a31de27d934ee59459e251fac08bd2bf",
++    "headless_frames": 300,
++    "trace_frames": 128,
++    "trace_sha256": "b2589f2712b0aed42f31b1a35ebb4837c211391ba3e8d8888c422242d051af28",
++    "trace_rolling_hash": "d905b042",
++    "trace_byte_identity": "PASS",
++    "render_tga_sha256": "1325e6fd365c1e62fbf36c4fadcbe9110faa94778c4c14b43fa9efe56d35e154",
++    "render_pixel_hash": "55f9fc9c",
++    "render_sample_hash": "3ec42fe3",
++    "render_ssim": 1.0,
++    "render_identity": "PASS",
++    "udp_loopback": "PASS"
++  },
++  "acceptance": {
++    "build_once": true,
++    "continue_independent_tests": true,
++    "installed_game_validation": true,
++    "default_headless_frames": 300,
++    "default_trace_frames": 128,
++    "single_render_evidence_frame": 128,
++    "corpus_scenarios": 3,
++    "mini_pair_exact_identity": true,
++    "optional_original_ssim_floor": 0.95,
++    "udp_loopback": true
++  },
++  "scope_boundary": {
++    "original_glquake_reference_images": "external optional corpus; not bundled",
++    "current_visual_evidence": "three independent MiniQuake A/B exact pairs; optional Original GLQuake SSIM gate",
++    "modern_renderer_backend": "later block",
++    "frozen_parent_contracts": "unchanged"
++  },
++  "status": "implemented; BP-050-054 Windows acceptance pending"
++}
+diff --git a/docs/BP-050-054_TESTING.md b/docs/BP-050-054_TESTING.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b04ce3943dc6cc0f1e30d73b0e819f0169c43435
+--- /dev/null
++++ b/docs/BP-050-054_TESTING.md
+@@ -0,0 +1,46 @@
++# BP-050-BP-054 Windows acceptance
++
++Extract the complete ZIP into a new empty directory. Set `QuakeBase` to the directory containing `id1\pak0.pak`.
++
++```powershell
++$QuakeBase = "C:\Path\To\Quake"
++Test-Path "$QuakeBase\id1\pak0.pak"
++
++.\TEST_BP-050-054.ps1 `
++  -Compiler C:\Users\nilsk\Desktop\MiniLangCompilerPy\mlc_win64.py `
++  -StdLib C:\Users\nilsk\Desktop\MiniLangCompilerPy `
++  -QuakeBase $QuakeBase `
++  -Game id1 `
++  -Map start `
++  -Frames 300 `
++  -TraceFrames 128 `
++  -RenderEvidenceFrame 128 `
++  -NetworkTests `
++  -ContinueIndependentTests `
++  -BisectOnFailure
++```
++
++An optional Original GLQuake corpus can be supplied with:
++
++```powershell
++-OriginalRenderReference C:\Path\To\OriginalGLQuakeCaptures
++```
++
++That directory must contain `start-064.tga`, `start-128.tga`, and `e1m1-128.tga`. Without it, exact MiniQuake A/B corpus determinism is still mandatory and the Original comparison is explicitly marked SKIPPED.
++
++Expected new test markers:
++
++```text
++MiniQuake BP-050 mirror special-render tests passed: 22
++MiniQuake BP-051 render-clear special tests passed: 20
++MiniQuake BP-052 envmap/timerefresh tests passed: 20
++MiniQuake BP-053 render-evidence corpus tests passed: 18
++MiniQuake BP-054 render-special closure tests passed: 24
++MiniQuake BP-050-054 acceptance test: PASS
++```
++
++After the run:
++
++```powershell
++.\COLLECT_RESULTS.ps1
++```
+diff --git a/docs/BP-054_RENDER_SPECIAL_CLOSURE_AUDIT.md b/docs/BP-054_RENDER_SPECIAL_CLOSURE_AUDIT.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..9ead74ed2ed0a92f0c201813185ab3ae2af9ffcc
+--- /dev/null
++++ b/docs/BP-054_RENDER_SPECIAL_CLOSURE_AUDIT.md
+@@ -0,0 +1,9 @@
++# BP-054 special-render closure
++
++Candidate contract: `render_special_109_frozen_v1`
++
++Fingerprint: `0x2a3d8081`
++
++The contract binds mirror discovery/reflection, R_Clear and z-trick, envmap/timerefresh constants, the three-scenario deterministic evidence corpus, a 0.95 external-reference SSIM floor, and the 12-stage special render order.
++
++Asset-free fixtures: 24. Total block fixtures: 104.
+diff --git a/src/main.ml b/src/main.ml
+index 5cb75491188fc5f843f7621485924fd5be31ce77..181b01b39f9529a457187122fa299d54220320e1 100644
+--- a/src/main.ml
++++ b/src/main.ml
+@@ -394,6 +394,8 @@ function runSelfCheck()
+   print "World/render fingerprint: 0x846a74de"
+   print "Model/UI/render status: " + buildInfo.MODEL_UI_RENDER_STATUS
+   print "Model/UI/render fingerprint: 0x0a62f5b1"
++  print "Render-special status: " + buildInfo.RENDER_SPECIAL_STATUS
++  print "Render-special fingerprint: 0x2a3d8081"
+   print "Package purpose: " + buildInfo.PACKAGE_PURPOSE
+   print "Compatibility profile: " + buildInfo.COMPATIBILITY_PROFILE
+   print "Native text ABI: " + buildInfo.NATIVE_TEXT_ABI
+@@ -401,7 +403,7 @@ function runSelfCheck()
+   print "Package date: " + buildInfo.PACKAGE_DATE
+   print "Baseline archive SHA-256: " + buildInfo.BASE_ARCHIVE_SHA256
+   print "Core CRC self-check: 0x" + hex(bytes([(check >> 8) & 255, check & 255]))
+-  print "Port status: BP-049 freezes GLQuake 1.09 alias/sprite behavior, 2D/HUD composition and deterministic framebuffer evidence on top of the accepted world renderer."
++  print "Port status: BP-054 freezes GLQuake 1.09 mirror, z-trick, envmap/timerefresh and multi-scene render-evidence behavior on top of the accepted model/UI renderer."
+   return 0
+ end function
+ 
+diff --git a/src/miniquake/build_info.ml b/src/miniquake/build_info.ml
+index 3e004e437d564d1de78c38a2075076fab932d39c..32b2d83ee58eb56908be00cb4b7f612058389ec9 100644
+--- a/src/miniquake/build_info.ml
++++ b/src/miniquake/build_info.ml
+@@ -8,17 +8,17 @@ back to an exact source baseline.
+ 
+ package miniquake.build_info
+ 
+-const PACKAGE_ID = "BP-049"
+-const PARENT_PACKAGE_ID = "BP-048"
+-const PACKAGE_DATE = "2026-07-27"
++const PACKAGE_ID = "BP-054"
++const PARENT_PACKAGE_ID = "BP-053"
++const PACKAGE_DATE = "2026-07-28"
+ const COMPATIBILITY_PROFILE = "compat_109"
+ const NATIVE_TEXT_ABI = "caller_owned_bytes_v1"
+ const PROTOCOL_TEXT_ABI = "quake_latin1_cstring_v1"
+ const BASE_ARCHIVE = "MiniQuake_Source24.07.2026.zip"
+ const BASE_ARCHIVE_SHA256 = "bb2b5bf173fe687cada6e7fec2dcdb8b2099589f2ebc039417a5571ced9729d3"
+ const MANIFEST_FORMAT = 1
+-const BLOCK_ID = "BP-045-049"
+-const BLOCK_PARENT_PACKAGE_ID = "BP-040-044R3"
++const BLOCK_ID = "BP-050-054"
++const BLOCK_PARENT_PACKAGE_ID = "BP-045-049R3"
+ const PROTOCOL_STATUS = "protocol15_frozen_v1"
+ const QUAKEC_STATUS = "quakec_109_frozen_v1"
+ const WORLD_PHYSICS_STATUS = "world_physics_109_frozen_v1"
+@@ -30,4 +30,6 @@ const WORLD_RENDER_STATUS = "world_render_109_frozen_v1"
+ const WORLD_RENDER_FINGERPRINT = 0x846a74de
+ const MODEL_UI_RENDER_STATUS = "model_ui_render_109_frozen_v1"
+ const MODEL_UI_RENDER_FINGERPRINT = 0x0a62f5b1
+-const PACKAGE_PURPOSE = "Frozen GLQuake 1.09 alias, sprite, 2D/HUD render and deterministic framebuffer-evidence compatibility contract"
++const RENDER_SPECIAL_STATUS = "render_special_109_frozen_v1"
++const RENDER_SPECIAL_FINGERPRINT = 0x2a3d8081
++const PACKAGE_PURPOSE = "Frozen GLQuake 1.09 mirrors, clear/z-trick, envmap, timerefresh and multi-scene render-evidence compatibility contract"
+diff --git a/src/miniquake/render_special_contract.ml b/src/miniquake/render_special_contract.ml
+new file mode 100644
+index 0000000000000000000000000000000000000000..ba34fad9080ce655733cd65771e1f19b3e80b2bb
+--- /dev/null
++++ b/src/miniquake/render_special_contract.ml
+@@ -0,0 +1,55 @@
++/* Frozen GLQuake 1.09 special-render and evidence-corpus contract. */
++package miniquake.render_special_contract
++
++import miniquake.render.special_paths as special
++import miniquake.render_evidence_corpus as corpus
++import miniquake.model_ui_render_contract as parent
++
++const STATUS = "render_special_109_frozen_v1"
++const FINGERPRINT = 0x2a3d8081
++const MIRROR_PREFIX_BYTES = 10
++const MIRROR_DEPTH_SPLIT_MILLI = 500
++const ZTRICK_ODD_DEPTH_MICRO = 499990
++const ENVMAP_SIZE = 256
++const ENVMAP_FACES = 6
++const TIMEREFRESH_STEPS = 128
++const EVIDENCE_SCENARIOS = 3
++const ORIGINAL_SSIM_MILLI = 950
++const EXACT_PAIR_REQUIRED = 1
++const SPECIAL_RENDER_STAGE_COUNT = 12
++const ORIGINAL_REFERENCE_EXTERNAL = 1
++const PARENT_STATUS = "model_ui_render_109_frozen_v1"
++
++function status()
++  return STATUS
++end function
++
++function fingerprint()
++  return FINGERPRINT
++end function
++
++function constants()
++  return [
++    MIRROR_PREFIX_BYTES,
++    MIRROR_DEPTH_SPLIT_MILLI,
++    ZTRICK_ODD_DEPTH_MICRO,
++    ENVMAP_SIZE,
++    ENVMAP_FACES,
++    TIMEREFRESH_STEPS,
++    EVIDENCE_SCENARIOS,
++    ORIGINAL_SSIM_MILLI,
++    EXACT_PAIR_REQUIRED,
++    SPECIAL_RENDER_STAGE_COUNT,
++    ORIGINAL_REFERENCE_EXTERNAL,
++  ]
++end function
++
++function verify()
++  if parent.status() != PARENT_STATUS then return false end if
++  if special.ENVMAP_SIZE != ENVMAP_SIZE then return false end if
++  if special.ENVMAP_FACES != ENVMAP_FACES then return false end if
++  if special.TIMEREFRESH_STEPS != TIMEREFRESH_STEPS then return false end if
++  if corpus.count() != EVIDENCE_SCENARIOS then return false end if
++  if corpus.ORIGINAL_SSIM_MILLI != ORIGINAL_SSIM_MILLI then return false end if
++  return true
++end function
+diff --git a/test.ps1 b/test.ps1
+index b7f2789c660998e200bc18568dd84db9e0ec0a69..3873da81f5abfdf29b746a9b65303790e6931dff 100644
+--- a/test.ps1
++++ b/test.ps1
+@@ -1 +1 @@
+-﻿& (Join-Path $PSScriptRoot "TEST_BP-045-049R3.ps1") @args
++﻿& "$PSScriptRoot\TEST_BP-050-054.ps1" @args
+diff --git a/tests/render_special_closure_tests.ml b/tests/render_special_closure_tests.ml
+new file mode 100644
+index 0000000000000000000000000000000000000000..e82478d87b5024812f6c020cd348f88988b9229f
+--- /dev/null
++++ b/tests/render_special_closure_tests.ml
+@@ -0,0 +1,158 @@
++/* BP-054: frozen GLQuake special-render and evidence-corpus contract. */
++import miniquake.render_special_contract as bp054Contract
++import miniquake.render.special_paths as bp054Special
++import miniquake.render_evidence_corpus as bp054Corpus
++import miniquake.model_ui_render_contract as bp054Parent
++import miniquake.host as bp054Host
++import miniquake.cvar as bp054Cvar
++import miniquake.types as bp054Types
++
++function bp054Equal(actual, expected, name)
++  if actual != expected then return error(5400, name + ": expected " + expected + ", got " + actual) end if
++  return true
++end function
++function bp054Yes(value, name)
++  if not value then return error(5401, name + ": expected true") end if
++  return true
++end function
++function bp054Run(number, name, fn)
++  print "[" + number + "/24] " + name
++  result = try(fn())
++  if result is error then print "FAIL: " + result.message; return false end if
++  return true
++end function
++function bp054Status()
++  bp054Equal(bp054Contract.status(), "render_special_109_frozen_v1", "status")
++  return true
++end function
++function bp054Fingerprint()
++  bp054Equal(bp054Contract.fingerprint(), 708673665, "fingerprint")
++  return true
++end function
++function bp054Verify()
++  bp054Yes(bp054Contract.verify(), "contract verification")
++  return true
++end function
++function bp054ParentStatus()
++  bp054Equal(bp054Parent.status(), "model_ui_render_109_frozen_v1", "parent status")
++  return true
++end function
++function bp054MirrorPrefix()
++  bp054Equal(bp054Contract.MIRROR_PREFIX_BYTES, 10, "mirror prefix bytes")
++  return true
++end function
++function bp054MirrorDepth()
++  bp054Equal(bp054Contract.MIRROR_DEPTH_SPLIT_MILLI, 500, "mirror depth split")
++  return true
++end function
++function bp054ZTrickDepth()
++  bp054Equal(bp054Contract.ZTRICK_ODD_DEPTH_MICRO, 499990, "ztrick depth")
++  return true
++end function
++function bp054EnvmapSize()
++  bp054Equal(bp054Contract.ENVMAP_SIZE, 256, "envmap size")
++  return true
++end function
++function bp054EnvmapFaces()
++  bp054Equal(bp054Contract.ENVMAP_FACES, 6, "envmap faces")
++  return true
++end function
++function bp054TimeRefresh()
++  bp054Equal(bp054Contract.TIMEREFRESH_STEPS, 128, "timerefresh steps")
++  return true
++end function
++function bp054CorpusCount()
++  bp054Equal(bp054Contract.EVIDENCE_SCENARIOS, 3, "corpus scenarios")
++  return true
++end function
++function bp054Ssim()
++  bp054Equal(bp054Contract.ORIGINAL_SSIM_MILLI, 950, "original SSIM")
++  return true
++end function
++function bp054ExactPair()
++  bp054Equal(bp054Contract.EXACT_PAIR_REQUIRED, 1, "exact process pair")
++  return true
++end function
++function bp054ExternalReference()
++  bp054Equal(bp054Contract.ORIGINAL_REFERENCE_EXTERNAL, 1, "external original reference")
++  return true
++end function
++function bp054StageCount()
++  bp054Equal(len(bp054Special.specialRenderStageOrder()), 12, "stage count")
++  return true
++end function
++function bp054StageClear()
++  bp054Equal(bp054Special.specialRenderStageOrder()[0], "clear", "first stage")
++  return true
++end function
++function bp054StageMirror()
++  stages = bp054Special.specialRenderStageOrder()
++  bp054Equal(stages[6], "mirror_scene", "mirror scene stage")
++  bp054Equal(stages[8], "mirror_overlay", "mirror overlay stage")
++  return true
++end function
++function bp054StageCapture()
++  stages = bp054Special.specialRenderStageOrder()
++  bp054Equal(stages[11], "capture_before_swap", "capture stage")
++  return true
++end function
++function bp054CorpusDimensions()
++  bp054Equal(bp054Corpus.CAPTURE_WIDTH, 640, "corpus width")
++  bp054Equal(bp054Corpus.CAPTURE_HEIGHT, 480, "corpus height")
++  return true
++end function
++function bp054CorpusMaps()
++  bp054Equal(bp054Corpus.mapName(0), "start", "start map")
++  bp054Equal(bp054Corpus.mapName(2), "e1m1", "e1m1 map")
++  return true
++end function
++function bp054Cvars()
++  registry = bp054Host.createCvars("", true)
++  bp054Equal(bp054Cvar.variableValue(registry, "r_mirroralpha"), 1.0, "mirror alpha default")
++  bp054Equal(bp054Cvar.variableValue(registry, "r_norefresh"), 0.0, "norefresh default")
++  bp054Equal(bp054Cvar.variableValue(registry, "gl_finish"), 0.0, "finish default")
++  bp054Equal(bp054Cvar.variableValue(registry, "gl_clear"), 0.0, "clear default")
++  return true
++end function
++function bp054ProjectionFloor()
++  value = bp054Special.mirrorProjectionScale(bp054Types.Plane(bp054Types.Vec3(0.0, 0.0, 1.0), 0.0, 2, 0))
++  bp054Equal(value.y, -1.0, "floor projection")
++  return true
++end function
++function bp054ClearOdd()
++  value = bp054Special.clearPlan(1.0, false, true, 0)
++  bp054Equal(value[4], 1, "odd trick frame")
++  return true
++end function
++function bp054Vector()
++  bp054Equal(len(bp054Contract.constants()), 11, "contract vector length")
++  return true
++end function
++
++passed = 0
++if bp054Run(1, "contract status", bp054Status) then passed = passed + 1 end if
++if bp054Run(2, "contract fingerprint", bp054Fingerprint) then passed = passed + 1 end if
++if bp054Run(3, "contract verification", bp054Verify) then passed = passed + 1 end if
++if bp054Run(4, "parent contract", bp054ParentStatus) then passed = passed + 1 end if
++if bp054Run(5, "mirror prefix bytes", bp054MirrorPrefix) then passed = passed + 1 end if
++if bp054Run(6, "mirror depth split", bp054MirrorDepth) then passed = passed + 1 end if
++if bp054Run(7, "ztrick odd depth", bp054ZTrickDepth) then passed = passed + 1 end if
++if bp054Run(8, "envmap size", bp054EnvmapSize) then passed = passed + 1 end if
++if bp054Run(9, "envmap faces", bp054EnvmapFaces) then passed = passed + 1 end if
++if bp054Run(10, "timerefresh steps", bp054TimeRefresh) then passed = passed + 1 end if
++if bp054Run(11, "evidence scenario count", bp054CorpusCount) then passed = passed + 1 end if
++if bp054Run(12, "original SSIM threshold", bp054Ssim) then passed = passed + 1 end if
++if bp054Run(13, "exact process pair", bp054ExactPair) then passed = passed + 1 end if
++if bp054Run(14, "external original reference", bp054ExternalReference) then passed = passed + 1 end if
++if bp054Run(15, "special stage count", bp054StageCount) then passed = passed + 1 end if
++if bp054Run(16, "clear stage", bp054StageClear) then passed = passed + 1 end if
++if bp054Run(17, "mirror stages", bp054StageMirror) then passed = passed + 1 end if
++if bp054Run(18, "capture stage", bp054StageCapture) then passed = passed + 1 end if
++if bp054Run(19, "corpus dimensions", bp054CorpusDimensions) then passed = passed + 1 end if
++if bp054Run(20, "corpus maps", bp054CorpusMaps) then passed = passed + 1 end if
++if bp054Run(21, "special cvar defaults", bp054Cvars) then passed = passed + 1 end if
++if bp054Run(22, "mirror projection sample", bp054ProjectionFloor) then passed = passed + 1 end if
++if bp054Run(23, "ztrick sample", bp054ClearOdd) then passed = passed + 1 end if
++if bp054Run(24, "contract vector", bp054Vector) then passed = passed + 1 end if
++if passed != 24 then print "MiniQuake BP-054 render-special closure tests failed: " + passed + "/24"; error(5499, "BP-054 render special closure") end if
++print "MiniQuake BP-054 render-special closure tests passed: 24"
+diff --git a/tools/bp049_model_ui_render_checker.py b/tools/bp049_model_ui_render_checker.py
+index 14b152747acb6663a5d6d9e3ae666d9c30c85ebd..feb4455fd485a8da44f223c53b8f537479b5a478 100644
+--- a/tools/bp049_model_ui_render_checker.py
++++ b/tools/bp049_model_ui_render_checker.py
+@@ -18,9 +18,11 @@ if "MiniQuake BP-049 model/UI/render closure tests passed: 24" not in test:
+     errors.append("BP-049 fixture marker differs")
+ if test.count("bp049Run(") != 25:
+     errors.append("BP-049 test does not contain 24 fixture calls")
++# The closure contract remains a frozen parent of later deliveries.  Package
++# identity advances from BP-049 onward, so this component checker binds only
++# the status and fingerprint; the active delivery verifier owns PACKAGE_ID,
++# PARENT_PACKAGE_ID and BLOCK_ID.
+ for marker in (
+-    'const PACKAGE_ID = "BP-049"', 'const PARENT_PACKAGE_ID = "BP-048"',
+-    'const BLOCK_ID = "BP-045-049"',
+     'const MODEL_UI_RENDER_STATUS = "model_ui_render_109_frozen_v1"',
+     'const MODEL_UI_RENDER_FINGERPRINT = 0x0a62f5b1',
+ ):
+diff --git a/tools/check_render_special_054.py b/tools/check_render_special_054.py
+new file mode 100755
+index 0000000000000000000000000000000000000000..22591f9a3262e6622a4b372cc4c6d7aee6197775
+--- /dev/null
++++ b/tools/check_render_special_054.py
+@@ -0,0 +1,34 @@
++#!/usr/bin/env python3
++from __future__ import annotations
++import argparse, json, pathlib
++
++def emit_report(path, name, passed, details, errors):
++    if not path:
++        return
++    payload = {"schema": 1, "check": name, "status": "PASS" if passed else "FAIL", "passed": passed, "details": details, "errors": errors}
++    pathlib.Path(path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
++
++def main() -> int:
++    ap=argparse.ArgumentParser(); ap.add_argument('--root', default=str(pathlib.Path(__file__).resolve().parents[1])); ap.add_argument('--json-output'); a=ap.parse_args(); root=pathlib.Path(a.root).resolve(); errors=[]
++    contract=(root/'src/miniquake/render_special_contract.ml').read_text(encoding='utf-8')
++    test=(root/'tests/render_special_closure_tests.ml').read_text(encoding='utf-8')
++    build=(root/'src/miniquake/build_info.ml').read_text(encoding='utf-8')
++    golden=json.loads((root/'audit/render_special_closure_golden.json').read_text(encoding='utf-8'))
++    for marker in ('const STATUS = "render_special_109_frozen_v1"','const FINGERPRINT = 0x2a3d8081','const SPECIAL_RENDER_STAGE_COUNT = 12','const ORIGINAL_REFERENCE_EXTERNAL = 1','function verify()'):
++        if marker not in contract: errors.append(f'contract missing {marker}')
++    if test.count('bp054Run(')!=25: errors.append('BP-054 test does not contain 24 fixture calls')
++    if 'MiniQuake BP-054 render-special closure tests passed: 24' not in test: errors.append('BP-054 pass marker differs')
++    for marker in ('const PACKAGE_ID = "BP-054"','const PARENT_PACKAGE_ID = "BP-053"','const BLOCK_ID = "BP-050-054"','const RENDER_SPECIAL_STATUS = "render_special_109_frozen_v1"','const RENDER_SPECIAL_FINGERPRINT = 0x2a3d8081'):
++        if marker not in build: errors.append(f'build info missing {marker}')
++    expected={'fixtures':24,'total_block_fixtures':104,'fingerprint':708673665,'special_stage_count':12}
++    for k,v in expected.items():
++        if golden.get(k)!=v: errors.append(f'BP-054 golden {k} differs')
++    details={"root": str(root), "error_count": len(errors)}
++    if errors:
++        emit_report(a.json_output, 'bp054_render_special_closure', False, details, errors)
++        print('MiniQuake BP-054 render-special closure verification: FAIL'); [print('  '+e) for e in errors]; return 1
++    emit_report(a.json_output, 'bp054_render_special_closure', True, details, [])
++    print('MiniQuake BP-054 render-special closure verification: PASS')
++    print('  status=render_special_109_frozen_v1 fingerprint=0x2a3d8081 fixtures=24')
++    return 0
++if __name__=='__main__': raise SystemExit(main())
+diff --git a/tools/oracle/render_special_closure_oracle.c b/tools/oracle/render_special_closure_oracle.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..9398c85b80c9edd9ba91e6381c203bcf68c63637
+--- /dev/null
++++ b/tools/oracle/render_special_closure_oracle.c
+@@ -0,0 +1,9 @@
++#include <stdio.h>
++int main(void) {
++  printf("status=render_special_109_frozen_v1\n");
++  printf("fingerprint=0x2a3d8081\n");
++  printf("stages=12\n");
++  printf("fixtures=104\n");
++  printf("parent=model_ui_render_109_frozen_v1\n");
++  return 0;
++}
+diff --git a/tools/verify.py b/tools/verify.py
+index c17a8cc1f6f568354aa0453570c217f8f8b42060..72416ebd24dc812b76fcccb79e2f6221dc5e2eed 100644
+--- a/tools/verify.py
++++ b/tools/verify.py
+@@ -1,10 +1,10 @@
+ #!/usr/bin/env python3
+-"""Self-contained MiniQuake BP-049 / BP-045-049R3 model/UI/render delivery verifier.
++"""Self-contained MiniQuake BP-054 / BP-050-054 special-render delivery verifier.
+ 
+ The verifier uses only the Python standard library so the exact source archive
+ can be checked before MiniLang compilation. It preserves all accepted parent
+-contracts and validates alias models, sprites, 2D/HUD integration, deterministic
+-framebuffer evidence and the model/UI/render closure contract.
++contracts and validates mirrors, clear/z-trick, envmap/timerefresh, the
++multi-scene framebuffer corpus and the special-render closure contract.
+ """
+ 
+ from __future__ import annotations
+@@ -21,12 +21,12 @@ from dataclasses import asdict, dataclass, field
+ from pathlib import Path, PurePosixPath
+ from typing import Iterable
+ 
+-PACKAGE_ID = "BP-049"
+-PARENT_PACKAGE_ID = "BP-048"
+-BLOCK_ID = "BP-045-049"
+-BLOCK_PARENT_PACKAGE_ID = "BP-040-044R3"
+-DELIVERY_REVISION = "BP-045-049R3"
+-DELIVERY_PARENT = "BP-045-049R2"
++PACKAGE_ID = "BP-054"
++PARENT_PACKAGE_ID = "BP-053"
++BLOCK_ID = "BP-050-054"
++BLOCK_PARENT_PACKAGE_ID = "BP-045-049R3"
++DELIVERY_REVISION = "BP-050-054"
++DELIVERY_PARENT = "BP-045-049R3"
+ PROTOCOL_STATUS = "protocol15_frozen_v1"
+ QUAKEC_STATUS = "quakec_109_frozen_v1"
+ WORLD_PHYSICS_STATUS = "world_physics_109_frozen_v1"
+@@ -38,6 +38,8 @@ WORLD_RENDER_STATUS = "world_render_109_frozen_v1"
+ WORLD_RENDER_FINGERPRINT = 0x846A74DE
+ MODEL_UI_RENDER_STATUS = "model_ui_render_109_frozen_v1"
+ MODEL_UI_RENDER_FINGERPRINT = 0x0A62F5B1
++RENDER_SPECIAL_STATUS = "render_special_109_frozen_v1"
++RENDER_SPECIAL_FINGERPRINT = 0x2A3D8081
+ MANIFEST_NAME = "SOURCE_MANIFEST.sha256"
+ EXCLUDED_DIR_NAMES = {".git", "__pycache__", ".pytest_cache", "build"}
+ EXCLUDED_RELATIVE_DIRS = {PurePosixPath("native/build"), PurePosixPath("native/text_build")}
+@@ -444,6 +446,45 @@ REQUIRED_PATHS.update({
+ })
+ 
+ 
++REQUIRED_PATHS.update({
++    "CHANGELOG_BP-050.md", "CHANGELOG_BP-051.md", "CHANGELOG_BP-052.md",
++    "CHANGELOG_BP-053.md", "CHANGELOG_BP-054.md", "CHANGELOG_BP-050-054.md",
++    "TEST_BP-050-054.ps1", "docs/BP-045-049R3_ACCEPTANCE_ANALYSIS.md",
++    "docs/BP-050_MIRROR_SPECIAL_AUDIT.md",
++    "docs/BP-051_RENDER_CLEAR_SPECIAL_AUDIT.md",
++    "docs/BP-052_ENVMAP_TIMEREFRESH_AUDIT.md",
++    "docs/BP-053_RENDER_EVIDENCE_CORPUS_AUDIT.md",
++    "docs/BP-054_RENDER_SPECIAL_CLOSURE_AUDIT.md",
++    "docs/BP-050-054_TESTING.md", "docs/BP-050-054_BLOCK_LEDGER.json",
++    "src/miniquake/render/special_paths.ml",
++    "src/miniquake/render_evidence_corpus.ml",
++    "src/miniquake/render_special_contract.ml",
++    "tests/mirror_special_render_tests.ml",
++    "tests/render_clear_special_tests.ml",
++    "tests/envmap_timerefresh_tests.ml",
++    "tests/render_evidence_corpus_tests.ml",
++    "tests/render_special_closure_tests.ml",
++    "tools/check_render_special_050.py",
++    "tools/check_render_special_051.py",
++    "tools/check_render_special_052.py",
++    "tools/check_render_special_053.py",
++    "tools/check_render_special_054.py",
++    "tools/compare_render_corpus.py",
++    "tools/oracle/mirror_special_oracle.c",
++    "tools/oracle/render_clear_special_oracle.c",
++    "tools/oracle/envmap_timerefresh_oracle.c",
++    "tools/oracle/render_evidence_corpus_oracle.c",
++    "tools/oracle/render_special_closure_oracle.c",
++    "audit/mirror_special_golden.json",
++    "audit/render_clear_special_golden.json",
++    "audit/envmap_timerefresh_golden.json",
++    "audit/render_evidence_corpus_golden.json",
++    "audit/render_special_closure_golden.json",
++    "patches/BP-050.diff", "patches/BP-051.diff", "patches/BP-052.diff",
++    "patches/BP-053.diff", "patches/BP-054.diff",
++})
++
++
+ @dataclass
+ class CheckResult:
+     name: str
+@@ -4645,6 +4686,229 @@ def check_package_identity(root: Path) -> CheckResult:
+     return CheckResult("package_identity", not errors, details, errors)
+ 
+ 
++
++def check_frozen_parent_contracts(root: Path) -> CheckResult:
++    """Validate all accepted parent fingerprints and the BP-045-049R3 result."""
++    errors: list[str] = []
++    details: dict[str, object] = {}
++    try:
++        build = (root / "src/miniquake/build_info.ml").read_text(encoding="utf-8")
++        string_values = {
++            "PROTOCOL_STATUS": PROTOCOL_STATUS,
++            "QUAKEC_STATUS": QUAKEC_STATUS,
++            "WORLD_PHYSICS_STATUS": WORLD_PHYSICS_STATUS,
++            "HOST_LIFECYCLE_STATUS": HOST_LIFECYCLE_STATUS,
++            "CLIENT_RENDER_STATUS": CLIENT_RENDER_STATUS,
++            "WORLD_RENDER_STATUS": WORLD_RENDER_STATUS,
++            "MODEL_UI_RENDER_STATUS": MODEL_UI_RENDER_STATUS,
++        }
++        for key, wanted in string_values.items():
++            match = re.search(rf'^const\s+{key}\s*=\s*"([^"]+)"\s*$', build, flags=re.M)
++            if not match or match.group(1) != wanted:
++                errors.append(f"build_info.ml {key} differs from {wanted!r}")
++        numeric_values = {
++            "HOST_LIFECYCLE_FINGERPRINT": HOST_LIFECYCLE_FINGERPRINT,
++            "CLIENT_RENDER_FINGERPRINT": CLIENT_RENDER_FINGERPRINT,
++            "WORLD_RENDER_FINGERPRINT": WORLD_RENDER_FINGERPRINT,
++            "MODEL_UI_RENDER_FINGERPRINT": MODEL_UI_RENDER_FINGERPRINT,
++        }
++        for key, wanted in numeric_values.items():
++            match = re.search(rf'^const\s+{key}\s*=\s*(0x[0-9a-fA-F]+|\d+)\s*$', build, flags=re.M)
++            if not match or int(match.group(1), 0) != wanted:
++                errors.append(f"build_info.ml {key} differs from 0x{wanted:08x}")
++        analysis = (root / "docs/BP-045-049R3_ACCEPTANCE_ANALYSIS.md").read_text(encoding="utf-8")
++        markers = (
++            "112/112",
++            "65bb521faf300fed61b7d03e15429896a31de27d934ee59459e251fac08bd2bf",
++            "b2589f2712b0aed42f31b1a35ebb4837c211391ba3e8d8888c422242d051af28",
++            "d905b042",
++            "1325e6fd365c1e62fbf36c4fadcbe9110faa94778c4c14b43fa9efe56d35e154",
++            "55f9fc9c", "3ec42fe3", "SSIM: `1.0`",
++            "model_ui_render_109_frozen_v1", "0x0a62f5b1",
++        )
++        for marker in markers:
++            if marker not in analysis:
++                errors.append(f"BP-045-049R3 acceptance analysis is missing {marker}")
++        details.update({
++            "accepted_parent": "BP-045-049R3",
++            "parent_result_sha256": "65bb521faf300fed61b7d03e15429896a31de27d934ee59459e251fac08bd2bf",
++            "parent_trace_sha256": "b2589f2712b0aed42f31b1a35ebb4837c211391ba3e8d8888c422242d051af28",
++            "parent_render_ssim": 1.0,
++        })
++    except OSError as exc:
++        errors.append(f"cannot validate frozen parent contracts: {exc}")
++    return CheckResult("frozen_parent_contracts", not errors, details, errors)
++
++
++def check_render_corpus_comparator(root: Path) -> CheckResult:
++    errors: list[str] = []
++    details: dict[str, object] = {}
++    path = root / "tools/compare_render_corpus.py"
++    try:
++        completed = subprocess.run(
++            [sys.executable, str(path), "--root", str(root), "--self-test"],
++            cwd=root, capture_output=True, text=True, timeout=30, check=False,
++        )
++        details.update({"returncode": completed.returncode, "stdout": completed.stdout.strip()})
++        if completed.returncode != 0:
++            errors.append(completed.stdout.strip() or completed.stderr.strip() or "render corpus comparator self-test failed")
++    except (OSError, subprocess.SubprocessError) as exc:
++        errors.append(f"cannot run render corpus comparator: {exc}")
++    return CheckResult("render_evidence_corpus_comparator", not errors, details, errors)
++
++
++def check_render_special_block_contract(root: Path) -> CheckResult:
++    errors: list[str] = []
++    details: dict[str, object] = {}
++    try:
++        ledger = json.loads((root / "BLOCK_LEDGER.json").read_text(encoding="utf-8"))
++        expected = {
++            "block_id": BLOCK_ID,
++            "parent_package_id": BLOCK_PARENT_PACKAGE_ID,
++            "final_package_id": PACKAGE_ID,
++            "delivery_revision": DELIVERY_REVISION,
++            "render_special_status": RENDER_SPECIAL_STATUS,
++            "render_special_fingerprint": "0x2a3d8081",
++        }
++        for key, wanted in expected.items():
++            if ledger.get(key) != wanted:
++                errors.append(f"BLOCK_LEDGER.json {key} is {ledger.get(key)!r}, expected {wanted!r}")
++        steps = ledger.get("steps", [])
++        ids = [item.get("package_id") for item in steps if isinstance(item, dict)]
++        counts = [item.get("runtime_fixtures") for item in steps if isinstance(item, dict)]
++        if ids != ["BP-050", "BP-051", "BP-052", "BP-053", "BP-054"]:
++            errors.append(f"block step order differs: {ids!r}")
++        if counts != [22, 20, 20, 18, 24] or ledger.get("block_runtime_fixtures") != 104:
++            errors.append(f"block fixture vector differs: {counts!r}, total={ledger.get('block_runtime_fixtures')!r}")
++        parent = ledger.get("accepted_parent", {})
++        parent_expected = {
++            "delivery_revision": "BP-045-049R3",
++            "status": "PASS",
++            "result_archive_sha256": "65bb521faf300fed61b7d03e15429896a31de27d934ee59459e251fac08bd2bf",
++            "trace_sha256": "b2589f2712b0aed42f31b1a35ebb4837c211391ba3e8d8888c422242d051af28",
++            "trace_rolling_hash": "d905b042",
++            "render_tga_sha256": "1325e6fd365c1e62fbf36c4fadcbe9110faa94778c4c14b43fa9efe56d35e154",
++            "render_ssim": 1.0,
++        }
++        for key, wanted in parent_expected.items():
++            if parent.get(key) != wanted:
++                errors.append(f"accepted parent {key} differs: {parent.get(key)!r}")
++        contract = (root / "src/miniquake/render_special_contract.ml").read_text(encoding="utf-8")
++        if RENDER_SPECIAL_STATUS not in contract or "0x2a3d8081" not in contract.lower():
++            errors.append("render-special contract source differs")
++        golden = json.loads((root / "audit/render_special_closure_golden.json").read_text(encoding="utf-8"))
++        if golden.get("fingerprint") != RENDER_SPECIAL_FINGERPRINT:
++            errors.append("render-special golden fingerprint differs")
++        if golden.get("fixtures") != 24 or golden.get("total_block_fixtures") != 104:
++            errors.append("render-special golden fixture counts differ")
++        for package in ids:
++            patch = root / "patches" / f"{package}.diff"
++            if not patch.is_file() or patch.stat().st_size == 0:
++                errors.append(f"logical block patch is missing or empty: patches/{package}.diff")
++        details.update({
++            "steps": ids,
++            "fixture_vector": counts,
++            "runtime_fixtures": ledger.get("block_runtime_fixtures"),
++            "contract_status": RENDER_SPECIAL_STATUS,
++            "contract_fingerprint": "0x2a3d8081",
++            "optional_original_ssim_floor": 0.95,
++        })
++    except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
++        errors.append(f"cannot validate render-special block contract: {exc}")
++    return CheckResult("render_special_block_contract", not errors, details, errors)
++
++
++def check_current_delivery_scripts(root: Path) -> CheckResult:
++    errors: list[str] = []
++    details: dict[str, object] = {}
++    expected: dict[str, list[str]] = {
++        "build.ps1": [
++            '$PackageId = "BP-054"', '$ParentPackageId = "BP-053"',
++            '$BlockId = "BP-050-054"', '$BlockParentPackageId = "BP-045-049R3"',
++            '$RenderSpecialStatus = "render_special_109_frozen_v1"',
++            "MiniQuakeMirrorSpecialRenderTests.exe", "MiniQuakeRenderSpecialClosureTests.exe",
++            "check_render_special_050.py", "check_render_special_054.py", "compare_render_corpus.py",
++        ],
++        "TEST_BP-050-054.ps1": [
++            '$PackageId = "BP-054"', '$BlockId = "BP-050-054"',
++            '$DeliveryRevision = "BP-050-054"',
++            "OriginalRenderReference", "SkipRenderCorpus", "ContinueIndependentTests", "BisectOnFailure",
++            "name = \"start-064\"", "name = \"e1m1-128\"",
++            "compare_render_corpus.py", "MiniQuake $DeliveryRevision acceptance test: PASS",
++        ],
++        "COLLECT_RESULTS.ps1": [
++            "MiniQuake_BP-050-054_RESULTS_", ".mqtrace", ".tga",
++            "BP-050-054", "render_special_closure_golden.json", "Compress-Archive",
++            "MiniQuakeProtocol15ServerDataTests.exe", "BP-012_PROTOCOL15_SERVERDATA_AUDIT.md",
++            "protocol15_serverdata_golden.json", "BP-054_RENDER_SPECIAL_CLOSURE_AUDIT.md",
++        ],
++        "test.ps1": ["TEST_BP-050-054.ps1"],
++    }
++    for relative, markers in expected.items():
++        path = root / relative
++        try:
++            text = path.read_text(encoding="utf-8-sig")
++        except OSError as exc:
++            errors.append(f"cannot read {relative}: {exc}")
++            continue
++        for marker in markers:
++            if marker not in text:
++                errors.append(f"{relative} missing marker: {marker}")
++    details["scripts_checked"] = len(expected)
++    return CheckResult("delivery_scripts", not errors, details, errors)
++
++
++def check_package_identity(root: Path) -> CheckResult:
++    errors: list[str] = []
++    details: dict[str, object] = {}
++    try:
++        text = (root / "src/miniquake/build_info.ml").read_text(encoding="utf-8")
++        expected = {
++            "PACKAGE_ID": PACKAGE_ID, "PARENT_PACKAGE_ID": PARENT_PACKAGE_ID,
++            "BLOCK_ID": BLOCK_ID, "BLOCK_PARENT_PACKAGE_ID": BLOCK_PARENT_PACKAGE_ID,
++            "PROTOCOL_STATUS": PROTOCOL_STATUS, "QUAKEC_STATUS": QUAKEC_STATUS,
++            "WORLD_PHYSICS_STATUS": WORLD_PHYSICS_STATUS,
++            "HOST_LIFECYCLE_STATUS": HOST_LIFECYCLE_STATUS,
++            "CLIENT_RENDER_STATUS": CLIENT_RENDER_STATUS,
++            "WORLD_RENDER_STATUS": WORLD_RENDER_STATUS,
++            "MODEL_UI_RENDER_STATUS": MODEL_UI_RENDER_STATUS,
++            "RENDER_SPECIAL_STATUS": RENDER_SPECIAL_STATUS,
++            "COMPATIBILITY_PROFILE": "compat_109",
++            "NATIVE_TEXT_ABI": "caller_owned_bytes_v1",
++            "PROTOCOL_TEXT_ABI": "quake_latin1_cstring_v1",
++        }
++        for name, wanted in expected.items():
++            match = re.search(rf'^const\s+{name}\s*=\s*"([^"]+)"\s*$', text, flags=re.M)
++            if not match or match.group(1) != wanted:
++                errors.append(f"build_info.ml {name} differs from {wanted!r}")
++            else:
++                details[name.lower()] = wanted
++        numeric = {
++            "HOST_LIFECYCLE_FINGERPRINT": HOST_LIFECYCLE_FINGERPRINT,
++            "CLIENT_RENDER_FINGERPRINT": CLIENT_RENDER_FINGERPRINT,
++            "WORLD_RENDER_FINGERPRINT": WORLD_RENDER_FINGERPRINT,
++            "MODEL_UI_RENDER_FINGERPRINT": MODEL_UI_RENDER_FINGERPRINT,
++            "RENDER_SPECIAL_FINGERPRINT": RENDER_SPECIAL_FINGERPRINT,
++        }
++        for name, wanted in numeric.items():
++            match = re.search(rf'^const\s+{name}\s*=\s*(0x[0-9a-fA-F]+|\d+)\s*$', text, flags=re.M)
++            if not match or int(match.group(1), 0) != wanted:
++                errors.append(f"build_info.ml {name} differs from 0x{wanted:08x}")
++        main = (root / "src/main.ml").read_text(encoding="utf-8")
++        for marker in (
++            "buildInfo.RENDER_SPECIAL_STATUS", "Render-special fingerprint: 0x2a3d8081",
++            "--render-evidence", "runRenderEvidenceCommand",
++        ):
++            if marker not in main:
++                errors.append(f"src/main.ml missing identity/command marker: {marker}")
++        purpose = re.search(r'^const\s+PACKAGE_PURPOSE\s*=\s*"([^"]+)"', text, flags=re.M)
++        purpose_text = purpose.group(1).lower() if purpose else ""
++        if not all(term in purpose_text for term in ("mirror", "envmap", "evidence")):
++            errors.append("PACKAGE_PURPOSE does not describe the current block")
++    except OSError as exc:
++        errors.append(f"cannot read package identity files: {exc}")
++    return CheckResult("package_identity", not errors, details, errors)
++
+ def run_checks(root: Path, manifest_path: Path) -> VerificationReport:
+     checks = [
+         check_required_paths(root),
+@@ -4668,18 +4932,20 @@ def run_checks(root: Path, manifest_path: Path) -> VerificationReport:
+         check_current_component(root, "bp048_render_evidence_checker.py", "bp048_render_evidence_contract"),
+         check_current_component(root, "bp049_model_ui_render_checker.py", "bp049_model_ui_render_contract"),
+         check_render_evidence_comparator(root),
+-        check_model_ui_render_block_contract(root),
+-        check_bp045049r1_collector_history_contract(root),
+-        check_bp045049r2_render_evidence_fixture_contract(root),
+-        check_bp045049r3_render_input_isolation_contract(root),
++        check_current_component(root, "check_render_special_050.py", "bp050_mirror_special_contract"),
++        check_current_component(root, "check_render_special_051.py", "bp051_render_clear_contract"),
++        check_current_component(root, "check_render_special_052.py", "bp052_envmap_timerefresh_contract"),
++        check_current_component(root, "check_render_special_053.py", "bp053_render_evidence_corpus_contract"),
++        check_current_component(root, "check_render_special_054.py", "bp054_render_special_closure_contract"),
++        check_render_corpus_comparator(root),
++        check_render_special_block_contract(root),
+         check_current_delivery_scripts(root),
+         check_package_identity(root),
+     ]
+     return VerificationReport(PACKAGE_ID, str(root), all(check.passed for check in checks), checks)
+ 
+-
+ def print_human(report: VerificationReport) -> None:
+-    print(f"MiniQuake {report.package_id} source, frozen-parent and model/UI/render verification")
++    print(f"MiniQuake {report.package_id} source, frozen-parent and special-render verification")
+     for check in report.checks:
+         status = "PASS" if check.passed else "FAIL"
+         print(f"  [{status}] {check.name}")
+@@ -4691,7 +4957,7 @@ def print_human(report: VerificationReport) -> None:
+             compact = ", ".join(f"{key}={value}" for key, value in check.details.items() if not isinstance(value, list))
+             if compact:
+                 print(f"         {compact}")
+-    print(f"MiniQuake {report.package_id} source, frozen-parent and model/UI/render verification: {'PASS' if report.passed else 'FAIL'}")
++    print(f"MiniQuake {report.package_id} source, frozen-parent and render-special verification: {'PASS' if report.passed else 'FAIL'}")
+ 
+ def main(argv: list[str] | None = None) -> int:
+     parser = argparse.ArgumentParser(description=__doc__)

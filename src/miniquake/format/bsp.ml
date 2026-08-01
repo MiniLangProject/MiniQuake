@@ -4,7 +4,9 @@ import miniquake.types as t
 import miniquake.constants as c
 import miniquake.byteio as bio
 import miniquake.array_util as arrayutil
+import miniquake.protocol_text as protocolText
 import miniquake.native as native
+import miniquake.common as common
 import std.fs as fs
 
 function parseLumps(data)
@@ -243,7 +245,7 @@ function parseTextures(data, lump)
 end function
 
 function tokenizeEntities(text)
-  source = bytes(text)
+  source = protocolText.encodeBytes(text)
   tokenBuilder = arrayutil.createArrayBuilder(64)
   i = 0
   while i < len(source)
@@ -289,13 +291,13 @@ function tokenizeEntities(text)
       end while
       i = scan
       if i < len(source) and source[i] == 34 then i = i + 1 end if
-      arrayutil.pushArrayBuilder(tokenBuilder, decode(output))
+      arrayutil.pushArrayBuilder(tokenBuilder, protocolText.decodeBytes(output))
     else
       start = i
       while i < len(source) and source[i] > 32 and source[i] != 123 and source[i] != 125
         i = i + 1
       end while
-      arrayutil.pushArrayBuilder(tokenBuilder, decode(slice(source, start, i - start)))
+      arrayutil.pushArrayBuilder(tokenBuilder, protocolText.decodeBytes(slice(source, start, i - start)))
     end if
   end while
   return arrayutil.finishArrayBuilder(tokenBuilder)
@@ -342,9 +344,7 @@ function parseVector(text)
       i = i + 1
     end while
     if i > start then
-      value = toNumber(decode(slice(source, start, i - start)))
-      if value is void then value = 0.0 end if
-      values[valueCount] = value
+      values[valueCount] = common.cAtof(decode(slice(source, start, i - start)))
       valueCount = valueCount + 1
     end if
   end while
@@ -728,7 +728,7 @@ end function
 
 function Mod_LoadEntities(data, lump)
   if lump.length == 0 then return "" end if
-  return decode(slice(data, lump.offset, lump.length))
+  return protocolText.decodeBytes(slice(data, lump.offset, lump.length))
 end function
 
 function Mod_LoadVertexes(data, lump)

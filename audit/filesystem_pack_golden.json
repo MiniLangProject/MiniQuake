@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "package": "BP-071",
+  "fixtures": 24,
+  "pack_entry_bytes": 64,
+  "max_files_in_pack": 2048,
+  "retail_pak0_files": 339,
+  "retail_pak0_directory_crc": 32981,
+  "search_order": [
+    "pakN-descending",
+    "loose-directory"
+  ],
+  "pack_lookup_case_sensitive": true,
+  "load_file_nul_terminated": true,
+  "text_abi": "quake_latin1_cstring_v1",
+  "shareware_loose_subdirectory_block": true
+}

@@ -21,6 +21,36 @@ function truePointContents(box, point)
   return c.CONTENTS_EMPTY
 end function
 
+function pointContentsFromNode(box, number, point)
+  // Exact six-node traversal created by WinQuake SV_InitBoxHull.  Callers may
+  // start at any clipnode, which matters for the public SV_HullPointContents
+  // contract and for malformed-node diagnostics.
+  node = number
+  while node >= 0
+    if node > 5 then return error(3850, "SV_HullPointContents: bad node number") end if
+    axis = node >> 1
+    distance = 0.0
+    coordinate = 0.0
+    if axis == 0 then coordinate = point.x end if
+    if axis == 1 then coordinate = point.y end if
+    if axis == 2 then coordinate = point.z end if
+    if node == 0 then distance = box.maxs.x end if
+    if node == 1 then distance = box.mins.x end if
+    if node == 2 then distance = box.maxs.y end if
+    if node == 3 then distance = box.mins.y end if
+    if node == 4 then distance = box.maxs.z end if
+    if node == 5 then distance = box.mins.z end if
+
+    side = 0
+    if coordinate < distance then side = 1 end if
+    emptySide = node & 1
+    if side == emptySide then return c.CONTENTS_EMPTY end if
+    if node == 5 then return c.CONTENTS_SOLID end if
+    node = node + 1
+  end while
+  return node
+end function
+
 function emptyPlane()
   return t.Plane(t.Vec3(0.0, 0.0, 0.0), 0.0, 0, 0)
 end function
@@ -50,7 +80,9 @@ function traceLine(box, start, finish)
   while axis < 3 and valid
     delta = endValues[axis] - startValues[axis]
     if delta == 0.0 then
-      if startValues[axis] < mins[axis] or startValues[axis] > maxs[axis] then valid = false end if
+      // The maximum plane is the empty side of the six-node box hull, so a
+      // parallel segment exactly on maxs is outside, not inside the solid.
+      if startValues[axis] < mins[axis] or startValues[axis] >= maxs[axis] then valid = false end if
     else
       nearValue = mins[axis]
       farValue = maxs[axis]

@@ -1,0 +1,20 @@
+{
+  "classification": "context_adapter",
+  "context_difference": "cvar_vars and Cmd_Argv state are explicit parameters",
+  "expected_missing": 0,
+  "fixture_count": 20,
+  "original_function_names": [
+    "Cvar_FindVar",
+    "Cvar_VariableValue",
+    "Cvar_VariableString",
+    "Cvar_CompleteVariable",
+    "Cvar_Set",
+    "Cvar_SetValue",
+    "Cvar_RegisterVariable",
+    "Cvar_Command",
+    "Cvar_WriteVariables"
+  ],
+  "original_source": "cvar.c",
+  "package": "BP-080",
+  "schema_version": 1
+}

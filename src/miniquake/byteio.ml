@@ -1,6 +1,7 @@
 package miniquake.byteio
 
 import miniquake.native as native
+import miniquake.protocol_text as quakeText
 
 function requireRange(data, offset, count)
   if typeof(data) != "bytes" then return error(1000, "byte buffer required") end if
@@ -95,7 +96,9 @@ function shortSwap(value)
 end function
 
 function shortNoSwap(value)
-  return value
+  narrowed = value & 0xffff
+  if narrowed >= 0x8000 then return narrowed - 0x10000 end if
+  return narrowed
 end function
 
 function longSwap(value)
@@ -108,7 +111,9 @@ function longSwap(value)
 end function
 
 function longNoSwap(value)
-  return value
+  narrowed = value & 0xffffffff
+  if narrowed >= 0x80000000 then return narrowed - 0x100000000 end if
+  return narrowed
 end function
 
 function floatSwap(value)
@@ -116,7 +121,7 @@ function floatSwap(value)
 end function
 
 function floatNoSwap(value)
-  return value
+  return native.bitsFloat(native.floatBits(value))
 end function
 
 // MiniQuake's supported release platform is little-endian Windows x64.
@@ -161,7 +166,7 @@ function fixedString(data, offset, count)
   while length < count and data[offset + length] != 0
     length = length + 1
   end while
-  return decode(slice(data, offset, length))
+  return quakeText.decodeBytes(slice(data, offset, length))
 end function
 
 function cString(data, offset)
@@ -170,7 +175,7 @@ function cString(data, offset)
   while endOffset < len(data) and data[endOffset] != 0
     endOffset = endOffset + 1
   end while
-  return decode(slice(data, offset, endOffset - offset))
+  return quakeText.decodeBytes(slice(data, offset, endOffset - offset))
 end function
 
 function lower(text)

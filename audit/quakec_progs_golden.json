@@ -1,0 +1,72 @@
+{
+  "schema": "MiniQuakeQuakeCProgsGolden/1",
+  "package_id": "BP-020",
+  "parent_package_id": "BP-019",
+  "sources": [
+    "pr_comp.h",
+    "progs.h",
+    "pr_edict.c",
+    "sv_main.c"
+  ],
+  "rows": [
+    {
+      "kind": "case",
+      "name": "sizeof_dprograms",
+      "value": 60
+    },
+    {
+      "kind": "case",
+      "name": "sizeof_dstatement",
+      "value": 8
+    },
+    {
+      "kind": "case",
+      "name": "sizeof_ddef",
+      "value": 8
+    },
+    {
+      "kind": "case",
+      "name": "sizeof_dfunction",
+      "value": 36
+    },
+    {
+      "kind": "case",
+      "name": "type_size_void",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "type_size_vector",
+      "value": 3
+    },
+    {
+      "kind": "case",
+      "name": "type_size_pointer",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "prog_version",
+      "value": 6
+    },
+    {
+      "kind": "case",
+      "name": "progheader_crc",
+      "value": 5927
+    },
+    {
+      "kind": "case",
+      "name": "fixture_bytes",
+      "value": 329
+    },
+    {
+      "kind": "case",
+      "name": "fixture_runtime_crc",
+      "value": 32868
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/quakec_progs_oracle.c",
+    "oracle_sha256": "b7d3c86fdf3a989838d78b49da2aff68cc68feeec9f91e051ead0d722ed0296b"
+  }
+}

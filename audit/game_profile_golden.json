@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "status": "game_profile_109_frozen_v1",
+  "fingerprint": "0x7a03b68d",
+  "contract_text": "game-profile|id1-first|rogue-before-hipnotic|explicit-game-last|path-overrides|registered-gate|caching-once",
+  "fixtures": 22,
+  "default_game": "id1",
+  "mission_packs": [
+    "rogue",
+    "hipnotic"
+  ],
+  "path_override": true,
+  "cached_lookup_count": 1
+}

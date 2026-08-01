@@ -578,8 +578,10 @@ function MapKey(key)
 end function
 
 function ClearAllStates()
-  keys.Key_ClearStates()
-  input.IN_ClearStates()
+  // Queue the same synthetic key-up commands emitted by WinQuake before the
+  // physical state tables are cleared. The host drains this queue into Cbuf.
+  keys.Key_QueueReleaseAllCommands()
+  input.IN_ClearDeviceStates()
   return true
 end function
 

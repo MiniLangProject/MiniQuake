@@ -8,16 +8,39 @@ import miniquake.byteio as bio
 import miniquake.array_util as arrayutil
 
 function emptyBaseline()
-  return t.EntityBaseline(0, 0, 0, 0, t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
+  // EntityBaseline and Vec3 are heap-backed MiniLang structs.  Keep both
+  // vectors in named roots while the baseline object itself is allocated.
+  // A GC triggered between nested constructor arguments must never leave one
+  // of the already-created vectors reachable only through an unevaluated
+  // argument slot.
+  origin = t.Vec3(0.0, 0.0, 0.0)
+  angles = t.Vec3(0.0, 0.0, 0.0)
+  return t.EntityBaseline(0, 0, 0, 0, 0, origin, angles)
 end function
 
 function create(number)
+  // QuakeEdict contains several heap-backed values.  Constructing all of them
+  // inline used to expose a native-backend GC rooting edge case: during the
+  // per-frame QuakeC-to-server synchronization a collection could occur while
+  // the outer struct constructor still held earlier Vec3/array arguments only
+  // in transient expression slots.  The resulting edict looked valid, but one
+  // vector field could later be a non-struct value.  Root every heap argument
+  // explicitly before allocating the QuakeEdict.
+  fields = []
+  keyValues = []
+  origin = t.Vec3(0.0, 0.0, 0.0)
+  angles = t.Vec3(0.0, 0.0, 0.0)
+  velocity = t.Vec3(0.0, 0.0, 0.0)
+  mins = t.Vec3(0.0, 0.0, 0.0)
+  maxs = t.Vec3(0.0, 0.0, 0.0)
+  viewOffset = t.Vec3(0.0, 0.0, c.DEFAULT_VIEWHEIGHT)
+  baseline = emptyBaseline()
   return t.QuakeEdict(
     number,
     false,
     0.0,
-    [],
-    [],
+    fields,
+    keyValues,
     "",
     "",
     0,
@@ -25,19 +48,19 @@ function create(number)
     0,
     0,
     0,
-    t.Vec3(0.0, 0.0, 0.0),
-    t.Vec3(0.0, 0.0, 0.0),
-    t.Vec3(0.0, 0.0, 0.0),
-    t.Vec3(0.0, 0.0, 0.0),
-    t.Vec3(0.0, 0.0, 0.0),
+    origin,
+    angles,
+    velocity,
+    mins,
+    maxs,
     c.MOVETYPE_NONE,
     c.SOLID_NOT,
     0,
     0.0,
-    t.Vec3(0.0, 0.0, c.DEFAULT_VIEWHEIGHT),
+    viewOffset,
     false,
     -1,
-    emptyBaseline(),
+    baseline,
   )
 end function
 
@@ -180,14 +203,18 @@ function free(item, currentTime)
 end function
 
 function baseline(item)
-  item.baseline = t.EntityBaseline(
+  origin = math.copy(item.origin)
+  angles = math.copy(item.angles)
+  value = t.EntityBaseline(
     item.modelIndex,
     item.frame,
     item.colormap,
     item.skin,
-    math.copy(item.origin),
-    math.copy(item.angles),
+    0,
+    origin,
+    angles,
   )
+  item.baseline = value
   return item.baseline
 end function
 

@@ -1,0 +1,18 @@
+{
+  "binary32_outcount": 45,
+  "findchunk_iff_data": 12,
+  "fixtures": 20,
+  "package": "BP-055",
+  "retail_paths": [
+    "sound/misc/menu1.wav",
+    "sound/ambience/water1.wav"
+  ],
+  "schema": 1,
+  "sound_f32_step_bits": "0x400b51da",
+  "source": "WinQuake/snd_mem.c",
+  "stereo_rejected": true,
+  "supported_widths": [
+    1,
+    2
+  ]
+}

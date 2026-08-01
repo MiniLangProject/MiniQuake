@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "project": "MiniQuake",
+  "block_id": "BP-055-059",
+  "parent_package_id": "BP-050-054R1",
+  "final_package_id": "BP-059",
+  "delivery_revision": "BP-055-059R2",
+  "protocol_status": "protocol15_frozen_v1",
+  "quakec_status": "quakec_109_frozen_v1",
+  "world_physics_status": "world_physics_109_frozen_v1",
+  "host_lifecycle_status": "host_lifecycle_109_frozen_v1",
+  "client_render_status": "client_render_109_frozen_v1",
+  "client_render_fingerprint": "0x95e2b295",
+  "world_render_status": "world_render_109_frozen_v1",
+  "world_render_fingerprint": "0x846a74de",
+  "model_ui_render_status": "model_ui_render_109_frozen_v1",
+  "model_ui_render_fingerprint": "0x0a62f5b1",
+  "render_special_status": "render_special_109_frozen_v1",
+  "render_special_fingerprint": "0x2a3d8081",
+  "audio_status": "audio_109_frozen_v1",
+  "audio_fingerprint": "0xdcf7a002",
+  "steps": [
+    {
+      "package_id": "BP-055",
+      "title": "WAVE loading, loop metadata and Binary32 resampling",
+      "patch": "patches/BP-055.diff",
+      "runtime_fixtures": 20,
+      "status": "implemented; R1 runtime findings repaired in R2; Windows acceptance pending"
+    },
+    {
+      "package_id": "BP-056",
+      "title": "DMA channel selection, spatialization and lifecycle",
+      "patch": "patches/BP-056.diff",
+      "runtime_fixtures": 22,
+      "status": "implemented; R1 runtime findings repaired in R2; Windows acceptance pending"
+    },
+    {
+      "package_id": "BP-057",
+      "title": "signed 32-bit software mixer and PCM transfer",
+      "patch": "patches/BP-057.diff",
+      "runtime_fixtures": 22,
+      "status": "implemented; R1 runtime findings repaired in R2; Windows acceptance pending"
+    },
+    {
+      "package_id": "BP-058",
+      "title": "Win32 waveOut ring, cursor and shutdown lifecycle",
+      "patch": "patches/BP-058.diff",
+      "runtime_fixtures": 20,
+      "status": "implemented; R1 runtime findings repaired in R2; Windows acceptance pending"
+    },
+    {
+      "package_id": "BP-059",
+      "title": "CD command equivalence, retail WAVE evidence and audio closure",
+      "patch": "patches/BP-059.diff",
+      "runtime_fixtures": 24,
+      "status": "implemented; R1 runtime findings repaired in R2; Windows acceptance pending"
+    }
+  ],
+  "block_runtime_fixtures": 108,
+  "retail_evidence_sounds": [
+    "misc/menu1.wav",
+    "ambience/water1.wav"
+  ],
+  "accepted_parent": {
+    "delivery_revision": "BP-050-054R1",
+    "status": "PASS",
+    "result_archive": "MiniQuake_BP-050-054R1_RESULTS_20260728-102942.zip",
+    "result_archive_sha256": "7e42fa8be8beb31f23f948e567ff9e2fcbb9a62e9bcd2066ea70af9651795624",
+    "steps": "131/131 required gates PASS; one external Original GLQuake corpus gate optional",
+    "headless_frames": 300,
+    "trace_frames": 128,
+    "trace_sha256": "bbfb59d8d0225a9a0401f3beb59a0422a57f898aebc35f239440e8cece742ad0",
+    "trace_rolling_hash": "d905b042",
+    "trace_byte_identity": "PASS",
+    "render_tga_sha256": "9047f96e9bef8e06035119ff71ddfe7ad4dcad89b4740c66618252a13cd166fb",
+    "render_pixel_hash": "c7a836b5",
+    "render_sample_hash": "beaf7844",
+    "render_ssim": 1.0,
+    "render_corpus": {
+      "start-064": "c3793f6b54564a8c1783d8cf86592f5b77ba97ac1e02fbbfa79692f071fc9b9a",
+      "start-128": "9047f96e9bef8e06035119ff71ddfe7ad4dcad89b4740c66618252a13cd166fb",
+      "e1m1-128": "c5dc943f739a46215f138ffe2d64cfa630154f676d1d73d370ad5093dccb7d9e"
+    },
+    "udp_loopback": "PASS"
+  },
+  "acceptance": {
+    "build_once": true,
+    "continue_independent_tests": true,
+    "installed_game_validation": true,
+    "default_headless_frames": 300,
+    "default_trace_frames": 128,
+    "retail_audio_evidence_processes": 2,
+    "retail_audio_evidence_exact_identity": true,
+    "udp_loopback": true
+  },
+  "scope_boundary": {
+    "physical_cd_device": "modern OGG/backend equivalence; original command/remap state preserved",
+    "software_mixer": "WinQuake 1.09 semantics are authoritative",
+    "native_output_device": "x64-safe waveOut bridge allowed",
+    "quake_game_data": "external; never bundled"
+  },
+  "status": "R2 audio runtime/fixture hotfix implemented; Windows acceptance pending",
+  "delivery_parent": "BP-055-059R1",
+  "predecessor_delivery_result": {
+    "delivery_revision": "BP-055-059R1",
+    "result_archive": "MiniQuake_BP-055-059R1_RESULTS_20260728-140756.zip",
+    "result_archive_sha256": "b7849b4a333f77633eb5caf578fda683c40eff3b9384ebe6d0265a981d91df45",
+    "status": "FAIL after 117/121 steps",
+    "static_verification": "PASS",
+    "build": "PASS",
+    "installed_game_validation": "PASS",
+    "headless_runtime": "300 frames PASS",
+    "first_failing_runtime_group": "BP-055 audio memory fixture",
+    "failures": [
+      "BP-055 fmt offset fixture",
+      "BP-056 channel-zero fixture",
+      "BP-056 S_ClearPrecache fixture",
+      "BP-059 CD info formatting",
+      "BP-059 retail evidence SoundCache.channels adapter"
+    ],
+    "trace_render_udp_reached": false
+  },
+  "delivery_hotfixes": [
+    {
+      "revision": "BP-055-059R1",
+      "parent": "BP-055-059",
+      "logical_patch": "patches/BP-059R1.diff",
+      "production_source_changed": false,
+      "native_source_changed": false,
+      "engine_contracts_changed": false,
+      "fixture_count_changed": false,
+      "checker_change": "BP-054 frozen render-special contract accepts explicit downstream-package verification while preserving exact identity checks for BP-054 itself",
+      "status": "implemented; Windows acceptance pending"
+    },
+    {
+      "revision": "BP-055-059R2",
+      "parent": "BP-055-059R1",
+      "logical_patch": "patches/BP-059R2.diff",
+      "production_source_changed": true,
+      "native_source_changed": false,
+      "engine_contracts_changed": false,
+      "fixture_count_changed": false,
+      "checker_change": "bind FindChunk iff_data, channel-zero/S_ClearPrecache semantics, six-decimal CD info, and retail channel derivation",
+      "status": "implemented; Windows acceptance pending"
+    }
+  ]
+}

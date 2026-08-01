@@ -1,0 +1,22 @@
+{
+  "context_adapter": 9,
+  "contract_text": "black_port_source_109_frozen_v1|53|10|1094|1081|9|4|0|4|64|31f437bb54a84fa690ff96011c50f8ca3e7dfabde05b4f450e58049eae5d8837",
+  "corpus_frames_per_scenario": 64,
+  "corpus_scenarios": 4,
+  "coverage_percent": 100.0,
+  "definitions_discovered": 1120,
+  "exact_name": 1081,
+  "fingerprint": "0x309b0737",
+  "fingerprint_algorithm": "FNV-1a 32-bit over contract_text",
+  "header_units": 10,
+  "missing": 0,
+  "package": "BP-084",
+  "profile_excluded": 26,
+  "runtime_fixture_count": 24,
+  "schema_version": 1,
+  "scope_note": "Source-function accounting is not by itself a claim of binary or visual equivalence.",
+  "source_units": 53,
+  "status": "black_port_source_109_frozen_v1",
+  "target_definitions": 1094,
+  "technical_equivalent": 4
+}

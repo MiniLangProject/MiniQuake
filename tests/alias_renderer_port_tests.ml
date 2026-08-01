@@ -79,7 +79,7 @@ function aliasEntity(number, modelIndex, frame, colormap)
     t.Vec3(1.0, 2.0, 3.0), t.Vec3(10.0, 20.0, 30.0), 0.0,
     t.Vec3(1.0, 2.0, 3.0), t.Vec3(1.0, 2.0, 3.0),
     t.Vec3(10.0, 20.0, 30.0), t.Vec3(10.0, 20.0, 30.0),
-    false, [],
+    false, [], 0.0,
   )
 end function
 
@@ -180,7 +180,7 @@ end function
 function testProductionProjectionDepth()
   gl.Trace_Begin()
   renderWorld.setupViewRect(
-    0, 0, 640, 480, 480, 90.0, 73.739795,
+    0, 0, 640, 480, 640, 480, 90.0, 73.739795,
     t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0),
   )
   commands = gl.Trace_End()

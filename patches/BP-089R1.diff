@@ -1,0 +1,2192 @@
+diff --git a/BLOCK_LEDGER.json b/BLOCK_LEDGER.json
+index 0a881e49867ef77e7f81ce0c292aa51ccd0058e7..b0b30c7b3d6790d7b2405d7cd1163344af54d5da 100644
+--- a/BLOCK_LEDGER.json
++++ b/BLOCK_LEDGER.json
+@@ -4,7 +4,7 @@
+   "block_id": "BP-085-089",
+   "parent_delivery": "BP-080-084R2",
+   "final_package_id": "BP-089",
+-  "delivery_revision": "BP-085-089",
++  "delivery_revision": "BP-085-089R1",
+   "steps": [
+     {
+       "package_id": "BP-085",
+@@ -63,7 +63,13 @@
+     },
+     "artifact_compat": {
+       "status": "artifact_compat_109_frozen_v1",
+-      "fingerprint": "0x59531091"
++      "fingerprint": "0x59531091",
++      "evidence_revision": "sequential_exact_v1",
++      "semantic_boundary": "parsed_save_domain",
++      "stable_reserialize_required": true,
++      "exact_roundtrip_required": true,
++      "preserves_edict_high_water": true,
++      "sequential_host_sessions": true
+     },
+     "stability": {
+       "status": "stability_109_frozen_v1",
+@@ -111,5 +117,16 @@
+     "host_soak_frames": 5000,
+     "listen_soak_frames": 5000,
+     "black_port_maps": 4
+-  }
++  },
++  "delivery_parent": "BP-085-089",
++  "block_parent_delivery": "BP-080-084R2",
++  "hotfixes": [
++    {
++      "revision": "BP-085-089R1",
++      "status": "candidate",
++      "failure_source": "BP-087 retail artifact evidence",
++      "fix": "sequential Host sessions, exact parsed-save roundtrip, preserved edict high-water mark and production load synchronization",
++      "result_archive_sha256": "cfaa061e9de12e13e9c38ba66f284eab8fb46986eebe5ddd27b2c3a0de777f87"
++    }
++  ]
+ }
+diff --git a/CHANGELOG_BP-085-089R1.md b/CHANGELOG_BP-085-089R1.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..517eb844f35586d87b594d62f4edb9d0cf0676b4
+--- /dev/null
++++ b/CHANGELOG_BP-085-089R1.md
+@@ -0,0 +1,14 @@
++# MiniQuake BP-085–BP-089R1
++
++## Quake-v5 savegame roundtrip and evidence hotfix
++
++- Replaces the invalid simultaneous dual-Host savegame evidence with three strictly sequential Host sessions.
++- Preserves the Quake `sv.num_edicts` high-water mark, including trailing free savegame edict blocks, when rebuilding MiniQuake's derived server-edict table.
++- Relinks restored non-free edicts without touching triggers, matching `Host_Loadgame_f` / `ED_ParseEdict` behavior.
++- Restores the saved map name at the savegame apply boundary.
++- Uses the parsed Quake-v5 save domain as the semantic boundary instead of treating all transient live VM globals as archived state.
++- Requires exact A→B byte identity and semantic equality, then verifies exact B→C stability in a third independent Host session.
++- Adds first-byte and first-semantic-difference diagnostics without collecting savegame or PAK payloads.
++- Keeps complete live server/global hashes as diagnostics only.
++- Extends the existing 24 BP-087 fixtures with save-domain comparison and byte-difference checks without changing the public fixture count.
++- Preserves all existing compatibility statuses and fingerprints.
+diff --git a/CHANGELOG_BP-087.md b/CHANGELOG_BP-087.md
+index 09b0860d97758e4d3930dcf05902625d1d46cf7b..08fb83f41323d0b571cd0fdc12e68c839f33cfe1 100644
+--- a/CHANGELOG_BP-087.md
++++ b/CHANGELOG_BP-087.md
+@@ -1,5 +1,9 @@
+-# BP-087 — demo and savegame artifact evidence
++# BP-087 — demo and savegame artifact compatibility
+ 
+ - Binds the three retail demo names and Quake savegame version 5 as explicit compatibility artifacts.
+-- Adds 24 asset-free fixtures for demo framing, replay verification, CRCs and save summaries.
+-- Adds two independent retail evidence runs that parse all three demos and perform an exact plus semantic live save/apply/reserialize roundtrip without collecting game data.
++- Provides 24 asset-free fixtures for demo framing, replay verification, CRCs and save-domain comparison helpers.
++- Uses strictly sequential Host sessions because the original NET/QSocket state is process-global.
++- Preserves the saved `sv.num_edicts` high-water mark, including trailing free edict blocks, when rebuilding MiniQuake's derived server state.
++- Compares parsed Quake-v5 save semantics rather than transient complete VM hashes.
++- Requires exact A→B byte and semantic identity and verifies exact B→C stability in a third independent Host session.
++- Never collects retail demo, save, PAK or other game-data bytes.
+diff --git a/COLLECT_RESULTS.ps1 b/COLLECT_RESULTS.ps1
+index 1709e2015e9b5665e791186a1682dde10a46bd63..273af50c401749d3a846242025d143341e21754a 100755
+--- a/COLLECT_RESULTS.ps1
++++ b/COLLECT_RESULTS.ps1
+@@ -7,11 +7,11 @@ $Root = $PSScriptRoot
+ $Build = Join-Path $Root "build"
+ $PackageId = "BP-089"
+ $BlockId = "BP-085-089"
+-$DeliveryRevision = "BP-085-089"
+-$DeliveryParent = "BP-080-084R2"
++$DeliveryRevision = "BP-085-089R1"
++$DeliveryParent = "BP-085-089"
+ $Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+-$Staging = Join-Path $Build (".bp085-089-results-{0}" -f $Timestamp)
+-$Archive = Join-Path $Build ("MiniQuake_BP-085-089_RESULTS_{0}.zip" -f $Timestamp)
++$Staging = Join-Path $Build (".bp085-089r1-results-{0}" -f $Timestamp)
++$Archive = Join-Path $Build ("MiniQuake_BP-085-089R1_RESULTS_{0}.zip" -f $Timestamp)
+ 
+ if (-not (Test-Path -LiteralPath $Build -PathType Container)) { throw "build directory does not exist: $Build" }
+ if (Test-Path -LiteralPath $Staging) { Remove-Item -Recurse -Force -LiteralPath $Staging }
+@@ -80,6 +80,12 @@ $RootFiles = @(
+   "docs\BP-088_STABILITY_AUDIT.md",
+   "docs\BP-089_COMPAT_RELEASE_CANDIDATE.md",
+   "docs\BP-085-089_TESTING.md",
++  "TEST_BP-085-089R1.ps1",
++  "CHANGELOG_BP-085-089R1.md",
++  "docs\BP-085-089R1_TESTING.md",
++  "docs\BP-085-089R1_RESULT_ANALYSIS.md",
++  "docs\BP-085-089R1_HOTFIX_REPORT.json",
++  "docs\BP-085-089R1_BLOCK_LEDGER.json",
+   "docs\BP-080-084R2_ACCEPTANCE_ANALYSIS.md",
+   "docs\BP-085-089_BLOCK_LEDGER.json",
+   "audit\game_profile_golden.json",
+@@ -90,6 +96,9 @@ $RootFiles = @(
+   "src\miniquake\game_profile.ml",
+   "src\miniquake\mod_compat.ml",
+   "src\miniquake\artifact_compat.ml",
++  "src\miniquake\savegame.ml",
++  "src\miniquake\savegame_runtime.ml",
++  "src\miniquake\host.ml",
+   "src\miniquake\stability_contract.ml",
+   "src\miniquake\compatibility_matrix.ml",
+   "tests\game_profile_compat_tests.ml",
+@@ -108,6 +117,7 @@ $RootFiles = @(
+   "patches\BP-087.diff",
+   "patches\BP-088.diff",
+   "patches\BP-089.diff",
++  "patches\BP-089R1.diff",
+   "SOURCE_MANIFEST.sha256",
+   "BLOCK_LEDGER.json",
+   "PORT_LEDGER.json",
+diff --git a/PORT_LEDGER.json b/PORT_LEDGER.json
+index 30f1f07a53e1f22369c3102a2049cfe47ea0b434..6d1271fd6b3b3f0b34b0ab498917ac6d8a801863 100644
+--- a/PORT_LEDGER.json
++++ b/PORT_LEDGER.json
+@@ -2,8 +2,8 @@
+   "schema_version": 1,
+   "project": "MiniQuake",
+   "current_package": "BP-089",
+-  "current_delivery_revision": "BP-085-089",
+-  "delivery_parent": "BP-080-084R2",
++  "current_delivery_revision": "BP-085-089R1",
++  "delivery_parent": "BP-085-089",
+   "parent_package": "BP-088",
+   "compatibility_target": {
+     "reference": "WinQuake/GLQuake 1.09",
+@@ -76,7 +76,7 @@
+     "block_parent": "BP-080-084R2",
+     "date": "2026-07-31",
+     "title": "compat_109 game-profile, artifact, stability and release-candidate closure",
+-    "status": "Windows acceptance pending",
++    "status": "Windows R1 acceptance pending",
+     "game_profile_status": "game_profile_109_frozen_v1",
+     "game_profile_fingerprint": "0x7a03b68d",
+     "mod_runtime_status": "mod_runtime_109_frozen_v1",
+@@ -91,8 +91,10 @@
+       "original_binary_interop",
+       "external_glquake_visual_reference"
+     ],
+-    "delivery_revision": "BP-085-089",
+-    "delivery_parent": "BP-080-084R2"
++    "delivery_revision": "BP-085-089R1",
++    "delivery_parent": "BP-085-089",
++    "artifact_evidence_revision": "sequential_exact_v1",
++    "savegame_high_water_preserved": true
+   },
+   "diagnostic_schemas": {
+     "trace": "MiniQuakeCompatTrace|schema=1",
+@@ -183,7 +185,7 @@
+     "the original GLQuake screenshot corpus is not bundled; BP-048 currently proves cross-process MiniQuake framebuffer determinism",
+     "the final >95% original-vs-MiniQuake image claim requires a separately captured external GLQuake reference corpus"
+   ],
+-  "next_package": "BP-085-089",
++  "next_package": "BP-085-089R1",
+   "bp001r2_acceptance": {
+     "result_archive": "MiniQuake_BP-001R2_RESULTS_20260724-181843.zip",
+     "result_archive_sha256": "a6373b21653760800af9cc67fc969b07a7b7f385e409e5c5f9bced718262816c",
+@@ -1949,5 +1951,15 @@
+     "native_source_changed": false,
+     "contract_fingerprint_changed": false,
+     "fixture_count_changed": false
++  },
++  "bp085089_acceptance": {
++    "result_archive": "MiniQuake_BP-085-089_RESULTS_20260731-133605.zip",
++    "result_archive_sha256": "cfaa061e9de12e13e9c38ba66f284eab8fb46986eebe5ddd27b2c3a0de777f87",
++    "status": "FAIL only at BP-087 retail save evidence",
++    "build_and_asset_free_tests": "PASS through BP-089",
++    "id1_rogue_hipnotic": "PASS",
++    "retail_demos": "demo1/demo2/demo3 PASS",
++    "save_failure": "byte and old live-hash mismatch followed by NET_FreeQSocket: not active",
++    "r1_fix": "sequential Host sessions, exact parsed-save roundtrip, preserved edict high-water mark and production load synchronization"
+   }
+ }
+diff --git a/PORT_STATUS.md b/PORT_STATUS.md
+index 59afda01e8493f325b43e24d09ec9f57a603bbf1..a07c7ffefe34924eee05965f86cafa837635e1e1 100644
+--- a/PORT_STATUS.md
++++ b/PORT_STATUS.md
+@@ -1,13 +1,16 @@
+ # MiniQuake port status
+ 
+-## Current delivery: BP-085–BP-089
++## Current delivery: BP-085–BP-089R1
+ 
+ Accepted Windows parent: **BP-080–BP-084R2**.
+ 
+ The source-function inventory is now Windows-accepted (`1,094/1,094` target
+ definitions classified). The current block adds game/search profiles, optional
+ mission-pack and mod runtime validation, retail demo/save evidence, two
+-5,000-frame stability modes and a cumulative release-candidate matrix.
++5,000-frame stability modes and a cumulative release-candidate matrix. R1
++repairs the Quake-v5 load roundtrip by preserving `sv.num_edicts`, uses
++sequential Host evidence sessions, and compares only the state actually
++archived by the version-5 format.
+ 
+ | Step | Scope | Fixtures |
+ |---|---|---:|
+diff --git a/README.md b/README.md
+index 8bfcfb813eee60cdc74172c31ddec220e682fc84..ae5227b3a0e02eb6cf568bb56e406a8788e1fb3c 100644
+--- a/README.md
++++ b/README.md
+@@ -1,4 +1,4 @@
+-# MiniQuake – BP-085–BP-089
++# MiniQuake – BP-085–BP-089R1
+ 
+ > Accepted Windows parent: BP-080–BP-084R2.
+ >
+@@ -13,7 +13,9 @@ accepted_contracts=18
+ pending_external_gates=2
+ ```
+ 
+-Run `TEST_BP-085-089.ps1`; see `docs/BP-085-089_TESTING.md`. No Quake game
++R1 fixes the real Quake-v5 load roundtrip by preserving the saved edict high-water mark and runs retail save evidence in strictly sequential Host sessions.
++
++Run `TEST_BP-085-089R1.ps1`; see `docs/BP-085-089R1_TESTING.md`. No Quake game
+ data is bundled or collected.
+ 
+ ---
+diff --git a/TEST_BP-085-089.ps1 b/TEST_BP-085-089.ps1
+index 49a0ed1658e3ebedd67bbb5a6c39427cf54bad91..b98bcabea10ee49475d5ef2541fe5bea5d221fcb 100755
+--- a/TEST_BP-085-089.ps1
++++ b/TEST_BP-085-089.ps1
+@@ -48,8 +48,8 @@ $env:PYTHONUNBUFFERED = "1"
+ $PackageId = "BP-089"
+ $ParentPackageId = "BP-088"
+ $BlockId = "BP-085-089"
+-$DeliveryRevision = "BP-085-089"
+-$DeliveryParent = "BP-080-084R2"
++$DeliveryRevision = "BP-085-089R1"
++$DeliveryParent = "BP-085-089"
+ $BlockParentPackageId = "BP-080-084R2"
+ $Root = $PSScriptRoot
+ $Build = Join-Path $Root "build"
+@@ -61,8 +61,8 @@ $ArtifactEvidenceExe = Join-Path $Build "MiniQuakeArtifactRetailEvidence.exe"
+ $TraceComparator = Join-Path $Root "tools\compare_traces.py"
+ $RenderComparator = Join-Path $Root "tools\compare_render_evidence.py"
+ $Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+-$TranscriptPath = Join-Path $Build ("bp085-089-test-{0}.log" -f $Timestamp)
+-$SummaryPath = Join-Path $Build "bp085-089-test-summary.json"
++$TranscriptPath = Join-Path $Build ("bp085-089r1-test-{0}.log" -f $Timestamp)
++$SummaryPath = Join-Path $Build "bp085-089r1-test-summary.json"
+ $Steps = New-Object System.Collections.Generic.List[object]
+ 
+ function Resolve-Tool([string]$Value, [string]$Label) {
+@@ -250,10 +250,10 @@ function Write-NetworkEvidenceOutput([string]$Suffix, [string]$Stdout, [string]$
+ }
+ 
+ function Run-NetworkEvidencePair([string]$Suffix, [int]$Port) {
+-  $ServerOut = Join-Path $Build ("bp085-089-network-server-{0}.log" -f $Suffix)
+-  $ServerErr = Join-Path $Build ("bp085-089-network-server-{0}.err.log" -f $Suffix)
+-  $ClientLog = Join-Path $Build ("bp085-089-network-client-{0}.log" -f $Suffix)
+-  $PairJson = Join-Path $Build ("bp085-089-network-pair-{0}.json" -f $Suffix)
++  $ServerOut = Join-Path $Build ("bp085-089r1-network-server-{0}.log" -f $Suffix)
++  $ServerErr = Join-Path $Build ("bp085-089r1-network-server-{0}.err.log" -f $Suffix)
++  $ClientLog = Join-Path $Build ("bp085-089r1-network-client-{0}.log" -f $Suffix)
++  $PairJson = Join-Path $Build ("bp085-089r1-network-pair-{0}.json" -f $Suffix)
+   Remove-Item -Force -ErrorAction SilentlyContinue $ServerOut, $ServerErr, $ClientLog, $PairJson
+ 
+   Write-Host ("[MiniQuake] starting network evidence server {0} on UDP port {1}" -f $Suffix, $Port) -ForegroundColor Cyan
+@@ -304,7 +304,7 @@ New-Item -ItemType Directory -Force -Path $Build | Out-Null
+ Start-Transcript -Path $TranscriptPath -Force | Out-Null
+ $Failure = ""
+ try {
+-  Write-Host "MiniQuake BP-085-089 acceptance test"
++  Write-Host "MiniQuake BP-085-089R1 acceptance test"
+   Write-Host "  parent: $BlockParentPackageId"
+   Write-Host "  root:   $Root"
+   if ($BisectOnFailure) { Write-Host "  logical bisect markers enabled" }
+@@ -321,14 +321,14 @@ try {
+     if ($NetworkTests) { $Arguments += "-NetworkTests" }
+     if ($RebuildNative) { $Arguments += "-RebuildNative" }
+     if ($Listings) { $Arguments += "-Listings" }
+-    [void](Run-Logged "single cumulative build and unit-test suite" $PowerShellExe $Arguments "bp085-089-build-child.log" "MiniQuake BP-089 compatibility release closure tests passed: 24")
++    [void](Run-Logged "single cumulative build and unit-test suite" $PowerShellExe $Arguments "bp085-089r1-build-child.log" "MiniQuake BP-089 compatibility release closure tests passed: 24")
+   } else {
+     Add-Step "single cumulative build and unit-test suite" "SKIPPED" 0 "-SkipBuild"
+   }
+ 
+   foreach ($Path in @($GameExe, $EvidenceExe, $CoreAssetEvidenceExe, $ArtifactEvidenceExe)) { if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "required executable missing: $Path" } }
+ 
+-  $Version = Run-Logged "package identity" $GameExe @("--version") "bp085-089-version.txt" "Compatibility release status: compat_109_release_candidate_v1"
++  $Version = Run-Logged "package identity" $GameExe @("--version") "bp085-089r1-version.txt" "Compatibility release status: compat_109_release_candidate_v1"
+   if ($Version -notmatch 'Package: BP-089' -or $Version -notmatch 'Block: BP-085-089') { throw "compiled package identity mismatch" }
+   if ($Version -notmatch 'Core assets/memory status: core_assets_memory_109_frozen_v1' -or $Version -notmatch 'Core assets/memory fingerprint: 0x6c8d974d') { throw "compiled core assets/memory identity mismatch" }
+   if ($Version -notmatch 'Gameplay/presentation status: gameplay_presentation_109_frozen_v1' -or $Version -notmatch 'Gameplay/presentation fingerprint: 0xad91624c') { throw "compiled gameplay/presentation identity mismatch" }
+@@ -342,8 +342,8 @@ try {
+   $CanUseGame = -not $SkipGameValidation -and -not [string]::IsNullOrWhiteSpace($QuakeBase)
+   if ($CanUseGame) {
+     if (-not (Test-Path -LiteralPath (Join-Path $QuakeBase "id1\pak0.pak") -PathType Leaf)) { throw "Quake data not found: $QuakeBase\id1\pak0.pak" }
+-    [void](Run-Logged "installed Quake data validation" $GameExe @("--validate-game", $QuakeBase, $Map, "-game", $Game) "bp085-089-game-validation.log" "Validation result: PASS")
+-    [void](Run-Logged "headless runtime validation" $GameExe @("--validate-runtime", $QuakeBase, $Map, [string]$Frames, "-game", $Game) "bp085-089-runtime-validation.log")
++    [void](Run-Logged "installed Quake data validation" $GameExe @("--validate-game", $QuakeBase, $Map, "-game", $Game) "bp085-089r1-game-validation.log" "Validation result: PASS")
++    [void](Run-Logged "headless runtime validation" $GameExe @("--validate-runtime", $QuakeBase, $Map, [string]$Frames, "-game", $Game) "bp085-089r1-runtime-validation.log")
+   } else {
+     Add-Step "installed Quake data validation" "SKIPPED" 0 "no usable -QuakeBase or skipped"
+     Add-Step "headless runtime validation" "SKIPPED" 0 "no usable -QuakeBase or skipped"
+@@ -358,16 +358,16 @@ try {
+         continue
+       }
+       $MissionFlag = "-" + $Mission
+-      [void](Run-Logged ("mission-pack {0} game validation" -f $Mission) $GameExe @("--validate-game", $QuakeBase, "start", $MissionFlag) ("bp085-089-{0}-validation.log" -f $Mission) "Validation result: PASS")
+-      [void](Run-Logged ("mission-pack {0} headless runtime" -f $Mission) $GameExe @("-basedir", $QuakeBase, $MissionFlag, "-headless", "-nosound", "-maxframes", "128", "+map", "start") ("bp085-089-{0}-runtime.log" -f $Mission))
++      [void](Run-Logged ("mission-pack {0} game validation" -f $Mission) $GameExe @("--validate-game", $QuakeBase, "start", $MissionFlag) ("bp085-089r1-{0}-validation.log" -f $Mission) "Validation result: PASS")
++      [void](Run-Logged ("mission-pack {0} headless runtime" -f $Mission) $GameExe @("-basedir", $QuakeBase, $MissionFlag, "-headless", "-nosound", "-maxframes", "128", "+map", "start") ("bp085-089r1-{0}-runtime.log" -f $Mission))
+     }
+   } else {
+     Add-Step "optional mission-pack validation" "SKIPPED" 0 "skipped or no usable Quake data"
+   }
+ 
+   if ($CanUseGame) {
+-    $CoreA = Join-Path $Build "bp085-089-core-assets-a.log"
+-    $CoreB = Join-Path $Build "bp085-089-core-assets-b.log"
++    $CoreA = Join-Path $Build "bp085-089r1-core-assets-a.log"
++    $CoreB = Join-Path $Build "bp085-089r1-core-assets-b.log"
+     [void](Run-Logged "retail core asset evidence A" $CoreAssetEvidenceExe @($QuakeBase, $Game) ([IO.Path]::GetFileName($CoreA)) "result=PASS")
+     [void](Run-Logged "retail core asset evidence B" $CoreAssetEvidenceExe @($QuakeBase, $Game) ([IO.Path]::GetFileName($CoreB)) "result=PASS")
+     $CoreHashA = (Get-FileHash -Algorithm SHA256 -LiteralPath $CoreA).Hash.ToLowerInvariant()
+@@ -380,7 +380,7 @@ try {
+ 
+   if (-not $SkipAudioEvidence -and $CanUseGame) {
+     $AudioExe = Join-Path $Build "MiniQuakeAudioRetailEvidence.exe"
+-    $A = Join-Path $Build "bp085-089-audio-a.log"; $B = Join-Path $Build "bp085-089-audio-b.log"
++    $A = Join-Path $Build "bp085-089r1-audio-a.log"; $B = Join-Path $Build "bp085-089r1-audio-b.log"
+     $TextA = Run-Logged "retail audio evidence A" $AudioExe @($QuakeBase, $Game) ([IO.Path]::GetFileName($A)) "MiniQuake BP-059 retail audio evidence: PASS"
+     $TextB = Run-Logged "retail audio evidence B" $AudioExe @($QuakeBase, $Game) ([IO.Path]::GetFileName($B)) "MiniQuake BP-059 retail audio evidence: PASS"
+     $HashA = (Get-FileHash -Algorithm SHA256 -LiteralPath $A).Hash.ToLowerInvariant(); $HashB = (Get-FileHash -Algorithm SHA256 -LiteralPath $B).Hash.ToLowerInvariant()
+@@ -389,10 +389,18 @@ try {
+   } else { Add-Step "retail audio evidence" "SKIPPED" 0 "skipped or no Quake data" }
+ 
+   if (-not $SkipArtifactEvidence -and $CanUseGame) {
+-    $ArtifactA = Join-Path $Build "bp085-089-artifacts-a.log"
+-    $ArtifactB = Join-Path $Build "bp085-089-artifacts-b.log"
+-    [void](Run-Logged "retail demo/save artifact evidence A" $ArtifactEvidenceExe @($QuakeBase, $Game, $Map) ([IO.Path]::GetFileName($ArtifactA)) "result=PASS")
+-    [void](Run-Logged "retail demo/save artifact evidence B" $ArtifactEvidenceExe @($QuakeBase, $Game, $Map) ([IO.Path]::GetFileName($ArtifactB)) "result=PASS")
++    $ArtifactA = Join-Path $Build "bp085-089r1-artifacts-a.log"
++    $ArtifactB = Join-Path $Build "bp085-089r1-artifacts-b.log"
++    $ArtifactTextA = Run-Logged "retail demo/save artifact evidence A" $ArtifactEvidenceExe @($QuakeBase, $Game, $Map) ([IO.Path]::GetFileName($ArtifactA)) "result=PASS"
++    $ArtifactTextB = Run-Logged "retail demo/save artifact evidence B" $ArtifactEvidenceExe @($QuakeBase, $Game, $Map) ([IO.Path]::GetFileName($ArtifactB)) "result=PASS"
++    foreach ($ArtifactText in @($ArtifactTextA, $ArtifactTextB)) {
++      if ($ArtifactText -notmatch 'first_pass_exact=true' -or
++          $ArtifactText -notmatch 'semantic=true' -or
++          $ArtifactText -notmatch 'stable_exact=true' -or
++          $ArtifactText -notmatch 'stable_semantic=true') {
++        throw "retail artifact evidence did not prove exact, semantic and stable save roundtrip"
++      }
++    }
+     $ArtifactHashA = (Get-FileHash -Algorithm SHA256 -LiteralPath $ArtifactA).Hash.ToLowerInvariant()
+     $ArtifactHashB = (Get-FileHash -Algorithm SHA256 -LiteralPath $ArtifactB).Hash.ToLowerInvariant()
+     if ($ArtifactHashA -ne $ArtifactHashB) { throw "retail artifact evidence differs: A=$ArtifactHashA B=$ArtifactHashB" }
+@@ -402,15 +410,15 @@ try {
+   }
+ 
+   if (-not $SkipTraceValidation -and $CanUseGame) {
+-    $TraceDir = Join-Path $Build "bp085-089-traces"; Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $TraceDir; New-Item -ItemType Directory -Force -Path $TraceDir | Out-Null
++    $TraceDir = Join-Path $Build "bp085-089r1-traces"; Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $TraceDir; New-Item -ItemType Directory -Force -Path $TraceDir | Out-Null
+     $PrefixA = Join-Path $TraceDir "run-a"; $PrefixB = Join-Path $TraceDir "run-b"
+-    [void](Run-Logged "compatibility trace A" $GameExe @("--compat-trace", $QuakeBase, $Map, [string]$TraceFrames, $PrefixA, "-game", $Game) "bp085-089-trace-a.log")
+-    [void](Run-Logged "compatibility trace B" $GameExe @("--compat-trace", $QuakeBase, $Map, [string]$TraceFrames, $PrefixB, "-game", $Game) "bp085-089-trace-b.log")
+-    [void](Run-Logged "byte-identical trace comparison" $PythonExe @($TraceComparator, ("{0}.mqtrace" -f $PrefixA), ("{0}.mqtrace" -f $PrefixB), "--json-output", (Join-Path $Build "bp085-089-trace-comparison.json")) "bp085-089-trace-comparison.log")
++    [void](Run-Logged "compatibility trace A" $GameExe @("--compat-trace", $QuakeBase, $Map, [string]$TraceFrames, $PrefixA, "-game", $Game) "bp085-089r1-trace-a.log")
++    [void](Run-Logged "compatibility trace B" $GameExe @("--compat-trace", $QuakeBase, $Map, [string]$TraceFrames, $PrefixB, "-game", $Game) "bp085-089r1-trace-b.log")
++    [void](Run-Logged "byte-identical trace comparison" $PythonExe @($TraceComparator, ("{0}.mqtrace" -f $PrefixA), ("{0}.mqtrace" -f $PrefixB), "--json-output", (Join-Path $Build "bp085-089r1-trace-comparison.json")) "bp085-089r1-trace-comparison.log")
+   } else { Add-Step "deterministic compatibility traces" "SKIPPED" 0 "skipped or no Quake data" }
+ 
+   if (-not $SkipBlackPortCorpus -and $CanUseGame) {
+-    $CorpusRoot = Join-Path $Build "bp085-089-black-port-corpus"
++    $CorpusRoot = Join-Path $Build "bp085-089r1-black-port-corpus"
+     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $CorpusRoot
+     New-Item -ItemType Directory -Force -Path $CorpusRoot | Out-Null
+     $CorpusScenarios = @(
+@@ -427,10 +435,10 @@ try {
+       New-Item -ItemType Directory -Force -Path $ScenarioDirectory | Out-Null
+       $PrefixA = Join-Path $ScenarioDirectory "run-a"
+       $PrefixB = Join-Path $ScenarioDirectory "run-b"
+-      [void](Run-Logged ("black-port corpus {0} trace A" -f $ScenarioName) $GameExe @("--compat-trace", $QuakeBase, $ScenarioMap, [string]$BlackPortCorpusFrames, $PrefixA, "-game", $Game) ("bp085-089-corpus-{0}-a.log" -f $ScenarioName))
+-      [void](Run-Logged ("black-port corpus {0} trace B" -f $ScenarioName) $GameExe @("--compat-trace", $QuakeBase, $ScenarioMap, [string]$BlackPortCorpusFrames, $PrefixB, "-game", $Game) ("bp085-089-corpus-{0}-b.log" -f $ScenarioName))
+-      $ComparisonJson = Join-Path $Build ("bp085-089-corpus-{0}-comparison.json" -f $ScenarioName)
+-      [void](Run-Logged ("black-port corpus {0} comparison" -f $ScenarioName) $PythonExe @($TraceComparator, ("{0}.mqtrace" -f $PrefixA), ("{0}.mqtrace" -f $PrefixB), "--json-output", $ComparisonJson) ("bp085-089-corpus-{0}-comparison.log" -f $ScenarioName))
++      [void](Run-Logged ("black-port corpus {0} trace A" -f $ScenarioName) $GameExe @("--compat-trace", $QuakeBase, $ScenarioMap, [string]$BlackPortCorpusFrames, $PrefixA, "-game", $Game) ("bp085-089r1-corpus-{0}-a.log" -f $ScenarioName))
++      [void](Run-Logged ("black-port corpus {0} trace B" -f $ScenarioName) $GameExe @("--compat-trace", $QuakeBase, $ScenarioMap, [string]$BlackPortCorpusFrames, $PrefixB, "-game", $Game) ("bp085-089r1-corpus-{0}-b.log" -f $ScenarioName))
++      $ComparisonJson = Join-Path $Build ("bp085-089r1-corpus-{0}-comparison.json" -f $ScenarioName)
++      [void](Run-Logged ("black-port corpus {0} comparison" -f $ScenarioName) $PythonExe @($TraceComparator, ("{0}.mqtrace" -f $PrefixA), ("{0}.mqtrace" -f $PrefixB), "--json-output", $ComparisonJson) ("bp085-089r1-corpus-{0}-comparison.log" -f $ScenarioName))
+       $TraceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath ("{0}.mqtrace" -f $PrefixA)).Hash.ToLowerInvariant()
+       $CorpusReport += [ordered]@{
+         name = $ScenarioName
+@@ -440,7 +448,7 @@ try {
+         comparison = [IO.Path]::GetFileName($ComparisonJson)
+       }
+     }
+-    $CorpusSummaryPath = Join-Path $Build "bp085-089-black-port-corpus-summary.json"
++    $CorpusSummaryPath = Join-Path $Build "bp085-089r1-black-port-corpus-summary.json"
+     [ordered]@{
+       schema_version = 1
+       status = "PASS"
+@@ -454,19 +462,19 @@ try {
+   }
+ 
+   if (-not $SkipSoak -and $CanUseGame) {
+-    [void](Run-Logged "5000-frame host soak" $GameExe @("--soak", $QuakeBase, $Map, [string]$SoakFrames, "-game", $Game) "bp085-089-host-soak.log" "result=PASS")
++    [void](Run-Logged "5000-frame host soak" $GameExe @("--soak", $QuakeBase, $Map, [string]$SoakFrames, "-game", $Game) "bp085-089r1-host-soak.log" "result=PASS")
+     $SoakPort = Get-Random -Minimum 30000 -Maximum 60000
+-    [void](Run-Logged "5000-frame listen-server resource soak" $GameExe @("--long-soak", "listen", $QuakeBase, $Map, [string]$ListenSoakFrames, "-game", $Game, "-port", [string]$SoakPort) "bp085-089-listen-soak.log" "result=PASS")
++    [void](Run-Logged "5000-frame listen-server resource soak" $GameExe @("--long-soak", "listen", $QuakeBase, $Map, [string]$ListenSoakFrames, "-game", $Game, "-port", [string]$SoakPort) "bp085-089r1-listen-soak.log" "result=PASS")
+   } else {
+     Add-Step "resource stability soaks" "SKIPPED" 0 "skipped or no usable Quake data"
+   }
+ 
+   if (-not $SkipRenderEvidence -and $CanUseGame) {
+-    $EvidenceDir = Join-Path $Build "bp085-089-render"; Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $EvidenceDir; New-Item -ItemType Directory -Force -Path $EvidenceDir | Out-Null
++    $EvidenceDir = Join-Path $Build "bp085-089r1-render"; Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $EvidenceDir; New-Item -ItemType Directory -Force -Path $EvidenceDir | Out-Null
+     $EA = Join-Path $EvidenceDir "a"; $EB = Join-Path $EvidenceDir "b"
+-    [void](Run-Logged "render evidence A" $GameExe @("--render-evidence", $QuakeBase, $Map, [string]$RenderEvidenceFrame, $EA, "-game", $Game) "bp085-089-render-a.log")
+-    [void](Run-Logged "render evidence B" $GameExe @("--render-evidence", $QuakeBase, $Map, [string]$RenderEvidenceFrame, $EB, "-game", $Game) "bp085-089-render-b.log")
+-    [void](Run-Logged "byte-identical render evidence" $PythonExe @($RenderComparator, ("{0}.tga" -f $EA), ("{0}.tga" -f $EB), "--require-exact", "--json-out", (Join-Path $Build "bp085-089-render-comparison.json")) "bp085-089-render-comparison.log")
++    [void](Run-Logged "render evidence A" $GameExe @("--render-evidence", $QuakeBase, $Map, [string]$RenderEvidenceFrame, $EA, "-game", $Game) "bp085-089r1-render-a.log")
++    [void](Run-Logged "render evidence B" $GameExe @("--render-evidence", $QuakeBase, $Map, [string]$RenderEvidenceFrame, $EB, "-game", $Game) "bp085-089r1-render-b.log")
++    [void](Run-Logged "byte-identical render evidence" $PythonExe @($RenderComparator, ("{0}.tga" -f $EA), ("{0}.tga" -f $EB), "--require-exact", "--json-out", (Join-Path $Build "bp085-089r1-render-comparison.json")) "bp085-089r1-render-comparison.log")
+   } else { Add-Step "deterministic framebuffer evidence" "SKIPPED" 0 "skipped or no Quake data" }
+ 
+   if (-not $SkipNetworkEvidence) {
+@@ -479,7 +487,7 @@ try {
+     Add-Step "two independent UDP control handshakes" "PASS" 0 ("sha256=" + $HashA)
+   } else { Add-Step "two independent UDP control handshakes" "SKIPPED" 0 "-SkipNetworkEvidence" }
+ 
+-  if ($NetworkTests) { [void](Run-Logged "Winsock UDP loopback smoke" $GameExe @("--udp-smoke", "2000") "bp085-089-udp-smoke.log" "result=PASS") }
++  if ($NetworkTests) { [void](Run-Logged "Winsock UDP loopback smoke" $GameExe @("--udp-smoke", "2000") "bp085-089r1-udp-smoke.log" "result=PASS") }
+   else { Add-Step "Winsock UDP loopback smoke" "SKIPPED" 0 "-NetworkTests not supplied" }
+ 
+   $Failed = @($Steps | Where-Object { $_.status -eq "FAIL" })
+@@ -533,11 +541,11 @@ try {
+ }
+ 
+ if (-not [string]::IsNullOrWhiteSpace($Failure)) {
+-  Write-Host "MiniQuake BP-085-089 acceptance test: FAIL" -ForegroundColor Red
++  Write-Host "MiniQuake BP-085-089R1 acceptance test: FAIL" -ForegroundColor Red
+   Write-Host "Run .\COLLECT_RESULTS.ps1 and upload the generated ZIP."
+   exit 1
+ }
+-Write-Host "MiniQuake BP-085-089 acceptance test: PASS" -ForegroundColor Green
++Write-Host "MiniQuake BP-085-089R1 acceptance test: PASS" -ForegroundColor Green
+ Write-Host "Result summary: $SummaryPath"
+ Write-Host "For feedback, run .\COLLECT_RESULTS.ps1 and upload the generated ZIP."
+ exit 0
+diff --git a/TEST_BP-085-089R1.ps1 b/TEST_BP-085-089R1.ps1
+new file mode 100644
+index 0000000000000000000000000000000000000000..b98bcabea10ee49475d5ef2541fe5bea5d221fcb
+--- /dev/null
++++ b/TEST_BP-085-089R1.ps1
+@@ -0,0 +1,551 @@
++﻿[CmdletBinding()]
++param(
++  [string]$Compiler = "",
++  [Alias("StdLibPath", "ImportRoot")]
++  [string]$StdLib = "",
++  [string]$Python = "",
++  [string]$QuakeBase = "",
++  [string]$Game = "id1",
++  [string]$Map = "start",
++  [ValidateRange(1, 1000000)]
++  [int]$Frames = 300,
++  [ValidateRange(1, 1000000)]
++  [int]$TraceFrames = 128,
++  [ValidateRange(1, 1000000)]
++  [int]$BlackPortCorpusFrames = 64,
++  [ValidateRange(1, 1000000)]
++  [int]$RenderEvidenceFrame = 128,
++  [ValidateRange(1, 2000000000)]
++  [int]$SoakFrames = 5000,
++  [ValidateRange(1, 2000000000)]
++  [int]$ListenSoakFrames = 5000,
++  [ValidateSet("Release", "Debug")]
++  [string]$Configuration = "Release",
++  [switch]$SkipBuild,
++  [switch]$SkipGameValidation,
++  [switch]$SkipTraceValidation,
++  [switch]$SkipRenderEvidence,
++  [switch]$SkipBlackPortCorpus,
++  [switch]$SkipAudioEvidence,
++  [switch]$SkipArtifactEvidence,
++  [switch]$SkipMissionPackEvidence,
++  [switch]$SkipSoak,
++  [switch]$SkipNetworkEvidence,
++  [switch]$NetworkTests,
++  [switch]$RebuildNative,
++  [switch]$Listings,
++  [switch]$ContinueIndependentTests = $true,
++  [switch]$BisectOnFailure
++)
++
++$ErrorActionPreference = "Stop"
++Set-StrictMode -Version Latest
++
++# Force Python tools and the Python MiniLang compiler to flush every line.
++# The PowerShell wrappers below also forward every received line immediately.
++$env:PYTHONUNBUFFERED = "1"
++
++$PackageId = "BP-089"
++$ParentPackageId = "BP-088"
++$BlockId = "BP-085-089"
++$DeliveryRevision = "BP-085-089R1"
++$DeliveryParent = "BP-085-089"
++$BlockParentPackageId = "BP-080-084R2"
++$Root = $PSScriptRoot
++$Build = Join-Path $Root "build"
++$BuildScript = Join-Path $Root "build.ps1"
++$GameExe = Join-Path $Build "MiniQuake.exe"
++$EvidenceExe = Join-Path $Build "MiniQuakeNetworkPlatformEvidence.exe"
++$CoreAssetEvidenceExe = Join-Path $Build "MiniQuakeCoreAssetRetailEvidence.exe"
++$ArtifactEvidenceExe = Join-Path $Build "MiniQuakeArtifactRetailEvidence.exe"
++$TraceComparator = Join-Path $Root "tools\compare_traces.py"
++$RenderComparator = Join-Path $Root "tools\compare_render_evidence.py"
++$Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
++$TranscriptPath = Join-Path $Build ("bp085-089r1-test-{0}.log" -f $Timestamp)
++$SummaryPath = Join-Path $Build "bp085-089r1-test-summary.json"
++$Steps = New-Object System.Collections.Generic.List[object]
++
++function Resolve-Tool([string]$Value, [string]$Label) {
++  if (-not [string]::IsNullOrWhiteSpace($Value) -and (Test-Path -LiteralPath $Value -PathType Leaf)) {
++    return [IO.Path]::GetFullPath($Value)
++  }
++  if (-not [string]::IsNullOrWhiteSpace($Value)) {
++    $Command = Get-Command $Value -ErrorAction SilentlyContinue | Select-Object -First 1
++    if ($null -ne $Command) { return $Command.Path }
++  }
++  throw "$Label not found: $Value"
++}
++
++function Add-Step([string]$Name, [string]$Status, [int]$ExitCode, [string]$Detail) {
++  $Steps.Add([ordered]@{ name = $Name; status = $Status; exit_code = $ExitCode; detail = $Detail })
++  $Color = if ($Status -eq "PASS") { "Green" } elseif ($Status -eq "SKIPPED") { "Yellow" } else { "Red" }
++  Write-Host ("[{0}] {1} - {2}" -f $Status, $Name, $Detail) -ForegroundColor $Color
++}
++
++function Failure-Marker([string]$Text) {
++  if ([string]::IsNullOrWhiteSpace($Text)) { return "" }
++  foreach ($Line in ($Text -split "`r?`n")) {
++    if ($Line -match '^\s*FAIL:\s*' -or $Line -match 'tests failed:\s*[1-9]' -or $Line -match 'evidence:\s*FAIL') { return $Line.Trim() }
++  }
++  return ""
++}
++
++function Invoke-LiveProcess(
++  [string]$Executable,
++  [string[]]$Arguments,
++  [string]$LogPath
++) {
++  $Lines = [System.Collections.Generic.List[string]]::new()
++  $Encoding = [System.Text.UTF8Encoding]::new($false)
++  $Writer = [System.IO.StreamWriter]::new($LogPath, $false, $Encoding)
++  $Code = 1
++  try {
++    & $Executable @Arguments 2>&1 |
++      ForEach-Object {
++        $Line = [string]$_
++        $Lines.Add($Line)
++        $Writer.WriteLine($Line)
++        $Writer.Flush()
++        Write-Host $Line
++      }
++    $Code = [int]$LASTEXITCODE
++  } finally {
++    $Writer.Flush()
++    $Writer.Dispose()
++  }
++  $Text = [string]::Join("`n", $Lines.ToArray())
++  return [pscustomobject]@{
++    exit_code = $Code
++    text = $Text
++  }
++}
++
++function Run-Logged([string]$Name, [string]$Executable, [string[]]$Arguments, [string]$LogName, [string]$RequiredMarker = "") {
++  $LogPath = Join-Path $Build $LogName
++  Write-Host ("[MiniQuake] starting {0}" -f $Name) -ForegroundColor Cyan
++  $Result = Invoke-LiveProcess -Executable $Executable -Arguments $Arguments -LogPath $LogPath
++  $Code = [int]$Result.exit_code
++  $Text = [string]$Result.text
++  $Marker = Failure-Marker $Text
++  if ($Code -eq 0 -and -not [string]::IsNullOrWhiteSpace($Marker)) { $Code = 1 }
++  if ($Code -eq 0 -and -not [string]::IsNullOrWhiteSpace($RequiredMarker) -and $Text -notmatch [regex]::Escape($RequiredMarker)) { $Code = 1; $Marker = "missing marker: $RequiredMarker" }
++  if ($Code -ne 0) { Add-Step $Name "FAIL" $Code ("log=" + $LogName + " " + $Marker); throw "$Name failed with exit code $Code" }
++  Add-Step $Name "PASS" 0 ("log=" + $LogName)
++  return $Text
++}
++
++function Start-BackgroundCapturedProcess(
++  [string]$Executable,
++  [string]$ArgumentsText,
++  [string]$Label
++) {
++  $StartInfo = New-Object System.Diagnostics.ProcessStartInfo
++  $StartInfo.FileName = $Executable
++  $StartInfo.Arguments = $ArgumentsText
++  $StartInfo.WorkingDirectory = $Root
++  $StartInfo.UseShellExecute = $false
++  $StartInfo.CreateNoWindow = $true
++  $StartInfo.RedirectStandardOutput = $true
++  $StartInfo.RedirectStandardError = $true
++
++  $Process = New-Object System.Diagnostics.Process
++  $Process.StartInfo = $StartInfo
++  try {
++    if (-not $Process.Start()) {
++      throw "process start returned false"
++    }
++  } catch {
++    $Process.Dispose()
++    throw ("INFRA_FAILURE: could not start {0}: {1}" -f $Label, $_.Exception.Message)
++  }
++
++  # Drain both redirected streams asynchronously while the server runs. This
++  # avoids a pipe deadlock without buffering any foreground compiler/test job.
++  $StdoutTask = $Process.StandardOutput.ReadToEndAsync()
++  $StderrTask = $Process.StandardError.ReadToEndAsync()
++  return [pscustomobject]@{
++    process = $Process
++    stdout_task = $StdoutTask
++    stderr_task = $StderrTask
++    label = $Label
++  }
++}
++
++function Stop-BackgroundCapturedProcess([pscustomobject]$Handle) {
++  if ($null -eq $Handle -or $null -eq $Handle.process) { return }
++  $Process = [System.Diagnostics.Process]$Handle.process
++  try {
++    if (-not $Process.HasExited) { $Process.Kill() }
++  } catch { }
++  try { $Process.WaitForExit() } catch { }
++}
++
++function Complete-BackgroundCapturedProcess(
++  [pscustomobject]$Handle,
++  [int]$TimeoutMilliseconds,
++  [string]$StdoutPath,
++  [string]$StderrPath
++) {
++  $Process = [System.Diagnostics.Process]$Handle.process
++  $Label = [string]$Handle.label
++  $Exited = $false
++  try {
++    $Exited = $Process.WaitForExit($TimeoutMilliseconds)
++  } catch {
++    Stop-BackgroundCapturedProcess $Handle
++    throw ("INFRA_FAILURE: waiting for {0} failed: {1}" -f $Label, $_.Exception.Message)
++  }
++  if (-not $Exited) {
++    Stop-BackgroundCapturedProcess $Handle
++    throw ("INFRA_FAILURE: {0} timed out after {1} ms" -f $Label, $TimeoutMilliseconds)
++  }
++
++  # The parameterless wait synchronizes redirected-stream completion on
++  # Windows PowerShell 5.1. Refresh before reading ExitCode so the process
++  # object cannot retain the blank/null status observed in R5.
++  $Process.WaitForExit()
++  $Process.Refresh()
++
++  try {
++    $Stdout = [string]$Handle.stdout_task.Result
++    $Stderr = [string]$Handle.stderr_task.Result
++  } catch {
++    $Process.Dispose()
++    throw ("INFRA_FAILURE: collecting {0} output failed: {1}" -f $Label, $_.Exception.Message)
++  }
++
++  $Encoding = New-Object System.Text.UTF8Encoding($false)
++  [System.IO.File]::WriteAllText($StdoutPath, $Stdout, $Encoding)
++  [System.IO.File]::WriteAllText($StderrPath, $Stderr, $Encoding)
++
++  try {
++    $Code = [int]$Process.ExitCode
++  } catch {
++    $Process.Dispose()
++    throw ("INFRA_FAILURE: {0} exit code unavailable after process completion: {1}" -f $Label, $_.Exception.Message)
++  }
++  $Process.Dispose()
++
++  return [pscustomobject]@{
++    exit_code = $Code
++    stdout = $Stdout
++    stderr = $Stderr
++    timed_out = $false
++  }
++}
++
++function Write-NetworkEvidenceOutput([string]$Suffix, [string]$Stdout, [string]$Stderr) {
++  if (-not [string]::IsNullOrWhiteSpace($Stdout)) {
++    Write-Host ("[MiniQuake] network evidence server {0} stdout" -f $Suffix) -ForegroundColor Cyan
++    foreach ($Line in ($Stdout -split "`r?`n")) {
++      if (-not [string]::IsNullOrEmpty($Line)) { Write-Host $Line }
++    }
++  }
++  if (-not [string]::IsNullOrWhiteSpace($Stderr)) {
++    Write-Host ("[MiniQuake] network evidence server {0} stderr" -f $Suffix) -ForegroundColor Yellow
++    foreach ($Line in ($Stderr -split "`r?`n")) {
++      if (-not [string]::IsNullOrEmpty($Line)) { Write-Host $Line -ForegroundColor Yellow }
++    }
++  }
++}
++
++function Run-NetworkEvidencePair([string]$Suffix, [int]$Port) {
++  $ServerOut = Join-Path $Build ("bp085-089r1-network-server-{0}.log" -f $Suffix)
++  $ServerErr = Join-Path $Build ("bp085-089r1-network-server-{0}.err.log" -f $Suffix)
++  $ClientLog = Join-Path $Build ("bp085-089r1-network-client-{0}.log" -f $Suffix)
++  $PairJson = Join-Path $Build ("bp085-089r1-network-pair-{0}.json" -f $Suffix)
++  Remove-Item -Force -ErrorAction SilentlyContinue $ServerOut, $ServerErr, $ClientLog, $PairJson
++
++  Write-Host ("[MiniQuake] starting network evidence server {0} on UDP port {1}" -f $Suffix, $Port) -ForegroundColor Cyan
++  $ServerHandle = Start-BackgroundCapturedProcess -Executable $EvidenceExe -ArgumentsText ("server {0}" -f $Port) -Label ("network evidence server {0}" -f $Suffix)
++  $ClientResult = $null
++  $ServerResult = $null
++  try {
++    Start-Sleep -Milliseconds 300
++    Write-Host ("[MiniQuake] starting network evidence client {0}" -f $Suffix) -ForegroundColor Cyan
++    $ClientResult = Invoke-LiveProcess -Executable $EvidenceExe -Arguments @("client", [string]$Port) -LogPath $ClientLog
++    $ServerResult = Complete-BackgroundCapturedProcess -Handle $ServerHandle -TimeoutMilliseconds 7000 -StdoutPath $ServerOut -StderrPath $ServerErr
++  } catch {
++    Stop-BackgroundCapturedProcess $ServerHandle
++    throw
++  }
++
++  $ClientCode = [int]$ClientResult.exit_code
++  $ClientText = [string]$ClientResult.text
++  $ServerCode = [int]$ServerResult.exit_code
++  $ServerText = [string]$ServerResult.stdout
++  $ServerErrorText = [string]$ServerResult.stderr
++  Write-NetworkEvidenceOutput -Suffix $Suffix -Stdout $ServerText -Stderr $ServerErrorText
++
++  $ServerPassed = $ServerText -match 'network platform evidence server: PASS'
++  $ClientPassed = $ClientText -match 'network platform evidence: PASS'
++  $PairSummary = [ordered]@{
++    schema_version = 1
++    suffix = $Suffix
++    port = $Port
++    server_exit_code = $ServerCode
++    client_exit_code = $ClientCode
++    server_pass_marker = [bool]$ServerPassed
++    client_pass_marker = [bool]$ClientPassed
++    server_stderr_empty = [string]::IsNullOrWhiteSpace($ServerErrorText)
++    status = if ($ServerCode -eq 0 -and $ClientCode -eq 0 -and $ServerPassed -and $ClientPassed) { "PASS" } else { "FAIL" }
++  }
++  $PairSummary | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $PairJson -Encoding UTF8
++
++  if ($ServerCode -ne 0 -or $ClientCode -ne 0) {
++    throw "network evidence pair $Suffix failed: server=$ServerCode client=$ClientCode"
++  }
++  if (-not $ServerPassed) { throw "network evidence server $Suffix did not report PASS" }
++  if (-not $ClientPassed) { throw "network evidence client $Suffix did not report PASS" }
++  return $ClientLog
++}
++
++New-Item -ItemType Directory -Force -Path $Build | Out-Null
++Start-Transcript -Path $TranscriptPath -Force | Out-Null
++$Failure = ""
++try {
++  Write-Host "MiniQuake BP-085-089R1 acceptance test"
++  Write-Host "  parent: $BlockParentPackageId"
++  Write-Host "  root:   $Root"
++  if ($BisectOnFailure) { Write-Host "  logical bisect markers enabled" }
++
++  if ([string]::IsNullOrWhiteSpace($Python)) { $Python = "python" }
++  $PythonExe = Resolve-Tool $Python "Python"
++
++  if (-not $SkipBuild) {
++    $PowerShellExe = (Get-Process -Id $PID).Path
++    $Arguments = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $BuildScript)
++    if (-not [string]::IsNullOrWhiteSpace($Compiler)) { $Arguments += @("-Compiler", $Compiler) }
++    if (-not [string]::IsNullOrWhiteSpace($StdLib)) { $Arguments += @("-StdLib", $StdLib) }
++    $Arguments += @("-Python", $PythonExe, "-Configuration", $Configuration)
++    if ($NetworkTests) { $Arguments += "-NetworkTests" }
++    if ($RebuildNative) { $Arguments += "-RebuildNative" }
++    if ($Listings) { $Arguments += "-Listings" }
++    [void](Run-Logged "single cumulative build and unit-test suite" $PowerShellExe $Arguments "bp085-089r1-build-child.log" "MiniQuake BP-089 compatibility release closure tests passed: 24")
++  } else {
++    Add-Step "single cumulative build and unit-test suite" "SKIPPED" 0 "-SkipBuild"
++  }
++
++  foreach ($Path in @($GameExe, $EvidenceExe, $CoreAssetEvidenceExe, $ArtifactEvidenceExe)) { if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "required executable missing: $Path" } }
++
++  $Version = Run-Logged "package identity" $GameExe @("--version") "bp085-089r1-version.txt" "Compatibility release status: compat_109_release_candidate_v1"
++  if ($Version -notmatch 'Package: BP-089' -or $Version -notmatch 'Block: BP-085-089') { throw "compiled package identity mismatch" }
++  if ($Version -notmatch 'Core assets/memory status: core_assets_memory_109_frozen_v1' -or $Version -notmatch 'Core assets/memory fingerprint: 0x6c8d974d') { throw "compiled core assets/memory identity mismatch" }
++  if ($Version -notmatch 'Gameplay/presentation status: gameplay_presentation_109_frozen_v1' -or $Version -notmatch 'Gameplay/presentation fingerprint: 0xad91624c') { throw "compiled gameplay/presentation identity mismatch" }
++  if ($Version -notmatch 'Black-port source status: black_port_source_109_frozen_v1' -or $Version -notmatch 'Black-port source fingerprint: 0x309b0737') { throw "compiled black-port source identity mismatch" }
++  if ($Version -notmatch 'Game profile status: game_profile_109_frozen_v1' -or $Version -notmatch 'Game profile fingerprint: 0x7a03b68d') { throw "compiled game-profile identity mismatch" }
++  if ($Version -notmatch 'Mod runtime status: mod_runtime_109_frozen_v1' -or $Version -notmatch 'Mod runtime fingerprint: 0x4649813d') { throw "compiled mod-runtime identity mismatch" }
++  if ($Version -notmatch 'Artifact compatibility status: artifact_compat_109_frozen_v1' -or $Version -notmatch 'Artifact compatibility fingerprint: 0x59531091') { throw "compiled artifact identity mismatch" }
++  if ($Version -notmatch 'Stability status: stability_109_frozen_v1' -or $Version -notmatch 'Stability fingerprint: 0x6c131501') { throw "compiled stability identity mismatch" }
++  if ($Version -notmatch 'Compatibility release status: compat_109_release_candidate_v1' -or $Version -notmatch 'Compatibility release fingerprint: 0x29b72a98') { throw "compiled release-candidate identity mismatch" }
++
++  $CanUseGame = -not $SkipGameValidation -and -not [string]::IsNullOrWhiteSpace($QuakeBase)
++  if ($CanUseGame) {
++    if (-not (Test-Path -LiteralPath (Join-Path $QuakeBase "id1\pak0.pak") -PathType Leaf)) { throw "Quake data not found: $QuakeBase\id1\pak0.pak" }
++    [void](Run-Logged "installed Quake data validation" $GameExe @("--validate-game", $QuakeBase, $Map, "-game", $Game) "bp085-089r1-game-validation.log" "Validation result: PASS")
++    [void](Run-Logged "headless runtime validation" $GameExe @("--validate-runtime", $QuakeBase, $Map, [string]$Frames, "-game", $Game) "bp085-089r1-runtime-validation.log")
++  } else {
++    Add-Step "installed Quake data validation" "SKIPPED" 0 "no usable -QuakeBase or skipped"
++    Add-Step "headless runtime validation" "SKIPPED" 0 "no usable -QuakeBase or skipped"
++  }
++
++  if (-not $SkipMissionPackEvidence -and $CanUseGame) {
++    foreach ($Mission in @("rogue", "hipnotic")) {
++      $MissionDirectory = Join-Path $QuakeBase $Mission
++      $MissionPak = Get-ChildItem -LiteralPath $MissionDirectory -File -Filter "pak*.pak" -ErrorAction SilentlyContinue | Select-Object -First 1
++      if ($null -eq $MissionPak) {
++        Add-Step ("optional mission-pack {0}" -f $Mission) "SKIPPED" 0 "directory or PAK not installed"
++        continue
++      }
++      $MissionFlag = "-" + $Mission
++      [void](Run-Logged ("mission-pack {0} game validation" -f $Mission) $GameExe @("--validate-game", $QuakeBase, "start", $MissionFlag) ("bp085-089r1-{0}-validation.log" -f $Mission) "Validation result: PASS")
++      [void](Run-Logged ("mission-pack {0} headless runtime" -f $Mission) $GameExe @("-basedir", $QuakeBase, $MissionFlag, "-headless", "-nosound", "-maxframes", "128", "+map", "start") ("bp085-089r1-{0}-runtime.log" -f $Mission))
++    }
++  } else {
++    Add-Step "optional mission-pack validation" "SKIPPED" 0 "skipped or no usable Quake data"
++  }
++
++  if ($CanUseGame) {
++    $CoreA = Join-Path $Build "bp085-089r1-core-assets-a.log"
++    $CoreB = Join-Path $Build "bp085-089r1-core-assets-b.log"
++    [void](Run-Logged "retail core asset evidence A" $CoreAssetEvidenceExe @($QuakeBase, $Game) ([IO.Path]::GetFileName($CoreA)) "result=PASS")
++    [void](Run-Logged "retail core asset evidence B" $CoreAssetEvidenceExe @($QuakeBase, $Game) ([IO.Path]::GetFileName($CoreB)) "result=PASS")
++    $CoreHashA = (Get-FileHash -Algorithm SHA256 -LiteralPath $CoreA).Hash.ToLowerInvariant()
++    $CoreHashB = (Get-FileHash -Algorithm SHA256 -LiteralPath $CoreB).Hash.ToLowerInvariant()
++    if ($CoreHashA -ne $CoreHashB) { throw "retail core asset evidence differs: A=$CoreHashA B=$CoreHashB" }
++    Add-Step "byte-identical retail core asset evidence" "PASS" 0 ("sha256=" + $CoreHashA)
++  } else {
++    Add-Step "retail core asset evidence" "SKIPPED" 0 "no usable -QuakeBase"
++  }
++
++  if (-not $SkipAudioEvidence -and $CanUseGame) {
++    $AudioExe = Join-Path $Build "MiniQuakeAudioRetailEvidence.exe"
++    $A = Join-Path $Build "bp085-089r1-audio-a.log"; $B = Join-Path $Build "bp085-089r1-audio-b.log"
++    $TextA = Run-Logged "retail audio evidence A" $AudioExe @($QuakeBase, $Game) ([IO.Path]::GetFileName($A)) "MiniQuake BP-059 retail audio evidence: PASS"
++    $TextB = Run-Logged "retail audio evidence B" $AudioExe @($QuakeBase, $Game) ([IO.Path]::GetFileName($B)) "MiniQuake BP-059 retail audio evidence: PASS"
++    $HashA = (Get-FileHash -Algorithm SHA256 -LiteralPath $A).Hash.ToLowerInvariant(); $HashB = (Get-FileHash -Algorithm SHA256 -LiteralPath $B).Hash.ToLowerInvariant()
++    if ($HashA -ne $HashB) { throw "retail audio evidence differs" }
++    Add-Step "byte-identical retail audio evidence" "PASS" 0 ("sha256=" + $HashA)
++  } else { Add-Step "retail audio evidence" "SKIPPED" 0 "skipped or no Quake data" }
++
++  if (-not $SkipArtifactEvidence -and $CanUseGame) {
++    $ArtifactA = Join-Path $Build "bp085-089r1-artifacts-a.log"
++    $ArtifactB = Join-Path $Build "bp085-089r1-artifacts-b.log"
++    $ArtifactTextA = Run-Logged "retail demo/save artifact evidence A" $ArtifactEvidenceExe @($QuakeBase, $Game, $Map) ([IO.Path]::GetFileName($ArtifactA)) "result=PASS"
++    $ArtifactTextB = Run-Logged "retail demo/save artifact evidence B" $ArtifactEvidenceExe @($QuakeBase, $Game, $Map) ([IO.Path]::GetFileName($ArtifactB)) "result=PASS"
++    foreach ($ArtifactText in @($ArtifactTextA, $ArtifactTextB)) {
++      if ($ArtifactText -notmatch 'first_pass_exact=true' -or
++          $ArtifactText -notmatch 'semantic=true' -or
++          $ArtifactText -notmatch 'stable_exact=true' -or
++          $ArtifactText -notmatch 'stable_semantic=true') {
++        throw "retail artifact evidence did not prove exact, semantic and stable save roundtrip"
++      }
++    }
++    $ArtifactHashA = (Get-FileHash -Algorithm SHA256 -LiteralPath $ArtifactA).Hash.ToLowerInvariant()
++    $ArtifactHashB = (Get-FileHash -Algorithm SHA256 -LiteralPath $ArtifactB).Hash.ToLowerInvariant()
++    if ($ArtifactHashA -ne $ArtifactHashB) { throw "retail artifact evidence differs: A=$ArtifactHashA B=$ArtifactHashB" }
++    Add-Step "byte-identical retail demo/save evidence" "PASS" 0 ("sha256=" + $ArtifactHashA)
++  } else {
++    Add-Step "retail demo/save artifact evidence" "SKIPPED" 0 "skipped or no usable Quake data"
++  }
++
++  if (-not $SkipTraceValidation -and $CanUseGame) {
++    $TraceDir = Join-Path $Build "bp085-089r1-traces"; Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $TraceDir; New-Item -ItemType Directory -Force -Path $TraceDir | Out-Null
++    $PrefixA = Join-Path $TraceDir "run-a"; $PrefixB = Join-Path $TraceDir "run-b"
++    [void](Run-Logged "compatibility trace A" $GameExe @("--compat-trace", $QuakeBase, $Map, [string]$TraceFrames, $PrefixA, "-game", $Game) "bp085-089r1-trace-a.log")
++    [void](Run-Logged "compatibility trace B" $GameExe @("--compat-trace", $QuakeBase, $Map, [string]$TraceFrames, $PrefixB, "-game", $Game) "bp085-089r1-trace-b.log")
++    [void](Run-Logged "byte-identical trace comparison" $PythonExe @($TraceComparator, ("{0}.mqtrace" -f $PrefixA), ("{0}.mqtrace" -f $PrefixB), "--json-output", (Join-Path $Build "bp085-089r1-trace-comparison.json")) "bp085-089r1-trace-comparison.log")
++  } else { Add-Step "deterministic compatibility traces" "SKIPPED" 0 "skipped or no Quake data" }
++
++  if (-not $SkipBlackPortCorpus -and $CanUseGame) {
++    $CorpusRoot = Join-Path $Build "bp085-089r1-black-port-corpus"
++    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $CorpusRoot
++    New-Item -ItemType Directory -Force -Path $CorpusRoot | Out-Null
++    $CorpusScenarios = @(
++      [ordered]@{ name = "start-064"; map = "start" },
++      [ordered]@{ name = "e1m1-064"; map = "e1m1" },
++      [ordered]@{ name = "e1m2-064"; map = "e1m2" },
++      [ordered]@{ name = "e1m3-064"; map = "e1m3" }
++    )
++    $CorpusReport = @()
++    foreach ($Scenario in $CorpusScenarios) {
++      $ScenarioName = [string]$Scenario.name
++      $ScenarioMap = [string]$Scenario.map
++      $ScenarioDirectory = Join-Path $CorpusRoot $ScenarioName
++      New-Item -ItemType Directory -Force -Path $ScenarioDirectory | Out-Null
++      $PrefixA = Join-Path $ScenarioDirectory "run-a"
++      $PrefixB = Join-Path $ScenarioDirectory "run-b"
++      [void](Run-Logged ("black-port corpus {0} trace A" -f $ScenarioName) $GameExe @("--compat-trace", $QuakeBase, $ScenarioMap, [string]$BlackPortCorpusFrames, $PrefixA, "-game", $Game) ("bp085-089r1-corpus-{0}-a.log" -f $ScenarioName))
++      [void](Run-Logged ("black-port corpus {0} trace B" -f $ScenarioName) $GameExe @("--compat-trace", $QuakeBase, $ScenarioMap, [string]$BlackPortCorpusFrames, $PrefixB, "-game", $Game) ("bp085-089r1-corpus-{0}-b.log" -f $ScenarioName))
++      $ComparisonJson = Join-Path $Build ("bp085-089r1-corpus-{0}-comparison.json" -f $ScenarioName)
++      [void](Run-Logged ("black-port corpus {0} comparison" -f $ScenarioName) $PythonExe @($TraceComparator, ("{0}.mqtrace" -f $PrefixA), ("{0}.mqtrace" -f $PrefixB), "--json-output", $ComparisonJson) ("bp085-089r1-corpus-{0}-comparison.log" -f $ScenarioName))
++      $TraceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath ("{0}.mqtrace" -f $PrefixA)).Hash.ToLowerInvariant()
++      $CorpusReport += [ordered]@{
++        name = $ScenarioName
++        map = $ScenarioMap
++        frames = $BlackPortCorpusFrames
++        trace_sha256 = $TraceHash
++        comparison = [IO.Path]::GetFileName($ComparisonJson)
++      }
++    }
++    $CorpusSummaryPath = Join-Path $Build "bp085-089r1-black-port-corpus-summary.json"
++    [ordered]@{
++      schema_version = 1
++      status = "PASS"
++      frames_per_scenario = $BlackPortCorpusFrames
++      scenario_count = $CorpusReport.Count
++      scenarios = $CorpusReport
++    } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $CorpusSummaryPath -Encoding UTF8
++    Add-Step "four-map deterministic black-port corpus" "PASS" 0 ("summary=" + [IO.Path]::GetFileName($CorpusSummaryPath))
++  } else {
++    Add-Step "four-map deterministic black-port corpus" "SKIPPED" 0 "skipped or no Quake data"
++  }
++
++  if (-not $SkipSoak -and $CanUseGame) {
++    [void](Run-Logged "5000-frame host soak" $GameExe @("--soak", $QuakeBase, $Map, [string]$SoakFrames, "-game", $Game) "bp085-089r1-host-soak.log" "result=PASS")
++    $SoakPort = Get-Random -Minimum 30000 -Maximum 60000
++    [void](Run-Logged "5000-frame listen-server resource soak" $GameExe @("--long-soak", "listen", $QuakeBase, $Map, [string]$ListenSoakFrames, "-game", $Game, "-port", [string]$SoakPort) "bp085-089r1-listen-soak.log" "result=PASS")
++  } else {
++    Add-Step "resource stability soaks" "SKIPPED" 0 "skipped or no usable Quake data"
++  }
++
++  if (-not $SkipRenderEvidence -and $CanUseGame) {
++    $EvidenceDir = Join-Path $Build "bp085-089r1-render"; Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $EvidenceDir; New-Item -ItemType Directory -Force -Path $EvidenceDir | Out-Null
++    $EA = Join-Path $EvidenceDir "a"; $EB = Join-Path $EvidenceDir "b"
++    [void](Run-Logged "render evidence A" $GameExe @("--render-evidence", $QuakeBase, $Map, [string]$RenderEvidenceFrame, $EA, "-game", $Game) "bp085-089r1-render-a.log")
++    [void](Run-Logged "render evidence B" $GameExe @("--render-evidence", $QuakeBase, $Map, [string]$RenderEvidenceFrame, $EB, "-game", $Game) "bp085-089r1-render-b.log")
++    [void](Run-Logged "byte-identical render evidence" $PythonExe @($RenderComparator, ("{0}.tga" -f $EA), ("{0}.tga" -f $EB), "--require-exact", "--json-out", (Join-Path $Build "bp085-089r1-render-comparison.json")) "bp085-089r1-render-comparison.log")
++  } else { Add-Step "deterministic framebuffer evidence" "SKIPPED" 0 "skipped or no Quake data" }
++
++  if (-not $SkipNetworkEvidence) {
++    $PortA = Get-Random -Minimum 30000 -Maximum 45000
++    $PortB = Get-Random -Minimum 45001 -Maximum 60000
++    $ClientA = Run-NetworkEvidencePair "a" $PortA
++    $ClientB = Run-NetworkEvidencePair "b" $PortB
++    $HashA = (Get-FileHash -Algorithm SHA256 -LiteralPath $ClientA).Hash.ToLowerInvariant(); $HashB = (Get-FileHash -Algorithm SHA256 -LiteralPath $ClientB).Hash.ToLowerInvariant()
++    if ($HashA -ne $HashB) { throw "network evidence client reports differ: A=$HashA B=$HashB" }
++    Add-Step "two independent UDP control handshakes" "PASS" 0 ("sha256=" + $HashA)
++  } else { Add-Step "two independent UDP control handshakes" "SKIPPED" 0 "-SkipNetworkEvidence" }
++
++  if ($NetworkTests) { [void](Run-Logged "Winsock UDP loopback smoke" $GameExe @("--udp-smoke", "2000") "bp085-089r1-udp-smoke.log" "result=PASS") }
++  else { Add-Step "Winsock UDP loopback smoke" "SKIPPED" 0 "-NetworkTests not supplied" }
++
++  $Failed = @($Steps | Where-Object { $_.status -eq "FAIL" })
++  if ($Failed.Count -gt 0) { throw "independent test groups failed: $($Failed.Count)" }
++  Add-Step "MiniQuake BP-085-089 acceptance" "PASS" 0 "all required gates passed"
++} catch {
++  $Failure = $_.Exception.Message
++  Write-Host ("ERROR: " + $Failure) -ForegroundColor Red
++} finally {
++  $Status = if ([string]::IsNullOrWhiteSpace($Failure)) { "PASS" } else { "FAIL" }
++  $Summary = [ordered]@{
++    schema_version = 1
++    package_id = $PackageId
++    parent_package_id = $ParentPackageId
++    block_id = $BlockId
++    block_parent_package_id = $BlockParentPackageId
++    delivery_revision = $DeliveryRevision
++    delivery_parent = $DeliveryParent
++    network_platform_status = "network_platform_109_frozen_v1"
++    network_platform_fingerprint = "0xb3ec7589"
++    frontend_status = "frontend_109_frozen_v1"
++    frontend_fingerprint = "0x924251fa"
++    core_assets_memory_status = "core_assets_memory_109_frozen_v1"
++    core_assets_memory_fingerprint = "0x6c8d974d"
++    gameplay_presentation_status = "gameplay_presentation_109_frozen_v1"
++    gameplay_presentation_fingerprint = "0xad91624c"
++    black_port_source_status = "black_port_source_109_frozen_v1"
++    black_port_source_fingerprint = "0x309b0737"
++    black_port_source_target_functions = 1094
++    black_port_source_missing_functions = 0
++    black_port_corpus_scenarios = 4
++    game_profile_status = "game_profile_109_frozen_v1"
++    game_profile_fingerprint = "0x7a03b68d"
++    mod_runtime_status = "mod_runtime_109_frozen_v1"
++    mod_runtime_fingerprint = "0x4649813d"
++    artifact_compat_status = "artifact_compat_109_frozen_v1"
++    artifact_compat_fingerprint = "0x59531091"
++    stability_status = "stability_109_frozen_v1"
++    stability_fingerprint = "0x6c131501"
++    compat_release_status = "compat_109_release_candidate_v1"
++    compat_release_fingerprint = "0x29b72a98"
++    pending_external_gates = @("original_binary_interop", "external_glquake_visual_reference")
++    status = $Status
++    failure = $Failure
++    created_utc = (Get-Date).ToUniversalTime().ToString("o")
++    quake_base_supplied = -not [string]::IsNullOrWhiteSpace($QuakeBase)
++    steps = $Steps
++  }
++  $Summary | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $SummaryPath -Encoding UTF8
++  Stop-Transcript | Out-Null
++}
++
++if (-not [string]::IsNullOrWhiteSpace($Failure)) {
++  Write-Host "MiniQuake BP-085-089R1 acceptance test: FAIL" -ForegroundColor Red
++  Write-Host "Run .\COLLECT_RESULTS.ps1 and upload the generated ZIP."
++  exit 1
++}
++Write-Host "MiniQuake BP-085-089R1 acceptance test: PASS" -ForegroundColor Green
++Write-Host "Result summary: $SummaryPath"
++Write-Host "For feedback, run .\COLLECT_RESULTS.ps1 and upload the generated ZIP."
++exit 0
+diff --git a/audit/artifact_compat_golden.json b/audit/artifact_compat_golden.json
+index d5f5f56054a06b3fe9b53be1acdde06a076e6124..fefb2c76b9658d3f395abbd388644531ab1158f3 100644
+--- a/audit/artifact_compat_golden.json
++++ b/audit/artifact_compat_golden.json
+@@ -10,5 +10,12 @@
+     "demo2.dem",
+     "demo3.dem"
+   ],
+-  "evidence_runs": 2
++  "evidence_runs": 2,
++  "evidence_revision": "sequential_exact_v1",
++  "semantic_boundary": "parsed_save_domain",
++  "requires_stable_reserialize": true,
++  "live_vm_hashes_are_diagnostic": true,
++  "simultaneous_host_sessions": false,
++  "requires_exact_roundtrip": true,
++  "preserves_edict_high_water": true
+ }
+diff --git a/docs/BP-085-089R1_BLOCK_LEDGER.json b/docs/BP-085-089R1_BLOCK_LEDGER.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..b0b30c7b3d6790d7b2405d7cd1163344af54d5da
+--- /dev/null
++++ b/docs/BP-085-089R1_BLOCK_LEDGER.json
+@@ -0,0 +1,132 @@
++{
++  "schema_version": 1,
++  "project": "MiniQuake",
++  "block_id": "BP-085-089",
++  "parent_delivery": "BP-080-084R2",
++  "final_package_id": "BP-089",
++  "delivery_revision": "BP-085-089R1",
++  "steps": [
++    {
++      "package_id": "BP-085",
++      "title": "game/search-path profile closure",
++      "patch": "patches/BP-085.diff",
++      "runtime_fixtures": 22,
++      "status": "candidate"
++    },
++    {
++      "package_id": "BP-086",
++      "title": "mod and mission-pack runtime compatibility",
++      "patch": "patches/BP-086.diff",
++      "runtime_fixtures": 22,
++      "status": "candidate"
++    },
++    {
++      "package_id": "BP-087",
++      "title": "demo and savegame artifact compatibility",
++      "patch": "patches/BP-087.diff",
++      "runtime_fixtures": 24,
++      "status": "candidate"
++    },
++    {
++      "package_id": "BP-088",
++      "title": "long-run resource stability",
++      "patch": "patches/BP-088.diff",
++      "runtime_fixtures": 20,
++      "status": "candidate"
++    },
++    {
++      "package_id": "BP-089",
++      "title": "cumulative compat_109 release candidate",
++      "patch": "patches/BP-089.diff",
++      "runtime_fixtures": 24,
++      "status": "candidate"
++    }
++  ],
++  "block_runtime_fixtures": 112,
++  "accepted_parent": {
++    "delivery_revision": "BP-080-084R2",
++    "status": "PASS",
++    "result_archive_sha256": "7d4969d9ed05877fbbcc7c071ea8d1d52f8d0892f3fa57a667df03d083503ef7",
++    "trace_sha256": "e91f4c9e32c8c9df39d7cb4ceaf83efaa78c51057516323da2ba6cc3412f0c7b",
++    "source_inventory_sha256": "31f437bb54a84fa690ff96011c50f8ca3e7dfabde05b4f450e58049eae5d8837",
++    "source_target_functions": 1094,
++    "source_missing_functions": 0
++  },
++  "contracts": {
++    "game_profile": {
++      "status": "game_profile_109_frozen_v1",
++      "fingerprint": "0x7a03b68d"
++    },
++    "mod_runtime": {
++      "status": "mod_runtime_109_frozen_v1",
++      "fingerprint": "0x4649813d"
++    },
++    "artifact_compat": {
++      "status": "artifact_compat_109_frozen_v1",
++      "fingerprint": "0x59531091",
++      "evidence_revision": "sequential_exact_v1",
++      "semantic_boundary": "parsed_save_domain",
++      "stable_reserialize_required": true,
++      "exact_roundtrip_required": true,
++      "preserves_edict_high_water": true,
++      "sequential_host_sessions": true
++    },
++    "stability": {
++      "status": "stability_109_frozen_v1",
++      "fingerprint": "0x6c131501"
++    },
++    "release_candidate": {
++      "status": "compat_109_release_candidate_v1",
++      "fingerprint": "0x29b72a98"
++    }
++  },
++  "release_matrix": {
++    "accepted_contracts": [
++      "protocol15_frozen_v1",
++      "quakec_109_frozen_v1",
++      "world_physics_109_frozen_v1",
++      "host_lifecycle_109_frozen_v1",
++      "client_render_109_frozen_v1",
++      "world_render_109_frozen_v1",
++      "model_ui_render_109_frozen_v1",
++      "render_special_109_frozen_v1",
++      "audio_109_frozen_v1",
++      "network_platform_109_frozen_v1",
++      "frontend_109_frozen_v1",
++      "core_assets_memory_109_frozen_v1",
++      "gameplay_presentation_109_frozen_v1",
++      "black_port_source_109_frozen_v1",
++      "game_profile_109_frozen_v1",
++      "mod_runtime_109_frozen_v1",
++      "artifact_compat_109_frozen_v1",
++      "stability_109_frozen_v1"
++    ],
++    "pending_external_gates": [
++      "original_binary_interop",
++      "external_glquake_visual_reference"
++    ]
++  },
++  "evidence": {
++    "required_game": "id1",
++    "optional_games": [
++      "rogue",
++      "hipnotic"
++    ],
++    "retail_demos": 3,
++    "artifact_runs": 2,
++    "host_soak_frames": 5000,
++    "listen_soak_frames": 5000,
++    "black_port_maps": 4
++  },
++  "delivery_parent": "BP-085-089",
++  "block_parent_delivery": "BP-080-084R2",
++  "hotfixes": [
++    {
++      "revision": "BP-085-089R1",
++      "status": "candidate",
++      "failure_source": "BP-087 retail artifact evidence",
++      "fix": "sequential Host sessions, exact parsed-save roundtrip, preserved edict high-water mark and production load synchronization",
++      "result_archive_sha256": "cfaa061e9de12e13e9c38ba66f284eab8fb46986eebe5ddd27b2c3a0de777f87"
++    }
++  ]
++}
+diff --git a/docs/BP-085-089R1_HOTFIX_REPORT.json b/docs/BP-085-089R1_HOTFIX_REPORT.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..a154ca3893e2f11429be2a87b04bcc9c23ada057
+--- /dev/null
++++ b/docs/BP-085-089R1_HOTFIX_REPORT.json
+@@ -0,0 +1,33 @@
++{
++  "schema_version": 1,
++  "delivery_revision": "BP-085-089R1",
++  "delivery_parent": "BP-085-089",
++  "engine_package_id": "BP-089",
++  "result_archive_sha256": "cfaa061e9de12e13e9c38ba66f284eab8fb46986eebe5ddd27b2c3a0de777f87",
++  "failure": {
++    "component": "BP-087 retail demo/save evidence",
++    "demos": "PASS",
++    "save_first_pass_exact": false,
++    "old_semantic_check": false,
++    "cleanup_error": "NET_FreeQSocket: not active"
++  },
++  "root_causes": [
++    "two complete Host sessions shared process-global NET/QSocket state",
++    "save load synchronization recomputed and trimmed the saved sv.num_edicts high-water mark",
++    "complete live VM hashes were incorrectly treated as Quake-v5 save semantics"
++  ],
++  "fix": {
++    "evidence_revision": "sequential_exact_v1",
++    "host_sessions": "strictly sequential",
++    "semantic_boundary": "parsed_save_domain",
++    "first_pass_byte_identity": "required",
++    "normalized_second_roundtrip": "exact required",
++    "preserves_edict_high_water": true,
++    "relinks_non_free_edicts": true,
++    "production_load_path_fixed": true,
++    "live_vm_hashes": "diagnostic only"
++  },
++  "contracts_changed": false,
++  "artifact_status": "artifact_compat_109_frozen_v1",
++  "artifact_fingerprint": "0x59531091"
++}
+diff --git a/docs/BP-085-089R1_RESULT_ANALYSIS.md b/docs/BP-085-089R1_RESULT_ANALYSIS.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..cfc4cf9bae29a3c5460102288653252d169dc047
+--- /dev/null
++++ b/docs/BP-085-089R1_RESULT_ANALYSIS.md
+@@ -0,0 +1,77 @@
++# BP-085–BP-089 result analysis and R1 correction
++
++The Windows result archive `MiniQuake_BP-085-089_RESULTS_20260731-133605.zip`
++completed the build, every asset-free test through BP-089, `id1`, `rogue`,
++`hipnotic`, normal runtime validation, retail core assets and retail audio.  The
++first retail artifact evidence process then reported:
++
++```text
++save=version5 bytes=35113 crc=55983 exact=false semantic=false
++NET_FreeQSocket: not active
++```
++
++All three retail demos (`demo1.dem`, `demo2.dem`, `demo3.dem`) parsed and
++replayed successfully.  The failure was isolated to the Quake-v5 savegame
++roundtrip and to the evidence process lifecycle.
++
++## Problem 1: two complete Host sessions shared process-global NET state
++
++The evidence retained `sessionA` while initializing `sessionB`.  WinQuake and
++MiniQuake intentionally own process-global NET/QSocket state.  Initializing a
++second complete Host replaces that global socket pool, so later shutdown of the
++first Host can attempt to free a socket which is no longer in the active list.
++
++R1 uses strictly sequential sessions: A is fully shut down before B is created,
++and B is fully shut down before C is created.
++
++## Problem 2: the saved edict high-water mark was trimmed after load
++
++A Quake save contains one edict block for every index below `sv.num_edicts`,
++including trailing free blocks.  `savegame.apply` restored that count, but the
++subsequent generic `syncQuakeCEdicts` recomputed the highest currently non-free
++edict and shortened both `runtime.numEdicts` and `server.numEdicts`.
++
++That changed the serialized entity-block count and therefore made the A→B
++savegame byte stream differ even when all live entities had been restored.
++
++R1 introduces `miniquake.savegame_runtime.synchronizeLoadedServer`.  It:
++
++1. remembers the saved high-water count;
++2. rebuilds the derived MiniQuake edict view;
++3. recreates any trailing free derived edicts;
++4. restores both runtime and server high-water counts;
++5. refreshes model indexes;
++6. relinks every restored non-free edict without touching triggers.
++
++The real `host.loadGame` path now uses the same helper, so this is an engine
++compatibility correction rather than an evidence-only workaround.
++
++## Problem 3: the old semantic check compared state not archived by Quake v5
++
++The old evidence compared complete live QuakeC-global and derived server-edict
++hashes.  Quake v5 archives only `DEF_SAVEGLOBAL` globals and serializable edict
++fields.  Other VM values are transient by design and must not be treated as
++save-format semantics.
++
++R1 compares the parsed save-domain values: version, comment, 16 spawn
++parameters, skill, map, time, 64 lightstyles, saved globals and every saved
++edict pair.  Full live VM hashes remain in the log as diagnostics only.
++
++## R1 acceptance model
++
++1. Create source Host A, advance 64 deterministic frames, serialize and parse
++   save A, then shut Host A down completely.
++2. Create fresh Host B, apply parsed A through the production load
++   synchronization, serialize and parse B, and require A/B byte and semantic
++   identity.  Shut Host B down completely.
++3. Create fresh Host C, apply parsed B, serialize C, and require B/C byte and
++   semantic identity.  Shut Host C down completely.
++
++On failure the evidence reports the first differing byte, lengths and first
++semantic field without placing any savegame payload in the result archive.
++
++Result archive SHA-256:
++
++```text
++cfaa061e9de12e13e9c38ba66f284eab8fb46986eebe5ddd27b2c3a0de777f87
++```
+diff --git a/docs/BP-085-089R1_TESTING.md b/docs/BP-085-089R1_TESTING.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c9009a4ac4bc53867e6cb78b2d122463872ecbf3
+--- /dev/null
++++ b/docs/BP-085-089R1_TESTING.md
+@@ -0,0 +1,59 @@
++# BP-085–BP-089R1 Windows acceptance
++
++Extract the complete ZIP into a new empty directory. Do not merge it over an
++older MiniQuake tree.
++
++```powershell
++$QuakeBase = "C:\Users\nilsk\Dropbox\Quake"
++Test-Path "$QuakeBase\id1\pak0.pak"
++```
++
++The path check must return `True`.
++
++```powershell
++.\TEST_BP-085-089R1.ps1 `
++  -Compiler C:\Users\nilsk\Desktop\MiniLang\MiniLangCompilerPy\mlc_win64.py `
++  -StdLib C:\Users\nilsk\Desktop\MiniLang\MiniLangCompilerPy `
++  -QuakeBase $QuakeBase `
++  -Game id1 `
++  -Map start `
++  -Frames 300 `
++  -TraceFrames 128 `
++  -BlackPortCorpusFrames 64 `
++  -SoakFrames 5000 `
++  -ListenSoakFrames 5000 `
++  -NetworkTests `
++  -ContinueIndependentTests `
++  -BisectOnFailure
++```
++
++The corrected artifact evidence must include:
++
++```text
++first_pass_exact=true
++semantic=true
++stable_exact=true
++stable_semantic=true
++result=PASS
++```
++
++The three Host sessions must run sequentially; no `NET_FreeQSocket: not active`
++message is allowed.
++
++Expected final line:
++
++```text
++MiniQuake BP-085-089R1 acceptance test: PASS
++```
++
++Then collect the result:
++
++```powershell
++.\COLLECT_RESULTS.ps1
++```
++
++The archive name is:
++
++```text
++build\MiniQuake_BP-085-089R1_RESULTS_*.zip
++```
+diff --git a/docs/BP-087_ARTIFACT_COMPAT_AUDIT.md b/docs/BP-087_ARTIFACT_COMPAT_AUDIT.md
+index d861051ad994a5e54a6ec7070d77e514ce7643b6..cb9f6465089bada018c571de9c0acd39240b362d 100644
+--- a/docs/BP-087_ARTIFACT_COMPAT_AUDIT.md
++++ b/docs/BP-087_ARTIFACT_COMPAT_AUDIT.md
+@@ -1,16 +1,33 @@
+ # BP-087 demo/save artifact audit
+ 
+ The asset-free fixture suite binds Protocol-15 demo framing and Quake savegame
+-version 5. The Windows retail evidence performs two independent runs:
++version 5. The Windows retail evidence performs two independent evidence runs.
++Each run:
+ 
+-1. load `demo1.dem`, `demo2.dem` and `demo3.dem` through the Quake filesystem;
+-2. parse every frame and verify the resulting client protocol stream;
+-3. initialize a live map, advance 64 deterministic frames and serialize a
+-   version-5 savegame;
+-4. parse and apply that save to a fresh server on the same map;
+-5. reserialize and require both exact bytes and matching global/edict hashes.
++1. loads `demo1.dem`, `demo2.dem` and `demo3.dem` through the Quake filesystem;
++2. parses every frame and verifies the resulting client protocol stream;
++3. initializes a live map, advances 64 deterministic frames and serializes a
++   version-5 savegame A;
++4. shuts Host A down completely before creating another Host session;
++5. initializes Host B, applies parsed A through the production load path,
++   preserves the saved `sv.num_edicts` high-water mark, relinks all restored
++   non-free edicts, and serializes savegame B;
++6. requires A and B to be byte-identical and semantically identical in the
++   parsed save domain;
++7. shuts Host B down, initializes Host C, applies parsed B and requires B and C
++   to be byte-identical and semantically identical.
+ 
+-Only textual evidence is collected. Demo, save, PAK and other game-data bytes
+-are never copied into the result archive.
++The semantic save domain consists of version, comment, sixteen spawn
++parameters, skill, map, time, sixty-four lightstyles, `DEF_SAVEGLOBAL` values
++and all serialized edict pairs. Complete live VM hashes include transient state
++which Quake v5 does not archive; they are logged as diagnostics only.
++
++The sequential sessions are required because WinQuake's NET/QSocket state is
++process-global. The high-water preservation mirrors `Host_Loadgame_f`, which
++sets `sv.num_edicts` to the number of parsed edict blocks, including trailing
++free blocks.
++
++No demo, save, PAK or other game-data payload is copied into the result archive.
+ 
+ Contract: `artifact_compat_109_frozen_v1`, fingerprint `0x59531091`.
++Evidence revision: `sequential_exact_v1`.
+diff --git a/src/miniquake/artifact_compat.ml b/src/miniquake/artifact_compat.ml
+index 863f1277070071b9dcd9f28eb93c4c7b87fbb070..3698ebdb5c395999245e598d837bed988e5a4b71 100644
+--- a/src/miniquake/artifact_compat.ml
++++ b/src/miniquake/artifact_compat.ml
+@@ -10,6 +10,7 @@ result archives.
+ package miniquake.artifact_compat
+ 
+ import miniquake.crc as crc
++import miniquake.native as native
+ 
+ const STATUS = "artifact_compat_109_frozen_v1"
+ const FINGERPRINT = 0x59531091
+@@ -36,6 +37,85 @@ function bytesCrc(data)
+   return crc.block(data, 0, len(data))
+ end function
+ 
++// A Quake version-5 savegame is a deliberately lossy text snapshot.  Runtime
++// floats are written with six decimals and only DEF_SAVEGLOBAL globals are
++// archived.  Compare the parsed save-domain state instead of the complete live
++// VM state, which also contains transient globals that the original format does
++// not preserve.
++function pairListDifference(leftPairs, rightPairs, label)
++  if len(leftPairs) != len(rightPairs) then
++    return label + " pair count: " + len(leftPairs) + " != " + len(rightPairs)
++  end if
++  index = 0
++  while index < len(leftPairs)
++    leftPair = leftPairs[index]
++    rightPair = rightPairs[index]
++    if leftPair.key != rightPair.key then
++      return label + " pair " + index + " key: " + leftPair.key + " != " + rightPair.key
++    end if
++    if leftPair.value != rightPair.value then
++      return label + " pair " + index + " value for " + leftPair.key
++    end if
++    index = index + 1
++  end while
++  return ""
++end function
++
++function saveSemanticDifference(left, right)
++  if left.version != right.version then return "version" end if
++  if left.comment != right.comment then return "comment" end if
++  if len(left.spawnParms) != len(right.spawnParms) then return "spawn parm count" end if
++  index = 0
++  while index < len(left.spawnParms)
++    if native.floatBits(left.spawnParms[index]) != native.floatBits(right.spawnParms[index]) then
++      return "spawn parm " + index
++    end if
++    index = index + 1
++  end while
++  if left.skill != right.skill then return "skill" end if
++  if left.mapName != right.mapName then return "map name" end if
++  if native.floatBits(left.time) != native.floatBits(right.time) then return "server time" end if
++  if len(left.lightStyles) != len(right.lightStyles) then return "lightstyle count" end if
++  index = 0
++  while index < len(left.lightStyles)
++    if left.lightStyles[index] != right.lightStyles[index] then return "lightstyle " + index end if
++    index = index + 1
++  end while
++  difference = pairListDifference(left.globalState.pairs, right.globalState.pairs, "globals")
++  if difference != "" then return difference end if
++  if len(left.entities) != len(right.entities) then return "entity count" end if
++  index = 0
++  while index < len(left.entities)
++    difference = pairListDifference(left.entities[index].pairs, right.entities[index].pairs, "entity " + index)
++    if difference != "" then return difference end if
++    index = index + 1
++  end while
++  return ""
++end function
++
++function saveSemanticEqual(left, right)
++  return saveSemanticDifference(left, right) == ""
++end function
++
++// Return [first differing offset, left byte, right byte, left length, right
++// length].  Byte values are -1 when the corresponding stream ended first.
++function firstByteDifference(left, right)
++  if left is not bytes or right is not bytes then return [-2, -1, -1, 0, 0] end if
++  limit = len(left)
++  if len(right) < limit then limit = len(right) end if
++  index = 0
++  while index < limit
++    if left[index] != right[index] then return [index, left[index], right[index], len(left), len(right)] end if
++    index = index + 1
++  end while
++  if len(left) == len(right) then return [-1, -1, -1, len(left), len(right)] end if
++  leftValue = -1
++  rightValue = -1
++  if index < len(left) then leftValue = left[index] end if
++  if index < len(right) then rightValue = right[index] end if
++  return [index, leftValue, rightValue, len(left), len(right)]
++end function
++
+ function demoSummary(recording, report, sourceBytes)
+   return [
+     recording.forcedTrack,
+diff --git a/src/miniquake/host.ml b/src/miniquake/host.ml
+index 7af13b240553898fee37bd57eee6e3f5b99d0fc0..e143390b7346d4cae3cee062b1bd983f86a0d54e 100644
+--- a/src/miniquake/host.ml
++++ b/src/miniquake/host.ml
+@@ -32,6 +32,7 @@ import miniquake.chase as chase
+ import miniquake.sound.mixer as mixer
+ import miniquake.sound.cd_audio as cdAudio
+ import miniquake.savegame as savegame
++import miniquake.savegame_runtime as saveRuntime
+ import miniquake.demo as demo
+ import miniquake.demo_player as demoPlayer
+ import miniquake.format.bsp as bsp
+@@ -769,8 +770,8 @@ function loadGame(session, requestedName)
+   if started is error then return started end if
+   restored = savegame.apply(session.server, saved)
+   if restored is error then return restored end if
+-  server.syncQuakeCEdicts(session.server)
+-  server.assignModelIndexes(session.server)
++  synchronized = saveRuntime.synchronizeLoadedServer(session.server)
++  if synchronized is error then return synchronized end if
+   if len(session.server.clients) > 0 then
+     server.syncPlayerFromQuakeC(session.server, session.server.clients[0], session.player)
+   end if
+diff --git a/src/miniquake/savegame.ml b/src/miniquake/savegame.ml
+index 5a6806c9d5d88029024591e5544bc290a0db93a0..3ebbb6d26c3d677daf41ec9eb73fc5e663619aaa 100644
+--- a/src/miniquake/savegame.ml
++++ b/src/miniquake/savegame.ml
+@@ -272,6 +272,7 @@ function apply(server, saved)
+   runtime = machine.context.edicts
+   runtime.numEdicts = len(saved.entities)
+   server.numEdicts = len(saved.entities)
++  server.mapName = saved.mapName
+   server.time = saved.time
+   server.skill = saved.skill
+   server.lightStyles = saved.lightStyles
+diff --git a/src/miniquake/savegame_runtime.ml b/src/miniquake/savegame_runtime.ml
+new file mode 100644
+index 0000000000000000000000000000000000000000..f4a11ffb2389761e3565e6edf9397e2a5b41a4bb
+--- /dev/null
++++ b/src/miniquake/savegame_runtime.ml
+@@ -0,0 +1,66 @@
++/*
++Copyright (C) 2026 MiniQuake contributors
++
++Runtime synchronization for Quake version-5 savegames.
++
++The text parser restores QuakeC globals and edict words.  This module rebuilds
++MiniQuake's derived server-edict view without losing the saved sv.num_edicts
++high-water mark.  WinQuake preserves that high-water mark even when the final
++saved edict blocks are free.
++*/
++
++package miniquake.savegame_runtime
++
++import miniquake.server as serverRuntime
++import miniquake.server_collision as collision
++
++function synchronizeLoadedServer(server)
++  if server.machine is void or server.machine.context is void then
++    return error(3790, "loadgame runtime synchronization requires a QuakeC server")
++  end if
++
++  savedCount = server.numEdicts
++  runtime = server.machine.context.edicts
++  if savedCount < 0 or savedCount > runtime.maxEdicts then
++    return error(3791, "loadgame edict high-water mark outside runtime: " + savedCount)
++  end if
++
++  // Preserve the provisional baselines created by SV_SpawnServer.  The
++  // original engine loads saved edict state after the new map signon/baselines
++  // have already been built.
++  previous = server.edicts
++  synchronized = try(serverRuntime.syncQuakeCEdicts(server))
++  if synchronized is error then return synchronized end if
++
++  // syncQuakeCEdicts normally recomputes the highest currently allocated
++  // edict.  Host_Loadgame_f instead keeps one block for every edict present in
++  // the save file, including trailing free blocks.  Recreate those derived
++  // records and then restore the authoritative high-water count.
++  index = len(server.edicts)
++  while index < savedCount
++    item = serverRuntime.syncQuakeCEdict(server, index)
++    if index < len(previous) and previous[index] is not void then
++      item.baseline = previous[index].baseline
++    end if
++    server.edicts = server.edicts + [item]
++    index = index + 1
++  end while
++
++  runtime.numEdicts = savedCount
++  server.numEdicts = savedCount
++  serverRuntime.assignModelIndexes(server)
++
++  // ED_ParseEdict links every restored non-free edict without touching
++  // triggers.  MiniQuake's linear collision world has no persistent area-node
++  // lists, but linkEntity still refreshes the observable absolute bounds.
++  index = 0
++  while index < savedCount
++    if not runtime.freeFlags[index] then
++      linked = try(collision.linkEntity(server, index, false))
++      if linked is error then return linked end if
++    end if
++    index = index + 1
++  end while
++
++  return savedCount
++end function
+diff --git a/test.ps1 b/test.ps1
+index e33a3530e99e05c5cde06f9b196d04af22d2f23f..4bd98391e1a1cf043ff56dd3fee5bda46dda148e 100755
+--- a/test.ps1
++++ b/test.ps1
+@@ -1,8 +1 @@
+-﻿[CmdletBinding()]
+-param(
+-  [Parameter(ValueFromRemainingArguments = $true)]
+-  [object[]]$RemainingArguments
+-)
+-
+-& (Join-Path $PSScriptRoot "TEST_BP-085-089.ps1") @RemainingArguments
+-exit $LASTEXITCODE
++﻿& "$PSScriptRoot\TEST_BP-085-089R1.ps1" @args
+diff --git a/tests/artifact_compat_tests.ml b/tests/artifact_compat_tests.ml
+index c8bd0135a07f2a906ebd51eda5f41d658f62226b..ec6020ca9e74916f659bda55803a58283bb4484f 100644
+--- a/tests/artifact_compat_tests.ml
++++ b/tests/artifact_compat_tests.ml
+@@ -26,6 +26,12 @@ function bp087SyntheticDemo()
+   return t.Demo(-1, [message], "-1\n")
+ end function
+ 
++function bp087SaveFixture(value)
++  globalState = t.Entity([t.EntityPair("serverflags", "3")])
++  world = t.Entity([t.EntityPair("classname", "worldspawn"), t.EntityPair("message", value)])
++  return t.SaveGame(5, "comment", [1.0], 1, "start", 2.0, ["m"], globalState, [world])
++end function
++
+ function main(args)
+   global passed, failed
+   print "[1/24] status"
+@@ -79,12 +85,16 @@ function main(args)
+   saveSummary = artifacts.saveSummary(bytes([1, 2, 3]), "start", 1.5, 0x1234, 0x5678)
+   print "[21/24] save summary version"
+   bp087Equal(saveSummary[0], 5, "summary version")
+-  print "[22/24] save summary map"
+-  bp087Equal(saveSummary[1], "start", "summary map")
+-  print "[23/24] save summary hashes"
+-  bp087Check(saveSummary[5] == 0x1234 and saveSummary[6] == 0x5678, "summary hashes")
+-  print "[24/24] contract text"
+-  bp087Check(len(bytes(artifacts.CONTRACT_TEXT)) > 32, "contract text")
++  saveLeft = bp087SaveFixture("alpha")
++  saveRight = bp087SaveFixture("alpha")
++  print "[22/24] save semantic equality"
++  bp087Check(artifacts.saveSemanticEqual(saveLeft, saveRight), "semantic equality")
++  changed = bp087SaveFixture("beta")
++  print "[23/24] save semantic difference"
++  bp087Equal(artifacts.saveSemanticDifference(saveLeft, changed), "entity 0 pair 1 value for message", "semantic difference")
++  difference = artifacts.firstByteDifference(bytes([1, 2, 3]), bytes([1, 9, 3]))
++  print "[24/24] byte difference and contract"
++  bp087Check(difference[0] == 1 and difference[1] == 2 and difference[2] == 9 and len(bytes(artifacts.CONTRACT_TEXT)) > 32, "byte difference contract")
+ 
+   if failed > 0 then print "MiniQuake BP-087 artifact compatibility tests failed: " + failed + "/24"; return 1 end if
+   print "MiniQuake BP-087 artifact compatibility tests passed: 24"
+diff --git a/tests/artifact_retail_evidence.ml b/tests/artifact_retail_evidence.ml
+index 5a5f0edb8721a0c5ccd5cdcf54b719491c6f251c..266a60d8b69e91f1c0db5ba129c7e311936eb635 100644
+--- a/tests/artifact_retail_evidence.ml
++++ b/tests/artifact_retail_evidence.ml
+@@ -4,8 +4,8 @@ import miniquake.demo as demo
+ import miniquake.demo_player as demoPlayer
+ import miniquake.host as host
+ import miniquake.savegame as savegame
++import miniquake.savegame_runtime as saveRuntime
+ import miniquake.compat_trace as trace
+-import miniquake.server as server
+ 
+ function bp087Fail(message)
+   print "error=" + message
+@@ -23,6 +23,21 @@ function bp087RunFrames(session, count)
+   return true
+ end function
+ 
++function bp087Shutdown(session, label)
++  result = try(host.shutdown(session))
++  if result is error then return error(8790, label + " shutdown: " + result.message) end if
++  if not result then return error(8791, label + " shutdown returned false") end if
++  return true
++end function
++
++function bp087PrepareLoadedSave(session, saved)
++  applied = try(savegame.apply(session.server, saved))
++  if applied is error then return applied end if
++  synchronized = try(saveRuntime.synchronizeLoadedServer(session.server))
++  if synchronized is error then return synchronized end if
++  return true
++end function
++
+ function main(args)
+   if len(args) < 3 then
+     print "usage: MiniQuakeArtifactRetailEvidence.exe BASE GAME MAP"
+@@ -48,35 +63,111 @@ function main(args)
+   end for
+   qfs.release(system)
+ 
++  // Phase A: create the live source state and serialize the version-5 file.
++  // Shut the complete host down before creating phase B.  NET/QSocket state is
++  // process-global just like WinQuake's globals, so two simultaneous Host
++  // sessions in one process are not a valid compatibility scenario.
+   sessionA = host.create(["-basedir", baseDirectory, "-game", gameDirectory, "-headless", "-nosound", "+map", mapName])
+   initializedA = try(host.initialize(sessionA))
+-  if initializedA is error then host.shutdown(sessionA); return bp087Fail("save source init: " + initializedA.message) end if
++  if initializedA is error then
++    ignoredA = try(host.shutdown(sessionA))
++    return bp087Fail("save source init: " + initializedA.message)
++  end if
+   ran = try(bp087RunFrames(sessionA, 64))
+-  if ran is error then host.shutdown(sessionA); return bp087Fail("save source frames: " + ran.message) end if
++  if ran is error then
++    ignoredA = try(host.shutdown(sessionA))
++    return bp087Fail("save source frames: " + ran.message)
++  end if
+   saveA = try(savegame.serializeBytes(sessionA.server))
+-  if saveA is error then host.shutdown(sessionA); return bp087Fail("save serialize: " + saveA.message) end if
+-  parsed = try(savegame.parseBytes(saveA))
+-  if parsed is error then host.shutdown(sessionA); return bp087Fail("save parse: " + parsed.message) end if
++  if saveA is error then
++    ignoredA = try(host.shutdown(sessionA))
++    return bp087Fail("save serialize: " + saveA.message)
++  end if
++  parsedA = try(savegame.parseBytes(saveA))
++  if parsedA is error then
++    ignoredA = try(host.shutdown(sessionA))
++    return bp087Fail("save parse: " + parsedA.message)
++  end if
+   sourceEdicts = trace.serverEdictsHash(sessionA)
+   sourceGlobals = trace.globalsHash(sessionA)
++  cleanA = try(bp087Shutdown(sessionA, "source"))
++  if cleanA is error then return bp087Fail(cleanA.message) end if
+ 
++  // Phase B: apply the source artifact to a freshly initialized server.  The
++  // parsed version-5 save domain is the semantic comparison boundary.  Quake
++  // archives only DEF_SAVEGLOBAL values and writes floats with six decimals;
++  // complete live VM hashes include transient state which the format never
++  // promises to preserve.
+   sessionB = host.create(["-basedir", baseDirectory, "-game", gameDirectory, "-headless", "-nosound", "+map", mapName])
+   initializedB = try(host.initialize(sessionB))
+-  if initializedB is error then host.shutdown(sessionA); host.shutdown(sessionB); return bp087Fail("save target init: " + initializedB.message) end if
+-  applied = try(savegame.apply(sessionB.server, parsed))
+-  if applied is error then host.shutdown(sessionA); host.shutdown(sessionB); return bp087Fail("save apply: " + applied.message) end if
+-  server.syncQuakeCEdicts(sessionB.server)
+-  server.assignModelIndexes(sessionB.server)
++  if initializedB is error then
++    ignoredB = try(host.shutdown(sessionB))
++    return bp087Fail("save target init: " + initializedB.message)
++  end if
++  preparedB = try(bp087PrepareLoadedSave(sessionB, parsedA))
++  if preparedB is error then
++    ignoredB = try(host.shutdown(sessionB))
++    return bp087Fail("save apply: " + preparedB.message)
++  end if
+   saveB = try(savegame.serializeBytes(sessionB.server))
+-  if saveB is error then host.shutdown(sessionA); host.shutdown(sessionB); return bp087Fail("save reserialize: " + saveB.message) end if
++  if saveB is error then
++    ignoredB = try(host.shutdown(sessionB))
++    return bp087Fail("save reserialize: " + saveB.message)
++  end if
++  parsedB = try(savegame.parseBytes(saveB))
++  if parsedB is error then
++    ignoredB = try(host.shutdown(sessionB))
++    return bp087Fail("normalized save parse: " + parsedB.message)
++  end if
+   targetEdicts = trace.serverEdictsHash(sessionB)
+   targetGlobals = trace.globalsHash(sessionB)
+-  exact = artifacts.bytesEqual(saveA, saveB)
+-  semantic = sourceEdicts == targetEdicts and sourceGlobals == targetGlobals and sessionA.server.mapName == sessionB.server.mapName
+-  print "save=version5 bytes=" + len(saveA) + " crc=" + artifacts.bytesCrc(saveA) + " exact=" + exact + " semantic=" + semantic + " edicts=" + sourceEdicts + " globals=" + sourceGlobals
+-  cleanA = host.shutdown(sessionA)
+-  cleanB = host.shutdown(sessionB)
+-  if not exact or not semantic or not cleanA or not cleanB then return bp087Fail("save roundtrip mismatch") end if
++  semanticDifferenceAB = artifacts.saveSemanticDifference(parsedA, parsedB)
++  byteDifferenceAB = artifacts.firstByteDifference(saveA, saveB)
++  cleanB = try(bp087Shutdown(sessionB, "target"))
++  if cleanB is error then return bp087Fail(cleanB.message) end if
++
++  // Phase C: a second independent load must be byte-stable.  This catches a
++  // parser/writer pair which keeps changing an already normalized save while
++  // still allowing the first live-state serialization to cross Quake's
++  // intentionally lossy six-decimal text boundary.
++  sessionC = host.create(["-basedir", baseDirectory, "-game", gameDirectory, "-headless", "-nosound", "+map", mapName])
++  initializedC = try(host.initialize(sessionC))
++  if initializedC is error then
++    ignoredC = try(host.shutdown(sessionC))
++    return bp087Fail("save stability init: " + initializedC.message)
++  end if
++  preparedC = try(bp087PrepareLoadedSave(sessionC, parsedB))
++  if preparedC is error then
++    ignoredC = try(host.shutdown(sessionC))
++    return bp087Fail("save stability apply: " + preparedC.message)
++  end if
++  saveC = try(savegame.serializeBytes(sessionC.server))
++  if saveC is error then
++    ignoredC = try(host.shutdown(sessionC))
++    return bp087Fail("save stability serialize: " + saveC.message)
++  end if
++  parsedC = try(savegame.parseBytes(saveC))
++  if parsedC is error then
++    ignoredC = try(host.shutdown(sessionC))
++    return bp087Fail("stable save parse: " + parsedC.message)
++  end if
++  semanticDifferenceBC = artifacts.saveSemanticDifference(parsedB, parsedC)
++  byteDifferenceBC = artifacts.firstByteDifference(saveB, saveC)
++  cleanC = try(bp087Shutdown(sessionC, "stability"))
++  if cleanC is error then return bp087Fail(cleanC.message) end if
++
++  exactFirstPass = artifacts.bytesEqual(saveA, saveB)
++  semanticFirstPass = semanticDifferenceAB == ""
++  stableExact = artifacts.bytesEqual(saveB, saveC)
++  stableSemantic = semanticDifferenceBC == ""
++  print "save=version5 source_bytes=" + len(saveA) + " source_crc=" + artifacts.bytesCrc(saveA) + " normalized_bytes=" + len(saveB) + " normalized_crc=" + artifacts.bytesCrc(saveB) + " first_pass_exact=" + exactFirstPass + " semantic=" + semanticFirstPass + " stable_exact=" + stableExact + " stable_semantic=" + stableSemantic
++  print "save_first_diff=" + byteDifferenceAB[0] + " left=" + byteDifferenceAB[1] + " right=" + byteDifferenceAB[2] + " semantic_diff=" + semanticDifferenceAB
++  print "save_stable_diff=" + byteDifferenceBC[0] + " left=" + byteDifferenceBC[1] + " right=" + byteDifferenceBC[2] + " semantic_diff=" + semanticDifferenceBC
++  print "runtime_full_hashes source_edicts=" + sourceEdicts + " target_edicts=" + targetEdicts + " source_globals=" + sourceGlobals + " target_globals=" + targetGlobals
++  if not exactFirstPass then return bp087Fail("save byte roundtrip mismatch at offset " + byteDifferenceAB[0]) end if
++  if not semanticFirstPass then return bp087Fail("save semantic roundtrip mismatch: " + semanticDifferenceAB) end if
++  if not stableExact then return bp087Fail("save normalized bytes are not stable at offset " + byteDifferenceBC[0]) end if
++  if not stableSemantic then return bp087Fail("save normalized semantic state is not stable: " + semanticDifferenceBC) end if
+   print "result=PASS"
+   return 0
+ end function
+diff --git a/tools/check_compat_087.py b/tools/check_compat_087.py
+index e2c2715e1c7c5b038a10925cfd94f382d1312b90..ce0aa7dc493e6115d22893d34ba6cb5e38d9270a 100755
+--- a/tools/check_compat_087.py
++++ b/tools/check_compat_087.py
+@@ -4,6 +4,8 @@ import argparse, json, pathlib, sys
+ EXPECTED_STATUS = 'artifact_compat_109_frozen_v1'
+ EXPECTED_FINGERPRINT = '0x59531091'
+ EXPECTED_FIXTURES = 24
++EXPECTED_EVIDENCE_REVISION = 'sequential_exact_v1'
++
+ 
+ def fnv1a32(data: bytes) -> int:
+     value = 0x811C9DC5
+@@ -12,6 +14,7 @@ def fnv1a32(data: bytes) -> int:
+         value = (value * 0x01000193) & 0xFFFFFFFF
+     return value
+ 
++
+ def main() -> int:
+     ap = argparse.ArgumentParser()
+     ap.add_argument("--root", default=".")
+@@ -22,8 +25,12 @@ def main() -> int:
+     golden_path = root / "audit/artifact_compat_golden.json"
+     module_path = root / "src/miniquake/artifact_compat.ml"
+     test_path = root / "tests/artifact_compat_tests.ml"
++    evidence_path = root / "tests/artifact_retail_evidence.ml"
++    runtime_path = root / "src/miniquake/savegame_runtime.ml"
++    savegame_path = root / "src/miniquake/savegame.ml"
++    host_path = root / "src/miniquake/host.ml"
+     build_info_path = root / "src/miniquake/build_info.ml"
+-    for path in [golden_path, module_path, test_path, build_info_path]:
++    for path in [golden_path, module_path, test_path, evidence_path, runtime_path, savegame_path, host_path, build_info_path]:
+         if not path.is_file():
+             errors.append("missing file: " + str(path.relative_to(root)))
+     golden = {}
+@@ -31,6 +38,10 @@ def main() -> int:
+         golden = json.loads(golden_path.read_text(encoding="utf-8-sig"))
+     source = module_path.read_text(encoding="utf-8-sig") if module_path.is_file() else ""
+     test = test_path.read_text(encoding="utf-8-sig") if test_path.is_file() else ""
++    evidence = evidence_path.read_text(encoding="utf-8-sig") if evidence_path.is_file() else ""
++    runtime = runtime_path.read_text(encoding="utf-8-sig") if runtime_path.is_file() else ""
++    savegame = savegame_path.read_text(encoding="utf-8-sig") if savegame_path.is_file() else ""
++    host = host_path.read_text(encoding="utf-8-sig") if host_path.is_file() else ""
+     build_info = build_info_path.read_text(encoding="utf-8-sig") if build_info_path.is_file() else ""
+     contract_text = golden.get("contract_text", "")
+     calculated = f"0x{fnv1a32(contract_text.encode('utf-8')):08x}"
+@@ -38,9 +49,64 @@ def main() -> int:
+     if golden.get("fingerprint") != EXPECTED_FINGERPRINT: errors.append("golden fingerprint differs")
+     if calculated != EXPECTED_FINGERPRINT: errors.append(f"fingerprint calculation: expected {EXPECTED_FINGERPRINT}, got {calculated}")
+     if golden.get("fixtures") != EXPECTED_FIXTURES: errors.append("golden fixture count differs")
+-    for text in [f'const STATUS = "{EXPECTED_STATUS}"', f'const FINGERPRINT = {EXPECTED_FINGERPRINT}']:
++    if golden.get("evidence_revision") != EXPECTED_EVIDENCE_REVISION: errors.append("golden evidence revision differs")
++    if golden.get("requires_exact_roundtrip") is not True: errors.append("exact roundtrip requirement missing")
++    if golden.get("requires_stable_reserialize") is not True: errors.append("stable reserialize requirement missing")
++    if golden.get("preserves_edict_high_water") is not True: errors.append("edict high-water requirement missing")
++    if golden.get("live_vm_hashes_are_diagnostic") is not True: errors.append("live VM hash classification missing")
++    for text in [
++        f'const STATUS = "{EXPECTED_STATUS}"',
++        f'const FINGERPRINT = {EXPECTED_FINGERPRINT}',
++        'function saveSemanticDifference(left, right)',
++        'function saveSemanticEqual(left, right)',
++        'function firstByteDifference(left, right)',
++    ]:
+         if text not in source: errors.append("missing module marker: " + text)
+-    if 'MiniQuake BP-087 artifact compatibility tests passed: 24' not in test: errors.append("runtime success marker missing")
++    for text in [
++        'MiniQuake BP-087 artifact compatibility tests passed: 24',
++        '[22/24] save semantic equality',
++        '[23/24] save semantic difference',
++        '[24/24] byte difference and contract',
++    ]:
++        if text not in test: errors.append("runtime marker missing: " + text)
++    evidence_markers = [
++        'cleanA = try(bp087Shutdown(sessionA, "source"))',
++        'sessionB = host.create(',
++        'cleanB = try(bp087Shutdown(sessionB, "target"))',
++        'sessionC = host.create(',
++        'saveRuntime.synchronizeLoadedServer(session.server)',
++        'semanticDifferenceAB = artifacts.saveSemanticDifference(parsedA, parsedB)',
++        'exactFirstPass = artifacts.bytesEqual(saveA, saveB)',
++        'stableExact = artifacts.bytesEqual(saveB, saveC)',
++        'save byte roundtrip mismatch at offset',
++        'save normalized bytes are not stable at offset',
++        'runtime_full_hashes source_edicts=',
++    ]
++    for text in evidence_markers:
++        if text not in evidence: errors.append("retail evidence marker missing: " + text)
++    runtime_markers = [
++        'function synchronizeLoadedServer(server)',
++        'savedCount = server.numEdicts',
++        'runtime.numEdicts = savedCount',
++        'server.numEdicts = savedCount',
++        'collision.linkEntity(server, index, false)',
++    ]
++    for text in runtime_markers:
++        if text not in runtime: errors.append("save runtime marker missing: " + text)
++    if 'server.mapName = saved.mapName' not in savegame:
++        errors.append("savegame apply does not restore map name")
++    if 'saveRuntime.synchronizeLoadedServer(session.server)' not in host:
++        errors.append("host load path bypasses save runtime synchronization")
++    if 'server.syncQuakeCEdicts(session.server)' in host[host.find('function loadGame('):host.find('function setPlayerFlag(')]:
++        errors.append("host load path still directly trims the saved edict high-water mark")
++    pos_shutdown_a = evidence.find('cleanA = try(bp087Shutdown(sessionA, "source"))')
++    pos_session_b = evidence.find('sessionB = host.create(')
++    pos_shutdown_b = evidence.find('cleanB = try(bp087Shutdown(sessionB, "target"))')
++    pos_session_c = evidence.find('sessionC = host.create(')
++    if min(pos_shutdown_a, pos_session_b, pos_shutdown_b, pos_session_c) < 0 or not (pos_shutdown_a < pos_session_b < pos_shutdown_b < pos_session_c):
++        errors.append("retail evidence sessions are not strictly sequential")
++    if 'semantic = sourceEdicts == targetEdicts' in evidence:
++        errors.append("retail evidence still treats complete live VM hashes as save semantics")
+     for text in ['const PACKAGE_ID = "BP-089"', 'const BLOCK_ID = "BP-085-089"']:
+         if text not in build_info: errors.append("missing build marker: " + text)
+     report = {
+@@ -51,13 +117,22 @@ def main() -> int:
+         "contract_status": golden.get("status"),
+         "fingerprint": calculated,
+         "fixtures": EXPECTED_FIXTURES,
++        "evidence_revision": EXPECTED_EVIDENCE_REVISION,
++        "sequential_sessions": not any("sequential" in e for e in errors),
++        "semantic_boundary": "parsed_save_domain",
++        "exact_roundtrip_required": True,
++        "stable_reserialize_required": True,
++        "preserves_edict_high_water": True,
+     }
+     if ns.json:
+         pathlib.Path(ns.json).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+     print("MiniQuake BP-087 artifact compat verification: " + report["status"])
+-    if not errors: print(f"  status={EXPECTED_STATUS} fingerprint={EXPECTED_FINGERPRINT} fixtures={EXPECTED_FIXTURES}")
++    if not errors:
++        print(f"  status={EXPECTED_STATUS} fingerprint={EXPECTED_FINGERPRINT} fixtures={EXPECTED_FIXTURES}")
++        print(f"  evidence_revision={EXPECTED_EVIDENCE_REVISION} semantic_boundary=parsed_save_domain exact_roundtrip=true preserves_edict_high_water=true sequential_sessions=true")
+     for error in errors: print("  [FAIL] " + error)
+     return 0 if not errors else 1
+ 
++
+ if __name__ == "__main__":
+     sys.exit(main())
+diff --git a/tools/verify.py b/tools/verify.py
+index 9144fd84f8ca9f155d58089a855c6aa650a90a8b..b72b3cbc92bd89f81eaa3bb4aea1523538a209e4 100755
+--- a/tools/verify.py
++++ b/tools/verify.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""Self-contained verifier for MiniQuake BP-089 / BP-085-089.
++"""Self-contained verifier for MiniQuake BP-089 / BP-085-089R1.
+ 
+ Historical semantic component checkers are executed by build.ps1. This verifier
+ owns current package integrity, imports, native bridge identity, delivery
+@@ -21,8 +21,8 @@ PACKAGE_ID = "BP-089"
+ PARENT_PACKAGE_ID = "BP-088"
+ BLOCK_ID = "BP-085-089"
+ BLOCK_PARENT_PACKAGE_ID = "BP-080-084R2"
+-DELIVERY_REVISION = "BP-085-089"
+-DELIVERY_PARENT = "BP-080-084R2"
++DELIVERY_REVISION = "BP-085-089R1"
++DELIVERY_PARENT = "BP-085-089"
+ MANIFEST = "SOURCE_MANIFEST.sha256"
+ 
+ EXCLUDED_DIRS = {".git", "build", "__pycache__", ".pytest_cache"}
+@@ -73,8 +73,12 @@ REQUIRED_PATHS = {
+     "TEST_BP-085-089.ps1", "CHANGELOG_BP-085-089.md",
+     "docs/BP-085-089_TESTING.md", "docs/BP-080-084R2_ACCEPTANCE_ANALYSIS.md",
+     "docs/BP-085-089_BLOCK_LEDGER.json",
++    "TEST_BP-085-089R1.ps1", "CHANGELOG_BP-085-089R1.md",
++    "docs/BP-085-089R1_TESTING.md", "docs/BP-085-089R1_RESULT_ANALYSIS.md",
++    "docs/BP-085-089R1_HOTFIX_REPORT.json", "docs/BP-085-089R1_BLOCK_LEDGER.json",
+     "src/miniquake/game_profile.ml", "src/miniquake/mod_compat.ml",
+-    "src/miniquake/artifact_compat.ml", "src/miniquake/stability_contract.ml",
++    "src/miniquake/artifact_compat.ml", "src/miniquake/savegame_runtime.ml",
++    "src/miniquake/stability_contract.ml",
+     "src/miniquake/compatibility_matrix.ml",
+     "tests/game_profile_compat_tests.ml", "tests/mod_runtime_compat_tests.ml",
+     "tests/artifact_compat_tests.ml", "tests/stability_contract_tests.ml",
+@@ -85,7 +89,7 @@ REQUIRED_PATHS = {
+     "tools/check_compat_085.py", "tools/check_compat_086.py",
+     "tools/check_compat_087.py", "tools/check_compat_088.py", "tools/check_compat_089.py",
+     "patches/BP-085.diff", "patches/BP-086.diff", "patches/BP-087.diff",
+-    "patches/BP-088.diff", "patches/BP-089.diff",
++    "patches/BP-088.diff", "patches/BP-089.diff", "patches/BP-089R1.diff",
+ }
+ 
+ EXPECTED_NATIVE = {
+@@ -211,19 +215,19 @@ def check_identity(root: Path) -> Check:
+         ],
+         "test": [
+             '$PackageId = "BP-089"', '$BlockId = "BP-085-089"',
+-            '$DeliveryRevision = "BP-085-089"',
+-            '$DeliveryParent = "BP-080-084R2"',
+-            "MiniQuake BP-085-089 acceptance test: PASS",
++            '$DeliveryRevision = "BP-085-089R1"',
++            '$DeliveryParent = "BP-085-089"',
++            "MiniQuake BP-085-089R1 acceptance test: PASS",
+             "retail demo/save artifact evidence A", "5000-frame host soak",
+         ],
+         "collector": [
+             '$PackageId = "BP-089"', '$BlockId = "BP-085-089"',
+-            '$DeliveryRevision = "BP-085-089"',
+-            '$DeliveryParent = "BP-080-084R2"',
+-            "MiniQuake_BP-085-089_RESULTS_",
++            '$DeliveryRevision = "BP-085-089R1"',
++            '$DeliveryParent = "BP-085-089"',
++            "MiniQuake_BP-085-089R1_RESULTS_",
+             "MiniQuakeArtifactRetailEvidence.exe",
+         ],
+-        "launcher": ["TEST_BP-085-089.ps1"],
++        "launcher": ["TEST_BP-085-089R1.ps1"],
+     }
+     texts = {
+         "build_info": build_info, "main": main, "build": build,
+@@ -539,6 +543,111 @@ def check_current_test_global_bindings(root: Path) -> Check:
+         errors,
+     )
+ 
++def check_artifact_roundtrip_hotfix(root: Path) -> Check:
++    """Bind the BP-087 sequential, exact Quake-v5 roundtrip correction."""
++    errors: list[str] = []
++    artifact = (root / "src/miniquake/artifact_compat.ml").read_text(encoding="utf-8-sig")
++    runtime = (root / "src/miniquake/savegame_runtime.ml").read_text(encoding="utf-8-sig")
++    savegame = (root / "src/miniquake/savegame.ml").read_text(encoding="utf-8-sig")
++    host = (root / "src/miniquake/host.ml").read_text(encoding="utf-8-sig")
++    evidence = (root / "tests/artifact_retail_evidence.ml").read_text(encoding="utf-8-sig")
++    golden = json.loads((root / "audit/artifact_compat_golden.json").read_text(encoding="utf-8-sig"))
++
++    markers = {
++        "artifact": [
++            "function saveSemanticDifference(left, right)",
++            "function firstByteDifference(left, right)",
++        ],
++        "runtime": [
++            "function synchronizeLoadedServer(server)",
++            "savedCount = server.numEdicts",
++            "runtime.numEdicts = savedCount",
++            "server.numEdicts = savedCount",
++            "collision.linkEntity(server, index, false)",
++        ],
++        "savegame": ["server.mapName = saved.mapName"],
++        "host": [
++            "import miniquake.savegame_runtime as saveRuntime",
++            "saveRuntime.synchronizeLoadedServer(session.server)",
++        ],
++        "evidence": [
++            'cleanA = try(bp087Shutdown(sessionA, "source"))',
++            'cleanB = try(bp087Shutdown(sessionB, "target"))',
++            'cleanC = try(bp087Shutdown(sessionC, "stability"))',
++            "exactFirstPass = artifacts.bytesEqual(saveA, saveB)",
++            "save byte roundtrip mismatch at offset",
++            "stableExact = artifacts.bytesEqual(saveB, saveC)",
++        ],
++    }
++    texts = {
++        "artifact": artifact,
++        "runtime": runtime,
++        "savegame": savegame,
++        "host": host,
++        "evidence": evidence,
++    }
++    for label, wanted in markers.items():
++        for marker in wanted:
++            if marker not in texts[label]:
++                errors.append(f"{label} missing marker: {marker}")
++
++    load_start = host.find("function loadGame(")
++    load_end = host.find("function setPlayerFlag(", load_start)
++    load_body = host[load_start:load_end] if load_start >= 0 and load_end > load_start else ""
++    if "server.syncQuakeCEdicts(session.server)" in load_body:
++        errors.append("loadGame still recomputes and trims the saved edict high-water mark")
++
++    order = [
++        evidence.find('cleanA = try(bp087Shutdown(sessionA, "source"))'),
++        evidence.find("sessionB = host.create("),
++        evidence.find('cleanB = try(bp087Shutdown(sessionB, "target"))'),
++        evidence.find("sessionC = host.create("),
++        evidence.find('cleanC = try(bp087Shutdown(sessionC, "stability"))'),
++    ]
++    if min(order) < 0 or order != sorted(order):
++        errors.append("retail save evidence does not use strictly sequential Host sessions")
++
++
++    current_test = (root / "TEST_BP-085-089R1.ps1").read_text(encoding="utf-8-sig")
++    if "first_pass_exact=true" not in current_test:
++        errors.append("acceptance script does not require exact A/B save roundtrip")
++    collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
++    for marker in [
++        "src\\miniquake\\savegame.ml",
++        "src\\miniquake\\savegame_runtime.ml",
++        "src\\miniquake\\host.ml",
++        "patches\\BP-089R1.diff",
++    ]:
++        if marker not in collector:
++            errors.append(f"collector missing save hotfix marker: {marker}")
++
++    expected_golden = {
++        "evidence_revision": "sequential_exact_v1",
++        "semantic_boundary": "parsed_save_domain",
++        "requires_exact_roundtrip": True,
++        "requires_stable_reserialize": True,
++        "preserves_edict_high_water": True,
++        "live_vm_hashes_are_diagnostic": True,
++        "simultaneous_host_sessions": False,
++    }
++    for key, value in expected_golden.items():
++        if golden.get(key) != value:
++            errors.append(f"artifact golden {key} differs: {golden.get(key)!r}")
++
++    return Check(
++        "artifact_save_roundtrip_hotfix",
++        not errors,
++        {
++            "evidence_revision": golden.get("evidence_revision"),
++            "semantic_boundary": golden.get("semantic_boundary"),
++            "exact_roundtrip": golden.get("requires_exact_roundtrip"),
++            "preserves_edict_high_water": golden.get("preserves_edict_high_water"),
++            "sequential_host_sessions": golden.get("simultaneous_host_sessions") is False,
++        },
++        errors,
++    )
++
++
+ def check_native(root: Path) -> Check:
+     errors: list[str] = []
+     details: dict[str, object] = {}
+@@ -585,7 +694,7 @@ def check_powershell(root: Path) -> Check:
+     errors: list[str] = []
+     current_names = [
+         "build.ps1",
+-        "TEST_BP-085-089.ps1",
++        "TEST_BP-085-089R1.ps1",
+         "COLLECT_RESULTS.ps1",
+         "test.ps1",
+     ]
+@@ -597,7 +706,7 @@ def check_powershell(root: Path) -> Check:
+             errors.append(f"{path.name}: comma immediately before closing parenthesis")
+         if re.search(r"\$\w+\s*=\s*@\(\s*&\s+", text):
+             errors.append(f"{path.name}: fully buffered child-process output")
+-    current_test = (root / "TEST_BP-085-089.ps1").read_text(encoding="utf-8-sig")
++    current_test = (root / "TEST_BP-085-089R1.ps1").read_text(encoding="utf-8-sig")
+     if "Invoke-LiveProcess" not in current_test or "$Writer.Flush()" not in current_test:
+         errors.append("current acceptance script does not stream and flush output")
+     return Check("powershell_delivery", not errors, {"scripts_checked": len(scripts)}, errors)
+@@ -695,6 +804,7 @@ def main() -> int:
+         check_minilang_entry_helper_namespace(root),
+         check_minilang_entry_function_shadow_arity(root),
+         check_current_test_global_bindings(root),
++        check_artifact_roundtrip_hotfix(root),
+         check_native(root),
+         check_no_game_data(root),
+         check_powershell(root),
+@@ -710,7 +820,7 @@ def main() -> int:
+                 print(f"         {key}={value}")
+         for error in check.errors:
+             print(f"         error: {error}")
+-    print(f"MiniQuake BP-085-089 verification: {'PASS' if passed else 'FAIL'}")
++    print(f"MiniQuake BP-085-089R1 verification: {'PASS' if passed else 'FAIL'}")
+ 
+     document = {
+         "schema_version": 1,

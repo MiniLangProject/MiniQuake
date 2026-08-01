@@ -1,0 +1,107 @@
+{
+  "schema": "MiniQuakeProtocol15DatagramGolden/1",
+  "package_id": "BP-017",
+  "parent_package_id": "BP-016",
+  "protocol_version": 15,
+  "sources": [
+    "net_dgrm.c",
+    "net.h",
+    "net_main.c"
+  ],
+  "cases": [
+    {
+      "kind": "case",
+      "name": "sequence_next_wrap",
+      "value": 0
+    },
+    {
+      "kind": "case",
+      "name": "sequence_previous_wrap",
+      "value": 4294967295
+    },
+    {
+      "kind": "case",
+      "name": "exact_fragment_eom",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "split_fragment_eom",
+      "value": 0
+    },
+    {
+      "kind": "case",
+      "name": "first_wire_size",
+      "value": 1032
+    },
+    {
+      "kind": "case",
+      "name": "ack_remaining_1500",
+      "value": 476
+    },
+    {
+      "kind": "case",
+      "name": "ack_sets_sendnext",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "ack_defers_wire_send",
+      "value": 0
+    },
+    {
+      "kind": "case",
+      "name": "flush_second_sequence",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "final_ack_cansend",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "retransmit_exact_second",
+      "value": 0
+    },
+    {
+      "kind": "case",
+      "name": "retransmit_above_second",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "unreliable_gap",
+      "value": 3
+    },
+    {
+      "kind": "case",
+      "name": "reliable_fragments_2500",
+      "value": 3
+    },
+    {
+      "kind": "case",
+      "name": "reliable_fragments_max",
+      "value": 8
+    },
+    {
+      "kind": "case",
+      "name": "duplicate_data_reack",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "cansend_query_side_effects",
+      "value": 0
+    },
+    {
+      "kind": "case",
+      "name": "receive_overflow_guard",
+      "value": 1
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/protocol15_datagram_oracle.c",
+    "oracle_sha256": "e07145117df3b4ad9bb67e727f4fa9626d9eef09bd5fe567db6e049e4ee379dc"
+  }
+}

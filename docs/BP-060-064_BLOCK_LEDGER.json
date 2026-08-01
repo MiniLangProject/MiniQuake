@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "project": "MiniQuake",
+  "block_id": "BP-060-064",
+  "parent_package_id": "BP-055-059R2",
+  "final_package_id": "BP-064",
+  "delivery_revision": "BP-060-064R1",
+  "network_platform_status": "network_platform_109_frozen_v1",
+  "network_platform_fingerprint": "0xb3ec7589",
+  "steps": [
+    {
+      "package_id": "BP-060",
+      "title": "NET main, qsocket pool, poll queue and active host port",
+      "patch": "patches/BP-060.diff",
+      "runtime_fixtures": 20,
+      "status": "implemented; Windows acceptance pending"
+    },
+    {
+      "package_id": "BP-061",
+      "title": "Protocol 3 control, discovery and connection classification",
+      "patch": "patches/BP-061.diff",
+      "runtime_fixtures": 24,
+      "status": "implemented; Windows acceptance pending"
+    },
+    {
+      "package_id": "BP-062",
+      "title": "WinSock address, partial IP and landriver parity",
+      "patch": "patches/BP-062.diff",
+      "runtime_fixtures": 24,
+      "status": "implemented; Windows acceptance pending"
+    },
+    {
+      "package_id": "BP-063",
+      "title": "sys_win, QHOST/conproc and WinMain lifecycle",
+      "patch": "patches/BP-063.diff",
+      "runtime_fixtures": 21,
+      "status": "implemented; Windows acceptance pending"
+    },
+    {
+      "package_id": "BP-064",
+      "title": "network/platform closure and cross-process UDP evidence",
+      "patch": "patches/BP-064.diff",
+      "runtime_fixtures": 24,
+      "status": "implemented; Windows acceptance pending"
+    }
+  ],
+  "block_runtime_fixtures": 113,
+  "accepted_parent": {
+    "delivery_revision": "BP-055-059R2",
+    "status": "PASS",
+    "result_archive": "MiniQuake_BP-055-059R2_RESULTS_20260728-155430.zip",
+    "result_archive_sha256": "7634070813d28b57ffdd0c18064e493187c4a0fc47259e55450aa7a75d3b32fd",
+    "required_steps": "143/143 PASS",
+    "optional_steps": "1 Original GLQuake corpus comparison skipped",
+    "trace_sha256": "f8aef48166ea9ffc3bfd864802238feec1b1e8a01dad27f3e55e3b47b20d99c1",
+    "trace_rolling_hash": "d905b042",
+    "retail_audio_evidence_sha256": "9988060eb6c3bb7692338b97325d50c97c233473298194a39196795ec88d4337",
+    "udp_loopback": "PASS"
+  },
+  "acceptance": {
+    "single_cumulative_build": true,
+    "installed_game_validation": true,
+    "headless_frames": 300,
+    "trace_frames": 128,
+    "render_evidence": true,
+    "retail_audio_evidence": true,
+    "network_evidence_process_pairs": 2,
+    "network_evidence_exact_identity": true,
+    "udp_loopback": true
+  },
+  "scope_boundary": {
+    "network_protocol": "Protocol 15 gameplay and Protocol 3 connectionless control",
+    "landriver": "WinSock UDP",
+    "platform": "observable sys_win/conproc behavior with x64-safe native bridge",
+    "serial_modem_ipx": "legacy transports remain outside the mandatory modern Windows profile",
+    "quake_game_data": "external; never bundled"
+  },
+  "delivery_parent": "BP-060-064",
+  "delivery_hotfix": {
+    "scope": "test/build infrastructure only",
+    "live_output": true,
+    "python_unbuffered": true,
+    "production_src_changed": false,
+    "native_changed": false
+  }
+}

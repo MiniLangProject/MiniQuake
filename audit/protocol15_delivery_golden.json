@@ -1,0 +1,88 @@
+{
+  "schema": "MiniQuakeProtocol15DeliveryGolden/1",
+  "package_id": "BP-016",
+  "parent_package_id": "BP-015",
+  "protocol_version": 15,
+  "sources": [
+    "cl_main.c",
+    "sv_main.c",
+    "host.c",
+    "net_main.c"
+  ],
+  "cases": [
+    {
+      "kind": "case",
+      "name": "send_failed",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "send_blocked",
+      "value": 2
+    },
+    {
+      "kind": "case",
+      "name": "send_committed",
+      "value": 3
+    },
+    {
+      "kind": "case",
+      "name": "spawned_plan",
+      "value": 9
+    },
+    {
+      "kind": "case",
+      "name": "signon_wait_equal",
+      "value": 4
+    },
+    {
+      "kind": "case",
+      "name": "signon_nop_above",
+      "value": 2
+    },
+    {
+      "kind": "case",
+      "name": "signon_requested",
+      "value": 8
+    },
+    {
+      "kind": "case",
+      "name": "overflow_first",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "drop_blocked",
+      "value": 2
+    },
+    {
+      "kind": "case",
+      "name": "drop_sendable",
+      "value": 3
+    },
+    {
+      "kind": "case",
+      "name": "reliable_send",
+      "value": 4
+    },
+    {
+      "kind": "case",
+      "name": "empty_none",
+      "value": 0
+    },
+    {
+      "kind": "case",
+      "name": "keepalive_equal",
+      "value": 0
+    },
+    {
+      "kind": "case",
+      "name": "keepalive_above",
+      "value": 1
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/protocol15_delivery_oracle.c",
+    "oracle_sha256": "ccc04eb15bb95e9b76477c6b7410be8f0c0cde6904b6ea3af0c3c77707ef8c5a"
+  }
+}

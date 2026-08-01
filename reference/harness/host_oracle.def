@@ -1,3 +1,0 @@
-LIBRARY host_oracle
-EXPORTS
-    host_oracle_jsonl

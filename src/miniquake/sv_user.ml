@@ -36,6 +36,10 @@ struct SvUserState
   diagnostics
 end struct
 
+function quakeFloat(value)
+  return native.bitsFloat(native.floatBits(value))
+end function
+
 function SV_UserInit(server)
   count = 1
   if server is not void then count = server.maxClients end if
@@ -103,7 +107,7 @@ function SV_IdealPitchFromHeights(state, heights, clientIndex)
   if direction == 0 then
     state.idealPitches[clientIndex] = 0.0
   else if steps >= 2 then
-    state.idealPitches[clientIndex] = -direction * state.idealPitchScale
+    state.idealPitches[clientIndex] = quakeFloat(-direction * state.idealPitchScale)
   end if
   if state.server is not void and state.server.machine is not void and clientIndex < len(state.server.clients) then
     runtime.setQcEntityFloat(state.server, state.server.clients[clientIndex].edictIndex, "idealpitch", state.idealPitches[clientIndex])
@@ -239,7 +243,7 @@ end function
 // SV_ReadClientMove
 function SV_ReadClientMove(state, reader, clientValue, player)
   clientTime = msg.readFloat(reader)
-  ping = state.server.time - clientTime
+  ping = quakeFloat(state.server.time - clientTime)
   if len(clientValue.pingTimes) > 0 then
     clientValue.pingTimes[clientValue.numPings % len(clientValue.pingTimes)] = ping
     clientValue.numPings = clientValue.numPings + 1
@@ -290,13 +294,21 @@ function svuAllowedCommand(text)
 end function
 
 function svuExecuteString(state, clientValue, player, text)
+  // sv_user.c initializes ret from privileged, then lets the whitelist replace
+  // it with src_client.  A privileged client therefore still executes allowed
+  // player commands in client context; only non-whitelisted text is inserted.
+  if svuAllowedCommand(text) then
+    state.commandEvents = state.commandEvents + [["client", text]]
+    // Cmd_ExecuteString is void in WinQuake.  The command has been accepted once
+    // it is dispatched in src_client context; handler-specific convenience
+    // return values (for example Host_Name_f returning the limited name) must
+    // not turn the client message into a rejection. Runtime errors still bubble.
+    runtime.executeStringCommand(state.server, clientValue, text, player)
+    return true
+  end if
   if clientValue.privileged then
     state.commandEvents = state.commandEvents + [["insert", text]]
     return true
-  end if
-  if svuAllowedCommand(text) then
-    state.commandEvents = state.commandEvents + [["client", text]]
-    return runtime.executeStringCommand(state.server, clientValue, text, player)
   end if
   state.diagnostics = state.diagnostics + [clientValue.name + " tried to " + text]
   return false
@@ -310,6 +322,7 @@ function SV_ReadClientMessage(state, clientValue, data, player)
   while msg.remaining(reader) > 0
     if not clientValue.active or reader.badRead then return false end if
     command = msg.readChar(reader)
+    if command == -1 then return true end if
     if command == c.CLC_NOP then
       continue
     else if command == c.CLC_STRINGCMD then
@@ -322,8 +335,12 @@ function SV_ReadClientMessage(state, clientValue, data, player)
       state.diagnostics = state.diagnostics + ["SV_ReadClientMessage: unknown command char " + command]
       return false
     end if
+    if reader.badRead then
+      state.diagnostics = state.diagnostics + ["SV_ReadClientMessage: badread"]
+      return false
+    end if
   end while
-  return not reader.badRead
+  return true
 end function
 
 function svuReadNetworkMessages(state, clientValue, player)

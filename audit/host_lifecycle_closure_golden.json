@@ -1,0 +1,71 @@
+{
+  "schema": "MiniQuakeHostLifecycleClosureGolden/1",
+  "package_id": "BP-034",
+  "parent_package_id": "BP-033",
+  "sources": [
+    "host.c",
+    "host_cmd.c",
+    "cl_main.c"
+  ],
+  "rows": [
+    {
+      "kind": "case",
+      "name": "contract_fingerprint",
+      "value": 2361094303
+    },
+    {
+      "kind": "case",
+      "name": "frame_trace_stages",
+      "value": 19
+    },
+    {
+      "kind": "case",
+      "name": "server_physics_stages",
+      "value": 5
+    },
+    {
+      "kind": "case",
+      "name": "map_replace_stages",
+      "value": 6
+    },
+    {
+      "kind": "case",
+      "name": "changelevel_stages",
+      "value": 4
+    },
+    {
+      "kind": "case",
+      "name": "restart_stages",
+      "value": 3
+    },
+    {
+      "kind": "case",
+      "name": "savegame_stages",
+      "value": 9
+    },
+    {
+      "kind": "case",
+      "name": "shutdown_stages",
+      "value": 6
+    },
+    {
+      "kind": "case",
+      "name": "shutdown_flush_seconds",
+      "value": 3
+    },
+    {
+      "kind": "case",
+      "name": "shutdown_broadcast_seconds",
+      "value": 5
+    },
+    {
+      "kind": "case",
+      "name": "fixture_count",
+      "value": 24
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/host_lifecycle_oracle.c",
+    "oracle_sha256": "ca3fccbf6251a2d54886f0eeaf3679c67eb4efc00e950df4195ae46f83a2f859"
+  }
+}

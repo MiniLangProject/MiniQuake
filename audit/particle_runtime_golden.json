@@ -1,0 +1,52 @@
+{
+  "schema": "MiniQuakeParticleRuntimeGolden/1",
+  "package_id": "BP-038",
+  "parent_package_id": "BP-037",
+  "sources": [
+    "cl_main.c",
+    "view.c",
+    "chase.c",
+    "cl_tent.c",
+    "r_part.c",
+    "gl_refrag.c",
+    "gl_rmain.c"
+  ],
+  "rows": [
+    {
+      "name": "custom_gravity_fbits",
+      "value": 1090519040
+    },
+    {
+      "name": "default_gravity_fbits",
+      "value": 1086324736
+    },
+    {
+      "name": "blob2_x_fbits",
+      "value": 1086324736
+    },
+    {
+      "name": "blob2_z_zero_gravity_fbits",
+      "value": 1092616192
+    },
+    {
+      "name": "blob2_z_gravity_fbits",
+      "value": 1086324736
+    },
+    {
+      "name": "explode_x_fbits",
+      "value": 1096810496
+    },
+    {
+      "name": "float_integer_boundary",
+      "value": 1266679808
+    },
+    {
+      "name": "fixtures",
+      "value": 22
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/particle_runtime_oracle.c",
+    "oracle_sha256": "38de90adde22f0862d906a4f5b4236e091b5682d09d5ee00c90c1040f92b1e6b"
+  }
+}

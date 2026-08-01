@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "project": "MiniQuake",
+  "delivery_revision": "BP-070-074R3",
+  "delivery_parent": "BP-070-074R2",
+  "engine_package_id": "BP-074",
+  "block_id": "BP-070-074",
+  "predecessor_result": {
+    "archive": "MiniQuake_BP-070-074R2_RESULTS_20260729-210721.zip",
+    "sha256": "e0206af9dd6775f6e302d697ea3db05ea55e8e902e96f47b3f1e83cf6d0c703b"
+  },
+  "failure": {
+    "group": "BP-071 filesystem/PACK",
+    "fixture": "10/24 shareware loose restriction",
+    "message": "shareware loose subdirectory: expected true"
+  },
+  "root_cause": "synthetic fixture bypassed COM_CheckRegistered but left FileSystem.staticRegistered at the intentional startup value true",
+  "fix": "explicitly set staticRegistered=false before testing loose subdirectory rejection; bind the state in checker, golden metadata and C oracle",
+  "production_source_changed": false,
+  "native_source_changed": false,
+  "test_source_changed": true,
+  "engine_contracts_changed": false,
+  "contract_status": "core_assets_memory_109_frozen_v1",
+  "contract_fingerprint": "0x6c8d974d",
+  "fixture_count_changed": false,
+  "runtime_fixtures": 116,
+  "windows_status": "pending revalidation"
+}

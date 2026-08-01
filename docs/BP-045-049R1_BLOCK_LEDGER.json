@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "project": "MiniQuake",
+  "block_id": "BP-045-049",
+  "parent_package_id": "BP-040-044R3",
+  "final_package_id": "BP-049",
+  "delivery_revision": "BP-045-049R1",
+  "protocol_status": "protocol15_frozen_v1",
+  "quakec_status": "quakec_109_frozen_v1",
+  "world_physics_status": "world_physics_109_frozen_v1",
+  "host_lifecycle_status": "host_lifecycle_109_frozen_v1",
+  "client_render_status": "client_render_109_frozen_v1",
+  "client_render_fingerprint": "0x95e2b295",
+  "world_render_status": "world_render_109_frozen_v1",
+  "world_render_fingerprint": "0x846a74de",
+  "model_ui_render_status": "model_ui_render_109_frozen_v1",
+  "model_ui_render_fingerprint": "0x0a62f5b1",
+  "steps": [
+    {
+      "package_id": "BP-045",
+      "title": "alias shadedot, shadow origin and texture-unit parity",
+      "patch": "patches/BP-045.diff",
+      "runtime_fixtures": 22,
+      "status": "implemented; Windows acceptance pending"
+    },
+    {
+      "package_id": "BP-046",
+      "title": "sprite synchronization and random syncbase parity",
+      "patch": "patches/BP-046.diff",
+      "runtime_fixtures": 22,
+      "status": "implemented; Windows acceptance pending"
+    },
+    {
+      "package_id": "BP-047",
+      "title": "2D, HUD, statusbar and screenshot layout parity",
+      "patch": "patches/BP-047.diff",
+      "runtime_fixtures": 24,
+      "status": "implemented; Windows acceptance pending"
+    },
+    {
+      "package_id": "BP-048",
+      "title": "deterministic framebuffer evidence and comparison",
+      "patch": "patches/BP-048.diff",
+      "runtime_fixtures": 18,
+      "status": "implemented; Windows acceptance pending"
+    },
+    {
+      "package_id": "BP-049",
+      "title": "model/UI/render closure contract",
+      "patch": "patches/BP-049.diff",
+      "runtime_fixtures": 24,
+      "status": "implemented; Windows acceptance pending"
+    }
+  ],
+  "block_runtime_fixtures": 110,
+  "acceptance": {
+    "build_once": true,
+    "continue_independent_tests": true,
+    "installed_game_validation": true,
+    "default_headless_frames": 300,
+    "default_trace_frames": 128,
+    "deterministic_trace_processes": 2,
+    "render_evidence_processes": 2,
+    "default_render_evidence_frame": 128,
+    "render_evidence_exact_identity": true,
+    "visual_ssim_floor_for_future_original_corpus": 0.95,
+    "udp_loopback": true
+  },
+  "accepted_parent": {
+    "delivery_revision": "BP-040-044R3",
+    "status": "PASS",
+    "result_archive": "MiniQuake_BP-040-044R3_RESULTS_20260727-181619.zip",
+    "result_archive_sha256": "ddb2345e4730c50a7072cd217bce8095e2e09dc64e96dd63c9116bc2a9da4534",
+    "headless_frames": 300,
+    "trace_frames": 128,
+    "trace_sha256": "a3c1c0019267d0c6b651c931b1044642b9ef0199cdf64156cef9e8e409a6ecfa",
+    "trace_rolling_hash": "0658dd48",
+    "trace_byte_identity": "PASS",
+    "udp_loopback": "PASS"
+  },
+  "scope_boundary": {
+    "original_glquake_reference_images": "not bundled; future external corpus",
+    "current_visual_evidence": "MiniQuake cross-process exact determinism",
+    "modern_renderer_backend": "later backend block",
+    "protocol_quakec_physics_host_contracts": "unchanged"
+  },
+  "status": "implemented; BP-045-049R1 Windows acceptance pending",
+  "delivery_hotfix": {
+    "revision": "BP-045-049R1",
+    "parent": "BP-045-049",
+    "result_archive": "MiniQuake_BP-045-049_RESULTS_20260727-211658.zip",
+    "result_archive_sha256": "0461fa3e618a3aa53824806a7225b58c63235ca3d3e537ee744f629840e4e6e5",
+    "failure_check": "minilang_serverdata_contract",
+    "missing_collector_markers": [
+      "MiniQuakeProtocol15ServerDataTests.exe",
+      "BP-012_PROTOCOL15_SERVERDATA_AUDIT.md",
+      "protocol15_serverdata_golden.json"
+    ],
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "engine_contracts_changed": false
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "schema": "MiniQuakeWorldLinkGolden/1",
+  "package_id": "BP-026",
+  "parent_package_id": "BP-025",
+  "sources": [
+    "world.c",
+    "world.h"
+  ],
+  "rows": [
+    {
+      "kind": "case",
+      "name": "normal_min_x",
+      "value": 8
+    },
+    {
+      "kind": "case",
+      "name": "normal_min_y",
+      "value": 17
+    },
+    {
+      "kind": "case",
+      "name": "normal_min_z",
+      "value": 26
+    },
+    {
+      "kind": "case",
+      "name": "normal_max_x",
+      "value": 15
+    },
+    {
+      "kind": "case",
+      "name": "normal_max_y",
+      "value": 26
+    },
+    {
+      "kind": "case",
+      "name": "normal_max_z",
+      "value": 37
+    },
+    {
+      "kind": "case",
+      "name": "item_min_x",
+      "value": -6
+    },
+    {
+      "kind": "case",
+      "name": "item_min_y",
+      "value": 3
+    },
+    {
+      "kind": "case",
+      "name": "item_min_z",
+      "value": 27
+    },
+    {
+      "kind": "case",
+      "name": "item_max_x",
+      "value": 29
+    },
+    {
+      "kind": "case",
+      "name": "item_max_y",
+      "value": 40
+    },
+    {
+      "kind": "case",
+      "name": "item_max_z",
+      "value": 36
+    },
+    {
+      "kind": "case",
+      "name": "inclusive_overlap",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "separated_overlap",
+      "value": 0
+    },
+    {
+      "kind": "case",
+      "name": "fixture_count",
+      "value": 15
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/world_link_oracle.c",
+    "oracle_sha256": "48c8b6322d8b924b7761c4d5ae71006bc639c973fddd3367cfa5fca6af7a1d88"
+  }
+}

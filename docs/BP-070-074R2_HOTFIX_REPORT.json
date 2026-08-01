@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "project": "MiniQuake",
+  "delivery_revision": "BP-070-074R2",
+  "delivery_parent": "BP-070-074R1",
+  "engine_package": "BP-074",
+  "block_id": "BP-070-074",
+  "predecessor_result": {
+    "archive": "MiniQuake_BP-070-074R1_RESULTS_20260729-192646.zip",
+    "sha256": "02cb2d978b35076623432cf46a8c56e9907e1430875b07b6ee401eb43387a1c9",
+    "status": "FAIL",
+    "failure": "MiniQuakeCommonCoreTests.exe failed to compile because the fixture called bio.ShortSwap"
+  },
+  "root_cause": "the BP-070 fixture used nonexistent uppercase members of miniquake.byteio instead of the public C-style endian API in miniquake.common",
+  "correction": {
+    "fixture_api": "miniquake.common",
+    "resolved_calls": [
+      "ShortSwap",
+      "LongSwap",
+      "ShortNoSwap",
+      "LongNoSwap",
+      "FloatNoSwap"
+    ],
+    "long_no_swap_boundary": "signed_int32",
+    "float_no_swap_boundary": "ieee754_binary32",
+    "static_checker_hardened": true
+  },
+  "production_source_changed": true,
+  "production_files_changed": ["src/miniquake/common.ml"],
+  "native_source_changed": false,
+  "engine_contracts_changed": false,
+  "fixture_count_changed": false,
+  "core_assets_memory_status": "core_assets_memory_109_frozen_v1",
+  "core_assets_memory_fingerprint": "0x6c8d974d"
+}

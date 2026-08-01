@@ -55,9 +55,9 @@ function TraceLine(worldMap, start, finish)
 end function
 
 // Returns [new view origin, new view angles, exact chase destination, impact].
-// cl.viewangles supplies camera direction while the r_refdef values are the
-// origin/angles being updated, matching Chase_Update's two distinct sources.
-function Chase_Update(state, viewOrigin, clientViewAngles, worldMap)
+// cl.viewangles supplies the trace direction.  Original Chase_Update modifies
+// only r_refdef.viewangles[PITCH]; yaw/roll, damage kick and idle sway survive.
+function Chase_UpdateRefdef(state, viewOrigin, clientViewAngles, renderViewAngles, worldMap)
   vectors = math.AngleVectors(clientViewAngles)
   forward = vectors[0]
   right = vectors[1]
@@ -74,9 +74,13 @@ function Chase_Update(state, viewOrigin, clientViewAngles, worldMap)
   distance = math.DotProduct(stopDelta, forward)
   if distance < 1.0 then distance = 1.0 end if
 
-  adjustedAngles = math.VectorCopy(clientViewAngles)
+  adjustedAngles = math.VectorCopy(renderViewAngles)
   adjustedAngles.x = -math.atan2(stopDelta.z, distance) * math.RAD_TO_DEG
   return [chaseDestination, adjustedAngles, math.VectorCopy(chaseDestination), stop]
+end function
+
+function Chase_Update(state, viewOrigin, clientViewAngles, worldMap)
+  return Chase_UpdateRefdef(state, viewOrigin, clientViewAngles, clientViewAngles, worldMap)
 end function
 
 // Existing convenience API retains its destination-only contract.

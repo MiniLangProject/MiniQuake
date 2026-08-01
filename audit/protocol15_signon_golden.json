@@ -1,0 +1,81 @@
+{
+  "schema": "MiniQuakeProtocol15SignonGolden/1",
+  "package_id": "BP-015",
+  "parent_package_id": "BP-014R1",
+  "protocol_version": 15,
+  "sources": [
+    "cl_main.c",
+    "cl_parse.c",
+    "host_cmd.c",
+    "sv_main.c",
+    "protocol.h"
+  ],
+  "vectors": [
+    {
+      "kind": "vector",
+      "name": "client_stage_1",
+      "bytes": "04707265737061776e00",
+      "length": 10
+    },
+    {
+      "kind": "vector",
+      "name": "client_stage_2_unmasked_high",
+      "bytes": "046e616d65202252616e676572220a0004636f6c6f722033312031330a0004737061776e20312032203300",
+      "length": 43
+    },
+    {
+      "kind": "vector",
+      "name": "client_stage_3",
+      "bytes": "04626567696e00",
+      "length": 7
+    },
+    {
+      "kind": "vector",
+      "name": "client_stage_4",
+      "bytes": "",
+      "length": 0
+    },
+    {
+      "kind": "vector",
+      "name": "server_signon_markers_1_2_3",
+      "bytes": "190119021903",
+      "length": 6
+    },
+    {
+      "kind": "vector",
+      "name": "server_prespawn_append",
+      "bytes": "141902",
+      "length": 3
+    }
+  ],
+  "cases": [
+    {
+      "name": "client_reply_queued_until_sendcmd",
+      "value": 1
+    },
+    {
+      "name": "server_prespawn_queued_until_reliable_phase",
+      "value": 1
+    },
+    {
+      "name": "server_spawn_clears_embedded_message",
+      "value": 1
+    },
+    {
+      "name": "server_begin_has_no_wire_stage_four",
+      "value": 1
+    },
+    {
+      "name": "first_fast_update_promotes_three_to_four",
+      "value": 1
+    },
+    {
+      "name": "blocked_reliable_retains_signon_queue",
+      "value": 1
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/protocol15_signon_oracle.c",
+    "oracle_sha256": "9bf3fcd9e05ad7d545e6e3f6e8c55bec52022268a3e93aaac7522af3e4be71a7"
+  }
+}

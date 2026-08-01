@@ -1,0 +1,2252 @@
+diff --git a/BLOCK_LEDGER.json b/BLOCK_LEDGER.json
+index 1bd32881be848a881622f427eace9117b0a59b4e..2aa62079e35c6e793e8a78f34dd3158b8bbef4dd 100644
+--- a/BLOCK_LEDGER.json
++++ b/BLOCK_LEDGER.json
+@@ -2,7 +2,7 @@
+   "schema": "MiniQuakeBlackPortBlockLedger/1",
+   "block_id": "BP-020-024",
+   "parent_package_id": "BP-015-019R1",
+-  "final_package_id": "BP-024R2",
++  "final_package_id": "BP-024R3",
+   "protocol_status": "protocol15_frozen_v1",
+   "quakec_status": "quakec_109_frozen_v1",
+   "steps": [
+@@ -12,7 +12,7 @@
+       "patch": "patches/BP-020.diff",
+       "runtime_fixture": "MiniQuakeQuakeCProgsTests.exe",
+       "fixture_count": 18,
+-      "status": "stock-qcc-parameter-storage-corrected; awaiting R2 Windows acceptance"
++      "status": "R2 Windows 18/18 PASS; stock qcc storage and installed game validation confirmed"
+     },
+     {
+       "package_id": "BP-021",
+@@ -20,7 +20,7 @@
+       "patch": "patches/BP-021.diff",
+       "runtime_fixture": "MiniQuakeQuakeCVMTests.exe",
+       "fixture_count": 16,
+-      "status": "R1 Windows component tests 16/16 PASS; awaiting cumulative R2 acceptance"
++      "status": "R2 Windows 16/16 PASS"
+     },
+     {
+       "package_id": "BP-022",
+@@ -28,7 +28,7 @@
+       "patch": "patches/BP-022.diff",
+       "runtime_fixture": "MiniQuakeQuakeCEdictTests.exe",
+       "fixture_count": 22,
+-      "status": "typed edict/save serialization corrected; awaiting R2 Windows acceptance"
++      "status": "R2 Windows 21/22; exact-size Quake-byte ED_Write/save serializer implemented in R3; awaiting Windows acceptance"
+     },
+     {
+       "package_id": "BP-023",
+@@ -36,7 +36,7 @@
+       "patch": "patches/BP-023.diff",
+       "runtime_fixture": "MiniQuakeQuakeCBuiltinTests.exe",
+       "fixture_count": 22,
+-      "status": "R1 Windows component tests 22/22 PASS; awaiting cumulative R2 acceptance"
++      "status": "R2 Windows 22/22 PASS"
+     },
+     {
+       "package_id": "BP-024",
+@@ -45,7 +45,7 @@
+       "runtime_fixture": "MiniQuakeQuakeCClosureTests.exe",
+       "fixture_count": 20,
+       "stock_fixture": "MiniQuakeQuakeCStockTests.exe",
+-      "status": "R1 closure tests 20/20 PASS; stock and cumulative R2 acceptance pending"
++      "status": "R2 Windows 20/20 PASS; stock id1/progs.dat, game validation, 300 frames and deterministic traces PASS; awaiting cumulative R3 acceptance"
+     }
+   ],
+   "block_runtime_fixtures": 98,
+@@ -73,8 +73,8 @@
+     "udp_loopback": "PASS"
+   },
+   "logical_final_package_id": "BP-024",
+-  "delivery_revision": "BP-020-024R2",
+-  "revision_parent": "BP-020-024R1",
++  "delivery_revision": "BP-020-024R3",
++  "revision_parent": "BP-020-024R2",
+   "initial_windows_result": {
+     "delivery_revision": "BP-020-024",
+     "result_archive": "MiniQuake_BP-020-024_RESULTS_20260725-201735.zip",
+@@ -141,6 +141,46 @@
+     ],
+     "protocol_freeze_changed": false,
+     "quakec_contract_fingerprint": "0xbc89cbf1",
++    "status": "implemented; all R2 production/runtime gates confirmed on Windows except BP-022 synthetic ED_Write fixture"
++  },
++  "r2_windows_result": {
++    "delivery_revision": "BP-020-024R2",
++    "result_archive": "MiniQuake_BP-020-024R2_RESULTS_20260725-224602.zip",
++    "result_archive_sha256": "fec22c41880ff1d34a66f0e254281e5d72777db5a19f0feb60f077deeedae060",
++    "status": "FAIL; 51/52 independent acceptance groups PASS",
++    "build": "PASS; game plus all 19 test executables compiled",
++    "base_core_and_milestones": "PASS",
++    "parent_protocol_regressions": "all PASS",
++    "bp020": "18/18 PASS",
++    "bp021": "16/16 PASS",
++    "bp022": "21/22; ED_Write raised Cannot stringify void for string concatenation",
++    "bp023": "22/22 PASS",
++    "bp024": "20/20 PASS",
++    "stock_progs": "PASS; 20940 statements, 2091 functions, 11471 globals, max builtin 78",
++    "game_validation": "PASS",
++    "headless_runtime": "300 frames PASS",
++    "deterministic_trace": "two 128-frame traces byte-identical",
++    "trace_sha256": "2efa7130b9dacabb1c463d35c903f1e8f8b3e24feeca27b649d1211a6fc62c17",
++    "trace_rolling_hash": "58a7d245",
++    "udp_loopback": "PASS"
++  },
++  "r3_corrections": {
++    "package_id": "BP-024R3",
++    "delivery_revision": "BP-020-024R3",
++    "source_changes": [
++      "replace growing ED_Write/ED_WriteGlobals strings with an exact-size two-pass Quake-byte serializer",
++      "share the serializer with savegame ED_Write and saveglobal output",
++      "preserve Quake one-byte text through quake_latin1_cstring_v1 and decode only the completed document",
++      "preserve original ED_WriteGlobals emission of eligible DEF_SAVEGLOBAL entries even when their stored value is zero"
++    ],
++    "fixture_changes": [
++      "preserve the existing 22 BP-022 fixtures while adding exact 0xe9 Quake-byte output checks",
++      "classify non-string ED_Write/savegame returns directly instead of failing inside assertion concatenation",
++      "retain cumulative appendQuotedPair coverage as an isolated compatibility helper",
++      "verify zero float, empty string and entity zero are emitted by ED_WriteGlobals and savegame output"
++    ],
++    "protocol_freeze_changed": false,
++    "quakec_contract_fingerprint": "0xbc89cbf1",
+     "status": "implemented; awaiting Windows acceptance"
+   }
+ }
+diff --git a/CHANGELOG_BP-020-024R3.md b/CHANGELOG_BP-020-024R3.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..e179e190e9f2c2179629f9d62a816699e985a941
+--- /dev/null
++++ b/CHANGELOG_BP-020-024R3.md
+@@ -0,0 +1,27 @@
++# MiniQuake BP-020–BP-024R3
++
++Parent delivery: BP-020–BP-024R2  
++Engine package: BP-024R3  
++Logical block: BP-020–BP-024  
++Protocol status: `protocol15_frozen_v1`  
++QuakeC status: `quakec_109_frozen_v1`
++
++## Fixed
++
++- Replaced the progressively concatenated `ED_Write`/`ED_WriteGlobals` output
++  with an exact-size two-pass Quake-byte serializer.
++- Unified direct QuakeC and savegame definition serialization.
++- Preserved extended Quake one-byte text through
++  `quake_latin1_cstring_v1` during ED_* document construction.
++- Added explicit output-size, output-type and byte-buffer checks.
++- Made the BP-022 runtime fixture report a non-string return directly instead
++  of failing while stringifying it in the assertion helper.
++- Added exact byte comparison with an extended `0xe9` Quake character.
++- Preserved the original `ED_WriteGlobals` behavior for zero-valued and empty `DEF_SAVEGLOBAL` entries.
++
++## Unchanged
++
++- Protocol-15 contract and fingerprint;
++- QuakeC 1.09 logical contract and fingerprint `0xbc89cbf1`;
++- progs.dat parsing, VM execution, builtins, physics and renderer behavior;
++- native bridge binaries and ABI.
+diff --git a/COLLECT_RESULTS.ps1 b/COLLECT_RESULTS.ps1
+index 33519358939c938bbc69030f88f8429f8a688ea0..d15cc84a480da3488ff3c5b113a9ca22e74b6cfe 100644
+--- a/COLLECT_RESULTS.ps1
++++ b/COLLECT_RESULTS.ps1
+@@ -7,9 +7,9 @@ param(
+ $ErrorActionPreference = "Stop"
+ Set-StrictMode -Version Latest
+ 
+-$PackageId = "BP-020-024R2"
+-$FinalPackageId = "BP-024R2"
+-$DeliveryParent = "BP-020-024R1"
++$PackageId = "BP-020-024R3"
++$FinalPackageId = "BP-024R3"
++$DeliveryParent = "BP-020-024R2"
+ $BlockParentPackageId = "BP-015-019R1"
+ $ProtocolStatus = "protocol15_frozen_v1"
+ $QuakeCStatus = "quakec_109_frozen_v1"
+@@ -23,7 +23,7 @@ if ([string]::IsNullOrWhiteSpace($Output)) {
+ }
+ $Output = [System.IO.Path]::GetFullPath($Output)
+ 
+-$Staging = Join-Path $BuildDirectory (".bp020-024r2-results-{0}" -f $Timestamp)
++$Staging = Join-Path $BuildDirectory (".bp020-024r3-results-{0}" -f $Timestamp)
+ $AllowedExtensions = @(".log", ".json", ".txt", ".csv", ".mqtrace")
+ if ($IncludeScreenshots) { $AllowedExtensions += ".png" }
+ $ForbiddenExtensions = @(".pak", ".bsp", ".mdl", ".spr", ".wad", ".dem", ".sav", ".lmp", ".ogg", ".wav", ".dat")
+@@ -227,14 +227,19 @@ $RootFiles = @(
+   "patches\BP-024.diff",
+   "CHANGELOG_BP-020-024R1.md",
+   "TEST_BP-020-024R1.ps1",
++  "docs\BP-020-024R1_TESTING.md",
++  "docs\BP-020-024R1_RESULT_ANALYSIS.md",
++  "patches\BP-024R1.diff",
+   "CHANGELOG_BP-020-024R2.md",
+   "TEST_BP-020-024R2.ps1",
++  "CHANGELOG_BP-020-024R3.md",
++  "TEST_BP-020-024R3.ps1",
+   "docs\BP-020-024_RESULT_ANALYSIS.md",
+-  "docs\BP-020-024R1_TESTING.md",
+-  "docs\BP-020-024R1_RESULT_ANALYSIS.md",
+   "docs\BP-020-024R2_TESTING.md",
+-  "patches\BP-024R1.diff",
++  "docs\BP-020-024R2_RESULT_ANALYSIS.md",
++  "docs\BP-020-024R3_TESTING.md",
+   "patches\BP-024R2.diff",
++  "patches\BP-024R3.diff",
+   "docs\BP-001_TRACE_FORMAT.md",
+   "docs\BP-001_RESULT_ANALYSIS.md",
+   "docs\BP-001R1_RESULT_ANALYSIS.md",
+diff --git a/PORT_LEDGER.json b/PORT_LEDGER.json
+index b1960cfe3f8a1f3163ae0a48c46f6deb5e16b527..da234082f30dc7b3e9cae11e8c1a59ad7aac5301 100644
+--- a/PORT_LEDGER.json
++++ b/PORT_LEDGER.json
+@@ -1,10 +1,10 @@
+ {
+   "schema_version": 1,
+   "project": "MiniQuake",
+-  "current_package": "BP-024R2",
+-  "current_delivery_revision": "BP-020-024R2",
+-  "delivery_parent": "BP-020-024R1",
+-  "parent_package": "BP-024R1",
++  "current_package": "BP-024R3",
++  "current_delivery_revision": "BP-020-024R3",
++  "delivery_parent": "BP-020-024R2",
++  "parent_package": "BP-024R2",
+   "compatibility_target": {
+     "reference": "WinQuake/GLQuake 1.09",
+     "profile": "compat_109",
+@@ -57,12 +57,12 @@
+     "root_cause": "clientEntitiesHash/clientEntitiesJson dereferenced void slots in the intentionally sparse client entity table"
+   },
+   "package": {
+-    "id": "BP-024R2",
+-    "parent": "BP-024R1",
++    "id": "BP-024R3",
++    "parent": "BP-024R2",
+     "block_id": "BP-020-024",
+     "block_parent": "BP-015-019R1",
+     "date": "2026-07-25",
+-    "title": "QuakeC stock-qcc parameter-storage and typed save-text correction revision",
++    "title": "QuakeC exact-size Quake-byte edict and save-text serialization correction",
+     "status": "implemented; awaiting Windows runtime acceptance",
+     "protocol_status": "protocol15_frozen_v1",
+     "quakec_status": "quakec_109_frozen_v1"
+@@ -78,7 +78,7 @@
+   },
+   "port_units": {
+     "total": 63,
+-    "state": "BP-014R1 is Windows-accepted; all BP-015 through BP-019 component/runtime gates passed on Windows; BP-015-019R1 only revalidates the corrected historical signon milestone",
++    "state": "Protocol 15 is Windows-accepted and frozen; the BP-020..024 QuakeC production/runtime stack passed R2 on stock id1, 300 frames and deterministic traces; only the synthetic BP-022 ED_Write fixture remains for R3 acceptance.",
+     "reclassified_units": [
+       {
+         "unit": 5,
+@@ -152,7 +152,7 @@
+     "protocol15_frozen_v1 is a source-guided compatibility contract; original Quake binary client/server interoperability is not yet claimed",
+     "all cumulative block-specific Windows runtime gates passed; only the corrected historical milestone harness awaits BP-015-019R1 revalidation"
+   ],
+-  "next_package": "BP-025-029: world, collision, movement and server physics",
++  "next_package": "BP-025-029: world, collision, movement and server physics (after BP-020-024R3 acceptance)",
+   "bp001r2_acceptance": {
+     "result_archive": "MiniQuake_BP-001R2_RESULTS_20260724-181843.zip",
+     "result_archive_sha256": "a6373b21653760800af9cc67fc969b07a7b7f385e409e5c5f9bced718262816c",
+@@ -563,17 +563,17 @@
+   "bp020_quakec_progs": {
+     "runtime_fixtures": 18,
+     "oracle_rows": 11,
+-    "status": "R2 stock-qcc parameter storage corrected; Windows cumulative acceptance pending"
++    "status": "R2 Windows 18/18 PASS; stock qcc parameter storage and runtime CRC confirmed"
+   },
+   "bp021_quakec_vm": {
+     "runtime_fixtures": 16,
+     "oracle_rows": 15,
+-    "status": "R1 Windows component tests 16/16 PASS; cumulative R2 acceptance pending"
++    "status": "R2 Windows 16/16 PASS"
+   },
+   "bp022_quakec_edicts": {
+     "runtime_fixtures": 22,
+     "oracle_rows": 12,
+-    "status": "R2 typed ED_Write/save serialization corrected; Windows cumulative acceptance pending"
++    "status": "R2 Windows 21/22; exact-size shared Quake-byte serializer implemented in R3; Windows acceptance pending"
+   },
+   "bp023_quakec_builtins": {
+     "runtime_fixtures": 22,
+@@ -581,12 +581,12 @@
+     "builtin_slots": 79,
+     "fixme_slots": 14,
+     "builtin_fingerprint": "0xb86a0245",
+-    "status": "R1 Windows component tests 22/22 PASS; cumulative R2 acceptance pending"
++    "status": "R2 Windows 22/22 PASS"
+   },
+   "bp024_quakec_closure": {
+     "block_id": "BP-020-024",
+     "parent_delivery": "BP-015-019R1",
+-    "final_package_id": "BP-024R2",
++    "final_package_id": "BP-024R3",
+     "quakec_status": "quakec_109_frozen_v1",
+     "contract_fingerprint": "0xbc89cbf1",
+     "runtime_fixtures": 20,
+@@ -594,7 +594,7 @@
+     "required_globals": 54,
+     "required_fields": 77,
+     "required_functions": 11,
+-    "status": "R1 closure 20/20 PASS; stock and cumulative R2 acceptance pending"
++    "status": "R2 closure 20/20, stock id1/progs.dat, game validation, 300 frames, deterministic traces and UDP PASS; cumulative R3 acceptance pending"
+   },
+   "bp020024_initial_acceptance": {
+     "result_archive": "MiniQuake_BP-020-024_RESULTS_20260725-201735.zip",
+@@ -666,6 +666,46 @@
+       "BP-020 covers bytecode parameters with locals zero, out-of-range parameter destinations and builtin signatures",
+       "BP-022 covers exact ED_Write/ED_WriteGlobals/savegame text and void rejection before concatenation"
+     ],
++    "status": "implemented; R2 Windows accepted all production/runtime gates; BP-022 synthetic ED_Write fixture remained 21/22"
++  },
++  "bp020024r2_acceptance": {
++    "result_archive": "MiniQuake_BP-020-024R2_RESULTS_20260725-224602.zip",
++    "result_archive_sha256": "fec22c41880ff1d34a66f0e254281e5d72777db5a19f0feb60f077deeedae060",
++    "status": "FAIL; one independent synthetic BP-022 fixture failed, 51/52 groups passed",
++    "build": "PASS; 19/19 executables",
++    "base_and_protocol": "all PASS",
++    "bp020": "18/18 PASS",
++    "bp021": "16/16 PASS",
++    "bp022": "21/22",
++    "bp023": "22/22 PASS",
++    "bp024": "20/20 PASS",
++    "stock_progs": "PASS",
++    "game_validation": "PASS",
++    "headless_runtime": "300 frames PASS",
++    "trace_frames": 128,
++    "trace_sha256": "2efa7130b9dacabb1c463d35c903f1e8f8b3e24feeca27b649d1211a6fc62c17",
++    "trace_rolling_hash": "58a7d245",
++    "udp_loopback": "PASS",
++    "failure": "ED_Write: Cannot stringify void for string concatenation"
++  },
++  "bp020024r3_hotfix": {
++    "delivery_revision": "BP-020-024R3",
++    "engine_package_id": "BP-024R3",
++    "parent_delivery": "BP-020-024R2",
++    "protocol_freeze_changed": false,
++    "quakec_contract_fingerprint": "0xbc89cbf1",
++    "production_changes": [
++      "two-pass exact-size Quake-byte serialization for ED_Write and ED_WriteGlobals",
++      "shared direct/savegame definition serializer",
++      "single final quake_latin1_cstring_v1 decode after byte-document completion",
++      "original ED_WriteGlobals emission of eligible zero-valued DEF_SAVEGLOBAL entries"
++    ],
++    "test_changes": [
++      "type-safe ED_Write result diagnostics",
++      "exact extended-byte 0xe9 output checks",
++      "cumulative appendQuotedPair check",
++      "zero float, empty string and entity-zero saveglobal checks"
++    ],
+     "status": "implemented; Windows acceptance pending"
+   }
+ }
+diff --git a/PORT_STATUS.md b/PORT_STATUS.md
+index e835c5a6ebfe38adfd59ff270401244fda1c71e2..1669d267ecfd43a70b0358ac03054e025d55d2da 100644
+--- a/PORT_STATUS.md
++++ b/PORT_STATUS.md
+@@ -1,50 +1,37 @@
+-# MiniQuake Black-Port-Status – BP-020–BP-024R2
++# MiniQuake Black-Port-Status – BP-020–BP-024R3
+ 
+ ## Bestätigte Elternbasis
+ 
+-BP-015–BP-019R1 ist unter Windows vollständig angenommen:
++BP-015–BP-019R1 ist unter Windows vollständig angenommen; Protocol 15 bleibt
++als `protocol15_frozen_v1` eingefroren.
+ 
+-- 40/40 Abnahmeschritte PASS,
+-- alle historischen und neuen Protocol-15-Gates PASS,
+-- `id1/start`, 300 Headless-Frames und UDP-Loopback PASS,
+-- zwei unabhängige 128-Frame-Traces byteidentisch,
+-- Trace SHA-256 `635b830d00997026fab868ab135e66062a367ef2855a103be38d96a7c04a3ddd`,
+-- Rolling Hash `58a7d245`.
++## BP-020–BP-024R2-Windows-Ergebnis
+ 
+-Protocol 15 bleibt eingefroren als `protocol15_frozen_v1`.
++Von 52 unabhängigen Abnahmegruppen waren 51 erfolgreich. Vollständiger Build,
++Core, Milestones, alle Protocol-Gates, BP-020, BP-021, BP-023, BP-024, das echte
++Stock-`id1/progs.dat`, Spielvalidierung, 300 Headless-Frames, zwei byteidentische
++128-Frame-Traces und UDP-Loopback waren grün.
+ 
+-## BP-020–BP-024R1-Windows-Ergebnis
++Die einzige Abweichung war:
+ 
+-Der vollständige Build und 37 von 42 protokollierten Abnahmeschritten waren
+-erfolgreich. Core, Milestones, sämtliche Protocol-15-Gruppen, BP-020, BP-021,
+-BP-023 und BP-024 blieben grün.
++```text
++[16/22] ED_Write
++FAIL: Cannot stringify void for string concatenation
++```
+ 
+-| Gate | Ergebnis | Ursache |
+-|---|---|---|
+-| BP-022 Edicts | 21/22 | `ED_Write` traf eine `void`-Stringkonkatenationsgrenze |
+-| Stock-`progs.dat` | FAIL | falsche Regel `parameterWords <= locals` lehnte `SUB_AttackFinished` ab |
+-| installierte Quake-Daten | FAIL | derselbe `progs.dat`-Fehler |
+-| Headless-Runtime | FAIL | derselbe Fehler bei `Host_Init` |
+-| Trace A | 0/128 | Abbruch vor Frame 0, Stufe `before_filter` |
++## BP-024R3-Korrektur
+ 
+-## BP-024R2-Korrekturen
+-
+-- `parse()` verwendet ausschließlich loaderrelevante Sicherheitsprüfungen.
+-- `validateProgram()` bleibt als expliziter strenger Audit erhalten.
+-- Parameterwörter werden nicht mehr fälschlich mit `dfunction_t.locals`
+-  verglichen, sondern gegen den tatsächlichen Globals-Zielbereich geprüft.
+-- Bytecode- und Builtinfunktionen mit Parametern und `locals == 0` sind gültig.
+-- Das echte Stock-`progs.dat` durchläuft zusätzlich den expliziten strikten Audit.
+-- `ED_Write`, `ED_WriteGlobals` und Savegames serialisieren Werte zunächst
+-  typisiert und hängen Quoted-Pairs erst nach ausdrücklicher Stringprüfung an.
+-- Die bestehenden BP-020- und BP-022-Suiten enthalten die zugehörigen
+-  Regressionen; ihre Fixturezahlen bleiben 18 und 22.
+-- Stock-, Spiel-, Runtime- und Trace-Gates behalten vollständige getrennte Logs.
+-
+-Der QuakeC-Vertrag bleibt eingefroren als `quakec_109_frozen_v1` mit
+-Contract-Fingerprint `0xbc89cbf1` und Builtin-Fingerprint `0xb86a0245`.
++- `ED_Write`, `ED_WriteGlobals` und der Savegame-Writer teilen einen
++  exact-size Quake-Byte-Serializer.
++- Der frühere wachsende Stringakkumulator wurde aus dem produktiven Pfad
++  entfernt.
++- Namen und Werte werden über `quake_latin1_cstring_v1` kodiert.
++- Ausgabegröße, Puffergrenzen und finaler Texttyp werden explizit geprüft.
++- Die bestehende 22. BP-022-Suite prüft zusätzlich Byte `0xe9` und meldet einen
++  falschen Rückgabetyp direkt.
++- Protocol- und QuakeC-Fingerprints bleiben unverändert.
+ 
+ ## Abnahme
+ 
+-Die Windows-Abnahme von BP-020–BP-024R2 steht aus. Nach einem grünen Lauf folgt
++Die Windows-Abnahme von BP-020–BP-024R3 steht aus. Nach einem grünen Lauf folgt
+ BP-025–BP-029 mit Welt, Kollision, Bewegung und Serverphysik.
+diff --git a/README.md b/README.md
+index 214f2e37a27ddbe1d18feab645f8f2244b036107..625a917d0252a894867beac1c689fff974be4c32 100644
+--- a/README.md
++++ b/README.md
+@@ -10,79 +10,60 @@ Quake-Spieldaten (`pak0.pak`, Maps, Sounds, Grafiken usw.) sind nicht enthalten.
+ MiniQuake verwendet die legal vorhandenen Daten einer installierten Quake-
+ Version.
+ 
+-## Paketstand: BP-020–BP-024R2 (Endstand BP-024R2)
++## Paketstand: BP-020–BP-024R3 (Endstand BP-024R3)
+ 
+-Die Elternbasis **BP-015–BP-019R1** ist unter Windows vollständig angenommen:
+-40/40 Abnahmeschritte, alle bisherigen Protocol-15-Testgruppen, `id1/start`,
+-300 Headless-Frames, zwei byteidentische 128-Frame-Traces und der
+-Winsock-UDP-Loopback sind grün. Die bestätigte Referenz lautet:
++Die Elternbasis **BP-015–BP-019R1** ist unter Windows vollständig angenommen.
++Protocol 15 bleibt als `protocol15_frozen_v1` eingefroren.
+ 
+-```text
+-Trace SHA-256: 635b830d00997026fab868ab135e66062a367ef2855a103be38d96a7c04a3ddd
+-Rolling Hash:  58a7d245
+-```
++Der kumulative QuakeC-Block enthält weiterhin 98 assetfreie Fixtures plus das
++echte Stock-`id1/progs.dat`-Gate:
+ 
+-Protocol 15 bleibt als `protocol15_frozen_v1` eingefroren. Der kumulative
+-QuakeC-Block enthält weiterhin:
+-
+-| Schritt | Inhalt | assetfreie Fixtures |
++| Schritt | Inhalt | Fixtures |
+ |---|---|---:|
+ | BP-020 | `progs.dat`-ABI, Parser, Stringtabelle und Runtime-CRC | 18 |
+ | BP-021 | VM, 66 Opcodes, Binary32, Stack und Pointer | 16 |
+ | BP-022 | Edicts, Epair, BSP-Entitytext und Save-Format | 22 |
+ | BP-023 | 79 Builtins, Temporärstrings, Random und Formatierung | 22 |
+ | BP-024 | Stock-Contract, Cross-Layer-Abschluss und Freeze | 20 |
+-| **Summe** |  | **98** |
+-
+-Der R1-Windows-Lauf kompilierte den vollständigen Block und bestätigte alle
+-historischen Protocol-15-Gruppen, Core, Milestones, VM, Builtins und Closure.
+-Er fand zwei verbleibende QuakeC-Grenzen:
+-
+-- das originale `id1/progs.dat` wurde bei `SUB_AttackFinished` durch die
+-  unzutreffende Zusatzregel `parameterWords <= locals` abgelehnt,
+-- `ED_Write` erreichte beim Aufbau eines Quoted-Pair-Texts noch eine
+-  `void`-Stringkonkatenation.
+-
+-BP-024R2 korrigiert beide Punkte:
+-
+-- Produktionsladen und strikter `progs.dat`-Audit sind getrennt,
+-- Parameter werden unabhängig von `dfunction_t.locals` gegen ihren tatsächlichen
+-  Zielbereich in den Globals geprüft,
+-- Bytecode- und Builtinfunktionen dürfen Parameter bei `locals == 0` besitzen,
+-- das echte Stock-`progs.dat` durchläuft zusätzlich den expliziten strikten Audit,
+-- QuakeC-Werte werden vor der Textausgabe typisiert serialisiert,
+-- `ED_Write`, `ED_WriteGlobals` und Savegames verwenden denselben geprüften,
+-  schrittweisen `appendQuotedPair`-Pfad,
+-- die bestehenden 18 beziehungsweise 22 Fixtures enthalten neue
+-  Regressionen für Stock-qcc-Parameterablage und exakte Save-Text-Ausgabe.
+ 
+-`MiniQuakeQuakeCStockTests.exe` lädt weiterhin ausschließlich das
+-benutzereigene `id1/progs.dat`; Quake-Daten werden weder mitgeliefert noch in
+-Ergebnisarchive übernommen.
+-
+-Der source-guided QuakeC-Vertrag bleibt unverändert:
++Der R2-Windows-Lauf bestätigte den gesamten produktiven QuakeC- und
++Protocol-Unterbau:
++
++- vollständiger Build und alle Basis-/Protocol-Testgruppen PASS,
++- BP-020, BP-021, BP-023 und BP-024 vollständig PASS,
++- Stock-`id1/progs.dat`, installierte Quake-Daten und 300 Headless-Frames PASS,
++- zwei byteidentische 128-Frame-Traces PASS,
++- Trace SHA-256
++  `2efa7130b9dacabb1c463d35c903f1e8f8b3e24feeca27b649d1211a6fc62c17`,
++- Rolling Hash `58a7d245`,
++- UDP-Loopback PASS.
++
++Die einzige R2-Abweichung lag in der synthetischen BP-022-Fixture `ED_Write`.
++Der Lauf zeigte, dass im schrittweisen, wachsenden Stringakkumulator schließlich
++ein `void` an die nächste Konkatenation gelangte; ohne nativen Stacktrace ist
++der exakte Runtime-Mikroschritt nicht bewiesen. BP-024R3 entfernt diesen Pfad
++vollständig:
++
++- ED_Write, ED_WriteGlobals und Savegames verwenden einen gemeinsamen
++  zweiphasigen Byte-Serializer,
++- Feldnamen und Werte werden über `quake_latin1_cstring_v1` in Quake-Bytes
++  überführt,
++- die exakte Dokumentgröße wird vorab berechnet,
++- ein einzelner caller-owned `bytes`-Puffer wird gefüllt und erst am Ende
++  einmal dekodiert,
++- erweiterte Quake-Zeichen wie Byte `0xe9` werden bytegenau getestet,
++- nicht-stringförmige Rückgaben werden in der Fixture direkt klassifiziert.
++
++Der QuakeC-Vertrag bleibt unverändert eingefroren als:
+ 
+ ```text
+ quakec_109_frozen_v1
++Contract-Fingerprint: 0xbc89cbf1
++Builtin-Fingerprint:  0xb86a0245
+ ```
+ 
+-Gebunden sind `PROG_VERSION = 6`, System-CRC 5927, 66 Opcodes, 79
+-Builtin-Slots, 14 originale `PF_Fixme`-Slots, Callstack 32, Localstack 2048,
+-54 benötigte Globals, 77 Entityfelder und 11 Stock-Einstiegsfunktionen. Der
+-Contract-Fingerprint lautet `0xbc89cbf1`; der Builtin-Fingerprint
+-`0xb86a0245`.
+-
+-Die fünf logisch getrennten BP-020–BP-024-Teilpatches bleiben unter `patches/`;
+-`patches/BP-024R1.diff` dokumentiert die erste Windows-Runtime-Korrektur und
+-`patches/BP-024R2.diff` die Stock-qcc-/Edict-Korrektur. Die R2-Windows-Abnahme
+-steht noch aus.
+-
+-Die ursprüngliche Quellbasis bleibt:
+-
+-```text
+-MiniQuake_Source24.07.2026.zip
+-SHA-256 bb2b5bf173fe687cada6e7fec2dcdb8b2099589f2ebc039417a5571ced9729d3
+-```
++Die fünf logischen BP-020–BP-024-Teilpatches und die Korrekturpatches
++`BP-024R1.diff`, `BP-024R2.diff` und `BP-024R3.diff` liegen unter `patches/`.
+ 
+ ## Aktuelle Spielbarkeitsrevision
+ 
+@@ -285,16 +266,16 @@ filtert diese Einträge für `CL_UpdateTEnts`, Rendering und
+ `client_effects.pruneTemporary`. Die Runtime-Event-Suite umfasst nun 28
+ Fixtures; die bestehende Meilensteinfixture 12 bleibt unverändert.
+ 
+-## Build und Abnahme von BP-020–BP-024R2 unter Windows
++## Build und Abnahme von BP-020–BP-024R3 unter Windows
+ 
+ Empfohlen ist `MiniLangCompilerPy`. Das vollständige ZIP muss in einen neuen,
+-leeren Ordner entpackt werden. Die Blockabnahme baut BP-024R2 einmal und führt
++leeren Ordner entpackt werden. Die Blockabnahme baut BP-024R3 einmal und führt
+ alle unabhängigen Testgruppen anschließend weiter aus:
+ 
+ ```powershell
+-cd C:\Pfad\MiniQuake_BP-020-024R2
++cd C:\Pfad\MiniQuake_BP-020-024R3
+ 
+-.\TEST_BP-020-024R2.ps1 `
++.\TEST_BP-020-024R3.ps1 `
+   -Compiler C:\Pfad\MiniLangCompilerPy\mlc_win64.py `
+   -StdLib C:\Pfad\MiniLangCompilerPy `
+   -QuakeBase "C:\Program Files (x86)\Steam\steamapps\common\Quake" `
+@@ -324,7 +305,7 @@ MiniQuake BP-022 QuakeC edict tests passed: 22
+ MiniQuake BP-023 QuakeC builtin tests passed: 22
+ MiniQuake BP-024 QuakeC closure tests passed: 20
+ MiniQuake BP-024 stock QuakeC test: PASS
+-MiniQuake BP-020-024R2 acceptance test: PASS
++MiniQuake BP-020-024R3 acceptance test: PASS
+ ```
+ 
+ Nützliche Buildschalter:
+@@ -429,7 +410,7 @@ Weitere Einzelpfade:
+ .\build\MiniQuake.exe --udp-smoke 2000
+ ```
+ 
+-`TEST_BP-020-024R2.ps1` schreibt Blocksummary, statischen Bericht, Versionsausgabe,
++`TEST_BP-020-024R3.ps1` schreibt Blocksummary, statischen Bericht, Versionsausgabe,
+ Transcript, separate Stock-/Spiel-/Runtime-Logs, zwei unabhängige Trace-Sätze sowie einen direkten Snapshot-CLI-Lauf. Danach erzeugt
+ 
+ ```powershell
+diff --git a/TEST_BP-020-024R3.ps1 b/TEST_BP-020-024R3.ps1
+new file mode 100644
+index 0000000000000000000000000000000000000000..01f0289de952b1ab72c430628c7b79633667a5d6
+--- /dev/null
++++ b/TEST_BP-020-024R3.ps1
+@@ -0,0 +1,747 @@
++﻿[CmdletBinding()]
++param(
++  [string]$Compiler = "",
++
++  [Alias("StdLibPath", "ImportRoot")]
++  [string]$StdLib = "",
++
++  [string]$Python = "",
++
++  [string]$QuakeBase = "",
++  [string]$Game = "id1",
++  [string]$Map = "start",
++
++  [ValidateRange(1, 1000000)]
++  [int]$Frames = 300,
++
++  [ValidateRange(1, 1000000)]
++  [int]$TraceFrames = 128,
++
++  [ValidateSet("Release", "Debug")]
++  [string]$Configuration = "Release",
++
++  [switch]$SkipBuild,
++  [switch]$SkipGameValidation,
++  [switch]$SkipTraceValidation,
++  [switch]$NetworkTests,
++  [switch]$RebuildNative,
++  [switch]$Listings,
++  [switch]$ContinueIndependentTests = $true,
++  [switch]$BisectOnFailure
++)
++
++$ErrorActionPreference = "Stop"
++Set-StrictMode -Version Latest
++
++$PackageId = "BP-024R3"
++$ParentPackageId = "BP-024R2"
++$NativeTextAbi = "caller_owned_bytes_v1"
++$ProtocolTextAbi = "quake_latin1_cstring_v1"
++$BlockId = "BP-020-024"
++$BlockParentPackageId = "BP-015-019R1"
++$ProtocolStatus = "protocol15_frozen_v1"
++$QuakeCStatus = "quakec_109_frozen_v1"
++$DeliveryRevision = "BP-020-024R3"
++$Root = $PSScriptRoot
++$BuildDirectory = Join-Path $Root "build"
++$TraceDirectory = Join-Path $BuildDirectory "bp020-024r3-traces"
++$GameExe = Join-Path $BuildDirectory "MiniQuake.exe"
++$Verifier = Join-Path $Root "tools\verify.py"
++$TraceComparator = Join-Path $Root "tools\compare_traces.py"
++$ProtocolVectorChecker = Join-Path $Root "tools\check_protocol15_vectors.py"
++$ProtocolCommandChecker = Join-Path $Root "tools\check_protocol15_commands.py"
++$ProtocolServerDataChecker = Join-Path $Root "tools\check_protocol15_serverdata.py"
++$ProtocolEventChecker = Join-Path $Root "tools\check_protocol15_events.py"
++$ProtocolRuntimeEventChecker = Join-Path $Root "tools\check_protocol15_runtime_events.py"
++$ProtocolSignonChecker = Join-Path $Root "tools\check_protocol15_signon.py"
++$ProtocolDeliveryChecker = Join-Path $Root "tools\check_protocol15_delivery.py"
++$ProtocolDatagramChecker = Join-Path $Root "tools\check_protocol15_datagram.py"
++$ProtocolDemoChecker = Join-Path $Root "tools\check_protocol15_demo.py"
++$ProtocolClosureChecker = Join-Path $Root "tools\check_protocol15_closure.py"
++$QuakeCProgsChecker = Join-Path $Root "tools\check_quakec_progs.py"
++$QuakeCVMChecker = Join-Path $Root "tools\check_quakec_vm.py"
++$QuakeCEdictChecker = Join-Path $Root "tools\check_quakec_edict.py"
++$QuakeCBuiltinChecker = Join-Path $Root "tools\check_quakec_builtins.py"
++$QuakeCClosureChecker = Join-Path $Root "tools\check_quakec_closure.py"
++$BuildScript = Join-Path $Root "build.ps1"
++$Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
++$TranscriptPath = Join-Path $BuildDirectory ("bp020-024r3-test-{0}.log" -f $Timestamp)
++$SummaryPath = Join-Path $BuildDirectory "bp020-024r3-test-summary.json"
++$StaticReportPath = Join-Path $BuildDirectory "bp020-024r3-static-verification.json"
++$VersionPath = Join-Path $BuildDirectory "bp020-024r3-version.txt"
++$BuildChildLogPath = Join-Path $BuildDirectory "bp020-024r3-build-child.log"
++$TraceALogPath = Join-Path $BuildDirectory "bp020-024r3-trace-a.log"
++$TraceBLogPath = Join-Path $BuildDirectory "bp020-024r3-trace-b.log"
++$SnapshotCommandLogPath = Join-Path $BuildDirectory "bp020-024r3-snapshot-command.log"
++$TraceComparisonPath = Join-Path $BuildDirectory "bp020-024r3-trace-comparison.json"
++$TraceComparisonLogPath = Join-Path $BuildDirectory "bp020-024r3-trace-comparison.log"
++$ProtocolVectorReportPath = Join-Path $BuildDirectory "bp020-024r3-protocol15-vectors.json"
++$ProtocolVectorLogPath = Join-Path $BuildDirectory "bp020-024r3-protocol15-vectors.log"
++$ProtocolCommandReportPath = Join-Path $BuildDirectory "bp020-024r3-protocol15-commands.json"
++$ProtocolCommandLogPath = Join-Path $BuildDirectory "bp020-024r3-protocol15-commands.log"
++$ProtocolServerDataReportPath = Join-Path $BuildDirectory "bp020-024r3-protocol15-serverdata.json"
++$ProtocolServerDataLogPath = Join-Path $BuildDirectory "bp020-024r3-protocol15-serverdata.log"
++$ProtocolEventReportPath = Join-Path $BuildDirectory "bp020-024r3-protocol15-events.json"
++$ProtocolEventLogPath = Join-Path $BuildDirectory "bp020-024r3-protocol15-events.log"
++$ProtocolRuntimeEventReportPath = Join-Path $BuildDirectory "bp020-024r3-protocol15-runtime-events.json"
++$ProtocolRuntimeEventLogPath = Join-Path $BuildDirectory "bp020-024r3-protocol15-runtime-events.log"
++$ProtocolSignonReportPath = Join-Path $BuildDirectory "bp020-024r3-protocol15-signon.json"
++$ProtocolSignonLogPath = Join-Path $BuildDirectory "bp020-024r3-protocol15-signon.log"
++$ProtocolDeliveryReportPath = Join-Path $BuildDirectory "bp020-024r3-protocol15-delivery.json"
++$ProtocolDeliveryLogPath = Join-Path $BuildDirectory "bp020-024r3-protocol15-delivery.log"
++$ProtocolDatagramReportPath = Join-Path $BuildDirectory "bp020-024r3-protocol15-datagram.json"
++$ProtocolDatagramLogPath = Join-Path $BuildDirectory "bp020-024r3-protocol15-datagram.log"
++$ProtocolDemoReportPath = Join-Path $BuildDirectory "bp020-024r3-protocol15-demo.json"
++$ProtocolDemoLogPath = Join-Path $BuildDirectory "bp020-024r3-protocol15-demo.log"
++$ProtocolClosureReportPath = Join-Path $BuildDirectory "bp020-024r3-protocol15-closure.json"
++$ProtocolClosureLogPath = Join-Path $BuildDirectory "bp020-024r3-protocol15-closure.log"
++$QuakeCProgsReportPath = Join-Path $BuildDirectory "bp020-024r3-quakec-progs.json"
++$QuakeCProgsLogPath = Join-Path $BuildDirectory "bp020-024r3-quakec-progs.log"
++$QuakeCVMReportPath = Join-Path $BuildDirectory "bp020-024r3-quakec-vm.json"
++$QuakeCVMLogPath = Join-Path $BuildDirectory "bp020-024r3-quakec-vm.log"
++$QuakeCEdictReportPath = Join-Path $BuildDirectory "bp020-024r3-quakec-edict.json"
++$QuakeCEdictLogPath = Join-Path $BuildDirectory "bp020-024r3-quakec-edict.log"
++$QuakeCBuiltinReportPath = Join-Path $BuildDirectory "bp020-024r3-quakec-builtins.json"
++$QuakeCBuiltinLogPath = Join-Path $BuildDirectory "bp020-024r3-quakec-builtins.log"
++$QuakeCClosureReportPath = Join-Path $BuildDirectory "bp020-024r3-quakec-closure.json"
++$QuakeCClosureLogPath = Join-Path $BuildDirectory "bp020-024r3-quakec-closure.log"
++$QuakeCStockLogPath = Join-Path $BuildDirectory "bp020-024r3-quakec-stock-tests.log"
++$GameValidationLogPath = Join-Path $BuildDirectory "bp020-024r3-game-validation.log"
++$RuntimeValidationLogPath = Join-Path $BuildDirectory "bp020-024r3-runtime-validation.log"
++$BisectReportPath = Join-Path $BuildDirectory "bp020-024r3-bisect-report.json"
++$IndependentFailures = New-Object System.Collections.ArrayList
++$Steps = New-Object System.Collections.ArrayList
++$OverallStatus = "FAIL"
++$FailureMessage = ""
++$TranscriptStarted = $false
++$TraceHash = ""
++$TraceRollingHash = ""
++
++New-Item -ItemType Directory -Force -Path $BuildDirectory | Out-Null
++
++function Add-StepResult {
++  param(
++    [string]$Name,
++    [string]$Status,
++    [int]$ExitCode,
++    [string]$Detail
++  )
++
++  [void]$Steps.Add([ordered]@{
++    name = $Name
++    status = $Status
++    exit_code = $ExitCode
++    detail = $Detail
++  })
++}
++
++function Resolve-PythonCommand {
++  if (-not [string]::IsNullOrWhiteSpace($Python)) {
++    if (Test-Path -LiteralPath $Python -PathType Leaf) {
++      $Resolved = [System.IO.Path]::GetFullPath($Python)
++    } else {
++      $Command = Get-Command $Python -ErrorAction SilentlyContinue | Select-Object -First 1
++      if ($null -eq $Command) { throw "Python interpreter not found: $Python" }
++      $Resolved = $Command.Path
++    }
++    if ([System.IO.Path]::GetFileNameWithoutExtension($Resolved) -ieq "py") {
++      return [ordered]@{ executable = $Resolved; prefix = @("-3") }
++    }
++    return [ordered]@{ executable = $Resolved; prefix = @() }
++  }
++
++  $Launcher = Get-Command "py" -ErrorAction SilentlyContinue | Select-Object -First 1
++  if ($null -ne $Launcher) {
++    return [ordered]@{ executable = $Launcher.Path; prefix = @("-3") }
++  }
++
++  $Command = Get-Command "python" -ErrorAction SilentlyContinue | Select-Object -First 1
++  if ($null -eq $Command) { throw "Python 3 was not found. Pass -Python PATH." }
++  return [ordered]@{ executable = $Command.Path; prefix = @() }
++}
++
++function Invoke-ExternalStep {
++  param(
++    [Parameter(Mandatory = $true)]
++    [string]$Name,
++
++    [Parameter(Mandatory = $true)]
++    [string]$Executable,
++
++    [Parameter(Mandatory = $true)]
++    [string[]]$Arguments,
++
++    [string]$Detail = "",
++    [string]$LogPath = ""
++  )
++
++  Write-Host "[MiniQuake/$PackageId] $Name"
++  if ([string]::IsNullOrWhiteSpace($LogPath)) {
++    & $Executable @Arguments
++  } else {
++    if (Test-Path -LiteralPath $LogPath -PathType Leaf) { Remove-Item -Force -LiteralPath $LogPath }
++    & $Executable @Arguments 2>&1 | Tee-Object -FilePath $LogPath
++  }
++  $ExitCode = [int]$LASTEXITCODE
++  if ($ExitCode -ne 0) {
++    $LogDetail = $Detail
++    if (-not [string]::IsNullOrWhiteSpace($LogPath)) {
++      $LogDetail = ($Detail + "; log=" + [System.IO.Path]::GetFileName($LogPath)).TrimStart([char[]]@(';', ' '))
++    }
++    Add-StepResult $Name "FAIL" $ExitCode $LogDetail
++    throw "$Name failed with exit code $ExitCode."
++  }
++  Add-StepResult $Name "PASS" 0 $Detail
++}
++
++function Invoke-IndependentTest {
++  param(
++    [Parameter(Mandatory = $true)]
++    [string]$Package,
++    [Parameter(Mandatory = $true)]
++    [string]$Name,
++    [Parameter(Mandatory = $true)]
++    [string]$Executable,
++    [Parameter(Mandatory = $true)]
++    [string]$LogName,
++
++    [string[]]$Arguments = @()
++  )
++
++  $LogPath = Join-Path $BuildDirectory $LogName
++  Write-Host "[MiniQuake/$BlockId][$Package] $Name"
++  if (Test-Path -LiteralPath $LogPath -PathType Leaf) { Remove-Item -Force -LiteralPath $LogPath }
++  & $Executable @Arguments 2>&1 | Tee-Object -FilePath $LogPath
++  $ExitCode = [int]$LASTEXITCODE
++  if ($ExitCode -eq 0) {
++    Add-StepResult ("[" + $Package + "] " + $Name) "PASS" 0 ("log=" + [System.IO.Path]::GetFileName($LogPath))
++    return $true
++  }
++
++  [void]$IndependentFailures.Add([ordered]@{
++    package = $Package
++    name = $Name
++    executable = [System.IO.Path]::GetFileName($Executable)
++    exit_code = $ExitCode
++    log = [System.IO.Path]::GetFileName($LogPath)
++  })
++  Add-StepResult ("[" + $Package + "] " + $Name) "FAIL" $ExitCode ("log=" + [System.IO.Path]::GetFileName($LogPath))
++  Write-Host "ERROR: [$Package] $Name failed with exit code $ExitCode." -ForegroundColor Red
++  if (-not $ContinueIndependentTests) { throw "[$Package] $Name failed with exit code $ExitCode." }
++  return $false
++}
++
++function Require-File {
++  param([string]$Path, [string]$Label)
++  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
++    throw "$Label is missing: $Path"
++  }
++}
++
++function Read-JsonFile {
++  param([string]$Path)
++  Require-File $Path "JSON artifact"
++  return Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
++}
++
++try {
++  try {
++    Start-Transcript -LiteralPath $TranscriptPath -Force | Out-Null
++    $TranscriptStarted = $true
++  } catch {
++    Write-Warning "PowerShell transcript could not be started: $($_.Exception.Message)"
++  }
++
++  Write-Host "MiniQuake $DeliveryRevision cumulative QuakeC acceptance test"
++  Write-Host "  final package: $PackageId"
++  Write-Host "  parent:        $ParentPackageId"
++  Write-Host "  block parent:  $BlockParentPackageId"
++  Write-Host "  root:          $Root"
++  Write-Host "  configuration: $Configuration"
++
++  $PythonCommand = Resolve-PythonCommand
++  $PythonExe = $PythonCommand.executable
++  $PythonPrefix = @($PythonCommand.prefix)
++
++  Invoke-ExternalStep `
++    -Name "static package and diagnostics verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($Verifier, $Root, "--json-output", $StaticReportPath)) `
++    -Detail "manifest, packages, ABI, accepted BP-015-019R1 parent, frozen Protocol 15 and cumulative BP-020-024 QuakeC contracts"
++
++  Invoke-ExternalStep `
++    -Name "trace comparator self-test" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($TraceComparator, "--self-test")) `
++    -Detail "field-level first-divergence reporter"
++
++  Invoke-ExternalStep `
++    -Name "Protocol 15 C/Python golden-vector verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolVectorChecker, $Root, "--json-output", $ProtocolVectorReportPath)) `
++    -Detail "13 inherited C-derived byte streams, 18 constants and MiniLang wire markers" `
++    -LogPath $ProtocolVectorLogPath
++
++  Invoke-ExternalStep `
++    -Name "Protocol 15 signon, command-stream and fast-update verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolCommandChecker, $Root, "--json-output", $ProtocolCommandReportPath)) `
++    -Detail "14 C-derived command/update byte streams, 57 constants and 34 SVC events" `
++    -LogPath $ProtocolCommandLogPath
++
++  Invoke-ExternalStep `
++    -Name "Protocol 15 serverinfo, sound, clientdata, baseline and packet-planning verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolServerDataChecker, "--root", $Root, "--json-output", $ProtocolServerDataReportPath)) `
++    -Detail "11 C-derived server payload vectors plus datagram, fast-update and client-delivery contracts" `
++    -LogPath $ProtocolServerDataLogPath
++
++  Invoke-ExternalStep `
++    -Name "Protocol 15 static-event, particle, scoreboard and graceful-drop verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolEventChecker, "--root", $Root, "--json-output", $ProtocolEventReportPath)) `
++    -Detail "15 C-derived event payload vectors, 13 semantic cases and 22 MiniLang runtime fixtures" `
++    -LogPath $ProtocolEventLogPath
++
++  Invoke-ExternalStep `
++    -Name "Protocol 15 temporary-entity, dynamic-sound and delivery-boundary verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolRuntimeEventChecker, "--root", $Root, "--json-output", $ProtocolRuntimeEventReportPath)) `
++    -Detail "10 C-derived runtime-event vectors, 49 semantic cases and 28 MiniLang runtime fixtures" `
++    -LogPath $ProtocolRuntimeEventLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-015 signon queue and stage verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolSignonChecker, "--root", $Root, "--json-output", $ProtocolSignonReportPath)) `
++    -Detail "source-guided signon stages 1-4 and queue boundaries" `
++    -LogPath $ProtocolSignonLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-016 reliable delivery scheduling verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolDeliveryChecker, "--root", $Root, "--json-output", $ProtocolDeliveryReportPath)) `
++    -Detail "blocked, retained, committed, keepalive and drop scheduling" `
++    -LogPath $ProtocolDeliveryLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-017 datagram ACK and retransmission verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolDatagramChecker, "--root", $Root, "--json-output", $ProtocolDatagramReportPath)) `
++    -Detail "fragmentation, deferred ACK flush, loss, duplicate and wrap cases" `
++    -LogPath $ProtocolDatagramLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-018 demo framing and playback verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolDemoChecker, "--root", $Root, "--json-output", $ProtocolDemoReportPath)) `
++    -Detail "recording atoi, frame ABI, keepalive filtering and timedemo semantics" `
++    -LogPath $ProtocolDemoLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-019 cumulative Protocol 15 closure and freeze verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($ProtocolClosureChecker, "--root", $Root, "--json-output", $ProtocolClosureReportPath)) `
++    -Detail "nine component checkers, 15 authoritative files and frozen fingerprint" `
++    -LogPath $ProtocolClosureLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-020 QuakeC progs.dat ABI and runtime CRC verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($QuakeCProgsChecker, "--root", $Root, "--json-output", $QuakeCProgsReportPath)) `
++    -Detail "dprograms_t ABI, semantic parser guards, Latin-1 string table and full-file CRC" `
++    -LogPath $QuakeCProgsLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-021 QuakeC VM byte, stack and pointer verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($QuakeCVMChecker, "--root", $Root, "--json-output", $QuakeCVMReportPath)) `
++    -Detail "66 opcodes, Binary32 boundaries, stack/local limits and pointer validation" `
++    -LogPath $QuakeCVMLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-022 QuakeC edict and save-text verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($QuakeCEdictChecker, "--root", $Root, "--json-output", $QuakeCEdictReportPath)) `
++    -Detail "Epair parsing, Latin-1 text, EV_VOID width and exact save formatting" `
++    -LogPath $QuakeCEdictLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-023 QuakeC builtin-table and formatting verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($QuakeCBuiltinChecker, "--root", $Root, "--json-output", $QuakeCBuiltinReportPath)) `
++    -Detail "79 stock slots, 14 PF_Fixme entries, temp strings, random and numeric formatting" `
++    -LogPath $QuakeCBuiltinLogPath
++
++  Invoke-ExternalStep `
++    -Name "BP-024 cumulative QuakeC closure and freeze verification" `
++    -Executable $PythonExe `
++    -Arguments @($PythonPrefix + @($QuakeCClosureChecker, "--root", $Root, "--json-output", $QuakeCClosureReportPath)) `
++    -Detail "stock QuakeC 1.09 contract, required globals/fields/functions and frozen fingerprint" `
++    -LogPath $QuakeCClosureLogPath
++
++  if (-not $SkipBuild) {
++    $BuildArguments = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $BuildScript)
++    if (-not [string]::IsNullOrWhiteSpace($Compiler)) { $BuildArguments += @("-Compiler", $Compiler) }
++    if (-not [string]::IsNullOrWhiteSpace($StdLib)) { $BuildArguments += @("-StdLib", $StdLib) }
++    $BuildArguments += @("-Python", $PythonExe, "-Configuration", $Configuration, "-NoRunTests")
++    if ($RebuildNative) { $BuildArguments += "-RebuildNative" }
++    if ($Listings) { $BuildArguments += "-Listings" }
++
++    $PowerShellExe = (Get-Process -Id $PID).Path
++    Invoke-ExternalStep `
++      -Name "single cumulative build of game and all block test executables" `
++      -Executable $PowerShellExe `
++      -Arguments $BuildArguments `
++      -Detail "compile once with -NoRunTests; independent groups execute below" `
++      -LogPath $BuildChildLogPath
++  } else {
++    Add-StepResult "single cumulative build of game and all block test executables" "SKIPPED" 0 "-SkipBuild"
++  }
++
++  Require-File $GameExe "MiniQuake executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15WireTests.exe") "Protocol 15 wire test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15CommandTests.exe") "Protocol 15 command test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15ServerDataTests.exe") "Protocol 15 server-data test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15EventTests.exe") "Protocol 15 event test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15RuntimeEventTests.exe") "Protocol 15 runtime-event test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15SignonTests.exe") "Protocol 15 signon test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15DeliveryTests.exe") "Protocol 15 delivery test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15DatagramTests.exe") "Protocol 15 datagram test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15DemoTests.exe") "Protocol 15 demo test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeProtocol15ClosureTests.exe") "Protocol 15 closure test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeQuakeCProgsTests.exe") "BP-020 QuakeC progs.dat test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeQuakeCVMTests.exe") "BP-021 QuakeC VM test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeQuakeCEdictTests.exe") "BP-022 QuakeC edict test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeQuakeCBuiltinTests.exe") "BP-023 QuakeC builtin test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeQuakeCClosureTests.exe") "BP-024 QuakeC closure test executable"
++  Require-File (Join-Path $BuildDirectory "MiniQuakeQuakeCStockTests.exe") "BP-024 stock progs.dat test executable"
++
++  foreach ($BridgeName in @("miniquake_native.dll", "miniquake_text.dll")) {
++    $SourceBridge = Join-Path (Join-Path $Root "native") $BridgeName
++    $BuiltBridge = Join-Path $BuildDirectory $BridgeName
++    Require-File $SourceBridge "Packaged native bridge"
++    Require-File $BuiltBridge "Built native bridge"
++    $SourceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $SourceBridge).Hash
++    $BuiltHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $BuiltBridge).Hash
++    if ($SourceHash -ne $BuiltHash) { throw "Built native bridge hash mismatch: $BridgeName" }
++  }
++  Add-StepResult "native bridge deployment" "PASS" 0 "main and buffered-text DLL hashes match package"
++
++  Write-Host "[MiniQuake/$PackageId] executable identity"
++  $VersionOutput = @(& $GameExe "--version" 2>&1)
++  $VersionExitCode = [int]$LASTEXITCODE
++  $VersionOutput | Set-Content -LiteralPath $VersionPath -Encoding UTF8
++  $VersionOutput | ForEach-Object { Write-Host $_ }
++  if ($VersionExitCode -ne 0) { throw "MiniQuake --version failed with exit code $VersionExitCode." }
++  $VersionText = $VersionOutput -join "`n"
++  foreach ($Marker in @(
++    "Package: $PackageId",
++    "Parent package: $ParentPackageId",
++    "Compatibility profile: compat_109",
++    "Native text ABI: $NativeTextAbi",
++    "Protocol text ABI: $ProtocolTextAbi",
++    "Block: $BlockId",
++    "Block parent package: $BlockParentPackageId",
++    "Protocol status: $ProtocolStatus",
++    "QuakeC status: $QuakeCStatus"
++  )) {
++    if ($VersionText -notmatch [regex]::Escape($Marker)) { throw "Executable identity marker missing: $Marker" }
++  }
++  Add-StepResult "executable identity" "PASS" 0 "Package: $PackageId; block: $BlockId; protocol: $ProtocolStatus; quakec: $QuakeCStatus"
++
++  $IndependentGroups = @(
++    [ordered]@{ package = "BASE"; name = "core tests"; exe = "MiniQuakeTests.exe"; log = "bp020-024r3-core-tests.log" },
++    [ordered]@{ package = "BASE"; name = "milestone tests"; exe = "MiniQuakeMilestoneTests.exe"; log = "bp020-024r3-milestone-tests.log" },
++    [ordered]@{ package = "BASE"; name = "deterministic diagnostics"; exe = "MiniQuakeCompatTraceTests.exe"; log = "bp020-024r3-diagnostics-tests.log" },
++    [ordered]@{ package = "BP-010R1"; name = "Protocol 15 wire"; exe = "MiniQuakeProtocol15WireTests.exe"; log = "bp020-024r3-wire-tests.log" },
++    [ordered]@{ package = "BP-011"; name = "Protocol 15 command/update"; exe = "MiniQuakeProtocol15CommandTests.exe"; log = "bp020-024r3-command-tests.log" },
++    [ordered]@{ package = "BP-012R1"; name = "Protocol 15 server data"; exe = "MiniQuakeProtocol15ServerDataTests.exe"; log = "bp020-024r3-serverdata-tests.log" },
++    [ordered]@{ package = "BP-013"; name = "Protocol 15 events"; exe = "MiniQuakeProtocol15EventTests.exe"; log = "bp020-024r3-event-tests.log" },
++    [ordered]@{ package = "BP-014R1"; name = "Protocol 15 runtime events"; exe = "MiniQuakeProtocol15RuntimeEventTests.exe"; log = "bp020-024r3-runtime-event-tests.log" },
++    [ordered]@{ package = "BP-015"; name = "signon queue and stages"; exe = "MiniQuakeProtocol15SignonTests.exe"; log = "bp020-024r3-signon-tests.log" },
++    [ordered]@{ package = "BP-016"; name = "reliable delivery scheduling"; exe = "MiniQuakeProtocol15DeliveryTests.exe"; log = "bp020-024r3-delivery-tests.log" },
++    [ordered]@{ package = "BP-017"; name = "datagram ACK and retransmission"; exe = "MiniQuakeProtocol15DatagramTests.exe"; log = "bp020-024r3-datagram-tests.log" },
++    [ordered]@{ package = "BP-018"; name = "demo framing and playback"; exe = "MiniQuakeProtocol15DemoTests.exe"; log = "bp020-024r3-demo-tests.log" },
++    [ordered]@{ package = "BP-019"; name = "cross-layer Protocol 15 closure and freeze"; exe = "MiniQuakeProtocol15ClosureTests.exe"; log = "bp020-024r3-protocol15-closure-tests.log" },
++    [ordered]@{ package = "BP-020"; name = "QuakeC progs.dat ABI and CRC"; exe = "MiniQuakeQuakeCProgsTests.exe"; log = "bp020-024r3-quakec-progs-tests.log" },
++    [ordered]@{ package = "BP-021"; name = "QuakeC VM byte and stack parity"; exe = "MiniQuakeQuakeCVMTests.exe"; log = "bp020-024r3-quakec-vm-tests.log" },
++    [ordered]@{ package = "BP-022"; name = "QuakeC edict and save-text parity"; exe = "MiniQuakeQuakeCEdictTests.exe"; log = "bp020-024r3-quakec-edict-tests.log" },
++    [ordered]@{ package = "BP-023"; name = "QuakeC builtin table and formatting"; exe = "MiniQuakeQuakeCBuiltinTests.exe"; log = "bp020-024r3-quakec-builtin-tests.log" },
++    [ordered]@{ package = "BP-024"; name = "frozen QuakeC contract closure"; exe = "MiniQuakeQuakeCClosureTests.exe"; log = "bp020-024r3-quakec-closure-tests.log" }
++  )
++  foreach ($Group in $IndependentGroups) {
++    $Path = Join-Path $BuildDirectory $Group.exe
++    Require-File $Path ("test executable for " + $Group.package)
++    [void](Invoke-IndependentTest -Package $Group.package -Name $Group.name -Executable $Path -LogName $Group.log)
++  }
++
++  $CanUseGameData = -not $SkipGameValidation -and -not [string]::IsNullOrWhiteSpace($QuakeBase)
++  if (-not $CanUseGameData) {
++    $Reason = if ($SkipGameValidation) { "-SkipGameValidation" } else { "no -QuakeBase supplied" }
++    Add-StepResult "[BP-024R3] stock progs.dat compatibility gate" "SKIPPED" 0 $Reason
++    Add-StepResult "[BP-024R3] installed Quake data validation" "SKIPPED" 0 $Reason
++    Add-StepResult "[BP-024R3] headless runtime validation" "SKIPPED" 0 $Reason
++  } else {
++    if (-not (Test-Path -LiteralPath $QuakeBase -PathType Container)) {
++      throw "Quake base directory does not exist: $QuakeBase"
++    }
++
++    # Run the focused stock progs.dat gate first. All three user-data gates
++    # are independent and retain complete native stdout/stderr logs even when
++    # one of them fails.
++    $StockExe = Join-Path $BuildDirectory "MiniQuakeQuakeCStockTests.exe"
++    [void](Invoke-IndependentTest -Package "BP-024R3" -Name "stock progs.dat compatibility gate" -Executable $StockExe -LogName ([System.IO.Path]::GetFileName($QuakeCStockLogPath)) -Arguments @($QuakeBase, $Game))
++    [void](Invoke-IndependentTest -Package "BP-024R3" -Name "installed Quake data validation" -Executable $GameExe -LogName ([System.IO.Path]::GetFileName($GameValidationLogPath)) -Arguments @("--validate-game", $QuakeBase, $Map, "-game", $Game))
++    [void](Invoke-IndependentTest -Package "BP-024R3" -Name "headless runtime validation" -Executable $GameExe -LogName ([System.IO.Path]::GetFileName($RuntimeValidationLogPath)) -Arguments @("--validate-runtime", $QuakeBase, $Map, [string]$Frames, "-game", $Game))
++  }
++
++  $CanTrace = -not $SkipTraceValidation -and -not [string]::IsNullOrWhiteSpace($QuakeBase)
++  if (-not $CanTrace) {
++    $Reason = if ($SkipTraceValidation) { "-SkipTraceValidation" } else { "no -QuakeBase supplied" }
++    Add-StepResult "deterministic compatibility trace A" "SKIPPED" 0 $Reason
++    Add-StepResult "deterministic compatibility trace B" "SKIPPED" 0 $Reason
++    Add-StepResult "byte-identical trace comparison" "SKIPPED" 0 $Reason
++    Add-StepResult "trace artifact schema validation" "SKIPPED" 0 $Reason
++    Add-StepResult "compatibility snapshot command" "SKIPPED" 0 $Reason
++  } else {
++    if (Test-Path -LiteralPath $TraceDirectory) { Remove-Item -Recurse -Force -LiteralPath $TraceDirectory }
++    New-Item -ItemType Directory -Force -Path $TraceDirectory | Out-Null
++    $PrefixA = Join-Path $TraceDirectory "run-a"
++    $PrefixB = Join-Path $TraceDirectory "run-b"
++
++    Invoke-ExternalStep `
++      -Name "deterministic compatibility trace A" `
++      -Executable $GameExe `
++      -Arguments @("--compat-trace", $QuakeBase, $Map, [string]$TraceFrames, $PrefixA, "-game", $Game) `
++      -Detail "fixed 0.02 second steps; game=$Game map=$Map frames=$TraceFrames" `
++      -LogPath $TraceALogPath
++    Invoke-ExternalStep `
++      -Name "deterministic compatibility trace B" `
++      -Executable $GameExe `
++      -Arguments @("--compat-trace", $QuakeBase, $Map, [string]$TraceFrames, $PrefixB, "-game", $Game) `
++      -Detail "independent second process with identical arguments" `
++      -LogPath $TraceBLogPath
++
++    $TraceA = $PrefixA + ".mqtrace"
++    $TraceB = $PrefixB + ".mqtrace"
++    $SnapshotA = $PrefixA + "-snapshot.json"
++    $ContextA = $PrefixA + "-context.json"
++    $SummaryAPath = $PrefixA + "-summary.json"
++    $SummaryBPath = $PrefixB + "-summary.json"
++    foreach ($Artifact in @($TraceA, $TraceB, $SnapshotA, $ContextA, $SummaryAPath, $SummaryBPath)) {
++      Require-File $Artifact "BP-024 trace artifact"
++    }
++
++    Write-Host "[MiniQuake/$PackageId] byte-identical trace comparison"
++    if (Test-Path -LiteralPath $TraceComparisonPath -PathType Leaf) { Remove-Item -Force -LiteralPath $TraceComparisonPath }
++    if (Test-Path -LiteralPath $TraceComparisonLogPath -PathType Leaf) { Remove-Item -Force -LiteralPath $TraceComparisonLogPath }
++    $ComparisonArguments = @($PythonPrefix + @($TraceComparator, $TraceA, $TraceB, "--json-output", $TraceComparisonPath))
++    & $PythonExe @ComparisonArguments 2>&1 | Tee-Object -FilePath $TraceComparisonLogPath
++    $ComparisonExitCode = [int]$LASTEXITCODE
++    $Comparison = Read-JsonFile $TraceComparisonPath
++    if ($ComparisonExitCode -ne 0 -or -not [bool]$Comparison.equal) {
++      $Detail = "run-a=$($Comparison.left.sha256) run-b=$($Comparison.right.sha256)"
++      if ($null -ne $Comparison.first_difference) {
++        $Detail = $Detail + " first_line=$($Comparison.first_difference.line_index)"
++        if ($null -ne $Comparison.first_difference.frame) {
++          $Detail = $Detail + " first_frame=$($Comparison.first_difference.frame)"
++        }
++      }
++      $Detail = $Detail + "; report=" + [System.IO.Path]::GetFileName($TraceComparisonPath)
++      Add-StepResult "byte-identical trace comparison" "FAIL" $ComparisonExitCode $Detail
++      throw "BP-024 deterministic traces differ. The first differing fields are recorded in $TraceComparisonPath."
++    }
++    $TraceHash = [string]$Comparison.left.sha256
++    $LineCount = [int]$Comparison.left.lines
++    if ($LineCount -ne ($TraceFrames + 1)) {
++      throw "Trace line count is $LineCount, expected $($TraceFrames + 1)."
++    }
++    Add-StepResult "byte-identical trace comparison" "PASS" 0 "sha256=$TraceHash lines=$LineCount report=$([System.IO.Path]::GetFileName($TraceComparisonPath))"
++
++    $SummaryA = Read-JsonFile $SummaryAPath
++    $SummaryB = Read-JsonFile $SummaryBPath
++    $Snapshot = Read-JsonFile $SnapshotA
++    $Context = Read-JsonFile $ContextA
++    if ($SummaryA.schema -ne "MiniQuakeTraceSummary/1" -or $SummaryB.schema -ne "MiniQuakeTraceSummary/1") {
++      throw "Unexpected trace summary schema."
++    }
++    if ($SummaryA.package -ne $PackageId -or $SummaryB.package -ne $PackageId) {
++      throw "Trace summary package marker mismatch."
++    }
++    if (-not $SummaryA.ok -or -not $SummaryB.ok) { throw "A trace summary reports failure." }
++    if ([int]$SummaryA.frames_written -ne $TraceFrames -or [int]$SummaryB.frames_written -ne $TraceFrames) {
++      throw "Trace summary frame count mismatch."
++    }
++    if ($SummaryA.rolling_hash -ne $SummaryB.rolling_hash) {
++      throw "Trace rolling hashes differ despite byte comparison."
++    }
++    if ($Snapshot.schema -ne "MiniQuakeSnapshot/1") { throw "Unexpected snapshot schema." }
++    if ($Context.schema -ne "MiniQuakeCrashContext/1") { throw "Unexpected crash-context schema." }
++    if ($Context.phase -ne "trace_complete") { throw "Final crash context phase is '$($Context.phase)', expected trace_complete." }
++    $TraceRollingHash = [string]$SummaryA.rolling_hash
++
++    foreach ($Artifact in @($TraceA, $SnapshotA, $ContextA, $SummaryAPath)) {
++      Invoke-ExternalStep `
++        -Name ("compatibility report " + [System.IO.Path]::GetFileName($Artifact)) `
++        -Executable $GameExe `
++        -Arguments @("--compat-report", $Artifact) `
++        -Detail "schema recognition"
++    }
++    Add-StepResult "trace artifact schema validation" "PASS" 0 "rolling_hash=$TraceRollingHash"
++
++    $SnapshotFrames = [int][Math]::Min($TraceFrames, 8)
++    $SnapshotPrefix = Join-Path $TraceDirectory "snapshot-command"
++    Invoke-ExternalStep `
++      -Name "compatibility snapshot command" `
++      -Executable $GameExe `
++      -Arguments @("--compat-snapshot", $QuakeBase, $Map, [string]$SnapshotFrames, $SnapshotPrefix, "-game", $Game) `
++      -Detail "direct --compat-snapshot CLI path; frames=$SnapshotFrames" `
++      -LogPath $SnapshotCommandLogPath
++    $SnapshotCommandPath = $SnapshotPrefix + "-snapshot.json"
++    $SnapshotCommandSummaryPath = $SnapshotPrefix + "-summary.json"
++    $SnapshotCommand = Read-JsonFile $SnapshotCommandPath
++    $SnapshotCommandSummary = Read-JsonFile $SnapshotCommandSummaryPath
++    if ($SnapshotCommand.schema -ne "MiniQuakeSnapshot/1") { throw "Direct snapshot command produced an unexpected schema." }
++    if ([int]$SnapshotCommand.frame -ne ($SnapshotFrames - 1)) { throw "Direct snapshot command stopped at frame $($SnapshotCommand.frame), expected $($SnapshotFrames - 1)." }
++    if (-not $SnapshotCommandSummary.ok -or [int]$SnapshotCommandSummary.frames_written -ne $SnapshotFrames) {
++      throw "Direct snapshot command summary reports failure or the wrong frame count."
++    }
++  }
++
++  if ($NetworkTests) {
++    Invoke-ExternalStep `
++      -Name "Winsock UDP loopback smoke" `
++      -Executable $GameExe `
++      -Arguments @("--udp-smoke", "2000") `
++      -Detail "2 second timeout"
++  } else {
++    Add-StepResult "Winsock UDP loopback smoke" "SKIPPED" 0 "use -NetworkTests"
++  }
++
++  if ($IndependentFailures.Count -gt 0) {
++    $First = $IndependentFailures[0]
++    throw ("Independent test groups failed: " + $IndependentFailures.Count + "; first=" + $First.package + " " + $First.name)
++  }
++
++  $OverallStatus = "PASS"
++} catch {
++  $FailureMessage = $_.Exception.Message
++  Write-Host "ERROR: $FailureMessage" -ForegroundColor Red
++} finally {
++  $BlockPackages = @("BP-020", "BP-021", "BP-022", "BP-023", "BP-024")
++  $FirstFailureIndex = -1
++  $FirstFailurePackage = ""
++  if ($IndependentFailures.Count -gt 0) {
++    $FirstFailurePackage = [string]$IndependentFailures[0].package
++    $FirstFailureIndex = [array]::IndexOf($BlockPackages, $FirstFailurePackage)
++    if ($FirstFailureIndex -lt 0) { $FirstFailureIndex = 0 }
++  }
++  $LogicalSteps = @()
++  for ($LogicalIndex = 0; $LogicalIndex -lt $BlockPackages.Count; $LogicalIndex++) {
++    $LogicalPackage = $BlockPackages[$LogicalIndex]
++    $OwnFailure = @($IndependentFailures | Where-Object { $_.package -eq $LogicalPackage })
++    $LogicalStatus = "PASS"
++    if ($OwnFailure.Count -gt 0) {
++      $LogicalStatus = "FAIL"
++    } elseif ($FirstFailureIndex -ge 0 -and $LogicalIndex -gt $FirstFailureIndex) {
++      # The independent fixture may have passed, but the cumulative dependency
++      # chain is not accepted after an earlier block failure.
++      $LogicalStatus = "BLOCKED"
++    } elseif ($FirstFailureIndex -eq 0 -and $FirstFailurePackage -notmatch "^BP-02[0-4]$") {
++      $LogicalStatus = "BLOCKED"
++    }
++    $LogicalSteps += [ordered]@{ package = $LogicalPackage; status = $LogicalStatus }
++  }
++  $Bisect = [ordered]@{
++    schema = "MiniQuakeLogicalBlockBisect/1"
++    block_id = $BlockId
++    requested = [bool]$BisectOnFailure
++    mode = "logical test-group checkpoint locator; no source rebuild is performed"
++    failures = @($IndependentFailures)
++    logical_steps = $LogicalSteps
++    first_failing_package = $FirstFailurePackage
++    suggested_patch = if ($FirstFailurePackage -match "^BP-02[0-4]$") { "patches/" + $FirstFailurePackage + ".diff" } else { "" }
++  }
++  $Bisect | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $BisectReportPath -Encoding UTF8
++
++  $Summary = [ordered]@{
++    schema_version = 1
++    package_id = $PackageId
++    parent_package_id = $ParentPackageId
++    block_id = $BlockId
++    delivery_revision = $DeliveryRevision
++    block_parent_package_id = $BlockParentPackageId
++    protocol_status = $ProtocolStatus
++    quakec_status = $QuakeCStatus
++    created_utc = (Get-Date).ToUniversalTime().ToString("o")
++    status = $OverallStatus
++    failure = $FailureMessage
++    configuration = $Configuration
++    quake_validation = [ordered]@{
++      base_supplied = -not [string]::IsNullOrWhiteSpace($QuakeBase)
++      game = $Game
++      map = $Map
++      frames = $Frames
++      trace_frames = $TraceFrames
++    }
++    deterministic_trace = [ordered]@{
++      sha256 = $TraceHash
++      rolling_hash = $TraceRollingHash
++    }
++    artifacts = [ordered]@{
++      transcript = [System.IO.Path]::GetFileName($TranscriptPath)
++      static_report = [System.IO.Path]::GetFileName($StaticReportPath)
++      version_output = [System.IO.Path]::GetFileName($VersionPath)
++      build_child_log = [System.IO.Path]::GetFileName($BuildChildLogPath)
++      trace_a_log = [System.IO.Path]::GetFileName($TraceALogPath)
++      trace_b_log = [System.IO.Path]::GetFileName($TraceBLogPath)
++      snapshot_command_log = [System.IO.Path]::GetFileName($SnapshotCommandLogPath)
++      trace_comparison = [System.IO.Path]::GetFileName($TraceComparisonPath)
++      trace_comparison_log = [System.IO.Path]::GetFileName($TraceComparisonLogPath)
++      protocol15_vector_report = [System.IO.Path]::GetFileName($ProtocolVectorReportPath)
++      protocol15_vector_log = [System.IO.Path]::GetFileName($ProtocolVectorLogPath)
++      protocol15_command_report = [System.IO.Path]::GetFileName($ProtocolCommandReportPath)
++      protocol15_command_log = [System.IO.Path]::GetFileName($ProtocolCommandLogPath)
++      protocol15_serverdata_report = [System.IO.Path]::GetFileName($ProtocolServerDataReportPath)
++      protocol15_serverdata_log = [System.IO.Path]::GetFileName($ProtocolServerDataLogPath)
++      protocol15_event_report = [System.IO.Path]::GetFileName($ProtocolEventReportPath)
++      protocol15_event_log = [System.IO.Path]::GetFileName($ProtocolEventLogPath)
++      protocol15_runtime_event_report = [System.IO.Path]::GetFileName($ProtocolRuntimeEventReportPath)
++      protocol15_runtime_event_log = [System.IO.Path]::GetFileName($ProtocolRuntimeEventLogPath)
++      protocol15_signon_report = [System.IO.Path]::GetFileName($ProtocolSignonReportPath)
++      protocol15_delivery_report = [System.IO.Path]::GetFileName($ProtocolDeliveryReportPath)
++      protocol15_datagram_report = [System.IO.Path]::GetFileName($ProtocolDatagramReportPath)
++      protocol15_demo_report = [System.IO.Path]::GetFileName($ProtocolDemoReportPath)
++      protocol15_closure_report = [System.IO.Path]::GetFileName($ProtocolClosureReportPath)
++      quakec_progs_report = [System.IO.Path]::GetFileName($QuakeCProgsReportPath)
++      quakec_vm_report = [System.IO.Path]::GetFileName($QuakeCVMReportPath)
++      quakec_edict_report = [System.IO.Path]::GetFileName($QuakeCEdictReportPath)
++      quakec_builtin_report = [System.IO.Path]::GetFileName($QuakeCBuiltinReportPath)
++      quakec_closure_report = [System.IO.Path]::GetFileName($QuakeCClosureReportPath)
++      quakec_stock_log = [System.IO.Path]::GetFileName($QuakeCStockLogPath)
++      game_validation_log = [System.IO.Path]::GetFileName($GameValidationLogPath)
++      runtime_validation_log = [System.IO.Path]::GetFileName($RuntimeValidationLogPath)
++      bisect_report = [System.IO.Path]::GetFileName($BisectReportPath)
++      trace_directory = "bp020-024r3-traces"
++      independent_failures = @($IndependentFailures)
++    }
++    steps = @($Steps)
++  }
++  $Summary | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $SummaryPath -Encoding UTF8
++
++  if ($TranscriptStarted) {
++    try { Stop-Transcript | Out-Null } catch { }
++  }
++}
++
++if ($OverallStatus -ne "PASS") {
++  Write-Host "MiniQuake $DeliveryRevision acceptance test: FAIL"
++  Write-Host "Run .\COLLECT_RESULTS.ps1 and upload the generated result archive."
++  exit 1
++}
++
++Write-Host "MiniQuake $DeliveryRevision acceptance test: PASS"
++Write-Host "Result summary: $SummaryPath"
++Write-Host "For feedback, run .\COLLECT_RESULTS.ps1 and upload the generated ZIP."
++exit 0
+diff --git a/build.ps1 b/build.ps1
+index 269544b7a79e7c06d5cc70c492f7314e06ae407a..e9d7956350f3c5d72591d6e9f4d81c3057d19e6c 100644
+--- a/build.ps1
++++ b/build.ps1
+@@ -26,8 +26,8 @@ $Root = $PSScriptRoot
+ $Output = Join-Path $Root "build"
+ $Source = Join-Path $Root "src"
+ $Parent = Split-Path -Parent $Root
+-$PackageId = "BP-024R2"
+-$ParentPackageId = "BP-024R1"
++$PackageId = "BP-024R3"
++$ParentPackageId = "BP-024R2"
+ $NativeTextAbi = "caller_owned_bytes_v1"
+ $ProtocolTextAbi = "quake_latin1_cstring_v1"
+ $BlockId = "BP-020-024"
+@@ -310,7 +310,7 @@ New-Item -ItemType Directory -Force -Path $Output | Out-Null
+ 
+ # Remove all package targets before the first compile.  If the game target
+ # fails, executables and compile logs from the parent package cannot be mistaken
+-# for current BP-024R2 products by the result collector.
++# for current BP-024R3 products by the result collector.
+ $PackageBuildArtifacts = @(
+   "MiniQuake.exe",
+   "MiniQuakeTests.exe",
+@@ -489,10 +489,10 @@ if (-not $SkipPreflight -and $null -ne $PythonExe) {
+ 
+   $QuakeCClosureChecker = Join-Path $Root "tools\check_quakec_closure.py"
+   if (-not (Test-Path -LiteralPath $QuakeCClosureChecker -PathType Leaf)) {
+-    throw "BP-024R2 QuakeC closure checker is missing: $QuakeCClosureChecker"
++    throw "BP-024R3 QuakeC closure checker is missing: $QuakeCClosureChecker"
+   }
+   & $PythonExe @PythonPrefixArgs $QuakeCClosureChecker --root $Root
+-  if ($LASTEXITCODE -ne 0) { throw "$PackageId BP-024R2 frozen QuakeC contract preflight failed." }
++  if ($LASTEXITCODE -ne 0) { throw "$PackageId BP-024R3 frozen QuakeC contract preflight failed." }
+ } elseif ($SkipPreflight) {
+   Write-Warning "$PackageId diagnostics preflight was explicitly skipped."
+ } else {
+@@ -568,7 +568,7 @@ if (-not $NoRunTests) {
+   Write-Host "[MiniQuake] checking executable package identity"
+   $VersionOutput = @(& $GameExe "--version" 2>&1)
+   $VersionExitCode = [int]$LASTEXITCODE
+-  $VersionOutput | Set-Content -LiteralPath (Join-Path $Output "bp024r2-build-version.txt") -Encoding UTF8
++  $VersionOutput | Set-Content -LiteralPath (Join-Path $Output "bp024r3-build-version.txt") -Encoding UTF8
+   $VersionOutput | ForEach-Object { Write-Host $_ }
+   if ($VersionExitCode -ne 0) {
+     throw "MiniQuake --version failed with exit code $VersionExitCode."
+diff --git a/docs/BP-020-024R2_RESULT_ANALYSIS.md b/docs/BP-020-024R2_RESULT_ANALYSIS.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..44c6a2da33e2e1e85fc4898acfb306f98e6f9085
+--- /dev/null
++++ b/docs/BP-020-024R2_RESULT_ANALYSIS.md
+@@ -0,0 +1,80 @@
++# BP-020–BP-024R2 Windows result analysis
++
++## Result
++
++The uploaded result archive `MiniQuake_BP-020-024R2_RESULTS_20260725-224602.zip`
++has SHA-256:
++
++```text
++fec22c41880ff1d34a66f0e254281e5d72777db5a19f0feb60f077deeedae060
++```
++
++The cumulative build and 51 of 52 acceptance groups succeeded. The sole
++failure was the BP-022 edict/save-text runtime group:
++
++```text
++[16/22] ED_Write
++FAIL: Cannot stringify void for string concatenation
++```
++
++Everything after that group was still executed because the block runner used
++independent-test continuation.
++
++## Confirmed green gates
++
++- game plus all 19 test executables compiled;
++- base core and milestone tests passed;
++- all Protocol-15 gates BP-010R1 through BP-019 passed;
++- BP-020 progs.dat tests passed 18/18;
++- BP-021 VM tests passed 16/16;
++- BP-023 builtin tests passed 22/22;
++- BP-024 closure tests passed 20/20;
++- the installed stock `id1/progs.dat` gate passed;
++- installed game-data validation passed;
++- 300 headless frames passed;
++- two independent 128-frame traces were byte-identical;
++- trace SHA-256 was
++  `2efa7130b9dacabb1c463d35c903f1e8f8b3e24feeca27b649d1211a6fc62c17`;
++- rolling hash was `58a7d245`;
++- direct snapshot and all report schemas passed;
++- Winsock UDP loopback passed.
++
++This confirms that the R2 qcc parameter-storage correction is correct and that
++stock QuakeC, map loading, runtime initialization, Protocol 15 and deterministic
++execution are healthy.
++
++## Failure classification
++
++The failure is isolated to the synthetic BP-022 serialization fixture. It does
++not occur while loading the stock program or running the game. The old R2
++serializer constructed a progressively growing MiniLang string and passed that
++string through multiple helper-call boundaries. The observed error proves that
++a `void` reached a subsequent concatenation, but it does not identify which
++compiler/runtime micro-step produced that value.
++
++The result archive does not contain a native stack trace that proves the exact
++compiler/runtime micro-step at which the value became `void`. BP-024R3 therefore
++does not merely add another null check. It removes the failing construction
++strategy completely.
++
++## R3 correction
++
++`ED_Write`, `ED_WriteGlobals` and the savegame writer now share a two-pass,
++exact-size byte serializer:
++
++1. select definitions using the original Quake rules;
++2. format each value using the existing QuakeC word formatter;
++3. convert field names and values through `quake_latin1_cstring_v1`;
++4. calculate the exact output byte count;
++5. fill one caller-owned `bytes` buffer with the literal Quake save-text layout;
++6. convert that completed byte document back to a MiniLang string once.
++
++The serializer no longer concatenates an ever-growing prefix. It also preserves
++all Quake one-byte characters from `0x01` through `0xff` in the in-memory text
++representation. Savegame and direct ED_* writers use the same implementation.
++Entity fields whose QuakeC words are all zero remain omitted, while `ED_WriteGlobals` preserves the original rule of writing every eligible `DEF_SAVEGLOBAL` string, float and entity value, including zero and empty-string values.
++
++The existing 22-fixture BP-022 test program remains the acceptance gate. Its
++ED_Write fixture now also checks an extended Quake byte and reports a direct
++return-type error instead of masking a `void` result while constructing the test
++failure message.
+diff --git a/docs/BP-020-024R3_TESTING.md b/docs/BP-020-024R3_TESTING.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..7aa468261a12ea104a1f731a60db7ba3392d13a1
+--- /dev/null
++++ b/docs/BP-020-024R3_TESTING.md
+@@ -0,0 +1,48 @@
++# BP-020–BP-024R3 Windows acceptance
++
++Extract the complete package into a new empty directory. Do not overlay it on
++R2 or an older package.
++
++```powershell
++.\TEST_BP-020-024R3.ps1 `
++  -Compiler C:\Users\nilsk\Desktop\MiniLangCompilerPy\mlc_win64.py `
++  -StdLib C:\Users\nilsk\Desktop\MiniLangCompilerPy `
++  -QuakeBase "C:\Program Files (x86)\Steam\steamapps\common\Quake" `
++  -Game id1 `
++  -Map start `
++  -Frames 300 `
++  -TraceFrames 128 `
++  -NetworkTests `
++  -ContinueIndependentTests `
++  -BisectOnFailure
++```
++
++The repaired gate is:
++
++```text
++[16/22] ED_Write
++MiniQuake BP-022 QuakeC edict tests passed: 22
++```
++
++All other R2 gates must remain green, including:
++
++```text
++MiniQuake BP-024 stock QuakeC test: PASS
++Validation result: PASS
++byte-identical trace comparison: PASS
++MiniQuake UDP loopback smoke
++  result=PASS
++MiniQuake BP-020-024R3 acceptance test: PASS
++```
++
++After the run, regardless of the result:
++
++```powershell
++.\COLLECT_RESULTS.ps1
++```
++
++The output archive will be named approximately:
++
++```text
++build\MiniQuake_BP-020-024R3_RESULTS_YYYYMMDD-HHMMSS.zip
++```
+diff --git a/docs/BP-022_QUAKEC_EDICT_AUDIT.md b/docs/BP-022_QUAKEC_EDICT_AUDIT.md
+index 54db0c9bfe7c71c54a53bb2fce4fd4af35e0f3b9..8ce7061581a3194fb908265feff80fb8a85ffdb1 100644
+--- a/docs/BP-022_QUAKEC_EDICT_AUDIT.md
++++ b/docs/BP-022_QUAKEC_EDICT_AUDIT.md
+@@ -12,3 +12,24 @@ und Entityglobals mit `DEF_SAVEGLOBAL` werden archiviert.
+ 
+ BSP-Entitytext ist wie QuakeC-Stringtabellen Byteinhalt. BP-022 führt ihn daher
+ nicht mehr durch eine UTF-8-Neuinterpretation.
++
++## BP-024R3: exakter Quake-Byte-Serializer
++
++Der Windows-Lauf von BP-020–BP-024R2 bestätigte Stock-`progs.dat`,
++Spielinitialisierung, 300 Headless-Frames, deterministische Traces und alle
++übrigen QuakeC-Gruppen. Ausschließlich die synthetische `ED_Write`-Fixture
++traf noch eine MiniLang-Stringkonkatenationsgrenze.
++
++BP-024R3 modelliert die `fprintf`-Folge des C-Originals deshalb nicht länger
++als wiederholt wachsenden MiniLang-String. `ED_Write`, `ED_WriteGlobals` und
++die Savegame-Writer verwenden gemeinsam zwei Durchläufe:
++
++1. Definitionen nach den Originalregeln auswählen und die exakte Bytelänge
++   berechnen;
++2. einen caller-owned `bytes`-Puffer einmalig befüllen und das fertige
++   Dokument anschließend über `quake_latin1_cstring_v1` dekodieren.
++
++Entityfelder mit ausschließlich Nullwörtern werden weiterhin ausgelassen.
++`ED_WriteGlobals` schreibt dagegen wie das Original jedes geeignete
++`DEF_SAVEGLOBAL`-String-, Float- und Entityglobal – auch bei Nullwerten.
++Erweiterte Quake-Einbytezeichen werden unverändert erhalten.
+diff --git a/scripts/validate_real_game.ps1 b/scripts/validate_real_game.ps1
+index d1eeba057ad0b389ecbc34b601324cadabb4c4ea..39eb6689e91ad6780bec1ddb0f47a827c17aec7b 100644
+--- a/scripts/validate_real_game.ps1
++++ b/scripts/validate_real_game.ps1
+@@ -19,7 +19,7 @@ $ErrorActionPreference = "Stop"
+ Set-StrictMode -Version Latest
+ 
+ $Root = Split-Path -Parent $PSScriptRoot
+-$TestScript = Join-Path $Root "TEST_BP-020-024R2.ps1"
++$TestScript = Join-Path $Root "TEST_BP-020-024R3.ps1"
+ $PowerShellExecutable = (Get-Process -Id $PID).Path
+ $Arguments = @(
+   "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $TestScript,
+diff --git a/src/main.ml b/src/main.ml
+index d0aee8d3b9aef2703d7a2477b32fcb60925bae90..f5b8f3c4eddc4cfe3c73e9144366427d66019425 100644
+--- a/src/main.ml
++++ b/src/main.ml
+@@ -372,7 +372,7 @@ function runSelfCheck()
+   print "Package date: " + buildInfo.PACKAGE_DATE
+   print "Baseline archive SHA-256: " + buildInfo.BASE_ARCHIVE_SHA256
+   print "Core CRC self-check: 0x" + hex(bytes([(check >> 8) & 255, check & 255]))
+-  print "Port status: BP-024R2 accepts stock qcc parameter storage and uses typed edict/save serialization while preserving the frozen Protocol 15 and QuakeC 1.09 contracts."
++  print "Port status: BP-024R3 uses exact-size Quake-byte edict/save serialization while preserving the frozen Protocol 15 and QuakeC 1.09 contracts."
+   return 0
+ end function
+ 
+diff --git a/src/miniquake/build_info.ml b/src/miniquake/build_info.ml
+index 3088d6fcd39bc5992f1a7dc78f72f415b0dac566..926b6ab7015fd22a7866958dff1d5f171fbcc151 100644
+--- a/src/miniquake/build_info.ml
++++ b/src/miniquake/build_info.ml
+@@ -8,8 +8,8 @@ back to an exact source baseline.
+ 
+ package miniquake.build_info
+ 
+-const PACKAGE_ID = "BP-024R2"
+-const PARENT_PACKAGE_ID = "BP-024R1"
++const PACKAGE_ID = "BP-024R3"
++const PARENT_PACKAGE_ID = "BP-024R2"
+ const PACKAGE_DATE = "2026-07-25"
+ const COMPATIBILITY_PROFILE = "compat_109"
+ const NATIVE_TEXT_ABI = "caller_owned_bytes_v1"
+@@ -21,4 +21,4 @@ const BLOCK_ID = "BP-020-024"
+ const BLOCK_PARENT_PACKAGE_ID = "BP-015-019R1"
+ const PROTOCOL_STATUS = "protocol15_frozen_v1"
+ const QUAKEC_STATUS = "quakec_109_frozen_v1"
+-const PACKAGE_PURPOSE = "Corrected frozen QuakeC 1.09 compatibility contract with stock qcc parameter storage and typed edict/save serialization"
++const PACKAGE_PURPOSE = "Corrected frozen QuakeC 1.09 compatibility contract with byte-buffered edict and save-text serialization"
+diff --git a/src/miniquake/quakec/edict.ml b/src/miniquake/quakec/edict.ml
+index 6e4a32dafda5f1ed249f5145e8873dd9d41e7d93..6271558107136b51c37e4251b243189b5c1d94ad 100644
+--- a/src/miniquake/quakec/edict.ml
++++ b/src/miniquake/quakec/edict.ml
+@@ -429,6 +429,13 @@ function displayVectorString(words, offset)
+   return result
+ end function
+ 
++function voidValueString()
++  // Construct the textual ev_void representation through the Quake byte
++  // codec. This guarantees a real four-byte string at MiniLang's strict
++  // void/string boundary.
++  return protocolText.decodeBytes(bytes([118, 111, 105, 100]))
++end function
++
+ function valueString(machine, valueType, words, offset, ugly)
+   valueType = valueType & 0x7fff
+   if valueType == c.EV_STRING then
+@@ -455,7 +462,7 @@ function valueString(machine, valueType, words, offset, ugly)
+     if ugly then return definition.name end if
+     return "." + definition.name
+   end if
+-  if valueType == c.EV_VOID then return "void" end if
++  if valueType == c.EV_VOID then return voidValueString() end if
+   if valueType == c.EV_FLOAT then
+     if ugly then return fixedSixDecimalsWord(words[offset]) end if
+     return fixedOneDecimal(native.bitsFloat(words[offset]))
+@@ -472,13 +479,45 @@ function appendQuotedPair(prefix, name, value)
+   if typeof(prefix) != "string" then return error(2610, "QuakeC serialization received a non-string prefix") end if
+   if typeof(name) != "string" then return error(2611, "QuakeC serialization received a non-string field name") end if
+   if typeof(value) != "string" then return error(2615, "QuakeC serialization received a non-string field value") end if
+-  result = prefix
+-  result = result + "\""
+-  result = result + name
+-  result = result + "\" \""
+-  result = result + value
+-  result = result + "\"\n"
+-  return result
++
++  prefixData = try(protocolText.encodeBytes(prefix))
++  if prefixData is error then return prefixData end if
++  nameData = try(protocolText.encodeBytes(name))
++  if nameData is error then return nameData end if
++  valueData = try(protocolText.encodeBytes(value))
++  if valueData is error then return valueData end if
++
++  // Build the complete quoted pair as Quake bytes.  The earlier implementation
++  // repeatedly concatenated MiniLang strings and could surface a transient void
++  // value in the native runtime after several ED_Write fields.  The C original
++  // writes directly to FILE, so a caller-owned byte buffer is the closer model.
++  output = bytes(len(prefixData) + len(nameData) + len(valueData) + 6, 0)
++  cursor = 0
++  if len(prefixData) > 0 then
++    copyBytes(output, cursor, prefixData, 0, len(prefixData))
++    cursor = cursor + len(prefixData)
++  end if
++  output[cursor] = 34
++  cursor = cursor + 1
++  if len(nameData) > 0 then
++    copyBytes(output, cursor, nameData, 0, len(nameData))
++    cursor = cursor + len(nameData)
++  end if
++  output[cursor] = 34
++  output[cursor + 1] = 32
++  output[cursor + 2] = 34
++  cursor = cursor + 3
++  if len(valueData) > 0 then
++    copyBytes(output, cursor, valueData, 0, len(valueData))
++    cursor = cursor + len(valueData)
++  end if
++  output[cursor] = 34
++  output[cursor + 1] = 10
++
++  decoded = try(protocolText.decodeBytes(output))
++  if decoded is error then return decoded end if
++  if typeof(decoded) != "string" then return error(2617, "QuakeC quoted-pair decoder returned no text") end if
++  return decoded
+ end function
+ 
+ function quotedPairLine(name, value)
+@@ -510,53 +549,120 @@ function printEdict(machine, entityIndex)
+   return text
+ end function
+ 
+-function appendEdictDefinition(machine, words, definition, text)
+-  size = typeSize(definition.type)
+-  include = not vectorComponentDefinition(definition.name) and size > 0
+-  include = include and definition.offset >= 0
+-  include = include and definition.offset + size <= len(words)
+-  include = include and not wordsAreZero(words, definition.offset, size)
+-  if not include then return text end if
++function definitionShouldSerialize(words, definition, globalsOnly)
++  valueType = definition.type & 0x7fff
++  size = typeSize(valueType)
++  include = size > 0
++
++  if globalsOnly then
++    include = include and (definition.type & c.DEF_SAVEGLOBAL) != 0
++    include = include and (valueType == c.EV_STRING or valueType == c.EV_FLOAT or valueType == c.EV_ENTITY)
++    if not include then return false end if
++    if definition.offset < 0 or definition.offset + size > len(words) then
++      return error(2616, "ED_WriteGlobals: definition outside global storage")
++    end if
++  else
++    include = include and not vectorComponentDefinition(definition.name)
++    include = include and definition.offset >= 0
++    include = include and definition.offset + size <= len(words)
++    if not include then return false end if
++  end if
++
++  // ED_Write skips zero-valued entity fields, while ED_WriteGlobals writes
++  // every DEF_SAVEGLOBAL string/float/entity even when the stored value is 0.
++  if globalsOnly then return true end if
++  return not wordsAreZero(words, definition.offset, size)
++end function
++
++function definitionSerializedLength(machine, words, definition)
+   serialized = try(valueString(machine, definition.type, words, definition.offset, true))
+   if serialized is error then return serialized end if
+-  return appendQuotedPair(text, definition.name, serialized)
++  if typeof(serialized) != "string" then return error(2618, "QuakeC definition formatter returned no text") end if
++  if typeof(definition.name) != "string" then return error(2611, "QuakeC serialization received a non-string field name") end if
++
++  nameData = try(protocolText.encodeBytes(definition.name))
++  if nameData is error then return nameData end if
++  valueData = try(protocolText.encodeBytes(serialized))
++  if valueData is error then return valueData end if
++  return len(nameData) + len(valueData) + 6
+ end function
+ 
+-function writeEdict(machine, entityIndex)
+-  if entityIndex < 0 or entityIndex >= len(machine.edicts) then return error(2606, "ED_Write: bad edict " + entityIndex) end if
+-  text = "{\n"
+-  if machine.edictFree[entityIndex] then return text + "}\n" end if
+-  index = 1
+-  while index < len(machine.program.fieldDefs)
+-    nextText = try(appendEdictDefinition(machine, machine.edicts[entityIndex], machine.program.fieldDefs[index], text))
+-    if nextText is error then return nextText end if
+-    text = nextText
++function writeDefinitionBytes(machine, words, definition, output, cursor)
++  serialized = try(valueString(machine, definition.type, words, definition.offset, true))
++  if serialized is error then return serialized end if
++  if typeof(serialized) != "string" then return error(2618, "QuakeC definition formatter returned no text") end if
++  if typeof(definition.name) != "string" then return error(2611, "QuakeC serialization received a non-string field name") end if
++
++  nameData = try(protocolText.encodeBytes(definition.name))
++  if nameData is error then return nameData end if
++  valueData = try(protocolText.encodeBytes(serialized))
++  if valueData is error then return valueData end if
++
++  output[cursor] = 34
++  cursor = cursor + 1
++  if len(nameData) > 0 then
++    copyBytes(output, cursor, nameData, 0, len(nameData))
++    cursor = cursor + len(nameData)
++  end if
++  output[cursor] = 34
++  output[cursor + 1] = 32
++  output[cursor + 2] = 34
++  cursor = cursor + 3
++  if len(valueData) > 0 then
++    copyBytes(output, cursor, valueData, 0, len(valueData))
++    cursor = cursor + len(valueData)
++  end if
++  output[cursor] = 34
++  output[cursor + 1] = 10
++  return cursor + 2
++end function
++
++function serializeDefinitions(machine, words, definitions, firstIndex, globalsOnly)
++  total = 4 // "{\n" plus "}\n"
++  index = firstIndex
++  while index < len(definitions)
++    include = try(definitionShouldSerialize(words, definitions[index], globalsOnly))
++    if include is error then return include end if
++    if include then
++      length = try(definitionSerializedLength(machine, words, definitions[index]))
++      if length is error then return length end if
++      total = total + length
++    end if
+     index = index + 1
+   end while
+-  return text + "}\n"
++
++  output = bytes(total, 0)
++  output[0] = 123
++  output[1] = 10
++  cursor = 2
++  index = firstIndex
++  while index < len(definitions)
++    include = try(definitionShouldSerialize(words, definitions[index], globalsOnly))
++    if include is error then return include end if
++    if include then
++      nextCursor = try(writeDefinitionBytes(machine, words, definitions[index], output, cursor))
++      if nextCursor is error then return nextCursor end if
++      cursor = nextCursor
++    end if
++    index = index + 1
++  end while
++  output[cursor] = 125
++  output[cursor + 1] = 10
++
++  decoded = try(protocolText.decodeBytes(output))
++  if decoded is error then return decoded end if
++  if typeof(decoded) != "string" then return error(2619, "QuakeC block decoder returned no text") end if
++  return decoded
+ end function
+ 
+-function appendGlobalDefinition(machine, definition, text)
+-  valueType = definition.type & 0x7fff
+-  include = (definition.type & c.DEF_SAVEGLOBAL) != 0
+-  include = include and (valueType == c.EV_STRING or valueType == c.EV_FLOAT or valueType == c.EV_ENTITY)
+-  if not include then return text end if
+-  if definition.offset < 0 or definition.offset >= len(machine.globals) then
+-    return error(2616, "ED_WriteGlobals: definition outside global storage")
+-  end if
+-  serialized = try(valueString(machine, valueType, machine.globals, definition.offset, true))
+-  if serialized is error then return serialized end if
+-  return appendQuotedPair(text, definition.name, serialized)
++function writeEdict(machine, entityIndex)
++  if entityIndex < 0 or entityIndex >= len(machine.edicts) then return error(2606, "ED_Write: bad edict " + entityIndex) end if
++  if machine.edictFree[entityIndex] then return "{\n}\n" end if
++  return serializeDefinitions(machine, machine.edicts[entityIndex], machine.program.fieldDefs, 1, false)
+ end function
+ 
+ function writeGlobals(machine)
+-  text = "{\n"
+-  for each definition in machine.program.globalDefs
+-    nextText = try(appendGlobalDefinition(machine, definition, text))
+-    if nextText is error then return nextText end if
+-    text = nextText
+-  end for
+-  return text + "}\n"
++  return serializeDefinitions(machine, machine.globals, machine.program.globalDefs, 0, true)
+ end function
+ 
+ function countEdicts(machine)
+diff --git a/src/miniquake/savegame.ml b/src/miniquake/savegame.ml
+index f5be724b44ceef9a0cafb9d958135b80a43b1a77..713adb08a914386c37bad151139119d7e4e318b7 100644
+--- a/src/miniquake/savegame.ml
++++ b/src/miniquake/savegame.ml
+@@ -51,31 +51,9 @@ function uglyValue(machine, words, definition)
+ end function
+ 
+ function writeDefinitions(machine, words, definitions, globalsOnly)
+-  text = "{\n"
+-  index = 0
+-  while index < len(definitions)
+-    definition = definitions[index]
+-    valueType = definition.type & 0x7fff
+-    include = true
+-    if globalsOnly then
+-      include = (definition.type & c.DEF_SAVEGLOBAL) != 0
+-      include = include and (valueType == c.EV_STRING or valueType == c.EV_FLOAT or valueType == c.EV_ENTITY)
+-    else
+-      include = index > 0 and not vectorComponentName(definition.name)
+-    end if
+-    size = typeSize(valueType)
+-    if include and size > 0 and definition.offset >= 0 and definition.offset + size <= len(words) then
+-      if not wordsAreZero(words, definition.offset, size) then
+-        serialized = try(uglyValue(machine, words, definition))
+-        if serialized is error then return serialized end if
+-        nextText = try(qcedict.appendQuotedPair(text, definition.name, serialized))
+-        if nextText is error then return nextText end if
+-        text = nextText
+-      end if
+-    end if
+-    index = index + 1
+-  end while
+-  return text + "}\n"
++  firstIndex = 0
++  if not globalsOnly then firstIndex = 1 end if
++  return qcedict.serializeDefinitions(machine, words, definitions, firstIndex, globalsOnly)
+ end function
+ 
+ function writeGlobals(machine)
+diff --git a/tests/quakec_edict_tests.ml b/tests/quakec_edict_tests.ml
+index 6475d219d474eb28dcc295773ce618bca49cf9e3..d3b18265335a0cf402e2043c05777b30fb281b9b 100644
+--- a/tests/quakec_edict_tests.ml
++++ b/tests/quakec_edict_tests.ml
+@@ -27,6 +27,13 @@ function yes(value, name)
+   return true
+ end function
+ 
++function equalText(actual, expected, name)
++  if typeof(actual) != "string" then return error(10202, name + ": expected string, got " + typeof(actual)) end if
++  if typeof(expected) != "string" then return error(10203, name + ": fixture expected value is not a string") end if
++  if actual != expected then return error(10204, name + ": text mismatch") end if
++  return true
++end function
++
+ function contains(text, wanted)
+   source = bytes(text)
+   needle = bytes(wanted)
+@@ -255,19 +262,46 @@ function testWriteEdict()
+   vm.setEntityFloat(machine, 1, 6, 12.5)
+   vm.setEntityVector(machine, 1, 2, t.Vec3(1.0, 2.0, 3.0))
+   vm.setEntityField(machine, 1, 29, 1)
+-  equal(edict.PR_UglyValueString(machine, c.EV_FLOAT, machine.edicts[1], 6), "12.500000", "float value string")
+-  equal(edict.PR_UglyValueString(machine, c.EV_VECTOR, machine.edicts[1], 2), "1.000000 2.000000 3.000000", "vector value string")
+-  equal(edict.PR_UglyValueString(machine, c.EV_VOID, machine.edicts[1], 29), "void", "void value string")
+-  equal(edict.appendQuotedPair("{\n", "key", "value"), "{\n\"key\" \"value\"\n", "quoted pair append")
++  high = protocolText.decodeBytes(bytes([0xe9]))
++  vm.setEntityString(machine, 1, 10, high)
++  floatText = try(edict.PR_UglyValueString(machine, c.EV_FLOAT, machine.edicts[1], 6))
++  if floatText is error then return floatText end if
++  equalText(floatText, "12.500000", "float value string")
++  vectorText = try(edict.PR_UglyValueString(machine, c.EV_VECTOR, machine.edicts[1], 2))
++  if vectorText is error then return vectorText end if
++  equalText(vectorText, "1.000000 2.000000 3.000000", "vector value string")
++  voidText = try(edict.PR_UglyValueString(machine, c.EV_VOID, machine.edicts[1], 29))
++  if voidText is error then return voidText end if
++  equalText(voidText, protocolText.decodeBytes(bytes([118, 111, 105, 100])), "void value string")
++  pairText = try(edict.appendQuotedPair("{\n", "key", "value"))
++  if pairText is error then return pairText end if
++  equalText(pairText, "{\n\"key\" \"value\"\n", "quoted pair append")
+   yes(try(edict.appendQuotedPair("", "key", void)) is error, "void value rejected before concatenation")
+ 
++  cumulative = try(edict.appendQuotedPair("{\n", "first", "one"))
++  if cumulative is error then return cumulative end if
++  cumulative = try(edict.appendQuotedPair(cumulative, "second", "two"))
++  if cumulative is error then return cumulative end if
++  equalText(cumulative, "{\n\"first\" \"one\"\n\"second\" \"two\"\n", "quoted pair cumulative append")
++
+   expected = "{\n"
+   expected = expected + "\"angles\" \"1.000000 2.000000 3.000000\"\n"
+   expected = expected + "\"health\" \"12.500000\"\n"
++  expected = expected + "\"message\" \"" + high + "\"\n"
+   expected = expected + "\"voidslot\" \"void\"\n"
+   expected = expected + "}\n"
+-  equal(edict.ED_Write(machine, 1), expected, "ED_Write exact text")
+-  equal(savegame.writeEdict(machine, 1), expected, "savegame ED_Write exact text")
++
++  actual = try(edict.ED_Write(machine, 1))
++  if actual is error then return actual end if
++  if typeof(actual) != "string" then return error(10202, "ED_Write returned " + typeof(actual)) end if
++  equalText(actual, expected, "ED_Write exact text")
++  equal(hex(protocolText.encodeBytes(actual)), "7b0a22616e676c6573222022312e30303030303020322e30303030303020332e303030303030220a226865616c746822202231322e353030303030220a226d657373616765222022e9220a22766f6964736c6f74222022766f6964220a7d0a", "ED_Write exact Quake bytes")
++
++  saved = try(savegame.writeEdict(machine, 1))
++  if saved is error then return saved end if
++  if typeof(saved) != "string" then return error(10203, "savegame ED_Write returned " + typeof(saved)) end if
++  equalText(saved, expected, "savegame ED_Write exact text")
++  equal(hex(protocolText.encodeBytes(saved)), "7b0a22616e676c6573222022312e30303030303020322e30303030303020332e303030303030220a226865616c746822202231322e353030303030220a226d657373616765222022e9220a22766f6964736c6f74222022766f6964220a7d0a", "savegame ED_Write exact Quake bytes")
+   return true
+ end function
+ 
+@@ -282,8 +316,27 @@ function testWriteGlobals()
+   expected = expected + "\"globalstr\" \"hello\"\n"
+   expected = expected + "\"globalent\" \"3\"\n"
+   expected = expected + "}\n"
+-  equal(edict.ED_WriteGlobals(machine), expected, "ED_WriteGlobals exact text")
+-  equal(savegame.writeGlobals(machine), expected, "savegame globals exact text")
++  actual = try(edict.ED_WriteGlobals(machine))
++  if actual is error then return actual end if
++  if typeof(actual) != "string" then return error(10204, "ED_WriteGlobals returned " + typeof(actual)) end if
++  equalText(actual, expected, "ED_WriteGlobals exact text")
++  saved = try(savegame.writeGlobals(machine))
++  if saved is error then return saved end if
++  if typeof(saved) != "string" then return error(10205, "savegame globals returned " + typeof(saved)) end if
++  equalText(saved, expected, "savegame globals exact text")
++
++  zeroMachine = makeMachine()
++  zeroExpected = "{\n"
++  zeroExpected = zeroExpected + "\"globalx\" \"0.000000\"\n"
++  zeroExpected = zeroExpected + "\"globalstr\" \"\"\n"
++  zeroExpected = zeroExpected + "\"globalent\" \"0\"\n"
++  zeroExpected = zeroExpected + "}\n"
++  zeroGlobals = try(edict.ED_WriteGlobals(zeroMachine))
++  if zeroGlobals is error then return zeroGlobals end if
++  equalText(zeroGlobals, zeroExpected, "ED_WriteGlobals preserves zero saveglobals")
++  zeroSaved = try(savegame.writeGlobals(zeroMachine))
++  if zeroSaved is error then return zeroSaved end if
++  equalText(zeroSaved, zeroExpected, "savegame preserves zero saveglobals")
+   return true
+ end function
+ 
+diff --git a/tools/check_quakec_closure.py b/tools/check_quakec_closure.py
+index 68785c6111f81c5481420cccf179581232af933d..72884d5cedb5fe4e11edda9cf87e6934f0c761d7 100644
+--- a/tools/check_quakec_closure.py
++++ b/tools/check_quakec_closure.py
+@@ -73,10 +73,10 @@ def contract(root):
+     if 'const BUILTIN_COUNT = 79' not in builtins or 'function builtinContractFingerprint()' not in builtins: errors.append('builtin contract not bound')
+     if tests.count('if run(')!=20 or 'MiniQuake BP-024 QuakeC closure tests passed: 20' not in tests: errors.append('expected 20 closure fixtures')
+     if 'MiniQuake BP-024 stock QuakeC test: PASS' not in stock or 'contract.validate(program)' not in stock: errors.append('stock progs.dat gate missing')
+-    # The frozen logical contract remains BP-024.  BP-024R1 is a runtime
++    # The frozen logical contract remains BP-024.  BP-024R3 is a delivery/runtime
+     # correction delivery built on that contract and therefore has its own
+     # executable identity while retaining the same semantic fingerprint.
+-    for marker in ('const PACKAGE_ID = "BP-024R2"','const PARENT_PACKAGE_ID = "BP-024R1"','const BLOCK_ID = "BP-020-024"'):
++    for marker in ('const PACKAGE_ID = "BP-024R3"','const PARENT_PACKAGE_ID = "BP-024R2"','const BLOCK_ID = "BP-020-024"'):
+         if marker not in info: errors.append('package identity mismatch: '+marker)
+     return errors
+ 
+diff --git a/tools/check_quakec_edict.py b/tools/check_quakec_edict.py
+index 4f665cf9b144b048185d333bc9263e7cfc4d3216..528494d8d8142a7067176890219cb72f7341c38f 100644
+--- a/tools/check_quakec_edict.py
++++ b/tools/check_quakec_edict.py
+@@ -24,17 +24,56 @@ def run_oracle(root):
+   if b.returncode:return False,b.stdout+b.stderr,[]
+   r=subprocess.run([str(exe)],capture_output=True,text=True);return r.returncode==0,' '.join(cc),[json.loads(x) for x in r.stdout.splitlines() if x.strip()]
+ def contract(root):
+- errors=[];e=(root/'src/miniquake/quakec/edict.ml').read_text(encoding='utf-8-sig');b=(root/'src/miniquake/format/bsp.ml').read_text(encoding='utf-8-sig');s=(root/'src/miniquake/savegame.ml').read_text(encoding='utf-8-sig');t=(root/'tests/quakec_edict_tests.ml').read_text(encoding='utf-8-sig')
+- for m in ('if valueType == c.EV_VOID then return 1 end if','function diagnostic(machine, text)',"is not a field", "is not a global",'function fixedSixDecimalsWord(rawWord)','negative = (rawWord & 0x80000000) != 0','function appendQuotedPair(prefix, name, value)','if typeof(prefix) != "string" then return error(2610, "QuakeC serialization received a non-string prefix") end if','if typeof(name) != "string" then return error(2611, "QuakeC serialization received a non-string field name") end if','if typeof(value) != "string" then return error(2615, "QuakeC serialization received a non-string field value") end if','function appendEdictDefinition(machine, words, definition, text)','return appendQuotedPair(text, definition.name, serialized)','source = protocolText.encodeBytes(text)','return "Bad edict number\\n"'):
++ errors=[]
++ e=(root/'src/miniquake/quakec/edict.ml').read_text(encoding='utf-8-sig')
++ b=(root/'src/miniquake/format/bsp.ml').read_text(encoding='utf-8-sig')
++ s=(root/'src/miniquake/savegame.ml').read_text(encoding='utf-8-sig')
++ t=(root/'tests/quakec_edict_tests.ml').read_text(encoding='utf-8-sig')
++ for m in (
++  'if valueType == c.EV_VOID then return 1 end if',
++  'function diagnostic(machine, text)',
++  "is not a field",
++  "is not a global",
++  'function fixedSixDecimalsWord(rawWord)',
++  'negative = (rawWord & 0x80000000) != 0',
++  'function voidValueString()',
++  'return protocolText.decodeBytes(bytes([118, 111, 105, 100]))',
++  'function voidValueString()',
++  'return protocolText.decodeBytes(bytes([118, 111, 105, 100]))',
++  'function appendQuotedPair(prefix, name, value)',
++  'if typeof(prefix) != "string" then return error(2610, "QuakeC serialization received a non-string prefix") end if',
++  'if typeof(name) != "string" then return error(2611, "QuakeC serialization received a non-string field name") end if',
++  'if typeof(value) != "string" then return error(2615, "QuakeC serialization received a non-string field value") end if',
++  'function serializeDefinitions(machine, words, definitions, firstIndex, globalsOnly)',
++  'function definitionSerializedLength(machine, words, definition)',
++  'if globalsOnly then return true end if',
++  'function writeDefinitionBytes(machine, words, definition, output, cursor)',
++  'output = bytes(total, 0)',
++  'nameData = try(protocolText.encodeBytes(definition.name))',
++  'valueData = try(protocolText.encodeBytes(serialized))',
++  'copyBytes(output, cursor, nameData, 0, len(nameData))',
++  'copyBytes(output, cursor, valueData, 0, len(valueData))',
++  'decoded = try(protocolText.decodeBytes(output))',
++  'return serializeDefinitions(machine, machine.edicts[entityIndex], machine.program.fieldDefs, 1, false)',
++  'return serializeDefinitions(machine, machine.globals, machine.program.globalDefs, 0, true)',
++  'source = protocolText.encodeBytes(text)',
++  r'return "Bad edict number\n"',
++ ):
+   if m not in e+s:errors.append('missing edict marker: '+m)
+  for m in ('source = protocolText.encodeBytes(text)','protocolText.decodeBytes(output)','return protocolText.decodeBytes(slice(data, lump.offset, lump.length))'):
+   if m not in b:errors.append('missing BSP byte-text marker: '+m)
+  if 'native.bitsFloat(0x80000000)' not in t or 'negative zero raw formatter' not in t:errors.append('negative-zero fixture is not constructed from its raw QuakeC word')
+  if 'float value string' not in t or 'vector value string' not in t or 'void value string' not in t:errors.append('ED_Write value-string isolation fixtures are missing')
+- if 'void value rejected before concatenation' not in t or 'ED_Write exact text' not in t or 'savegame ED_Write exact text' not in t:errors.append('ED_Write exact serialization boundary fixtures are missing')
+- if 'line = try(quotedPairLine(definition.name, serialized))' in e or 'text = text + line' in e:errors.append('ED_Write still concatenates a possibly void intermediate line')
+- if 'qcedict.appendQuotedPair(text, definition.name, serialized)' not in s:errors.append('savegame writer does not share the typed append serializer')
+- if 'qcedict.quotedPairLine(definition.name, serialized)' in s or 'text = text + line' in s:errors.append('savegame writer still concatenates a possibly void intermediate line')
++ if 'void value rejected before concatenation' not in t:errors.append('typed append rejection fixture is missing')
++ if 'quoted pair cumulative append' not in t:errors.append('cumulative quoted-pair regression fixture is missing')
++ if 'ED_Write returned " + typeof(actual)' not in t or 'savegame ED_Write returned " + typeof(saved)' not in t:errors.append('ED_Write result type boundaries are missing')
++ if 'ED_Write exact Quake bytes' not in t or 'savegame ED_Write exact Quake bytes' not in t or 'bytes([0xe9])' not in t:errors.append('ED_Write Quake-byte fixture is missing')
++ if 'ED_WriteGlobals preserves zero saveglobals' not in t or 'savegame preserves zero saveglobals' not in t:errors.append('zero-valued DEF_SAVEGLOBAL regression fixture is missing')
++ if 'zeroExpected = zeroExpected +' not in t or r'\"globalstr\" \"\"' not in t or r'\"globalent\" \"0\"' not in t:errors.append('zero saveglobal exact-output fixture is incomplete')
++ if 'function appendEdictDefinition(' in e:errors.append('ED_Write still uses the growing-string definition helper')
++ if 'return appendQuotedPair(text, definition.name, serialized)' in e:errors.append('ED_Write still appends to a growing string')
++ if 'qcedict.appendQuotedPair(text, definition.name, serialized)' in s:errors.append('savegame writer still duplicates the growing-string serializer')
++ if 'return qcedict.serializeDefinitions(machine, words, definitions, firstIndex, globalsOnly)' not in s:errors.append('savegame writer does not delegate to the shared byte serializer')
+  if t.count('if run(')!=22 or 'MiniQuake BP-022 QuakeC edict tests passed: 22' not in t:errors.append('expected 22 BP-022 fixtures')
+  return errors
+ 
+diff --git a/tools/verify.py b/tools/verify.py
+index 1f5fa303adfd0baf1200386ef91c0ef0f2c3c063..b4b06b3e780e06a530ef97915c65b516f8527309 100644
+--- a/tools/verify.py
++++ b/tools/verify.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""Self-contained MiniQuake BP-024R2 and BP-020-024 cumulative QuakeC delivery verifier.
++"""Self-contained MiniQuake BP-024R3 and BP-020-024 cumulative QuakeC delivery verifier.
+ 
+ The verifier deliberately uses only the Python standard library so the exact
+ source archive can be checked before MiniLang compilation. It verifies the
+@@ -22,12 +22,12 @@ from dataclasses import asdict, dataclass, field
+ from pathlib import Path, PurePosixPath
+ from typing import Iterable
+ 
+-PACKAGE_ID = "BP-024R2"
+-PARENT_PACKAGE_ID = "BP-024R1"
++PACKAGE_ID = "BP-024R3"
++PARENT_PACKAGE_ID = "BP-024R2"
+ BLOCK_ID = "BP-020-024"
+ BLOCK_PARENT_PACKAGE_ID = "BP-015-019R1"
+-DELIVERY_REVISION = "BP-020-024R2"
+-DELIVERY_PARENT = "BP-020-024R1"
++DELIVERY_REVISION = "BP-020-024R3"
++DELIVERY_PARENT = "BP-020-024R2"
+ PROTOCOL_STATUS = "protocol15_frozen_v1"
+ QUAKEC_STATUS = "quakec_109_frozen_v1"
+ MANIFEST_NAME = "SOURCE_MANIFEST.sha256"
+@@ -202,12 +202,16 @@ REQUIRED_PATHS = {
+     "TEST_BP-020-024.ps1",
+     "TEST_BP-020-024R1.ps1",
+     "TEST_BP-020-024R2.ps1",
++    "TEST_BP-020-024R3.ps1",
+     "CHANGELOG_BP-020-024R1.md",
+     "CHANGELOG_BP-020-024R2.md",
++    "CHANGELOG_BP-020-024R3.md",
+     "docs/BP-020-024_RESULT_ANALYSIS.md",
+     "docs/BP-020-024R1_TESTING.md",
+     "docs/BP-020-024R1_RESULT_ANALYSIS.md",
+     "docs/BP-020-024R2_TESTING.md",
++    "docs/BP-020-024R2_RESULT_ANALYSIS.md",
++    "docs/BP-020-024R3_TESTING.md",
+     "docs/BP-015-019R1_ACCEPTANCE_ANALYSIS.md",
+     "docs/BP-020_QUAKEC_PROGS_AUDIT.md",
+     "docs/BP-021_QUAKEC_VM_AUDIT.md",
+@@ -244,6 +248,7 @@ REQUIRED_PATHS = {
+     "patches/BP-024.diff",
+     "patches/BP-024R1.diff",
+     "patches/BP-024R2.diff",
++    "patches/BP-024R3.diff",
+ }
+ 
+ 
+@@ -958,7 +963,7 @@ def check_delivery_scripts(root: Path) -> CheckResult:
+     ]
+     expected_markers = {
+         "build.ps1": [
+-            '$PackageId = "BP-024R2"', '$ParentPackageId = "BP-024R1"',
++            '$PackageId = "BP-024R3"', '$ParentPackageId = "BP-024R2"',
+             '$BlockId = "BP-020-024"', '$BlockParentPackageId = "BP-015-019R1"',
+             '$ProtocolStatus = "protocol15_frozen_v1"', '$QuakeCStatus = "quakec_109_frozen_v1"',
+             "check_quakec_progs.py", "check_quakec_vm.py", "check_quakec_edict.py",
+@@ -966,27 +971,27 @@ def check_delivery_scripts(root: Path) -> CheckResult:
+             "MiniQuakeQuakeCProgsTests.exe", "MiniQuakeQuakeCVMTests.exe",
+             "MiniQuakeQuakeCEdictTests.exe", "MiniQuakeQuakeCBuiltinTests.exe",
+             "MiniQuakeQuakeCClosureTests.exe", "MiniQuakeQuakeCStockTests.exe",
+-            "bp024r2-build-version.txt", "quakec_closure=",
++            "bp024r3-build-version.txt", "quakec_closure=",
+         ],
+-        "TEST_BP-020-024R2.ps1": [
+-            '$PackageId = "BP-024R2"', '$ParentPackageId = "BP-024R1"',
++        "TEST_BP-020-024R3.ps1": [
++            '$PackageId = "BP-024R3"', '$ParentPackageId = "BP-024R2"',
+             '$BlockId = "BP-020-024"', '$BlockParentPackageId = "BP-015-019R1"',
+-            '$DeliveryRevision = "BP-020-024R2"', '$QuakeCStatus = "quakec_109_frozen_v1"',
++            '$DeliveryRevision = "BP-020-024R3"', '$QuakeCStatus = "quakec_109_frozen_v1"',
+             "ContinueIndependentTests", "BisectOnFailure", "Invoke-IndependentTest", "BLOCKED",
+             "check_quakec_progs.py", "check_quakec_vm.py", "check_quakec_edict.py",
+             "check_quakec_builtins.py", "check_quakec_closure.py",
+             "MiniQuakeQuakeCStockTests.exe", "--compat-trace",
+-            "bp020-024r2-game-validation.log", "bp020-024r2-runtime-validation.log",
+-            "byte-identical trace comparison", "bp020-024r2-bisect-report.json",
++            "bp020-024r3-game-validation.log", "bp020-024r3-runtime-validation.log",
++            "byte-identical trace comparison", "bp020-024r3-bisect-report.json",
+             "MiniQuake $DeliveryRevision acceptance test: PASS",
+         ],
+         "COLLECT_RESULTS.ps1": [
+-            'BP-020-024R2', 'BP-024R2', 'BP-020-024', 'quakec_109_frozen_v1',
++            'BP-020-024R3', 'BP-024R3', 'BP-020-024', 'quakec_109_frozen_v1',
+             "MiniQuakeQuakeCProgsTests.exe", "MiniQuakeQuakeCStockTests.exe",
+             "quakec_closure_golden.json", "BP-024_QUAKEC_CLOSURE_AUDIT.md",
+             ".mqtrace", "ForbiddenExtensions", "Compress-Archive",
+         ],
+-        "scripts/validate_real_game.ps1": ["TEST_BP-020-024R2.ps1", "TraceFrames", "Frames"],
++        "scripts/validate_real_game.ps1": ["TEST_BP-020-024R3.ps1", "TraceFrames", "Frames"],
+         "tools/check_quakec_progs.py": ["quakec_progs_oracle.c", "BP-020", "runtime_fixtures"],
+         "tools/check_quakec_vm.py": ["quakec_vm_oracle.c", "BP-021", "runtime_fixtures"],
+         "tools/check_quakec_edict.py": ["quakec_edict_oracle.c", "BP-022", "runtime_fixtures"],
+@@ -2432,6 +2437,85 @@ def check_quakec_closure_contract(root: Path) -> CheckResult:
+     return CheckResult("quakec_closure_contract", not errors, details, errors)
+ 
+ 
++
++def check_quakec_edict_byte_serializer_contract(root: Path) -> CheckResult:
++    """Bind the BP-024R3 ED_Write fix to an exact-size Quake-byte document."""
++    errors: list[str] = []
++    details: dict[str, object] = {}
++    try:
++        edict = (root / "src/miniquake/quakec/edict.ml").read_text(encoding="utf-8")
++        savegame = (root / "src/miniquake/savegame.ml").read_text(encoding="utf-8")
++        tests = (root / "tests/quakec_edict_tests.ml").read_text(encoding="utf-8")
++        analysis = (root / "docs/BP-020-024R2_RESULT_ANALYSIS.md").read_text(encoding="utf-8")
++
++        required_edict = (
++            "function definitionShouldSerialize(words, definition, globalsOnly)",
++            "function definitionSerializedLength(machine, words, definition)",
++            "function writeDefinitionBytes(machine, words, definition, output, cursor)",
++            "function serializeDefinitions(machine, words, definitions, firstIndex, globalsOnly)",
++            'total = 4 // "{\\n" plus "}\\n"',
++            "output = bytes(total, 0)",
++            "nameData = try(protocolText.encodeBytes(definition.name))",
++            "valueData = try(protocolText.encodeBytes(serialized))",
++            "copyBytes(output, cursor, nameData, 0, len(nameData))",
++            "copyBytes(output, cursor, valueData, 0, len(valueData))",
++            "decoded = try(protocolText.decodeBytes(output))",
++            "return serializeDefinitions(machine, machine.edicts[entityIndex], machine.program.fieldDefs, 1, false)",
++            "return serializeDefinitions(machine, machine.globals, machine.program.globalDefs, 0, true)",
++            "if globalsOnly then return true end if",
++        )
++        for marker in required_edict:
++            if marker not in edict:
++                errors.append(f"edict byte serializer is missing: {marker}")
++        for marker in (
++            "function appendEdictDefinition(",
++            "function appendGlobalDefinition(",
++            "return appendQuotedPair(text, definition.name, serialized)",
++        ):
++            if marker in edict:
++                errors.append(f"growing ED_Write serializer returned: {marker}")
++        if "return qcedict.serializeDefinitions(machine, words, definitions, firstIndex, globalsOnly)" not in savegame:
++            errors.append("savegame writer does not delegate to the shared exact-size serializer")
++        if "qcedict.appendQuotedPair(text, definition.name, serialized)" in savegame:
++            errors.append("savegame writer still duplicates the growing-string serializer")
++
++        test_markers = (
++            "high = protocolText.decodeBytes(bytes([0xe9]))",
++            'if typeof(actual) != "string" then return error(10202, "ED_Write returned " + typeof(actual)) end if',
++            'if typeof(saved) != "string" then return error(10203, "savegame ED_Write returned " + typeof(saved)) end if',
++            '"ED_Write exact Quake bytes"',
++            '"savegame ED_Write exact Quake bytes"',
++            "ED_WriteGlobals preserves zero saveglobals",
++            "savegame preserves zero saveglobals",
++            'MiniQuake BP-022 QuakeC edict tests passed: 22',
++        )
++        for marker in test_markers:
++            if marker not in tests:
++                errors.append(f"BP-022 R3 runtime fixture is missing: {marker}")
++        if tests.count("if run(") != 22:
++            errors.append("BP-022 fixture count differs from 22")
++
++        for marker in (
++            "fec22c41880ff1d34a66f0e254281e5d72777db5a19f0feb60f077deeedae060",
++            "51 of 52 acceptance groups succeeded",
++            "[16/22] ED_Write",
++            "2efa7130b9dacabb1c463d35c903f1e8f8b3e24feeca27b649d1211a6fc62c17",
++        ):
++            if marker not in analysis:
++                errors.append(f"R2 result analysis is missing evidence marker: {marker}")
++
++        details.update({
++            "serialization_passes": 2,
++            "runtime_fixtures": tests.count("if run("),
++            "extended_quake_byte_fixture": "bytes([0xe9])" in tests,
++            "savegame_shared_serializer": "qcedict.serializeDefinitions" in savegame,
++            "r2_result_archive_sha256_bound": "fec22c41880ff1d34a66f0e254281e5d72777db5a19f0feb60f077deeedae060" in analysis,
++        })
++    except OSError as exc:
++        errors.append(f"cannot validate BP-024R3 byte serializer: {exc}")
++    return CheckResult("quakec_edict_byte_serializer_contract", not errors, details, errors)
++
++
+ def check_package_identity(root: Path) -> CheckResult:
+     errors: list[str] = []
+     details: dict[str, object] = {}
+@@ -2509,6 +2593,7 @@ def run_checks(root: Path, manifest_path: Path) -> VerificationReport:
+         check_protocol15_beam_state_view_contract(root),
+         check_protocol15_closure_contract(root),
+         check_quakec_closure_contract(root),
++        check_quakec_edict_byte_serializer_contract(root),
+         check_milestone_signon_phase_contract(root),
+         check_no_game_data(root),
+         check_delivery_scripts(root),

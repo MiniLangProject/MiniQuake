@@ -145,9 +145,23 @@ function R_AddEfrags(ent)
   return count
 end function
 
+function R_BeginVisibleFrame()
+  global cl_visedicts, cl_numvisedicts
+  cl_visedicts = []
+  cl_numvisedicts = 0
+  return true
+end function
+
 function R_StoreEfrags(leafIndex)
   global cl_visedicts, cl_numvisedicts
+  // World traversal calls R_StoreEfrags once for every visible leaf.  The C
+  // function appends to the frame-global cl_visedicts array; it does not clear
+  // that array for each leaf.  Preserve previously stored entities here and
+  // de-duplicate exactly once per frame.
   builder = arrayutil.createArrayBuilder(c.MAX_VISEDICTS)
+  for each existing in cl_visedicts
+    if builder.count < c.MAX_VISEDICTS then arrayutil.pushArrayBuilder(builder, existing) end if
+  end for
   if leafIndex >= 0 and leafIndex < len(refragLeafEfrags) then
     for each reference in refragLeafEfrags[leafIndex]
       entity = reference.entity
@@ -165,6 +179,10 @@ function R_StoreEfrags(leafIndex)
   end if
   cl_visedicts = arrayutil.finishArrayBuilder(builder)
   cl_numvisedicts = len(cl_visedicts)
+  return cl_visedicts
+end function
+
+function R_VisibleEntities()
   return cl_visedicts
 end function
 

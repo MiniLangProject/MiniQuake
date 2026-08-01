@@ -1,0 +1,15 @@
+{
+  "ambient_channels": 4,
+  "binary32_spatial": true,
+  "channel_zero_override": false,
+  "clear_precache_noop": true,
+  "dynamic_channels": 8,
+  "exact_channel_replacement": true,
+  "fixtures": 22,
+  "max_channels": 128,
+  "max_sfx": 512,
+  "nominal_clip_distance": 1000,
+  "package": "BP-056",
+  "schema": 1,
+  "source": "WinQuake/snd_dma.c"
+}

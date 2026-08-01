@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+  "project": "MiniQuake",
+  "block_id": "BP-060-064",
+  "parent_package_id": "BP-055-059R2",
+  "final_package_id": "BP-064",
+  "delivery_revision": "BP-060-064R3",
+  "network_platform_status": "network_platform_109_frozen_v1",
+  "network_platform_fingerprint": "0xb3ec7589",
+  "steps": [
+    {
+      "package_id": "BP-060",
+      "title": "NET main, qsocket pool, poll queue and active host port",
+      "patch": "patches/BP-060.diff",
+      "runtime_fixtures": 20,
+      "status": "R2 Windows runtime PASS; R3 trace/GC-root revalidation pending"
+    },
+    {
+      "package_id": "BP-061",
+      "title": "Protocol 3 control, discovery and connection classification",
+      "patch": "patches/BP-061.diff",
+      "runtime_fixtures": 24,
+      "status": "R2 Windows runtime PASS; R3 trace/GC-root revalidation pending"
+    },
+    {
+      "package_id": "BP-062",
+      "title": "WinSock address, partial IP and landriver parity",
+      "patch": "patches/BP-062.diff",
+      "runtime_fixtures": 24,
+      "status": "R2 Windows runtime PASS; R3 trace/GC-root revalidation pending"
+    },
+    {
+      "package_id": "BP-063",
+      "title": "sys_win, QHOST/conproc and WinMain lifecycle",
+      "patch": "patches/BP-063.diff",
+      "runtime_fixtures": 21,
+      "status": "R2 Windows runtime PASS; R3 trace/GC-root revalidation pending"
+    },
+    {
+      "package_id": "BP-064",
+      "title": "network/platform closure and cross-process UDP evidence",
+      "patch": "patches/BP-064.diff",
+      "runtime_fixtures": 24,
+      "status": "R2 Windows runtime PASS; R3 trace/GC-root revalidation pending"
+    }
+  ],
+  "block_runtime_fixtures": 113,
+  "accepted_parent": {
+    "delivery_revision": "BP-055-059R2",
+    "status": "PASS",
+    "result_archive": "MiniQuake_BP-055-059R2_RESULTS_20260728-155430.zip",
+    "result_archive_sha256": "7634070813d28b57ffdd0c18064e493187c4a0fc47259e55450aa7a75d3b32fd",
+    "required_steps": "143/143 PASS",
+    "optional_steps": "1 Original GLQuake corpus comparison skipped",
+    "trace_sha256": "f8aef48166ea9ffc3bfd864802238feec1b1e8a01dad27f3e55e3b47b20d99c1",
+    "trace_rolling_hash": "d905b042",
+    "retail_audio_evidence_sha256": "9988060eb6c3bb7692338b97325d50c97c233473298194a39196795ec88d4337",
+    "udp_loopback": "PASS"
+  },
+  "acceptance": {
+    "single_cumulative_build": true,
+    "installed_game_validation": true,
+    "headless_frames": 300,
+    "trace_frames": 128,
+    "render_evidence": true,
+    "retail_audio_evidence": true,
+    "network_evidence_process_pairs": 2,
+    "network_evidence_exact_identity": true,
+    "udp_loopback": true
+  },
+  "scope_boundary": {
+    "network_protocol": "Protocol 15 gameplay and Protocol 3 connectionless control",
+    "landriver": "WinSock UDP",
+    "platform": "observable sys_win/conproc behavior with x64-safe native bridge",
+    "serial_modem_ipx": "legacy transports remain outside the mandatory modern Windows profile",
+    "quake_game_data": "external; never bundled"
+  },
+  "delivery_parent": "BP-060-064R2",
+  "delivery_hotfix": {
+    "revision": "BP-060-064R3",
+    "parent": "BP-060-064R2",
+    "scope": "GC-safe heap argument rooting plus allocation-safe compatibility diagnostics",
+    "live_output": true,
+    "production_src_changed": true,
+    "native_changed": false,
+    "engine_contracts_changed": false,
+    "runtime_fixture_count_changed": false,
+    "trace_vector_classification": true,
+    "snapshot_error_split": true
+  },
+  "initial_delivery_result": {
+    "delivery_revision": "BP-060-064",
+    "result_archive": "MiniQuake_BP-060-064_RESULTS_20260728-184449.zip",
+    "result_archive_sha256": "bde52d9bcb2e7052c3dcac5ee62dbe49dd3acd6887cbeabfc54c1f8b4916c719",
+    "status": "FAIL during BP-061 runtime fixture",
+    "compiled_targets": "65/65",
+    "bp060": "20/20 PASS",
+    "bp061": "19 fixtures completed; void indexing before fixture 20",
+    "later_runtime": "not reached"
+  },
+  "r1_delivery_hotfix": {
+    "revision": "BP-060-064R1",
+    "parent": "BP-060-064",
+    "scope": "live output and logging infrastructure",
+    "windows_run": "not executed separately",
+    "production_source_changed": false
+  },
+  "r2_delivery_hotfix": {
+    "revision": "BP-060-064R2",
+    "parent": "BP-060-064R1",
+    "scope": "Protocol-3 rule enumeration distinction plus BP-061 fixture",
+    "rule_end_wire": "command_only",
+    "unknown_previous": "no_reply",
+    "live_output": true,
+    "production_source_changed": true,
+    "native_changed": false,
+    "windows_acceptance": "pending"
+  },
+  "predecessor_result": {
+    "archive": "MiniQuake_BP-060-064_RESULTS_20260728-184449.zip",
+    "sha256": "bde52d9bcb2e7052c3dcac5ee62dbe49dd3acd6887cbeabfc54c1f8b4916c719",
+    "status": "FAIL at BP-061 fixture 20 after 65/65 targets compiled",
+    "bp060": "20/20 PASS",
+    "first_failure": "Cannot index void in rule enumeration terminator fixture"
+  },
+  "r2_hotfix": {
+    "live_output_carried_forward": true,
+    "rule_end": "command-only CCREP_RULE_INFO",
+    "unknown_previous": "silent no reply",
+    "runtime_fixtures": 113,
+    "contract_fingerprint": "0xb3ec7589"
+  },
+  "r2_delivery_result": {
+    "delivery_revision": "BP-060-064R2",
+    "archive": "MiniQuake_BP-060-064R2_RESULTS_20260728-215240.zip",
+    "sha256": "4c784f8afbd02624552c18339a1f8ab48c052c38dced9057ca044a12c8be4fef",
+    "status": "FAIL only at compatibility trace B frame 26",
+    "build": "PASS; 65/65 executables",
+    "inherited_and_block_runtime_tests": "PASS",
+    "bp060": "20/20 PASS",
+    "bp061": "24/24 PASS",
+    "bp062": "24/24 PASS",
+    "bp063": "21/21 PASS",
+    "bp064": "24/24 PASS",
+    "installed_game_validation": "PASS",
+    "headless_runtime": "300 frames PASS",
+    "retail_audio_evidence": "A/B byte-identical",
+    "trace_a": {
+      "frames": "128/128",
+      "sha256": "03656a0e9f3b13d4430014de3787053c204acdd1e7f2e33c292ee8ee2b47c8cc",
+      "rolling_hash": "d905b042",
+      "status": "PASS"
+    },
+    "trace_b": {
+      "frames": "26/128",
+      "sha256": "a09230346fe487f787533300ade45ecc731680a60cccffd8cefcd582f9a1f3d5",
+      "rolling_hash": "69e05234",
+      "status": "FAIL",
+      "frame": 26,
+      "last_stage": "trace_canonical"
+    },
+    "first_error": "canonical frame: Cannot access member 'x' on non-struct value",
+    "snapshot_followup": "writeAllText: invalid args due to nested snapshot serialization/write expression"
+  },
+  "r3_delivery_hotfix": {
+    "revision": "BP-060-064R3",
+    "parent": "BP-060-064R2",
+    "root_cause_classification": "strongly supported native GC-rooting edge in nested heap-backed struct construction; exact offending entity not captured by R2 diagnostics",
+    "corrections": [
+      "root QuakeEdict arrays, Vec3 fields and baseline before outer struct allocation",
+      "root ClientEntityState vectors before outer struct allocation",
+      "hash and serialize Vec3 values through typed allocation-safe helpers",
+      "compute canonical digests before long trace-string allocation",
+      "separate snapshot serialization and snapshot write errors",
+      "force-GC diagnostics regression with 192 edicts and precise malformed-vector classification"
+    ],
+    "production_source_changed": true,
+    "native_source_changed": false,
+    "engine_contracts_changed": false,
+    "network_platform_fingerprint": "0xb3ec7589",
+    "windows_acceptance": "pending"
+  }
+}

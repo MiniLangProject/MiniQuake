@@ -69,11 +69,15 @@ function configureAliasModel(model)
   return model
 end function
 
+function shadeDotRow(yaw)
+  return (compatAliasNative.trunc(yaw * (16.0 / 360.0))) & 15
+end function
+
 function configureAliasLighting(lightValue, ambientValue, yaw, spot)
   global shadelight, ambientlight, shadevector, shadedots, lightspot
   shadelight = lightValue
   ambientlight = ambientValue
-  row = (compatAliasNative.trunc(yaw * (16.0 / 360.0))) & 15
+  row = shadeDotRow(yaw)
   shadedots = compatAliasNormals.shadeDots[row]
   angle = yaw * compatAliasMath.DEG_TO_RAD
   shadevector = compatAliasMath.normalize(
@@ -354,7 +358,15 @@ function GL_DrawAliasFrame(header, posenum)
   return drawAliasMesh(model, frame, mesh)
 end function
 
-function GL_DrawAliasShadow(header, posenum)
+function aliasShadowProjection(entityOriginZ, lightSpotZ)
+  lheight = entityOriginZ - lightSpotZ
+  return [lheight, -lheight + 1.0]
+end function
+
+// gl_rmain.c computes the projected height from currententity->origin[2].
+// The vertex coordinates below are still model-local because the entity
+// transform is already active on the GL matrix stack.
+function GL_DrawAliasShadowAtOrigin(header, posenum, entityOriginZ)
   model = header
   if model is void then model = paliashdr end if
   if model is void then return 0 end if
@@ -362,8 +374,9 @@ function GL_DrawAliasShadow(header, posenum)
   if posenum is int then frame = frameForNumber(model, posenum, 0.0) end if
   if frame is void then return 0 end if
   mesh = GL_MakeAliasModelDisplayLists(model, model)
-  heightDifference = 0.0 - lightspot.z
-  height = -heightDifference + 1.0
+  projection = aliasShadowProjection(entityOriginZ, lightspot.z)
+  heightDifference = projection[0]
+  height = projection[1]
   drawn = 0
   for each command in mesh.commands
     if command.count == 0 then break end if
@@ -392,6 +405,11 @@ function GL_DrawAliasShadow(header, posenum)
     drawn = drawn + count - 2
   end for
   return drawn
+end function
+
+// Compatibility entry point retained for the direct differential wrapper.
+function GL_DrawAliasShadow(header, posenum)
+  return GL_DrawAliasShadowAtOrigin(header, posenum, 0.0)
 end function
 
 function R_SetupAliasFrame(frame, header)

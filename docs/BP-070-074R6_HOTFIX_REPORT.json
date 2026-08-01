@@ -1,0 +1,25 @@
+{
+  "schema": "MiniQuakeDeliveryHotfix/1",
+  "delivery_revision": "BP-070-074R6",
+  "delivery_parent": "BP-070-074R5",
+  "package_id": "BP-074",
+  "block_id": "BP-070-074",
+  "classification": "test fixture correction",
+  "predecessor_result_archive": "MiniQuake_BP-070-074R5_RESULTS_20260730-121742.zip",
+  "predecessor_result_sha256": "7cf42d4a9a8aed1ff532d944920c8d30bed9906a8f431366e26a3b08b20d655f",
+  "parent_package_sha256": "50159760a2545277c4d6609bbef2d4e7fc4a426e7e5efb3379f9f267635e0d37",
+  "observed_failure": "BP-073 BSP submodel fixture expected raw mins -3 although the loaded model correctly returned -4",
+  "root_cause": "fixture omitted the original Mod_LoadSubmodels one-unit expansion on both sides of every axis",
+  "fixes": [
+    "bind all six expanded submodel bounds",
+    "correct registry brush-bounds expectation",
+    "extend golden data, C oracle and checker"
+  ],
+  "production_source_changed": false,
+  "native_source_changed": false,
+  "engine_contracts_changed": false,
+  "fixture_count_changed": false,
+  "runtime_retest_required": true,
+  "contract_status": "core_assets_memory_109_frozen_v1",
+  "contract_fingerprint": "0x6c8d974d"
+}

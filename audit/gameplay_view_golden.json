@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "package": "BP-076",
+  "fixtures": 22,
+  "gamma_entries": 256,
+  "cshift_count": 4,
+  "bob_max": 4,
+  "bob_min": -7,
+  "view_nudge": 0.03125,
+  "damage_minimum": 30,
+  "lava_percent": 150,
+  "bonus_percent": 50
+}

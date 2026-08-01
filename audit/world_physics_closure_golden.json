@@ -1,0 +1,27 @@
+{
+  "schema": "MiniQuakeWorldPhysicsClosureGolden/1",
+  "package_id": "BP-029",
+  "parent_package_id": "BP-028",
+  "status": "world_physics_109_frozen_v1",
+  "fingerprint": 573953916,
+  "canonical": "world_physics_109_frozen_v1|hull_nodes=6|link_expand=1|item_expand=15|move_step=18|clip_planes=5|fly_bumps=4|stop_epsilon=0.1|client_maxspeed=320|air_cap=30|idealpitch_forward=6|production_dispatch=shared_nonclient|force_retouch=ordered|protocol=protocol15_frozen_v1|quakec=quakec_109_frozen_v1",
+  "components": [
+    "BP-025",
+    "BP-026",
+    "BP-027",
+    "BP-028",
+    "BP-029"
+  ],
+  "authoritative_files": {
+    "src/miniquake/world_hull.ml": "80a87aaf4f7bf9d36bbcb528d791093159a44fcc938cb4ca852afa332821f648",
+    "src/miniquake/world.ml": "000965e284bd971d7381f1b4cb9fe13c6cf66293f1429457c7520d5a5173f5cf",
+    "src/miniquake/world_bsp.ml": "bffb60d376443b112a94cbb45afbfc7351d078568e5cdb9fb1996f4132df2beb",
+    "src/miniquake/server_collision.ml": "624794c46db3c3cb832fbd649c51ce9a46851594d49302609e03d97c48addf39",
+    "src/miniquake/server_move.ml": "5701fac8abc3780c747fb811623482179bd62f2c0790d877f82f520252ef4b41",
+    "src/miniquake/physics.ml": "df633c83251f21745c0c32a8e95c06ee72480d57cbc9c186c52ee78214ce74da",
+    "src/miniquake/sv_user.ml": "fbba91b0a5b4e461355ef3054337b6ff4e40bb843a1ced4e12a722ec0d23fd27",
+    "src/miniquake/server.ml": "f46b6ec20c32301752ea89d535affc04638e7613c6c2805c4e6c90fad3410655",
+    "src/miniquake/world_physics_contract.ml": "41e631d42b28ffaca44a799ac95e56c17a3ebbb1497a6dc7f8552e0de5ea5165"
+  },
+  "runtime_fixtures": 20
+}

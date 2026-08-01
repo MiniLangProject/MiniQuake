@@ -32,7 +32,7 @@ function svmTestNear(actual, expected, name)
 end function
 
 function svmBaseline(modelIndex, frame, colormap, skin, origin, angles)
-  return t.EntityBaseline(modelIndex, frame, colormap, skin, origin, angles)
+  return t.EntityBaseline(modelIndex, frame, colormap, skin, 0, origin, angles)
 end function
 
 function testEntityUpdatePacking()

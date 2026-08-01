@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "project": "MiniQuake",
+  "block_id": "BP-030-034",
+  "parent_package_id": "BP-029R3",
+  "final_package_id": "BP-034",
+  "delivery_revision": "BP-030-034R1",
+  "delivery_parent": "BP-030-034",
+  "protocol_status": "protocol15_frozen_v1",
+  "quakec_status": "quakec_109_frozen_v1",
+  "world_physics_status": "world_physics_109_frozen_v1",
+  "host_lifecycle_status": "host_lifecycle_109_frozen_v1",
+  "host_lifecycle_fingerprint": "0x8cbb709f",
+  "steps": [
+    {
+      "package_id": "BP-030",
+      "title": "host timing and frame clock parity",
+      "patch": "patches/BP-030.diff",
+      "runtime_fixtures": 18,
+      "status": "Windows accepted"
+    },
+    {
+      "package_id": "BP-031",
+      "title": "command buffer, alias and cvar lifecycle parity",
+      "patch": "patches/BP-031.diff",
+      "runtime_fixtures": 20,
+      "status": "Windows accepted"
+    },
+    {
+      "package_id": "BP-032",
+      "title": "demo recording, playback and timedemo parity",
+      "patch": "patches/BP-032.diff",
+      "runtime_fixtures": 20,
+      "status": "Windows accepted"
+    },
+    {
+      "package_id": "BP-033",
+      "title": "Quake savegame version 5 byte and parser parity",
+      "patch": "patches/BP-033.diff",
+      "runtime_fixtures": 24,
+      "status": "Windows accepted"
+    },
+    {
+      "package_id": "BP-034",
+      "title": "host transitions, shutdown and lifecycle closure",
+      "patch": "patches/BP-034.diff",
+      "runtime_fixtures": 24,
+      "status": "Windows accepted"
+    }
+  ],
+  "block_runtime_fixtures": 106,
+  "acceptance": {
+    "build_once": true,
+    "continue_independent_tests": true,
+    "deterministic_trace_processes": 2,
+    "default_headless_frames": 300,
+    "default_trace_frames": 128,
+    "udp_loopback": true,
+    "installed_game_validation": true
+  },
+  "accepted_parent": {
+    "delivery_revision": "BP-025-029R3",
+    "status": "PASS",
+    "result_archive": "MiniQuake_BP-025-029R3_RESULTS_20260726-115205.zip",
+    "result_archive_sha256": "518b080fe6dbb69d10c5395a7d96ad0c9cbab585b0054a6e810ca762da88c556",
+    "headless_frames": 300,
+    "trace_frames": 128,
+    "trace_sha256": "24830a3e183784de44a9c7261a42cc8e5aebf8fd1c8fdbafc32ea447ee0eba9f",
+    "trace_rolling_hash": "4d8fc98d",
+    "udp_loopback": "PASS"
+  },
+  "status": "PASS; Windows accepted",
+  "initial_delivery_result": {
+    "delivery_revision": "BP-030-034",
+    "status": "FAIL; one independent fixture group failed",
+    "result_archive": "MiniQuake_BP-030-034_RESULTS_20260726-134405.zip",
+    "result_archive_sha256": "1bf865b23206b74dc6ad0f3785bf7171cd9ffac3193bd86d3af6b674f4e1d4c9",
+    "build": "PASS; all targets compiled",
+    "historical_protocol_quakec_world_physics": "PASS",
+    "new_groups": "BP-031 through BP-034 PASS; BP-030 17/18",
+    "installed_game_validation": "PASS",
+    "headless_runtime": "300 frames PASS",
+    "trace_frames": 128,
+    "trace_sha256": "31647a08ecb3204cd58b71b4fc6f441f5ed814d6c27aa6813ac3e566bf1c4769",
+    "trace_rolling_hash": "0658dd48",
+    "trace_byte_identity": "PASS",
+    "udp_loopback": "PASS",
+    "first_failure": "BP-030 filtered accumulation fixture expected the second 0.007 delta to be filtered"
+  },
+  "delivery_hotfix": {
+    "revision": "BP-030-034R1",
+    "parent": "BP-030-034",
+    "corrections": [
+      "mirror the Host_FilterTime C-oracle accumulation sequence 0.001, 0.007, 0.007",
+      "bind two filtered calls followed by one accepted 0.015 frame",
+      "add a pre-build stale-threshold fixture contract"
+    ],
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "runtime_fixture_counts_changed": false,
+    "host_lifecycle_fingerprint": "0x8cbb709f",
+    "status": "Windows accepted",
+    "patch": "patches/BP-034R1.diff"
+  },
+  "accepted_delivery_result": {
+    "delivery_revision": "BP-030-034R1",
+    "status": "PASS",
+    "result_archive": "MiniQuake_BP-030-034R1_RESULTS_20260726-142334.zip",
+    "result_archive_sha256": "04e4653b8d1533d345ae24bfed8fdbbc8468e9800a91d25ef6c5b4a0a189b362",
+    "headless_frames": 300,
+    "trace_frames": 128,
+    "trace_sha256": "31647a08ecb3204cd58b71b4fc6f441f5ed814d6c27aa6813ac3e566bf1c4769",
+    "trace_rolling_hash": "0658dd48",
+    "trace_byte_identity": "PASS",
+    "udp_loopback": "PASS"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "revision": "BP-060-064R6",
+  "parent": "BP-060-064R5",
+  "predecessor_result": {
+    "archive": "MiniQuake_BP-060-064R5_RESULTS_20260729-103523.zip",
+    "sha256": "24dc4cdf88b654944f78b2aefaab7437609e1614b3c2eccb54f16b93218c1fcb",
+    "status": "FAIL only in PowerShell server ExitCode capture after server and client both reported PASS",
+    "compiled_targets": "65/65 PASS",
+    "all_runtime_groups": "PASS",
+    "installed_game_validation": "PASS",
+    "headless_runtime": "300 frames PASS",
+    "trace_sha256": "03656a0e9f3b13d4430014de3787053c204acdd1e7f2e33c292ee8ee2b47c8cc",
+    "render_tga_sha256": "9047f96e9bef8e06035119ff71ddfe7ad4dcad89b4740c66618252a13cd166fb",
+    "network_server_log_sha256": "ce65b367cf2296d913e3691916d5c27926c040c7456e6bd39dd0ac8a53af3874",
+    "network_client_log_sha256": "50534266c750fa20058c82ce48baca953b0107106dc24fd69c5854fc3364ba96",
+    "first_failure": "network evidence pair a failed: server= client=0"
+  },
+  "root_cause": "Windows PowerShell 5.1 exposed a blank Start-Process.ExitCode after the redirected server had already completed",
+  "corrections": [
+    "use System.Diagnostics.ProcessStartInfo and Process directly for the background evidence server",
+    "drain stdout/stderr with ReadToEndAsync while the server runs",
+    "perform timed WaitForExit, parameterless WaitForExit and Refresh before ExitCode",
+    "write per-pair JSON with both exit codes and PASS markers",
+    "classify process lifecycle failures as INFRA_FAILURE"
+  ],
+  "production_source_changed": false,
+  "native_source_changed": false,
+  "test_tool_changed": true,
+  "engine_contracts_changed": false,
+  "runtime_fixture_count_changed": false,
+  "network_platform_status": "network_platform_109_frozen_v1",
+  "network_platform_fingerprint": "0xb3ec7589",
+  "windows_acceptance": "pending"
+}

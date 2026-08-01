@@ -4,11 +4,12 @@ import miniquake.types as t
 import miniquake.constants as c
 import miniquake.native as native
 import miniquake.quakec.opcodes as op
-import miniquake.byteio as bio
 import miniquake.array_util as arrayutil
+import miniquake.protocol_text as protocolText
 
 const MAX_STACK_DEPTH = 32
 const LOCALSTACK_SIZE = 2048
+const TEMP_STRING_HANDLE = 0xffffffff
 
 function zeroArray(count)
   return arrayutil.makeFilledArray(count, 0)
@@ -28,7 +29,7 @@ function create(program, maxEdicts)
   end while
   edictFree = arrayutil.makeFilledArray(maxEdicts, true)
   if maxEdicts > 0 then edictFree[0] = false end if
-  return t.QuakeCMachine(program, globals, [], 0, 0, 0, 0, edicts, [], 100000, void, edictFree, [], 1, false)
+  return t.QuakeCMachine(program, globals, [], 0, 0, 0, 0, edicts, [], 100000, void, edictFree, [], "", 1, false)
 end function
 
 function ensureGlobal(machine, offset)
@@ -65,13 +66,23 @@ function returnFloat(machine)
 end function
 
 function stringValue(machine, rawValue)
+  if rawValue == TEMP_STRING_HANDLE then return machine.temporaryString end if
   if rawValue >= 0x80000000 then
     dynamicIndex = rawValue - 0x80000000
     if dynamicIndex >= 0 and dynamicIndex < len(machine.dynamicStrings) then return machine.dynamicStrings[dynamicIndex] end if
     return ""
   end if
   if rawValue < 0 or rawValue >= len(machine.program.strings) then return "" end if
-  return bio.cString(machine.program.strings, rawValue)
+  endOffset = rawValue
+  while endOffset < len(machine.program.strings) and machine.program.strings[endOffset] != 0
+    endOffset = endOffset + 1
+  end while
+  return protocolText.decodeBytes(slice(machine.program.strings, rawValue, endOffset - rawValue))
+end function
+
+function canonicalString(text)
+  encoded = protocolText.encodeBytes(text)
+  return protocolText.decodeBytes(encoded)
 end function
 
 function stringAt(machine, globalOffset)
@@ -79,6 +90,7 @@ function stringAt(machine, globalOffset)
 end function
 
 function internString(machine, text)
+  text = canonicalString(text)
   index = 0
   while index < len(machine.dynamicStrings)
     if machine.dynamicStrings[index] == text then return 0x80000000 + index end if
@@ -86,6 +98,11 @@ function internString(machine, text)
   end while
   machine.dynamicStrings = machine.dynamicStrings + [text]
   return 0x80000000 + len(machine.dynamicStrings) - 1
+end function
+
+function setTemporaryString(machine, text)
+  machine.temporaryString = canonicalString(text)
+  return TEMP_STRING_HANDLE
 end function
 
 function setGlobalString(machine, offset, text)
@@ -123,6 +140,19 @@ end function
 function pointerField(machine, pointer)
   if machine.program.entityFields <= 0 then return 0 end if
   return pointer % machine.program.entityFields
+end function
+
+function validatePointer(machine, pointer, wordCount)
+  if machine.program.entityFields <= 0 then return error(2218, "QuakeC pointer uses an empty edict layout") end if
+  totalWords = len(machine.edicts) * machine.program.entityFields
+  if pointer < 0 or wordCount <= 0 or pointer >= totalWords or pointer + wordCount > totalWords then
+    return error(2219, "QuakeC pointer outside edict storage")
+  end if
+  fieldOffset = pointerField(machine, pointer)
+  if fieldOffset + wordCount > machine.program.entityFields then
+    return error(2220, "QuakeC pointer crosses an edict boundary")
+  end if
+  return true
 end function
 
 function saveLocals(machine, functionValue)
@@ -389,8 +419,8 @@ function floatTruth(value)
 end function
 
 function stringCompare(left, right)
-  leftBytes = bytes(left)
-  rightBytes = bytes(right)
+  leftBytes = protocolText.encodeBytes(left)
+  rightBytes = protocolText.encodeBytes(right)
   count = len(leftBytes)
   if len(rightBytes) < count then count = len(rightBytes) end if
   index = 0
@@ -435,12 +465,23 @@ function executeState(machine, frameOffset, thinkOffset)
   thinkField = namedFieldOffset(machine, "think")
   if nextThinkField < 0 or frameField < 0 or thinkField < 0 then return error(2211, "OP_STATE: required generated field is missing") end if
   setEntityField(machine, selfIndex, nextThinkField, native.floatBits(namedGlobalFloat(machine, "time") + 0.1))
-  setEntityField(machine, selfIndex, frameField, word(machine, frameOffset))
+
+  // pr_exec.c compares the float values before assigning ed->v.frame.  This is
+  // observable for +0/-0: they compare equal, so the existing sign bit stays.
+  // NaNs compare unequal and therefore still replace the previous frame word.
+  currentFrameWord = entityField(machine, selfIndex, frameField)
+  if globalFloat(machine, frameOffset) != native.bitsFloat(currentFrameWord) then
+    setEntityField(machine, selfIndex, frameField, word(machine, frameOffset))
+  end if
   setEntityField(machine, selfIndex, thinkField, word(machine, thinkOffset))
   return true
 end function
 
 function execute(machine, functionIndex)
+  // PR_ExecuteProgram resets the global pr_trace flag at the start of every
+  // invocation, including recursive entries made by movement builtins.
+  machine.trace = false
+
   // PR_ExecuteProgram may be entered recursively from builtins such as
   // walkmove/movetogoal when relinking an edict touches a trigger.  The stock
   // VM records the current depth and returns when the nested function has
@@ -534,14 +575,22 @@ function execute(machine, functionIndex)
     else if code >= op.OP_LOAD_F and code <= op.OP_LOAD_FNC then
       entityIndex = word(machine, statement.a)
       fieldOffset = word(machine, statement.b)
-      setWord(machine, statement.c, entityField(machine, entityIndex, fieldOffset))
+      loaded = try(entityField(machine, entityIndex, fieldOffset))
+      if loaded is error then return runError(machine, loaded.message) end if
+      setWord(machine, statement.c, loaded)
       if code == op.OP_LOAD_V then
-        setWord(machine, statement.c + 1, entityField(machine, entityIndex, fieldOffset + 1))
-        setWord(machine, statement.c + 2, entityField(machine, entityIndex, fieldOffset + 2))
+        loadedY = try(entityField(machine, entityIndex, fieldOffset + 1))
+        if loadedY is error then return runError(machine, loadedY.message) end if
+        loadedZ = try(entityField(machine, entityIndex, fieldOffset + 2))
+        if loadedZ is error then return runError(machine, loadedZ.message) end if
+        setWord(machine, statement.c + 1, loadedY)
+        setWord(machine, statement.c + 2, loadedZ)
       end if
     else if code == op.OP_ADDRESS then
       entityIndex = word(machine, statement.a)
       fieldOffset = word(machine, statement.b)
+      if entityIndex < 0 or entityIndex >= len(machine.edicts) then return runError(machine, "QuakeC entity outside edict table") end if
+      if fieldOffset < 0 or fieldOffset >= machine.program.entityFields then return runError(machine, "QuakeC field outside edict") end if
       if entityIndex == 0 and machine.context is not void and machine.context.server is not void and machine.context.server.active and not machine.context.server.loading then
         return runError(machine, "assignment to world entity")
       end if
@@ -554,6 +603,10 @@ function execute(machine, functionIndex)
       end if
     else if code >= op.OP_STOREP_F and code <= op.OP_STOREP_FNC then
       pointer = word(machine, statement.b)
+      pointerWords = 1
+      if code == op.OP_STOREP_V then pointerWords = 3 end if
+      pointerCheck = try(validatePointer(machine, pointer, pointerWords))
+      if pointerCheck is error then return runError(machine, pointerCheck.message) end if
       entityIndex = pointerEntity(machine, pointer)
       fieldOffset = pointerField(machine, pointer)
       setEntityField(machine, entityIndex, fieldOffset, word(machine, statement.a))

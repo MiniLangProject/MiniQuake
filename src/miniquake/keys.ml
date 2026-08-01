@@ -59,6 +59,7 @@ keyDownStates = []
 chatBuffer = ""
 teamMessage = false
 registeredCommandNames = []
+pendingReleaseCommands = ""
 
 function zeroValues(count)
   result = []
@@ -198,7 +199,7 @@ function Key_Init()
   global keyDest, keyCount, keyLastPress, shiftDown
   global consoleKeys, menuBound, keyRepeats, keyDownStates
   global chatBuffer, teamMessage
-  global registeredCommandNames
+  global registeredCommandNames, pendingReleaseCommands
   keyLines = []
   index = 0
   while index < 32
@@ -215,6 +216,7 @@ function Key_Init()
   chatBuffer = ""
   teamMessage = false
   registeredCommandNames = ["bind", "unbind", "unbindall"]
+  pendingReleaseCommands = ""
   console.setBackscroll(0)
   consoleKeys = zeroValues(256)
   menuBound = zeroValues(256)
@@ -433,6 +435,41 @@ function Key_ClearStates()
     index = index + 1
   end while
   return true
+end function
+
+// gl_vidnt.c::ClearAllStates sends an up event for every Quake key before
+// clearing the physical key table.  The releases are deliberately generated
+// for every + binding, not only keys that still appear down: this is how the
+// original clears server-side button state after Alt-Tab and mode changes.
+function Key_ReleaseAllCommands()
+  global shiftDown
+  if len(keyDownStates) != 256 then Key_Init() end if
+  queued = ""
+  key = 0
+  while key < 256
+    queued = queued + plusRelease(input.bindingForCode(key), key)
+    shifted = keyShift[key]
+    if shifted != key then
+      queued = queued + plusRelease(input.bindingForCode(shifted), key)
+    end if
+    key = key + 1
+  end while
+  shiftDown = false
+  Key_ClearStates()
+  return queued
+end function
+
+function Key_QueueReleaseAllCommands()
+  global pendingReleaseCommands
+  pendingReleaseCommands = pendingReleaseCommands + Key_ReleaseAllCommands()
+  return len(bytes(pendingReleaseCommands))
+end function
+
+function Key_TakePendingCommands()
+  global pendingReleaseCommands
+  queued = pendingReleaseCommands
+  pendingReleaseCommands = ""
+  return queued
 end function
 
 function hardwareKeyCodes()

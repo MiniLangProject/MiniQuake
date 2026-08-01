@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "delivery_revision": "BP-085-089R5",
+  "delivery_parent": "BP-085-089R4",
+  "package_id": "BP-089",
+  "block_id": "BP-085-089",
+  "result_archive": "MiniQuake_BP-085-089R4_RESULTS_20260801-030559.zip",
+  "result_archive_sha256": "407953ec4856166f9717620b9cbc8feaab00fab01b5f83f8544798c253c368fb",
+  "failure_stage": "BP-087 retail savegame evidence A",
+  "failure_message": "first save load lost signed zero; first semantic difference was v_forward_x",
+  "classification": "production savegame parse parity defect",
+  "evidence": {
+    "source_bytes": 35047,
+    "normalized_bytes": 35037,
+    "first_difference_offset": 1299,
+    "left_byte": 45,
+    "right_byte": 48,
+    "first_semantic_difference": "globals pair 31 value for v_forward_x",
+    "stable_second_roundtrip": true
+  },
+  "root_cause": "MiniLang toNumber normalized -0.000000 before the Binary32 boundary, while WinQuake parses save/edict floats through C atof and preserves IEEE-754 signed zero.",
+  "fix": {
+    "adapter": "common.cAtof",
+    "native_boundary": "mq_f32_from_text / strtod / C float",
+    "affected_parsers": [
+      "QuakeC global float",
+      "QuakeC entity float",
+      "Quake vector components",
+      "Quake-v5 scalar lines"
+    ],
+    "evidence_marker": "save_float_parse=-0.000000:80000000",
+    "artifact_evidence_revision": "sequential_exact_fixed6_signedzero_v3",
+    "contract_fingerprint_changed": false,
+    "native_binary_changed": false
+  }
+}

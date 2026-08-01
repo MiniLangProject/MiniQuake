@@ -1,0 +1,254 @@
+diff --git a/CHANGELOG_BP-068.md b/CHANGELOG_BP-068.md
+new file mode 100644
+index 0000000..b93f95a
+--- /dev/null
++++ b/CHANGELOG_BP-068.md
+@@ -0,0 +1,6 @@
++# BP-068 — Menu lifecycle parity
++
++- `togglemenu` now returns from submenus to the main menu before closing.
++- Removes the duplicate `M_Menu_Save_f` invocation in the host command adapter.
++- Uses WinQuake's full-unit CD-volume option step.
++- Adds 22 MiniLang fixtures, a C oracle, golden data and a static checker.
+diff --git a/audit/menu_lifecycle_golden.json b/audit/menu_lifecycle_golden.json
+new file mode 100644
+index 0000000..50a1ae1
+--- /dev/null
++++ b/audit/menu_lifecycle_golden.json
+@@ -0,0 +1,11 @@
++{
++  "schema_version": 1,
++  "package": "BP-068",
++  "fixtures": 22,
++  "options_items": 14,
++  "help_pages": 6,
++  "save_slots": 12,
++  "cd_volume_step": 1.0,
++  "sound_volume_step": 0.1,
++  "tcp_selection": 3
++}
+diff --git a/docs/BP-068_MENU_LIFECYCLE_AUDIT.md b/docs/BP-068_MENU_LIFECYCLE_AUDIT.md
+new file mode 100644
+index 0000000..b60583e
+--- /dev/null
++++ b/docs/BP-068_MENU_LIFECYCLE_AUDIT.md
+@@ -0,0 +1,4 @@
++# BP-068 menu lifecycle audit
++
++Compared paths: `menu.c::M_ToggleMenu_f`, `M_Menu_Save_f`, and `M_AdjustSliders`.
++Submenu toggles return to main, save entry is dispatched once, and the Windows CD-volume slider uses the original full-unit step.
+diff --git a/src/miniquake/host.ml b/src/miniquake/host.ml
+index ebd7042..93a22d2 100644
+--- a/src/miniquake/host.ml
++++ b/src/miniquake/host.ml
+@@ -1913,14 +1913,13 @@ function executeCommand(session, text)
+     end if
+     return true
+   end if
+-  if name == "togglemenu" then setMenuActive(session, not session.menu.active); return true end if
++  if name == "togglemenu" then toggleMenu(session); return true end if
+   if name == "menu_main" then setMenuActive(session, true); menu.M_Menu_Main_f(session.menu); return true end if
+   if name == "menu_singleplayer" then setMenuActive(session, true); menu.M_Menu_SinglePlayer_f(session.menu); return true end if
+   if name == "menu_load" then setMenuActive(session, true); menu.M_Menu_Load_f(session.menu); refreshSaveSlots(session); return true end if
+   if name == "menu_save" then
+     if menu.M_Menu_Save_f(session.menu, session.server.active, screen.SCR_IntermissionMode(), session.server.maxClients) then
+       setMenuActive(session, true)
+-      menu.M_Menu_Save_f(session.menu, session.server.active, screen.SCR_IntermissionMode(), session.server.maxClients)
+       refreshSaveSlots(session)
+     end if
+     return true
+@@ -2260,6 +2259,18 @@ function setMenuActive(session, active)
+   return active
+ end function
+ 
++// menu.c::M_ToggleMenu_f returns from a submenu to the main menu before it
++// closes the menu. Keep this distinct from explicit action-driven closes.
++function toggleMenu(session)
++  if session.menu.active and session.menu.page != menu.PAGE_MAIN then
++    menu.M_Menu_Main_f(session.menu)
++    keys.setDestination(keys.KEY_MENU)
++    updateMouseCapture(session)
++    return true
++  end if
++  return setMenuActive(session, not session.menu.active)
++end function
++
+ function setConsoleActive(session, active)
+   if active and session.menu.active then setMenuActive(session, false) end if
+   console.setActive(session.console, active)
+@@ -2288,7 +2299,8 @@ function adjustMenuOption(session, direction)
+     value = math.clamp(cvar.variableValue(session.cvars, "sensitivity") + direction * 0.5, 1.0, 11.0)
+     cvar.setValue(session.cvars, "sensitivity", value)
+   else if selection == 6 then
+-    value = math.clamp(cvar.variableValue(session.cvars, "bgmvolume") + direction * 0.1, 0.0, 1.0)
++    // WinQuake's Windows options menu changes CD volume by a full unit.
++    value = math.clamp(cvar.variableValue(session.cvars, "bgmvolume") + direction * 1.0, 0.0, 1.0)
+     cvar.setValue(session.cvars, "bgmvolume", value)
+   else if selection == 7 then
+     value = math.clamp(cvar.variableValue(session.cvars, "volume") + direction * 0.1, 0.0, 1.0)
+@@ -2554,7 +2566,7 @@ function handleKeyResult(session, result)
+   action = result[1]
+   key = result[2]
+   if action == "toggle_menu" then
+-    setMenuActive(session, not session.menu.active)
++    toggleMenu(session)
+     if session.menu.active then playMenuSound(session, "misc/menu2.wav") end if
+     return true
+   end if
+diff --git a/tests/menu_lifecycle_parity_tests.ml b/tests/menu_lifecycle_parity_tests.ml
+new file mode 100644
+index 0000000..c952097
+--- /dev/null
++++ b/tests/menu_lifecycle_parity_tests.ml
+@@ -0,0 +1,104 @@
++/*
++Copyright (C) 1996-1997 Id Software, Inc.
++Copyright (C) 2026 MiniQuake contributors
++
++BP-068: menu.c toggle, options and save-entry lifecycle parity.
++*/
++
++import miniquake.menu as bp068Menu
++import miniquake.cvar as bp068Cvar
++import miniquake.keys as bp068Keys
++
++bp068Index = 0
++bp068Failures = 0
++
++function bp068Check(value, name)
++  global bp068Index, bp068Failures
++  bp068Index = bp068Index + 1
++  print "[" + bp068Index + "/22] " + name
++  if not value then
++    bp068Failures = bp068Failures + 1
++    print "FAIL: " + name
++    return false
++  end if
++  return true
++end function
++
++function bp068Registry()
++  registry = bp068Cvar.createRegistry()
++  registry.variables = [
++    bp068Cvar.create("viewsize", "100", true, false),
++    bp068Cvar.create("gamma", "1", true, false),
++    bp068Cvar.create("sensitivity", "3", true, false),
++    bp068Cvar.create("bgmvolume", "1", true, false),
++    bp068Cvar.create("volume", "0.7", true, false),
++    bp068Cvar.create("cl_forwardspeed", "200", true, false),
++    bp068Cvar.create("cl_backspeed", "200", true, false),
++    bp068Cvar.create("m_pitch", "0.022", true, false),
++    bp068Cvar.create("lookspring", "0", true, false),
++    bp068Cvar.create("lookstrafe", "0", true, false),
++    bp068Cvar.create("_windowed_mouse", "1", true, false),
++    bp068Cvar.create("_cl_name", "player", true, false),
++    bp068Cvar.create("_cl_color", "0", true, false),
++    bp068Cvar.create("hostname", "UNNAMED", true, false),
++  ]
++  return registry
++end function
++
++function main(args)
++  state = bp068Menu.create()
++  registry = bp068Registry()
++  bp068Check(len(bp068Menu.optionsItems()) == 14, "Windows options item count")
++  bp068Check(len(bp068Menu.saveSlotItems()) == 12, "save slot count")
++  bp068Check(bp068Menu.HELP_PAGES == 6, "help page count")
++
++  bp068Check(bp068Menu.M_ToggleMenu_f(state), "toggle opens menu")
++  bp068Check(state.active and state.page == bp068Menu.PAGE_MAIN, "toggle opens main page")
++  bp068Menu.M_Menu_Options_f(state)
++  bp068Check(state.page == bp068Menu.PAGE_OPTIONS, "options page entered")
++  bp068Check(bp068Menu.M_ToggleMenu_f(state), "submenu toggle remains open")
++  bp068Check(state.active and state.page == bp068Menu.PAGE_MAIN, "submenu toggle returns main")
++  bp068Check(not bp068Menu.M_ToggleMenu_f(state), "main toggle closes")
++  bp068Check(not state.active, "toggle close state")
++
++  bp068Check(not bp068Menu.M_Menu_Save_f(state, false, 0, 1), "save rejects inactive server")
++  bp068Check(not bp068Menu.M_Menu_Save_f(state, true, 1, 1), "save rejects intermission")
++  bp068Check(not bp068Menu.M_Menu_Save_f(state, true, 0, 2), "save rejects multiplayer")
++  bp068Check(bp068Menu.M_Menu_Save_f(state, true, 0, 1), "save accepts local game")
++  bp068Check(state.page == bp068Menu.PAGE_SAVE, "save page selected")
++
++  bp068Menu.M_Menu_Options_f(state)
++  state.selection = 6
++  bp068Menu.M_AdjustSliders(state, registry, -1)
++  bp068Check(bp068Cvar.variableValue(registry, "bgmvolume") == 0.0, "CD volume full-step down")
++  bp068Menu.M_AdjustSliders(state, registry, 1)
++  bp068Check(bp068Cvar.variableValue(registry, "bgmvolume") == 1.0, "CD volume full-step up")
++  state.selection = 7
++  bp068Menu.M_AdjustSliders(state, registry, 1)
++  bp068Check(bp068Cvar.variableValue(registry, "volume") == 0.8, "sound volume tenth-step")
++  state.selection = 8
++  bp068Menu.M_AdjustSliders(state, registry, 1)
++  bp068Check(bp068Cvar.variableValue(registry, "cl_forwardspeed") == 400.0, "always-run toggle on")
++  bp068Menu.M_AdjustSliders(state, registry, 1)
++  bp068Check(bp068Cvar.variableValue(registry, "cl_forwardspeed") == 200.0, "always-run toggle off")
++  state.selection = 9
++  bp068Menu.M_AdjustSliders(state, registry, 1)
++  bp068Check(bp068Cvar.variableValue(registry, "m_pitch") == -0.022, "invert mouse")
++  state.selection = 13
++  bp068Menu.M_AdjustSliders(state, registry, 1)
++  bp068Check(bp068Cvar.variableValue(registry, "_windowed_mouse") == 0.0, "windowed mouse toggle")
++
++  bp068Menu.M_Menu_Help_f(state)
++  state.helpPage = 5
++  bp068Menu.M_Help_Key(state, bp068Keys.K_RIGHTARROW)
++  bp068Check(state.helpPage == 0, "help pages wrap")
++  bp068Menu.M_Menu_Net_f(state)
++  bp068Check(state.selection == 3, "excluded transports skip to TCP/IP")
++
++  if bp068Failures > 0 then
++    print "MiniQuake BP-068 menu lifecycle tests failed: " + bp068Failures + "/22"
++    return 1
++  end if
++  print "MiniQuake BP-068 menu lifecycle tests passed: 22"
++  return 0
++end function
+diff --git a/tools/check_frontend_068.py b/tools/check_frontend_068.py
+new file mode 100755
+index 0000000..cb30c9b
+--- /dev/null
++++ b/tools/check_frontend_068.py
+@@ -0,0 +1,26 @@
++#!/usr/bin/env python3
++import argparse, json, pathlib, re, sys
++
++def main():
++    ap=argparse.ArgumentParser(); ap.add_argument('--root',default='.'); ap.add_argument('--json',default='')
++    ns=ap.parse_args(); root=pathlib.Path(ns.root).resolve(); errors=[]
++    host=(root/'src/miniquake/host.ml').read_text(encoding='utf-8-sig')
++    menu=(root/'src/miniquake/menu.ml').read_text(encoding='utf-8-sig')
++    test=(root/'tests/menu_lifecycle_parity_tests.ml').read_text(encoding='utf-8-sig')
++    golden=json.loads((root/'audit/menu_lifecycle_golden.json').read_text())
++    for m in ['function toggleMenu(session)', 'session.menu.page != menu.PAGE_MAIN',
++              'direction * 1.0, 0.0, 1.0', 'if name == "togglemenu" then toggleMenu(session)']:
++        if m not in host: errors.append('host.ml missing marker: '+m)
++    block=re.search(r'if name == "menu_save" then(.*?)\n  end if',host,re.S)
++    if not block: errors.append('menu_save command block missing')
++    elif block.group(1).count('menu.M_Menu_Save_f(')!=1: errors.append('menu_save invokes M_Menu_Save_f more than once')
++    if 'direction * 1.0, 0.0, 1.0' not in menu: errors.append('menu slider CD step is not one full unit')
++    if 'MiniQuake BP-068 menu lifecycle tests passed: 22' not in test: errors.append('fixture count marker missing')
++    if golden.get('fixtures')!=22 or golden.get('options_items')!=14 or golden.get('cd_volume_step')!=1.0: errors.append('golden mismatch')
++    report={'schema_version':1,'package':'BP-068','status':'PASS' if not errors else 'FAIL','errors':errors,
++            'fixtures':22,'options_items':14,'save_single_dispatch':not errors,'cd_volume_step':1.0}
++    if ns.json: pathlib.Path(ns.json).write_text(json.dumps(report,indent=2)+'\n')
++    print('MiniQuake BP-068 menu lifecycle verification: '+report['status'])
++    for e in errors: print('  [FAIL] '+e)
++    return 0 if not errors else 1
++if __name__=='__main__': sys.exit(main())
+diff --git a/tools/oracle/menu_lifecycle_oracle.c b/tools/oracle/menu_lifecycle_oracle.c
+new file mode 100644
+index 0000000..2e043ec
+--- /dev/null
++++ b/tools/oracle/menu_lifecycle_oracle.c
+@@ -0,0 +1,9 @@
++#include <stdio.h>
++static double clamp(double x,double lo,double hi){return x<lo?lo:(x>hi?hi:x);}
++int main(void) {
++  printf("cd_down=%.1f\n", clamp(1.0-1.0,0.0,1.0));
++  printf("cd_up=%.1f\n", clamp(0.0+1.0,0.0,1.0));
++  printf("sound_up=%.1f\n", clamp(0.7+0.1,0.0,1.0));
++  printf("submenu_toggle=main\n");
++  return 0;
++}

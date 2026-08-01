@@ -234,7 +234,10 @@ function testWaterAndToss()
   return true
 end function
 
-function testCurrentsConveyorsAndExtendedDispatch()
+function testStrictQuakeOneDispatch()
+  // The pinned WinQuake/GLQuake 1.09 build is compiled without QUAKE2.
+  // Merely exposing extended fields must not activate currents, conveyors,
+  // MOVETYPE_FOLLOW or MOVETYPE_BOUNCEMISSILE.
   game = makePhysicsFixture(5)
   machine = game.machine
   game.worldModel = makePhysicsMap(c.CONTENTS_CURRENT_DOWN)
@@ -245,42 +248,26 @@ function testCurrentsConveyorsAndExtendedDispatch()
   physAssertEqual(native.trunc(vm.entityFloat(machine, 1, 29)), 3, "current waterlevel")
   physAssertEqual(native.trunc(vm.entityFloat(machine, 1, 30)), c.CONTENTS_WATER, "current normalizes watertype")
   currentBase = vm.entityVector(machine, 1, 48)
-  physAssertNear(currentBase.x, 1.0, "current preserves base x")
-  physAssertNear(currentBase.y, 2.0, "current preserves base y")
-  physAssertNear(currentBase.z, -147.0, "down current adds 150 units")
+  physAssertNear(currentBase.x, 1.0, "strict Q1 preserves base x")
+  physAssertNear(currentBase.y, 2.0, "strict Q1 preserves base y")
+  physAssertNear(currentBase.z, 3.0, "strict Q1 ignores Q2 current")
 
   game = makePhysicsFixture(5)
   machine = game.machine
   game.worldModel = makePhysicsMap(c.CONTENTS_EMPTY)
-  setPhysicsBox(machine, 1, t.Vec3(10.0, 0.0, 0.0), t.Vec3(-1.0, -1.0, -1.0), t.Vec3(1.0, 1.0, 1.0), c.MOVETYPE_TOSS, c.SOLID_BBOX)
-  vm.setEntityFloat(machine, 1, 21, c.FL_ONGROUND)
-  vm.setEntityField(machine, 1, 22, 2)
-  vm.setEntityFloat(machine, 2, 21, c.FL_CONVEYOR)
-  vm.setEntityVector(machine, 2, 41, t.Vec3(1.0, 0.0, 0.0))
-  vm.setEntityFloat(machine, 2, 51, 100.0)
-  physics.SV_Physics_Toss(game, 1, 0.1, 800.0, 2000.0)
-  physAssertNear(vm.entityVector(machine, 1, 1).x, 20.0, "conveyor moves grounded toss entity")
-  physAssertNear(vm.entityVector(machine, 1, 4).x, 0.0, "conveyor is subtracted from toss velocity")
-  physAssertNear(vm.entityVector(machine, 1, 48).x, 100.0, "conveyor basevelocity")
-
-  // FOLLOW is movetype 12 in the conditioned source and tracks aiment+v_angle.
   setPhysicsBox(machine, 2, t.Vec3(0.0, 0.0, 0.0), t.Vec3(-1.0, -1.0, -1.0), t.Vec3(1.0, 1.0, 1.0), 12, c.SOLID_NOT)
   vm.setEntityField(machine, 2, 45, 3)
   vm.setEntityVector(machine, 2, 34, t.Vec3(1.0, 2.0, 3.0))
   vm.setEntityVector(machine, 3, 1, t.Vec3(20.0, 30.0, 40.0))
-  physics.SV_Physics(game, 0.1, 800.0, 2000.0)
-  followOrigin = vm.entityVector(machine, 2, 1)
-  physAssertNear(followOrigin.x, 21.0, "follow x")
-  physAssertNear(followOrigin.y, 32.0, "follow y")
-  physAssertNear(followOrigin.z, 43.0, "follow z")
+  followResult = try(physics.SV_Physics(game, 0.1, 800.0, 2000.0))
+  physAssertTrue(followResult is error, "MOVETYPE_FOLLOW rejected by Quake 1")
 
   game = makePhysicsFixture(4)
   machine = game.machine
   game.worldModel = makePhysicsMap(c.CONTENTS_EMPTY)
   setPhysicsBox(machine, 2, t.Vec3(10.0, 0.0, 0.0), t.Vec3(-1.0, -1.0, -1.0), t.Vec3(1.0, 1.0, 1.0), 11, c.SOLID_BBOX)
-  vm.setEntityVector(machine, 2, 4, t.Vec3(0.0, 0.0, 10.0))
-  physics.SV_Physics(game, 0.1, 800.0, 2000.0)
-  physAssertNear(vm.entityVector(machine, 2, 4).z, 10.0, "bounce missile has no gravity")
+  bounceMissileResult = try(physics.SV_Physics(game, 0.1, 800.0, 2000.0))
+  physAssertTrue(bounceMissileResult is error, "MOVETYPE_BOUNCEMISSILE rejected by Quake 1")
   return true
 end function
 
@@ -308,9 +295,9 @@ function main(args)
   print "[3/5] water transition and toss"
   result = try(testWaterAndToss())
   if result is error then print "water/toss failed"; return 1 end if
-  print "[4/5] currents, conveyors and extended dispatch"
-  result = try(testCurrentsConveyorsAndExtendedDispatch())
-  if result is error then print "current/conveyor/dispatch failed"; return 1 end if
+  print "[4/5] strict Quake 1 dispatch"
+  result = try(testStrictQuakeOneDispatch())
+  if result is error then print "strict Quake 1 dispatch failed"; return 1 end if
   print "[5/5] force retouch"
   result = try(testForceRetouch())
   if result is error then print "force retouch failed"; return 1 end if

@@ -330,7 +330,7 @@ function R_StoreEfrags(ppefrag)
     for each reference in ppefrag
       compatStoreReference(reference, builder)
     end for
-  else if typeName(ppefrag) == "EfragRef" then
+  else if compatRmainTypes.concreteTypeNameMatches(ppefrag, "EfragRef", "miniquake.render.original.EfragRef") then
     compatStoreReference(ppefrag, builder)
   end if
   cl_visedicts = compatRmainArrays.finishArrayBuilder(builder)
@@ -533,6 +533,7 @@ function R_SetupFrame()
   global r_origin, vpn, vright, vup, r_oldviewleaf, r_viewleaf
   global r_cache_thrash, c_brush_polys, c_alias_polys
   if rCompatView is void or rCompatRenderer is void then return false end if
+  renderer = rCompatRenderer
   compatRmainWorld.R_AnimateLight()
   compatRmainWorld.R_AdvanceFrameCounters()
   r_origin = compatRmainMath.copy(rCompatView.origin)
@@ -541,8 +542,8 @@ function R_SetupFrame()
   vright = vectors[1]
   vup = vectors[2]
   r_oldviewleaf = r_viewleaf
-  r_viewleaf = compatRmainBsp.leafForPoint(rCompatRenderer.map, r_origin)
-  rCompatRenderer.viewLeaf = r_viewleaf
+  r_viewleaf = compatRmainBsp.leafForPoint(renderer.map, r_origin)
+  renderer.viewLeaf = r_viewleaf
   r_cache_thrash = false
   c_brush_polys = 0
   c_alias_polys = 0
@@ -645,22 +646,23 @@ end function
 function R_Mirror()
   global mirror
   if not mirror or mirror_plane is void or rCompatView is void then return false end if
-  originalOrigin = compatRmainMath.copy(rCompatView.origin)
-  originalAngles = compatRmainMath.copy(rCompatView.angles)
-  distance = compatRmainMath.dot(rCompatView.origin, mirror_plane.normal) - mirror_plane.dist
-  rCompatView.origin = compatRmainMath.multiplyAdd(rCompatView.origin, -2.0 * distance, mirror_plane.normal)
+  view = rCompatView
+  originalOrigin = compatRmainMath.copy(view.origin)
+  originalAngles = compatRmainMath.copy(view.angles)
+  distance = compatRmainMath.dot(view.origin, mirror_plane.normal) - mirror_plane.dist
+  view.origin = compatRmainMath.multiplyAdd(view.origin, -2.0 * distance, mirror_plane.normal)
   reflectedForward = compatRmainMath.copy(vpn)
   distance = compatRmainMath.dot(reflectedForward, mirror_plane.normal)
   reflectedForward = compatRmainMath.multiplyAdd(reflectedForward, -2.0 * distance, mirror_plane.normal)
   horizontal = compatRmainNative.sqrt(reflectedForward.x * reflectedForward.x + reflectedForward.y * reflectedForward.y)
-  rCompatView.angles.x = -compatRmainNative.atan2(reflectedForward.z, horizontal) * compatRmainMath.RAD_TO_DEG
-  rCompatView.angles.y = compatRmainNative.atan2(reflectedForward.y, reflectedForward.x) * compatRmainMath.RAD_TO_DEG
-  rCompatView.angles.z = -rCompatView.angles.z
+  view.angles.x = -compatRmainNative.atan2(reflectedForward.z, horizontal) * compatRmainMath.RAD_TO_DEG
+  view.angles.y = compatRmainNative.atan2(reflectedForward.y, reflectedForward.x) * compatRmainMath.RAD_TO_DEG
+  view.angles.z = -view.angles.z
   compatRmainGl.depthRange(0.5, 1.0)
   R_RenderScene()
   compatRmainWorld.R_DrawWaterSurfaces()
-  rCompatView.origin = originalOrigin
-  rCompatView.angles = originalAngles
+  view.origin = originalOrigin
+  view.angles = originalAngles
   compatRmainGl.depthRange(0.0, 0.5)
   mirror = false
   return true
@@ -761,8 +763,9 @@ end function
 function R_Envmap_f()
   global envmap
   if rCompatRenderer is void or rCompatView is void then return error(3801, "R_Envmap_f: renderer is not initialized") end if
-  originalOrigin = compatRmainMath.copy(rCompatView.origin)
-  originalAngles = compatRmainMath.copy(rCompatView.angles)
+  view = rCompatView
+  originalOrigin = compatRmainMath.copy(view.origin)
+  originalAngles = compatRmainMath.copy(view.angles)
   originalWidth = rCompatWidth
   originalHeight = rCompatHeight
   envmap = true
@@ -776,20 +779,20 @@ function R_Envmap_f()
   ]
   index = 0
   while index < len(directions)
-    rCompatView.angles = directions[index]
+    view.angles = directions[index]
     R_RenderView()
     pixels = compatRmainGl.readPixelsRgba(0, 0, 256, 256)
     written = try(compatRmainFs.writeAllBytes(compatEnvmapPath(index), pixels))
     if written is error then
       envmap = false
-      rCompatView.origin = originalOrigin
-      rCompatView.angles = originalAngles
+      view.origin = originalOrigin
+      view.angles = originalAngles
       return written
     end if
     index = index + 1
   end while
-  rCompatView.origin = originalOrigin
-  rCompatView.angles = originalAngles
+  view.origin = originalOrigin
+  view.angles = originalAngles
   envmap = false
   return true
 end function
@@ -881,17 +884,18 @@ end function
 
 function R_TimeRefresh_f()
   if rCompatView is void then return error(3802, "R_TimeRefresh_f: no view") end if
-  originalYaw = rCompatView.angles.y
+  view = rCompatView
+  originalYaw = view.angles.y
   start = compatRmainWin.ticks()
   index = 0
   while index < 128
-    rCompatView.angles.y = index / 128.0 * 360.0
+    view.angles.y = index / 128.0 * 360.0
     R_RenderView()
     index = index + 1
   end while
   compatRmainGl.finish()
   stop = compatRmainWin.ticks()
-  rCompatView.angles.y = originalYaw
+  view.angles.y = originalYaw
   seconds = (stop - start) / 1000.0
   fps = 0.0
   if seconds > 0.0 then fps = 128.0 / seconds end if

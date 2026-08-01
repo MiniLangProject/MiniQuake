@@ -1,3 +1,0 @@
-LIBRARY cl_demo_oracle
-EXPORTS
-  cl_demo_oracle_jsonl

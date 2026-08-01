@@ -7,12 +7,18 @@ package miniquake.sv_main
 
 import miniquake.types as t
 import miniquake.constants as c
+import miniquake.format.progs as progs
 import miniquake.server as runtime
 import miniquake.server_move as serverMove
 import miniquake.physics as physics
 import miniquake.edict as edict
 import miniquake.sizebuf as sz
 import miniquake.message as msg
+import miniquake.protocol_update as protocolUpdate
+import miniquake.protocol_serverdata as serverData
+import miniquake.protocol_events as protocolEvents
+import miniquake.protocol_transients as transients
+import miniquake.quakec.vm as vm
 import miniquake.net_main as netmain
 import miniquake.net_loop as netloop
 import miniquake.mathlib as math
@@ -58,7 +64,7 @@ function SV_Init(maxClients)
   // sv.reliable_datagram is a MAX_DATAGRAM broadcast buffer.  Client message
   // buffers are the larger MAX_MSGLEN buffers and are allowed to overflow so
   // SV_SendClientMessages can drop a backed-up connection deterministically.
-  gameServer.reliableDatagram = sz.allocOverflowing(c.MAX_DATAGRAM)
+  gameServer.reliableDatagram = sz.alloc(c.MAX_DATAGRAM)
   for each clientValue in gameServer.clients
     clientValue.message.allowOverflow = true
   end for
@@ -90,12 +96,13 @@ end function
 
 function SV_SetStandardQuake(state, enabled)
   state.standardQuake = enabled
+  state.server.standardQuake = enabled
   return enabled
 end function
 
 function SV_SetClientFrags(state, clientIndex, frags)
   if clientIndex < 0 or clientIndex >= len(state.clientFrags) then return error(2870, "SV_SetClientFrags: bad client") end if
-  state.clientFrags[clientIndex] = native.trunc(frags)
+  state.clientFrags[clientIndex] = protocolEvents.cFloat(frags)
   return state.clientFrags[clientIndex]
 end function
 
@@ -109,98 +116,65 @@ function svmSoundIndex(server, sample)
 end function
 
 function svmEntityCenter(item)
-  return t.Vec3(
-    item.origin.x + 0.5 * (item.mins.x + item.maxs.x),
-    item.origin.y + 0.5 * (item.mins.y + item.maxs.y),
-    item.origin.z + 0.5 * (item.mins.z + item.maxs.z),
-  )
+  return transients.soundCenter(item.origin, item.mins, item.maxs)
 end function
 
 // SV_StartParticle
 function SV_StartParticle(state, origin, direction, color, count)
   buffer = state.server.datagram
-  if buffer.curSize > c.MAX_DATAGRAM - 16 then return false end if
-  msg.writeByte(buffer, c.SVC_PARTICLE)
-  msg.writeCoord(buffer, origin.x)
-  msg.writeCoord(buffer, origin.y)
-  msg.writeCoord(buffer, origin.z)
-  components = [direction.x, direction.y, direction.z]
-  index = 0
-  while index < 3
-    value = native.trunc(components[index] * 16.0)
-    if value > 127 then value = 127 end if
-    if value < -128 then value = -128 end if
-    msg.writeChar(buffer, value)
-    index = index + 1
-  end while
-  msg.writeByte(buffer, count)
-  msg.writeByte(buffer, color)
+  if not protocolEvents.canWriteTransient(buffer) then return false end if
+  protocolEvents.writeParticle(buffer, origin, direction, count, color)
   return true
 end function
 
 // SV_StartSound
 function SV_StartSound(state, entityIndex, channel, sample, volume, attenuation)
-  if volume < 0 or volume > 255 then return error(2871, "SV_StartSound: volume = " + volume) end if
-  if attenuation < 0.0 or attenuation > 4.0 then return error(2872, "SV_StartSound: attenuation = " + attenuation) end if
-  if channel < 0 or channel > 7 then return error(2873, "SV_StartSound: channel = " + channel) end if
+  entityIndexValue = native.trunc(entityIndex)
+  channelValue = native.trunc(channel)
+  volumeValue = native.trunc(volume)
+  attenuationValue = transients.cFloat(attenuation)
+  if volumeValue < 0 or volumeValue > 255 then return error(2871, "SV_StartSound: volume = " + volumeValue) end if
+  if attenuationValue < 0.0 or attenuationValue > 4.0 then return error(2872, "SV_StartSound: attenuation = " + attenuationValue) end if
+  if channelValue < 0 or channelValue > 7 then return error(2873, "SV_StartSound: channel = " + channelValue) end if
   server = state.server
-  if server.datagram.curSize > c.MAX_DATAGRAM - 16 then return false end if
-  if entityIndex < 0 or entityIndex >= len(server.edicts) then return error(2874, "SV_StartSound: bad entity") end if
+  if not transients.canWriteDynamicSound(server.datagram) then return false end if
+  if entityIndexValue < 0 or entityIndexValue >= len(server.edicts) then return error(2874, "SV_StartSound: bad entity") end if
+  item = server.edicts[entityIndexValue]
+  if item is void then return error(2874, "SV_StartSound: bad entity") end if
   soundNumber = svmSoundIndex(server, sample)
   if soundNumber == 0 then
     state.diagnostics = state.diagnostics + ["SV_StartSound: " + sample + " not precached"]
     return false
   end if
-  fieldMask = 0
-  if volume != 255 then fieldMask = fieldMask | 1 end if
-  if attenuation != 1.0 then fieldMask = fieldMask | 2 end if
-  msg.writeByte(server.datagram, c.SVC_SOUND)
-  msg.writeByte(server.datagram, fieldMask)
-  if (fieldMask & 1) != 0 then msg.writeByte(server.datagram, volume) end if
-  if (fieldMask & 2) != 0 then msg.writeByte(server.datagram, native.trunc(attenuation * 64.0)) end if
-  msg.writeShort(server.datagram, (entityIndex << 3) | channel)
-  msg.writeByte(server.datagram, soundNumber)
-  center = svmEntityCenter(server.edicts[entityIndex])
-  msg.writeCoord(server.datagram, center.x)
-  msg.writeCoord(server.datagram, center.y)
-  msg.writeCoord(server.datagram, center.z)
+  center = svmEntityCenter(item)
+  serverData.writeSound(server.datagram, entityIndexValue, channelValue, soundNumber, volumeValue, attenuationValue, center)
   return true
 end function
 
+function svmProgsCrc(server)
+  if server.progs is not void then return progs.runtimeCrc(server.progs) end if
+  if server.machine is not void and server.machine.program is not void then return progs.runtimeCrc(server.machine.program) end if
+  return 0
+end function
+
 function svmAppendServerInfo(server, clientValue)
-  buffer = clientValue.message
-  msg.writeByte(buffer, c.SVC_PRINT)
-  msg.writeString(buffer, "\u0002\nVERSION 1.09 SERVER (protocol 15)")
-  msg.writeByte(buffer, c.SVC_SERVERINFO)
-  msg.writeLong(buffer, c.PROTOCOL_VERSION)
-  msg.writeByte(buffer, server.maxClients)
-  if not server.coop and server.deathmatch then msg.writeByte(buffer, c.GAME_DEATHMATCH) else msg.writeByte(buffer, c.GAME_COOP) end if
-  msg.writeString(buffer, server.levelName)
-  index = 1
-  while index < len(server.modelPrecache)
-    if server.modelPrecache[index] == "" then break end if
-    msg.writeString(buffer, server.modelPrecache[index])
-    index = index + 1
-  end while
-  msg.writeByte(buffer, 0)
-  index = 1
-  while index < len(server.soundPrecache)
-    if server.soundPrecache[index] == "" then break end if
-    msg.writeString(buffer, server.soundPrecache[index])
-    index = index + 1
-  end while
-  msg.writeByte(buffer, 0)
-  msg.writeByte(buffer, c.SVC_CDTRACK)
-  msg.writeByte(buffer, server.cdTrack)
-  msg.writeByte(buffer, server.cdTrack)
-  msg.writeByte(buffer, c.SVC_SETVIEW)
-  msg.writeShort(buffer, clientValue.edictIndex)
-  msg.writeByte(buffer, c.SVC_SIGNONNUM)
-  msg.writeByte(buffer, c.SIGNON_SERVERINFO)
+  gameType = c.GAME_COOP
+  if not server.coop and server.deathmatch then gameType = c.GAME_DEATHMATCH end if
+  serverData.writeServerInfo(
+    clientValue.message,
+    svmProgsCrc(server),
+    server.maxClients,
+    gameType,
+    server.levelName,
+    server.modelPrecache,
+    server.soundPrecache,
+    server.cdTrack,
+    clientValue.edictIndex,
+  )
   clientValue.sendSignon = true
   clientValue.spawned = false
   clientValue.signonStage = c.SIGNON_SERVERINFO
-  return buffer.curSize
+  return clientValue.message.curSize
 end function
 
 // SV_SendServerinfo
@@ -225,10 +199,12 @@ function svmResetClient(state, clientIndex, socket)
   clientValue.command = runtime.createServerClient(clientIndex).command
   clientValue.pingTimes = arrayutil.makeFilledArray(16, 0.0)
   clientValue.numPings = 0
-  clientValue.oldFrags = -999999
+  clientValue.oldFrags = 0
   if state.server.loadGame then clientValue.spawnParms = savedSpawnParms end if
   state.lastMessages[clientIndex] = state.realtime
   state.dropAsap[clientIndex] = false
+  clientValue.lastMessage = state.realtime
+  clientValue.dropAsap = false
   state.clientFrags[clientIndex] = 0
   return clientValue
 end function
@@ -419,40 +395,20 @@ function svmAbsolute(value)
   return value
 end function
 
+function svmEntityBits(item)
+  return protocolUpdate.computeBits(
+    item.number, item.baseline, item.modelIndex, item.frame, item.colormap, item.skin,
+    item.effects, item.origin, item.angles, item.moveType,
+  )
+end function
+
 // Exact Protocol-15 fast-update encoder used by SV_WriteEntitiesToClient.
 function SV_WriteEntityDelta(state, buffer, item)
-  baseline = item.baseline
-  bits = 0
-  if svmAbsolute(item.origin.x - baseline.origin.x) > 0.1 then bits = bits | c.U_ORIGIN1 end if
-  if svmAbsolute(item.origin.y - baseline.origin.y) > 0.1 then bits = bits | c.U_ORIGIN2 end if
-  if svmAbsolute(item.origin.z - baseline.origin.z) > 0.1 then bits = bits | c.U_ORIGIN3 end if
-  if item.angles.x != baseline.angles.x then bits = bits | c.U_ANGLE1 end if
-  if item.angles.y != baseline.angles.y then bits = bits | c.U_ANGLE2 end if
-  if item.angles.z != baseline.angles.z then bits = bits | c.U_ANGLE3 end if
-  if item.moveType == c.MOVETYPE_STEP then bits = bits | c.U_NOLERP end if
-  if item.colormap != baseline.colormap then bits = bits | c.U_COLORMAP end if
-  if item.skin != baseline.skin then bits = bits | c.U_SKIN end if
-  if item.frame != baseline.frame then bits = bits | c.U_FRAME end if
-  if item.effects != 0 then bits = bits | c.U_EFFECTS end if
-  if item.modelIndex != baseline.modelIndex then bits = bits | c.U_MODEL end if
-  if item.number >= 256 then bits = bits | c.U_LONGENTITY end if
-  if bits >= 256 then bits = bits | c.U_MOREBITS end if
-
-  msg.writeByte(buffer, (bits & 255) | c.U_SIGNAL)
-  if (bits & c.U_MOREBITS) != 0 then msg.writeByte(buffer, (bits >> 8) & 255) end if
-  if (bits & c.U_LONGENTITY) != 0 then msg.writeShort(buffer, item.number) else msg.writeByte(buffer, item.number) end if
-  if (bits & c.U_MODEL) != 0 then msg.writeByte(buffer, item.modelIndex) end if
-  if (bits & c.U_FRAME) != 0 then msg.writeByte(buffer, item.frame) end if
-  if (bits & c.U_COLORMAP) != 0 then msg.writeByte(buffer, item.colormap) end if
-  if (bits & c.U_SKIN) != 0 then msg.writeByte(buffer, item.skin) end if
-  if (bits & c.U_EFFECTS) != 0 then msg.writeByte(buffer, item.effects) end if
-  if (bits & c.U_ORIGIN1) != 0 then msg.writeCoord(buffer, item.origin.x) end if
-  if (bits & c.U_ANGLE1) != 0 then msg.writeAngle(buffer, item.angles.x) end if
-  if (bits & c.U_ORIGIN2) != 0 then msg.writeCoord(buffer, item.origin.y) end if
-  if (bits & c.U_ANGLE2) != 0 then msg.writeAngle(buffer, item.angles.y) end if
-  if (bits & c.U_ORIGIN3) != 0 then msg.writeCoord(buffer, item.origin.z) end if
-  if (bits & c.U_ANGLE3) != 0 then msg.writeAngle(buffer, item.angles.z) end if
-  return bits
+  bits = svmEntityBits(item)
+  return protocolUpdate.writeFastUpdateBits(
+    buffer, bits, item.number, item.modelIndex, item.frame, item.colormap, item.skin,
+    item.effects, item.origin, item.angles,
+  )
 end function
 
 // SV_WriteEntitiesToClient
@@ -464,11 +420,15 @@ function SV_WriteEntitiesToClient(state, clientEntity, buffer)
   while index < state.server.numEdicts and index < len(state.server.edicts)
     item = state.server.edicts[index]
     if item is not void and not item.free and svmEntityVisible(state, item, clientEntity.number, pvs) then
-      if buffer.maxSize - buffer.curSize < 16 then
+      bits = svmEntityBits(item)
+      if not protocolUpdate.canWrite(buffer, bits) then
         state.diagnostics = state.diagnostics + ["packet overflow"]
         return written
       end if
-      SV_WriteEntityDelta(state, buffer, item)
+      protocolUpdate.writeFastUpdateBits(
+        buffer, bits, item.number, item.modelIndex, item.frame, item.colormap, item.skin,
+        item.effects, item.origin, item.angles,
+      )
       written = written + 1
     end if
     index = index + 1
@@ -503,10 +463,22 @@ function svmQcVector(state, entityIndex, fieldName, fallback)
 end function
 
 function svmClientItems(state, clientValue, player)
-  items2 = svmQcFloat(state, clientValue.edictIndex, "items2", -999999.0)
-  items = native.trunc(player.items)
-  if items2 != -999999.0 then return items | (native.trunc(items2) << 23) end if
-  return items | ((state.server.serverFlags & 15) << 28)
+  entityIndex = clientValue.edictIndex
+  items = native.trunc(svmQcFloat(state, entityIndex, "items", player.items))
+  if state.server.machine is not void and state.server.machine.context is not void then
+    items2Offset = vm.fieldOffset(state.server.machine, "items2")
+    if items2Offset >= 0 then
+      return items | (native.trunc(vm.entityFloat(state.server.machine, entityIndex, items2Offset)) << 23)
+    end if
+  end if
+  return items | (native.trunc(state.server.serverFlags) << 28)
+end function
+
+function svmWeaponModelIndex(state, entityIndex, fallback)
+  if state.server.machine is void or state.server.machine.context is void then return fallback end if
+  modelName = runtime.qcString(state.server.machine, entityIndex, "weaponmodel", "")
+  if modelName == "" then return 0 end if
+  return SV_ModelIndex(state, modelName)
 end function
 
 // SV_SetIdealPitch.  The result is cached per client for hosts that keep their
@@ -561,109 +533,100 @@ function svmClampByte(value)
   return result
 end function
 
-function svmWriteDamageAndAngle(state, clientValue, player, buffer)
+function svmWriteDamage(state, clientValue, buffer)
   entityIndex = clientValue.edictIndex
   damageTake = native.trunc(svmQcFloat(state, entityIndex, "dmg_take", 0.0))
   damageSave = native.trunc(svmQcFloat(state, entityIndex, "dmg_save", 0.0))
-  if damageTake != 0 or damageSave != 0 then
-    inflictor = runtime.qcWord(state.server.machine, entityIndex, "dmg_inflictor", 0)
-    center = t.Vec3(0.0, 0.0, 0.0)
-    if inflictor >= 0 and inflictor < len(state.server.edicts) then center = svmEntityCenter(state.server.edicts[inflictor]) end if
-    msg.writeByte(buffer, c.SVC_DAMAGE)
-    msg.writeByte(buffer, damageSave)
-    msg.writeByte(buffer, damageTake)
-    msg.writeCoord(buffer, center.x)
-    msg.writeCoord(buffer, center.y)
-    msg.writeCoord(buffer, center.z)
-    runtime.setQcEntityFloat(state.server, entityIndex, "dmg_take", 0.0)
-    runtime.setQcEntityFloat(state.server, entityIndex, "dmg_save", 0.0)
-  end if
+  if damageTake == 0 and damageSave == 0 then return false end if
+  inflictor = runtime.qcWord(state.server.machine, entityIndex, "dmg_inflictor", 0)
+  center = t.Vec3(0.0, 0.0, 0.0)
+  if inflictor >= 0 and inflictor < len(state.server.edicts) then center = svmEntityCenter(state.server.edicts[inflictor]) end if
+  msg.writeByte(buffer, c.SVC_DAMAGE)
+  msg.writeByte(buffer, damageSave)
+  msg.writeByte(buffer, damageTake)
+  msg.writeCoord(buffer, center.x)
+  msg.writeCoord(buffer, center.y)
+  msg.writeCoord(buffer, center.z)
+  runtime.setQcEntityFloat(state.server, entityIndex, "dmg_take", 0.0)
+  runtime.setQcEntityFloat(state.server, entityIndex, "dmg_save", 0.0)
+  return true
+end function
+
+function svmWriteFixAngle(state, clientValue, player, buffer)
+  entityIndex = clientValue.edictIndex
   fixAngle = player.fixAngle
   if svmQcFloat(state, entityIndex, "fixangle", 0.0) != 0.0 then fixAngle = true end if
-  if fixAngle then
-    angles = svmQcVector(state, entityIndex, "angles", player.renderAngles)
-    msg.writeByte(buffer, c.SVC_SETANGLE)
-    msg.writeAngle(buffer, angles.x)
-    msg.writeAngle(buffer, angles.y)
-    msg.writeAngle(buffer, angles.z)
-    player.fixAngle = false
-    if state.server.machine is not void then runtime.setQcEntityFloat(state.server, entityIndex, "fixangle", 0.0) end if
-  end if
+  if not fixAngle then return false end if
+  angles = svmQcVector(state, entityIndex, "angles", player.renderAngles)
+  msg.writeByte(buffer, c.SVC_SETANGLE)
+  msg.writeAngle(buffer, angles.x)
+  msg.writeAngle(buffer, angles.y)
+  msg.writeAngle(buffer, angles.z)
+  player.fixAngle = false
+  if state.server.machine is not void then runtime.setQcEntityFloat(state.server, entityIndex, "fixangle", 0.0) end if
+  return true
+end function
+
+function svmWriteDamageAndAngle(state, clientValue, player, buffer)
+  svmWriteDamage(state, clientValue, buffer)
+  svmWriteFixAngle(state, clientValue, player, buffer)
   return true
 end function
 
 // SV_WriteClientdataToMessage
 function SV_WriteClientdataToMessage(state, clientValue, player, buffer)
-  svmWriteDamageAndAngle(state, clientValue, player, buffer)
   entityIndex = clientValue.edictIndex
+  clientIndex = entityIndex - 1
+  // Original ordering is damage, SV_SetIdealPitch, fixangle, then the
+  // svc_clientdata bitfield and payload.
+  svmWriteDamage(state, clientValue, buffer)
+  if clientIndex >= 0 and clientIndex < len(state.idealPitches) then
+    SV_SetIdealPitch(state, clientIndex, player, 0.8)
+  end if
+  svmWriteFixAngle(state, clientValue, player, buffer)
+
   viewHeight = svmQcVector(state, entityIndex, "view_ofs", t.Vec3(0.0, 0.0, player.viewHeight)).z
-  clientIndex = clientValue.edictIndex - 1
   idealPitchFallback = 0.0
   if clientIndex >= 0 and clientIndex < len(state.idealPitches) then idealPitchFallback = state.idealPitches[clientIndex] end if
   idealPitch = svmQcFloat(state, entityIndex, "idealpitch", idealPitchFallback)
   punch = svmQcVector(state, entityIndex, "punchangle", player.punchAngle)
   velocity = svmQcVector(state, entityIndex, "velocity", player.velocity)
-  flags = native.trunc(svmQcFloat(state, entityIndex, "flags", player.flags))
+  // Without a live QuakeC edict, PlayerState.onGround is the authoritative
+  // mirror used by the integrated movement path. With QuakeC loaded, the
+  // real ent->v.flags value still wins exactly as in the original engine.
+  fallbackFlags = runtime.playerProtocolFlags(player)
+  flags = native.trunc(svmQcFloat(state, entityIndex, "flags", fallbackFlags))
   waterLevel = native.trunc(svmQcFloat(state, entityIndex, "waterlevel", player.waterLevel))
-  weaponFrame = native.trunc(svmQcFloat(state, entityIndex, "weaponframe", player.weaponFrame))
+  weaponFrame = svmQcFloat(state, entityIndex, "weaponframe", player.weaponFrame)
   armor = svmQcFloat(state, entityIndex, "armorvalue", player.armor)
-  weaponModel = player.weapon
+  weaponModel = svmWeaponModelIndex(state, entityIndex, player.weapon)
 
-  bits = c.SU_ITEMS | c.SU_WEAPON
-  if viewHeight != c.DEFAULT_VIEWHEIGHT then bits = bits | c.SU_VIEWHEIGHT end if
-  if idealPitch != 0.0 then bits = bits | c.SU_IDEALPITCH end if
-  if (flags & c.FL_ONGROUND) != 0 then bits = bits | c.SU_ONGROUND end if
-  if waterLevel >= 2 then bits = bits | c.SU_INWATER end if
-  punches = [punch.x, punch.y, punch.z]
-  velocities = [velocity.x, velocity.y, velocity.z]
-  axis = 0
-  while axis < 3
-    if punches[axis] != 0.0 then bits = bits | (c.SU_PUNCH1 << axis) end if
-    if velocities[axis] != 0.0 then bits = bits | (c.SU_VELOCITY1 << axis) end if
-    axis = axis + 1
-  end while
-  if weaponFrame != 0 then bits = bits | c.SU_WEAPONFRAME end if
-  if armor != 0.0 then bits = bits | c.SU_ARMOR end if
-
-  msg.writeByte(buffer, c.SVC_CLIENTDATA)
-  msg.writeShort(buffer, bits)
-  if (bits & c.SU_VIEWHEIGHT) != 0 then msg.writeChar(buffer, native.trunc(viewHeight)) end if
-  if (bits & c.SU_IDEALPITCH) != 0 then msg.writeChar(buffer, native.trunc(idealPitch)) end if
-  axis = 0
-  while axis < 3
-    if (bits & (c.SU_PUNCH1 << axis)) != 0 then msg.writeChar(buffer, native.trunc(punches[axis])) end if
-    if (bits & (c.SU_VELOCITY1 << axis)) != 0 then msg.writeChar(buffer, native.trunc(velocities[axis] / 16.0)) end if
-    axis = axis + 1
-  end while
-  msg.writeLong(buffer, svmClientItems(state, clientValue, player))
-  if (bits & c.SU_WEAPONFRAME) != 0 then msg.writeByte(buffer, svmClampByte(weaponFrame)) end if
-  if (bits & c.SU_ARMOR) != 0 then msg.writeByte(buffer, svmClampByte(armor)) end if
-  msg.writeByte(buffer, svmClampByte(weaponModel))
-  msg.writeShort(buffer, native.trunc(svmQcFloat(state, entityIndex, "health", player.health)))
-  msg.writeByte(buffer, svmClampByte(svmQcFloat(state, entityIndex, "currentammo", player.ammo)))
-  msg.writeByte(buffer, svmClampByte(svmQcFloat(state, entityIndex, "ammo_shells", player.shells)))
-  msg.writeByte(buffer, svmClampByte(svmQcFloat(state, entityIndex, "ammo_nails", player.nails)))
-  msg.writeByte(buffer, svmClampByte(svmQcFloat(state, entityIndex, "ammo_rockets", player.rockets)))
-  msg.writeByte(buffer, svmClampByte(svmQcFloat(state, entityIndex, "ammo_cells", player.cells)))
-  activeWeapon = native.trunc(svmQcFloat(state, entityIndex, "weapon", player.activeWeapon))
-  if state.standardQuake then
-    msg.writeByte(buffer, svmClampByte(activeWeapon))
-  else
-    bit = 0
-    while bit < 32
-      if (activeWeapon & (1 << bit)) != 0 then msg.writeByte(buffer, bit); return bits end if
-      bit = bit + 1
-    end while
-    msg.writeByte(buffer, 0)
-  end if
-  return bits
+  data = t.ProtocolClientData(
+    viewHeight,
+    idealPitch,
+    punch,
+    velocity,
+    flags,
+    waterLevel,
+    weaponFrame,
+    armor,
+    weaponModel,
+    svmQcFloat(state, entityIndex, "health", player.health),
+    svmQcFloat(state, entityIndex, "currentammo", player.ammo),
+    svmQcFloat(state, entityIndex, "ammo_shells", player.shells),
+    svmQcFloat(state, entityIndex, "ammo_nails", player.nails),
+    svmQcFloat(state, entityIndex, "ammo_rockets", player.rockets),
+    svmQcFloat(state, entityIndex, "ammo_cells", player.cells),
+    svmClientItems(state, clientValue, player),
+    svmQcFloat(state, entityIndex, "weapon", player.activeWeapon),
+    state.standardQuake,
+  )
+  result = serverData.writeClientData(buffer, data)
+  return result[0]
 end function
 
 function svmAppendDatagram(destination, source)
-  if source.curSize == 0 then return true end if
-  if destination.curSize + source.curSize >= destination.maxSize then return false end if
-  sz.write(destination, source.data, 0, source.curSize)
-  return true
+  return serverData.appendDatagramIfFits(destination, source)
 end function
 
 // SV_SendClientDatagram
@@ -693,7 +656,7 @@ end function
 function svmCurrentFrags(state, clientIndex)
   clientValue = state.server.clients[clientIndex]
   if state.server.machine is not void and state.server.machine.context is not void then
-    return native.trunc(runtime.qcFloat(state.server.machine, clientValue.edictIndex, "frags", state.clientFrags[clientIndex]))
+    return runtime.qcFloat(state.server.machine, clientValue.edictIndex, "frags", state.clientFrags[clientIndex])
   end if
   return state.clientFrags[clientIndex]
 end function
@@ -705,18 +668,14 @@ function SV_UpdateToReliableMessages(state)
   while index < len(state.server.clients)
     sourceClient = state.server.clients[index]
     frags = svmCurrentFrags(state, index)
-    if sourceClient.oldFrags != frags then
+    if protocolEvents.fragChanged(sourceClient.oldFrags, frags) then
       destinationIndex = 0
       while destinationIndex < len(state.server.clients)
         destination = state.server.clients[destinationIndex]
-        if destination.active then
-          msg.writeByte(destination.message, c.SVC_UPDATEFRAGS)
-          msg.writeByte(destination.message, index)
-          msg.writeShort(destination.message, frags)
-        end if
+        if destination.active then protocolEvents.writeUpdateFrags(destination.message, index, frags) end if
         destinationIndex = destinationIndex + 1
       end while
-      sourceClient.oldFrags = frags
+      sourceClient.oldFrags = protocolEvents.storedFrag(frags)
       changed = changed + 1
     end if
     index = index + 1
@@ -737,35 +696,41 @@ function SV_SendNop(state, clientValue)
   buffer = sz.alloc(4)
   msg.writeChar(buffer, c.SVC_NOP)
   sent = netmain.NET_SendUnreliableMessage(clientValue.socket, buffer)
-  if sent == -1 then SV_DropClient(state, clientValue, true); return false end if
+  if sent == -1 then SV_DropClient(state, clientValue, true) end if
   clientIndex = clientValue.edictIndex - 1
   if clientIndex >= 0 and clientIndex < len(state.lastMessages) then state.lastMessages[clientIndex] = state.realtime end if
-  return true
+  clientValue.lastMessage = state.realtime
+  return sent != -1
 end function
 
 // SV_DropClient is declared by server.h and implemented by host.c in the
 // original tree; it lives here because all message lifecycle decisions call it.
 function SV_DropClient(state, clientValue, crashed)
   clientIndex = clientValue.edictIndex - 1
+  connected = clientValue.active and clientValue.socket is not void
+  if clientValue.socket is not void and not crashed and netmain.NET_CanSendMessage(clientValue.socket) then
+    protocolEvents.writeDisconnect(clientValue.message)
+    netmain.NET_SendMessage(clientValue.socket, clientValue.message)
+  end if
   if not crashed and clientValue.active and clientValue.spawned and state.server.machine is not void then
     runtime.executeQcFunction(state.server, "ClientDisconnect", clientValue.edictIndex, 0)
   end if
-  connected = clientValue.active and clientValue.socket is not void
-  if clientValue.socket is not void then
-    if not crashed then
-      disconnect = sz.alloc(4)
-      msg.writeByte(disconnect, c.SVC_DISCONNECT)
-      netmain.NET_SendUnreliableMessage(clientValue.socket, disconnect)
-    end if
-    netmain.NET_Close(clientValue.socket)
-  end if
+  if clientValue.socket is not void then netmain.NET_Close(clientValue.socket) end if
   clientValue.socket = void
   clientValue.active = false
   clientValue.spawned = false
   clientValue.sendSignon = false
   clientValue.signonStage = 0
-  clientValue.name = "unconnected"
+  clientValue.name = ""
+  clientValue.oldFrags = -999999
+  clientValue.lastMessage = 0.0
+  clientValue.dropAsap = false
   sz.clear(clientValue.message)
+  if clientIndex >= 0 and clientIndex < state.server.maxClients then
+    for each peer in state.server.clients
+      if peer.active then protocolEvents.writeScoreReset(peer.message, clientIndex) end if
+    end for
+  end if
   if connected then netmain.NET_ConnectionClosed() end if
   if clientIndex >= 0 and clientIndex < len(state.dropAsap) then state.dropAsap[clientIndex] = false end if
   return true
@@ -774,6 +739,7 @@ end function
 function SV_SetDropAsap(state, clientIndex, enabled)
   if clientIndex < 0 or clientIndex >= len(state.dropAsap) then return false end if
   state.dropAsap[clientIndex] = enabled
+  state.server.clients[clientIndex].dropAsap = enabled
   return enabled
 end function
 
@@ -785,32 +751,57 @@ function SV_SendClientMessages(state, player)
   while index < len(state.server.clients)
     clientValue = state.server.clients[index]
     if clientValue.active then
-      if clientValue.spawned then
-        if SV_SendClientDatagram(state, clientValue, player) then sent = sent + 1 end if
-      else if not clientValue.sendSignon then
-        if state.realtime - state.lastMessages[index] > 5.0 then SV_SendNop(state, clientValue) end if
+      initialPlan = serverData.initialDeliveryPlan(
+        clientValue.spawned,
+        clientValue.sendSignon,
+        state.realtime - state.lastMessages[index],
+      )
+
+      if (initialPlan & serverData.PLAN_SEND_UNRELIABLE) != 0 then
+        if not SV_SendClientDatagram(state, clientValue, player) then
+          index = index + 1
+          continue
+        end if
+        sent = sent + 1
+      end if
+
+      if clientValue.active and (initialPlan & serverData.PLAN_SEND_NOP) != 0 then
+        SV_SendNop(state, clientValue)
+        index = index + 1
+        continue
+      end if
+      if clientValue.active and (initialPlan & serverData.PLAN_WAIT_SIGNON) != 0 then
         index = index + 1
         continue
       end if
 
-      if clientValue.active and clientValue.message.overflowed then
-        SV_DropClient(state, clientValue, true)
-        clientValue.message.overflowed = false
-      else if clientValue.active and (clientValue.message.curSize > 0 or state.dropAsap[index]) then
-        if netmain.NET_CanSendMessage(clientValue.socket) then
-          if state.dropAsap[index] then
-            SV_DropClient(state, clientValue, false)
+      if clientValue.active and (initialPlan & serverData.PLAN_RELIABLE_PHASE) != 0 then
+        canSend = false
+        if clientValue.message.curSize > 0 or state.dropAsap[index] then
+          canSend = netmain.NET_CanSendMessage(clientValue.socket)
+        end if
+        reliablePlan = serverData.reliableDeliveryPlan(
+          clientValue.message.overflowed,
+          clientValue.message.curSize,
+          state.dropAsap[index],
+          canSend,
+        )
+        if reliablePlan == serverData.RELIABLE_DROP_OVERFLOW then
+          SV_DropClient(state, clientValue, true)
+          clientValue.message.overflowed = false
+        else if reliablePlan == serverData.RELIABLE_DROP_ASAP then
+          SV_DropClient(state, clientValue, false)
+        else if reliablePlan == serverData.RELIABLE_SEND then
+          result = netmain.NET_SendMessage(clientValue.socket, clientValue.message)
+          if result == -1 then
+            SV_DropClient(state, clientValue, true)
           else
-            result = netmain.NET_SendMessage(clientValue.socket, clientValue.message)
-            if result == -1 then
-              SV_DropClient(state, clientValue, true)
-            else
-              sz.clear(clientValue.message)
-              state.lastMessages[index] = state.realtime
-              clientValue.sendSignon = false
-              sent = sent + 1
-            end if
+            sent = sent + 1
           end if
+          sz.clear(clientValue.message)
+          state.lastMessages[index] = state.realtime
+          clientValue.lastMessage = state.realtime
+          clientValue.sendSignon = false
         end if
       end if
     end if
@@ -832,18 +823,7 @@ function SV_ModelIndex(state, name)
 end function
 
 function svmWriteBaseline(buffer, entityNumber, baseline)
-  msg.writeByte(buffer, c.SVC_SPAWNBASELINE)
-  msg.writeShort(buffer, entityNumber)
-  msg.writeByte(buffer, baseline.modelIndex)
-  msg.writeByte(buffer, baseline.frame)
-  msg.writeByte(buffer, baseline.colormap)
-  msg.writeByte(buffer, baseline.skin)
-  msg.writeCoord(buffer, baseline.origin.x)
-  msg.writeAngle(buffer, baseline.angles.x)
-  msg.writeCoord(buffer, baseline.origin.y)
-  msg.writeAngle(buffer, baseline.angles.y)
-  msg.writeCoord(buffer, baseline.origin.z)
-  msg.writeAngle(buffer, baseline.angles.z)
+  serverData.writeBaseline(buffer, entityNumber, baseline)
   return true
 end function
 
@@ -871,6 +851,7 @@ function SV_CreateBaseline(state)
         item.frame,
         colormap,
         item.skin,
+        0,
         math.copy(item.origin),
         math.copy(item.angles),
       )
@@ -885,8 +866,7 @@ end function
 // SV_SendReconnect
 function SV_SendReconnect(state)
   buffer = sz.alloc(128)
-  msg.writeChar(buffer, c.SVC_STUFFTEXT)
-  msg.writeString(buffer, "reconnect\n")
+  transients.writeReconnect(buffer)
   return netmain.NET_SendToAll(state.server.clients, buffer, 5.0)
 end function
 

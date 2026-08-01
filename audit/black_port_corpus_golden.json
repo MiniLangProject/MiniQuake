@@ -1,0 +1,29 @@
+{
+  "frames_per_scenario": 64,
+  "package": "BP-083",
+  "required_comparison": "byte-identical mqtrace",
+  "required_processes_per_scenario": 2,
+  "scenarios": [
+    {
+      "frames": 64,
+      "map": "start",
+      "name": "start-064"
+    },
+    {
+      "frames": 64,
+      "map": "e1m1",
+      "name": "e1m1-064"
+    },
+    {
+      "frames": 64,
+      "map": "e1m2",
+      "name": "e1m2-064"
+    },
+    {
+      "frames": 64,
+      "map": "e1m3",
+      "name": "e1m3-064"
+    }
+  ],
+  "schema_version": 1
+}

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "delivery_revision": "BP-080-084R2",
+  "delivery_parent": "BP-080-084R1",
+  "package_id": "BP-084",
+  "block_id": "BP-080-084",
+  "predecessor_result_archive": "MiniQuake_BP-080-084R1_RESULTS_20260731-102759.zip",
+  "predecessor_result_sha256": "2412022204edd7715efb30ede6aae6b7777be01e89a97f8150603e5eff7e3ca5",
+  "failure": "package-free BP-081 check/2 shadowed miniquake.zone.check/1 in the merged import closure",
+  "first_compiler_diagnostic": "src/miniquake/zone.ml: Function check expects 2 args, got 1",
+  "fix": "namespace all BP-080..084 entry helpers and add helper-prefix plus import-closure arity verifier gates",
+  "changed_test_entries": 5,
+  "production_source_changed": false,
+  "native_source_changed": false,
+  "contract_fingerprint_changed": false,
+  "fixture_count_changed": false,
+  "windows_acceptance": "pending"
+}

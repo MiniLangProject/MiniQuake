@@ -1,0 +1,194 @@
+{
+  "schema": "MiniQuakeProtocol15EventsGolden/1",
+  "package_id": "BP-013",
+  "parent_package_id": "BP-012R1",
+  "protocol_version": 15,
+  "sources": [
+    "sv_main.c",
+    "host.c",
+    "host_cmd.c",
+    "pr_cmds.c",
+    "cl_parse.c",
+    "r_part.c",
+    "protocol.h"
+  ],
+  "vectors": [
+    {
+      "kind": "vector",
+      "name": "static_entity_basic",
+      "bytes": "14010203049eff400100c0ff7fff",
+      "length": 14
+    },
+    {
+      "kind": "vector",
+      "name": "static_entity_wrapped",
+      "bytes": "142cff01ff50000060ff20f00040",
+      "length": 14
+    },
+    {
+      "kind": "vector",
+      "name": "static_sound_basic",
+      "bytes": "1d500060fff000057f50",
+      "length": 10
+    },
+    {
+      "kind": "vector",
+      "name": "static_sound_wrapped",
+      "bytes": "1d9eff0100ff7f2c3e20",
+      "length": 10
+    },
+    {
+      "kind": "vector",
+      "name": "particle_basic",
+      "bytes": "12500060fff00010e0011407",
+      "length": 12
+    },
+    {
+      "kind": "vector",
+      "name": "particle_clamped",
+      "bytes": "129eff0100ff7f7f8081ff2c",
+      "length": 12
+    },
+    {
+      "kind": "vector",
+      "name": "update_name_ascii",
+      "bytes": "0d0252616e67657200",
+      "length": 9
+    },
+    {
+      "kind": "vector",
+      "name": "update_name_latin1",
+      "bytes": "0d014a6f73e900",
+      "length": 7
+    },
+    {
+      "kind": "vector",
+      "name": "update_name_truncated",
+      "bytes": "0d003132333435363738393031323334e900",
+      "length": 18
+    },
+    {
+      "kind": "vector",
+      "name": "update_frags_negative",
+      "bytes": "0e0385ff",
+      "length": 4
+    },
+    {
+      "kind": "vector",
+      "name": "update_frags_wrapped",
+      "bytes": "0eff409c",
+      "length": 4
+    },
+    {
+      "kind": "vector",
+      "name": "update_colors",
+      "bytes": "1104de",
+      "length": 3
+    },
+    {
+      "kind": "vector",
+      "name": "score_reset",
+      "bytes": "0d05000e050000110500",
+      "length": 10
+    },
+    {
+      "kind": "vector",
+      "name": "score_triplet",
+      "bytes": "0d01506c61796572000e012a0011014d",
+      "length": 16
+    },
+    {
+      "kind": "vector",
+      "name": "graceful_disconnect_pending",
+      "bytes": "086279650a0002",
+      "length": 7
+    }
+  ],
+  "cases": {
+    "particle_count": [
+      {
+        "name": "zero",
+        "value": 0
+      },
+      {
+        "name": "normal",
+        "value": 254
+      },
+      {
+        "name": "explosion",
+        "value": 1024
+      }
+    ],
+    "datagram_gate": [
+      {
+        "name": "exact_margin",
+        "value": 1
+      },
+      {
+        "name": "above_margin",
+        "value": 0
+      }
+    ],
+    "frag_compare": [
+      {
+        "name": "equal",
+        "value": 0
+      },
+      {
+        "name": "fractional",
+        "value": 1
+      },
+      {
+        "name": "int_float_rounding",
+        "value": 0
+      }
+    ],
+    "stored_frag": [
+      {
+        "name": "positive_fraction",
+        "value": 42
+      },
+      {
+        "name": "negative_fraction",
+        "value": -42
+      }
+    ],
+    "player_color": [
+      {
+        "name": "normal",
+        "value": 77
+      },
+      {
+        "name": "clamped",
+        "value": 221
+      },
+      {
+        "name": "negative_mask",
+        "value": 221
+      }
+    ]
+  },
+  "constants": {
+    "SVC_DISCONNECT": 2,
+    "SVC_PRINT": 8,
+    "SVC_UPDATENAME": 13,
+    "SVC_UPDATEFRAGS": 14,
+    "SVC_UPDATECOLORS": 17,
+    "SVC_PARTICLE": 18,
+    "SVC_SPAWNSTATIC": 20,
+    "SVC_SPAWNSTATICSOUND": 29,
+    "MAX_DATAGRAM": 1024,
+    "MAX_PLAYER_NAME_BYTES": 15
+  },
+  "reference": {
+    "oracle": "tools/oracle/protocol15_events_oracle.c",
+    "oracle_sha256": "91047de68ef9d58eba8a3693c8f6b7d70bcd59ddd45b041674f1034c6de84875"
+  },
+  "notes": [
+    "PF_ambientsound performs no volume or attenuation clamping.",
+    "R_ParseParticleEffect expands wire count 255 to 1024.",
+    "SV_StartParticle accepts MAX_DATAGRAM-16 exactly and rejects only larger cursize values.",
+    "client_t.old_frags is converted to float for comparison, then current frags is truncated back to int for storage.",
+    "SV_DropClient appends svc_disconnect to already queued reliable bytes before closing a sendable graceful connection."
+  ]
+}

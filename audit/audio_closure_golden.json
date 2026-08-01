@@ -1,0 +1,19 @@
+{
+  "contract_vector_length": 17,
+  "fingerprint": 3707215874,
+  "fingerprint_hex": "0xdcf7a002",
+  "fixtures": 24,
+  "info_volume": "1.000000",
+  "package": "BP-059",
+  "parent_status": "render_special_109_frozen_v1",
+  "physical_cd_backend": "modern_ogg_equivalent",
+  "quake_atoi_cd": true,
+  "retail_evidence_runs": 2,
+  "retail_evidence_sounds": [
+    "misc/menu1.wav",
+    "ambience/water1.wav"
+  ],
+  "schema": 1,
+  "status": "audio_109_frozen_v1",
+  "total_block_fixtures": 108
+}

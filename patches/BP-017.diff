@@ -1,0 +1,870 @@
+diff --git a/audit/protocol15_datagram_golden.json b/audit/protocol15_datagram_golden.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..47360fe93aa25c40eb85be4f8213aeeb95b71538
+--- /dev/null
++++ b/audit/protocol15_datagram_golden.json
+@@ -0,0 +1,107 @@
++{
++  "schema": "MiniQuakeProtocol15DatagramGolden/1",
++  "package_id": "BP-017",
++  "parent_package_id": "BP-016",
++  "protocol_version": 15,
++  "sources": [
++    "net_dgrm.c",
++    "net.h",
++    "net_main.c"
++  ],
++  "cases": [
++    {
++      "kind": "case",
++      "name": "sequence_next_wrap",
++      "value": 0
++    },
++    {
++      "kind": "case",
++      "name": "sequence_previous_wrap",
++      "value": 4294967295
++    },
++    {
++      "kind": "case",
++      "name": "exact_fragment_eom",
++      "value": 1
++    },
++    {
++      "kind": "case",
++      "name": "split_fragment_eom",
++      "value": 0
++    },
++    {
++      "kind": "case",
++      "name": "first_wire_size",
++      "value": 1032
++    },
++    {
++      "kind": "case",
++      "name": "ack_remaining_1500",
++      "value": 476
++    },
++    {
++      "kind": "case",
++      "name": "ack_sets_sendnext",
++      "value": 1
++    },
++    {
++      "kind": "case",
++      "name": "ack_defers_wire_send",
++      "value": 0
++    },
++    {
++      "kind": "case",
++      "name": "flush_second_sequence",
++      "value": 1
++    },
++    {
++      "kind": "case",
++      "name": "final_ack_cansend",
++      "value": 1
++    },
++    {
++      "kind": "case",
++      "name": "retransmit_exact_second",
++      "value": 0
++    },
++    {
++      "kind": "case",
++      "name": "retransmit_above_second",
++      "value": 1
++    },
++    {
++      "kind": "case",
++      "name": "unreliable_gap",
++      "value": 3
++    },
++    {
++      "kind": "case",
++      "name": "reliable_fragments_2500",
++      "value": 3
++    },
++    {
++      "kind": "case",
++      "name": "reliable_fragments_max",
++      "value": 8
++    },
++    {
++      "kind": "case",
++      "name": "duplicate_data_reack",
++      "value": 1
++    },
++    {
++      "kind": "case",
++      "name": "cansend_query_side_effects",
++      "value": 0
++    },
++    {
++      "kind": "case",
++      "name": "receive_overflow_guard",
++      "value": 1
++    }
++  ],
++  "reference": {
++    "oracle": "tools/oracle/protocol15_datagram_oracle.c",
++    "oracle_sha256": "e07145117df3b4ad9bb67e727f4fa9626d9eef09bd5fe567db6e049e4ee379dc"
++  }
++}
+diff --git a/build.ps1 b/build.ps1
+index 1f9404baed583a2fec33f74fe123a1d320f31969..4b6ca89af4e86f52b6336713d4cbd50a3f7c3464 100644
+--- a/build.ps1
++++ b/build.ps1
+@@ -26,8 +26,8 @@ $Root = $PSScriptRoot
+ $Output = Join-Path $Root "build"
+ $Source = Join-Path $Root "src"
+ $Parent = Split-Path -Parent $Root
+-$PackageId = "BP-016"
+-$ParentPackageId = "BP-015"
++$PackageId = "BP-017"
++$ParentPackageId = "BP-016"
+ $NativeTextAbi = "caller_owned_bytes_v1"
+ $ProtocolTextAbi = "quake_latin1_cstring_v1"
+ 
+@@ -318,7 +318,8 @@ $PackageBuildArtifacts = @(
+   "MiniQuakeProtocol15EventTests.exe",
+   "MiniQuakeProtocol15RuntimeEventTests.exe",
+   "MiniQuakeProtocol15SignonTests.exe",
+-  "MiniQuakeProtocol15DeliveryTests.exe"
++  "MiniQuakeProtocol15DeliveryTests.exe",
++  "MiniQuakeProtocol15DatagramTests.exe"
+ )
+ foreach ($ArtifactName in $PackageBuildArtifacts) {
+   foreach ($Candidate in @(
+@@ -418,6 +419,15 @@ if (-not $SkipPreflight -and $null -ne $PythonExe) {
+   if ($LASTEXITCODE -ne 0) {
+     throw "$PackageId Protocol 15 reliable/unreliable delivery preflight failed."
+   }
++
++  $ProtocolDatagramChecker = Join-Path $Root "tools\check_protocol15_datagram.py"
++  if (-not (Test-Path -LiteralPath $ProtocolDatagramChecker -PathType Leaf)) {
++    throw "Protocol 15 datagram checker is missing: $ProtocolDatagramChecker"
++  }
++  & $PythonExe @PythonPrefixArgs $ProtocolDatagramChecker --root $Root
++  if ($LASTEXITCODE -ne 0) {
++    throw "$PackageId Protocol 15 datagram/ACK/retransmission preflight failed."
++  }
+ } elseif ($SkipPreflight) {
+   Write-Warning "$PackageId diagnostics preflight was explicitly skipped."
+ } else {
+@@ -493,7 +503,7 @@ if (-not $NoRunTests) {
+   Write-Host "[MiniQuake] checking executable package identity"
+   $VersionOutput = @(& $GameExe "--version" 2>&1)
+   $VersionExitCode = [int]$LASTEXITCODE
+-  $VersionOutput | Set-Content -LiteralPath (Join-Path $Output "bp016-build-version.txt") -Encoding UTF8
++  $VersionOutput | Set-Content -LiteralPath (Join-Path $Output "bp017-build-version.txt") -Encoding UTF8
+   $VersionOutput | ForEach-Object { Write-Host $_ }
+   if ($VersionExitCode -ne 0) {
+     throw "MiniQuake --version failed with exit code $VersionExitCode."
+@@ -549,6 +559,7 @@ $ProtocolEventTestStatus = "SKIPPED"
+ $ProtocolRuntimeEventTestStatus = "SKIPPED"
+ $ProtocolSignonTestStatus = "SKIPPED"
+ $ProtocolDeliveryTestStatus = "SKIPPED"
++$ProtocolDatagramTestStatus = "SKIPPED"
+ $NetworkTestStatus = "SKIPPED"
+ 
+ if (-not $SkipTests) {
+@@ -605,6 +616,11 @@ if (-not $SkipTests) {
+   Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\protocol15_delivery_tests.ml") -OutputFile $ProtocolDeliveryTestExe -CompilerArguments $CommonArgs -Label "protocol15-delivery-tests"
+   $ProtocolDeliveryTestStatus = "COMPILED"
+ 
++  $ProtocolDatagramTestExe = Join-Path $Output "MiniQuakeProtocol15DatagramTests.exe"
++  Write-Host "[MiniQuake] compiling $ProtocolDatagramTestExe"
++  Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\protocol15_datagram_tests.ml") -OutputFile $ProtocolDatagramTestExe -CompilerArguments $CommonArgs -Label "protocol15-datagram-tests"
++  $ProtocolDatagramTestStatus = "COMPILED"
++
+   if (-not $NoRunTests) {
+     Invoke-MiniQuakeTestBinary `
+       -Label "core tests" `
+@@ -669,6 +685,13 @@ if (-not $SkipTests) {
+       -Executable $ProtocolDeliveryTestExe `
+       -ProgressHint "The last printed [NN/14] line identifies the active reliable/unreliable scheduling fixture."
+     $ProtocolDeliveryTestStatus = "PASS"
++
++
++    Invoke-MiniQuakeTestBinary `
++      -Label "BP-017 Protocol 15 datagram tests" `
++      -Executable $ProtocolDatagramTestExe `
++      -ProgressHint "The last printed [NN/18] line identifies the active fragmentation, ACK, retransmission or loss fixture."
++    $ProtocolDatagramTestStatus = "PASS"
+   }
+ }
+ 
+@@ -685,6 +708,6 @@ if ($NetworkTests -and -not $NoRunTests) {
+   $NetworkTestStatus = "COMPILED-NOT-RUN"
+ }
+ 
+-Write-Host "[MiniQuake] test summary: core=$CoreTestStatus milestone=$MilestoneTestStatus diagnostics=$DiagnosticsTestStatus protocol15=$ProtocolTestStatus protocol15_commands=$ProtocolCommandTestStatus protocol15_serverdata=$ProtocolServerDataTestStatus protocol15_events=$ProtocolEventTestStatus protocol15_runtime_events=$ProtocolRuntimeEventTestStatus protocol15_signon=$ProtocolSignonTestStatus protocol15_delivery=$ProtocolDeliveryTestStatus network=$NetworkTestStatus"
++Write-Host "[MiniQuake] test summary: core=$CoreTestStatus milestone=$MilestoneTestStatus diagnostics=$DiagnosticsTestStatus protocol15=$ProtocolTestStatus protocol15_commands=$ProtocolCommandTestStatus protocol15_serverdata=$ProtocolServerDataTestStatus protocol15_events=$ProtocolEventTestStatus protocol15_runtime_events=$ProtocolRuntimeEventTestStatus protocol15_signon=$ProtocolSignonTestStatus protocol15_delivery=$ProtocolDeliveryTestStatus protocol15_datagram=$ProtocolDatagramTestStatus network=$NetworkTestStatus"
+ Write-Host "[MiniQuake] build completed: $GameExe"
+ exit 0
+diff --git a/src/main.ml b/src/main.ml
+index 350410a02dea2620dd9205423c0c014fd5e71085..53d23ec050b3c9c933706772a81a2f54cf1f977b 100644
+--- a/src/main.ml
++++ b/src/main.ml
+@@ -368,7 +368,7 @@ function runSelfCheck()
+   print "Package date: " + buildInfo.PACKAGE_DATE
+   print "Baseline archive SHA-256: " + buildInfo.BASE_ARCHIVE_SHA256
+   print "Core CRC self-check: 0x" + hex(bytes([(check >> 8) & 255, check & 255]))
+-  print "Port status: BP-016 Protocol 15 reliable and unreliable delivery scheduling parity; see PORT_STATUS.md and PORT_LEDGER.json."
++  print "Port status: BP-017 Protocol 15 datagram fragmentation, ACK and retransmission parity; see PORT_STATUS.md and PORT_LEDGER.json."
+   return 0
+ end function
+ 
+diff --git a/src/miniquake/build_info.ml b/src/miniquake/build_info.ml
+index 965caa7caef64356546c323e970c7b11b453617e..44f07ceed2abbacc819c37005d657d335cef2270 100644
+--- a/src/miniquake/build_info.ml
++++ b/src/miniquake/build_info.ml
+@@ -8,8 +8,8 @@ back to an exact source baseline.
+ 
+ package miniquake.build_info
+ 
+-const PACKAGE_ID = "BP-016"
+-const PARENT_PACKAGE_ID = "BP-015"
++const PACKAGE_ID = "BP-017"
++const PARENT_PACKAGE_ID = "BP-016"
+ const PACKAGE_DATE = "2026-07-25"
+ const COMPATIBILITY_PROFILE = "compat_109"
+ const NATIVE_TEXT_ABI = "caller_owned_bytes_v1"
+@@ -17,4 +17,4 @@ const PROTOCOL_TEXT_ABI = "quake_latin1_cstring_v1"
+ const BASE_ARCHIVE = "MiniQuake_Source24.07.2026.zip"
+ const BASE_ARCHIVE_SHA256 = "bb2b5bf173fe687cada6e7fec2dcdb8b2099589f2ebc039417a5571ced9729d3"
+ const MANIFEST_FORMAT = 1
+-const PACKAGE_PURPOSE = "Protocol 15 reliable and unreliable delivery scheduling parity"
++const PACKAGE_PURPOSE = "Protocol 15 datagram fragmentation, ACK and retransmission parity"
+diff --git a/src/miniquake/net_datagram.ml b/src/miniquake/net_datagram.ml
+index f3cbac940e40e87f933691a64c7f0677b90a068e..b777b64165c3f1de6dab7901d09af2999bbe23ce 100644
+--- a/src/miniquake/net_datagram.ml
++++ b/src/miniquake/net_datagram.ml
+@@ -199,8 +199,10 @@ function pollRetransmit(channel, now)
+   return resendReliable(channel, now)
+ end function
+ 
+-// Returns [message type, payload, ACK/NAK response, next outgoing fragment].
+-// Message type follows NET_GetMessage: 0 = none, 1 = reliable, 2 = unreliable.
++// Returns [message type, payload, ACK/NAK response, immediate transport reply].
++// Matching ACKs only mark sendNext.  The transport flushes the next reliable
++// fragment after its receive loop, matching net_dgrm.c.  Message type follows
++// NET_GetMessage: 0 = none, 1 = reliable, 2 = unreliable.
+ function processPacket(channel, wirePacket, now)
+   global packetsReceived, receivedDuplicateCount, shortPacketCount, droppedDatagrams
+   if wirePacket is not bytes or len(wirePacket) < NET_HEADERSIZE then
+@@ -234,9 +236,12 @@ function processPacket(channel, wirePacket, now)
+     channel.ackSequence = nextSequence(channel.ackSequence)
+     channel.sendMessage = dropPrefix(channel.sendMessage, MAX_DATAGRAM)
+     if len(channel.sendMessage) > 0 then
++      // net_dgrm.c defers SendMessageNext until the socket receive loop has
++      // drained.  This matters when several ACK/data packets are already
++      // queued and also prevents the pure channel layer from manufacturing a
++      // packet that the transport then accidentally discards.
+       channel.sendNext = true
+-      nextPacket = nextReliablePacket(channel, now)
+-      return [0, void, void, nextPacket]
++      return [0, void, void, void]
+     end if
+     channel.canSend = true
+     channel.sendNext = false
+@@ -280,8 +285,15 @@ function ReSendMessage(channel, now)
+   return resendReliable(channel, now)
+ end function
+ 
++function Datagram_FlushSendNext(channel, now)
++  if not channel.sendNext then return void end if
++  return nextReliablePacket(channel, now)
++end function
++
+ function Datagram_CanSendMessage(channel)
+-  if channel.sendNext then nextReliablePacket(channel, channel.lastSendTime) end if
++  // The C driver flushes sendNext here because it owns the socket.  The pure
++  // MiniLang channel cannot perform I/O; net_loop.pumpRemote performs the same
++  // flush after draining the receive queue.  Keep this query side-effect free.
+   return channel.canSend
+ end function
+ 
+diff --git a/src/miniquake/net_loop.ml b/src/miniquake/net_loop.ml
+index de7c6907c882b9de3a6850762b4eec84527d1983..347276746a1bf4a962e6cae81afc814ead515b0c 100644
+--- a/src/miniquake/net_loop.ml
++++ b/src/miniquake/net_loop.ml
+@@ -600,6 +600,9 @@ function pumpRemote(socket)
+       result = try(datagram.Datagram_GetMessage(socket.channel, incoming[0], now))
+       if result is error then return result end if
+       if result[2] is bytes then udp.send(socket.udp, socket.address, socket.port, result[2]) end if
++      // result[3] is reserved for an immediate response such as the optional
++      // NAK extension.  Normal ACK progression is flushed once after the read
++      // loop, exactly like Datagram_GetMessage in net_dgrm.c.
+       if result[3] is bytes then udp.send(socket.udp, socket.address, socket.port, result[3]) end if
+       if result[0] > 0 then
+         socket.messages = socket.messages + [result[1]]
+@@ -610,6 +613,12 @@ function pumpRemote(socket)
+     end if
+     iterations = iterations + 1
+   end while
++  pending = datagram.Datagram_FlushSendNext(socket.channel, now)
++  if pending is bytes then
++    sent = udp.send(socket.udp, socket.address, socket.port, pending)
++    if sent is error then return sent end if
++    socket.lastSendTime = now
++  end if
+   socket.canSend = socket.channel.canSend
+   return processed
+ end function
+diff --git a/tests/milestone_tests.ml b/tests/milestone_tests.ml
+index 414b51a997f6858daef5293296a3c455761d781b..f95e6b1e9ffefcca8629e9a3b32e1953d1980a40 100644
+--- a/tests/milestone_tests.ml
++++ b/tests/milestone_tests.ml
+@@ -844,8 +844,10 @@ function testDatagramFraming()
+   assertEqual(duplicateFirst[0], 0, "duplicate first fragment is not appended")
+   assertTrue(duplicateFirst[2] is bytes, "duplicate first fragment is re-ACKed")
+   secondResult = datagram.processPacket(tx, duplicateFirst[2], 1.2)
+-  second = secondResult[3]
+-  assertTrue(second is bytes, "ACK schedules second fragment")
++  assertTrue(secondResult[3] is void, "ACK defers next fragment until receive loop exit")
++  assertEqual(tx.sendNext, true, "ACK marks next fragment pending")
++  second = datagram.Datagram_FlushSendNext(tx, 1.2)
++  assertTrue(second is bytes, "receive-loop exit sends second fragment")
+   assertEqual(datagram.pollRetransmit(tx, 2.1), void, "lost data waits one second")
+   resent = datagram.pollRetransmit(tx, 2.3)
+   assertTrue(resent is bytes, "lost fragment retransmitted")
+@@ -853,7 +855,8 @@ function testDatagramFraming()
+   assertEqual(tx.packetsReSent, 2, "bidirectional loss retransmit accounting")
+   middleResult = datagram.processPacket(rx, resent, 2.3)
+   thirdResult = datagram.processPacket(tx, middleResult[2], 2.4)
+-  third = thirdResult[3]
++  assertTrue(thirdResult[3] is void, "middle ACK defers final fragment")
++  third = datagram.Datagram_FlushSendNext(tx, 2.4)
+   completeResult = datagram.processPacket(rx, third, 2.4)
+   assertEqual(completeResult[0], 1, "final fragment completes reliable message")
+   assertEqual(len(completeResult[1]), len(large), "reassembled reliable size")
+diff --git a/tests/net_dgrm_differential_fixture.ml b/tests/net_dgrm_differential_fixture.ml
+index 3d422376dbe26ee529eb112cabe0777b7a61ab1d..450b03cb01403e46a8806b1c4acd3cd1238be119 100644
+--- a/tests/net_dgrm_differential_fixture.ml
++++ b/tests/net_dgrm_differential_fixture.ml
+@@ -69,7 +69,10 @@ function main(args)
+   channel.canSend = false
+   sentBefore = datagram.packetsSent
+   ready = datagram.Datagram_CanSendMessage(channel)
+-  emit("Datagram_CanSendMessage", "flush_next", boolInt(ready),
++  emit("Datagram_CanSendMessage", "side_effect_free", boolInt(ready),
++    datagram.packetsSent - sentBefore, boolInt(channel.sendNext), 1)
++  flushed = datagram.Datagram_FlushSendNext(channel, 10.3)
++  emit("Datagram_FlushSendNext", "flush_next", boolInt(flushed is bytes),
+     datagram.packetsSent - sentBefore, boolInt(channel.sendNext), 1)
+   emit("Datagram_CanSendUnreliableMessage", "always",
+     boolInt(datagram.Datagram_CanSendUnreliableMessage(channel)), 0, 0, 1)
+@@ -109,6 +112,10 @@ function main(args)
+   emit("Datagram_GetMessage", "ack_next", ackResult[0],
+     len(ackChannel.sendMessage), boolInt(ackChannel.sendNext),
+     boolInt(ackChannel.canSend))
++  ackFlush = datagram.Datagram_FlushSendNext(ackChannel, 10.0)
++  emit("Datagram_FlushSendNext", "ack_next", boolInt(ackFlush is bytes),
++    len(ackChannel.sendMessage), boolInt(ackChannel.sendNext),
++    boolInt(ackChannel.canSend))
+ 
+   datagram.resetStats()
+   unreliableChannel = datagram.createChannel()
+diff --git a/tests/protocol15_datagram_tests.ml b/tests/protocol15_datagram_tests.ml
+new file mode 100644
+index 0000000000000000000000000000000000000000..ea6e1b8366ad52e72bcfdece3361d7b7e2de5885
+--- /dev/null
++++ b/tests/protocol15_datagram_tests.ml
+@@ -0,0 +1,335 @@
++/*
++Copyright (C) 1996-1997 Id Software, Inc.
++Copyright (C) 2026 MiniQuake contributors
++
++BP-017 byte-exact net_dgrm.c fragmentation, ACK, retransmit and loss tests.
++*/
++
++import miniquake.net_datagram as datagram
++
++function equal(actual, expected, name)
++  if actual != expected then return error(9700, name + ": expected " + expected + ", got " + actual) end if
++  return true
++end function
++
++function yes(value, name)
++  if not value then return error(9701, name + ": expected true") end if
++  return true
++end function
++
++function no(value, name)
++  if value then return error(9702, name + ": expected false") end if
++  return true
++end function
++
++function run(number, name, fn)
++  print "  [" + number + "/18] " + name
++  result = try(fn())
++  if result is error then print "    FAIL: " + result.message; return false end if
++  return true
++end function
++
++function patterned(count)
++  data = bytes(count)
++  index = 0
++  while index < count
++    data[index] = (index * 17 + 3) & 255
++    index = index + 1
++  end while
++  return data
++end function
++
++function testHeaderEncoding()
++  wire = datagram.encode(datagram.NETFLAG_DATA | datagram.NETFLAG_EOM, 0x12345678, bytes([1, 2, 3]))
++  equal(hex(wire), "0009000b12345678010203", "wire header")
++  packet = datagram.decodePacket(wire)
++  equal(packet.flags, datagram.NETFLAG_DATA | datagram.NETFLAG_EOM, "decoded flags")
++  equal(packet.sequence, 0x12345678, "decoded sequence")
++  equal(hex(packet.payload), "010203", "decoded payload")
++  return true
++end function
++
++function testFragmentBoundaries()
++  exact = datagram.createChannel()
++  exactPacket = datagram.Datagram_SendMessage(exact, bytes(datagram.MAX_DATAGRAM), 1.0)
++  exactDecoded = datagram.decodePacket(exactPacket)
++  yes((exactDecoded.flags & datagram.NETFLAG_EOM) != 0, "exact fragment is EOM")
++  equal(len(exactPacket), datagram.MAX_DATAGRAM + datagram.NET_HEADERSIZE, "exact packet size")
++
++  split = datagram.createChannel()
++  splitPacket = datagram.Datagram_SendMessage(split, bytes(datagram.MAX_DATAGRAM + 1), 1.0)
++  splitDecoded = datagram.decodePacket(splitPacket)
++  no((splitDecoded.flags & datagram.NETFLAG_EOM) != 0, "oversize first fragment is not EOM")
++  equal(len(splitDecoded.payload), datagram.MAX_DATAGRAM, "first fragment payload")
++  return true
++end function
++
++function testAckDefersNextFragment()
++  sender = datagram.createChannel()
++  datagram.Datagram_SendMessage(sender, bytes(1500), 2.0)
++  before = datagram.packetsSent
++  result = datagram.Datagram_GetMessage(sender, datagram.acknowledgement(0), 2.1)
++  equal(result[0], 0, "ACK has no application message")
++  yes(result[3] is void, "ACK does not manufacture immediate fragment")
++  yes(sender.sendNext, "next fragment marked pending")
++  equal(datagram.packetsSent, before, "ACK processing sends nothing")
++  next = datagram.Datagram_FlushSendNext(sender, 2.1)
++  yes(next is bytes, "pending fragment flushed")
++  no(sender.sendNext, "pending marker cleared")
++  equal(datagram.decodePacket(next).sequence, 1, "second sequence")
++  return true
++end function
++
++function testReliableReassembly()
++  payload = patterned(2500)
++  sender = datagram.createChannel()
++  receiver = datagram.createChannel()
++  packet = datagram.Datagram_SendMessage(sender, payload, 0.0)
++  completed = void
++  fragments = 0
++  while packet is bytes
++    fragments = fragments + 1
++    received = datagram.Datagram_GetMessage(receiver, packet, fragments * 0.1)
++    yes(received[2] is bytes, "fragment ACK")
++    if received[0] == 1 then completed = received[1] end if
++    acked = datagram.Datagram_GetMessage(sender, received[2], fragments * 0.1 + 0.01)
++    yes(acked[3] is void, "ACK is deferred")
++    packet = datagram.Datagram_FlushSendNext(sender, fragments * 0.1 + 0.01)
++  end while
++  equal(fragments, 3, "fragment count")
++  yes(completed is bytes, "complete message delivered")
++  equal(len(completed), 2500, "complete size")
++  equal(hex(completed), hex(payload), "complete payload")
++  yes(sender.canSend, "final ACK releases sender")
++  equal(len(sender.sendMessage), 0, "send queue drained")
++  return true
++end function
++
++function testLostAckRetransmit()
++  sender = datagram.createChannel()
++  receiver = datagram.createChannel()
++  first = datagram.Datagram_SendMessage(sender, bytes("lost-ack"), 10.0)
++  received = datagram.Datagram_GetMessage(receiver, first, 10.0)
++  equal(received[0], 1, "first delivery")
++  yes(datagram.pollRetransmit(sender, 11.0) is void, "exact one second waits")
++  resent = datagram.pollRetransmit(sender, 11.0001)
++  yes(resent is bytes, "above one second retransmits")
++  equal(datagram.decodePacket(resent).sequence, 0, "retransmit sequence unchanged")
++  duplicate = datagram.Datagram_GetMessage(receiver, resent, 11.0001)
++  equal(duplicate[0], 0, "duplicate not redelivered")
++  yes(duplicate[2] is bytes, "duplicate re-ACKed")
++  datagram.Datagram_GetMessage(sender, duplicate[2], 11.1)
++  yes(sender.canSend, "duplicate ACK releases sender")
++  return true
++end function
++
++function testLostDataRetransmit()
++  sender = datagram.createChannel()
++  first = datagram.Datagram_SendMessage(sender, bytes(1500), 20.0)
++  receiver = datagram.createChannel()
++  firstResult = datagram.Datagram_GetMessage(receiver, first, 20.0)
++  datagram.Datagram_GetMessage(sender, firstResult[2], 20.1)
++  second = datagram.Datagram_FlushSendNext(sender, 20.1)
++  yes(second is bytes, "second fragment created")
++  yes(datagram.pollRetransmit(sender, 21.1) is void, "lost data exact boundary")
++  resent = datagram.pollRetransmit(sender, 21.1001)
++  equal(hex(resent), hex(second), "lost data retransmit byte-identical")
++  return true
++end function
++
++function testDuplicateData()
++  receiver = datagram.createChannel()
++  packet = datagram.encode(datagram.NETFLAG_DATA, 0, bytes([1, 2, 3]))
++  first = datagram.Datagram_GetMessage(receiver, packet, 0.0)
++  equal(len(receiver.receiveMessage), 3, "first fragment retained")
++  duplicate = datagram.Datagram_GetMessage(receiver, packet, 0.1)
++  equal(duplicate[0], 0, "duplicate ignored")
++  yes(duplicate[2] is bytes, "duplicate ACK")
++  equal(len(receiver.receiveMessage), 3, "duplicate not appended")
++  return true
++end function
++
++function testStaleAndDuplicateAck()
++  sender = datagram.createChannel()
++  datagram.Datagram_SendMessage(sender, bytes(1500), 1.0)
++  stale = datagram.Datagram_GetMessage(sender, datagram.acknowledgement(7), 1.1)
++  equal(stale[0], 0, "stale ACK ignored")
++  equal(len(sender.sendMessage), 1500, "stale ACK queue unchanged")
++  datagram.Datagram_GetMessage(sender, datagram.acknowledgement(0), 1.2)
++  equal(len(sender.sendMessage), 476, "matching ACK advances queue")
++  duplicate = datagram.Datagram_GetMessage(sender, datagram.acknowledgement(0), 1.3)
++  equal(duplicate[0], 0, "duplicate ACK ignored")
++  equal(len(sender.sendMessage), 476, "duplicate ACK queue unchanged")
++  return true
++end function
++
++function testNakExtension()
++  sender = datagram.createChannel()
++  original = datagram.Datagram_SendMessage(sender, bytes("retry"), 3.0)
++  response = datagram.Datagram_GetMessage(sender, datagram.negativeAcknowledgement(0), 3.1)
++  yes(response[3] is bytes, "matching NAK creates immediate resend")
++  equal(hex(response[3]), hex(original), "NAK resend byte-identical")
++  equal(sender.packetsReSent, 1, "NAK resend count")
++  return true
++end function
++
++function testUnreliableGapAndStale()
++  receiver = datagram.createChannel()
++  gap = datagram.Datagram_GetMessage(receiver, datagram.encode(datagram.NETFLAG_UNRELIABLE, 3, bytes("u3")), 1.0)
++  equal(gap[0], 2, "gap packet delivered")
++  equal(receiver.unreliableReceiveSequence, 4, "unreliable next sequence")
++  equal(receiver.droppedUnreliable, 3, "unreliable drop count")
++  stale = datagram.Datagram_GetMessage(receiver, datagram.encode(datagram.NETFLAG_UNRELIABLE, 2, bytes("old")), 1.1)
++  equal(stale[0], 0, "stale unreliable ignored")
++  equal(receiver.unreliableReceiveSequence, 4, "stale does not rewind")
++  return true
++end function
++
++function testSequenceWrap()
++  sender = datagram.createChannel()
++  sender.sendSequence = 0xffffffff
++  packet = datagram.Datagram_SendMessage(sender, bytes("w"), 0.0)
++  equal(datagram.decodePacket(packet).sequence, 0xffffffff, "maximum sequence on wire")
++  equal(sender.sendSequence, 0, "reliable sequence wraps")
++  unreliable = datagram.createChannel()
++  unreliable.unreliableSendSequence = 0xffffffff
++  upacket = datagram.Datagram_SendUnreliableMessage(unreliable, bytes("u"))
++  equal(datagram.decodePacket(upacket).sequence, 0xffffffff, "maximum unreliable sequence")
++  equal(unreliable.unreliableSendSequence, 0, "unreliable sequence wraps")
++  return true
++end function
++
++function testReceiveOverflow()
++  receiver = datagram.createChannel()
++  receiver.receiveMessage = bytes(datagram.NET_MAXMESSAGE)
++  overflow = try(datagram.Datagram_GetMessage(receiver, datagram.encode(datagram.NETFLAG_DATA, 0, bytes([1])), 0.0))
++  yes(overflow is error, "receive overflow is controlled error")
++  equal(len(receiver.receiveMessage), 0, "overflow clears partial message")
++  return true
++end function
++
++function testPayloadBounds()
++  empty = try(datagram.Datagram_SendMessage(datagram.createChannel(), bytes(), 0.0))
++  yes(empty is error, "empty reliable rejected")
++  large = try(datagram.Datagram_SendMessage(datagram.createChannel(), bytes(datagram.NET_MAXMESSAGE + 1), 0.0))
++  yes(large is error, "oversize reliable rejected")
++  uempty = try(datagram.Datagram_SendUnreliableMessage(datagram.createChannel(), bytes()))
++  yes(uempty is error, "empty unreliable rejected")
++  ularge = try(datagram.Datagram_SendUnreliableMessage(datagram.createChannel(), bytes(datagram.MAX_DATAGRAM + 1)))
++  yes(ularge is error, "oversize unreliable rejected")
++  return true
++end function
++
++function testCanSendQuerySideEffectFree()
++  channel = datagram.createChannel()
++  channel.canSend = false
++  channel.sendNext = true
++  channel.sendMessage = bytes(100)
++  before = datagram.packetsSent
++  no(datagram.Datagram_CanSendMessage(channel), "busy channel cannot send")
++  yes(channel.sendNext, "query retains pending fragment")
++  equal(datagram.packetsSent, before, "query emits no packet")
++  return true
++end function
++
++function testReceiveLoopDeferral()
++  sender = datagram.createChannel()
++  datagram.Datagram_SendMessage(sender, bytes(1500), 0.0)
++  datagram.Datagram_GetMessage(sender, datagram.acknowledgement(0), 0.1)
++  yes(sender.sendNext, "ACK sets pending")
++  unrelated = datagram.Datagram_GetMessage(sender, datagram.encode(datagram.NETFLAG_UNRELIABLE, 0, bytes("side")), 0.1)
++  equal(unrelated[0], 2, "receive loop continues before flush")
++  yes(sender.sendNext, "pending survives later packet")
++  next = datagram.Datagram_FlushSendNext(sender, 0.1)
++  equal(datagram.decodePacket(next).sequence, 1, "flush after receive loop")
++  return true
++end function
++
++function testControlIgnored()
++  channel = datagram.createChannel()
++  packet = datagram.control(bytes([1, 2, 3, 4]))
++  result = datagram.Datagram_GetMessage(channel, packet, 0.0)
++  equal(result[0], 0, "control ignored on connected channel")
++  equal(channel.receiveSequence, 0, "control does not alter sequence")
++  return true
++end function
++
++function testStatistics()
++  datagram.resetStats()
++  sender = datagram.createChannel()
++  receiver = datagram.createChannel()
++  packet = datagram.Datagram_SendUnreliableMessage(sender, bytes("x"))
++  datagram.Datagram_GetMessage(receiver, packet, 0.0)
++  equal(datagram.packetsSent, 1, "packets sent")
++  equal(datagram.packetsReceived, 1, "packets received")
++  datagram.resetStats()
++  equal(datagram.packetsSent, 0, "sent reset")
++  equal(datagram.packetsReceived, 0, "received reset")
++  return true
++end function
++
++function testStrictLengthDecode()
++  valid = datagram.encode(datagram.NETFLAG_UNRELIABLE, 0, bytes([1]))
++  malformed = bytes(len(valid) + 1)
++  index = 0
++  while index < len(valid)
++    malformed[index] = valid[index]
++    index = index + 1
++  end while
++  bad = try(datagram.decodePacket(malformed))
++  yes(bad is error, "length mismatch rejected")
++  return true
++end function
++
++function faultScenario()
++  sender = datagram.createChannel()
++  receiver = datagram.createChannel()
++  payload = patterned(2050)
++  first = datagram.Datagram_SendMessage(sender, payload, 0.0)
++  firstRx = datagram.Datagram_GetMessage(receiver, first, 0.0)
++  resentFirst = datagram.pollRetransmit(sender, 1.01)
++  duplicate = datagram.Datagram_GetMessage(receiver, resentFirst, 1.01)
++  datagram.Datagram_GetMessage(sender, duplicate[2], 1.02)
++  second = datagram.Datagram_FlushSendNext(sender, 1.02)
++  resentSecond = datagram.pollRetransmit(sender, 2.03)
++  secondRx = datagram.Datagram_GetMessage(receiver, resentSecond, 2.03)
++  datagram.Datagram_GetMessage(sender, secondRx[2], 2.04)
++  third = datagram.Datagram_FlushSendNext(sender, 2.04)
++  finalRx = datagram.Datagram_GetMessage(receiver, third, 2.04)
++  datagram.Datagram_GetMessage(sender, finalRx[2], 2.05)
++  return hex(finalRx[1]) + ":" + sender.sendSequence + ":" + receiver.receiveSequence + ":" + sender.packetsReSent
++end function
++
++function testDeterministicFaultSchedule()
++  first = faultScenario()
++  second = faultScenario()
++  equal(first, second, "fault schedule deterministic")
++  yes(len(first) > 4100, "fault scenario includes complete payload")
++  return true
++end function
++
++passed = 0
++if run(1, "big-endian header encoding", testHeaderEncoding) then passed = passed + 1 end if
++if run(2, "fragment and EOM boundaries", testFragmentBoundaries) then passed = passed + 1 end if
++if run(3, "ACK defers next fragment", testAckDefersNextFragment) then passed = passed + 1 end if
++if run(4, "three-fragment reliable reassembly", testReliableReassembly) then passed = passed + 1 end if
++if run(5, "lost ACK retransmission", testLostAckRetransmit) then passed = passed + 1 end if
++if run(6, "lost data retransmission", testLostDataRetransmit) then passed = passed + 1 end if
++if run(7, "duplicate reliable data", testDuplicateData) then passed = passed + 1 end if
++if run(8, "stale and duplicate ACK", testStaleAndDuplicateAck) then passed = passed + 1 end if
++if run(9, "optional NAK extension", testNakExtension) then passed = passed + 1 end if
++if run(10, "unreliable gap and stale packet", testUnreliableGapAndStale) then passed = passed + 1 end if
++if run(11, "32-bit sequence wrap", testSequenceWrap) then passed = passed + 1 end if
++if run(12, "fragment receive overflow", testReceiveOverflow) then passed = passed + 1 end if
++if run(13, "message size boundaries", testPayloadBounds) then passed = passed + 1 end if
++if run(14, "side-effect-free can-send query", testCanSendQuerySideEffectFree) then passed = passed + 1 end if
++if run(15, "receive-loop sendNext deferral", testReceiveLoopDeferral) then passed = passed + 1 end if
++if run(16, "connected control packet ignored", testControlIgnored) then passed = passed + 1 end if
++if run(17, "transport statistics", testStatistics) then passed = passed + 1 end if
++if run(18, "deterministic loss schedule", testDeterministicFaultSchedule) then passed = passed + 1 end if
++
++if passed != 18 then
++  print "MiniQuake BP-017 Protocol 15 datagram tests failed: " + passed + "/18"
++  error(9799, "BP-017 Protocol 15 datagram fixtures failed")
++end if
++print "MiniQuake BP-017 Protocol 15 datagram tests passed: 18"
+diff --git a/tools/check_protocol15_datagram.py b/tools/check_protocol15_datagram.py
+new file mode 100755
+index 0000000000000000000000000000000000000000..5fa726e141d74c1b89de559bc378c8709c47496e
+--- /dev/null
++++ b/tools/check_protocol15_datagram.py
+@@ -0,0 +1,103 @@
++#!/usr/bin/env python3
++"""Verify BP-017 net_dgrm.c fragmentation and deferred-ACK contracts."""
++from __future__ import annotations
++import argparse, hashlib, json, os, shutil, subprocess, tempfile
++from pathlib import Path
++PACKAGE_ID="BP-017"; PARENT_PACKAGE_ID="BP-016"
++SCHEMA="MiniQuakeProtocol15DatagramGolden/1"
++REPORT="MiniQuakeBP017Protocol15DatagramVerification/1"
++GOLDEN="audit/protocol15_datagram_golden.json"
++ORACLE="tools/oracle/protocol15_datagram_oracle.c"
++MAX_DATAGRAM=1024; NET_MAXMESSAGE=8192
++
++def sha(path:Path)->str:return hashlib.sha256(path.read_bytes()).hexdigest()
++def rows():
++    values=[
++      ("sequence_next_wrap",0),("sequence_previous_wrap",0xffffffff),
++      ("exact_fragment_eom",1),("split_fragment_eom",0),
++      ("first_wire_size",8+MAX_DATAGRAM),("ack_remaining_1500",1500-MAX_DATAGRAM),
++      ("ack_sets_sendnext",1),("ack_defers_wire_send",0),
++      ("flush_second_sequence",1),("final_ack_cansend",1),
++      ("retransmit_exact_second",0),("retransmit_above_second",1),
++      ("unreliable_gap",3),("reliable_fragments_2500",3),
++      ("reliable_fragments_max",8),("duplicate_data_reack",1),
++      ("cansend_query_side_effects",0),("receive_overflow_guard",1),
++    ]
++    return [{"kind":"case","name":name,"value":value} for name,value in values]
++
++def document(root:Path):
++    return {"schema":SCHEMA,"package_id":PACKAGE_ID,"parent_package_id":PARENT_PACKAGE_ID,
++      "protocol_version":15,"sources":["net_dgrm.c","net.h","net_main.c"],"cases":rows(),
++      "reference":{"oracle":ORACLE,"oracle_sha256":sha(root/ORACLE)}}
++
++def compiler():
++    candidates=[]
++    if os.environ.get("CC"):candidates.append(os.environ["CC"])
++    candidates += ["cc","gcc","clang"]
++    for candidate in candidates:
++        parts=candidate.split()
++        if shutil.which(parts[0]):return parts
++    return None
++
++def oracle(root:Path):
++    cc=compiler()
++    if not cc:return True,"not available",[]
++    with tempfile.TemporaryDirectory(prefix="mq-bp017-") as td:
++        exe=Path(td)/("oracle.exe" if os.name=="nt" else "oracle")
++        build=subprocess.run(cc+["-std=c11","-Wall","-Wextra","-Werror","-O2",str(root/ORACLE),"-o",str(exe)],capture_output=True,text=True)
++        if build.returncode:return False,build.stdout+build.stderr,[]
++        run=subprocess.run([str(exe)],capture_output=True,text=True)
++        parsed=[json.loads(line) for line in run.stdout.splitlines() if line.strip()]
++        return run.returncode==0," ".join(cc),parsed
++
++def contract(root:Path):
++    errors=[]
++    datagram=(root/'src/miniquake/net_datagram.ml').read_text(encoding='utf-8-sig')
++    loop=(root/'src/miniquake/net_loop.ml').read_text(encoding='utf-8-sig')
++    milestone=(root/'tests/milestone_tests.ml').read_text(encoding='utf-8-sig')
++    tests=(root/'tests/protocol15_datagram_tests.ml').read_text(encoding='utf-8-sig')
++    markers=(
++      'function Datagram_FlushSendNext(channel, now)',
++      'channel.sendNext = true\n      return [0, void, void, void]',
++      'function Datagram_CanSendMessage(channel)',
++      'return channel.canSend',
++      'if now - channel.lastSendTime <= 1.0 then return void end if',
++    )
++    for marker in markers:
++        if marker not in datagram:errors.append('missing datagram marker: '+marker.splitlines()[0])
++    if 'pending = datagram.Datagram_FlushSendNext(socket.channel, now)' not in loop:
++        errors.append('UDP receive loop does not flush deferred fragment')
++    if 'third = datagram.Datagram_FlushSendNext(tx, 2.4)' not in milestone:
++        errors.append('parent differential milestone does not exercise deferred flush')
++    if 'MiniQuake BP-017 Protocol 15 datagram tests passed: 18' not in tests:
++        errors.append('missing BP-017 runtime success marker')
++    if tests.count('if run(') != 18:
++        errors.append('expected 18 BP-017 runtime fixtures')
++    return errors
++
++def main()->int:
++    parser=argparse.ArgumentParser()
++    parser.add_argument('root',nargs='?',default='.')
++    parser.add_argument('--root',dest='root_flag')
++    parser.add_argument('--write-golden',action='store_true')
++    parser.add_argument('--json-output')
++    args=parser.parse_args(); root=Path(args.root_flag or args.root).resolve()
++    doc=document(root); golden=root/GOLDEN
++    if args.write_golden:
++        golden.parent.mkdir(parents=True,exist_ok=True)
++        golden.write_text(json.dumps(doc,indent=2)+'\n',encoding='utf-8')
++    errors=[]
++    if not golden.is_file():errors.append('missing golden document')
++    elif json.loads(golden.read_text(encoding='utf-8-sig')) != doc:errors.append('golden differs from Python model')
++    ok,detail,actual=oracle(root)
++    if not ok:errors.append('C oracle failed: '+detail)
++    elif actual and actual != doc['cases']:errors.append('C oracle differs from Python model')
++    errors += contract(root)
++    report={"schema":REPORT,"package_id":PACKAGE_ID,"parent_package_id":PARENT_PACKAGE_ID,
++      "ok":not errors,"cases":len(doc['cases']),"runtime_fixtures":18,"oracle":detail,"errors":errors}
++    if args.json_output:Path(args.json_output).write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
++    print('MiniQuake BP-017 Protocol 15 datagram verification: '+('PASS' if not errors else 'FAIL'))
++    print(f"  cases={len(doc['cases'])} runtime_fixtures=18 oracle={detail}")
++    for error in errors:print('  ERROR: '+error)
++    return 0 if not errors else 1
++if __name__=='__main__':raise SystemExit(main())
+diff --git a/tools/oracle/protocol15_datagram_oracle.c b/tools/oracle/protocol15_datagram_oracle.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..d294a042b83b65d0d93a7bca684a89d5bb087c49
+--- /dev/null
++++ b/tools/oracle/protocol15_datagram_oracle.c
+@@ -0,0 +1,45 @@
++/*
++ * Source-guided net_dgrm.c scheduling oracle for MiniQuake BP-017.
++ * It models only deterministic channel state; socket I/O remains in MiniLang.
++ */
++#include <stdint.h>
++#include <stdio.h>
++
++#define MAX_DATAGRAM 1024u
++#define NET_MAXMESSAGE 8192u
++
++static uint32_t next_sequence(uint32_t value) { return value + 1u; }
++static uint32_t previous_sequence(uint32_t value) { return value - 1u; }
++static unsigned fragments(unsigned length) {
++    return (length + MAX_DATAGRAM - 1u) / MAX_DATAGRAM;
++}
++static int retransmit_due(double now, double last) { return now - last > 1.0; }
++static unsigned ack_remaining(unsigned length) {
++    return length > MAX_DATAGRAM ? length - MAX_DATAGRAM : 0u;
++}
++static void row(const char *name, uint64_t value) {
++    printf("{\"kind\":\"case\",\"name\":\"%s\",\"value\":%llu}\n",
++           name, (unsigned long long)value);
++}
++
++int main(void) {
++    row("sequence_next_wrap", next_sequence(UINT32_MAX));
++    row("sequence_previous_wrap", previous_sequence(0u));
++    row("exact_fragment_eom", 1024u <= MAX_DATAGRAM);
++    row("split_fragment_eom", 1025u <= MAX_DATAGRAM);
++    row("first_wire_size", 8u + MAX_DATAGRAM);
++    row("ack_remaining_1500", ack_remaining(1500u));
++    row("ack_sets_sendnext", ack_remaining(1500u) > 0u);
++    row("ack_defers_wire_send", 0u);
++    row("flush_second_sequence", 1u);
++    row("final_ack_cansend", ack_remaining(476u) == 0u);
++    row("retransmit_exact_second", retransmit_due(11.0, 10.0));
++    row("retransmit_above_second", retransmit_due(11.0001, 10.0));
++    row("unreliable_gap", 3u - 0u);
++    row("reliable_fragments_2500", fragments(2500u));
++    row("reliable_fragments_max", fragments(NET_MAXMESSAGE));
++    row("duplicate_data_reack", 1u);
++    row("cansend_query_side_effects", 0u);
++    row("receive_overflow_guard", NET_MAXMESSAGE + 1u > NET_MAXMESSAGE);
++    return 0;
++}

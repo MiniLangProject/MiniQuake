@@ -1,0 +1,101 @@
+{
+  "schema": "MiniQuakeProtocol15Golden/1",
+  "package": "BP-010R1",
+  "reference": {
+    "engine": "WinQuake/GLQuake 1.09",
+    "source_units": [
+      "common.c:MSG_*",
+      "common.c:SZ_*",
+      "cl_input.c:CL_SendMove",
+      "sv_main.c:SV_CreateBaseline",
+      "protocol.h"
+    ],
+    "target": "little-endian two's-complement Win32/Win64 release semantics",
+    "oracle_source": "tools/oracle/protocol15_common_oracle.c",
+    "oracle_sha256": "34d1a2aecb72c829288dc8be09b071796960a24635d9f9ac7384818c6180ea39"
+  },
+  "string_abi": "quake_latin1_cstring_v1",
+  "protocol_version": 15,
+  "vectors": [
+    {
+      "name": "primitive_stream",
+      "bytes": "fefe2efb78563412000048417175616b65009eff40",
+      "length": 21
+    },
+    {
+      "name": "release_wrapping",
+      "bytes": "82ff4523feffffff",
+      "length": 8
+    },
+    {
+      "name": "coord_angle_boundaries",
+      "bytes": "0000ffffff7f008000c0ff00",
+      "length": 12
+    },
+    {
+      "name": "float_parameter_rounding",
+      "bytes": "0000804b0100ffff1000f0ff01ff0000",
+      "length": 16
+    },
+    {
+      "name": "raw_high_bit_string",
+      "bytes": "4180e9fe00",
+      "length": 5
+    },
+    {
+      "name": "embedded_nul_string",
+      "bytes": "4100",
+      "length": 2
+    },
+    {
+      "name": "null_string",
+      "bytes": "00",
+      "length": 1
+    },
+    {
+      "name": "string_overflow_restart",
+      "bytes": "787900",
+      "length": 3,
+      "overflowed": true
+    },
+    {
+      "name": "sz_print_concat",
+      "bytes": "6f6e6574776f00",
+      "length": 7
+    },
+    {
+      "name": "sz_print_overflow_restart",
+      "bytes": "616200",
+      "length": 3,
+      "overflowed": true
+    },
+    {
+      "name": "sz_overflow_restart",
+      "bytes": "0908",
+      "length": 2,
+      "overflowed": true
+    },
+    {
+      "name": "clc_move",
+      "bytes": "03000048410880c0c80085ff00800307",
+      "length": 16
+    },
+    {
+      "name": "baseline_payload",
+      "bytes": "010203049eff400100c0ff7fff",
+      "length": 13
+    }
+  ],
+  "write_semantics": {
+    "message_string_reservation": "payload plus trailing NUL are reserved atomically as strlen+1 bytes",
+    "sizebuf_print_no_nul_reservation": "payload plus trailing NUL are reserved atomically as strlen+1 bytes",
+    "empty_sizebuf_print_divergence": "MiniQuake handles cursize==0 safely; original common.c reads data[-1]",
+    "trailing_nul_overflow_divergence": "MiniQuake safely restarts the complete string; original pointer subtraction writes before data[0] after clear"
+  },
+  "read_semantics": {
+    "signed_char_ff_terminates_string": true,
+    "string_payload_limit": 2047,
+    "truncated_integer_sets_badread_without_advancing": true,
+    "safe_float_truncation_divergence": "MiniQuake returns -1.0 and sets badRead instead of performing the original out-of-bounds read"
+  }
+}

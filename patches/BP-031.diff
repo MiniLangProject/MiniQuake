@@ -1,0 +1,431 @@
+diff --git a/CHANGELOG_BP-031.md b/CHANGELOG_BP-031.md
+new file mode 100644
+index 0000000..918c566
+--- /dev/null
++++ b/CHANGELOG_BP-031.md
+@@ -0,0 +1,6 @@
++# BP-031 – Command and cvar lifecycle parity
++
++- Stores `cvar_t.value` at the original binary32 boundary.
++- Implements `%f`-style six-decimal `Cvar_SetValue`, including negative zero.
++- Centralizes `Cvar_Command` query/set semantics and uses it from the host.
++- Binds command-buffer, alias, completion, archive and `wait` limits with 20 fixtures.
+diff --git a/audit/command_cvar_golden.json b/audit/command_cvar_golden.json
+new file mode 100644
+index 0000000..73ee56f
+--- /dev/null
++++ b/audit/command_cvar_golden.json
+@@ -0,0 +1,50 @@
++{
++  "schema": "MiniQuakeCommandCvarGolden/1",
++  "package_id": "BP-031",
++  "parent_package_id": "BP-030",
++  "sources": [
++    "cmd.c",
++    "cvar.c"
++  ],
++  "rows": [
++    {
++      "kind": "case",
++      "name": "stored_value_bits",
++      "value": 1036831949
++    },
++    {
++      "kind": "case",
++      "name": "setvalue_1_25",
++      "value": "1.250000"
++    },
++    {
++      "kind": "case",
++      "name": "setvalue_negative_zero",
++      "value": "-0.000000"
++    },
++    {
++      "kind": "case",
++      "name": "command_buffer_size",
++      "value": 8192
++    },
++    {
++      "kind": "case",
++      "name": "max_alias_name",
++      "value": 32
++    },
++    {
++      "kind": "case",
++      "name": "max_args",
++      "value": 80
++    },
++    {
++      "kind": "case",
++      "name": "fixture_count",
++      "value": 20
++    }
++  ],
++  "reference": {
++    "oracle": "tools/oracle/command_cvar_oracle.c",
++    "oracle_sha256": "73d30c8d0008ab967412d8296e90a4f9a6f412c7ad27147feefb54d6a6fde2e6"
++  }
++}
+diff --git a/docs/BP-031_COMMAND_CVAR_AUDIT.md b/docs/BP-031_COMMAND_CVAR_AUDIT.md
+new file mode 100644
+index 0000000..6fce46d
+--- /dev/null
++++ b/docs/BP-031_COMMAND_CVAR_AUDIT.md
+@@ -0,0 +1,8 @@
++# BP-031 command/cvar audit
++
++Reference: `cmd.c` and `cvar.c` from WinQuake 1.09.
++
++The contract covers the 8192-byte command buffer, 32-byte alias-name storage,
++80 parsed arguments, head insertion, case-sensitive registration/completion,
++case-insensitive execution, alias replacement rules, `wait`, archived-variable
++order and the binary32 `cvar_t.value` field.
+diff --git a/src/miniquake/cvar.ml b/src/miniquake/cvar.ml
+index 4dc4793..8d822a2 100644
+--- a/src/miniquake/cvar.ml
++++ b/src/miniquake/cvar.ml
+@@ -5,7 +5,9 @@ import miniquake.native as native
+ import miniquake.common as common
+ 
+ function numericValue(text)
+-  return common.atof(text)
++  // cvar_t.value is a C float even though MiniLang expressions may retain more
++  // precision.  Keep the stored numeric view at the original binary32 boundary.
++  return native.bitsFloat(native.floatBits(common.atof(text)))
+ end function
+ 
+ function createRegistry()
+@@ -53,20 +55,36 @@ function takeServerChanges(registry)
+   return changes
+ end function
+ 
+-function setValue(registry, name, value)
+-  negative = value < 0.0
+-  magnitude = value
++function fixedSixValue(value)
++  raw = native.floatBits(value)
++  rounded = native.bitsFloat(raw)
++  negative = (raw & 0x80000000) != 0
++  magnitude = rounded
+   if negative then magnitude = -magnitude end if
+   scaled = native.trunc(magnitude * 1000000.0 + 0.5)
+   whole = native.trunc(scaled / 1000000)
+-  fraction = scaled % 1000000
+-  digits = "" + fraction
+-  while len(bytes(digits)) < 6
+-    digits = "0" + digits
++  fraction = "" + (scaled % 1000000)
++  while len(bytes(fraction)) < 6
++    fraction = "0" + fraction
+   end while
+-  text = "" + whole + "." + digits
++  text = "" + whole + "." + fraction
+   if negative then text = "-" + text end if
+-  return set(registry, name, text)
++  return text
++end function
++
++function setValue(registry, name, value)
++  return set(registry, name, fixedSixValue(value))
++end function
++
++function command(registry, arguments)
++  if len(arguments) == 0 then return [false, ""] end if
++  variable = find(registry, arguments[0])
++  if variable is void then return [false, ""] end if
++  if len(arguments) == 1 then
++    return [true, "\"" + variable.name + "\" is \"" + variable.string + "\""]
++  end if
++  set(registry, variable.name, arguments[1])
++  return [true, ""]
+ end function
+ 
+ function variableValue(registry, name)
+diff --git a/src/miniquake/host.ml b/src/miniquake/host.ml
+index e64c042..c64482d 100644
+--- a/src/miniquake/host.ml
++++ b/src/miniquake/host.ml
+@@ -334,14 +334,9 @@ function filterTime(timing, newRealtime, maxFps, forcedFrameRate, timedemo)
+ end function
+ 
+ function cvarCommand(session, arguments)
+-  if len(arguments) == 0 then return false end if
+-  variable = cvar.find(session.cvars, arguments[0])
+-  if variable is void then return false end if
+-  if len(arguments) == 1 then
+-    print "\"" + variable.name + "\" is \"" + variable.string + "\""
+-  else
+-    cvar.set(session.cvars, variable.name, arguments[1])
+-  end if
++  result = cvar.command(session.cvars, arguments)
++  if not result[0] then return false end if
++  if result[1] != "" then print result[1] end if
+   return true
+ end function
+ 
+diff --git a/tests/command_cvar_lifecycle_tests.ml b/tests/command_cvar_lifecycle_tests.ml
+new file mode 100644
+index 0000000..e5ab254
+--- /dev/null
++++ b/tests/command_cvar_lifecycle_tests.ml
+@@ -0,0 +1,172 @@
++/* BP-031: command buffer, alias and cvar lifecycle parity. */
++import miniquake.cmd as cmd
++import miniquake.cvar as cvar
++import miniquake.native as native
++
++function never(name)
++  return false
++end function
++
++function yes(value, name)
++  if not value then return error(3100, name + ": expected true") end if
++  return true
++end function
++function no(value, name)
++  if value then return error(3101, name + ": expected false") end if
++  return true
++end function
++function equal(actual, expected, name)
++  if actual != expected then return error(3102, name + ": expected " + expected + ", got " + actual) end if
++  return true
++end function
++function run(number, name, fn)
++  print "[" + number + "/20] " + name
++  result = try(fn())
++  if result is error then print "FAIL: " + result.message; return false end if
++  return true
++end function
++
++function registry()
++  value = cvar.createRegistry()
++  cvar.register(value, cvar.create("first", "1", true, false), never)
++  cvar.register(value, cvar.create("second", "2", true, true), never)
++  return value
++end function
++
++function testStoredFloat()
++  value = cvar.create("x", "0.100000001", false, false)
++  equal(native.floatBits(value.value), native.floatBits(0.100000001), "stored binary32")
++  return true
++end function
++function testSetValue()
++  value = registry(); cvar.setValue(value, "first", 1.25)
++  equal(cvar.variableString(value, "first"), "1.250000", "setvalue text")
++  return true
++end function
++function testNegativeZero()
++  value = registry(); cvar.setValue(value, "first", native.bitsFloat(0x80000000))
++  equal(cvar.variableString(value, "first"), "-0.000000", "negative zero")
++  return true
++end function
++function testPositiveZero()
++  value = registry(); cvar.setValue(value, "first", 0.0)
++  equal(cvar.variableString(value, "first"), "0.000000", "positive zero")
++  return true
++end function
++function testServerChange()
++  value = registry(); cvar.set(value, "second", "3")
++  changes = cvar.takeServerChanges(value)
++  equal(len(changes), 1, "server change count")
++  equal(changes[0][0], "second", "server change name")
++  return true
++end function
++function testUnchangedServerValue()
++  value = registry(); cvar.set(value, "second", "2")
++  equal(len(cvar.takeServerChanges(value)), 0, "unchanged server value")
++  return true
++end function
++function testNonServerChange()
++  value = registry(); cvar.set(value, "first", "4")
++  equal(len(cvar.takeServerChanges(value)), 0, "non-server change")
++  return true
++end function
++function testHeadInsertion()
++  value = registry()
++  equal(value.variables[0].name, "second", "cvar head insertion")
++  return true
++end function
++function testArchiveOrder()
++  value = registry()
++  equal(cvar.archiveText(value), "second \"2\"\nfirst \"1\"\n", "archive list order")
++  return true
++end function
++function testCompletion()
++  value = registry()
++  equal(cvar.completeVariable(value, "sec"), "second", "completion")
++  return true
++end function
++function testCompletionCaseSensitive()
++  value = registry()
++  yes(cvar.completeVariable(value, "Sec") is void, "completion case")
++  return true
++end function
++function testCommandQuery()
++  value = registry(); result = cvar.command(value, ["first"])
++  yes(result[0], "query handled")
++  equal(result[1], "\"first\" is \"1\"", "query text")
++  return true
++end function
++function testCommandSet()
++  value = registry(); result = cvar.command(value, ["first", "7", "ignored"])
++  yes(result[0], "set handled")
++  equal(cvar.variableString(value, "first"), "7", "only argv1 used")
++  return true
++end function
++function testUnknownCommand()
++  value = registry(); result = cvar.command(value, ["missing"])
++  no(result[0], "unknown cvar")
++  return true
++end function
++function testCommandBufferBoundary()
++  system = cmd.create(); fill = bytes(cmd.COMMAND_BUFFER_SIZE - 1, 97)
++  yes(cmd.addText(system, decode(fill)), "buffer max minus one")
++  no(cmd.addText(system, "b"), "exact max rejected")
++  return true
++end function
++function testQuotedSemicolon()
++  parts = cmd.splitFirstCommand("echo \"a;b\";echo c")
++  equal(parts[0], "echo \"a;b\"", "quoted semicolon")
++  equal(parts[1], "echo c", "remaining command")
++  return true
++end function
++function testAliasTermination()
++  system = cmd.create(); alias = cmd.addAlias(system, "x", "echo hi")
++  equal(alias.value, "echo hi \n", "alias trailing space and newline")
++  return true
++end function
++function testAliasExactReplacement()
++  system = cmd.create(); cmd.addAlias(system, "x", "one"); cmd.addAlias(system, "X", "two")
++  equal(len(system.aliases), 2, "case-distinct aliases")
++  cmd.addAlias(system, "x", "three")
++  equal(len(system.aliases), 2, "exact alias reused")
++  return true
++end function
++function testWaitRetainsBuffer()
++  system = cmd.create(); cmd.addText(system, "wait;echo later\n")
++  equal(cmd.executeBuffer(system), 1, "wait executes one")
++  yes(system.text != "", "wait retains rest")
++  return true
++end function
++function testTokenLimit()
++  text = "command"
++  index = 0
++  while index < 100
++    text = text + " x"
++    index = index + 1
++  end while
++  equal(len(cmd.tokenize(text)), cmd.MAX_ARGS, "MAX_ARGS")
++  return true
++end function
++
++function main(args)
++  tests = [
++    ["binary32 cvar storage", testStoredFloat], ["setvalue formatting", testSetValue],
++    ["negative zero", testNegativeZero], ["positive zero", testPositiveZero],
++    ["server change", testServerChange], ["unchanged server value", testUnchangedServerValue],
++    ["non-server change", testNonServerChange], ["registration order", testHeadInsertion],
++    ["archive order", testArchiveOrder], ["completion", testCompletion],
++    ["completion case", testCompletionCaseSensitive], ["cvar query", testCommandQuery],
++    ["cvar set", testCommandSet], ["unknown cvar", testUnknownCommand],
++    ["command buffer boundary", testCommandBufferBoundary], ["quoted semicolon", testQuotedSemicolon],
++    ["alias termination", testAliasTermination], ["alias replacement", testAliasExactReplacement],
++    ["wait semantics", testWaitRetainsBuffer], ["argument limit", testTokenLimit],
++  ]
++  passed = 0; index = 0
++  while index < len(tests)
++    if run(index + 1, tests[index][0], tests[index][1]) then passed = passed + 1 end if
++    index = index + 1
++  end while
++  if passed != 20 then return 1 end if
++  print "MiniQuake BP-031 command/cvar lifecycle tests passed: 20"
++  return 0
++end function
+diff --git a/tools/check_command_cvar.py b/tools/check_command_cvar.py
+new file mode 100755
+index 0000000..3b7ba1f
+--- /dev/null
++++ b/tools/check_command_cvar.py
+@@ -0,0 +1,56 @@
++#!/usr/bin/env python3
++"""Verify BP-031 WinQuake command buffer, alias and cvar contracts."""
++from __future__ import annotations
++import argparse, hashlib, json, os, shutil, struct, subprocess, tempfile
++from pathlib import Path
++PACKAGE='BP-031';PARENT='BP-030';GOLDEN='audit/command_cvar_golden.json';ORACLE='tools/oracle/command_cvar_oracle.c'
++def sha(p):return hashlib.sha256(Path(p).read_bytes()).hexdigest()
++def fbits(v):return struct.unpack('<I',struct.pack('<f',v))[0]
++def rows():return [
++ {'kind':'case','name':'stored_value_bits','value':fbits(0.100000001)},
++ {'kind':'case','name':'setvalue_1_25','value':'1.250000'},
++ {'kind':'case','name':'setvalue_negative_zero','value':'-0.000000'},
++ {'kind':'case','name':'command_buffer_size','value':8192},
++ {'kind':'case','name':'max_alias_name','value':32},
++ {'kind':'case','name':'max_args','value':80},
++ {'kind':'case','name':'fixture_count','value':20}]
++def doc(root):return {'schema':'MiniQuakeCommandCvarGolden/1','package_id':PACKAGE,'parent_package_id':PARENT,'sources':['cmd.c','cvar.c'],'rows':rows(),'reference':{'oracle':ORACLE,'oracle_sha256':sha(root/ORACLE)}}
++def compiler():
++ for v in ([os.environ['CC']] if os.environ.get('CC') else [])+['cc','gcc','clang']:
++  p=v.split()
++  if shutil.which(p[0]):return p
++ return None
++def oracle(root):
++ cc=compiler()
++ if not cc:return True,'not available',[]
++ with tempfile.TemporaryDirectory(prefix='mq-bp031-') as td:
++  exe=Path(td)/('oracle.exe' if os.name=='nt' else 'oracle')
++  b=subprocess.run(cc+['-std=c11','-Wall','-Wextra','-Werror','-O2',str(root/ORACLE),'-o',str(exe)],capture_output=True,text=True)
++  if b.returncode:return False,b.stdout+b.stderr,[]
++  r=subprocess.run([str(exe)],capture_output=True,text=True)
++  return r.returncode==0,' '.join(cc),[json.loads(x) for x in r.stdout.splitlines() if x.strip()]
++def contract(root):
++ e=[];cv=(root/'src/miniquake/cvar.ml').read_text(encoding='utf-8-sig');cm=(root/'src/miniquake/cmd.ml').read_text(encoding='utf-8-sig');h=(root/'src/miniquake/host.ml').read_text(encoding='utf-8-sig');t=(root/'tests/command_cvar_lifecycle_tests.ml').read_text(encoding='utf-8-sig')
++ for m in ('return native.bitsFloat(native.floatBits(common.atof(text)))','function fixedSixValue(value)','negative = (raw & 0x80000000) != 0','function command(registry, arguments)'):
++  if m not in cv:e.append('missing cvar marker: '+m)
++ for m in ('const MAX_ALIAS_NAME = 32','const MAX_ARGS = 80','const COMMAND_BUFFER_SIZE = 8192','if len(bytes(system.text)) + len(bytes(text)) >= COMMAND_BUFFER_SIZE'):
++  if m not in cm:e.append('missing command marker: '+m)
++ if 'result = cvar.command(session.cvars, arguments)' not in h:e.append('host does not use shared Cvar_Command adapter')
++ if 'command/cvar lifecycle tests passed: 20' not in t:e.append('expected 20 BP-031 fixtures')
++ return e
++def main():
++ ap=argparse.ArgumentParser();ap.add_argument('root',nargs='?',default='.');ap.add_argument('--root',dest='rf');ap.add_argument('--write-golden',action='store_true');ap.add_argument('--json-output');a=ap.parse_args();root=Path(a.rf or a.root).resolve();d=doc(root);g=root/GOLDEN
++ if a.write_golden:g.parent.mkdir(parents=True,exist_ok=True);g.write_text(json.dumps(d,indent=2)+'\n',encoding='utf-8')
++ e=[]
++ if not g.is_file():e.append('missing golden')
++ elif json.loads(g.read_text(encoding='utf-8-sig'))!=d:e.append('golden differs from Python model')
++ ok,detail,actual=oracle(root)
++ if not ok:e.append('C oracle failed: '+detail)
++ elif actual and actual!=d['rows']:e.append('C oracle differs from Python model')
++ e+=contract(root)
++ r={'schema':'MiniQuakeBP031CommandCvarVerification/1','package_id':PACKAGE,'parent_package_id':PARENT,'ok':not e,'oracle':detail,'rows':len(d['rows']),'runtime_fixtures':20,'errors':e}
++ if a.json_output:Path(a.json_output).write_text(json.dumps(r,indent=2)+'\n',encoding='utf-8')
++ print('MiniQuake BP-031 command/cvar verification: '+('PASS' if not e else 'FAIL'));print(f'  rows={len(d["rows"])} runtime_fixtures=20 oracle={detail}')
++ for x in e:print('  ERROR: '+x)
++ return 0 if not e else 1
++if __name__=='__main__':raise SystemExit(main())
+diff --git a/tools/oracle/command_cvar_oracle.c b/tools/oracle/command_cvar_oracle.c
+new file mode 100644
+index 0000000..2661114
+--- /dev/null
++++ b/tools/oracle/command_cvar_oracle.c
+@@ -0,0 +1,20 @@
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
++
++static uint32_t fbits(float value) { uint32_t bits; memcpy(&bits,&value,4); return bits; }
++static void row_i(const char *name, long long value) { printf("{\"kind\":\"case\",\"name\":\"%s\",\"value\":%lld}\n",name,value); }
++static void row_s(const char *name, const char *value) { printf("{\"kind\":\"case\",\"name\":\"%s\",\"value\":\"%s\"}\n",name,value); }
++int main(void) {
++    char text[32];
++    float value = 0.100000001f;
++    row_i("stored_value_bits", fbits(value));
++    snprintf(text,sizeof(text),"%f",1.25f); row_s("setvalue_1_25",text);
++    float nz; uint32_t bits=0x80000000u; memcpy(&nz,&bits,4);
++    snprintf(text,sizeof(text),"%f",nz); row_s("setvalue_negative_zero",text);
++    row_i("command_buffer_size",8192);
++    row_i("max_alias_name",32);
++    row_i("max_args",80);
++    row_i("fixture_count",20);
++    return 0;
++}

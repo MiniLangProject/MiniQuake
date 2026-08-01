@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "package": "BP-068",
+  "fixtures": 24,
+  "options_items": 14,
+  "help_pages": 6,
+  "save_slots": 12,
+  "cd_volume_step": 1.0,
+  "sound_volume_step": 0.1,
+  "tcp_selection": 3,
+  "sound_volume_bits": "0x3f4ccccd",
+  "sound_volume_string": "0.800000",
+  "invert_pitch_bits": "0xbcb43958",
+  "invert_pitch_string": "-0.022000"
+}

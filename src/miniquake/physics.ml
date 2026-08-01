@@ -22,6 +22,16 @@ function zeroVector()
   return t.Vec3(0.0, 0.0, 0.0)
 end function
 
+// The compatibility profile in this port is the unconditioned WinQuake /
+// GLQuake 1.09 source, never the optional QUAKE2 preprocessor branch.
+function strictQuake109()
+  return true
+end function
+
+function collapsePusherCorpseBounds(mins)
+  return t.Vec3(0.0, 0.0, mins.z)
+end function
+
 function createPlayer(origin, angles)
   return t.PlayerState(
     math.copy(origin),
@@ -394,7 +404,10 @@ function dropPunchAngle(player, frameTime)
 end function
 
 function airMove(player, command, frameTime, maxSpeed, acceleration, friction, edgeFriction, stopSpeed, map, server, entityIndex)
-  movementAngles = t.Vec3(0.0, player.renderAngles.y, 0.0)
+  // WinQuake passes the complete ent->v.angles vector to AngleVectors. Pitch
+  // therefore contributes to noclip/fly intentions; WALK still clears the
+  // vertical wish component below, exactly like sv_user.c.
+  movementAngles = math.copy(player.renderAngles)
   vectors = math.angleVectors(movementAngles)
   forwardMove = command.forwardMove
   if server is not void and server.time < player.teleportTime and forwardMove < 0.0 then forwardMove = 0.0 end if
@@ -524,7 +537,7 @@ function moveServer(player, server, entityIndex, command, frameTime, registry)
   checkStuck(player, server.worldModel, server, entityIndex)
   walkMoveInternal(player, server.worldModel, server, entityIndex, frameTime)
   collision.setEntityVector(server, entityIndex, "origin", player.origin)
-  collision.touchTriggers(server, entityIndex)
+  collision.linkEntity(server, entityIndex, true)
   return player
 end function
 
@@ -632,7 +645,7 @@ end function
 function physicsQueueSound(server, entityIndex, sample)
   if server is void or server.machine is void or server.machine.context is void then return false end if
   contextValue = server.machine.context
-  contextValue.soundEvents = contextValue.soundEvents + [[entityIndex, 0, sample, 1.0, 1.0]]
+  contextValue.soundEvents = contextValue.soundEvents + [[entityIndex, 0, sample, 255, 1.0]]
   return true
 end function
 
@@ -750,8 +763,8 @@ function SV_PushEntity(server, entityIndex, push)
   if entityMoveType == c.MOVETYPE_FLYMISSILE then moveType = c.MOVE_MISSILE end if
   trace = collision.move(server, origin, mins, maxs, destination, moveType, entityIndex)
   collision.setEntityVector(server, entityIndex, "origin", trace.endPosition)
-  collision.touchTriggers(server, entityIndex)
-  if trace.entity >= 0 and (trace.fraction < 1.0 or trace.startSolid) then SV_Impact(server, entityIndex, trace.entity) end if
+  collision.linkEntity(server, entityIndex, true)
+  if trace.entity >= 0 then SV_Impact(server, entityIndex, trace.entity) end if
   return trace
 end function
 
@@ -776,14 +789,13 @@ function SV_PushMove(server, pusherIndex, moveTime)
 
   move = math.scale(velocity, moveTime)
   oldPusherOrigin = collision.entityVector(server, pusherIndex, "origin", zeroVector())
-  newPusherOrigin = math.add(oldPusherOrigin, move)
-  pusherMins = collision.entityVector(server, pusherIndex, "mins", zeroVector())
-  pusherMaxs = collision.entityVector(server, pusherIndex, "maxs", zeroVector())
-  finalMins = math.add(newPusherOrigin, pusherMins)
-  finalMaxs = math.add(newPusherOrigin, pusherMaxs)
-  pusherSolid = native.trunc(collision.entityFloat(server, pusherIndex, "solid", c.SOLID_BSP))
-  collision.setEntityVector(server, pusherIndex, "origin", newPusherOrigin)
+  // world.c keeps one-unit-expanded abs bounds on linked entities.  sv_phys.c
+  // translates those stored bounds to find occupants of the final position.
+  finalMins = math.add(collision.entityAbsMin(server, pusherIndex), move)
+  finalMaxs = math.add(collision.entityAbsMax(server, pusherIndex), move)
+  collision.setEntityVector(server, pusherIndex, "origin", math.add(oldPusherOrigin, move))
   collision.setEntityFloat(server, pusherIndex, "ltime", oldLocalTime + moveTime)
+  collision.linkEntity(server, pusherIndex, false)
 
   movedIndexes = []
   movedOrigins = []
@@ -792,15 +804,17 @@ function SV_PushMove(server, pusherIndex, moveTime)
   while index < physicsEntityCount(server)
     if index != pusherIndex and not physicsEntityFree(server, index) then
       moveType = native.trunc(collision.entityFloat(server, index, "movetype", c.MOVETYPE_NONE))
-      if moveType != c.MOVETYPE_PUSH and moveType != c.MOVETYPE_NONE and moveType != MOVETYPE_FOLLOW_COMPAT and moveType != c.MOVETYPE_NOCLIP then
+      if moveType != c.MOVETYPE_PUSH and moveType != c.MOVETYPE_NONE and moveType != c.MOVETYPE_NOCLIP then
         flags = native.trunc(collision.entityFloat(server, index, "flags", 0.0))
         standing = (flags & c.FL_ONGROUND) != 0 and collision.entityWord(server, index, "groundentity", -1) == pusherIndex
         shouldMove = standing
         if not shouldMove then
-          entityOrigin = collision.entityVector(server, index, "origin", zeroVector())
-          entityMins = collision.entityVector(server, index, "mins", zeroVector())
-          entityMaxs = collision.entityVector(server, index, "maxs", zeroVector())
-          shouldMove = physicsStrictOverlap(math.add(entityOrigin, entityMins), math.add(entityOrigin, entityMaxs), finalMins, finalMaxs)
+          shouldMove = physicsStrictOverlap(
+            collision.entityAbsMin(server, index),
+            collision.entityAbsMax(server, index),
+            finalMins,
+            finalMaxs,
+          )
           if shouldMove and collision.testEntityPosition(server, index) < 0 then shouldMove = false end if
         end if
         if shouldMove then
@@ -810,7 +824,7 @@ function SV_PushMove(server, pusherIndex, moveTime)
           if moveType != c.MOVETYPE_WALK then collision.setEntityFloat(server, index, "flags", flags & ~c.FL_ONGROUND) end if
           collision.setEntityFloat(server, pusherIndex, "solid", c.SOLID_NOT)
           SV_PushEntity(server, index, move)
-          collision.setEntityFloat(server, pusherIndex, "solid", pusherSolid)
+          collision.setEntityFloat(server, pusherIndex, "solid", c.SOLID_BSP)
           if collision.testEntityPosition(server, index) >= 0 then
             entityMins = collision.entityVector(server, index, "mins", zeroVector())
             entityMaxs = collision.entityVector(server, index, "maxs", zeroVector())
@@ -818,11 +832,12 @@ function SV_PushMove(server, pusherIndex, moveTime)
             if entityMins.x == entityMaxs.x then
               // Point entities do not block a pusher.
             else if solid == c.SOLID_NOT or solid == c.SOLID_TRIGGER then
-              collapsed = zeroVector()
+              collapsed = collapsePusherCorpseBounds(entityMins)
               collision.setEntityVector(server, index, "mins", collapsed)
               collision.setEntityVector(server, index, "maxs", collapsed)
             else
               collision.setEntityVector(server, index, "origin", original)
+              collision.linkEntity(server, index, true)
               blockedBy = index
               break
             end if
@@ -835,12 +850,14 @@ function SV_PushMove(server, pusherIndex, moveTime)
 
   if blockedBy >= 0 then
     collision.setEntityVector(server, pusherIndex, "origin", oldPusherOrigin)
+    collision.linkEntity(server, pusherIndex, false)
     collision.setEntityFloat(server, pusherIndex, "ltime", oldLocalTime)
-    // The callback observes already-carried entities at their pushed position.
+    // blocked() observes entities already carried by the attempted move.
     physicsPusherBlocked(server, pusherIndex, blockedBy)
     rollback = 0
     while rollback < len(movedIndexes)
       collision.setEntityVector(server, movedIndexes[rollback], "origin", movedOrigins[rollback])
+      collision.linkEntity(server, movedIndexes[rollback], false)
       rollback = rollback + 1
     end while
     return false
@@ -945,12 +962,9 @@ function SV_Physics_Pusher(server, entityIndex, frameTime)
     if moveTime < 0.0 then moveTime = 0.0 end if
   end if
   if moveTime != 0.0 then
-    angularVelocity = collision.entityVector(server, entityIndex, "avelocity", zeroVector())
-    if physicsHasBaseVelocity(server) and (angularVelocity.x != 0.0 or angularVelocity.y != 0.0 or angularVelocity.z != 0.0) then
-      SV_PushRotate(server, entityIndex, moveTime)
-    else
-      SV_PushMove(server, entityIndex, moveTime)
-    end if
+    // GLQuake 1.09 is compiled without QUAKE2: angular velocity never selects
+    // the alternate rotating-pusher body.
+    SV_PushMove(server, entityIndex, moveTime)
   end if
   newLocalTime = collision.entityFloat(server, entityIndex, "ltime", oldLocalTime)
   if thinkTime > oldLocalTime and thinkTime <= newLocalTime then
@@ -975,7 +989,6 @@ function SV_CheckWater(server, entityIndex)
   waterLevel = 0
   waterType = c.CONTENTS_EMPTY
   point = t.Vec3(origin.x, origin.y, origin.z + mins.z + 1.0)
-  trueContents = world.truePointContents(server.worldModel, point)
   contents = world.pointContentsWorld(server.worldModel, point)
   if contents <= c.CONTENTS_WATER then
     waterType = contents
@@ -988,18 +1001,6 @@ function SV_CheckWater(server, entityIndex)
       contents = world.pointContentsWorld(server.worldModel, point)
       if contents <= c.CONTENTS_WATER then waterLevel = 3 end if
     end if
-  end if
-  if physicsHasBaseVelocity(server) and trueContents <= c.CONTENTS_CURRENT_0 and trueContents >= c.CONTENTS_CURRENT_DOWN then
-    current = zeroVector()
-    if trueContents == c.CONTENTS_CURRENT_0 then current.x = 1.0 end if
-    if trueContents == c.CONTENTS_CURRENT_90 then current.y = 1.0 end if
-    if trueContents == c.CONTENTS_CURRENT_180 then current.x = -1.0 end if
-    if trueContents == c.CONTENTS_CURRENT_270 then current.y = -1.0 end if
-    if trueContents == c.CONTENTS_CURRENT_UP then current.z = 1.0 end if
-    if trueContents == c.CONTENTS_CURRENT_DOWN then current.z = -1.0 end if
-    baseVelocity = collision.entityVector(server, entityIndex, "basevelocity", zeroVector())
-    baseVelocity = math.multiplyAdd(baseVelocity, 150.0 * waterLevel / 3.0, current)
-    collision.setEntityVector(server, entityIndex, "basevelocity", baseVelocity)
   end if
   collision.setEntityFloat(server, entityIndex, "waterlevel", waterLevel)
   collision.setEntityFloat(server, entityIndex, "watertype", waterType)
@@ -1039,18 +1040,7 @@ function SV_Physics_Client(server, entityIndex, frameTime, gravity, maxVelocity)
     flags = native.trunc(collision.entityFloat(server, entityIndex, "flags", 0.0))
     if not SV_CheckWater(server, entityIndex) and (flags & c.FL_WATERJUMP) == 0 then SV_AddGravity(server, entityIndex, gravity, frameTime) end if
     SV_CheckStuck(server, entityIndex)
-    if physicsHasBaseVelocity(server) then
-      velocity = collision.entityVector(server, entityIndex, "velocity", zeroVector())
-      baseVelocity = collision.entityVector(server, entityIndex, "basevelocity", zeroVector())
-      collision.setEntityVector(server, entityIndex, "velocity", math.add(velocity, baseVelocity))
-    end if
     SV_WalkMove(server, entityIndex, frameTime)
-    if physicsHasBaseVelocity(server) then
-      velocity = collision.entityVector(server, entityIndex, "velocity", zeroVector())
-      // Re-read after movement: trigger/touch callbacks can mutate the field.
-      baseVelocity = collision.entityVector(server, entityIndex, "basevelocity", zeroVector())
-      collision.setEntityVector(server, entityIndex, "velocity", math.subtract(velocity, baseVelocity))
-    end if
   else if moveType == c.MOVETYPE_TOSS or moveType == c.MOVETYPE_BOUNCE then
     SV_Physics_Toss(server, entityIndex, frameTime, gravity, maxVelocity)
   else if moveType == c.MOVETYPE_FLY then
@@ -1064,7 +1054,7 @@ function SV_Physics_Client(server, entityIndex, frameTime, gravity, maxVelocity)
   else
     return error(3410, "SV_Physics_Client: bad movetype " + moveType)
   end if
-  collision.touchTriggers(server, entityIndex)
+  collision.linkEntity(server, entityIndex, true)
   physicsExecuteNamedFunction(server, "PlayerPostThink", entityIndex)
   return not physicsEntityFree(server, entityIndex)
 end function
@@ -1079,7 +1069,7 @@ function SV_Physics_Follow(server, entityIndex, frameTime)
   aimOrigin = collision.entityVector(server, aimEntity, "origin", zeroVector())
   offset = collision.entityVector(server, entityIndex, "v_angle", zeroVector())
   collision.setEntityVector(server, entityIndex, "origin", math.add(aimOrigin, offset))
-  collision.touchTriggers(server, entityIndex)
+  collision.linkEntity(server, entityIndex, true)
   return not physicsEntityFree(server, entityIndex)
 end function
 
@@ -1091,6 +1081,7 @@ function SV_Physics_Noclip(server, entityIndex, frameTime)
   velocity = collision.entityVector(server, entityIndex, "velocity", zeroVector())
   collision.setEntityVector(server, entityIndex, "angles", math.multiplyAdd(angles, frameTime, angularVelocity))
   collision.setEntityVector(server, entityIndex, "origin", math.multiplyAdd(origin, frameTime, velocity))
+  collision.linkEntity(server, entityIndex, false)
   return true
 end function
 
@@ -1117,56 +1108,22 @@ function SV_CheckWaterTransition(server, entityIndex)
 end function
 
 function SV_Physics_Toss(server, entityIndex, frameTime, gravity, maxVelocity)
-  extended = physicsHasBaseVelocity(server)
-  if extended then
-    physicsRefreshConveyorVelocity(server, entityIndex)
-    SV_CheckWater(server, entityIndex)
-  end if
   if not SV_RunThink(server, entityIndex, frameTime) then return false end if
   flags = native.trunc(collision.entityFloat(server, entityIndex, "flags", 0.0))
-  if extended then
-    velocity = collision.entityVector(server, entityIndex, "velocity", zeroVector())
-    if velocity.z > 0.0 then
-      flags = flags & ~c.FL_ONGROUND
-      collision.setEntityFloat(server, entityIndex, "flags", flags)
-    end if
-    baseVelocity = collision.entityVector(server, entityIndex, "basevelocity", zeroVector())
-    if (flags & c.FL_ONGROUND) != 0 and physicsVectorIsZero(baseVelocity) then return true end if
-  else
-    if (flags & c.FL_ONGROUND) != 0 then return true end if
-  end if
+  if (flags & c.FL_ONGROUND) != 0 then return true end if
   SV_CheckVelocity(server, entityIndex, maxVelocity)
   moveType = native.trunc(collision.entityFloat(server, entityIndex, "movetype", c.MOVETYPE_NONE))
-  if extended then
-    flags = native.trunc(collision.entityFloat(server, entityIndex, "flags", 0.0))
-    if (flags & c.FL_ONGROUND) == 0 and moveType != c.MOVETYPE_FLY and moveType != MOVETYPE_BOUNCEMISSILE_COMPAT and moveType != c.MOVETYPE_FLYMISSILE then
-      SV_AddGravity(server, entityIndex, gravity, frameTime)
-    end if
-  else
-    if moveType != c.MOVETYPE_FLY and moveType != c.MOVETYPE_FLYMISSILE then SV_AddGravity(server, entityIndex, gravity, frameTime) end if
-  end if
+  if moveType != c.MOVETYPE_FLY and moveType != c.MOVETYPE_FLYMISSILE then SV_AddGravity(server, entityIndex, gravity, frameTime) end if
   angles = collision.entityVector(server, entityIndex, "angles", zeroVector())
   angularVelocity = collision.entityVector(server, entityIndex, "avelocity", zeroVector())
   collision.setEntityVector(server, entityIndex, "angles", math.multiplyAdd(angles, frameTime, angularVelocity))
   velocity = collision.entityVector(server, entityIndex, "velocity", zeroVector())
-  if extended then
-    baseVelocity = collision.entityVector(server, entityIndex, "basevelocity", zeroVector())
-    velocity = math.add(velocity, baseVelocity)
-    collision.setEntityVector(server, entityIndex, "velocity", velocity)
-  end if
   trace = SV_PushEntity(server, entityIndex, math.scale(velocity, frameTime))
-  if extended then
-    velocity = collision.entityVector(server, entityIndex, "velocity", zeroVector())
-    baseVelocity = collision.entityVector(server, entityIndex, "basevelocity", zeroVector())
-    velocity = math.subtract(velocity, baseVelocity)
-    collision.setEntityVector(server, entityIndex, "velocity", velocity)
-  end if
   if trace.fraction == 1.0 or physicsEntityFree(server, entityIndex) then return true end if
   overbounce = 1.0
   if moveType == c.MOVETYPE_BOUNCE then overbounce = 1.5 end if
-  if moveType == MOVETYPE_BOUNCEMISSILE_COMPAT then overbounce = 2.0 end if
   velocity = ClipVelocity(velocity, trace.plane.normal, overbounce)[0]
-  if trace.plane.normal.z > 0.7 and (velocity.z < 60.0 or (moveType != c.MOVETYPE_BOUNCE and moveType != MOVETYPE_BOUNCEMISSILE_COMPAT)) then
+  if trace.plane.normal.z > 0.7 and (velocity.z < 60.0 or moveType != c.MOVETYPE_BOUNCE) then
     flags = flags | c.FL_ONGROUND
     collision.setEntityWord(server, entityIndex, "groundentity", trace.entity)
     velocity = zeroVector()
@@ -1187,7 +1144,7 @@ function SV_Physics_Step(server, entityIndex, frameTime, gravity, maxVelocity)
     SV_CheckVelocity(server, entityIndex, maxVelocity)
     SV_FlyMove(server, entityIndex, frameTime)
     newFlags = native.trunc(collision.entityFloat(server, entityIndex, "flags", 0.0))
-    collision.touchTriggers(server, entityIndex)
+    collision.linkEntity(server, entityIndex, true)
     if (newFlags & c.FL_ONGROUND) != 0 and hitSound then physicsQueueSound(server, entityIndex, "demon/dland2.wav") end if
   end if
   SV_RunThink(server, entityIndex, frameTime)
@@ -1274,6 +1231,51 @@ function SV_Physics_Step_Quake2(server, entityIndex, frameTime, gravity, maxVelo
   return not physicsEntityFree(server, entityIndex)
 end function
 
+function SV_ForceRetouchValue(server)
+  if server is void or server.machine is void or server.machine.context is void then return 0.0 end if
+  forceOffset = vm.globalOffset(server.machine, "force_retouch")
+  if forceOffset < 0 then return 0.0 end if
+  return vm.globalFloat(server.machine, forceOffset)
+end function
+
+function SV_ForceRetouchEntity(server, entityIndex, forceRetouch)
+  if forceRetouch == 0.0 then return false end if
+  if physicsEntityFree(server, entityIndex) then return false end if
+  collision.linkEntity(server, entityIndex, true)
+  return true
+end function
+
+function SV_FinishForceRetouch(server, forceRetouch)
+  if forceRetouch == 0.0 or server is void or server.machine is void then return false end if
+  forceOffset = vm.globalOffset(server.machine, "force_retouch")
+  if forceOffset < 0 then return false end if
+  vm.setGlobalFloat(server.machine, forceOffset, forceRetouch - 1.0)
+  return true
+end function
+
+// Dispatch one non-client edict through the exact unconditioned WinQuake 1.09
+// SV_Physics switch.  The integrated server frame uses this entry point after
+// it has run client movement, so the production path and the direct sv_main
+// pendant share the same pusher, toss, step, noclip and think semantics.
+function SV_Physics_NonClientEntity(server, entityIndex, frameTime, gravity, maxVelocity)
+  if physicsEntityFree(server, entityIndex) then return false end if
+  moveType = native.trunc(collision.entityFloat(server, entityIndex, "movetype", c.MOVETYPE_NONE))
+  if moveType == c.MOVETYPE_PUSH then
+    SV_Physics_Pusher(server, entityIndex, frameTime)
+  else if moveType == c.MOVETYPE_NONE then
+    SV_Physics_None(server, entityIndex, frameTime)
+  else if moveType == c.MOVETYPE_NOCLIP then
+    SV_Physics_Noclip(server, entityIndex, frameTime)
+  else if moveType == c.MOVETYPE_STEP then
+    SV_Physics_Step(server, entityIndex, frameTime, gravity, maxVelocity)
+  else if moveType == c.MOVETYPE_TOSS or moveType == c.MOVETYPE_BOUNCE or moveType == c.MOVETYPE_FLY or moveType == c.MOVETYPE_FLYMISSILE then
+    SV_Physics_Toss(server, entityIndex, frameTime, gravity, maxVelocity)
+  else
+    return error(3411, "SV_Physics: bad movetype " + moveType)
+  end if
+  return true
+end function
+
 function SV_Physics(server, frameTime, gravity, maxVelocity)
   if server is void or server.machine is void or server.machine.context is void then return 0 end if
   machine = server.machine
@@ -1286,45 +1288,21 @@ function SV_Physics(server, frameTime, gravity, maxVelocity)
     vm.execute(machine, startFrame)
   end if
   processed = 0
-  forceOffset = vm.globalOffset(machine, "force_retouch")
-  forceRetouch = 0.0
-  if forceOffset >= 0 then forceRetouch = vm.globalFloat(machine, forceOffset) end if
+  forceRetouch = SV_ForceRetouchValue(server)
   index = 0
   while index < physicsEntityCount(server)
     if not physicsEntityFree(server, index) then
-      if forceRetouch != 0.0 then collision.touchTriggers(server, index) end if
+      if forceRetouch != 0.0 then collision.linkEntity(server, index, true) end if
       if index > 0 and index <= server.maxClients then
         clientActive = index - 1 < len(server.clients) and server.clients[index - 1].active
         if clientActive then SV_Physics_Client(server, index, frameTime, gravity, maxVelocity); processed = processed + 1 end if
       else
-        moveType = native.trunc(collision.entityFloat(server, index, "movetype", c.MOVETYPE_NONE))
-        if moveType == c.MOVETYPE_PUSH then
-          SV_Physics_Pusher(server, index, frameTime)
-        else if moveType == c.MOVETYPE_NONE then
-          SV_Physics_None(server, index, frameTime)
-        else if moveType == MOVETYPE_FOLLOW_COMPAT then
-          SV_Physics_Follow(server, index, frameTime)
-        else if moveType == c.MOVETYPE_NOCLIP then
-          SV_Physics_Noclip(server, index, frameTime)
-        else if moveType == c.MOVETYPE_STEP then
-          if physicsHasBaseVelocity(server) then
-            SV_Physics_Step_Quake2(server, index, frameTime, gravity, maxVelocity)
-          else
-            SV_Physics_Step(server, index, frameTime, gravity, maxVelocity)
-          end if
-        else if moveType == c.MOVETYPE_TOSS or moveType == c.MOVETYPE_BOUNCE or moveType == MOVETYPE_BOUNCEMISSILE_COMPAT or moveType == c.MOVETYPE_FLY or moveType == c.MOVETYPE_FLYMISSILE then
-          SV_Physics_Toss(server, index, frameTime, gravity, maxVelocity)
-        else
-          return error(3411, "SV_Physics: bad movetype " + moveType)
-        end if
-        processed = processed + 1
+        if SV_Physics_NonClientEntity(server, index, frameTime, gravity, maxVelocity) then processed = processed + 1 end if
       end if
     end if
     index = index + 1
   end while
-  if forceOffset >= 0 then
-    if forceRetouch != 0.0 then vm.setGlobalFloat(machine, forceOffset, forceRetouch - 1.0) end if
-  end if
+  SV_FinishForceRetouch(server, forceRetouch)
   server.time = server.time + frameTime
   machine.context.serverTime = server.time
   return processed

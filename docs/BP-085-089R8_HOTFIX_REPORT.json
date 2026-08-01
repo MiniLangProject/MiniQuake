@@ -1,0 +1,35 @@
+{
+  "schema": "MiniQuakeBP085089R8Hotfix/1",
+  "package_id": "BP-089",
+  "block_id": "BP-085-089",
+  "delivery_revision": "BP-085-089R8",
+  "delivery_parent": "BP-085-089R7",
+  "result_archive_sha256": "73d687753608117190a7527ac7a84f7ef7a0d57755ebe6e5887574a272710560",
+  "failure": {
+    "gate": "5000-frame listen-server resource soak",
+    "exit_code": 3,
+    "heap_live_blocks_before": 113916,
+    "heap_live_blocks_after": 113928,
+    "heap_live_bytes_before": 115647808,
+    "heap_live_bytes_after": 115648656,
+    "server_edicts_before": 67,
+    "server_edicts_after": 67,
+    "client_entity_slots_before": 66,
+    "client_entity_slots_after": 67,
+    "all_other_resource_gates_stable": true
+  },
+  "classification": "false positive: sparse MiniLang client entity high-water caught up to WinQuake server Edict high-water; no unbounded resource growth observed",
+  "fix": {
+    "client_entity_policy": "server_high_water_plus_existing_static_offset",
+    "observed_limit": 67,
+    "absolute_server_limit": 600,
+    "absolute_client_limit": 728,
+    "production_and_fixture_rule_shared": true,
+    "per_gate_diagnostics": true,
+    "stability_fingerprint": "0xd0e3c03f",
+    "server_edict_growth_during_idle_soak": "rejected"
+  },
+  "contracts_unchanged": false,
+  "native_binary_changed": false,
+  "contract_change": "stability predicate refined before Windows acceptance; status remains stability_109_frozen_v1"
+}

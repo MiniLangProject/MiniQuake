@@ -1,0 +1,50 @@
+{
+  "schema": "MiniQuakeLightmapAtlasGolden/1",
+  "package_id": "BP-041",
+  "parent_package_id": "BP-040",
+  "sources": [
+    "gl_rmain.c",
+    "gl_rsurf.c",
+    "gl_rlight.c",
+    "gl_warp.c",
+    "gl_refrag.c"
+  ],
+  "rows": [
+    {
+      "name": "atlas_width",
+      "value": 128
+    },
+    {
+      "name": "atlas_height",
+      "value": 128
+    },
+    {
+      "name": "atlas_pages",
+      "value": 64
+    },
+    {
+      "name": "luminance_bytes",
+      "value": 1
+    },
+    {
+      "name": "rgba_bytes",
+      "value": 4
+    },
+    {
+      "name": "rgba_2x2_stride10_required",
+      "value": 18
+    },
+    {
+      "name": "shared_texture_delete_once",
+      "value": 1
+    },
+    {
+      "name": "fixtures",
+      "value": 22
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/lightmap_atlas_render_oracle.c",
+    "oracle_sha256": "bf702444a63f54705f7d4bcafc0cffaf8f0590d665aa07b12ba871d10e9ed026"
+  }
+}

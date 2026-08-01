@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "status": "compat_109_release_candidate_v1",
+  "fingerprint": "0x29b72a98",
+  "contract_text": "compat-release-candidate|contracts=18|source-functions=1094|maps=4|retail-demos=3|soak=2|optional-mission-packs|external-binary-pending|external-visual-pending",
+  "fixtures": 24,
+  "contracts": 18,
+  "source_functions": 1094,
+  "black_port_maps": 4,
+  "retail_demos": 3,
+  "soak_modes": 2,
+  "pending_external_gates": [
+    "original_binary_interop",
+    "external_glquake_visual_reference"
+  ],
+  "accepted_contracts": [
+    "protocol15_frozen_v1",
+    "quakec_109_frozen_v1",
+    "world_physics_109_frozen_v1",
+    "host_lifecycle_109_frozen_v1",
+    "client_render_109_frozen_v1",
+    "world_render_109_frozen_v1",
+    "model_ui_render_109_frozen_v1",
+    "render_special_109_frozen_v1",
+    "audio_109_frozen_v1",
+    "network_platform_109_frozen_v1",
+    "frontend_109_frozen_v1",
+    "core_assets_memory_109_frozen_v1",
+    "gameplay_presentation_109_frozen_v1",
+    "black_port_source_109_frozen_v1",
+    "game_profile_109_frozen_v1",
+    "mod_runtime_109_frozen_v1",
+    "artifact_compat_109_frozen_v1",
+    "stability_109_frozen_v1"
+  ]
+}

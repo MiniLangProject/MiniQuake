@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "project": "MiniQuake",
+  "block_id": "BP-080-084",
+  "parent_delivery": "BP-075-079R3",
+  "final_package_id": "BP-084",
+  "delivery_revision": "BP-080-084R1",
+  "steps": [
+    {
+      "package_id": "BP-080",
+      "title": "cvar.c source-surface closure",
+      "patch": "patches/BP-080.diff",
+      "runtime_fixtures": 20,
+      "status": "candidate"
+    },
+    {
+      "package_id": "BP-081",
+      "title": "cd_win.c mechanical source surface",
+      "patch": "patches/BP-081.diff",
+      "runtime_fixtures": 20,
+      "status": "candidate"
+    },
+    {
+      "package_id": "BP-082",
+      "title": "deterministic source function inventory",
+      "patch": "patches/BP-082.diff",
+      "runtime_fixtures": 20,
+      "status": "candidate"
+    },
+    {
+      "package_id": "BP-083",
+      "title": "multi-map deterministic black-port corpus",
+      "patch": "patches/BP-083.diff",
+      "runtime_fixtures": 18,
+      "status": "candidate"
+    },
+    {
+      "package_id": "BP-084",
+      "title": "source-guided black-port closure",
+      "patch": "patches/BP-084.diff",
+      "runtime_fixtures": 24,
+      "status": "candidate"
+    }
+  ],
+  "block_runtime_fixtures": 102,
+  "source_inventory": {
+    "definitions_discovered": 1120,
+    "profile_excluded": 26,
+    "target_definitions": 1094,
+    "exact_name": 1081,
+    "context_adapter": 9,
+    "technical_equivalent": 4,
+    "missing": 0,
+    "inventory_sha256": "31f437bb54a84fa690ff96011c50f8ca3e7dfabde05b4f450e58049eae5d8837"
+  },
+  "contract": {
+    "status": "black_port_source_109_frozen_v1",
+    "fingerprint": "0x309b0737",
+    "windows_acceptance": "pending"
+  },
+  "accepted_parent": {
+    "delivery_revision": "BP-075-079R3",
+    "status": "PASS",
+    "result_archive_sha256": "f86256028a30ed0740e2c80cf120eccec0977a841f3babdc297e25ca7d01d167",
+    "trace_sha256": "2b420f8b9713f09bc1edc632af7e2b18820629f428209775c85a29a4d7d6b293",
+    "render_tga_sha256": "734e965e17c9a20af7c42184d3d8a3d7f2997e1321342976799ec7f4670af945"
+  },
+  "scope_boundary": {
+    "source_profile": "WinQuake/GLQuake 1.09 with QUAKE2 undefined",
+    "game_data": "external; never bundled",
+    "closure_claim": "all selected source definitions classified; observed interoperability gates remain separate"
+  },
+  "delivery_parent": "BP-080-084",
+  "hotfix": {
+    "revision": "BP-080-084R1",
+    "parent": "BP-080-084",
+    "classification": "test entrypoint compile blocker",
+    "changed_test_entries": 5,
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "windows_acceptance": "pending"
+  }
+}

@@ -70,7 +70,7 @@ function moveStep(server, entityIndex, movement, relink)
       if trace.fraction == 1.0 then
         if (flags & c.FL_SWIM) != 0 and world.pointContentsWorld(server.worldModel, trace.endPosition) == c.CONTENTS_EMPTY then return false end if
         collision.setEntityVector(server, entityIndex, "origin", trace.endPosition)
-        if relink then collision.touchTriggers(server, entityIndex) end if
+        if relink then collision.linkEntity(server, entityIndex, true) end if
         return true
       end if
       if enemy == 0 then break end if
@@ -98,7 +98,7 @@ function moveStep(server, entityIndex, movement, relink)
       collision.setEntityVector(server, entityIndex, "origin", math.add(oldOrigin, movement))
       flags = flags & ~c.FL_ONGROUND
       collision.setEntityFloat(server, entityIndex, "flags", flags)
-      if relink then collision.touchTriggers(server, entityIndex) end if
+      if relink then collision.linkEntity(server, entityIndex, true) end if
       return true
     end if
     return false
@@ -107,7 +107,7 @@ function moveStep(server, entityIndex, movement, relink)
   collision.setEntityVector(server, entityIndex, "origin", trace.endPosition)
   if not collision.checkBottom(server, entityIndex) then
     if (flags & c.FL_PARTIALGROUND) != 0 then
-      if relink then collision.touchTriggers(server, entityIndex) end if
+      if relink then collision.linkEntity(server, entityIndex, true) end if
       return true
     end if
     collision.setEntityVector(server, entityIndex, "origin", oldOrigin)
@@ -119,7 +119,7 @@ function moveStep(server, entityIndex, movement, relink)
     collision.setEntityFloat(server, entityIndex, "flags", flags)
   end if
   collision.setEntityWord(server, entityIndex, "groundentity", trace.entity)
-  if relink then collision.touchTriggers(server, entityIndex) end if
+  if relink then collision.linkEntity(server, entityIndex, true) end if
   return true
 end function
 
@@ -134,10 +134,10 @@ function stepDirection(server, entityIndex, yaw, distance)
     ideal = collision.entityFloat(server, entityIndex, "ideal_yaw", yaw)
     delta = angles.y - ideal
     if delta > 45.0 and delta < 315.0 then collision.setEntityVector(server, entityIndex, "origin", oldOrigin) end if
-    collision.touchTriggers(server, entityIndex)
+    collision.linkEntity(server, entityIndex, true)
     return true
   end if
-  collision.touchTriggers(server, entityIndex)
+  collision.linkEntity(server, entityIndex, true)
   return false
 end function
 

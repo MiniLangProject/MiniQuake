@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "package": "BP-063",
+  "minimum_memory": 8912896,
+  "maximum_memory": 16777216,
+  "max_file_handles": 10,
+  "console_line_bytes": 256,
+  "qhost_commands": [2, 3, 4, 5],
+  "fixtures": 21
+}

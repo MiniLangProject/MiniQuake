@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "package": "BP-060",
+  "default_port": 26000,
+  "valid_port_min": 1,
+  "valid_port_max": 65534,
+  "socket_pool_client_extra": 1,
+  "poll_order": ["early", "middle", "late"],
+  "fixtures": 20
+}

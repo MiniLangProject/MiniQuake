@@ -4,11 +4,121 @@ import miniquake.types as t
 import miniquake.constants as c
 import miniquake.byteio as bio
 import miniquake.array_util as arrayutil
+import miniquake.protocol_text as protocolText
+import miniquake.crc as crc16
 import std.fs as fs
 
 function stringAt(strings, offset)
   if offset < 0 or offset >= len(strings) then return "" end if
-  return bio.cString(strings, offset)
+  endOffset = offset
+  while endOffset < len(strings) and strings[endOffset] != 0
+    endOffset = endOffset + 1
+  end while
+  return protocolText.decodeBytes(slice(strings, offset, endOffset - offset))
+end function
+
+function typeSize(valueType)
+  baseType = valueType & 0x7fff
+  if baseType == c.EV_VECTOR then return 3 end if
+  return 1
+end function
+
+function validType(valueType)
+  baseType = valueType & 0x7fff
+  return baseType >= c.EV_VOID and baseType <= c.EV_POINTER
+end function
+
+function validateDefinition(definition, limit, sectionName)
+  if not validType(definition.type) then
+    return error(1910, "progs.dat " + sectionName + " has invalid type " + (definition.type & 0x7fff))
+  end if
+  if definition.offset < 0 or definition.offset + typeSize(definition.type) > limit then
+    return error(1911, "progs.dat " + sectionName + " offset outside storage: " + definition.name)
+  end if
+  return true
+end function
+
+function validateLoadableProgram(program)
+  // PR_LoadProgs performs only the loader-level checks that protect the
+  // on-disk layout consumed by the engine.  Keep deeper diagnostics in the
+  // explicit validateProgram audit so valid stock/mod qcc output is not
+  // rejected during normal loading.
+  if len(program.strings) <= 0 or program.strings[0] != 0 then
+    return error(1912, program.filename + ": progs.dat string table does not begin with NUL")
+  end if
+  if program.entityFields <= 0 then
+    return error(1913, program.filename + ": progs.dat entity field count is invalid")
+  end if
+  for each definition in program.fieldDefs
+    if (definition.type & c.DEF_SAVEGLOBAL) != 0 then
+      return error(1915, program.filename + ": field definition uses DEF_SAVEGLOBAL: " + definition.name)
+    end if
+  end for
+  return true
+end function
+
+function validateProgram(program)
+  loadable = try(validateLoadableProgram(program))
+  if loadable is error then return loadable end if
+
+  index = 0
+  while index < len(program.statements)
+    statement = program.statements[index]
+    if statement.op < 0 or statement.op > 65 then
+      return error(1914, program.filename + ": invalid QuakeC opcode " + statement.op + " at statement " + index)
+    end if
+    index = index + 1
+  end while
+
+  for each definition in program.globalDefs
+    checked = try(validateDefinition(definition, len(program.globals), "global definition"))
+    if checked is error then return checked end if
+  end for
+  for each definition in program.fieldDefs
+    checked = try(validateDefinition(definition, program.entityFields, "field definition"))
+    if checked is error then return checked end if
+  end for
+
+  index = 0
+  while index < len(program.functions)
+    fn = program.functions[index]
+    if fn.numParms < 0 or fn.numParms > c.QC_MAX_PARMS then
+      return error(1916, program.filename + ": invalid parameter count in function " + fn.name)
+    end if
+    if fn.parmStart < 0 or fn.locals < 0 or fn.parmStart + fn.locals > len(program.globals) then
+      return error(1917, program.filename + ": local storage outside globals in function " + fn.name)
+    end if
+    if fn.firstStatement >= len(program.statements) then
+      return error(1918, program.filename + ": first statement outside program in function " + fn.name)
+    end if
+    parameterWords = 0
+    parameter = 0
+    while parameter < fn.numParms
+      size = fn.parmSize[parameter]
+      if size != 1 and size != 3 then
+        return error(1919, program.filename + ": invalid parameter size in function " + fn.name)
+      end if
+      parameterWords = parameterWords + size
+      parameter = parameter + 1
+    end while
+
+    // qcc's dfunction_t.locals counts only the words that PR_EnterFunction
+    // saves/restores.  Parameters are copied independently to parmStart, so a
+    // bytecode function may legitimately declare parameters while locals is
+    // zero (for example stock SUB_AttackFinished).  Audit the actual parameter
+    // destination rather than imposing the false parameterWords <= locals rule.
+    if fn.firstStatement >= 0 and fn.parmStart + parameterWords > len(program.globals) then
+      return error(1920, program.filename + ": parameter storage outside globals in function " + fn.name)
+    end if
+    index = index + 1
+  end while
+  return true
+end function
+
+function runtimeCrc(program)
+  if program is void then return 0 end if
+  if typeof(program.data) != "bytes" or len(program.data) == 0 then return program.crc end if
+  return crc16.CRC_Block(program.data, 0, len(program.data))
 end function
 
 function checkSection(data, offset, count, stride, name)
@@ -107,7 +217,10 @@ function parse(data, filename)
     i = i + 1
   end while
 
-  return t.QuakeCProgram(filename, data, version, crc, statements, globalDefs, fieldDefs, functions, strings, globals, entityFields)
+  program = t.QuakeCProgram(filename, data, version, crc, statements, globalDefs, fieldDefs, functions, strings, globals, entityFields)
+  validation = try(validateLoadableProgram(program))
+  if validation is error then return validation end if
+  return program
 end function
 
 function load(filename)

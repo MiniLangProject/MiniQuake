@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "project": "MiniQuake",
+  "block_id": "BP-030-034",
+  "parent_package_id": "BP-029R3",
+  "final_package_id": "BP-034",
+  "delivery_revision": "BP-030-034",
+  "delivery_parent": "BP-025-029R3",
+  "protocol_status": "protocol15_frozen_v1",
+  "quakec_status": "quakec_109_frozen_v1",
+  "world_physics_status": "world_physics_109_frozen_v1",
+  "host_lifecycle_status": "host_lifecycle_109_frozen_v1",
+  "host_lifecycle_fingerprint": "0x8cbb709f",
+  "steps": [
+    {
+      "package_id": "BP-030",
+      "title": "host timing and frame clock parity",
+      "patch": "patches/BP-030.diff",
+      "runtime_fixtures": 18,
+      "status": "implemented; Windows acceptance pending"
+    },
+    {
+      "package_id": "BP-031",
+      "title": "command buffer, alias and cvar lifecycle parity",
+      "patch": "patches/BP-031.diff",
+      "runtime_fixtures": 20,
+      "status": "implemented; Windows acceptance pending"
+    },
+    {
+      "package_id": "BP-032",
+      "title": "demo recording, playback and timedemo parity",
+      "patch": "patches/BP-032.diff",
+      "runtime_fixtures": 20,
+      "status": "implemented; Windows acceptance pending"
+    },
+    {
+      "package_id": "BP-033",
+      "title": "Quake savegame version 5 byte and parser parity",
+      "patch": "patches/BP-033.diff",
+      "runtime_fixtures": 24,
+      "status": "implemented; Windows acceptance pending"
+    },
+    {
+      "package_id": "BP-034",
+      "title": "host transitions, shutdown and lifecycle closure",
+      "patch": "patches/BP-034.diff",
+      "runtime_fixtures": 24,
+      "status": "implemented; Windows acceptance pending"
+    }
+  ],
+  "block_runtime_fixtures": 106,
+  "acceptance": {
+    "build_once": true,
+    "continue_independent_tests": true,
+    "deterministic_trace_processes": 2,
+    "default_headless_frames": 300,
+    "default_trace_frames": 128,
+    "udp_loopback": true,
+    "installed_game_validation": true
+  },
+  "accepted_parent": {
+    "delivery_revision": "BP-025-029R3",
+    "status": "PASS",
+    "result_archive": "MiniQuake_BP-025-029R3_RESULTS_20260726-115205.zip",
+    "result_archive_sha256": "518b080fe6dbb69d10c5395a7d96ad0c9cbab585b0054a6e810ca762da88c556",
+    "headless_frames": 300,
+    "trace_frames": 128,
+    "trace_sha256": "24830a3e183784de44a9c7261a42cc8e5aebf8fd1c8fdbafc32ea447ee0eba9f",
+    "trace_rolling_hash": "4d8fc98d",
+    "udp_loopback": "PASS"
+  },
+  "status": "implemented; Windows acceptance pending"
+}

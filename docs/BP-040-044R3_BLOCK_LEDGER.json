@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "project": "MiniQuake",
+  "block_id": "BP-040-044",
+  "parent_package_id": "BP-035-039R1",
+  "final_package_id": "BP-044",
+  "delivery_revision": "BP-040-044R3",
+  "protocol_status": "protocol15_frozen_v1",
+  "quakec_status": "quakec_109_frozen_v1",
+  "world_physics_status": "world_physics_109_frozen_v1",
+  "host_lifecycle_status": "host_lifecycle_109_frozen_v1",
+  "client_render_status": "client_render_109_frozen_v1",
+  "client_render_fingerprint": "0x95e2b295",
+  "world_render_status": "world_render_109_frozen_v1",
+  "world_render_fingerprint": "0x846a74de",
+  "steps": [
+    {
+      "package_id": "BP-040",
+      "title": "world surface facing, texture chains and deferred water classification",
+      "patch": "patches/BP-040.diff",
+      "runtime_fixtures": 20,
+      "status": "implemented; R3 Windows acceptance pending"
+    },
+    {
+      "package_id": "BP-041",
+      "title": "lightmap formats, row strides and shared atlas ownership",
+      "patch": "patches/BP-041.diff",
+      "runtime_fixtures": 22,
+      "status": "implemented; R3 Windows acceptance pending"
+    },
+    {
+      "package_id": "BP-042",
+      "title": "dynamic-light frame ordering and movable brush marking",
+      "patch": "patches/BP-042.diff",
+      "runtime_fixtures": 20,
+      "status": "implemented; R3 Windows acceptance pending"
+    },
+    {
+      "package_id": "BP-043",
+      "title": "Binary32 sky, water and subdivision math",
+      "patch": "patches/BP-043.diff",
+      "runtime_fixtures": 22,
+      "status": "implemented; R3 Windows acceptance pending"
+    },
+    {
+      "package_id": "BP-044",
+      "title": "viewport, culling and central GLQuake world-render closure",
+      "patch": "patches/BP-044.diff",
+      "runtime_fixtures": 24,
+      "status": "implemented; R3 Windows acceptance pending"
+    }
+  ],
+  "block_runtime_fixtures": 108,
+  "acceptance": {
+    "build_once": true,
+    "continue_independent_tests": true,
+    "deterministic_trace_processes": 2,
+    "default_headless_frames": 300,
+    "default_trace_frames": 128,
+    "udp_loopback": true,
+    "installed_game_validation": true
+  },
+  "accepted_parent": {
+    "delivery_revision": "BP-035-039R1",
+    "status": "PASS",
+    "result_archive": "MiniQuake_BP-035-039R1_RESULTS_20260726-213106.zip",
+    "result_archive_sha256": "2bdab8329975fbd2108c4cf644c70178769c0b713aceec2cfbc8d9a2a2bf613b",
+    "headless_frames": 300,
+    "trace_frames": 128,
+    "trace_sha256": "e4c5334bf6aa4205b3a8d6c0c408a398a16bf042852703ea0bf29ba31c1919a1",
+    "trace_rolling_hash": "0658dd48",
+    "trace_byte_identity": "PASS",
+    "udp_loopback": "PASS"
+  },
+  "scope_boundary": {
+    "visual_golden_images": "later acceptance block",
+    "modern_renderer_backend": "later backend block",
+    "protocol_quakec_physics_host_client_contracts": "unchanged"
+  },
+  "status": "PASS; Windows acceptance complete",
+  "delivery_parent": "BP-040-044R2",
+  "initial_delivery_result": {
+    "delivery_revision": "BP-040-044",
+    "status": "FAIL; static preflight passed, cumulative game compile failed",
+    "result_archive": "MiniQuake_BP-040-044_RESULTS_20260727-071848.zip",
+    "result_archive_sha256": "4c847c6249f51bf68b1763cf83b27e6316ebc5963e29b8a5f368bc49e5eb3d89",
+    "static_verification": "38/38 PASS",
+    "build": "FAIL while compiling MiniQuake.exe",
+    "compiler_exit_code": 2,
+    "first_failure": "Undefined global variable 'rCompatRenderer.lightmaps' in render/world.ml:1918",
+    "runtime_reached": false
+  },
+  "r1_delivery_hotfix": {
+    "revision": "BP-040-044R1",
+    "parent": "BP-040-044",
+    "corrections": [
+      "mutate the compatibility renderer through a local object reference in GL_BuildLightmaps",
+      "remove equivalent package-global-root member assignments from the canonical original renderer module",
+      "bind the compiler-safe renderer member-write contract in the verifier and BP-041 checker"
+    ],
+    "production_source_changed": true,
+    "native_source_changed": false,
+    "runtime_fixture_counts_changed": false,
+    "world_render_fingerprint": "0x846a74de",
+    "status": "Windows build progressed past game; lightmap test-entry compile blocker remained",
+    "patch": "patches/BP-044R1.diff"
+  },
+  "r1_delivery_result": {
+    "delivery_revision": "BP-040-044R1",
+    "status": "FAIL; static preflight and game compile passed, BP-041 test entry failed to compile",
+    "result_archive": "MiniQuake_BP-040-044R1_RESULTS_20260727-080437.zip",
+    "result_archive_sha256": "73ea957dacb8f106ccbc3c7b176b8167a882d95109ff98f3604703be7fe53754",
+    "static_verification": "39/39 PASS",
+    "build": "39/43 executable targets compiled",
+    "compiler_exit_code": 2,
+    "first_failure": "Function standard expects 0 args, got 2 in filesystem.ml:70 while compiling lightmap_atlas_tests.ml",
+    "runtime_reached": false
+  },
+  "r2_delivery_hotfix": {
+    "revision": "BP-040-044R2",
+    "parent": "BP-040-044R1",
+    "corrections": [
+      "rename the package-free BP-041 standard helper to standardFixture",
+      "rename the BP-043 bits helper to fixtureFloatBits to avoid future internal-helper shadowing",
+      "reject entry-function/imported-internal-function arity shadowing across every merged MiniLang import closure"
+    ],
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "runtime_fixture_counts_changed": false,
+    "world_render_fingerprint": "0x846a74de",
+    "status": "awaiting Windows acceptance",
+    "patch": "patches/BP-044R2.diff"
+  },
+  "r2_delivery_result": {
+    "delivery_revision": "BP-040-044R2",
+    "status": "FAIL; 43/43 targets compiled and all 84 script steps were reported PASS, but the supplied Quake base directory did not exist; retrospective log scan found five suppressed fixture failures",
+    "result_archive": "MiniQuake_BP-040-044R2_RESULTS_20260727-105653.zip",
+    "result_archive_sha256": "2678896b8071fe20d5f7a97fa86eb5cb5ad395a536be62ae464c697fc2f6d831",
+    "static_verification": "41/41 PASS",
+    "build": "43/43 executable targets compiled",
+    "script_steps": "84/84 reported PASS",
+    "suppressed_runtime_failures": 5,
+    "suppressed_failure_groups": [
+      "BP-013 events",
+      "BP-014R1 runtime events",
+      "BP-015 signon",
+      "BP-018 demo",
+      "BP-043 sky/water"
+    ],
+    "quake_base": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Quake",
+    "quake_base_exists": false,
+    "real_game_runtime_reached": false
+  },
+  "delivery_hotfix": {
+    "revision": "BP-040-044R3",
+    "parent": "BP-040-044R2",
+    "corrections": [
+      "correct five source-guided runtime fixtures whose expectations or adapters differed from their production APIs",
+      "treat FAIL output and failed aggregate summaries as process failure even when a MiniLang test executable exits with zero",
+      "add an independent runtime-test log checker and bind it in build, acceptance and static verification",
+      "retain all production and native engine sources unchanged"
+    ],
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "runtime_fixture_counts_changed": false,
+    "runtime_fixture_content_corrected": true,
+    "runtime_failure_marker_guard": true,
+    "world_render_fingerprint": "0x846a74de",
+    "status": "awaiting Windows acceptance with an existing Quake base directory",
+    "patch": "patches/BP-044R3.diff"
+  },
+  "r3_acceptance": {
+    "delivery_revision": "BP-040-044R3",
+    "status": "PASS",
+    "result_archive": "MiniQuake_BP-040-044R3_RESULTS_20260727-181619.zip",
+    "result_archive_sha256": "ddb2345e4730c50a7072cd217bce8095e2e09dc64e96dd63c9116bc2a9da4534",
+    "build": "PASS",
+    "all_independent_test_groups": "PASS",
+    "real_game_validation": "id1/start PASS",
+    "headless_frames": 300,
+    "trace_frames": 128,
+    "trace_sha256": "a3c1c0019267d0c6b651c931b1044642b9ef0199cdf64156cef9e8e409a6ecfa",
+    "trace_rolling_hash": "0658dd48",
+    "trace_byte_identity": "PASS",
+    "udp_loopback": "PASS",
+    "world_render_status": "world_render_109_frozen_v1",
+    "world_render_fingerprint": "0x846a74de"
+  }
+}

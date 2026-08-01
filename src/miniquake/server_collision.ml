@@ -77,36 +77,43 @@ function modelSubIndex(name)
   return value
 end function
 
-function entityAbsMin(server, entityIndex)
+function computedEntityBounds(server, entityIndex)
   origin = entityVector(server, entityIndex, "origin", zeroVector())
   mins = entityVector(server, entityIndex, "mins", zeroVector())
-  result = math.add(origin, mins)
+  maxs = entityVector(server, entityIndex, "maxs", zeroVector())
+  absMin = math.add(origin, mins)
+  absMax = math.add(origin, maxs)
   flags = native.trunc(entityFloat(server, entityIndex, "flags", 0.0))
   if (flags & c.FL_ITEM) != 0 then
-    result.x = result.x - 15.0
-    result.y = result.y - 15.0
+    absMin.x = absMin.x - 15.0
+    absMin.y = absMin.y - 15.0
+    absMax.x = absMax.x + 15.0
+    absMax.y = absMax.y + 15.0
   else
-    result.x = result.x - 1.0
-    result.y = result.y - 1.0
-    result.z = result.z - 1.0
+    absMin.x = absMin.x - 1.0
+    absMin.y = absMin.y - 1.0
+    absMin.z = absMin.z - 1.0
+    absMax.x = absMax.x + 1.0
+    absMax.y = absMax.y + 1.0
+    absMax.z = absMax.z + 1.0
   end if
-  return result
+  return [absMin, absMax]
+end function
+
+function entityAbsMin(server, entityIndex)
+  return computedEntityBounds(server, entityIndex)[0]
 end function
 
 function entityAbsMax(server, entityIndex)
-  origin = entityVector(server, entityIndex, "origin", zeroVector())
-  maxs = entityVector(server, entityIndex, "maxs", zeroVector())
-  result = math.add(origin, maxs)
-  flags = native.trunc(entityFloat(server, entityIndex, "flags", 0.0))
-  if (flags & c.FL_ITEM) != 0 then
-    result.x = result.x + 15.0
-    result.y = result.y + 15.0
-  else
-    result.x = result.x + 1.0
-    result.y = result.y + 1.0
-    result.z = result.z + 1.0
-  end if
-  return result
+  return computedEntityBounds(server, entityIndex)[1]
+end function
+
+function updateEntityBounds(server, entityIndex)
+  if entityIndex == 0 or not entityValid(server, entityIndex) then return false end if
+  bounds = computedEntityBounds(server, entityIndex)
+  setEntityVector(server, entityIndex, "absmin", bounds[0])
+  setEntityVector(server, entityIndex, "absmax", bounds[1])
+  return true
 end function
 
 function boxesOverlap(minsA, maxsA, minsB, maxsB)
@@ -195,7 +202,7 @@ end function
 // observable Quake semantics and is suitable for the stock MAX_EDICTS limit.
 function move(server, start, mins, maxs, finish, moveType, passedEntity)
   best = world.trace(server.worldModel, start, mins, maxs, finish)
-  best.entity = 0
+  if best.fraction < 1.0 or best.startSolid then best.entity = 0 else best.entity = -1 end if
   if server.machine is void or server.machine.context is void then return best end if
 
   clipMins = mins
@@ -265,7 +272,7 @@ function testEntityPosition(server, entityIndex)
   mins = entityVector(server, entityIndex, "mins", zeroVector())
   maxs = entityVector(server, entityIndex, "maxs", zeroVector())
   trace = move(server, origin, mins, maxs, origin, c.MOVE_NORMAL, entityIndex)
-  if trace.startSolid then return trace.entity end if
+  if trace.startSolid then return 0 end if
   return -1
 end function
 
@@ -332,17 +339,12 @@ function pushEntity(server, entityIndex, push)
   if entityMoveType == c.MOVETYPE_FLYMISSILE then moveType = c.MOVE_MISSILE end if
   trace = move(server, origin, mins, maxs, target, moveType, entityIndex)
   setEntityVector(server, entityIndex, "origin", trace.endPosition)
-  if trace.entity >= 0 and trace.fraction < 1.0 then impact(server, entityIndex, trace.entity) end if
+  linkEntity(server, entityIndex, true)
+  if trace.entity >= 0 then impact(server, entityIndex, trace.entity) end if
   return trace
 end function
 
-function touchTriggers(server, entityIndex)
-  if not entityValid(server, entityIndex) then return 0 end if
-  origin = entityVector(server, entityIndex, "origin", zeroVector())
-  mins = entityVector(server, entityIndex, "mins", zeroVector())
-  maxs = entityVector(server, entityIndex, "maxs", zeroVector())
-  absMin = math.add(origin, mins)
-  absMax = math.add(origin, maxs)
+function touchTriggersWithBounds(server, entityIndex, absMin, absMax)
   touched = 0
   runtime = server.machine.context.edicts
   index = 1
@@ -350,16 +352,39 @@ function touchTriggers(server, entityIndex)
     if index != entityIndex and not runtime.freeFlags[index] then
       solid = native.trunc(entityFloat(server, index, "solid", c.SOLID_NOT))
       if solid == c.SOLID_TRIGGER then
-        triggerMin = entityAbsMin(server, index)
-        triggerMax = entityAbsMax(server, index)
-        if boxesOverlap(absMin, absMax, triggerMin, triggerMax) then
+        triggerBounds = computedEntityBounds(server, index)
+        if boxesOverlap(absMin, absMax, triggerBounds[0], triggerBounds[1]) then
           if executeTouch(server, index, entityIndex) then touched = touched + 1 end if
+          // QuakeC is allowed to remove the moving entity from a touch callback.
+          if not entityValid(server, entityIndex) then return touched end if
         end if
       end if
     end if
     index = index + 1
   end while
   return touched
+end function
+
+// Linear-scan equivalent of world.c SV_LinkEdict. Area nodes only optimize the
+// candidate set; updated abs bounds, SOLID_NOT suppression and touch ordering
+// are observable parts of the engine contract.
+function linkEntity(server, entityIndex, touchTriggerLinks)
+  if not updateEntityBounds(server, entityIndex) then return false end if
+  solid = native.trunc(entityFloat(server, entityIndex, "solid", c.SOLID_NOT))
+  if solid == c.SOLID_NOT then return true end if
+  if touchTriggerLinks then
+    bounds = computedEntityBounds(server, entityIndex)
+    touchTriggersWithBounds(server, entityIndex, bounds[0], bounds[1])
+  end if
+  return true
+end function
+
+function touchTriggers(server, entityIndex)
+  if not entityValid(server, entityIndex) then return 0 end if
+  solid = native.trunc(entityFloat(server, entityIndex, "solid", c.SOLID_NOT))
+  if solid == c.SOLID_NOT then return 0 end if
+  bounds = computedEntityBounds(server, entityIndex)
+  return touchTriggersWithBounds(server, entityIndex, bounds[0], bounds[1])
 end function
 
 // SV_CheckBottom: first accept the common case where all four lower corners are

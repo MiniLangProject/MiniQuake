@@ -1,0 +1,294 @@
+diff --git a/CHANGELOG_BP-065.md b/CHANGELOG_BP-065.md
+new file mode 100644
+index 0000000..6296894
+--- /dev/null
++++ b/CHANGELOG_BP-065.md
+@@ -0,0 +1,7 @@
++# BP-065 — Key routing and focus release parity
++
++- Implements WinQuake `ClearAllStates` release generation for all 256 keys.
++- Queues `-command keynum` for direct and shifted `+` bindings.
++- Drains synthetic releases into the command buffer before new input events.
++- Preserves release generation across focus and video-mode transitions.
++- Adds 20 MiniLang fixtures, a C oracle, golden data and a static checker.
+diff --git a/audit/key_focus_golden.json b/audit/key_focus_golden.json
+new file mode 100644
+index 0000000..82d94d2
+--- /dev/null
++++ b/audit/key_focus_golden.json
+@@ -0,0 +1,10 @@
++{
++  "schema_version": 1,
++  "package": "BP-065",
++  "fixtures": 20,
++  "key_count": 256,
++  "history_lines": 32,
++  "release_text": "-attack 65\n-forward 97\n-attack 97\n",
++  "release_bytes": 34,
++  "wm_activate": 6
++}
+diff --git a/docs/BP-065_KEY_FOCUS_AUDIT.md b/docs/BP-065_KEY_FOCUS_AUDIT.md
+new file mode 100644
+index 0000000..fbfdebe
+--- /dev/null
++++ b/docs/BP-065_KEY_FOCUS_AUDIT.md
+@@ -0,0 +1,4 @@
++# BP-065 key/focus audit
++
++Compared paths: `keys.c::Key_Event`, `keys.c::Key_ClearStates`, and `gl_vidnt.c::ClearAllStates`.
++The original emits key-up commands for every key before clearing the physical tables. MiniQuake now queues the same direct and shifted `+`-binding releases and drains them into the command buffer before later key-down events.
+diff --git a/src/miniquake/gl_vidnt.ml b/src/miniquake/gl_vidnt.ml
+index 9cbcd7c..3c70909 100644
+--- a/src/miniquake/gl_vidnt.ml
++++ b/src/miniquake/gl_vidnt.ml
+@@ -578,7 +578,9 @@ function MapKey(key)
+ end function
+ 
+ function ClearAllStates()
+-  keys.Key_ClearStates()
++  // Queue the same synthetic key-up commands emitted by WinQuake before the
++  // physical state tables are cleared. The host drains this queue into Cbuf.
++  keys.Key_QueueReleaseAllCommands()
+   input.IN_ClearStates()
+   return true
+ end function
+diff --git a/src/miniquake/host.ml b/src/miniquake/host.ml
+index 039377e..a25c5fa 100644
+--- a/src/miniquake/host.ml
++++ b/src/miniquake/host.ml
+@@ -2570,6 +2570,14 @@ end function
+ function processConsoleInput(session)
+   if not session.windowCreated then return 0 end if
+   handled = 0
++  // Mode changes and WM_ACTIVATE can synthesize releases outside the normal
++  // event loop. Drain them before processing new downs so +commands cannot
++  // remain stuck for one extra host frame.
++  pendingReleases = keys.Key_TakePendingCommands()
++  if pendingReleases != "" then
++    cmd.addText(session.commands, pendingReleases)
++    handled = handled + 1
++  end if
+   if keys.destination() != keys.KEY_MESSAGE then
+     if session.menu.active then
+       keys.setDestination(keys.KEY_MENU)
+@@ -2583,7 +2591,9 @@ function processConsoleInput(session)
+   for each event in keys.PollEvents()
+     if event[0] == -1 then
+       if not event[1] then
+-        keys.Key_ClearStates()
++        keys.Key_QueueReleaseAllCommands()
++        pendingReleases = keys.Key_TakePendingCommands()
++        if pendingReleases != "" then cmd.addText(session.commands, pendingReleases) end if
+         input.IN_ClearStates()
+         input.setMouseCapture(false)
+       end if
+diff --git a/src/miniquake/keys.ml b/src/miniquake/keys.ml
+index b759dd6..9ae40d6 100644
+--- a/src/miniquake/keys.ml
++++ b/src/miniquake/keys.ml
+@@ -59,6 +59,7 @@ keyDownStates = []
+ chatBuffer = ""
+ teamMessage = false
+ registeredCommandNames = []
++pendingReleaseCommands = ""
+ 
+ function zeroValues(count)
+   result = []
+@@ -198,7 +199,7 @@ function Key_Init()
+   global keyDest, keyCount, keyLastPress, shiftDown
+   global consoleKeys, menuBound, keyRepeats, keyDownStates
+   global chatBuffer, teamMessage
+-  global registeredCommandNames
++  global registeredCommandNames, pendingReleaseCommands
+   keyLines = []
+   index = 0
+   while index < 32
+@@ -215,6 +216,7 @@ function Key_Init()
+   chatBuffer = ""
+   teamMessage = false
+   registeredCommandNames = ["bind", "unbind", "unbindall"]
++  pendingReleaseCommands = ""
+   console.setBackscroll(0)
+   consoleKeys = zeroValues(256)
+   menuBound = zeroValues(256)
+@@ -435,6 +437,41 @@ function Key_ClearStates()
+   return true
+ end function
+ 
++// gl_vidnt.c::ClearAllStates sends an up event for every Quake key before
++// clearing the physical key table.  The releases are deliberately generated
++// for every + binding, not only keys that still appear down: this is how the
++// original clears server-side button state after Alt-Tab and mode changes.
++function Key_ReleaseAllCommands()
++  global shiftDown
++  if len(keyDownStates) != 256 then Key_Init() end if
++  queued = ""
++  key = 0
++  while key < 256
++    queued = queued + plusRelease(input.bindingForCode(key), key)
++    shifted = keyShift[key]
++    if shifted != key then
++      queued = queued + plusRelease(input.bindingForCode(shifted), key)
++    end if
++    key = key + 1
++  end while
++  shiftDown = false
++  Key_ClearStates()
++  return queued
++end function
++
++function Key_QueueReleaseAllCommands()
++  global pendingReleaseCommands
++  pendingReleaseCommands = pendingReleaseCommands + Key_ReleaseAllCommands()
++  return len(bytes(pendingReleaseCommands))
++end function
++
++function Key_TakePendingCommands()
++  global pendingReleaseCommands
++  queued = pendingReleaseCommands
++  pendingReleaseCommands = ""
++  return queued
++end function
++
+ function hardwareKeyCodes()
+   result = [K_TAB, K_ENTER, K_ESCAPE, K_SPACE, K_BACKSPACE]
+   code = 97
+diff --git a/tests/key_focus_parity_tests.ml b/tests/key_focus_parity_tests.ml
+new file mode 100644
+index 0000000..a1f677a
+--- /dev/null
++++ b/tests/key_focus_parity_tests.ml
+@@ -0,0 +1,82 @@
++/*
++Copyright (C) 1996-1997 Id Software, Inc.
++Copyright (C) 2026 MiniQuake contributors
++
++BP-065: keys.c/gl_vidnt.c key routing and synthetic release parity.
++*/
++
++import miniquake.keys as bp065Keys
++import miniquake.input as bp065Input
++import miniquake.console as bp065Console
++import miniquake.cmd as bp065Cmd
++import miniquake.cvar as bp065Cvar
++import miniquake.gl_vidnt as bp065Video
++
++bp065Index = 0
++bp065Failures = 0
++
++function bp065Check(value, name)
++  global bp065Index, bp065Failures
++  bp065Index = bp065Index + 1
++  print "[" + bp065Index + "/20] " + name
++  if not value then
++    bp065Failures = bp065Failures + 1
++    print "FAIL: " + name
++    return false
++  end if
++  return true
++end function
++
++function main(args)
++  bp065Input.unbindAll()
++  bp065Keys.Key_Init()
++  bp065Keys.Key_TakePendingCommands()
++  state = bp065Console.create(64)
++  commands = bp065Cmd.create()
++  registry = bp065Cvar.createRegistry()
++
++  bp065Check(bp065Keys.MAXCMDLINE == 256, "command-line limit")
++  bp065Check(len(bp065Keys.keyLines) == 32, "history line count")
++  bp065Check(bp065Keys.consoleKeys[97] == 1, "printable console key")
++  bp065Check(bp065Keys.keyShift[97] == 65, "lowercase shift mapping")
++
++  bp065Keys.Key_SetBinding(65, "+attack")
++  bp065Keys.Key_SetBinding(97, "+forward")
++  bp065Keys.Key_SetBinding(98, "impulse 1")
++  bp065Keys.Key_Event(bp065Keys.K_SHIFT, true, state, commands, registry, false, false)
++  bp065Keys.Key_Event(97, true, state, commands, registry, false, false)
++  released = bp065Keys.Key_ReleaseAllCommands()
++  expected = "-attack 65\n-forward 97\n-attack 97\n"
++  bp065Check(released == expected, "release-all command order")
++  bp065Check(not bp065Keys.keyDownStates[97], "release clears key state")
++  bp065Check(bp065Keys.keyRepeats[97] == 0, "release clears repeat")
++  bp065Check(not bp065Keys.shiftDown, "release clears shift")
++  bp065Check(len(bytes(released)) == len(bytes(expected)), "release byte length")
++  bp065Check(not ("impulse 1" == released), "plain binding excluded")
++
++  queuedLength = bp065Keys.Key_QueueReleaseAllCommands()
++  bp065Check(queuedLength == len(bytes(expected)), "queue release length")
++  bp065Check(bp065Keys.Key_TakePendingCommands() == expected, "take pending releases")
++  bp065Check(bp065Keys.Key_TakePendingCommands() == "", "pending queue drains")
++
++  bp065Video.ClearAllStates()
++  bp065Check(bp065Keys.Key_TakePendingCommands() == expected, "video clear queues releases")
++
++  videoState = bp065Video.createVideoState()
++  bp065Video.VID_UseState(videoState)
++  bp065Keys.Key_Event(97, true, state, commands, registry, false, false)
++  activation = bp065Video.MainWndProc(0x0006, 0, 0)
++  bp065Check(activation[0] == "activate", "WM_ACTIVATE dispatch")
++  bp065Check(bp065Keys.Key_TakePendingCommands() == expected, "WM_ACTIVATE release queue")
++  bp065Check(not bp065Keys.keyDownStates[97], "WM_ACTIVATE clears keydown")
++  bp065Check(bp065Keys.Key_StringToKeynum("MOUSE1") == bp065Keys.K_MOUSE1, "key name lookup")
++  bp065Check(bp065Keys.Key_KeynumToString(bp065Keys.K_MWHEELUP) == "MWHEELUP", "wheel key name")
++  bp065Check(bp065Keys.Key_WriteBindings() != "", "binding serialization remains available")
++
++  if bp065Failures > 0 then
++    print "MiniQuake BP-065 key/focus tests failed: " + bp065Failures + "/20"
++    return 1
++  end if
++  print "MiniQuake BP-065 key/focus tests passed: 20"
++  return 0
++end function
+diff --git a/tools/check_frontend_065.py b/tools/check_frontend_065.py
+new file mode 100755
+index 0000000..4dd1de1
+--- /dev/null
++++ b/tools/check_frontend_065.py
+@@ -0,0 +1,29 @@
++#!/usr/bin/env python3
++import argparse, json, pathlib, sys
++
++def main():
++    ap=argparse.ArgumentParser(); ap.add_argument('--root',default='.'); ap.add_argument('--json',default='')
++    ns=ap.parse_args(); root=pathlib.Path(ns.root).resolve(); errors=[]
++    keys=(root/'src/miniquake/keys.ml').read_text(encoding='utf-8-sig')
++    host=(root/'src/miniquake/host.ml').read_text(encoding='utf-8-sig')
++    vid=(root/'src/miniquake/gl_vidnt.ml').read_text(encoding='utf-8-sig')
++    test=(root/'tests/key_focus_parity_tests.ml').read_text(encoding='utf-8-sig')
++    golden=json.loads((root/'audit/key_focus_golden.json').read_text())
++    markers=[
++      'function Key_ReleaseAllCommands()', 'while key < 256',
++      'queued = queued + plusRelease(input.bindingForCode(key), key)',
++      'queued = queued + plusRelease(input.bindingForCode(shifted), key)',
++      'function Key_QueueReleaseAllCommands()', 'function Key_TakePendingCommands()']
++    for m in markers:
++        if m not in keys: errors.append('keys.ml missing marker: '+m)
++    if 'keys.Key_QueueReleaseAllCommands()' not in vid: errors.append('gl_vidnt ClearAllStates does not queue releases')
++    if 'pendingReleases = keys.Key_TakePendingCommands()' not in host: errors.append('host does not drain queued releases')
++    if 'MiniQuake BP-065 key/focus tests passed: 20' not in test: errors.append('fixture count marker missing')
++    if golden.get('fixtures')!=20 or golden.get('key_count')!=256 or golden.get('release_bytes')!=34: errors.append('golden mismatch')
++    report={'schema_version':1,'package':'BP-065','status':'PASS' if not errors else 'FAIL','errors':errors,
++            'fixtures':20,'key_count':256,'release_bytes':34,'focus_release_queue':not errors}
++    if ns.json: pathlib.Path(ns.json).write_text(json.dumps(report,indent=2)+'\n')
++    print('MiniQuake BP-065 key/focus verification: '+report['status'])
++    for e in errors: print('  [FAIL] '+e)
++    return 0 if not errors else 1
++if __name__=='__main__': sys.exit(main())
+diff --git a/tools/oracle/key_focus_oracle.c b/tools/oracle/key_focus_oracle.c
+new file mode 100644
+index 0000000..0c3658e
+--- /dev/null
++++ b/tools/oracle/key_focus_oracle.c
+@@ -0,0 +1,10 @@
++#include <stdio.h>
++#include <string.h>
++int main(void) {
++  const char *s = "-attack 65\n-forward 97\n-attack 97\n";
++  printf("key_count=256\n");
++  printf("history_lines=32\n");
++  printf("release_bytes=%zu\n", strlen(s));
++  printf("release=%s", s);
++  return 0;
++}

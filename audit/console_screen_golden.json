@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "package": "BP-067",
+  "fixtures": 22,
+  "notify_edges": 2,
+  "console_text_bytes": 16384,
+  "notify_times": 4,
+  "modal_accept": [89, 121],
+  "modal_reject": [27, 78, 110]
+}

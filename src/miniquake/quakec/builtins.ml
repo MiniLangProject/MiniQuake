@@ -5,6 +5,8 @@ import miniquake.constants as c
 import miniquake.native as native
 import miniquake.mathlib as math
 import miniquake.message as msg
+import miniquake.protocol_events as protocolEvents
+import miniquake.protocol_transients as transients
 import miniquake.cvar as cvar
 import miniquake.cmd as cmd
 import miniquake.filesystem as filesystem
@@ -16,6 +18,10 @@ import miniquake.server_move as serverMove
 import miniquake.quakec.opcodes as op
 import miniquake.quakec.vm as qvm
 import miniquake.quakec.edict as qcedict
+
+const BUILTIN_COUNT = 79
+const FNV_OFFSET = 2166136261
+const FNV_PRIME = 16777619
 
 activeContext = void
 
@@ -122,6 +128,10 @@ end function
 
 function returnString(machine, text)
   returnWord(machine, internString(machine, text))
+end function
+
+function returnTemporaryString(machine, text)
+  returnWord(machine, qvm.setTemporaryString(machine, text))
 end function
 
 function definitionOffset(definitions, name)
@@ -235,6 +245,9 @@ function updateBounds(machine, entityIndex)
   setEntityVector(machine, entityIndex, "absmin", absMin)
   setEntityVector(machine, entityIndex, "absmax", absMax)
   setEntityVector(machine, entityIndex, "size", math.subtract(maxs, mins))
+  if machine.context is not void and machine.context.server is not void then
+    collision.linkEntity(machine.context.server, entityIndex, false)
+  end if
 end function
 
 function setMinMaxSize(machine, entityIndex, mins, maxs, rotate)
@@ -316,7 +329,7 @@ function appendConsole(text)
 end function
 
 function fixme(machine)
-  return error(2650, "unimplemented builtin")
+  return error(2650, "unimplemented bulitin")
 end function
 
 function makeVectors(machine)
@@ -364,10 +377,15 @@ end function
 
 function randomBuiltin(machine)
   ctx = context()
-  // WinQuake was built with Microsoft C's rand().  Reproduce its 15-bit
-  // sequence instead of the unrelated ANSI/POSIX LCG previously used here.
-  ctx.randomSeed = (ctx.randomSeed * 214013 + 2531011) & 0xffffffff
-  value = (ctx.randomSeed >> 16) & 0x7fff
+  // WinQuake used the Microsoft C runtime rand() state.  Keep the state on
+  // the VM as the context-independent authority and mirror it into the host
+  // context used by the integrated server.
+  seed = machine.randomSeed
+  if ctx is not void then seed = ctx.randomSeed end if
+  seed = (seed * 214013 + 2531011) & 0xffffffff
+  machine.randomSeed = seed
+  if ctx is not void then ctx.randomSeed = seed end if
+  value = (seed >> 16) & 0x7fff
   returnFloat(machine, value / 32767.0)
   return true
 end function
@@ -375,14 +393,14 @@ end function
 function soundBuiltin(machine)
   ctx = context()
   entityIndex = parmWord(machine, 0)
-  channel = native.trunc(parmFloat(machine, 1))
+  channel = transients.quakeCSoundChannel(parmFloat(machine, 1))
   sample = parmString(machine, 2)
-  volumeByte = native.trunc(parmFloat(machine, 3) * 255.0)
-  attenuation = parmFloat(machine, 4)
+  volumeByte = transients.quakeCSoundVolumeByte(parmFloat(machine, 3))
+  attenuation = transients.quakeCSoundAttenuation(parmFloat(machine, 4))
   if channel < 0 or channel > 7 then return error(2660, "SV_StartSound: bad channel " + channel) end if
   if volumeByte < 0 or volumeByte > 255 then return error(2661, "SV_StartSound: bad volume " + volumeByte) end if
   if attenuation < 0.0 or attenuation > 4.0 then return error(2662, "SV_StartSound: bad attenuation " + attenuation) end if
-  ctx.soundEvents = ctx.soundEvents + [[entityIndex, channel, sample, volumeByte / 255.0, attenuation]]
+  ctx.soundEvents = ctx.soundEvents + [[entityIndex, channel, sample, volumeByte, attenuation]]
   return true
 end function
 
@@ -647,15 +665,25 @@ end function
 function floatToStringBuiltin(machine)
   value = parmFloat(machine, 0)
   rounded = native.trunc(value)
-  if value == rounded then returnString(machine, "" + rounded) else returnString(machine, fixedOneDecimal(value)) end if
+  if value == rounded then returnTemporaryString(machine, "" + rounded) else returnTemporaryString(machine, fixedOneDecimal(value)) end if
   return true
 end function
 
+function roundHalfEvenPositive(value)
+  lower = floorNumber(value)
+  fraction = value - lower
+  if fraction < 0.5 then return lower end if
+  if fraction > 0.5 then return lower + 1 end if
+  if (lower % 2) != 0 then return lower + 1 end if
+  return lower
+end function
+
 function fixedOneDecimal(value)
-  scaled = 0
-  if value >= 0.0 then scaled = floorNumber(value * 10.0 + 0.5) else scaled = ceilNumber(value * 10.0 - 0.5) end if
-  negative = scaled < 0
-  if negative then scaled = -scaled end if
+  value = native.bitsFloat(native.floatBits(value))
+  negative = (native.floatBits(value) & 0x80000000) != 0
+  magnitude = value
+  if negative then magnitude = -magnitude end if
+  scaled = roundHalfEvenPositive(magnitude * 10.0)
   whole = native.trunc(scaled / 10)
   fraction = scaled % 10
   text = "" + whole + "." + fraction
@@ -668,7 +696,7 @@ end function
 
 function vectorToStringBuiltin(machine)
   value = parmVector(machine, 0)
-  returnString(machine, "'" + fixedOneDecimal(value.x) + " " + fixedOneDecimal(value.y) + " " + fixedOneDecimal(value.z) + "'")
+  returnTemporaryString(machine, "'" + fixedOneDecimal(value.x) + " " + fixedOneDecimal(value.y) + " " + fixedOneDecimal(value.z) + "'")
   return true
 end function
 
@@ -817,7 +845,7 @@ end function
 
 function absoluteBuiltin(machine)
   value = parmFloat(machine, 0)
-  if value < 0.0 then value = -value end if
+  if value == 0.0 then value = 0.0 else if value < 0.0 then value = -value end if
   returnFloat(machine, value)
   return true
 end function
@@ -1028,21 +1056,20 @@ function writeStaticBaseline(buffer, machine, entityIndex)
     modelIndex = precacheIndex(context().modelPrecache, modelName)
     if modelIndex < 0 then return error(2667, "SV_ModelIndex: model was not precached: " + modelName) end if
   end if
-  origin = entityVector(machine, entityIndex, "origin")
-  angles = entityVector(machine, entityIndex, "angles")
-  msg.writeByte(buffer, modelIndex)
-  msg.writeByte(buffer, native.trunc(entityFloat(machine, entityIndex, "frame")))
-  msg.writeByte(buffer, native.trunc(entityFloat(machine, entityIndex, "colormap")))
-  msg.writeByte(buffer, native.trunc(entityFloat(machine, entityIndex, "skin")))
-  msg.writeCoord(buffer, origin.x); msg.writeAngle(buffer, angles.x)
-  msg.writeCoord(buffer, origin.y); msg.writeAngle(buffer, angles.y)
-  msg.writeCoord(buffer, origin.z); msg.writeAngle(buffer, angles.z)
+  return protocolEvents.writeSpawnStatic(
+    buffer,
+    modelIndex,
+    entityFloat(machine, entityIndex, "frame"),
+    entityFloat(machine, entityIndex, "colormap"),
+    entityFloat(machine, entityIndex, "skin"),
+    entityVector(machine, entityIndex, "origin"),
+    entityVector(machine, entityIndex, "angles"),
+  )
 end function
 
 function makeStaticBuiltin(machine)
   ctx = context()
   entityIndex = parmWord(machine, 0)
-  msg.writeByte(ctx.signon, c.SVC_SPAWNSTATIC)
   writeStaticBaseline(ctx.signon, machine, entityIndex)
   releaseEdict(machine, entityIndex)
   return true
@@ -1084,13 +1111,13 @@ function ambientSoundBuiltin(machine)
   sample = parmString(machine, 1)
   soundIndex = precacheIndex(ctx.soundPrecache, sample)
   if soundIndex < 0 then appendConsole("no precache: " + sample); return true end if
-  msg.writeByte(ctx.signon, c.SVC_SPAWNSTATICSOUND)
-  msg.writeCoord(ctx.signon, origin.x)
-  msg.writeCoord(ctx.signon, origin.y)
-  msg.writeCoord(ctx.signon, origin.z)
-  msg.writeByte(ctx.signon, soundIndex)
-  msg.writeByte(ctx.signon, native.trunc(parmFloat(machine, 2) * 255.0))
-  msg.writeByte(ctx.signon, native.trunc(parmFloat(machine, 3) * 64.0))
+  protocolEvents.writeStaticSound(
+    ctx.signon,
+    origin,
+    soundIndex,
+    parmFloat(machine, 2),
+    parmFloat(machine, 3),
+  )
   return true
 end function
 
@@ -1111,9 +1138,46 @@ function setSpawnParmsBuiltin(machine)
   return true
 end function
 
+function builtinNames()
+  return [
+    "PF_Fixme", "PF_makevectors", "PF_setorigin", "PF_setmodel", "PF_setsize", "PF_Fixme", "PF_break", "PF_random",
+    "PF_sound", "PF_normalize", "PF_error", "PF_objerror", "PF_vlen", "PF_vectoyaw", "PF_Spawn", "PF_Remove",
+    "PF_traceline", "PF_checkclient", "PF_Find", "PF_precache_sound", "PF_precache_model", "PF_stuffcmd", "PF_findradius", "PF_bprint",
+    "PF_sprint", "PF_dprint", "PF_ftos", "PF_vtos", "PF_coredump", "PF_traceon", "PF_traceoff", "PF_eprint",
+    "PF_walkmove", "PF_Fixme", "PF_droptofloor", "PF_lightstyle", "PF_rint", "PF_floor", "PF_ceil", "PF_Fixme",
+    "PF_checkbottom", "PF_pointcontents", "PF_Fixme", "PF_fabs", "PF_aim", "PF_cvar", "PF_localcmd", "PF_nextent",
+    "PF_particle", "PF_changeyaw", "PF_Fixme", "PF_vectoangles", "PF_WriteByte", "PF_WriteChar", "PF_WriteShort", "PF_WriteLong",
+    "PF_WriteCoord", "PF_WriteAngle", "PF_WriteString", "PF_WriteEntity", "PF_Fixme", "PF_Fixme", "PF_Fixme", "PF_Fixme",
+    "PF_Fixme", "PF_Fixme", "PF_Fixme", "SV_MoveToGoal", "PF_precache_file", "PF_makestatic", "PF_changelevel", "PF_Fixme",
+    "PF_cvar_set", "PF_centerprint", "PF_ambientsound", "PF_precache_model", "PF_precache_sound", "PF_precache_file", "PF_setspawnparms",
+  ]
+end function
+
+function fixmeSlots()
+  return [0, 5, 33, 39, 42, 50, 60, 61, 62, 63, 64, 65, 66, 71]
+end function
+
+function builtinContractFingerprint()
+  names = builtinNames()
+  hash = FNV_OFFSET
+  index = 0
+  while index < len(names)
+    hash = ((hash ^ (index & 255)) * FNV_PRIME) & 0xffffffff
+    data = bytes(names[index])
+    byteIndex = 0
+    while byteIndex < len(data)
+      hash = ((hash ^ data[byteIndex]) * FNV_PRIME) & 0xffffffff
+      byteIndex = byteIndex + 1
+    end while
+    hash = (hash * FNV_PRIME) & 0xffffffff
+    index = index + 1
+  end while
+  return hash
+end function
+
 function install(machine, contextValue)
   bind(contextValue)
-  machine.builtins = [
+  table = [
     fixme,
     makeVectors,
     setOrigin,
@@ -1194,6 +1258,9 @@ function install(machine, contextValue)
     precacheFileBuiltin,
     setSpawnParmsBuiltin,
   ]
+  if len(table) != BUILTIN_COUNT then return error(3370, "QuakeC builtin table size mismatch") end if
+  if len(builtinNames()) != BUILTIN_COUNT then return error(3371, "QuakeC builtin name table size mismatch") end if
+  machine.builtins = table
   return machine
 end function
 

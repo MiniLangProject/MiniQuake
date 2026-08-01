@@ -1,0 +1,76 @@
+{
+  "schema": "MiniQuakeQuakeCEdictGolden/1",
+  "package_id": "BP-022",
+  "parent_package_id": "BP-021",
+  "sources": [
+    "pr_edict.c",
+    "progs.h",
+    "world.c"
+  ],
+  "rows": [
+    {
+      "kind": "case",
+      "name": "type_size_void",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "type_size_vector",
+      "value": 3
+    },
+    {
+      "kind": "case",
+      "name": "type_size_pointer",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "reuse_early_free_time",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "reuse_recent_old_slot",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "reuse_exact_half_second",
+      "value": 0
+    },
+    {
+      "kind": "case",
+      "name": "angle_hack_pitch",
+      "value": 0
+    },
+    {
+      "kind": "case",
+      "name": "angle_hack_yaw",
+      "value": 90
+    },
+    {
+      "kind": "case",
+      "name": "light_alias",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "unknown_key_continues",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "save_global_type_count",
+      "value": 3
+    },
+    {
+      "kind": "text",
+      "name": "negative_zero_fixed",
+      "value": "-0.000000"
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/quakec_edict_oracle.c",
+    "oracle_sha256": "ac2c20f36629f13895c1cfc0ab947f0c1f339f9cee47bd5076af174563733ab3"
+  }
+}

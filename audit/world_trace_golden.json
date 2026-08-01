@@ -1,0 +1,60 @@
+{
+  "schema": "MiniQuakeWorldTraceGolden/1",
+  "package_id": "BP-025",
+  "parent_package_id": "BP-024R3",
+  "sources": [
+    "world.c",
+    "world.h"
+  ],
+  "rows": [
+    {
+      "kind": "case",
+      "name": "max_plane_empty",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "min_plane_solid",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "parallel_max_clear",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "entry_fraction",
+      "value": 0.65625
+    },
+    {
+      "kind": "case",
+      "name": "entry_plane_distance",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "translated_clear_world_end",
+      "value": 70
+    },
+    {
+      "kind": "case",
+      "name": "translated_hit_fraction",
+      "value": 0.499218762
+    },
+    {
+      "kind": "case",
+      "name": "translated_hit_world_x",
+      "value": 99.96875
+    },
+    {
+      "kind": "case",
+      "name": "dist_epsilon",
+      "value": 0.03125
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/world_trace_oracle.c",
+    "oracle_sha256": "3bd3cc7c97d50ded8880e68ba1f023c831ff4a42fb4a4d809ad1ece64dde52a7"
+  }
+}

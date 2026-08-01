@@ -130,10 +130,16 @@ function testByteIo()
   print "  [02.14] exact integer truncation"
   assertEqual(native.trunc(0x12345678), 0x12345678, "integer truncation preserves 32-bit mask")
 
-  print "  [02.15] native C string return"
-  assertEqual(native.asciiChar(65), "A", "native C string return")
+  print "  [02.15] buffered native ASCII return"
+  assertEqual(native.asciiChar(65), "A", "buffered native ASCII return")
 
-  print "  [02.16] byte I/O complete"
+  print "  [02.16] buffered native NUL return"
+  assertEqual(native.asciiChar(0), "", "buffered native NUL return")
+
+  print "  [02.17] buffered native float text"
+  assertEqual(native.floatText(12.5), "12.5", "buffered native float text")
+
+  print "  [02.18] byte I/O complete"
   assertEqual(bio.shortSwap(0x1234), 0x3412, "ShortSwap")
   assertEqual(bio.shortSwap(0x0080), -32768, "ShortSwap signed return")
   assertEqual(bio.longSwap(0x12345678), 0x78563412, "LongSwap")
@@ -684,10 +690,13 @@ end function
 
 
 function makeLargeSyntheticProgs(statementCount)
-  data = bytes(60 + statementCount * 8)
+  sectionEnd = 60 + statementCount * 8
+  // dprograms_t requires the first string-table byte to be the empty string.
+  // Keep the large statement allocation while emitting a minimally valid
+  // one-byte string lump and a zero-length globals lump after it.
+  data = bytes(sectionEnd + 1)
   bio.putI32(data, 0, c.PROG_VERSION)
   bio.putI32(data, 4, 5927)
-  sectionEnd = 60 + statementCount * 8
   bio.putI32(data, 8, 60)
   bio.putI32(data, 12, statementCount)
   bio.putI32(data, 16, sectionEnd)
@@ -697,10 +706,11 @@ function makeLargeSyntheticProgs(statementCount)
   bio.putI32(data, 32, sectionEnd)
   bio.putI32(data, 36, 0)
   bio.putI32(data, 40, sectionEnd)
-  bio.putI32(data, 44, 0)
-  bio.putI32(data, 48, sectionEnd)
+  bio.putI32(data, 44, 1)
+  bio.putI32(data, 48, sectionEnd + 1)
   bio.putI32(data, 52, 0)
   bio.putI32(data, 56, 1)
+  data[sectionEnd] = 0
   return data
 end function
 

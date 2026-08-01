@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "package": "BP-066",
+  "fixtures": 22,
+  "first_filtered": [5.0, -3.0],
+  "second_filtered": [8.0, -2.0],
+  "joystick_axes": 6,
+  "mouse_buttons": 3,
+  "device_clear_preserves_buttons": true
+}

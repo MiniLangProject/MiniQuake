@@ -148,10 +148,12 @@ function colorFloat(red, green, blue, alpha)
 end function
 
 function clearColor(red, green, blue, alpha)
+  if traceCommand("clear_color", [bits(red), bits(green), bits(blue), bits(alpha)]) then return void end if
   native.glClearColor(bits(red), bits(green), bits(blue), bits(alpha))
 end function
 
 function clear(mask)
+  if traceCommand("clear", [mask]) then return void end if
   native.glClear(mask)
 end function
 
@@ -171,6 +173,7 @@ function blendFunc(source, destination)
 end function
 
 function depthFunc(value)
+  if traceCommand("depth_func", [value]) then return void end if
   native.glDepthFunc(value)
 end function
 
@@ -181,6 +184,7 @@ function depthMask(enabled)
 end function
 
 function depthRange(nearValue, farValue)
+  if traceCommand("depth_range", [bits(nearValue), bits(farValue)]) then return void end if
   native.glDepthRange(bits(nearValue), bits(farValue))
 end function
 
@@ -284,6 +288,7 @@ function alphaFunc(functionName, reference)
 end function
 
 function cullFace(mode)
+  if traceCommand("cull_face", [mode]) then return void end if
   native.glCullFace(mode)
 end function
 
@@ -354,6 +359,7 @@ function readPixelsRgba(x, y, width, height)
 end function
 
 function finish()
+  if traceCommand("finish", []) then return void end if
   native.glFinish()
 end function
 

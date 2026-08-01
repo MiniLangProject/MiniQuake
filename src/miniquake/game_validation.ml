@@ -12,19 +12,48 @@ import miniquake.host as host
 import miniquake.constants as c
 import miniquake.world_bsp as world
 import miniquake.mathlib as math
+import miniquake.common as common
 
 function append(messages, level, text)
   return messages + [level + " " + text]
 end function
 
+function filesystemArguments(options)
+  // Preserve the full COM_InitFilesystem profile instead of reducing it to
+  // only the final com_gamedir.  In particular, -rogue and -hipnotic may both
+  // be present before a later -game override.
+  source = common.create(options.originalArgs)
+  result = ["-basedir", options.basedir]
+  if common.hasParm(source, "-rogue") then result = result + ["-rogue"] end if
+  if common.hasParm(source, "-hipnotic") then result = result + ["-hipnotic"] end if
+  gamePosition = common.checkParm(source, "-game")
+  if gamePosition != 0 and gamePosition < len(source.args) then
+    result = result + ["-game", source.args[gamePosition]]
+  end if
+  cachePosition = common.checkParm(source, "-cachedir")
+  if cachePosition != 0 and cachePosition < len(source.args) then
+    result = result + ["-cachedir", source.args[cachePosition]]
+  end if
+  if common.hasParm(source, "-proghack") then result = result + ["-proghack"] end if
+  pathPosition = common.checkParm(source, "-path")
+  if pathPosition != 0 then
+    result = result + ["-path"]
+    index = pathPosition
+    while index < len(source.args)
+      value = source.args[index]
+      valueBytes = bytes(value)
+      if len(valueBytes) == 0 or valueBytes[0] == 43 or valueBytes[0] == 45 then break end if
+      result = result + [value]
+      index = index + 1
+    end while
+  end if
+  return result
+end function
+
 function runtimeArguments(options)
-  return [
-    "-basedir", options.basedir,
-    "-game", options.gameDirectory,
-    "-headless",
-    "-nosound",
-    "+map", options.startMap,
-  ]
+  result = filesystemArguments(options)
+  result = result + ["-headless", "-nosound", "+map", options.startMap]
+  return result
 end function
 
 function validateIntegratedRuntime(options, messages)
@@ -128,7 +157,7 @@ function validateProgramData(system, messages)
     else
       functionCount = len(program.functions)
       messages = append(messages, "OK  ", "progs.dat: " + functionCount + " functions, " + program.entityFields + " entity words")
-      if program.crc != 5927 then messages = append(messages, "WARN", "progs.dat system CRC is " + program.crc + "; stock Quake is 5927") end if
+      if program.crc != c.PROGHEADER_CRC then messages = append(messages, "WARN", "progs.dat system CRC is " + program.crc + "; stock Quake is " + c.PROGHEADER_CRC) end if
     end if
   end if
   return [messages, ok, functionCount]
@@ -207,7 +236,7 @@ end function
 
 function validate(options)
   print "[validate 1/7] mounting game search paths"
-  system = qfs.initialize(options.basedir, options.gameDirectory)
+  system = qfs.initializeArguments(options.basedir, common.create(filesystemArguments(options)))
   messages = []
   ok = true
   packFiles = qfs.packFileCount(system)

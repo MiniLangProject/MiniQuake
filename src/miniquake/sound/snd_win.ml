@@ -279,11 +279,19 @@ function nextHeader(state)
 end function
 
 function copySubmission(state, data, header)
-  count = len(data)
+  sourceOffset = 0
+  // The original waveOut headers point at distinct 1024-byte regions of the
+  // circular DMA buffer. Accept a single convenience block too, but when a
+  // full ring is supplied copy the region owned by this exact header.
+  if len(data) >= header.bufferOffset + WAV_BUFFER_SIZE then
+    sourceOffset = header.bufferOffset
+  end if
+  count = len(data) - sourceOffset
   if count > WAV_BUFFER_SIZE then count = WAV_BUFFER_SIZE end if
+  if count < 0 then count = 0 end if
   index = 0
   while index < count
-    state.buffer[header.bufferOffset + index] = data[index]
+    state.buffer[header.bufferOffset + index] = data[sourceOffset + index]
     index = index + 1
   end while
   header.bufferLength = count

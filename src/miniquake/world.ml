@@ -308,18 +308,11 @@ function SV_LinkEdict(state, entityIndex, touchTriggers)
   origin = entityVector(state, entityIndex, "origin")
   mins = entityVector(state, entityIndex, "mins")
   maxs = entityVector(state, entityIndex, "maxs")
-  angles = entityVector(state, entityIndex, "angles")
   solid = entityNumber(state, entityIndex, "solid", c.SOLID_NOT)
-  absMin = zeroVector()
-  absMax = zeroVector()
-  if solid == c.SOLID_BSP and (angles.x != 0.0 or angles.y != 0.0 or angles.z != 0.0) then
-    bounds = rotatedBounds(origin, mins, maxs)
-    absMin = bounds[0]
-    absMax = bounds[1]
-  else
-    absMin = math.VectorAdd(origin, mins)
-    absMax = math.VectorAdd(origin, maxs)
-  end if
+  // WinQuake 1.09 is built without QUAKE2: rotated BSP broad-phase bounds are
+  // not part of the compatibility profile.
+  absMin = math.VectorAdd(origin, mins)
+  absMax = math.VectorAdd(origin, maxs)
 
   flags = entityNumber(state, entityIndex, "flags", 0)
   if (flags & c.FL_ITEM) != 0 then
@@ -380,7 +373,7 @@ function SV_LinkEdict(state, entityIndex, touchTriggers)
 end function
 
 function SV_HullPointContents(hull, number, point)
-  return boxworld.truePointContents(hull, point)
+  return boxworld.pointContentsFromNode(hull, number, point)
 end function
 
 function SV_BspHullPointContents(hull, number, point)
@@ -416,9 +409,9 @@ function SV_HullForEntity(state, entityIndex, mins, maxs)
     if submodel < 0 then return error(3805, "MOVETYPE_PUSH with a non bsp model") end if
     hull = bspworld.createModelHull(state.map, submodel, hullIndex(mins, maxs))
     offset = math.VectorAdd(math.VectorSubtract(hull.clipMins, mins), origin)
-    angles = entityVector(state, entityIndex, "angles")
-    rotated = angles.x != 0.0 or angles.y != 0.0 or angles.z != 0.0
-    return [hull, offset, rotated]
+    // WinQuake's QUAKE2-only rotating brush path is deliberately disabled in
+    // compat_109.  The angle fields remain available to QuakeC/rendering.
+    return [hull, offset, false]
   end if
   hullMins = math.VectorSubtract(entityVector(state, entityIndex, "mins"), maxs)
   hullMaxs = math.VectorSubtract(entityVector(state, entityIndex, "maxs"), mins)
@@ -463,11 +456,17 @@ function SV_ClipMoveToEntity(state, entityIndex, start, mins, maxs, finish)
     trace = boxworld.traceLine(hull, localStart, localFinish)
   end if
 
-  if rotated and trace.fraction != 1.0 then
-    trace.endPosition = rotateFromModel(trace.endPosition, angles)
-    trace.plane.normal = rotateFromModel(trace.plane.normal, angles)
+  if trace.fraction == 1.0 then
+    // world.c initializes trace.endpos with the caller's world-space end
+    // point.  Local hull coordinates must never leak from a clear trace.
+    trace.endPosition = math.VectorCopy(finish)
+  else
+    if rotated then
+      trace.endPosition = rotateFromModel(trace.endPosition, angles)
+      trace.plane.normal = rotateFromModel(trace.plane.normal, angles)
+    end if
+    trace.endPosition = math.VectorAdd(trace.endPosition, offset)
   end if
-  if trace.fraction != 1.0 then trace.endPosition = math.VectorAdd(trace.endPosition, offset) end if
   if trace.fraction < 1.0 or trace.startSolid then trace.entity = entityIndex end if
   return trace
 end function
@@ -527,7 +526,7 @@ end function
 
 function SV_Move(state, start, mins, maxs, finish, moveType, passedEntity)
   trace = bspworld.trace(state.map, start, mins, maxs, finish)
-  trace.entity = 0
+  if trace.fraction < 1.0 or trace.startSolid then trace.entity = 0 else trace.entity = -1 end if
   mins2 = math.VectorCopy(mins)
   maxs2 = math.VectorCopy(maxs)
   if moveType == c.MOVE_MISSILE then

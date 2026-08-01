@@ -1,0 +1,80 @@
+{
+  "schema": "MiniQuakeQuakeCBuiltinGolden/1",
+  "package_id": "BP-023",
+  "parent_package_id": "BP-022",
+  "sources": [
+    "pr_cmds.c",
+    "progs.h"
+  ],
+  "rows": [
+    {
+      "kind": "case",
+      "name": "builtin_count",
+      "value": 79
+    },
+    {
+      "kind": "case",
+      "name": "fixme_slot_5",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "fixme_slot_66",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "ftos_integer",
+      "value": "-12"
+    },
+    {
+      "kind": "case",
+      "name": "ftos_positive_tie",
+      "value": "  1.2"
+    },
+    {
+      "kind": "case",
+      "name": "ftos_negative_tie",
+      "value": " -1.2"
+    },
+    {
+      "kind": "case",
+      "name": "ftos_binary32_below_tie",
+      "value": "  2.3"
+    },
+    {
+      "kind": "case",
+      "name": "ftos_negative_zero",
+      "value": " -0.0"
+    },
+    {
+      "kind": "case",
+      "name": "vtos",
+      "value": "'  1.2  -1.2  -0.0'"
+    },
+    {
+      "kind": "case",
+      "name": "msvc_rand_first",
+      "value": 41
+    },
+    {
+      "kind": "case",
+      "name": "msvc_rand_float_bits",
+      "value": 983826760
+    },
+    {
+      "kind": "case",
+      "name": "changelevel_one_shot",
+      "value": 1
+    },
+    {
+      "kind": "case",
+      "name": "temporary_string_shared",
+      "value": 1
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/quakec_builtin_oracle.c",
+    "oracle_sha256": "91bcc06482b0b79dc90de6647c553585284f54e8f78dfbe8e3ab78e4f55d6aad"
+  }
+}

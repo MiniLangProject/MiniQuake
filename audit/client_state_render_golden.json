@@ -1,0 +1,52 @@
+{
+  "schema": "MiniQuakeClientStateGolden/1",
+  "package_id": "BP-035",
+  "parent_package_id": "BP-034R1",
+  "sources": [
+    "cl_main.c",
+    "view.c",
+    "chase.c",
+    "cl_tent.c",
+    "r_part.c",
+    "gl_refrag.c",
+    "gl_rmain.c"
+  ],
+  "rows": [
+    {
+      "name": "lerp_half_fbits",
+      "value": 1056964608
+    },
+    {
+      "name": "angle_wrap_fbits",
+      "value": 1135869952
+    },
+    {
+      "name": "dlight_decay_fbits",
+      "value": 1119092736
+    },
+    {
+      "name": "nolerp_time_fbits",
+      "value": 1073741824
+    },
+    {
+      "name": "nolerp_rotate_fbits",
+      "value": 1128791744
+    },
+    {
+      "name": "float_integer_boundary",
+      "value": 1266679808
+    },
+    {
+      "name": "max_visedicts",
+      "value": 256
+    },
+    {
+      "name": "fixtures",
+      "value": 20
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/client_state_oracle.c",
+    "oracle_sha256": "190ef37ced777160974d584bedeec0b16db2a10f667ea7384ab5fc254e202975"
+  }
+}

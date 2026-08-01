@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "package": "BP-061",
+  "protocol_version": 3,
+  "game_name": "QUAKE",
+  "host_cache_size": 8,
+  "request_opcodes": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "reply_opcodes": [
+    129,
+    130,
+    131,
+    132,
+    133
+  ],
+  "fixtures": 24,
+  "rule_enumeration": {
+    "first": [
+      "deathmatch",
+      "1"
+    ],
+    "next": [
+      "fraglimit",
+      "20"
+    ],
+    "end": [
+      "",
+      ""
+    ],
+    "unknown_previous": "no_reply"
+  }
+}

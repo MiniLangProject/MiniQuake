@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "revision": "BP-045-049R3",
+  "parent": "BP-045-049R2",
+  "result_archive": "MiniQuake_BP-045-049R2_RESULTS_20260727-231227.zip",
+  "result_archive_sha256": "e1feebede5c28fed87dc673c8d3b05363da230fe18afdb174fcb212861b8ad27",
+  "steps": {"pass": 110, "fail": 1},
+  "trace_equal": true,
+  "trace_sha256": "b2589f2712b0aed42f31b1a35ebb4837c211391ba3e8d8888c422242d051af28",
+  "render_equal": false,
+  "render_ssim": 0.7532948781615113,
+  "render_a_pixel_hash": "3a409255",
+  "render_b_pixel_hash": "6dc1f987",
+  "cause": "visible render-evidence sessions inherited asynchronous desktop input",
+  "changes": [
+    "render-evidence adds -nolan -nomouse -nojoy -noinput",
+    "host suppresses live button and device input under -noinput",
+    "host clears key, input and command state before visible deterministic run",
+    "BP-048 checker binds deterministic input isolation"
+  ],
+  "production_source_changed": true,
+  "native_source_changed": false,
+  "engine_contracts_changed": false
+}

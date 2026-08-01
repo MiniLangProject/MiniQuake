@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "project": "MiniQuake",
+  "revision": "BP-045-049R2",
+  "parent": "BP-045-049R1",
+  "result_archive": "MiniQuake_BP-045-049R1_RESULTS_20260727-221019.zip",
+  "result_archive_sha256": "2aef7b2b8eacd19f8c17c4883ade88644dc61a2a1232fb8b60bcd8720e9393a5",
+  "r1_summary": {
+    "steps": 108,
+    "passed": 96,
+    "failed": 1,
+    "skipped": 11,
+    "quake_base_supplied": false
+  },
+  "failure": {
+    "group": "BP-048 deterministic render evidence",
+    "marker": "FAIL: summary JSON: expected true",
+    "passed_fixtures": 17,
+    "total_fixtures": 18
+  },
+  "root_cause": "fixture used text[1] == 34 instead of inspecting bytes(text)",
+  "changes": [
+    "render evidence summary fixture validates JSON prefix and suffix as UTF-8 bytes",
+    "BP-048 checker rejects the old string/integer comparison",
+    "acceptance requires a usable Quake base unless all asset gates are skipped explicitly",
+    "R2 acceptance and collector metadata added"
+  ],
+  "production_source_changed": false,
+  "native_source_changed": false,
+  "contracts_changed": false
+}

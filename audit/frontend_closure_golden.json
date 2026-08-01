@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "package": "BP-069",
+  "fixtures": 24,
+  "status": "frontend_109_frozen_v1",
+  "fingerprint": "0x924251fa",
+  "key_count": 256,
+  "console_text_bytes": 16384,
+  "max_video_modes": 30,
+  "max_video_descriptions": 27,
+  "contract_values": 13
+}

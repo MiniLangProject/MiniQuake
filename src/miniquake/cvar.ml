@@ -5,7 +5,9 @@ import miniquake.native as native
 import miniquake.common as common
 
 function numericValue(text)
-  return common.atof(text)
+  // cvar_t.value is a C float even though MiniLang expressions may retain more
+  // precision.  Keep the stored numeric view at the original binary32 boundary.
+  return native.bitsFloat(native.floatBits(common.atof(text)))
 end function
 
 function createRegistry()
@@ -53,20 +55,23 @@ function takeServerChanges(registry)
   return changes
 end function
 
+function fixedSixValue(value)
+  return native.fixedSixText(value)
+end function
+
 function setValue(registry, name, value)
-  negative = value < 0.0
-  magnitude = value
-  if negative then magnitude = -magnitude end if
-  scaled = native.trunc(magnitude * 1000000.0 + 0.5)
-  whole = native.trunc(scaled / 1000000)
-  fraction = scaled % 1000000
-  digits = "" + fraction
-  while len(bytes(digits)) < 6
-    digits = "0" + digits
-  end while
-  text = "" + whole + "." + digits
-  if negative then text = "-" + text end if
-  return set(registry, name, text)
+  return set(registry, name, fixedSixValue(value))
+end function
+
+function command(registry, arguments)
+  if len(arguments) == 0 then return [false, ""] end if
+  variable = find(registry, arguments[0])
+  if variable is void then return [false, ""] end if
+  if len(arguments) == 1 then
+    return [true, "\"" + variable.name + "\" is \"" + variable.string + "\""]
+  end if
+  set(registry, variable.name, arguments[1])
+  return [true, ""]
 end function
 
 function variableValue(registry, name)
@@ -113,3 +118,58 @@ function archiveText(registry)
   end for
   return text
 end function
+
+// ---------------------------------------------------------------------------
+// WinQuake cvar.c source-surface adapters.
+//
+// The C implementation stores its registry and current command arguments in
+// globals. MiniQuake keeps those contexts explicit, so the original exported
+// names are retained with the required context passed as parameters.
+// ---------------------------------------------------------------------------
+
+function Cvar_FindVar(registry, varName)
+  return find(registry, varName)
+end function
+
+function Cvar_VariableValue(registry, varName)
+  return variableValue(registry, varName)
+end function
+
+function Cvar_VariableString(registry, varName)
+  return variableString(registry, varName)
+end function
+
+function Cvar_CompleteVariable(registry, partial)
+  return completeVariable(registry, partial)
+end function
+
+function Cvar_Set(registry, varName, value)
+  result = try(set(registry, varName, value))
+  if result is error then
+    // The original prints and returns when a variable does not exist. Keep the
+    // adapter non-fatal while preserving the diagnostic for callers.
+    return [false, result.message]
+  end if
+  return [true, ""]
+end function
+
+function Cvar_SetValue(registry, varName, value)
+  result = try(setValue(registry, varName, value))
+  if result is error then return [false, result.message] end if
+  return [true, ""]
+end function
+
+function Cvar_RegisterVariable(registry, variable, commandExists)
+  result = try(register(registry, variable, commandExists))
+  if result is error then return [false, result.message] end if
+  return [true, ""]
+end function
+
+function Cvar_Command(registry, arguments)
+  return command(registry, arguments)
+end function
+
+function Cvar_WriteVariables(registry)
+  return archiveText(registry)
+end function
+

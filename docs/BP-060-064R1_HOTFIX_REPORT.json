@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "delivery_revision": "BP-060-064R1",
+  "parent_delivery": "BP-060-064",
+  "classification": "test_infrastructure_hotfix",
+  "problem": "foreground child-process output was collected before being displayed",
+  "changes": {
+    "acceptance_runner_live_streaming": true,
+    "build_runtime_tests_live_streaming": true,
+    "logs_flushed_per_line": true,
+    "python_unbuffered": true,
+    "engine_source_changed": false,
+    "native_bridge_changed": false
+  },
+  "contract": {
+    "status": "network_platform_109_frozen_v1",
+    "fingerprint": "0xb3ec7589",
+    "runtime_fixtures": 113
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "schema": "MiniQuakeTemporaryBeamGolden/1",
+  "package_id": "BP-037",
+  "parent_package_id": "BP-036",
+  "sources": [
+    "cl_main.c",
+    "view.c",
+    "chase.c",
+    "cl_tent.c",
+    "r_part.c",
+    "gl_refrag.c",
+    "gl_rmain.c"
+  ],
+  "rows": [
+    {
+      "name": "segments_zero",
+      "value": 0
+    },
+    {
+      "name": "segments_one",
+      "value": 1
+    },
+    {
+      "name": "segments_thirty",
+      "value": 1
+    },
+    {
+      "name": "segments_thirty_one",
+      "value": 2
+    },
+    {
+      "name": "segments_sixty_one",
+      "value": 3
+    },
+    {
+      "name": "pitch_up",
+      "value": 90
+    },
+    {
+      "name": "pitch_down",
+      "value": 270
+    },
+    {
+      "name": "yaw_left",
+      "value": 90
+    },
+    {
+      "name": "beam_pool",
+      "value": 24
+    },
+    {
+      "name": "temp_limit",
+      "value": 64
+    },
+    {
+      "name": "fixtures",
+      "value": 22
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/temp_beam_oracle.c",
+    "oracle_sha256": "540ef2300e2f9a7c0a7ede277ffeeafa6b4e0d658b5dfcf89a4bb9b7dd7494a1"
+  }
+}

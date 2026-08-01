@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "package": "BP-072",
+  "fixtures": 20,
+  "wad_magic": "WAD2",
+  "name_size": 16,
+  "lumpinfo_size": 32,
+  "qpic_header_size": 8,
+  "compression_none": 0,
+  "compression_lzss": 1,
+  "conchars_bytes": 16384,
+  "quake_text_abi": "quake_latin1_cstring_v1"
+}

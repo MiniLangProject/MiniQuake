@@ -296,20 +296,29 @@ function setRandomSeed(seed)
   return randomSeed
 end function
 
+function mixerF32(value)
+  return native.bitsFloat(native.floatBits(value))
+end function
+
 function startSound(mixer, entityNumber, channelNumber, name, origin, volume, attenuation)
   if not mixer.enabled then return false end if
+  dynamicBefore = dynamicChannelCount(mixer)
   victim = pickDynamicChannel(mixer, entityNumber, channelNumber)
-  if dynamicChannelCount(mixer) >= MAX_DYNAMIC_CHANNELS then
-    if victim < 0 then return false end if
+  // A matching non-zero entity channel always replaces its existing slot,
+  // even while fewer than eight dynamic channels are active. When full, the
+  // same result represents the shortest-lived eligible victim.
+  if victim >= 0 then
     removeChannelAt(mixer, victim)
+  else if dynamicBefore >= MAX_DYNAMIC_CHANNELS then
+    return false
   end if
   candidate = t.MixerChannel(
     entityNumber,
     channelNumber,
     void,
     math.copy(origin),
-    volume,
-    attenuation,
+    mixerF32(volume),
+    mixerF32(attenuation),
     0,
     false,
     true,
@@ -561,7 +570,7 @@ function clampSample(value)
 end function
 
 function channelVolumes(mixer, channel)
-  master = native.trunc(channel.volume * 255.0)
+  master = native.trunc(mixerF32(mixerF32(channel.volume) * 255.0))
   // Sounds emitted by the view entity (weapon and menu sounds) are never
   // spatialized in WinQuake; they play equally in both speakers.
   if channel.entityNumber == mixer.listenerEntity then
@@ -569,14 +578,17 @@ function channelVolumes(mixer, channel)
   end if
 
   delta = math.subtract(channel.origin, mixer.listenerOrigin)
-  distance = math.length(delta)
-  spatial = 1.0 - distance * channel.attenuation / 1000.0
+  distance = mixerF32(math.length(delta))
+  spatial = mixerF32(1.0 - mixerF32(mixerF32(distance * channel.attenuation) / 1000.0))
   if channel.attenuation <= 0.0 then spatial = 1.0 end if
-  spatial = math.clamp(spatial, 0.0, 1.0)
+  spatial = mixerF32(math.clamp(spatial, 0.0, 1.0))
   pan = 0.0
-  if distance > 0.0 then pan = math.clamp(math.dot(math.scale(delta, 1.0 / distance), mixer.listenerRight), -1.0, 1.0) end if
-  left = native.trunc(master * spatial * (1.0 - pan))
-  right = native.trunc(master * spatial * (1.0 + pan))
+  if distance > 0.0 then
+    direction = math.scale(delta, mixerF32(1.0 / distance))
+    pan = mixerF32(math.clamp(math.dot(direction, mixer.listenerRight), -1.0, 1.0))
+  end if
+  left = native.trunc(mixerF32(mixerF32(master * spatial) * mixerF32(1.0 - pan)))
+  right = native.trunc(mixerF32(mixerF32(master * spatial) * mixerF32(1.0 + pan)))
   if left < 0 then left = 0 end if
   if right < 0 then right = 0 end if
   return [left, right]

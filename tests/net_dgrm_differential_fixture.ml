@@ -69,7 +69,10 @@ function main(args)
   channel.canSend = false
   sentBefore = datagram.packetsSent
   ready = datagram.Datagram_CanSendMessage(channel)
-  emit("Datagram_CanSendMessage", "flush_next", boolInt(ready),
+  emit("Datagram_CanSendMessage", "side_effect_free", boolInt(ready),
+    datagram.packetsSent - sentBefore, boolInt(channel.sendNext), 1)
+  flushed = datagram.Datagram_FlushSendNext(channel, 10.3)
+  emit("Datagram_FlushSendNext", "flush_next", boolInt(flushed is bytes),
     datagram.packetsSent - sentBefore, boolInt(channel.sendNext), 1)
   emit("Datagram_CanSendUnreliableMessage", "always",
     boolInt(datagram.Datagram_CanSendUnreliableMessage(channel)), 0, 0, 1)
@@ -107,6 +110,10 @@ function main(args)
     10.0,
   )
   emit("Datagram_GetMessage", "ack_next", ackResult[0],
+    len(ackChannel.sendMessage), boolInt(ackChannel.sendNext),
+    boolInt(ackChannel.canSend))
+  ackFlush = datagram.Datagram_FlushSendNext(ackChannel, 10.0)
+  emit("Datagram_FlushSendNext", "ack_next", boolInt(ackFlush is bytes),
     len(ackChannel.sendMessage), boolInt(ackChannel.sendNext),
     boolInt(ackChannel.canSend))
 

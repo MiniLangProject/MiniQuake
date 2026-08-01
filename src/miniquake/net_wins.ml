@@ -7,6 +7,7 @@ package miniquake.net_wins
 import miniquake.types as t
 import miniquake.net_udp as udp
 import miniquake.platform.win32 as win
+import miniquake.common as common
 
 const AF_INET = 2
 const MAXHOSTNAMELEN = 256
@@ -308,9 +309,9 @@ function PartialIPAddress(input, hostaddr)
   if colon >= 0 then
     addressPart = decode(slice(source, 0, colon))
     portText = decode(slice(source, colon + 1, len(source) - colon - 1))
-    parsedPort = parseDecimal(portText, 5, 65535)
-    if parsedPort is void then return -1 end if
-    port = parsedPort
+    // WinQuake uses Q_atoi here and then stores the result through htons(short).
+    // Preserve decimal-prefix parsing and 16-bit wrapping for PartialIPAddress.
+    port = common.atoi(portText)
   end if
   parts = splitText(addressPart, 46)
   if len(parts) < 1 or len(parts) > 4 then return -1 end if

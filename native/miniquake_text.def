@@ -1,0 +1,14 @@
+LIBRARY miniquake_text.dll
+EXPORTS
+  mqt_f32_to_text
+  mqt_f32_to_fixed6
+  mqt_ascii_char
+  mqt_conproc_read_text
+  mqt_conproc_read_console_text
+  mqt_udp_bound_address
+  mqt_udp_last_address
+  mqt_udp_local_address
+  mqt_udp_host_name
+  mqt_udp_resolve_name
+  mqt_udp_reverse_name
+  mqt_gl_get_string

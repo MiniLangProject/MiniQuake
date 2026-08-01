@@ -1,3 +1,0 @@
-LIBRARY sv_user_oracle
-EXPORTS
-  sv_user_oracle_jsonl

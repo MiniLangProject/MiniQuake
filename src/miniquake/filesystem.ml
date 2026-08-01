@@ -6,6 +6,7 @@ import miniquake.byteio as bio
 import miniquake.common as common
 import miniquake.memory as memory
 import miniquake.array_util as arrayutil
+import miniquake.protocol_text as quakeText
 import std.fs as fs
 
 extern function CreateDirectoryW(path as wstr, security as ptr) from "kernel32.dll" returns bool
@@ -276,7 +277,9 @@ function readFile(system, name)
 end function
 
 function readText(system, name)
-  return decode(readFile(system, name))
+  data = readFile(system, name)
+  if data is error then return data end if
+  return quakeText.decodeBytes(data)
 end function
 
 function findFile(system, name)
@@ -434,7 +437,9 @@ function writeBytes(system, name, data)
 end function
 
 function writeText(system, name, text)
-  return fs.writeAllText(gamePath(system, name), text)
+  data = quakeText.encodeBytes(text)
+  if data is error then return data end if
+  return fs.writeAllBytes(gamePath(system, name), data)
 end function
 
 function musicTrackName(track)

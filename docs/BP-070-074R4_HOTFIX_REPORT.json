@@ -1,0 +1,24 @@
+{
+  "schema": "MiniQuakeDeliveryHotfix/1",
+  "delivery_revision": "BP-070-074R4",
+  "delivery_parent": "BP-070-074R3",
+  "package_id": "BP-074",
+  "block_id": "BP-070-074",
+  "classification": "result-collection infrastructure",
+  "observed_failure": "refusing to collect id1 content: build\\bp071_fs\\id1\\latin.txt",
+  "root_cause": "strict source game-data exclusion was also applied fatally to disposable build fixtures",
+  "fixes": [
+    "skip known synthetic build workspaces",
+    "skip and record game-data-shaped build artifacts",
+    "keep source/docs copy strict",
+    "record skipped paths in collection.json"
+  ],
+  "production_source_changed": false,
+  "native_source_changed": false,
+  "engine_contracts_changed": false,
+  "fixture_count_changed": false,
+  "runtime_retest_required": false,
+  "collector_rerun_required": true,
+  "contract_status": "core_assets_memory_109_frozen_v1",
+  "contract_fingerprint": "0x6c8d974d"
+}

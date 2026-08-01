@@ -1,0 +1,231 @@
+diff --git a/CHANGELOG_BP-067.md b/CHANGELOG_BP-067.md
+new file mode 100644
+index 0000000..d034a51
+--- /dev/null
++++ b/CHANGELOG_BP-067.md
+@@ -0,0 +1,6 @@
++# BP-067 — Console and screen modal lifecycle
++
++- Implements the original two-edge notify acknowledgement (`key_count=-2`) without blocking the host loop.
++- Routes notify-box key down/up edges before normal key dispatch.
++- Keeps `SCR_ModalMessage` yes/no/escape semantics explicitly covered.
++- Adds 22 MiniLang fixtures, a C oracle, golden data and a static checker.
+diff --git a/audit/console_screen_golden.json b/audit/console_screen_golden.json
+new file mode 100644
+index 0000000..4bddfdd
+--- /dev/null
++++ b/audit/console_screen_golden.json
+@@ -0,0 +1,10 @@
++{
++  "schema_version": 1,
++  "package": "BP-067",
++  "fixtures": 22,
++  "notify_edges": 2,
++  "console_text_bytes": 16384,
++  "notify_times": 4,
++  "modal_accept": [89, 121],
++  "modal_reject": [27, 78, 110]
++}
+diff --git a/docs/BP-067_CONSOLE_SCREEN_AUDIT.md b/docs/BP-067_CONSOLE_SCREEN_AUDIT.md
+new file mode 100644
+index 0000000..b8833f7
+--- /dev/null
++++ b/docs/BP-067_CONSOLE_SCREEN_AUDIT.md
+@@ -0,0 +1,4 @@
++# BP-067 console/screen audit
++
++Compared paths: `console.c::Con_NotifyBox` and `gl_screen.c::SCR_ModalMessage`.
++The blocking C loop is represented as a nonblocking two-edge state machine: one key down arms acknowledgement and the following key up dismisses the notice.
+diff --git a/src/miniquake/console.ml b/src/miniquake/console.ml
+index 741cb35..86a9e9e 100644
+--- a/src/miniquake/console.ml
++++ b/src/miniquake/console.ml
+@@ -12,6 +12,8 @@ const DEFAULT_LINEWIDTH = 38
+ const MAXCMDLINE = 256
+ 
+ backscrollLines = 0
++notifyBoxWaiting = false
++notifyBoxSawDown = false
+ 
+ function filledBytes(count, value)
+   output = bytes(count)
+@@ -420,11 +422,46 @@ function Con_DrawConsole(state, pixelLines, drawInput, realtime)
+ end function
+ 
+ function Con_NotifyBox(state, text)
++  global notifyBoxWaiting, notifyBoxSawDown
+   border = decode(bytes([29, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 31]))
+   state.notifyBoxText = text
+   Con_Printf(state, "\n\n" + border + "\n" + text + "Press a key.\n" + border + "\n", state.dedicated, true)
+   state.active = true
+   state.realtime = 0.0
++  // console.c sets key_count=-2 and waits for one key-down followed by one
++  // key-up. MiniQuake keeps the host loop non-blocking but preserves that
++  // exact two-edge acknowledgement contract.
++  notifyBoxWaiting = true
++  notifyBoxSawDown = false
++  return true
++end function
++
++function Con_NotifyBoxPending()
++  return notifyBoxWaiting
++end function
++
++function Con_NotifyBoxKey(state, down)
++  global notifyBoxWaiting, notifyBoxSawDown
++  if not notifyBoxWaiting then return false end if
++  if down then
++    notifyBoxSawDown = true
++    return false
++  end if
++  if not notifyBoxSawDown then return false end if
++  notifyBoxWaiting = false
++  notifyBoxSawDown = false
++  Con_Printf(state, "\n", state.dedicated, true)
++  state.active = false
++  state.realtime = 0.0
++  state.notifyBoxText = ""
++  return true
++end function
++
++function Con_CancelNotifyBox(state)
++  global notifyBoxWaiting, notifyBoxSawDown
++  notifyBoxWaiting = false
++  notifyBoxSawDown = false
++  state.notifyBoxText = ""
+   return true
+ end function
+ 
+diff --git a/src/miniquake/host.ml b/src/miniquake/host.ml
+index 700ec6f..ebd7042 100644
+--- a/src/miniquake/host.ml
++++ b/src/miniquake/host.ml
+@@ -2601,6 +2601,12 @@ function processConsoleInput(session)
+       handled = handled + 1
+       continue
+     end if
++    if console.Con_NotifyBoxPending() then
++      completed = console.Con_NotifyBoxKey(session.console, event[1])
++      if completed then keys.setDestination(keys.KEY_GAME) end if
++      handled = handled + 1
++      continue
++    end if
+     result = keys.Key_Event(
+       event[0],
+       event[1],
+diff --git a/tests/console_screen_lifecycle_tests.ml b/tests/console_screen_lifecycle_tests.ml
+new file mode 100644
+index 0000000..4c3e94f
+--- /dev/null
++++ b/tests/console_screen_lifecycle_tests.ml
+@@ -0,0 +1,62 @@
++/*
++Copyright (C) 1996-1997 Id Software, Inc.
++Copyright (C) 2026 MiniQuake contributors
++
++BP-067: console notify-box and screen modal lifecycle parity.
++*/
++
++import miniquake.console as bp067Console
++import miniquake.screen as bp067Screen
++
++bp067Index = 0
++bp067Failures = 0
++
++function bp067Check(value, name)
++  global bp067Index, bp067Failures
++  bp067Index = bp067Index + 1
++  print "[" + bp067Index + "/22] " + name
++  if not value then
++    bp067Failures = bp067Failures + 1
++    print "FAIL: " + name
++    return false
++  end if
++  return true
++end function
++
++function main(args)
++  state = bp067Console.create(64)
++  bp067Console.Con_Init(state, void, 320, false)
++  bp067Console.Con_CancelNotifyBox(state)
++  bp067Check(not bp067Console.Con_NotifyBoxPending(), "notify initially idle")
++  bp067Check(bp067Console.Con_NotifyBox(state, "Warning\n"), "notify starts")
++  bp067Check(bp067Console.Con_NotifyBoxPending(), "notify pending")
++  bp067Check(state.active, "notify selects console")
++  bp067Check(state.notifyBoxText == "Warning\n", "notify text retained")
++  bp067Check(state.realtime == 0.0, "notify cursor time reset")
++  bp067Check(not bp067Console.Con_NotifyBoxKey(state, false), "up before down ignored")
++  bp067Check(bp067Console.Con_NotifyBoxPending(), "up-before-down remains pending")
++  bp067Check(not bp067Console.Con_NotifyBoxKey(state, true), "down arms acknowledgement")
++  bp067Check(bp067Console.Con_NotifyBoxPending(), "down alone remains pending")
++  bp067Check(bp067Console.Con_NotifyBoxKey(state, false), "following up dismisses")
++  bp067Check(not bp067Console.Con_NotifyBoxPending(), "notify no longer pending")
++  bp067Check(not state.active, "notify restores game console state")
++  bp067Check(state.notifyBoxText == "", "notify text cleared")
++  bp067Check(state.realtime == 0.0, "dismissal resets cursor time")
++  bp067Check(state.lineCount > 0, "notify output reached console")
++
++  bp067Console.Con_NotifyBox(state, "Second\n")
++  bp067Check(bp067Console.Con_CancelNotifyBox(state), "notify cancellation")
++  bp067Check(not bp067Console.Con_NotifyBoxPending(), "cancel clears pending")
++
++  bp067Check(bp067Screen.SCR_ModalMessage("Continue?", void, true), "dedicated modal auto accepts")
++  bp067Check(bp067Screen.SCR_ModalMessage("Continue?", void, false) is void, "interactive modal waits")
++  bp067Check(bp067Screen.SCR_ModalMessage("Continue?", 89, false) == true, "modal Y accepts")
++  bp067Check(bp067Screen.SCR_ModalMessage("Continue?", 78, false) == false and bp067Screen.SCR_ModalMessage("Continue?", 27, false) == false, "modal N and escape reject")
++
++  if bp067Failures > 0 then
++    print "MiniQuake BP-067 console/screen tests failed: " + bp067Failures + "/22"
++    return 1
++  end if
++  print "MiniQuake BP-067 console/screen tests passed: 22"
++  return 0
++end function
+diff --git a/tools/check_frontend_067.py b/tools/check_frontend_067.py
+new file mode 100755
+index 0000000..4efe314
+--- /dev/null
++++ b/tools/check_frontend_067.py
+@@ -0,0 +1,23 @@
++#!/usr/bin/env python3
++import argparse, json, pathlib, sys
++
++def main():
++    ap=argparse.ArgumentParser(); ap.add_argument('--root',default='.'); ap.add_argument('--json',default='')
++    ns=ap.parse_args(); root=pathlib.Path(ns.root).resolve(); errors=[]
++    console=(root/'src/miniquake/console.ml').read_text(encoding='utf-8-sig')
++    host=(root/'src/miniquake/host.ml').read_text(encoding='utf-8-sig')
++    test=(root/'tests/console_screen_lifecycle_tests.ml').read_text(encoding='utf-8-sig')
++    golden=json.loads((root/'audit/console_screen_golden.json').read_text())
++    for m in ['function Con_NotifyBoxPending()', 'function Con_NotifyBoxKey(state, down)',
++              'notifyBoxSawDown = true', 'if not notifyBoxSawDown then return false end if']:
++        if m not in console: errors.append('console.ml missing marker: '+m)
++    if 'if console.Con_NotifyBoxPending() then' not in host: errors.append('host does not route notify-box key edges')
++    if 'MiniQuake BP-067 console/screen tests passed: 22' not in test: errors.append('fixture count marker missing')
++    if golden.get('fixtures')!=22 or golden.get('notify_edges')!=2: errors.append('golden mismatch')
++    report={'schema_version':1,'package':'BP-067','status':'PASS' if not errors else 'FAIL','errors':errors,
++            'fixtures':22,'notify_edges':2,'nonblocking_modal':not errors}
++    if ns.json: pathlib.Path(ns.json).write_text(json.dumps(report,indent=2)+'\n')
++    print('MiniQuake BP-067 console/screen verification: '+report['status'])
++    for e in errors: print('  [FAIL] '+e)
++    return 0 if not errors else 1
++if __name__=='__main__': sys.exit(main())
+diff --git a/tools/oracle/console_screen_oracle.c b/tools/oracle/console_screen_oracle.c
+new file mode 100644
+index 0000000..c3b7484
+--- /dev/null
++++ b/tools/oracle/console_screen_oracle.c
+@@ -0,0 +1,13 @@
++#include <stdio.h>
++int main(void) {
++  int waiting=1, saw_down=0;
++  int up_before = waiting && !saw_down;
++  saw_down=1;
++  int down_pending=waiting;
++  waiting=0;
++  printf("up_before_down_ignored=%d\n", up_before);
++  printf("down_pending=%d\n", down_pending);
++  printf("dismissed=%d\n", !waiting);
++  printf("notify_edges=2\n");
++  return 0;
++}

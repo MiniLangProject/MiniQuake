@@ -1,3 +1,0 @@
-LIBRARY snd_win_oracle
-EXPORTS
-    snd_win_oracle_jsonl

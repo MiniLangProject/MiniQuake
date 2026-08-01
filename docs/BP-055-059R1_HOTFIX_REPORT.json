@@ -1,0 +1,25 @@
+{
+  "schema": "MiniQuakeDeliveryHotfix/1",
+  "revision": "BP-055-059R1",
+  "parent": "BP-055-059",
+  "engine_package": "BP-059",
+  "classification": "pre-build inherited checker lineage defect",
+  "predecessor_result": {
+    "archive": "MiniQuake_BP-055-059_RESULTS_20260728-123401.zip",
+    "sha256": "889f140434415275b149f68a484993d4bf1ca4aa1fe4083ffcc264032163916a",
+    "status": "FAIL before build",
+    "first_failing_gate": "BP-054 render-special closure verification"
+  },
+  "root_cause": "The historical BP-054 checker required BP-054 package identity inside the downstream BP-059 build_info instead of separating package identity from the frozen semantic contract.",
+  "fix": {
+    "checker_option": "--allow-downstream-package",
+    "historical_identity_mode_preserved": true,
+    "downstream_status": "render_special_109_frozen_v1",
+    "downstream_fingerprint": "0x2a3d8081"
+  },
+  "production_source_changed": false,
+  "native_source_changed": false,
+  "engine_contracts_changed": false,
+  "fixture_count_changed": false,
+  "status": "implemented; Windows acceptance pending"
+}

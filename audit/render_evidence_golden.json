@@ -1,0 +1,12 @@
+{
+  "capture_stage": "after_ui_before_swap",
+  "fixtures": 18,
+  "fnv_empty": 2166136261,
+  "fnv_known": 3146166556,
+  "non_black": 3,
+  "oracle_sha256": "f1713a653265a75ea4076fedda72e8cd25c325d2c6a894bfbc05847d33ff7342",
+  "rgba_hash": 2479160868,
+  "sample_grid": 16,
+  "schema": 1,
+  "tga_bytes_2x2": 30
+}

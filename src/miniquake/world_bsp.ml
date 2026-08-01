@@ -330,7 +330,12 @@ function traceBrushModel(map, modelIndex, entityOrigin, start, mins, maxs, finis
   localStart = math.subtract(start, offset)
   localFinish = math.subtract(finish, offset)
   result = traceInHull(hull, localStart, localFinish)
-  if result.fraction != 1.0 then result.endPosition = math.add(result.endPosition, offset) end if
+  if result.fraction == 1.0 then
+    // A clear brush trace reports the caller's original world-space end.
+    result.endPosition = math.copy(finish)
+  else
+    result.endPosition = math.add(result.endPosition, offset)
+  end if
   return result
 end function
 

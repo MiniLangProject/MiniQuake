@@ -1,0 +1,50 @@
+{
+  "schema": "MiniQuakeSkyWaterGolden/1",
+  "package_id": "BP-043",
+  "parent_package_id": "BP-042",
+  "sources": [
+    "gl_rmain.c",
+    "gl_rsurf.c",
+    "gl_rlight.c",
+    "gl_warp.c",
+    "gl_refrag.c"
+  ],
+  "rows": [
+    {
+      "name": "float_integer_boundary",
+      "value": 1266679808
+    },
+    {
+      "name": "water_one_s",
+      "value": 1063479990
+    },
+    {
+      "name": "water_one_t",
+      "value": 1058902125
+    },
+    {
+      "name": "water_two_s",
+      "value": 3198128027
+    },
+    {
+      "name": "water_two_t",
+      "value": 1070062064
+    },
+    {
+      "name": "sky_general_s",
+      "value": 1075496402
+    },
+    {
+      "name": "sky_general_t",
+      "value": 1069200014
+    },
+    {
+      "name": "fixtures",
+      "value": 22
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/sky_water_render_oracle.c",
+    "oracle_sha256": "ba07b62908235fba576fa7045d59b42fbdc66ee90e12fc1313b0f97de24e342b"
+  }
+}

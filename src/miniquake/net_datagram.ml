@@ -199,8 +199,10 @@ function pollRetransmit(channel, now)
   return resendReliable(channel, now)
 end function
 
-// Returns [message type, payload, ACK/NAK response, next outgoing fragment].
-// Message type follows NET_GetMessage: 0 = none, 1 = reliable, 2 = unreliable.
+// Returns [message type, payload, ACK/NAK response, immediate transport reply].
+// Matching ACKs only mark sendNext.  The transport flushes the next reliable
+// fragment after its receive loop, matching net_dgrm.c.  Message type follows
+// NET_GetMessage: 0 = none, 1 = reliable, 2 = unreliable.
 function processPacket(channel, wirePacket, now)
   global packetsReceived, receivedDuplicateCount, shortPacketCount, droppedDatagrams
   if wirePacket is not bytes or len(wirePacket) < NET_HEADERSIZE then
@@ -234,9 +236,12 @@ function processPacket(channel, wirePacket, now)
     channel.ackSequence = nextSequence(channel.ackSequence)
     channel.sendMessage = dropPrefix(channel.sendMessage, MAX_DATAGRAM)
     if len(channel.sendMessage) > 0 then
+      // net_dgrm.c defers SendMessageNext until the socket receive loop has
+      // drained.  This matters when several ACK/data packets are already
+      // queued and also prevents the pure channel layer from manufacturing a
+      // packet that the transport then accidentally discards.
       channel.sendNext = true
-      nextPacket = nextReliablePacket(channel, now)
-      return [0, void, void, nextPacket]
+      return [0, void, void, void]
     end if
     channel.canSend = true
     channel.sendNext = false
@@ -280,8 +285,15 @@ function ReSendMessage(channel, now)
   return resendReliable(channel, now)
 end function
 
+function Datagram_FlushSendNext(channel, now)
+  if not channel.sendNext then return void end if
+  return nextReliablePacket(channel, now)
+end function
+
 function Datagram_CanSendMessage(channel)
-  if channel.sendNext then nextReliablePacket(channel, channel.lastSendTime) end if
+  // The C driver flushes sendNext here because it owns the socket.  The pure
+  // MiniLang channel cannot perform I/O; net_loop.pumpRemote performs the same
+  // flush after draining the receive queue.  Keep this query side-effect free.
   return channel.canSend
 end function
 

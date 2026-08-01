@@ -1,0 +1,50 @@
+{
+  "schema": "MiniQuakeDeliveryHotfix/1",
+  "revision": "BP-055-059R2",
+  "parent": "BP-055-059R1",
+  "engine_package": "BP-059",
+  "classification": "audio runtime and fixture parity repairs",
+  "predecessor_result_sha256": "b7849b4a333f77633eb5caf578fda683c40eff3b9384ebe6d0265a981d91df45",
+  "predecessor_steps": "117/121",
+  "failures": [
+    {
+      "package": "BP-055",
+      "marker": "fmt offset: expected 12, got -1",
+      "classification": "fixture setup defect"
+    },
+    {
+      "package": "BP-056",
+      "marker": "channel zero uses lifetime selection: expected true",
+      "classification": "fixture expectation defect"
+    },
+    {
+      "package": "BP-056",
+      "marker": "precache cleared: expected 0, got 2",
+      "classification": "fixture expectation defect"
+    },
+    {
+      "package": "BP-059",
+      "marker": "info text: expected true",
+      "classification": "production formatting defect"
+    },
+    {
+      "package": "BP-059",
+      "marker": "Struct has no member 'channels'",
+      "classification": "retail evidence adapter defect"
+    }
+  ],
+  "fixes": {
+    "findchunk": "set iffData=12 after RIFF/WAVE before searching fmt/data",
+    "channel_zero": "normal lifetime selection; no same-entity override for channel zero",
+    "clear_precache": "preserve descriptors and caches; S_ClearPrecache is a no-op",
+    "cd_info": "Binary32 plus six-decimal %f-equivalent formatting",
+    "retail_channels": "cache.stereo + 1"
+  },
+  "production_source_changed": true,
+  "native_source_changed": false,
+  "engine_contracts_changed": false,
+  "fixture_count_changed": false,
+  "audio_status": "audio_109_frozen_v1",
+  "audio_fingerprint": "0xdcf7a002",
+  "status": "implemented; Windows acceptance pending"
+}

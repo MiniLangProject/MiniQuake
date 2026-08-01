@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "equal": false,
+  "left": {
+    "name": "run-a.mqtrace",
+    "bytes": 46570,
+    "lines": 65,
+    "sha256": "86908d8e7914b70dcf0d800fad9284cd68ba8b0d2de63772a74d62d0deea27ca"
+  },
+  "right": {
+    "name": "run-b.mqtrace",
+    "bytes": 46570,
+    "lines": 65,
+    "sha256": "f9202251135efd6d2bec103b8b3e9017fad87c73c432e6a760a19a8dbd0bc9b1"
+  },
+  "first_difference": {
+    "line_index": 16,
+    "kind": "frame",
+    "frame": 15,
+    "left_prefix": "frame=15",
+    "right_prefix": "frame=15",
+    "fields": [
+      {
+        "field": "player_angles",
+        "left": "c0340000,42b40000,00000000",
+        "right": "00000000,42b40000,00000000"
+      },
+      {
+        "field": "qc_edicts",
+        "left": "96de64b1",
+        "right": "a8756b6a"
+      },
+      {
+        "field": "qc_globals",
+        "left": "0cc355ba",
+        "right": "88636c4a"
+      },
+      {
+        "field": "server_edicts",
+        "left": "d5fd74f4",
+        "right": "1e32cbb3"
+      },
+      {
+        "field": "state_hash",
+        "left": "bbb1f0f8",
+        "right": "1eed18f5"
+      }
+    ],
+    "left_line": null,
+    "right_line": null
+  }
+}

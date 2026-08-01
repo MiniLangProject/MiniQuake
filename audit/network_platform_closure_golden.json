@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "package": "BP-064",
+  "status": "network_platform_109_frozen_v1",
+  "fingerprint": "0xb3ec7589",
+  "default_host_port": 26000,
+  "control_protocol_version": 3,
+  "reliable_message": 8192,
+  "datagram": 1024,
+  "host_cache": 8,
+  "message_timeout": 300,
+  "network_drivers": 2,
+  "lan_drivers": 1,
+  "max_file_handles": 10,
+  "max_hostname": 256,
+  "net_name_length": 64,
+  "qhost_commands": 4,
+  "fixtures": 24,
+  "evidence": "two independent UDP control handshakes"
+}

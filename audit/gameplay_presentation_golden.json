@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "package": "BP-079",
+  "fixtures": 24,
+  "status": "gameplay_presentation_109_frozen_v1",
+  "fingerprint": "0xad91624c",
+  "host_color_parser": "atoi",
+  "host_give_parser": "atoi",
+  "host_viewframe_parser": "atoi",
+  "host_edict_parser": "q_atoi",
+  "host_player_index_parser": "q_atof",
+  "screen_loading_sound_order": "before_connection_gate",
+  "screenshot_failure_text": "PCX",
+  "crt_atoi_space_plus": 12,
+  "crt_atoi_hex": 0,
+  "crt_atoi_character": 0,
+  "q_atof_hex": 3
+}

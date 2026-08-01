@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "revision": "BP-060-064R3",
+  "parent": "BP-060-064R2",
+  "engine_package": "BP-064",
+  "predecessor_result": {
+    "archive": "MiniQuake_BP-060-064R2_RESULTS_20260728-215240.zip",
+    "sha256": "4c784f8afbd02624552c18339a1f8ab48c052c38dced9057ca044a12c8be4fef",
+    "build": "65/65 PASS",
+    "all_runtime_groups": "PASS",
+    "trace_a": "128/128 PASS",
+    "trace_b": "26/128 FAIL at trace_canonical",
+    "first_error": "Cannot access member 'x' on non-struct value"
+  },
+  "root_cause": {
+    "classification": "strongly supported native GC-rooting edge in nested heap-backed constructor arguments",
+    "exact_offending_entity_captured": false,
+    "why_not_proven": "R2 diagnostics accessed .x before recording the entity/field label"
+  },
+  "correction": {
+    "gc_safe_constructors": [
+      "QuakeEdict",
+      "EntityBaseline",
+      "ClientEntityState"
+    ],
+    "typed_vector_diagnostics": true,
+    "canonical_digests_before_string_allocation": true,
+    "snapshot_serialization_write_split": true,
+    "forced_gc_regression": {
+      "edicts": 192,
+      "churn_vectors": 2048,
+      "diagnostics_test_count": 10
+    }
+  },
+  "production_source_changed": true,
+  "native_source_changed": false,
+  "engine_contracts_changed": false,
+  "fixture_count_changed": false,
+  "contract_status": "network_platform_109_frozen_v1",
+  "contract_fingerprint": "0xb3ec7589",
+  "windows_acceptance": "pending"
+}

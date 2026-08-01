@@ -4,6 +4,7 @@ import miniquake.types as t
 import miniquake.byteio as bio
 import miniquake.constants as c
 import miniquake.array_util as arrays
+import miniquake.native as native
 import std.fs as fs
 
 function hasSuffixInsensitive(text, suffix)
@@ -24,27 +25,49 @@ function filename(name)
   return name + ".dem"
 end function
 
+// CL_Record_f uses the C library atoi, not MiniLang toNumber/Q_atof.  It
+// skips leading ASCII whitespace, accepts an optional sign, consumes the
+// initial decimal digit run and returns zero when no digits are present.
+function recordTrackNumber(text)
+  data = bytes(text)
+  index = 0
+  while index < len(data) and (data[index] == 32 or (data[index] >= 9 and data[index] <= 13))
+    index = index + 1
+  end while
+  sign = 1
+  if index < len(data) and data[index] == 45 then
+    sign = -1
+    index = index + 1
+  else if index < len(data) and data[index] == 43 then
+    index = index + 1
+  end if
+  value = 0
+  while index < len(data) and data[index] >= 48 and data[index] <= 57
+    value = value * 10 + data[index] - 48
+    index = index + 1
+  end while
+  return value * sign
+end function
+
+function isKeepalivePayload(payload)
+  return payload is bytes and len(payload) == 1 and payload[0] == c.SVC_NOP
+end function
+
 function parseTrack(data)
   i = 0
   while i < len(data) and data[i] != 10
     i = i + 1
   end while
   if i >= len(data) then return error(2000, "demo track header is missing newline") end if
-  // GLQuake's CL_PlayDemo_f parses this one byte at a time rather than with
-  // fscanf.  Preserve its observable leading-whitespace arithmetic for old
-  // retail demos while retaining a safe rejection for other punctuation.
+  // GLQuake deliberately does not call atoi here: every non-minus byte before
+  // the newline participates in `forcetrack = forcetrack * 10 + (c - '0')`.
+  // Retain that odd but observable retail-demo behavior byte for byte.
   value = 0
   negative = false
   index = 0
   while index < i
     item = data[index]
-    if item == 45 then
-      negative = true
-    else if (item >= 48 and item <= 57) or item == 32 or item == 9 then
-      value = value * 10 + (item - 48)
-    else
-      return error(2001, "invalid demo track")
-    end if
+    if item == 45 then negative = true else value = value * 10 + (item - 48) end if
     index = index + 1
   end while
   if negative then value = -value end if
@@ -121,7 +144,11 @@ end function
 function CL_WriteDemoMessage(recording, payload, viewAngles)
   if recording is void then return error(2010, "CL_WriteDemoMessage: not recording") end if
   if len(payload) > c.MAX_MSGLEN then return error(2011, "Demo message > MAX_MSGLEN") end if
-  copiedAngles = t.Vec3(viewAngles.x, viewAngles.y, viewAngles.z)
+  copiedAngles = t.Vec3(
+    native.bitsFloat(native.floatBits(viewAngles.x)),
+    native.bitsFloat(native.floatBits(viewAngles.y)),
+    native.bitsFloat(native.floatBits(viewAngles.z)),
+  )
   copiedPayload = slice(payload, 0, len(payload))
   recording.messages = recording.messages + [t.DemoMessage(copiedAngles, copiedPayload)]
   return len(recording.messages)
@@ -146,11 +173,7 @@ function CL_Record_f(arguments, connected)
   name = filename(arguments[1])
   if name is error then return name end if
   track = -1
-  if len(arguments) == 4 then
-    trackValue = toNumber(arguments[3])
-    if trackValue is void or trackValue is not int then return error(2015, "invalid CD track") end if
-    track = trackValue
-  end if
+  if len(arguments) == 4 then track = recordTrackNumber(arguments[3]) end if
   mapName = ""
   if len(arguments) > 2 then mapName = arguments[2] end if
   return [name, t.Demo(track, [], "" + track + "\n"), mapName]

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "delivery_revision": "BP-080-084R1",
+  "delivery_parent": "BP-080-084",
+  "package_id": "BP-084",
+  "block_id": "BP-080-084",
+  "predecessor_result_archive": "MiniQuake_BP-080-084_RESULTS_20260731-081355.zip",
+  "predecessor_result_sha256": "b5ff4b1defbfffacf14e6d9e0b84102093b21f367f5065d1bcc873310cb7b51a",
+  "failure": "main(args) declared in a MiniLang package in all five new block test entry files",
+  "first_compiler_diagnostic": "tests/cvar_source_surface_tests.ml: main(args) must be declared at top-level",
+  "fix": "remove package declarations from executable entry files and enforce the rule in tools/verify.py",
+  "changed_test_entries": 5,
+  "production_source_changed": false,
+  "native_source_changed": false,
+  "contract_fingerprint_changed": false,
+  "fixture_count_changed": false,
+  "windows_acceptance": "pending"
+}

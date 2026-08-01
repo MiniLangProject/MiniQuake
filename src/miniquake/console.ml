@@ -12,6 +12,8 @@ const DEFAULT_LINEWIDTH = 38
 const MAXCMDLINE = 256
 
 backscrollLines = 0
+notifyBoxWaiting = false
+notifyBoxSawDown = false
 
 function filledBytes(count, value)
   output = bytes(count)
@@ -420,11 +422,46 @@ function Con_DrawConsole(state, pixelLines, drawInput, realtime)
 end function
 
 function Con_NotifyBox(state, text)
+  global notifyBoxWaiting, notifyBoxSawDown
   border = decode(bytes([29, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 31]))
   state.notifyBoxText = text
   Con_Printf(state, "\n\n" + border + "\n" + text + "Press a key.\n" + border + "\n", state.dedicated, true)
   state.active = true
   state.realtime = 0.0
+  // console.c sets key_count=-2 and waits for one key-down followed by one
+  // key-up. MiniQuake keeps the host loop non-blocking but preserves that
+  // exact two-edge acknowledgement contract.
+  notifyBoxWaiting = true
+  notifyBoxSawDown = false
+  return true
+end function
+
+function Con_NotifyBoxPending()
+  return notifyBoxWaiting
+end function
+
+function Con_NotifyBoxKey(state, down)
+  global notifyBoxWaiting, notifyBoxSawDown
+  if not notifyBoxWaiting then return false end if
+  if down then
+    notifyBoxSawDown = true
+    return false
+  end if
+  if not notifyBoxSawDown then return false end if
+  notifyBoxWaiting = false
+  notifyBoxSawDown = false
+  Con_Printf(state, "\n", state.dedicated, true)
+  state.active = false
+  state.realtime = 0.0
+  state.notifyBoxText = ""
+  return true
+end function
+
+function Con_CancelNotifyBox(state)
+  global notifyBoxWaiting, notifyBoxSawDown
+  notifyBoxWaiting = false
+  notifyBoxSawDown = false
+  state.notifyBoxText = ""
   return true
 end function
 

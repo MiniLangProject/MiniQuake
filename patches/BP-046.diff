@@ -1,0 +1,6181 @@
+diff --git a/audit/sprite_sync_golden.json b/audit/sprite_sync_golden.json
+new file mode 100644
+index 0000000..703e58a
+--- /dev/null
++++ b/audit/sprite_sync_golden.json
+@@ -0,0 +1,42 @@
++{
++  "schema_version": 1,
++  "component": "BP-046 sprite sync",
++  "rows": [
++    {
++      "name": "first_rand",
++      "value": 41
++    },
++    {
++      "name": "first_sync_bits",
++      "value": 983826760
++    },
++    {
++      "name": "second_rand",
++      "value": 18467
++    },
++    {
++      "name": "second_sync_bits",
++      "value": 1058031393
++    },
++    {
++      "name": "cycle_005",
++      "value": 0
++    },
++    {
++      "name": "cycle_015",
++      "value": 1
++    },
++    {
++      "name": "cycle_025",
++      "value": 0
++    },
++    {
++      "name": "sync_modes",
++      "value": 2
++    },
++    {
++      "name": "fixtures",
++      "value": 22
++    }
++  ]
++}
+diff --git a/src/miniquake/client.ml b/src/miniquake/client.ml
+index 54cc2d4..672cb1c 100644
+--- a/src/miniquake/client.ml
++++ b/src/miniquake/client.ml
+@@ -26,6 +26,7 @@ clDlights = []
+ clDlightTime = 0.0
+ clDlightOldTime = 0.0
+ clModelFlags = []
++clModelSyncTypes = []
+ clRelinkParticleEffects = []
+ clChaseActive = false
+ clRelinkParticlePool = []
+@@ -214,6 +215,34 @@ function CL_ModelFlags()
+   return clModelFlags
+ end function
+ 
++function CL_SetModelSyncTypes(syncTypes)
++  global clModelSyncTypes
++  clModelSyncTypes = syncTypes
++  return len(clModelSyncTypes)
++end function
++
++function CL_ModelSyncTypes()
++  global clModelSyncTypes
++  return clModelSyncTypes
++end function
++
++function modelSyncTypeForIndex(modelIndex)
++  global clModelSyncTypes
++  if modelIndex < 0 or modelIndex >= len(clModelSyncTypes) then return c.ST_SYNC end if
++  return clModelSyncTypes[modelIndex]
++end function
++
++function CL_AssignModelSyncBase(entity, previousModelIndex)
++  if entity.modelIndex == previousModelIndex then return entity.syncBase end if
++  if entity.modelIndex <= 0 then entity.syncBase = 0.0; return entity.syncBase end if
++  if modelSyncTypeForIndex(entity.modelIndex) == c.ST_RAND then
++    entity.syncBase = clientFloat(particles.compatRand() / 32767.0)
++  else
++    entity.syncBase = 0.0
++  end if
++  return entity.syncBase
++end function
++
+ function CL_SetChaseActive(active)
+   global clChaseActive
+   clChaseActive = active
+@@ -477,6 +506,7 @@ function createEntity(number)
+     math.copy(angles),
+     true,
+     [0, 0, 0, 0, math.copy(origin), math.copy(angles), 0],
++    0.0,
+   )
+ end function
+ 
+@@ -555,6 +585,7 @@ function CL_ClearState(client)
+   client.levelName = ""
+   client.modelPrecache = [""]
+   client.soundPrecache = [""]
++  CL_SetModelSyncTypes([c.ST_SYNC])
+   client.viewEntity = 0
+   client.serverTime = 0.0
+   client.time = 0.0
+@@ -877,6 +908,7 @@ end function
+ function applyBaseline(client, number, baseline)
+   entity = CL_EntityNum(client, number)
+   if entity is error then return entity end if
++  previousModelIndex = entity.modelIndex
+   entity.baseline = [
+     baseline[0],
+     baseline[1],
+@@ -897,6 +929,7 @@ function applyBaseline(client, number, baseline)
+   entity.messageAngles = math.copy(baseline[5])
+   entity.previousMessageAngles = math.copy(baseline[5])
+   entity.forceLink = true
++  CL_AssignModelSyncBase(entity, previousModelIndex)
+   return entity
+ end function
+ 
+@@ -904,6 +937,7 @@ function applyFastUpdate(client, payload)
+   number = payload[0]
+   entity = CL_EntityNum(client, number)
+   if entity is error then return entity end if
++  previousModelIndex = entity.modelIndex
+   forceLink = entity.forceLink or entity.messageTime != client.messageTimes[1]
+   entity.previousMessageOrigin = math.copy(entity.messageOrigin)
+   entity.previousMessageAngles = math.copy(entity.messageAngles)
+@@ -925,6 +959,7 @@ function applyFastUpdate(client, payload)
+   if entity.colormap < 0 or entity.colormap > client.maxClients then
+     return error(2917, "CL_ParseUpdate: colormap > maxclients")
+   end if
++  CL_AssignModelSyncBase(entity, previousModelIndex)
+   origin = payload[7]
+   angles = payload[8]
+   if origin[0] is not void then entity.messageOrigin.x = origin[0] end if
+diff --git a/src/miniquake/client_render_handoff.ml b/src/miniquake/client_render_handoff.ml
+index 4f9ae9d..9ea4aef 100644
+--- a/src/miniquake/client_render_handoff.ml
++++ b/src/miniquake/client_render_handoff.ml
+@@ -104,6 +104,7 @@ function makeBeamEntity(number, modelIndex, origin, angles, currentTime)
+     math.copy(angles),
+     false,
+     void,
++    0.0,
+   )
+ end function
+ 
+diff --git a/src/miniquake/compat_trace.ml b/src/miniquake/compat_trace.ml
+index 84e8b88..b6911a2 100644
+--- a/src/miniquake/compat_trace.ml
++++ b/src/miniquake/compat_trace.ml
+@@ -1,749 +1,751 @@
+-/*
+-Copyright (C) 1996-1997 Id Software, Inc.
+-Copyright (C) 2026 MiniQuake contributors
+-
+-Deterministic compatibility traces and state snapshots for the source-guided
+-black-port workflow.  The .mqtrace stream intentionally excludes heap addresses,
+-wall-clock timestamps and output paths so two identical runs are byte-identical.
+-*/
+-
+-package miniquake.compat_trace
+-
+-import miniquake.types as t
+-import miniquake.build_info as buildInfo
+-import miniquake.host as host
+-import miniquake.compat_diagnostics as diagnostics
+-import miniquake.native as native
+-import std.fs as fs
+-
+-const TRACE_SCHEMA = 1
+-const FNV_OFFSET = 2166136261
+-const FNV_PRIME = 16777619
+-
+-function boolNumber(value)
+-  if value then return 1 end if
+-  return 0
+-end function
+-
+-function safeText(value)
+-  if value is string then return value end if
+-  return ""
+-end function
+-
+-function qcFunctionIndex(session)
+-  if session.server.machine is void then return -1 end if
+-  return session.server.machine.currentFunction
+-end function
+-
+-function hashByte(state, value)
+-  return (((state & 0xffffffff) ^ (value & 255)) * FNV_PRIME) & 0xffffffff
+-end function
+-
+-function hashWord(state, value)
+-  word = value & 0xffffffff
+-  result = hashByte(state, word)
+-  result = hashByte(result, word >> 8)
+-  result = hashByte(result, word >> 16)
+-  result = hashByte(result, word >> 24)
+-  return result
+-end function
+-
+-function hashFloat(state, value)
+-  return hashWord(state, native.floatBits(value))
+-end function
+-
+-function hashTextSeed(state, text)
+-  source = bytes(text)
+-  result = state & 0xffffffff
+-  index = 0
+-  while index < len(source)
+-    result = hashByte(result, source[index])
+-    index = index + 1
+-  end while
+-  return result
+-end function
+-
+-function hashText(text)
+-  return hashTextSeed(FNV_OFFSET, text)
+-end function
+-
+-function hashWordArray(words)
+-  result = FNV_OFFSET
+-  index = 0
+-  while index < len(words)
+-    result = hashWord(result, words[index])
+-    index = index + 1
+-  end while
+-  return result
+-end function
+-
+-function hashSizeBuffer(state, buffer)
+-  result = hashWord(state, buffer.curSize)
+-  limit = buffer.curSize
+-  if limit < 0 then limit = 0 end if
+-  if limit > len(buffer.data) then limit = len(buffer.data) end if
+-  index = 0
+-  while index < limit
+-    result = hashByte(result, buffer.data[index])
+-    index = index + 1
+-  end while
+-  return result
+-end function
+-
+-function globalsHash(session)
+-  machine = session.server.machine
+-  if machine is void then return 0 end if
+-  return hashWordArray(machine.globals)
+-end function
+-
+-function qcEdictsHash(session)
+-  machine = session.server.machine
+-  if machine is void then return 0 end if
+-  limit = session.server.numEdicts
+-  if limit > len(machine.edicts) then limit = len(machine.edicts) end if
+-  result = FNV_OFFSET
+-  index = 0
+-  while index < limit
+-    result = hashWord(result, index)
+-    freeValue = 1
+-    if index < len(machine.edictFree) and not machine.edictFree[index] then freeValue = 0 end if
+-    result = hashByte(result, freeValue)
+-    if freeValue == 0 then
+-      words = machine.edicts[index]
+-      wordIndex = 0
+-      while wordIndex < len(words)
+-        result = hashWord(result, words[wordIndex])
+-        wordIndex = wordIndex + 1
+-      end while
+-    end if
+-    index = index + 1
+-  end while
+-  return result
+-end function
+-
+-function serverEdictsHash(session)
+-  limit = session.server.numEdicts
+-  if limit > len(session.server.edicts) then limit = len(session.server.edicts) end if
+-  result = FNV_OFFSET
+-  index = 0
+-  while index < limit
+-    item = session.server.edicts[index]
+-    result = hashWord(result, item.number)
+-    result = hashByte(result, boolNumber(item.free))
+-    if not item.free then
+-      result = hashTextSeed(result, safeText(item.className))
+-      result = hashTextSeed(result, safeText(item.model))
+-      result = hashWord(result, item.modelIndex)
+-      result = hashWord(result, item.frame)
+-      result = hashWord(result, item.skin)
+-      result = hashWord(result, item.colormap)
+-      result = hashWord(result, item.effects)
+-      result = hashFloat(result, item.origin.x)
+-      result = hashFloat(result, item.origin.y)
+-      result = hashFloat(result, item.origin.z)
+-      result = hashFloat(result, item.angles.x)
+-      result = hashFloat(result, item.angles.y)
+-      result = hashFloat(result, item.angles.z)
+-      result = hashFloat(result, item.velocity.x)
+-      result = hashFloat(result, item.velocity.y)
+-      result = hashFloat(result, item.velocity.z)
+-      result = hashWord(result, item.moveType)
+-      result = hashWord(result, item.solid)
+-      result = hashWord(result, item.flags)
+-      result = hashFloat(result, item.health)
+-      result = hashWord(result, item.groundEntity)
+-    end if
+-    index = index + 1
+-  end while
+-  return result
+-end function
+-
+-// cl.entities is intentionally sparse.  SV_CreateBaseline omits non-model
+-// entities, while CL_EntityNum grows the array with void slots up to the next
+-// transmitted entity number.  Hash both the slot topology and the populated
+-// records without dereferencing void.
+-function clientEntitiesHash(session)
+-  result = hashWord(FNV_OFFSET, len(session.client.entities))
+-  index = 0
+-  while index < len(session.client.entities)
+-    result = hashWord(result, index)
+-    item = session.client.entities[index]
+-    if item is void then
+-      result = hashByte(result, 0)
+-    else
+-      result = hashByte(result, 1)
+-      result = hashWord(result, item.number)
+-      result = hashWord(result, item.modelIndex)
+-      result = hashWord(result, item.frame)
+-      result = hashWord(result, item.colormap)
+-      result = hashWord(result, item.skin)
+-      result = hashWord(result, item.effects)
+-      result = hashFloat(result, item.origin.x)
+-      result = hashFloat(result, item.origin.y)
+-      result = hashFloat(result, item.origin.z)
+-      result = hashFloat(result, item.angles.x)
+-      result = hashFloat(result, item.angles.y)
+-      result = hashFloat(result, item.angles.z)
+-    end if
+-    index = index + 1
+-  end while
+-  return result
+-end function
+-
+-function protocolHash(session)
+-  result = FNV_OFFSET
+-  result = hashSizeBuffer(result, session.server.datagram)
+-  result = hashSizeBuffer(result, session.server.reliableDatagram)
+-  result = hashSizeBuffer(result, session.server.signon)
+-  for each item in session.server.clients
+-    if item.active then result = hashSizeBuffer(result, item.message) end if
+-  end for
+-  result = hashSizeBuffer(result, session.client.outgoing)
+-  result = hashSizeBuffer(result, session.client.incoming)
+-  return result
+-end function
+-
+-function stagesHash(session)
+-  result = FNV_OFFSET
+-  for each stage in session.frameTrace
+-    result = hashTextSeed(result, stage)
+-    result = hashByte(result, 0)
+-  end for
+-  return result
+-end function
+-
+-// BP-001 originally expressed the complete frame as one deeply nested + tree.
+-// The Win64 backend has a bounded expression-temporary area, so keep every
+-// canonical field in the same order but append it in compiler-safe statements.
+-function canonicalFrame(session, frameIndex, accepted)
+-  result = "frame=" + frameIndex
+-  result = result + "|accepted=" + boolNumber(accepted)
+-  result = result + "|host_frame=" + session.timing.frameCount
+-  result = result + "|simulated=" + session.simulatedFrames
+-  result = result + "|realtime=" + diagnostics.f32Hex(session.timing.realtime)
+-  result = result + "|frametime=" + diagnostics.f32Hex(session.timing.frameTime)
+-  result = result + "|hosttime=" + diagnostics.f32Hex(session.hostTime)
+-  result = result + "|server_active=" + boolNumber(session.server.active)
+-  result = result + "|server_paused=" + boolNumber(session.server.paused)
+-  result = result + "|server_time=" + diagnostics.f32Hex(session.server.time)
+-  result = result + "|map_hex=" + hex(bytes(session.server.mapName))
+-  result = result + "|random=" + diagnostics.u32Hex(session.server.randomSeed)
+-  result = result + "|num_edicts=" + session.server.numEdicts
+-  result = result + "|active_edicts=" + diagnostics.activeEdicts(session)
+-  result = result + "|active_clients=" + diagnostics.activeServerClients(session)
+-  result = result + "|client_connected=" + boolNumber(session.client.connected)
+-  result = result + "|signon=" + session.client.signon
+-  result = result + "|spawned=" + boolNumber(session.client.spawned)
+-  result = result + "|view_entity=" + session.client.viewEntity
+-  result = result + "|client_time=" + diagnostics.f32Hex(session.client.time)
+-  result = result + "|server_message_time=" + diagnostics.f32Hex(session.client.serverTime)
+-  result = result + "|player_origin=" + diagnostics.f32Hex(session.player.origin.x)
+-  result = result + "," + diagnostics.f32Hex(session.player.origin.y)
+-  result = result + "," + diagnostics.f32Hex(session.player.origin.z)
+-  result = result + "|player_velocity=" + diagnostics.f32Hex(session.player.velocity.x)
+-  result = result + "," + diagnostics.f32Hex(session.player.velocity.y)
+-  result = result + "," + diagnostics.f32Hex(session.player.velocity.z)
+-  result = result + "|player_angles=" + diagnostics.f32Hex(session.player.viewAngles.x)
+-  result = result + "," + diagnostics.f32Hex(session.player.viewAngles.y)
+-  result = result + "," + diagnostics.f32Hex(session.player.viewAngles.z)
+-  result = result + "|health=" + diagnostics.f32Hex(session.player.health)
+-  result = result + "|flags=" + session.player.flags
+-  result = result + "|movetype=" + session.player.moveType
+-  result = result + "|waterlevel=" + session.player.waterLevel
+-  result = result + "|ground=" + session.player.groundEntity
+-  result = result + "|items=" + session.player.items
+-  result = result + "|weapon=" + session.player.activeWeapon
+-  result = result + "|qc_function=" + qcFunctionIndex(session)
+-  result = result + "|qc_statement=" + diagnostics.qcStatement(session)
+-  result = result + "|qc_depth=" + diagnostics.qcCallDepth(session)
+-  result = result + "|qc_globals=" + diagnostics.u32Hex(globalsHash(session))
+-  result = result + "|qc_edicts=" + diagnostics.u32Hex(qcEdictsHash(session))
+-  result = result + "|server_edicts=" + diagnostics.u32Hex(serverEdictsHash(session))
+-  result = result + "|client_entities=" + diagnostics.u32Hex(clientEntitiesHash(session))
+-  result = result + "|protocol=" + diagnostics.u32Hex(protocolHash(session))
+-  result = result + "|stages=" + diagnostics.u32Hex(stagesHash(session))
+-  return result
+-end function
+-
+-function traceLine(session, frameIndex, accepted)
+-  canonical = canonicalFrame(session, frameIndex, accepted)
+-  return canonical + "|state_hash=" + diagnostics.u32Hex(hashText(canonical)) + "\n"
+-end function
+-
+-function rawEdictHash(session, index)
+-  machine = session.server.machine
+-  if machine is void or index < 0 or index >= len(machine.edicts) then return 0 end if
+-  return hashWordArray(machine.edicts[index])
+-end function
+-
+-function edictJson(session, index, item)
+-  result = "{"
+-  result = result + "\"number\":" + item.number + ","
+-  result = result + "\"free\":" + diagnostics.boolText(item.free) + ","
+-  result = result + "\"class\":" + diagnostics.jsonString(safeText(item.className)) + ","
+-  result = result + "\"model\":" + diagnostics.jsonString(safeText(item.model)) + ","
+-  result = result + "\"model_index\":" + item.modelIndex + ","
+-  result = result + "\"frame\":" + item.frame + ","
+-  result = result + "\"skin\":" + item.skin + ","
+-  result = result + "\"effects\":" + item.effects + ","
+-  result = result + "\"origin\":" + diagnostics.vecJson(item.origin) + ","
+-  result = result + "\"angles\":" + diagnostics.vecJson(item.angles) + ","
+-  result = result + "\"velocity\":" + diagnostics.vecJson(item.velocity) + ","
+-  result = result + "\"movetype\":" + item.moveType + ","
+-  result = result + "\"solid\":" + item.solid + ","
+-  result = result + "\"flags\":" + item.flags + ","
+-  result = result + "\"health_f32\":\"" + diagnostics.f32Hex(item.health) + "\","
+-  result = result + "\"ground_entity\":" + item.groundEntity + ","
+-  result = result + "\"qc_words_hash\":\"" + diagnostics.u32Hex(rawEdictHash(session, index)) + "\""
+-  return result + "}"
+-end function
+-
+-function edictsJson(session)
+-  limit = session.server.numEdicts
+-  if limit > len(session.server.edicts) then limit = len(session.server.edicts) end if
+-  result = "["
+-  index = 0
+-  while index < limit
+-    if index > 0 then result = result + "," end if
+-    item = session.server.edicts[index]
+-    result = result + edictJson(session, index, item)
+-    index = index + 1
+-  end while
+-  return result + "]"
+-end function
+-
+-function clientEntityJson(item)
+-  result = "{"
+-  result = result + "\"number\":" + item.number + ","
+-  result = result + "\"model_index\":" + item.modelIndex + ","
+-  result = result + "\"frame\":" + item.frame + ","
+-  result = result + "\"skin\":" + item.skin + ","
+-  result = result + "\"effects\":" + item.effects + ","
+-  result = result + "\"origin\":" + diagnostics.vecJson(item.origin) + ","
+-  result = result + "\"angles\":" + diagnostics.vecJson(item.angles)
+-  return result + "}"
+-end function
+-
+-function clientEntitiesJson(session)
+-  result = "["
+-  index = 0
+-  while index < len(session.client.entities)
+-    if index > 0 then result = result + "," end if
+-    item = session.client.entities[index]
+-    if item is void then
+-      // Preserve the entity number-to-array-index relationship in snapshots.
+-      result = result + "null"
+-    else
+-      result = result + clientEntityJson(item)
+-    end if
+-    index = index + 1
+-  end while
+-  return result + "]"
+-end function
+-
+-function resourceJson(session)
+-  values = host.resourceSnapshot(session)
+-  result = "{"
+-  result = result + "\"heap_live\":" + values[0] + ","
+-  result = result + "\"heap_high_water\":" + values[1] + ","
+-  result = result + "\"heap_live_bytes\":" + values[2] + ","
+-  result = result + "\"heap_free_bytes\":" + values[3] + ","
+-  result = result + "\"edicts\":" + values[4] + ","
+-  result = result + "\"client_entities\":" + values[5] + ","
+-  result = result + "\"active_clients\":" + values[6] + ","
+-  result = result + "\"active_qsockets\":" + values[7] + ","
+-  result = result + "\"free_qsockets\":" + values[8] + ","
+-  result = result + "\"queued_messages\":" + values[9] + ","
+-  result = result + "\"queued_bytes\":" + values[10] + ","
+-  result = result + "\"poll_procedures\":" + values[11] + ","
+-  result = result + "\"udp_endpoints\":" + values[12] + ","
+-  result = result + "\"audio_queued\":" + values[13] + ","
+-  result = result + "\"audio_channels\":" + values[14] + ","
+-  result = result + "\"process_handles\":" + values[15] + ","
+-  result = result + "\"particles\":" + values[16] + ","
+-  result = result + "\"temporary_entities\":" + values[17]
+-  return result + "}"
+-end function
+-
+-function snapshotHostJson(session)
+-  result = "{"
+-  result = result + "\"frame_count\":" + session.timing.frameCount + ","
+-  result = result + "\"simulated_frames\":" + session.simulatedFrames + ","
+-  result = result + "\"realtime_f32\":\"" + diagnostics.f32Hex(session.timing.realtime) + "\","
+-  result = result + "\"frametime_f32\":\"" + diagnostics.f32Hex(session.timing.frameTime) + "\","
+-  result = result + "\"host_time_f32\":\"" + diagnostics.f32Hex(session.hostTime) + "\""
+-  return result + "}"
+-end function
+-
+-function snapshotServerJson(session)
+-  result = "{"
+-  result = result + "\"active\":" + diagnostics.boolText(session.server.active) + ","
+-  result = result + "\"paused\":" + diagnostics.boolText(session.server.paused) + ","
+-  result = result + "\"time_f32\":\"" + diagnostics.f32Hex(session.server.time) + "\","
+-  result = result + "\"random_seed_u32\":\"" + diagnostics.u32Hex(session.server.randomSeed) + "\","
+-  result = result + "\"num_edicts\":" + session.server.numEdicts + ","
+-  result = result + "\"active_edicts\":" + diagnostics.activeEdicts(session) + ","
+-  result = result + "\"active_clients\":" + diagnostics.activeServerClients(session)
+-  return result + "}"
+-end function
+-
+-function snapshotClientJson(session)
+-  result = "{"
+-  result = result + "\"connected\":" + diagnostics.boolText(session.client.connected) + ","
+-  result = result + "\"signon\":" + session.client.signon + ","
+-  result = result + "\"spawned\":" + diagnostics.boolText(session.client.spawned) + ","
+-  result = result + "\"view_entity\":" + session.client.viewEntity + ","
+-  result = result + "\"time_f32\":\"" + diagnostics.f32Hex(session.client.time) + "\","
+-  result = result + "\"server_time_f32\":\"" + diagnostics.f32Hex(session.client.serverTime) + "\""
+-  return result + "}"
+-end function
+-
+-function snapshotPlayerJson(session)
+-  result = "{"
+-  result = result + "\"origin\":" + diagnostics.vecJson(session.player.origin) + ","
+-  result = result + "\"velocity\":" + diagnostics.vecJson(session.player.velocity) + ","
+-  result = result + "\"view_angles\":" + diagnostics.vecJson(session.player.viewAngles) + ","
+-  result = result + "\"render_angles\":" + diagnostics.vecJson(session.player.renderAngles) + ","
+-  result = result + "\"health_f32\":\"" + diagnostics.f32Hex(session.player.health) + "\","
+-  result = result + "\"armor_f32\":\"" + diagnostics.f32Hex(session.player.armor) + "\","
+-  result = result + "\"flags\":" + session.player.flags + ","
+-  result = result + "\"movetype\":" + session.player.moveType + ","
+-  result = result + "\"waterlevel\":" + session.player.waterLevel + ","
+-  result = result + "\"ground_entity\":" + session.player.groundEntity + ","
+-  result = result + "\"items\":" + session.player.items + ","
+-  result = result + "\"active_weapon\":" + session.player.activeWeapon
+-  return result + "}"
+-end function
+-
+-function snapshotQuakeCJson(session)
+-  result = "{"
+-  result = result + "\"function\":" + diagnostics.jsonString(diagnostics.qcFunctionName(session)) + ","
+-  result = result + "\"function_index\":" + qcFunctionIndex(session) + ","
+-  result = result + "\"statement\":" + diagnostics.qcStatement(session) + ","
+-  result = result + "\"call_depth\":" + diagnostics.qcCallDepth(session) + ","
+-  result = result + "\"globals_hash\":\"" + diagnostics.u32Hex(globalsHash(session)) + "\","
+-  result = result + "\"edicts_hash\":\"" + diagnostics.u32Hex(qcEdictsHash(session)) + "\""
+-  return result + "}"
+-end function
+-
+-function snapshotDigestsJson(session)
+-  result = "{"
+-  result = result + "\"server_edicts\":\"" + diagnostics.u32Hex(serverEdictsHash(session)) + "\","
+-  result = result + "\"client_entities\":\"" + diagnostics.u32Hex(clientEntitiesHash(session)) + "\","
+-  result = result + "\"protocol\":\"" + diagnostics.u32Hex(protocolHash(session)) + "\""
+-  return result + "}"
+-end function
+-
+-function snapshotJson(session, frameIndex, phase, errorText)
+-  canonical = canonicalFrame(session, frameIndex, true)
+-  result = "{"
+-  result = result + "\"schema\":\"MiniQuakeSnapshot/" + TRACE_SCHEMA + "\","
+-  result = result + "\"package\":" + diagnostics.jsonString(buildInfo.PACKAGE_ID) + ","
+-  result = result + "\"profile\":" + diagnostics.jsonString(buildInfo.COMPATIBILITY_PROFILE) + ","
+-  result = result + "\"phase\":" + diagnostics.jsonString(phase) + ","
+-  result = result + "\"error\":" + diagnostics.jsonString(errorText) + ","
+-  result = result + "\"frame\":" + frameIndex + ","
+-  result = result + "\"state_hash\":\"" + diagnostics.u32Hex(hashText(canonical)) + "\","
+-  result = result + "\"map\":" + diagnostics.jsonString(session.server.mapName) + ","
+-  result = result + "\"frame_stages\":" + diagnostics.stageJson(session.frameTrace) + ","
+-  result = result + "\"host\":" + snapshotHostJson(session) + ","
+-  result = result + "\"server\":" + snapshotServerJson(session) + ","
+-  result = result + "\"client\":" + snapshotClientJson(session) + ","
+-  result = result + "\"player\":" + snapshotPlayerJson(session) + ","
+-  result = result + "\"quakec\":" + snapshotQuakeCJson(session) + ","
+-  result = result + "\"digests\":" + snapshotDigestsJson(session) + ","
+-  result = result + "\"resources\":" + resourceJson(session) + ","
+-  result = result + "\"edicts\":" + edictsJson(session) + ","
+-  result = result + "\"client_entities\":" + clientEntitiesJson(session)
+-  return result + "}\n"
+-end function
+-
+-function writeFile(path, text)
+-  result = try(fs.writeAllText(path, text))
+-  if result is error then return result end if
+-  return true
+-end function
+-
+-function appendFile(path, text)
+-  result = try(fs.appendAllText(path, text))
+-  if result is error then return result end if
+-  return true
+-end function
+-
+-function traceErrorLine(frameIndex, lastStage, message)
+-  result = "error_frame=" + frameIndex
+-  result = result + "|last_stage=" + lastStage
+-  result = result + "|message_hex=" + hex(bytes(message))
+-  return result + "\n"
+-end function
+-
+-function attemptShutdown(session)
+-  result = try(host.shutdown(session))
+-  if result is error then return [false, result.message] end if
+-  if result != true then return [false, "Host_Shutdown failed"] end if
+-  return [true, ""]
+-end function
+-
+-function summaryJson(ok, requested, written, accepted, rollingHash, tracePath, snapshotPath, contextPath, lastStage, errorText, cleanShutdown, diagnosticWriteError)
+-  result = "{"
+-  result = result + "\"schema\":\"MiniQuakeTraceSummary/" + TRACE_SCHEMA + "\","
+-  result = result + "\"package\":" + diagnostics.jsonString(buildInfo.PACKAGE_ID) + ","
+-  result = result + "\"profile\":" + diagnostics.jsonString(buildInfo.COMPATIBILITY_PROFILE) + ","
+-  result = result + "\"ok\":" + diagnostics.boolText(ok) + ","
+-  result = result + "\"frames_requested\":" + requested + ","
+-  result = result + "\"frames_written\":" + written + ","
+-  result = result + "\"accepted_frames\":" + accepted + ","
+-  result = result + "\"rolling_hash\":\"" + diagnostics.u32Hex(rollingHash) + "\","
+-  result = result + "\"trace_path\":" + diagnostics.jsonString(tracePath) + ","
+-  result = result + "\"snapshot_path\":" + diagnostics.jsonString(snapshotPath) + ","
+-  result = result + "\"context_path\":" + diagnostics.jsonString(contextPath) + ","
+-  result = result + "\"last_stage\":" + diagnostics.jsonString(lastStage) + ","
+-  result = result + "\"error\":" + diagnostics.jsonString(errorText) + ","
+-  result = result + "\"diagnostic_write_error\":" + diagnostics.jsonString(diagnosticWriteError) + ","
+-  result = result + "\"clean_shutdown\":" + diagnostics.boolText(cleanShutdown)
+-  return result + "}\n"
+-end function
+-
+-function makeResult(ok, requested, written, accepted, rollingHash, prefix, lastStage, errorText, cleanShutdown)
+-  return t.CompatibilityTraceResult(
+-    ok,
+-    requested,
+-    written,
+-    accepted,
+-    rollingHash,
+-    prefix + ".mqtrace",
+-    prefix + "-snapshot.json",
+-    prefix + "-context.json",
+-    prefix + "-summary.json",
+-    lastStage,
+-    errorText,
+-    cleanShutdown,
+-  )
+-end function
+-
+-function runInternal(baseDirectory, gameDirectory, mapName, frameCount, outputPrefix)
+-  if gameDirectory == "" then gameDirectory = "id1" end if
+-  if mapName == "" then mapName = "start" end if
+-  if frameCount < 1 then frameCount = 1 end if
+-  if frameCount > 1000000 then frameCount = 1000000 end if
+-  if outputPrefix == "" then outputPrefix = "miniquake-compat" end if
+-
+-  tracePath = outputPrefix + ".mqtrace"
+-  snapshotPath = outputPrefix + "-snapshot.json"
+-  contextPath = outputPrefix + "-context.json"
+-  summaryPath = outputPrefix + "-summary.json"
+-  header = "MiniQuakeCompatTrace|schema=" + TRACE_SCHEMA
+-  header = header + "|package=" + buildInfo.PACKAGE_ID
+-  header = header + "|profile=" + buildInfo.COMPATIBILITY_PROFILE
+-  header = header + "|game_hex=" + hex(bytes(gameDirectory))
+-  header = header + "|map_hex=" + hex(bytes(mapName))
+-  header = header + "|frames=" + frameCount
+-  header = header + "|step_f32=" + diagnostics.f32Hex(0.02) + "\n"
+-
+-  initializedTrace = try(writeFile(tracePath, header))
+-  if initializedTrace is error then
+-    return makeResult(false, frameCount, 0, 0, FNV_OFFSET, outputPrefix, "trace_open", initializedTrace.message, false)
+-  end if
+-
+-  args = ["-basedir", baseDirectory, "-game", gameDirectory, "-headless", "-nosound", "-nolan", "-nomouse", "-nojoy", "+map", mapName]
+-  created = try(host.create(args))
+-  if created is error then
+-    createFailure = created.message
+-    createSummary = summaryJson(false, frameCount, 0, 0, FNV_OFFSET, tracePath, snapshotPath, contextPath, "create", createFailure, false, "")
+-    createSummaryWrite = try(writeFile(summaryPath, createSummary))
+-    if createSummaryWrite is error then createFailure = createFailure + "; summary: " + createSummaryWrite.message end if
+-    return makeResult(false, frameCount, 0, 0, FNV_OFFSET, outputPrefix, "create", createFailure, false)
+-  end if
+-  session = created
+-  session.diagnosticContextPath = contextPath
+-  session.diagnosticFrame = -1
+-  diagnostics.persist(session, "before_initialize", "")
+-  initialized = try(host.initialize(session))
+-  if initialized is error then
+-    diagnostics.failFrame(session, initialized.message)
+-    initializationFailure = initialized.message
+-    snapshotWrite = try(writeFile(snapshotPath, snapshotJson(session, -1, "initialize_error", initializationFailure)))
+-    if snapshotWrite is error then initializationFailure = initializationFailure + "; snapshot: " + snapshotWrite.message end if
+-    shutdownResult = attemptShutdown(session)
+-    clean = shutdownResult[0]
+-    if shutdownResult[1] != "" then initializationFailure = initializationFailure + "; shutdown: " + shutdownResult[1] end if
+-    summary = summaryJson(false, frameCount, 0, 0, FNV_OFFSET, tracePath, snapshotPath, contextPath, diagnostics.lastStage(session), initializationFailure, clean, session.diagnosticWriteError)
+-    summaryWrite = try(writeFile(summaryPath, summary))
+-    if summaryWrite is error then initializationFailure = initializationFailure + "; summary: " + summaryWrite.message end if
+-    return makeResult(false, frameCount, 0, 0, FNV_OFFSET, outputPrefix, diagnostics.lastStage(session), initializationFailure, clean)
+-  end if
+-
+-  rollingHash = FNV_OFFSET
+-  writtenFrames = 0
+-  acceptedFrames = 0
+-  failure = ""
+-  index = 0
+-  while index < frameCount
+-    session.diagnosticFrame = index
+-    frameResult = try(host.frame(session, 0.02))
+-    if frameResult is error then
+-      failure = frameResult.message
+-      diagnostics.failFrame(session, failure)
+-      errorAppend = try(appendFile(tracePath, traceErrorLine(index, diagnostics.lastStage(session), failure)))
+-      if errorAppend is error then failure = failure + "; trace error record: " + errorAppend.message end if
+-      break
+-    end if
+-    accepted = frameResult == true
+-
+-    diagnostics.postFrameStage(session, "trace_canonical")
+-    canonicalResult = try(canonicalFrame(session, index, accepted))
+-    if canonicalResult is error then
+-      failure = "canonical frame: " + canonicalResult.message
+-      diagnostics.failFrame(session, failure)
+-      errorAppend = try(appendFile(tracePath, traceErrorLine(index, diagnostics.lastStage(session), failure)))
+-      if errorAppend is error then failure = failure + "; trace error record: " + errorAppend.message end if
+-      break
+-    end if
+-    canonical = canonicalResult
+-
+-    diagnostics.postFrameStage(session, "trace_state_hash")
+-    stateHashResult = try(hashText(canonical))
+-    if stateHashResult is error then
+-      failure = "state hash: " + stateHashResult.message
+-      diagnostics.failFrame(session, failure)
+-      errorAppend = try(appendFile(tracePath, traceErrorLine(index, diagnostics.lastStage(session), failure)))
+-      if errorAppend is error then failure = failure + "; trace error record: " + errorAppend.message end if
+-      break
+-    end if
+-
+-    diagnostics.postFrameStage(session, "trace_append")
+-    line = canonical + "|state_hash=" + diagnostics.u32Hex(stateHashResult) + "\n"
+-    appended = try(appendFile(tracePath, line))
+-    if appended is error then
+-      failure = "trace append: " + appended.message
+-      diagnostics.failFrame(session, failure)
+-      break
+-    end if
+-
+-    diagnostics.postFrameStage(session, "trace_rolling_hash")
+-    rollingResult = try(hashTextSeed(rollingHash, canonical))
+-    if rollingResult is error then
+-      failure = "rolling hash: " + rollingResult.message
+-      diagnostics.failFrame(session, failure)
+-      break
+-    end if
+-    rollingHash = hashByte(rollingResult, 10)
+-    writtenFrames = writtenFrames + 1
+-    if accepted then acceptedFrames = acceptedFrames + 1 end if
+-    diagnostics.postFrameStage(session, "trace_frame_complete")
+-    index = index + 1
+-  end while
+-
+-  if failure == "" and session.diagnosticWriteError != "" then failure = session.diagnosticWriteError end if
+-  phase = "complete"
+-  ok = failure == "" and writtenFrames == frameCount
+-  if not ok then phase = "error" end if
+-  snapshotWritten = try(writeFile(snapshotPath, snapshotJson(session, writtenFrames - 1, phase, failure)))
+-  if snapshotWritten is error then
+-    ok = false
+-    if failure == "" then failure = "snapshot: " + snapshotWritten.message else failure = failure + "; snapshot: " + snapshotWritten.message end if
+-  end if
+-  contextPhase = "trace_complete"
+-  if not ok then contextPhase = "trace_error" end if
+-  diagnostics.persist(session, contextPhase, failure)
+-  contextWriteError = session.diagnosticWriteError
+-  session.diagnosticContextPath = ""
+-  lastStageValue = diagnostics.lastStage(session)
+-  shutdownResult = attemptShutdown(session)
+-  cleanShutdown = shutdownResult[0]
+-  if not cleanShutdown then
+-    ok = false
+-    if failure == "" then failure = shutdownResult[1] else failure = failure + "; shutdown: " + shutdownResult[1] end if
+-  end if
+-
+-  summary = summaryJson(ok, frameCount, writtenFrames, acceptedFrames, rollingHash, tracePath, snapshotPath, contextPath, lastStageValue, failure, cleanShutdown, contextWriteError)
+-  summaryWritten = try(writeFile(summaryPath, summary))
+-  if summaryWritten is error then
+-    ok = false
+-    if failure == "" then failure = summaryWritten.message end if
+-  end if
+-  return makeResult(ok, frameCount, writtenFrames, acceptedFrames, rollingHash, outputPrefix, lastStageValue, failure, cleanShutdown)
+-end function
+-
+-// No diagnostics-only failure may escape as an unclassified process exit.
+-// Convert unexpected propagation into a regular failed result and leave an
+-// emergency summary for the black-port feedback loop whenever possible.
+-function run(baseDirectory, gameDirectory, mapName, frameCount, outputPrefix)
+-  prefix = outputPrefix
+-  if prefix == "" then prefix = "miniquake-compat" end if
+-  requested = frameCount
+-  if requested < 1 then requested = 1 end if
+-  if requested > 1000000 then requested = 1000000 end if
+-
+-  result = try(runInternal(baseDirectory, gameDirectory, mapName, frameCount, outputPrefix))
+-  if result is not error then return result end if
+-
+-  failure = "unhandled compatibility diagnostic error: " + result.message
+-  tracePath = prefix + ".mqtrace"
+-  snapshotPath = prefix + "-snapshot.json"
+-  contextPath = prefix + "-context.json"
+-  summaryPath = prefix + "-summary.json"
+-  emergency = try(summaryJson(false, requested, 0, 0, FNV_OFFSET, tracePath, snapshotPath, contextPath, "unhandled", failure, false, ""))
+-  if emergency is not error then
+-    ignored = try(writeFile(summaryPath, emergency))
+-  end if
+-  return makeResult(false, requested, 0, 0, FNV_OFFSET, prefix, "unhandled", failure, false)
+-end function
+-
+-function printResult(result)
+-  print "MiniQuake deterministic compatibility trace"
+-  print "  trace=" + result.tracePath
+-  print "  snapshot=" + result.snapshotPath
+-  print "  context=" + result.contextPath
+-  print "  summary=" + result.summaryPath
+-  print "  frames=" + result.framesWritten + "/" + result.framesRequested + " accepted=" + result.acceptedFrames
+-  print "  rolling-hash=" + diagnostics.u32Hex(result.rollingHash)
+-  print "  last-stage=" + result.lastStage
+-  if result.errorMessage != "" then print "  error=" + result.errorMessage end if
+-  if result.ok then print "  result=PASS" else print "  result=FAIL" end if
+-  return result.ok
+-end function
+-
+-function containsText(text, needle)
+-  source = bytes(text)
+-  wanted = bytes(needle)
+-  if len(wanted) == 0 then return true end if
+-  if len(wanted) > len(source) then return false end if
+-  start = 0
+-  while start <= len(source) - len(wanted)
+-    matched = true
+-    index = 0
+-    while index < len(wanted)
+-      if source[start + index] != wanted[index] then matched = false; break end if
+-      index = index + 1
+-    end while
+-    if matched then return true end if
+-    start = start + 1
+-  end while
+-  return false
+-end function
+-
+-function lineCount(text)
+-  source = bytes(text)
+-  count = 0
+-  index = 0
+-  while index < len(source)
+-    if source[index] == 10 then count = count + 1 end if
+-    index = index + 1
+-  end while
+-  return count
+-end function
+-
+-function inspect(path)
+-  loaded = try(fs.readAllText(path))
+-  if loaded is error then print "MiniQuake compatibility report: " + loaded.message; return false end if
+-  recognized = containsText(loaded, "MiniQuakeCompatTrace|schema=") or
+-    containsText(loaded, "\"schema\":\"MiniQuakeTraceSummary/") or
+-    containsText(loaded, "\"schema\":\"MiniQuakeSnapshot/") or
+-    containsText(loaded, "\"schema\":\"MiniQuakeCrashContext/")
+-  print "MiniQuake compatibility report"
+-  print "  file=" + path
+-  print "  bytes=" + len(bytes(loaded)) + " lines=" + lineCount(loaded)
+-  if recognized then print "  schema=recognized"; print "  result=PASS" else print "  schema=unknown"; print "  result=FAIL" end if
+-  return recognized
+-end function
++/*
++Copyright (C) 1996-1997 Id Software, Inc.
++Copyright (C) 2026 MiniQuake contributors
++
++Deterministic compatibility traces and state snapshots for the source-guided
++black-port workflow.  The .mqtrace stream intentionally excludes heap addresses,
++wall-clock timestamps and output paths so two identical runs are byte-identical.
++*/
++
++package miniquake.compat_trace
++
++import miniquake.types as t
++import miniquake.build_info as buildInfo
++import miniquake.host as host
++import miniquake.compat_diagnostics as diagnostics
++import miniquake.native as native
++import std.fs as fs
++
++const TRACE_SCHEMA = 1
++const FNV_OFFSET = 2166136261
++const FNV_PRIME = 16777619
++
++function boolNumber(value)
++  if value then return 1 end if
++  return 0
++end function
++
++function safeText(value)
++  if value is string then return value end if
++  return ""
++end function
++
++function qcFunctionIndex(session)
++  if session.server.machine is void then return -1 end if
++  return session.server.machine.currentFunction
++end function
++
++function hashByte(state, value)
++  return (((state & 0xffffffff) ^ (value & 255)) * FNV_PRIME) & 0xffffffff
++end function
++
++function hashWord(state, value)
++  word = value & 0xffffffff
++  result = hashByte(state, word)
++  result = hashByte(result, word >> 8)
++  result = hashByte(result, word >> 16)
++  result = hashByte(result, word >> 24)
++  return result
++end function
++
++function hashFloat(state, value)
++  return hashWord(state, native.floatBits(value))
++end function
++
++function hashTextSeed(state, text)
++  source = bytes(text)
++  result = state & 0xffffffff
++  index = 0
++  while index < len(source)
++    result = hashByte(result, source[index])
++    index = index + 1
++  end while
++  return result
++end function
++
++function hashText(text)
++  return hashTextSeed(FNV_OFFSET, text)
++end function
++
++function hashWordArray(words)
++  result = FNV_OFFSET
++  index = 0
++  while index < len(words)
++    result = hashWord(result, words[index])
++    index = index + 1
++  end while
++  return result
++end function
++
++function hashSizeBuffer(state, buffer)
++  result = hashWord(state, buffer.curSize)
++  limit = buffer.curSize
++  if limit < 0 then limit = 0 end if
++  if limit > len(buffer.data) then limit = len(buffer.data) end if
++  index = 0
++  while index < limit
++    result = hashByte(result, buffer.data[index])
++    index = index + 1
++  end while
++  return result
++end function
++
++function globalsHash(session)
++  machine = session.server.machine
++  if machine is void then return 0 end if
++  return hashWordArray(machine.globals)
++end function
++
++function qcEdictsHash(session)
++  machine = session.server.machine
++  if machine is void then return 0 end if
++  limit = session.server.numEdicts
++  if limit > len(machine.edicts) then limit = len(machine.edicts) end if
++  result = FNV_OFFSET
++  index = 0
++  while index < limit
++    result = hashWord(result, index)
++    freeValue = 1
++    if index < len(machine.edictFree) and not machine.edictFree[index] then freeValue = 0 end if
++    result = hashByte(result, freeValue)
++    if freeValue == 0 then
++      words = machine.edicts[index]
++      wordIndex = 0
++      while wordIndex < len(words)
++        result = hashWord(result, words[wordIndex])
++        wordIndex = wordIndex + 1
++      end while
++    end if
++    index = index + 1
++  end while
++  return result
++end function
++
++function serverEdictsHash(session)
++  limit = session.server.numEdicts
++  if limit > len(session.server.edicts) then limit = len(session.server.edicts) end if
++  result = FNV_OFFSET
++  index = 0
++  while index < limit
++    item = session.server.edicts[index]
++    result = hashWord(result, item.number)
++    result = hashByte(result, boolNumber(item.free))
++    if not item.free then
++      result = hashTextSeed(result, safeText(item.className))
++      result = hashTextSeed(result, safeText(item.model))
++      result = hashWord(result, item.modelIndex)
++      result = hashWord(result, item.frame)
++      result = hashWord(result, item.skin)
++      result = hashWord(result, item.colormap)
++      result = hashWord(result, item.effects)
++      result = hashFloat(result, item.origin.x)
++      result = hashFloat(result, item.origin.y)
++      result = hashFloat(result, item.origin.z)
++      result = hashFloat(result, item.angles.x)
++      result = hashFloat(result, item.angles.y)
++      result = hashFloat(result, item.angles.z)
++      result = hashFloat(result, item.velocity.x)
++      result = hashFloat(result, item.velocity.y)
++      result = hashFloat(result, item.velocity.z)
++      result = hashWord(result, item.moveType)
++      result = hashWord(result, item.solid)
++      result = hashWord(result, item.flags)
++      result = hashFloat(result, item.health)
++      result = hashWord(result, item.groundEntity)
++    end if
++    index = index + 1
++  end while
++  return result
++end function
++
++// cl.entities is intentionally sparse.  SV_CreateBaseline omits non-model
++// entities, while CL_EntityNum grows the array with void slots up to the next
++// transmitted entity number.  Hash both the slot topology and the populated
++// records without dereferencing void.
++function clientEntitiesHash(session)
++  result = hashWord(FNV_OFFSET, len(session.client.entities))
++  index = 0
++  while index < len(session.client.entities)
++    result = hashWord(result, index)
++    item = session.client.entities[index]
++    if item is void then
++      result = hashByte(result, 0)
++    else
++      result = hashByte(result, 1)
++      result = hashWord(result, item.number)
++      result = hashWord(result, item.modelIndex)
++      result = hashWord(result, item.frame)
++      result = hashWord(result, item.colormap)
++      result = hashWord(result, item.skin)
++      result = hashWord(result, item.effects)
++      result = hashFloat(result, item.origin.x)
++      result = hashFloat(result, item.origin.y)
++      result = hashFloat(result, item.origin.z)
++      result = hashFloat(result, item.angles.x)
++      result = hashFloat(result, item.angles.y)
++      result = hashFloat(result, item.angles.z)
++      result = hashFloat(result, item.syncBase)
++    end if
++    index = index + 1
++  end while
++  return result
++end function
++
++function protocolHash(session)
++  result = FNV_OFFSET
++  result = hashSizeBuffer(result, session.server.datagram)
++  result = hashSizeBuffer(result, session.server.reliableDatagram)
++  result = hashSizeBuffer(result, session.server.signon)
++  for each item in session.server.clients
++    if item.active then result = hashSizeBuffer(result, item.message) end if
++  end for
++  result = hashSizeBuffer(result, session.client.outgoing)
++  result = hashSizeBuffer(result, session.client.incoming)
++  return result
++end function
++
++function stagesHash(session)
++  result = FNV_OFFSET
++  for each stage in session.frameTrace
++    result = hashTextSeed(result, stage)
++    result = hashByte(result, 0)
++  end for
++  return result
++end function
++
++// BP-001 originally expressed the complete frame as one deeply nested + tree.
++// The Win64 backend has a bounded expression-temporary area, so keep every
++// canonical field in the same order but append it in compiler-safe statements.
++function canonicalFrame(session, frameIndex, accepted)
++  result = "frame=" + frameIndex
++  result = result + "|accepted=" + boolNumber(accepted)
++  result = result + "|host_frame=" + session.timing.frameCount
++  result = result + "|simulated=" + session.simulatedFrames
++  result = result + "|realtime=" + diagnostics.f32Hex(session.timing.realtime)
++  result = result + "|frametime=" + diagnostics.f32Hex(session.timing.frameTime)
++  result = result + "|hosttime=" + diagnostics.f32Hex(session.hostTime)
++  result = result + "|server_active=" + boolNumber(session.server.active)
++  result = result + "|server_paused=" + boolNumber(session.server.paused)
++  result = result + "|server_time=" + diagnostics.f32Hex(session.server.time)
++  result = result + "|map_hex=" + hex(bytes(session.server.mapName))
++  result = result + "|random=" + diagnostics.u32Hex(session.server.randomSeed)
++  result = result + "|num_edicts=" + session.server.numEdicts
++  result = result + "|active_edicts=" + diagnostics.activeEdicts(session)
++  result = result + "|active_clients=" + diagnostics.activeServerClients(session)
++  result = result + "|client_connected=" + boolNumber(session.client.connected)
++  result = result + "|signon=" + session.client.signon
++  result = result + "|spawned=" + boolNumber(session.client.spawned)
++  result = result + "|view_entity=" + session.client.viewEntity
++  result = result + "|client_time=" + diagnostics.f32Hex(session.client.time)
++  result = result + "|server_message_time=" + diagnostics.f32Hex(session.client.serverTime)
++  result = result + "|player_origin=" + diagnostics.f32Hex(session.player.origin.x)
++  result = result + "," + diagnostics.f32Hex(session.player.origin.y)
++  result = result + "," + diagnostics.f32Hex(session.player.origin.z)
++  result = result + "|player_velocity=" + diagnostics.f32Hex(session.player.velocity.x)
++  result = result + "," + diagnostics.f32Hex(session.player.velocity.y)
++  result = result + "," + diagnostics.f32Hex(session.player.velocity.z)
++  result = result + "|player_angles=" + diagnostics.f32Hex(session.player.viewAngles.x)
++  result = result + "," + diagnostics.f32Hex(session.player.viewAngles.y)
++  result = result + "," + diagnostics.f32Hex(session.player.viewAngles.z)
++  result = result + "|health=" + diagnostics.f32Hex(session.player.health)
++  result = result + "|flags=" + session.player.flags
++  result = result + "|movetype=" + session.player.moveType
++  result = result + "|waterlevel=" + session.player.waterLevel
++  result = result + "|ground=" + session.player.groundEntity
++  result = result + "|items=" + session.player.items
++  result = result + "|weapon=" + session.player.activeWeapon
++  result = result + "|qc_function=" + qcFunctionIndex(session)
++  result = result + "|qc_statement=" + diagnostics.qcStatement(session)
++  result = result + "|qc_depth=" + diagnostics.qcCallDepth(session)
++  result = result + "|qc_globals=" + diagnostics.u32Hex(globalsHash(session))
++  result = result + "|qc_edicts=" + diagnostics.u32Hex(qcEdictsHash(session))
++  result = result + "|server_edicts=" + diagnostics.u32Hex(serverEdictsHash(session))
++  result = result + "|client_entities=" + diagnostics.u32Hex(clientEntitiesHash(session))
++  result = result + "|protocol=" + diagnostics.u32Hex(protocolHash(session))
++  result = result + "|stages=" + diagnostics.u32Hex(stagesHash(session))
++  return result
++end function
++
++function traceLine(session, frameIndex, accepted)
++  canonical = canonicalFrame(session, frameIndex, accepted)
++  return canonical + "|state_hash=" + diagnostics.u32Hex(hashText(canonical)) + "\n"
++end function
++
++function rawEdictHash(session, index)
++  machine = session.server.machine
++  if machine is void or index < 0 or index >= len(machine.edicts) then return 0 end if
++  return hashWordArray(machine.edicts[index])
++end function
++
++function edictJson(session, index, item)
++  result = "{"
++  result = result + "\"number\":" + item.number + ","
++  result = result + "\"free\":" + diagnostics.boolText(item.free) + ","
++  result = result + "\"class\":" + diagnostics.jsonString(safeText(item.className)) + ","
++  result = result + "\"model\":" + diagnostics.jsonString(safeText(item.model)) + ","
++  result = result + "\"model_index\":" + item.modelIndex + ","
++  result = result + "\"frame\":" + item.frame + ","
++  result = result + "\"skin\":" + item.skin + ","
++  result = result + "\"effects\":" + item.effects + ","
++  result = result + "\"origin\":" + diagnostics.vecJson(item.origin) + ","
++  result = result + "\"angles\":" + diagnostics.vecJson(item.angles) + ","
++  result = result + "\"velocity\":" + diagnostics.vecJson(item.velocity) + ","
++  result = result + "\"movetype\":" + item.moveType + ","
++  result = result + "\"solid\":" + item.solid + ","
++  result = result + "\"flags\":" + item.flags + ","
++  result = result + "\"health_f32\":\"" + diagnostics.f32Hex(item.health) + "\","
++  result = result + "\"ground_entity\":" + item.groundEntity + ","
++  result = result + "\"qc_words_hash\":\"" + diagnostics.u32Hex(rawEdictHash(session, index)) + "\""
++  return result + "}"
++end function
++
++function edictsJson(session)
++  limit = session.server.numEdicts
++  if limit > len(session.server.edicts) then limit = len(session.server.edicts) end if
++  result = "["
++  index = 0
++  while index < limit
++    if index > 0 then result = result + "," end if
++    item = session.server.edicts[index]
++    result = result + edictJson(session, index, item)
++    index = index + 1
++  end while
++  return result + "]"
++end function
++
++function clientEntityJson(item)
++  result = "{"
++  result = result + "\"number\":" + item.number + ","
++  result = result + "\"model_index\":" + item.modelIndex + ","
++  result = result + "\"frame\":" + item.frame + ","
++  result = result + "\"skin\":" + item.skin + ","
++  result = result + "\"effects\":" + item.effects + ","
++  result = result + "\"origin\":" + diagnostics.vecJson(item.origin) + ","
++  result = result + "\"angles\":" + diagnostics.vecJson(item.angles) + ","
++  result = result + "\"sync_base_f32\":\"" + diagnostics.f32Hex(item.syncBase) + "\""
++  return result + "}"
++end function
++
++function clientEntitiesJson(session)
++  result = "["
++  index = 0
++  while index < len(session.client.entities)
++    if index > 0 then result = result + "," end if
++    item = session.client.entities[index]
++    if item is void then
++      // Preserve the entity number-to-array-index relationship in snapshots.
++      result = result + "null"
++    else
++      result = result + clientEntityJson(item)
++    end if
++    index = index + 1
++  end while
++  return result + "]"
++end function
++
++function resourceJson(session)
++  values = host.resourceSnapshot(session)
++  result = "{"
++  result = result + "\"heap_live\":" + values[0] + ","
++  result = result + "\"heap_high_water\":" + values[1] + ","
++  result = result + "\"heap_live_bytes\":" + values[2] + ","
++  result = result + "\"heap_free_bytes\":" + values[3] + ","
++  result = result + "\"edicts\":" + values[4] + ","
++  result = result + "\"client_entities\":" + values[5] + ","
++  result = result + "\"active_clients\":" + values[6] + ","
++  result = result + "\"active_qsockets\":" + values[7] + ","
++  result = result + "\"free_qsockets\":" + values[8] + ","
++  result = result + "\"queued_messages\":" + values[9] + ","
++  result = result + "\"queued_bytes\":" + values[10] + ","
++  result = result + "\"poll_procedures\":" + values[11] + ","
++  result = result + "\"udp_endpoints\":" + values[12] + ","
++  result = result + "\"audio_queued\":" + values[13] + ","
++  result = result + "\"audio_channels\":" + values[14] + ","
++  result = result + "\"process_handles\":" + values[15] + ","
++  result = result + "\"particles\":" + values[16] + ","
++  result = result + "\"temporary_entities\":" + values[17]
++  return result + "}"
++end function
++
++function snapshotHostJson(session)
++  result = "{"
++  result = result + "\"frame_count\":" + session.timing.frameCount + ","
++  result = result + "\"simulated_frames\":" + session.simulatedFrames + ","
++  result = result + "\"realtime_f32\":\"" + diagnostics.f32Hex(session.timing.realtime) + "\","
++  result = result + "\"frametime_f32\":\"" + diagnostics.f32Hex(session.timing.frameTime) + "\","
++  result = result + "\"host_time_f32\":\"" + diagnostics.f32Hex(session.hostTime) + "\""
++  return result + "}"
++end function
++
++function snapshotServerJson(session)
++  result = "{"
++  result = result + "\"active\":" + diagnostics.boolText(session.server.active) + ","
++  result = result + "\"paused\":" + diagnostics.boolText(session.server.paused) + ","
++  result = result + "\"time_f32\":\"" + diagnostics.f32Hex(session.server.time) + "\","
++  result = result + "\"random_seed_u32\":\"" + diagnostics.u32Hex(session.server.randomSeed) + "\","
++  result = result + "\"num_edicts\":" + session.server.numEdicts + ","
++  result = result + "\"active_edicts\":" + diagnostics.activeEdicts(session) + ","
++  result = result + "\"active_clients\":" + diagnostics.activeServerClients(session)
++  return result + "}"
++end function
++
++function snapshotClientJson(session)
++  result = "{"
++  result = result + "\"connected\":" + diagnostics.boolText(session.client.connected) + ","
++  result = result + "\"signon\":" + session.client.signon + ","
++  result = result + "\"spawned\":" + diagnostics.boolText(session.client.spawned) + ","
++  result = result + "\"view_entity\":" + session.client.viewEntity + ","
++  result = result + "\"time_f32\":\"" + diagnostics.f32Hex(session.client.time) + "\","
++  result = result + "\"server_time_f32\":\"" + diagnostics.f32Hex(session.client.serverTime) + "\""
++  return result + "}"
++end function
++
++function snapshotPlayerJson(session)
++  result = "{"
++  result = result + "\"origin\":" + diagnostics.vecJson(session.player.origin) + ","
++  result = result + "\"velocity\":" + diagnostics.vecJson(session.player.velocity) + ","
++  result = result + "\"view_angles\":" + diagnostics.vecJson(session.player.viewAngles) + ","
++  result = result + "\"render_angles\":" + diagnostics.vecJson(session.player.renderAngles) + ","
++  result = result + "\"health_f32\":\"" + diagnostics.f32Hex(session.player.health) + "\","
++  result = result + "\"armor_f32\":\"" + diagnostics.f32Hex(session.player.armor) + "\","
++  result = result + "\"flags\":" + session.player.flags + ","
++  result = result + "\"movetype\":" + session.player.moveType + ","
++  result = result + "\"waterlevel\":" + session.player.waterLevel + ","
++  result = result + "\"ground_entity\":" + session.player.groundEntity + ","
++  result = result + "\"items\":" + session.player.items + ","
++  result = result + "\"active_weapon\":" + session.player.activeWeapon
++  return result + "}"
++end function
++
++function snapshotQuakeCJson(session)
++  result = "{"
++  result = result + "\"function\":" + diagnostics.jsonString(diagnostics.qcFunctionName(session)) + ","
++  result = result + "\"function_index\":" + qcFunctionIndex(session) + ","
++  result = result + "\"statement\":" + diagnostics.qcStatement(session) + ","
++  result = result + "\"call_depth\":" + diagnostics.qcCallDepth(session) + ","
++  result = result + "\"globals_hash\":\"" + diagnostics.u32Hex(globalsHash(session)) + "\","
++  result = result + "\"edicts_hash\":\"" + diagnostics.u32Hex(qcEdictsHash(session)) + "\""
++  return result + "}"
++end function
++
++function snapshotDigestsJson(session)
++  result = "{"
++  result = result + "\"server_edicts\":\"" + diagnostics.u32Hex(serverEdictsHash(session)) + "\","
++  result = result + "\"client_entities\":\"" + diagnostics.u32Hex(clientEntitiesHash(session)) + "\","
++  result = result + "\"protocol\":\"" + diagnostics.u32Hex(protocolHash(session)) + "\""
++  return result + "}"
++end function
++
++function snapshotJson(session, frameIndex, phase, errorText)
++  canonical = canonicalFrame(session, frameIndex, true)
++  result = "{"
++  result = result + "\"schema\":\"MiniQuakeSnapshot/" + TRACE_SCHEMA + "\","
++  result = result + "\"package\":" + diagnostics.jsonString(buildInfo.PACKAGE_ID) + ","
++  result = result + "\"profile\":" + diagnostics.jsonString(buildInfo.COMPATIBILITY_PROFILE) + ","
++  result = result + "\"phase\":" + diagnostics.jsonString(phase) + ","
++  result = result + "\"error\":" + diagnostics.jsonString(errorText) + ","
++  result = result + "\"frame\":" + frameIndex + ","
++  result = result + "\"state_hash\":\"" + diagnostics.u32Hex(hashText(canonical)) + "\","
++  result = result + "\"map\":" + diagnostics.jsonString(session.server.mapName) + ","
++  result = result + "\"frame_stages\":" + diagnostics.stageJson(session.frameTrace) + ","
++  result = result + "\"host\":" + snapshotHostJson(session) + ","
++  result = result + "\"server\":" + snapshotServerJson(session) + ","
++  result = result + "\"client\":" + snapshotClientJson(session) + ","
++  result = result + "\"player\":" + snapshotPlayerJson(session) + ","
++  result = result + "\"quakec\":" + snapshotQuakeCJson(session) + ","
++  result = result + "\"digests\":" + snapshotDigestsJson(session) + ","
++  result = result + "\"resources\":" + resourceJson(session) + ","
++  result = result + "\"edicts\":" + edictsJson(session) + ","
++  result = result + "\"client_entities\":" + clientEntitiesJson(session)
++  return result + "}\n"
++end function
++
++function writeFile(path, text)
++  result = try(fs.writeAllText(path, text))
++  if result is error then return result end if
++  return true
++end function
++
++function appendFile(path, text)
++  result = try(fs.appendAllText(path, text))
++  if result is error then return result end if
++  return true
++end function
++
++function traceErrorLine(frameIndex, lastStage, message)
++  result = "error_frame=" + frameIndex
++  result = result + "|last_stage=" + lastStage
++  result = result + "|message_hex=" + hex(bytes(message))
++  return result + "\n"
++end function
++
++function attemptShutdown(session)
++  result = try(host.shutdown(session))
++  if result is error then return [false, result.message] end if
++  if result != true then return [false, "Host_Shutdown failed"] end if
++  return [true, ""]
++end function
++
++function summaryJson(ok, requested, written, accepted, rollingHash, tracePath, snapshotPath, contextPath, lastStage, errorText, cleanShutdown, diagnosticWriteError)
++  result = "{"
++  result = result + "\"schema\":\"MiniQuakeTraceSummary/" + TRACE_SCHEMA + "\","
++  result = result + "\"package\":" + diagnostics.jsonString(buildInfo.PACKAGE_ID) + ","
++  result = result + "\"profile\":" + diagnostics.jsonString(buildInfo.COMPATIBILITY_PROFILE) + ","
++  result = result + "\"ok\":" + diagnostics.boolText(ok) + ","
++  result = result + "\"frames_requested\":" + requested + ","
++  result = result + "\"frames_written\":" + written + ","
++  result = result + "\"accepted_frames\":" + accepted + ","
++  result = result + "\"rolling_hash\":\"" + diagnostics.u32Hex(rollingHash) + "\","
++  result = result + "\"trace_path\":" + diagnostics.jsonString(tracePath) + ","
++  result = result + "\"snapshot_path\":" + diagnostics.jsonString(snapshotPath) + ","
++  result = result + "\"context_path\":" + diagnostics.jsonString(contextPath) + ","
++  result = result + "\"last_stage\":" + diagnostics.jsonString(lastStage) + ","
++  result = result + "\"error\":" + diagnostics.jsonString(errorText) + ","
++  result = result + "\"diagnostic_write_error\":" + diagnostics.jsonString(diagnosticWriteError) + ","
++  result = result + "\"clean_shutdown\":" + diagnostics.boolText(cleanShutdown)
++  return result + "}\n"
++end function
++
++function makeResult(ok, requested, written, accepted, rollingHash, prefix, lastStage, errorText, cleanShutdown)
++  return t.CompatibilityTraceResult(
++    ok,
++    requested,
++    written,
++    accepted,
++    rollingHash,
++    prefix + ".mqtrace",
++    prefix + "-snapshot.json",
++    prefix + "-context.json",
++    prefix + "-summary.json",
++    lastStage,
++    errorText,
++    cleanShutdown,
++  )
++end function
++
++function runInternal(baseDirectory, gameDirectory, mapName, frameCount, outputPrefix)
++  if gameDirectory == "" then gameDirectory = "id1" end if
++  if mapName == "" then mapName = "start" end if
++  if frameCount < 1 then frameCount = 1 end if
++  if frameCount > 1000000 then frameCount = 1000000 end if
++  if outputPrefix == "" then outputPrefix = "miniquake-compat" end if
++
++  tracePath = outputPrefix + ".mqtrace"
++  snapshotPath = outputPrefix + "-snapshot.json"
++  contextPath = outputPrefix + "-context.json"
++  summaryPath = outputPrefix + "-summary.json"
++  header = "MiniQuakeCompatTrace|schema=" + TRACE_SCHEMA
++  header = header + "|package=" + buildInfo.PACKAGE_ID
++  header = header + "|profile=" + buildInfo.COMPATIBILITY_PROFILE
++  header = header + "|game_hex=" + hex(bytes(gameDirectory))
++  header = header + "|map_hex=" + hex(bytes(mapName))
++  header = header + "|frames=" + frameCount
++  header = header + "|step_f32=" + diagnostics.f32Hex(0.02) + "\n"
++
++  initializedTrace = try(writeFile(tracePath, header))
++  if initializedTrace is error then
++    return makeResult(false, frameCount, 0, 0, FNV_OFFSET, outputPrefix, "trace_open", initializedTrace.message, false)
++  end if
++
++  args = ["-basedir", baseDirectory, "-game", gameDirectory, "-headless", "-nosound", "-nolan", "-nomouse", "-nojoy", "+map", mapName]
++  created = try(host.create(args))
++  if created is error then
++    createFailure = created.message
++    createSummary = summaryJson(false, frameCount, 0, 0, FNV_OFFSET, tracePath, snapshotPath, contextPath, "create", createFailure, false, "")
++    createSummaryWrite = try(writeFile(summaryPath, createSummary))
++    if createSummaryWrite is error then createFailure = createFailure + "; summary: " + createSummaryWrite.message end if
++    return makeResult(false, frameCount, 0, 0, FNV_OFFSET, outputPrefix, "create", createFailure, false)
++  end if
++  session = created
++  session.diagnosticContextPath = contextPath
++  session.diagnosticFrame = -1
++  diagnostics.persist(session, "before_initialize", "")
++  initialized = try(host.initialize(session))
++  if initialized is error then
++    diagnostics.failFrame(session, initialized.message)
++    initializationFailure = initialized.message
++    snapshotWrite = try(writeFile(snapshotPath, snapshotJson(session, -1, "initialize_error", initializationFailure)))
++    if snapshotWrite is error then initializationFailure = initializationFailure + "; snapshot: " + snapshotWrite.message end if
++    shutdownResult = attemptShutdown(session)
++    clean = shutdownResult[0]
++    if shutdownResult[1] != "" then initializationFailure = initializationFailure + "; shutdown: " + shutdownResult[1] end if
++    summary = summaryJson(false, frameCount, 0, 0, FNV_OFFSET, tracePath, snapshotPath, contextPath, diagnostics.lastStage(session), initializationFailure, clean, session.diagnosticWriteError)
++    summaryWrite = try(writeFile(summaryPath, summary))
++    if summaryWrite is error then initializationFailure = initializationFailure + "; summary: " + summaryWrite.message end if
++    return makeResult(false, frameCount, 0, 0, FNV_OFFSET, outputPrefix, diagnostics.lastStage(session), initializationFailure, clean)
++  end if
++
++  rollingHash = FNV_OFFSET
++  writtenFrames = 0
++  acceptedFrames = 0
++  failure = ""
++  index = 0
++  while index < frameCount
++    session.diagnosticFrame = index
++    frameResult = try(host.frame(session, 0.02))
++    if frameResult is error then
++      failure = frameResult.message
++      diagnostics.failFrame(session, failure)
++      errorAppend = try(appendFile(tracePath, traceErrorLine(index, diagnostics.lastStage(session), failure)))
++      if errorAppend is error then failure = failure + "; trace error record: " + errorAppend.message end if
++      break
++    end if
++    accepted = frameResult == true
++
++    diagnostics.postFrameStage(session, "trace_canonical")
++    canonicalResult = try(canonicalFrame(session, index, accepted))
++    if canonicalResult is error then
++      failure = "canonical frame: " + canonicalResult.message
++      diagnostics.failFrame(session, failure)
++      errorAppend = try(appendFile(tracePath, traceErrorLine(index, diagnostics.lastStage(session), failure)))
++      if errorAppend is error then failure = failure + "; trace error record: " + errorAppend.message end if
++      break
++    end if
++    canonical = canonicalResult
++
++    diagnostics.postFrameStage(session, "trace_state_hash")
++    stateHashResult = try(hashText(canonical))
++    if stateHashResult is error then
++      failure = "state hash: " + stateHashResult.message
++      diagnostics.failFrame(session, failure)
++      errorAppend = try(appendFile(tracePath, traceErrorLine(index, diagnostics.lastStage(session), failure)))
++      if errorAppend is error then failure = failure + "; trace error record: " + errorAppend.message end if
++      break
++    end if
++
++    diagnostics.postFrameStage(session, "trace_append")
++    line = canonical + "|state_hash=" + diagnostics.u32Hex(stateHashResult) + "\n"
++    appended = try(appendFile(tracePath, line))
++    if appended is error then
++      failure = "trace append: " + appended.message
++      diagnostics.failFrame(session, failure)
++      break
++    end if
++
++    diagnostics.postFrameStage(session, "trace_rolling_hash")
++    rollingResult = try(hashTextSeed(rollingHash, canonical))
++    if rollingResult is error then
++      failure = "rolling hash: " + rollingResult.message
++      diagnostics.failFrame(session, failure)
++      break
++    end if
++    rollingHash = hashByte(rollingResult, 10)
++    writtenFrames = writtenFrames + 1
++    if accepted then acceptedFrames = acceptedFrames + 1 end if
++    diagnostics.postFrameStage(session, "trace_frame_complete")
++    index = index + 1
++  end while
++
++  if failure == "" and session.diagnosticWriteError != "" then failure = session.diagnosticWriteError end if
++  phase = "complete"
++  ok = failure == "" and writtenFrames == frameCount
++  if not ok then phase = "error" end if
++  snapshotWritten = try(writeFile(snapshotPath, snapshotJson(session, writtenFrames - 1, phase, failure)))
++  if snapshotWritten is error then
++    ok = false
++    if failure == "" then failure = "snapshot: " + snapshotWritten.message else failure = failure + "; snapshot: " + snapshotWritten.message end if
++  end if
++  contextPhase = "trace_complete"
++  if not ok then contextPhase = "trace_error" end if
++  diagnostics.persist(session, contextPhase, failure)
++  contextWriteError = session.diagnosticWriteError
++  session.diagnosticContextPath = ""
++  lastStageValue = diagnostics.lastStage(session)
++  shutdownResult = attemptShutdown(session)
++  cleanShutdown = shutdownResult[0]
++  if not cleanShutdown then
++    ok = false
++    if failure == "" then failure = shutdownResult[1] else failure = failure + "; shutdown: " + shutdownResult[1] end if
++  end if
++
++  summary = summaryJson(ok, frameCount, writtenFrames, acceptedFrames, rollingHash, tracePath, snapshotPath, contextPath, lastStageValue, failure, cleanShutdown, contextWriteError)
++  summaryWritten = try(writeFile(summaryPath, summary))
++  if summaryWritten is error then
++    ok = false
++    if failure == "" then failure = summaryWritten.message end if
++  end if
++  return makeResult(ok, frameCount, writtenFrames, acceptedFrames, rollingHash, outputPrefix, lastStageValue, failure, cleanShutdown)
++end function
++
++// No diagnostics-only failure may escape as an unclassified process exit.
++// Convert unexpected propagation into a regular failed result and leave an
++// emergency summary for the black-port feedback loop whenever possible.
++function run(baseDirectory, gameDirectory, mapName, frameCount, outputPrefix)
++  prefix = outputPrefix
++  if prefix == "" then prefix = "miniquake-compat" end if
++  requested = frameCount
++  if requested < 1 then requested = 1 end if
++  if requested > 1000000 then requested = 1000000 end if
++
++  result = try(runInternal(baseDirectory, gameDirectory, mapName, frameCount, outputPrefix))
++  if result is not error then return result end if
++
++  failure = "unhandled compatibility diagnostic error: " + result.message
++  tracePath = prefix + ".mqtrace"
++  snapshotPath = prefix + "-snapshot.json"
++  contextPath = prefix + "-context.json"
++  summaryPath = prefix + "-summary.json"
++  emergency = try(summaryJson(false, requested, 0, 0, FNV_OFFSET, tracePath, snapshotPath, contextPath, "unhandled", failure, false, ""))
++  if emergency is not error then
++    ignored = try(writeFile(summaryPath, emergency))
++  end if
++  return makeResult(false, requested, 0, 0, FNV_OFFSET, prefix, "unhandled", failure, false)
++end function
++
++function printResult(result)
++  print "MiniQuake deterministic compatibility trace"
++  print "  trace=" + result.tracePath
++  print "  snapshot=" + result.snapshotPath
++  print "  context=" + result.contextPath
++  print "  summary=" + result.summaryPath
++  print "  frames=" + result.framesWritten + "/" + result.framesRequested + " accepted=" + result.acceptedFrames
++  print "  rolling-hash=" + diagnostics.u32Hex(result.rollingHash)
++  print "  last-stage=" + result.lastStage
++  if result.errorMessage != "" then print "  error=" + result.errorMessage end if
++  if result.ok then print "  result=PASS" else print "  result=FAIL" end if
++  return result.ok
++end function
++
++function containsText(text, needle)
++  source = bytes(text)
++  wanted = bytes(needle)
++  if len(wanted) == 0 then return true end if
++  if len(wanted) > len(source) then return false end if
++  start = 0
++  while start <= len(source) - len(wanted)
++    matched = true
++    index = 0
++    while index < len(wanted)
++      if source[start + index] != wanted[index] then matched = false; break end if
++      index = index + 1
++    end while
++    if matched then return true end if
++    start = start + 1
++  end while
++  return false
++end function
++
++function lineCount(text)
++  source = bytes(text)
++  count = 0
++  index = 0
++  while index < len(source)
++    if source[index] == 10 then count = count + 1 end if
++    index = index + 1
++  end while
++  return count
++end function
++
++function inspect(path)
++  loaded = try(fs.readAllText(path))
++  if loaded is error then print "MiniQuake compatibility report: " + loaded.message; return false end if
++  recognized = containsText(loaded, "MiniQuakeCompatTrace|schema=") or
++    containsText(loaded, "\"schema\":\"MiniQuakeTraceSummary/") or
++    containsText(loaded, "\"schema\":\"MiniQuakeSnapshot/") or
++    containsText(loaded, "\"schema\":\"MiniQuakeCrashContext/")
++  print "MiniQuake compatibility report"
++  print "  file=" + path
++  print "  bytes=" + len(bytes(loaded)) + " lines=" + lineCount(loaded)
++  if recognized then print "  schema=recognized"; print "  result=PASS" else print "  schema=unknown"; print "  result=FAIL" end if
++  return recognized
++end function
+diff --git a/src/miniquake/host.ml b/src/miniquake/host.ml
+index 24963a6..3f0f9b9 100644
+--- a/src/miniquake/host.ml
++++ b/src/miniquake/host.ml
+@@ -2124,16 +2124,23 @@ end function
+ 
+ function synchronizeClientRelinkModels(session)
+   flags = arrayutil.makeFilledArray(len(session.client.modelPrecache), 0)
++  syncTypes = arrayutil.makeFilledArray(len(session.client.modelPrecache), c.ST_SYNC)
+   if session.entityRenderer is not void then
+     entityRenderer.synchronize(session.entityRenderer, session.client.modelPrecache)
+     index = 0
+     while index < len(flags) and index < len(session.entityRenderer.models)
+       model = session.entityRenderer.models[index]
+-      if model is not void and model.aliasModel is not void then flags[index] = model.aliasModel.flags end if
++      if model is not void and model.aliasModel is not void then
++        flags[index] = model.aliasModel.flags
++        syncTypes[index] = model.aliasModel.syncType
++      else if model is not void and model.spriteModel is not void then
++        syncTypes[index] = model.spriteModel.syncType
++      end if
+       index = index + 1
+     end while
+   end if
+   client.CL_SetModelFlags(flags)
++  client.CL_SetModelSyncTypes(syncTypes)
+   client.CL_SetChaseActive(cvar.variableValue(session.cvars, "chase_active") != 0.0)
+   return len(flags)
+ end function
+diff --git a/src/miniquake/render/entities.ml b/src/miniquake/render/entities.ml
+index 9ab62ed..d5eafaa 100644
+--- a/src/miniquake/render/entities.ml
++++ b/src/miniquake/render/entities.ml
+@@ -263,7 +263,7 @@ function spriteFrameAndTexture(model, entity, time)
+   frameSet = source.frames[frameIndex]
+   if len(frameSet.frames) == 0 then return void end if
+   groupIndex = 0
+-  if frameSet.grouped then groupIndex = cycleIndex(frameSet.intervals, time, len(frameSet.frames)) end if
++  if frameSet.grouped then groupIndex = cycleIndex(frameSet.intervals, time + entity.syncBase, len(frameSet.frames)) end if
+   frame = frameSet.frames[groupIndex]
+   texture = 0
+   if frameIndex < len(model.textureIds) then
+@@ -543,6 +543,7 @@ function renderViewModel(renderer, player, view, time)
+     math.copy(gunAngles),
+     true,
+     [player.weapon, player.weaponFrame, 0, 0, math.copy(gunOrigin), math.copy(gunAngles), 0],
++    0.0,
+   )
+   gl.depthRange(0.0, 0.3)
+   result = drawAlias(renderer, model, entity, time, true)
+diff --git a/src/miniquake/types.ml b/src/miniquake/types.ml
+index 683c54c..26f211a 100644
+--- a/src/miniquake/types.ml
++++ b/src/miniquake/types.ml
+@@ -1,1350 +1,1351 @@
+-package miniquake.types
+-
+-struct Vec3
+-  x
+-  y
+-  z
+-end struct
+-
+-struct Link
+-  previous
+-  next
+-end struct
+-
+-struct CommonFileHandle
+-  data
+-  position
+-  length
+-  persistent
+-  closed
+-  source
+-end struct
+-
+-struct Plane
+-  normal
+-  dist
+-  type
+-  signBits
+-end struct
+-
+-struct SizeBuffer
+-  data
+-  maxSize
+-  curSize
+-  allowOverflow
+-  overflowed
+-end struct
+-
+-struct MessageReader
+-  data
+-  readCount
+-  badRead
+-end struct
+-
+-struct Cvar
+-  name
+-  string
+-  value
+-  archive
+-  server
+-end struct
+-
+-struct CvarRegistry
+-  variables
+-  serverChanges
+-end struct
+-
+-struct CommandAlias
+-  name
+-  value
+-end struct
+-
+-struct CommandSystem
+-  commands
+-  aliases
+-  arguments
+-  rawArgs
+-  text
+-  wait
+-end struct
+-
+-struct PackFile
+-  name
+-  offset
+-  length
+-end struct
+-
+-struct PackArchive
+-  filename
+-  data
+-  files
+-  numFiles
+-end struct
+-
+-struct WadLump
+-  filePosition
+-  diskSize
+-  size
+-  type
+-  compression
+-  name
+-end struct
+-
+-struct WadArchive
+-  filename
+-  data
+-  lumps
+-  numLumps
+-end struct
+-
+-struct LoopSocket
+-  peer
+-  messages
+-  messageTypes
+-  canSend
+-  disconnected
+-  transport
+-  udp
+-  address
+-  port
+-  channel
+-  lastReceiveTime
+-  connectTime
+-  lastSendTime
+-  driver
+-  landriver
+-end struct
+-
+-struct LoopState
+-  client
+-  server
+-  pending
+-  listener
+-  pendingRemote
+-  hostName
+-  mapName
+-  currentPlayers
+-  maxPlayers
+-  remoteSockets
+-  hostCache
+-  banAddress
+-  banMask
+-  playerInfo
+-  serverRules
+-  lanEnabled
+-end struct
+-
+-struct MemoryBlock
+-  kind
+-  name
+-  data
+-  size
+-  alive
+-  allocationIndex
+-end struct
+-
+-struct MemoryState
+-  capacity
+-  blocks
+-  totalAllocated
+-end struct
+-
+-struct CacheUser
+-  block
+-end struct
+-
+-struct Hull
+-  mins
+-  maxs
+-end struct
+-
+-struct Trace
+-  allSolid
+-  startSolid
+-  inOpen
+-  inWater
+-  fraction
+-  endPosition
+-  plane
+-  entity
+-end struct
+-
+-struct EntityPair
+-  key
+-  value
+-end struct
+-
+-struct Entity
+-  pairs
+-end struct
+-
+-struct Lump
+-  offset
+-  length
+-end struct
+-
+-struct BspPlane
+-  normal
+-  dist
+-  type
+-end struct
+-
+-struct BspVertex
+-  position
+-end struct
+-
+-struct BspEdge
+-  vertex0
+-  vertex1
+-end struct
+-
+-struct BspNode
+-  planeIndex
+-  child0
+-  child1
+-  mins
+-  maxs
+-  firstFace
+-  numFaces
+-end struct
+-
+-struct BspClipNode
+-  planeIndex
+-  child0
+-  child1
+-end struct
+-
+-struct BspTexInfo
+-  s
+-  t
+-  textureIndex
+-  flags
+-end struct
+-
+-struct BspFace
+-  planeIndex
+-  side
+-  firstEdge
+-  numEdges
+-  texInfo
+-  styles
+-  lightOffset
+-end struct
+-
+-struct BspLeaf
+-  contents
+-  visibilityOffset
+-  mins
+-  maxs
+-  firstMarkSurface
+-  numMarkSurfaces
+-  ambient
+-end struct
+-
+-struct BspModel
+-  mins
+-  maxs
+-  origin
+-  headNodes
+-  visibleLeafs
+-  firstFace
+-  numFaces
+-end struct
+-
+-struct BspTexture
+-  name
+-  width
+-  height
+-  mipOffsets
+-  pixels
+-end struct
+-
+-struct BspMap
+-  filename
+-  data
+-  version
+-  lumps
+-  entityText
+-  entities
+-  planes
+-  textures
+-  vertices
+-  visibility
+-  nodes
+-  texInfo
+-  faces
+-  lighting
+-  clipNodes
+-  leafs
+-  markSurfaces
+-  edges
+-  surfEdges
+-  models
+-end struct
+-
+-struct MdlSkin
+-  grouped
+-  intervals
+-  images
+-end struct
+-
+-struct MdlTexCoord
+-  onSeam
+-  s
+-  t
+-end struct
+-
+-struct MdlTriangle
+-  facesFront
+-  vertex0
+-  vertex1
+-  vertex2
+-end struct
+-
+-struct MdlVertex
+-  x
+-  y
+-  z
+-  normalIndex
+-end struct
+-
+-struct MdlFrame
+-  name
+-  mins
+-  maxs
+-  vertices
+-end struct
+-
+-struct MdlFrameSet
+-  grouped
+-  intervals
+-  frames
+-end struct
+-
+-struct MdlModel
+-  filename
+-  data
+-  version
+-  scale
+-  scaleOrigin
+-  boundingRadius
+-  eyePosition
+-  numSkins
+-  skinWidth
+-  skinHeight
+-  numVertices
+-  numTriangles
+-  numFrames
+-  syncType
+-  flags
+-  size
+-  skins
+-  texCoords
+-  triangles
+-  frames
+-end struct
+-
+-struct SpriteFrame
+-  originX
+-  originY
+-  width
+-  height
+-  pixels
+-end struct
+-
+-struct SpriteFrameSet
+-  grouped
+-  intervals
+-  frames
+-end struct
+-
+-struct SpriteModel
+-  filename
+-  data
+-  version
+-  type
+-  boundingRadius
+-  width
+-  height
+-  numFrames
+-  beamLength
+-  syncType
+-  frames
+-end struct
+-
+-struct QuakeCStatement
+-  op
+-  a
+-  b
+-  c
+-end struct
+-
+-struct QuakeCDef
+-  type
+-  offset
+-  nameOffset
+-  name
+-end struct
+-
+-struct QuakeCFunction
+-  firstStatement
+-  parmStart
+-  locals
+-  profile
+-  name
+-  file
+-  numParms
+-  parmSize
+-end struct
+-
+-struct QuakeCProgram
+-  filename
+-  data
+-  version
+-  crc
+-  statements
+-  globalDefs
+-  fieldDefs
+-  functions
+-  strings
+-  globals
+-  entityFields
+-end struct
+-
+-struct QuakeCCallFrame
+-  statement
+-  functionIndex
+-  savedLocals
+-end struct
+-
+-struct QuakeCMachine
+-  program
+-  globals
+-  callStack
+-  currentFunction
+-  statement
+-  returnWord
+-  argCount
+-  edicts
+-  builtins
+-  runaway
+-  context
+-  edictFree
+-  dynamicStrings
+-  temporaryString
+-  randomSeed
+-  trace
+-end struct
+-
+-struct WaveInfo
+-  rate
+-  width
+-  channels
+-  samples
+-  loopStart
+-  dataOffset
+-  dataLength
+-end struct
+-
+-struct DemoMessage
+-  viewAngles
+-  payload
+-end struct
+-
+-struct Demo
+-  forcedTrack
+-  messages
+-  trackHeader
+-end struct
+-
+-struct SaveGame
+-  version
+-  comment
+-  spawnParms
+-  skill
+-  mapName
+-  time
+-  lightStyles
+-  globalState
+-  entities
+-end struct
+-
+-struct ProtocolEvent
+-  command
+-  payload
+-end struct
+-
+-struct ProtocolResult
+-  events
+-  bytesRead
+-end struct
+-
+-// Canonical input record for the stock Protocol-15 svc_clientdata writer.
+-// Keeping the wire state separate from PlayerState makes the C field ordering
+-// and mission-pack active-weapon rule directly testable.
+-struct ProtocolClientData
+-  viewHeight
+-  idealPitch
+-  punch
+-  velocity
+-  flags
+-  waterLevel
+-  weaponFrame
+-  armor
+-  weaponModel
+-  health
+-  currentAmmo
+-  shells
+-  nails
+-  rockets
+-  cells
+-  items
+-  activeWeapon
+-  standardQuake
+-end struct
+-
+-struct SearchPath
+-  directory
+-  archive
+-end struct
+-
+-struct FileSystem
+-  baseDirectory
+-  gameDirectory
+-  searchPaths
+-  cacheDirectory
+-  modified
+-  registered
+-  staticRegistered
+-  progsHack
+-end struct
+-
+-struct ModelRegistry
+-  names
+-  models
+-  needLoad
+-  types
+-  touched
+-  noVis
+-end struct
+-
+-struct UserCommand
+-  viewAngles
+-  forwardMove
+-  sideMove
+-  upMove
+-  buttons
+-  impulse
+-  msec
+-end struct
+-
+-struct ChaseState
+-  active
+-  back
+-  up
+-  right
+-end struct
+-
+-
+-struct ClientState
+-  protocol
+-  time
+-  viewEntity
+-  viewAngles
+-  entities
+-  stats
+-  messages
+-end struct
+-
+-struct ServerState
+-  active
+-  time
+-  mapName
+-  clients
+-  entities
+-  reliableDatagram
+-end struct
+-
+-struct Particle
+-  origin
+-  velocity
+-  die
+-  color
+-  ramp
+-  type
+-end struct
+-
+-struct TemporaryEntity
+-  type
+-  origin
+-  endPosition
+-  entity
+-end struct
+-
+-struct AudioState
+-  opened
+-  rate
+-  channels
+-  width
+-end struct
+-
+-// -----------------------------------------------------------------------------
+-// Playable-engine milestone state.  The original lightweight structs above are
+-// kept for the format/protocol tools; these structs mirror the long-lived host,
+-// server, client, collision and renderer state used by the real game loop.
+-// -----------------------------------------------------------------------------
+-
+-struct CommandLine
+-  args
+-  commandLine
+-  safeMode
+-  rogue
+-  hipnotic
+-  standardQuake
+-end struct
+-
+-struct HostTiming
+-  realtime
+-  oldRealtime
+-  frameTime
+-  frameCount
+-  filteredFrames
+-end struct
+-
+-struct EntityBaseline
+-  modelIndex
+-  frame
+-  colormap
+-  skin
+-  effects
+-  origin
+-  angles
+-end struct
+-
+-struct QuakeEdict
+-  number
+-  free
+-  freeTime
+-  fields
+-  keyValues
+-  className
+-  model
+-  modelIndex
+-  frame
+-  skin
+-  colormap
+-  effects
+-  origin
+-  angles
+-  velocity
+-  mins
+-  maxs
+-  moveType
+-  solid
+-  flags
+-  health
+-  viewOffset
+-  onGround
+-  groundEntity
+-  baseline
+-end struct
+-
+-struct ServerClient
+-  active
+-  spawned
+-  sendSignon
+-  signonStage
+-  name
+-  colors
+-  privileged
+-  edictIndex
+-  socket
+-  message
+-  spawnParms
+-  command
+-  pingTimes
+-  numPings
+-  oldFrags
+-  lastMessage
+-  dropAsap
+-end struct
+-
+-struct GameServer
+-  active
+-  loading
+-  loadGame
+-  paused
+-  time
+-  mapName
+-  modelName
+-  levelName
+-  worldModel
+-  progs
+-  machine
+-  edicts
+-  numEdicts
+-  maxEdicts
+-  clients
+-  maxClients
+-  modelPrecache
+-  soundPrecache
+-  lightStyles
+-  datagram
+-  reliableDatagram
+-  signon
+-  collisionHull
+-  spawnPoint
+-  spawnAngles
+-  skill
+-  deathmatch
+-  coop
+-  serverFlags
+-  cdTrack
+-  standardQuake
+-  randomSeed
+-  diagnostics
+-end struct
+-
+-struct LocalClient
+-  connected
+-  signon
+-  spawned
+-  socket
+-  outgoing
+-  incoming
+-  protocol
+-  maxClients
+-  gameType
+-  levelName
+-  modelPrecache
+-  soundPrecache
+-  viewEntity
+-  serverTime
+-  messages
+-  printLog
+-  entities
+-  player
+-  lastMessageTime
+-  command
+-  name
+-  colors
+-  localAuthoritative
+-  scores
+-  stats
+-  itemGetTime
+-  completedTime
+-  faceAnimTime
+-  items
+-  idealPitch
+-  time
+-  oldTime
+-  messageTimes
+-  velocitySamples
+-  viewAngleSamples
+-  spawnParms
+-  visibleEntities
+-  initialized
+-  demoPlayback
+-  timedemo
+-  noLerp
+-  lightStyles
+-  paused
+-  intermission
+-  intermissionText
+-  cdTrack
+-  loopTrack
+-  sellScreen
+-  standardQuake
+-end struct
+-
+-struct ClientScore
+-  name
+-  enterTime
+-  frags
+-  colors
+-end struct
+-
+-struct PlayerState
+-  origin
+-  velocity
+-  viewAngles
+-  renderAngles
+-  mins
+-  maxs
+-  viewHeight
+-  onGround
+-  waterLevel
+-  moveType
+-  health
+-  armor
+-  ammo
+-  shells
+-  nails
+-  rockets
+-  cells
+-  items
+-  activeWeapon
+-  weaponFrame
+-  weapon
+-  noclip
+-  jumpHeld
+-  flags
+-  groundEntity
+-  waterType
+-  punchAngle
+-  fixAngle
+-  teleportTime
+-  moveDir
+-  oldOrigin
+-  deadFlag
+-end struct
+-
+-struct BspCollisionHull
+-  map
+-  clipNodes
+-  planes
+-  firstClipNode
+-  lastClipNode
+-  clipMins
+-  clipMaxs
+-end struct
+-
+-struct RenderVertex
+-  position
+-  s
+-  t
+-  lightS
+-  lightT
+-end struct
+-
+-struct RenderSurface
+-  faceIndex
+-  textureIndex
+-  textureMins
+-  extents
+-  lightWidth
+-  lightHeight
+-  lightOffset
+-  flags
+-  vertices
+-  lightmapId
+-end struct
+-
+-struct RenderTexture
+-  name
+-  width
+-  height
+-  glId
+-  pixels
+-  transparent
+-end struct
+-
+-struct WorldRenderer
+-  map
+-  palette
+-  textures
+-  surfaces
+-  lightmaps
+-  uploaded
+-  noTextureId
+-  fullbright
+-  wireframe
+-  viewLeaf
+-  visibleFaces
+-  frameCount
+-  waterAlpha
+-end struct
+-
+-struct GameSession
+-  arguments
+-  filesystem
+-  commands
+-  cvars
+-  timing
+-  server
+-  client
+-  network
+-  player
+-  renderer
+-  entityRenderer
+-  running
+-  initialized
+-  windowCreated
+-  basedir
+-  gameDirectory
+-  startMap
+-  width
+-  height
+-  fullscreen
+-  headless
+-  maxFrames
+-  lastTicks
+-  consoleVisible
+-  statusMessage
+-  console
+-  menu
+-  view
+-  mixer
+-  particles
+-  temporaryEntities
+-  qcEnabled
+-  noSound
+-  audioStarted
+-  renderedFrames
+-  simulatedFrames
+-  demoName
+-  demoRecording
+-  demoPlayback
+-  timedemoActive
+-  timedemoStartFrame
+-  timedemoStartTime
+-  timedemoLastFrame
+-  lastRemoteHost
+-  demoLoop
+-  demoNumber
+-  hostTime
+-  shutdownStarted
+-  inError
+-  frameTrace
+-  profileTime
+-  profileCount
+-  diagnosticContextPath
+-  diagnosticFrame
+-  diagnosticLastStage
+-  diagnosticWriteError
+-end struct
+-
+-// -----------------------------------------------------------------------------
+-// Integrated engine services added after the first compiler-stable milestone.
+-// These keep platform resources at the boundary while host/game state stays in
+-// MiniLang, matching the ownership split of WinQuake's common/host subsystems.
+-// -----------------------------------------------------------------------------
+-
+-struct LaunchOptions
+-  originalArgs
+-  basedir
+-  gameDirectory
+-  width
+-  height
+-  fullscreen
+-  noSound
+-  developer
+-  dedicated
+-  skill
+-  startMap
+-  plusCommands
+-  maxFrames
+-  validateOnly
+-  headless
+-  timedemo
+-end struct
+-
+-struct GameValidation
+-  ok
+-  messages
+-  packFiles
+-  mapFaces
+-  mapTextures
+-  mapEntities
+-  progsFunctions
+-end struct
+-
+-struct LightmapPage
+-  glId
+-  pixels
+-  allocated
+-  dirty
+-end struct
+-
+-struct EdictRuntime
+-  maxEdicts
+-  numEdicts
+-  freeFlags
+-  freeTimes
+-end struct
+-
+-struct QuakeCContext
+-  filesystem
+-  worldMap
+-  collisionHull
+-  cvars
+-  commands
+-  edicts
+-  modelPrecache
+-  soundPrecache
+-  lightStyles
+-  datagram
+-  reliableDatagram
+-  signon
+-  consoleLines
+-  staticEntities
+-  staticSounds
+-  soundEvents
+-  particles
+-  serverTime
+-  randomSeed
+-  changeLevel
+-  traceEntity
+-  server
+-  clientMessages
+-  clientSpawnParms
+-  lastCheckClient
+-  lastCheckTime
+-  checkPvs
+-end struct
+-
+-struct DynamicLight
+-  origin
+-  radius
+-  die
+-  decay
+-  minLight
+-  key
+-end struct
+-
+-struct ClientEntityState
+-  number
+-  modelIndex
+-  frame
+-  colormap
+-  skin
+-  effects
+-  origin
+-  angles
+-  messageTime
+-  messageOrigin
+-  previousMessageOrigin
+-  messageAngles
+-  previousMessageAngles
+-  forceLink
+-  baseline
+-end struct
+-
+-struct SoundEffect
+-  name
+-  samples
+-  rate
+-  width
+-  channels
+-  loopStart
+-end struct
+-
+-struct MixerChannel
+-  entityNumber
+-  channelNumber
+-  effect
+-  origin
+-  volume
+-  attenuation
+-  sample
+-  looping
+-  active
+-  endTime
+-end struct
+-
+-struct MusicTrack
+-  number
+-  samples
+-  rate
+-  channels
+-  frames
+-  position
+-  looping
+-  playing
+-  paused
+-end struct
+-
+-struct SoundMixer
+-  audioState
+-  filesystem
+-  effects
+-  channels
+-  sampleRate
+-  masterVolume
+-  listenerOrigin
+-  listenerForward
+-  listenerRight
+-  listenerEntity
+-  enabled
+-  underruns
+-  submittedBuffers
+-  music
+-  musicVolume
+-  paintedTime
+-  blockDepth
+-  staticAllocations
+-  playHash
+-  playVolumeHash
+-end struct
+-
+-struct ConsoleState
+-  lines
+-  maxLines
+-  inputText
+-  active
+-  notifyUntil
+-  textureId
+-  toggleLatch
+-  centerText
+-  centerUntil
+-  textBuffer
+-  lineWidth
+-  totalLines
+-  currentLine
+-  cursorX
+-  carriageReturn
+-  notifyTimes
+-  realtime
+-  visiblePixelLines
+-  forcedUp
+-  initialized
+-  notifyPixelLines
+-  debugLog
+-  debugLogName
+-  filesystem
+-  lineCount
+-  talkSoundRequested
+-  drawTrace
+-  updateRequested
+-  safePrintDepth
+-  notifyBoxText
+-  dedicated
+-end struct
+-
+-struct MenuPicture
+-  name
+-  width
+-  height
+-  textureId
+-end struct
+-
+-struct MenuState
+-  active
+-  selection
+-  items
+-  title
+-  pausedByMenu
+-  page
+-  previousPage
+-  helpPage
+-  pictures
+-  initialized
+-  statusText
+-  waitingForKey
+-  pageSelections
+-  drawTrace
+-  action
+-  setupHostname
+-  setupName
+-  setupTop
+-  setupBottom
+-  setupOldTop
+-  setupOldBottom
+-  lanPort
+-  lanPortText
+-  lanJoinName
+-  joiningGame
+-  tcpAvailable
+-  localAddress
+-  maxPlayers
+-  maxPlayersLimit
+-  startEpisode
+-  startLevel
+-  missionPack
+-  searchComplete
+-  searchCompleteTime
+-  servers
+-  serverListSorted
+-  returnReason
+-  enterSound
+-  excludedPaths
+-  videoDrawCallback
+-  videoKeyCallback
+-  loadable
+-end struct
+-
+-struct ViewState
+-  origin
+-  angles
+-  forward
+-  right
+-  up
+-  bob
+-  roll
+-  damageKick
+-  blend
+-  oldZ
+-  oldZValid
+-  gunOrigin
+-  gunAngles
+-  pitchVelocity
+-  noDrift
+-  driftMove
+-  lastStop
+-  damageTime
+-  damageRoll
+-  damagePitch
+-  cshifts
+-  previousCshifts
+-  gammaTable
+-  ramps
+-  oldGamma
+-  oldGunYaw
+-  oldGunPitch
+-  intermission
+-  viewModelVisible
+-  commandTrace
+-  lastInputPitch
+-  lastInputPitchValid
+-  emptyCshift
+-end struct
+-
+-struct AliasGpuModel
+-  source
+-  textureIds
+-  uploaded
+-end struct
+-
+-struct SpriteGpuModel
+-  source
+-  textureIds
+-  uploaded
+-end struct
+-
+-
+-struct ClientRenderModel
+-  name
+-  kind
+-  aliasModel
+-  spriteModel
+-  textureIds
+-  uploaded
+-end struct
+-
+-struct EntityRenderer
+-  filesystem
+-  palette
+-  models
+-  renderedEntities
+-end struct
+-
+-struct UdpSocket
+-  handle
+-  port
+-  address
+-  open
+-  bindAddress
+-  broadcast
+-end struct
+-
+-struct WinSockAddress
+-  family
+-  address
+-  port
+-end struct
+-
+-struct HostSoakResult
+-  frames
+-  liveBefore
+-  liveAfter
+-  bytesBefore
+-  bytesAfter
+-  stable
+-end struct
+-
+-
+-struct UdpSmokeResult
+-  ok
+-  senderPort
+-  receiverPort
+-  bytesSent
+-  bytesReceived
+-  payload
+-  remoteAddress
+-  remotePort
+-  errorCode
+-end struct
+-
+-struct CompatibilityTraceResult
+-  ok
+-  framesRequested
+-  framesWritten
+-  acceptedFrames
+-  rollingHash
+-  tracePath
+-  snapshotPath
+-  contextPath
+-  summaryPath
+-  lastStage
+-  errorMessage
+-  cleanShutdown
+-end struct
+-
+-struct RuntimeValidation
+-  ok
+-  messages
+-  mapName
+-  signon
+-  spawned
+-  edicts
+-  modelPrecache
+-  soundPrecache
+-  worldFaces
+-  renderSurfaces
+-  simulatedFrames
+-  traceFraction
+-  heapLiveBefore
+-  heapLiveAfter
+-  heapBytesBefore
+-  heapBytesAfter
+-  cleanShutdown
+-end struct
+-
+-struct DemoPlayback
+-  recording
+-  client
+-  index
+-  eventCount
+-  payloadBytes
+-  complete
+-  errors
+-  timedemo
+-  startFrame
+-  startTime
+-  lastFrame
+-  stopped
+-  finishResult
+-end struct
+-
+-struct DemoVerification
+-  ok
+-  messages
+-  eventCount
+-  payloadBytes
+-  signon
+-  serverTime
+-  viewEntity
+-  entities
+-  prints
+-end struct
+-
+-struct DatagramPacket
+-  flags
+-  sequence
+-  payload
+-end struct
+-
+-struct DatagramChannel
+-  sendSequence
+-  receiveSequence
+-  unreliableSendSequence
+-  unreliableReceiveSequence
+-  droppedUnreliable
+-  ackSequence
+-  sendMessage
+-  receiveMessage
+-  canSend
+-  sendNext
+-  lastSendTime
+-  packetsReSent
+-end struct
++package miniquake.types
++
++struct Vec3
++  x
++  y
++  z
++end struct
++
++struct Link
++  previous
++  next
++end struct
++
++struct CommonFileHandle
++  data
++  position
++  length
++  persistent
++  closed
++  source
++end struct
++
++struct Plane
++  normal
++  dist
++  type
++  signBits
++end struct
++
++struct SizeBuffer
++  data
++  maxSize
++  curSize
++  allowOverflow
++  overflowed
++end struct
++
++struct MessageReader
++  data
++  readCount
++  badRead
++end struct
++
++struct Cvar
++  name
++  string
++  value
++  archive
++  server
++end struct
++
++struct CvarRegistry
++  variables
++  serverChanges
++end struct
++
++struct CommandAlias
++  name
++  value
++end struct
++
++struct CommandSystem
++  commands
++  aliases
++  arguments
++  rawArgs
++  text
++  wait
++end struct
++
++struct PackFile
++  name
++  offset
++  length
++end struct
++
++struct PackArchive
++  filename
++  data
++  files
++  numFiles
++end struct
++
++struct WadLump
++  filePosition
++  diskSize
++  size
++  type
++  compression
++  name
++end struct
++
++struct WadArchive
++  filename
++  data
++  lumps
++  numLumps
++end struct
++
++struct LoopSocket
++  peer
++  messages
++  messageTypes
++  canSend
++  disconnected
++  transport
++  udp
++  address
++  port
++  channel
++  lastReceiveTime
++  connectTime
++  lastSendTime
++  driver
++  landriver
++end struct
++
++struct LoopState
++  client
++  server
++  pending
++  listener
++  pendingRemote
++  hostName
++  mapName
++  currentPlayers
++  maxPlayers
++  remoteSockets
++  hostCache
++  banAddress
++  banMask
++  playerInfo
++  serverRules
++  lanEnabled
++end struct
++
++struct MemoryBlock
++  kind
++  name
++  data
++  size
++  alive
++  allocationIndex
++end struct
++
++struct MemoryState
++  capacity
++  blocks
++  totalAllocated
++end struct
++
++struct CacheUser
++  block
++end struct
++
++struct Hull
++  mins
++  maxs
++end struct
++
++struct Trace
++  allSolid
++  startSolid
++  inOpen
++  inWater
++  fraction
++  endPosition
++  plane
++  entity
++end struct
++
++struct EntityPair
++  key
++  value
++end struct
++
++struct Entity
++  pairs
++end struct
++
++struct Lump
++  offset
++  length
++end struct
++
++struct BspPlane
++  normal
++  dist
++  type
++end struct
++
++struct BspVertex
++  position
++end struct
++
++struct BspEdge
++  vertex0
++  vertex1
++end struct
++
++struct BspNode
++  planeIndex
++  child0
++  child1
++  mins
++  maxs
++  firstFace
++  numFaces
++end struct
++
++struct BspClipNode
++  planeIndex
++  child0
++  child1
++end struct
++
++struct BspTexInfo
++  s
++  t
++  textureIndex
++  flags
++end struct
++
++struct BspFace
++  planeIndex
++  side
++  firstEdge
++  numEdges
++  texInfo
++  styles
++  lightOffset
++end struct
++
++struct BspLeaf
++  contents
++  visibilityOffset
++  mins
++  maxs
++  firstMarkSurface
++  numMarkSurfaces
++  ambient
++end struct
++
++struct BspModel
++  mins
++  maxs
++  origin
++  headNodes
++  visibleLeafs
++  firstFace
++  numFaces
++end struct
++
++struct BspTexture
++  name
++  width
++  height
++  mipOffsets
++  pixels
++end struct
++
++struct BspMap
++  filename
++  data
++  version
++  lumps
++  entityText
++  entities
++  planes
++  textures
++  vertices
++  visibility
++  nodes
++  texInfo
++  faces
++  lighting
++  clipNodes
++  leafs
++  markSurfaces
++  edges
++  surfEdges
++  models
++end struct
++
++struct MdlSkin
++  grouped
++  intervals
++  images
++end struct
++
++struct MdlTexCoord
++  onSeam
++  s
++  t
++end struct
++
++struct MdlTriangle
++  facesFront
++  vertex0
++  vertex1
++  vertex2
++end struct
++
++struct MdlVertex
++  x
++  y
++  z
++  normalIndex
++end struct
++
++struct MdlFrame
++  name
++  mins
++  maxs
++  vertices
++end struct
++
++struct MdlFrameSet
++  grouped
++  intervals
++  frames
++end struct
++
++struct MdlModel
++  filename
++  data
++  version
++  scale
++  scaleOrigin
++  boundingRadius
++  eyePosition
++  numSkins
++  skinWidth
++  skinHeight
++  numVertices
++  numTriangles
++  numFrames
++  syncType
++  flags
++  size
++  skins
++  texCoords
++  triangles
++  frames
++end struct
++
++struct SpriteFrame
++  originX
++  originY
++  width
++  height
++  pixels
++end struct
++
++struct SpriteFrameSet
++  grouped
++  intervals
++  frames
++end struct
++
++struct SpriteModel
++  filename
++  data
++  version
++  type
++  boundingRadius
++  width
++  height
++  numFrames
++  beamLength
++  syncType
++  frames
++end struct
++
++struct QuakeCStatement
++  op
++  a
++  b
++  c
++end struct
++
++struct QuakeCDef
++  type
++  offset
++  nameOffset
++  name
++end struct
++
++struct QuakeCFunction
++  firstStatement
++  parmStart
++  locals
++  profile
++  name
++  file
++  numParms
++  parmSize
++end struct
++
++struct QuakeCProgram
++  filename
++  data
++  version
++  crc
++  statements
++  globalDefs
++  fieldDefs
++  functions
++  strings
++  globals
++  entityFields
++end struct
++
++struct QuakeCCallFrame
++  statement
++  functionIndex
++  savedLocals
++end struct
++
++struct QuakeCMachine
++  program
++  globals
++  callStack
++  currentFunction
++  statement
++  returnWord
++  argCount
++  edicts
++  builtins
++  runaway
++  context
++  edictFree
++  dynamicStrings
++  temporaryString
++  randomSeed
++  trace
++end struct
++
++struct WaveInfo
++  rate
++  width
++  channels
++  samples
++  loopStart
++  dataOffset
++  dataLength
++end struct
++
++struct DemoMessage
++  viewAngles
++  payload
++end struct
++
++struct Demo
++  forcedTrack
++  messages
++  trackHeader
++end struct
++
++struct SaveGame
++  version
++  comment
++  spawnParms
++  skill
++  mapName
++  time
++  lightStyles
++  globalState
++  entities
++end struct
++
++struct ProtocolEvent
++  command
++  payload
++end struct
++
++struct ProtocolResult
++  events
++  bytesRead
++end struct
++
++// Canonical input record for the stock Protocol-15 svc_clientdata writer.
++// Keeping the wire state separate from PlayerState makes the C field ordering
++// and mission-pack active-weapon rule directly testable.
++struct ProtocolClientData
++  viewHeight
++  idealPitch
++  punch
++  velocity
++  flags
++  waterLevel
++  weaponFrame
++  armor
++  weaponModel
++  health
++  currentAmmo
++  shells
++  nails
++  rockets
++  cells
++  items
++  activeWeapon
++  standardQuake
++end struct
++
++struct SearchPath
++  directory
++  archive
++end struct
++
++struct FileSystem
++  baseDirectory
++  gameDirectory
++  searchPaths
++  cacheDirectory
++  modified
++  registered
++  staticRegistered
++  progsHack
++end struct
++
++struct ModelRegistry
++  names
++  models
++  needLoad
++  types
++  touched
++  noVis
++end struct
++
++struct UserCommand
++  viewAngles
++  forwardMove
++  sideMove
++  upMove
++  buttons
++  impulse
++  msec
++end struct
++
++struct ChaseState
++  active
++  back
++  up
++  right
++end struct
++
++
++struct ClientState
++  protocol
++  time
++  viewEntity
++  viewAngles
++  entities
++  stats
++  messages
++end struct
++
++struct ServerState
++  active
++  time
++  mapName
++  clients
++  entities
++  reliableDatagram
++end struct
++
++struct Particle
++  origin
++  velocity
++  die
++  color
++  ramp
++  type
++end struct
++
++struct TemporaryEntity
++  type
++  origin
++  endPosition
++  entity
++end struct
++
++struct AudioState
++  opened
++  rate
++  channels
++  width
++end struct
++
++// -----------------------------------------------------------------------------
++// Playable-engine milestone state.  The original lightweight structs above are
++// kept for the format/protocol tools; these structs mirror the long-lived host,
++// server, client, collision and renderer state used by the real game loop.
++// -----------------------------------------------------------------------------
++
++struct CommandLine
++  args
++  commandLine
++  safeMode
++  rogue
++  hipnotic
++  standardQuake
++end struct
++
++struct HostTiming
++  realtime
++  oldRealtime
++  frameTime
++  frameCount
++  filteredFrames
++end struct
++
++struct EntityBaseline
++  modelIndex
++  frame
++  colormap
++  skin
++  effects
++  origin
++  angles
++end struct
++
++struct QuakeEdict
++  number
++  free
++  freeTime
++  fields
++  keyValues
++  className
++  model
++  modelIndex
++  frame
++  skin
++  colormap
++  effects
++  origin
++  angles
++  velocity
++  mins
++  maxs
++  moveType
++  solid
++  flags
++  health
++  viewOffset
++  onGround
++  groundEntity
++  baseline
++end struct
++
++struct ServerClient
++  active
++  spawned
++  sendSignon
++  signonStage
++  name
++  colors
++  privileged
++  edictIndex
++  socket
++  message
++  spawnParms
++  command
++  pingTimes
++  numPings
++  oldFrags
++  lastMessage
++  dropAsap
++end struct
++
++struct GameServer
++  active
++  loading
++  loadGame
++  paused
++  time
++  mapName
++  modelName
++  levelName
++  worldModel
++  progs
++  machine
++  edicts
++  numEdicts
++  maxEdicts
++  clients
++  maxClients
++  modelPrecache
++  soundPrecache
++  lightStyles
++  datagram
++  reliableDatagram
++  signon
++  collisionHull
++  spawnPoint
++  spawnAngles
++  skill
++  deathmatch
++  coop
++  serverFlags
++  cdTrack
++  standardQuake
++  randomSeed
++  diagnostics
++end struct
++
++struct LocalClient
++  connected
++  signon
++  spawned
++  socket
++  outgoing
++  incoming
++  protocol
++  maxClients
++  gameType
++  levelName
++  modelPrecache
++  soundPrecache
++  viewEntity
++  serverTime
++  messages
++  printLog
++  entities
++  player
++  lastMessageTime
++  command
++  name
++  colors
++  localAuthoritative
++  scores
++  stats
++  itemGetTime
++  completedTime
++  faceAnimTime
++  items
++  idealPitch
++  time
++  oldTime
++  messageTimes
++  velocitySamples
++  viewAngleSamples
++  spawnParms
++  visibleEntities
++  initialized
++  demoPlayback
++  timedemo
++  noLerp
++  lightStyles
++  paused
++  intermission
++  intermissionText
++  cdTrack
++  loopTrack
++  sellScreen
++  standardQuake
++end struct
++
++struct ClientScore
++  name
++  enterTime
++  frags
++  colors
++end struct
++
++struct PlayerState
++  origin
++  velocity
++  viewAngles
++  renderAngles
++  mins
++  maxs
++  viewHeight
++  onGround
++  waterLevel
++  moveType
++  health
++  armor
++  ammo
++  shells
++  nails
++  rockets
++  cells
++  items
++  activeWeapon
++  weaponFrame
++  weapon
++  noclip
++  jumpHeld
++  flags
++  groundEntity
++  waterType
++  punchAngle
++  fixAngle
++  teleportTime
++  moveDir
++  oldOrigin
++  deadFlag
++end struct
++
++struct BspCollisionHull
++  map
++  clipNodes
++  planes
++  firstClipNode
++  lastClipNode
++  clipMins
++  clipMaxs
++end struct
++
++struct RenderVertex
++  position
++  s
++  t
++  lightS
++  lightT
++end struct
++
++struct RenderSurface
++  faceIndex
++  textureIndex
++  textureMins
++  extents
++  lightWidth
++  lightHeight
++  lightOffset
++  flags
++  vertices
++  lightmapId
++end struct
++
++struct RenderTexture
++  name
++  width
++  height
++  glId
++  pixels
++  transparent
++end struct
++
++struct WorldRenderer
++  map
++  palette
++  textures
++  surfaces
++  lightmaps
++  uploaded
++  noTextureId
++  fullbright
++  wireframe
++  viewLeaf
++  visibleFaces
++  frameCount
++  waterAlpha
++end struct
++
++struct GameSession
++  arguments
++  filesystem
++  commands
++  cvars
++  timing
++  server
++  client
++  network
++  player
++  renderer
++  entityRenderer
++  running
++  initialized
++  windowCreated
++  basedir
++  gameDirectory
++  startMap
++  width
++  height
++  fullscreen
++  headless
++  maxFrames
++  lastTicks
++  consoleVisible
++  statusMessage
++  console
++  menu
++  view
++  mixer
++  particles
++  temporaryEntities
++  qcEnabled
++  noSound
++  audioStarted
++  renderedFrames
++  simulatedFrames
++  demoName
++  demoRecording
++  demoPlayback
++  timedemoActive
++  timedemoStartFrame
++  timedemoStartTime
++  timedemoLastFrame
++  lastRemoteHost
++  demoLoop
++  demoNumber
++  hostTime
++  shutdownStarted
++  inError
++  frameTrace
++  profileTime
++  profileCount
++  diagnosticContextPath
++  diagnosticFrame
++  diagnosticLastStage
++  diagnosticWriteError
++end struct
++
++// -----------------------------------------------------------------------------
++// Integrated engine services added after the first compiler-stable milestone.
++// These keep platform resources at the boundary while host/game state stays in
++// MiniLang, matching the ownership split of WinQuake's common/host subsystems.
++// -----------------------------------------------------------------------------
++
++struct LaunchOptions
++  originalArgs
++  basedir
++  gameDirectory
++  width
++  height
++  fullscreen
++  noSound
++  developer
++  dedicated
++  skill
++  startMap
++  plusCommands
++  maxFrames
++  validateOnly
++  headless
++  timedemo
++end struct
++
++struct GameValidation
++  ok
++  messages
++  packFiles
++  mapFaces
++  mapTextures
++  mapEntities
++  progsFunctions
++end struct
++
++struct LightmapPage
++  glId
++  pixels
++  allocated
++  dirty
++end struct
++
++struct EdictRuntime
++  maxEdicts
++  numEdicts
++  freeFlags
++  freeTimes
++end struct
++
++struct QuakeCContext
++  filesystem
++  worldMap
++  collisionHull
++  cvars
++  commands
++  edicts
++  modelPrecache
++  soundPrecache
++  lightStyles
++  datagram
++  reliableDatagram
++  signon
++  consoleLines
++  staticEntities
++  staticSounds
++  soundEvents
++  particles
++  serverTime
++  randomSeed
++  changeLevel
++  traceEntity
++  server
++  clientMessages
++  clientSpawnParms
++  lastCheckClient
++  lastCheckTime
++  checkPvs
++end struct
++
++struct DynamicLight
++  origin
++  radius
++  die
++  decay
++  minLight
++  key
++end struct
++
++struct ClientEntityState
++  number
++  modelIndex
++  frame
++  colormap
++  skin
++  effects
++  origin
++  angles
++  messageTime
++  messageOrigin
++  previousMessageOrigin
++  messageAngles
++  previousMessageAngles
++  forceLink
++  baseline
++  syncBase
++end struct
++
++struct SoundEffect
++  name
++  samples
++  rate
++  width
++  channels
++  loopStart
++end struct
++
++struct MixerChannel
++  entityNumber
++  channelNumber
++  effect
++  origin
++  volume
++  attenuation
++  sample
++  looping
++  active
++  endTime
++end struct
++
++struct MusicTrack
++  number
++  samples
++  rate
++  channels
++  frames
++  position
++  looping
++  playing
++  paused
++end struct
++
++struct SoundMixer
++  audioState
++  filesystem
++  effects
++  channels
++  sampleRate
++  masterVolume
++  listenerOrigin
++  listenerForward
++  listenerRight
++  listenerEntity
++  enabled
++  underruns
++  submittedBuffers
++  music
++  musicVolume
++  paintedTime
++  blockDepth
++  staticAllocations
++  playHash
++  playVolumeHash
++end struct
++
++struct ConsoleState
++  lines
++  maxLines
++  inputText
++  active
++  notifyUntil
++  textureId
++  toggleLatch
++  centerText
++  centerUntil
++  textBuffer
++  lineWidth
++  totalLines
++  currentLine
++  cursorX
++  carriageReturn
++  notifyTimes
++  realtime
++  visiblePixelLines
++  forcedUp
++  initialized
++  notifyPixelLines
++  debugLog
++  debugLogName
++  filesystem
++  lineCount
++  talkSoundRequested
++  drawTrace
++  updateRequested
++  safePrintDepth
++  notifyBoxText
++  dedicated
++end struct
++
++struct MenuPicture
++  name
++  width
++  height
++  textureId
++end struct
++
++struct MenuState
++  active
++  selection
++  items
++  title
++  pausedByMenu
++  page
++  previousPage
++  helpPage
++  pictures
++  initialized
++  statusText
++  waitingForKey
++  pageSelections
++  drawTrace
++  action
++  setupHostname
++  setupName
++  setupTop
++  setupBottom
++  setupOldTop
++  setupOldBottom
++  lanPort
++  lanPortText
++  lanJoinName
++  joiningGame
++  tcpAvailable
++  localAddress
++  maxPlayers
++  maxPlayersLimit
++  startEpisode
++  startLevel
++  missionPack
++  searchComplete
++  searchCompleteTime
++  servers
++  serverListSorted
++  returnReason
++  enterSound
++  excludedPaths
++  videoDrawCallback
++  videoKeyCallback
++  loadable
++end struct
++
++struct ViewState
++  origin
++  angles
++  forward
++  right
++  up
++  bob
++  roll
++  damageKick
++  blend
++  oldZ
++  oldZValid
++  gunOrigin
++  gunAngles
++  pitchVelocity
++  noDrift
++  driftMove
++  lastStop
++  damageTime
++  damageRoll
++  damagePitch
++  cshifts
++  previousCshifts
++  gammaTable
++  ramps
++  oldGamma
++  oldGunYaw
++  oldGunPitch
++  intermission
++  viewModelVisible
++  commandTrace
++  lastInputPitch
++  lastInputPitchValid
++  emptyCshift
++end struct
++
++struct AliasGpuModel
++  source
++  textureIds
++  uploaded
++end struct
++
++struct SpriteGpuModel
++  source
++  textureIds
++  uploaded
++end struct
++
++
++struct ClientRenderModel
++  name
++  kind
++  aliasModel
++  spriteModel
++  textureIds
++  uploaded
++end struct
++
++struct EntityRenderer
++  filesystem
++  palette
++  models
++  renderedEntities
++end struct
++
++struct UdpSocket
++  handle
++  port
++  address
++  open
++  bindAddress
++  broadcast
++end struct
++
++struct WinSockAddress
++  family
++  address
++  port
++end struct
++
++struct HostSoakResult
++  frames
++  liveBefore
++  liveAfter
++  bytesBefore
++  bytesAfter
++  stable
++end struct
++
++
++struct UdpSmokeResult
++  ok
++  senderPort
++  receiverPort
++  bytesSent
++  bytesReceived
++  payload
++  remoteAddress
++  remotePort
++  errorCode
++end struct
++
++struct CompatibilityTraceResult
++  ok
++  framesRequested
++  framesWritten
++  acceptedFrames
++  rollingHash
++  tracePath
++  snapshotPath
++  contextPath
++  summaryPath
++  lastStage
++  errorMessage
++  cleanShutdown
++end struct
++
++struct RuntimeValidation
++  ok
++  messages
++  mapName
++  signon
++  spawned
++  edicts
++  modelPrecache
++  soundPrecache
++  worldFaces
++  renderSurfaces
++  simulatedFrames
++  traceFraction
++  heapLiveBefore
++  heapLiveAfter
++  heapBytesBefore
++  heapBytesAfter
++  cleanShutdown
++end struct
++
++struct DemoPlayback
++  recording
++  client
++  index
++  eventCount
++  payloadBytes
++  complete
++  errors
++  timedemo
++  startFrame
++  startTime
++  lastFrame
++  stopped
++  finishResult
++end struct
++
++struct DemoVerification
++  ok
++  messages
++  eventCount
++  payloadBytes
++  signon
++  serverTime
++  viewEntity
++  entities
++  prints
++end struct
++
++struct DatagramPacket
++  flags
++  sequence
++  payload
++end struct
++
++struct DatagramChannel
++  sendSequence
++  receiveSequence
++  unreliableSendSequence
++  unreliableReceiveSequence
++  droppedUnreliable
++  ackSequence
++  sendMessage
++  receiveMessage
++  canSend
++  sendNext
++  lastSendTime
++  packetsReSent
++end struct
+diff --git a/tests/alias_renderer_port_tests.ml b/tests/alias_renderer_port_tests.ml
+index edca19e..b216bf6 100644
+--- a/tests/alias_renderer_port_tests.ml
++++ b/tests/alias_renderer_port_tests.ml
+@@ -1,237 +1,237 @@
+-/*
+-Copyright (C) 1996-1997 Id Software, Inc.
+-Copyright (C) 2026 MiniQuake contributors
+-
+-Production-path branch tests for the alias/viewmodel part of gl_rmain.c.
+-*/
+-
+-import miniquake.types as t
+-import miniquake.render.entities as entities
+-import miniquake.render.gl11 as gl
+-import miniquake.render.world as renderWorld
+-import miniquake.render.alias_mesh as aliasMesh
+-
+-function require(value, name)
+-  if not value then return error(9950, name) end if
+-  return true
+-end function
+-
+-function equal(actual, expected, name)
+-  if actual != expected then return error(9951, name + ": expected " + expected + ", got " + actual) end if
+-  return true
+-end function
+-
+-function countCommand(commands, name)
+-  count = 0
+-  for each command in commands
+-    if command[0] == name then count = count + 1 end if
+-  end for
+-  return count
+-end function
+-
+-function firstTexture(commands)
+-  for each command in commands
+-    if command[0] == "bind_texture" and len(command[1]) > 1 then return command[1][1] end if
+-  end for
+-  return -1
+-end function
+-
+-function hasTranslateZ(commands, expected)
+-  for each command in commands
+-    if command[0] == "translate" and len(command[1]) >= 3 and command[1][2] == expected then return true end if
+-  end for
+-  return false
+-end function
+-
+-function aliasSource(name)
+-  frame0 = t.MdlFrame("idle0", t.MdlVertex(0, 0, 0, 0), t.MdlVertex(2, 2, 1, 0), [
+-    t.MdlVertex(0, 0, 0, 0),
+-    t.MdlVertex(2, 0, 0, 1),
+-    t.MdlVertex(0, 2, 0, 2),
+-  ])
+-  frame1 = t.MdlFrame("idle1", t.MdlVertex(0, 0, 0, 0), t.MdlVertex(2, 2, 2, 0), [
+-    t.MdlVertex(0, 0, 1, 3),
+-    t.MdlVertex(2, 0, 1, 4),
+-    t.MdlVertex(0, 2, 1, 5),
+-  ])
+-  return t.MdlModel(
+-    name, bytes(), 6,
+-    t.Vec3(1.0, 1.0, 1.0), t.Vec3(0.0, 0.0, 30.0),
+-    4.0, t.Vec3(0.0, 0.0, 0.0),
+-    1, 4, 4, 3, 1, 2, 0, 0, 1.0,
+-    [t.MdlSkin(false, [], [bytes(16)])],
+-    [t.MdlTexCoord(0, 0, 0), t.MdlTexCoord(0, 3, 0), t.MdlTexCoord(0, 0, 3)],
+-    [t.MdlTriangle(1, 0, 1, 2)],
+-    [
+-      t.MdlFrameSet(false, [], [frame0]),
+-      t.MdlFrameSet(true, [0.1, 0.2], [frame0, frame1]),
+-    ],
+-  )
+-end function
+-
+-function aliasModel(name)
+-  return t.ClientRenderModel(name, entities.MODEL_ALIAS, aliasSource(name), void, [[11, 12, 13, 14]], true)
+-end function
+-
+-function aliasEntity(number, modelIndex, frame, colormap)
+-  return t.ClientEntityState(
+-    number, modelIndex, frame, colormap, 0, 0,
+-    t.Vec3(1.0, 2.0, 3.0), t.Vec3(10.0, 20.0, 30.0), 0.0,
+-    t.Vec3(1.0, 2.0, 3.0), t.Vec3(1.0, 2.0, 3.0),
+-    t.Vec3(10.0, 20.0, 30.0), t.Vec3(10.0, 20.0, 30.0),
+-    false, [],
+-  )
+-end function
+-
+-function spriteModel()
+-  frame = t.SpriteFrame(1.0, 1.0, 2, 2, bytes(4))
+-  source = t.SpriteModel("progs/fixture.spr", bytes(), 1, 0, 2.0, 2, 2, 1, 0.0, 0, [
+-    t.SpriteFrameSet(false, [], [frame]),
+-  ])
+-  return t.ClientRenderModel(source.filename, entities.MODEL_SPRITE, void, source, [[22]], true)
+-end function
+-
+-function testFrameSelection()
+-  source = aliasSource("progs/fixture.mdl")
+-  equal(entities.aliasFrame(source, -1, 0.0).name, "idle0", "negative frame falls back")
+-  equal(entities.aliasFrame(source, 99, 0.0).name, "idle0", "out-of-range frame falls back")
+-  equal(entities.aliasFrame(source, 1, 0.05).name, "idle0", "group first pose")
+-  equal(entities.aliasFrame(source, 1, 0.15).name, "idle1", "group timed pose")
+-  return true
+-end function
+-
+-function testAliasStateBranches()
+-  palette = bytes(768)
+-  renderer = t.EntityRenderer(void, palette, [void, aliasModel("progs/fixture.mdl")], 0)
+-  entity = aliasEntity(7, 1, 0, 0)
+-
+-  entities.ConfigureAliasRendering(true, false, false, false, true)
+-  gl.Trace_Begin()
+-  entities.drawAlias(renderer, renderer.models[1], entity, 0.25, true)
+-  commands = gl.Trace_End()
+-  equal(firstTexture(commands), 13, "animated skin selects cl.time slot")
+-  equal(countCommand(commands, "shade_model"), 2, "smooth then flat shade state")
+-  require(countCommand(commands, "enable") >= 1, "alias enables culling")
+-  require(countCommand(commands, "disable") >= 1, "alias restores culling")
+-  equal(countCommand(commands, "texture_environment"), 2, "modulate then replace")
+-
+-  entities.ConfigureAliasRendering(false, false, false, false, true)
+-  gl.Trace_Begin()
+-  entities.drawAlias(renderer, renderer.models[1], entity, 0.25, false)
+-  commands = gl.Trace_End()
+-  equal(countCommand(commands, "shade_model"), 1, "flat-model branch skips smooth")
+-
+-  entities.setTranslatedPlayerTexture(7, 77)
+-  entity.colormap = 1
+-  entities.ConfigureAliasRendering(true, false, false, false, true)
+-  gl.Trace_Begin()
+-  entities.drawAlias(renderer, renderer.models[1], entity, 0.25, false)
+-  commands = gl.Trace_End()
+-  equal(firstTexture(commands), 77, "translated player texture")
+-  entities.ConfigureAliasRendering(true, false, false, true, true)
+-  gl.Trace_Begin()
+-  entities.drawAlias(renderer, renderer.models[1], entity, 0.25, false)
+-  commands = gl.Trace_End()
+-  equal(firstTexture(commands), 13, "gl_nocolors stock texture")
+-
+-  eye = aliasModel("progs/eyes.mdl")
+-  eye.aliasModel.filename = "progs/eyes.mdl"
+-  renderer.models[1] = eye
+-  entities.ConfigureAliasRendering(true, false, false, false, true)
+-  gl.Trace_Begin()
+-  entities.drawAlias(renderer, eye, entity, 0.0, false)
+-  commands = gl.Trace_End()
+-  require(hasTranslateZ(commands, 0.0), "double-eyes translates scale origin down by 30")
+-
+-  entities.ConfigureAliasRendering(true, false, true, false, false)
+-  gl.Trace_Begin()
+-  entities.drawAlias(renderer, eye, entity, 0.0, false)
+-  commands = gl.Trace_End()
+-  equal(countCommand(commands, "push_matrix"), 2, "shadow has second entity transform")
+-  require(countCommand(commands, "enable") >= 3, "shadow enables cull, blend and texture")
+-  require(countCommand(commands, "disable") >= 3, "shadow disables cull, texture and blend")
+-  entities.ConfigureAliasRendering(true, false, false, false, true)
+-  return true
+-end function
+-
+-function testOpaqueThenSpriteOrdering()
+-  alias = aliasModel("progs/fixture.mdl")
+-  sprite = spriteModel()
+-  renderer = t.EntityRenderer(void, bytes(768), [void, alias, sprite], 0)
+-  spriteEntity = aliasEntity(2, 2, 0, 0)
+-  aliasValue = aliasEntity(1, 1, 0, 0)
+-  gl.Trace_Begin()
+-  rendered = entities.render(
+-    renderer, void, [spriteEntity, aliasValue], 99,
+-    t.Vec3(0.0, -1.0, 0.0), t.Vec3(0.0, 0.0, 1.0), 0.0,
+-  )
+-  commands = gl.Trace_End()
+-  binds = []
+-  for each command in commands
+-    if command[0] == "bind_texture" then binds = binds + [command[1][1]] end if
+-  end for
+-  equal(rendered, 2, "both entities rendered")
+-  require(len(binds) >= 2, "both model textures bound")
+-  equal(binds[0], 11, "opaque alias pass precedes sprite")
+-  equal(binds[1], 22, "sprite pass follows opaque models")
+-  return true
+-end function
+-
+-function testProductionProjectionDepth()
+-  gl.Trace_Begin()
+-  renderWorld.setupViewRect(
+-    0, 0, 640, 480, 640, 480, 90.0, 73.739795,
+-    t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0),
+-  )
+-  commands = gl.Trace_End()
+-  for each command in commands
+-    if command[0] == "frustum" then
+-      equal(command[1][4], 4.0, "GLQuake projection near plane")
+-      equal(command[1][5], 4096.0, "GLQuake projection far plane")
+-      return true
+-    end if
+-  end for
+-  return error(9952, "production setupViewRect did not emit a frustum")
+-end function
+-
+-function testMeshTerminationAndCacheBranches()
+-  model = aliasSource("progs/cache-branch.mdl")
+-  model.texCoords = [
+-    t.MdlTexCoord(0, 0, 0), t.MdlTexCoord(0, 3, 0),
+-    t.MdlTexCoord(0, 0, 3), t.MdlTexCoord(1, 3, 3),
+-  ]
+-  model.triangles = [
+-    t.MdlTriangle(0, 0, 1, 2),
+-    t.MdlTriangle(1, 2, 1, 3),
+-  ]
+-  aliasMesh.configureAliasModel(model)
+-  equal(aliasMesh.StripLength(0, 0), 1, "faces-front mismatch terminates strip")
+-  model.triangles[1].facesFront = 0
+-  aliasMesh.configureAliasModel(model)
+-  aliasMesh.used[1] = 1
+-  equal(aliasMesh.StripLength(0, 0), 1, "already-used triangle terminates strip")
+-
+-  before = aliasMesh.alltris
+-  first = aliasMesh.GL_MakeAliasModelDisplayLists(model, model)
+-  afterBuild = aliasMesh.alltris
+-  second = aliasMesh.GL_MakeAliasModelDisplayLists(model, model)
+-  require(first == second, "mesh cache returns the existing display list")
+-  require(afterBuild > before, "first display-list request builds the mesh")
+-  equal(aliasMesh.alltris, afterBuild, "cache hit skips mesh rebuild")
+-  return true
+-end function
+-
+-function main(args)
+-  testFrameSelection()
+-  print "[1/5] alias frame selection"
+-  testAliasStateBranches()
+-  print "[2/5] alias GL state / lighting branches"
+-  testOpaqueThenSpriteOrdering()
+-  print "[3/5] opaque then sprite ordering"
+-  testProductionProjectionDepth()
+-  print "[4/5] production projection depth range"
+-  testMeshTerminationAndCacheBranches()
+-  print "[5/5] mesh termination and cache branches"
+-  print "Alias renderer port tests passed."
+-  return 0
+-end function
++/*
++Copyright (C) 1996-1997 Id Software, Inc.
++Copyright (C) 2026 MiniQuake contributors
++
++Production-path branch tests for the alias/viewmodel part of gl_rmain.c.
++*/
++
++import miniquake.types as t
++import miniquake.render.entities as entities
++import miniquake.render.gl11 as gl
++import miniquake.render.world as renderWorld
++import miniquake.render.alias_mesh as aliasMesh
++
++function require(value, name)
++  if not value then return error(9950, name) end if
++  return true
++end function
++
++function equal(actual, expected, name)
++  if actual != expected then return error(9951, name + ": expected " + expected + ", got " + actual) end if
++  return true
++end function
++
++function countCommand(commands, name)
++  count = 0
++  for each command in commands
++    if command[0] == name then count = count + 1 end if
++  end for
++  return count
++end function
++
++function firstTexture(commands)
++  for each command in commands
++    if command[0] == "bind_texture" and len(command[1]) > 1 then return command[1][1] end if
++  end for
++  return -1
++end function
++
++function hasTranslateZ(commands, expected)
++  for each command in commands
++    if command[0] == "translate" and len(command[1]) >= 3 and command[1][2] == expected then return true end if
++  end for
++  return false
++end function
++
++function aliasSource(name)
++  frame0 = t.MdlFrame("idle0", t.MdlVertex(0, 0, 0, 0), t.MdlVertex(2, 2, 1, 0), [
++    t.MdlVertex(0, 0, 0, 0),
++    t.MdlVertex(2, 0, 0, 1),
++    t.MdlVertex(0, 2, 0, 2),
++  ])
++  frame1 = t.MdlFrame("idle1", t.MdlVertex(0, 0, 0, 0), t.MdlVertex(2, 2, 2, 0), [
++    t.MdlVertex(0, 0, 1, 3),
++    t.MdlVertex(2, 0, 1, 4),
++    t.MdlVertex(0, 2, 1, 5),
++  ])
++  return t.MdlModel(
++    name, bytes(), 6,
++    t.Vec3(1.0, 1.0, 1.0), t.Vec3(0.0, 0.0, 30.0),
++    4.0, t.Vec3(0.0, 0.0, 0.0),
++    1, 4, 4, 3, 1, 2, 0, 0, 1.0,
++    [t.MdlSkin(false, [], [bytes(16)])],
++    [t.MdlTexCoord(0, 0, 0), t.MdlTexCoord(0, 3, 0), t.MdlTexCoord(0, 0, 3)],
++    [t.MdlTriangle(1, 0, 1, 2)],
++    [
++      t.MdlFrameSet(false, [], [frame0]),
++      t.MdlFrameSet(true, [0.1, 0.2], [frame0, frame1]),
++    ],
++  )
++end function
++
++function aliasModel(name)
++  return t.ClientRenderModel(name, entities.MODEL_ALIAS, aliasSource(name), void, [[11, 12, 13, 14]], true)
++end function
++
++function aliasEntity(number, modelIndex, frame, colormap)
++  return t.ClientEntityState(
++    number, modelIndex, frame, colormap, 0, 0,
++    t.Vec3(1.0, 2.0, 3.0), t.Vec3(10.0, 20.0, 30.0), 0.0,
++    t.Vec3(1.0, 2.0, 3.0), t.Vec3(1.0, 2.0, 3.0),
++    t.Vec3(10.0, 20.0, 30.0), t.Vec3(10.0, 20.0, 30.0),
++    false, [], 0.0,
++  )
++end function
++
++function spriteModel()
++  frame = t.SpriteFrame(1.0, 1.0, 2, 2, bytes(4))
++  source = t.SpriteModel("progs/fixture.spr", bytes(), 1, 0, 2.0, 2, 2, 1, 0.0, 0, [
++    t.SpriteFrameSet(false, [], [frame]),
++  ])
++  return t.ClientRenderModel(source.filename, entities.MODEL_SPRITE, void, source, [[22]], true)
++end function
++
++function testFrameSelection()
++  source = aliasSource("progs/fixture.mdl")
++  equal(entities.aliasFrame(source, -1, 0.0).name, "idle0", "negative frame falls back")
++  equal(entities.aliasFrame(source, 99, 0.0).name, "idle0", "out-of-range frame falls back")
++  equal(entities.aliasFrame(source, 1, 0.05).name, "idle0", "group first pose")
++  equal(entities.aliasFrame(source, 1, 0.15).name, "idle1", "group timed pose")
++  return true
++end function
++
++function testAliasStateBranches()
++  palette = bytes(768)
++  renderer = t.EntityRenderer(void, palette, [void, aliasModel("progs/fixture.mdl")], 0)
++  entity = aliasEntity(7, 1, 0, 0)
++
++  entities.ConfigureAliasRendering(true, false, false, false, true)
++  gl.Trace_Begin()
++  entities.drawAlias(renderer, renderer.models[1], entity, 0.25, true)
++  commands = gl.Trace_End()
++  equal(firstTexture(commands), 13, "animated skin selects cl.time slot")
++  equal(countCommand(commands, "shade_model"), 2, "smooth then flat shade state")
++  require(countCommand(commands, "enable") >= 1, "alias enables culling")
++  require(countCommand(commands, "disable") >= 1, "alias restores culling")
++  equal(countCommand(commands, "texture_environment"), 2, "modulate then replace")
++
++  entities.ConfigureAliasRendering(false, false, false, false, true)
++  gl.Trace_Begin()
++  entities.drawAlias(renderer, renderer.models[1], entity, 0.25, false)
++  commands = gl.Trace_End()
++  equal(countCommand(commands, "shade_model"), 1, "flat-model branch skips smooth")
++
++  entities.setTranslatedPlayerTexture(7, 77)
++  entity.colormap = 1
++  entities.ConfigureAliasRendering(true, false, false, false, true)
++  gl.Trace_Begin()
++  entities.drawAlias(renderer, renderer.models[1], entity, 0.25, false)
++  commands = gl.Trace_End()
++  equal(firstTexture(commands), 77, "translated player texture")
++  entities.ConfigureAliasRendering(true, false, false, true, true)
++  gl.Trace_Begin()
++  entities.drawAlias(renderer, renderer.models[1], entity, 0.25, false)
++  commands = gl.Trace_End()
++  equal(firstTexture(commands), 13, "gl_nocolors stock texture")
++
++  eye = aliasModel("progs/eyes.mdl")
++  eye.aliasModel.filename = "progs/eyes.mdl"
++  renderer.models[1] = eye
++  entities.ConfigureAliasRendering(true, false, false, false, true)
++  gl.Trace_Begin()
++  entities.drawAlias(renderer, eye, entity, 0.0, false)
++  commands = gl.Trace_End()
++  require(hasTranslateZ(commands, 0.0), "double-eyes translates scale origin down by 30")
++
++  entities.ConfigureAliasRendering(true, false, true, false, false)
++  gl.Trace_Begin()
++  entities.drawAlias(renderer, eye, entity, 0.0, false)
++  commands = gl.Trace_End()
++  equal(countCommand(commands, "push_matrix"), 2, "shadow has second entity transform")
++  require(countCommand(commands, "enable") >= 3, "shadow enables cull, blend and texture")
++  require(countCommand(commands, "disable") >= 3, "shadow disables cull, texture and blend")
++  entities.ConfigureAliasRendering(true, false, false, false, true)
++  return true
++end function
++
++function testOpaqueThenSpriteOrdering()
++  alias = aliasModel("progs/fixture.mdl")
++  sprite = spriteModel()
++  renderer = t.EntityRenderer(void, bytes(768), [void, alias, sprite], 0)
++  spriteEntity = aliasEntity(2, 2, 0, 0)
++  aliasValue = aliasEntity(1, 1, 0, 0)
++  gl.Trace_Begin()
++  rendered = entities.render(
++    renderer, void, [spriteEntity, aliasValue], 99,
++    t.Vec3(0.0, -1.0, 0.0), t.Vec3(0.0, 0.0, 1.0), 0.0,
++  )
++  commands = gl.Trace_End()
++  binds = []
++  for each command in commands
++    if command[0] == "bind_texture" then binds = binds + [command[1][1]] end if
++  end for
++  equal(rendered, 2, "both entities rendered")
++  require(len(binds) >= 2, "both model textures bound")
++  equal(binds[0], 11, "opaque alias pass precedes sprite")
++  equal(binds[1], 22, "sprite pass follows opaque models")
++  return true
++end function
++
++function testProductionProjectionDepth()
++  gl.Trace_Begin()
++  renderWorld.setupViewRect(
++    0, 0, 640, 480, 640, 480, 90.0, 73.739795,
++    t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0),
++  )
++  commands = gl.Trace_End()
++  for each command in commands
++    if command[0] == "frustum" then
++      equal(command[1][4], 4.0, "GLQuake projection near plane")
++      equal(command[1][5], 4096.0, "GLQuake projection far plane")
++      return true
++    end if
++  end for
++  return error(9952, "production setupViewRect did not emit a frustum")
++end function
++
++function testMeshTerminationAndCacheBranches()
++  model = aliasSource("progs/cache-branch.mdl")
++  model.texCoords = [
++    t.MdlTexCoord(0, 0, 0), t.MdlTexCoord(0, 3, 0),
++    t.MdlTexCoord(0, 0, 3), t.MdlTexCoord(1, 3, 3),
++  ]
++  model.triangles = [
++    t.MdlTriangle(0, 0, 1, 2),
++    t.MdlTriangle(1, 2, 1, 3),
++  ]
++  aliasMesh.configureAliasModel(model)
++  equal(aliasMesh.StripLength(0, 0), 1, "faces-front mismatch terminates strip")
++  model.triangles[1].facesFront = 0
++  aliasMesh.configureAliasModel(model)
++  aliasMesh.used[1] = 1
++  equal(aliasMesh.StripLength(0, 0), 1, "already-used triangle terminates strip")
++
++  before = aliasMesh.alltris
++  first = aliasMesh.GL_MakeAliasModelDisplayLists(model, model)
++  afterBuild = aliasMesh.alltris
++  second = aliasMesh.GL_MakeAliasModelDisplayLists(model, model)
++  require(first == second, "mesh cache returns the existing display list")
++  require(afterBuild > before, "first display-list request builds the mesh")
++  equal(aliasMesh.alltris, afterBuild, "cache hit skips mesh rebuild")
++  return true
++end function
++
++function main(args)
++  testFrameSelection()
++  print "[1/5] alias frame selection"
++  testAliasStateBranches()
++  print "[2/5] alias GL state / lighting branches"
++  testOpaqueThenSpriteOrdering()
++  print "[3/5] opaque then sprite ordering"
++  testProductionProjectionDepth()
++  print "[4/5] production projection depth range"
++  testMeshTerminationAndCacheBranches()
++  print "[5/5] mesh termination and cache branches"
++  print "Alias renderer port tests passed."
++  return 0
++end function
+diff --git a/tests/client_render_closure_tests.ml b/tests/client_render_closure_tests.ml
+index 27a77f6..2342057 100644
+--- a/tests/client_render_closure_tests.ml
++++ b/tests/client_render_closure_tests.ml
+@@ -38,7 +38,7 @@ end function
+ 
+ function makeEntity(number, modelIndex)
+   zero = t.Vec3(0.0, 0.0, 0.0)
+-  return t.ClientEntityState(number, modelIndex, 0, 0, 0, 0, zero, zero, 0.0, zero, zero, zero, zero, false, void)
++  return t.ClientEntityState(number, modelIndex, 0, 0, 0, 0, zero, zero, 0.0, zero, zero, zero, zero, false, void, 0.0)
+ end function
+ 
+ function setup()
+diff --git a/tests/renderer_refrag_trace_fixture.ml b/tests/renderer_refrag_trace_fixture.ml
+index 4e6f9f2..00c62e5 100644
+--- a/tests/renderer_refrag_trace_fixture.ml
++++ b/tests/renderer_refrag_trace_fixture.ml
+@@ -1,92 +1,92 @@
+-/*
+-Deterministic MiniLang side of the original gl_refrag.c differential oracle.
+-*/
+-
+-import miniquake.render.gl_refrag as refrag
+-import miniquake.render.entities as entities
+-import miniquake.types as t
+-import miniquake.constants as c
+-
+-function emit(scene, functionName, operation, arguments)
+-  print "{\"schema\":\"miniquake.renderer.gl.v1\",\"scene\":\"" + scene + "\",\"function\":\"" + functionName + "\",\"seq\":0,\"op\":\"" + operation + "\",\"args\":" + arguments + "}"
+-end function
+-
+-function makeEntity(number)
+-  zero = t.Vec3(0.0, 0.0, 0.0)
+-  return t.ClientEntityState(
+-    number, 1, 0, 0, 0, 0, zero, zero, 0.0,
+-    zero, zero, zero, zero, false, void
+-  )
+-end function
+-
+-function makeSetup()
+-  zero = t.Vec3(0.0, 0.0, 0.0)
+-  minimum = t.Vec3(-1.0, -1.0, -1.0)
+-  maximum = t.Vec3(1.0, 1.0, 1.0)
+-  plane = t.BspPlane(t.Vec3(1.0, 0.0, 0.0), 0.0, 0)
+-  node = t.BspNode(0, -1, -2, minimum, maximum, 0, 0)
+-  leaf0 = t.BspLeaf(-1, -1, minimum, maximum, 0, 0, bytes(4))
+-  leaf1 = t.BspLeaf(-1, -1, minimum, maximum, 0, 0, bytes(4))
+-  worldModel = t.BspModel(minimum, maximum, zero, [0, 0, 0, 0], 2, 0, 0)
+-  submodel = t.BspModel(minimum, maximum, zero, [0, 0, 0, 0], 0, 0, 0)
+-  map = t.BspMap(
+-    "refrag-fixture.bsp", bytes(), c.BSP_VERSION, [], "", [], [plane],
+-    [], [], bytes(), [node], [], [], bytes(), [], [leaf0, leaf1], [],
+-    [], [], [worldModel, submodel]
+-  )
+-  renderer = t.WorldRenderer(
+-    map, bytes(), [], [], [], true, 0, false, false, 0, bytes(), 0, 1.0
+-  )
+-  noneModel = t.ClientRenderModel("", entities.MODEL_NONE, void, void, [], false)
+-  brushModel = t.ClientRenderModel("*1", entities.MODEL_BRUSH, void, void, [], false)
+-  entityRenderer = t.EntityRenderer(void, bytes(), [noneModel, brushModel], 0)
+-  first = makeEntity(0)
+-  second = makeEntity(1)
+-  refrag.Configure(renderer, entityRenderer, [first, second])
+-  return [first, second]
+-end function
+-
+-function traceRemove()
+-  setup = makeSetup()
+-  refrag.R_AddEfrags(setup[0])
+-  refrag.R_RemoveEfrags(setup[0])
+-  state = refrag.GetState(0)
+-  emit("refrag_remove", "R_RemoveEfrags", "state", "[" + state[0] + "," + state[2][0] + "," + state[2][1] + ",1]")
+-end function
+-
+-function traceSplit()
+-  setup = makeSetup()
+-  refrag.SetSplitState(
+-    setup[0], t.Vec3(-1.0, -1.0, -1.0), t.Vec3(1.0, 1.0, 1.0)
+-  )
+-  refrag.R_SplitEntityOnNode(0)
+-  state = refrag.GetState(0)
+-  topIsRoot = 0
+-  if state[1] == 0 then topIsRoot = 1 end if
+-  emit("refrag_split", "R_SplitEntityOnNode", "state", "[" + state[0] + "," + topIsRoot + "," + state[2][0] + "," + state[2][1] + "]")
+-end function
+-
+-function traceAdd()
+-  setup = makeSetup()
+-  refrag.R_AddEfrags(setup[0])
+-  state = refrag.GetState(0)
+-  topIsRoot = 0
+-  if state[1] == 0 then topIsRoot = 1 end if
+-  emit("refrag_add", "R_AddEfrags", "state", "[" + state[0] + "," + topIsRoot + "," + state[2][0] + "," + state[2][1] + "]")
+-end function
+-
+-function traceStore()
+-  setup = makeSetup()
+-  refrag.R_AddEfrags(setup[0])
+-  refrag.R_AddEfrags(setup[1])
+-  visible = refrag.R_StoreEfrags(0)
+-  emit("refrag_store", "R_StoreEfrags", "state", "[" + len(visible) + "]")
+-end function
+-
+-function main(args)
+-  traceRemove()
+-  traceSplit()
+-  traceAdd()
+-  traceStore()
+-  return 0
+-end function
++/*
++Deterministic MiniLang side of the original gl_refrag.c differential oracle.
++*/
++
++import miniquake.render.gl_refrag as refrag
++import miniquake.render.entities as entities
++import miniquake.types as t
++import miniquake.constants as c
++
++function emit(scene, functionName, operation, arguments)
++  print "{\"schema\":\"miniquake.renderer.gl.v1\",\"scene\":\"" + scene + "\",\"function\":\"" + functionName + "\",\"seq\":0,\"op\":\"" + operation + "\",\"args\":" + arguments + "}"
++end function
++
++function makeEntity(number)
++  zero = t.Vec3(0.0, 0.0, 0.0)
++  return t.ClientEntityState(
++    number, 1, 0, 0, 0, 0, zero, zero, 0.0,
++    zero, zero, zero, zero, false, void, 0.0
++  )
++end function
++
++function makeSetup()
++  zero = t.Vec3(0.0, 0.0, 0.0)
++  minimum = t.Vec3(-1.0, -1.0, -1.0)
++  maximum = t.Vec3(1.0, 1.0, 1.0)
++  plane = t.BspPlane(t.Vec3(1.0, 0.0, 0.0), 0.0, 0)
++  node = t.BspNode(0, -1, -2, minimum, maximum, 0, 0)
++  leaf0 = t.BspLeaf(-1, -1, minimum, maximum, 0, 0, bytes(4))
++  leaf1 = t.BspLeaf(-1, -1, minimum, maximum, 0, 0, bytes(4))
++  worldModel = t.BspModel(minimum, maximum, zero, [0, 0, 0, 0], 2, 0, 0)
++  submodel = t.BspModel(minimum, maximum, zero, [0, 0, 0, 0], 0, 0, 0)
++  map = t.BspMap(
++    "refrag-fixture.bsp", bytes(), c.BSP_VERSION, [], "", [], [plane],
++    [], [], bytes(), [node], [], [], bytes(), [], [leaf0, leaf1], [],
++    [], [], [worldModel, submodel]
++  )
++  renderer = t.WorldRenderer(
++    map, bytes(), [], [], [], true, 0, false, false, 0, bytes(), 0, 1.0
++  )
++  noneModel = t.ClientRenderModel("", entities.MODEL_NONE, void, void, [], false)
++  brushModel = t.ClientRenderModel("*1", entities.MODEL_BRUSH, void, void, [], false)
++  entityRenderer = t.EntityRenderer(void, bytes(), [noneModel, brushModel], 0)
++  first = makeEntity(0)
++  second = makeEntity(1)
++  refrag.Configure(renderer, entityRenderer, [first, second])
++  return [first, second]
++end function
++
++function traceRemove()
++  setup = makeSetup()
++  refrag.R_AddEfrags(setup[0])
++  refrag.R_RemoveEfrags(setup[0])
++  state = refrag.GetState(0)
++  emit("refrag_remove", "R_RemoveEfrags", "state", "[" + state[0] + "," + state[2][0] + "," + state[2][1] + ",1]")
++end function
++
++function traceSplit()
++  setup = makeSetup()
++  refrag.SetSplitState(
++    setup[0], t.Vec3(-1.0, -1.0, -1.0), t.Vec3(1.0, 1.0, 1.0)
++  )
++  refrag.R_SplitEntityOnNode(0)
++  state = refrag.GetState(0)
++  topIsRoot = 0
++  if state[1] == 0 then topIsRoot = 1 end if
++  emit("refrag_split", "R_SplitEntityOnNode", "state", "[" + state[0] + "," + topIsRoot + "," + state[2][0] + "," + state[2][1] + "]")
++end function
++
++function traceAdd()
++  setup = makeSetup()
++  refrag.R_AddEfrags(setup[0])
++  state = refrag.GetState(0)
++  topIsRoot = 0
++  if state[1] == 0 then topIsRoot = 1 end if
++  emit("refrag_add", "R_AddEfrags", "state", "[" + state[0] + "," + topIsRoot + "," + state[2][0] + "," + state[2][1] + "]")
++end function
++
++function traceStore()
++  setup = makeSetup()
++  refrag.R_AddEfrags(setup[0])
++  refrag.R_AddEfrags(setup[1])
++  visible = refrag.R_StoreEfrags(0)
++  emit("refrag_store", "R_StoreEfrags", "state", "[" + len(visible) + "]")
++end function
++
++function main(args)
++  traceRemove()
++  traceSplit()
++  traceAdd()
++  traceStore()
++  return 0
++end function
+diff --git a/tests/renderer_rsurf_trace_fixture.ml b/tests/renderer_rsurf_trace_fixture.ml
+index 8f05df7..2bf46c9 100644
+--- a/tests/renderer_rsurf_trace_fixture.ml
++++ b/tests/renderer_rsurf_trace_fixture.ml
+@@ -1,419 +1,419 @@
+-/*
+-Deterministic MiniLang side of the original gl_rsurf.c differential oracle.
+-*/
+-
+-import miniquake.render.world as rsurf
+-import miniquake.render.gl11 as gl
+-import miniquake.types as t
+-import miniquake.constants as c
+-import miniquake.native as native
+-import miniquake.array_util as arrayutil
+-import std.string as string
+-
+-function jsonNumber(value)
+-  integerValue = native.trunc(value)
+-  if value == integerValue then return "" + integerValue end if
+-  return string.replaceAll("" + value, ".e", "e")
+-end function
+-
+-function jsonArguments(values)
+-  result = "["
+-  index = 0
+-  while index < len(values)
+-    if index != 0 then result = result + "," end if
+-    result = result + jsonNumber(values[index])
+-    index = index + 1
+-  end while
+-  return result + "]"
+-end function
+-
+-function emit(scene, functionName, sequence, operation, arguments)
+-  print "{\"schema\":\"miniquake.renderer.gl.v1\",\"scene\":\"" + scene + "\",\"function\":\"" + functionName + "\",\"seq\":" + sequence + ",\"op\":\"" + operation + "\",\"args\":" + arguments + "}"
+-end function
+-
+-function emitCommands(scene, functionName, commands)
+-  sequence = 0
+-  for each command in commands
+-    emit(scene, functionName, sequence, command[0], jsonArguments(command[1]))
+-    sequence = sequence + 1
+-  end for
+-  return sequence
+-end function
+-
+-function fnvByte(hash, value)
+-  return ((hash ^ (value & 255)) * 16777619) & 4294967295
+-end function
+-
+-function hashBytes(data)
+-  hash = 2166136261
+-  index = 0
+-  while index < len(data)
+-    hash = fnvByte(hash, data[index])
+-    index = index + 1
+-  end while
+-  return hash
+-end function
+-
+-function hashU32(values, count)
+-  hash = 2166136261
+-  index = 0
+-  while index < count
+-    value = values[index]
+-    hash = fnvByte(hash, value)
+-    hash = fnvByte(hash, value >> 8)
+-    hash = fnvByte(hash, value >> 16)
+-    hash = fnvByte(hash, value >> 24)
+-    index = index + 1
+-  end while
+-  return hash
+-end function
+-
+-function baseVertices()
+-  return [
+-    t.RenderVertex(t.Vec3(0.0, 0.0, 0.0), 0.0, 0.0, 0.1, 0.2),
+-    t.RenderVertex(t.Vec3(16.0, 0.0, 0.0), 1.0, 0.0, 0.3, 0.2),
+-    t.RenderVertex(t.Vec3(16.0, 16.0, 0.0), 1.0, 1.0, 0.3, 0.4),
+-    t.RenderVertex(t.Vec3(0.0, 16.0, 0.0), 0.0, 1.0, 0.1, 0.4),
+-  ]
+-end function
+-
+-function makeSetup(flags)
+-  zero = t.Vec3(0.0, 0.0, 0.0)
+-  plane = t.BspPlane(t.Vec3(0.0, 0.0, 1.0), 0.0, 2)
+-  info = t.BspTexInfo([1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], 0, 0)
+-  face = t.BspFace(0, 0, 0, 4, 0, bytes([0, 1, 255, 255]), 0)
+-  texture = t.BspTexture("fixture", 64, 64, [0, 0, 0, 0], bytes(64 * 64))
+-  vertices = [
+-    t.BspVertex(t.Vec3(0.0, 0.0, 0.0)),
+-    t.BspVertex(t.Vec3(16.0, 0.0, 0.0)),
+-    t.BspVertex(t.Vec3(16.0, 16.0, 0.0)),
+-    t.BspVertex(t.Vec3(0.0, 16.0, 0.0)),
+-  ]
+-  edges = [
+-    t.BspEdge(0, 0), t.BspEdge(0, 1), t.BspEdge(1, 2),
+-    t.BspEdge(2, 3), t.BspEdge(3, 0),
+-  ]
+-  model = t.BspModel(zero, zero, zero, [0, 0, 0, 0], 0, 0, 1)
+-  lighting = bytes([20, 27, 34, 41, 48, 55, 62, 69])
+-  map = t.BspMap(
+-    "rsurf-fixture.bsp", bytes(), c.BSP_VERSION, [], "", [], [plane],
+-    [texture], vertices, bytes(), [], [info], [face], lighting, [], [], [],
+-    edges, [1, 2, 3, 4], [model]
+-  )
+-  surface = t.RenderSurface(
+-    0, 0, zero, t.Vec3(16.0, 16.0, 0.0), 2, 2, 0, flags,
+-    baseVertices(), 500
+-  )
+-  renderTexture = t.RenderTexture("fixture", 64, 64, 77, bytes(64 * 64), false)
+-  renderer = t.WorldRenderer(
+-    map, bytes(768), [renderTexture], [surface], [], true, 0, false, false,
+-    0, bytes(1, 1), 0, 1.0
+-  )
+-  light = t.DynamicLight(t.Vec3(8.0, 8.0, 16.0), 64.0, 1.0, 0.0, 0.0, 0)
+-  rsurf.R_ConfigureWorldCompatibility(
+-    renderer, zero, zero, t.Vec3(1.0, 0.0, 0.0),
+-    t.Vec3(0.0, -1.0, 0.0), t.Vec3(0.0, 0.0, 1.0),
+-    [light], [], [0.0, 0.0, 0.0, 0.0], 0.0, 0.25, 0.0,
+-    true, true, false
+-  )
+-  rsurf.R_ResetLightmapCompatibility()
+-  rsurf.R_SetLightmapCompatibility(500, 1)
+-  rsurf.R_SetFrameCompatibility(7, 3)
+-  styles = arrayutil.makeFilledArray(c.MAX_LIGHTSTYLES, 0)
+-  styles[0] = 256
+-  styles[1] = 128
+-  rsurf.R_SetLightStyleCompatibility(styles)
+-  rsurf.R_SetSurfaceCompatibilityState(0, 0, 0, [256, 128, 0, 0], false, 0, 2, 3)
+-  rsurf.R_SetMultitextureCompatibility(false, false)
+-  rsurf.R_SetAbstractSurfaceCalls(true)
+-  rsurf.R_SetSurfaceChainCompatibility(true, [], [])
+-  return [renderer, surface, plane]
+-end function
+-
+-function configureWorldTree(setup, textureSort)
+-  zero = t.Vec3(0.0, 0.0, 0.0)
+-  setup[0].map.nodes = [
+-    t.BspNode(0, -1, -2, zero, zero, 0, 1),
+-  ]
+-  setup[0].map.models[0].headNodes = [0, 0, 0, 0]
+-  viewOrigin = t.Vec3(0.0, 0.0, 10.0)
+-  rsurf.R_ConfigureWorldCompatibility(
+-    setup[0], viewOrigin, zero, t.Vec3(1.0, 0.0, 0.0),
+-    t.Vec3(0.0, -1.0, 0.0), t.Vec3(0.0, 0.0, 1.0),
+-    [], [], [0.0, 0.0, 0.0, 0.0], 0.0, 0.25, 0.0,
+-    true, true, false
+-  )
+-  rsurf.R_SetFrameCompatibility(7, 3)
+-  rsurf.R_SetSurfaceCompatibilityState(0, 0, 0, [256, 128, 0, 0], false, 0, 2, 3)
+-  rsurf.R_SetSurfaceChainCompatibility(textureSort, [], [])
+-  return setup
+-end function
+-
+-function traceAddDynamicLights()
+-  setup = makeSetup(0)
+-  rsurf.R_SetSurfaceCompatibilityState(0, 1, 0, [256, 128, 0, 0], false, 0, 2, 3)
+-  rsurf.R_AddDynamicLights(setup[1])
+-  emit("rsurf_add_dynamic_lights", "R_AddDynamicLights", 0, "blocklights_hash", "[" + hashU32(rsurf.R_GetBlocklights(), 4) + "]")
+-end function
+-
+-function traceBuildLightMap()
+-  setup = makeSetup(0)
+-  destination = bytes(12, 204)
+-  result = rsurf.R_BuildLightMap(setup[1], destination, 6)
+-  state = rsurf.R_GetSurfaceCompatibilityState(0)
+-  emit("rsurf_build_lightmap", "R_BuildLightMap", 0, "lightmap_hash", "[" + hashBytes(result) + "]")
+-  emit("rsurf_build_lightmap", "R_BuildLightMap", 1, "cached_styles", "[" + state[0][0] + "," + state[0][1] + ",0]")
+-end function
+-
+-function traceTextureAnimation()
+-  setup = makeSetup(0)
+-  baseMap = t.BspTexture("+0fixture", 64, 64, [0, 0, 0, 0], bytes())
+-  nextMap = t.BspTexture("+1fixture", 64, 64, [0, 0, 0, 0], bytes())
+-  alternateMap = t.BspTexture("+Afixture", 64, 64, [0, 0, 0, 0], bytes())
+-  base = t.RenderTexture("+0fixture", 64, 64, 10, bytes(), false)
+-  next = t.RenderTexture("+1fixture", 64, 64, 11, bytes(), false)
+-  alternate = t.RenderTexture("+Afixture", 64, 64, 20, bytes(), false)
+-  setup[0].map.textures = [baseMap, nextMap, alternateMap]
+-  setup[0].textures = [base, next, alternate]
+-  rsurf.R_ConfigureWorldCompatibility(
+-    setup[0], t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0),
+-    t.Vec3(1.0, 0.0, 0.0), t.Vec3(0.0, -1.0, 0.0),
+-    t.Vec3(0.0, 0.0, 1.0), [], [], [0.0, 0.0, 0.0, 0.0],
+-    0.3, 0.25, 0.0, true, true, false
+-  )
+-  rsurf.R_SetTextureAnimationFrame(0)
+-  selected = rsurf.R_TextureAnimation(base)
+-  emit("rsurf_texture_animation", "R_TextureAnimation", 0, "selected_texture", "[" + selected.glId + "]")
+-  rsurf.R_SetTextureAnimationFrame(1)
+-  selected = rsurf.R_TextureAnimation(base)
+-  emit("rsurf_texture_animation", "R_TextureAnimation", 1, "selected_texture", "[" + selected.glId + "]")
+-end function
+-
+-function traceMultitexture()
+-  makeSetup(0)
+-  rsurf.R_SetMultitextureCompatibility(true, true)
+-  gl.Trace_Begin()
+-  rsurf.GL_DisableMultitexture()
+-  commands = gl.Trace_End()
+-  sequence = emitCommands("rsurf_disable_multitexture", "GL_DisableMultitexture", commands)
+-  emit("rsurf_disable_multitexture", "GL_DisableMultitexture", sequence, "state", "[0]")
+-  makeSetup(0)
+-  rsurf.R_SetMultitextureCompatibility(true, false)
+-  gl.Trace_Begin()
+-  rsurf.GL_EnableMultitexture()
+-  commands = gl.Trace_End()
+-  sequence = emitCommands("rsurf_enable_multitexture", "GL_EnableMultitexture", commands)
+-  emit("rsurf_enable_multitexture", "GL_EnableMultitexture", sequence, "state", "[1]")
+-end function
+-
+-function traceCall(scene, functionName, setup, callback)
+-  gl.Trace_Begin()
+-  if callback == 0 then rsurf.DrawGLWaterPoly(setup[1]) end if
+-  if callback == 1 then rsurf.DrawGLWaterPolyLightmap(setup[1]) end if
+-  if callback == 2 then rsurf.DrawGLPoly(setup[1]) end if
+-  commands = gl.Trace_End()
+-  emitCommands(scene, functionName, commands)
+-end function
+-
+-function traceDrawPolygons()
+-  traceCall("rsurf_draw_water_poly", "DrawGLWaterPoly", makeSetup(0), 0)
+-  traceCall("rsurf_draw_water_lightmap", "DrawGLWaterPolyLightmap", makeSetup(0), 1)
+-  traceCall("rsurf_draw_poly", "DrawGLPoly", makeSetup(0), 2)
+-end function
+-
+-function traceSequential(multitexture)
+-  setup = makeSetup(0)
+-  rsurf.R_SetMultitextureCompatibility(multitexture, false)
+-  if multitexture then rsurf.R_SetLightmapDirtyCompatibility(0, [2, 3, 2, 2], true) end if
+-  gl.Trace_Begin()
+-  rsurf.R_DrawSequentialPoly(setup[1])
+-  commands = gl.Trace_End()
+-  scene = "rsurf_sequential_single"
+-  if multitexture then scene = "rsurf_sequential_mtex" end if
+-  emitCommands(scene, "R_DrawSequentialPoly", commands)
+-end function
+-
+-function traceBlendLightmaps()
+-  setup = makeSetup(0)
+-  underwater = t.RenderSurface(
+-    0, 0, t.Vec3(0.0, 0.0, 0.0), t.Vec3(16.0, 16.0, 0.0),
+-    2, 2, 0, 0x80, baseVertices(), 500
+-  )
+-  rsurf.R_SetLightmapChainCompatibility(0, [setup[1], underwater])
+-  rsurf.R_SetLightmapDirtyCompatibility(0, [0, 3, 0, 2], true)
+-  gl.Trace_Begin()
+-  rsurf.R_BlendLightmaps()
+-  commands = gl.Trace_End()
+-  emitCommands("rsurf_blend_lightmaps", "R_BlendLightmaps", commands)
+-end function
+-
+-function traceRenderBrush(flags, scene)
+-  setup = makeSetup(flags)
+-  gl.Trace_Begin()
+-  rsurf.R_RenderBrushPoly(setup[1])
+-  commands = gl.Trace_End()
+-  sequence = emitCommands(scene, "R_RenderBrushPoly", commands)
+-  if flags == 0 then
+-    state = rsurf.R_GetLightmapCompatibilityState(0)
+-    emit(scene, "R_RenderBrushPoly", sequence, "chain_state", "[1," + state[2] + "]")
+-  end if
+-end function
+-
+-function traceDynamicLightmaps()
+-  setup = makeSetup(0)
+-  rsurf.R_SetSurfaceCompatibilityState(0, 0, 0, [1, 128, 0, 0], false, 0, 2, 3)
+-  rsurf.R_SetLightmapDirtyCompatibility(0, [0, 0, 0, 0], false)
+-  rsurf.R_RenderDynamicLightmaps(setup[1])
+-  state = rsurf.R_GetLightmapCompatibilityState(0)
+-  rectangle = state[1]
+-  modified = 0
+-  if state[0] then modified = 1 end if
+-  emit("rsurf_dynamic_lightmaps", "R_RenderDynamicLightmaps", 0, "dynamic_state", "[" + modified + "," + rectangle[0] + "," + rectangle[1] + "," + rectangle[2] + "," + rectangle[3] + "," + state[2] + "]")
+-  emit("rsurf_dynamic_lightmaps", "R_RenderDynamicLightmaps", 1, "atlas_hash", "[" + hashBytes(rsurf.R_GetLightmapBytes()) + "]")
+-end function
+-
+-function traceMirror()
+-  setup = makeSetup(0)
+-  rsurf.R_MirrorChain(setup[1])
+-  state = rsurf.R_GetMirrorCompatibilityState()
+-  samePlane = 0
+-  if state[0] and state[1] == setup[2] then samePlane = 1 end if
+-  emit("rsurf_mirror_chain", "R_MirrorChain", 0, "mirror_state", "[1," + samePlane + "]")
+-end function
+-
+-function traceAlloc()
+-  makeSetup(0)
+-  x = [-1]
+-  y = [-1]
+-  page = rsurf.AllocBlock(4, 3, x, y)
+-  allocation = rsurf.R_GetAllocationCompatibilityState(0)
+-  emit("rsurf_alloc_block", "AllocBlock", 0, "allocation", "[" + page + "," + x[0] + "," + y[0] + "," + allocation[x[0]] + "," + allocation[x[0] + 3] + "]")
+-end function
+-
+-function traceDisplayList()
+-  setup = makeSetup(0)
+-  setup[1].vertices = [
+-    t.RenderVertex(t.Vec3(0.0, 0.0, 0.0), 0.0, 0.0, 0.01953125, 0.02734375),
+-    t.RenderVertex(t.Vec3(8.0, 0.0, 0.0), 0.125, 0.0, 0.0234375, 0.02734375),
+-    t.RenderVertex(t.Vec3(16.0, 0.0, 0.0), 0.25, 0.0, 0.02734375, 0.02734375),
+-    t.RenderVertex(t.Vec3(16.0, 16.0, 0.0), 0.25, 0.25, 0.02734375, 0.03515625),
+-    t.RenderVertex(t.Vec3(0.0, 16.0, 0.0), 0.0, 0.25, 0.01953125, 0.03515625),
+-  ]
+-  result = rsurf.BuildSurfaceDisplayList(setup[1])
+-  arguments = "[" + len(result.vertices) + ",1"
+-  for each vertex in result.vertices
+-    arguments = arguments + "," + jsonNumber(vertex.position.x) + "," + jsonNumber(vertex.position.y) + "," + jsonNumber(vertex.s) + "," + jsonNumber(vertex.lightS) + "," + jsonNumber(vertex.lightT)
+-  end for
+-  emit("rsurf_build_display_list", "BuildSurfaceDisplayList", 0, "display_list", arguments + "]")
+-end function
+-
+-function traceCreateLightmap()
+-  setup = makeSetup(0)
+-  rsurf.GL_CreateSurfaceLightmap(setup[1])
+-  state = rsurf.R_GetSurfaceCompatibilityState(0)
+-  emit("rsurf_create_surface_lightmap", "GL_CreateSurfaceLightmap", 0, "surface_lightmap", "[" + state[2] + "," + state[3] + "," + state[4] + "]")
+-  emit("rsurf_create_surface_lightmap", "GL_CreateSurfaceLightmap", 1, "atlas_hash", "[" + hashBytes(rsurf.R_GetLightmapBytes()) + "]")
+-end function
+-
+-function traceBuildLightmaps()
+-  setup = makeSetup(c.SURF_DRAWSKY)
+-  gl.Trace_Begin()
+-  rsurf.GL_BuildLightmaps()
+-  gl.Trace_End()
+-  emit("rsurf_build_lightmaps", "GL_BuildLightmaps", 0, "build_state", "[1,500,1000]")
+-end function
+-
+-function traceDrawTextureChains()
+-  setup = makeSetup(c.SURF_DRAWSKY)
+-  rsurf.R_SetSurfaceChainCompatibility(false, [setup[1]], [])
+-  gl.Trace_Begin()
+-  rsurf.DrawTextureChains()
+-  commands = gl.Trace_End()
+-  emitCommands("rsurf_draw_texture_chains", "DrawTextureChains", commands)
+-end function
+-
+-function traceDrawWaterSurfaces()
+-  setup = makeSetup(c.SURF_DRAWTURB)
+-  setup[0].waterAlpha = 0.5
+-  rsurf.R_SetSurfaceChainCompatibility(false, [], [setup[1]])
+-  gl.Trace_Begin()
+-  rsurf.R_DrawWaterSurfaces()
+-  commands = gl.Trace_End()
+-  emitCommands("rsurf_draw_water_surfaces", "R_DrawWaterSurfaces", commands)
+-end function
+-
+-function traceDrawBrushModel()
+-  setup = configureWorldTree(makeSetup(0), true)
+-  baseModel = setup[0].map.models[0]
+-  submodel = t.BspModel(
+-    baseModel.mins, baseModel.maxs, baseModel.origin,
+-    [0, 0, 0, 0], 0, 0, 1
+-  )
+-  setup[0].map.models = [baseModel, submodel]
+-  zero = t.Vec3(0.0, 0.0, 0.0)
+-  entity = t.ClientEntityState(
+-    1, 1, 0, 0, 0, 0, zero, zero, 0.0, zero, zero, zero, zero, false, void
+-  )
+-  gl.Trace_Begin()
+-  rsurf.R_DrawBrushModel(entity)
+-  commands = gl.Trace_End()
+-  emitCommands("rsurf_draw_brush_model", "R_DrawBrushModel", commands)
+-end function
+-
+-function traceRecursiveWorldNode()
+-  setup = configureWorldTree(makeSetup(0), false)
+-  gl.Trace_Begin()
+-  rsurf.R_RecursiveWorldNode(0)
+-  commands = gl.Trace_End()
+-  emitCommands("rsurf_recursive_world_node", "R_RecursiveWorldNode", commands)
+-end function
+-
+-function traceDrawWorld()
+-  setup = configureWorldTree(makeSetup(0), false)
+-  gl.Trace_Begin()
+-  rsurf.R_DrawWorld()
+-  commands = gl.Trace_End()
+-  emitCommands("rsurf_draw_world", "R_DrawWorld", commands)
+-end function
+-
+-function traceMarkLeaves()
+-  setup = makeSetup(0)
+-  zero = t.Vec3(0.0, 0.0, 0.0)
+-  rsurf.R_ConfigureWorldCompatibility(
+-    setup[0], zero, zero, t.Vec3(1.0, 0.0, 0.0),
+-    t.Vec3(0.0, -1.0, 0.0), t.Vec3(0.0, 0.0, 1.0),
+-    [], [], [0.0, 0.0, 0.0, 0.0], 0.0, 0.25, 0.0,
+-    true, true, true
+-  )
+-  rsurf.R_SetFrameCompatibility(7, 3)
+-  rsurf.R_MarkLeaves()
+-  state = rsurf.R_GetFrameCompatibility()
+-  emit("rsurf_mark_leaves", "R_MarkLeaves", 0, "visframe", "[" + state[1] + "]")
+-end function
+-
+-function main(args)
+-  traceAddDynamicLights()
+-  traceBuildLightMap()
+-  traceTextureAnimation()
+-  traceMultitexture()
+-  traceDrawPolygons()
+-  traceSequential(false)
+-  traceSequential(true)
+-  traceBlendLightmaps()
+-  traceRenderBrush(0, "rsurf_render_brush_normal")
+-  traceRenderBrush(c.SURF_DRAWSKY, "rsurf_render_brush_sky")
+-  traceRenderBrush(c.SURF_DRAWTURB, "rsurf_render_brush_turb")
+-  traceDynamicLightmaps()
+-  traceMirror()
+-  traceAlloc()
+-  traceDisplayList()
+-  traceCreateLightmap()
+-  traceBuildLightmaps()
+-  traceDrawWaterSurfaces()
+-  traceDrawTextureChains()
+-  traceDrawBrushModel()
+-  traceRecursiveWorldNode()
+-  traceDrawWorld()
+-  traceMarkLeaves()
+-  return 0
+-end function
++/*
++Deterministic MiniLang side of the original gl_rsurf.c differential oracle.
++*/
++
++import miniquake.render.world as rsurf
++import miniquake.render.gl11 as gl
++import miniquake.types as t
++import miniquake.constants as c
++import miniquake.native as native
++import miniquake.array_util as arrayutil
++import std.string as string
++
++function jsonNumber(value)
++  integerValue = native.trunc(value)
++  if value == integerValue then return "" + integerValue end if
++  return string.replaceAll("" + value, ".e", "e")
++end function
++
++function jsonArguments(values)
++  result = "["
++  index = 0
++  while index < len(values)
++    if index != 0 then result = result + "," end if
++    result = result + jsonNumber(values[index])
++    index = index + 1
++  end while
++  return result + "]"
++end function
++
++function emit(scene, functionName, sequence, operation, arguments)
++  print "{\"schema\":\"miniquake.renderer.gl.v1\",\"scene\":\"" + scene + "\",\"function\":\"" + functionName + "\",\"seq\":" + sequence + ",\"op\":\"" + operation + "\",\"args\":" + arguments + "}"
++end function
++
++function emitCommands(scene, functionName, commands)
++  sequence = 0
++  for each command in commands
++    emit(scene, functionName, sequence, command[0], jsonArguments(command[1]))
++    sequence = sequence + 1
++  end for
++  return sequence
++end function
++
++function fnvByte(hash, value)
++  return ((hash ^ (value & 255)) * 16777619) & 4294967295
++end function
++
++function hashBytes(data)
++  hash = 2166136261
++  index = 0
++  while index < len(data)
++    hash = fnvByte(hash, data[index])
++    index = index + 1
++  end while
++  return hash
++end function
++
++function hashU32(values, count)
++  hash = 2166136261
++  index = 0
++  while index < count
++    value = values[index]
++    hash = fnvByte(hash, value)
++    hash = fnvByte(hash, value >> 8)
++    hash = fnvByte(hash, value >> 16)
++    hash = fnvByte(hash, value >> 24)
++    index = index + 1
++  end while
++  return hash
++end function
++
++function baseVertices()
++  return [
++    t.RenderVertex(t.Vec3(0.0, 0.0, 0.0), 0.0, 0.0, 0.1, 0.2),
++    t.RenderVertex(t.Vec3(16.0, 0.0, 0.0), 1.0, 0.0, 0.3, 0.2),
++    t.RenderVertex(t.Vec3(16.0, 16.0, 0.0), 1.0, 1.0, 0.3, 0.4),
++    t.RenderVertex(t.Vec3(0.0, 16.0, 0.0), 0.0, 1.0, 0.1, 0.4),
++  ]
++end function
++
++function makeSetup(flags)
++  zero = t.Vec3(0.0, 0.0, 0.0)
++  plane = t.BspPlane(t.Vec3(0.0, 0.0, 1.0), 0.0, 2)
++  info = t.BspTexInfo([1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], 0, 0)
++  face = t.BspFace(0, 0, 0, 4, 0, bytes([0, 1, 255, 255]), 0)
++  texture = t.BspTexture("fixture", 64, 64, [0, 0, 0, 0], bytes(64 * 64))
++  vertices = [
++    t.BspVertex(t.Vec3(0.0, 0.0, 0.0)),
++    t.BspVertex(t.Vec3(16.0, 0.0, 0.0)),
++    t.BspVertex(t.Vec3(16.0, 16.0, 0.0)),
++    t.BspVertex(t.Vec3(0.0, 16.0, 0.0)),
++  ]
++  edges = [
++    t.BspEdge(0, 0), t.BspEdge(0, 1), t.BspEdge(1, 2),
++    t.BspEdge(2, 3), t.BspEdge(3, 0),
++  ]
++  model = t.BspModel(zero, zero, zero, [0, 0, 0, 0], 0, 0, 1)
++  lighting = bytes([20, 27, 34, 41, 48, 55, 62, 69])
++  map = t.BspMap(
++    "rsurf-fixture.bsp", bytes(), c.BSP_VERSION, [], "", [], [plane],
++    [texture], vertices, bytes(), [], [info], [face], lighting, [], [], [],
++    edges, [1, 2, 3, 4], [model]
++  )
++  surface = t.RenderSurface(
++    0, 0, zero, t.Vec3(16.0, 16.0, 0.0), 2, 2, 0, flags,
++    baseVertices(), 500
++  )
++  renderTexture = t.RenderTexture("fixture", 64, 64, 77, bytes(64 * 64), false)
++  renderer = t.WorldRenderer(
++    map, bytes(768), [renderTexture], [surface], [], true, 0, false, false,
++    0, bytes(1, 1), 0, 1.0
++  )
++  light = t.DynamicLight(t.Vec3(8.0, 8.0, 16.0), 64.0, 1.0, 0.0, 0.0, 0)
++  rsurf.R_ConfigureWorldCompatibility(
++    renderer, zero, zero, t.Vec3(1.0, 0.0, 0.0),
++    t.Vec3(0.0, -1.0, 0.0), t.Vec3(0.0, 0.0, 1.0),
++    [light], [], [0.0, 0.0, 0.0, 0.0], 0.0, 0.25, 0.0,
++    true, true, false
++  )
++  rsurf.R_ResetLightmapCompatibility()
++  rsurf.R_SetLightmapCompatibility(500, 1)
++  rsurf.R_SetFrameCompatibility(7, 3)
++  styles = arrayutil.makeFilledArray(c.MAX_LIGHTSTYLES, 0)
++  styles[0] = 256
++  styles[1] = 128
++  rsurf.R_SetLightStyleCompatibility(styles)
++  rsurf.R_SetSurfaceCompatibilityState(0, 0, 0, [256, 128, 0, 0], false, 0, 2, 3)
++  rsurf.R_SetMultitextureCompatibility(false, false)
++  rsurf.R_SetAbstractSurfaceCalls(true)
++  rsurf.R_SetSurfaceChainCompatibility(true, [], [])
++  return [renderer, surface, plane]
++end function
++
++function configureWorldTree(setup, textureSort)
++  zero = t.Vec3(0.0, 0.0, 0.0)
++  setup[0].map.nodes = [
++    t.BspNode(0, -1, -2, zero, zero, 0, 1),
++  ]
++  setup[0].map.models[0].headNodes = [0, 0, 0, 0]
++  viewOrigin = t.Vec3(0.0, 0.0, 10.0)
++  rsurf.R_ConfigureWorldCompatibility(
++    setup[0], viewOrigin, zero, t.Vec3(1.0, 0.0, 0.0),
++    t.Vec3(0.0, -1.0, 0.0), t.Vec3(0.0, 0.0, 1.0),
++    [], [], [0.0, 0.0, 0.0, 0.0], 0.0, 0.25, 0.0,
++    true, true, false
++  )
++  rsurf.R_SetFrameCompatibility(7, 3)
++  rsurf.R_SetSurfaceCompatibilityState(0, 0, 0, [256, 128, 0, 0], false, 0, 2, 3)
++  rsurf.R_SetSurfaceChainCompatibility(textureSort, [], [])
++  return setup
++end function
++
++function traceAddDynamicLights()
++  setup = makeSetup(0)
++  rsurf.R_SetSurfaceCompatibilityState(0, 1, 0, [256, 128, 0, 0], false, 0, 2, 3)
++  rsurf.R_AddDynamicLights(setup[1])
++  emit("rsurf_add_dynamic_lights", "R_AddDynamicLights", 0, "blocklights_hash", "[" + hashU32(rsurf.R_GetBlocklights(), 4) + "]")
++end function
++
++function traceBuildLightMap()
++  setup = makeSetup(0)
++  destination = bytes(12, 204)
++  result = rsurf.R_BuildLightMap(setup[1], destination, 6)
++  state = rsurf.R_GetSurfaceCompatibilityState(0)
++  emit("rsurf_build_lightmap", "R_BuildLightMap", 0, "lightmap_hash", "[" + hashBytes(result) + "]")
++  emit("rsurf_build_lightmap", "R_BuildLightMap", 1, "cached_styles", "[" + state[0][0] + "," + state[0][1] + ",0]")
++end function
++
++function traceTextureAnimation()
++  setup = makeSetup(0)
++  baseMap = t.BspTexture("+0fixture", 64, 64, [0, 0, 0, 0], bytes())
++  nextMap = t.BspTexture("+1fixture", 64, 64, [0, 0, 0, 0], bytes())
++  alternateMap = t.BspTexture("+Afixture", 64, 64, [0, 0, 0, 0], bytes())
++  base = t.RenderTexture("+0fixture", 64, 64, 10, bytes(), false)
++  next = t.RenderTexture("+1fixture", 64, 64, 11, bytes(), false)
++  alternate = t.RenderTexture("+Afixture", 64, 64, 20, bytes(), false)
++  setup[0].map.textures = [baseMap, nextMap, alternateMap]
++  setup[0].textures = [base, next, alternate]
++  rsurf.R_ConfigureWorldCompatibility(
++    setup[0], t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0),
++    t.Vec3(1.0, 0.0, 0.0), t.Vec3(0.0, -1.0, 0.0),
++    t.Vec3(0.0, 0.0, 1.0), [], [], [0.0, 0.0, 0.0, 0.0],
++    0.3, 0.25, 0.0, true, true, false
++  )
++  rsurf.R_SetTextureAnimationFrame(0)
++  selected = rsurf.R_TextureAnimation(base)
++  emit("rsurf_texture_animation", "R_TextureAnimation", 0, "selected_texture", "[" + selected.glId + "]")
++  rsurf.R_SetTextureAnimationFrame(1)
++  selected = rsurf.R_TextureAnimation(base)
++  emit("rsurf_texture_animation", "R_TextureAnimation", 1, "selected_texture", "[" + selected.glId + "]")
++end function
++
++function traceMultitexture()
++  makeSetup(0)
++  rsurf.R_SetMultitextureCompatibility(true, true)
++  gl.Trace_Begin()
++  rsurf.GL_DisableMultitexture()
++  commands = gl.Trace_End()
++  sequence = emitCommands("rsurf_disable_multitexture", "GL_DisableMultitexture", commands)
++  emit("rsurf_disable_multitexture", "GL_DisableMultitexture", sequence, "state", "[0]")
++  makeSetup(0)
++  rsurf.R_SetMultitextureCompatibility(true, false)
++  gl.Trace_Begin()
++  rsurf.GL_EnableMultitexture()
++  commands = gl.Trace_End()
++  sequence = emitCommands("rsurf_enable_multitexture", "GL_EnableMultitexture", commands)
++  emit("rsurf_enable_multitexture", "GL_EnableMultitexture", sequence, "state", "[1]")
++end function
++
++function traceCall(scene, functionName, setup, callback)
++  gl.Trace_Begin()
++  if callback == 0 then rsurf.DrawGLWaterPoly(setup[1]) end if
++  if callback == 1 then rsurf.DrawGLWaterPolyLightmap(setup[1]) end if
++  if callback == 2 then rsurf.DrawGLPoly(setup[1]) end if
++  commands = gl.Trace_End()
++  emitCommands(scene, functionName, commands)
++end function
++
++function traceDrawPolygons()
++  traceCall("rsurf_draw_water_poly", "DrawGLWaterPoly", makeSetup(0), 0)
++  traceCall("rsurf_draw_water_lightmap", "DrawGLWaterPolyLightmap", makeSetup(0), 1)
++  traceCall("rsurf_draw_poly", "DrawGLPoly", makeSetup(0), 2)
++end function
++
++function traceSequential(multitexture)
++  setup = makeSetup(0)
++  rsurf.R_SetMultitextureCompatibility(multitexture, false)
++  if multitexture then rsurf.R_SetLightmapDirtyCompatibility(0, [2, 3, 2, 2], true) end if
++  gl.Trace_Begin()
++  rsurf.R_DrawSequentialPoly(setup[1])
++  commands = gl.Trace_End()
++  scene = "rsurf_sequential_single"
++  if multitexture then scene = "rsurf_sequential_mtex" end if
++  emitCommands(scene, "R_DrawSequentialPoly", commands)
++end function
++
++function traceBlendLightmaps()
++  setup = makeSetup(0)
++  underwater = t.RenderSurface(
++    0, 0, t.Vec3(0.0, 0.0, 0.0), t.Vec3(16.0, 16.0, 0.0),
++    2, 2, 0, 0x80, baseVertices(), 500
++  )
++  rsurf.R_SetLightmapChainCompatibility(0, [setup[1], underwater])
++  rsurf.R_SetLightmapDirtyCompatibility(0, [0, 3, 0, 2], true)
++  gl.Trace_Begin()
++  rsurf.R_BlendLightmaps()
++  commands = gl.Trace_End()
++  emitCommands("rsurf_blend_lightmaps", "R_BlendLightmaps", commands)
++end function
++
++function traceRenderBrush(flags, scene)
++  setup = makeSetup(flags)
++  gl.Trace_Begin()
++  rsurf.R_RenderBrushPoly(setup[1])
++  commands = gl.Trace_End()
++  sequence = emitCommands(scene, "R_RenderBrushPoly", commands)
++  if flags == 0 then
++    state = rsurf.R_GetLightmapCompatibilityState(0)
++    emit(scene, "R_RenderBrushPoly", sequence, "chain_state", "[1," + state[2] + "]")
++  end if
++end function
++
++function traceDynamicLightmaps()
++  setup = makeSetup(0)
++  rsurf.R_SetSurfaceCompatibilityState(0, 0, 0, [1, 128, 0, 0], false, 0, 2, 3)
++  rsurf.R_SetLightmapDirtyCompatibility(0, [0, 0, 0, 0], false)
++  rsurf.R_RenderDynamicLightmaps(setup[1])
++  state = rsurf.R_GetLightmapCompatibilityState(0)
++  rectangle = state[1]
++  modified = 0
++  if state[0] then modified = 1 end if
++  emit("rsurf_dynamic_lightmaps", "R_RenderDynamicLightmaps", 0, "dynamic_state", "[" + modified + "," + rectangle[0] + "," + rectangle[1] + "," + rectangle[2] + "," + rectangle[3] + "," + state[2] + "]")
++  emit("rsurf_dynamic_lightmaps", "R_RenderDynamicLightmaps", 1, "atlas_hash", "[" + hashBytes(rsurf.R_GetLightmapBytes()) + "]")
++end function
++
++function traceMirror()
++  setup = makeSetup(0)
++  rsurf.R_MirrorChain(setup[1])
++  state = rsurf.R_GetMirrorCompatibilityState()
++  samePlane = 0
++  if state[0] and state[1] == setup[2] then samePlane = 1 end if
++  emit("rsurf_mirror_chain", "R_MirrorChain", 0, "mirror_state", "[1," + samePlane + "]")
++end function
++
++function traceAlloc()
++  makeSetup(0)
++  x = [-1]
++  y = [-1]
++  page = rsurf.AllocBlock(4, 3, x, y)
++  allocation = rsurf.R_GetAllocationCompatibilityState(0)
++  emit("rsurf_alloc_block", "AllocBlock", 0, "allocation", "[" + page + "," + x[0] + "," + y[0] + "," + allocation[x[0]] + "," + allocation[x[0] + 3] + "]")
++end function
++
++function traceDisplayList()
++  setup = makeSetup(0)
++  setup[1].vertices = [
++    t.RenderVertex(t.Vec3(0.0, 0.0, 0.0), 0.0, 0.0, 0.01953125, 0.02734375),
++    t.RenderVertex(t.Vec3(8.0, 0.0, 0.0), 0.125, 0.0, 0.0234375, 0.02734375),
++    t.RenderVertex(t.Vec3(16.0, 0.0, 0.0), 0.25, 0.0, 0.02734375, 0.02734375),
++    t.RenderVertex(t.Vec3(16.0, 16.0, 0.0), 0.25, 0.25, 0.02734375, 0.03515625),
++    t.RenderVertex(t.Vec3(0.0, 16.0, 0.0), 0.0, 0.25, 0.01953125, 0.03515625),
++  ]
++  result = rsurf.BuildSurfaceDisplayList(setup[1])
++  arguments = "[" + len(result.vertices) + ",1"
++  for each vertex in result.vertices
++    arguments = arguments + "," + jsonNumber(vertex.position.x) + "," + jsonNumber(vertex.position.y) + "," + jsonNumber(vertex.s) + "," + jsonNumber(vertex.lightS) + "," + jsonNumber(vertex.lightT)
++  end for
++  emit("rsurf_build_display_list", "BuildSurfaceDisplayList", 0, "display_list", arguments + "]")
++end function
++
++function traceCreateLightmap()
++  setup = makeSetup(0)
++  rsurf.GL_CreateSurfaceLightmap(setup[1])
++  state = rsurf.R_GetSurfaceCompatibilityState(0)
++  emit("rsurf_create_surface_lightmap", "GL_CreateSurfaceLightmap", 0, "surface_lightmap", "[" + state[2] + "," + state[3] + "," + state[4] + "]")
++  emit("rsurf_create_surface_lightmap", "GL_CreateSurfaceLightmap", 1, "atlas_hash", "[" + hashBytes(rsurf.R_GetLightmapBytes()) + "]")
++end function
++
++function traceBuildLightmaps()
++  setup = makeSetup(c.SURF_DRAWSKY)
++  gl.Trace_Begin()
++  rsurf.GL_BuildLightmaps()
++  gl.Trace_End()
++  emit("rsurf_build_lightmaps", "GL_BuildLightmaps", 0, "build_state", "[1,500,1000]")
++end function
++
++function traceDrawTextureChains()
++  setup = makeSetup(c.SURF_DRAWSKY)
++  rsurf.R_SetSurfaceChainCompatibility(false, [setup[1]], [])
++  gl.Trace_Begin()
++  rsurf.DrawTextureChains()
++  commands = gl.Trace_End()
++  emitCommands("rsurf_draw_texture_chains", "DrawTextureChains", commands)
++end function
++
++function traceDrawWaterSurfaces()
++  setup = makeSetup(c.SURF_DRAWTURB)
++  setup[0].waterAlpha = 0.5
++  rsurf.R_SetSurfaceChainCompatibility(false, [], [setup[1]])
++  gl.Trace_Begin()
++  rsurf.R_DrawWaterSurfaces()
++  commands = gl.Trace_End()
++  emitCommands("rsurf_draw_water_surfaces", "R_DrawWaterSurfaces", commands)
++end function
++
++function traceDrawBrushModel()
++  setup = configureWorldTree(makeSetup(0), true)
++  baseModel = setup[0].map.models[0]
++  submodel = t.BspModel(
++    baseModel.mins, baseModel.maxs, baseModel.origin,
++    [0, 0, 0, 0], 0, 0, 1
++  )
++  setup[0].map.models = [baseModel, submodel]
++  zero = t.Vec3(0.0, 0.0, 0.0)
++  entity = t.ClientEntityState(
++    1, 1, 0, 0, 0, 0, zero, zero, 0.0, zero, zero, zero, zero, false, void, 0.0
++  )
++  gl.Trace_Begin()
++  rsurf.R_DrawBrushModel(entity)
++  commands = gl.Trace_End()
++  emitCommands("rsurf_draw_brush_model", "R_DrawBrushModel", commands)
++end function
++
++function traceRecursiveWorldNode()
++  setup = configureWorldTree(makeSetup(0), false)
++  gl.Trace_Begin()
++  rsurf.R_RecursiveWorldNode(0)
++  commands = gl.Trace_End()
++  emitCommands("rsurf_recursive_world_node", "R_RecursiveWorldNode", commands)
++end function
++
++function traceDrawWorld()
++  setup = configureWorldTree(makeSetup(0), false)
++  gl.Trace_Begin()
++  rsurf.R_DrawWorld()
++  commands = gl.Trace_End()
++  emitCommands("rsurf_draw_world", "R_DrawWorld", commands)
++end function
++
++function traceMarkLeaves()
++  setup = makeSetup(0)
++  zero = t.Vec3(0.0, 0.0, 0.0)
++  rsurf.R_ConfigureWorldCompatibility(
++    setup[0], zero, zero, t.Vec3(1.0, 0.0, 0.0),
++    t.Vec3(0.0, -1.0, 0.0), t.Vec3(0.0, 0.0, 1.0),
++    [], [], [0.0, 0.0, 0.0, 0.0], 0.0, 0.25, 0.0,
++    true, true, true
++  )
++  rsurf.R_SetFrameCompatibility(7, 3)
++  rsurf.R_MarkLeaves()
++  state = rsurf.R_GetFrameCompatibility()
++  emit("rsurf_mark_leaves", "R_MarkLeaves", 0, "visframe", "[" + state[1] + "]")
++end function
++
++function main(args)
++  traceAddDynamicLights()
++  traceBuildLightMap()
++  traceTextureAnimation()
++  traceMultitexture()
++  traceDrawPolygons()
++  traceSequential(false)
++  traceSequential(true)
++  traceBlendLightmaps()
++  traceRenderBrush(0, "rsurf_render_brush_normal")
++  traceRenderBrush(c.SURF_DRAWSKY, "rsurf_render_brush_sky")
++  traceRenderBrush(c.SURF_DRAWTURB, "rsurf_render_brush_turb")
++  traceDynamicLightmaps()
++  traceMirror()
++  traceAlloc()
++  traceDisplayList()
++  traceCreateLightmap()
++  traceBuildLightmaps()
++  traceDrawWaterSurfaces()
++  traceDrawTextureChains()
++  traceDrawBrushModel()
++  traceRecursiveWorldNode()
++  traceDrawWorld()
++  traceMarkLeaves()
++  return 0
++end function
+diff --git a/tests/sprite_sync_parity_tests.ml b/tests/sprite_sync_parity_tests.ml
+new file mode 100644
+index 0000000..a50f175
+--- /dev/null
++++ b/tests/sprite_sync_parity_tests.ml
+@@ -0,0 +1,190 @@
++/* BP-046: sprite ST_SYNC/ST_RAND and entity syncbase parity. */
++
++import miniquake.types as t
++import miniquake.constants as c
++import miniquake.client as client
++import miniquake.particles as particles
++import miniquake.native as native
++import miniquake.render.entities as entities
++
++function bp046Yes(value, name)
++  if not value then return error(4600, name + ": expected true") end if
++  return true
++end function
++function bp046Equal(actual, expected, name)
++  if actual != expected then return error(4601, name + ": expected " + expected + ", got " + actual) end if
++  return true
++end function
++function bp046Run(number, name, fn)
++  print "[" + number + "/22] " + name
++  result = try(fn())
++  if result is error then print "FAIL: " + result.message; return false end if
++  return true
++end function
++function bp046Entity(modelIndex)
++  zero = t.Vec3(0.0, 0.0, 0.0)
++  return t.ClientEntityState(1, modelIndex, 0, 0, 0, 0, zero, zero, 0.0, zero, zero, zero, zero, false, void, 0.0)
++end function
++function bp046Sprite(syncType)
++  first = t.SpriteFrame(0.0, 1.0, 1, 1, bytes(1))
++  second = t.SpriteFrame(0.0, 1.0, 1, 1, bytes(1))
++  set = t.SpriteFrameSet(true, [0.1, 0.2], [first, second])
++  source = t.SpriteModel("fixture.spr", bytes(), 1, 0, 1.0, 1, 1, 1, 0.0, syncType, [set])
++  return t.ClientRenderModel("fixture.spr", entities.MODEL_SPRITE, void, source, [[101, 102]], true)
++end function
++
++function bp046SetTypes()
++  bp046Equal(client.CL_SetModelSyncTypes([c.ST_SYNC, c.ST_RAND, c.ST_SYNC]), 3, "sync type count")
++  return true
++end function
++function bp046ReadTypes()
++  types = client.CL_ModelSyncTypes()
++  bp046Equal(types[1], c.ST_RAND, "sync type value")
++  return true
++end function
++function bp046UnknownType()
++  bp046Equal(client.modelSyncTypeForIndex(99), c.ST_SYNC, "unknown model sync")
++  return true
++end function
++function bp046SyncModel()
++  client.CL_SetModelSyncTypes([c.ST_SYNC, c.ST_SYNC])
++  entity = bp046Entity(1)
++  entity.syncBase = 0.5
++  client.CL_AssignModelSyncBase(entity, 0)
++  bp046Equal(native.floatBits(entity.syncBase), 0, "ST_SYNC base")
++  return true
++end function
++function bp046RandFirst()
++  particles.resetRandom(1)
++  client.CL_SetModelSyncTypes([c.ST_SYNC, c.ST_RAND])
++  entity = bp046Entity(1)
++  client.CL_AssignModelSyncBase(entity, 0)
++  bp046Equal(native.floatBits(entity.syncBase), 0x3aa40148, "first random syncbase")
++  return true
++end function
++function bp046RandSecond()
++  particles.resetRandom(1)
++  particles.compatRand()
++  client.CL_SetModelSyncTypes([c.ST_SYNC, c.ST_RAND])
++  entity = bp046Entity(1)
++  client.CL_AssignModelSyncBase(entity, 0)
++  bp046Equal(native.floatBits(entity.syncBase), 0x3f104721, "second random syncbase")
++  return true
++end function
++function bp046SameModelPreserves()
++  client.CL_SetModelSyncTypes([c.ST_SYNC, c.ST_RAND])
++  entity = bp046Entity(1)
++  entity.syncBase = 0.25
++  client.CL_AssignModelSyncBase(entity, 1)
++  bp046Equal(entity.syncBase, 0.25, "same model preserves")
++  return true
++end function
++function bp046NullModelResets()
++  entity = bp046Entity(0)
++  entity.syncBase = 0.25
++  client.CL_AssignModelSyncBase(entity, 1)
++  bp046Equal(entity.syncBase, 0.0, "null model resets")
++  return true
++end function
++function bp046CycleFirst()
++  bp046Equal(entities.cycleIndex([0.1, 0.2], 0.05, 2), 0, "cycle first")
++  return true
++end function
++function bp046CycleSecond()
++  bp046Equal(entities.cycleIndex([0.1, 0.2], 0.15, 2), 1, "cycle second")
++  return true
++end function
++function bp046CycleWrap()
++  bp046Equal(entities.cycleIndex([0.1, 0.2], 0.25, 2), 0, "cycle wrap")
++  return true
++end function
++function bp046CycleExactBoundary()
++  bp046Equal(entities.cycleIndex([0.1, 0.2], 0.1, 2), 1, "cycle exact boundary")
++  return true
++end function
++function bp046SpriteSyncBaseFirst()
++  model = bp046Sprite(c.ST_RAND)
++  entity = bp046Entity(1)
++  entity.syncBase = 0.0
++  selected = entities.spriteFrameAndTexture(model, entity, 0.05)
++  bp046Equal(selected[1], 101, "sprite first texture")
++  return true
++end function
++function bp046SpriteSyncBaseSecond()
++  model = bp046Sprite(c.ST_RAND)
++  entity = bp046Entity(1)
++  entity.syncBase = 0.1
++  selected = entities.spriteFrameAndTexture(model, entity, 0.05)
++  bp046Equal(selected[1], 102, "sprite syncbase texture")
++  return true
++end function
++function bp046SpriteWrap()
++  model = bp046Sprite(c.ST_RAND)
++  entity = bp046Entity(1)
++  entity.syncBase = 0.2
++  selected = entities.spriteFrameAndTexture(model, entity, 0.05)
++  bp046Equal(selected[1], 101, "sprite wrapped texture")
++  return true
++end function
++function bp046SingleCycle()
++  bp046Equal(entities.cycleIndex([], 9.0, 1), 0, "single cycle")
++  return true
++end function
++function bp046EmptyIntervals()
++  bp046Equal(entities.cycleIndex([], 9.0, 2), 0, "empty intervals")
++  return true
++end function
++function bp046ZeroInterval()
++  bp046Equal(entities.cycleIndex([0.0], 9.0, 2), 0, "zero interval")
++  return true
++end function
++function bp046NegativeTime()
++  bp046Equal(entities.cycleIndex([0.1, 0.2], -0.05, 2), 0, "negative time compatibility")
++  return true
++end function
++function bp046SyncTypeConstants()
++  bp046Equal(c.ST_SYNC, 0, "ST_SYNC")
++  bp046Equal(c.ST_RAND, 1, "ST_RAND")
++  return true
++end function
++function bp046FirstRandWord()
++  particles.resetRandom(1)
++  bp046Equal(particles.compatRand(), 41, "first MSVCRT rand")
++  return true
++end function
++function bp046SecondRandWord()
++  particles.resetRandom(1)
++  particles.compatRand()
++  bp046Equal(particles.compatRand(), 18467, "second MSVCRT rand")
++  return true
++end function
++
++passed = 0
++if bp046Run(1, "set model sync types", bp046SetTypes) then passed = passed + 1 end if
++if bp046Run(2, "read model sync types", bp046ReadTypes) then passed = passed + 1 end if
++if bp046Run(3, "unknown model sync type", bp046UnknownType) then passed = passed + 1 end if
++if bp046Run(4, "synchronized model base", bp046SyncModel) then passed = passed + 1 end if
++if bp046Run(5, "first random syncbase", bp046RandFirst) then passed = passed + 1 end if
++if bp046Run(6, "second random syncbase", bp046RandSecond) then passed = passed + 1 end if
++if bp046Run(7, "unchanged model preserves syncbase", bp046SameModelPreserves) then passed = passed + 1 end if
++if bp046Run(8, "null model resets syncbase", bp046NullModelResets) then passed = passed + 1 end if
++if bp046Run(9, "group cycle first", bp046CycleFirst) then passed = passed + 1 end if
++if bp046Run(10, "group cycle second", bp046CycleSecond) then passed = passed + 1 end if
++if bp046Run(11, "group cycle wrap", bp046CycleWrap) then passed = passed + 1 end if
++if bp046Run(12, "group cycle boundary", bp046CycleExactBoundary) then passed = passed + 1 end if
++if bp046Run(13, "sprite first frame", bp046SpriteSyncBaseFirst) then passed = passed + 1 end if
++if bp046Run(14, "sprite syncbase frame", bp046SpriteSyncBaseSecond) then passed = passed + 1 end if
++if bp046Run(15, "sprite syncbase wrap", bp046SpriteWrap) then passed = passed + 1 end if
++if bp046Run(16, "single-frame cycle", bp046SingleCycle) then passed = passed + 1 end if
++if bp046Run(17, "empty interval cycle", bp046EmptyIntervals) then passed = passed + 1 end if
++if bp046Run(18, "zero interval cycle", bp046ZeroInterval) then passed = passed + 1 end if
++if bp046Run(19, "negative group time", bp046NegativeTime) then passed = passed + 1 end if
++if bp046Run(20, "sync type constants", bp046SyncTypeConstants) then passed = passed + 1 end if
++if bp046Run(21, "first random word", bp046FirstRandWord) then passed = passed + 1 end if
++if bp046Run(22, "second random word", bp046SecondRandWord) then passed = passed + 1 end if
++
++if passed != 22 then
++  print "MiniQuake BP-046 sprite sync tests failed: " + passed + "/22"
++  error(4699, "BP-046 sprite sync parity")
++end if
++print "MiniQuake BP-046 sprite sync tests passed: 22"
+diff --git a/tools/bp046_sprite_sync_checker.py b/tools/bp046_sprite_sync_checker.py
+new file mode 100755
+index 0000000..dccea4a
+--- /dev/null
++++ b/tools/bp046_sprite_sync_checker.py
+@@ -0,0 +1,16 @@
++#!/usr/bin/env python3
++from __future__ import annotations
++import argparse,json,pathlib
++
++def main():
++ ap=argparse.ArgumentParser(); ap.add_argument('--root',default='.'); ap.add_argument('--json-out','--json-output',dest='out'); ns=ap.parse_args(); root=pathlib.Path(ns.root).resolve(); errors=[]
++ types=(root/'src/miniquake/types.ml').read_text(encoding='utf-8-sig'); client=(root/'src/miniquake/client.ml').read_text(encoding='utf-8-sig'); entities=(root/'src/miniquake/render/entities.ml').read_text(encoding='utf-8-sig'); host=(root/'src/miniquake/host.ml').read_text(encoding='utf-8-sig'); trace=(root/'src/miniquake/compat_trace.ml').read_text(encoding='utf-8-sig'); tests=(root/'tests/sprite_sync_parity_tests.ml').read_text(encoding='utf-8-sig')
++ for label,text,marker in [('types',types,'  syncBase\nend struct'),('client',client,'function CL_AssignModelSyncBase(entity, previousModelIndex)'),('entities',entities,'time + entity.syncBase'),('host',host,'client.CL_SetModelSyncTypes(syncTypes)'),('trace',trace,'item.syncBase')]:
++  if marker not in text: errors.append(f'{label} missing marker: {marker}')
++ if tests.count('if bp046Run(')!=22: errors.append('BP-046 fixture count differs from 22')
++ golden=json.loads((root/'audit/sprite_sync_golden.json').read_text()); vals={r['name']:r['value'] for r in golden['rows']}
++ if vals.get('first_rand')!=41 or vals.get('first_sync_bits')!=0x3aa40148: errors.append('first random syncbase golden differs')
++ report={'schema_version':1,'component':'BP-046','passed':not errors,'fixtures':22,'errors':errors}; out=json.dumps(report,indent=2)+'\n'; print(out,end='')
++ if ns.out:pathlib.Path(ns.out).write_text(out)
++ return 0 if not errors else 1
++if __name__=='__main__': raise SystemExit(main())
+diff --git a/tools/oracle/sprite_sync_oracle.c b/tools/oracle/sprite_sync_oracle.c
+new file mode 100644
+index 0000000..9e044be
+--- /dev/null
++++ b/tools/oracle/sprite_sync_oracle.c
+@@ -0,0 +1,17 @@
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
++static uint32_t state=1;
++static int qrand(void){state=state*214013u+2531011u; return (int)((state>>16)&0x7fffu);}
++static uint32_t bits(float value){uint32_t out; memcpy(&out,&value,sizeof(out)); return out;}
++static int cycle(const float *intervals,int count,float time){float full=intervals[count-1]; float target=time-(int)(time/full)*full; int i=0; while(i<count-1 && intervals[i]<=target)i++; return i;}
++int main(void){
++ int first=qrand(),second=qrand();
++ printf("first_rand=%d\n",first); printf("first_sync_bits=%08x\n",bits((float)first/32767.0f));
++ printf("second_rand=%d\n",second); printf("second_sync_bits=%08x\n",bits((float)second/32767.0f));
++ float intervals[2]={0.1f,0.2f};
++ printf("cycle_005=%d\n",cycle(intervals,2,0.05f));
++ printf("cycle_015=%d\n",cycle(intervals,2,0.15f));
++ printf("cycle_025=%d\n",cycle(intervals,2,0.25f));
++ printf("sync_modes=%d\n",2); printf("fixtures=%d\n",22); return 0;
++}

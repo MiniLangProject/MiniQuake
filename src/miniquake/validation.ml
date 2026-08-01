@@ -33,7 +33,8 @@ function run(baseDirectory, preferredMap)
   print "  base directory: " + baseDirectory
   print "  palette: " + len(palette) + " bytes"
   print "  progs.dat: " + len(program.functions) + " functions, " + len(program.statements) + " statements"
-  print "  progs crc: " + program.crc
+  print "  progs header crc: " + program.crc
+  print "  progs runtime crc: " + progs.runtimeCrc(program)
   print "  search paths:" + qfs.describe(filesystem)
 
   mapName = preferredMap

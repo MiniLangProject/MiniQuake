@@ -1,0 +1,80 @@
+{
+  "schema": "MiniQuakeSvUserMovementGolden/1",
+  "package_id": "BP-028",
+  "parent_package_id": "BP-027",
+  "sources": [
+    "sv_user.c",
+    "sv_phys.c"
+  ],
+  "rows": [
+    {
+      "kind": "case",
+      "name": "pitch60_forward_x",
+      "value": 50.0
+    },
+    {
+      "kind": "case",
+      "name": "nonwalk_upmove",
+      "value": 25.0
+    },
+    {
+      "kind": "case",
+      "name": "walk_vertical",
+      "value": 0.0
+    },
+    {
+      "kind": "case",
+      "name": "teleport_backmove",
+      "value": 0.0
+    },
+    {
+      "kind": "case",
+      "name": "maxspeed",
+      "value": 320.0
+    },
+    {
+      "kind": "case",
+      "name": "air_cap",
+      "value": 30.0
+    },
+    {
+      "kind": "case",
+      "name": "idle_water_sink",
+      "value": -42.0
+    },
+    {
+      "kind": "case",
+      "name": "forward_water",
+      "value": 70.0
+    },
+    {
+      "kind": "case",
+      "name": "ideal_pitch",
+      "value": -0.8
+    },
+    {
+      "kind": "case",
+      "name": "read_angle_128",
+      "value": -180.0
+    },
+    {
+      "kind": "case",
+      "name": "punch_x",
+      "value": 2.7
+    },
+    {
+      "kind": "case",
+      "name": "punch_y",
+      "value": 3.6
+    },
+    {
+      "kind": "case",
+      "name": "fixture_count",
+      "value": 16.0
+    }
+  ],
+  "reference": {
+    "oracle": "tools/oracle/sv_user_movement_oracle.c",
+    "oracle_sha256": "2314486b4119326bff6e77850b9c9cba09ff332f183e99c65c67b76e5f4415ee"
+  }
+}

@@ -3,17 +3,19 @@ package miniquake.savegame
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.native as native
+import miniquake.common as common
 import miniquake.format.bsp as bsp
 import miniquake.quakec.vm as vm
 import miniquake.quakec.edict as qcedict
 import miniquake.array_util as arrayutil
+import miniquake.protocol_text as protocolText
 
 const SAVEGAME_VERSION = 5
 const SAVEGAME_COMMENT_LENGTH = 39
 
 function typeSize(valueType)
   if valueType == c.EV_VECTOR then return 3 end if
-  if valueType == c.EV_VOID then return 0 end if
+  if valueType == c.EV_VOID then return 1 end if
   return 1
 end function
 
@@ -47,43 +49,13 @@ function fieldName(machine, offset)
 end function
 
 function uglyValue(machine, words, definition)
-  valueType = definition.type & 0x7fff
-  offset = definition.offset
-  if valueType == c.EV_STRING then return vm.stringValue(machine, words[offset]) end if
-  if valueType == c.EV_FLOAT then return qcedict.fixedSixDecimals(native.bitsFloat(words[offset])) end if
-  if valueType == c.EV_VECTOR then
-    return qcedict.fixedSixDecimals(native.bitsFloat(words[offset])) + " " +
-      qcedict.fixedSixDecimals(native.bitsFloat(words[offset + 1])) + " " +
-      qcedict.fixedSixDecimals(native.bitsFloat(words[offset + 2]))
-  end if
-  if valueType == c.EV_ENTITY then return "" + words[offset] end if
-  if valueType == c.EV_FIELD then return fieldName(machine, words[offset]) end if
-  if valueType == c.EV_FUNCTION then return functionName(machine, words[offset]) end if
-  return ""
+  return qcedict.PR_UglyValueString(machine, definition.type, words, definition.offset)
 end function
 
 function writeDefinitions(machine, words, definitions, globalsOnly)
-  text = "{\n"
-  index = 0
-  while index < len(definitions)
-    definition = definitions[index]
-    valueType = definition.type & 0x7fff
-    include = true
-    if globalsOnly then
-      include = (definition.type & c.DEF_SAVEGLOBAL) != 0
-      include = include and (valueType == c.EV_STRING or valueType == c.EV_FLOAT or valueType == c.EV_ENTITY)
-    else
-      include = index > 0 and not vectorComponentName(definition.name)
-    end if
-    size = typeSize(valueType)
-    if include and size > 0 and definition.offset >= 0 and definition.offset + size <= len(words) then
-      if not wordsAreZero(words, definition.offset, size) then
-        text = text + "\"" + definition.name + "\" \"" + uglyValue(machine, words, definition) + "\"\n"
-      end if
-    end if
-    index = index + 1
-  end while
-  return text + "}\n"
+  firstIndex = 0
+  if not globalsOnly then firstIndex = 1 end if
+  return qcedict.serializeDefinitions(machine, words, definitions, firstIndex, globalsOnly)
 end function
 
 function writeGlobals(machine)
@@ -98,7 +70,10 @@ end function
 
 function paddedComment(levelName, killed, total)
   output = arrayutil.makeFilledArray(SAVEGAME_COMMENT_LENGTH, 32)
-  level = bytes(levelName)
+  // Savegames are Quake byte streams, not UTF-8 text files.  Use the same
+  // reversible one-byte mapping as Protocol 15 so extended level names keep
+  // their original bytes.
+  level = protocolText.encodeBytes(levelName)
   count = len(level)
   if count > SAVEGAME_COMMENT_LENGTH then count = SAVEGAME_COMMENT_LENGTH end if
   index = 0
@@ -114,7 +89,7 @@ function paddedComment(levelName, killed, total)
   while len(bytes(totalText)) < 3
     totalText = " " + totalText
   end while
-  kills = bytes("kills:" + killedText + "/" + totalText)
+  kills = protocolText.encodeBytes("kills:" + killedText + "/" + totalText)
   index = 0
   while index < len(kills) and 22 + index < SAVEGAME_COMMENT_LENGTH
     output[22 + index] = kills[index]
@@ -125,7 +100,7 @@ function paddedComment(levelName, killed, total)
     if output[index] == 32 then output[index] = 95 end if
     index = index + 1
   end while
-  return decode(bytes(output))
+  return protocolText.decodeBytes(bytes(output))
 end function
 
 function namedGlobalFloat(machine, name)
@@ -169,13 +144,30 @@ function serializeServer(server)
   return text
 end function
 
+// fopen(..., "w") writes the one-byte Quake text stream verbatim.  Keep
+// the in-memory string API for tests and command code, but make byte I/O the
+// authoritative savegame boundary.
+function serializeBytes(server)
+  text = serializeServer(server)
+  if text is error then return text end if
+  return protocolText.encodeBytes(text)
+end function
+
+function encodeText(text)
+  return protocolText.encodeBytes(text)
+end function
+
+function decodeText(data)
+  return protocolText.decodeBytes(data)
+end function
+
 function readLine(data, offset)
   if offset < 0 or offset > len(data) then return error(3702, "savegame line offset outside file") end if
   finish = offset
   while finish < len(data) and data[finish] != 10 and data[finish] != 13
     finish = finish + 1
   end while
-  line = decode(slice(data, offset, finish - offset))
+  line = protocolText.decodeBytes(slice(data, offset, finish - offset))
   while finish < len(data) and (data[finish] == 10 or data[finish] == 13)
     finish = finish + 1
   end while
@@ -189,8 +181,18 @@ function numberLine(data, offset, label)
   return [value, line[1]]
 end function
 
-function parse(text)
-  data = bytes(text)
+function floatLine(data, offset, label)
+  line = readLine(data, offset)
+  validated = toNumber(line[0])
+  if validated is void then return error(3703, "invalid savegame " + label + ": " + line[0]) end if
+  // fscanf("%f") / atof stores the parsed text through a C float.  Parse the
+  // original line again at that native boundary so -0.000000 remains the
+  // IEEE-754 word 0x80000000 instead of being normalized to positive zero.
+  return [common.cAtof(line[0]), line[1]]
+end function
+
+function parseBytes(data)
+  if data is not bytes then return error(3712, "savegame parser requires bytes") end if
   cursor = 0
   versionLine = numberLine(data, cursor, "version")
   version = native.trunc(versionLine[0])
@@ -202,18 +204,18 @@ function parse(text)
   spawnParms = arrayutil.makeEmptyArray(c.NUM_SPAWN_PARMS)
   index = 0
   while index < c.NUM_SPAWN_PARMS
-    valueLine = numberLine(data, cursor, "spawn parm " + index)
+    valueLine = floatLine(data, cursor, "spawn parm " + index)
     spawnParms[index] = valueLine[0]
     cursor = valueLine[1]
     index = index + 1
   end while
-  skillLine = numberLine(data, cursor, "skill")
+  skillLine = floatLine(data, cursor, "skill")
   skill = native.trunc(skillLine[0] + 0.1)
   cursor = skillLine[1]
   mapLine = readLine(data, cursor)
   mapName = mapLine[0]
   cursor = mapLine[1]
-  timeLine = numberLine(data, cursor, "time")
+  timeLine = floatLine(data, cursor, "time")
   time = timeLine[0]
   cursor = timeLine[1]
   lightStyles = arrayutil.makeEmptyArray(c.MAX_LIGHTSTYLES)
@@ -225,7 +227,7 @@ function parse(text)
     index = index + 1
   end while
   if cursor >= len(data) then return error(3705, "savegame has no globals or edicts") end if
-  blocks = bsp.parseEntities(decode(slice(data, cursor, len(data) - cursor)))
+  blocks = bsp.parseEntities(protocolText.decodeBytes(slice(data, cursor, len(data) - cursor)))
   if len(blocks) < 1 then return error(3706, "savegame has no global block") end if
   entityCount = len(blocks) - 1
   entities = arrayutil.makeEmptyArray(entityCount)
@@ -235,6 +237,12 @@ function parse(text)
     index = index + 1
   end while
   return t.SaveGame(version, comment, spawnParms, skill, mapName, time, lightStyles, blocks[0], entities)
+end function
+
+function parse(text)
+  encoded = protocolText.encodeBytes(text)
+  if encoded is error then return encoded end if
+  return parseBytes(encoded)
 end function
 
 function apply(server, saved)
@@ -267,6 +275,7 @@ function apply(server, saved)
   runtime = machine.context.edicts
   runtime.numEdicts = len(saved.entities)
   server.numEdicts = len(saved.entities)
+  server.mapName = saved.mapName
   server.time = saved.time
   server.skill = saved.skill
   server.lightStyles = saved.lightStyles
@@ -278,21 +287,26 @@ function apply(server, saved)
 end function
 
 function displayComment(comment)
-  data = bytes(comment)
+  data = protocolText.encodeBytes(comment)
   index = 0
   while index < len(data)
     if data[index] == 95 then data[index] = 32 end if
     index = index + 1
   end while
-  return decode(data)
+  return protocolText.decodeBytes(data)
 end function
 
-function inspectComment(text)
-  data = bytes(text)
+function inspectCommentBytes(data)
   versionLine = numberLine(data, 0, "version")
   if native.trunc(versionLine[0]) != SAVEGAME_VERSION then return "" end if
   commentLine = readLine(data, versionLine[1])
   return displayComment(commentLine[0])
+end function
+
+function inspectComment(text)
+  encoded = protocolText.encodeBytes(text)
+  if encoded is error then return "" end if
+  return inspectCommentBytes(encoded)
 end function
 
 function hasSuffixInsensitive(text, suffix)
@@ -334,6 +348,16 @@ end function
 
 function SaveGamestate(server)
   return serializeServer(server)
+end function
+
+function SaveGamestateBytes(server)
+  return serializeBytes(server)
+end function
+
+function LoadGamestateBytes(server, data)
+  saved = parseBytes(data)
+  if saved is error then return saved end if
+  return apply(server, saved)
 end function
 
 function LoadGamestate(server, text)

@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "project": "MiniQuake",
+  "block_id": "BP-065-069",
+  "parent_package_id": "BP-060-064R6",
+  "final_package_id": "BP-069",
+  "delivery_revision": "BP-065-069",
+  "frontend_status": "frontend_109_frozen_v1",
+  "frontend_fingerprint": "0x924251fa",
+  "steps": [
+    {
+      "package_id": "BP-065",
+      "title": "key routing, bindings and synthetic release commands",
+      "patch": "patches/BP-065.diff",
+      "runtime_fixtures": 20,
+      "status": "candidate"
+    },
+    {
+      "package_id": "BP-066",
+      "title": "Win32 mouse filtering and device clear parity",
+      "patch": "patches/BP-066.diff",
+      "runtime_fixtures": 22,
+      "status": "candidate"
+    },
+    {
+      "package_id": "BP-067",
+      "title": "console notify and modal screen lifecycle",
+      "patch": "patches/BP-067.diff",
+      "runtime_fixtures": 22,
+      "status": "candidate"
+    },
+    {
+      "package_id": "BP-068",
+      "title": "menu toggle, save and options lifecycle",
+      "patch": "patches/BP-068.diff",
+      "runtime_fixtures": 24,
+      "status": "candidate"
+    },
+    {
+      "package_id": "BP-069",
+      "title": "video/focus/frontend closure contract",
+      "patch": "patches/BP-069.diff",
+      "runtime_fixtures": 24,
+      "status": "candidate"
+    }
+  ],
+  "block_runtime_fixtures": 112,
+  "accepted_parent": {
+    "delivery_revision": "BP-060-064R6",
+    "status": "PASS",
+    "result_archive": "MiniQuake_BP-060-064R6_RESULTS_20260729-134030.zip",
+    "result_archive_sha256": "5f9812a0527ea426889b4ae0d08e6e40bb2b715e32e232ebe215dd3ab99674a1",
+    "required_steps": "16/16 PASS",
+    "trace_sha256": "03656a0e9f3b13d4430014de3787053c204acdd1e7f2e33c292ee8ee2b47c8cc",
+    "trace_rolling_hash": "d905b042",
+    "retail_audio_evidence_sha256": "896049a03f26b1db4ddc1550d35d1cacb5f7e0f0c900b0ee36393c8ab8bd0501",
+    "render_tga_sha256": "9047f96e9bef8e06035119ff71ddfe7ad4dcad89b4740c66618252a13cd166fb",
+    "network_client_report_sha256": "50534266c750fa20058c82ce48baca953b0107106dc24fd69c5854fc3364ba96",
+    "udp_loopback": "PASS"
+  },
+  "acceptance": {
+    "single_cumulative_build": true,
+    "installed_game_validation": true,
+    "headless_frames": 300,
+    "trace_frames": 128,
+    "render_evidence": true,
+    "retail_audio_evidence": true,
+    "network_evidence_process_pairs": 2,
+    "network_evidence_exact_identity": true,
+    "udp_loopback": true
+  },
+  "scope_boundary": {
+    "reference": "WinQuake/GLQuake 1.09 Windows frontend",
+    "keyboard": "256-key Quake routing and +command release semantics",
+    "input": "Win32 mouse and joystick observable behavior",
+    "console_screen": "console notify and modal acknowledgement lifecycle",
+    "menu": "classic Windows menu and options behavior",
+    "video": "mode, focus and frontend state transitions",
+    "quake_game_data": "external; never bundled"
+  },
+  "delivery_hotfix": {
+    "revision": "BP-065-069R1",
+    "parent": "BP-065-069",
+    "result_archive": "MiniQuake_BP-065-069_RESULTS_20260729-154632.zip",
+    "result_archive_sha256": "96934acd755555383271141db651f1304561366aec73c540b943e296ec9a2f39",
+    "classification": "fixture-only binary32 expectation and count correction",
+    "production_source_changed": false,
+    "native_source_changed": false,
+    "engine_contracts_changed": false,
+    "runtime_fixtures": 112
+  }
+}

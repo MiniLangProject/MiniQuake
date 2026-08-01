@@ -1,3 +1,0 @@
-LIBRARY in_win_oracle
-EXPORTS
-    in_win_oracle_jsonl

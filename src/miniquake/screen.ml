@@ -14,6 +14,7 @@ import miniquake.mathlib as math
 import miniquake.view as view
 import miniquake.gl_vidnt as glvid
 import std.fs as fs
+import miniquake.render_ui_contract as renderUiContract
 
 scr_copytop = 0
 scr_copyeverything = 0
@@ -422,7 +423,7 @@ end function
 
 function BuildTga(width, height, rgba)
   if width <= 0 or height <= 0 or len(rgba) < width * height * 4 then return error(3401, "SCR_ScreenShot_f: invalid framebuffer") end if
-  output = bytes(18 + width * height * 3)
+  output = bytes(renderUiContract.tgaByteLength(width, height))
   output[2] = 2
   output[12] = width & 255
   output[13] = (width >> 8) & 255
@@ -453,9 +454,14 @@ function screenshotName(filesystem)
   return ""
 end function
 
+function SCR_ScreenshotFailure()
+  // GLQuake writes a TGA but preserves this historical PCX diagnostic text.
+  return error(3402, "SCR_ScreenShot_f: Couldn't create a PCX file")
+end function
+
 function SCR_ScreenShot_f(filesystem, x, y, width, height)
   name = screenshotName(filesystem)
-  if name == "" then return error(3402, "SCR_ScreenShot_f: Couldn't create a TGA file") end if
+  if name == "" then return SCR_ScreenshotFailure() end if
   rgba = gl.readPixelsRgba(x, y, width, height)
   tga = try(BuildTga(width, height, rgba))
   if tga is error then return tga end if
@@ -656,11 +662,7 @@ function SCR_UpdateWholeScreen()
 end function
 
 function ScreenOverlayOrder(dialog, loading, intermission, gameInput)
-  if dialog then return ["set2d", "tileclear", "dialog", "hud", "fade", "notify-string"] end if
-  if loading then return ["set2d", "tileclear", "loading", "hud"] end if
-  if intermission == 1 and gameInput then return ["set2d", "tileclear", "intermission"] end if
-  if intermission == 2 and gameInput then return ["set2d", "tileclear", "finale", "center"] end if
-  return ["set2d", "tileclear", "crosshair", "ram", "net", "turtle", "pause", "center", "hud", "console", "menu"]
+  return renderUiContract.overlayOrder(dialog, loading, intermission, gameInput)
 end function
 
 function SCR_UpdateScreen(

@@ -431,6 +431,7 @@ struct QuakeCMachine
   context
   edictFree
   dynamicStrings
+  temporaryString
   randomSeed
   trace
 end struct
@@ -476,6 +477,30 @@ end struct
 struct ProtocolResult
   events
   bytesRead
+end struct
+
+// Canonical input record for the stock Protocol-15 svc_clientdata writer.
+// Keeping the wire state separate from PlayerState makes the C field ordering
+// and mission-pack active-weapon rule directly testable.
+struct ProtocolClientData
+  viewHeight
+  idealPitch
+  punch
+  velocity
+  flags
+  waterLevel
+  weaponFrame
+  armor
+  weaponModel
+  health
+  currentAmmo
+  shells
+  nails
+  rockets
+  cells
+  items
+  activeWeapon
+  standardQuake
 end struct
 
 struct SearchPath
@@ -591,6 +616,7 @@ struct EntityBaseline
   frame
   colormap
   skin
+  effects
   origin
   angles
 end struct
@@ -639,6 +665,8 @@ struct ServerClient
   pingTimes
   numPings
   oldFrags
+  lastMessage
+  dropAsap
 end struct
 
 struct GameServer
@@ -672,6 +700,7 @@ struct GameServer
   coop
   serverFlags
   cdTrack
+  standardQuake
   randomSeed
   diagnostics
 end struct
@@ -879,6 +908,10 @@ struct GameSession
   frameTrace
   profileTime
   profileCount
+  diagnosticContextPath
+  diagnosticFrame
+  diagnosticLastStage
+  diagnosticWriteError
 end struct
 
 // -----------------------------------------------------------------------------
@@ -985,6 +1018,7 @@ struct ClientEntityState
   previousMessageAngles
   forceLink
   baseline
+  syncBase
 end struct
 
 struct SoundEffect
@@ -1232,6 +1266,21 @@ struct UdpSmokeResult
   errorCode
 end struct
 
+struct CompatibilityTraceResult
+  ok
+  framesRequested
+  framesWritten
+  acceptedFrames
+  rollingHash
+  tracePath
+  snapshotPath
+  contextPath
+  summaryPath
+  lastStage
+  errorMessage
+  cleanShutdown
+end struct
+
 struct RuntimeValidation
   ok
   messages
@@ -1300,3 +1349,32 @@ struct DatagramChannel
   lastSendTime
   packetsReSent
 end struct
+
+// MiniLang's native backend returns package-qualified concrete type names for
+// packaged structs (for example "miniquake.types.Vec3"), while older
+// backends and package-free fixtures may return the short name.  Accept both
+// spellings so runtime type guards remain backend-independent.
+function concreteTypeNameMatches(value, shortName, qualifiedName)
+  kind = typeName(value)
+  return kind == shortName or kind == qualifiedName
+end function
+
+function isVec3Value(value)
+  return concreteTypeNameMatches(value, "Vec3", "miniquake.types.Vec3")
+end function
+
+function isEntityBaselineValue(value)
+  return concreteTypeNameMatches(
+    value,
+    "EntityBaseline",
+    "miniquake.types.EntityBaseline",
+  )
+end function
+
+function isQuakeEdictValue(value)
+  return concreteTypeNameMatches(
+    value,
+    "QuakeEdict",
+    "miniquake.types.QuakeEdict",
+  )
+end function

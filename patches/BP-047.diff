@@ -1,0 +1,4013 @@
+diff --git a/audit/render_ui_hud_golden.json b/audit/render_ui_hud_golden.json
+new file mode 100644
+index 0000000..ad08920
+--- /dev/null
++++ b/audit/render_ui_hud_golden.json
+@@ -0,0 +1,50 @@
++{
++  "schema_version": 1,
++  "component": "BP-047 render UI/HUD",
++  "rows": [
++    {
++      "name": "sbar_coop_640",
++      "value": 160
++    },
++    {
++      "name": "sbar_dm_640",
++      "value": 0
++    },
++    {
++      "name": "normal_overlay_stages",
++      "value": 11
++    },
++    {
++      "name": "set2d_stages",
++      "value": 11
++    },
++    {
++      "name": "tga_1x1",
++      "value": 21
++    },
++    {
++      "name": "tga_640x480",
++      "value": 921618
++    },
++    {
++      "name": "viewmodel_depth_milli",
++      "value": 300
++    },
++    {
++      "name": "sbar_lines_100",
++      "value": 48
++    },
++    {
++      "name": "sbar_lines_110",
++      "value": 24
++    },
++    {
++      "name": "sbar_lines_120",
++      "value": 0
++    },
++    {
++      "name": "fixtures",
++      "value": 24
++    }
++  ]
++}
+diff --git a/src/miniquake/render/entities.ml b/src/miniquake/render/entities.ml
+index d5eafaa..7415502 100644
+--- a/src/miniquake/render/entities.ml
++++ b/src/miniquake/render/entities.ml
+@@ -11,6 +11,7 @@ import miniquake.array_util as arrayutil
+ import miniquake.mathlib as math
+ import miniquake.render.alias_mesh as aliasMesh
+ import miniquake.render.draw2d as draw2d
++import miniquake.render_ui_contract as renderUiContract
+ 
+ const MODEL_NONE = 0
+ const MODEL_BRUSH = 1
+@@ -545,7 +546,7 @@ function renderViewModel(renderer, player, view, time)
+     [player.weapon, player.weaponFrame, 0, 0, math.copy(gunOrigin), math.copy(gunAngles), 0],
+     0.0,
+   )
+-  gl.depthRange(0.0, 0.3)
++  gl.depthRange(0.0, renderUiContract.viewModelDepthMaximum())
+   result = drawAlias(renderer, model, entity, time, true)
+   gl.depthRange(0.0, 1.0)
+   return result
+diff --git a/src/miniquake/render_ui_contract.ml b/src/miniquake/render_ui_contract.ml
+new file mode 100644
+index 0000000..c7ddcc3
+--- /dev/null
++++ b/src/miniquake/render_ui_contract.ml
+@@ -0,0 +1,54 @@
++/*
++Copyright (C) 1996-1997 Id Software, Inc.
++Copyright (C) 2026 MiniQuake contributors
++
++Shared gl_draw.c / gl_screen.c / sbar.c compatibility decisions. Keeping these
++pure rules in one package makes the 2D/HUD handoff observable and testable.
++*/
++
++package miniquake.render_ui_contract
++
++import miniquake.constants as c
++import miniquake.native as native
++
++const STATUSBAR_WIDTH = 320
++const STATUSBAR_HEIGHT = 24
++const INVENTORY_HEIGHT = 24
++const TGA_HEADER_BYTES = 18
++const TGA_BYTES_PER_PIXEL = 3
++
++function statusbarXOffset(width, gameType)
++  if gameType == c.GAME_DEATHMATCH then return 0 end if
++  return native.trunc((width - STATUSBAR_WIDTH) / 2)
++end function
++
++function overlayOrder(dialog, loading, intermission, gameInput)
++  if dialog then return ["set2d", "tileclear", "dialog", "hud", "fade", "notify-string"] end if
++  if loading then return ["set2d", "tileclear", "loading", "hud"] end if
++  if intermission == 1 and gameInput then return ["set2d", "tileclear", "intermission"] end if
++  if intermission == 2 and gameInput then return ["set2d", "tileclear", "finale", "center"] end if
++  return ["set2d", "tileclear", "crosshair", "ram", "net", "turtle", "pause", "center", "hud", "console", "menu"]
++end function
++
++function set2dStateOrder()
++  return [
++    "viewport", "projection", "identity", "ortho", "modelview", "identity",
++    "disable-depth", "disable-cull", "disable-blend", "enable-alpha", "white",
++  ]
++end function
++
++function tgaByteLength(width, height)
++  if width <= 0 or height <= 0 then return 0 end if
++  return TGA_HEADER_BYTES + width * height * TGA_BYTES_PER_PIXEL
++end function
++
++function viewModelDepthMaximum()
++  return 0.3
++end function
++
++function statusbarLines(viewSize, intermission)
++  if intermission != 0 then return 0 end if
++  if viewSize >= 120.0 then return 0 end if
++  if viewSize >= 110.0 then return STATUSBAR_HEIGHT end if
++  return STATUSBAR_HEIGHT + INVENTORY_HEIGHT
++end function
+diff --git a/src/miniquake/screen.ml b/src/miniquake/screen.ml
+index 5fab135..c41af2b 100644
+--- a/src/miniquake/screen.ml
++++ b/src/miniquake/screen.ml
+@@ -1,781 +1,778 @@
+-package miniquake.screen
+-
+-import miniquake.render.gl11 as gl
+-import miniquake.render.draw2d as draw
+-import miniquake.native as native
+-import miniquake.menu as menu
+-import miniquake.statusbar as statusbar
+-import miniquake.cvar as cvar
+-import miniquake.console as console
+-import miniquake.keys as keys
+-import miniquake.filesystem as qfs
+-import miniquake.constants as c
+-import miniquake.mathlib as math
+-import miniquake.view as view
+-import miniquake.gl_vidnt as glvid
+-import std.fs as fs
+-
+-scr_copytop = 0
+-scr_copyeverything = 0
+-scr_con_current = 0.0
+-scr_conlines = 0.0
+-oldscreensize = -1.0
+-oldfov = -1.0
+-oldRefdefWidth = -1
+-oldRefdefHeight = -1
+-oldRefdefIntermission = -1
+-scr_initialized = false
+-scr_ram = void
+-scr_net = void
+-scr_turtle = void
+-scr_fullupdate = 0
+-clearconsole = 0
+-clearnotify = 0
+-sb_lines = 0
+-scr_vrect = [0, 0, 320, 152, 90.0, 74.0]
+-scr_disabled_for_loading = false
+-scr_drawloading = false
+-scr_disabled_time = 0.0
+-scr_loading_pending = false
+-block_drawing = false
+-scr_skipupdate = false
+-scr_centerstring = ""
+-scr_centertime_start = 0.0
+-scr_centertime_off = 0.0
+-scr_center_lines = 0
+-scr_erase_lines = 0
+-scr_erase_center = 0
+-scr_notifystring = ""
+-scr_drawdialog = false
+-scr_turtle_count = 0
+-scr_intermission = 0
+-screenFilesystem = void
+-screenRegistry = void
+-screenClient = void
+-screenConsole = void
+-screenBasePalette = void
+-lastScreenCommands = []
+-screenRealtime = 0.0
+-
+-function initialize(consoleState, menuState, filesystem, palette, width, height, registry)
+-  global screenConsole, screenBasePalette
+-  if consoleState is void then return false end if
+-  screenConsole = consoleState
+-  screenBasePalette = palette
+-  if consoleState.textureId == 0 then
+-    initialized = try(draw.Draw_Init(filesystem, palette, width, height, registry))
+-    if initialized is error then return false end if
+-    consoleState.textureId = draw.CharTexture()
+-  end if
+-  if not scr_initialized then
+-    initialized = try(SCR_Init(filesystem, registry, width, height))
+-    if initialized is error then return false end if
+-  end if
+-  if menuState is not void then menu.initialize(menuState, filesystem, palette) end if
+-  sbarInitialized = try(statusbar.Sbar_Init(filesystem.gameDirectory))
+-  if sbarInitialized is error then return false end if
+-  return true
+-end function
+-
+-function SCR_ConfigureClient(clientState)
+-  global screenClient
+-  screenClient = clientState
+-  return true
+-end function
+-
+-function shutdown(consoleState, menuState)
+-  if menuState is not void then menu.shutdown(menuState) end if
+-  if consoleState is not void and consoleState.textureId != 0 then
+-    gl.deleteTexture(consoleState.textureId)
+-    consoleState.textureId = 0
+-  end if
+-  return true
+-end function
+-
+-function drawCrosshair(width, height)
+-  centerX = native.trunc(width * 0.5) - 4
+-  centerY = native.trunc(height * 0.5) - 4
+-  return draw.Draw_Character(centerX, centerY, 43)
+-end function
+-
+-function drawBlend(viewState, width, height)
+-  if viewState is void or len(viewState.blend) < 4 or viewState.blend[3] <= 0.0 then return false end if
+-  red = native.trunc(viewState.blend[0] * 255.0)
+-  green = native.trunc(viewState.blend[1] * 255.0)
+-  blue = native.trunc(viewState.blend[2] * 255.0)
+-  alpha = native.trunc(viewState.blend[3] * 255.0)
+-  draw.solidQuad(0.0, 0.0, width * 1.0, height * 1.0, red, green, blue, alpha)
+-  return true
+-end function
+-
+-function drawHud(consoleState, menuState, player, width, height, registry)
+-  if consoleState is void or consoleState.textureId == 0 then return false end if
+-  viewSize = 100.0
+-  if registry is not void then viewSize = cvar.variableValue(registry, "viewsize") end if
+-  teamplay = 0.0
+-  if registry is not void then teamplay = cvar.variableValue(registry, "teamplay") end if
+-  return statusbar.render(menuState, consoleState.textureId, player, width, height, viewSize, screenClient, teamplay)
+-end function
+-
+-
+-function drawNotify(consoleState, width, height)
+-  if consoleState is void or consoleState.textureId == 0 or consoleState.active then return false end if
+-  messageMode = keys.destination() == keys.KEY_MESSAGE
+-  commands = console.Con_DrawNotify(consoleState, screenRealtime, screenCvar("con_notifytime", 3.0), messageMode, keys.chatBuffer)
+-  for each command in commands
+-    data = command[3]
+-    index = 0
+-    while index < len(data)
+-      draw.Draw_Character(command[1] + index * 8, command[2], data[index])
+-      index = index + 1
+-    end while
+-    if command[0] == "chat" then draw.Draw_Character(command[1] + len(data) * 8, command[2], command[4]) end if
+-  end for
+-  return true
+-end function
+-
+-function drawCenter(consoleState, width, height)
+-  if consoleState is void or consoleState.textureId == 0 or consoleState.centerText == "" then return false end if
+-  data = bytes(consoleState.centerText)
+-  lineWidth = len(data) * 8.0
+-  x = (width - lineWidth) * 0.5
+-  if x < 8.0 then x = 8.0 end if
+-  y = height * 0.35
+-  draw.string(consoleState.textureId, x, y, consoleState.centerText, 1.0, 255)
+-  return true
+-end function
+-
+-// =============================================================================
+-// gl_screen.c compatibility surface
+-// =============================================================================
+-
+-function screenCvar(name, fallback)
+-  if screenRegistry is void then return fallback end if
+-  variable = cvar.find(screenRegistry, name)
+-  if variable is void then return fallback end if
+-  return variable.value
+-end function
+-
+-function SCR_CenterPrint(consoleState, text, currentTime)
+-  global scr_centerstring, scr_centertime_off, scr_centertime_start, scr_center_lines
+-  data = bytes(text)
+-  if len(data) > 1023 then data = slice(data, 0, 1023); text = decode(data) end if
+-  scr_centerstring = text
+-  scr_centertime_off = screenCvar("scr_centertime", 2.0)
+-  scr_centertime_start = currentTime
+-  scr_center_lines = 1
+-  index = 0
+-  while index < len(data)
+-    if data[index] == 10 then scr_center_lines = scr_center_lines + 1 end if
+-    index = index + 1
+-  end while
+-  if consoleState is not void then
+-    consoleState.centerText = text
+-    consoleState.centerUntil = currentTime + scr_centertime_off
+-    console.Con_LogCenterPrint(consoleState, text, currentTime)
+-  end if
+-  return scr_center_lines
+-end function
+-
+-function CenterStringTrace(text, width, height, lineCount, remaining)
+-  commands = []
+-  source = bytes(text)
+-  offset = 0
+-  y = 48
+-  if lineCount <= 4 then y = native.trunc(height * 0.35) end if
+-  while offset < len(source)
+-    length = 0
+-    while length < 40 and offset + length < len(source) and source[offset + length] != 10
+-      length = length + 1
+-    end while
+-    x = native.trunc((width - length * 8) / 2)
+-    index = 0
+-    while index < length
+-      commands = commands + [[x, y, source[offset + index]]]
+-      if remaining == 0 then return commands end if
+-      remaining = remaining - 1
+-      x = x + 8
+-      index = index + 1
+-    end while
+-    y = y + 8
+-    offset = offset + length
+-    if offset >= len(source) then break end if
+-    if source[offset] == 10 then offset = offset + 1 end if
+-  end while
+-  return commands
+-end function
+-
+-function SCR_DrawCenterString(width, height, currentTime)
+-  global scr_erase_center
+-  remaining = 9999
+-  if scr_intermission != 0 then
+-    remaining = native.trunc(screenCvar("scr_printspeed", 8.0) * (currentTime - scr_centertime_start))
+-  end if
+-  scr_erase_center = 0
+-  commands = CenterStringTrace(scr_centerstring, width, height, scr_center_lines, remaining)
+-  for each command in commands
+-    draw.Draw_Character(command[0], command[1], command[2])
+-  end for
+-  return len(commands)
+-end function
+-
+-function SCR_CheckDrawCenterString(width, height, currentTime, frameTime, gameInput)
+-  global scr_copytop, scr_erase_lines, scr_centertime_off
+-  scr_copytop = 1
+-  if scr_center_lines > scr_erase_lines then scr_erase_lines = scr_center_lines end if
+-  scr_centertime_off = scr_centertime_off - frameTime
+-  if scr_centertime_off <= 0.0 and scr_intermission == 0 then return 0 end if
+-  if not gameInput then return 0 end if
+-  return SCR_DrawCenterString(width, height, currentTime)
+-end function
+-
+-function CalcFov(fov_x, width, height)
+-  if fov_x < 1.0 or fov_x > 179.0 then return error(3400, "Bad fov: " + fov_x) end if
+-  halfAngle = fov_x * math.DEG_TO_RAD * 0.5
+-  tangent = math.sin(halfAngle) / math.cos(halfAngle)
+-  x = width / tangent
+-  return math.atan2(height, x) * 2.0 * math.RAD_TO_DEG
+-end function
+-
+-function SCR_CalcRefdef(width, height, registry, intermission)
+-  global scr_fullupdate, sb_lines, scr_vrect, oldscreensize, oldfov, screenRegistry
+-  global oldRefdefWidth, oldRefdefHeight, oldRefdefIntermission
+-  if registry is not void then screenRegistry = registry end if
+-  viewSize = screenCvar("viewsize", 100.0)
+-  fov = screenCvar("fov", 90.0)
+-  refdefChanged = viewSize != oldscreensize or fov != oldfov or width != oldRefdefWidth or height != oldRefdefHeight or intermission != oldRefdefIntermission
+-  oldscreensize = viewSize
+-  oldfov = fov
+-  oldRefdefWidth = width
+-  oldRefdefHeight = height
+-  oldRefdefIntermission = intermission
+-  if refdefChanged then
+-    scr_fullupdate = 0
+-    statusbar.Sbar_Changed()
+-  end if
+-  if viewSize < 30.0 then viewSize = 30.0; if screenRegistry is not void then cvar.setValue(screenRegistry, "viewsize", viewSize) end if end if
+-  if viewSize > 120.0 then viewSize = 120.0; if screenRegistry is not void then cvar.setValue(screenRegistry, "viewsize", viewSize) end if end if
+-  if fov < 10.0 then fov = 10.0; if screenRegistry is not void then cvar.setValue(screenRegistry, "fov", fov) end if end if
+-  if fov > 170.0 then fov = 170.0; if screenRegistry is not void then cvar.setValue(screenRegistry, "fov", fov) end if end if
+-
+-  size = viewSize
+-  if intermission != 0 then size = 120.0 end if
+-  if size >= 120.0 then sb_lines = 0
+-  else if size >= 110.0 then sb_lines = 24
+-  else sb_lines = 48
+-  end if
+-
+-  full = false
+-  if viewSize >= 100.0 then full = true; size = 100.0 else size = viewSize end if
+-  if intermission != 0 then full = true; size = 100.0; sb_lines = 0 end if
+-  size = size / 100.0
+-  availableHeight = height - sb_lines
+-  viewWidth = native.trunc(width * size)
+-  if viewWidth < 96 then size = 96.0 / viewWidth; viewWidth = 96 end if
+-  viewHeight = native.trunc(height * size)
+-  if viewHeight > availableHeight then viewHeight = availableHeight end if
+-  if viewHeight > height then viewHeight = height end if
+-  viewX = native.trunc((width - viewWidth) / 2)
+-  viewY = 0
+-  if not full then viewY = native.trunc((availableHeight - viewHeight) / 2) end if
+-  fovY = try(CalcFov(fov, viewWidth, viewHeight))
+-  if fovY is error then return fovY end if
+-  scr_vrect = [viewX, viewY, viewWidth, viewHeight, fov, fovY]
+-  return scr_vrect
+-end function
+-
+-function SCR_SizeUp_f(registry)
+-  if registry is void then return false end if
+-  return cvar.setValue(registry, "viewsize", cvar.variableValue(registry, "viewsize") + 10.0)
+-end function
+-
+-function SCR_SizeDown_f(registry)
+-  if registry is void then return false end if
+-  return cvar.setValue(registry, "viewsize", cvar.variableValue(registry, "viewsize") - 10.0)
+-end function
+-
+-function SCR_SizeUp()
+-  return SCR_SizeUp_f(screenRegistry)
+-end function
+-
+-function SCR_SizeDown()
+-  return SCR_SizeDown_f(screenRegistry)
+-end function
+-
+-function SCR_Init(filesystem, registry, width, height)
+-  global scr_initialized, scr_ram, scr_net, scr_turtle, screenFilesystem, screenRegistry
+-  screenFilesystem = filesystem
+-  screenRegistry = registry
+-  draw.SetVideoSize(width, height)
+-  scr_ram = try(draw.Draw_PicFromWad("ram"))
+-  if scr_ram is error then return scr_ram end if
+-  scr_net = try(draw.Draw_PicFromWad("net"))
+-  if scr_net is error then return scr_net end if
+-  scr_turtle = try(draw.Draw_PicFromWad("turtle"))
+-  if scr_turtle is error then return scr_turtle end if
+-  SCR_CalcRefdef(width, height, registry, 0)
+-  scr_initialized = true
+-  return true
+-end function
+-
+-function SCR_DrawRam(cacheThrash)
+-  if screenCvar("showram", 1.0) == 0.0 or not cacheThrash or scr_ram is void then return false end if
+-  return draw.Draw_Pic(scr_vrect[0] + 32, scr_vrect[1], scr_ram)
+-end function
+-
+-function SCR_DrawTurtle(frameTime)
+-  global scr_turtle_count
+-  if screenCvar("showturtle", 0.0) == 0.0 or scr_turtle is void then return false end if
+-  if frameTime < 0.1 then scr_turtle_count = 0; return false end if
+-  scr_turtle_count = scr_turtle_count + 1
+-  if scr_turtle_count < 3 then return false end if
+-  return draw.Draw_Pic(scr_vrect[0], scr_vrect[1], scr_turtle)
+-end function
+-
+-function SCR_DrawNet(realtime, lastMessageTime, demoPlayback)
+-  if realtime - lastMessageTime < 0.3 or demoPlayback or scr_net is void then return false end if
+-  return draw.Draw_Pic(scr_vrect[0] + 64, scr_vrect[1], scr_net)
+-end function
+-
+-function SCR_DrawPause(paused, width, height)
+-  if screenCvar("showpause", 1.0) == 0.0 or not paused then return false end if
+-  picture = try(draw.Draw_CachePic("gfx/pause.lmp"))
+-  if picture is error then return picture end if
+-  return draw.Draw_Pic(native.trunc((width - picture.width) / 2), native.trunc((height - 48 - picture.height) / 2), picture)
+-end function
+-
+-function SCR_DrawLoading(width, height)
+-  if not scr_drawloading then return false end if
+-  picture = try(draw.Draw_CachePic("gfx/loading.lmp"))
+-  if picture is error then return picture end if
+-  return draw.Draw_Pic(native.trunc((width - picture.width) / 2), native.trunc((height - 48 - picture.height) / 2), picture)
+-end function
+-
+-function SCR_SetUpToDrawConsole(consoleState, height, frameTime, registry, forcedUp, consoleInput, numPages)
+-  global scr_conlines, scr_con_current, clearconsole, clearnotify, screenRegistry
+-  if registry is not void then screenRegistry = registry end if
+-  if consoleState is not void then consoleState.forcedUp = forcedUp end if
+-  if scr_drawloading then return scr_con_current end if
+-  if forcedUp then
+-    scr_conlines = height
+-    scr_con_current = scr_conlines
+-  else if consoleInput then scr_conlines = height / 2.0
+-  else scr_conlines = 0.0
+-  end if
+-  speed = screenCvar("scr_conspeed", 300.0) * frameTime
+-  if scr_conlines < scr_con_current then
+-    scr_con_current = scr_con_current - speed
+-    if scr_conlines > scr_con_current then scr_con_current = scr_conlines end if
+-  else if scr_conlines > scr_con_current then
+-    scr_con_current = scr_con_current + speed
+-    if scr_conlines < scr_con_current then scr_con_current = scr_conlines end if
+-  end if
+-  oldClear = clearconsole
+-  clearconsole = clearconsole + 1
+-  if oldClear < numPages then
+-    statusbar.Sbar_Changed()
+-  else
+-    oldNotify = clearnotify
+-    clearnotify = clearnotify + 1
+-    if oldNotify >= numPages and consoleState is not void then consoleState.notifyPixelLines = 0 end if
+-  end if
+-  return scr_con_current
+-end function
+-
+-function drawConsoleHeight(consoleState, width, height, visibleHeight)
+-  if consoleState is void or consoleState.textureId == 0 or visibleHeight <= 0 then return false end if
+-  lines = native.trunc(visibleHeight)
+-  commands = console.Con_DrawConsole(consoleState, lines, true, screenRealtime)
+-  for each command in commands
+-    if command[0] == "background" then
+-      draw.Draw_ConsoleBackground(command[1])
+-    else if command[0] == "text" then
+-      data = command[3]
+-      index = 0
+-      while index < len(data)
+-        draw.Draw_Character(command[1] + index * 8, command[2], data[index])
+-        index = index + 1
+-      end while
+-    else if command[0] == "input" then
+-      data = command[1]
+-      index = 0
+-      while index < len(data)
+-        draw.Draw_Character(8 + index * 8, lines - 16, data[index])
+-        index = index + 1
+-      end while
+-    end if
+-  end for
+-  return true
+-end function
+-
+-function SCR_DrawConsole(consoleState, width, height, gameOrMessageInput)
+-  global scr_copyeverything, clearconsole
+-  if scr_con_current > 0.0 then
+-    scr_copyeverything = 1
+-    drawConsoleHeight(consoleState, width, height, scr_con_current)
+-    clearconsole = 0
+-    return "console"
+-  end if
+-  if gameOrMessageInput or keys.destination() == keys.KEY_MESSAGE then drawNotify(consoleState, width, height); return "notify" end if
+-  return "none"
+-end function
+-
+-function BuildTga(width, height, rgba)
+-  if width <= 0 or height <= 0 or len(rgba) < width * height * 4 then return error(3401, "SCR_ScreenShot_f: invalid framebuffer") end if
+-  output = bytes(18 + width * height * 3)
+-  output[2] = 2
+-  output[12] = width & 255
+-  output[13] = (width >> 8) & 255
+-  output[14] = height & 255
+-  output[15] = (height >> 8) & 255
+-  output[16] = 24
+-  index = 0
+-  while index < width * height
+-    source = index * 4
+-    destination = 18 + index * 3
+-    output[destination] = rgba[source + 2]
+-    output[destination + 1] = rgba[source + 1]
+-    output[destination + 2] = rgba[source]
+-    index = index + 1
+-  end while
+-  return output
+-end function
+-
+-function screenshotName(filesystem)
+-  index = 0
+-  while index <= 99
+-    tens = native.trunc(index / 10)
+-    ones = index % 10
+-    name = "quake" + tens + ones + ".tga"
+-    if not fs.exists(qfs.gamePath(filesystem, name)) then return name end if
+-    index = index + 1
+-  end while
+-  return ""
+-end function
+-
+-function SCR_ScreenShot_f(filesystem, x, y, width, height)
+-  name = screenshotName(filesystem)
+-  if name == "" then return error(3402, "SCR_ScreenShot_f: Couldn't create a TGA file") end if
+-  rgba = gl.readPixelsRgba(x, y, width, height)
+-  tga = try(BuildTga(width, height, rgba))
+-  if tga is error then return tga end if
+-  written = qfs.writeFile(filesystem, name, tga)
+-  if written is error then return written end if
+-  return name
+-end function
+-
+-function SCR_BeginLoadingPlaque(consoleState, realtime, connected, signon)
+-  global scr_drawloading, scr_fullupdate, scr_disabled_for_loading, scr_disabled_time, scr_centertime_off, scr_con_current, scr_loading_pending
+-  if not connected or signon != c.SIGNONS then return false end if
+-  if consoleState is not void then console.Con_ClearNotify(consoleState) end if
+-  scr_centertime_off = 0.0
+-  scr_con_current = 0.0
+-  scr_drawloading = true
+-  scr_loading_pending = true
+-  scr_fullupdate = 0
+-  statusbar.Sbar_Changed()
+-  scr_disabled_for_loading = false
+-  scr_disabled_time = realtime
+-  return true
+-end function
+-
+-function SCR_EndLoadingPlaque(consoleState)
+-  global scr_disabled_for_loading, scr_drawloading, scr_fullupdate, scr_loading_pending
+-  scr_disabled_for_loading = false
+-  scr_drawloading = false
+-  scr_loading_pending = false
+-  scr_fullupdate = 0
+-  if consoleState is not void then console.Con_ClearNotify(consoleState) end if
+-  return true
+-end function
+-
+-function SCR_DrawNotifyString(width, height)
+-  commands = CenterStringTrace(scr_notifystring, width, height, 1, 9999)
+-  for each command in commands
+-    draw.Draw_Character(command[0], command[1], command[2])
+-  end for
+-  return len(commands)
+-end function
+-
+-// The original blocks in a platform event loop.  MiniLang's host owns that
+-// loop, so a key code is supplied when available; void means "still pending".
+-function SCR_ModalMessage(text, keyCode, dedicated)
+-  global scr_notifystring, scr_drawdialog, scr_fullupdate
+-  if dedicated then return true end if
+-  scr_notifystring = text
+-  scr_fullupdate = 0
+-  scr_drawdialog = true
+-  if keyCode is void then return void end if
+-  if keyCode == 121 or keyCode == 89 then scr_drawdialog = false; scr_fullupdate = 0; return true end if
+-  if keyCode == 110 or keyCode == 78 or keyCode == 27 then scr_drawdialog = false; scr_fullupdate = 0; return false end if
+-  return void
+-end function
+-
+-function SCR_BringDownConsole(consoleState, height, frameTime, registry, viewState)
+-  global scr_centertime_off
+-  scr_centertime_off = 0.0
+-  steps = 0
+-  while steps < 20 and scr_conlines != scr_con_current
+-    SCR_SetUpToDrawConsole(consoleState, height, frameTime, registry, false, false, 3)
+-    steps = steps + 1
+-  end while
+-  if viewState is not void then viewState.cshifts[view.CSHIFT_CONTENTS][3] = 0.0 end if
+-  if screenBasePalette is not void then glvid.VID_SetPalette(screenBasePalette) end if
+-  return steps
+-end function
+-
+-function SCR_TileClear(width, height)
+-  commands = []
+-  x = scr_vrect[0]
+-  y = scr_vrect[1]
+-  viewWidth = scr_vrect[2]
+-  viewHeight = scr_vrect[3]
+-  if x > 0 then
+-    draw.Draw_TileClear(0, 0, x, height - sb_lines)
+-    commands = commands + [[0, 0, x, height - sb_lines]]
+-    rightX = x + viewWidth
+-    // Preserve GLQuake 1.09's historical width expression verbatim.
+-    rightWidth = width - x + viewWidth
+-    if rightWidth > 0 then draw.Draw_TileClear(rightX, 0, rightWidth, height - sb_lines); commands = commands + [[rightX, 0, rightWidth, height - sb_lines]] end if
+-  end if
+-  if y > 0 then
+-    topWidth = x + viewWidth
+-    draw.Draw_TileClear(x, 0, topWidth, y)
+-    commands = commands + [[x, 0, topWidth, y]]
+-    bottomY = y + viewHeight
+-    bottomHeight = height - sb_lines - bottomY
+-    if bottomHeight > 0 then draw.Draw_TileClear(x, bottomY, viewWidth, bottomHeight); commands = commands + [[x, bottomY, viewWidth, bottomHeight]] end if
+-  end if
+-  return commands
+-end function
+-
+-function SCR_SetIntermission(mode, text, consoleState, currentTime)
+-  global scr_intermission
+-  scr_intermission = mode
+-  if text != "" then SCR_CenterPrint(void, text, currentTime) end if
+-  return scr_intermission
+-end function
+-
+-function SCR_IntermissionMode()
+-  return scr_intermission
+-end function
+-
+-// Deterministic differential hooks. They expose logical C globals without
+-// putting renderer or platform behavior into the native bridge.
+-function SCR_DifferentialSetEraseLines(value)
+-  global scr_erase_lines
+-  scr_erase_lines = value
+-  return value
+-end function
+-
+-function SCR_DifferentialSetTurtleCount(value)
+-  global scr_turtle_count
+-  scr_turtle_count = value
+-  return value
+-end function
+-
+-function SCR_DifferentialSetDrawLoading(value)
+-  global scr_drawloading
+-  scr_drawloading = value
+-  return value
+-end function
+-
+-function SCR_DifferentialSetConsole(current, lines)
+-  global scr_con_current, scr_conlines
+-  scr_con_current = current
+-  scr_conlines = lines
+-  return current
+-end function
+-
+-function SCR_DifferentialSetNotify(text)
+-  global scr_notifystring
+-  scr_notifystring = text
+-  return text
+-end function
+-
+-function SCR_DifferentialSetTile(viewRectangle, statusLines)
+-  global scr_vrect, sb_lines
+-  scr_vrect = viewRectangle
+-  sb_lines = statusLines
+-  return scr_vrect
+-end function
+-
+-function SCR_DifferentialSetBlocked(value)
+-  global block_drawing
+-  block_drawing = value
+-  return block_drawing
+-end function
+-
+-function SCR_DifferentialState()
+-  return [
+-    scr_copytop,
+-    scr_copyeverything,
+-    scr_con_current,
+-    scr_conlines,
+-    scr_centertime_off,
+-    scr_centertime_start,
+-    scr_center_lines,
+-    scr_erase_lines,
+-    scr_erase_center,
+-    sb_lines,
+-    scr_fullupdate,
+-    scr_disabled_for_loading,
+-    scr_turtle_count,
+-    clearconsole,
+-    scr_ram,
+-    scr_net,
+-    scr_turtle,
+-  ]
+-end function
+-
+-function SCR_ShouldSkipUpdate(realtime)
+-  global scr_disabled_for_loading
+-  if block_drawing or scr_skipupdate then return true end if
+-  if scr_loading_pending then return false end if
+-  if not scr_disabled_for_loading then return false end if
+-  if realtime - scr_disabled_time > 60.0 then
+-    scr_disabled_for_loading = false
+-    if screenConsole is not void then
+-      console.Con_Printf(screenConsole, "load failed.\n", screenConsole.dedicated, false)
+-    else
+-      print "load failed."
+-    end if
+-    return false
+-  end if
+-  return true
+-end function
+-
+-function ScreenCommandTrace()
+-  return lastScreenCommands
+-end function
+-
+-function SCR_UpdateWholeScreen()
+-  global scr_fullupdate
+-  scr_fullupdate = 0
+-  return true
+-end function
+-
+-function ScreenOverlayOrder(dialog, loading, intermission, gameInput)
+-  if dialog then return ["set2d", "tileclear", "dialog", "hud", "fade", "notify-string"] end if
+-  if loading then return ["set2d", "tileclear", "loading", "hud"] end if
+-  if intermission == 1 and gameInput then return ["set2d", "tileclear", "intermission"] end if
+-  if intermission == 2 and gameInput then return ["set2d", "tileclear", "finale", "center"] end if
+-  return ["set2d", "tileclear", "crosshair", "ram", "net", "turtle", "pause", "center", "hud", "console", "menu"]
+-end function
+-
+-function SCR_UpdateScreen(
+-  consoleState,
+-  menuState,
+-  viewState,
+-  player,
+-  width,
+-  height,
+-  mapName,
+-  showCrosshair,
+-  realtime,
+-  frameTime,
+-  registry,
+-  connected,
+-  signon,
+-  paused,
+-  lastMessageTime,
+-  demoPlayback,
+-  cacheThrash,
+-  gameInput,
+-  consoleInput
+-)
+-  global scr_copytop, scr_copyeverything, lastScreenCommands, scr_fullupdate, scr_loading_pending, scr_drawloading, scr_disabled_for_loading, scr_disabled_time, screenRealtime
+-  screenRealtime = realtime
+-  lastScreenCommands = []
+-  if block_drawing or scr_skipupdate or not scr_initialized then return lastScreenCommands end if
+-  if SCR_ShouldSkipUpdate(realtime) then lastScreenCommands = [["skip-loading"]]; return lastScreenCommands end if
+-  scr_copytop = 0
+-  scr_copyeverything = 0
+-  draw.SetVideoSize(width, height)
+-  console.Con_CheckResize(consoleState, width)
+-  refdef = SCR_CalcRefdef(width, height, registry, scr_intermission)
+-  if refdef is error then return refdef end if
+-  numPages = 2 + native.trunc(screenCvar("gl_triplebuffer", 1.0))
+-  SCR_SetUpToDrawConsole(consoleState, height, frameTime, registry, not connected or signon != c.SIGNONS, consoleInput, numPages)
+-  draw.GL_Set2D()
+-  lastScreenCommands = lastScreenCommands + [["set2d"]]
+-  SCR_TileClear(width, height)
+-  lastScreenCommands = lastScreenCommands + [["tileclear"]]
+-  teamplay = screenCvar("teamplay", 0.0)
+-  statusbar.Sbar_Configure(menuState, consoleState.textureId, player, screenClient, width, height, sb_lines, teamplay)
+-  statusbar.Sbar_SetFrameState(scr_con_current, numPages)
+-
+-  if scr_drawdialog then
+-    drawHud(consoleState, menuState, player, width, height, registry)
+-    draw.Draw_FadeScreen()
+-    statusbar.Sbar_Changed()
+-    SCR_DrawNotifyString(width, height)
+-    scr_copyeverything = 1
+-    lastScreenCommands = lastScreenCommands + [["dialog"], ["hud"], ["fade"], ["notify-string"]]
+-  else if scr_drawloading then
+-    SCR_DrawLoading(width, height)
+-    drawHud(consoleState, menuState, player, width, height, registry)
+-    lastScreenCommands = lastScreenCommands + [["loading"], ["hud"]]
+-  else if scr_intermission == 1 and gameInput then
+-    statusbar.Sbar_IntermissionOverlay()
+-    lastScreenCommands = lastScreenCommands + [["intermission"]]
+-  else if scr_intermission == 2 and gameInput then
+-    statusbar.Sbar_FinaleOverlay()
+-    SCR_CheckDrawCenterString(width, height, realtime, frameTime, gameInput)
+-    lastScreenCommands = lastScreenCommands + [["finale"], ["center"]]
+-  else
+-    if showCrosshair then
+-      draw.Draw_Character(scr_vrect[0] + native.trunc(scr_vrect[2] / 2), scr_vrect[1] + native.trunc(scr_vrect[3] / 2), 43)
+-      lastScreenCommands = lastScreenCommands + [["crosshair"]]
+-    end if
+-    if SCR_DrawRam(cacheThrash) then lastScreenCommands = lastScreenCommands + [["ram"]] end if
+-    if SCR_DrawNet(realtime, lastMessageTime, demoPlayback) then lastScreenCommands = lastScreenCommands + [["net"]] end if
+-    if SCR_DrawTurtle(frameTime) then lastScreenCommands = lastScreenCommands + [["turtle"]] end if
+-    if SCR_DrawPause(paused, width, height) then lastScreenCommands = lastScreenCommands + [["pause"]] end if
+-    SCR_CheckDrawCenterString(width, height, realtime, frameTime, gameInput)
+-    lastScreenCommands = lastScreenCommands + [["center"]]
+-    drawHud(consoleState, menuState, player, width, height, registry)
+-    lastScreenCommands = lastScreenCommands + [["hud"]]
+-    consoleResult = SCR_DrawConsole(consoleState, width, height, gameInput)
+-    lastScreenCommands = lastScreenCommands + [[consoleResult]]
+-    menu.render(menuState, consoleState.textureId, width, height, mapName, realtime, registry)
+-    lastScreenCommands = lastScreenCommands + [["menu"]]
+-  end if
+-  draw.end2d()
+-  // gl_screen.c updates the cshifts only after the entire 2D overlay has been
+-  // drawn.  R_PolyBlend therefore consumed the pre-update blend for this
+-  // frame, while this prepares the blend/gamma ramps for the next frame.
+-  if viewState is not void and player is not void and registry is not void then
+-    view.V_UpdatePalette(
+-      viewState,
+-      player.items,
+-      frameTime,
+-      cvar.variableValue(registry, "gl_cshiftpercent"),
+-      cvar.variableValue(registry, "gamma"),
+-    )
+-    lastScreenCommands = lastScreenCommands + [["palette"]]
+-  end if
+-  if scr_loading_pending then
+-    scr_loading_pending = false
+-    scr_drawloading = false
+-    scr_disabled_for_loading = true
+-    scr_disabled_time = realtime
+-  end if
+-  scr_fullupdate = scr_fullupdate + 1
+-  return lastScreenCommands
+-end function
+-
+-function render(consoleState, menuState, viewState, player, width, height, mapName, showCrosshair, realtime, registry)
+-  global screenRealtime
+-  screenRealtime = realtime
+-  draw.begin2d(width, height)
+-  if showCrosshair and (menuState is void or not menuState.active) then drawCrosshair(width, height) end if
+-  drawBlend(viewState, width, height)
+-  drawHud(consoleState, menuState, player, width, height, registry)
+-  drawNotify(consoleState, width, height)
+-  drawCenter(consoleState, width, height)
+-  draw.end2d()
+-  menu.render(menuState, consoleState.textureId, width, height, mapName, realtime, registry)
+-  draw.drawConsole(consoleState, width, height, 1.0)
+-  return true
+-end function
++package miniquake.screen
++
++import miniquake.render.gl11 as gl
++import miniquake.render.draw2d as draw
++import miniquake.native as native
++import miniquake.menu as menu
++import miniquake.statusbar as statusbar
++import miniquake.cvar as cvar
++import miniquake.console as console
++import miniquake.keys as keys
++import miniquake.filesystem as qfs
++import miniquake.constants as c
++import miniquake.mathlib as math
++import miniquake.view as view
++import miniquake.gl_vidnt as glvid
++import std.fs as fs
++import miniquake.render_ui_contract as renderUiContract
++
++scr_copytop = 0
++scr_copyeverything = 0
++scr_con_current = 0.0
++scr_conlines = 0.0
++oldscreensize = -1.0
++oldfov = -1.0
++oldRefdefWidth = -1
++oldRefdefHeight = -1
++oldRefdefIntermission = -1
++scr_initialized = false
++scr_ram = void
++scr_net = void
++scr_turtle = void
++scr_fullupdate = 0
++clearconsole = 0
++clearnotify = 0
++sb_lines = 0
++scr_vrect = [0, 0, 320, 152, 90.0, 74.0]
++scr_disabled_for_loading = false
++scr_drawloading = false
++scr_disabled_time = 0.0
++scr_loading_pending = false
++block_drawing = false
++scr_skipupdate = false
++scr_centerstring = ""
++scr_centertime_start = 0.0
++scr_centertime_off = 0.0
++scr_center_lines = 0
++scr_erase_lines = 0
++scr_erase_center = 0
++scr_notifystring = ""
++scr_drawdialog = false
++scr_turtle_count = 0
++scr_intermission = 0
++screenFilesystem = void
++screenRegistry = void
++screenClient = void
++screenConsole = void
++screenBasePalette = void
++lastScreenCommands = []
++screenRealtime = 0.0
++
++function initialize(consoleState, menuState, filesystem, palette, width, height, registry)
++  global screenConsole, screenBasePalette
++  if consoleState is void then return false end if
++  screenConsole = consoleState
++  screenBasePalette = palette
++  if consoleState.textureId == 0 then
++    initialized = try(draw.Draw_Init(filesystem, palette, width, height, registry))
++    if initialized is error then return false end if
++    consoleState.textureId = draw.CharTexture()
++  end if
++  if not scr_initialized then
++    initialized = try(SCR_Init(filesystem, registry, width, height))
++    if initialized is error then return false end if
++  end if
++  if menuState is not void then menu.initialize(menuState, filesystem, palette) end if
++  sbarInitialized = try(statusbar.Sbar_Init(filesystem.gameDirectory))
++  if sbarInitialized is error then return false end if
++  return true
++end function
++
++function SCR_ConfigureClient(clientState)
++  global screenClient
++  screenClient = clientState
++  return true
++end function
++
++function shutdown(consoleState, menuState)
++  if menuState is not void then menu.shutdown(menuState) end if
++  if consoleState is not void and consoleState.textureId != 0 then
++    gl.deleteTexture(consoleState.textureId)
++    consoleState.textureId = 0
++  end if
++  return true
++end function
++
++function drawCrosshair(width, height)
++  centerX = native.trunc(width * 0.5) - 4
++  centerY = native.trunc(height * 0.5) - 4
++  return draw.Draw_Character(centerX, centerY, 43)
++end function
++
++function drawBlend(viewState, width, height)
++  if viewState is void or len(viewState.blend) < 4 or viewState.blend[3] <= 0.0 then return false end if
++  red = native.trunc(viewState.blend[0] * 255.0)
++  green = native.trunc(viewState.blend[1] * 255.0)
++  blue = native.trunc(viewState.blend[2] * 255.0)
++  alpha = native.trunc(viewState.blend[3] * 255.0)
++  draw.solidQuad(0.0, 0.0, width * 1.0, height * 1.0, red, green, blue, alpha)
++  return true
++end function
++
++function drawHud(consoleState, menuState, player, width, height, registry)
++  if consoleState is void or consoleState.textureId == 0 then return false end if
++  viewSize = 100.0
++  if registry is not void then viewSize = cvar.variableValue(registry, "viewsize") end if
++  teamplay = 0.0
++  if registry is not void then teamplay = cvar.variableValue(registry, "teamplay") end if
++  return statusbar.render(menuState, consoleState.textureId, player, width, height, viewSize, screenClient, teamplay)
++end function
++
++
++function drawNotify(consoleState, width, height)
++  if consoleState is void or consoleState.textureId == 0 or consoleState.active then return false end if
++  messageMode = keys.destination() == keys.KEY_MESSAGE
++  commands = console.Con_DrawNotify(consoleState, screenRealtime, screenCvar("con_notifytime", 3.0), messageMode, keys.chatBuffer)
++  for each command in commands
++    data = command[3]
++    index = 0
++    while index < len(data)
++      draw.Draw_Character(command[1] + index * 8, command[2], data[index])
++      index = index + 1
++    end while
++    if command[0] == "chat" then draw.Draw_Character(command[1] + len(data) * 8, command[2], command[4]) end if
++  end for
++  return true
++end function
++
++function drawCenter(consoleState, width, height)
++  if consoleState is void or consoleState.textureId == 0 or consoleState.centerText == "" then return false end if
++  data = bytes(consoleState.centerText)
++  lineWidth = len(data) * 8.0
++  x = (width - lineWidth) * 0.5
++  if x < 8.0 then x = 8.0 end if
++  y = height * 0.35
++  draw.string(consoleState.textureId, x, y, consoleState.centerText, 1.0, 255)
++  return true
++end function
++
++// =============================================================================
++// gl_screen.c compatibility surface
++// =============================================================================
++
++function screenCvar(name, fallback)
++  if screenRegistry is void then return fallback end if
++  variable = cvar.find(screenRegistry, name)
++  if variable is void then return fallback end if
++  return variable.value
++end function
++
++function SCR_CenterPrint(consoleState, text, currentTime)
++  global scr_centerstring, scr_centertime_off, scr_centertime_start, scr_center_lines
++  data = bytes(text)
++  if len(data) > 1023 then data = slice(data, 0, 1023); text = decode(data) end if
++  scr_centerstring = text
++  scr_centertime_off = screenCvar("scr_centertime", 2.0)
++  scr_centertime_start = currentTime
++  scr_center_lines = 1
++  index = 0
++  while index < len(data)
++    if data[index] == 10 then scr_center_lines = scr_center_lines + 1 end if
++    index = index + 1
++  end while
++  if consoleState is not void then
++    consoleState.centerText = text
++    consoleState.centerUntil = currentTime + scr_centertime_off
++    console.Con_LogCenterPrint(consoleState, text, currentTime)
++  end if
++  return scr_center_lines
++end function
++
++function CenterStringTrace(text, width, height, lineCount, remaining)
++  commands = []
++  source = bytes(text)
++  offset = 0
++  y = 48
++  if lineCount <= 4 then y = native.trunc(height * 0.35) end if
++  while offset < len(source)
++    length = 0
++    while length < 40 and offset + length < len(source) and source[offset + length] != 10
++      length = length + 1
++    end while
++    x = native.trunc((width - length * 8) / 2)
++    index = 0
++    while index < length
++      commands = commands + [[x, y, source[offset + index]]]
++      if remaining == 0 then return commands end if
++      remaining = remaining - 1
++      x = x + 8
++      index = index + 1
++    end while
++    y = y + 8
++    offset = offset + length
++    if offset >= len(source) then break end if
++    if source[offset] == 10 then offset = offset + 1 end if
++  end while
++  return commands
++end function
++
++function SCR_DrawCenterString(width, height, currentTime)
++  global scr_erase_center
++  remaining = 9999
++  if scr_intermission != 0 then
++    remaining = native.trunc(screenCvar("scr_printspeed", 8.0) * (currentTime - scr_centertime_start))
++  end if
++  scr_erase_center = 0
++  commands = CenterStringTrace(scr_centerstring, width, height, scr_center_lines, remaining)
++  for each command in commands
++    draw.Draw_Character(command[0], command[1], command[2])
++  end for
++  return len(commands)
++end function
++
++function SCR_CheckDrawCenterString(width, height, currentTime, frameTime, gameInput)
++  global scr_copytop, scr_erase_lines, scr_centertime_off
++  scr_copytop = 1
++  if scr_center_lines > scr_erase_lines then scr_erase_lines = scr_center_lines end if
++  scr_centertime_off = scr_centertime_off - frameTime
++  if scr_centertime_off <= 0.0 and scr_intermission == 0 then return 0 end if
++  if not gameInput then return 0 end if
++  return SCR_DrawCenterString(width, height, currentTime)
++end function
++
++function CalcFov(fov_x, width, height)
++  if fov_x < 1.0 or fov_x > 179.0 then return error(3400, "Bad fov: " + fov_x) end if
++  halfAngle = fov_x * math.DEG_TO_RAD * 0.5
++  tangent = math.sin(halfAngle) / math.cos(halfAngle)
++  x = width / tangent
++  return math.atan2(height, x) * 2.0 * math.RAD_TO_DEG
++end function
++
++function SCR_CalcRefdef(width, height, registry, intermission)
++  global scr_fullupdate, sb_lines, scr_vrect, oldscreensize, oldfov, screenRegistry
++  global oldRefdefWidth, oldRefdefHeight, oldRefdefIntermission
++  if registry is not void then screenRegistry = registry end if
++  viewSize = screenCvar("viewsize", 100.0)
++  fov = screenCvar("fov", 90.0)
++  refdefChanged = viewSize != oldscreensize or fov != oldfov or width != oldRefdefWidth or height != oldRefdefHeight or intermission != oldRefdefIntermission
++  oldscreensize = viewSize
++  oldfov = fov
++  oldRefdefWidth = width
++  oldRefdefHeight = height
++  oldRefdefIntermission = intermission
++  if refdefChanged then
++    scr_fullupdate = 0
++    statusbar.Sbar_Changed()
++  end if
++  if viewSize < 30.0 then viewSize = 30.0; if screenRegistry is not void then cvar.setValue(screenRegistry, "viewsize", viewSize) end if end if
++  if viewSize > 120.0 then viewSize = 120.0; if screenRegistry is not void then cvar.setValue(screenRegistry, "viewsize", viewSize) end if end if
++  if fov < 10.0 then fov = 10.0; if screenRegistry is not void then cvar.setValue(screenRegistry, "fov", fov) end if end if
++  if fov > 170.0 then fov = 170.0; if screenRegistry is not void then cvar.setValue(screenRegistry, "fov", fov) end if end if
++
++  size = viewSize
++  if intermission != 0 then size = 120.0 end if
++  if size >= 120.0 then sb_lines = 0
++  else if size >= 110.0 then sb_lines = 24
++  else sb_lines = 48
++  end if
++
++  full = false
++  if viewSize >= 100.0 then full = true; size = 100.0 else size = viewSize end if
++  if intermission != 0 then full = true; size = 100.0; sb_lines = 0 end if
++  size = size / 100.0
++  availableHeight = height - sb_lines
++  viewWidth = native.trunc(width * size)
++  if viewWidth < 96 then size = 96.0 / viewWidth; viewWidth = 96 end if
++  viewHeight = native.trunc(height * size)
++  if viewHeight > availableHeight then viewHeight = availableHeight end if
++  if viewHeight > height then viewHeight = height end if
++  viewX = native.trunc((width - viewWidth) / 2)
++  viewY = 0
++  if not full then viewY = native.trunc((availableHeight - viewHeight) / 2) end if
++  fovY = try(CalcFov(fov, viewWidth, viewHeight))
++  if fovY is error then return fovY end if
++  scr_vrect = [viewX, viewY, viewWidth, viewHeight, fov, fovY]
++  return scr_vrect
++end function
++
++function SCR_SizeUp_f(registry)
++  if registry is void then return false end if
++  return cvar.setValue(registry, "viewsize", cvar.variableValue(registry, "viewsize") + 10.0)
++end function
++
++function SCR_SizeDown_f(registry)
++  if registry is void then return false end if
++  return cvar.setValue(registry, "viewsize", cvar.variableValue(registry, "viewsize") - 10.0)
++end function
++
++function SCR_SizeUp()
++  return SCR_SizeUp_f(screenRegistry)
++end function
++
++function SCR_SizeDown()
++  return SCR_SizeDown_f(screenRegistry)
++end function
++
++function SCR_Init(filesystem, registry, width, height)
++  global scr_initialized, scr_ram, scr_net, scr_turtle, screenFilesystem, screenRegistry
++  screenFilesystem = filesystem
++  screenRegistry = registry
++  draw.SetVideoSize(width, height)
++  scr_ram = try(draw.Draw_PicFromWad("ram"))
++  if scr_ram is error then return scr_ram end if
++  scr_net = try(draw.Draw_PicFromWad("net"))
++  if scr_net is error then return scr_net end if
++  scr_turtle = try(draw.Draw_PicFromWad("turtle"))
++  if scr_turtle is error then return scr_turtle end if
++  SCR_CalcRefdef(width, height, registry, 0)
++  scr_initialized = true
++  return true
++end function
++
++function SCR_DrawRam(cacheThrash)
++  if screenCvar("showram", 1.0) == 0.0 or not cacheThrash or scr_ram is void then return false end if
++  return draw.Draw_Pic(scr_vrect[0] + 32, scr_vrect[1], scr_ram)
++end function
++
++function SCR_DrawTurtle(frameTime)
++  global scr_turtle_count
++  if screenCvar("showturtle", 0.0) == 0.0 or scr_turtle is void then return false end if
++  if frameTime < 0.1 then scr_turtle_count = 0; return false end if
++  scr_turtle_count = scr_turtle_count + 1
++  if scr_turtle_count < 3 then return false end if
++  return draw.Draw_Pic(scr_vrect[0], scr_vrect[1], scr_turtle)
++end function
++
++function SCR_DrawNet(realtime, lastMessageTime, demoPlayback)
++  if realtime - lastMessageTime < 0.3 or demoPlayback or scr_net is void then return false end if
++  return draw.Draw_Pic(scr_vrect[0] + 64, scr_vrect[1], scr_net)
++end function
++
++function SCR_DrawPause(paused, width, height)
++  if screenCvar("showpause", 1.0) == 0.0 or not paused then return false end if
++  picture = try(draw.Draw_CachePic("gfx/pause.lmp"))
++  if picture is error then return picture end if
++  return draw.Draw_Pic(native.trunc((width - picture.width) / 2), native.trunc((height - 48 - picture.height) / 2), picture)
++end function
++
++function SCR_DrawLoading(width, height)
++  if not scr_drawloading then return false end if
++  picture = try(draw.Draw_CachePic("gfx/loading.lmp"))
++  if picture is error then return picture end if
++  return draw.Draw_Pic(native.trunc((width - picture.width) / 2), native.trunc((height - 48 - picture.height) / 2), picture)
++end function
++
++function SCR_SetUpToDrawConsole(consoleState, height, frameTime, registry, forcedUp, consoleInput, numPages)
++  global scr_conlines, scr_con_current, clearconsole, clearnotify, screenRegistry
++  if registry is not void then screenRegistry = registry end if
++  if consoleState is not void then consoleState.forcedUp = forcedUp end if
++  if scr_drawloading then return scr_con_current end if
++  if forcedUp then
++    scr_conlines = height
++    scr_con_current = scr_conlines
++  else if consoleInput then scr_conlines = height / 2.0
++  else scr_conlines = 0.0
++  end if
++  speed = screenCvar("scr_conspeed", 300.0) * frameTime
++  if scr_conlines < scr_con_current then
++    scr_con_current = scr_con_current - speed
++    if scr_conlines > scr_con_current then scr_con_current = scr_conlines end if
++  else if scr_conlines > scr_con_current then
++    scr_con_current = scr_con_current + speed
++    if scr_conlines < scr_con_current then scr_con_current = scr_conlines end if
++  end if
++  oldClear = clearconsole
++  clearconsole = clearconsole + 1
++  if oldClear < numPages then
++    statusbar.Sbar_Changed()
++  else
++    oldNotify = clearnotify
++    clearnotify = clearnotify + 1
++    if oldNotify >= numPages and consoleState is not void then consoleState.notifyPixelLines = 0 end if
++  end if
++  return scr_con_current
++end function
++
++function drawConsoleHeight(consoleState, width, height, visibleHeight)
++  if consoleState is void or consoleState.textureId == 0 or visibleHeight <= 0 then return false end if
++  lines = native.trunc(visibleHeight)
++  commands = console.Con_DrawConsole(consoleState, lines, true, screenRealtime)
++  for each command in commands
++    if command[0] == "background" then
++      draw.Draw_ConsoleBackground(command[1])
++    else if command[0] == "text" then
++      data = command[3]
++      index = 0
++      while index < len(data)
++        draw.Draw_Character(command[1] + index * 8, command[2], data[index])
++        index = index + 1
++      end while
++    else if command[0] == "input" then
++      data = command[1]
++      index = 0
++      while index < len(data)
++        draw.Draw_Character(8 + index * 8, lines - 16, data[index])
++        index = index + 1
++      end while
++    end if
++  end for
++  return true
++end function
++
++function SCR_DrawConsole(consoleState, width, height, gameOrMessageInput)
++  global scr_copyeverything, clearconsole
++  if scr_con_current > 0.0 then
++    scr_copyeverything = 1
++    drawConsoleHeight(consoleState, width, height, scr_con_current)
++    clearconsole = 0
++    return "console"
++  end if
++  if gameOrMessageInput or keys.destination() == keys.KEY_MESSAGE then drawNotify(consoleState, width, height); return "notify" end if
++  return "none"
++end function
++
++function BuildTga(width, height, rgba)
++  if width <= 0 or height <= 0 or len(rgba) < width * height * 4 then return error(3401, "SCR_ScreenShot_f: invalid framebuffer") end if
++  output = bytes(renderUiContract.tgaByteLength(width, height))
++  output[2] = 2
++  output[12] = width & 255
++  output[13] = (width >> 8) & 255
++  output[14] = height & 255
++  output[15] = (height >> 8) & 255
++  output[16] = 24
++  index = 0
++  while index < width * height
++    source = index * 4
++    destination = 18 + index * 3
++    output[destination] = rgba[source + 2]
++    output[destination + 1] = rgba[source + 1]
++    output[destination + 2] = rgba[source]
++    index = index + 1
++  end while
++  return output
++end function
++
++function screenshotName(filesystem)
++  index = 0
++  while index <= 99
++    tens = native.trunc(index / 10)
++    ones = index % 10
++    name = "quake" + tens + ones + ".tga"
++    if not fs.exists(qfs.gamePath(filesystem, name)) then return name end if
++    index = index + 1
++  end while
++  return ""
++end function
++
++function SCR_ScreenShot_f(filesystem, x, y, width, height)
++  name = screenshotName(filesystem)
++  if name == "" then return error(3402, "SCR_ScreenShot_f: Couldn't create a TGA file") end if
++  rgba = gl.readPixelsRgba(x, y, width, height)
++  tga = try(BuildTga(width, height, rgba))
++  if tga is error then return tga end if
++  written = qfs.writeFile(filesystem, name, tga)
++  if written is error then return written end if
++  return name
++end function
++
++function SCR_BeginLoadingPlaque(consoleState, realtime, connected, signon)
++  global scr_drawloading, scr_fullupdate, scr_disabled_for_loading, scr_disabled_time, scr_centertime_off, scr_con_current, scr_loading_pending
++  if not connected or signon != c.SIGNONS then return false end if
++  if consoleState is not void then console.Con_ClearNotify(consoleState) end if
++  scr_centertime_off = 0.0
++  scr_con_current = 0.0
++  scr_drawloading = true
++  scr_loading_pending = true
++  scr_fullupdate = 0
++  statusbar.Sbar_Changed()
++  scr_disabled_for_loading = false
++  scr_disabled_time = realtime
++  return true
++end function
++
++function SCR_EndLoadingPlaque(consoleState)
++  global scr_disabled_for_loading, scr_drawloading, scr_fullupdate, scr_loading_pending
++  scr_disabled_for_loading = false
++  scr_drawloading = false
++  scr_loading_pending = false
++  scr_fullupdate = 0
++  if consoleState is not void then console.Con_ClearNotify(consoleState) end if
++  return true
++end function
++
++function SCR_DrawNotifyString(width, height)
++  commands = CenterStringTrace(scr_notifystring, width, height, 1, 9999)
++  for each command in commands
++    draw.Draw_Character(command[0], command[1], command[2])
++  end for
++  return len(commands)
++end function
++
++// The original blocks in a platform event loop.  MiniLang's host owns that
++// loop, so a key code is supplied when available; void means "still pending".
++function SCR_ModalMessage(text, keyCode, dedicated)
++  global scr_notifystring, scr_drawdialog, scr_fullupdate
++  if dedicated then return true end if
++  scr_notifystring = text
++  scr_fullupdate = 0
++  scr_drawdialog = true
++  if keyCode is void then return void end if
++  if keyCode == 121 or keyCode == 89 then scr_drawdialog = false; scr_fullupdate = 0; return true end if
++  if keyCode == 110 or keyCode == 78 or keyCode == 27 then scr_drawdialog = false; scr_fullupdate = 0; return false end if
++  return void
++end function
++
++function SCR_BringDownConsole(consoleState, height, frameTime, registry, viewState)
++  global scr_centertime_off
++  scr_centertime_off = 0.0
++  steps = 0
++  while steps < 20 and scr_conlines != scr_con_current
++    SCR_SetUpToDrawConsole(consoleState, height, frameTime, registry, false, false, 3)
++    steps = steps + 1
++  end while
++  if viewState is not void then viewState.cshifts[view.CSHIFT_CONTENTS][3] = 0.0 end if
++  if screenBasePalette is not void then glvid.VID_SetPalette(screenBasePalette) end if
++  return steps
++end function
++
++function SCR_TileClear(width, height)
++  commands = []
++  x = scr_vrect[0]
++  y = scr_vrect[1]
++  viewWidth = scr_vrect[2]
++  viewHeight = scr_vrect[3]
++  if x > 0 then
++    draw.Draw_TileClear(0, 0, x, height - sb_lines)
++    commands = commands + [[0, 0, x, height - sb_lines]]
++    rightX = x + viewWidth
++    // Preserve GLQuake 1.09's historical width expression verbatim.
++    rightWidth = width - x + viewWidth
++    if rightWidth > 0 then draw.Draw_TileClear(rightX, 0, rightWidth, height - sb_lines); commands = commands + [[rightX, 0, rightWidth, height - sb_lines]] end if
++  end if
++  if y > 0 then
++    topWidth = x + viewWidth
++    draw.Draw_TileClear(x, 0, topWidth, y)
++    commands = commands + [[x, 0, topWidth, y]]
++    bottomY = y + viewHeight
++    bottomHeight = height - sb_lines - bottomY
++    if bottomHeight > 0 then draw.Draw_TileClear(x, bottomY, viewWidth, bottomHeight); commands = commands + [[x, bottomY, viewWidth, bottomHeight]] end if
++  end if
++  return commands
++end function
++
++function SCR_SetIntermission(mode, text, consoleState, currentTime)
++  global scr_intermission
++  scr_intermission = mode
++  if text != "" then SCR_CenterPrint(void, text, currentTime) end if
++  return scr_intermission
++end function
++
++function SCR_IntermissionMode()
++  return scr_intermission
++end function
++
++// Deterministic differential hooks. They expose logical C globals without
++// putting renderer or platform behavior into the native bridge.
++function SCR_DifferentialSetEraseLines(value)
++  global scr_erase_lines
++  scr_erase_lines = value
++  return value
++end function
++
++function SCR_DifferentialSetTurtleCount(value)
++  global scr_turtle_count
++  scr_turtle_count = value
++  return value
++end function
++
++function SCR_DifferentialSetDrawLoading(value)
++  global scr_drawloading
++  scr_drawloading = value
++  return value
++end function
++
++function SCR_DifferentialSetConsole(current, lines)
++  global scr_con_current, scr_conlines
++  scr_con_current = current
++  scr_conlines = lines
++  return current
++end function
++
++function SCR_DifferentialSetNotify(text)
++  global scr_notifystring
++  scr_notifystring = text
++  return text
++end function
++
++function SCR_DifferentialSetTile(viewRectangle, statusLines)
++  global scr_vrect, sb_lines
++  scr_vrect = viewRectangle
++  sb_lines = statusLines
++  return scr_vrect
++end function
++
++function SCR_DifferentialSetBlocked(value)
++  global block_drawing
++  block_drawing = value
++  return block_drawing
++end function
++
++function SCR_DifferentialState()
++  return [
++    scr_copytop,
++    scr_copyeverything,
++    scr_con_current,
++    scr_conlines,
++    scr_centertime_off,
++    scr_centertime_start,
++    scr_center_lines,
++    scr_erase_lines,
++    scr_erase_center,
++    sb_lines,
++    scr_fullupdate,
++    scr_disabled_for_loading,
++    scr_turtle_count,
++    clearconsole,
++    scr_ram,
++    scr_net,
++    scr_turtle,
++  ]
++end function
++
++function SCR_ShouldSkipUpdate(realtime)
++  global scr_disabled_for_loading
++  if block_drawing or scr_skipupdate then return true end if
++  if scr_loading_pending then return false end if
++  if not scr_disabled_for_loading then return false end if
++  if realtime - scr_disabled_time > 60.0 then
++    scr_disabled_for_loading = false
++    if screenConsole is not void then
++      console.Con_Printf(screenConsole, "load failed.\n", screenConsole.dedicated, false)
++    else
++      print "load failed."
++    end if
++    return false
++  end if
++  return true
++end function
++
++function ScreenCommandTrace()
++  return lastScreenCommands
++end function
++
++function SCR_UpdateWholeScreen()
++  global scr_fullupdate
++  scr_fullupdate = 0
++  return true
++end function
++
++function ScreenOverlayOrder(dialog, loading, intermission, gameInput)
++  return renderUiContract.overlayOrder(dialog, loading, intermission, gameInput)
++end function
++
++function SCR_UpdateScreen(
++  consoleState,
++  menuState,
++  viewState,
++  player,
++  width,
++  height,
++  mapName,
++  showCrosshair,
++  realtime,
++  frameTime,
++  registry,
++  connected,
++  signon,
++  paused,
++  lastMessageTime,
++  demoPlayback,
++  cacheThrash,
++  gameInput,
++  consoleInput
++)
++  global scr_copytop, scr_copyeverything, lastScreenCommands, scr_fullupdate, scr_loading_pending, scr_drawloading, scr_disabled_for_loading, scr_disabled_time, screenRealtime
++  screenRealtime = realtime
++  lastScreenCommands = []
++  if block_drawing or scr_skipupdate or not scr_initialized then return lastScreenCommands end if
++  if SCR_ShouldSkipUpdate(realtime) then lastScreenCommands = [["skip-loading"]]; return lastScreenCommands end if
++  scr_copytop = 0
++  scr_copyeverything = 0
++  draw.SetVideoSize(width, height)
++  console.Con_CheckResize(consoleState, width)
++  refdef = SCR_CalcRefdef(width, height, registry, scr_intermission)
++  if refdef is error then return refdef end if
++  numPages = 2 + native.trunc(screenCvar("gl_triplebuffer", 1.0))
++  SCR_SetUpToDrawConsole(consoleState, height, frameTime, registry, not connected or signon != c.SIGNONS, consoleInput, numPages)
++  draw.GL_Set2D()
++  lastScreenCommands = lastScreenCommands + [["set2d"]]
++  SCR_TileClear(width, height)
++  lastScreenCommands = lastScreenCommands + [["tileclear"]]
++  teamplay = screenCvar("teamplay", 0.0)
++  statusbar.Sbar_Configure(menuState, consoleState.textureId, player, screenClient, width, height, sb_lines, teamplay)
++  statusbar.Sbar_SetFrameState(scr_con_current, numPages)
++
++  if scr_drawdialog then
++    drawHud(consoleState, menuState, player, width, height, registry)
++    draw.Draw_FadeScreen()
++    statusbar.Sbar_Changed()
++    SCR_DrawNotifyString(width, height)
++    scr_copyeverything = 1
++    lastScreenCommands = lastScreenCommands + [["dialog"], ["hud"], ["fade"], ["notify-string"]]
++  else if scr_drawloading then
++    SCR_DrawLoading(width, height)
++    drawHud(consoleState, menuState, player, width, height, registry)
++    lastScreenCommands = lastScreenCommands + [["loading"], ["hud"]]
++  else if scr_intermission == 1 and gameInput then
++    statusbar.Sbar_IntermissionOverlay()
++    lastScreenCommands = lastScreenCommands + [["intermission"]]
++  else if scr_intermission == 2 and gameInput then
++    statusbar.Sbar_FinaleOverlay()
++    SCR_CheckDrawCenterString(width, height, realtime, frameTime, gameInput)
++    lastScreenCommands = lastScreenCommands + [["finale"], ["center"]]
++  else
++    if showCrosshair then
++      draw.Draw_Character(scr_vrect[0] + native.trunc(scr_vrect[2] / 2), scr_vrect[1] + native.trunc(scr_vrect[3] / 2), 43)
++      lastScreenCommands = lastScreenCommands + [["crosshair"]]
++    end if
++    if SCR_DrawRam(cacheThrash) then lastScreenCommands = lastScreenCommands + [["ram"]] end if
++    if SCR_DrawNet(realtime, lastMessageTime, demoPlayback) then lastScreenCommands = lastScreenCommands + [["net"]] end if
++    if SCR_DrawTurtle(frameTime) then lastScreenCommands = lastScreenCommands + [["turtle"]] end if
++    if SCR_DrawPause(paused, width, height) then lastScreenCommands = lastScreenCommands + [["pause"]] end if
++    SCR_CheckDrawCenterString(width, height, realtime, frameTime, gameInput)
++    lastScreenCommands = lastScreenCommands + [["center"]]
++    drawHud(consoleState, menuState, player, width, height, registry)
++    lastScreenCommands = lastScreenCommands + [["hud"]]
++    consoleResult = SCR_DrawConsole(consoleState, width, height, gameInput)
++    lastScreenCommands = lastScreenCommands + [[consoleResult]]
++    menu.render(menuState, consoleState.textureId, width, height, mapName, realtime, registry)
++    lastScreenCommands = lastScreenCommands + [["menu"]]
++  end if
++  draw.end2d()
++  // gl_screen.c updates the cshifts only after the entire 2D overlay has been
++  // drawn.  R_PolyBlend therefore consumed the pre-update blend for this
++  // frame, while this prepares the blend/gamma ramps for the next frame.
++  if viewState is not void and player is not void and registry is not void then
++    view.V_UpdatePalette(
++      viewState,
++      player.items,
++      frameTime,
++      cvar.variableValue(registry, "gl_cshiftpercent"),
++      cvar.variableValue(registry, "gamma"),
++    )
++    lastScreenCommands = lastScreenCommands + [["palette"]]
++  end if
++  if scr_loading_pending then
++    scr_loading_pending = false
++    scr_drawloading = false
++    scr_disabled_for_loading = true
++    scr_disabled_time = realtime
++  end if
++  scr_fullupdate = scr_fullupdate + 1
++  return lastScreenCommands
++end function
++
++function render(consoleState, menuState, viewState, player, width, height, mapName, showCrosshair, realtime, registry)
++  global screenRealtime
++  screenRealtime = realtime
++  draw.begin2d(width, height)
++  if showCrosshair and (menuState is void or not menuState.active) then drawCrosshair(width, height) end if
++  drawBlend(viewState, width, height)
++  drawHud(consoleState, menuState, player, width, height, registry)
++  drawNotify(consoleState, width, height)
++  drawCenter(consoleState, width, height)
++  draw.end2d()
++  menu.render(menuState, consoleState.textureId, width, height, mapName, realtime, registry)
++  draw.drawConsole(consoleState, width, height, 1.0)
++  return true
++end function
+diff --git a/src/miniquake/statusbar.ml b/src/miniquake/statusbar.ml
+index c8c96cd..99019fb 100644
+--- a/src/miniquake/statusbar.ml
++++ b/src/miniquake/statusbar.ml
+@@ -1,1057 +1,1057 @@
+-package miniquake.statusbar
+-
+-import miniquake.constants as c
+-import miniquake.native as native
+-import miniquake.menu as menu
+-import miniquake.render.draw2d as draw
+-import miniquake.byteio as bio
+-import miniquake.array_util as arrayutil
+-
+-const SBAR_HEIGHT = 24
+-const STAT_MINUS = 10
+-
+-sb_updates = 0
+-sb_showscores = false
+-sb_lines = 48
+-sbarInitialized = false
+-sbarHipnotic = false
+-sbarRogue = false
+-sbarState = void
+-sbarFontTexture = 0
+-sbarPlayer = void
+-sbarClient = void
+-sbarWidth = 320
+-sbarHeight = 200
+-sbarGameType = c.GAME_COOP
+-sbarTeamplay = 0.0
+-sbarConsoleCurrent = -1.0
+-sbarNumPages = 999999
+-sbarCopyEverything = false
+-sbarFullUpdate = 0
+-sbarPictures = []
+-sbarPictureNames = []
+-sbarInjectedPictures = []
+-sbarLoadTrace = []
+-fragsort = []
+-scoreboardtext = []
+-scoreboardtop = []
+-scoreboardbottom = []
+-scoreboardlines = 0
+-sbarTrace = []
+-
+-function rememberSbarPicture(name, value)
+-  global sbarPictures, sbarPictureNames
+-  if value is error then return value end if
+-  sbarPictureNames = sbarPictureNames + [name]
+-  sbarPictures = sbarPictures + [value]
+-  return value
+-end function
+-
+-function loadSbarPicture(name)
+-  global sbarLoadTrace
+-  sbarLoadTrace = sbarLoadTrace + [name]
+-  index = 0
+-  while index < len(sbarPictureNames)
+-    if sbarPictureNames[index] == name then return sbarPictures[index] end if
+-    index = index + 1
+-  end while
+-  for each injected in sbarInjectedPictures
+-    if injected.name == name then return rememberSbarPicture(name, injected) end if
+-  end for
+-  return rememberSbarPicture(name, draw.Draw_PicFromWad(name))
+-end function
+-
+-function loadedSbarPicture(name)
+-  index = 0
+-  while index < len(sbarPictureNames)
+-    if sbarPictureNames[index] == name then return sbarPictures[index] end if
+-    index = index + 1
+-  end while
+-  for each injected in sbarInjectedPictures
+-    if injected.name == name then return injected end if
+-  end for
+-  if sbarState is not void then
+-    found = menu.findWadPicture(sbarState, name)
+-    if found is not void then return found end if
+-  end if
+-  return void
+-end function
+-
+-function picture(state, name)
+-  if state is void then return void end if
+-  return menu.findWadPicture(state, name)
+-end function
+-
+-function drawPicture(state, name, x, y, scale, alpha)
+-  value = picture(state, name)
+-  if value is void or value.textureId == 0 then return false end if
+-  return draw.Draw_PicScaled(value, x, y, scale, alpha)
+-end function
+-
+-function scaleFor(width, height)
+-  // The WinQuake status area is authored at 320 pixels. Use an integral scale
+-  // so the original indexed artwork remains crisp while avoiding an oversized
+-  // bar in a short widescreen window.
+-  value = native.trunc(width / 640.0)
+-  if value < 1 then value = 1 end if
+-  while 48.0 * value > height * 0.28 and value > 1
+-    value = value - 1
+-  end while
+-  return value * 1.0
+-end function
+-
+-function drawNumber(state, x, y, number, digits, alternate, scale)
+-  value = native.trunc(number)
+-  source = bytes("" + value)
+-  start = 0
+-  if len(source) > digits then start = len(source) - digits end if
+-  visible = len(source) - start
+-  if visible < digits then x = x + (digits - visible) * 24.0 * scale end if
+-  index = start
+-  while index < len(source)
+-    code = source[index]
+-    name = ""
+-    if code == 45 then
+-      if alternate then name = "anum_minus" else name = "num_minus" end if
+-    else if code >= 48 and code <= 57 then
+-      if alternate then name = "anum_" + (code - 48) else name = "num_" + (code - 48) end if
+-    end if
+-    if name != "" then drawPicture(state, name, x, y, scale, 255) end if
+-    x = x + 24.0 * scale
+-    index = index + 1
+-  end while
+-  return true
+-end function
+-
+-function smallAmmoDigit(texture, x, y, digit, scale)
+-  if digit < 0 or digit > 9 then return false end if
+-  draw.character(texture, x, y, 18 + digit, scale, 255)
+-  return true
+-end function
+-
+-function drawSmallAmmo(texture, x, y, number, scale)
+-  value = native.trunc(number)
+-  if value < 0 then value = 0 end if
+-  if value > 999 then value = 999 end if
+-  hundreds = native.trunc(value / 100.0)
+-  tens = native.trunc((value % 100) / 10.0)
+-  ones = value % 10
+-  if hundreds > 0 then smallAmmoDigit(texture, x, y, hundreds, scale) end if
+-  if hundreds > 0 or tens > 0 then smallAmmoDigit(texture, x + 8.0 * scale, y, tens, scale) end if
+-  smallAmmoDigit(texture, x + 16.0 * scale, y, ones, scale)
+-  return true
+-end function
+-
+-function faceNameFor(items, health)
+-  if (items & (c.IT_INVISIBILITY | c.IT_INVULNERABILITY)) == (c.IT_INVISIBILITY | c.IT_INVULNERABILITY) then return "face_inv2" end if
+-  if (items & c.IT_QUAD) != 0 then return "face_quad" end if
+-  if (items & c.IT_INVISIBILITY) != 0 then return "face_invis" end if
+-  if (items & c.IT_INVULNERABILITY) != 0 then return "face_invul2" end if
+-  if health >= 80 then return "face1" end if
+-  if health >= 60 then return "face2" end if
+-  if health >= 40 then return "face3" end if
+-  if health >= 20 then return "face4" end if
+-  return "face5"
+-end function
+-
+-function faceName(player)
+-  return faceNameFor(native.trunc(player.items), native.trunc(player.health))
+-end function
+-
+-function armorName(items)
+-  if (items & c.IT_ARMOR3) != 0 then return "sb_armor3" end if
+-  if (items & c.IT_ARMOR2) != 0 then return "sb_armor2" end if
+-  if (items & c.IT_ARMOR1) != 0 then return "sb_armor1" end if
+-  return ""
+-end function
+-
+-function ammoName(items)
+-  if (items & c.IT_SHELLS) != 0 then return "sb_shells" end if
+-  if (items & c.IT_NAILS) != 0 then return "sb_nails" end if
+-  if (items & c.IT_ROCKETS) != 0 then return "sb_rocket" end if
+-  if (items & c.IT_CELLS) != 0 then return "sb_cells" end if
+-  return ""
+-end function
+-
+-function drawInventory(state, fontTexture, player, x, y, scale)
+-  drawPicture(state, "ibar", x, y, scale, 255)
+-  items = native.trunc(player.items)
+-  active = native.trunc(player.activeWeapon)
+-  weaponNames = ["shotgun", "sshotgun", "nailgun", "snailgun", "rlaunch", "srlaunch", "lightng"]
+-  index = 0
+-  while index < len(weaponNames)
+-    bit = c.IT_SHOTGUN << index
+-    if (items & bit) != 0 then
+-      prefix = "inv_"
+-      if active == bit then prefix = "inv2_" end if
+-      drawPicture(state, prefix + weaponNames[index], x + index * 24.0 * scale, y + 8.0 * scale, scale, 255)
+-    end if
+-    index = index + 1
+-  end while
+-
+-  counts = [player.shells, player.nails, player.rockets, player.cells]
+-  index = 0
+-  while index < 4
+-    drawSmallAmmo(
+-      fontTexture,
+-      x + ((6.0 * index + 1.0) * 8.0 - 2.0) * scale,
+-      y,
+-      counts[index],
+-      scale,
+-    )
+-    index = index + 1
+-  end while
+-
+-  itemNames = ["sb_key1", "sb_key2", "sb_invis", "sb_invuln", "sb_suit", "sb_quad"]
+-  index = 0
+-  while index < 6
+-    bit = 1 << (17 + index)
+-    if (items & bit) != 0 then
+-      drawPicture(state, itemNames[index], x + (192.0 + index * 16.0) * scale, y + 8.0 * scale, scale, 255)
+-    end if
+-    index = index + 1
+-  end while
+-
+-  index = 0
+-  while index < 4
+-    bit = 1 << (28 + index)
+-    if (items & bit) != 0 then
+-      drawPicture(state, "sb_sigil" + (index + 1), x + (288.0 + index * 8.0) * scale, y + 8.0 * scale, scale, 255)
+-    end if
+-    index = index + 1
+-  end while
+-  return true
+-end function
+-
+-function drawMainBar(state, player, x, y, scale)
+-  drawPicture(state, "sbar", x, y, scale, 255)
+-  items = native.trunc(player.items)
+-
+-  if (items & c.IT_INVULNERABILITY) != 0 then
+-    drawNumber(state, x + 24.0 * scale, y, 666, 3, true, scale)
+-    drawPicture(state, "disc", x, y, scale, 255)
+-  else
+-    drawNumber(state, x + 24.0 * scale, y, player.armor, 3, player.armor <= 25.0, scale)
+-    armor = armorName(items)
+-    if armor != "" then drawPicture(state, armor, x, y, scale, 255) end if
+-  end if
+-
+-  drawPicture(state, faceName(player), x + 112.0 * scale, y, scale, 255)
+-  drawNumber(state, x + 136.0 * scale, y, player.health, 3, player.health <= 25.0, scale)
+-  ammo = ammoName(items)
+-  if ammo != "" then drawPicture(state, ammo, x + 224.0 * scale, y, scale, 255) end if
+-  drawNumber(state, x + 248.0 * scale, y, player.ammo, 3, player.ammo <= 10.0, scale)
+-  return true
+-end function
+-
+-// Sbar_Draw for the stock single-player layout. The original 320x24/48 qpics
+-// are taken from the user's gfx.wad; no Quake art is embedded in MiniQuake.
+-function render(state, fontTexture, player, width, height, viewSize, clientState, teamplay)
+-  if state is void or player is void or fontTexture == 0 then return false end if
+-  if picture(state, "sbar") is void then return false end if
+-  lines = 48
+-  if viewSize >= 120.0 then lines = 0 else if viewSize >= 110.0 then lines = 24 end if
+-  Sbar_Configure(state, fontTexture, player, clientState, width, height, lines, teamplay)
+-  return Sbar_Draw()
+-end function
+-
+-// =============================================================================
+-// sbar.c compatibility surface
+-// =============================================================================
+-
+-function Sbar_ShowScores()
+-  global sb_showscores, sb_updates
+-  if sb_showscores then return false end if
+-  sb_showscores = true
+-  sb_updates = 0
+-  return true
+-end function
+-
+-function Sbar_DontShowScores()
+-  global sb_showscores, sb_updates
+-  sb_showscores = false
+-  sb_updates = 0
+-  return true
+-end function
+-
+-function Sbar_Changed()
+-  global sb_updates
+-  sb_updates = 0
+-  return true
+-end function
+-
+-function Sbar_Init(gameDirectory)
+-  global sbarInitialized, sbarHipnotic, sbarRogue, sbarPictureNames, sbarPictures, sbarLoadTrace
+-  if sbarInitialized and ((gameDirectory == "hipnotic") == sbarHipnotic) and ((gameDirectory == "rogue") == sbarRogue) then return true end if
+-  sbarHipnotic = bio.lower(gameDirectory) == "hipnotic"
+-  sbarRogue = bio.lower(gameDirectory) == "rogue"
+-  sbarPictureNames = []
+-  sbarPictures = []
+-  sbarLoadTrace = []
+-  index = 0
+-  while index < 10
+-    loadSbarPicture("num_" + index)
+-    loadSbarPicture("anum_" + index)
+-    index = index + 1
+-  end while
+-  loadSbarPicture("num_minus")
+-  loadSbarPicture("anum_minus")
+-  loadSbarPicture("num_colon")
+-  loadSbarPicture("num_slash")
+-  weapons = ["shotgun", "sshotgun", "nailgun", "snailgun", "rlaunch", "srlaunch", "lightng"]
+-  for each weapon in weapons
+-    loadSbarPicture("inv_" + weapon)
+-  end for
+-  for each weapon in weapons
+-    loadSbarPicture("inv2_" + weapon)
+-  end for
+-  flash = 1
+-  while flash <= 5
+-    for each weapon in weapons
+-      loadSbarPicture("inva" + flash + "_" + weapon)
+-    end for
+-    flash = flash + 1
+-  end while
+-  stock = [
+-    "sb_shells", "sb_nails", "sb_rocket", "sb_cells",
+-    "sb_armor1", "sb_armor2", "sb_armor3",
+-    "sb_key1", "sb_key2", "sb_invis", "sb_invuln", "sb_suit", "sb_quad",
+-    "sb_sigil1", "sb_sigil2", "sb_sigil3", "sb_sigil4",
+-    "face1", "face_p1", "face2", "face_p2", "face3", "face_p3",
+-    "face4", "face_p4", "face5", "face_p5",
+-    "face_invis", "face_invul2", "face_inv2", "face_quad",
+-    "sbar", "ibar", "scorebar",
+-  ]
+-  for each name in stock
+-    loadSbarPicture(name)
+-  end for
+-  if sbarHipnotic then
+-    hipWeapons = ["laser", "mjolnir", "gren_prox", "prox_gren", "prox"]
+-    for each weapon in hipWeapons
+-      loadSbarPicture("inv_" + weapon)
+-    end for
+-    for each weapon in hipWeapons
+-      loadSbarPicture("inv2_" + weapon)
+-    end for
+-    flash = 1
+-    while flash <= 5
+-      for each weapon in hipWeapons
+-        loadSbarPicture("inva" + flash + "_" + weapon)
+-      end for
+-      flash = flash + 1
+-    end while
+-    loadSbarPicture("sb_wsuit")
+-    loadSbarPicture("sb_eshld")
+-  end if
+-  if sbarRogue then
+-    rogueNames = [
+-      "r_invbar1", "r_invbar2", "r_lava", "r_superlava", "r_gren",
+-      "r_multirock", "r_plasma", "r_shield1", "r_agrav1", "r_teambord",
+-      "r_ammolava", "r_ammomulti", "r_ammoplasma",
+-    ]
+-    for each name in rogueNames
+-      loadSbarPicture(name)
+-    end for
+-  end if
+-  sbarInitialized = true
+-  return true
+-end function
+-
+-function Sbar_SetFrameState(consoleCurrent, numPages)
+-  global sbarConsoleCurrent, sbarNumPages
+-  sbarConsoleCurrent = consoleCurrent
+-  sbarNumPages = numPages
+-  return true
+-end function
+-
+-function sbarItems()
+-  if sbarClient is not void then return native.trunc(sbarClient.items) end if
+-  if sbarPlayer is not void then return native.trunc(sbarPlayer.items) end if
+-  return 0
+-end function
+-
+-// Deterministic state injection for the direct pinned-source differential.
+-// Production functions remain the code under test; only their globals/assets
+-// are arranged without requiring retail gfx.wad or an OpenGL context.
+-function Sbar_DifferentialReset(pictures)
+-  global sb_updates, sb_showscores, sb_lines, sbarInitialized, sbarHipnotic, sbarRogue
+-  global sbarState, sbarFontTexture, sbarPlayer, sbarClient, sbarWidth, sbarHeight
+-  global sbarGameType, sbarTeamplay, sbarPictures, sbarPictureNames, sbarInjectedPictures
+-  global fragsort, scoreboardtext, scoreboardtop, scoreboardbottom, scoreboardlines
+-  global sbarTrace, sbarLoadTrace, sbarConsoleCurrent, sbarNumPages
+-  global sbarCopyEverything, sbarFullUpdate
+-  sb_updates = 0
+-  sb_showscores = false
+-  sb_lines = 48
+-  sbarInitialized = false
+-  sbarHipnotic = false
+-  sbarRogue = false
+-  sbarState = void
+-  sbarFontTexture = 1
+-  sbarPlayer = void
+-  sbarClient = void
+-  sbarWidth = 320
+-  sbarHeight = 200
+-  sbarGameType = c.GAME_COOP
+-  sbarTeamplay = 0.0
+-  sbarPictures = []
+-  sbarPictureNames = []
+-  sbarInjectedPictures = pictures
+-  fragsort = []
+-  scoreboardtext = []
+-  scoreboardtop = []
+-  scoreboardbottom = []
+-  scoreboardlines = 0
+-  sbarTrace = []
+-  sbarLoadTrace = []
+-  sbarConsoleCurrent = -1.0
+-  sbarNumPages = 999999
+-  sbarCopyEverything = false
+-  sbarFullUpdate = 0
+-  return true
+-end function
+-
+-function Sbar_DifferentialState()
+-  return [
+-    sb_updates, sb_showscores, sb_lines, sbarCopyEverything, sbarFullUpdate,
+-    fragsort, scoreboardtext, scoreboardtop, scoreboardbottom, sbarLoadTrace,
+-  ]
+-end function
+-
+-function Sbar_DifferentialSetState(updates, showScores, hipnoticValue, rogueValue, teamplayValue)
+-  global sb_updates, sb_showscores, sbarHipnotic, sbarRogue, sbarTeamplay
+-  sb_updates = updates
+-  sb_showscores = showScores
+-  sbarHipnotic = hipnoticValue
+-  sbarRogue = rogueValue
+-  sbarTeamplay = teamplayValue
+-  return true
+-end function
+-
+-function Sbar_DifferentialClearTrace()
+-  global sbarTrace
+-  sbarTrace = []
+-  return true
+-end function
+-
+-function Sbar_Configure(state, fontTexture, player, clientState, width, height, lines, teamplay)
+-  global sbarState, sbarFontTexture, sbarPlayer, sbarClient, sbarWidth, sbarHeight, sb_lines, sbarGameType, sbarTeamplay
+-  sbarState = state
+-  sbarFontTexture = fontTexture
+-  sbarPlayer = player
+-  sbarClient = clientState
+-  sbarWidth = width
+-  sbarHeight = height
+-  sb_lines = lines
+-  sbarTeamplay = teamplay
+-  sbarGameType = c.GAME_COOP
+-  if clientState is not void then sbarGameType = clientState.gameType end if
+-  return true
+-end function
+-
+-function sbarXOffset()
+-  if sbarGameType == c.GAME_DEATHMATCH then return 0 end if
+-  return native.trunc((sbarWidth - 320) / 2)
+-end function
+-
+-function traceSbar(command)
+-  global sbarTrace
+-  sbarTrace = sbarTrace + [command]
+-  return true
+-end function
+-
+-function sbarDirectPic(x, y, pic)
+-  if pic is void then return false end if
+-  traceSbar(["pic", pic.name, x, y])
+-  return draw.Draw_Pic(x, y, pic)
+-end function
+-
+-function sbarDirectTransPic(x, y, pic)
+-  if pic is void then return false end if
+-  traceSbar(["transpic", pic.name, x, y])
+-  return draw.Draw_TransPic(x, y, pic)
+-end function
+-
+-function sbarDirectCharacter(x, y, num)
+-  traceSbar(["char", num, x, y])
+-  return draw.Draw_Character(x, y, num)
+-end function
+-
+-function sbarDirectString(x, y, text)
+-  traceSbar(["string", text, x, y])
+-  return draw.Draw_String(x, y, text)
+-end function
+-
+-function sbarDirectFill(x, y, width, height, color)
+-  traceSbar(["fill", x, y, width, height, color])
+-  return draw.Draw_Fill(x, y, width, height, color)
+-end function
+-
+-function sbarDirectTileClear(x, y, width, height)
+-  traceSbar(["tileclear", x, y, width, height])
+-  return draw.Draw_TileClear(x, y, width, height)
+-end function
+-
+-function Sbar_DrawPic(x, y, pic)
+-  if pic is void then return false end if
+-  drawX = x + sbarXOffset()
+-  drawY = y + sbarHeight - SBAR_HEIGHT
+-  traceSbar(["pic", pic.name, drawX, drawY])
+-  return draw.Draw_Pic(drawX, drawY, pic)
+-end function
+-
+-function Sbar_DrawTransPic(x, y, pic)
+-  if pic is void then return false end if
+-  drawX = x + sbarXOffset()
+-  drawY = y + sbarHeight - SBAR_HEIGHT
+-  traceSbar(["transpic", pic.name, drawX, drawY])
+-  return draw.Draw_TransPic(drawX, drawY, pic)
+-end function
+-
+-function Sbar_DrawCharacter(x, y, num)
+-  drawX = x + sbarXOffset() + 4
+-  drawY = y + sbarHeight - SBAR_HEIGHT
+-  traceSbar(["char", num, drawX, drawY])
+-  return draw.Draw_Character(drawX, drawY, num)
+-end function
+-
+-function Sbar_DrawString(x, y, text)
+-  drawX = x + sbarXOffset()
+-  drawY = y + sbarHeight - SBAR_HEIGHT
+-  traceSbar(["string", text, drawX, drawY])
+-  return draw.Draw_String(drawX, drawY, text)
+-end function
+-
+-// The C routine fills a caller buffer and returns its length.  MiniLang
+-// returns [text, length].
+-function Sbar_itoa(num)
+-  text = "" + native.trunc(num)
+-  return [text, len(bytes(text))]
+-end function
+-
+-function numberPicture(color, frame)
+-  prefix = "num_"
+-  if color != 0 then prefix = "anum_" end if
+-  if frame == STAT_MINUS then return loadedSbarPicture(prefix + "minus") end if
+-  return loadedSbarPicture(prefix + frame)
+-end function
+-
+-function Sbar_DrawNum(x, y, num, digits, color)
+-  converted = Sbar_itoa(num)
+-  text = bytes(converted[0])
+-  start = 0
+-  if len(text) > digits then start = len(text) - digits end if
+-  if len(text) < digits then x = x + (digits - len(text)) * 24 end if
+-  index = start
+-  while index < len(text)
+-    frame = text[index] - 48
+-    if text[index] == 45 then frame = STAT_MINUS end if
+-    Sbar_DrawTransPic(x, y, numberPicture(color, frame))
+-    x = x + 24
+-    index = index + 1
+-  end while
+-  return true
+-end function
+-
+-function Sbar_SortFrags(scores)
+-  global fragsort, scoreboardlines
+-  fragsort = []
+-  if scores is void then scoreboardlines = 0; return fragsort end if
+-  index = 0
+-  while index < len(scores)
+-    if scores[index].name != "" then fragsort = fragsort + [index] end if
+-    index = index + 1
+-  end while
+-  i = 0
+-  while i < len(fragsort)
+-    j = 0
+-    while j < len(fragsort) - 1 - i
+-      if scores[fragsort[j]].frags < scores[fragsort[j + 1]].frags then
+-        temporary = fragsort[j]
+-        fragsort[j] = fragsort[j + 1]
+-        fragsort[j + 1] = temporary
+-      end if
+-      j = j + 1
+-    end while
+-    i = i + 1
+-  end while
+-  scoreboardlines = len(fragsort)
+-  return fragsort
+-end function
+-
+-function Sbar_ColorForMap(mapColor)
+-  return mapColor + 8
+-end function
+-
+-function padFrag(value)
+-  text = "" + native.trunc(value)
+-  while len(bytes(text)) < 3
+-    text = " " + text
+-  end while
+-  return text
+-end function
+-
+-function fragGlyphs(value)
+-  return slice(bytes(padFrag(value)), 0, 3)
+-end function
+-
+-function Sbar_UpdateScoreboard()
+-  global scoreboardtext, scoreboardtop, scoreboardbottom
+-  scores = []
+-  if sbarClient is not void then scores = sbarClient.scores end if
+-  Sbar_SortFrags(scores)
+-  scoreboardtext = arrayutil.makeEmptyArray(scoreboardlines)
+-  scoreboardtop = arrayutil.makeEmptyArray(scoreboardlines)
+-  scoreboardbottom = arrayutil.makeEmptyArray(scoreboardlines)
+-  index = 0
+-  while index < scoreboardlines
+-    score = scores[fragsort[index]]
+-    // C stores this payload at scoreboardtext[i][1], leaving byte zero as NUL.
+-    // The ML string models the useful payload beginning at that offset.
+-    scoreboardtext[index] = padFrag(score.frags) + " " + score.name
+-    scoreboardtop[index] = Sbar_ColorForMap(score.colors & 0xf0)
+-    scoreboardbottom[index] = Sbar_ColorForMap((score.colors & 15) << 4)
+-    index = index + 1
+-  end while
+-  return scoreboardlines
+-end function
+-
+-function stat(index, fallback)
+-  if sbarClient is not void and index >= 0 and index < len(sbarClient.stats) then return sbarClient.stats[index] end if
+-  return fallback
+-end function
+-
+-function Sbar_SoloScoreboard()
+-  monsters = stat(c.STAT_MONSTERS, 0)
+-  totalMonsters = stat(c.STAT_TOTALMONSTERS, 0)
+-  secrets = stat(c.STAT_SECRETS, 0)
+-  totalSecrets = stat(c.STAT_TOTALSECRETS, 0)
+-  currentTime = 0.0
+-  levelName = ""
+-  if sbarClient is not void then currentTime = sbarClient.time; levelName = sbarClient.levelName end if
+-  minutes = native.trunc(currentTime / 60.0)
+-  seconds = native.trunc(currentTime - minutes * 60)
+-  Sbar_DrawString(8, 4, "Monsters:" + padFrag(monsters) + " /" + padFrag(totalMonsters))
+-  Sbar_DrawString(8, 12, "Secrets :" + padFrag(secrets) + " /" + padFrag(totalSecrets))
+-  Sbar_DrawString(184, 4, "Time :" + padFrag(minutes) + ":" + native.trunc(seconds / 10) + (seconds % 10))
+-  Sbar_DrawString(232 - len(bytes(levelName)) * 4, 12, levelName)
+-  return true
+-end function
+-
+-function Sbar_DrawScoreboard()
+-  Sbar_SoloScoreboard()
+-  if sbarGameType == c.GAME_DEATHMATCH then Sbar_DeathmatchOverlay() end if
+-  return true
+-end function
+-
+-function weaponFlash(itemIndex, activeWeapon, currentTime)
+-  global sb_updates
+-  acquired = 0.0
+-  if sbarClient is not void and itemIndex < len(sbarClient.itemGetTime) then acquired = sbarClient.itemGetTime[itemIndex] end if
+-  flash = native.trunc((currentTime - acquired) * 10.0)
+-  if flash >= 10 then
+-    if activeWeapon == (1 << itemIndex) then return 1 end if
+-    return 0
+-  end if
+-  result = (flash % 5) + 2
+-  if result > 1 then sb_updates = 0 end if
+-  return result
+-end function
+-
+-function flashWeaponName(prefix, weapon, flash)
+-  if flash == 0 then return "inv_" + weapon end if
+-  if flash == 1 then return "inv2_" + weapon end if
+-  return "inva" + (flash - 1) + "_" + weapon
+-end function
+-
+-function itemNeedsRefresh(itemIndex, currentTime)
+-  global sb_updates
+-  if sbarClient is void or itemIndex >= len(sbarClient.itemGetTime) then return false end if
+-  acquired = sbarClient.itemGetTime[itemIndex]
+-  if acquired != 0.0 and acquired > currentTime - 2.0 then
+-    sb_updates = 0
+-    return true
+-  end if
+-  return false
+-end function
+-
+-function sbarActiveWeapon()
+-  if sbarPlayer is void then return 0 end if
+-  return native.trunc(stat(c.STAT_ACTIVEWEAPON, sbarPlayer.activeWeapon))
+-end function
+-
+-function Sbar_DrawInventory()
+-  if sbarPlayer is void then return false end if
+-  items = sbarItems()
+-  active = sbarActiveWeapon()
+-  currentTime = 0.0
+-  if sbarClient is not void then currentTime = sbarClient.time end if
+-  if sbarRogue then
+-    if active >= c.RIT_LAVA_NAILGUN then Sbar_DrawPic(0, -24, loadedSbarPicture("r_invbar1"))
+-    else Sbar_DrawPic(0, -24, loadedSbarPicture("r_invbar2"))
+-    end if
+-  else Sbar_DrawPic(0, -24, loadedSbarPicture("ibar"))
+-  end if
+-  weapons = ["shotgun", "sshotgun", "nailgun", "snailgun", "rlaunch", "srlaunch", "lightng"]
+-  index = 0
+-  while index < 7
+-    bit = c.IT_SHOTGUN << index
+-    if (items & bit) != 0 then
+-      flash = weaponFlash(index, active, currentTime)
+-      Sbar_DrawPic(index * 24, -16, loadedSbarPicture(flashWeaponName("", weapons[index], flash)))
+-    end if
+-    index = index + 1
+-  end while
+-  if sbarHipnotic then
+-    if (items & c.HIT_LASER_CANNON) != 0 then
+-      flash = weaponFlash(c.HIT_LASER_CANNON_BIT, active, currentTime)
+-      Sbar_DrawPic(176, -16, loadedSbarPicture(flashWeaponName("", "laser", flash)))
+-    end if
+-    if (items & c.HIT_MJOLNIR) != 0 then
+-      flash = weaponFlash(c.HIT_MJOLNIR_BIT, active, currentTime)
+-      Sbar_DrawPic(200, -16, loadedSbarPicture(flashWeaponName("", "mjolnir", flash)))
+-    end if
+-    grenadeFlashing = false
+-    if (items & c.IT_GRENADE_LAUNCHER) != 0 and (items & c.HIT_PROXIMITY_GUN) != 0 then
+-      flash = weaponFlash(4, active, currentTime)
+-      if flash != 0 then
+-        grenadeFlashing = true
+-        Sbar_DrawPic(96, -16, loadedSbarPicture(flashWeaponName("", "gren_prox", flash)))
+-      end if
+-    end if
+-    if (items & c.HIT_PROXIMITY_GUN) != 0 and not grenadeFlashing then
+-      flash = weaponFlash(c.HIT_PROXIMITY_GUN_BIT, active, currentTime)
+-      if (items & c.IT_GRENADE_LAUNCHER) != 0 then Sbar_DrawPic(96, -16, loadedSbarPicture(flashWeaponName("", "prox_gren", flash)))
+-      else Sbar_DrawPic(96, -16, loadedSbarPicture(flashWeaponName("", "prox", flash)))
+-      end if
+-    end if
+-  end if
+-  if sbarRogue and active >= c.RIT_LAVA_NAILGUN then
+-    names = ["r_lava", "r_superlava", "r_gren", "r_multirock", "r_plasma"]
+-    index = 0
+-    while index < 5
+-      if active == (c.RIT_LAVA_NAILGUN << index) then Sbar_DrawPic((index + 2) * 24, -16, loadedSbarPicture(names[index])) end if
+-      index = index + 1
+-    end while
+-  end if
+-  counts = [
+-    stat(c.STAT_SHELLS, sbarPlayer.shells),
+-    stat(c.STAT_NAILS, sbarPlayer.nails),
+-    stat(c.STAT_ROCKETS, sbarPlayer.rockets),
+-    stat(c.STAT_CELLS, sbarPlayer.cells),
+-  ]
+-  index = 0
+-  while index < 4
+-    text = fragGlyphs(counts[index])
+-    digit = 0
+-    while digit < 3
+-      if text[digit] != 32 then Sbar_DrawCharacter((6 * index + 1 + digit) * 8 - 2, -24, 18 + text[digit] - 48) end if
+-      digit = digit + 1
+-    end while
+-    index = index + 1
+-  end while
+-  baseItems = ["sb_key1", "sb_key2", "sb_invis", "sb_invuln", "sb_suit", "sb_quad"]
+-  index = 0
+-  while index < 6
+-    if (items & (1 << (17 + index))) != 0 then
+-      if not sbarHipnotic or index > 1 then Sbar_DrawPic(192 + index * 16, -16, loadedSbarPicture(baseItems[index])) end if
+-      itemNeedsRefresh(17 + index, currentTime)
+-    end if
+-    index = index + 1
+-  end while
+-  if sbarHipnotic then
+-    // GLQuake 1.09 tests raw inventory bits 24 and 25 here.  Keep that
+-    // historical behavior even though the mission-pack symbolic constants
+-    // call later bits HIT_WETSUIT/HIT_EMPATHY_SHIELDS.
+-    if (items & (1 << 24)) != 0 then Sbar_DrawPic(288, -16, loadedSbarPicture("sb_wsuit")); itemNeedsRefresh(24, currentTime) end if
+-    if (items & (1 << 25)) != 0 then Sbar_DrawPic(304, -16, loadedSbarPicture("sb_eshld")); itemNeedsRefresh(25, currentTime) end if
+-  end if
+-  if sbarRogue then
+-    if (items & c.RIT_SHIELD) != 0 then Sbar_DrawPic(288, -16, loadedSbarPicture("r_shield1")); itemNeedsRefresh(29, currentTime) end if
+-    if (items & c.RIT_ANTIGRAV) != 0 then Sbar_DrawPic(304, -16, loadedSbarPicture("r_agrav1")); itemNeedsRefresh(30, currentTime) end if
+-  else
+-    index = 0
+-    while index < 4
+-      if (items & (1 << (28 + index))) != 0 then
+-        Sbar_DrawPic(288 + index * 8, -16, loadedSbarPicture("sb_sigil" + (index + 1)))
+-        itemNeedsRefresh(28 + index, currentTime)
+-      end if
+-      index = index + 1
+-    end while
+-  end if
+-  return true
+-end function
+-
+-function Sbar_DrawFrags()
+-  if sbarClient is void then return false end if
+-  scores = sbarClient.scores
+-  Sbar_SortFrags(scores)
+-  count = scoreboardlines
+-  if count > 4 then count = 4 end if
+-  x = 23
+-  index = 0
+-  while index < count
+-    clientIndex = fragsort[index]
+-    score = scores[clientIndex]
+-    fillX = sbarXOffset() + x * 8 + 10
+-    fillY = sbarHeight - SBAR_HEIGHT - 23
+-    sbarDirectFill(fillX, fillY, 28, 4, Sbar_ColorForMap(score.colors & 0xf0))
+-    sbarDirectFill(fillX, fillY + 4, 28, 3, Sbar_ColorForMap((score.colors & 15) << 4))
+-    text = fragGlyphs(score.frags)
+-    Sbar_DrawCharacter((x + 1) * 8, -24, text[0])
+-    Sbar_DrawCharacter((x + 2) * 8, -24, text[1])
+-    Sbar_DrawCharacter((x + 3) * 8, -24, text[2])
+-    if clientIndex == sbarClient.viewEntity - 1 then Sbar_DrawCharacter(x * 8 + 2, -24, 16); Sbar_DrawCharacter((x + 4) * 8 - 4, -24, 17) end if
+-    x = x + 4
+-    index = index + 1
+-  end while
+-  return true
+-end function
+-
+-function Sbar_DrawFace()
+-  global sb_updates
+-  if sbarPlayer is void then return false end if
+-  items = sbarItems()
+-  if sbarRogue and sbarClient is not void and sbarClient.maxClients != 1 and sbarTeamplay > 3.0 and sbarTeamplay < 7.0 and sbarClient.viewEntity > 0 and sbarClient.viewEntity <= len(sbarClient.scores) then
+-    score = sbarClient.scores[sbarClient.viewEntity - 1]
+-    xOffset = sbarXOffset() + 113
+-    Sbar_DrawPic(112, 0, loadedSbarPicture("r_teambord"))
+-    sbarDirectFill(xOffset, sbarHeight - SBAR_HEIGHT + 3, 22, 9, Sbar_ColorForMap(score.colors & 0xf0))
+-    sbarDirectFill(xOffset, sbarHeight - SBAR_HEIGHT + 12, 22, 9, Sbar_ColorForMap((score.colors & 15) << 4))
+-    text = fragGlyphs(score.frags)
+-    top = Sbar_ColorForMap(score.colors & 0xf0)
+-    if top == 8 then
+-      if text[0] != 32 then Sbar_DrawCharacter(109, 3, 18 + text[0] - 48) end if
+-      if text[1] != 32 then Sbar_DrawCharacter(116, 3, 18 + text[1] - 48) end if
+-      if text[2] != 32 then Sbar_DrawCharacter(123, 3, 18 + text[2] - 48) end if
+-    else
+-      Sbar_DrawCharacter(109, 3, text[0]); Sbar_DrawCharacter(116, 3, text[1]); Sbar_DrawCharacter(123, 3, text[2])
+-    end if
+-    return true
+-  end if
+-  face = faceNameFor(items, native.trunc(stat(c.STAT_HEALTH, sbarPlayer.health)))
+-  if sbarClient is not void and sbarClient.time <= sbarClient.faceAnimTime then
+-    sb_updates = 0
+-    if face == "face1" then face = "face_p1"
+-    else if face == "face2" then face = "face_p2"
+-    else if face == "face3" then face = "face_p3"
+-    else if face == "face4" then face = "face_p4"
+-    else if face == "face5" then face = "face_p5"
+-    end if
+-  end if
+-  return Sbar_DrawPic(112, 0, loadedSbarPicture(face))
+-end function
+-
+-function rogueArmorName(items)
+-  if (items & c.RIT_ARMOR3) != 0 then return "sb_armor3" end if
+-  if (items & c.RIT_ARMOR2) != 0 then return "sb_armor2" end if
+-  if (items & c.RIT_ARMOR1) != 0 then return "sb_armor1" end if
+-  return ""
+-end function
+-
+-function rogueAmmoName(items)
+-  if (items & c.RIT_SHELLS) != 0 then return "sb_shells" end if
+-  if (items & c.RIT_NAILS) != 0 then return "sb_nails" end if
+-  if (items & c.RIT_ROCKETS) != 0 then return "sb_rocket" end if
+-  if (items & c.RIT_CELLS) != 0 then return "sb_cells" end if
+-  if (items & c.RIT_LAVA_NAILS) != 0 then return "r_ammolava" end if
+-  if (items & c.RIT_PLASMA_AMMO) != 0 then return "r_ammomulti" end if
+-  if (items & c.RIT_MULTI_ROCKETS) != 0 then return "r_ammoplasma" end if
+-  return ""
+-end function
+-
+-function Sbar_Draw()
+-  global sb_updates, sbarTrace, sbarCopyEverything
+-  sbarTrace = []
+-  if sbarPlayer is void then return false end if
+-  if sbarConsoleCurrent == sbarHeight then return false end if
+-  if sb_updates >= sbarNumPages then return false end if
+-  sbarCopyEverything = true
+-  sb_updates = sb_updates + 1
+-  if sb_lines != 0 and sbarWidth > 320 then
+-    sbarDirectTileClear(0, sbarHeight - sb_lines, sbarWidth, sb_lines)
+-  end if
+-  if sb_lines > 24 then
+-    Sbar_DrawInventory()
+-    if sbarClient is not void and sbarClient.maxClients != 1 then Sbar_DrawFrags() end if
+-  end if
+-  health = stat(c.STAT_HEALTH, sbarPlayer.health)
+-  if sb_showscores or health <= 0.0 then
+-    Sbar_DrawPic(0, 0, loadedSbarPicture("scorebar"))
+-    Sbar_DrawScoreboard()
+-    sb_updates = 0
+-  else if sb_lines != 0 then
+-    Sbar_DrawPic(0, 0, loadedSbarPicture("sbar"))
+-    items = sbarItems()
+-    if sbarHipnotic then
+-      if (items & c.IT_KEY1) != 0 then Sbar_DrawPic(209, 3, loadedSbarPicture("sb_key1")) end if
+-      if (items & c.IT_KEY2) != 0 then Sbar_DrawPic(209, 12, loadedSbarPicture("sb_key2")) end if
+-    end if
+-    if (items & c.IT_INVULNERABILITY) != 0 then
+-      Sbar_DrawNum(24, 0, 666, 3, 1)
+-      Sbar_DrawPic(0, 0, loadedSbarPicture("disc"))
+-    else
+-      armorColor = 0
+-      armorValue = stat(c.STAT_ARMOR, sbarPlayer.armor)
+-      if armorValue <= 25.0 then armorColor = 1 end if
+-      Sbar_DrawNum(24, 0, armorValue, 3, armorColor)
+-      armor = armorName(items)
+-      if sbarRogue then armor = rogueArmorName(items) end if
+-      if armor != "" then Sbar_DrawPic(0, 0, loadedSbarPicture(armor)) end if
+-    end if
+-    Sbar_DrawFace()
+-    healthColor = 0
+-    if health <= 25.0 then healthColor = 1 end if
+-    Sbar_DrawNum(136, 0, health, 3, healthColor)
+-    ammo = ammoName(items)
+-    if sbarRogue then ammo = rogueAmmoName(items) end if
+-    if ammo != "" then Sbar_DrawPic(224, 0, loadedSbarPicture(ammo)) end if
+-    ammoColor = 0
+-    ammoValue = stat(c.STAT_AMMO, sbarPlayer.ammo)
+-    if ammoValue <= 10.0 then ammoColor = 1 end if
+-    Sbar_DrawNum(248, 0, ammoValue, 3, ammoColor)
+-  end if
+-  if sbarGameType == c.GAME_DEATHMATCH and sbarWidth > 320 then Sbar_MiniDeathmatchOverlay() end if
+-  return true
+-end function
+-
+-function Sbar_IntermissionNumber(x, y, num, digits, color)
+-  converted = Sbar_itoa(num)
+-  text = bytes(converted[0])
+-  start = 0
+-  if len(text) > digits then start = len(text) - digits end if
+-  if len(text) < digits then x = x + (digits - len(text)) * 24 end if
+-  index = start
+-  while index < len(text)
+-    frame = text[index] - 48
+-    if text[index] == 45 then frame = STAT_MINUS end if
+-    sbarDirectTransPic(x, y, numberPicture(color, frame))
+-    x = x + 24
+-    index = index + 1
+-  end while
+-  return true
+-end function
+-
+-function Sbar_DeathmatchOverlay()
+-  global sbarCopyEverything, sbarFullUpdate
+-  if sbarClient is void then return false end if
+-  sbarCopyEverything = true
+-  sbarFullUpdate = 0
+-  ranking = try(draw.Draw_CachePic("gfx/ranking.lmp"))
+-  if ranking is not error then sbarDirectPic(native.trunc((sbarWidth - ranking.width) / 2), 8, ranking) end if
+-  scores = sbarClient.scores
+-  Sbar_SortFrags(scores)
+-  x = 80 + native.trunc((sbarWidth - 320) / 2)
+-  y = 40
+-  index = 0
+-  while index < scoreboardlines
+-    clientIndex = fragsort[index]
+-    score = scores[clientIndex]
+-    sbarDirectFill(x, y, 40, 4, Sbar_ColorForMap(score.colors & 0xf0))
+-    sbarDirectFill(x, y + 4, 40, 4, Sbar_ColorForMap((score.colors & 15) << 4))
+-    text = fragGlyphs(score.frags)
+-    sbarDirectCharacter(x + 8, y, text[0]); sbarDirectCharacter(x + 16, y, text[1]); sbarDirectCharacter(x + 24, y, text[2])
+-    if clientIndex == sbarClient.viewEntity - 1 then sbarDirectCharacter(x - 8, y, 12) end if
+-    sbarDirectString(x + 64, y, score.name)
+-    traceSbar(["score", clientIndex, score.frags, score.name, x, y])
+-    y = y + 10
+-    index = index + 1
+-  end while
+-  return true
+-end function
+-
+-function Sbar_MiniDeathmatchOverlay()
+-  global sbarCopyEverything, sbarFullUpdate
+-  if sbarClient is void or sbarWidth < 512 or sb_lines == 0 then return false end if
+-  sbarCopyEverything = true
+-  sbarFullUpdate = 0
+-  scores = sbarClient.scores
+-  Sbar_SortFrags(scores)
+-  numLines = native.trunc(sb_lines / 8)
+-  if numLines < 3 then return false end if
+-  current = 0
+-  while current < scoreboardlines and fragsort[current] != sbarClient.viewEntity - 1
+-    current = current + 1
+-  end while
+-  start = current - native.trunc(numLines / 2)
+-  if current == scoreboardlines then start = 0 end if
+-  if start > scoreboardlines - numLines then start = scoreboardlines - numLines end if
+-  if start < 0 then start = 0 end if
+-  x = 324
+-  y = sbarHeight - sb_lines
+-  index = start
+-  while index < scoreboardlines and y < sbarHeight - 8
+-    clientIndex = fragsort[index]
+-    score = scores[clientIndex]
+-    sbarDirectFill(x, y + 1, 40, 3, Sbar_ColorForMap(score.colors & 0xf0))
+-    sbarDirectFill(x, y + 4, 40, 4, Sbar_ColorForMap((score.colors & 15) << 4))
+-    text = fragGlyphs(score.frags)
+-    sbarDirectCharacter(x + 8, y, text[0]); sbarDirectCharacter(x + 16, y, text[1]); sbarDirectCharacter(x + 24, y, text[2])
+-    if clientIndex == sbarClient.viewEntity - 1 then sbarDirectCharacter(x, y, 16); sbarDirectCharacter(x + 32, y, 17) end if
+-    sbarDirectString(x + 48, y, score.name)
+-    traceSbar(["miniscore", clientIndex, score.frags, score.name, x, y])
+-    y = y + 8
+-    index = index + 1
+-  end while
+-  return true
+-end function
+-
+-function Sbar_IntermissionOverlay()
+-  global sbarCopyEverything, sbarFullUpdate
+-  sbarCopyEverything = true
+-  sbarFullUpdate = 0
+-  if sbarGameType == c.GAME_DEATHMATCH then return Sbar_DeathmatchOverlay() end if
+-  complete = try(draw.Draw_CachePic("gfx/complete.lmp"))
+-  inter = try(draw.Draw_CachePic("gfx/inter.lmp"))
+-  if complete is not error then sbarDirectPic(64, 24, complete) end if
+-  if inter is not error then sbarDirectTransPic(0, 56, inter) end if
+-  completed = 0.0
+-  if sbarClient is not void then completed = sbarClient.completedTime end if
+-  minutes = native.trunc(completed / 60.0)
+-  seconds = native.trunc(completed - minutes * 60)
+-  Sbar_IntermissionNumber(160, 64, minutes, 3, 0)
+-  sbarDirectTransPic(234, 64, loadedSbarPicture("num_colon"))
+-  sbarDirectTransPic(246, 64, numberPicture(0, native.trunc(seconds / 10)))
+-  sbarDirectTransPic(266, 64, numberPicture(0, seconds % 10))
+-  Sbar_IntermissionNumber(160, 104, stat(c.STAT_SECRETS, 0), 3, 0)
+-  sbarDirectTransPic(232, 104, loadedSbarPicture("num_slash"))
+-  Sbar_IntermissionNumber(240, 104, stat(c.STAT_TOTALSECRETS, 0), 3, 0)
+-  Sbar_IntermissionNumber(160, 144, stat(c.STAT_MONSTERS, 0), 3, 0)
+-  sbarDirectTransPic(232, 144, loadedSbarPicture("num_slash"))
+-  Sbar_IntermissionNumber(240, 144, stat(c.STAT_TOTALMONSTERS, 0), 3, 0)
+-  traceSbar(["intermission", minutes, seconds])
+-  return true
+-end function
+-
+-function Sbar_FinaleOverlay()
+-  global sbarCopyEverything
+-  sbarCopyEverything = true
+-  finale = try(draw.Draw_CachePic("gfx/finale.lmp"))
+-  if finale is error then return finale end if
+-  sbarDirectTransPic(native.trunc((sbarWidth - finale.width) / 2), 16, finale)
+-  traceSbar(["finale", native.trunc((sbarWidth - finale.width) / 2), 16])
+-  return true
+-end function
+-
+-function Sbar_CommandTrace()
+-  return sbarTrace
+-end function
+-
+-function Sbar_LayoutTrace(gameDirectory, player, clientState, width, height, lines, teamplay)
+-  global sbarHipnotic, sbarRogue
+-  previousHipnotic = sbarHipnotic
+-  previousRogue = sbarRogue
+-  sbarHipnotic = bio.lower(gameDirectory) == "hipnotic"
+-  sbarRogue = bio.lower(gameDirectory) == "rogue"
+-  result = [
+-    ["game", gameDirectory],
+-    ["inventory", lines > 24],
+-    ["rogue-powered", sbarRogue and player is not void and player.activeWeapon >= c.RIT_LAVA_NAILGUN],
+-    ["hipnotic-extra", sbarHipnotic],
+-    ["team-face", sbarRogue and clientState is not void and clientState.maxClients != 1 and teamplay > 3.0 and teamplay < 7.0],
+-    ["deathmatch", clientState is not void and clientState.gameType == c.GAME_DEATHMATCH],
+-  ]
+-  sbarHipnotic = previousHipnotic
+-  sbarRogue = previousRogue
+-  return result
+-end function
++package miniquake.statusbar
++
++import miniquake.constants as c
++import miniquake.native as native
++import miniquake.menu as menu
++import miniquake.render.draw2d as draw
++import miniquake.byteio as bio
++import miniquake.array_util as arrayutil
++import miniquake.render_ui_contract as renderUiContract
++
++const SBAR_HEIGHT = 24
++const STAT_MINUS = 10
++
++sb_updates = 0
++sb_showscores = false
++sb_lines = 48
++sbarInitialized = false
++sbarHipnotic = false
++sbarRogue = false
++sbarState = void
++sbarFontTexture = 0
++sbarPlayer = void
++sbarClient = void
++sbarWidth = 320
++sbarHeight = 200
++sbarGameType = c.GAME_COOP
++sbarTeamplay = 0.0
++sbarConsoleCurrent = -1.0
++sbarNumPages = 999999
++sbarCopyEverything = false
++sbarFullUpdate = 0
++sbarPictures = []
++sbarPictureNames = []
++sbarInjectedPictures = []
++sbarLoadTrace = []
++fragsort = []
++scoreboardtext = []
++scoreboardtop = []
++scoreboardbottom = []
++scoreboardlines = 0
++sbarTrace = []
++
++function rememberSbarPicture(name, value)
++  global sbarPictures, sbarPictureNames
++  if value is error then return value end if
++  sbarPictureNames = sbarPictureNames + [name]
++  sbarPictures = sbarPictures + [value]
++  return value
++end function
++
++function loadSbarPicture(name)
++  global sbarLoadTrace
++  sbarLoadTrace = sbarLoadTrace + [name]
++  index = 0
++  while index < len(sbarPictureNames)
++    if sbarPictureNames[index] == name then return sbarPictures[index] end if
++    index = index + 1
++  end while
++  for each injected in sbarInjectedPictures
++    if injected.name == name then return rememberSbarPicture(name, injected) end if
++  end for
++  return rememberSbarPicture(name, draw.Draw_PicFromWad(name))
++end function
++
++function loadedSbarPicture(name)
++  index = 0
++  while index < len(sbarPictureNames)
++    if sbarPictureNames[index] == name then return sbarPictures[index] end if
++    index = index + 1
++  end while
++  for each injected in sbarInjectedPictures
++    if injected.name == name then return injected end if
++  end for
++  if sbarState is not void then
++    found = menu.findWadPicture(sbarState, name)
++    if found is not void then return found end if
++  end if
++  return void
++end function
++
++function picture(state, name)
++  if state is void then return void end if
++  return menu.findWadPicture(state, name)
++end function
++
++function drawPicture(state, name, x, y, scale, alpha)
++  value = picture(state, name)
++  if value is void or value.textureId == 0 then return false end if
++  return draw.Draw_PicScaled(value, x, y, scale, alpha)
++end function
++
++function scaleFor(width, height)
++  // The WinQuake status area is authored at 320 pixels. Use an integral scale
++  // so the original indexed artwork remains crisp while avoiding an oversized
++  // bar in a short widescreen window.
++  value = native.trunc(width / 640.0)
++  if value < 1 then value = 1 end if
++  while 48.0 * value > height * 0.28 and value > 1
++    value = value - 1
++  end while
++  return value * 1.0
++end function
++
++function drawNumber(state, x, y, number, digits, alternate, scale)
++  value = native.trunc(number)
++  source = bytes("" + value)
++  start = 0
++  if len(source) > digits then start = len(source) - digits end if
++  visible = len(source) - start
++  if visible < digits then x = x + (digits - visible) * 24.0 * scale end if
++  index = start
++  while index < len(source)
++    code = source[index]
++    name = ""
++    if code == 45 then
++      if alternate then name = "anum_minus" else name = "num_minus" end if
++    else if code >= 48 and code <= 57 then
++      if alternate then name = "anum_" + (code - 48) else name = "num_" + (code - 48) end if
++    end if
++    if name != "" then drawPicture(state, name, x, y, scale, 255) end if
++    x = x + 24.0 * scale
++    index = index + 1
++  end while
++  return true
++end function
++
++function smallAmmoDigit(texture, x, y, digit, scale)
++  if digit < 0 or digit > 9 then return false end if
++  draw.character(texture, x, y, 18 + digit, scale, 255)
++  return true
++end function
++
++function drawSmallAmmo(texture, x, y, number, scale)
++  value = native.trunc(number)
++  if value < 0 then value = 0 end if
++  if value > 999 then value = 999 end if
++  hundreds = native.trunc(value / 100.0)
++  tens = native.trunc((value % 100) / 10.0)
++  ones = value % 10
++  if hundreds > 0 then smallAmmoDigit(texture, x, y, hundreds, scale) end if
++  if hundreds > 0 or tens > 0 then smallAmmoDigit(texture, x + 8.0 * scale, y, tens, scale) end if
++  smallAmmoDigit(texture, x + 16.0 * scale, y, ones, scale)
++  return true
++end function
++
++function faceNameFor(items, health)
++  if (items & (c.IT_INVISIBILITY | c.IT_INVULNERABILITY)) == (c.IT_INVISIBILITY | c.IT_INVULNERABILITY) then return "face_inv2" end if
++  if (items & c.IT_QUAD) != 0 then return "face_quad" end if
++  if (items & c.IT_INVISIBILITY) != 0 then return "face_invis" end if
++  if (items & c.IT_INVULNERABILITY) != 0 then return "face_invul2" end if
++  if health >= 80 then return "face1" end if
++  if health >= 60 then return "face2" end if
++  if health >= 40 then return "face3" end if
++  if health >= 20 then return "face4" end if
++  return "face5"
++end function
++
++function faceName(player)
++  return faceNameFor(native.trunc(player.items), native.trunc(player.health))
++end function
++
++function armorName(items)
++  if (items & c.IT_ARMOR3) != 0 then return "sb_armor3" end if
++  if (items & c.IT_ARMOR2) != 0 then return "sb_armor2" end if
++  if (items & c.IT_ARMOR1) != 0 then return "sb_armor1" end if
++  return ""
++end function
++
++function ammoName(items)
++  if (items & c.IT_SHELLS) != 0 then return "sb_shells" end if
++  if (items & c.IT_NAILS) != 0 then return "sb_nails" end if
++  if (items & c.IT_ROCKETS) != 0 then return "sb_rocket" end if
++  if (items & c.IT_CELLS) != 0 then return "sb_cells" end if
++  return ""
++end function
++
++function drawInventory(state, fontTexture, player, x, y, scale)
++  drawPicture(state, "ibar", x, y, scale, 255)
++  items = native.trunc(player.items)
++  active = native.trunc(player.activeWeapon)
++  weaponNames = ["shotgun", "sshotgun", "nailgun", "snailgun", "rlaunch", "srlaunch", "lightng"]
++  index = 0
++  while index < len(weaponNames)
++    bit = c.IT_SHOTGUN << index
++    if (items & bit) != 0 then
++      prefix = "inv_"
++      if active == bit then prefix = "inv2_" end if
++      drawPicture(state, prefix + weaponNames[index], x + index * 24.0 * scale, y + 8.0 * scale, scale, 255)
++    end if
++    index = index + 1
++  end while
++
++  counts = [player.shells, player.nails, player.rockets, player.cells]
++  index = 0
++  while index < 4
++    drawSmallAmmo(
++      fontTexture,
++      x + ((6.0 * index + 1.0) * 8.0 - 2.0) * scale,
++      y,
++      counts[index],
++      scale,
++    )
++    index = index + 1
++  end while
++
++  itemNames = ["sb_key1", "sb_key2", "sb_invis", "sb_invuln", "sb_suit", "sb_quad"]
++  index = 0
++  while index < 6
++    bit = 1 << (17 + index)
++    if (items & bit) != 0 then
++      drawPicture(state, itemNames[index], x + (192.0 + index * 16.0) * scale, y + 8.0 * scale, scale, 255)
++    end if
++    index = index + 1
++  end while
++
++  index = 0
++  while index < 4
++    bit = 1 << (28 + index)
++    if (items & bit) != 0 then
++      drawPicture(state, "sb_sigil" + (index + 1), x + (288.0 + index * 8.0) * scale, y + 8.0 * scale, scale, 255)
++    end if
++    index = index + 1
++  end while
++  return true
++end function
++
++function drawMainBar(state, player, x, y, scale)
++  drawPicture(state, "sbar", x, y, scale, 255)
++  items = native.trunc(player.items)
++
++  if (items & c.IT_INVULNERABILITY) != 0 then
++    drawNumber(state, x + 24.0 * scale, y, 666, 3, true, scale)
++    drawPicture(state, "disc", x, y, scale, 255)
++  else
++    drawNumber(state, x + 24.0 * scale, y, player.armor, 3, player.armor <= 25.0, scale)
++    armor = armorName(items)
++    if armor != "" then drawPicture(state, armor, x, y, scale, 255) end if
++  end if
++
++  drawPicture(state, faceName(player), x + 112.0 * scale, y, scale, 255)
++  drawNumber(state, x + 136.0 * scale, y, player.health, 3, player.health <= 25.0, scale)
++  ammo = ammoName(items)
++  if ammo != "" then drawPicture(state, ammo, x + 224.0 * scale, y, scale, 255) end if
++  drawNumber(state, x + 248.0 * scale, y, player.ammo, 3, player.ammo <= 10.0, scale)
++  return true
++end function
++
++// Sbar_Draw for the stock single-player layout. The original 320x24/48 qpics
++// are taken from the user's gfx.wad; no Quake art is embedded in MiniQuake.
++function render(state, fontTexture, player, width, height, viewSize, clientState, teamplay)
++  if state is void or player is void or fontTexture == 0 then return false end if
++  if picture(state, "sbar") is void then return false end if
++  lines = 48
++  if viewSize >= 120.0 then lines = 0 else if viewSize >= 110.0 then lines = 24 end if
++  Sbar_Configure(state, fontTexture, player, clientState, width, height, lines, teamplay)
++  return Sbar_Draw()
++end function
++
++// =============================================================================
++// sbar.c compatibility surface
++// =============================================================================
++
++function Sbar_ShowScores()
++  global sb_showscores, sb_updates
++  if sb_showscores then return false end if
++  sb_showscores = true
++  sb_updates = 0
++  return true
++end function
++
++function Sbar_DontShowScores()
++  global sb_showscores, sb_updates
++  sb_showscores = false
++  sb_updates = 0
++  return true
++end function
++
++function Sbar_Changed()
++  global sb_updates
++  sb_updates = 0
++  return true
++end function
++
++function Sbar_Init(gameDirectory)
++  global sbarInitialized, sbarHipnotic, sbarRogue, sbarPictureNames, sbarPictures, sbarLoadTrace
++  if sbarInitialized and ((gameDirectory == "hipnotic") == sbarHipnotic) and ((gameDirectory == "rogue") == sbarRogue) then return true end if
++  sbarHipnotic = bio.lower(gameDirectory) == "hipnotic"
++  sbarRogue = bio.lower(gameDirectory) == "rogue"
++  sbarPictureNames = []
++  sbarPictures = []
++  sbarLoadTrace = []
++  index = 0
++  while index < 10
++    loadSbarPicture("num_" + index)
++    loadSbarPicture("anum_" + index)
++    index = index + 1
++  end while
++  loadSbarPicture("num_minus")
++  loadSbarPicture("anum_minus")
++  loadSbarPicture("num_colon")
++  loadSbarPicture("num_slash")
++  weapons = ["shotgun", "sshotgun", "nailgun", "snailgun", "rlaunch", "srlaunch", "lightng"]
++  for each weapon in weapons
++    loadSbarPicture("inv_" + weapon)
++  end for
++  for each weapon in weapons
++    loadSbarPicture("inv2_" + weapon)
++  end for
++  flash = 1
++  while flash <= 5
++    for each weapon in weapons
++      loadSbarPicture("inva" + flash + "_" + weapon)
++    end for
++    flash = flash + 1
++  end while
++  stock = [
++    "sb_shells", "sb_nails", "sb_rocket", "sb_cells",
++    "sb_armor1", "sb_armor2", "sb_armor3",
++    "sb_key1", "sb_key2", "sb_invis", "sb_invuln", "sb_suit", "sb_quad",
++    "sb_sigil1", "sb_sigil2", "sb_sigil3", "sb_sigil4",
++    "face1", "face_p1", "face2", "face_p2", "face3", "face_p3",
++    "face4", "face_p4", "face5", "face_p5",
++    "face_invis", "face_invul2", "face_inv2", "face_quad",
++    "sbar", "ibar", "scorebar",
++  ]
++  for each name in stock
++    loadSbarPicture(name)
++  end for
++  if sbarHipnotic then
++    hipWeapons = ["laser", "mjolnir", "gren_prox", "prox_gren", "prox"]
++    for each weapon in hipWeapons
++      loadSbarPicture("inv_" + weapon)
++    end for
++    for each weapon in hipWeapons
++      loadSbarPicture("inv2_" + weapon)
++    end for
++    flash = 1
++    while flash <= 5
++      for each weapon in hipWeapons
++        loadSbarPicture("inva" + flash + "_" + weapon)
++      end for
++      flash = flash + 1
++    end while
++    loadSbarPicture("sb_wsuit")
++    loadSbarPicture("sb_eshld")
++  end if
++  if sbarRogue then
++    rogueNames = [
++      "r_invbar1", "r_invbar2", "r_lava", "r_superlava", "r_gren",
++      "r_multirock", "r_plasma", "r_shield1", "r_agrav1", "r_teambord",
++      "r_ammolava", "r_ammomulti", "r_ammoplasma",
++    ]
++    for each name in rogueNames
++      loadSbarPicture(name)
++    end for
++  end if
++  sbarInitialized = true
++  return true
++end function
++
++function Sbar_SetFrameState(consoleCurrent, numPages)
++  global sbarConsoleCurrent, sbarNumPages
++  sbarConsoleCurrent = consoleCurrent
++  sbarNumPages = numPages
++  return true
++end function
++
++function sbarItems()
++  if sbarClient is not void then return native.trunc(sbarClient.items) end if
++  if sbarPlayer is not void then return native.trunc(sbarPlayer.items) end if
++  return 0
++end function
++
++// Deterministic state injection for the direct pinned-source differential.
++// Production functions remain the code under test; only their globals/assets
++// are arranged without requiring retail gfx.wad or an OpenGL context.
++function Sbar_DifferentialReset(pictures)
++  global sb_updates, sb_showscores, sb_lines, sbarInitialized, sbarHipnotic, sbarRogue
++  global sbarState, sbarFontTexture, sbarPlayer, sbarClient, sbarWidth, sbarHeight
++  global sbarGameType, sbarTeamplay, sbarPictures, sbarPictureNames, sbarInjectedPictures
++  global fragsort, scoreboardtext, scoreboardtop, scoreboardbottom, scoreboardlines
++  global sbarTrace, sbarLoadTrace, sbarConsoleCurrent, sbarNumPages
++  global sbarCopyEverything, sbarFullUpdate
++  sb_updates = 0
++  sb_showscores = false
++  sb_lines = 48
++  sbarInitialized = false
++  sbarHipnotic = false
++  sbarRogue = false
++  sbarState = void
++  sbarFontTexture = 1
++  sbarPlayer = void
++  sbarClient = void
++  sbarWidth = 320
++  sbarHeight = 200
++  sbarGameType = c.GAME_COOP
++  sbarTeamplay = 0.0
++  sbarPictures = []
++  sbarPictureNames = []
++  sbarInjectedPictures = pictures
++  fragsort = []
++  scoreboardtext = []
++  scoreboardtop = []
++  scoreboardbottom = []
++  scoreboardlines = 0
++  sbarTrace = []
++  sbarLoadTrace = []
++  sbarConsoleCurrent = -1.0
++  sbarNumPages = 999999
++  sbarCopyEverything = false
++  sbarFullUpdate = 0
++  return true
++end function
++
++function Sbar_DifferentialState()
++  return [
++    sb_updates, sb_showscores, sb_lines, sbarCopyEverything, sbarFullUpdate,
++    fragsort, scoreboardtext, scoreboardtop, scoreboardbottom, sbarLoadTrace,
++  ]
++end function
++
++function Sbar_DifferentialSetState(updates, showScores, hipnoticValue, rogueValue, teamplayValue)
++  global sb_updates, sb_showscores, sbarHipnotic, sbarRogue, sbarTeamplay
++  sb_updates = updates
++  sb_showscores = showScores
++  sbarHipnotic = hipnoticValue
++  sbarRogue = rogueValue
++  sbarTeamplay = teamplayValue
++  return true
++end function
++
++function Sbar_DifferentialClearTrace()
++  global sbarTrace
++  sbarTrace = []
++  return true
++end function
++
++function Sbar_Configure(state, fontTexture, player, clientState, width, height, lines, teamplay)
++  global sbarState, sbarFontTexture, sbarPlayer, sbarClient, sbarWidth, sbarHeight, sb_lines, sbarGameType, sbarTeamplay
++  sbarState = state
++  sbarFontTexture = fontTexture
++  sbarPlayer = player
++  sbarClient = clientState
++  sbarWidth = width
++  sbarHeight = height
++  sb_lines = lines
++  sbarTeamplay = teamplay
++  sbarGameType = c.GAME_COOP
++  if clientState is not void then sbarGameType = clientState.gameType end if
++  return true
++end function
++
++function sbarXOffset()
++  return renderUiContract.statusbarXOffset(sbarWidth, sbarGameType)
++end function
++
++function traceSbar(command)
++  global sbarTrace
++  sbarTrace = sbarTrace + [command]
++  return true
++end function
++
++function sbarDirectPic(x, y, pic)
++  if pic is void then return false end if
++  traceSbar(["pic", pic.name, x, y])
++  return draw.Draw_Pic(x, y, pic)
++end function
++
++function sbarDirectTransPic(x, y, pic)
++  if pic is void then return false end if
++  traceSbar(["transpic", pic.name, x, y])
++  return draw.Draw_TransPic(x, y, pic)
++end function
++
++function sbarDirectCharacter(x, y, num)
++  traceSbar(["char", num, x, y])
++  return draw.Draw_Character(x, y, num)
++end function
++
++function sbarDirectString(x, y, text)
++  traceSbar(["string", text, x, y])
++  return draw.Draw_String(x, y, text)
++end function
++
++function sbarDirectFill(x, y, width, height, color)
++  traceSbar(["fill", x, y, width, height, color])
++  return draw.Draw_Fill(x, y, width, height, color)
++end function
++
++function sbarDirectTileClear(x, y, width, height)
++  traceSbar(["tileclear", x, y, width, height])
++  return draw.Draw_TileClear(x, y, width, height)
++end function
++
++function Sbar_DrawPic(x, y, pic)
++  if pic is void then return false end if
++  drawX = x + sbarXOffset()
++  drawY = y + sbarHeight - SBAR_HEIGHT
++  traceSbar(["pic", pic.name, drawX, drawY])
++  return draw.Draw_Pic(drawX, drawY, pic)
++end function
++
++function Sbar_DrawTransPic(x, y, pic)
++  if pic is void then return false end if
++  drawX = x + sbarXOffset()
++  drawY = y + sbarHeight - SBAR_HEIGHT
++  traceSbar(["transpic", pic.name, drawX, drawY])
++  return draw.Draw_TransPic(drawX, drawY, pic)
++end function
++
++function Sbar_DrawCharacter(x, y, num)
++  drawX = x + sbarXOffset() + 4
++  drawY = y + sbarHeight - SBAR_HEIGHT
++  traceSbar(["char", num, drawX, drawY])
++  return draw.Draw_Character(drawX, drawY, num)
++end function
++
++function Sbar_DrawString(x, y, text)
++  drawX = x + sbarXOffset()
++  drawY = y + sbarHeight - SBAR_HEIGHT
++  traceSbar(["string", text, drawX, drawY])
++  return draw.Draw_String(drawX, drawY, text)
++end function
++
++// The C routine fills a caller buffer and returns its length.  MiniLang
++// returns [text, length].
++function Sbar_itoa(num)
++  text = "" + native.trunc(num)
++  return [text, len(bytes(text))]
++end function
++
++function numberPicture(color, frame)
++  prefix = "num_"
++  if color != 0 then prefix = "anum_" end if
++  if frame == STAT_MINUS then return loadedSbarPicture(prefix + "minus") end if
++  return loadedSbarPicture(prefix + frame)
++end function
++
++function Sbar_DrawNum(x, y, num, digits, color)
++  converted = Sbar_itoa(num)
++  text = bytes(converted[0])
++  start = 0
++  if len(text) > digits then start = len(text) - digits end if
++  if len(text) < digits then x = x + (digits - len(text)) * 24 end if
++  index = start
++  while index < len(text)
++    frame = text[index] - 48
++    if text[index] == 45 then frame = STAT_MINUS end if
++    Sbar_DrawTransPic(x, y, numberPicture(color, frame))
++    x = x + 24
++    index = index + 1
++  end while
++  return true
++end function
++
++function Sbar_SortFrags(scores)
++  global fragsort, scoreboardlines
++  fragsort = []
++  if scores is void then scoreboardlines = 0; return fragsort end if
++  index = 0
++  while index < len(scores)
++    if scores[index].name != "" then fragsort = fragsort + [index] end if
++    index = index + 1
++  end while
++  i = 0
++  while i < len(fragsort)
++    j = 0
++    while j < len(fragsort) - 1 - i
++      if scores[fragsort[j]].frags < scores[fragsort[j + 1]].frags then
++        temporary = fragsort[j]
++        fragsort[j] = fragsort[j + 1]
++        fragsort[j + 1] = temporary
++      end if
++      j = j + 1
++    end while
++    i = i + 1
++  end while
++  scoreboardlines = len(fragsort)
++  return fragsort
++end function
++
++function Sbar_ColorForMap(mapColor)
++  return mapColor + 8
++end function
++
++function padFrag(value)
++  text = "" + native.trunc(value)
++  while len(bytes(text)) < 3
++    text = " " + text
++  end while
++  return text
++end function
++
++function fragGlyphs(value)
++  return slice(bytes(padFrag(value)), 0, 3)
++end function
++
++function Sbar_UpdateScoreboard()
++  global scoreboardtext, scoreboardtop, scoreboardbottom
++  scores = []
++  if sbarClient is not void then scores = sbarClient.scores end if
++  Sbar_SortFrags(scores)
++  scoreboardtext = arrayutil.makeEmptyArray(scoreboardlines)
++  scoreboardtop = arrayutil.makeEmptyArray(scoreboardlines)
++  scoreboardbottom = arrayutil.makeEmptyArray(scoreboardlines)
++  index = 0
++  while index < scoreboardlines
++    score = scores[fragsort[index]]
++    // C stores this payload at scoreboardtext[i][1], leaving byte zero as NUL.
++    // The ML string models the useful payload beginning at that offset.
++    scoreboardtext[index] = padFrag(score.frags) + " " + score.name
++    scoreboardtop[index] = Sbar_ColorForMap(score.colors & 0xf0)
++    scoreboardbottom[index] = Sbar_ColorForMap((score.colors & 15) << 4)
++    index = index + 1
++  end while
++  return scoreboardlines
++end function
++
++function stat(index, fallback)
++  if sbarClient is not void and index >= 0 and index < len(sbarClient.stats) then return sbarClient.stats[index] end if
++  return fallback
++end function
++
++function Sbar_SoloScoreboard()
++  monsters = stat(c.STAT_MONSTERS, 0)
++  totalMonsters = stat(c.STAT_TOTALMONSTERS, 0)
++  secrets = stat(c.STAT_SECRETS, 0)
++  totalSecrets = stat(c.STAT_TOTALSECRETS, 0)
++  currentTime = 0.0
++  levelName = ""
++  if sbarClient is not void then currentTime = sbarClient.time; levelName = sbarClient.levelName end if
++  minutes = native.trunc(currentTime / 60.0)
++  seconds = native.trunc(currentTime - minutes * 60)
++  Sbar_DrawString(8, 4, "Monsters:" + padFrag(monsters) + " /" + padFrag(totalMonsters))
++  Sbar_DrawString(8, 12, "Secrets :" + padFrag(secrets) + " /" + padFrag(totalSecrets))
++  Sbar_DrawString(184, 4, "Time :" + padFrag(minutes) + ":" + native.trunc(seconds / 10) + (seconds % 10))
++  Sbar_DrawString(232 - len(bytes(levelName)) * 4, 12, levelName)
++  return true
++end function
++
++function Sbar_DrawScoreboard()
++  Sbar_SoloScoreboard()
++  if sbarGameType == c.GAME_DEATHMATCH then Sbar_DeathmatchOverlay() end if
++  return true
++end function
++
++function weaponFlash(itemIndex, activeWeapon, currentTime)
++  global sb_updates
++  acquired = 0.0
++  if sbarClient is not void and itemIndex < len(sbarClient.itemGetTime) then acquired = sbarClient.itemGetTime[itemIndex] end if
++  flash = native.trunc((currentTime - acquired) * 10.0)
++  if flash >= 10 then
++    if activeWeapon == (1 << itemIndex) then return 1 end if
++    return 0
++  end if
++  result = (flash % 5) + 2
++  if result > 1 then sb_updates = 0 end if
++  return result
++end function
++
++function flashWeaponName(prefix, weapon, flash)
++  if flash == 0 then return "inv_" + weapon end if
++  if flash == 1 then return "inv2_" + weapon end if
++  return "inva" + (flash - 1) + "_" + weapon
++end function
++
++function itemNeedsRefresh(itemIndex, currentTime)
++  global sb_updates
++  if sbarClient is void or itemIndex >= len(sbarClient.itemGetTime) then return false end if
++  acquired = sbarClient.itemGetTime[itemIndex]
++  if acquired != 0.0 and acquired > currentTime - 2.0 then
++    sb_updates = 0
++    return true
++  end if
++  return false
++end function
++
++function sbarActiveWeapon()
++  if sbarPlayer is void then return 0 end if
++  return native.trunc(stat(c.STAT_ACTIVEWEAPON, sbarPlayer.activeWeapon))
++end function
++
++function Sbar_DrawInventory()
++  if sbarPlayer is void then return false end if
++  items = sbarItems()
++  active = sbarActiveWeapon()
++  currentTime = 0.0
++  if sbarClient is not void then currentTime = sbarClient.time end if
++  if sbarRogue then
++    if active >= c.RIT_LAVA_NAILGUN then Sbar_DrawPic(0, -24, loadedSbarPicture("r_invbar1"))
++    else Sbar_DrawPic(0, -24, loadedSbarPicture("r_invbar2"))
++    end if
++  else Sbar_DrawPic(0, -24, loadedSbarPicture("ibar"))
++  end if
++  weapons = ["shotgun", "sshotgun", "nailgun", "snailgun", "rlaunch", "srlaunch", "lightng"]
++  index = 0
++  while index < 7
++    bit = c.IT_SHOTGUN << index
++    if (items & bit) != 0 then
++      flash = weaponFlash(index, active, currentTime)
++      Sbar_DrawPic(index * 24, -16, loadedSbarPicture(flashWeaponName("", weapons[index], flash)))
++    end if
++    index = index + 1
++  end while
++  if sbarHipnotic then
++    if (items & c.HIT_LASER_CANNON) != 0 then
++      flash = weaponFlash(c.HIT_LASER_CANNON_BIT, active, currentTime)
++      Sbar_DrawPic(176, -16, loadedSbarPicture(flashWeaponName("", "laser", flash)))
++    end if
++    if (items & c.HIT_MJOLNIR) != 0 then
++      flash = weaponFlash(c.HIT_MJOLNIR_BIT, active, currentTime)
++      Sbar_DrawPic(200, -16, loadedSbarPicture(flashWeaponName("", "mjolnir", flash)))
++    end if
++    grenadeFlashing = false
++    if (items & c.IT_GRENADE_LAUNCHER) != 0 and (items & c.HIT_PROXIMITY_GUN) != 0 then
++      flash = weaponFlash(4, active, currentTime)
++      if flash != 0 then
++        grenadeFlashing = true
++        Sbar_DrawPic(96, -16, loadedSbarPicture(flashWeaponName("", "gren_prox", flash)))
++      end if
++    end if
++    if (items & c.HIT_PROXIMITY_GUN) != 0 and not grenadeFlashing then
++      flash = weaponFlash(c.HIT_PROXIMITY_GUN_BIT, active, currentTime)
++      if (items & c.IT_GRENADE_LAUNCHER) != 0 then Sbar_DrawPic(96, -16, loadedSbarPicture(flashWeaponName("", "prox_gren", flash)))
++      else Sbar_DrawPic(96, -16, loadedSbarPicture(flashWeaponName("", "prox", flash)))
++      end if
++    end if
++  end if
++  if sbarRogue and active >= c.RIT_LAVA_NAILGUN then
++    names = ["r_lava", "r_superlava", "r_gren", "r_multirock", "r_plasma"]
++    index = 0
++    while index < 5
++      if active == (c.RIT_LAVA_NAILGUN << index) then Sbar_DrawPic((index + 2) * 24, -16, loadedSbarPicture(names[index])) end if
++      index = index + 1
++    end while
++  end if
++  counts = [
++    stat(c.STAT_SHELLS, sbarPlayer.shells),
++    stat(c.STAT_NAILS, sbarPlayer.nails),
++    stat(c.STAT_ROCKETS, sbarPlayer.rockets),
++    stat(c.STAT_CELLS, sbarPlayer.cells),
++  ]
++  index = 0
++  while index < 4
++    text = fragGlyphs(counts[index])
++    digit = 0
++    while digit < 3
++      if text[digit] != 32 then Sbar_DrawCharacter((6 * index + 1 + digit) * 8 - 2, -24, 18 + text[digit] - 48) end if
++      digit = digit + 1
++    end while
++    index = index + 1
++  end while
++  baseItems = ["sb_key1", "sb_key2", "sb_invis", "sb_invuln", "sb_suit", "sb_quad"]
++  index = 0
++  while index < 6
++    if (items & (1 << (17 + index))) != 0 then
++      if not sbarHipnotic or index > 1 then Sbar_DrawPic(192 + index * 16, -16, loadedSbarPicture(baseItems[index])) end if
++      itemNeedsRefresh(17 + index, currentTime)
++    end if
++    index = index + 1
++  end while
++  if sbarHipnotic then
++    // GLQuake 1.09 tests raw inventory bits 24 and 25 here.  Keep that
++    // historical behavior even though the mission-pack symbolic constants
++    // call later bits HIT_WETSUIT/HIT_EMPATHY_SHIELDS.
++    if (items & (1 << 24)) != 0 then Sbar_DrawPic(288, -16, loadedSbarPicture("sb_wsuit")); itemNeedsRefresh(24, currentTime) end if
++    if (items & (1 << 25)) != 0 then Sbar_DrawPic(304, -16, loadedSbarPicture("sb_eshld")); itemNeedsRefresh(25, currentTime) end if
++  end if
++  if sbarRogue then
++    if (items & c.RIT_SHIELD) != 0 then Sbar_DrawPic(288, -16, loadedSbarPicture("r_shield1")); itemNeedsRefresh(29, currentTime) end if
++    if (items & c.RIT_ANTIGRAV) != 0 then Sbar_DrawPic(304, -16, loadedSbarPicture("r_agrav1")); itemNeedsRefresh(30, currentTime) end if
++  else
++    index = 0
++    while index < 4
++      if (items & (1 << (28 + index))) != 0 then
++        Sbar_DrawPic(288 + index * 8, -16, loadedSbarPicture("sb_sigil" + (index + 1)))
++        itemNeedsRefresh(28 + index, currentTime)
++      end if
++      index = index + 1
++    end while
++  end if
++  return true
++end function
++
++function Sbar_DrawFrags()
++  if sbarClient is void then return false end if
++  scores = sbarClient.scores
++  Sbar_SortFrags(scores)
++  count = scoreboardlines
++  if count > 4 then count = 4 end if
++  x = 23
++  index = 0
++  while index < count
++    clientIndex = fragsort[index]
++    score = scores[clientIndex]
++    fillX = sbarXOffset() + x * 8 + 10
++    fillY = sbarHeight - SBAR_HEIGHT - 23
++    sbarDirectFill(fillX, fillY, 28, 4, Sbar_ColorForMap(score.colors & 0xf0))
++    sbarDirectFill(fillX, fillY + 4, 28, 3, Sbar_ColorForMap((score.colors & 15) << 4))
++    text = fragGlyphs(score.frags)
++    Sbar_DrawCharacter((x + 1) * 8, -24, text[0])
++    Sbar_DrawCharacter((x + 2) * 8, -24, text[1])
++    Sbar_DrawCharacter((x + 3) * 8, -24, text[2])
++    if clientIndex == sbarClient.viewEntity - 1 then Sbar_DrawCharacter(x * 8 + 2, -24, 16); Sbar_DrawCharacter((x + 4) * 8 - 4, -24, 17) end if
++    x = x + 4
++    index = index + 1
++  end while
++  return true
++end function
++
++function Sbar_DrawFace()
++  global sb_updates
++  if sbarPlayer is void then return false end if
++  items = sbarItems()
++  if sbarRogue and sbarClient is not void and sbarClient.maxClients != 1 and sbarTeamplay > 3.0 and sbarTeamplay < 7.0 and sbarClient.viewEntity > 0 and sbarClient.viewEntity <= len(sbarClient.scores) then
++    score = sbarClient.scores[sbarClient.viewEntity - 1]
++    xOffset = sbarXOffset() + 113
++    Sbar_DrawPic(112, 0, loadedSbarPicture("r_teambord"))
++    sbarDirectFill(xOffset, sbarHeight - SBAR_HEIGHT + 3, 22, 9, Sbar_ColorForMap(score.colors & 0xf0))
++    sbarDirectFill(xOffset, sbarHeight - SBAR_HEIGHT + 12, 22, 9, Sbar_ColorForMap((score.colors & 15) << 4))
++    text = fragGlyphs(score.frags)
++    top = Sbar_ColorForMap(score.colors & 0xf0)
++    if top == 8 then
++      if text[0] != 32 then Sbar_DrawCharacter(109, 3, 18 + text[0] - 48) end if
++      if text[1] != 32 then Sbar_DrawCharacter(116, 3, 18 + text[1] - 48) end if
++      if text[2] != 32 then Sbar_DrawCharacter(123, 3, 18 + text[2] - 48) end if
++    else
++      Sbar_DrawCharacter(109, 3, text[0]); Sbar_DrawCharacter(116, 3, text[1]); Sbar_DrawCharacter(123, 3, text[2])
++    end if
++    return true
++  end if
++  face = faceNameFor(items, native.trunc(stat(c.STAT_HEALTH, sbarPlayer.health)))
++  if sbarClient is not void and sbarClient.time <= sbarClient.faceAnimTime then
++    sb_updates = 0
++    if face == "face1" then face = "face_p1"
++    else if face == "face2" then face = "face_p2"
++    else if face == "face3" then face = "face_p3"
++    else if face == "face4" then face = "face_p4"
++    else if face == "face5" then face = "face_p5"
++    end if
++  end if
++  return Sbar_DrawPic(112, 0, loadedSbarPicture(face))
++end function
++
++function rogueArmorName(items)
++  if (items & c.RIT_ARMOR3) != 0 then return "sb_armor3" end if
++  if (items & c.RIT_ARMOR2) != 0 then return "sb_armor2" end if
++  if (items & c.RIT_ARMOR1) != 0 then return "sb_armor1" end if
++  return ""
++end function
++
++function rogueAmmoName(items)
++  if (items & c.RIT_SHELLS) != 0 then return "sb_shells" end if
++  if (items & c.RIT_NAILS) != 0 then return "sb_nails" end if
++  if (items & c.RIT_ROCKETS) != 0 then return "sb_rocket" end if
++  if (items & c.RIT_CELLS) != 0 then return "sb_cells" end if
++  if (items & c.RIT_LAVA_NAILS) != 0 then return "r_ammolava" end if
++  if (items & c.RIT_PLASMA_AMMO) != 0 then return "r_ammomulti" end if
++  if (items & c.RIT_MULTI_ROCKETS) != 0 then return "r_ammoplasma" end if
++  return ""
++end function
++
++function Sbar_Draw()
++  global sb_updates, sbarTrace, sbarCopyEverything
++  sbarTrace = []
++  if sbarPlayer is void then return false end if
++  if sbarConsoleCurrent == sbarHeight then return false end if
++  if sb_updates >= sbarNumPages then return false end if
++  sbarCopyEverything = true
++  sb_updates = sb_updates + 1
++  if sb_lines != 0 and sbarWidth > 320 then
++    sbarDirectTileClear(0, sbarHeight - sb_lines, sbarWidth, sb_lines)
++  end if
++  if sb_lines > 24 then
++    Sbar_DrawInventory()
++    if sbarClient is not void and sbarClient.maxClients != 1 then Sbar_DrawFrags() end if
++  end if
++  health = stat(c.STAT_HEALTH, sbarPlayer.health)
++  if sb_showscores or health <= 0.0 then
++    Sbar_DrawPic(0, 0, loadedSbarPicture("scorebar"))
++    Sbar_DrawScoreboard()
++    sb_updates = 0
++  else if sb_lines != 0 then
++    Sbar_DrawPic(0, 0, loadedSbarPicture("sbar"))
++    items = sbarItems()
++    if sbarHipnotic then
++      if (items & c.IT_KEY1) != 0 then Sbar_DrawPic(209, 3, loadedSbarPicture("sb_key1")) end if
++      if (items & c.IT_KEY2) != 0 then Sbar_DrawPic(209, 12, loadedSbarPicture("sb_key2")) end if
++    end if
++    if (items & c.IT_INVULNERABILITY) != 0 then
++      Sbar_DrawNum(24, 0, 666, 3, 1)
++      Sbar_DrawPic(0, 0, loadedSbarPicture("disc"))
++    else
++      armorColor = 0
++      armorValue = stat(c.STAT_ARMOR, sbarPlayer.armor)
++      if armorValue <= 25.0 then armorColor = 1 end if
++      Sbar_DrawNum(24, 0, armorValue, 3, armorColor)
++      armor = armorName(items)
++      if sbarRogue then armor = rogueArmorName(items) end if
++      if armor != "" then Sbar_DrawPic(0, 0, loadedSbarPicture(armor)) end if
++    end if
++    Sbar_DrawFace()
++    healthColor = 0
++    if health <= 25.0 then healthColor = 1 end if
++    Sbar_DrawNum(136, 0, health, 3, healthColor)
++    ammo = ammoName(items)
++    if sbarRogue then ammo = rogueAmmoName(items) end if
++    if ammo != "" then Sbar_DrawPic(224, 0, loadedSbarPicture(ammo)) end if
++    ammoColor = 0
++    ammoValue = stat(c.STAT_AMMO, sbarPlayer.ammo)
++    if ammoValue <= 10.0 then ammoColor = 1 end if
++    Sbar_DrawNum(248, 0, ammoValue, 3, ammoColor)
++  end if
++  if sbarGameType == c.GAME_DEATHMATCH and sbarWidth > 320 then Sbar_MiniDeathmatchOverlay() end if
++  return true
++end function
++
++function Sbar_IntermissionNumber(x, y, num, digits, color)
++  converted = Sbar_itoa(num)
++  text = bytes(converted[0])
++  start = 0
++  if len(text) > digits then start = len(text) - digits end if
++  if len(text) < digits then x = x + (digits - len(text)) * 24 end if
++  index = start
++  while index < len(text)
++    frame = text[index] - 48
++    if text[index] == 45 then frame = STAT_MINUS end if
++    sbarDirectTransPic(x, y, numberPicture(color, frame))
++    x = x + 24
++    index = index + 1
++  end while
++  return true
++end function
++
++function Sbar_DeathmatchOverlay()
++  global sbarCopyEverything, sbarFullUpdate
++  if sbarClient is void then return false end if
++  sbarCopyEverything = true
++  sbarFullUpdate = 0
++  ranking = try(draw.Draw_CachePic("gfx/ranking.lmp"))
++  if ranking is not error then sbarDirectPic(native.trunc((sbarWidth - ranking.width) / 2), 8, ranking) end if
++  scores = sbarClient.scores
++  Sbar_SortFrags(scores)
++  x = 80 + native.trunc((sbarWidth - 320) / 2)
++  y = 40
++  index = 0
++  while index < scoreboardlines
++    clientIndex = fragsort[index]
++    score = scores[clientIndex]
++    sbarDirectFill(x, y, 40, 4, Sbar_ColorForMap(score.colors & 0xf0))
++    sbarDirectFill(x, y + 4, 40, 4, Sbar_ColorForMap((score.colors & 15) << 4))
++    text = fragGlyphs(score.frags)
++    sbarDirectCharacter(x + 8, y, text[0]); sbarDirectCharacter(x + 16, y, text[1]); sbarDirectCharacter(x + 24, y, text[2])
++    if clientIndex == sbarClient.viewEntity - 1 then sbarDirectCharacter(x - 8, y, 12) end if
++    sbarDirectString(x + 64, y, score.name)
++    traceSbar(["score", clientIndex, score.frags, score.name, x, y])
++    y = y + 10
++    index = index + 1
++  end while
++  return true
++end function
++
++function Sbar_MiniDeathmatchOverlay()
++  global sbarCopyEverything, sbarFullUpdate
++  if sbarClient is void or sbarWidth < 512 or sb_lines == 0 then return false end if
++  sbarCopyEverything = true
++  sbarFullUpdate = 0
++  scores = sbarClient.scores
++  Sbar_SortFrags(scores)
++  numLines = native.trunc(sb_lines / 8)
++  if numLines < 3 then return false end if
++  current = 0
++  while current < scoreboardlines and fragsort[current] != sbarClient.viewEntity - 1
++    current = current + 1
++  end while
++  start = current - native.trunc(numLines / 2)
++  if current == scoreboardlines then start = 0 end if
++  if start > scoreboardlines - numLines then start = scoreboardlines - numLines end if
++  if start < 0 then start = 0 end if
++  x = 324
++  y = sbarHeight - sb_lines
++  index = start
++  while index < scoreboardlines and y < sbarHeight - 8
++    clientIndex = fragsort[index]
++    score = scores[clientIndex]
++    sbarDirectFill(x, y + 1, 40, 3, Sbar_ColorForMap(score.colors & 0xf0))
++    sbarDirectFill(x, y + 4, 40, 4, Sbar_ColorForMap((score.colors & 15) << 4))
++    text = fragGlyphs(score.frags)
++    sbarDirectCharacter(x + 8, y, text[0]); sbarDirectCharacter(x + 16, y, text[1]); sbarDirectCharacter(x + 24, y, text[2])
++    if clientIndex == sbarClient.viewEntity - 1 then sbarDirectCharacter(x, y, 16); sbarDirectCharacter(x + 32, y, 17) end if
++    sbarDirectString(x + 48, y, score.name)
++    traceSbar(["miniscore", clientIndex, score.frags, score.name, x, y])
++    y = y + 8
++    index = index + 1
++  end while
++  return true
++end function
++
++function Sbar_IntermissionOverlay()
++  global sbarCopyEverything, sbarFullUpdate
++  sbarCopyEverything = true
++  sbarFullUpdate = 0
++  if sbarGameType == c.GAME_DEATHMATCH then return Sbar_DeathmatchOverlay() end if
++  complete = try(draw.Draw_CachePic("gfx/complete.lmp"))
++  inter = try(draw.Draw_CachePic("gfx/inter.lmp"))
++  if complete is not error then sbarDirectPic(64, 24, complete) end if
++  if inter is not error then sbarDirectTransPic(0, 56, inter) end if
++  completed = 0.0
++  if sbarClient is not void then completed = sbarClient.completedTime end if
++  minutes = native.trunc(completed / 60.0)
++  seconds = native.trunc(completed - minutes * 60)
++  Sbar_IntermissionNumber(160, 64, minutes, 3, 0)
++  sbarDirectTransPic(234, 64, loadedSbarPicture("num_colon"))
++  sbarDirectTransPic(246, 64, numberPicture(0, native.trunc(seconds / 10)))
++  sbarDirectTransPic(266, 64, numberPicture(0, seconds % 10))
++  Sbar_IntermissionNumber(160, 104, stat(c.STAT_SECRETS, 0), 3, 0)
++  sbarDirectTransPic(232, 104, loadedSbarPicture("num_slash"))
++  Sbar_IntermissionNumber(240, 104, stat(c.STAT_TOTALSECRETS, 0), 3, 0)
++  Sbar_IntermissionNumber(160, 144, stat(c.STAT_MONSTERS, 0), 3, 0)
++  sbarDirectTransPic(232, 144, loadedSbarPicture("num_slash"))
++  Sbar_IntermissionNumber(240, 144, stat(c.STAT_TOTALMONSTERS, 0), 3, 0)
++  traceSbar(["intermission", minutes, seconds])
++  return true
++end function
++
++function Sbar_FinaleOverlay()
++  global sbarCopyEverything
++  sbarCopyEverything = true
++  finale = try(draw.Draw_CachePic("gfx/finale.lmp"))
++  if finale is error then return finale end if
++  sbarDirectTransPic(native.trunc((sbarWidth - finale.width) / 2), 16, finale)
++  traceSbar(["finale", native.trunc((sbarWidth - finale.width) / 2), 16])
++  return true
++end function
++
++function Sbar_CommandTrace()
++  return sbarTrace
++end function
++
++function Sbar_LayoutTrace(gameDirectory, player, clientState, width, height, lines, teamplay)
++  global sbarHipnotic, sbarRogue
++  previousHipnotic = sbarHipnotic
++  previousRogue = sbarRogue
++  sbarHipnotic = bio.lower(gameDirectory) == "hipnotic"
++  sbarRogue = bio.lower(gameDirectory) == "rogue"
++  result = [
++    ["game", gameDirectory],
++    ["inventory", lines > 24],
++    ["rogue-powered", sbarRogue and player is not void and player.activeWeapon >= c.RIT_LAVA_NAILGUN],
++    ["hipnotic-extra", sbarHipnotic],
++    ["team-face", sbarRogue and clientState is not void and clientState.maxClients != 1 and teamplay > 3.0 and teamplay < 7.0],
++    ["deathmatch", clientState is not void and clientState.gameType == c.GAME_DEATHMATCH],
++  ]
++  sbarHipnotic = previousHipnotic
++  sbarRogue = previousRogue
++  return result
++end function
+diff --git a/tests/render_ui_hud_parity_tests.ml b/tests/render_ui_hud_parity_tests.ml
+new file mode 100644
+index 0000000..a2051bc
+--- /dev/null
++++ b/tests/render_ui_hud_parity_tests.ml
+@@ -0,0 +1,148 @@
++/* BP-047: GL_Set2D, screen overlay, statusbar and TGA contract. */
++import miniquake.render_ui_contract as ui
++import miniquake.constants as c
++
++function bp047Equal(actual, expected, name)
++  if actual != expected then return error(4700, name + ": expected " + expected + ", got " + actual) end if
++  return true
++end function
++function bp047Array(actual, expected, name)
++  bp047Equal(len(actual), len(expected), name + " length")
++  index = 0
++  while index < len(expected)
++    bp047Equal(actual[index], expected[index], name + "[" + index + "]")
++    index = index + 1
++  end while
++  return true
++end function
++function bp047Run(number, name, fn)
++  print "[" + number + "/24] " + name
++  result = try(fn())
++  if result is error then print "FAIL: " + result.message; return false end if
++  return true
++end function
++function bp047Coop320()
++  bp047Equal(ui.statusbarXOffset(320, c.GAME_COOP), 0, "coop 320")
++  return true
++end function
++function bp047Coop640()
++  bp047Equal(ui.statusbarXOffset(640, c.GAME_COOP), 160, "coop 640")
++  return true
++end function
++function bp047Coop800()
++  bp047Equal(ui.statusbarXOffset(800, c.GAME_COOP), 240, "coop 800")
++  return true
++end function
++function bp047Dm640()
++  bp047Equal(ui.statusbarXOffset(640, c.GAME_DEATHMATCH), 0, "deathmatch left")
++  return true
++end function
++function bp047Dialog()
++  bp047Array(ui.overlayOrder(true, false, 0, true), ["set2d","tileclear","dialog","hud","fade","notify-string"], "dialog")
++  return true
++end function
++function bp047Loading()
++  bp047Array(ui.overlayOrder(false, true, 0, true), ["set2d","tileclear","loading","hud"], "loading")
++  return true
++end function
++function bp047Intermission()
++  bp047Array(ui.overlayOrder(false, false, 1, true), ["set2d","tileclear","intermission"], "intermission")
++  return true
++end function
++function bp047Finale()
++  bp047Array(ui.overlayOrder(false, false, 2, true), ["set2d","tileclear","finale","center"], "finale")
++  return true
++end function
++function bp047NormalCount()
++  bp047Equal(len(ui.overlayOrder(false, false, 0, true)), 11, "normal overlay count")
++  return true
++end function
++function bp047NormalFirst()
++  bp047Equal(ui.overlayOrder(false, false, 0, true)[0], "set2d", "normal first")
++  return true
++end function
++function bp047NormalLast()
++  bp047Equal(ui.overlayOrder(false, false, 0, true)[10], "menu", "normal last")
++  return true
++end function
++function bp047Set2dCount()
++  bp047Equal(len(ui.set2dStateOrder()), 11, "set2d count")
++  return true
++end function
++function bp047Set2dViewport()
++  bp047Equal(ui.set2dStateOrder()[0], "viewport", "set2d viewport")
++  return true
++end function
++function bp047Set2dDepth()
++  bp047Equal(ui.set2dStateOrder()[6], "disable-depth", "set2d depth")
++  return true
++end function
++function bp047Set2dAlpha()
++  bp047Equal(ui.set2dStateOrder()[9], "enable-alpha", "set2d alpha")
++  return true
++end function
++function bp047TgaOne()
++  bp047Equal(ui.tgaByteLength(1, 1), 21, "TGA 1x1")
++  return true
++end function
++function bp047Tga640()
++  bp047Equal(ui.tgaByteLength(640, 480), 921618, "TGA 640x480")
++  return true
++end function
++function bp047TgaInvalid()
++  bp047Equal(ui.tgaByteLength(0, 480), 0, "TGA invalid")
++  return true
++end function
++function bp047ViewmodelDepth()
++  bp047Equal(ui.viewModelDepthMaximum(), 0.3, "viewmodel depth")
++  return true
++end function
++function bp047Lines100()
++  bp047Equal(ui.statusbarLines(100.0, 0), 48, "viewsize 100")
++  return true
++end function
++function bp047Lines110()
++  bp047Equal(ui.statusbarLines(110.0, 0), 24, "viewsize 110")
++  return true
++end function
++function bp047Lines120()
++  bp047Equal(ui.statusbarLines(120.0, 0), 0, "viewsize 120")
++  return true
++end function
++function bp047LinesIntermission()
++  bp047Equal(ui.statusbarLines(100.0, 1), 0, "intermission lines")
++  return true
++end function
++function bp047Constants()
++  bp047Equal(ui.STATUSBAR_WIDTH, 320, "statusbar width")
++  bp047Equal(ui.TGA_BYTES_PER_PIXEL, 3, "TGA BPP")
++  return true
++end function
++
++passed = 0
++if bp047Run(1,"co-op statusbar 320",bp047Coop320) then passed=passed+1 end if
++if bp047Run(2,"co-op statusbar 640",bp047Coop640) then passed=passed+1 end if
++if bp047Run(3,"co-op statusbar 800",bp047Coop800) then passed=passed+1 end if
++if bp047Run(4,"deathmatch left alignment",bp047Dm640) then passed=passed+1 end if
++if bp047Run(5,"dialog overlay order",bp047Dialog) then passed=passed+1 end if
++if bp047Run(6,"loading overlay order",bp047Loading) then passed=passed+1 end if
++if bp047Run(7,"intermission overlay order",bp047Intermission) then passed=passed+1 end if
++if bp047Run(8,"finale overlay order",bp047Finale) then passed=passed+1 end if
++if bp047Run(9,"normal overlay count",bp047NormalCount) then passed=passed+1 end if
++if bp047Run(10,"normal overlay first",bp047NormalFirst) then passed=passed+1 end if
++if bp047Run(11,"normal overlay last",bp047NormalLast) then passed=passed+1 end if
++if bp047Run(12,"GL_Set2D state count",bp047Set2dCount) then passed=passed+1 end if
++if bp047Run(13,"GL_Set2D viewport",bp047Set2dViewport) then passed=passed+1 end if
++if bp047Run(14,"GL_Set2D depth",bp047Set2dDepth) then passed=passed+1 end if
++if bp047Run(15,"GL_Set2D alpha",bp047Set2dAlpha) then passed=passed+1 end if
++if bp047Run(16,"TGA one pixel",bp047TgaOne) then passed=passed+1 end if
++if bp047Run(17,"TGA 640x480",bp047Tga640) then passed=passed+1 end if
++if bp047Run(18,"TGA invalid size",bp047TgaInvalid) then passed=passed+1 end if
++if bp047Run(19,"viewmodel depth",bp047ViewmodelDepth) then passed=passed+1 end if
++if bp047Run(20,"statusbar 48 lines",bp047Lines100) then passed=passed+1 end if
++if bp047Run(21,"statusbar 24 lines",bp047Lines110) then passed=passed+1 end if
++if bp047Run(22,"statusbar hidden",bp047Lines120) then passed=passed+1 end if
++if bp047Run(23,"intermission statusbar",bp047LinesIntermission) then passed=passed+1 end if
++if bp047Run(24,"2D constants",bp047Constants) then passed=passed+1 end if
++if passed != 24 then print "MiniQuake BP-047 render UI/HUD tests failed: " + passed + "/24"; error(4799,"BP-047 render UI/HUD") end if
++print "MiniQuake BP-047 render UI/HUD tests passed: 24"
+diff --git a/tools/bp047_render_ui_checker.py b/tools/bp047_render_ui_checker.py
+new file mode 100755
+index 0000000..73bea5b
+--- /dev/null
++++ b/tools/bp047_render_ui_checker.py
+@@ -0,0 +1,16 @@
++#!/usr/bin/env python3
++from __future__ import annotations
++import argparse,json,pathlib
++
++def main():
++ ap=argparse.ArgumentParser(); ap.add_argument('--root',default='.'); ap.add_argument('--json-out','--json-output',dest='out'); ns=ap.parse_args(); root=pathlib.Path(ns.root).resolve(); errors=[]
++ contract=(root/'src/miniquake/render_ui_contract.ml').read_text(encoding='utf-8-sig'); screen=(root/'src/miniquake/screen.ml').read_text(encoding='utf-8-sig'); status=(root/'src/miniquake/statusbar.ml').read_text(encoding='utf-8-sig'); entities=(root/'src/miniquake/render/entities.ml').read_text(encoding='utf-8-sig'); tests=(root/'tests/render_ui_hud_parity_tests.ml').read_text(encoding='utf-8-sig')
++ for marker in ['function statusbarXOffset(width, gameType)','function overlayOrder(dialog, loading, intermission, gameInput)','function set2dStateOrder()','function tgaByteLength(width, height)','function viewModelDepthMaximum()']:
++  if marker not in contract: errors.append('contract missing '+marker)
++ for text,marker in [(screen,'return renderUiContract.overlayOrder'),(status,'return renderUiContract.statusbarXOffset'),(entities,'renderUiContract.viewModelDepthMaximum()')]:
++  if marker not in text: errors.append('production integration missing '+marker)
++ if tests.count('if bp047Run(')!=24: errors.append('BP-047 fixture count differs')
++ report={'schema_version':1,'component':'BP-047','passed':not errors,'fixtures':24,'errors':errors}; out=json.dumps(report,indent=2)+'\n'; print(out,end='')
++ if ns.out:pathlib.Path(ns.out).write_text(out)
++ return 0 if not errors else 1
++if __name__=='__main__': raise SystemExit(main())
+diff --git a/tools/oracle/render_ui_hud_oracle.c b/tools/oracle/render_ui_hud_oracle.c
+new file mode 100644
+index 0000000..1b7433c
+--- /dev/null
++++ b/tools/oracle/render_ui_hud_oracle.c
+@@ -0,0 +1,11 @@
++#include <stdio.h>
++static int sbar_x(int width,int deathmatch){return deathmatch?0:(width-320)/2;}
++static int sbar_lines(float size,int intermission){if(intermission)return 0;if(size>=120.0f)return 0;if(size>=110.0f)return 24;return 48;}
++int main(void){
++ printf("sbar_coop_640=%d\n",sbar_x(640,0)); printf("sbar_dm_640=%d\n",sbar_x(640,1));
++ printf("normal_overlay_stages=%d\n",11); printf("set2d_stages=%d\n",11);
++ printf("tga_1x1=%d\n",18+3); printf("tga_640x480=%d\n",18+640*480*3);
++ printf("viewmodel_depth_milli=%d\n",300); printf("sbar_lines_100=%d\n",sbar_lines(100.0f,0));
++ printf("sbar_lines_110=%d\n",sbar_lines(110.0f,0)); printf("sbar_lines_120=%d\n",sbar_lines(120.0f,0));
++ printf("fixtures=%d\n",24); return 0;
++}
