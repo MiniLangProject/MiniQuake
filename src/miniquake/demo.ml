@@ -59,7 +59,7 @@ function parseTrack(data)
     i = i + 1
   end while
   if i >= len(data) then return error(2000, "demo track header is missing newline") end if
-  // GLQuake deliberately does not call atoi here: every non-minus byte before
+  // MiniQuake deliberately does not call atoi here: every non-minus byte before
   // the newline participates in `forcetrack = forcetrack * 10 + (c - '0')`.
   // Retain that odd but observable retail-demo behavior byte for byte.
   value = 0

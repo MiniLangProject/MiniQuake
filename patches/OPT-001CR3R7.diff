@@ -1,0 +1,2994 @@
+--- a/audit/opt001cr3r7_audio_transition_hotpath.json
++++ b/audit/opt001cr3r7_audio_transition_hotpath.json
+@@ -0,0 +1,22 @@
++{
++  "schema": "MiniQuakeOPT001CR3R7AudioTransitionHotpath/1",
++  "delivery_revision": "OPT-001CR3R7",
++  "delivery_parent": "OPT-001CR3R6",
++  "status": "opt001cr3r7_audio_transition_hotpath_candidate_v1",
++  "fingerprint": "0x1c001c0d",
++  "changes": [
++    "default _snd_mixahead 0.2",
++    "unconditional renderer teardown on map transitions",
++    "same-leaf PVS reuse",
++    "frame-local hot Cvar cache",
++    "audio loop length hoists",
++    "audio cost analysis"
++  ],
++  "runtime_gates": [
++    "e1m1/e1m2 matrix",
++    "1500 visible e1m2 frames",
++    "10000 headless e1m2 frames",
++    "256-frame e1m1-e1m2-e1m1 transition",
++    "handle plateau"
++  ]
++}
+--- a/CHANGELOG_OPT-001CR3R7.md
++++ b/CHANGELOG_OPT-001CR3R7.md
+@@ -0,0 +1,49 @@
++# MiniQuake OPT-001CR3R7 – Changelog
++
++## Parent
++
++`OPT-001CR3R6`
++
++## Kartenwechsel
++
++- Der `changelevel`-Pfad erhält vor dem neuen `SV_SpawnServer` dieselbe Sound- und Rendererbereinigung wie der explizite Map-Pfad.
++- Alte Mischkanäle werden vor dem synchronen Kartenaufbau gestoppt.
++- Map-spezifischer Rendererzustand wird vor dem Laden der Folgewelt verworfen.
++- Der Übergangstest verwendet standardmäßig 256 statt 64 Frames pro Abschnitt.
++
++## Audio
++
++- Der Standardwert für `s_mixahead` wird auf 0,2 Sekunden angehoben, damit der Hauptthread bei langsamen sichtbaren Frames seltener den WaveOut-Puffer leer laufen lässt.
++- Sichere Append-Schleifen in Audioquellen werden auf direkt dimensionierte Arrays umgestellt.
++- Wiederholte Cvar-Abfragen innerhalb desselben Audio-/Frameaufrufs werden lokal wiederverwendet.
++- Der Test erzeugt `opt001cr3r7-audio-analysis.json` mit Audioanteil und Starvation-Risiko.
++
++## MiniLang-Hotpaths
++
++- aufeinanderfolgende sichere `array + [item]`-Operationen werden zusammengefasst,
++- stabile `len(array)`-Werte werden aus geeigneten Schleifen gezogen,
++- bekannte Größen verwenden direkt dimensionierte Arrays,
++- kleine reine skalare Funktionen werden selektiv inlined.
++
++### Zusätzliche Inline-Kandidaten
++
++- `traceEnabled` in `src/miniquake/render/gl11.ml` (13 direkte Aufrufe im Quellbaum)
++- `nextSequence` in `src/miniquake/net_datagram.ml` (8 direkte Aufrufe im Quellbaum)
++- `SCR_IntermissionMode` in `src/miniquake/screen.ml` (7 direkte Aufrufe im Quellbaum)
++- `privilegedCommandAllowed` in `src/miniquake/server.ml` (6 direkte Aufrufe im Quellbaum)
++- `parameterOffset` in `src/miniquake/quakec/builtins.ml` (6 direkte Aufrufe im Quellbaum)
++- `freeHunkBytes` in `src/miniquake/memory.ml` (6 direkte Aufrufe im Quellbaum)
++
++## Renderer
++
++- Ein unverändertes Viewleaf kann den bereits markierten PVS-Zustand wiederverwenden, sofern der bestehende Rendererzustand die erforderlichen Felder bereitstellt.
++- Bereits vorhandene Viewmodel-, Underwater- und Trace-Allokationskorrekturen bleiben aktiv.
++
++## Nicht geändert
++
++- Protocol 15,
++- QuakeC-Semantik,
++- Physik,
++- native Bridge-ABI,
++- Original-GLQuake-Referenzgrenzen,
++- Standard-Fenstermodus aus CR3R6.
+--- a/COLLECT_RESULTS.ps1
++++ b/COLLECT_RESULTS.ps1
+@@ -7,14 +7,14 @@
+ $Build = Join-Path $Root "build"
+ $PackageId = "BP-094"
+ $BlockId = "BP-090-094"
+-$DeliveryRevision = "OPT-001CR3R6"
+-$DeliveryParent = "OPT-001CR3R5"
++$DeliveryRevision = "OPT-001CR3R7"
++$DeliveryParent = "OPT-001CR3R6"
+ $Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+ # original_reference_binary_in_result_archive=$false
+ # historical external staging marker retained for contract verification: bp090-094-original-reference
+ # quake_game_data_in_result_archive=$false
+-$Staging = Join-Path $Build (".opt001cr3r6-results-{0}" -f $Timestamp)
+-$Archive = Join-Path $Build ("MiniQuake_OPT-001CR3R6_RESULTS_{0}.zip" -f $Timestamp)
++$Staging = Join-Path $Build (".opt001cr3r7-results-{0}" -f $Timestamp)
++$Archive = Join-Path $Build ("MiniQuake_OPT-001CR3R7_RESULTS_{0}.zip" -f $Timestamp)
+ 
+ if (-not (Test-Path -LiteralPath $Build -PathType Container)) { throw "build directory does not exist: $Build" }
+ if (Test-Path -LiteralPath $Staging) { Remove-Item -Recurse -Force -LiteralPath $Staging }
+@@ -78,15 +78,16 @@
+ }
+ 
+ $RootFiles = @(
+-  "TEST_OPT-001CR3R6.ps1",
+-  "CHANGELOG_OPT-001CR3R6.md",
+-  "docs\OPT-001CR3R6_TESTING.md",
+-  "docs\OPT-001CR3R6_CHANGELOG.md",
+-  "docs\OPT-001CR3R6_RESULT_ANALYSIS.md",
+-  "docs\OPT-001CR3R6_HOTFIX_REPORT.json",
+-  "audit\opt001cr3r6_windowed_transition.json",
+-  "tools\check_opt001cr3r6.py",
+-  "patches\OPT-001CR3R6.diff",
++  "TEST_OPT-001CR3R7.ps1",
++  "CHANGELOG_OPT-001CR3R7.md",
++  "docs\OPT-001CR3R7_TESTING.md",
++  "docs\OPT-001CR3R7_CHANGELOG.md",
++  "docs\OPT-001CR3R7_RESULT_ANALYSIS.md",
++  "docs\OPT-001CR3R7_HOTFIX_REPORT.json",
++  "audit\opt001cr3r7_audio_transition_hotpath.json",
++  "tools\check_opt001cr3r7.py",
++  "tools\analyze_opt001cr3r7_audio.py",
++  "patches\OPT-001CR3R7.diff",
+   "TEST_OPT-001CR3R4.ps1",
+   "CHANGELOG_OPT-001CR3R4.md",
+   "docs\OPT-001CR3R4_TESTING.md",
+--- a/docs/OPT-001CR3R7_CHANGELOG.md
++++ b/docs/OPT-001CR3R7_CHANGELOG.md
+@@ -0,0 +1,49 @@
++# MiniQuake OPT-001CR3R7 – Changelog
++
++## Parent
++
++`OPT-001CR3R6`
++
++## Kartenwechsel
++
++- Der `changelevel`-Pfad erhält vor dem neuen `SV_SpawnServer` dieselbe Sound- und Rendererbereinigung wie der explizite Map-Pfad.
++- Alte Mischkanäle werden vor dem synchronen Kartenaufbau gestoppt.
++- Map-spezifischer Rendererzustand wird vor dem Laden der Folgewelt verworfen.
++- Der Übergangstest verwendet standardmäßig 256 statt 64 Frames pro Abschnitt.
++
++## Audio
++
++- Der Standardwert für `s_mixahead` wird auf 0,2 Sekunden angehoben, damit der Hauptthread bei langsamen sichtbaren Frames seltener den WaveOut-Puffer leer laufen lässt.
++- Sichere Append-Schleifen in Audioquellen werden auf direkt dimensionierte Arrays umgestellt.
++- Wiederholte Cvar-Abfragen innerhalb desselben Audio-/Frameaufrufs werden lokal wiederverwendet.
++- Der Test erzeugt `opt001cr3r7-audio-analysis.json` mit Audioanteil und Starvation-Risiko.
++
++## MiniLang-Hotpaths
++
++- aufeinanderfolgende sichere `array + [item]`-Operationen werden zusammengefasst,
++- stabile `len(array)`-Werte werden aus geeigneten Schleifen gezogen,
++- bekannte Größen verwenden direkt dimensionierte Arrays,
++- kleine reine skalare Funktionen werden selektiv inlined.
++
++### Zusätzliche Inline-Kandidaten
++
++- `traceEnabled` in `src/miniquake/render/gl11.ml` (13 direkte Aufrufe im Quellbaum)
++- `nextSequence` in `src/miniquake/net_datagram.ml` (8 direkte Aufrufe im Quellbaum)
++- `SCR_IntermissionMode` in `src/miniquake/screen.ml` (7 direkte Aufrufe im Quellbaum)
++- `privilegedCommandAllowed` in `src/miniquake/server.ml` (6 direkte Aufrufe im Quellbaum)
++- `parameterOffset` in `src/miniquake/quakec/builtins.ml` (6 direkte Aufrufe im Quellbaum)
++- `freeHunkBytes` in `src/miniquake/memory.ml` (6 direkte Aufrufe im Quellbaum)
++
++## Renderer
++
++- Ein unverändertes Viewleaf kann den bereits markierten PVS-Zustand wiederverwenden, sofern der bestehende Rendererzustand die erforderlichen Felder bereitstellt.
++- Bereits vorhandene Viewmodel-, Underwater- und Trace-Allokationskorrekturen bleiben aktiv.
++
++## Nicht geändert
++
++- Protocol 15,
++- QuakeC-Semantik,
++- Physik,
++- native Bridge-ABI,
++- Original-GLQuake-Referenzgrenzen,
++- Standard-Fenstermodus aus CR3R6.
+--- a/docs/OPT-001CR3R7_HOTFIX_REPORT.json
++++ b/docs/OPT-001CR3R7_HOTFIX_REPORT.json
+@@ -0,0 +1,22 @@
++{
++  "schema": "MiniQuakeOPT001CR3R7AudioTransitionHotpath/1",
++  "delivery_revision": "OPT-001CR3R7",
++  "delivery_parent": "OPT-001CR3R6",
++  "status": "opt001cr3r7_audio_transition_hotpath_candidate_v1",
++  "fingerprint": "0x1c001c0d",
++  "changes": [
++    "default _snd_mixahead 0.2",
++    "unconditional renderer teardown on map transitions",
++    "same-leaf PVS reuse",
++    "frame-local hot Cvar cache",
++    "audio loop length hoists",
++    "audio cost analysis"
++  ],
++  "runtime_gates": [
++    "e1m1/e1m2 matrix",
++    "1500 visible e1m2 frames",
++    "10000 headless e1m2 frames",
++    "256-frame e1m1-e1m2-e1m1 transition",
++    "handle plateau"
++  ]
++}
+--- a/docs/OPT-001CR3R7_RESULT_ANALYSIS.md
++++ b/docs/OPT-001CR3R7_RESULT_ANALYSIS.md
+@@ -0,0 +1,31 @@
++# MiniQuake OPT-001CR3R6 – Ergebnisanalyse
++
++- Ergebnisarchiv SHA-256: `472378d77754e41114ab69c3eb82c5b1dcfc40619255b1626367b7adfb2e6d71`
++- Gesamtstatus: **INCONCLUSIVE**
++- Handleklassifikation: **INCONCLUSIVE**
++- Testschritte: **27**
++- Fehlgeschlagene/übersprungene Schritte: **3**
++
++## Fehlgeschlagene Schritte
++- `listen-server handle plateau`: **DIAGNOSTIC**, Exitcode `3`, Log `opt001cr3r6-handle-plateau.log`
++- `OPT-001CR3R6 aggregate analysis`: **DIAGNOSTIC**, Exitcode `2`, Log `opt001cr3r6-aggregate-analysis.log`
++- `OPT-001CR3R6 incremental performance comparison`: **DIAGNOSTIC**, Exitcode `2`, Log `opt001cr3r6-incremental-performance.log`
++
++## Übergangstest
++- `OPT-001CR3R6 e1m1-e1m2-e1m1 transition`: **PASS**, Exitcode `0`
++
++## Performance- und Audiomessung
++
++| Map | Modus | Median | P95 | P99 | Maximum | Audioanteil | Screenanteil | Serveranteil |
++|---|---|---:|---:|---:|---:|---:|---:|---:|
++| e1m1 | headless | 15 ms | 16 ms | 16 ms | 32 ms | 0.00% | 0.00% | 96.59% |
++| e1m1 | render | 63 ms | 94 ms | 110 ms | 141 ms | 0.00% | 71.89% | 27.29% |
++| e1m2 | headless | 16 ms | 32 ms | 47 ms | 47 ms | 0.00% | 0.00% | 97.76% |
++| e1m2 | render | 93 ms | 110 ms | 125 ms | 172 ms | 0.00% | 64.15% | 35.08% |
++
++## Einordnung
++
++- Die vom Benutzer wahrgenommene Audio-Störung muss nicht bedeuten, dass der Mixer den größten CPU-Anteil hat. Bei langsamen sichtbaren Frames kann der Hauptthread den WaveOut-Puffer zu spät nachfüllen; das klingt wie ein Audio-Problem, obwohl der Renderer die Ursache der Pufferunterläufe ist.
++- CR3R7 erhöht deshalb den standardmäßigen Vorlaufpuffer, stoppt alte Sounds vor dem Kartenwechsel und entfernt weitere kurzlebige Audio-/Renderarrays.
++- Der Kartenwechsel erhält dieselbe Sound- und Rendererbereinigung wie der explizite `map`-Pfad.
++- Zusätzlich werden stabile Cvarwerte funktionslokal gecacht, kleine reine Funktionen selektiv inlined, stabile `len()`-Abfragen aus Schleifen gezogen und unveränderte Viewleaf-PVS wiederverwendet, sofern der bestehende Rendererzustand dies zulässt.
+--- a/docs/OPT-001CR3R7_TESTING.md
++++ b/docs/OPT-001CR3R7_TESTING.md
+@@ -0,0 +1,77 @@
++# MiniQuake OPT-001CR3R7 – Windows-Test
++
++## Zweck
++
++Dieser Zwischenstand kombiniert drei Ziele:
++
++1. realer Kartenwechsel `e1m1 → e1m2` ohne Hänger,
++2. robusterer Ton bei langsamen Frames und weniger Audio-Allokationen,
++3. zusätzliche risikoarme MiniLang-Hotpath-Optimierungen.
++
++## Voraussetzungen
++
++```powershell
++$QuakeBase = "C:\Users\nilsk\Dropbox\Quake"
++$CompilerRoot = "C:\Users\nilsk\Desktop\MiniLangCompilerPy"
++
++Test-Path "$QuakeBase\id1\pak0.pak"
++Test-Path "$CompilerRoot\mlc_win64.py"
++Test-Path .\TEST_OPT-001CR3R7.ps1
++Test-Path .\tools\verify.py
++```
++
++Alle Prüfungen müssen `True` liefern.
++
++## Lauf
++
++```powershell
++.\TEST_OPT-001CR3R7.ps1 `
++  -Compiler "$CompilerRoot\mlc_win64.py" `
++  -StdLib $CompilerRoot `
++  -QuakeBase $QuakeBase `
++  -Game id1 `
++  -MatrixFrames 64 `
++  -WarmupFrames 300 `
++  -BenchmarkFrames 3000 `
++  -HandleWarmupFrames 1200 `
++  -HandleWindowFrames 5000 `
++  -HandleWindows 3 `
++  -HandleConfirmationWindows 2 `
++  -E1M2VisibleFrames 1500 `
++  -E1M2HeadlessFrames 10000 `
++  -TransitionFrames 256 `
++  -ContinueIndependentTests
++```
++
++Die Ausgabe wird live auf derselben Konsole angezeigt.
++
++## Wichtige Gates
++
++```text
++MiniQuake OPT-001CR3R7 hotpath/transition/audio verification: PASS
++e1m1 -> e1m2 -> e1m1 transition: PASS
++handle_classification=STABLE oder PLATEAU
++MiniQuake OPT-001CR3R7 audio cost analysis: ...
++MiniQuake OPT-001CR3R7 acceptance test: PASS
++```
++
++## Manuelle Spielprüfung
++
++Nach dem Build:
++
++```powershell
++.\build\MiniQuake.exe --play "$QuakeBase" e1m1
++```
++
++Der normale Start ist weiterhin fensterbasiert. Bitte bis zum Ausgang von `e1m1` spielen und prüfen:
++
++- Wechsel nach `e1m2` beendet sich ohne dauerhaften Hänger,
++- alter Kartenton läuft nicht in die neue Karte hinein,
++- Musik/SFX reißen bei sichtbaren Langframes weniger ab,
++- Eingabe und Fenster bleiben während und nach dem Kartenwechsel reaktionsfähig.
++
++## Ergebnisse
++
++```powershell
++.\COLLECT_RESULTS.ps1
++```
+--- a/patches/OPT-001CR3R7.diff
++++ b/patches/OPT-001CR3R7.diff
+@@ -0,0 +1,1497 @@
++--- a/audit/opt001cr3r7_audio_transition_hotpath.json
+++++ b/audit/opt001cr3r7_audio_transition_hotpath.json
++@@ -0,0 +1,22 @@
+++{
+++  "schema": "MiniQuakeOPT001CR3R7AudioTransitionHotpath/1",
+++  "delivery_revision": "OPT-001CR3R7",
+++  "delivery_parent": "OPT-001CR3R6",
+++  "status": "opt001cr3r7_audio_transition_hotpath_candidate_v1",
+++  "fingerprint": "0x1c001c0d",
+++  "changes": [
+++    "default _snd_mixahead 0.2",
+++    "unconditional renderer teardown on map transitions",
+++    "same-leaf PVS reuse",
+++    "frame-local hot Cvar cache",
+++    "audio loop length hoists",
+++    "audio cost analysis"
+++  ],
+++  "runtime_gates": [
+++    "e1m1/e1m2 matrix",
+++    "1500 visible e1m2 frames",
+++    "10000 headless e1m2 frames",
+++    "256-frame e1m1-e1m2-e1m1 transition",
+++    "handle plateau"
+++  ]
+++}
++--- a/CHANGELOG_OPT-001CR3R7.md
+++++ b/CHANGELOG_OPT-001CR3R7.md
++@@ -0,0 +1,49 @@
+++# MiniQuake OPT-001CR3R7 – Changelog
+++
+++## Parent
+++
+++`OPT-001CR3R6`
+++
+++## Kartenwechsel
+++
+++- Der `changelevel`-Pfad erhält vor dem neuen `SV_SpawnServer` dieselbe Sound- und Rendererbereinigung wie der explizite Map-Pfad.
+++- Alte Mischkanäle werden vor dem synchronen Kartenaufbau gestoppt.
+++- Map-spezifischer Rendererzustand wird vor dem Laden der Folgewelt verworfen.
+++- Der Übergangstest verwendet standardmäßig 256 statt 64 Frames pro Abschnitt.
+++
+++## Audio
+++
+++- Der Standardwert für `s_mixahead` wird auf 0,2 Sekunden angehoben, damit der Hauptthread bei langsamen sichtbaren Frames seltener den WaveOut-Puffer leer laufen lässt.
+++- Sichere Append-Schleifen in Audioquellen werden auf direkt dimensionierte Arrays umgestellt.
+++- Wiederholte Cvar-Abfragen innerhalb desselben Audio-/Frameaufrufs werden lokal wiederverwendet.
+++- Der Test erzeugt `opt001cr3r7-audio-analysis.json` mit Audioanteil und Starvation-Risiko.
+++
+++## MiniLang-Hotpaths
+++
+++- aufeinanderfolgende sichere `array + [item]`-Operationen werden zusammengefasst,
+++- stabile `len(array)`-Werte werden aus geeigneten Schleifen gezogen,
+++- bekannte Größen verwenden direkt dimensionierte Arrays,
+++- kleine reine skalare Funktionen werden selektiv inlined.
+++
+++### Zusätzliche Inline-Kandidaten
+++
+++- `traceEnabled` in `src/miniquake/render/gl11.ml` (13 direkte Aufrufe im Quellbaum)
+++- `nextSequence` in `src/miniquake/net_datagram.ml` (8 direkte Aufrufe im Quellbaum)
+++- `SCR_IntermissionMode` in `src/miniquake/screen.ml` (7 direkte Aufrufe im Quellbaum)
+++- `privilegedCommandAllowed` in `src/miniquake/server.ml` (6 direkte Aufrufe im Quellbaum)
+++- `parameterOffset` in `src/miniquake/quakec/builtins.ml` (6 direkte Aufrufe im Quellbaum)
+++- `freeHunkBytes` in `src/miniquake/memory.ml` (6 direkte Aufrufe im Quellbaum)
+++
+++## Renderer
+++
+++- Ein unverändertes Viewleaf kann den bereits markierten PVS-Zustand wiederverwenden, sofern der bestehende Rendererzustand die erforderlichen Felder bereitstellt.
+++- Bereits vorhandene Viewmodel-, Underwater- und Trace-Allokationskorrekturen bleiben aktiv.
+++
+++## Nicht geändert
+++
+++- Protocol 15,
+++- QuakeC-Semantik,
+++- Physik,
+++- native Bridge-ABI,
+++- Original-GLQuake-Referenzgrenzen,
+++- Standard-Fenstermodus aus CR3R6.
++--- a/COLLECT_RESULTS.ps1
+++++ b/COLLECT_RESULTS.ps1
++@@ -7,14 +7,14 @@
++ $Build = Join-Path $Root "build"
++ $PackageId = "BP-094"
++ $BlockId = "BP-090-094"
++-$DeliveryRevision = "OPT-001CR3R6"
++-$DeliveryParent = "OPT-001CR3R5"
+++$DeliveryRevision = "OPT-001CR3R7"
+++$DeliveryParent = "OPT-001CR3R6"
++ $Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
++ # original_reference_binary_in_result_archive=$false
++ # historical external staging marker retained for contract verification: bp090-094-original-reference
++ # quake_game_data_in_result_archive=$false
++-$Staging = Join-Path $Build (".opt001cr3r6-results-{0}" -f $Timestamp)
++-$Archive = Join-Path $Build ("MiniQuake_OPT-001CR3R6_RESULTS_{0}.zip" -f $Timestamp)
+++$Staging = Join-Path $Build (".opt001cr3r7-results-{0}" -f $Timestamp)
+++$Archive = Join-Path $Build ("MiniQuake_OPT-001CR3R7_RESULTS_{0}.zip" -f $Timestamp)
++ 
++ if (-not (Test-Path -LiteralPath $Build -PathType Container)) { throw "build directory does not exist: $Build" }
++ if (Test-Path -LiteralPath $Staging) { Remove-Item -Recurse -Force -LiteralPath $Staging }
++@@ -78,15 +78,16 @@
++ }
++ 
++ $RootFiles = @(
++-  "TEST_OPT-001CR3R6.ps1",
++-  "CHANGELOG_OPT-001CR3R6.md",
++-  "docs\OPT-001CR3R6_TESTING.md",
++-  "docs\OPT-001CR3R6_CHANGELOG.md",
++-  "docs\OPT-001CR3R6_RESULT_ANALYSIS.md",
++-  "docs\OPT-001CR3R6_HOTFIX_REPORT.json",
++-  "audit\opt001cr3r6_windowed_transition.json",
++-  "tools\check_opt001cr3r6.py",
++-  "patches\OPT-001CR3R6.diff",
+++  "TEST_OPT-001CR3R7.ps1",
+++  "CHANGELOG_OPT-001CR3R7.md",
+++  "docs\OPT-001CR3R7_TESTING.md",
+++  "docs\OPT-001CR3R7_CHANGELOG.md",
+++  "docs\OPT-001CR3R7_RESULT_ANALYSIS.md",
+++  "docs\OPT-001CR3R7_HOTFIX_REPORT.json",
+++  "audit\opt001cr3r7_audio_transition_hotpath.json",
+++  "tools\check_opt001cr3r7.py",
+++  "tools\analyze_opt001cr3r7_audio.py",
+++  "patches\OPT-001CR3R7.diff",
++   "TEST_OPT-001CR3R4.ps1",
++   "CHANGELOG_OPT-001CR3R4.md",
++   "docs\OPT-001CR3R4_TESTING.md",
++--- a/docs/OPT-001CR3R7_CHANGELOG.md
+++++ b/docs/OPT-001CR3R7_CHANGELOG.md
++@@ -0,0 +1,49 @@
+++# MiniQuake OPT-001CR3R7 – Changelog
+++
+++## Parent
+++
+++`OPT-001CR3R6`
+++
+++## Kartenwechsel
+++
+++- Der `changelevel`-Pfad erhält vor dem neuen `SV_SpawnServer` dieselbe Sound- und Rendererbereinigung wie der explizite Map-Pfad.
+++- Alte Mischkanäle werden vor dem synchronen Kartenaufbau gestoppt.
+++- Map-spezifischer Rendererzustand wird vor dem Laden der Folgewelt verworfen.
+++- Der Übergangstest verwendet standardmäßig 256 statt 64 Frames pro Abschnitt.
+++
+++## Audio
+++
+++- Der Standardwert für `s_mixahead` wird auf 0,2 Sekunden angehoben, damit der Hauptthread bei langsamen sichtbaren Frames seltener den WaveOut-Puffer leer laufen lässt.
+++- Sichere Append-Schleifen in Audioquellen werden auf direkt dimensionierte Arrays umgestellt.
+++- Wiederholte Cvar-Abfragen innerhalb desselben Audio-/Frameaufrufs werden lokal wiederverwendet.
+++- Der Test erzeugt `opt001cr3r7-audio-analysis.json` mit Audioanteil und Starvation-Risiko.
+++
+++## MiniLang-Hotpaths
+++
+++- aufeinanderfolgende sichere `array + [item]`-Operationen werden zusammengefasst,
+++- stabile `len(array)`-Werte werden aus geeigneten Schleifen gezogen,
+++- bekannte Größen verwenden direkt dimensionierte Arrays,
+++- kleine reine skalare Funktionen werden selektiv inlined.
+++
+++### Zusätzliche Inline-Kandidaten
+++
+++- `traceEnabled` in `src/miniquake/render/gl11.ml` (13 direkte Aufrufe im Quellbaum)
+++- `nextSequence` in `src/miniquake/net_datagram.ml` (8 direkte Aufrufe im Quellbaum)
+++- `SCR_IntermissionMode` in `src/miniquake/screen.ml` (7 direkte Aufrufe im Quellbaum)
+++- `privilegedCommandAllowed` in `src/miniquake/server.ml` (6 direkte Aufrufe im Quellbaum)
+++- `parameterOffset` in `src/miniquake/quakec/builtins.ml` (6 direkte Aufrufe im Quellbaum)
+++- `freeHunkBytes` in `src/miniquake/memory.ml` (6 direkte Aufrufe im Quellbaum)
+++
+++## Renderer
+++
+++- Ein unverändertes Viewleaf kann den bereits markierten PVS-Zustand wiederverwenden, sofern der bestehende Rendererzustand die erforderlichen Felder bereitstellt.
+++- Bereits vorhandene Viewmodel-, Underwater- und Trace-Allokationskorrekturen bleiben aktiv.
+++
+++## Nicht geändert
+++
+++- Protocol 15,
+++- QuakeC-Semantik,
+++- Physik,
+++- native Bridge-ABI,
+++- Original-GLQuake-Referenzgrenzen,
+++- Standard-Fenstermodus aus CR3R6.
++--- a/docs/OPT-001CR3R7_HOTFIX_REPORT.json
+++++ b/docs/OPT-001CR3R7_HOTFIX_REPORT.json
++@@ -0,0 +1,22 @@
+++{
+++  "schema": "MiniQuakeOPT001CR3R7AudioTransitionHotpath/1",
+++  "delivery_revision": "OPT-001CR3R7",
+++  "delivery_parent": "OPT-001CR3R6",
+++  "status": "opt001cr3r7_audio_transition_hotpath_candidate_v1",
+++  "fingerprint": "0x1c001c0d",
+++  "changes": [
+++    "default _snd_mixahead 0.2",
+++    "unconditional renderer teardown on map transitions",
+++    "same-leaf PVS reuse",
+++    "frame-local hot Cvar cache",
+++    "audio loop length hoists",
+++    "audio cost analysis"
+++  ],
+++  "runtime_gates": [
+++    "e1m1/e1m2 matrix",
+++    "1500 visible e1m2 frames",
+++    "10000 headless e1m2 frames",
+++    "256-frame e1m1-e1m2-e1m1 transition",
+++    "handle plateau"
+++  ]
+++}
++--- a/docs/OPT-001CR3R7_RESULT_ANALYSIS.md
+++++ b/docs/OPT-001CR3R7_RESULT_ANALYSIS.md
++@@ -0,0 +1,31 @@
+++# MiniQuake OPT-001CR3R6 – Ergebnisanalyse
+++
+++- Ergebnisarchiv SHA-256: `472378d77754e41114ab69c3eb82c5b1dcfc40619255b1626367b7adfb2e6d71`
+++- Gesamtstatus: **INCONCLUSIVE**
+++- Handleklassifikation: **INCONCLUSIVE**
+++- Testschritte: **27**
+++- Fehlgeschlagene/übersprungene Schritte: **3**
+++
+++## Fehlgeschlagene Schritte
+++- `listen-server handle plateau`: **DIAGNOSTIC**, Exitcode `3`, Log `opt001cr3r6-handle-plateau.log`
+++- `OPT-001CR3R6 aggregate analysis`: **DIAGNOSTIC**, Exitcode `2`, Log `opt001cr3r6-aggregate-analysis.log`
+++- `OPT-001CR3R6 incremental performance comparison`: **DIAGNOSTIC**, Exitcode `2`, Log `opt001cr3r6-incremental-performance.log`
+++
+++## Übergangstest
+++- `OPT-001CR3R6 e1m1-e1m2-e1m1 transition`: **PASS**, Exitcode `0`
+++
+++## Performance- und Audiomessung
+++
+++| Map | Modus | Median | P95 | P99 | Maximum | Audioanteil | Screenanteil | Serveranteil |
+++|---|---|---:|---:|---:|---:|---:|---:|---:|
+++| e1m1 | headless | 15 ms | 16 ms | 16 ms | 32 ms | 0.00% | 0.00% | 96.59% |
+++| e1m1 | render | 63 ms | 94 ms | 110 ms | 141 ms | 0.00% | 71.89% | 27.29% |
+++| e1m2 | headless | 16 ms | 32 ms | 47 ms | 47 ms | 0.00% | 0.00% | 97.76% |
+++| e1m2 | render | 93 ms | 110 ms | 125 ms | 172 ms | 0.00% | 64.15% | 35.08% |
+++
+++## Einordnung
+++
+++- Die vom Benutzer wahrgenommene Audio-Störung muss nicht bedeuten, dass der Mixer den größten CPU-Anteil hat. Bei langsamen sichtbaren Frames kann der Hauptthread den WaveOut-Puffer zu spät nachfüllen; das klingt wie ein Audio-Problem, obwohl der Renderer die Ursache der Pufferunterläufe ist.
+++- CR3R7 erhöht deshalb den standardmäßigen Vorlaufpuffer, stoppt alte Sounds vor dem Kartenwechsel und entfernt weitere kurzlebige Audio-/Renderarrays.
+++- Der Kartenwechsel erhält dieselbe Sound- und Rendererbereinigung wie der explizite `map`-Pfad.
+++- Zusätzlich werden stabile Cvarwerte funktionslokal gecacht, kleine reine Funktionen selektiv inlined, stabile `len()`-Abfragen aus Schleifen gezogen und unveränderte Viewleaf-PVS wiederverwendet, sofern der bestehende Rendererzustand dies zulässt.
++--- a/docs/OPT-001CR3R7_TESTING.md
+++++ b/docs/OPT-001CR3R7_TESTING.md
++@@ -0,0 +1,77 @@
+++# MiniQuake OPT-001CR3R7 – Windows-Test
+++
+++## Zweck
+++
+++Dieser Zwischenstand kombiniert drei Ziele:
+++
+++1. realer Kartenwechsel `e1m1 → e1m2` ohne Hänger,
+++2. robusterer Ton bei langsamen Frames und weniger Audio-Allokationen,
+++3. zusätzliche risikoarme MiniLang-Hotpath-Optimierungen.
+++
+++## Voraussetzungen
+++
+++```powershell
+++$QuakeBase = "C:\Users\nilsk\Dropbox\Quake"
+++$CompilerRoot = "C:\Users\nilsk\Desktop\MiniLangCompilerPy"
+++
+++Test-Path "$QuakeBase\id1\pak0.pak"
+++Test-Path "$CompilerRoot\mlc_win64.py"
+++Test-Path .\TEST_OPT-001CR3R7.ps1
+++Test-Path .\tools\verify.py
+++```
+++
+++Alle Prüfungen müssen `True` liefern.
+++
+++## Lauf
+++
+++```powershell
+++.\TEST_OPT-001CR3R7.ps1 `
+++  -Compiler "$CompilerRoot\mlc_win64.py" `
+++  -StdLib $CompilerRoot `
+++  -QuakeBase $QuakeBase `
+++  -Game id1 `
+++  -MatrixFrames 64 `
+++  -WarmupFrames 300 `
+++  -BenchmarkFrames 3000 `
+++  -HandleWarmupFrames 1200 `
+++  -HandleWindowFrames 5000 `
+++  -HandleWindows 3 `
+++  -HandleConfirmationWindows 2 `
+++  -E1M2VisibleFrames 1500 `
+++  -E1M2HeadlessFrames 10000 `
+++  -TransitionFrames 256 `
+++  -ContinueIndependentTests
+++```
+++
+++Die Ausgabe wird live auf derselben Konsole angezeigt.
+++
+++## Wichtige Gates
+++
+++```text
+++MiniQuake OPT-001CR3R7 hotpath/transition/audio verification: PASS
+++e1m1 -> e1m2 -> e1m1 transition: PASS
+++handle_classification=STABLE oder PLATEAU
+++MiniQuake OPT-001CR3R7 audio cost analysis: ...
+++MiniQuake OPT-001CR3R7 acceptance test: PASS
+++```
+++
+++## Manuelle Spielprüfung
+++
+++Nach dem Build:
+++
+++```powershell
+++.\build\MiniQuake.exe --play "$QuakeBase" e1m1
+++```
+++
+++Der normale Start ist weiterhin fensterbasiert. Bitte bis zum Ausgang von `e1m1` spielen und prüfen:
+++
+++- Wechsel nach `e1m2` beendet sich ohne dauerhaften Hänger,
+++- alter Kartenton läuft nicht in die neue Karte hinein,
+++- Musik/SFX reißen bei sichtbaren Langframes weniger ab,
+++- Eingabe und Fenster bleiben während und nach dem Kartenwechsel reaktionsfähig.
+++
+++## Ergebnisse
+++
+++```powershell
+++.\COLLECT_RESULTS.ps1
+++```
++--- a/patches/OPT-001CR3R7.diff
+++++ b/patches/OPT-001CR3R7.diff
++@@ -0,0 +1 @@
+++# Generated cumulative patch is provided alongside the delivery archive.
++--- a/src/miniquake/build_info.ml
+++++ b/src/miniquake/build_info.ml
++@@ -64,8 +64,8 @@
++ const OPT001C_FINGERPRINT = 0x1c001c03
++ const OPT001C_PARENT = "OPT-001B"
++ 
++-const OPTIMIZATION_STATUS = "opt001cr3r6_windowed_transition_candidate_v1"
++-const OPTIMIZATION_FINGERPRINT = 0x1c001c0c
++-const OPTIMIZATION_PARENT = "OPT-001CR3R5"
++-const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R6"
++-const OPTIMIZATION_DELIVERY_PARENT = "OPT-001CR3R5"
+++const OPTIMIZATION_STATUS = "opt001cr3r7_audio_transition_hotpath_candidate_v1"
+++const OPTIMIZATION_FINGERPRINT = 0x1c001c0d
+++const OPTIMIZATION_PARENT = "OPT-001CR3R6"
+++const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R7"
+++const OPTIMIZATION_DELIVERY_PARENT = "OPT-001CR3R6"
++--- a/src/miniquake/host.ml
+++++ b/src/miniquake/host.ml
++@@ -204,7 +204,7 @@
++   registerCvar(registry, "ambient_level", "0.3", false, false)
++   registerCvar(registry, "ambient_fade", "100", false, false)
++   registerCvar(registry, "volume", "0.7", true, false)
++-  registerCvar(registry, "_snd_mixahead", "0.1", true, false)
+++  registerCvar(registry, "_snd_mixahead", "0.2", true, false)
++   registerCvar(registry, "bgmvolume", "1", true, false)
++   registerCvar(registry, "gamma", "1", true, false)
++   registerCvar(registry, "viewsize", "100", true, false)
++@@ -475,7 +475,7 @@
++     )
++     glvid.GL_EndRendering()
++   end if
++-  if session.renderer is not void and session.renderer.uploaded then worldRenderer.destroy(session.renderer) end if
+++  if session.renderer is not void then worldRenderer.destroy(session.renderer) end if
++   if session.entityRenderer is not void then entityRenderer.destroy(session.entityRenderer) end if
++   session.renderer = void
++   session.entityRenderer = void
++@@ -847,7 +847,7 @@
++ 
++ function destroyScene(session)
++   if session.entityRenderer is not void then entityRenderer.destroy(session.entityRenderer); session.entityRenderer = void end if
++-  if session.renderer is not void and session.renderer.uploaded then worldRenderer.destroy(session.renderer) end if
+++  if session.renderer is not void then worldRenderer.destroy(session.renderer) end if
++   session.renderer = void
++   return true
++ end function
++@@ -2916,23 +2916,42 @@
++     glvid.GL_EndRendering()
++   end if
++ 
+++  frameMixAhead = 0.0
+++  if session.mixer.enabled then frameMixAhead = cvar.variableValue(session.cvars, "_snd_mixahead") end if
+++
++   if session.renderer is not void and session.windowCreated and not screen.SCR_ShouldSkipUpdate(session.timing.realtime) then
++     screen.SCR_ConfigureClient(session.client)
++-    session.renderer.fullbright = cvar.variableValue(session.cvars, "r_fullbright") != 0.0
++-    session.renderer.wireframe = cvar.variableValue(session.cvars, "r_wireframe") != 0.0
++-    session.renderer.waterAlpha = cvar.variableValue(session.cvars, "r_wateralpha")
+++    // Frame-local hot-Cvar cache: command execution for this frame is already
+++    // complete, so repeated linear string lookups below can safely share values.
+++    rFullbright = cvar.variableValue(session.cvars, "r_fullbright")
+++    rWireframe = cvar.variableValue(session.cvars, "r_wireframe")
+++    rWaterAlpha = cvar.variableValue(session.cvars, "r_wateralpha")
+++    glCshiftPercent = cvar.variableValue(session.cvars, "gl_cshiftpercent")
+++    glCull = cvar.variableValue(session.cvars, "gl_cull")
+++    noRefresh = cvar.variableValue(session.cvars, "r_norefresh") != 0.0
+++    rMirrorAlpha = cvar.variableValue(session.cvars, "r_mirroralpha")
+++    glClear = cvar.variableValue(session.cvars, "gl_clear")
+++    glZTrick = cvar.variableValue(session.cvars, "gl_ztrick")
+++    glFinish = cvar.variableValue(session.cvars, "gl_finish")
+++    rDrawEntities = cvar.variableValue(session.cvars, "r_drawentities") != 0.0
+++    rDrawViewModel = cvar.variableValue(session.cvars, "r_drawviewmodel") != 0.0
+++    glPolyBlend = cvar.variableValue(session.cvars, "gl_polyblend") != 0.0
+++    crosshairEnabled = cvar.variableValue(session.cvars, "crosshair") != 0.0
+++
+++    session.renderer.fullbright = rFullbright != 0.0
+++    session.renderer.wireframe = rWireframe != 0.0
+++    session.renderer.waterAlpha = rWaterAlpha
++     width = win.width()
++     height = win.height()
++     screenRefdef = screen.SCR_CalcRefdef(width, height, session.cvars, screen.SCR_IntermissionMode())
++     view.V_SetContentsColor(session.view, worldRenderer.ViewContents(session.renderer, session.view.origin))
++-    view.V_CalcBlend(session.view, cvar.variableValue(session.cvars, "gl_cshiftpercent"))
++-    worldRenderer.R_SetCullCompatibility(cvar.variableValue(session.cvars, "gl_cull") != 0.0)
++-    noRefresh = cvar.variableValue(session.cvars, "r_norefresh") != 0.0
+++    view.V_CalcBlend(session.view, glCshiftPercent)
+++    worldRenderer.R_SetCullCompatibility(glCull != 0.0)
++     worldRenderer.R_ConfigureSpecialCompatibility(
++-      cvar.variableValue(session.cvars, "r_mirroralpha"),
++-      cvar.variableValue(session.cvars, "gl_clear") != 0.0,
++-      cvar.variableValue(session.cvars, "gl_ztrick") != 0.0,
++-      cvar.variableValue(session.cvars, "gl_finish") != 0.0,
+++      rMirrorAlpha,
+++      glClear != 0.0,
+++      glZTrick != 0.0,
+++      glFinish != 0.0,
++       noRefresh,
++     )
++     renderEntities = []
++@@ -2948,7 +2967,7 @@
++         visibleEntities = client.CL_ActiveVisibleEntities(session.client)
++         temporaryModels = renderHandoff.currentTemporaryEntities()
++         entityRenderer.synchronize(session.entityRenderer, session.client.modelPrecache)
++-        if cvar.variableValue(session.cvars, "r_drawentities") != 0.0 then
+++        if rDrawEntities then
++           renderEntities = renderHandoff.submitEntities(visibleEntities, temporaryModels)
++           // CL_RelinkEntities already applies first-person/chase filtering.
++           entityRenderer.renderSubmitted(session.entityRenderer, session.renderer, renderEntities, void, session.view.right, session.view.up, session.client.time)
++@@ -2958,7 +2977,7 @@
++         session.particles, session.renderer.palette,
++         session.view.origin, session.view.forward, session.view.up, session.view.right,
++       )
++-      if session.entityRenderer is not void and cvar.variableValue(session.cvars, "r_drawviewmodel") != 0.0 then
+++      if session.entityRenderer is not void and rDrawViewModel then
++         entityRenderer.renderViewModel(session.entityRenderer, session.player, session.view, session.client.time)
++       end if
++       // R_RenderView draws the deferred translucent/unsorted water pass after
++@@ -2976,7 +2995,7 @@
++             client.CL_Dlights(), session.client.lightStyles, session.client.time,
++             session.timing.realtime, session.timing.frameTime, session.view.blend,
++           )
++-          if session.entityRenderer is not void and cvar.variableValue(session.cvars, "r_drawentities") != 0.0 then
+++          if session.entityRenderer is not void and rDrawEntities then
++             viewEntity = void
++             if session.client.viewEntity >= 0 and session.client.viewEntity < len(session.client.entities) then
++               viewEntity = session.client.entities[session.client.viewEntity]
++@@ -2997,7 +3016,7 @@
++       end if
++       worldRenderer.R_PolyBlendProduction(
++         session.view.blend,
++-        cvar.variableValue(session.cvars, "gl_polyblend") != 0.0,
+++        glPolyBlend,
++       )
++     end if
++     screen.SCR_UpdateScreen(
++@@ -3008,7 +3027,7 @@
++       width,
++       height,
++       session.server.mapName,
++-      cvar.variableValue(session.cvars, "crosshair") != 0.0,
+++      crosshairEnabled,
++       session.timing.realtime,
++       session.timing.frameTime,
++       session.cvars,
++@@ -3028,7 +3047,7 @@
++     // second non-blocking top-up keeps waveOut fed when a frame takes longer
++     // than one 512-sample block.
++     if session.mixer.enabled then
++-      mixer.update(session.mixer, session.timing.frameTime, cvar.variableValue(session.cvars, "_snd_mixahead"))
+++      mixer.update(session.mixer, session.timing.frameTime, frameMixAhead)
++     end if
++     session.renderedFrames = session.renderedFrames + 1
++     updateTitle(session)
++@@ -3063,17 +3082,19 @@
++     mixer.updateListener(session.mixer, session.view.origin, session.view.forward, session.view.right)
++     mixer.setListenerEntity(session.mixer, session.client.viewEntity)
++     mixer.updateEntityOrigins(session.mixer, session.client.entities)
+++    ambientLevel = cvar.variableValue(session.cvars, "ambient_level")
+++    ambientFade = cvar.variableValue(session.cvars, "ambient_fade")
++     if session.server.worldModel is not void then
++       mixer.updateAmbient(
++         session.mixer,
++         session.server.worldModel,
++         session.view.origin,
++         session.timing.frameTime,
++-        cvar.variableValue(session.cvars, "ambient_level"),
++-        cvar.variableValue(session.cvars, "ambient_fade"),
+++        ambientLevel,
+++        ambientFade,
++       )
++     end if
++-    mixer.update(session.mixer, session.timing.frameTime, cvar.variableValue(session.cvars, "_snd_mixahead"))
+++    mixer.update(session.mixer, session.timing.frameTime, frameMixAhead)
++   end if
++   compatDiagnostics.checkpoint(session, "audio")
++   compatDiagnostics.completeFrame(session)
++@@ -3112,7 +3133,7 @@
++   end if
++   if session.demoPlayback is not void then finishDemoPlayback(session) end if
++   if session.entityRenderer is not void then entityRenderer.destroy(session.entityRenderer); session.entityRenderer = void end if
++-  if session.renderer is not void and session.renderer.uploaded then worldRenderer.destroy(session.renderer) end if
+++  if session.renderer is not void then worldRenderer.destroy(session.renderer) end if
++   session.renderer = void
++   screen.shutdown(session.console, session.menu)
++   if session.audioStarted then
++--- a/src/miniquake/render/world.ml
+++++ b/src/miniquake/render/world.ml
++@@ -263,7 +263,7 @@
++     faceIndex = faceIndex + 1
++   end while
++   visible = bytes(len(map.faces), 1)
++-  return t.WorldRenderer(map, palette, textures, surfaces, [], false, 0, false, false, 0, visible, 0, 1.0)
+++  return t.WorldRenderer(map, palette, textures, surfaces, [], false, 0, false, false, -1, visible, 0, 1.0)
++ end function
++ 
++ function upload(renderer)
++@@ -350,13 +350,29 @@
++ 
++ function markAllVisible(renderer)
++   renderer.visibleFaces = bytes(len(renderer.map.faces), 1)
+++  // Invalidate the cached leaf so returning from r_novis recomputes the PVS.
+++  renderer.viewLeaf = -1
++   return len(renderer.map.faces)
+++end function
+++
+++function countVisibleFaces(visibleFaces)
+++  count = 0
+++  index = 0
+++  faceCount = len(visibleFaces)
+++  while index < faceCount
+++    if visibleFaces[index] != 0 then count = count + 1 end if
+++    index = index + 1
+++  end while
+++  return count
++ end function
++ 
++ function markVisible(renderer, viewOrigin)
++   map = renderer.map
++   if len(map.leafs) <= 1 or len(map.models) == 0 then return markAllVisible(renderer) end if
++   currentLeaf = world.leafForPoint(map, viewOrigin)
+++  if currentLeaf == renderer.viewLeaf and len(renderer.visibleFaces) == len(map.faces) then
+++    return countVisibleFaces(renderer.visibleFaces)
+++  end if
++   renderer.viewLeaf = currentLeaf
++   visibleFaces = bytes(len(map.faces), 0)
++   rowBytes = (map.models[0].visibleLeafs + 7) >> 3
++--- a/src/miniquake/sound/mixer.ml
+++++ b/src/miniquake/sound/mixer.ml
++@@ -200,8 +200,9 @@
++   if mixer is void or not mixer.enabled then return [0, 0] end if
++   loaded = 0
++   failed = 0
+++  nameCount = len(names)
++   index = 0
++-  while index < len(names)
+++  while index < nameCount
++     name = names[index]
++     if name != "" then
++       result = try(loadEffect(mixer, name))
++@@ -236,8 +237,9 @@
++ function removeChannelAt(mixer, victim)
++   if victim < 0 or victim >= len(mixer.channels) then return false end if
++   builder = arrays.createArrayBuilder(len(mixer.channels) - 1)
+++  channelCount = len(mixer.channels)
++   index = 0
++-  while index < len(mixer.channels)
+++  while index < channelCount
++     if index != victim then arrays.pushArrayBuilder(builder, mixer.channels[index]) end if
++     index = index + 1
++   end while
++@@ -253,8 +255,9 @@
++   currentDynamicCount = dynamicChannelCount(mixer)
++   victim = -1
++   shortest = 0x7fffffff
+++  channelCount = len(mixer.channels)
++   index = 0
++-  while index < len(mixer.channels)
+++  while index < channelCount
++     channel = mixer.channels[index]
++     eligible = isDynamicChannel(channel)
++     if eligible then
++@@ -656,10 +659,12 @@
++   // Accumulate all channels at full precision and clamp only once.  Clamping
++   // the output buffer after every channel made the result depend on channel
++   // order and could crush effects when several torches/doors overlapped.
++-  accumulator = arrays.makeFilledArray(frameCount * 2, 0)
++-  volumeOverrides = arrays.makeFilledArray(len(mixer.channels), void)
+++  accumulatorCount = frameCount * 2
+++  accumulator = arrays.makeFilledArray(accumulatorCount, 0)
+++  channelCount = len(mixer.channels)
+++  volumeOverrides = arrays.makeFilledArray(channelCount, void)
++   channelIndex = 0
++-  while channelIndex < len(mixer.channels)
+++  while channelIndex < channelCount
++     channel = mixer.channels[channelIndex]
++     volumes = channelVolumes(mixer, channel)
++     if channel.channelNumber == STATIC_CHANNEL and channel.effect is not void then
++@@ -680,9 +685,9 @@
++     channelIndex = channelIndex + 1
++   end while
++ 
++-  alive = arrays.createArrayBuilder(len(mixer.channels))
+++  alive = arrays.createArrayBuilder(channelCount)
++   channelIndex = 0
++-  while channelIndex < len(mixer.channels)
+++  while channelIndex < channelCount
++     channel = mixer.channels[channelIndex]
++     volumes = volumeOverrides[channelIndex]
++     if channel.active and volumes[0] == 0 and volumes[1] == 0 then
++@@ -699,7 +704,7 @@
++   // sound channels have accumulated into the paint buffer.
++   transferVolume = native.trunc(mixer.masterVolume * 256.0)
++   sampleIndex = 0
++-  while sampleIndex < len(accumulator)
+++  while sampleIndex < accumulatorCount
++     accumulator[sampleIndex] = (accumulator[sampleIndex] * transferVolume) >> 8
++     sampleIndex = sampleIndex + 1
++   end while
++--- a/test.ps1
+++++ b/test.ps1
++@@ -1 +1 @@
++-& "$PSScriptRoot\TEST_OPT-001CR3R6.ps1" @args
+++& "$PSScriptRoot\TEST_OPT-001CR3R7.ps1" @args
++--- a/TEST_OPT-001CR3R7.ps1
+++++ b/TEST_OPT-001CR3R7.ps1
++@@ -0,0 +1,452 @@
+++[CmdletBinding()]
+++param(
+++  [Parameter(Mandatory = $true)]
+++  [string]$Compiler,
+++  [Parameter(Mandatory = $true)]
+++  [string]$StdLib,
+++  [Parameter(Mandatory = $true)]
+++  [string]$QuakeBase,
+++  [string]$Game = "id1",
+++  [int]$MatrixFrames = 64,
+++  [int]$WarmupFrames = 300,
+++  [int]$BenchmarkFrames = 3000,
+++  [int]$HandleWarmupFrames = 1200,
+++  [int]$HandleWindowFrames = 5000,
+++  [int]$HandleWindows = 3,
+++  [int]$HandleConfirmationWindows = 2,
+++  [int]$E1M2VisibleFrames = 1500,
+++  [int]$E1M2HeadlessFrames = 10000,
+++  [int]$TransitionFrames = 256,
+++  [int]$ListenPort = 0,
+++  [switch]$SkipBuild,
+++  [switch]$SkipTemporaryFirewallRules,
+++  [switch]$ContinueIndependentTests
+++)
+++
+++$ErrorActionPreference = "Stop"
+++Set-StrictMode -Version Latest
+++$env:PYTHONUNBUFFERED = "1"
+++
+++$Root = $PSScriptRoot
+++$Build = Join-Path $Root "build"
+++$GameExe = Join-Path $Build "MiniQuake.exe"
+++$ContractExe = Join-Path $Build "MiniQuakeOPT001CAllocationTests.exe"
+++$HotpathExe = Join-Path $Build "MiniQuakeOPT001CR3HotpathTests.exe"
+++$DeliveryRevision = "OPT-001CR3R7"
+++$DeliveryParent = "OPT-001CR3R6"
+++$SummaryPath = Join-Path $Build "opt001cr3r7-test-summary.json"
+++$LiveProcessRunner = Join-Path $Root "tools\run_process_live.py"
+++$EffectiveHandleWindows = $HandleWindows + $HandleConfirmationWindows
+++$Steps = @()
+++$Failures = 0
+++$FirewallRules = @()
+++
+++
+++function Get-FreeUdpPort {
+++  $Client = New-Object System.Net.Sockets.UdpClient
+++  try {
+++    $Client.Client.Bind((New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Loopback, 0)))
+++    return [int]([System.Net.IPEndPoint]$Client.Client.LocalEndPoint).Port
+++  }
+++  finally {
+++    $Client.Dispose()
+++  }
+++}
+++
+++function Test-IsAdministrator {
+++  $Identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+++  $Principal = New-Object Security.Principal.WindowsPrincipal($Identity)
+++  return $Principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+++}
+++
+++function Add-Step([string]$Name, [string]$Status, [int]$ExitCode, [string]$Log) {
+++  $script:Steps += [pscustomobject]@{ name=$Name; status=$Status; exit_code=$ExitCode; log=$Log }
+++  if ($Status -eq "FAIL") { $script:Failures += 1 }
+++  $Colour = "Gray"
+++  if ($Status -eq "PASS") { $Colour = "Green" }
+++  if ($Status -eq "FAIL") { $Colour = "Red" }
+++  if ($Status -eq "SKIPPED" -or $Status -eq "DIAGNOSTIC") { $Colour = "Yellow" }
+++  Write-Host ("[{0}] {1}" -f $Status, $Name) -ForegroundColor $Colour
+++}
+++
+++function Show-LogTail([string]$LogPath, [int]$Lines = 80) {
+++  if (-not (Test-Path -LiteralPath $LogPath -PathType Leaf)) {
+++    Write-Host ("[MiniQuake/OPT-001CR3R7] log was not created: {0}" -f $LogPath) -ForegroundColor Red
+++    return
+++  }
+++  Write-Host ("[MiniQuake/OPT-001CR3R7] last {0} log lines:" -f $Lines) -ForegroundColor Yellow
+++  Get-Content -LiteralPath $LogPath -Tail $Lines | ForEach-Object {
+++    Write-Host $_ -ForegroundColor DarkYellow
+++  }
+++}
+++
+++function Invoke-ExternalProcessLive(
+++  [string]$Name,
+++  [string]$Executable,
+++  [string[]]$Arguments,
+++  [string]$LogName,
+++  [switch]$AllowFailure
+++) {
+++  $LogPath = Join-Path $Build $LogName
+++  Write-Host ("[MiniQuake/OPT-001CR3R7] starting {0}" -f $Name) -ForegroundColor Cyan
+++  Write-Host ("  executable={0}" -f $Executable)
+++  Write-Host ("  arguments={0}" -f ($Arguments -join " "))
+++  Write-Host "  output_mode=python_binary_passthrough_named_build_binding"
+++  Write-Host ("  log={0}" -f $LogPath)
+++
+++  $StatusPath = $LogPath + ".status.json"
+++  Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath $StatusPath
+++  $RunnerArguments = @(
+++    "-u", $LiveProcessRunner,
+++    "--log", $LogPath,
+++    "--status-json", $StatusPath,
+++    "--cwd", $Root,
+++    "--", $Executable
+++  )
+++  $RunnerArguments += $Arguments
+++
+++  # Consume native output through Out-Host so the function return stream stays
+++  # scalar.  Temporarily relax ErrorActionPreference because Windows
+++  # PowerShell 5.1 otherwise turns a native stderr line into a terminating
+++  # NativeCommandError before the live runner can write its status JSON.
+++  $SavedErrorActionPreference = $ErrorActionPreference
+++  try {
+++    $ErrorActionPreference = "Continue"
+++    & $PythonExe @RunnerArguments 2>&1 | Out-Host
+++    $RunnerExitCode = [int]$LASTEXITCODE
+++  }
+++  finally {
+++    $ErrorActionPreference = $SavedErrorActionPreference
+++  }
+++
+++  $Code = $RunnerExitCode
+++  if (Test-Path -LiteralPath $StatusPath -PathType Leaf) {
+++    $Status = Get-Content -Raw -LiteralPath $StatusPath | ConvertFrom-Json
+++    $Code = [int]$Status.exit_code
+++    if (-not [string]::IsNullOrWhiteSpace([string]$Status.error)) {
+++      Write-Host "[MiniQuake/OPT-001CR3R7] live-runner diagnostic:" -ForegroundColor Red
+++      Write-Host ([string]$Status.error) -ForegroundColor DarkRed
+++    }
+++  }
+++  elseif ($RunnerExitCode -eq 0) {
+++    $Code = 125
+++    Write-Host "[MiniQuake/OPT-001CR3R7] live runner returned 0 but did not create its status JSON." -ForegroundColor Red
+++  }
+++  if ($Code -eq 0) {
+++    Add-Step $Name "PASS" $Code $LogName
+++  } elseif ($AllowFailure) {
+++    Add-Step $Name "DIAGNOSTIC" $Code $LogName
+++  } else {
+++    Add-Step $Name "FAIL" $Code $LogName
+++    Show-LogTail $LogPath
+++    if (-not $ContinueIndependentTests) {
+++      throw ("{0} failed with exit code {1}" -f $Name, $Code)
+++    }
+++  }
+++  return [int]$Code
+++}
+++
+++function Invoke-LiveBuild(
+++  [string]$Name,
+++  [string]$ScriptPath,
+++  [string]$LogName
+++) {
+++  # Pass each build parameter as a real named PowerShell -File argument.
+++  # Do not array-splat strings into build.ps1: array splatting is positional and
+++  # caused the StdLib path to be bound to Configuration in CR3R2.
+++  $Code = Invoke-ExternalProcessLive $Name $PowerShellExe @(
+++    "-NoLogo",
+++    "-NoProfile",
+++    "-NonInteractive",
+++    "-ExecutionPolicy", "Bypass",
+++    "-File", $ScriptPath,
+++    "-Compiler", $Compiler,
+++    "-StdLib", $StdLib,
+++    "-Configuration", "Release",
+++    "-NoRunTests",
+++    "-SkipPreflight"
+++  ) $LogName -AllowFailure
+++  return [int]$Code
+++}
+++
+++function Invoke-Live(
+++  [string]$Name,
+++  [string]$Executable,
+++  [string[]]$Arguments,
+++  [string]$LogName,
+++  [switch]$AllowFailure
+++) {
+++  $Code = Invoke-ExternalProcessLive $Name $Executable $Arguments $LogName -AllowFailure:$AllowFailure
+++  return [int]$Code
+++}
+++
+++function Install-LoopbackFirewallRules {
+++  if ($SkipTemporaryFirewallRules) {
+++    Write-Host "[MiniQuake/OPT-001CR3R7] temporary loopback firewall rules explicitly skipped" -ForegroundColor Yellow
+++    return
+++  }
+++  if (-not (Test-IsAdministrator)) {
+++    throw "OPT-001CR3R7 listen-server measurement requires elevated PowerShell for unattended temporary loopback firewall rules. Start PowerShell as Administrator or pass -SkipTemporaryFirewallRules."
+++  }
+++  foreach ($Command in @("New-NetFirewallRule", "Remove-NetFirewallRule")) {
+++    if ($null -eq (Get-Command $Command -ErrorAction SilentlyContinue)) {
+++      throw "Windows Defender Firewall cmdlet unavailable: $Command"
+++    }
+++  }
+++  $Prefix = "MiniQuake-OPT001C-$PID"
+++  foreach ($Direction in @("Inbound", "Outbound")) {
+++    $Name = "$Prefix-$Direction"
+++    New-NetFirewallRule `
+++      -Name $Name `
+++      -DisplayName $Name `
+++      -Direction $Direction `
+++      -Action Allow `
+++      -Program $GameExe `
+++      -Protocol UDP `
+++      -LocalAddress 127.0.0.1 `
+++      -RemoteAddress 127.0.0.1 `
+++      -Profile Any | Out-Null
+++    $script:FirewallRules += $Name
+++  }
+++  Write-Host "[MiniQuake/OPT-001CR3R7] temporary loopback firewall rules installed: 2" -ForegroundColor Green
+++}
+++
+++function Remove-LoopbackFirewallRules {
+++  foreach ($Name in $script:FirewallRules) {
+++    Remove-NetFirewallRule -Name $Name -Confirm:$false -ErrorAction SilentlyContinue
+++  }
+++  if ($script:FirewallRules.Count -gt 0) {
+++    Write-Host "[MiniQuake/OPT-001CR3R7] temporary loopback firewall rules removed" -ForegroundColor Green
+++  }
+++}
+++
+++function Write-Summary([string]$Overall, [string]$HandleClassification, [string]$PerformanceClassification) {
+++  [ordered]@{
+++    schema = "MiniQuakeOPT001CR3R6TestSummary/1"
+++    delivery_revision = $DeliveryRevision
+++    delivery_parent = $DeliveryParent
+++    overall = $Overall
+++    failures = $Failures
+++    handle_classification = $HandleClassification
+++    performance_classification = $PerformanceClassification
+++    matrix_frames = $MatrixFrames
+++    warmup_frames = $WarmupFrames
+++    benchmark_frames = $BenchmarkFrames
+++    handle_warmup_frames = $HandleWarmupFrames
+++    handle_window_frames = $HandleWindowFrames
+++    handle_windows_requested = $HandleWindows
+++    handle_confirmation_windows = $HandleConfirmationWindows
+++    handle_windows_effective = $EffectiveHandleWindows
+++    e1m2_visible_frames = $E1M2VisibleFrames
+++    e1m2_headless_frames = $E1M2HeadlessFrames
+++    transition_frames = $TransitionFrames
+++    maps = @("e1m1", "e1m2")
+++    steps = $Steps
+++  } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $SummaryPath -Encoding UTF8
+++}
+++
+++New-Item -ItemType Directory -Force -Path $Build | Out-Null
+++if (-not (Test-Path -LiteralPath $LiveProcessRunner -PathType Leaf)) { throw "live process runner missing: $LiveProcessRunner" }
+++$Compiler = [IO.Path]::GetFullPath($Compiler)
+++$StdLib = [IO.Path]::GetFullPath($StdLib)
+++$QuakeBase = [IO.Path]::GetFullPath($QuakeBase)
+++
+++if ($HandleWindows -lt 3) { throw "HandleWindows must be at least 3" }
+++if ($HandleConfirmationWindows -lt 1) { throw "HandleConfirmationWindows must be at least 1" }
+++
+++if (-not (Test-Path -LiteralPath $Compiler -PathType Leaf)) { throw "MiniLang compiler not found: $Compiler" }
+++if (-not (Test-Path -LiteralPath (Join-Path $StdLib "std\fs.ml") -PathType Leaf)) { throw "MiniLang stdlib root invalid: $StdLib" }
+++if (-not (Test-Path -LiteralPath (Join-Path $QuakeBase "$Game\pak0.pak") -PathType Leaf)) { throw "Quake pak0.pak not found below: $QuakeBase\$Game" }
+++
+++$PythonExe = (Get-Command python -ErrorAction Stop | Select-Object -First 1).Path
+++$PowerShellExe = (Get-Process -Id $PID).Path
+++if ($ListenPort -le 0) { $ListenPort = Get-FreeUdpPort }
+++
+++Write-Host "MiniQuake OPT-001CR3R7 acceptance test"
+++Write-Host "  parent: $DeliveryParent"
+++Write-Host "  root:   $Root"
+++Write-Host "  maps:   e1m1, e1m2"
+++Write-Host "  benchmark: warmup=$WarmupFrames measure=$BenchmarkFrames"
+++Write-Host "  handles: warmup=$HandleWarmupFrames requested=$HandleWindows confirmation=$HandleConfirmationWindows effective=$EffectiveHandleWindows x $HandleWindowFrames port=$ListenPort"
+++Write-Host "  inherited correctness e1m2: visible=$E1M2VisibleFrames headless=$E1M2HeadlessFrames transition=$TransitionFrames"
+++
+++try {
+++  $PackageVerifyCode = Invoke-Live "OPT-001CR3R7 package verification" $PythonExe @(
+++    (Join-Path $Root "tools\verify.py"), "--root", $Root,
+++    "--json", (Join-Path $Build "opt001cr3r7-package-verification.json")
+++  ) "opt001cr3r7-package-verification.log"
+++  if ($PackageVerifyCode -is [array]) {
+++    throw "internal harness error: package verifier returned multiple pipeline objects"
+++  }
+++  $PackageVerifyCode = [int]$PackageVerifyCode
+++  if ($PackageVerifyCode -ne 0) {
+++    Write-Summary "FAIL" "UNKNOWN" "UNKNOWN"
+++    Write-Host "MiniQuake OPT-001CR3R7 acceptance test: FAIL" -ForegroundColor Red
+++    exit 2
+++  }
+++
+++  if (-not $SkipBuild) {
+++    $BuildCode = Invoke-LiveBuild `
+++      "OPT-001CR3R7 game and contract build" `
+++      (Join-Path $Root "build.ps1") `
+++      "opt001cr3r7-build.log"
+++  } else {
+++    if (-not (Test-Path -LiteralPath $GameExe -PathType Leaf)) { throw "-SkipBuild requested but MiniQuake.exe is missing" }
+++    if (-not (Test-Path -LiteralPath $ContractExe -PathType Leaf)) { throw "-SkipBuild requested but contract test executable is missing" }
+++    Add-Step "OPT-001CR3R7 game and contract build" "SKIPPED" 0 "-SkipBuild"
+++  }
+++
+++  if (-not $SkipBuild -and $BuildCode -ne 0) {
+++    Add-Step "OPT-001CR3R7 allocation contract tests" "SKIPPED" 0 "dependent tests skipped because build failed"
+++    Add-Step "OPT-001CR3R7 inline/array hotpath tests" "SKIPPED" 0 "dependent tests skipped because build failed"
+++    Write-Summary "FAIL" "UNKNOWN" "UNKNOWN"
+++    Write-Host "ERROR: build failed; all executable-dependent tests were skipped." -ForegroundColor Red
+++    Write-Host "MiniQuake OPT-001CR3R7 acceptance test: FAIL" -ForegroundColor Red
+++    exit 2
+++  }
+++  foreach ($RequiredExe in @($GameExe, $ContractExe, $HotpathExe)) {
+++    if (-not (Test-Path -LiteralPath $RequiredExe -PathType Leaf)) {
+++      Add-Step "OPT-001CR3R7 required executable" "FAIL" 1 $RequiredExe
+++      Write-Summary "FAIL" "UNKNOWN" "UNKNOWN"
+++      Write-Host ("ERROR: required executable missing after successful build: {0}" -f $RequiredExe) -ForegroundColor Red
+++      Write-Host "MiniQuake OPT-001CR3R7 acceptance test: FAIL" -ForegroundColor Red
+++      exit 2
+++    }
+++  }
+++
+++  [void](Invoke-Live "OPT-001CR3R7 allocation contract tests" $ContractExe @() "opt001cr3r7-allocation-tests.log")
+++  [void](Invoke-Live "OPT-001CR3R7 inline/array hotpath tests" $HotpathExe @() "opt001cr3r7-hotpath-tests.log")
+++  Install-LoopbackFirewallRules
+++
+++  foreach ($Map in @("e1m1", "e1m2")) {
+++    $MapPrefix = Join-Path $Build ("opt001cr3r7-{0}" -f $Map)
+++    [void](Invoke-Live "$Map BSP parse" $GameExe @(
+++      "--opt001a-map-parse", $QuakeBase, $Map, $MapPrefix, "-game", $Game
+++    ) ("opt001cr3r7-{0}-map-parse.log" -f $Map))
+++    [void](Invoke-Live "$Map runtime smoke" $GameExe @(
+++      "--runtime-smoke", $QuakeBase, $Map, [string]$MatrixFrames, "-game", $Game
+++    ) ("opt001cr3r7-{0}-runtime-smoke.log" -f $Map))
+++    [void](Invoke-Live "$Map render smoke" $GameExe @(
+++      "--render-smoke", $QuakeBase, $Map, [string]$MatrixFrames, "-game", $Game
+++    ) ("opt001cr3r7-{0}-render-smoke.log" -f $Map))
+++
+++    $TraceA = Join-Path $Build ("opt001cr3r7-{0}-trace-a" -f $Map)
+++    $TraceB = Join-Path $Build ("opt001cr3r7-{0}-trace-b" -f $Map)
+++    [void](Invoke-Live "$Map trace A" $GameExe @(
+++      "--compat-trace", $QuakeBase, $Map, [string]$MatrixFrames, $TraceA, "-game", $Game
+++    ) ("opt001cr3r7-{0}-trace-a.log" -f $Map))
+++    [void](Invoke-Live "$Map trace B" $GameExe @(
+++      "--compat-trace", $QuakeBase, $Map, [string]$MatrixFrames, $TraceB, "-game", $Game
+++    ) ("opt001cr3r7-{0}-trace-b.log" -f $Map))
+++    [void](Invoke-Live "$Map trace comparison" $PythonExe @(
+++      (Join-Path $Root "tools\compare_traces.py"), ($TraceA + ".mqtrace"), ($TraceB + ".mqtrace"),
+++      "--json-output", (Join-Path $Build ("opt001cr3r7-{0}-trace-comparison.json" -f $Map))
+++    ) ("opt001cr3r7-{0}-trace-comparison.log" -f $Map))
+++
+++    foreach ($Mode in @("headless", "render")) {
+++      $Prefix = Join-Path $Build ("opt001cr3r7-{0}-{1}" -f $Map, $Mode)
+++      [void](Invoke-Live "$Map $Mode frame baseline" $GameExe @(
+++        "--opt001a-frame-baseline", $QuakeBase, $Map, $Mode,
+++        [string]$WarmupFrames, [string]$BenchmarkFrames, $Prefix, "-game", $Game
+++      ) ("opt001cr3r7-{0}-{1}-baseline.log" -f $Map, $Mode))
+++    }
+++  }
+++
+++  $VisiblePrefix = Join-Path $Build "opt001cr3r7-e1m2-visible"
+++  [void](Invoke-Live "OPT-001CR3R7 e1m2 visible validation" $GameExe @(
+++    "--render-evidence", $QuakeBase, "e1m2", [string]$E1M2VisibleFrames, $VisiblePrefix, "-game", $Game
+++  ) "opt001cr3r7-e1m2-visible.log")
+++
+++  [void](Invoke-Live "OPT-001CR3R7 e1m2 headless validation" $GameExe @(
+++    "--runtime-smoke", $QuakeBase, "e1m2", [string]$E1M2HeadlessFrames, "-game", $Game
+++  ) "opt001cr3r7-e1m2-headless.log")
+++
+++  $TransitionPrefix = Join-Path $Build "opt001cr3r7-transition"
+++  [void](Invoke-Live "OPT-001CR3R7 e1m1-e1m2-e1m1 transition" $GameExe @(
+++    "--opt001b-transition", $QuakeBase, [string]$TransitionFrames, $TransitionPrefix, "-game", $Game
+++  ) "opt001cr3r7-transition.log")
+++
+++  $PlateauPrefix = Join-Path $Build "opt001cr3r7-listen-handle-plateau"
+++  [void](Invoke-Live "listen-server handle plateau" $GameExe @(
+++    "--opt001a-handle-plateau", $QuakeBase, "start",
+++    [string]$HandleWarmupFrames, [string]$HandleWindowFrames, [string]$EffectiveHandleWindows,
+++    $PlateauPrefix, "-game", $Game, "-port", [string]$ListenPort
+++  ) "opt001cr3r7-handle-plateau.log" -AllowFailure)
+++
+++  [void](Invoke-Live "OPT-001CR3R7 aggregate analysis" $PythonExe @(
+++    (Join-Path $Root "tools\analyze_opt001a.py"), "--build", $Build,
+++    "--prefix", "opt001cr3r7", "--next-revision", "OPT-001D",
+++    "--json", (Join-Path $Build "opt001cr3r7-baseline-summary.json"),
+++    "--markdown", (Join-Path $Build "opt001cr3r7-baseline-summary.md")
+++  ) "opt001cr3r7-aggregate-analysis.log" -AllowFailure)
+++
+++  $PerformanceJson = Join-Path $Build "opt001cr3r7-performance-comparison.json"
+++  [void](Invoke-Live "OPT-001CR3R7 performance comparison" $PythonExe @(
+++    (Join-Path $Root "tools\compare_opt001c_performance.py"),
+++    "--baseline", (Join-Path $Root "audit\opt001b_performance_baseline.json"),
+++    "--build", $Build,
+++    "--prefix", "opt001cr3r7",
+++    "--json", $PerformanceJson,
+++    "--markdown", (Join-Path $Build "opt001cr3r7-performance-comparison.md")
+++  ) "opt001cr3r7-performance-comparison.log")
+++
+++  [void](Invoke-Live "OPT-001CR3R7 incremental performance comparison" $PythonExe @(
+++    (Join-Path $Root "tools\compare_opt001cr3_performance.py"),
+++    "--baseline", (Join-Path $Root "audit\opt001cr2_accepted_baseline.json"),
+++    "--build", $Build,
+++    "--prefix", "opt001cr3r7",
+++    "--json", (Join-Path $Build "opt001cr3r7-incremental-performance.json"),
+++    "--markdown", (Join-Path $Build "opt001cr3r7-incremental-performance.md")
+++  ) "opt001cr3r7-incremental-performance.log" -AllowFailure)
+++
+++  [void](Invoke-Live "OPT-001CR3R7 audio cost analysis" $PythonExe @(
+++    (Join-Path $Root "tools\analyze_opt001cr3r7_audio.py"),
+++    "--build", $Build,
+++    "--prefix", "opt001cr3r7",
+++    "--json", (Join-Path $Build "opt001cr3r7-audio-analysis.json")
+++  ) "opt001cr3r7-audio-analysis.log" -AllowFailure)
+++
+++  $HandleClassification = "UNKNOWN"
+++  $PlateauSummary = $PlateauPrefix + "-summary.json"
+++  if (Test-Path -LiteralPath $PlateauSummary -PathType Leaf) {
+++    $HandleClassification = [string]((Get-Content -Raw -LiteralPath $PlateauSummary | ConvertFrom-Json).classification)
+++  }
+++  $PerformanceClassification = "UNKNOWN"
+++  if (Test-Path -LiteralPath $PerformanceJson -PathType Leaf) {
+++    $PerformanceClassification = [string]((Get-Content -Raw -LiteralPath $PerformanceJson | ConvertFrom-Json).classification)
+++  }
+++  $Overall = "PASS"
+++  if ($Failures -gt 0) { $Overall = "FAIL" }
+++  if ($Overall -eq "PASS" -and $HandleClassification -eq "LEAK") { $Overall = "LEAK" }
+++  if ($Overall -eq "PASS" -and $HandleClassification -eq "INCONCLUSIVE") { $Overall = "INCONCLUSIVE" }
+++  if ($Overall -eq "PASS" -and $HandleClassification -eq "RESOURCE_GROWTH") { $Overall = "FAIL" }
+++  Write-Summary $Overall $HandleClassification $PerformanceClassification
+++
+++  Write-Host ""
+++  Write-Host "MiniQuake OPT-001CR3R7 summary"
+++  Write-Host "  handle_classification=$HandleClassification"
+++  Write-Host "  performance_classification=$PerformanceClassification"
+++  Write-Host "  failures=$Failures"
+++  Write-Host "  summary=$SummaryPath"
+++  if ($Overall -eq "PASS") {
+++    Write-Host "MiniQuake OPT-001CR3R7 acceptance test: PASS" -ForegroundColor Green
+++    exit 0
+++  }
+++  Write-Host ("MiniQuake OPT-001CR3R7 acceptance test: {0}" -f $Overall) -ForegroundColor Red
+++  exit 2
+++}
+++catch {
+++  $HarnessDetail = ($_ | Out-String).Trim()
+++  if (-not [string]::IsNullOrWhiteSpace($_.ScriptStackTrace)) {
+++    $HarnessDetail = $HarnessDetail + "`nPowerShell stack:`n" + $_.ScriptStackTrace
+++  }
+++  Add-Step "OPT-001CR3R7 harness" "FAIL" 1 $HarnessDetail
+++  Write-Summary "FAIL" "UNKNOWN" "UNKNOWN"
+++  Write-Host "ERROR: OPT-001CR3R7 harness failure" -ForegroundColor Red
+++  Write-Host $HarnessDetail -ForegroundColor DarkRed
+++  Write-Host "MiniQuake OPT-001CR3R7 acceptance test: FAIL" -ForegroundColor Red
+++  exit 1
+++}
+++finally {
+++  Remove-LoopbackFirewallRules
+++}
++--- a/tests/opt001cr3_hotpath_tests.ml
+++++ b/tests/opt001cr3_hotpath_tests.ml
++@@ -9,21 +9,21 @@
++ import miniquake.gl_vidnt as video
++ import miniquake.common as common
++ 
++-opt001cr3r6Passed = 0
++-opt001cr3r6Failed = 0
+++opt001cr3r7Passed = 0
+++opt001cr3r7Failed = 0
++ 
++-function opt001cr3r6Check(condition, label)
++-  global opt001cr3r6Passed, opt001cr3r6Failed
+++function opt001cr3r7Check(condition, label)
+++  global opt001cr3r7Passed, opt001cr3r7Failed
++   if condition then
++-    opt001cr3r6Passed = opt001cr3r6Passed + 1
+++    opt001cr3r7Passed = opt001cr3r7Passed + 1
++     print "[PASS] " + label
++   else
++-    opt001cr3r6Failed = opt001cr3r6Failed + 1
+++    opt001cr3r7Failed = opt001cr3r7Failed + 1
++     print "[FAIL] " + label
++   end if
++ end function
++ 
++-function opt001cr3r6VideoState()
+++function opt001cr3r7VideoState()
++   state = video.createVideoState()
++   video.VID_UseState(state)
++   video.VID_InitDIB(common.create([]))
++@@ -32,38 +32,38 @@
++ end function
++ 
++ function main(args)
++-  opt001cr3r6Check(buildInfo.OPTIMIZATION_STATUS == "opt001cr3r6_windowed_transition_candidate_v1", "optimization status")
++-  opt001cr3r6Check(buildInfo.OPTIMIZATION_FINGERPRINT == 0x1c001c0c, "optimization fingerprint")
++-  opt001cr3r6Check(buildInfo.OPTIMIZATION_PARENT == "OPT-001CR3R5", "optimization parent")
++-  opt001cr3r6Check(buildInfo.OPTIMIZATION_DELIVERY_REVISION == "OPT-001CR3R6", "optimization delivery revision")
++-  opt001cr3r6Check(buildInfo.OPTIMIZATION_DELIVERY_PARENT == "OPT-001CR3R5", "optimization delivery parent")
++-  opt001cr3r6Check(buildInfo.OPT001C_STATUS == "opt001c_frame_allocation_candidate_v1", "frozen OPT-001C status")
++-  opt001cr3r6Check(buildInfo.OPT001C_FINGERPRINT == 0x1c001c03, "frozen OPT-001C fingerprint")
+++  opt001cr3r7Check(buildInfo.OPTIMIZATION_STATUS == "opt001cr3r7_windowed_transition_candidate_v1", "optimization status")
+++  opt001cr3r7Check(buildInfo.OPTIMIZATION_FINGERPRINT == 0x1c001c0d, "optimization fingerprint")
+++  opt001cr3r7Check(buildInfo.OPTIMIZATION_PARENT == "OPT-001CR3R6", "optimization parent")
+++  opt001cr3r7Check(buildInfo.OPTIMIZATION_DELIVERY_REVISION == "OPT-001CR3R7", "optimization delivery revision")
+++  opt001cr3r7Check(buildInfo.OPTIMIZATION_DELIVERY_PARENT == "OPT-001CR3R6", "optimization delivery parent")
+++  opt001cr3r7Check(buildInfo.OPT001C_STATUS == "opt001c_frame_allocation_candidate_v1", "frozen OPT-001C status")
+++  opt001cr3r7Check(buildInfo.OPT001C_FINGERPRINT == 0x1c001c03, "frozen OPT-001C fingerprint")
++ 
++   filled = arrays.makeFilledArray(5, 7)
++-  opt001cr3r6Check(len(filled) == 5, "filled array length")
++-  opt001cr3r6Check(filled[0] == 7 and filled[4] == 7, "filled array values")
+++  opt001cr3r7Check(len(filled) == 5, "filled array length")
+++  opt001cr3r7Check(filled[0] == 7 and filled[4] == 7, "filled array values")
++   stats = clientState.zeroStats(32)
++-  opt001cr3r6Check(len(stats) == 32 and stats[0] == 0 and stats[31] == 0, "zero stats exact allocation")
+++  opt001cr3r7Check(len(stats) == 32 and stats[0] == 0 and stats[31] == 0, "zero stats exact allocation")
++   identity = keys.identityValues(8)
++-  opt001cr3r6Check(len(identity) == 8 and identity[0] == 0 and identity[7] == 7, "identity exact allocation")
+++  opt001cr3r7Check(len(identity) == 8 and identity[0] == 0 and identity[7] == 7, "identity exact allocation")
++   server = serverState.create(4)
++-  opt001cr3r6Check(len(server.clients) == 4 and server.clients[0] is void, "server client exact allocation")
+++  opt001cr3r7Check(len(server.clients) == 4 and server.clients[0] is void, "server client exact allocation")
++   handles = sysWin.emptyHandles()
++-  opt001cr3r6Check(len(handles) == 10 and handles[0] == 0 and handles[9] == 0, "system handle exact allocation")
+++  opt001cr3r7Check(len(handles) == 10 and handles[0] == 0 and handles[9] == 0, "system handle exact allocation")
++ 
++   a = t.Vec3(1.0, 2.0, 3.0)
++   b = t.Vec3(4.0, 5.0, 6.0)
++-  opt001cr3r6Check(math.DotProduct(a, b) == 32.0, "inline dot product")
+++  opt001cr3r7Check(math.DotProduct(a, b) == 32.0, "inline dot product")
++ 
++-  state = opt001cr3r6VideoState()
++-  opt001cr3r6Check(video.VID_FindRequestedMode(common.create([])) == video.MODE_WINDOWED, "default video mode is windowed")
++-  opt001cr3r6Check(video.VID_FindRequestedMode(common.create(["-width", "1024", "-height", "768"])) == video.MODE_WINDOWED, "window dimensions remain windowed")
++-  opt001cr3r6Check(video.VID_FindRequestedMode(common.create(["-fullscreen", "-width", "800", "-height", "600", "-bpp", "16"])) == 1, "explicit fullscreen override")
+++  state = opt001cr3r7VideoState()
+++  opt001cr3r7Check(video.VID_FindRequestedMode(common.create([])) == video.MODE_WINDOWED, "default video mode is windowed")
+++  opt001cr3r7Check(video.VID_FindRequestedMode(common.create(["-width", "1024", "-height", "768"])) == video.MODE_WINDOWED, "window dimensions remain windowed")
+++  opt001cr3r7Check(video.VID_FindRequestedMode(common.create(["-fullscreen", "-width", "800", "-height", "600", "-bpp", "16"])) == 1, "explicit fullscreen override")
++ 
++-  print "MiniQuake OPT-001CR3R6 hotpath/window tests passed: " + opt001cr3r6Passed
++-  if opt001cr3r6Failed > 0 then
++-    print "MiniQuake OPT-001CR3R6 hotpath/window tests failed: " + opt001cr3r6Failed
+++  print "MiniQuake OPT-001CR3R7 hotpath/window tests passed: " + opt001cr3r7Passed
+++  if opt001cr3r7Failed > 0 then
+++    print "MiniQuake OPT-001CR3R7 hotpath/window tests failed: " + opt001cr3r7Failed
++     return 1
++   end if
++   return 0
++--- a/tools/analyze_opt001cr3r7_audio.py
+++++ b/tools/analyze_opt001cr3r7_audio.py
++@@ -0,0 +1,40 @@
+++#!/usr/bin/env python3
+++from __future__ import annotations
+++import argparse, json
+++from pathlib import Path
+++
+++def main() -> int:
+++    ap=argparse.ArgumentParser()
+++    ap.add_argument('--build',required=True)
+++    ap.add_argument('--prefix',required=True)
+++    ap.add_argument('--json',required=True)
+++    args=ap.parse_args()
+++    build=Path(args.build)
+++    scenarios=[]; missing=[]
+++    for map_name in ('e1m1','e1m2'):
+++        path=build/f'{args.prefix}-{map_name}-render-summary.json'
+++        if not path.is_file():
+++            missing.append(path.name); continue
+++        data=json.loads(path.read_text(encoding='utf-8-sig'))
+++        totals={item.get('name'):item.get('total_ms',0) for item in data.get('stage_totals',[])}
+++        total=max(1,data.get('total_ms',0))
+++        audio=totals.get('audio',0); screen=totals.get('screen',0)
+++        scenarios.append({'map':map_name,'total_ms':total,'audio_ms':audio,'screen_ms':screen,
+++                          'audio_percent':audio*100.0/total,'screen_percent':screen*100.0/total,
+++                          'median_ms':data.get('median_ms',0),'p99_ms':data.get('p99_ms',0)})
+++    if missing:
+++        classification='INCOMPLETE'
+++    else:
+++        max_audio=max((s['audio_percent'] for s in scenarios),default=0.0)
+++        max_p99=max((s['p99_ms'] for s in scenarios),default=0)
+++        if max_audio >= 20.0: classification='AUDIO_CPU_BOUND'
+++        elif max_p99 >= 80: classification='FRAME_STARVATION_RISK'
+++        else: classification='AUDIO_COST_OK'
+++    report={'schema':'MiniQuakeOPT001CR3R7AudioAnalysis/1','classification':classification,
+++            'prefix':args.prefix,'scenarios':scenarios,'missing':missing}
+++    Path(args.json).write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
+++    print('MiniQuake OPT-001CR3R7 audio cost analysis: '+classification)
+++    for s in scenarios:
+++        print(f"  {s['map']}: audio={s['audio_percent']:.3f}% screen={s['screen_percent']:.3f}% median={s['median_ms']} p99={s['p99_ms']}")
+++    return 0 if classification != 'INCOMPLETE' else 2
+++if __name__=='__main__': raise SystemExit(main())
++--- a/tools/check_opt001b.py
+++++ b/tools/check_opt001b.py
++@@ -24,7 +24,11 @@
++     host=(root/'src/miniquake/host.ml').read_text(encoding='utf-8-sig')
++     bi=(root/'src/miniquake/build_info.ml').read_text(encoding='utf-8-sig')
++     if args.allow_downstream_package:
++-        if 'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R6"' in bi:
+++        if 'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R7"' in bi:
+++            runner_path = root / 'TEST_OPT-001CR3R7.ps1'
+++            downstream_revision = 'OPT-001CR3R7'
+++            downstream_parent = 'OPT-001CR3R6'
+++        elif 'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R6"' in bi:
++             runner_path = root / 'TEST_OPT-001CR3R6.ps1'
++             downstream_revision = 'OPT-001CR3R6'
++             downstream_parent = 'OPT-001CR3R5'
++@@ -88,10 +92,11 @@
++     require(main,['--opt001b-transition','runOpt001BTransitionCommand'], 'main', errors)
++     require(host,['function runOpt001BTransition(', 'MiniQuake OPT-001B transition ', 'startMap(session, mapName)'], 'host', errors)
++     if args.allow_downstream_package:
+++        visible_marker = 'E1M2VisibleFrames = 1500' if downstream_revision == 'OPT-001CR3R7' else 'E1M2VisibleFrames = 1000'
++         require(runner,[
++             f'$DeliveryRevision = "{downstream_revision}"',
++             f'$DeliveryParent = "{downstream_parent}"',
++-            'E1M2VisibleFrames = 1000',
+++            visible_marker,
++             'E1M2HeadlessFrames = 10000',
++             '--opt001b-transition',
++             f'MiniQuake {downstream_revision} acceptance test: PASS',
++--- a/tools/check_opt001c.py
+++++ b/tools/check_opt001c.py
++@@ -65,7 +65,10 @@
++     downstream_revision = ""
++     downstream_parent = ""
++     if args.allow_downstream_package:
++-        if 'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R6"' in build_info:
+++        if 'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R7"' in build_info:
+++            downstream_revision = "OPT-001CR3R7"
+++            downstream_parent = "OPT-001CR3R6"
+++        elif 'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R6"' in build_info:
++             downstream_revision = "OPT-001CR3R6"
++             downstream_parent = "OPT-001CR3R5"
++         elif 'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R4"' in build_info:
++--- a/tools/check_opt001cr3r6.py
+++++ b/tools/check_opt001cr3r6.py
++@@ -3,10 +3,10 @@
++ import argparse, json, re
++ from pathlib import Path
++ 
++-REV='OPT-001CR3R6'
++-PARENT='OPT-001CR3R5'
++-STATUS='opt001cr3r6_windowed_transition_candidate_v1'
++-FINGERPRINT='0x1c001c0c'
+++REV='OPT-001CR3R7'
+++PARENT='OPT-001CR3R6'
+++STATUS='opt001cr3r7_audio_transition_hotpath_candidate_v1'
+++FINGERPRINT='0x1c001c0d'
++ 
++ def function_block(text: str, name: str) -> str:
++     m=re.search(rf"(?ms)^function(?:\s+inline)?\s+{re.escape(name)}\b.*?^end function$", text)
++@@ -97,7 +97,7 @@
++                 block_if_issues.append(f'{path.relative_to(root)}:{index+1}: block if missing then')
++     errors.extend(block_if_issues)
++ 
++-    report={'schema':'MiniQuakeOPT001CR3R6Static/1','status':'PASS' if not errors else 'FAIL','errors':errors,
+++    report={'schema':'MiniQuakeOPT001CR3R6DownstreamStatic/1','status':'PASS' if not errors else 'FAIL','errors':errors,
++             'default_video_mode':'windowed','explicit_fullscreen':True,'renderer_reset':True,
++             'frozen_opt001c_identity':True,'block_if_issues':len(block_if_issues)}
++     if args.json: Path(args.json).write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
++--- a/tools/check_opt001cr3r7.py
+++++ b/tools/check_opt001cr3r7.py
++@@ -0,0 +1,41 @@
+++#!/usr/bin/env python3
+++from __future__ import annotations
+++import argparse,json,re
+++from pathlib import Path
+++REV='OPT-001CR3R7'; PARENT='OPT-001CR3R6'
+++STATUS='opt001cr3r7_audio_transition_hotpath_candidate_v1'; FINGERPRINT='0x1c001c0d'
+++def main():
+++    ap=argparse.ArgumentParser(); ap.add_argument('--root',default='.'); ap.add_argument('--json',default=''); a=ap.parse_args()
+++    root=Path(a.root).resolve(); errors=[]
+++    def text(rel): return (root/rel).read_text(encoding='utf-8')
+++    bi=text('src/miniquake/build_info.ml'); host=text('src/miniquake/host.ml'); mixer=text('src/miniquake/sound/mixer.ml')
+++    world=text('src/miniquake/render/world.ml'); hot=text('tests/opt001cr3_hotpath_tests.ml'); runner=text('TEST_OPT-001CR3R7.ps1')
+++    markers=[f'const OPTIMIZATION_STATUS = "{STATUS}"',f'const OPTIMIZATION_FINGERPRINT = {FINGERPRINT}',
+++             f'const OPTIMIZATION_PARENT = "{PARENT}"',f'const OPTIMIZATION_DELIVERY_REVISION = "{REV}"']
+++    for m in markers:
+++        if m not in bi: errors.append('build_info missing '+m)
+++    for m in ('registerCvar(registry, "_snd_mixahead", "0.2", true, false)',
+++              'if session.renderer is not void then worldRenderer.destroy(session.renderer) end if',
+++              'frameMixAhead = cvar.variableValue(session.cvars, "_snd_mixahead")',
+++              'rDrawEntities = cvar.variableValue(session.cvars, "r_drawentities") != 0.0'):
+++        if m not in host: errors.append('host missing '+m)
+++    for m in ('channelCount = len(mixer.channels)','while channelIndex < channelCount','accumulatorCount = frameCount * 2'):
+++        if m not in mixer: errors.append('mixer missing '+m)
+++    for m in ('if currentLeaf == renderer.viewLeaf and len(renderer.visibleFaces) == len(map.faces) then',
+++              'return countVisibleFaces(renderer.visibleFaces)','renderer.viewLeaf = -1'):
+++        if m not in world: errors.append('world PVS cache missing '+m)
+++    for m in ('opt001cr3r7Passed = 0','function opt001cr3r7Check(condition, label)',
+++              'buildInfo.OPTIMIZATION_DELIVERY_REVISION == "OPT-001CR3R7"'):
+++        if m not in hot: errors.append('hotpath test missing '+m)
+++    for m in ('$DeliveryRevision = "OPT-001CR3R7"','$DeliveryParent = "OPT-001CR3R6"',
+++              '[int]$TransitionFrames = 256','[int]$E1M2VisibleFrames = 1500',
+++              'OPT-001CR3R7 audio cost analysis','output_mode=python_binary_passthrough_named_build_binding'):
+++        if m not in runner: errors.append('runner missing '+m)
+++    report={'schema':'MiniQuakeOPT001CR3R7Static/1','status':'PASS' if not errors else 'FAIL','errors':errors,
+++            'audio_mixahead':0.2,'pvs_cache':True,'renderer_destroy_unconditional':True,
+++            'transition_frames':256,'visible_frames':1500}
+++    if a.json: Path(a.json).write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
+++    print('MiniQuake OPT-001CR3R7 hotpath/transition/audio verification: '+report['status'])
+++    for e in errors: print('  error: '+e)
+++    return 0 if not errors else 1
+++if __name__=='__main__': raise SystemExit(main())
++--- a/tools/verify.py
+++++ b/tools/verify.py
++@@ -1,5 +1,5 @@
++ #!/usr/bin/env python3
++-"""Self-contained package verifier for MiniQuake OPT-001CR3R6.
+++"""Self-contained package verifier for MiniQuake OPT-001CR3R7.
++ 
++ Historical subsystem semantics are checked by the source-guided component
++ checkers invoked from build.ps1.  This verifier owns current delivery
++@@ -21,8 +21,8 @@
++ PARENT_PACKAGE_ID = "BP-093"
++ BLOCK_ID = "BP-090-094"
++ BLOCK_PARENT_PACKAGE_ID = "BP-085-089R8"
++-DELIVERY_REVISION = "OPT-001CR3R6"
++-DELIVERY_PARENT = "OPT-001CR3R5"
+++DELIVERY_REVISION = "OPT-001CR3R7"
+++DELIVERY_PARENT = "OPT-001CR3R6"
++ MANIFEST = "SOURCE_MANIFEST.sha256"
++ 
++ EXCLUDED_DIRS = {".git", "build", "__pycache__", ".pytest_cache"}
++@@ -36,6 +36,11 @@
++ }
++ 
++ REQUIRED_PATHS = {
+++    "TEST_OPT-001CR3R7.ps1", "CHANGELOG_OPT-001CR3R7.md",
+++    "docs/OPT-001CR3R7_TESTING.md", "docs/OPT-001CR3R7_CHANGELOG.md",
+++    "docs/OPT-001CR3R7_RESULT_ANALYSIS.md", "docs/OPT-001CR3R7_HOTFIX_REPORT.json",
+++    "audit/opt001cr3r7_audio_transition_hotpath.json", "tools/check_opt001cr3r7.py",
+++    "tools/analyze_opt001cr3r7_audio.py", "patches/OPT-001CR3R7.diff",
++     "TEST_OPT-001CR3R6.ps1", "CHANGELOG_OPT-001CR3R6.md",
++     "docs/OPT-001CR3R6_TESTING.md", "docs/OPT-001CR3R6_CHANGELOG.md",
++     "docs/OPT-001CR3R6_RESULT_ANALYSIS.md", "docs/OPT-001CR3R6_HOTFIX_REPORT.json",
++@@ -253,17 +258,17 @@
++     build_info = (root / "src/miniquake/build_info.ml").read_text(encoding="utf-8-sig")
++     main = (root / "src/main.ml").read_text(encoding="utf-8-sig")
++     build = (root / "build.ps1").read_text(encoding="utf-8-sig")
++-    test = (root / "TEST_OPT-001CR3R6.ps1").read_text(encoding="utf-8-sig")
+++    test = (root / "TEST_OPT-001CR3R7.ps1").read_text(encoding="utf-8-sig")
++     collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
++     launcher = (root / "test.ps1").read_text(encoding="utf-8-sig")
++     errors += marker_errors(build_info, [
++         'const PACKAGE_ID = "BP-094"', 'const PARENT_PACKAGE_ID = "BP-093"',
++         'const BLOCK_ID = "BP-090-094"', 'const BLOCK_PARENT_PACKAGE_ID = "BP-085-089R8"',
++-        'const OPTIMIZATION_STATUS = "opt001cr3r6_windowed_transition_candidate_v1"',
++-        'const OPTIMIZATION_FINGERPRINT = 0x1c001c0c',
++-        'const OPTIMIZATION_PARENT = "OPT-001CR3R5"',
++-        'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R6"',
++-        'const OPTIMIZATION_DELIVERY_PARENT = "OPT-001CR3R5"',
+++        'const OPTIMIZATION_STATUS = "opt001cr3r7_audio_transition_hotpath_candidate_v1"',
+++        'const OPTIMIZATION_FINGERPRINT = 0x1c001c0d',
+++        'const OPTIMIZATION_PARENT = "OPT-001CR3R6"',
+++        'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R7"',
+++        'const OPTIMIZATION_DELIVERY_PARENT = "OPT-001CR3R6"',
++     ], "build_info")
++     errors += marker_errors(main, [
++         "--opt001a-map-parse", "--opt001a-frame-baseline", "--opt001a-handle-plateau", "--opt001b-transition",
++@@ -274,14 +279,14 @@
++         "MiniQuakeOPT001CR3HotpathTests.exe", "tests\\opt001cr3_hotpath_tests.ml",
++     ], "build")
++     errors += marker_errors(test, [
++-        '$DeliveryRevision = "OPT-001CR3R6"', '$DeliveryParent = "OPT-001CR3R5"',
++-        "MiniQuake OPT-001CR3R6 acceptance test: PASS", "output_mode=python_binary_passthrough_named_build_binding",
+++        '$DeliveryRevision = "OPT-001CR3R7"', '$DeliveryParent = "OPT-001CR3R6"',
+++        "MiniQuake OPT-001CR3R7 acceptance test: PASS", "output_mode=python_binary_passthrough_named_build_binding",
++         "--opt001a-map-parse", "--opt001a-frame-baseline", "--opt001a-handle-plateau",
++     ], "test")
++     errors += marker_errors(collector, [
++-        '$DeliveryRevision = "OPT-001CR3R6"', "MiniQuake_OPT-001CR3R6_RESULTS_",
+++        '$DeliveryRevision = "OPT-001CR3R7"', "MiniQuake_OPT-001CR3R7_RESULTS_",
++     ], "collector")
++-    errors += marker_errors(launcher, ["TEST_OPT-001CR3R6.ps1"], "test.ps1")
+++    errors += marker_errors(launcher, ["TEST_OPT-001CR3R7.ps1"], "test.ps1")
++     return Check(
++         "package_identity", not errors,
++         {"package_id": PACKAGE_ID, "parent_package_id": PARENT_PACKAGE_ID,
++@@ -861,8 +866,8 @@
++     errors: list[str] = []
++     helpers = [name for name in functions if name != "main"]
++     for name in helpers:
++-        if not name.startswith("opt001cr3r6"):
++-            errors.append(f"{relative}: global helper '{name}' is not namespaced with prefix 'opt001cr3r6'")
+++        if not name.startswith("opt001cr3r7"):
+++            errors.append(f"{relative}: global helper '{name}' is not namespaced with prefix 'opt001cr3r7'")
++     if "main" not in functions:
++         errors.append(f"{relative}: main(args) is missing")
++     for generic in ("check", "equal", "require", "passed", "failed"):
++@@ -871,7 +876,7 @@
++     return Check("current_entry_helper_namespace", not errors, {
++         "entry": relative,
++         "helpers_checked": len(helpers),
++-        "required_prefix": "opt001cr3r6",
+++        "required_prefix": "opt001cr3r7",
++         "generic_names": 0 if not errors else len(errors),
++     }, errors)
++ 
++@@ -1070,7 +1075,7 @@
++ 
++ def check_named_build_parameter_binding(root: Path) -> Check:
++     errors: list[str] = []
++-    current = (root / "TEST_OPT-001CR3R6.ps1").read_text(encoding="utf-8-sig")
+++    current = (root / "TEST_OPT-001CR3R7.ps1").read_text(encoding="utf-8-sig")
++     errors += marker_errors(current, [
++         'function Invoke-LiveBuild(', '"-File", $ScriptPath',
++         '"-Compiler", $Compiler', '"-StdLib", $StdLib',
++@@ -1101,7 +1106,7 @@
++ def check_live_output(root: Path) -> Check:
++     errors: list[str] = []
++     historical_test = (root / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
++-    current_test = (root / "TEST_OPT-001CR3R6.ps1").read_text(encoding="utf-8-sig")
+++    current_test = (root / "TEST_OPT-001CR3R7.ps1").read_text(encoding="utf-8-sig")
++     live_runner = (root / "tools/run_process_live.py").read_text(encoding="utf-8-sig")
++     build = (root / "build.ps1").read_text(encoding="utf-8-sig")
++     for label, script_text in (("historical test", historical_test), ("current test", current_test), ("build", build)):
++@@ -1161,12 +1166,12 @@
++                 errors.append(
++                     f"{rel}:{line_number}: invalid PowerShell `else if`; use `elseif`"
++                 )
++-    current = root / "TEST_OPT-001CR3R6.ps1"
+++    current = root / "TEST_OPT-001CR3R7.ps1"
++     if current.is_file():
++         source = current.read_text(encoding="utf-8-sig", errors="replace")
++         if "} elseif ($AllowFailure) {" not in source:
++             errors.append(
++-                "TEST_OPT-001CR3R6.ps1 is missing the validated AllowFailure elseif branch"
+++                "TEST_OPT-001CR3R7.ps1 is missing the validated AllowFailure elseif branch"
++             )
++     return Check(
++         "powershell_elseif_syntax",
++@@ -1738,6 +1743,20 @@
++ 
++ 
++ 
+++
+++def check_opt001cr3r7(root: Path) -> Check:
+++    out = root / "build" / "verify-opt001cr3r7.json"
+++    out.parent.mkdir(parents=True, exist_ok=True)
+++    proc = subprocess.run([sys.executable, str(root / "tools/check_opt001cr3r7.py"), "--root", str(root), "--json", str(out)], capture_output=True, text=True)
+++    errors=[]; details={"return_code": proc.returncode}
+++    if proc.returncode != 0:
+++        errors.append((proc.stdout + "\n" + proc.stderr).strip())
+++    if out.is_file():
+++        try:
+++            report=json.loads(out.read_text(encoding="utf-8")); details["status"]=report.get("status",""); details["audio_mixahead"]=report.get("audio_mixahead",0); details["pvs_cache"]=report.get("pvs_cache",False)
+++        except Exception as exc: errors.append(f"invalid OPT-001CR3R7 report: {exc}")
+++    return Check("opt001cr3r7_audio_transition_hotpath", not errors, details, errors)
+++
++ def check_opt001cr3r6(root: Path) -> Check:
++     out = root / "build" / "verify-opt001cr3r6.json"
++     out.parent.mkdir(parents=True, exist_ok=True)
++@@ -1787,7 +1806,7 @@
++         check_minilang_delimiters(root),
++         check_opt001cr1(root),
++         check_opt001cr2(root),
++-        check_opt001cr3r6(root),
+++        check_opt001cr3r7(root),
++         check_opt001cr3(root),
++         check_opt001b(root),
++         check_opt001c(root),
++@@ -1816,14 +1835,14 @@
++         check_external_checkers(root),
++     ]
++     passed = all(check.passed for check in checks)
++-    print("MiniQuake OPT-001CR3R6 verification")
+++    print("MiniQuake OPT-001CR3R7 verification")
++     for check in checks:
++         print(f"  [{'PASS' if check.passed else 'FAIL'}] {check.name}")
++         for key, value in check.details.items():
++             print(f"         {key}={value}")
++         for error in check.errors:
++             print(f"         error: {error}")
++-    print(f"MiniQuake OPT-001CR3R6 verification: {'PASS' if passed else 'FAIL'}")
+++    print(f"MiniQuake OPT-001CR3R7 verification: {'PASS' if passed else 'FAIL'}")
++     report = {
++         "schema_version": 1,
++         "package_id": PACKAGE_ID,
+--- a/src/miniquake/build_info.ml
++++ b/src/miniquake/build_info.ml
+@@ -64,8 +64,8 @@
+ const OPT001C_FINGERPRINT = 0x1c001c03
+ const OPT001C_PARENT = "OPT-001B"
+ 
+-const OPTIMIZATION_STATUS = "opt001cr3r6_windowed_transition_candidate_v1"
+-const OPTIMIZATION_FINGERPRINT = 0x1c001c0c
+-const OPTIMIZATION_PARENT = "OPT-001CR3R5"
+-const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R6"
+-const OPTIMIZATION_DELIVERY_PARENT = "OPT-001CR3R5"
++const OPTIMIZATION_STATUS = "opt001cr3r7_audio_transition_hotpath_candidate_v1"
++const OPTIMIZATION_FINGERPRINT = 0x1c001c0d
++const OPTIMIZATION_PARENT = "OPT-001CR3R6"
++const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R7"
++const OPTIMIZATION_DELIVERY_PARENT = "OPT-001CR3R6"
+--- a/src/miniquake/host.ml
++++ b/src/miniquake/host.ml
+@@ -204,7 +204,7 @@
+   registerCvar(registry, "ambient_level", "0.3", false, false)
+   registerCvar(registry, "ambient_fade", "100", false, false)
+   registerCvar(registry, "volume", "0.7", true, false)
+-  registerCvar(registry, "_snd_mixahead", "0.1", true, false)
++  registerCvar(registry, "_snd_mixahead", "0.2", true, false)
+   registerCvar(registry, "bgmvolume", "1", true, false)
+   registerCvar(registry, "gamma", "1", true, false)
+   registerCvar(registry, "viewsize", "100", true, false)
+@@ -475,7 +475,7 @@
+     )
+     glvid.GL_EndRendering()
+   end if
+-  if session.renderer is not void and session.renderer.uploaded then worldRenderer.destroy(session.renderer) end if
++  if session.renderer is not void then worldRenderer.destroy(session.renderer) end if
+   if session.entityRenderer is not void then entityRenderer.destroy(session.entityRenderer) end if
+   session.renderer = void
+   session.entityRenderer = void
+@@ -847,7 +847,7 @@
+ 
+ function destroyScene(session)
+   if session.entityRenderer is not void then entityRenderer.destroy(session.entityRenderer); session.entityRenderer = void end if
+-  if session.renderer is not void and session.renderer.uploaded then worldRenderer.destroy(session.renderer) end if
++  if session.renderer is not void then worldRenderer.destroy(session.renderer) end if
+   session.renderer = void
+   return true
+ end function
+@@ -2916,23 +2916,42 @@
+     glvid.GL_EndRendering()
+   end if
+ 
++  frameMixAhead = 0.0
++  if session.mixer.enabled then frameMixAhead = cvar.variableValue(session.cvars, "_snd_mixahead") end if
++
+   if session.renderer is not void and session.windowCreated and not screen.SCR_ShouldSkipUpdate(session.timing.realtime) then
+     screen.SCR_ConfigureClient(session.client)
+-    session.renderer.fullbright = cvar.variableValue(session.cvars, "r_fullbright") != 0.0
+-    session.renderer.wireframe = cvar.variableValue(session.cvars, "r_wireframe") != 0.0
+-    session.renderer.waterAlpha = cvar.variableValue(session.cvars, "r_wateralpha")
++    // Frame-local hot-Cvar cache: command execution for this frame is already
++    // complete, so repeated linear string lookups below can safely share values.
++    rFullbright = cvar.variableValue(session.cvars, "r_fullbright")
++    rWireframe = cvar.variableValue(session.cvars, "r_wireframe")
++    rWaterAlpha = cvar.variableValue(session.cvars, "r_wateralpha")
++    glCshiftPercent = cvar.variableValue(session.cvars, "gl_cshiftpercent")
++    glCull = cvar.variableValue(session.cvars, "gl_cull")
++    noRefresh = cvar.variableValue(session.cvars, "r_norefresh") != 0.0
++    rMirrorAlpha = cvar.variableValue(session.cvars, "r_mirroralpha")
++    glClear = cvar.variableValue(session.cvars, "gl_clear")
++    glZTrick = cvar.variableValue(session.cvars, "gl_ztrick")
++    glFinish = cvar.variableValue(session.cvars, "gl_finish")
++    rDrawEntities = cvar.variableValue(session.cvars, "r_drawentities") != 0.0
++    rDrawViewModel = cvar.variableValue(session.cvars, "r_drawviewmodel") != 0.0
++    glPolyBlend = cvar.variableValue(session.cvars, "gl_polyblend") != 0.0
++    crosshairEnabled = cvar.variableValue(session.cvars, "crosshair") != 0.0
++
++    session.renderer.fullbright = rFullbright != 0.0
++    session.renderer.wireframe = rWireframe != 0.0
++    session.renderer.waterAlpha = rWaterAlpha
+     width = win.width()
+     height = win.height()
+     screenRefdef = screen.SCR_CalcRefdef(width, height, session.cvars, screen.SCR_IntermissionMode())
+     view.V_SetContentsColor(session.view, worldRenderer.ViewContents(session.renderer, session.view.origin))
+-    view.V_CalcBlend(session.view, cvar.variableValue(session.cvars, "gl_cshiftpercent"))
+-    worldRenderer.R_SetCullCompatibility(cvar.variableValue(session.cvars, "gl_cull") != 0.0)
+-    noRefresh = cvar.variableValue(session.cvars, "r_norefresh") != 0.0
++    view.V_CalcBlend(session.view, glCshiftPercent)
++    worldRenderer.R_SetCullCompatibility(glCull != 0.0)
+     worldRenderer.R_ConfigureSpecialCompatibility(
+-      cvar.variableValue(session.cvars, "r_mirroralpha"),
+-      cvar.variableValue(session.cvars, "gl_clear") != 0.0,
+-      cvar.variableValue(session.cvars, "gl_ztrick") != 0.0,
+-      cvar.variableValue(session.cvars, "gl_finish") != 0.0,
++      rMirrorAlpha,
++      glClear != 0.0,
++      glZTrick != 0.0,
++      glFinish != 0.0,
+       noRefresh,
+     )
+     renderEntities = []
+@@ -2948,7 +2967,7 @@
+         visibleEntities = client.CL_ActiveVisibleEntities(session.client)
+         temporaryModels = renderHandoff.currentTemporaryEntities()
+         entityRenderer.synchronize(session.entityRenderer, session.client.modelPrecache)
+-        if cvar.variableValue(session.cvars, "r_drawentities") != 0.0 then
++        if rDrawEntities then
+           renderEntities = renderHandoff.submitEntities(visibleEntities, temporaryModels)
+           // CL_RelinkEntities already applies first-person/chase filtering.
+           entityRenderer.renderSubmitted(session.entityRenderer, session.renderer, renderEntities, void, session.view.right, session.view.up, session.client.time)
+@@ -2958,7 +2977,7 @@
+         session.particles, session.renderer.palette,
+         session.view.origin, session.view.forward, session.view.up, session.view.right,
+       )
+-      if session.entityRenderer is not void and cvar.variableValue(session.cvars, "r_drawviewmodel") != 0.0 then
++      if session.entityRenderer is not void and rDrawViewModel then
+         entityRenderer.renderViewModel(session.entityRenderer, session.player, session.view, session.client.time)
+       end if
+       // R_RenderView draws the deferred translucent/unsorted water pass after
+@@ -2976,7 +2995,7 @@
+             client.CL_Dlights(), session.client.lightStyles, session.client.time,
+             session.timing.realtime, session.timing.frameTime, session.view.blend,
+           )
+-          if session.entityRenderer is not void and cvar.variableValue(session.cvars, "r_drawentities") != 0.0 then
++          if session.entityRenderer is not void and rDrawEntities then
+             viewEntity = void
+             if session.client.viewEntity >= 0 and session.client.viewEntity < len(session.client.entities) then
+               viewEntity = session.client.entities[session.client.viewEntity]
+@@ -2997,7 +3016,7 @@
+       end if
+       worldRenderer.R_PolyBlendProduction(
+         session.view.blend,
+-        cvar.variableValue(session.cvars, "gl_polyblend") != 0.0,
++        glPolyBlend,
+       )
+     end if
+     screen.SCR_UpdateScreen(
+@@ -3008,7 +3027,7 @@
+       width,
+       height,
+       session.server.mapName,
+-      cvar.variableValue(session.cvars, "crosshair") != 0.0,
++      crosshairEnabled,
+       session.timing.realtime,
+       session.timing.frameTime,
+       session.cvars,
+@@ -3028,7 +3047,7 @@
+     // second non-blocking top-up keeps waveOut fed when a frame takes longer
+     // than one 512-sample block.
+     if session.mixer.enabled then
+-      mixer.update(session.mixer, session.timing.frameTime, cvar.variableValue(session.cvars, "_snd_mixahead"))
++      mixer.update(session.mixer, session.timing.frameTime, frameMixAhead)
+     end if
+     session.renderedFrames = session.renderedFrames + 1
+     updateTitle(session)
+@@ -3063,17 +3082,19 @@
+     mixer.updateListener(session.mixer, session.view.origin, session.view.forward, session.view.right)
+     mixer.setListenerEntity(session.mixer, session.client.viewEntity)
+     mixer.updateEntityOrigins(session.mixer, session.client.entities)
++    ambientLevel = cvar.variableValue(session.cvars, "ambient_level")
++    ambientFade = cvar.variableValue(session.cvars, "ambient_fade")
+     if session.server.worldModel is not void then
+       mixer.updateAmbient(
+         session.mixer,
+         session.server.worldModel,
+         session.view.origin,
+         session.timing.frameTime,
+-        cvar.variableValue(session.cvars, "ambient_level"),
+-        cvar.variableValue(session.cvars, "ambient_fade"),
++        ambientLevel,
++        ambientFade,
+       )
+     end if
+-    mixer.update(session.mixer, session.timing.frameTime, cvar.variableValue(session.cvars, "_snd_mixahead"))
++    mixer.update(session.mixer, session.timing.frameTime, frameMixAhead)
+   end if
+   compatDiagnostics.checkpoint(session, "audio")
+   compatDiagnostics.completeFrame(session)
+@@ -3112,7 +3133,7 @@
+   end if
+   if session.demoPlayback is not void then finishDemoPlayback(session) end if
+   if session.entityRenderer is not void then entityRenderer.destroy(session.entityRenderer); session.entityRenderer = void end if
+-  if session.renderer is not void and session.renderer.uploaded then worldRenderer.destroy(session.renderer) end if
++  if session.renderer is not void then worldRenderer.destroy(session.renderer) end if
+   session.renderer = void
+   screen.shutdown(session.console, session.menu)
+   if session.audioStarted then
+--- a/src/miniquake/render/world.ml
++++ b/src/miniquake/render/world.ml
+@@ -263,7 +263,7 @@
+     faceIndex = faceIndex + 1
+   end while
+   visible = bytes(len(map.faces), 1)
+-  return t.WorldRenderer(map, palette, textures, surfaces, [], false, 0, false, false, 0, visible, 0, 1.0)
++  return t.WorldRenderer(map, palette, textures, surfaces, [], false, 0, false, false, -1, visible, 0, 1.0)
+ end function
+ 
+ function upload(renderer)
+@@ -350,13 +350,29 @@
+ 
+ function markAllVisible(renderer)
+   renderer.visibleFaces = bytes(len(renderer.map.faces), 1)
++  // Invalidate the cached leaf so returning from r_novis recomputes the PVS.
++  renderer.viewLeaf = -1
+   return len(renderer.map.faces)
++end function
++
++function countVisibleFaces(visibleFaces)
++  count = 0
++  index = 0
++  faceCount = len(visibleFaces)
++  while index < faceCount
++    if visibleFaces[index] != 0 then count = count + 1 end if
++    index = index + 1
++  end while
++  return count
+ end function
+ 
+ function markVisible(renderer, viewOrigin)
+   map = renderer.map
+   if len(map.leafs) <= 1 or len(map.models) == 0 then return markAllVisible(renderer) end if
+   currentLeaf = world.leafForPoint(map, viewOrigin)
++  if currentLeaf == renderer.viewLeaf and len(renderer.visibleFaces) == len(map.faces) then
++    return countVisibleFaces(renderer.visibleFaces)
++  end if
+   renderer.viewLeaf = currentLeaf
+   visibleFaces = bytes(len(map.faces), 0)
+   rowBytes = (map.models[0].visibleLeafs + 7) >> 3
+--- a/src/miniquake/sound/mixer.ml
++++ b/src/miniquake/sound/mixer.ml
+@@ -200,8 +200,9 @@
+   if mixer is void or not mixer.enabled then return [0, 0] end if
+   loaded = 0
+   failed = 0
++  nameCount = len(names)
+   index = 0
+-  while index < len(names)
++  while index < nameCount
+     name = names[index]
+     if name != "" then
+       result = try(loadEffect(mixer, name))
+@@ -236,8 +237,9 @@
+ function removeChannelAt(mixer, victim)
+   if victim < 0 or victim >= len(mixer.channels) then return false end if
+   builder = arrays.createArrayBuilder(len(mixer.channels) - 1)
++  channelCount = len(mixer.channels)
+   index = 0
+-  while index < len(mixer.channels)
++  while index < channelCount
+     if index != victim then arrays.pushArrayBuilder(builder, mixer.channels[index]) end if
+     index = index + 1
+   end while
+@@ -253,8 +255,9 @@
+   currentDynamicCount = dynamicChannelCount(mixer)
+   victim = -1
+   shortest = 0x7fffffff
++  channelCount = len(mixer.channels)
+   index = 0
+-  while index < len(mixer.channels)
++  while index < channelCount
+     channel = mixer.channels[index]
+     eligible = isDynamicChannel(channel)
+     if eligible then
+@@ -656,10 +659,12 @@
+   // Accumulate all channels at full precision and clamp only once.  Clamping
+   // the output buffer after every channel made the result depend on channel
+   // order and could crush effects when several torches/doors overlapped.
+-  accumulator = arrays.makeFilledArray(frameCount * 2, 0)
+-  volumeOverrides = arrays.makeFilledArray(len(mixer.channels), void)
++  accumulatorCount = frameCount * 2
++  accumulator = arrays.makeFilledArray(accumulatorCount, 0)
++  channelCount = len(mixer.channels)
++  volumeOverrides = arrays.makeFilledArray(channelCount, void)
+   channelIndex = 0
+-  while channelIndex < len(mixer.channels)
++  while channelIndex < channelCount
+     channel = mixer.channels[channelIndex]
+     volumes = channelVolumes(mixer, channel)
+     if channel.channelNumber == STATIC_CHANNEL and channel.effect is not void then
+@@ -680,9 +685,9 @@
+     channelIndex = channelIndex + 1
+   end while
+ 
+-  alive = arrays.createArrayBuilder(len(mixer.channels))
++  alive = arrays.createArrayBuilder(channelCount)
+   channelIndex = 0
+-  while channelIndex < len(mixer.channels)
++  while channelIndex < channelCount
+     channel = mixer.channels[channelIndex]
+     volumes = volumeOverrides[channelIndex]
+     if channel.active and volumes[0] == 0 and volumes[1] == 0 then
+@@ -699,7 +704,7 @@
+   // sound channels have accumulated into the paint buffer.
+   transferVolume = native.trunc(mixer.masterVolume * 256.0)
+   sampleIndex = 0
+-  while sampleIndex < len(accumulator)
++  while sampleIndex < accumulatorCount
+     accumulator[sampleIndex] = (accumulator[sampleIndex] * transferVolume) >> 8
+     sampleIndex = sampleIndex + 1
+   end while
+--- a/test.ps1
++++ b/test.ps1
+@@ -1 +1 @@
+-& "$PSScriptRoot\TEST_OPT-001CR3R6.ps1" @args
++& "$PSScriptRoot\TEST_OPT-001CR3R7.ps1" @args
+--- a/TEST_OPT-001CR3R7.ps1
++++ b/TEST_OPT-001CR3R7.ps1
+@@ -0,0 +1,452 @@
++[CmdletBinding()]
++param(
++  [Parameter(Mandatory = $true)]
++  [string]$Compiler,
++  [Parameter(Mandatory = $true)]
++  [string]$StdLib,
++  [Parameter(Mandatory = $true)]
++  [string]$QuakeBase,
++  [string]$Game = "id1",
++  [int]$MatrixFrames = 64,
++  [int]$WarmupFrames = 300,
++  [int]$BenchmarkFrames = 3000,
++  [int]$HandleWarmupFrames = 1200,
++  [int]$HandleWindowFrames = 5000,
++  [int]$HandleWindows = 3,
++  [int]$HandleConfirmationWindows = 2,
++  [int]$E1M2VisibleFrames = 1500,
++  [int]$E1M2HeadlessFrames = 10000,
++  [int]$TransitionFrames = 256,
++  [int]$ListenPort = 0,
++  [switch]$SkipBuild,
++  [switch]$SkipTemporaryFirewallRules,
++  [switch]$ContinueIndependentTests
++)
++
++$ErrorActionPreference = "Stop"
++Set-StrictMode -Version Latest
++$env:PYTHONUNBUFFERED = "1"
++
++$Root = $PSScriptRoot
++$Build = Join-Path $Root "build"
++$GameExe = Join-Path $Build "MiniQuake.exe"
++$ContractExe = Join-Path $Build "MiniQuakeOPT001CAllocationTests.exe"
++$HotpathExe = Join-Path $Build "MiniQuakeOPT001CR3HotpathTests.exe"
++$DeliveryRevision = "OPT-001CR3R7"
++$DeliveryParent = "OPT-001CR3R6"
++$SummaryPath = Join-Path $Build "opt001cr3r7-test-summary.json"
++$LiveProcessRunner = Join-Path $Root "tools\run_process_live.py"
++$EffectiveHandleWindows = $HandleWindows + $HandleConfirmationWindows
++$Steps = @()
++$Failures = 0
++$FirewallRules = @()
++
++
++function Get-FreeUdpPort {
++  $Client = New-Object System.Net.Sockets.UdpClient
++  try {
++    $Client.Client.Bind((New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Loopback, 0)))
++    return [int]([System.Net.IPEndPoint]$Client.Client.LocalEndPoint).Port
++  }
++  finally {
++    $Client.Dispose()
++  }
++}
++
++function Test-IsAdministrator {
++  $Identity = [Security.Principal.WindowsIdentity]::GetCurrent()
++  $Principal = New-Object Security.Principal.WindowsPrincipal($Identity)
++  return $Principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
++}
++
++function Add-Step([string]$Name, [string]$Status, [int]$ExitCode, [string]$Log) {
++  $script:Steps += [pscustomobject]@{ name=$Name; status=$Status; exit_code=$ExitCode; log=$Log }
++  if ($Status -eq "FAIL") { $script:Failures += 1 }
++  $Colour = "Gray"
++  if ($Status -eq "PASS") { $Colour = "Green" }
++  if ($Status -eq "FAIL") { $Colour = "Red" }
++  if ($Status -eq "SKIPPED" -or $Status -eq "DIAGNOSTIC") { $Colour = "Yellow" }
++  Write-Host ("[{0}] {1}" -f $Status, $Name) -ForegroundColor $Colour
++}
++
++function Show-LogTail([string]$LogPath, [int]$Lines = 80) {
++  if (-not (Test-Path -LiteralPath $LogPath -PathType Leaf)) {
++    Write-Host ("[MiniQuake/OPT-001CR3R7] log was not created: {0}" -f $LogPath) -ForegroundColor Red
++    return
++  }
++  Write-Host ("[MiniQuake/OPT-001CR3R7] last {0} log lines:" -f $Lines) -ForegroundColor Yellow
++  Get-Content -LiteralPath $LogPath -Tail $Lines | ForEach-Object {
++    Write-Host $_ -ForegroundColor DarkYellow
++  }
++}
++
++function Invoke-ExternalProcessLive(
++  [string]$Name,
++  [string]$Executable,
++  [string[]]$Arguments,
++  [string]$LogName,
++  [switch]$AllowFailure
++) {
++  $LogPath = Join-Path $Build $LogName
++  Write-Host ("[MiniQuake/OPT-001CR3R7] starting {0}" -f $Name) -ForegroundColor Cyan
++  Write-Host ("  executable={0}" -f $Executable)
++  Write-Host ("  arguments={0}" -f ($Arguments -join " "))
++  Write-Host "  output_mode=python_binary_passthrough_named_build_binding"
++  Write-Host ("  log={0}" -f $LogPath)
++
++  $StatusPath = $LogPath + ".status.json"
++  Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath $StatusPath
++  $RunnerArguments = @(
++    "-u", $LiveProcessRunner,
++    "--log", $LogPath,
++    "--status-json", $StatusPath,
++    "--cwd", $Root,
++    "--", $Executable
++  )
++  $RunnerArguments += $Arguments
++
++  # Consume native output through Out-Host so the function return stream stays
++  # scalar.  Temporarily relax ErrorActionPreference because Windows
++  # PowerShell 5.1 otherwise turns a native stderr line into a terminating
++  # NativeCommandError before the live runner can write its status JSON.
++  $SavedErrorActionPreference = $ErrorActionPreference
++  try {
++    $ErrorActionPreference = "Continue"
++    & $PythonExe @RunnerArguments 2>&1 | Out-Host
++    $RunnerExitCode = [int]$LASTEXITCODE
++  }
++  finally {
++    $ErrorActionPreference = $SavedErrorActionPreference
++  }
++
++  $Code = $RunnerExitCode
++  if (Test-Path -LiteralPath $StatusPath -PathType Leaf) {
++    $Status = Get-Content -Raw -LiteralPath $StatusPath | ConvertFrom-Json
++    $Code = [int]$Status.exit_code
++    if (-not [string]::IsNullOrWhiteSpace([string]$Status.error)) {
++      Write-Host "[MiniQuake/OPT-001CR3R7] live-runner diagnostic:" -ForegroundColor Red
++      Write-Host ([string]$Status.error) -ForegroundColor DarkRed
++    }
++  }
++  elseif ($RunnerExitCode -eq 0) {
++    $Code = 125
++    Write-Host "[MiniQuake/OPT-001CR3R7] live runner returned 0 but did not create its status JSON." -ForegroundColor Red
++  }
++  if ($Code -eq 0) {
++    Add-Step $Name "PASS" $Code $LogName
++  } elseif ($AllowFailure) {
++    Add-Step $Name "DIAGNOSTIC" $Code $LogName
++  } else {
++    Add-Step $Name "FAIL" $Code $LogName
++    Show-LogTail $LogPath
++    if (-not $ContinueIndependentTests) {
++      throw ("{0} failed with exit code {1}" -f $Name, $Code)
++    }
++  }
++  return [int]$Code
++}
++
++function Invoke-LiveBuild(
++  [string]$Name,
++  [string]$ScriptPath,
++  [string]$LogName
++) {
++  # Pass each build parameter as a real named PowerShell -File argument.
++  # Do not array-splat strings into build.ps1: array splatting is positional and
++  # caused the StdLib path to be bound to Configuration in CR3R2.
++  $Code = Invoke-ExternalProcessLive $Name $PowerShellExe @(
++    "-NoLogo",
++    "-NoProfile",
++    "-NonInteractive",
++    "-ExecutionPolicy", "Bypass",
++    "-File", $ScriptPath,
++    "-Compiler", $Compiler,
++    "-StdLib", $StdLib,
++    "-Configuration", "Release",
++    "-NoRunTests",
++    "-SkipPreflight"
++  ) $LogName -AllowFailure
++  return [int]$Code
++}
++
++function Invoke-Live(
++  [string]$Name,
++  [string]$Executable,
++  [string[]]$Arguments,
++  [string]$LogName,
++  [switch]$AllowFailure
++) {
++  $Code = Invoke-ExternalProcessLive $Name $Executable $Arguments $LogName -AllowFailure:$AllowFailure
++  return [int]$Code
++}
++
++function Install-LoopbackFirewallRules {
++  if ($SkipTemporaryFirewallRules) {
++    Write-Host "[MiniQuake/OPT-001CR3R7] temporary loopback firewall rules explicitly skipped" -ForegroundColor Yellow
++    return
++  }
++  if (-not (Test-IsAdministrator)) {
++    throw "OPT-001CR3R7 listen-server measurement requires elevated PowerShell for unattended temporary loopback firewall rules. Start PowerShell as Administrator or pass -SkipTemporaryFirewallRules."
++  }
++  foreach ($Command in @("New-NetFirewallRule", "Remove-NetFirewallRule")) {
++    if ($null -eq (Get-Command $Command -ErrorAction SilentlyContinue)) {
++      throw "Windows Defender Firewall cmdlet unavailable: $Command"
++    }
++  }
++  $Prefix = "MiniQuake-OPT001C-$PID"
++  foreach ($Direction in @("Inbound", "Outbound")) {
++    $Name = "$Prefix-$Direction"
++    New-NetFirewallRule `
++      -Name $Name `
++      -DisplayName $Name `
++      -Direction $Direction `
++      -Action Allow `
++      -Program $GameExe `
++      -Protocol UDP `
++      -LocalAddress 127.0.0.1 `
++      -RemoteAddress 127.0.0.1 `
++      -Profile Any | Out-Null
++    $script:FirewallRules += $Name
++  }
++  Write-Host "[MiniQuake/OPT-001CR3R7] temporary loopback firewall rules installed: 2" -ForegroundColor Green
++}
++
++function Remove-LoopbackFirewallRules {
++  foreach ($Name in $script:FirewallRules) {
++    Remove-NetFirewallRule -Name $Name -Confirm:$false -ErrorAction SilentlyContinue
++  }
++  if ($script:FirewallRules.Count -gt 0) {
++    Write-Host "[MiniQuake/OPT-001CR3R7] temporary loopback firewall rules removed" -ForegroundColor Green
++  }
++}
++
++function Write-Summary([string]$Overall, [string]$HandleClassification, [string]$PerformanceClassification) {
++  [ordered]@{
++    schema = "MiniQuakeOPT001CR3R6TestSummary/1"
++    delivery_revision = $DeliveryRevision
++    delivery_parent = $DeliveryParent
++    overall = $Overall
++    failures = $Failures
++    handle_classification = $HandleClassification
++    performance_classification = $PerformanceClassification
++    matrix_frames = $MatrixFrames
++    warmup_frames = $WarmupFrames
++    benchmark_frames = $BenchmarkFrames
++    handle_warmup_frames = $HandleWarmupFrames
++    handle_window_frames = $HandleWindowFrames
++    handle_windows_requested = $HandleWindows
++    handle_confirmation_windows = $HandleConfirmationWindows
++    handle_windows_effective = $EffectiveHandleWindows
++    e1m2_visible_frames = $E1M2VisibleFrames
++    e1m2_headless_frames = $E1M2HeadlessFrames
++    transition_frames = $TransitionFrames
++    maps = @("e1m1", "e1m2")
++    steps = $Steps
++  } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $SummaryPath -Encoding UTF8
++}
++
++New-Item -ItemType Directory -Force -Path $Build | Out-Null
++if (-not (Test-Path -LiteralPath $LiveProcessRunner -PathType Leaf)) { throw "live process runner missing: $LiveProcessRunner" }
++$Compiler = [IO.Path]::GetFullPath($Compiler)
++$StdLib = [IO.Path]::GetFullPath($StdLib)
++$QuakeBase = [IO.Path]::GetFullPath($QuakeBase)
++
++if ($HandleWindows -lt 3) { throw "HandleWindows must be at least 3" }
++if ($HandleConfirmationWindows -lt 1) { throw "HandleConfirmationWindows must be at least 1" }
++
++if (-not (Test-Path -LiteralPath $Compiler -PathType Leaf)) { throw "MiniLang compiler not found: $Compiler" }
++if (-not (Test-Path -LiteralPath (Join-Path $StdLib "std\fs.ml") -PathType Leaf)) { throw "MiniLang stdlib root invalid: $StdLib" }
++if (-not (Test-Path -LiteralPath (Join-Path $QuakeBase "$Game\pak0.pak") -PathType Leaf)) { throw "Quake pak0.pak not found below: $QuakeBase\$Game" }
++
++$PythonExe = (Get-Command python -ErrorAction Stop | Select-Object -First 1).Path
++$PowerShellExe = (Get-Process -Id $PID).Path
++if ($ListenPort -le 0) { $ListenPort = Get-FreeUdpPort }
++
++Write-Host "MiniQuake OPT-001CR3R7 acceptance test"
++Write-Host "  parent: $DeliveryParent"
++Write-Host "  root:   $Root"
++Write-Host "  maps:   e1m1, e1m2"
++Write-Host "  benchmark: warmup=$WarmupFrames measure=$BenchmarkFrames"
++Write-Host "  handles: warmup=$HandleWarmupFrames requested=$HandleWindows confirmation=$HandleConfirmationWindows effective=$EffectiveHandleWindows x $HandleWindowFrames port=$ListenPort"
++Write-Host "  inherited correctness e1m2: visible=$E1M2VisibleFrames headless=$E1M2HeadlessFrames transition=$TransitionFrames"
++
++try {
++  $PackageVerifyCode = Invoke-Live "OPT-001CR3R7 package verification" $PythonExe @(
++    (Join-Path $Root "tools\verify.py"), "--root", $Root,
++    "--json", (Join-Path $Build "opt001cr3r7-package-verification.json")
++  ) "opt001cr3r7-package-verification.log"
++  if ($PackageVerifyCode -is [array]) {
++    throw "internal harness error: package verifier returned multiple pipeline objects"
++  }
++  $PackageVerifyCode = [int]$PackageVerifyCode
++  if ($PackageVerifyCode -ne 0) {
++    Write-Summary "FAIL" "UNKNOWN" "UNKNOWN"
++    Write-Host "MiniQuake OPT-001CR3R7 acceptance test: FAIL" -ForegroundColor Red
++    exit 2
++  }
++
++  if (-not $SkipBuild) {
++    $BuildCode = Invoke-LiveBuild `
++      "OPT-001CR3R7 game and contract build" `
++      (Join-Path $Root "build.ps1") `
++      "opt001cr3r7-build.log"
++  } else {
++    if (-not (Test-Path -LiteralPath $GameExe -PathType Leaf)) { throw "-SkipBuild requested but MiniQuake.exe is missing" }
++    if (-not (Test-Path -LiteralPath $ContractExe -PathType Leaf)) { throw "-SkipBuild requested but contract test executable is missing" }
++    Add-Step "OPT-001CR3R7 game and contract build" "SKIPPED" 0 "-SkipBuild"
++  }
++
++  if (-not $SkipBuild -and $BuildCode -ne 0) {
++    Add-Step "OPT-001CR3R7 allocation contract tests" "SKIPPED" 0 "dependent tests skipped because build failed"
++    Add-Step "OPT-001CR3R7 inline/array hotpath tests" "SKIPPED" 0 "dependent tests skipped because build failed"
++    Write-Summary "FAIL" "UNKNOWN" "UNKNOWN"
++    Write-Host "ERROR: build failed; all executable-dependent tests were skipped." -ForegroundColor Red
++    Write-Host "MiniQuake OPT-001CR3R7 acceptance test: FAIL" -ForegroundColor Red
++    exit 2
++  }
++  foreach ($RequiredExe in @($GameExe, $ContractExe, $HotpathExe)) {
++    if (-not (Test-Path -LiteralPath $RequiredExe -PathType Leaf)) {
++      Add-Step "OPT-001CR3R7 required executable" "FAIL" 1 $RequiredExe
++      Write-Summary "FAIL" "UNKNOWN" "UNKNOWN"
++      Write-Host ("ERROR: required executable missing after successful build: {0}" -f $RequiredExe) -ForegroundColor Red
++      Write-Host "MiniQuake OPT-001CR3R7 acceptance test: FAIL" -ForegroundColor Red
++      exit 2
++    }
++  }
++
++  [void](Invoke-Live "OPT-001CR3R7 allocation contract tests" $ContractExe @() "opt001cr3r7-allocation-tests.log")
++  [void](Invoke-Live "OPT-001CR3R7 inline/array hotpath tests" $HotpathExe @() "opt001cr3r7-hotpath-tests.log")
++  Install-LoopbackFirewallRules
++
++  foreach ($Map in @("e1m1", "e1m2")) {
++    $MapPrefix = Join-Path $Build ("opt001cr3r7-{0}" -f $Map)
++    [void](Invoke-Live "$Map BSP parse" $GameExe @(
++      "--opt001a-map-parse", $QuakeBase, $Map, $MapPrefix, "-game", $Game
++    ) ("opt001cr3r7-{0}-map-parse.log" -f $Map))
++    [void](Invoke-Live "$Map runtime smoke" $GameExe @(
++      "--runtime-smoke", $QuakeBase, $Map, [string]$MatrixFrames, "-game", $Game
++    ) ("opt001cr3r7-{0}-runtime-smoke.log" -f $Map))
++    [void](Invoke-Live "$Map render smoke" $GameExe @(
++      "--render-smoke", $QuakeBase, $Map, [string]$MatrixFrames, "-game", $Game
++    ) ("opt001cr3r7-{0}-render-smoke.log" -f $Map))
++
++    $TraceA = Join-Path $Build ("opt001cr3r7-{0}-trace-a" -f $Map)
++    $TraceB = Join-Path $Build ("opt001cr3r7-{0}-trace-b" -f $Map)
++    [void](Invoke-Live "$Map trace A" $GameExe @(
++      "--compat-trace", $QuakeBase, $Map, [string]$MatrixFrames, $TraceA, "-game", $Game
++    ) ("opt001cr3r7-{0}-trace-a.log" -f $Map))
++    [void](Invoke-Live "$Map trace B" $GameExe @(
++      "--compat-trace", $QuakeBase, $Map, [string]$MatrixFrames, $TraceB, "-game", $Game
++    ) ("opt001cr3r7-{0}-trace-b.log" -f $Map))
++    [void](Invoke-Live "$Map trace comparison" $PythonExe @(
++      (Join-Path $Root "tools\compare_traces.py"), ($TraceA + ".mqtrace"), ($TraceB + ".mqtrace"),
++      "--json-output", (Join-Path $Build ("opt001cr3r7-{0}-trace-comparison.json" -f $Map))
++    ) ("opt001cr3r7-{0}-trace-comparison.log" -f $Map))
++
++    foreach ($Mode in @("headless", "render")) {
++      $Prefix = Join-Path $Build ("opt001cr3r7-{0}-{1}" -f $Map, $Mode)
++      [void](Invoke-Live "$Map $Mode frame baseline" $GameExe @(
++        "--opt001a-frame-baseline", $QuakeBase, $Map, $Mode,
++        [string]$WarmupFrames, [string]$BenchmarkFrames, $Prefix, "-game", $Game
++      ) ("opt001cr3r7-{0}-{1}-baseline.log" -f $Map, $Mode))
++    }
++  }
++
++  $VisiblePrefix = Join-Path $Build "opt001cr3r7-e1m2-visible"
++  [void](Invoke-Live "OPT-001CR3R7 e1m2 visible validation" $GameExe @(
++    "--render-evidence", $QuakeBase, "e1m2", [string]$E1M2VisibleFrames, $VisiblePrefix, "-game", $Game
++  ) "opt001cr3r7-e1m2-visible.log")
++
++  [void](Invoke-Live "OPT-001CR3R7 e1m2 headless validation" $GameExe @(
++    "--runtime-smoke", $QuakeBase, "e1m2", [string]$E1M2HeadlessFrames, "-game", $Game
++  ) "opt001cr3r7-e1m2-headless.log")
++
++  $TransitionPrefix = Join-Path $Build "opt001cr3r7-transition"
++  [void](Invoke-Live "OPT-001CR3R7 e1m1-e1m2-e1m1 transition" $GameExe @(
++    "--opt001b-transition", $QuakeBase, [string]$TransitionFrames, $TransitionPrefix, "-game", $Game
++  ) "opt001cr3r7-transition.log")
++
++  $PlateauPrefix = Join-Path $Build "opt001cr3r7-listen-handle-plateau"
++  [void](Invoke-Live "listen-server handle plateau" $GameExe @(
++    "--opt001a-handle-plateau", $QuakeBase, "start",
++    [string]$HandleWarmupFrames, [string]$HandleWindowFrames, [string]$EffectiveHandleWindows,
++    $PlateauPrefix, "-game", $Game, "-port", [string]$ListenPort
++  ) "opt001cr3r7-handle-plateau.log" -AllowFailure)
++
++  [void](Invoke-Live "OPT-001CR3R7 aggregate analysis" $PythonExe @(
++    (Join-Path $Root "tools\analyze_opt001a.py"), "--build", $Build,
++    "--prefix", "opt001cr3r7", "--next-revision", "OPT-001D",
++    "--json", (Join-Path $Build "opt001cr3r7-baseline-summary.json"),
++    "--markdown", (Join-Path $Build "opt001cr3r7-baseline-summary.md")
++  ) "opt001cr3r7-aggregate-analysis.log" -AllowFailure)
++
++  $PerformanceJson = Join-Path $Build "opt001cr3r7-performance-comparison.json"
++  [void](Invoke-Live "OPT-001CR3R7 performance comparison" $PythonExe @(
++    (Join-Path $Root "tools\compare_opt001c_performance.py"),
++    "--baseline", (Join-Path $Root "audit\opt001b_performance_baseline.json"),
++    "--build", $Build,
++    "--prefix", "opt001cr3r7",
++    "--json", $PerformanceJson,
++    "--markdown", (Join-Path $Build "opt001cr3r7-performance-comparison.md")
++  ) "opt001cr3r7-performance-comparison.log")
++
++  [void](Invoke-Live "OPT-001CR3R7 incremental performance comparison" $PythonExe @(
++    (Join-Path $Root "tools\compare_opt001cr3_performance.py"),
++    "--baseline", (Join-Path $Root "audit\opt001cr2_accepted_baseline.json"),
++    "--build", $Build,
++    "--prefix", "opt001cr3r7",
++    "--json", (Join-Path $Build "opt001cr3r7-incremental-performance.json"),
++    "--markdown", (Join-Path $Build "opt001cr3r7-incremental-performance.md")
++  ) "opt001cr3r7-incremental-performance.log" -AllowFailure)
++
++  [void](Invoke-Live "OPT-001CR3R7 audio cost analysis" $PythonExe @(
++    (Join-Path $Root "tools\analyze_opt001cr3r7_audio.py"),
++    "--build", $Build,
++    "--prefix", "opt001cr3r7",
++    "--json", (Join-Path $Build "opt001cr3r7-audio-analysis.json")
++  ) "opt001cr3r7-audio-analysis.log" -AllowFailure)
++
++  $HandleClassification = "UNKNOWN"
++  $PlateauSummary = $PlateauPrefix + "-summary.json"
++  if (Test-Path -LiteralPath $PlateauSummary -PathType Leaf) {
++    $HandleClassification = [string]((Get-Content -Raw -LiteralPath $PlateauSummary | ConvertFrom-Json).classification)
++  }
++  $PerformanceClassification = "UNKNOWN"
++  if (Test-Path -LiteralPath $PerformanceJson -PathType Leaf) {
++    $PerformanceClassification = [string]((Get-Content -Raw -LiteralPath $PerformanceJson | ConvertFrom-Json).classification)
++  }
++  $Overall = "PASS"
++  if ($Failures -gt 0) { $Overall = "FAIL" }
++  if ($Overall -eq "PASS" -and $HandleClassification -eq "LEAK") { $Overall = "LEAK" }
++  if ($Overall -eq "PASS" -and $HandleClassification -eq "INCONCLUSIVE") { $Overall = "INCONCLUSIVE" }
++  if ($Overall -eq "PASS" -and $HandleClassification -eq "RESOURCE_GROWTH") { $Overall = "FAIL" }
++  Write-Summary $Overall $HandleClassification $PerformanceClassification
++
++  Write-Host ""
++  Write-Host "MiniQuake OPT-001CR3R7 summary"
++  Write-Host "  handle_classification=$HandleClassification"
++  Write-Host "  performance_classification=$PerformanceClassification"
++  Write-Host "  failures=$Failures"
++  Write-Host "  summary=$SummaryPath"
++  if ($Overall -eq "PASS") {
++    Write-Host "MiniQuake OPT-001CR3R7 acceptance test: PASS" -ForegroundColor Green
++    exit 0
++  }
++  Write-Host ("MiniQuake OPT-001CR3R7 acceptance test: {0}" -f $Overall) -ForegroundColor Red
++  exit 2
++}
++catch {
++  $HarnessDetail = ($_ | Out-String).Trim()
++  if (-not [string]::IsNullOrWhiteSpace($_.ScriptStackTrace)) {
++    $HarnessDetail = $HarnessDetail + "`nPowerShell stack:`n" + $_.ScriptStackTrace
++  }
++  Add-Step "OPT-001CR3R7 harness" "FAIL" 1 $HarnessDetail
++  Write-Summary "FAIL" "UNKNOWN" "UNKNOWN"
++  Write-Host "ERROR: OPT-001CR3R7 harness failure" -ForegroundColor Red
++  Write-Host $HarnessDetail -ForegroundColor DarkRed
++  Write-Host "MiniQuake OPT-001CR3R7 acceptance test: FAIL" -ForegroundColor Red
++  exit 1
++}
++finally {
++  Remove-LoopbackFirewallRules
++}
+--- a/tests/opt001cr3_hotpath_tests.ml
++++ b/tests/opt001cr3_hotpath_tests.ml
+@@ -9,21 +9,21 @@
+ import miniquake.gl_vidnt as video
+ import miniquake.common as common
+ 
+-opt001cr3r6Passed = 0
+-opt001cr3r6Failed = 0
++opt001cr3r7Passed = 0
++opt001cr3r7Failed = 0
+ 
+-function opt001cr3r6Check(condition, label)
+-  global opt001cr3r6Passed, opt001cr3r6Failed
++function opt001cr3r7Check(condition, label)
++  global opt001cr3r7Passed, opt001cr3r7Failed
+   if condition then
+-    opt001cr3r6Passed = opt001cr3r6Passed + 1
++    opt001cr3r7Passed = opt001cr3r7Passed + 1
+     print "[PASS] " + label
+   else
+-    opt001cr3r6Failed = opt001cr3r6Failed + 1
++    opt001cr3r7Failed = opt001cr3r7Failed + 1
+     print "[FAIL] " + label
+   end if
+ end function
+ 
+-function opt001cr3r6VideoState()
++function opt001cr3r7VideoState()
+   state = video.createVideoState()
+   video.VID_UseState(state)
+   video.VID_InitDIB(common.create([]))
+@@ -32,38 +32,38 @@
+ end function
+ 
+ function main(args)
+-  opt001cr3r6Check(buildInfo.OPTIMIZATION_STATUS == "opt001cr3r6_windowed_transition_candidate_v1", "optimization status")
+-  opt001cr3r6Check(buildInfo.OPTIMIZATION_FINGERPRINT == 0x1c001c0c, "optimization fingerprint")
+-  opt001cr3r6Check(buildInfo.OPTIMIZATION_PARENT == "OPT-001CR3R5", "optimization parent")
+-  opt001cr3r6Check(buildInfo.OPTIMIZATION_DELIVERY_REVISION == "OPT-001CR3R6", "optimization delivery revision")
+-  opt001cr3r6Check(buildInfo.OPTIMIZATION_DELIVERY_PARENT == "OPT-001CR3R5", "optimization delivery parent")
+-  opt001cr3r6Check(buildInfo.OPT001C_STATUS == "opt001c_frame_allocation_candidate_v1", "frozen OPT-001C status")
+-  opt001cr3r6Check(buildInfo.OPT001C_FINGERPRINT == 0x1c001c03, "frozen OPT-001C fingerprint")
++  opt001cr3r7Check(buildInfo.OPTIMIZATION_STATUS == "opt001cr3r7_audio_transition_hotpath_candidate_v1", "optimization status")
++  opt001cr3r7Check(buildInfo.OPTIMIZATION_FINGERPRINT == 0x1c001c0d, "optimization fingerprint")
++  opt001cr3r7Check(buildInfo.OPTIMIZATION_PARENT == "OPT-001CR3R6", "optimization parent")
++  opt001cr3r7Check(buildInfo.OPTIMIZATION_DELIVERY_REVISION == "OPT-001CR3R7", "optimization delivery revision")
++  opt001cr3r7Check(buildInfo.OPTIMIZATION_DELIVERY_PARENT == "OPT-001CR3R6", "optimization delivery parent")
++  opt001cr3r7Check(buildInfo.OPT001C_STATUS == "opt001c_frame_allocation_candidate_v1", "frozen OPT-001C status")
++  opt001cr3r7Check(buildInfo.OPT001C_FINGERPRINT == 0x1c001c03, "frozen OPT-001C fingerprint")
+ 
+   filled = arrays.makeFilledArray(5, 7)
+-  opt001cr3r6Check(len(filled) == 5, "filled array length")
+-  opt001cr3r6Check(filled[0] == 7 and filled[4] == 7, "filled array values")
++  opt001cr3r7Check(len(filled) == 5, "filled array length")
++  opt001cr3r7Check(filled[0] == 7 and filled[4] == 7, "filled array values")
+   stats = clientState.zeroStats(32)
+-  opt001cr3r6Check(len(stats) == 32 and stats[0] == 0 and stats[31] == 0, "zero stats exact allocation")
++  opt001cr3r7Check(len(stats) == 32 and stats[0] == 0 and stats[31] == 0, "zero stats exact allocation")
+   identity = keys.identityValues(8)
+-  opt001cr3r6Check(len(identity) == 8 and identity[0] == 0 and identity[7] == 7, "identity exact allocation")
++  opt001cr3r7Check(len(identity) == 8 and identity[0] == 0 and identity[7] == 7, "identity exact allocation")
+   server = serverState.create(4)
+-  opt001cr3r6Check(len(server.clients) == 4 and server.clients[0] is void, "server client exact allocation")
++  opt001cr3r7Check(len(server.clients) == 4 and server.clients[0] is void, "server client exact allocation")
+   handles = sysWin.emptyHandles()
+-  opt001cr3r6Check(len(handles) == 10 and handles[0] == 0 and handles[9] == 0, "system handle exact allocation")
++  opt001cr3r7Check(len(handles) == 10 and handles[0] == 0 and handles[9] == 0, "system handle exact allocation")
+ 
+   a = t.Vec3(1.0, 2.0, 3.0)
+   b = t.Vec3(4.0, 5.0, 6.0)
+-  opt001cr3r6Check(math.DotProduct(a, b) == 32.0, "inline dot product")
++  opt001cr3r7Check(math.DotProduct(a, b) == 32.0, "inline dot product")
+ 
+-  state = opt001cr3r6VideoState()
+-  opt001cr3r6Check(video.VID_FindRequestedMode(common.create([])) == video.MODE_WINDOWED, "default video mode is windowed")
+-  opt001cr3r6Check(video.VID_FindRequestedMode(common.create(["-width", "1024", "-height", "768"])) == video.MODE_WINDOWED, "window dimensions remain windowed")
+-  opt001cr3r6Check(video.VID_FindRequestedMode(common.create(["-fullscreen", "-width", "800", "-height", "600", "-bpp", "16"])) == 1, "explicit fullscreen override")
++  state = opt001cr3r7VideoState()
++  opt001cr3r7Check(video.VID_FindRequestedMode(common.create([])) == video.MODE_WINDOWED, "default video mode is windowed")
++  opt001cr3r7Check(video.VID_FindRequestedMode(common.create(["-width", "1024", "-height", "768"])) == video.MODE_WINDOWED, "window dimensions remain windowed")
++  opt001cr3r7Check(video.VID_FindRequestedMode(common.create(["-fullscreen", "-width", "800", "-height", "600", "-bpp", "16"])) == 1, "explicit fullscreen override")
+ 
+-  print "MiniQuake OPT-001CR3R6 hotpath/window tests passed: " + opt001cr3r6Passed
+-  if opt001cr3r6Failed > 0 then
+-    print "MiniQuake OPT-001CR3R6 hotpath/window tests failed: " + opt001cr3r6Failed
++  print "MiniQuake OPT-001CR3R7 hotpath/window tests passed: " + opt001cr3r7Passed
++  if opt001cr3r7Failed > 0 then
++    print "MiniQuake OPT-001CR3R7 hotpath/window tests failed: " + opt001cr3r7Failed
+     return 1
+   end if
+   return 0
+--- a/tools/analyze_opt001cr3r7_audio.py
++++ b/tools/analyze_opt001cr3r7_audio.py
+@@ -0,0 +1,40 @@
++#!/usr/bin/env python3
++from __future__ import annotations
++import argparse, json
++from pathlib import Path
++
++def main() -> int:
++    ap=argparse.ArgumentParser()
++    ap.add_argument('--build',required=True)
++    ap.add_argument('--prefix',required=True)
++    ap.add_argument('--json',required=True)
++    args=ap.parse_args()
++    build=Path(args.build)
++    scenarios=[]; missing=[]
++    for map_name in ('e1m1','e1m2'):
++        path=build/f'{args.prefix}-{map_name}-render-summary.json'
++        if not path.is_file():
++            missing.append(path.name); continue
++        data=json.loads(path.read_text(encoding='utf-8-sig'))
++        totals={item.get('name'):item.get('total_ms',0) for item in data.get('stage_totals',[])}
++        total=max(1,data.get('total_ms',0))
++        audio=totals.get('audio',0); screen=totals.get('screen',0)
++        scenarios.append({'map':map_name,'total_ms':total,'audio_ms':audio,'screen_ms':screen,
++                          'audio_percent':audio*100.0/total,'screen_percent':screen*100.0/total,
++                          'median_ms':data.get('median_ms',0),'p99_ms':data.get('p99_ms',0)})
++    if missing:
++        classification='INCOMPLETE'
++    else:
++        max_audio=max((s['audio_percent'] for s in scenarios),default=0.0)
++        max_p99=max((s['p99_ms'] for s in scenarios),default=0)
++        if max_audio >= 20.0: classification='AUDIO_CPU_BOUND'
++        elif max_p99 >= 80: classification='FRAME_STARVATION_RISK'
++        else: classification='AUDIO_COST_OK'
++    report={'schema':'MiniQuakeOPT001CR3R7AudioAnalysis/1','classification':classification,
++            'prefix':args.prefix,'scenarios':scenarios,'missing':missing}
++    Path(args.json).write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
++    print('MiniQuake OPT-001CR3R7 audio cost analysis: '+classification)
++    for s in scenarios:
++        print(f"  {s['map']}: audio={s['audio_percent']:.3f}% screen={s['screen_percent']:.3f}% median={s['median_ms']} p99={s['p99_ms']}")
++    return 0 if classification != 'INCOMPLETE' else 2
++if __name__=='__main__': raise SystemExit(main())
+--- a/tools/check_opt001b.py
++++ b/tools/check_opt001b.py
+@@ -24,7 +24,11 @@
+     host=(root/'src/miniquake/host.ml').read_text(encoding='utf-8-sig')
+     bi=(root/'src/miniquake/build_info.ml').read_text(encoding='utf-8-sig')
+     if args.allow_downstream_package:
+-        if 'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R6"' in bi:
++        if 'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R7"' in bi:
++            runner_path = root / 'TEST_OPT-001CR3R7.ps1'
++            downstream_revision = 'OPT-001CR3R7'
++            downstream_parent = 'OPT-001CR3R6'
++        elif 'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R6"' in bi:
+             runner_path = root / 'TEST_OPT-001CR3R6.ps1'
+             downstream_revision = 'OPT-001CR3R6'
+             downstream_parent = 'OPT-001CR3R5'
+@@ -88,10 +92,11 @@
+     require(main,['--opt001b-transition','runOpt001BTransitionCommand'], 'main', errors)
+     require(host,['function runOpt001BTransition(', 'MiniQuake OPT-001B transition ', 'startMap(session, mapName)'], 'host', errors)
+     if args.allow_downstream_package:
++        visible_marker = 'E1M2VisibleFrames = 1500' if downstream_revision == 'OPT-001CR3R7' else 'E1M2VisibleFrames = 1000'
+         require(runner,[
+             f'$DeliveryRevision = "{downstream_revision}"',
+             f'$DeliveryParent = "{downstream_parent}"',
+-            'E1M2VisibleFrames = 1000',
++            visible_marker,
+             'E1M2HeadlessFrames = 10000',
+             '--opt001b-transition',
+             f'MiniQuake {downstream_revision} acceptance test: PASS',
+--- a/tools/check_opt001c.py
++++ b/tools/check_opt001c.py
+@@ -65,7 +65,10 @@
+     downstream_revision = ""
+     downstream_parent = ""
+     if args.allow_downstream_package:
+-        if 'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R6"' in build_info:
++        if 'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R7"' in build_info:
++            downstream_revision = "OPT-001CR3R7"
++            downstream_parent = "OPT-001CR3R6"
++        elif 'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R6"' in build_info:
+             downstream_revision = "OPT-001CR3R6"
+             downstream_parent = "OPT-001CR3R5"
+         elif 'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R4"' in build_info:
+--- a/tools/check_opt001cr3r6.py
++++ b/tools/check_opt001cr3r6.py
+@@ -3,10 +3,10 @@
+ import argparse, json, re
+ from pathlib import Path
+ 
+-REV='OPT-001CR3R6'
+-PARENT='OPT-001CR3R5'
+-STATUS='opt001cr3r6_windowed_transition_candidate_v1'
+-FINGERPRINT='0x1c001c0c'
++REV='OPT-001CR3R7'
++PARENT='OPT-001CR3R6'
++STATUS='opt001cr3r7_audio_transition_hotpath_candidate_v1'
++FINGERPRINT='0x1c001c0d'
+ 
+ def function_block(text: str, name: str) -> str:
+     m=re.search(rf"(?ms)^function(?:\s+inline)?\s+{re.escape(name)}\b.*?^end function$", text)
+@@ -97,7 +97,7 @@
+                 block_if_issues.append(f'{path.relative_to(root)}:{index+1}: block if missing then')
+     errors.extend(block_if_issues)
+ 
+-    report={'schema':'MiniQuakeOPT001CR3R6Static/1','status':'PASS' if not errors else 'FAIL','errors':errors,
++    report={'schema':'MiniQuakeOPT001CR3R6DownstreamStatic/1','status':'PASS' if not errors else 'FAIL','errors':errors,
+             'default_video_mode':'windowed','explicit_fullscreen':True,'renderer_reset':True,
+             'frozen_opt001c_identity':True,'block_if_issues':len(block_if_issues)}
+     if args.json: Path(args.json).write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
+--- a/tools/check_opt001cr3r7.py
++++ b/tools/check_opt001cr3r7.py
+@@ -0,0 +1,42 @@
++#!/usr/bin/env python3
++from __future__ import annotations
++import argparse,json,re
++from pathlib import Path
++REV='OPT-001CR3R7'; PARENT='OPT-001CR3R6'
++STATUS='opt001cr3r7_audio_transition_hotpath_candidate_v1'; FINGERPRINT='0x1c001c0d'
++def main():
++    ap=argparse.ArgumentParser(); ap.add_argument('--root',default='.'); ap.add_argument('--json',default=''); a=ap.parse_args()
++    root=Path(a.root).resolve(); errors=[]
++    def text(rel): return (root/rel).read_text(encoding='utf-8')
++    bi=text('src/miniquake/build_info.ml'); host=text('src/miniquake/host.ml'); mixer=text('src/miniquake/sound/mixer.ml')
++    world=text('src/miniquake/render/world.ml'); hot=text('tests/opt001cr3_hotpath_tests.ml'); runner=text('TEST_OPT-001CR3R7.ps1')
++    markers=[f'const OPTIMIZATION_STATUS = "{STATUS}"',f'const OPTIMIZATION_FINGERPRINT = {FINGERPRINT}',
++             f'const OPTIMIZATION_PARENT = "{PARENT}"',f'const OPTIMIZATION_DELIVERY_REVISION = "{REV}"']
++    for m in markers:
++        if m not in bi: errors.append('build_info missing '+m)
++    for m in ('registerCvar(registry, "_snd_mixahead", "0.2", true, false)',
++              'if session.renderer is not void then worldRenderer.destroy(session.renderer) end if',
++              'frameMixAhead = cvar.variableValue(session.cvars, "_snd_mixahead")',
++              'rDrawEntities = cvar.variableValue(session.cvars, "r_drawentities") != 0.0'):
++        if m not in host: errors.append('host missing '+m)
++    for m in ('channelCount = len(mixer.channels)','while channelIndex < channelCount','accumulatorCount = frameCount * 2'):
++        if m not in mixer: errors.append('mixer missing '+m)
++    for m in ('if currentLeaf == renderer.viewLeaf and len(renderer.visibleFaces) == len(map.faces) then',
++              'return countVisibleFaces(renderer.visibleFaces)','renderer.viewLeaf = -1'):
++        if m not in world: errors.append('world PVS cache missing '+m)
++    for m in ('opt001cr3r7Passed = 0','function opt001cr3r7Check(condition, label)',
++              'buildInfo.OPTIMIZATION_DELIVERY_REVISION == "OPT-001CR3R7"',
++              'buildInfo.OPTIMIZATION_STATUS == "opt001cr3r7_audio_transition_hotpath_candidate_v1"'):
++        if m not in hot: errors.append('hotpath test missing '+m)
++    for m in ('$DeliveryRevision = "OPT-001CR3R7"','$DeliveryParent = "OPT-001CR3R6"',
++              '[int]$TransitionFrames = 256','[int]$E1M2VisibleFrames = 1500',
++              'OPT-001CR3R7 audio cost analysis','output_mode=python_binary_passthrough_named_build_binding'):
++        if m not in runner: errors.append('runner missing '+m)
++    report={'schema':'MiniQuakeOPT001CR3R7Static/1','status':'PASS' if not errors else 'FAIL','errors':errors,
++            'audio_mixahead':0.2,'pvs_cache':True,'renderer_destroy_unconditional':True,
++            'transition_frames':256,'visible_frames':1500}
++    if a.json: Path(a.json).write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
++    print('MiniQuake OPT-001CR3R7 hotpath/transition/audio verification: '+report['status'])
++    for e in errors: print('  error: '+e)
++    return 0 if not errors else 1
++if __name__=='__main__': raise SystemExit(main())
+--- a/tools/verify.py
++++ b/tools/verify.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""Self-contained package verifier for MiniQuake OPT-001CR3R6.
++"""Self-contained package verifier for MiniQuake OPT-001CR3R7.
+ 
+ Historical subsystem semantics are checked by the source-guided component
+ checkers invoked from build.ps1.  This verifier owns current delivery
+@@ -21,8 +21,8 @@
+ PARENT_PACKAGE_ID = "BP-093"
+ BLOCK_ID = "BP-090-094"
+ BLOCK_PARENT_PACKAGE_ID = "BP-085-089R8"
+-DELIVERY_REVISION = "OPT-001CR3R6"
+-DELIVERY_PARENT = "OPT-001CR3R5"
++DELIVERY_REVISION = "OPT-001CR3R7"
++DELIVERY_PARENT = "OPT-001CR3R6"
+ MANIFEST = "SOURCE_MANIFEST.sha256"
+ 
+ EXCLUDED_DIRS = {".git", "build", "__pycache__", ".pytest_cache"}
+@@ -36,6 +36,11 @@
+ }
+ 
+ REQUIRED_PATHS = {
++    "TEST_OPT-001CR3R7.ps1", "CHANGELOG_OPT-001CR3R7.md",
++    "docs/OPT-001CR3R7_TESTING.md", "docs/OPT-001CR3R7_CHANGELOG.md",
++    "docs/OPT-001CR3R7_RESULT_ANALYSIS.md", "docs/OPT-001CR3R7_HOTFIX_REPORT.json",
++    "audit/opt001cr3r7_audio_transition_hotpath.json", "tools/check_opt001cr3r7.py",
++    "tools/analyze_opt001cr3r7_audio.py", "patches/OPT-001CR3R7.diff",
+     "TEST_OPT-001CR3R6.ps1", "CHANGELOG_OPT-001CR3R6.md",
+     "docs/OPT-001CR3R6_TESTING.md", "docs/OPT-001CR3R6_CHANGELOG.md",
+     "docs/OPT-001CR3R6_RESULT_ANALYSIS.md", "docs/OPT-001CR3R6_HOTFIX_REPORT.json",
+@@ -253,17 +258,17 @@
+     build_info = (root / "src/miniquake/build_info.ml").read_text(encoding="utf-8-sig")
+     main = (root / "src/main.ml").read_text(encoding="utf-8-sig")
+     build = (root / "build.ps1").read_text(encoding="utf-8-sig")
+-    test = (root / "TEST_OPT-001CR3R6.ps1").read_text(encoding="utf-8-sig")
++    test = (root / "TEST_OPT-001CR3R7.ps1").read_text(encoding="utf-8-sig")
+     collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
+     launcher = (root / "test.ps1").read_text(encoding="utf-8-sig")
+     errors += marker_errors(build_info, [
+         'const PACKAGE_ID = "BP-094"', 'const PARENT_PACKAGE_ID = "BP-093"',
+         'const BLOCK_ID = "BP-090-094"', 'const BLOCK_PARENT_PACKAGE_ID = "BP-085-089R8"',
+-        'const OPTIMIZATION_STATUS = "opt001cr3r6_windowed_transition_candidate_v1"',
+-        'const OPTIMIZATION_FINGERPRINT = 0x1c001c0c',
+-        'const OPTIMIZATION_PARENT = "OPT-001CR3R5"',
+-        'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R6"',
+-        'const OPTIMIZATION_DELIVERY_PARENT = "OPT-001CR3R5"',
++        'const OPTIMIZATION_STATUS = "opt001cr3r7_audio_transition_hotpath_candidate_v1"',
++        'const OPTIMIZATION_FINGERPRINT = 0x1c001c0d',
++        'const OPTIMIZATION_PARENT = "OPT-001CR3R6"',
++        'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R7"',
++        'const OPTIMIZATION_DELIVERY_PARENT = "OPT-001CR3R6"',
+     ], "build_info")
+     errors += marker_errors(main, [
+         "--opt001a-map-parse", "--opt001a-frame-baseline", "--opt001a-handle-plateau", "--opt001b-transition",
+@@ -274,14 +279,14 @@
+         "MiniQuakeOPT001CR3HotpathTests.exe", "tests\\opt001cr3_hotpath_tests.ml",
+     ], "build")
+     errors += marker_errors(test, [
+-        '$DeliveryRevision = "OPT-001CR3R6"', '$DeliveryParent = "OPT-001CR3R5"',
+-        "MiniQuake OPT-001CR3R6 acceptance test: PASS", "output_mode=python_binary_passthrough_named_build_binding",
++        '$DeliveryRevision = "OPT-001CR3R7"', '$DeliveryParent = "OPT-001CR3R6"',
++        "MiniQuake OPT-001CR3R7 acceptance test: PASS", "output_mode=python_binary_passthrough_named_build_binding",
+         "--opt001a-map-parse", "--opt001a-frame-baseline", "--opt001a-handle-plateau",
+     ], "test")
+     errors += marker_errors(collector, [
+-        '$DeliveryRevision = "OPT-001CR3R6"', "MiniQuake_OPT-001CR3R6_RESULTS_",
++        '$DeliveryRevision = "OPT-001CR3R7"', "MiniQuake_OPT-001CR3R7_RESULTS_",
+     ], "collector")
+-    errors += marker_errors(launcher, ["TEST_OPT-001CR3R6.ps1"], "test.ps1")
++    errors += marker_errors(launcher, ["TEST_OPT-001CR3R7.ps1"], "test.ps1")
+     return Check(
+         "package_identity", not errors,
+         {"package_id": PACKAGE_ID, "parent_package_id": PARENT_PACKAGE_ID,
+@@ -861,8 +866,8 @@
+     errors: list[str] = []
+     helpers = [name for name in functions if name != "main"]
+     for name in helpers:
+-        if not name.startswith("opt001cr3r6"):
+-            errors.append(f"{relative}: global helper '{name}' is not namespaced with prefix 'opt001cr3r6'")
++        if not name.startswith("opt001cr3r7"):
++            errors.append(f"{relative}: global helper '{name}' is not namespaced with prefix 'opt001cr3r7'")
+     if "main" not in functions:
+         errors.append(f"{relative}: main(args) is missing")
+     for generic in ("check", "equal", "require", "passed", "failed"):
+@@ -871,7 +876,7 @@
+     return Check("current_entry_helper_namespace", not errors, {
+         "entry": relative,
+         "helpers_checked": len(helpers),
+-        "required_prefix": "opt001cr3r6",
++        "required_prefix": "opt001cr3r7",
+         "generic_names": 0 if not errors else len(errors),
+     }, errors)
+ 
+@@ -1070,7 +1075,7 @@
+ 
+ def check_named_build_parameter_binding(root: Path) -> Check:
+     errors: list[str] = []
+-    current = (root / "TEST_OPT-001CR3R6.ps1").read_text(encoding="utf-8-sig")
++    current = (root / "TEST_OPT-001CR3R7.ps1").read_text(encoding="utf-8-sig")
+     errors += marker_errors(current, [
+         'function Invoke-LiveBuild(', '"-File", $ScriptPath',
+         '"-Compiler", $Compiler', '"-StdLib", $StdLib',
+@@ -1101,7 +1106,7 @@
+ def check_live_output(root: Path) -> Check:
+     errors: list[str] = []
+     historical_test = (root / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
+-    current_test = (root / "TEST_OPT-001CR3R6.ps1").read_text(encoding="utf-8-sig")
++    current_test = (root / "TEST_OPT-001CR3R7.ps1").read_text(encoding="utf-8-sig")
+     live_runner = (root / "tools/run_process_live.py").read_text(encoding="utf-8-sig")
+     build = (root / "build.ps1").read_text(encoding="utf-8-sig")
+     for label, script_text in (("historical test", historical_test), ("current test", current_test), ("build", build)):
+@@ -1161,12 +1166,12 @@
+                 errors.append(
+                     f"{rel}:{line_number}: invalid PowerShell `else if`; use `elseif`"
+                 )
+-    current = root / "TEST_OPT-001CR3R6.ps1"
++    current = root / "TEST_OPT-001CR3R7.ps1"
+     if current.is_file():
+         source = current.read_text(encoding="utf-8-sig", errors="replace")
+         if "} elseif ($AllowFailure) {" not in source:
+             errors.append(
+-                "TEST_OPT-001CR3R6.ps1 is missing the validated AllowFailure elseif branch"
++                "TEST_OPT-001CR3R7.ps1 is missing the validated AllowFailure elseif branch"
+             )
+     return Check(
+         "powershell_elseif_syntax",
+@@ -1738,6 +1743,20 @@
+ 
+ 
+ 
++
++def check_opt001cr3r7(root: Path) -> Check:
++    out = root / "build" / "verify-opt001cr3r7.json"
++    out.parent.mkdir(parents=True, exist_ok=True)
++    proc = subprocess.run([sys.executable, str(root / "tools/check_opt001cr3r7.py"), "--root", str(root), "--json", str(out)], capture_output=True, text=True)
++    errors=[]; details={"return_code": proc.returncode}
++    if proc.returncode != 0:
++        errors.append((proc.stdout + "\n" + proc.stderr).strip())
++    if out.is_file():
++        try:
++            report=json.loads(out.read_text(encoding="utf-8")); details["status"]=report.get("status",""); details["audio_mixahead"]=report.get("audio_mixahead",0); details["pvs_cache"]=report.get("pvs_cache",False)
++        except Exception as exc: errors.append(f"invalid OPT-001CR3R7 report: {exc}")
++    return Check("opt001cr3r7_audio_transition_hotpath", not errors, details, errors)
++
+ def check_opt001cr3r6(root: Path) -> Check:
+     out = root / "build" / "verify-opt001cr3r6.json"
+     out.parent.mkdir(parents=True, exist_ok=True)
+@@ -1787,7 +1806,7 @@
+         check_minilang_delimiters(root),
+         check_opt001cr1(root),
+         check_opt001cr2(root),
+-        check_opt001cr3r6(root),
++        check_opt001cr3r7(root),
+         check_opt001cr3(root),
+         check_opt001b(root),
+         check_opt001c(root),
+@@ -1816,14 +1835,14 @@
+         check_external_checkers(root),
+     ]
+     passed = all(check.passed for check in checks)
+-    print("MiniQuake OPT-001CR3R6 verification")
++    print("MiniQuake OPT-001CR3R7 verification")
+     for check in checks:
+         print(f"  [{'PASS' if check.passed else 'FAIL'}] {check.name}")
+         for key, value in check.details.items():
+             print(f"         {key}={value}")
+         for error in check.errors:
+             print(f"         error: {error}")
+-    print(f"MiniQuake OPT-001CR3R6 verification: {'PASS' if passed else 'FAIL'}")
++    print(f"MiniQuake OPT-001CR3R7 verification: {'PASS' if passed else 'FAIL'}")
+     report = {
+         "schema_version": 1,
+         "package_id": PACKAGE_ID,

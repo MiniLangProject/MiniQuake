@@ -27,7 +27,7 @@ function clientReliablePlan(connected, messageSize, canSend)
   return SEND_COMMIT
 end function
 
-function keepaliveDue(elapsed)
+function inline keepaliveDue(elapsed)
   return elapsed > 5.0
 end function
 

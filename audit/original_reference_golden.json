@@ -1,0 +1,12 @@
+{
+  "contract_sha256_input": "referenceContractText",
+  "fingerprint": "0xdc355175",
+  "fixtures": 20,
+  "redistributed": false,
+  "reference_bytes": 435712,
+  "reference_pe_machine": "0x014c",
+  "reference_sha256": "04862c835c399bc9184f62101ae0390c2a758c21656ec06dcc0384e0f373d588",
+  "schema_version": 1,
+  "status": "original_reference_109_candidate_v1",
+  "step": "BP-090"
+}

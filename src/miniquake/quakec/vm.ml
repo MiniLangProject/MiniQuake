@@ -414,7 +414,7 @@ function runError(machine, message)
   return error(2216, "Program error: " + message)
 end function
 
-function floatTruth(value)
+function inline floatTruth(value)
   return value != 0.0
 end function
 
@@ -435,7 +435,7 @@ end function
 function definitionOffset(definitions, name)
   for each definition in definitions
     // ED_FindField/ED_FindGlobal use strcmp.  Treating generated names as
-    // case-insensitive accepts entity/save data that GLQuake rejects.
+    // case-insensitive accepts entity/save data that MiniQuake rejects.
     if definition.name == name then return definition.offset end if
   end for
   return -1
@@ -733,7 +733,7 @@ function randomFloat(machine)
   return ((machine.randomSeed >> 16) & 0x7fff) / 32767.0
 end function
 
-// Names matching the GLQuake entry points keep the source-to-port mapping
+// Names matching the MiniQuake entry points keep the source-to-port mapping
 // explicit while the lower-camel functions remain the idiomatic MiniLang API.
 function PR_PrintStatement(machine, statementValue)
   return printStatement(machine, statementValue)

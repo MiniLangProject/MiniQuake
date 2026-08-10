@@ -363,14 +363,15 @@ function CL_RelinkEntities(client)
   end if
 
   clRelinkParticleEffects = []
-  client.visibleEntities = []
+  visibleBuilder = arrayutil.createArrayBuilder(c.MAX_VISEDICTS)
   binaryObjectRotation = clientFloat(math.anglemod(100.0 * client.time))
+  entityCount = len(client.entities)
   index = 1
-  while index < len(client.entities)
+  while index < entityCount
     entity = client.entities[index]
     if entity is not void and entity.modelIndex != 0 then
       if entity.messageTime < 0.0 then
-        if len(client.visibleEntities) < c.MAX_VISEDICTS then client.visibleEntities = client.visibleEntities + [entity] end if
+        if visibleBuilder.count < c.MAX_VISEDICTS then arrayutil.pushArrayBuilder(visibleBuilder, entity) end if
       else if entity.messageTime != client.messageTimes[0] then
         entity.modelIndex = 0
       else
@@ -422,13 +423,14 @@ function CL_RelinkEntities(client)
           queueRelinkParticleEffect("rocket_trail", [oldOrigin, math.copy(entity.origin), 6])
         end if
         entity.forceLink = false
-        if (index != client.viewEntity or clChaseActive) and len(client.visibleEntities) < c.MAX_VISEDICTS then
-          client.visibleEntities = client.visibleEntities + [entity]
+        if (index != client.viewEntity or clChaseActive) and visibleBuilder.count < c.MAX_VISEDICTS then
+          arrayutil.pushArrayBuilder(visibleBuilder, entity)
         end if
       end if
     end if
     index = index + 1
   end while
+  client.visibleEntities = arrayutil.finishArrayBuilder(visibleBuilder)
   return client.visibleEntities
 end function
 
@@ -437,13 +439,13 @@ end function
 // Keep this as a defensive view: invalid/cleared entries can never leak into a
 // modern backend even if a caller retained an older visibleEntities array.
 function CL_ActiveVisibleEntities(client)
-  active = []
+  builder = arrayutil.createArrayBuilder(len(client.visibleEntities))
   for each entity in client.visibleEntities
-    if entity is not void and entity.modelIndex != 0 and len(active) < c.MAX_VISEDICTS then
-      active = active + [entity]
+    if entity is not void and entity.modelIndex != 0 and builder.count < c.MAX_VISEDICTS then
+      arrayutil.pushArrayBuilder(builder, entity)
     end if
   end for
-  return active
+  return arrayutil.finishArrayBuilder(builder)
 end function
 
 // gl_refrag.c removes stale efrags when a force-linked entity no longer has a
@@ -460,13 +462,13 @@ function CL_ViewEntityOrigin(client)
 end function
 
 function CL_EfragRemovalCandidates(client)
-  candidates = []
+  builder = arrayutil.createArrayBuilder(len(client.entities))
   for each entity in client.entities
     if entity is not void and entity.modelIndex == 0 and entity.forceLink then
-      candidates = candidates + [entity]
+      arrayutil.pushArrayBuilder(builder, entity)
     end if
   end for
-  return candidates
+  return arrayutil.finishArrayBuilder(builder)
 end function
 
 function nextDlightRandom()
@@ -675,8 +677,8 @@ function CL_PrintEntities_f(client)
   return lines
 end function
 
-// The GLQuake SetPal debug body is compiled out with #if 0.
-function SetPal(index)
+// The MiniQuake SetPal debug body is compiled out with #if 0.
+function inline SetPal(index)
   return false
 end function
 
@@ -716,7 +718,7 @@ function CL_NewTranslation(client, slot)
   while len(clTranslations) <= slot
     clTranslations = clTranslations + [void]
   end while
-  // scoreboard_t.translations contains every colormap grade in GLQuake,
+  // scoreboard_t.translations contains every colormap grade in MiniQuake,
   // even though the GL player-skin upload consumes the first grade directly.
   gradeCount = 64
   translation = bytes(256 * gradeCount)
@@ -771,6 +773,30 @@ end function
 
 function connectHost(client, network, host)
   return CL_EstablishConnection(client, network, host)
+end function
+
+function CL_EstablishInteropConnection(client, network, host, timeoutMilliseconds, resendMilliseconds)
+  global clMoveMessages
+  if client.demoPlayback then return error(2950, "interop connect cannot start during demo playback") end if
+  CL_Disconnect(client)
+  CL_ClearDlights()
+  socket = netmain.NET_ConnectInterop(network, host, timeoutMilliseconds, resendMilliseconds)
+  if socket is void then return error(2951, "CL_EstablishInteropConnection: connect failed") end if
+  if socket is error then return socket end if
+  client.socket = socket
+  client.connected = true
+  client.signon = c.SIGNON_NONE
+  client.spawned = false
+  client.printLog = []
+  clMoveMessages = 0
+  if client.player is not void then client.command.viewAngles = math.copy(client.player.viewAngles) end if
+  sz.clear(client.outgoing)
+  sz.clear(client.incoming)
+  return client
+end function
+
+function connectHostInterop(client, network, host, timeoutMilliseconds, resendMilliseconds)
+  return CL_EstablishInteropConnection(client, network, host, timeoutMilliseconds, resendMilliseconds)
 end function
 
 function CL_KeepaliveMessage(client, localServerActive, realtime)
@@ -1135,7 +1161,7 @@ function applyEvent(client, item)
     staticEntity.messageTime = -1.0
     staticEntity.forceLink = false
   else if name == "fast_update" then
-    // GLQuake promotes signon 3 to 4 on the first entity update. The server
+    // MiniQuake promotes signon 3 to 4 on the first entity update. The server
     // never emits svc_signonnum 4 on the original demo/network path.
     if client.signon == c.SIGNON_SPAWN then
       signedOn = try(advanceSignon(client, c.SIGNON_ACTIVE))

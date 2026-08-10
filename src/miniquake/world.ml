@@ -73,7 +73,7 @@ function fallbackEdict(state, entityIndex)
   return state.server.edicts[entityIndex]
 end function
 
-function hasRuntime(state)
+function inline hasRuntime(state)
   return state.server is not void and state.server.machine is not void and state.server.machine.context is not void
 end function
 

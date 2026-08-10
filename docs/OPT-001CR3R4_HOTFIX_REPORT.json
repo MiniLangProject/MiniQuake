@@ -1,0 +1,16 @@
+{
+  "schema": "MiniQuakeOPT001CR3R4Hotfix/1",
+  "revision": "OPT-001CR3R4",
+  "parent": "OPT-001CR3R3",
+  "classification": "test-entry-symbol-collision",
+  "status": "candidate",
+  "source_error": "check/2 shadows zone.check/1",
+  "fix": [
+    "prefix package-free test helper",
+    "prefix test globals",
+    "scan entry/import arity collisions",
+    "bind matching fingerprint"
+  ],
+  "engine_code_changed": false,
+  "native_code_changed": false
+}

@@ -1,0 +1,1729 @@
+--- a/BLOCK_LEDGER.json
++++ b/BLOCK_LEDGER.json
+@@ -113,8 +113,8 @@
+       "status": "candidate"
+     }
+   ],
+-  "delivery_revision": "OPT-001A",
+-  "delivery_parent": "BP-090-094R15",
++  "delivery_revision": "OPT-001C",
++  "delivery_parent": "OPT-001B",
+   "hotfixes": [
+     {
+       "revision": "BP-090-094R1",
+@@ -243,17 +243,19 @@
+     }
+   ],
+   "optimization": {
+-    "status": "opt001a_baseline_candidate_v1",
+-    "fingerprint": "0x1a001a01",
+-    "diagnostic_only": true,
++    "status": "opt001c_frame_allocation_candidate_v1",
++    "fingerprint": "0x1c001c03",
++    "parent": "OPT-001B",
++    "parent_windows_status": "PASS",
++    "parent_handle_classification": "PLATEAU",
++    "scope": "disabled GL trace argument-array fast path and performance comparison",
+     "maps": [
+       "e1m1",
+       "e1m2"
+     ],
+-    "handle_windows": 3,
++    "baseline_revision": "OPT-001B",
+     "next": [
+-      "OPT-001B",
+-      "OPT-001C",
++      "OPT-001C-R1-if-needed",
+       "OPT-001D",
+       "OPT-001E"
+     ]
+--- a/CHANGELOG_OPT-001C.md
++++ b/CHANGELOG_OPT-001C.md
+@@ -0,0 +1,17 @@
++# MiniQuake OPT-001C
++
++Parent: OPT-001B (Windows acceptance PASS, handle classification PLATEAU)
++
++## Changes
++
++- Removed per-call temporary trace arrays from the normal OpenGL wrapper fast path.
++- Every `traceCommand(..., [...])` construction in `render/gl11.ml` is now short-circuited by `diagnosticTraceEnabled` before the argument array is evaluated.
++- Direct renderer trace calls in `render/world.ml` are guarded by `gl.traceEnabled()` before arrays, lightmap hashes, or trace-only values are constructed.
++- Added an allocation contract executable that proves the enabled trace format remains unchanged.
++- Added a static source checker that rejects unguarded renderer trace arrays.
++- Embedded the accepted OPT-001B performance baseline and added automatic median/P95/P99/throughput comparison.
++- Preserved all OPT-001B correctness gates: e1m2 visible/headless soaks, deterministic traces, map transition and handle plateau analysis.
++
++## Deliberately deferred
++
++Persistent entity/viewmodel buffers, particle/audio scratch buffers, hot-Cvar caching, PVS/BSP restructuring, surface chains and QuakeC stack work remain scheduled for later OPT-001C/OPT-001D/OPT-001E revisions after this measurement.
+--- a/COLLECT_RESULTS.ps1
++++ b/COLLECT_RESULTS.ps1
+@@ -7,14 +7,14 @@
+ $Build = Join-Path $Root "build"
+ $PackageId = "BP-094"
+ $BlockId = "BP-090-094"
+-$DeliveryRevision = "OPT-001B"
+-$DeliveryParent = "OPT-001A"
++$DeliveryRevision = "OPT-001C"
++$DeliveryParent = "OPT-001B"
+ $Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+ # original_reference_binary_in_result_archive=$false
+ # historical external staging marker retained for contract verification: bp090-094-original-reference
+ # quake_game_data_in_result_archive=$false
+-$Staging = Join-Path $Build (".opt001b-results-{0}" -f $Timestamp)
+-$Archive = Join-Path $Build ("MiniQuake_OPT-001B_RESULTS_{0}.zip" -f $Timestamp)
++$Staging = Join-Path $Build (".opt001c-results-{0}" -f $Timestamp)
++$Archive = Join-Path $Build ("MiniQuake_OPT-001C_RESULTS_{0}.zip" -f $Timestamp)
+ 
+ if (-not (Test-Path -LiteralPath $Build -PathType Container)) { throw "build directory does not exist: $Build" }
+ if (Test-Path -LiteralPath $Staging) { Remove-Item -Recurse -Force -LiteralPath $Staging }
+@@ -78,6 +78,17 @@
+ }
+ 
+ $RootFiles = @(
++  "TEST_OPT-001C.ps1",
++  "CHANGELOG_OPT-001C.md",
++  "docs\OPT-001C_TESTING.md",
++  "docs\OPT-001C_ALLOCATION_CONTRACT.md",
++  "docs\OPT-001C_DELIVERY_REPORT.json",
++  "tests\opt001c_contract_tests.ml",
++  "tools\check_opt001c.py",
++  "tools\compare_opt001c_performance.py",
++  "audit\opt001c_allocation_golden.json",
++  "audit\opt001b_performance_baseline.json",
++  "patches\OPT-001C.diff",
+   "TEST_OPT-001B.ps1",
+   "CHANGELOG_OPT-001B.md",
+   "docs\OPT-001B_TESTING.md",
+@@ -566,6 +577,8 @@
+   "MiniQuakeExternalCompatibilityClosureTests.exe",
+   "MiniQuake.exe",
+   "MiniQuakeOPT001AContractTests.exe",
++  "MiniQuakeOPT001BCorrectnessTests.exe",
++  "MiniQuakeOPT001CAllocationTests.exe",
+   "MiniQuakeProtocol15ServerDataTests.exe",
+   "MiniQuakeCommonCoreTests.exe",
+   "MiniQuakeFilesystemPackTests.exe",
+--- a/PORT_STATUS.md
++++ b/PORT_STATUS.md
+@@ -1,6 +1,8 @@
+-# OPT-001A diagnostic baseline
++# OPT-001C frame-allocation optimization
+ 
+-Current delivery: `OPT-001A`, parent `BP-090–BP-094R15`.
++Current delivery: `OPT-001C`, parent `OPT-001B`.
++
++OPT-001B is Windows-accepted: `e1m2` completed 1,000 visible and 10,000 headless frames, `e1m1 -> e1m2 -> e1m1` passed, deterministic traces matched, and the handle sequence `278,279,279,279` was classified as a plateau rather than a leak. OPT-001C removes trace-only argument-array construction from the disabled GL diagnostic fast path and compares the result against the accepted OPT-001B performance baseline.
+ 
+ # MiniQuake port status
+ 
+--- a/README.md
++++ b/README.md
+@@ -1,4 +1,5 @@
+-> Current delivery: **OPT-001A diagnostic baseline**, parent **BP-090–BP-094R15**.
++> Current delivery: **OPT-001C frame-allocation optimization**, parent **OPT-001B**.
++> OPT-001B is the Windows-accepted error-freedom baseline (`e1m2` visible/headless/transition PASS, handles PLATEAU).
+ 
+ # MiniQuake – BP-090–BP-094
+ 
+--- a/TEST_OPT-001C.ps1
++++ b/TEST_OPT-001C.ps1
+@@ -0,0 +1,310 @@
++﻿[CmdletBinding()]
++param(
++  [Parameter(Mandatory = $true)]
++  [string]$Compiler,
++  [Parameter(Mandatory = $true)]
++  [string]$StdLib,
++  [Parameter(Mandatory = $true)]
++  [string]$QuakeBase,
++  [string]$Game = "id1",
++  [int]$MatrixFrames = 64,
++  [int]$WarmupFrames = 300,
++  [int]$BenchmarkFrames = 3000,
++  [int]$HandleWarmupFrames = 1200,
++  [int]$HandleWindowFrames = 5000,
++  [int]$HandleWindows = 3,
++  [int]$E1M2VisibleFrames = 1000,
++  [int]$E1M2HeadlessFrames = 10000,
++  [int]$TransitionFrames = 64,
++  [int]$ListenPort = 0,
++  [switch]$SkipBuild,
++  [switch]$SkipTemporaryFirewallRules,
++  [switch]$ContinueIndependentTests
++)
++
++$ErrorActionPreference = "Stop"
++Set-StrictMode -Version Latest
++$env:PYTHONUNBUFFERED = "1"
++
++$Root = $PSScriptRoot
++$Build = Join-Path $Root "build"
++$GameExe = Join-Path $Build "MiniQuake.exe"
++$ContractExe = Join-Path $Build "MiniQuakeOPT001CAllocationTests.exe"
++$DeliveryRevision = "OPT-001C"
++$DeliveryParent = "OPT-001B"
++$SummaryPath = Join-Path $Build "opt001c-test-summary.json"
++$Steps = @()
++$Failures = 0
++$FirewallRules = @()
++
++
++function Get-FreeUdpPort {
++  $Client = New-Object System.Net.Sockets.UdpClient
++  try {
++    $Client.Client.Bind((New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Loopback, 0)))
++    return [int]([System.Net.IPEndPoint]$Client.Client.LocalEndPoint).Port
++  }
++  finally {
++    $Client.Dispose()
++  }
++}
++
++function Test-IsAdministrator {
++  $Identity = [Security.Principal.WindowsIdentity]::GetCurrent()
++  $Principal = New-Object Security.Principal.WindowsPrincipal($Identity)
++  return $Principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
++}
++
++function Add-Step([string]$Name, [string]$Status, [int]$ExitCode, [string]$Log) {
++  $script:Steps += [pscustomobject]@{ name=$Name; status=$Status; exit_code=$ExitCode; log=$Log }
++  if ($Status -eq "FAIL") { $script:Failures += 1 }
++  $Colour = "Gray"
++  if ($Status -eq "PASS") { $Colour = "Green" }
++  if ($Status -eq "FAIL") { $Colour = "Red" }
++  if ($Status -eq "SKIPPED" -or $Status -eq "DIAGNOSTIC") { $Colour = "Yellow" }
++  Write-Host ("[{0}] {1}" -f $Status, $Name) -ForegroundColor $Colour
++}
++
++function Invoke-Live(
++  [string]$Name,
++  [string]$Executable,
++  [string[]]$Arguments,
++  [string]$LogName,
++  [switch]$AllowFailure
++) {
++  $LogPath = Join-Path $Build $LogName
++  Write-Host ("[MiniQuake/OPT-001C] starting {0}" -f $Name) -ForegroundColor Cyan
++  Write-Host ("  executable={0}" -f $Executable)
++  Write-Host ("  arguments={0}" -f ($Arguments -join " "))
++  & $Executable @Arguments 2>&1 | Tee-Object -FilePath $LogPath
++  $Code = [int]$LASTEXITCODE
++  if ($Code -eq 0) {
++    Add-Step $Name "PASS" $Code $LogName
++  } else {
++    if ($AllowFailure) {
++      Add-Step $Name "DIAGNOSTIC" $Code $LogName
++    } else {
++      Add-Step $Name "FAIL" $Code $LogName
++      if (-not $ContinueIndependentTests) {
++        throw ("{0} failed with exit code {1}" -f $Name, $Code)
++      }
++    }
++  }
++  return $Code
++}
++
++function Install-LoopbackFirewallRules {
++  if ($SkipTemporaryFirewallRules) {
++    Write-Host "[MiniQuake/OPT-001C] temporary loopback firewall rules explicitly skipped" -ForegroundColor Yellow
++    return
++  }
++  if (-not (Test-IsAdministrator)) {
++    throw "OPT-001C listen-server measurement requires elevated PowerShell for unattended temporary loopback firewall rules. Start PowerShell as Administrator or pass -SkipTemporaryFirewallRules."
++  }
++  foreach ($Command in @("New-NetFirewallRule", "Remove-NetFirewallRule")) {
++    if ($null -eq (Get-Command $Command -ErrorAction SilentlyContinue)) {
++      throw "Windows Defender Firewall cmdlet unavailable: $Command"
++    }
++  }
++  $Prefix = "MiniQuake-OPT001C-$PID"
++  foreach ($Direction in @("Inbound", "Outbound")) {
++    $Name = "$Prefix-$Direction"
++    New-NetFirewallRule `
++      -Name $Name `
++      -DisplayName $Name `
++      -Direction $Direction `
++      -Action Allow `
++      -Program $GameExe `
++      -Protocol UDP `
++      -LocalAddress 127.0.0.1 `
++      -RemoteAddress 127.0.0.1 `
++      -Profile Any | Out-Null
++    $script:FirewallRules += $Name
++  }
++  Write-Host "[MiniQuake/OPT-001C] temporary loopback firewall rules installed: 2" -ForegroundColor Green
++}
++
++function Remove-LoopbackFirewallRules {
++  foreach ($Name in $script:FirewallRules) {
++    Remove-NetFirewallRule -Name $Name -Confirm:$false -ErrorAction SilentlyContinue
++  }
++  if ($script:FirewallRules.Count -gt 0) {
++    Write-Host "[MiniQuake/OPT-001C] temporary loopback firewall rules removed" -ForegroundColor Green
++  }
++}
++
++function Write-Summary([string]$Overall, [string]$HandleClassification, [string]$PerformanceClassification) {
++  [ordered]@{
++    schema = "MiniQuakeOPT001CTestSummary/1"
++    delivery_revision = $DeliveryRevision
++    delivery_parent = $DeliveryParent
++    overall = $Overall
++    failures = $Failures
++    handle_classification = $HandleClassification
++    performance_classification = $PerformanceClassification
++    matrix_frames = $MatrixFrames
++    warmup_frames = $WarmupFrames
++    benchmark_frames = $BenchmarkFrames
++    handle_warmup_frames = $HandleWarmupFrames
++    handle_window_frames = $HandleWindowFrames
++    handle_windows = $HandleWindows
++    e1m2_visible_frames = $E1M2VisibleFrames
++    e1m2_headless_frames = $E1M2HeadlessFrames
++    transition_frames = $TransitionFrames
++    maps = @("e1m1", "e1m2")
++    steps = $Steps
++  } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $SummaryPath -Encoding UTF8
++}
++
++New-Item -ItemType Directory -Force -Path $Build | Out-Null
++$Compiler = [IO.Path]::GetFullPath($Compiler)
++$StdLib = [IO.Path]::GetFullPath($StdLib)
++$QuakeBase = [IO.Path]::GetFullPath($QuakeBase)
++
++if (-not (Test-Path -LiteralPath $Compiler -PathType Leaf)) { throw "MiniLang compiler not found: $Compiler" }
++if (-not (Test-Path -LiteralPath (Join-Path $StdLib "std\fs.ml") -PathType Leaf)) { throw "MiniLang stdlib root invalid: $StdLib" }
++if (-not (Test-Path -LiteralPath (Join-Path $QuakeBase "$Game\pak0.pak") -PathType Leaf)) { throw "Quake pak0.pak not found below: $QuakeBase\$Game" }
++
++$PythonExe = (Get-Command python -ErrorAction Stop | Select-Object -First 1).Path
++$PowerShellExe = (Get-Process -Id $PID).Path
++if ($ListenPort -le 0) { $ListenPort = Get-FreeUdpPort }
++
++Write-Host "MiniQuake OPT-001C acceptance test"
++Write-Host "  parent: $DeliveryParent"
++Write-Host "  root:   $Root"
++Write-Host "  maps:   e1m1, e1m2"
++Write-Host "  benchmark: warmup=$WarmupFrames measure=$BenchmarkFrames"
++Write-Host "  handles: warmup=$HandleWarmupFrames windows=$HandleWindows x $HandleWindowFrames port=$ListenPort"
++Write-Host "  inherited correctness e1m2: visible=$E1M2VisibleFrames headless=$E1M2HeadlessFrames transition=$TransitionFrames"
++
++try {
++  [void](Invoke-Live "OPT-001C package verification" $PythonExe @(
++    (Join-Path $Root "tools\verify.py"), "--root", $Root,
++    "--json", (Join-Path $Build "opt001c-package-verification.json")
++  ) "opt001c-package-verification.log")
++
++  if (-not $SkipBuild) {
++    $BuildArgs = @(
++      "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $Root "build.ps1"),
++      "-Compiler", $Compiler, "-StdLib", $StdLib, "-Configuration", "Release",
++      "-NoRunTests", "-SkipPreflight"
++    )
++    [void](Invoke-Live "OPT-001C game and contract build" $PowerShellExe $BuildArgs "opt001c-build.log")
++  } else {
++    if (-not (Test-Path -LiteralPath $GameExe -PathType Leaf)) { throw "-SkipBuild requested but MiniQuake.exe is missing" }
++    if (-not (Test-Path -LiteralPath $ContractExe -PathType Leaf)) { throw "-SkipBuild requested but contract test executable is missing" }
++    Add-Step "OPT-001C game and contract build" "SKIPPED" 0 "-SkipBuild"
++  }
++
++  [void](Invoke-Live "OPT-001C allocation contract tests" $ContractExe @() "opt001c-allocation-tests.log")
++  Install-LoopbackFirewallRules
++
++  foreach ($Map in @("e1m1", "e1m2")) {
++    $MapPrefix = Join-Path $Build ("opt001c-{0}" -f $Map)
++    [void](Invoke-Live "$Map BSP parse" $GameExe @(
++      "--opt001a-map-parse", $QuakeBase, $Map, $MapPrefix, "-game", $Game
++    ) ("opt001c-{0}-map-parse.log" -f $Map))
++    [void](Invoke-Live "$Map runtime smoke" $GameExe @(
++      "--runtime-smoke", $QuakeBase, $Map, [string]$MatrixFrames, "-game", $Game
++    ) ("opt001c-{0}-runtime-smoke.log" -f $Map))
++    [void](Invoke-Live "$Map render smoke" $GameExe @(
++      "--render-smoke", $QuakeBase, $Map, [string]$MatrixFrames, "-game", $Game
++    ) ("opt001c-{0}-render-smoke.log" -f $Map))
++
++    $TraceA = Join-Path $Build ("opt001c-{0}-trace-a" -f $Map)
++    $TraceB = Join-Path $Build ("opt001c-{0}-trace-b" -f $Map)
++    [void](Invoke-Live "$Map trace A" $GameExe @(
++      "--compat-trace", $QuakeBase, $Map, [string]$MatrixFrames, $TraceA, "-game", $Game
++    ) ("opt001c-{0}-trace-a.log" -f $Map))
++    [void](Invoke-Live "$Map trace B" $GameExe @(
++      "--compat-trace", $QuakeBase, $Map, [string]$MatrixFrames, $TraceB, "-game", $Game
++    ) ("opt001c-{0}-trace-b.log" -f $Map))
++    [void](Invoke-Live "$Map trace comparison" $PythonExe @(
++      (Join-Path $Root "tools\compare_traces.py"), ($TraceA + ".mqtrace"), ($TraceB + ".mqtrace"),
++      "--json-output", (Join-Path $Build ("opt001c-{0}-trace-comparison.json" -f $Map))
++    ) ("opt001c-{0}-trace-comparison.log" -f $Map))
++
++    foreach ($Mode in @("headless", "render")) {
++      $Prefix = Join-Path $Build ("opt001c-{0}-{1}" -f $Map, $Mode)
++      [void](Invoke-Live "$Map $Mode frame baseline" $GameExe @(
++        "--opt001a-frame-baseline", $QuakeBase, $Map, $Mode,
++        [string]$WarmupFrames, [string]$BenchmarkFrames, $Prefix, "-game", $Game
++      ) ("opt001c-{0}-{1}-baseline.log" -f $Map, $Mode))
++    }
++  }
++
++  $VisiblePrefix = Join-Path $Build "opt001c-e1m2-visible"
++  [void](Invoke-Live "OPT-001C e1m2 visible validation" $GameExe @(
++    "--render-evidence", $QuakeBase, "e1m2", [string]$E1M2VisibleFrames, $VisiblePrefix, "-game", $Game
++  ) "opt001c-e1m2-visible.log")
++
++  [void](Invoke-Live "OPT-001C e1m2 headless validation" $GameExe @(
++    "--runtime-smoke", $QuakeBase, "e1m2", [string]$E1M2HeadlessFrames, "-game", $Game
++  ) "opt001c-e1m2-headless.log")
++
++  $TransitionPrefix = Join-Path $Build "opt001c-transition"
++  [void](Invoke-Live "OPT-001C e1m1-e1m2-e1m1 transition" $GameExe @(
++    "--opt001b-transition", $QuakeBase, [string]$TransitionFrames, $TransitionPrefix, "-game", $Game
++  ) "opt001c-transition.log")
++
++  $PlateauPrefix = Join-Path $Build "opt001c-listen-handle-plateau"
++  [void](Invoke-Live "listen-server handle plateau" $GameExe @(
++    "--opt001a-handle-plateau", $QuakeBase, "start",
++    [string]$HandleWarmupFrames, [string]$HandleWindowFrames, [string]$HandleWindows,
++    $PlateauPrefix, "-game", $Game, "-port", [string]$ListenPort
++  ) "opt001c-handle-plateau.log" -AllowFailure)
++
++  [void](Invoke-Live "OPT-001C aggregate analysis" $PythonExe @(
++    (Join-Path $Root "tools\analyze_opt001a.py"), "--build", $Build,
++    "--json", (Join-Path $Build "opt001c-baseline-summary.json"),
++    "--markdown", (Join-Path $Build "opt001c-baseline-summary.md")
++  ) "opt001c-aggregate-analysis.log" -AllowFailure)
++
++  $PerformanceJson = Join-Path $Build "opt001c-performance-comparison.json"
++  [void](Invoke-Live "OPT-001C performance comparison" $PythonExe @(
++    (Join-Path $Root "tools\compare_opt001c_performance.py"),
++    "--baseline", (Join-Path $Root "audit\opt001b_performance_baseline.json"),
++    "--build", $Build,
++    "--json", $PerformanceJson,
++    "--markdown", (Join-Path $Build "opt001c-performance-comparison.md")
++  ) "opt001c-performance-comparison.log")
++
++  $HandleClassification = "UNKNOWN"
++  $PlateauSummary = $PlateauPrefix + "-summary.json"
++  if (Test-Path -LiteralPath $PlateauSummary -PathType Leaf) {
++    $HandleClassification = [string]((Get-Content -Raw -LiteralPath $PlateauSummary | ConvertFrom-Json).classification)
++  }
++  $PerformanceClassification = "UNKNOWN"
++  if (Test-Path -LiteralPath $PerformanceJson -PathType Leaf) {
++    $PerformanceClassification = [string]((Get-Content -Raw -LiteralPath $PerformanceJson | ConvertFrom-Json).classification)
++  }
++  $Overall = "PASS"
++  if ($Failures -gt 0) { $Overall = "FAIL" }
++  if ($Overall -eq "PASS" -and $HandleClassification -eq "LEAK") { $Overall = "LEAK" }
++  if ($Overall -eq "PASS" -and $HandleClassification -eq "INCONCLUSIVE") { $Overall = "INCONCLUSIVE" }
++  if ($Overall -eq "PASS" -and $HandleClassification -eq "RESOURCE_GROWTH") { $Overall = "FAIL" }
++  Write-Summary $Overall $HandleClassification $PerformanceClassification
++
++  Write-Host ""
++  Write-Host "MiniQuake OPT-001C summary"
++  Write-Host "  handle_classification=$HandleClassification"
++  Write-Host "  performance_classification=$PerformanceClassification"
++  Write-Host "  failures=$Failures"
++  Write-Host "  summary=$SummaryPath"
++  if ($Overall -eq "PASS") {
++    Write-Host "MiniQuake OPT-001C acceptance test: PASS" -ForegroundColor Green
++    exit 0
++  }
++  Write-Host ("MiniQuake OPT-001C acceptance test: {0}" -f $Overall) -ForegroundColor Red
++  exit 2
++}
++catch {
++  Add-Step "OPT-001C harness" "FAIL" 1 $_.Exception.Message
++  Write-Summary "FAIL" "UNKNOWN" "UNKNOWN"
++  Write-Host ("ERROR: " + $_.Exception.Message) -ForegroundColor Red
++  Write-Host "MiniQuake OPT-001C acceptance test: FAIL" -ForegroundColor Red
++  exit 1
++}
++finally {
++  Remove-LoopbackFirewallRules
++}
+--- a/audit/opt001b_performance_baseline.json
++++ b/audit/opt001b_performance_baseline.json
+@@ -0,0 +1,52 @@
++{
++  "schema": "MiniQuakeOPT001BPerformanceBaseline/1",
++  "source_revision": "OPT-001B",
++  "source_result_archive": "MiniQuake_OPT-001B_RESULTS_20260807-000043.zip",
++  "source_result_sha256": "86f5923329e463e573c6a0499736e5b536c6cf1c9f4617e897c70f2264b5bf3e",
++  "warmup_frames": 300,
++  "measurement_frames": 3000,
++  "maps": {
++    "e1m1": {
++      "headless": {
++        "frames": 3000,
++        "total_ms": 118609,
++        "median_ms": 46,
++        "p95_ms": 47,
++        "p99_ms": 63,
++        "max_ms": 78
++      },
++      "render": {
++        "frames": 3000,
++        "total_ms": 332016,
++        "median_ms": 109,
++        "p95_ms": 140,
++        "p99_ms": 141,
++        "max_ms": 406
++      }
++    },
++    "e1m2": {
++      "headless": {
++        "frames": 3000,
++        "total_ms": 104938,
++        "median_ms": 31,
++        "p95_ms": 110,
++        "p99_ms": 188,
++        "max_ms": 360
++      },
++      "render": {
++        "frames": 3000,
++        "total_ms": 389234,
++        "median_ms": 125,
++        "p95_ms": 172,
++        "p99_ms": 203,
++        "max_ms": 453
++      }
++    }
++  },
++  "targets": {
++    "median_improvement_percent": 35.0,
++    "throughput_ratio": 1.5,
++    "p99_improvement_percent": 30.0,
++    "regression_limit_percent": 10.0
++  }
++}
+--- a/audit/opt001c_allocation_golden.json
++++ b/audit/opt001c_allocation_golden.json
+@@ -0,0 +1,25 @@
++{
++  "schema": "MiniQuakeOPT001CAllocationGolden/1",
++  "status": "opt001c_frame_allocation_candidate_v1",
++  "fingerprint": "0x1c001c03",
++  "parent": "OPT-001B",
++  "trace_fast_path": "short_circuit_before_argument_array",
++  "trace_scope": [
++    "src/miniquake/render/gl11.ml",
++    "src/miniquake/render/world.ml"
++  ],
++  "performance_baseline": "OPT-001B",
++  "maps": ["e1m1", "e1m2"],
++  "modes": ["headless", "render"],
++  "median_target_percent": 35.0,
++  "throughput_target_ratio": 1.5,
++  "p99_target_percent": 30.0,
++  "regression_limit_percent": 10.0,
++  "correctness_parent": {
++    "overall": "PASS",
++    "handle_classification": "PLATEAU",
++    "e1m2_visible_frames": 1000,
++    "e1m2_headless_frames": 10000,
++    "transition": ["e1m1", "e1m2", "e1m1"]
++  }
++}
+--- a/build.ps1
++++ b/build.ps1
+@@ -979,6 +979,10 @@
+ Write-Host "[MiniQuake] compiling $Opt001BContractExe"
+ Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\opt001b_contract_tests.ml") -OutputFile $Opt001BContractExe -CompilerArguments $CommonArgs -Label "opt001b-correctness-tests"
+ 
++$Opt001CContractExe = Join-Path $Output "MiniQuakeOPT001CAllocationTests.exe"
++Write-Host "[MiniQuake] compiling $Opt001CContractExe"
++Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\opt001c_contract_tests.ml") -OutputFile $Opt001CContractExe -CompilerArguments $CommonArgs -Label "opt001c-allocation-tests"
++
+ 
+ if (-not $NoRunTests) {
+   Write-Host "[MiniQuake] checking executable package identity"
+--- a/docs/OPT-001C_ALLOCATION_CONTRACT.md
++++ b/docs/OPT-001C_ALLOCATION_CONTRACT.md
+@@ -0,0 +1,36 @@
++# OPT-001C allocation contract
++
++## Fast-path invariant
++
++When GL diagnostic tracing is disabled, renderer wrappers must not evaluate an array literal solely for `traceCommand`.
++
++The accepted patterns are:
++
++```ml
++if diagnosticTraceEnabled and traceCommand("vertex", [x, y, z]) then
++  return void
++end if
++```
++
++and for calls outside `gl11.ml`:
++
++```ml
++if gl.traceEnabled() then
++  gl.traceCommand("multitexcoord", [unit, s, t])
++end if
++```
++
++Short-circuit `and` and the explicit `if` ensure the array literal and trace-only hash calculations are not evaluated on the normal production path.
++
++## Compatibility invariant
++
++With tracing enabled, command names, ordering, argument counts and argument values remain unchanged. Existing renderer differential fixtures remain authoritative.
++
++## Performance comparison
++
++The accepted OPT-001B baseline is stored in `audit/opt001b_performance_baseline.json`. OPT-001C compares e1m1/e1m2 in headless and render modes using identical 300-frame warm-up and 3000-frame measurement windows.
++
++A regression is any median or P99 increase above 10% in an individual map/mode. The long-term target is:
++
++- at least 35% lower average render median or at least 1.5x render throughput, and
++- at least 30% lower average render P99.
+--- a/docs/OPT-001C_DELIVERY_REPORT.json
++++ b/docs/OPT-001C_DELIVERY_REPORT.json
+@@ -0,0 +1,22 @@
++{
++  "schema": "MiniQuakeOPT001CDelivery/1",
++  "revision": "OPT-001C",
++  "parent": "OPT-001B",
++  "status": "windows_acceptance_pending",
++  "optimization_status": "opt001c_frame_allocation_candidate_v1",
++  "optimization_fingerprint": "0x1c001c03",
++  "changes": [
++    "short-circuit GL trace argument arrays",
++    "guard world trace-only hashes and arrays",
++    "preserve enabled trace format",
++    "automatic comparison to accepted OPT-001B performance baseline",
++    "retain OPT-001B e1m2 and resource correctness gates"
++  ],
++  "deferred": [
++    "persistent entity and viewmodel buffers",
++    "particle and audio scratch buffers",
++    "hot Cvar cache",
++    "PVS/BSP traversal restructuring",
++    "QuakeC and collision optimizations"
++  ]
++}
+--- a/docs/OPT-001C_TESTING.md
++++ b/docs/OPT-001C_TESTING.md
+@@ -0,0 +1,49 @@
++# OPT-001C Windows test
++
++Run from an elevated PowerShell in the flat project root:
++
++```powershell
++$QuakeBase = "C:\Users\nilsk\Dropbox\Quake"
++$CompilerRoot = "C:\Users\nilsk\Desktop\MiniLang\MiniLangCompilerPy"
++
++.\TEST_OPT-001C.ps1 `
++  -Compiler "$CompilerRoot\mlc_win64.py" `
++  -StdLib $CompilerRoot `
++  -QuakeBase $QuakeBase `
++  -Game id1 `
++  -MatrixFrames 64 `
++  -WarmupFrames 300 `
++  -BenchmarkFrames 3000 `
++  -HandleWarmupFrames 1200 `
++  -HandleWindowFrames 5000 `
++  -HandleWindows 3 `
++  -E1M2VisibleFrames 1000 `
++  -E1M2HeadlessFrames 10000 `
++  -TransitionFrames 64 `
++  -ContinueIndependentTests
++```
++
++Expected early gates:
++
++```text
++MiniQuake OPT-001C verification: PASS
++MiniQuake OPT-001C allocation verification: PASS
++MiniQuake OPT-001C allocation tests passed: 14
++```
++
++Performance classification is one of:
++
++```text
++TARGET_MET
++IMPROVED_BELOW_TARGET
++NO_REGRESSION_BELOW_TARGET
++REGRESSION
++```
++
++Only `REGRESSION` fails the performance gate. The target remains at least 35% lower render median or 1.5x throughput together with at least 30% lower render P99.
++
++After the run:
++
++```powershell
++.\COLLECT_RESULTS.ps1
++```
+--- a/src/miniquake/build_info.ml
++++ b/src/miniquake/build_info.ml
+@@ -10,7 +10,7 @@
+ 
+ const PACKAGE_ID = "BP-094"
+ const PARENT_PACKAGE_ID = "BP-093"
+-const PACKAGE_DATE = "2026-08-06"
++const PACKAGE_DATE = "2026-08-07"
+ const COMPATIBILITY_PROFILE = "compat_109"
+ const NATIVE_TEXT_ABI = "caller_owned_bytes_v1"
+ const PROTOCOL_TEXT_ABI = "quake_latin1_cstring_v1"
+@@ -60,6 +60,6 @@
+ const COMPAT_FINAL_FINGERPRINT = 0xe04a7727
+ const PACKAGE_PURPOSE = "Verified original GLQuake provenance, bidirectional binary interop, external visual-reference corpus and final compat_109 candidate"
+ 
+-const OPTIMIZATION_STATUS = "opt001b_error_freedom_candidate_v1"
+-const OPTIMIZATION_FINGERPRINT = 0x1b001b02
+-const OPTIMIZATION_PARENT = "OPT-001A"
++const OPTIMIZATION_STATUS = "opt001c_frame_allocation_candidate_v1"
++const OPTIMIZATION_FINGERPRINT = 0x1c001c03
++const OPTIMIZATION_PARENT = "OPT-001B"
+--- a/src/miniquake/render/gl11.ml
++++ b/src/miniquake/render/gl11.ml
+@@ -18,6 +18,10 @@
+   global diagnosticTraceEnabled
+   diagnosticTraceEnabled = false
+   return diagnosticTrace
++end function
++
++function traceEnabled()
++  return diagnosticTraceEnabled
+ end function
+ 
+ function traceCommand(name, arguments)
+@@ -108,37 +112,37 @@
+ end function
+ 
+ function begin(mode)
+-  if traceCommand("begin", [mode]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("begin", [mode]) then return void end if
+   native.glBegin(mode)
+ end function
+ 
+ function finishPrimitive()
+-  if traceCommand("end", []) then return void end if
++  if diagnosticTraceEnabled and traceCommand("end", []) then return void end if
+   native.glEnd()
+ end function
+ 
+ function vertex2(x, y)
+-  if traceCommand("vertex", [x, y]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("vertex", [x, y]) then return void end if
+   native.glVertex2(bits(x), bits(y))
+ end function
+ 
+ function vertex3(x, y, z)
+-  if traceCommand("vertex", [x, y, z]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("vertex", [x, y, z]) then return void end if
+   native.glVertex3(bits(x), bits(y), bits(z))
+ end function
+ 
+ function texcoord2(s, t)
+-  if traceCommand("texcoord", [s, t]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("texcoord", [s, t]) then return void end if
+   native.glTexcoord2(bits(s), bits(t))
+ end function
+ 
+ function color(red, green, blue, alpha)
+-  if traceCommand("color", [red / 255.0, green / 255.0, blue / 255.0, alpha / 255.0]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("color", [red / 255.0, green / 255.0, blue / 255.0, alpha / 255.0]) then return void end if
+   native.glColor4ub(red, green, blue, alpha)
+ end function
+ 
+ function colorFloat(red, green, blue, alpha)
+-  if traceCommand("color", [red, green, blue, alpha]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("color", [red, green, blue, alpha]) then return void end if
+   native.glColor4ub(
+     native.trunc(red * 255.0),
+     native.trunc(green * 255.0),
+@@ -148,78 +152,78 @@
+ end function
+ 
+ function clearColor(red, green, blue, alpha)
+-  if traceCommand("clear_color", [bits(red), bits(green), bits(blue), bits(alpha)]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("clear_color", [bits(red), bits(green), bits(blue), bits(alpha)]) then return void end if
+   native.glClearColor(bits(red), bits(green), bits(blue), bits(alpha))
+ end function
+ 
+ function clear(mask)
+-  if traceCommand("clear", [mask]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("clear", [mask]) then return void end if
+   native.glClear(mask)
+ end function
+ 
+ function enable(capability)
+-  if traceCommand("enable", [capability]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("enable", [capability]) then return void end if
+   native.glEnable(capability)
+ end function
+ 
+ function disable(capability)
+-  if traceCommand("disable", [capability]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("disable", [capability]) then return void end if
+   native.glDisable(capability)
+ end function
+ 
+ function blendFunc(source, destination)
+-  if traceCommand("blend_function", [source, destination]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("blend_function", [source, destination]) then return void end if
+   native.glBlendFunc(source, destination)
+ end function
+ 
+ function depthFunc(value)
+-  if traceCommand("depth_func", [value]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("depth_func", [value]) then return void end if
+   native.glDepthFunc(value)
+ end function
+ 
+ function depthMask(enabled)
+-  if enabled and traceCommand("depth_mask", [1]) then return void end if
+-  if not enabled and traceCommand("depth_mask", [0]) then return void end if
++  if diagnosticTraceEnabled and enabled and traceCommand("depth_mask", [1]) then return void end if
++  if diagnosticTraceEnabled and not enabled and traceCommand("depth_mask", [0]) then return void end if
+   if enabled then native.glDepthMask(1) else native.glDepthMask(0) end if
+ end function
+ 
+ function depthRange(nearValue, farValue)
+-  if traceCommand("depth_range", [bits(nearValue), bits(farValue)]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("depth_range", [bits(nearValue), bits(farValue)]) then return void end if
+   native.glDepthRange(bits(nearValue), bits(farValue))
+ end function
+ 
+ function viewport(x, y, width, height)
+-  if traceCommand("viewport", [x, y, width, height]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("viewport", [x, y, width, height]) then return void end if
+   native.glViewport(x, y, width, height)
+ end function
+ 
+ function matrixMode(mode)
+-  if traceCommand("matrix_mode", [mode]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("matrix_mode", [mode]) then return void end if
+   native.glMatrixMode(mode)
+ end function
+ 
+ function loadIdentity()
+-  if traceCommand("load_identity", []) then return void end if
++  if diagnosticTraceEnabled and traceCommand("load_identity", []) then return void end if
+   native.glLoadIdentity()
+ end function
+ 
+ function pushMatrix()
+-  if traceCommand("push_matrix", []) then return void end if
++  if diagnosticTraceEnabled and traceCommand("push_matrix", []) then return void end if
+   native.glPushMatrix()
+ end function
+ 
+ function popMatrix()
+-  if traceCommand("pop_matrix", []) then return void end if
++  if diagnosticTraceEnabled and traceCommand("pop_matrix", []) then return void end if
+   native.glPopMatrix()
+ end function
+ 
+ function translate(x, y, z)
+-  if traceCommand("translate", [x, y, z]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("translate", [x, y, z]) then return void end if
+   native.glTranslate(bits(x), bits(y), bits(z))
+ end function
+ 
+ function rotate(angle, x, y, z)
+-  if traceCommand("rotate", [angle, x, y, z]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("rotate", [angle, x, y, z]) then return void end if
+   native.glRotate(bits(angle), bits(x), bits(y), bits(z))
+ end function
+ 
+@@ -228,12 +232,12 @@
+ end function
+ 
+ function ortho(left, right, bottom, top, nearValue, farValue)
+-  if traceCommand("ortho", [left, right, bottom, top, nearValue, farValue]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("ortho", [left, right, bottom, top, nearValue, farValue]) then return void end if
+   native.glOrtho(bits(left), bits(right), bits(bottom), bits(top), bits(nearValue), bits(farValue))
+ end function
+ 
+ function frustum(left, right, bottom, top, nearValue, farValue)
+-  if traceCommand("frustum", [left, right, bottom, top, nearValue, farValue]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("frustum", [left, right, bottom, top, nearValue, farValue]) then return void end if
+   native.glFrustum(bits(left), bits(right), bits(bottom), bits(top), bits(nearValue), bits(farValue))
+ end function
+ 
+@@ -242,7 +246,7 @@
+ end function
+ 
+ function shadeModel(mode)
+-  if traceCommand("shade_model", [mode]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("shade_model", [mode]) then return void end if
+   native.glShadeModel(mode)
+ end function
+ 
+@@ -288,14 +292,14 @@
+ end function
+ 
+ function cullFace(mode)
+-  if traceCommand("cull_face", [mode]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("cull_face", [mode]) then return void end if
+   native.glCullFace(mode)
+ end function
+ 
+ function bindTexture(texture)
+   global boundTextureName
+   boundTextureName = texture
+-  if traceCommand("bind_texture", [GL_TEXTURE_2D, texture]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("bind_texture", [GL_TEXTURE_2D, texture]) then return void end if
+   native.glBindTexture(GL_TEXTURE_2D, texture)
+ end function
+ 
+@@ -313,27 +317,27 @@
+ end function
+ 
+ function textureParameter(name, value)
+-  if traceCommand("texture_parameter", [GL_TEXTURE_2D, name, value]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("texture_parameter", [GL_TEXTURE_2D, name, value]) then return void end if
+   native.glTexParameterI(GL_TEXTURE_2D, name, value)
+ end function
+ 
+ function textureEnvironment(mode)
+-  if traceCommand("texture_environment", [GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, mode]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("texture_environment", [GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, mode]) then return void end if
+   native.glTexEnvI(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, mode)
+ end function
+ 
+ function uploadRgba(width, height, pixels)
+-  if traceCommand("upload_rgba", [0, GL_RGBA, width, height, pixels]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("upload_rgba", [0, GL_RGBA, width, height, pixels]) then return void end if
+   native.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels)
+ end function
+ 
+ function uploadRgbaLevel(level, internalFormat, width, height, pixels)
+-  if traceCommand("upload_rgba", [level, internalFormat, width, height, pixels]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("upload_rgba", [level, internalFormat, width, height, pixels]) then return void end if
+   native.glTexImage2D(GL_TEXTURE_2D, level, internalFormat, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels)
+ end function
+ 
+ function uploadIndexedLevel(level, width, height, pixels)
+-  if traceCommand("upload_indexed", [level, width, height, pixels]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("upload_indexed", [level, width, height, pixels]) then return void end if
+   native.glTexImage2D(GL_TEXTURE_2D, level, GL_COLOR_INDEX8_EXT, width, height, 0, GL_COLOR_INDEX, GL_UNSIGNED_BYTE, pixels)
+ end function
+ 
+@@ -342,12 +346,12 @@
+ end function
+ 
+ function uploadLuminance(width, height, pixels)
+-  if traceCommand("upload_luminance", [width, height]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("upload_luminance", [width, height]) then return void end if
+   native.glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, pixels)
+ end function
+ 
+ function uploadLuminanceSubImage(x, y, width, height, pixels)
+-  if traceCommand("upload_luminance_subimage", [x, y, width, height]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("upload_luminance_subimage", [x, y, width, height]) then return void end if
+   native.glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_LUMINANCE, GL_UNSIGNED_BYTE, pixels)
+ end function
+ 
+@@ -359,11 +363,11 @@
+ end function
+ 
+ function finish()
+-  if traceCommand("finish", []) then return void end if
++  if diagnosticTraceEnabled and traceCommand("finish", []) then return void end if
+   native.glFinish()
+ end function
+ 
+ function drawBuffer(mode)
+-  if traceCommand("draw_buffer", [mode]) then return void end if
++  if diagnosticTraceEnabled and traceCommand("draw_buffer", [mode]) then return void end if
+   native.glDrawBuffer(mode)
+ end function
+--- a/src/miniquake/render/world.ml
++++ b/src/miniquake/render/world.ml
+@@ -1545,7 +1545,7 @@
+   global rCompatMultiTextureEnabled, mtexenabled
+   if rCompatMultiTextureEnabled then
+     gl.disable(gl.GL_TEXTURE_2D)
+-    gl.traceCommand("select_texture", [0x835E])
++    if gl.traceEnabled() then gl.traceCommand("select_texture", [0x835E]) end if
+   end if
+   rCompatMultiTextureEnabled = false
+   mtexenabled = false
+@@ -1555,7 +1555,7 @@
+ function GL_EnableMultitexture()
+   global rCompatMultiTextureEnabled, mtexenabled
+   if not rCompatMultiTextureAvailable then return false end if
+-  gl.traceCommand("select_texture", [0x835F])
++  if gl.traceEnabled() then gl.traceCommand("select_texture", [0x835F]) end if
+   gl.enable(gl.GL_TEXTURE_2D)
+   rCompatMultiTextureEnabled = true
+   mtexenabled = true
+@@ -1569,7 +1569,7 @@
+   if (value.flags & c.SURF_DRAWTURB) != 0 then return EmitWaterPolys(value) end if
+   R_RenderDynamicLightmaps(value)
+   if rCompatMultiTextureAvailable then
+-    gl.traceCommand("select_texture", [0x835E])
++    if gl.traceEnabled() then gl.traceCommand("select_texture", [0x835E]) end if
+     gl.bindTexture(textureIdForSurface(rCompatRenderer, value))
+     gl.textureEnvironment(gl.GL_REPLACE)
+     GL_EnableMultitexture()
+@@ -1578,11 +1578,14 @@
+     if index >= 0 and rCompatLightmapModified[rCompatSurfaceLightmapPage[index]] then
+       page = rCompatSurfaceLightmapPage[index]
+       rectangle = rCompatLightmapRectChange[page]
+-      tracedUpload = gl.traceCommand("upload_subimage", [
+-        gl.GL_TEXTURE_2D, 0, 0, rectangle[1], GLQUAKE_BLOCK_WIDTH,
+-        rectangle[3], gl.GL_LUMINANCE, gl.GL_UNSIGNED_BYTE,
+-        compatHashLightmapRows(page, rectangle[1], rectangle[3]),
+-      ])
++      tracedUpload = false
++      if gl.traceEnabled() then
++        tracedUpload = gl.traceCommand("upload_subimage", [
++          gl.GL_TEXTURE_2D, 0, 0, rectangle[1], GLQUAKE_BLOCK_WIDTH,
++          rectangle[3], gl.GL_LUMINANCE, gl.GL_UNSIGNED_BYTE,
++          compatHashLightmapRows(page, rectangle[1], rectangle[3]),
++        ])
++      end if
+       if not tracedUpload and rectangle[3] > 0 then
+         uploadOffset = (page * GLQUAKE_BLOCK_HEIGHT + rectangle[1]) * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
+         uploadLength = rectangle[3] * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
+@@ -1594,8 +1597,8 @@
+     gl.textureEnvironment(gl.GL_BLEND)
+     gl.begin(gl.GL_POLYGON)
+     for each vertex in value.vertices
+-      gl.traceCommand("multitexcoord", [0x835E, vertex.s, vertex.t])
+-      gl.traceCommand("multitexcoord", [0x835F, vertex.lightS, vertex.lightT])
++      if gl.traceEnabled() then gl.traceCommand("multitexcoord", [0x835E, vertex.s, vertex.t]) end if
++      if gl.traceEnabled() then gl.traceCommand("multitexcoord", [0x835F, vertex.lightS, vertex.lightT]) end if
+       gl.vertex3(vertex.position.x, vertex.position.y, vertex.position.z)
+     end for
+     gl.finishPrimitive()
+@@ -1670,11 +1673,14 @@
+       gl.bindTexture(lightmap_textures + page)
+       if rCompatLightmapModified[page] then
+         rectangle = rCompatLightmapRectChange[page]
+-        tracedUpload = gl.traceCommand("upload_subimage", [
+-          gl.GL_TEXTURE_2D, 0, 0, rectangle[1], GLQUAKE_BLOCK_WIDTH,
+-          rectangle[3], gl.GL_LUMINANCE, gl.GL_UNSIGNED_BYTE,
+-          compatHashLightmapRows(page, rectangle[1], rectangle[3]),
+-        ])
++        tracedUpload = false
++        if gl.traceEnabled() then
++          tracedUpload = gl.traceCommand("upload_subimage", [
++            gl.GL_TEXTURE_2D, 0, 0, rectangle[1], GLQUAKE_BLOCK_WIDTH,
++            rectangle[3], gl.GL_LUMINANCE, gl.GL_UNSIGNED_BYTE,
++            compatHashLightmapRows(page, rectangle[1], rectangle[3]),
++          ])
++        end if
+         if not tracedUpload and rectangle[3] > 0 then
+           uploadOffset = (page * GLQUAKE_BLOCK_HEIGHT + rectangle[1]) * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
+           uploadLength = rectangle[3] * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
+@@ -1788,7 +1794,7 @@
+ 
+   // The world matrix is stable in this compatibility layer; the trace hash is
+   // the FNV-1a value of GLQuake's identity fixture matrix.
+-  gl.traceCommand("load_matrix", [2358302629])
++  if gl.traceEnabled() then gl.traceCommand("load_matrix", [2358302629]) end if
+   if alpha < 1.0 then
+     gl.enable(gl.GL_BLEND)
+     gl.colorFloat(1.0, 1.0, 1.0, alpha)
+@@ -2135,11 +2141,14 @@
+     gl.textureParameter(gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)
+     pageOffset = page * GLQUAKE_BLOCK_WIDTH * GLQUAKE_BLOCK_HEIGHT * lightmap_bytes
+     pageLength = GLQUAKE_BLOCK_WIDTH * GLQUAKE_BLOCK_HEIGHT * lightmap_bytes
+-    tracedUpload = gl.traceCommand("upload_lightmap", [
+-      gl.GL_TEXTURE_2D, 0, lightmap_bytes, GLQUAKE_BLOCK_WIDTH,
+-      GLQUAKE_BLOCK_HEIGHT, 0, gl.GL_LUMINANCE, gl.GL_UNSIGNED_BYTE,
+-      compatFnv1a(lightmaps, pageOffset, pageLength),
+-    ])
++    tracedUpload = false
++    if gl.traceEnabled() then
++      tracedUpload = gl.traceCommand("upload_lightmap", [
++        gl.GL_TEXTURE_2D, 0, lightmap_bytes, GLQUAKE_BLOCK_WIDTH,
++        GLQUAKE_BLOCK_HEIGHT, 0, gl.GL_LUMINANCE, gl.GL_UNSIGNED_BYTE,
++        compatFnv1a(lightmaps, pageOffset, pageLength),
++      ])
++    end if
+     if not tracedUpload then gl.uploadLuminance(GLQUAKE_BLOCK_WIDTH, GLQUAKE_BLOCK_HEIGHT, slice(lightmaps, pageOffset, pageLength)) end if
+     page = page + 1
+   end while
+@@ -2195,7 +2204,7 @@
+   value = compatSurface(surface)
+   if value is void then return false end if
+   if rCompatAbstractSurfaceCalls then
+-    gl.traceCommand("emit_water", [value.flags])
++    if gl.traceEnabled() then gl.traceCommand("emit_water", [value.flags]) end if
+     return 1
+   end if
+   polygons = GL_SubdivideSurface(value)
+@@ -2236,7 +2245,7 @@
+   value = compatSurface(surface)
+   if value is void then return false end if
+   if rCompatAbstractSurfaceCalls then
+-    gl.traceCommand("emit_both_sky", [value.flags])
++    if gl.traceEnabled() then gl.traceCommand("emit_both_sky", [value.flags]) end if
+     return 1
+   end if
+   GL_DisableMultitexture()
+@@ -2256,7 +2265,7 @@
+   if chain is void then return 0 end if
+   if t.concreteTypeNameMatches(chain, "RenderSurface", "miniquake.types.RenderSurface") then chain = [chain] end if
+   if rCompatAbstractSurfaceCalls then
+-    gl.traceCommand("draw_sky_chain", [len(chain)])
++    if gl.traceEnabled() then gl.traceCommand("draw_sky_chain", [len(chain)]) end if
+     return len(chain)
+   end if
+   GL_DisableMultitexture()
+--- a/test.ps1
++++ b/test.ps1
+@@ -1 +1 @@
+-﻿& "$PSScriptRoot\TEST_OPT-001B.ps1" @args
++﻿& "$PSScriptRoot\TEST_OPT-001C.ps1" @args
+--- a/tests/opt001c_contract_tests.ml
++++ b/tests/opt001c_contract_tests.ml
+@@ -0,0 +1,49 @@
++import miniquake.build_info as buildInfo
++import miniquake.render.gl11 as gl
++
++opt001cPassed = 0
++opt001cFailed = 0
++
++function opt001cCheck(condition, label)
++  global opt001cPassed, opt001cFailed
++  if condition then
++    opt001cPassed = opt001cPassed + 1
++    print "[PASS] " + label
++  else
++    opt001cFailed = opt001cFailed + 1
++    print "[FAIL] " + label
++  end if
++end function
++
++function main(args)
++  opt001cCheck(buildInfo.OPTIMIZATION_STATUS == "opt001c_frame_allocation_candidate_v1", "optimization status")
++  opt001cCheck(buildInfo.OPTIMIZATION_FINGERPRINT == 0x1c001c03, "optimization fingerprint")
++  opt001cCheck(buildInfo.OPTIMIZATION_PARENT == "OPT-001B", "optimization parent")
++  opt001cCheck(not gl.traceEnabled(), "trace disabled initially")
++
++  gl.Trace_Begin()
++  opt001cCheck(gl.traceEnabled(), "trace enabled")
++  gl.begin(gl.GL_POLYGON)
++  gl.texcoord2(0.25, 0.75)
++  gl.vertex3(1.0, 2.0, 3.0)
++  gl.colorFloat(1.0, 0.5, 0.25, 1.0)
++  gl.finishPrimitive()
++  trace = gl.Trace_End()
++
++  opt001cCheck(not gl.traceEnabled(), "trace disabled after end")
++  opt001cCheck(len(trace) == 5, "trace command count")
++  opt001cCheck(trace[0][0] == "begin", "begin command preserved")
++  opt001cCheck(len(trace[0][1]) == 1 and trace[0][1][0] == gl.GL_POLYGON, "begin arguments preserved")
++  opt001cCheck(trace[1][0] == "texcoord" and len(trace[1][1]) == 2, "texcoord arguments preserved")
++  opt001cCheck(trace[2][0] == "vertex" and len(trace[2][1]) == 3, "vertex arguments preserved")
++  opt001cCheck(trace[2][1][0] == 1.0 and trace[2][1][1] == 2.0 and trace[2][1][2] == 3.0, "vertex values preserved")
++  opt001cCheck(trace[3][0] == "color" and len(trace[3][1]) == 4, "color arguments preserved")
++  opt001cCheck(trace[4][0] == "end" and len(trace[4][1]) == 0, "end command preserved")
++
++  print "MiniQuake OPT-001C allocation tests passed: " + opt001cPassed
++  if opt001cFailed > 0 then
++    print "MiniQuake OPT-001C allocation tests failed: " + opt001cFailed
++    return 1
++  end if
++  return 0
++end function
+--- a/tools/check_opt001b.py
++++ b/tools/check_opt001b.py
+@@ -13,6 +13,7 @@
+     ap=argparse.ArgumentParser()
+     ap.add_argument('--root',default='.')
+     ap.add_argument('--json',default='')
++    ap.add_argument('--allow-downstream-package', action='store_true')
+     args=ap.parse_args()
+     root=Path(args.root).resolve()
+     errors=[]
+@@ -22,7 +23,8 @@
+     main=(root/'src/main.ml').read_text(encoding='utf-8-sig')
+     host=(root/'src/miniquake/host.ml').read_text(encoding='utf-8-sig')
+     bi=(root/'src/miniquake/build_info.ml').read_text(encoding='utf-8-sig')
+-    runner=(root/'TEST_OPT-001B.ps1').read_text(encoding='utf-8-sig')
++    runner_path = root / ('TEST_OPT-001C.ps1' if args.allow_downstream_package else 'TEST_OPT-001B.ps1')
++    runner=runner_path.read_text(encoding='utf-8-sig')
+     contract=(root/'tests/opt001b_contract_tests.ml').read_text(encoding='utf-8-sig')
+     golden=json.loads((root/'audit/opt001b_correctness_golden.json').read_text(encoding='utf-8-sig'))
+ 
+@@ -55,19 +57,34 @@
+     ],'handle classification',errors)
+     require(main,['--opt001b-transition','runOpt001BTransitionCommand'], 'main', errors)
+     require(host,['function runOpt001BTransition(', 'MiniQuake OPT-001B transition ', 'startMap(session, mapName)'], 'host', errors)
+-    require(bi,[
+-        'const OPTIMIZATION_STATUS = "opt001b_error_freedom_candidate_v1"',
+-        'const OPTIMIZATION_FINGERPRINT = 0x1b001b02',
+-        'const OPTIMIZATION_PARENT = "OPT-001A"',
+-    ],'build info',errors)
+-    require(runner,[
+-        '$DeliveryRevision = "OPT-001B"',
+-        '$DeliveryParent = "OPT-001A"',
+-        'E1M2VisibleFrames = 1000',
+-        'E1M2HeadlessFrames = 10000',
+-        '--opt001b-transition',
+-        'MiniQuake OPT-001B acceptance test: PASS',
+-    ],'runner',errors)
++    if args.allow_downstream_package:
++        require(bi,[
++            'const OPTIMIZATION_STATUS = "opt001c_frame_allocation_candidate_v1"',
++            'const OPTIMIZATION_FINGERPRINT = 0x1c001c03',
++            'const OPTIMIZATION_PARENT = "OPT-001B"',
++        ],'downstream build info',errors)
++        require(runner,[
++            '$DeliveryRevision = "OPT-001C"',
++            '$DeliveryParent = "OPT-001B"',
++            'E1M2VisibleFrames = 1000',
++            'E1M2HeadlessFrames = 10000',
++            '--opt001b-transition',
++            'MiniQuake OPT-001C acceptance test: PASS',
++        ],'downstream runner',errors)
++    else:
++        require(bi,[
++            'const OPTIMIZATION_STATUS = "opt001b_error_freedom_candidate_v1"',
++            'const OPTIMIZATION_FINGERPRINT = 0x1b001b02',
++            'const OPTIMIZATION_PARENT = "OPT-001A"',
++        ],'build info',errors)
++        require(runner,[
++            '$DeliveryRevision = "OPT-001B"',
++            '$DeliveryParent = "OPT-001A"',
++            'E1M2VisibleFrames = 1000',
++            'E1M2HeadlessFrames = 10000',
++            '--opt001b-transition',
++            'MiniQuake OPT-001B acceptance test: PASS',
++        ],'runner',errors)
+     require(contract,[
+         'viewModelDepthRange(1.0, 0.5)',
+         '[278, 278, 279, 279]',
+@@ -86,6 +103,7 @@
+     report={
+         'schema':'MiniQuakeOPT001BStatic/1',
+         'status':'PASS' if not errors else 'FAIL',
++        'downstream_package': args.allow_downstream_package,
+         'errors':errors,
+         'checks':{
+             'viewmodel_depth_active_range':True,
+--- a/tools/check_opt001c.py
++++ b/tools/check_opt001c.py
+@@ -0,0 +1,188 @@
++#!/usr/bin/env python3
++"""Static OPT-001C frame-allocation and delivery contract checks."""
++from __future__ import annotations
++
++import argparse
++import json
++import re
++from pathlib import Path
++
++STATUS = "opt001c_frame_allocation_candidate_v1"
++FINGERPRINT = "0x1c001c03"
++PARENT = "OPT-001B"
++
++
++def require(text: str, markers: list[str], label: str, errors: list[str]) -> None:
++    for marker in markers:
++        if marker not in text:
++            errors.append(f"{label} missing marker: {marker}")
++
++
++def trace_calls(text: str) -> list[tuple[int, str]]:
++    result: list[tuple[int, str]] = []
++    for number, line in enumerate(text.splitlines(), 1):
++        if "traceCommand(" in line and not line.lstrip().startswith("function traceCommand"):
++            result.append((number, line.strip()))
++    return result
++
++
++def gl11_guard_errors(text: str) -> tuple[list[str], int]:
++    errors: list[str] = []
++    calls = trace_calls(text)
++    for number, line in calls:
++        if "diagnosticTraceEnabled and" not in line:
++            errors.append(f"gl11 unguarded trace array at line {number}: {line}")
++        if "[" not in line:
++            errors.append(f"gl11 trace call at line {number} does not expose argument construction for audit")
++    return errors, len(calls)
++
++
++def world_guard_errors(text: str) -> tuple[list[str], int]:
++    errors: list[str] = []
++    lines = text.splitlines()
++    calls = trace_calls(text)
++    for number, line in calls:
++        start = max(0, number - 5)
++        context = "\n".join(lines[start:number])
++        if "gl.traceEnabled()" not in context:
++            errors.append(f"world unguarded trace array at line {number}: {line}")
++    return errors, len(calls)
++
++
++def main() -> int:
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--root", default=".")
++    parser.add_argument("--json", default="")
++    args = parser.parse_args()
++    root = Path(args.root).resolve()
++    errors: list[str] = []
++
++    gl11 = (root / "src/miniquake/render/gl11.ml").read_text(encoding="utf-8-sig")
++    world = (root / "src/miniquake/render/world.ml").read_text(encoding="utf-8-sig")
++    build_info = (root / "src/miniquake/build_info.ml").read_text(encoding="utf-8-sig")
++    build = (root / "build.ps1").read_text(encoding="utf-8-sig")
++    runner = (root / "TEST_OPT-001C.ps1").read_text(encoding="utf-8-sig")
++    collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
++    launcher = (root / "test.ps1").read_text(encoding="utf-8-sig")
++    contract = (root / "tests/opt001c_contract_tests.ml").read_text(encoding="utf-8-sig")
++    comparator = (root / "tools/compare_opt001c_performance.py").read_text(encoding="utf-8-sig")
++    golden = json.loads((root / "audit/opt001c_allocation_golden.json").read_text(encoding="utf-8-sig"))
++    baseline = json.loads((root / "audit/opt001b_performance_baseline.json").read_text(encoding="utf-8-sig"))
++
++    require(gl11, [
++        "function traceEnabled()",
++        "if diagnosticTraceEnabled and traceCommand(\"vertex\", [x, y, z])",
++        "if diagnosticTraceEnabled and traceCommand(\"texcoord\", [s, t])",
++        "if diagnosticTraceEnabled and traceCommand(\"color\", [red, green, blue, alpha])",
++        "if diagnosticTraceEnabled and traceCommand(\"bind_texture\", [GL_TEXTURE_2D, texture])",
++    ], "gl11", errors)
++    gl_errors, gl_count = gl11_guard_errors(gl11)
++    errors.extend(gl_errors)
++
++    require(world, [
++        "if gl.traceEnabled() then gl.traceCommand(\"multitexcoord\"",
++        "tracedUpload = false",
++        "if gl.traceEnabled() then",
++        "gl.traceCommand(\"upload_subimage\"",
++        "gl.traceCommand(\"upload_lightmap\"",
++    ], "world", errors)
++    world_errors, world_count = world_guard_errors(world)
++    errors.extend(world_errors)
++
++    # No source file outside the trace implementation may construct a trace
++    # argument array without an explicit fast-path guard.
++    render_root = root / "src/miniquake/render"
++    all_calls = 0
++    for path in sorted(render_root.rglob("*.ml")):
++        text = path.read_text(encoding="utf-8-sig")
++        calls = trace_calls(text)
++        all_calls += len(calls)
++        if path.name not in {"gl11.ml", "world.ml"} and calls:
++            for number, line in calls:
++                errors.append(f"unexpected traceCommand caller {path.relative_to(root)}:{number}: {line}")
++
++    require(build_info, [
++        f'const OPTIMIZATION_STATUS = "{STATUS}"',
++        "const OPTIMIZATION_FINGERPRINT = 0x1c001c03",
++        f'const OPTIMIZATION_PARENT = "{PARENT}"',
++    ], "build info", errors)
++    require(build, [
++        "MiniQuakeOPT001CAllocationTests.exe",
++        "tests\\opt001c_contract_tests.ml",
++    ], "build", errors)
++    require(runner, [
++        '$DeliveryRevision = "OPT-001C"',
++        '$DeliveryParent = "OPT-001B"',
++        "compare_opt001c_performance.py",
++        "MiniQuake OPT-001C acceptance test: PASS",
++    ], "runner", errors)
++    require(collector, [
++        '$DeliveryRevision = "OPT-001C"',
++        "MiniQuake_OPT-001C_RESULTS_",
++    ], "collector", errors)
++    require(launcher, ["TEST_OPT-001C.ps1"], "test.ps1", errors)
++    require(contract, [
++        "not gl.traceEnabled()",
++        "gl.Trace_Begin()",
++        "gl.vertex3(1.0, 2.0, 3.0)",
++        "MiniQuake OPT-001C allocation tests passed:",
++    ], "contract", errors)
++    require(comparator, [
++        "TARGET_MET",
++        "IMPROVED_BELOW_TARGET",
++        "NO_REGRESSION_BELOW_TARGET",
++        "REGRESSION",
++        "regression_limit_percent",
++    ], "performance comparator", errors)
++
++    expected_golden = {
++        "status": STATUS,
++        "fingerprint": FINGERPRINT,
++        "parent": PARENT,
++        "trace_fast_path": "short_circuit_before_argument_array",
++        "performance_baseline": "OPT-001B",
++    }
++    for key, expected in expected_golden.items():
++        if golden.get(key) != expected:
++            errors.append(f"golden {key}={golden.get(key)!r}, expected {expected!r}")
++    if baseline.get("source_revision") != "OPT-001B":
++        errors.append("performance baseline is not tied to OPT-001B")
++    if baseline.get("measurement_frames") != 3000:
++        errors.append("performance baseline measurement frame count is not 3000")
++    for map_name in ("e1m1", "e1m2"):
++        for mode in ("headless", "render"):
++            metrics = baseline.get("maps", {}).get(map_name, {}).get(mode, {})
++            for field in ("median_ms", "p95_ms", "p99_ms", "max_ms", "total_ms"):
++                if not isinstance(metrics.get(field), (int, float)) or metrics[field] <= 0:
++                    errors.append(f"missing positive baseline {map_name}/{mode}/{field}")
++
++    report = {
++        "schema": "MiniQuakeOPT001CStatic/1",
++        "status": "PASS" if not errors else "FAIL",
++        "errors": errors,
++        "checks": {
++            "optimization_status": STATUS,
++            "optimization_fingerprint": FINGERPRINT,
++            "optimization_parent": PARENT,
++            "gl11_guarded_trace_calls": gl_count,
++            "world_guarded_trace_calls": world_count,
++            "all_render_trace_calls": all_calls,
++            "unguarded_trace_calls": len(gl_errors) + len(world_errors),
++            "baseline_maps": ["e1m1", "e1m2"],
++            "baseline_modes": ["headless", "render"],
++            "performance_targets": baseline.get("targets", {}),
++        },
++    }
++    if args.json:
++        Path(args.json).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
++    print("MiniQuake OPT-001C allocation verification: " + report["status"])
++    print(f"  gl11_guarded_trace_calls={gl_count}")
++    print(f"  world_guarded_trace_calls={world_count}")
++    print(f"  unguarded_trace_calls={len(gl_errors) + len(world_errors)}")
++    for error in errors:
++        print("  error: " + error)
++    return 0 if not errors else 1
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+--- a/tools/compare_opt001c_performance.py
++++ b/tools/compare_opt001c_performance.py
+@@ -0,0 +1,195 @@
++#!/usr/bin/env python3
++"""Compare OPT-001C frame baselines with the accepted OPT-001B baseline."""
++from __future__ import annotations
++
++import argparse
++import json
++from pathlib import Path
++from statistics import mean
++from typing import Any
++
++MAPS = ("e1m1", "e1m2")
++MODES = ("headless", "render")
++FIELDS = ("total_ms", "median_ms", "p95_ms", "p99_ms", "max_ms")
++
++
++def load_json(path: Path) -> dict[str, Any]:
++    return json.loads(path.read_text(encoding="utf-8-sig"))
++
++
++def percentage_improvement(old: float, new: float) -> float:
++    if old <= 0:
++        return 0.0
++    return (old - new) * 100.0 / old
++
++
++def ratio(old: float, new: float) -> float:
++    if new <= 0:
++        return 0.0
++    return old / new
++
++
++def main() -> int:
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--baseline", required=True)
++    parser.add_argument("--build", required=True)
++    parser.add_argument("--json", required=True)
++    parser.add_argument("--markdown", required=True)
++    args = parser.parse_args()
++
++    baseline_path = Path(args.baseline).resolve()
++    build = Path(args.build).resolve()
++    output_json = Path(args.json).resolve()
++    output_markdown = Path(args.markdown).resolve()
++    baseline = load_json(baseline_path)
++    targets = baseline["targets"]
++    regression_limit = float(targets["regression_limit_percent"])
++
++    errors: list[str] = []
++    comparisons: dict[str, dict[str, Any]] = {}
++    regression_reasons: list[str] = []
++    render_median_improvements: list[float] = []
++    render_p99_improvements: list[float] = []
++    render_throughput_ratios: list[float] = []
++
++    for map_name in MAPS:
++        comparisons[map_name] = {}
++        for mode in MODES:
++            current_path = build / f"opt001c-{map_name}-{mode}-summary.json"
++            if not current_path.is_file():
++                errors.append(f"missing current summary: {current_path}")
++                continue
++            current = load_json(current_path)
++            reference = baseline["maps"][map_name][mode]
++            entry: dict[str, Any] = {
++                "baseline_file": baseline_path.name,
++                "current_file": current_path.name,
++                "baseline": {field: reference[field] for field in FIELDS},
++                "current": {field: current[field] for field in FIELDS},
++                "improvement_percent": {},
++            }
++            for field in FIELDS:
++                improvement = percentage_improvement(float(reference[field]), float(current[field]))
++                entry["improvement_percent"][field] = improvement
++                if field in ("median_ms", "p99_ms") and improvement < -regression_limit:
++                    regression_reasons.append(
++                        f"{map_name}/{mode}/{field} regressed by {-improvement:.3f}% "
++                        f"({reference[field]} -> {current[field]})"
++                    )
++            throughput = ratio(float(reference["total_ms"]), float(current["total_ms"]))
++            entry["throughput_ratio"] = throughput
++            entry["frames"] = int(current.get("frames", 0))
++            comparisons[map_name][mode] = entry
++            if mode == "render":
++                render_median_improvements.append(entry["improvement_percent"]["median_ms"])
++                render_p99_improvements.append(entry["improvement_percent"]["p99_ms"])
++                render_throughput_ratios.append(throughput)
++
++    classification = "REGRESSION"
++    aggregate: dict[str, float] = {}
++    if not errors and len(render_median_improvements) == len(MAPS):
++        aggregate = {
++            "render_median_improvement_percent": mean(render_median_improvements),
++            "render_p99_improvement_percent": mean(render_p99_improvements),
++            "render_throughput_ratio": mean(render_throughput_ratios),
++        }
++        median_target = float(targets["median_improvement_percent"])
++        throughput_target = float(targets["throughput_ratio"])
++        p99_target = float(targets["p99_improvement_percent"])
++        target_met = (
++            (
++                aggregate["render_median_improvement_percent"] >= median_target
++                or aggregate["render_throughput_ratio"] >= throughput_target
++            )
++            and aggregate["render_p99_improvement_percent"] >= p99_target
++        )
++        if regression_reasons:
++            classification = "REGRESSION"
++        elif target_met:
++            classification = "TARGET_MET"
++        elif (
++            aggregate["render_median_improvement_percent"] > 2.0
++            or aggregate["render_p99_improvement_percent"] > 2.0
++            or aggregate["render_throughput_ratio"] > 1.02
++        ):
++            classification = "IMPROVED_BELOW_TARGET"
++        else:
++            classification = "NO_REGRESSION_BELOW_TARGET"
++
++    status = "PASS"
++    if errors or regression_reasons:
++        status = "FAIL"
++    report = {
++        "schema": "MiniQuakeOPT001CPerformanceComparison/1",
++        "status": status,
++        "classification": classification,
++        "baseline_revision": baseline.get("source_revision"),
++        "baseline_archive": baseline.get("source_result_archive"),
++        "baseline_archive_sha256": baseline.get("source_result_sha256"),
++        "targets": targets,
++        "aggregate": aggregate,
++        "comparisons": comparisons,
++        "regression_reasons": regression_reasons,
++        "errors": errors,
++    }
++    output_json.parent.mkdir(parents=True, exist_ok=True)
++    output_json.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
++
++    lines = [
++        "# MiniQuake OPT-001C – Performancevergleich",
++        "",
++        f"- Status: **{status}**",
++        f"- Klassifikation: **{classification}**",
++        f"- Baseline: `{baseline.get('source_revision')}` / `{baseline.get('source_result_archive')}`",
++        "",
++        "| Map | Modus | Median alt → neu | Median Δ | P99 alt → neu | P99 Δ | Durchsatzfaktor |",
++        "|---|---|---:|---:|---:|---:|---:|",
++    ]
++    for map_name in MAPS:
++        for mode in MODES:
++            entry = comparisons.get(map_name, {}).get(mode)
++            if not entry:
++                continue
++            b = entry["baseline"]
++            c = entry["current"]
++            imp = entry["improvement_percent"]
++            lines.append(
++                f"| `{map_name}` | `{mode}` | {b['median_ms']} → {c['median_ms']} ms | "
++                f"{imp['median_ms']:.3f}% | {b['p99_ms']} → {c['p99_ms']} ms | "
++                f"{imp['p99_ms']:.3f}% | {entry['throughput_ratio']:.4f}× |"
++            )
++    if aggregate:
++        lines += [
++            "",
++            "## Aggregierte Renderwerte",
++            "",
++            f"- Median-Verbesserung: **{aggregate['render_median_improvement_percent']:.3f}%**",
++            f"- P99-Verbesserung: **{aggregate['render_p99_improvement_percent']:.3f}%**",
++            f"- Durchsatzfaktor: **{aggregate['render_throughput_ratio']:.4f}×**",
++        ]
++    if regression_reasons:
++        lines += ["", "## Regressionen", ""] + [f"- {reason}" for reason in regression_reasons]
++    if errors:
++        lines += ["", "## Fehler", ""] + [f"- {error}" for error in errors]
++    output_markdown.write_text("\n".join(lines) + "\n", encoding="utf-8")
++
++    print("MiniQuake OPT-001C performance comparison: " + classification)
++    if aggregate:
++        print(
++            "  render_median_improvement_percent="
++            f"{aggregate['render_median_improvement_percent']:.3f}"
++        )
++        print(
++            "  render_p99_improvement_percent="
++            f"{aggregate['render_p99_improvement_percent']:.3f}"
++        )
++        print(f"  render_throughput_ratio={aggregate['render_throughput_ratio']:.4f}")
++    for reason in regression_reasons:
++        print("  regression: " + reason)
++    for error in errors:
++        print("  error: " + error)
++    return 0 if status == "PASS" else 2
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+--- a/tools/verify.py
++++ b/tools/verify.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""Self-contained package verifier for MiniQuake OPT-001B.
++"""Self-contained package verifier for MiniQuake OPT-001C.
+ 
+ Historical subsystem semantics are checked by the source-guided component
+ checkers invoked from build.ps1.  This verifier owns current delivery
+@@ -21,8 +21,8 @@
+ PARENT_PACKAGE_ID = "BP-093"
+ BLOCK_ID = "BP-090-094"
+ BLOCK_PARENT_PACKAGE_ID = "BP-085-089R8"
+-DELIVERY_REVISION = "OPT-001B"
+-DELIVERY_PARENT = "OPT-001A"
++DELIVERY_REVISION = "OPT-001C"
++DELIVERY_PARENT = "OPT-001B"
+ MANIFEST = "SOURCE_MANIFEST.sha256"
+ 
+ EXCLUDED_DIRS = {".git", "build", "__pycache__", ".pytest_cache"}
+@@ -36,6 +36,12 @@
+ }
+ 
+ REQUIRED_PATHS = {
++    "TEST_OPT-001C.ps1", "CHANGELOG_OPT-001C.md",
++    "docs/OPT-001C_TESTING.md", "docs/OPT-001C_ALLOCATION_CONTRACT.md",
++    "docs/OPT-001C_DELIVERY_REPORT.json", "patches/OPT-001C.diff",
++    "tests/opt001c_contract_tests.ml", "tools/check_opt001c.py",
++    "tools/compare_opt001c_performance.py",
++    "audit/opt001c_allocation_golden.json", "audit/opt001b_performance_baseline.json",
+     "TEST_OPT-001B.ps1", "CHANGELOG_OPT-001B.md",
+     "docs/OPT-001B_TESTING.md", "docs/OPT-001B_CORRECTNESS_CONTRACT.md",
+     "docs/OPT-001B_DELIVERY_REPORT.json", "patches/OPT-001B.diff",
+@@ -217,33 +223,33 @@
+     build_info = (root / "src/miniquake/build_info.ml").read_text(encoding="utf-8-sig")
+     main = (root / "src/main.ml").read_text(encoding="utf-8-sig")
+     build = (root / "build.ps1").read_text(encoding="utf-8-sig")
+-    test = (root / "TEST_OPT-001B.ps1").read_text(encoding="utf-8-sig")
++    test = (root / "TEST_OPT-001C.ps1").read_text(encoding="utf-8-sig")
+     collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
+     launcher = (root / "test.ps1").read_text(encoding="utf-8-sig")
+     errors += marker_errors(build_info, [
+         'const PACKAGE_ID = "BP-094"', 'const PARENT_PACKAGE_ID = "BP-093"',
+         'const BLOCK_ID = "BP-090-094"', 'const BLOCK_PARENT_PACKAGE_ID = "BP-085-089R8"',
+-        'const OPTIMIZATION_STATUS = "opt001b_error_freedom_candidate_v1"',
+-        'const OPTIMIZATION_FINGERPRINT = 0x1b001b02',
+-        'const OPTIMIZATION_PARENT = "OPT-001A"',
++        'const OPTIMIZATION_STATUS = "opt001c_frame_allocation_candidate_v1"',
++        'const OPTIMIZATION_FINGERPRINT = 0x1c001c03',
++        'const OPTIMIZATION_PARENT = "OPT-001B"',
+     ], "build_info")
+     errors += marker_errors(main, [
+         "--opt001a-map-parse", "--opt001a-frame-baseline", "--opt001a-handle-plateau", "--opt001b-transition",
+         "Optimization status:", "Optimization parent:",
+     ], "main")
+     errors += marker_errors(build, [
+-        '$PackageId = "BP-094"', "MiniQuakeOPT001BCorrectnessTests.exe",
+-        "tests\\opt001b_contract_tests.ml",
++        '$PackageId = "BP-094"', "MiniQuakeOPT001CAllocationTests.exe",
++        "tests\\opt001c_contract_tests.ml",
+     ], "build")
+     errors += marker_errors(test, [
+-        '$DeliveryRevision = "OPT-001B"', '$DeliveryParent = "OPT-001A"',
+-        "MiniQuake OPT-001B acceptance test: PASS",
++        '$DeliveryRevision = "OPT-001C"', '$DeliveryParent = "OPT-001B"',
++        "MiniQuake OPT-001C acceptance test: PASS",
+         "--opt001a-map-parse", "--opt001a-frame-baseline", "--opt001a-handle-plateau",
+     ], "test")
+     errors += marker_errors(collector, [
+-        '$DeliveryRevision = "OPT-001B"', "MiniQuake_OPT-001B_RESULTS_",
++        '$DeliveryRevision = "OPT-001C"', "MiniQuake_OPT-001C_RESULTS_",
+     ], "collector")
+-    errors += marker_errors(launcher, ["TEST_OPT-001B.ps1"], "test.ps1")
++    errors += marker_errors(launcher, ["TEST_OPT-001C.ps1"], "test.ps1")
+     return Check(
+         "package_identity", not errors,
+         {"package_id": PACKAGE_ID, "parent_package_id": PARENT_PACKAGE_ID,
+@@ -1336,7 +1342,7 @@
+     out = root / "build" / "verify-opt001b.json"
+     out.parent.mkdir(parents=True, exist_ok=True)
+     proc = subprocess.run(
+-        [sys.executable, str(root / "tools/check_opt001b.py"), "--root", str(root), "--json", str(out)],
++        [sys.executable, str(root / "tools/check_opt001b.py"), "--root", str(root), "--json", str(out), "--allow-downstream-package"],
+         capture_output=True, text=True,
+     )
+     errors: list[str] = []
+@@ -1350,6 +1356,28 @@
+         except Exception as exc:
+             errors.append(f"invalid OPT-001B report: {exc}")
+     return Check("opt001b_contract", not errors, details, errors)
++
++
++def check_opt001c(root: Path) -> Check:
++    out = root / "build" / "verify-opt001c.json"
++    out.parent.mkdir(parents=True, exist_ok=True)
++    proc = subprocess.run(
++        [sys.executable, str(root / "tools/check_opt001c.py"), "--root", str(root), "--json", str(out)],
++        capture_output=True, text=True,
++    )
++    errors: list[str] = []
++    if proc.returncode != 0:
++        errors.append((proc.stdout + "\n" + proc.stderr).strip())
++    details: dict[str, object] = {"return_code": proc.returncode}
++    if out.is_file():
++        try:
++            report = json.loads(out.read_text(encoding="utf-8-sig"))
++            details["status"] = report.get("status", "")
++            details["gl11_guarded_trace_calls"] = report.get("checks", {}).get("gl11_guarded_trace_calls", 0)
++            details["world_guarded_trace_calls"] = report.get("checks", {}).get("world_guarded_trace_calls", 0)
++        except Exception as exc:
++            errors.append(f"invalid OPT-001C report: {exc}")
++    return Check("opt001c_contract", not errors, details, errors)
+ 
+ 
+ def main() -> int:
+@@ -1367,6 +1395,7 @@
+         check_manifest(root),
+         check_identity(root),
+         check_opt001b(root),
++        check_opt001c(root),
+         check_r8_visual_parity(root),
+         check_r9_network_provenance(root),
+         check_r10_original_server_readiness(root),
+@@ -1390,14 +1419,14 @@
+         check_external_checkers(root),
+     ]
+     passed = all(check.passed for check in checks)
+-    print("MiniQuake OPT-001B verification")
++    print("MiniQuake OPT-001C verification")
+     for check in checks:
+         print(f"  [{'PASS' if check.passed else 'FAIL'}] {check.name}")
+         for key, value in check.details.items():
+             print(f"         {key}={value}")
+         for error in check.errors:
+             print(f"         error: {error}")
+-    print(f"MiniQuake OPT-001B verification: {'PASS' if passed else 'FAIL'}")
++    print(f"MiniQuake OPT-001C verification: {'PASS' if passed else 'FAIL'}")
+     report = {
+         "schema_version": 1,
+         "package_id": PACKAGE_ID,

@@ -331,6 +331,6 @@ function GetNewMapState()
   return [rmiscLightStyles, rmiscLeafCount, rmiscSkyTexture, rmiscMirrorTexture, rmiscClearParticles, rmiscBuildLightmaps]
 end function
 
-function GetRefreshState()
+function inline GetRefreshState()
   return [rmiscRenderViews, rmiscLastYaw, rmiscLastDrawBuffer, rmiscEndRendering]
 end function

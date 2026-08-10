@@ -1,30 +1,41 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param([switch]$IncludeAllCurrentDocs)
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 $Root = $PSScriptRoot
 $Build = Join-Path $Root "build"
-$PackageId = "BP-089"
-$BlockId = "BP-085-089"
-$DeliveryRevision = "BP-085-089R8"
-$DeliveryParent = "BP-085-089R7"
+$PackageId = "BP-094"
+$BlockId = "BP-090-094"
+$DeliveryRevision = "OPT-001D"
+$DeliveryParent = "OPT-001CR3R7"
 $Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$Staging = Join-Path $Build (".bp085-089r8-results-{0}" -f $Timestamp)
-$Archive = Join-Path $Build ("MiniQuake_BP-085-089R8_RESULTS_{0}.zip" -f $Timestamp)
+# original_reference_binary_in_result_archive=$false
+# historical external staging marker retained for contract verification: bp090-094-original-reference
+# quake_game_data_in_result_archive=$false
+$Staging = Join-Path $Build (".opt001d-results-{0}" -f $Timestamp)
+$Archive = Join-Path $Build ("MiniQuake_OPT-001D_RESULTS_{0}.zip" -f $Timestamp)
 
 if (-not (Test-Path -LiteralPath $Build -PathType Container)) { throw "build directory does not exist: $Build" }
 if (Test-Path -LiteralPath $Staging) { Remove-Item -Recurse -Force -LiteralPath $Staging }
 New-Item -ItemType Directory -Force -Path $Staging | Out-Null
 
-$AllowedBuildExtensions = @(".log", ".json", ".txt", ".csv", ".mqtrace", ".tga")
-$ForbiddenNames = @("pak0.pak", "pak1.pak", "progs.dat", "config.cfg", "autoexec.cfg", "gfx.wad")
+$AllowedBuildExtensions = @(".log", ".json", ".txt", ".csv", ".mqtrace", ".md")
+$ForbiddenNames = @("pak0.pak", "pak1.pak", "progs.dat", "config.cfg", "autoexec.cfg", "gfx.wad", "glquake.exe", "opengl32.dll")
 $SyntheticBuildRoots = @("bp071_fs", "bp071-filesystem", "bp072-wad", "sys_win_differential")
 $SkippedBuildArtifacts = @()
 
 function Get-BuildArtifactExclusionReason([string]$Relative) {
   $Normalized = $Relative.Replace('/', '\').TrimStart('\')
   $Leaf = [IO.Path]::GetFileName($Normalized).ToLowerInvariant()
+
+  if ($Normalized -match '(?i)^bp090-094(?:r[0-9]+)?-original-reference(?:\\|$)') {
+    return "build-only original GLQuake/Quake-data staging area"
+  }
+  if (($Normalized -match '(?i)^bp090-094(?:r[0-9]+)?-original-visual(?:\\|$)') -and
+      $Leaf.EndsWith(".tga")) {
+    return "external framebuffer image"
+  }
 
   foreach ($Prefix in $SyntheticBuildRoots) {
     if ($Normalized.Equals($Prefix, [StringComparison]::OrdinalIgnoreCase) -or
@@ -67,6 +78,110 @@ Get-ChildItem -LiteralPath $Build -Recurse -File | ForEach-Object {
 }
 
 $RootFiles = @(
+  "TEST_OPT-001D.ps1",
+  "CHANGELOG_OPT-001D.md",
+  "docs\OPT-001D_TESTING.md",
+  "docs\OPT-001D_CHANGELOG.md",
+  "docs\OPT-001D_RESULT_ANALYSIS.md",
+  "docs\OPT-001D_HOTFIX_REPORT.json",
+  "audit\opt001d_audio_transition_hotpath.json",
+  "tools\check_opt001d.py",
+  "tools\analyze_opt001d_audio.py",
+  "patches\OPT-001D.diff",
+  "TEST_OPT-001CR3R4.ps1",
+  "CHANGELOG_OPT-001CR3R4.md",
+  "docs\OPT-001CR3R4_TESTING.md",
+  "docs\OPT-001CR3R4_CHANGELOG.md",
+  "docs\OPT-001CR3R4_RESULT_ANALYSIS.md",
+  "docs\OPT-001CR3R4_HOTFIX_REPORT.json",
+  "audit\opt001cr3r4_entry_helper_namespace.json",
+  "patches\OPT-001CR3R4.diff",
+  "TEST_OPT-001CR3R3.ps1",
+  "CHANGELOG_OPT-001CR3R3.md",
+  "docs\OPT-001CR3R3_TESTING.md",
+  "docs\OPT-001CR3R3_CHANGELOG.md",
+  "docs\OPT-001CR3R3_RESULT_ANALYSIS.md",
+  "docs\OPT-001CR3R3_HOTFIX_REPORT.json",
+  "audit\opt001cr3r3_named_build_binding.json",
+  "patches\OPT-001CR3R3.diff",
+  "TEST_OPT-001CR3R2.ps1",
+  "CHANGELOG_OPT-001CR3R2.md",
+  "docs\OPT-001CR3R2_TESTING.md",
+  "docs\OPT-001CR3R2_CHANGELOG.md",
+  "docs\OPT-001CR3R2_RESULT_ANALYSIS.md",
+  "docs\OPT-001CR3R2_HOTFIX_REPORT.json",
+  "audit\opt001cr3r2_live_exitcode.json",
+  "patches\OPT-001CR3R2.diff",
+  "TEST_OPT-001CR3R1.ps1",
+  "CHANGELOG_OPT-001CR3R1.md",
+  "docs\OPT-001CR3R1_TESTING.md",
+  "docs\OPT-001CR3R1_CHANGELOG.md",
+  "docs\OPT-001CR3R1_RESULT_ANALYSIS.md",
+  "docs\OPT-001CR3R1_HOTFIX_REPORT.json",
+  "audit\opt001cr3r1_compiler_safe_inline.json",
+  "tools\run_process_live.py",
+  "patches\OPT-001CR3R1.diff",
+  "TEST_OPT-001CR3.ps1",
+  "CHANGELOG_OPT-001CR3.md",
+  "docs\OPT-001CR3_TESTING.md",
+  "docs\OPT-001CR3_CHANGELOG.md",
+  "docs\OPT-001CR3_DELIVERY_REPORT.json",
+  "tests\opt001cr3_hotpath_tests.ml",
+  "tools\check_opt001cr3.py",
+  "tools\compare_opt001cr3_performance.py",
+  "audit\opt001cr3_inline_array_hotpath.json",
+  "audit\opt001cr2_accepted_baseline.json",
+  "patches\OPT-001CR3.diff",
+  "TEST_OPT-001CR3.ps1",
+  "CHANGELOG_OPT-001CR3.md",
+  "docs\OPT-001CR3_TESTING.md",
+  "docs\OPT-001CR3_RESULT_ANALYSIS.md",
+  "docs\OPT-001CR3_HOTFIX_REPORT.json",
+  "docs\OPT-001CR3_DELIVERY_REPORT.json",
+  "tools\check_opt001cr3.py",
+  "audit\opt001cr3_harness_golden.json",
+  "patches\OPT-001CR3.diff",
+  "TEST_OPT-001CR2.ps1",
+  "CHANGELOG_OPT-001CR2.md",
+  "docs\OPT-001CR2_TESTING.md",
+  "docs\OPT-001CR2_RESULT_ANALYSIS.md",
+  "docs\OPT-001CR2_HOTFIX_REPORT.json",
+  "docs\OPT-001CR2_DELIVERY_REPORT.json",
+  "tools\check_opt001cr1.py",
+  "tools\check_minilang_delimiters.py",
+  "audit\opt001cr1_syntax_golden.json",
+  "patches\OPT-001CR2.diff",
+  "TEST_OPT-001C.ps1",
+  "CHANGELOG_OPT-001C.md",
+  "docs\OPT-001C_TESTING.md",
+  "docs\OPT-001C_ALLOCATION_CONTRACT.md",
+  "docs\OPT-001C_DELIVERY_REPORT.json",
+  "tests\opt001c_contract_tests.ml",
+  "tools\check_opt001c.py",
+  "tools\compare_opt001c_performance.py",
+  "audit\opt001c_allocation_golden.json",
+  "audit\opt001b_performance_baseline.json",
+  "patches\OPT-001C.diff",
+  "TEST_OPT-001B.ps1",
+  "CHANGELOG_OPT-001B.md",
+  "docs\OPT-001B_TESTING.md",
+  "docs\OPT-001B_CORRECTNESS_CONTRACT.md",
+  "docs\OPT-001B_DELIVERY_REPORT.json",
+  "tests\opt001b_contract_tests.ml",
+  "tools\check_opt001b.py",
+  "audit\opt001b_correctness_golden.json",
+  "patches\OPT-001B.diff",
+  "TEST_OPT-001A.ps1",
+  "CHANGELOG_OPT-001A.md",
+  "docs\OPT-001A_TESTING.md",
+  "docs\OPT-001A_BASELINE_CONTRACT.md",
+  "docs\OPT-001A_DELIVERY_REPORT.json",
+  "src\miniquake\optimization_baseline.ml",
+  "tests\opt001a_contract_tests.ml",
+  "tools\check_opt001a.py",
+  "tools\analyze_opt001a.py",
+  "audit\opt001a_baseline_golden.json",
+  "patches\OPT-001A.diff",
   "TEST_BP-085-089.ps1",
   "CHANGELOG_BP-085.md",
   "CHANGELOG_BP-086.md",
@@ -188,6 +303,120 @@ $RootFiles = @(
   "patches\BP-089R3.diff",
   "patches\BP-089R4.diff",
   "patches\BP-089R2.diff",
+  # BP-090--BP-094 external-reference closure. Original binary/game data are not included.
+  "TEST_BP-090-094R15.ps1",
+  "CHANGELOG_BP-090-094R15.md",
+  "docs\BP-090-094R15_TESTING.md",
+  "docs\BP-090-094R15_RESULT_ANALYSIS.md",
+  "docs\BP-090-094R15_HOTFIX_REPORT.json",
+  "patches\BP-094R15.diff",
+  "TEST_BP-090-094R14.ps1",
+  "CHANGELOG_BP-090-094R14.md",
+  "docs\BP-090-094R14_TESTING.md",
+  "docs\BP-090-094R14_RESULT_ANALYSIS.md",
+  "docs\BP-090-094R14_HOTFIX_REPORT.json",
+  "patches\BP-094R14.diff",
+  "TEST_BP-090-094R13.ps1",
+  "CHANGELOG_BP-090-094R13.md",
+  "docs\BP-090-094R13_TESTING.md",
+  "docs\BP-090-094R13_RESULT_ANALYSIS.md",
+  "docs\BP-090-094R13_HOTFIX_REPORT.json",
+  "patches\BP-094R13.diff",
+  "TEST_BP-090-094R12.ps1",
+  "CHANGELOG_BP-090-094R12.md",
+  "docs\BP-090-094R12_TESTING.md",
+  "docs\BP-090-094R12_RESULT_ANALYSIS.md",
+  "docs\BP-090-094R12_HOTFIX_REPORT.json",
+  "patches\BP-094R12.diff",
+  "patches\BP-094R11.diff",
+  "TEST_BP-090-094R11.ps1",
+  "CHANGELOG_BP-090-094R11.md",
+  "docs\BP-090-094R11_TESTING.md",
+  "docs\BP-090-094R11_RESULT_ANALYSIS.md",
+  "docs\BP-090-094R11_HOTFIX_REPORT.json",
+  "patches\BP-094R10.diff",
+  "TEST_BP-090-094R8.ps1",
+  "TEST_BP-090-094R9.ps1",
+  "CHANGELOG_BP-090-094R8.md",
+  "CHANGELOG_BP-090-094R9.md",
+  "docs\BP-090-094R8_TESTING.md",
+  "docs\BP-090-094R9_TESTING.md",
+  "docs\BP-090-094R9_RESULT_ANALYSIS.md",
+  "docs\BP-090-094R9_HOTFIX_REPORT.json",
+  "docs\BP-090-094R8_RESULT_ANALYSIS.md",
+  "docs\BP-090-094R8_HOTFIX_REPORT.json",
+  "docs\BP-093_R7_VISUAL_DIAGNOSTIC_ANALYSIS.md",
+  "docs\BP-093_R7_VISUAL_DIAGNOSTIC_ANALYSIS.json",
+  "patches\BP-094R8.diff",
+  "TEST_BP-090-094R7.ps1",
+  "CHANGELOG_BP-090-094R7.md",
+  "docs\BP-090-094R7_TESTING.md",
+  "docs\BP-090-094R7_RESULT_ANALYSIS.md",
+  "docs\BP-090-094R7_HOTFIX_REPORT.json",
+  "patches\BP-094R7.diff",
+  "TEST_BP-090-094R6.ps1",
+  "CHANGELOG_BP-090-094R6.md",
+  "docs\BP-090-094R6_TESTING.md",
+  "docs\BP-090-094R6_RESULT_ANALYSIS.md",
+  "docs\BP-090-094R6_HOTFIX_REPORT.json",
+  "patches\BP-094R6.diff",
+  "TEST_BP-090-094R5.ps1",
+  "CHANGELOG_BP-090-094R5.md",
+  "docs\BP-090-094R5_TESTING.md",
+  "docs\BP-090-094R5_RESULT_ANALYSIS.md",
+  "docs\BP-090-094R5_HOTFIX_REPORT.json",
+  "patches\BP-094R5.diff",
+  "TEST_BP-090-094R4.ps1",
+  "CHANGELOG_BP-090-094R4.md",
+  "docs\BP-090-094R4_TESTING.md",
+  "docs\BP-090-094R4_RESULT_ANALYSIS.md",
+  "docs\BP-090-094R4_HOTFIX_REPORT.json",
+  "patches\BP-094R4.diff",
+  "TEST_BP-090-094R3.ps1",
+  "CHANGELOG_BP-090-094R3.md",
+  "docs\BP-090-094R3_TESTING.md",
+  "docs\BP-090-094R3_RESULT_ANALYSIS.md",
+  "docs\BP-090-094R3_HOTFIX_REPORT.json",
+  "patches\BP-094R3.diff",
+  "TEST_BP-090-094R2.ps1",
+  "CHANGELOG_BP-090-094R2.md",
+  "docs\BP-090-094R2_TESTING.md",
+  "docs\BP-090-094R2_RESULT_ANALYSIS.md",
+  "docs\BP-090-094R2_HOTFIX_REPORT.json",
+  "patches\BP-094R2.diff",
+  "TEST_BP-090-094R1.ps1",
+  "CHANGELOG_BP-090-094R1.md",
+  "docs\BP-090-094R1_TESTING.md",
+  "docs\BP-090-094R1_RESULT_ANALYSIS.md",
+  "docs\BP-090-094R1_HOTFIX_REPORT.json",
+  "patches\BP-094R1.diff",
+  "TEST_BP-090-094.ps1",
+  "CHANGELOG_BP-090-094.md",
+  "docs\BP-090-094_TESTING.md",
+  "docs\BP-085-089R8_ACCEPTANCE_ANALYSIS.md",
+  "src\miniquake\external_reference_contract.ml",
+  "tests\original_reference_provenance_tests.ml",
+  "tests\original_server_interop_tests.ml",
+  "tests\original_client_interop_tests.ml",
+  "tests\original_visual_reference_tests.ml",
+  "tests\external_compat_closure_tests.ml",
+  "tools\prepare_original_reference.py",
+  "tools\compare_original_reference.py",
+  "tools\check_external_090.py",
+  "tools\check_external_091.py",
+  "tools\check_external_092.py",
+  "tools\check_external_093.py",
+  "tools\check_external_094.py",
+  "audit\original_reference_golden.json",
+  "audit\original_server_interop_golden.json",
+  "audit\original_client_interop_golden.json",
+  "audit\original_visual_reference_golden.json",
+  "audit\external_compat_closure_golden.json",
+  "patches\BP-090.diff",
+  "patches\BP-091.diff",
+  "patches\BP-092.diff",
+  "patches\BP-093.diff",
+  "patches\BP-094.diff",
   "SOURCE_MANIFEST.sha256",
   "BLOCK_LEDGER.json",
   "PORT_LEDGER.json",
@@ -414,7 +643,15 @@ if ($IncludeAllCurrentDocs) {
 }
 
 $BinaryNames = @(
+  "MiniQuakeOriginalReferenceTests.exe",
+  "MiniQuakeOriginalServerInteropTests.exe",
+  "MiniQuakeOriginalClientInteropTests.exe",
+  "MiniQuakeOriginalVisualReferenceTests.exe",
+  "MiniQuakeExternalCompatibilityClosureTests.exe",
   "MiniQuake.exe",
+  "MiniQuakeOPT001AContractTests.exe",
+  "MiniQuakeOPT001BCorrectnessTests.exe",
+  "MiniQuakeOPT001CAllocationTests.exe",
   "MiniQuakeProtocol15ServerDataTests.exe",
   "MiniQuakeCommonCoreTests.exe",
   "MiniQuakeFilesystemPackTests.exe",
@@ -471,6 +708,9 @@ $Meta = [ordered]@{
   source_root = $Root
   binaries = $BinaryState
   skipped_build_artifacts = $SkippedBuildArtifacts
+  original_reference_binary_in_result_archive = $false
+  quake_game_data_in_result_archive = $false
+  framebuffer_images_in_result_archive = $false
 }
 $Meta | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $Staging "collection.json") -Encoding UTF8
 
@@ -482,4 +722,4 @@ Write-Host "MiniQuake $DeliveryRevision result archive"
 Write-Host "  path=$Archive"
 Write-Host "  sha256=$Hash"
 Write-Host ("  skipped_unsafe_build_artifacts={0}" -f $SkippedBuildArtifacts.Count)
-Write-Host "  Quake PAK/model/map/audio data, synthetic asset workspaces and compiled binaries were not included."
+Write-Host "  Original GLQuake binary, Quake PAK/model/map/audio data, TGAs, synthetic asset workspaces and compiled binaries were not included."

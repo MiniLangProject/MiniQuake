@@ -173,7 +173,7 @@ function GetSinkState()
   ]
 end function
 
-function Dot(left, right)
+function inline Dot(left, right)
   return left[0] * right[0] + left[1] * right[1] + left[2] * right[2]
 end function
 

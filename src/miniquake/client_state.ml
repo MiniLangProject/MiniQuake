@@ -4,13 +4,7 @@ import miniquake.types as t
 import miniquake.constants as c
 
 function zeroStats(count)
-  result = []
-  i = 0
-  while i < count
-    result = result + [0]
-    i = i + 1
-  end while
-  return result
+  return array(count, 0)
 end function
 
 function create()

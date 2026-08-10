@@ -33,11 +33,11 @@ function resetStats()
   return true
 end function
 
-function nextSequence(sequence)
+function inline nextSequence(sequence)
   return (sequence + 1) & 0xffffffff
 end function
 
-function previousSequence(sequence)
+function inline previousSequence(sequence)
   return (sequence - 1) & 0xffffffff
 end function
 

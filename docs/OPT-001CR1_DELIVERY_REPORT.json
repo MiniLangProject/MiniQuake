@@ -1,0 +1,20 @@
+{
+  "schema": "MiniQuakeOPT001CR1Delivery/1",
+  "revision": "OPT-001CR1",
+  "parent": "OPT-001C",
+  "status": "windows_acceptance_pending",
+  "optimization_status": "opt001c_frame_allocation_candidate_v1",
+  "optimization_fingerprint": "0x1c001c03",
+  "scope": [
+    "repair guarded lightmap trace syntax",
+    "validate MiniLang delimiter balance before compilation",
+    "rerun complete OPT-001C performance and OPT-001B correctness matrix"
+  ],
+  "deferred": [
+    "persistent entity and viewmodel buffers",
+    "particle and audio scratch buffers",
+    "hot Cvar cache",
+    "PVS/BSP traversal restructuring",
+    "QuakeC and collision optimizations"
+  ]
+}

@@ -10,7 +10,6 @@
  * IEEE-754 values cross the ABI as their 32-bit bit patterns.
  */
 #include "miniquake_native.h"
-
 #define MQ_DLLIMPORT __declspec(dllimport)
 #define MQ_WINAPI __stdcall
 #define MQ_CDECL __cdecl
@@ -486,6 +485,67 @@ MQ_DLLIMPORT const mq_u8 *MQ_WINAPI glGetString(mq_u32 name);
 MQ_DLLIMPORT mq_u32 MQ_WINAPI glGetError(void);
 MQ_DLLIMPORT void MQ_WINAPI glFinish(void);
 MQ_DLLIMPORT void MQ_WINAPI glFlush(void);
+MQ_DLLIMPORT mq_u32 MQ_WINAPI glGenLists(mq_i32 range);
+MQ_DLLIMPORT void MQ_WINAPI glNewList(mq_u32 list_id, mq_u32 mode);
+MQ_DLLIMPORT void MQ_WINAPI glEndList(void);
+MQ_DLLIMPORT void MQ_WINAPI glCallList(mq_u32 list_id);
+MQ_DLLIMPORT void MQ_WINAPI glDeleteLists(mq_u32 list_id, mq_i32 range);
+
+#ifndef GL_COMPILE_AND_EXECUTE
+#define GL_COMPILE_AND_EXECUTE 0x1301
+#endif
+#define MQ_STATIC_GEOMETRY_CACHE_MAX 32768
+
+typedef struct mq_static_geometry_entry_s {
+    mq_u64 key;
+    mq_i32 pass;
+    mq_u32 list_id;
+} mq_static_geometry_entry_t;
+
+static mq_static_geometry_entry_t mq_static_geometry_cache[MQ_STATIC_GEOMETRY_CACHE_MAX];
+static mq_i32 mq_static_geometry_count = 0;
+static mq_i32 mq_static_geometry_pending = 0;
+static mq_i32 mq_static_geometry_recording = 0;
+static mq_u32 mq_static_geometry_pending_list = 0;
+
+MQ_EXPORT mq_i32 mq_gl_static_geometry_call(mq_u64 key_value, mq_i32 pass_value) {
+    mq_u64 key = key_value;
+    mq_i32 pass = pass_value;
+    mq_i32 i;
+    if (mq_static_geometry_pending || mq_static_geometry_recording) return 0;
+    for (i = 0; i < mq_static_geometry_count; ++i) {
+        if (mq_static_geometry_cache[i].key == key && mq_static_geometry_cache[i].pass == pass) {
+            glCallList(mq_static_geometry_cache[i].list_id);
+            return 1;
+        }
+    }
+    if (mq_static_geometry_count >= MQ_STATIC_GEOMETRY_CACHE_MAX) return 0;
+    {
+        mq_u32 list_id = glGenLists(1);
+        if (list_id == 0) return 0;
+        mq_static_geometry_cache[mq_static_geometry_count].key = key;
+        mq_static_geometry_cache[mq_static_geometry_count].pass = pass;
+        mq_static_geometry_cache[mq_static_geometry_count].list_id = list_id;
+        mq_static_geometry_count += 1;
+        mq_static_geometry_pending_list = list_id;
+        mq_static_geometry_pending = 1;
+    }
+    return 0;
+}
+
+MQ_EXPORT void mq_gl_static_geometry_clear(void) {
+    mq_i32 i;
+    if (mq_static_geometry_recording) {
+        glEndList();
+        mq_static_geometry_recording = 0;
+    }
+    for (i = 0; i < mq_static_geometry_count; ++i) {
+        if (mq_static_geometry_cache[i].list_id != 0) glDeleteLists(mq_static_geometry_cache[i].list_id, 1);
+    }
+    mq_static_geometry_count = 0;
+    mq_static_geometry_pending = 0;
+    mq_static_geometry_pending_list = 0;
+}
 
 #define MQ_FALSE 0
 #define MQ_TRUE 1
@@ -2374,8 +2434,20 @@ MQ_EXPORT const char *mq_udp_reverse_name(const char *address_text) {
     return mq_udp_reverse_name_text;
 }
 
-MQ_EXPORT void mq_gl_begin(mq_u32 mode) { glBegin(mode); }
-MQ_EXPORT void mq_gl_end(void) { glEnd(); }
+MQ_EXPORT void mq_gl_begin(mq_u32 mode) {
+    if (mq_static_geometry_pending && !mq_static_geometry_recording) {
+        glNewList(mq_static_geometry_pending_list, GL_COMPILE_AND_EXECUTE);
+        mq_static_geometry_pending = 0;
+        mq_static_geometry_recording = 1;
+    }
+ glBegin(mode); }
+MQ_EXPORT void mq_gl_end(void) { glEnd(); 
+    if (mq_static_geometry_recording) {
+        glEndList();
+        mq_static_geometry_recording = 0;
+        mq_static_geometry_pending_list = 0;
+    }
+}
 MQ_EXPORT void mq_gl_vertex2(mq_u32 x_bits, mq_u32 y_bits) { glVertex2f(mq_bits_to_float(x_bits), mq_bits_to_float(y_bits)); }
 MQ_EXPORT void mq_gl_vertex3(mq_u32 x_bits, mq_u32 y_bits, mq_u32 z_bits) { glVertex3f(mq_bits_to_float(x_bits), mq_bits_to_float(y_bits), mq_bits_to_float(z_bits)); }
 MQ_EXPORT void mq_gl_texcoord2(mq_u32 s_bits, mq_u32 t_bits) { glTexCoord2f(mq_bits_to_float(s_bits), mq_bits_to_float(t_bits)); }

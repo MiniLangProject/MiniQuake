@@ -345,7 +345,7 @@ function drawAlias(renderer, model, entity, time, viewModel)
   end if
   // R_SetupGL leaves front-face culling enabled for alias models.  The
   // production world path deliberately draws BSP polygons two-sided, so
-  // restore the GLQuake alias state locally instead of inheriting that state.
+  // restore the MiniQuake alias state locally instead of inheriting that state.
   // Without this, normally hidden weapon backfaces can win the depth test and
   // expose unrelated parts of the skin.
   gl.cullFace(gl.GL_FRONT)
@@ -446,33 +446,11 @@ end function
 function drawBrush(worldRendererValue, model, entity)
   submodelIndex = brushModelIndex(model.name)
   if submodelIndex <= 0 or submodelIndex >= len(worldRendererValue.map.models) then return 0 end if
-  submodel = worldRendererValue.map.models[submodelIndex]
-  firstFace = submodel.firstFace
-  lastFace = firstFace + submodel.numFaces
-  gl.pushMatrix()
-  gl.translate(entity.origin.x, entity.origin.y, entity.origin.z)
-  gl.rotate(entity.angles.y, 0.0, 0.0, 1.0)
-  gl.rotate(-entity.angles.x, 0.0, 1.0, 0.0)
-  gl.rotate(entity.angles.z, 1.0, 0.0, 0.0)
-  face = firstFace
-  while face < lastFace and face < len(worldRendererValue.surfaces)
-    if face >= 0 then worldRenderer.drawBaseSurface(worldRendererValue, worldRendererValue.surfaces[face]) end if
-    face = face + 1
-  end while
-  if not worldRendererValue.fullbright and not worldRendererValue.wireframe then
-    gl.enable(gl.GL_BLEND)
-    gl.blendFunc(gl.GL_ZERO, gl.GL_SRC_COLOR)
-    gl.depthMask(false)
-    face = firstFace
-    while face < lastFace and face < len(worldRendererValue.surfaces)
-      if face >= 0 then worldRenderer.drawLightSurface(worldRendererValue.surfaces[face]) end if
-      face = face + 1
-    end while
-    gl.depthMask(true)
-    gl.disable(gl.GL_BLEND)
-  end if
-  gl.popMatrix()
-  return submodel.numFaces
+  // Use the canonical MiniQuake bmodel path.  The client model index is a
+  // precache slot, while the leading *n name identifies the BSP submodel.
+  // Passing that index explicitly preserves entity.frame texture animation,
+  // dynamic-light marking and GL_LUMINANCE lightmap blend semantics.
+  return worldRenderer.R_DrawBrushModelForSubmodel(entity, submodelIndex)
 end function
 
 function renderSubmitted(renderer, worldRendererValue, entities, hiddenEntityNumber, viewRight, viewUp, time)
@@ -518,6 +496,11 @@ end function
 // R_DrawViewModel / V_CalcRefdef. The gun is a normal alias model drawn
 // from the view entity, with a compressed depth range so it cannot poke
 // through nearby world surfaces.
+function viewModelDepthRange(depthMin, depthMax)
+  weaponMax = depthMin + renderUiContract.viewModelDepthMaximum() * (depthMax - depthMin)
+  return [depthMin, weaponMax]
+end function
+
 function renderViewModel(renderer, player, view, time)
   if player.weapon <= 0 or player.weapon >= len(renderer.models) then return 0 end if
   if player.health <= 0.0 then return 0 end if
@@ -553,9 +536,11 @@ function renderViewModel(renderer, player, view, time)
     baseline,
     0.0,
   )
-  gl.depthRange(0.0, renderUiContract.viewModelDepthMaximum())
+  activeDepth = worldRenderer.R_CurrentDepthRange()
+  weaponDepth = viewModelDepthRange(activeDepth[0], activeDepth[1])
+  gl.depthRange(weaponDepth[0], weaponDepth[1])
   result = drawAlias(renderer, model, entity, time, true)
-  gl.depthRange(0.0, 1.0)
+  gl.depthRange(activeDepth[0], activeDepth[1])
   return result
 end function
 

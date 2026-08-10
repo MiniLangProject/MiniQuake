@@ -1,0 +1,32 @@
+{
+  "schema": "MiniQuakeOPT001CR2HarnessGolden/1",
+  "revision": "OPT-001CR2",
+  "parent": "OPT-001CR1",
+  "artifact_prefix": "opt001cr2",
+  "requested_handle_windows": 3,
+  "confirmation_handle_windows": 1,
+  "effective_handle_windows": 4,
+  "next_revision": "OPT-001D",
+  "opt001cr1_result": {
+    "archive": "MiniQuake_OPT-001CR1_RESULTS_20260807-212403.zip",
+    "archive_sha256": "d362d3f02385916cbff55dd854f3e2eb28a5d66b6ebae2098a0d5832e0090e01",
+    "all_product_and_correctness_steps_passed": true,
+    "performance_target_met_by_manual_reconstruction": true,
+    "handle_sequence": "275,275,275,276",
+    "handle_classification": "INCONCLUSIVE"
+  },
+  "performance_observation": {
+    "e1m1_headless_median_percent": 65.2173913043,
+    "e1m1_headless_p99_percent": 49.2063492063,
+    "e1m1_render_median_percent": 42.2018348624,
+    "e1m1_render_p99_percent": 33.3333333333,
+    "e1m2_headless_median_percent": 0.0,
+    "e1m2_headless_p99_percent": 82.9787234043,
+    "e1m2_render_median_percent": 49.6,
+    "e1m2_render_p99_percent": 61.0837438424
+  },
+  "source_hashes": {
+    "src/miniquake/render/gl11.ml": "aec9d743dddb55ca9dd390a1cce4b79b6469881320955005a1fe6556beb7b359",
+    "src/miniquake/render/world.ml": "ba9111317865d6ed22768ab0b5963f0923d0405e676036cdff556f0a4b247b32"
+  }
+}

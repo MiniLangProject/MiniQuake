@@ -1432,7 +1432,7 @@ end function
 
 function excludedMenuPath(state, name)
   state.action = ["excluded", name]
-  state.statusText = name + " networking is excluded from the Windows x64 GLQuake target"
+  state.statusText = name + " networking is excluded from the Windows x64 MiniQuake target"
   return false
 end function
 

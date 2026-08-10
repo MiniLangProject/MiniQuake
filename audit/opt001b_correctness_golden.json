@@ -1,0 +1,13 @@
+{
+  "schema": "MiniQuakeOPT001BCorrectnessGolden/1",
+  "status": "opt001b_error_freedom_candidate_v1",
+  "fingerprint": "0x1b001b02",
+  "parent": "OPT-001A",
+  "viewmodel_depth_fraction": 0.3,
+  "underwater_precomputation": "linear_leaf_marksurface_pass",
+  "void_texture_slot_policy": "leave_preinitialized_void_slot_untouched",
+  "maps": ["e1m1", "e1m2", "e1m1"],
+  "e1m2_visible_frames": 1000,
+  "e1m2_headless_frames": 10000,
+  "handle_sequence_plateau_example": [278, 278, 279, 279]
+}

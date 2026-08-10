@@ -710,7 +710,7 @@ function setClientColors(server, clientValue, topValue, bottomValue)
   return colors
 end function
 
-function privilegedCommandAllowed(server, clientValue)
+function inline privilegedCommandAllowed(server, clientValue)
   return not server.deathmatch or clientValue.privileged
 end function
 
@@ -1043,6 +1043,9 @@ function readMove(server, reader, client)
 end function
 
 function dropClient(server, client, crashed)
+  if client.lastMessage <= 0 then
+    return
+  end if
   wasConnected = client.active and client.socket is not void
   if client.socket is not void and not crashed and netmain.NET_CanSendMessage(client.socket) then
     protocolEvents.writeDisconnect(client.message)
@@ -2457,7 +2460,9 @@ function spawnRuntime(server, filesystem, mapName, skill, registry, commandSyste
   if server.machine is not void and server.machine.context is not void then
     server.randomSeed = server.machine.context.randomSeed
   end if
-  spawn(server, filesystem, mapName, skill)
+  spawned = true
+  spawned = try(spawn(server, filesystem, mapName, skill))
+  if spawned is error then return spawned end if
   // spawn() prepares the BSP/progs shell, but Quake keeps sv.state at
   // ss_loading through ED_LoadFromFile, the two settle frames and baselines.
   server.loading = true
@@ -2470,12 +2475,15 @@ function spawnRuntime(server, filesystem, mapName, skill, registry, commandSyste
   vm.setContext(server.machine, contextValue)
   qcbuiltins.install(server.machine, contextValue)
   qcedict.initializeGlobals(server.machine, server.mapName, skill, server.deathmatch, server.coop, server.serverFlags)
-  result = qcedict.loadMapEntitiesFrom(server.machine, server.worldModel, skill, server.deathmatch, server.maxClients + 1)
+  result = try(qcedict.loadMapEntitiesFrom(server.machine, server.worldModel, skill, server.deathmatch, server.maxClients + 1))
+  if result is error then return result end if
   recomputeEdictCount(server)
   server.modelPrecache = contextValue.modelPrecache
   server.soundPrecache = contextValue.soundPrecache
   server.lightStyles = contextValue.lightStyles
-  syncQuakeCEdicts(server)
+  synced = true
+  synced = try(syncQuakeCEdicts(server))
+  if synced is error then return synced end if
   assignModelIndexes(server)
 
   // WinQuake runs two 0.1 second physics frames before it creates baselines.
@@ -2493,7 +2501,8 @@ function spawnRuntime(server, filesystem, mapName, skill, registry, commandSyste
     sz.clear(server.datagram)
     settle = settle + 1
   end while
-  syncQuakeCEdicts(server)
+  synced = try(syncQuakeCEdicts(server))
+  if synced is error then return synced end if
   assignModelIndexes(server)
 
   // ED_LoadFromFile is authoritative for spawn entities. Recompute the local

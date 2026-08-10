@@ -1,0 +1,96 @@
+{
+  "schema": "MiniQuakeOPT001CR3R1Hotpath/1",
+  "revision": "OPT-001CR3R1",
+  "parent": "OPT-001CR3",
+  "result_archive": "MiniQuake_OPT-001CR3_RESULTS_20260808-234854.zip",
+  "result_sha256": "a57053a39cc4cb26a71cf638c2004374007380f89c7f20d525065bc4c4e78af8",
+  "observed_failure": {
+    "package_verification": "PASS",
+    "build": "FAIL",
+    "build_exit_code": 1,
+    "build_log_present_in_result_archive": false,
+    "follow_on_missing_executable": "MiniQuakeOPT001CAllocationTests.exe"
+  },
+  "compiler_safe_inline_policy": {
+    "required": [
+      {
+        "path": "src/miniquake/mathlib.ml",
+        "function": "DotProduct"
+      },
+      {
+        "path": "src/miniquake/protocol15_freeze.ml",
+        "function": "fingerprintValue"
+      },
+      {
+        "path": "src/miniquake/statusbar.ml",
+        "function": "Sbar_ColorForMap"
+      }
+    ],
+    "removed_risky_wrappers": [
+      {
+        "path": "src/miniquake/native.ml",
+        "functions": [
+          "floatBits",
+          "bitsFloat"
+        ]
+      },
+      {
+        "path": "src/miniquake/client.ml",
+        "functions": [
+          "clientFloat"
+        ]
+      },
+      {
+        "path": "src/miniquake/particles.ml",
+        "functions": [
+          "particleFloat"
+        ]
+      },
+      {
+        "path": "src/miniquake/sound/snd_dma.ml",
+        "functions": [
+          "soundF32"
+        ]
+      },
+      {
+        "path": "src/miniquake/sound/mixer.ml",
+        "functions": [
+          "mixerF32"
+        ]
+      },
+      {
+        "path": "src/miniquake/render/gl_warp.ml",
+        "functions": [
+          "warpFloat"
+        ]
+      },
+      {
+        "path": "src/miniquake/client_render_handoff.ml",
+        "functions": [
+          "renderFloat"
+        ]
+      },
+      {
+        "path": "src/miniquake/render/gl_rmain.ml",
+        "functions": [
+          "F32"
+        ]
+      }
+    ],
+    "budget": 3,
+    "rule": "single pure expression, no imported/native helper call in inline body"
+  },
+  "array_optimizations_preserved": [
+    "exact array(count, fill) allocation",
+    "geometric visible-entity builder",
+    "exact particle command/alive buffers",
+    "fixed-size zero/identity/client/handle arrays",
+    "guarded diagnostic frameTrace",
+    "fixed four-element partial IPv4 arrays"
+  ],
+  "harness": {
+    "live_output": "python_subprocess_live",
+    "build_failure_log_tail": 80,
+    "dependent_tests_after_build_failure": "SKIPPED"
+  }
+}

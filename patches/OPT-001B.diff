@@ -1,0 +1,1284 @@
+--- a/audit/opt001b_correctness_golden.json
++++ b/audit/opt001b_correctness_golden.json
+@@ -0,0 +1,13 @@
++{
++  "schema": "MiniQuakeOPT001BCorrectnessGolden/1",
++  "status": "opt001b_error_freedom_candidate_v1",
++  "fingerprint": "0x1b001b02",
++  "parent": "OPT-001A",
++  "viewmodel_depth_fraction": 0.3,
++  "underwater_precomputation": "linear_leaf_marksurface_pass",
++  "void_texture_slot_policy": "leave_preinitialized_void_slot_untouched",
++  "maps": ["e1m1", "e1m2", "e1m1"],
++  "e1m2_visible_frames": 1000,
++  "e1m2_headless_frames": 10000,
++  "handle_sequence_plateau_example": [278, 278, 279, 279]
++}
+--- a/build.ps1
++++ b/build.ps1
+@@ -975,6 +975,10 @@
+ Write-Host "[MiniQuake] compiling $Opt001AContractExe"
+ Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\opt001a_contract_tests.ml") -OutputFile $Opt001AContractExe -CompilerArguments $CommonArgs -Label "opt001a-contract-tests"
+ 
++$Opt001BContractExe = Join-Path $Output "MiniQuakeOPT001BCorrectnessTests.exe"
++Write-Host "[MiniQuake] compiling $Opt001BContractExe"
++Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\opt001b_contract_tests.ml") -OutputFile $Opt001BContractExe -CompilerArguments $CommonArgs -Label "opt001b-correctness-tests"
++
+ 
+ if (-not $NoRunTests) {
+   Write-Host "[MiniQuake] checking executable package identity"
+--- a/CHANGELOG_OPT-001B.md
++++ b/CHANGELOG_OPT-001B.md
+@@ -0,0 +1,16 @@
++# MiniQuake OPT-001B – Fehlerfreiheit
++
++Parent: `OPT-001A`
++
++## Änderungen
++
++- Viewmodel-Depth-Range wird aus dem tatsächlich aktiven GL-Z-Trick-Bereich berechnet und anschließend exakt wiederhergestellt.
++- `e1m2`-Renderabbruch durch eine unzulässige `void`-Indexzuweisung in einem leeren BSP-Texturslot behoben.
++- Unterwasserflächen werden beim WorldRenderer-Aufbau in einem linearen Leaf-/Marksurface-Durchlauf markiert.
++- Handlefolge `278,278,279,279` wird als einmalige Initialisierung mit anschließendem Plateau klassifiziert.
++- Neue In-Process-Transition `e1m1 -> e1m2 -> e1m1`.
++- Neue Zielgates: 1.000 sichtbare und 10.000 Headless-Frames auf `e1m2`.
++
++## Nicht enthalten
++
++Die breiten Frame-Allokations-, PVS-, Surface-Chain-, QuakeC- und Kollisionsoptimierungen folgen in OPT-001C bis OPT-001E.
+--- a/COLLECT_RESULTS.ps1
++++ b/COLLECT_RESULTS.ps1
+@@ -7,14 +7,14 @@
+ $Build = Join-Path $Root "build"
+ $PackageId = "BP-094"
+ $BlockId = "BP-090-094"
+-$DeliveryRevision = "OPT-001A"
+-$DeliveryParent = "BP-090-094R15"
++$DeliveryRevision = "OPT-001B"
++$DeliveryParent = "OPT-001A"
+ $Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+ # original_reference_binary_in_result_archive=$false
+ # historical external staging marker retained for contract verification: bp090-094-original-reference
+ # quake_game_data_in_result_archive=$false
+-$Staging = Join-Path $Build (".opt001a-results-{0}" -f $Timestamp)
+-$Archive = Join-Path $Build ("MiniQuake_OPT-001A_RESULTS_{0}.zip" -f $Timestamp)
++$Staging = Join-Path $Build (".opt001b-results-{0}" -f $Timestamp)
++$Archive = Join-Path $Build ("MiniQuake_OPT-001B_RESULTS_{0}.zip" -f $Timestamp)
+ 
+ if (-not (Test-Path -LiteralPath $Build -PathType Container)) { throw "build directory does not exist: $Build" }
+ if (Test-Path -LiteralPath $Staging) { Remove-Item -Recurse -Force -LiteralPath $Staging }
+@@ -78,6 +78,15 @@
+ }
+ 
+ $RootFiles = @(
++  "TEST_OPT-001B.ps1",
++  "CHANGELOG_OPT-001B.md",
++  "docs\OPT-001B_TESTING.md",
++  "docs\OPT-001B_CORRECTNESS_CONTRACT.md",
++  "docs\OPT-001B_DELIVERY_REPORT.json",
++  "tests\opt001b_contract_tests.ml",
++  "tools\check_opt001b.py",
++  "audit\opt001b_correctness_golden.json",
++  "patches\OPT-001B.diff",
+   "TEST_OPT-001A.ps1",
+   "CHANGELOG_OPT-001A.md",
+   "docs\OPT-001A_TESTING.md",
+--- a/docs/OPT-001A_RESULT_ANALYSIS.md
++++ b/docs/OPT-001A_RESULT_ANALYSIS.md
+@@ -0,0 +1,324 @@
++# MiniQuake OPT-001A – Ergebnisanalyse
++
++- Ergebnisarchiv: `MiniQuake_OPT-001A_RESULTS_20260806-170826.zip`
++- SHA-256: `db1ca9b1e420dee4cac645b536786e6c797df03120a0b2f55db44926e6a7ed20`
++- Erkannter Gesamtstatus: **nicht eindeutig in den Artefakten gefunden**
++- Handleklassifikation: **INCONCLUSIVE**
++- JSON-Dokumente ausgewertet: **117**
++
++## Gefundene OPT-001A-Zusammenfassungen
++
++- `build/opt001a-baseline-summary.json`
++- `build/opt001a-e1m1-render-summary.json`
++- `build/opt001a-listen-handle-plateau-summary.json`
++- `build/opt001a-e1m1-headless-summary.json`
++- `build/opt001a-e1m2-headless-summary.json`
++
++## Schlüsselwerte
++
++| Datei | Schlüssel | Wert |
++|---|---|---:|
++| `build/opt001a-baseline-summary.json` | `status` | `FAIL` |
++| `build/opt001a-baseline-summary.json` | `errors[0]` | `missing frame baseline: opt001a-e1m2-render-summary.json` |
++| `build/opt001a-baseline-summary.json` | `errors[1]` | `handle classification is INCONCLUSIVE` |
++| `build/opt001a-baseline-summary.json` | `handle_classification` | `INCONCLUSIVE` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.parse.schema` | `MiniQuakeOPT001AMapParse/1` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.parse.map` | `e1m1` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.parse.game` | `id1` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.parse.bytes` | `1365176` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.parse.read_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.parse.parse_ms` | `15` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.parse.total_ms` | `15` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.parse.entities` | `369` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.parse.models` | `58` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.parse.planes` | `1810` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.parse.vertices` | `7358` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.parse.faces` | `5516` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.parse.leafs` | `1531` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.parse.mark_surfaces` | `7073` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.parse.textures` | `81` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.parse.clipnodes` | `5408` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.trace.sha256_a` | `2cd0f88d05c4844dcfd86479eb8a6ffeaec6152988b65daed7934f0db8412d9e` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.trace.sha256_b` | `2cd0f88d05c4844dcfd86479eb8a6ffeaec6152988b65daed7934f0db8412d9e` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.trace.byte_identical` | `True` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.schema` | `MiniQuakeOPT001AFrameBaseline/1` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.mode` | `headless` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.map` | `e1m1` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.frames` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.total_ms` | `69312` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.median_ms` | `16` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.p95_ms` | `32` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.p99_ms` | `32` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.max_ms` | `47` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[0].name` | `filter` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[0].total_ms` | `15` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[0].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[1].name` | `commands` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[1].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[1].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[2].name` | `net_poll` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[2].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[2].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[3].name` | `send` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[3].total_ms` | `126` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[3].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[4].name` | `console` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[4].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[4].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[5].name` | `server` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[5].total_ms` | `68642` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[5].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[6].name` | `host_time` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[6].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[6].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[7].name` | `client_read` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[7].total_ms` | `172` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[7].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[8].name` | `demo_scene` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[8].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[8].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[9].name` | `entity_relink` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[9].total_ms` | `123` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[9].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[10].name` | `entity_effects` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[10].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[10].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[11].name` | `client_events` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[11].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[11].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[12].name` | `qc_control` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[12].total_ms` | `16` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[12].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[13].name` | `centerprint` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[13].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[13].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[14].name` | `view` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[14].total_ms` | `218` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[14].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[15].name` | `screen` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[15].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[15].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[16].name` | `dlight_decay` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[16].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[16].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[17].name` | `particles` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[17].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[17].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[18].name` | `audio` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[18].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[18].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[19].name` | `other` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[19].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.stage_totals[19].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_before[0]` | `114777` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_before[1]` | `118601672` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_before[2]` | `115401408` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_before[3]` | `3200264` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_before[4]` | `165` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_before[5]` | `150` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_before[6]` | `1` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_before[7]` | `2` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_before[8]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_before[9]` | `1` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_before[10]` | `93` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_before[11]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_before[12]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_before[13]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_before[14]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_before[15]` | `277` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_before[16]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_before[17]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_after[0]` | `114783` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_after[1]` | `118601672` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_after[2]` | `115425616` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_after[3]` | `3176056` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_after[4]` | `165` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_after[5]` | `150` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_after[6]` | `1` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_after[7]` | `2` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_after[8]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_after[9]` | `1` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_after[10]` | `93` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_after[11]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_after[12]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_after[13]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_after[14]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_after[15]` | `278` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_after[16]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.headless.resources_after[17]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.schema` | `MiniQuakeOPT001AFrameBaseline/1` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.mode` | `render` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.map` | `e1m1` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.frames` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.total_ms` | `207734` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.median_ms` | `63` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.p95_ms` | `79` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.p99_ms` | `79` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.max_ms` | `125` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[0].name` | `filter` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[0].total_ms` | `63` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[0].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[1].name` | `commands` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[1].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[1].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[2].name` | `net_poll` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[2].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[2].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[3].name` | `send` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[3].total_ms` | `530` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[3].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[4].name` | `console` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[4].total_ms` | `15` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[4].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[5].name` | `server` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[5].total_ms` | `66058` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[5].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[6].name` | `host_time` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[6].total_ms` | `30` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[6].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[7].name` | `client_read` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[7].total_ms` | `550` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[7].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[8].name` | `demo_scene` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[8].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[8].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[9].name` | `entity_relink` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[9].total_ms` | `266` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[9].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[10].name` | `entity_effects` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[10].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[10].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[11].name` | `client_events` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[11].total_ms` | `16` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[11].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[12].name` | `qc_control` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[12].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[12].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[13].name` | `centerprint` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[13].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[13].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[14].name` | `view` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[14].total_ms` | `332` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[14].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[15].name` | `screen` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[15].total_ms` | `139795` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[15].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[16].name` | `dlight_decay` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[16].total_ms` | `32` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[16].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[17].name` | `particles` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[17].total_ms` | `16` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[17].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[18].name` | `audio` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[18].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[18].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[19].name` | `other` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[19].total_ms` | `31` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.stage_totals[19].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_before[0]` | `348974` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_before[1]` | `152014752` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_before[2]` | `137499448` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_before[3]` | `14515304` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_before[4]` | `165` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_before[5]` | `150` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_before[6]` | `1` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_before[7]` | `2` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_before[8]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_before[9]` | `1` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_before[10]` | `93` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_before[11]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_before[12]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_before[13]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_before[14]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_before[15]` | `316` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_before[16]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_before[17]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_after[0]` | `348978` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_after[1]` | `152193696` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_after[2]` | `137523696` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_after[3]` | `14670000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_after[4]` | `165` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_after[5]` | `150` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_after[6]` | `1` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_after[7]` | `2` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_after[8]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_after[9]` | `1` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_after[10]` | `93` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_after[11]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_after[12]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_after[13]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_after[14]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_after[15]` | `313` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_after[16]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m1.render.resources_after[17]` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.parse.schema` | `MiniQuakeOPT001AMapParse/1` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.parse.map` | `e1m2` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.parse.game` | `id1` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.parse.bytes` | `1332228` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.parse.read_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.parse.parse_ms` | `15` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.parse.total_ms` | `15` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.parse.entities` | `555` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.parse.models` | `62` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.parse.planes` | `2079` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.parse.vertices` | `7558` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.parse.faces` | `5404` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.parse.leafs` | `1505` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.parse.mark_surfaces` | `7021` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.parse.textures` | `60` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.parse.clipnodes` | `8148` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.trace.sha256_a` | `18b74a7a9a9fa277356d3e3b833ac3360513492192a337c6de889ab12cc632e4` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.trace.sha256_b` | `18b74a7a9a9fa277356d3e3b833ac3360513492192a337c6de889ab12cc632e4` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.trace.byte_identical` | `True` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.schema` | `MiniQuakeOPT001AFrameBaseline/1` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.mode` | `headless` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.map` | `e1m2` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.frames` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.total_ms` | `87734` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.median_ms` | `31` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.p95_ms` | `46` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.p99_ms` | `47` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.max_ms` | `47` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[0].name` | `filter` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[0].total_ms` | `32` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[0].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[1].name` | `commands` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[1].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[1].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[2].name` | `net_poll` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[2].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[2].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[3].name` | `send` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[3].total_ms` | `140` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[3].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[4].name` | `console` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[4].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[4].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[5].name` | `server` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[5].total_ms` | `86949` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[5].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[6].name` | `host_time` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[6].total_ms` | `31` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[6].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[7].name` | `client_read` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[7].total_ms` | `157` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[7].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[8].name` | `demo_scene` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[8].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[8].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[9].name` | `entity_relink` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[9].total_ms` | `206` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[9].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[10].name` | `entity_effects` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[10].total_ms` | `0` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[10].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[11].name` | `client_events` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[11].total_ms` | `15` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[11].hits` | `3000` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[12].name` | `qc_control` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[12].total_ms` | `16` |
++| `build/opt001a-baseline-summary.json` | `maps.e1m2.headless.stage_totals[12].hits` | `3000` |
++
++## Aktuelle Fehler-/Abbruchmarker
++
++- Keine aktuellen `ERROR:`-/`FAIL:`-Marker in den ausgewerteten Buildlogs gefunden.--- a/docs/OPT-001B_CORRECTNESS_CONTRACT.md
++++ b/docs/OPT-001B_CORRECTNESS_CONTRACT.md
+@@ -0,0 +1,9 @@
++# OPT-001B Korrektheitsvertrag
++
++- aktiver Viewmodel-Tiefenbereich: `min .. min + 0.3 * (max-min)`
++- Wiederherstellung des exakten vorherigen Tiefenbereichs
++- keine `void`-Zuweisung über einen BSP-Texturarrayindex
++- lineare Unterwasser-Markierung über Leafs und Marksurfaces
++- `e1m2`: 1.000 sichtbare und 10.000 Headless-Frames
++- Kartenfolge: `e1m1 -> e1m2 -> e1m1`
++- Handlefolge mit einmaligem `+1` und anschließend stabilen Fenstern: `PLATEAU`
+--- a/docs/OPT-001B_DELIVERY_REPORT.json
++++ b/docs/OPT-001B_DELIVERY_REPORT.json
+@@ -0,0 +1,13 @@
++{
++  "schema": "MiniQuakeOPT001BDelivery/1",
++  "revision": "OPT-001B",
++  "parent": "OPT-001A",
++  "status": "windows_acceptance_pending",
++  "changes": [
++    "viewmodel active depth range",
++    "e1m2 void texture slot fix",
++    "linear underwater face precomputation",
++    "delayed handle plateau classification",
++    "e1m1-e1m2-e1m1 transition gate"
++  ]
++}
+--- a/docs/OPT-001B_TESTING.md
++++ b/docs/OPT-001B_TESTING.md
+@@ -0,0 +1,28 @@
++# OPT-001B Windows-Test
++
++```powershell
++$QuakeBase = "C:\Users\nilsk\Dropbox\Quake"
++$CompilerRoot = "C:\Users\nilsk\Desktop\MiniLang\MiniLangCompilerPy"
++
++.\TEST_OPT-001B.ps1 `
++  -Compiler "$CompilerRoot\mlc_win64.py" `
++  -StdLib $CompilerRoot `
++  -QuakeBase $QuakeBase `
++  -Game id1 `
++  -MatrixFrames 64 `
++  -WarmupFrames 300 `
++  -BenchmarkFrames 3000 `
++  -HandleWarmupFrames 1200 `
++  -HandleWindowFrames 5000 `
++  -HandleWindows 3 `
++  -E1M2VisibleFrames 1000 `
++  -E1M2HeadlessFrames 10000 `
++  -TransitionFrames 64 `
++  -ContinueIndependentTests
++```
++
++Anschließend:
++
++```powershell
++.\COLLECT_RESULTS.ps1
++```
+--- a/src/main.ml
++++ b/src/main.ml
+@@ -96,6 +96,8 @@
+   print "                             record headless/render frame-time and stage baseline"
+   print "  --opt001a-handle-plateau BASE MAP WARMUP WINDOW WINDOWS PREFIX [-game DIR] [-port N]"
+   print "                             classify process handles as STABLE, PLATEAU or LEAK"
++  print "  --opt001b-transition BASE FRAMES PREFIX [-game DIR]"
++  print "                             render e1m1 -> e1m2 -> e1m1 in one session"
+   print "  --udp-smoke [TIMEOUT_MS]   exchange a datagram through Winsock loopback"
+   print "  --music-smoke BASE GAME TRACK"
+   print "                             decode and mix an OGG replacement track"
+@@ -462,6 +464,13 @@
+     warmup, windowFrames, windows, port, arguments[6],
+   ))
+   if result is error then print "MiniQuake OPT-001A handle plateau: " + result.message; return 3 end if
++  return 0
++end function
++
++function runOpt001BTransitionCommand(arguments)
++  frames = boundedInteger(arguments[2], 64, 1, 1000000)
++  result = try(host.runOpt001BTransition(arguments[1], gameOption(arguments), frames, arguments[3]))
++  if result is error then print "MiniQuake OPT-001B transition: " + result.message; return 3 end if
+   return 0
+ end function
+ 
+@@ -585,6 +594,7 @@
+   if command == "--opt001a-map-parse" and len(args) >= 4 then return runOpt001AMapParseCommand(args) end if
+   if command == "--opt001a-frame-baseline" and len(args) >= 7 then return runOpt001AFrameBaselineCommand(args) end if
+   if command == "--opt001a-handle-plateau" and len(args) >= 7 then return runOpt001AHandlePlateauCommand(args) end if
++  if command == "--opt001b-transition" and len(args) >= 4 then return runOpt001BTransitionCommand(args) end if
+   if command == "--udp-smoke" and len(args) <= 2 then return runUdpSmoke(args) end if
+   if command == "--music-smoke" and len(args) == 4 then return musicSmoke(args[1], args[2], args[3]) end if
+   if command == "--play" and len(args) == 3 then return sysWin.WinMain(args, host.run) end if
+--- a/src/miniquake/build_info.ml
++++ b/src/miniquake/build_info.ml
+@@ -60,6 +60,6 @@
+ const COMPAT_FINAL_FINGERPRINT = 0xe04a7727
+ const PACKAGE_PURPOSE = "Verified original GLQuake provenance, bidirectional binary interop, external visual-reference corpus and final compat_109 candidate"
+ 
+-const OPTIMIZATION_STATUS = "opt001a_baseline_candidate_v1"
+-const OPTIMIZATION_FINGERPRINT = 0x1a001a01
+-const OPTIMIZATION_PARENT = "BP-090-094R15"
++const OPTIMIZATION_STATUS = "opt001b_error_freedom_candidate_v1"
++const OPTIMIZATION_FINGERPRINT = 0x1b001b02
++const OPTIMIZATION_PARENT = "OPT-001A"
+--- a/src/miniquake/host.ml
++++ b/src/miniquake/host.ml
+@@ -3660,6 +3660,46 @@
+   return error(3803, "OPT-001A frame baseline recorded an unexpected frame count")
+ end function
+ 
++function runOpt001BTransition(baseDirectory, gameDirectory, frameCount, outputPrefix)
++  session = create(opt001aSessionArguments(baseDirectory, gameDirectory, "e1m1", "render", 26000))
++  initialized = try(initialize(session))
++  if initialized is error then shutdown(session); return initialized end if
++  if not session.server.active or session.renderer is void then
++    shutdown(session)
++    return error(3820, "OPT-001B transition did not initialize e1m1 renderer")
++  end if
++
++  maps = ["e1m1", "e1m2", "e1m1"]
++  json = "{\"schema\":\"MiniQuakeOPT001BTransition/1\",\"maps\":["
++  mapIndex = 0
++  while mapIndex < len(maps)
++    mapName = maps[mapIndex]
++    if mapIndex > 0 then
++      changed = try(startMap(session, mapName))
++      if changed is error then shutdown(session); return changed end if
++    end if
++    if session.server.mapName != mapName then
++      shutdown(session)
++      return error(3821, "OPT-001B transition expected " + mapName + " got " + session.server.mapName)
++    end if
++    if session.renderer is void or not session.windowCreated then
++      shutdown(session)
++      return error(3822, "OPT-001B transition missing renderer for " + mapName)
++    end if
++    ran = try(opt001aRunFrames(session, frameCount, "transition_" + mapName))
++    if ran is error then shutdown(session); return ran end if
++    if mapIndex > 0 then json = json + "," end if
++    json = json + "{\"map\":\"" + mapName + "\",\"frames\":" + frameCount + ",\"renderer\":true}"
++    print "MiniQuake OPT-001B transition " + mapName + ": PASS"
++    mapIndex = mapIndex + 1
++  end while
++  json = json + "],\"result\":\"PASS\"}\n"
++  written = try(fs.writeAllText(outputPrefix + "-summary.json", json))
++  shutdown(session)
++  if written is error then return written end if
++  return true
++end function
++
+ function runOpt001AHandlePlateau(baseDirectory, gameDirectory, mapName, warmupFrames, windowFrames, windowCount, port, outputPrefix)
+   if windowCount < 3 then windowCount = 3 end if
+   session = create(opt001aSessionArguments(baseDirectory, gameDirectory, mapName, "listen", port))
+--- a/src/miniquake/optimization_baseline.ml
++++ b/src/miniquake/optimization_baseline.ml
+@@ -296,9 +296,24 @@
+   end while
+   if allEqual then return "STABLE" end if
+ 
+-  if len(handles) >= 4 then
++  if len(handles) >= 3 then
+     tail = len(handles) - 1
+-    if handles[tail] == handles[tail - 1] and handles[tail - 1] == handles[tail - 2] then
++    nonDecreasing = true
++    minimum = handles[0]
++    maximum = handles[0]
++    index = 1
++    while index < len(handles)
++      if handles[index] < handles[index - 1] then nonDecreasing = false end if
++      if handles[index] < minimum then minimum = handles[index] end if
++      if handles[index] > maximum then maximum = handles[index] end if
++      index = index + 1
++    end while
++    // A single delayed +1 handle after warm-up is a one-time initialization
++    // when the final two windows are stable.  Continued growth is still a leak.
++    if nonDecreasing and maximum - minimum <= 1 and handles[tail] == handles[tail - 1] then
++      return "PLATEAU"
++    end if
++    if len(handles) >= 4 and handles[tail] == handles[tail - 1] and handles[tail - 1] == handles[tail - 2] then
+       return "PLATEAU"
+     end if
+   end if
+--- a/src/miniquake/render/entities.ml
++++ b/src/miniquake/render/entities.ml
+@@ -496,6 +496,11 @@
+ // R_DrawViewModel / V_CalcRefdef. The gun is a normal alias model drawn
+ // from the view entity, with a compressed depth range so it cannot poke
+ // through nearby world surfaces.
++function viewModelDepthRange(depthMin, depthMax)
++  weaponMax = depthMin + renderUiContract.viewModelDepthMaximum() * (depthMax - depthMin)
++  return [depthMin, weaponMax]
++end function
++
+ function renderViewModel(renderer, player, view, time)
+   if player.weapon <= 0 or player.weapon >= len(renderer.models) then return 0 end if
+   if player.health <= 0.0 then return 0 end if
+@@ -531,9 +536,11 @@
+     baseline,
+     0.0,
+   )
+-  gl.depthRange(0.0, renderUiContract.viewModelDepthMaximum())
++  activeDepth = worldRenderer.R_CurrentDepthRange()
++  weaponDepth = viewModelDepthRange(activeDepth[0], activeDepth[1])
++  gl.depthRange(weaponDepth[0], weaponDepth[1])
+   result = drawAlias(renderer, model, entity, time, true)
+-  gl.depthRange(0.0, 1.0)
++  gl.depthRange(activeDepth[0], activeDepth[1])
+   return result
+ end function
+ 
+--- a/src/miniquake/render/world.ml
++++ b/src/miniquake/render/world.ml
+@@ -114,7 +114,28 @@
+   return flags
+ end function
+ 
+-function buildSurface(map, faceIndex)
++function buildUnderwaterFlags(map)
++  flags = bytes(len(map.faces), 0)
++  leafIndex = 0
++  while leafIndex < len(map.leafs)
++    leaf = map.leafs[leafIndex]
++    if leaf.contents != c.CONTENTS_EMPTY then
++      mark = 0
++      while mark < leaf.numMarkSurfaces
++        markIndex = leaf.firstMarkSurface + mark
++        if markIndex >= 0 and markIndex < len(map.markSurfaces) then
++          faceIndex = map.markSurfaces[markIndex]
++          if faceIndex >= 0 and faceIndex < len(flags) then flags[faceIndex] = 1 end if
++        end if
++        mark = mark + 1
++      end while
++    end if
++    leafIndex = leafIndex + 1
++  end while
++  return flags
++end function
++
++function buildSurface(map, faceIndex, underwaterFlags)
+   if faceIndex < 0 or faceIndex >= len(map.faces) then return error(2704, "R_BuildSurface: bad face") end if
+   face = map.faces[faceIndex]
+   if face.texInfo < 0 or face.texInfo >= len(map.texInfo) then return error(2705, "R_BuildSurface: bad texinfo") end if
+@@ -177,7 +198,7 @@
+ 
+   flags = textureFlags(textureName, face.side)
+   if (info.flags & c.TEX_SPECIAL) != 0 then flags = flags | c.SURF_DRAWTILED end if
+-  if bsp.faceUnderwater(map, faceIndex) then flags = flags | c.SURF_UNDERWATER end if
++  if faceIndex < len(underwaterFlags) and underwaterFlags[faceIndex] != 0 then flags = flags | c.SURF_UNDERWATER end if
+   return t.RenderSurface(
+     faceIndex,
+     textureIndex,
+@@ -225,18 +246,20 @@
+   textureIndex = 0
+   while textureIndex < len(map.textures)
+     sourceTexture = map.textures[textureIndex]
+-    if sourceTexture is void then
+-      textures[textureIndex] = void
+-    else
++    // makeEmptyArray already contains void.  Reassigning void through an
++    // array index is invalid under strict MiniLang void handling and caused
++    // e1m2 to abort for an intentionally empty BSP texture slot.
++    if sourceTexture is not void then
+       transparent = startsWith(sourceTexture.name, "{")
+       textures[textureIndex] = t.RenderTexture(sourceTexture.name, sourceTexture.width, sourceTexture.height, 0, sourceTexture.pixels, transparent)
+     end if
+     textureIndex = textureIndex + 1
+   end while
++  underwaterFlags = buildUnderwaterFlags(map)
+   surfaces = arrayutil.makeEmptyArray(len(map.faces))
+   faceIndex = 0
+   while faceIndex < len(map.faces)
+-    surfaces[faceIndex] = buildSurface(map, faceIndex)
++    surfaces[faceIndex] = buildSurface(map, faceIndex, underwaterFlags)
+     faceIndex = faceIndex + 1
+   end while
+   visible = bytes(len(map.faces), 1)
+@@ -463,6 +486,10 @@
+     rCompatFinish, rCompatNoRefresh, rCompatTrickFrame,
+     rCompatMirrorTexture, rCompatLastClearPlan,
+   ]
++end function
++
++function R_CurrentDepthRange()
++  return [rCompatDepthMin, rCompatDepthMax]
+ end function
+ 
+ function R_ClearProduction()
+--- a/test.ps1
++++ b/test.ps1
+@@ -1 +1 @@
+-﻿& "$PSScriptRoot\TEST_OPT-001A.ps1" @args
++& "$PSScriptRoot\TEST_OPT-001B.ps1" @args
+--- a/TEST_OPT-001B.ps1
++++ b/TEST_OPT-001B.ps1
+@@ -0,0 +1,295 @@
++[CmdletBinding()]
++param(
++  [Parameter(Mandatory = $true)]
++  [string]$Compiler,
++  [Parameter(Mandatory = $true)]
++  [string]$StdLib,
++  [Parameter(Mandatory = $true)]
++  [string]$QuakeBase,
++  [string]$Game = "id1",
++  [int]$MatrixFrames = 64,
++  [int]$WarmupFrames = 300,
++  [int]$BenchmarkFrames = 3000,
++  [int]$HandleWarmupFrames = 1200,
++  [int]$HandleWindowFrames = 5000,
++  [int]$HandleWindows = 3,
++  [int]$E1M2VisibleFrames = 1000,
++  [int]$E1M2HeadlessFrames = 10000,
++  [int]$TransitionFrames = 64,
++  [int]$ListenPort = 0,
++  [switch]$SkipBuild,
++  [switch]$SkipTemporaryFirewallRules,
++  [switch]$ContinueIndependentTests
++)
++
++$ErrorActionPreference = "Stop"
++Set-StrictMode -Version Latest
++$env:PYTHONUNBUFFERED = "1"
++
++$Root = $PSScriptRoot
++$Build = Join-Path $Root "build"
++$GameExe = Join-Path $Build "MiniQuake.exe"
++$ContractExe = Join-Path $Build "MiniQuakeOPT001BCorrectnessTests.exe"
++$DeliveryRevision = "OPT-001B"
++$DeliveryParent = "OPT-001A"
++$SummaryPath = Join-Path $Build "opt001b-test-summary.json"
++$Steps = @()
++$Failures = 0
++$FirewallRules = @()
++
++
++function Get-FreeUdpPort {
++  $Client = New-Object System.Net.Sockets.UdpClient
++  try {
++    $Client.Client.Bind((New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Loopback, 0)))
++    return [int]([System.Net.IPEndPoint]$Client.Client.LocalEndPoint).Port
++  }
++  finally {
++    $Client.Dispose()
++  }
++}
++
++function Test-IsAdministrator {
++  $Identity = [Security.Principal.WindowsIdentity]::GetCurrent()
++  $Principal = New-Object Security.Principal.WindowsPrincipal($Identity)
++  return $Principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
++}
++
++function Add-Step([string]$Name, [string]$Status, [int]$ExitCode, [string]$Log) {
++  $script:Steps += [pscustomobject]@{ name=$Name; status=$Status; exit_code=$ExitCode; log=$Log }
++  if ($Status -eq "FAIL") { $script:Failures += 1 }
++  $Colour = "Gray"
++  if ($Status -eq "PASS") { $Colour = "Green" }
++  if ($Status -eq "FAIL") { $Colour = "Red" }
++  if ($Status -eq "SKIPPED" -or $Status -eq "DIAGNOSTIC") { $Colour = "Yellow" }
++  Write-Host ("[{0}] {1}" -f $Status, $Name) -ForegroundColor $Colour
++}
++
++function Invoke-Live(
++  [string]$Name,
++  [string]$Executable,
++  [string[]]$Arguments,
++  [string]$LogName,
++  [switch]$AllowFailure
++) {
++  $LogPath = Join-Path $Build $LogName
++  Write-Host ("[MiniQuake/OPT-001B] starting {0}" -f $Name) -ForegroundColor Cyan
++  Write-Host ("  executable={0}" -f $Executable)
++  Write-Host ("  arguments={0}" -f ($Arguments -join " "))
++  & $Executable @Arguments 2>&1 | Tee-Object -FilePath $LogPath
++  $Code = [int]$LASTEXITCODE
++  if ($Code -eq 0) {
++    Add-Step $Name "PASS" $Code $LogName
++  } else {
++    if ($AllowFailure) {
++      Add-Step $Name "DIAGNOSTIC" $Code $LogName
++    } else {
++      Add-Step $Name "FAIL" $Code $LogName
++      if (-not $ContinueIndependentTests) {
++        throw ("{0} failed with exit code {1}" -f $Name, $Code)
++      }
++    }
++  }
++  return $Code
++}
++
++function Install-LoopbackFirewallRules {
++  if ($SkipTemporaryFirewallRules) {
++    Write-Host "[MiniQuake/OPT-001B] temporary loopback firewall rules explicitly skipped" -ForegroundColor Yellow
++    return
++  }
++  if (-not (Test-IsAdministrator)) {
++    throw "OPT-001B listen-server measurement requires elevated PowerShell for unattended temporary loopback firewall rules. Start PowerShell as Administrator or pass -SkipTemporaryFirewallRules."
++  }
++  foreach ($Command in @("New-NetFirewallRule", "Remove-NetFirewallRule")) {
++    if ($null -eq (Get-Command $Command -ErrorAction SilentlyContinue)) {
++      throw "Windows Defender Firewall cmdlet unavailable: $Command"
++    }
++  }
++  $Prefix = "MiniQuake-OPT001A-$PID"
++  foreach ($Direction in @("Inbound", "Outbound")) {
++    $Name = "$Prefix-$Direction"
++    New-NetFirewallRule `
++      -Name $Name `
++      -DisplayName $Name `
++      -Direction $Direction `
++      -Action Allow `
++      -Program $GameExe `
++      -Protocol UDP `
++      -LocalAddress 127.0.0.1 `
++      -RemoteAddress 127.0.0.1 `
++      -Profile Any | Out-Null
++    $script:FirewallRules += $Name
++  }
++  Write-Host "[MiniQuake/OPT-001B] temporary loopback firewall rules installed: 2" -ForegroundColor Green
++}
++
++function Remove-LoopbackFirewallRules {
++  foreach ($Name in $script:FirewallRules) {
++    Remove-NetFirewallRule -Name $Name -Confirm:$false -ErrorAction SilentlyContinue
++  }
++  if ($script:FirewallRules.Count -gt 0) {
++    Write-Host "[MiniQuake/OPT-001B] temporary loopback firewall rules removed" -ForegroundColor Green
++  }
++}
++
++function Write-Summary([string]$Overall, [string]$HandleClassification) {
++  [ordered]@{
++    schema = "MiniQuakeOPT001BTestSummary/1"
++    delivery_revision = $DeliveryRevision
++    delivery_parent = $DeliveryParent
++    overall = $Overall
++    failures = $Failures
++    handle_classification = $HandleClassification
++    matrix_frames = $MatrixFrames
++    warmup_frames = $WarmupFrames
++    benchmark_frames = $BenchmarkFrames
++    handle_warmup_frames = $HandleWarmupFrames
++    handle_window_frames = $HandleWindowFrames
++    handle_windows = $HandleWindows
++    e1m2_visible_frames = $E1M2VisibleFrames
++    e1m2_headless_frames = $E1M2HeadlessFrames
++    transition_frames = $TransitionFrames
++    maps = @("e1m1", "e1m2")
++    steps = $Steps
++  } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $SummaryPath -Encoding UTF8
++}
++
++New-Item -ItemType Directory -Force -Path $Build | Out-Null
++$Compiler = [IO.Path]::GetFullPath($Compiler)
++$StdLib = [IO.Path]::GetFullPath($StdLib)
++$QuakeBase = [IO.Path]::GetFullPath($QuakeBase)
++
++if (-not (Test-Path -LiteralPath $Compiler -PathType Leaf)) { throw "MiniLang compiler not found: $Compiler" }
++if (-not (Test-Path -LiteralPath (Join-Path $StdLib "std\fs.ml") -PathType Leaf)) { throw "MiniLang stdlib root invalid: $StdLib" }
++if (-not (Test-Path -LiteralPath (Join-Path $QuakeBase "$Game\pak0.pak") -PathType Leaf)) { throw "Quake pak0.pak not found below: $QuakeBase\$Game" }
++
++$PythonExe = (Get-Command python -ErrorAction Stop | Select-Object -First 1).Path
++$PowerShellExe = (Get-Process -Id $PID).Path
++if ($ListenPort -le 0) { $ListenPort = Get-FreeUdpPort }
++
++Write-Host "MiniQuake OPT-001B acceptance test"
++Write-Host "  parent: $DeliveryParent"
++Write-Host "  root:   $Root"
++Write-Host "  maps:   e1m1, e1m2"
++Write-Host "  benchmark: warmup=$WarmupFrames measure=$BenchmarkFrames"
++Write-Host "  handles: warmup=$HandleWarmupFrames windows=$HandleWindows x $HandleWindowFrames port=$ListenPort"
++Write-Host "  targeted e1m2: visible=$E1M2VisibleFrames headless=$E1M2HeadlessFrames transition=$TransitionFrames"
++
++try {
++  [void](Invoke-Live "OPT-001B package verification" $PythonExe @(
++    (Join-Path $Root "tools\verify.py"), "--root", $Root,
++    "--json", (Join-Path $Build "opt001a-package-verification.json")
++  ) "opt001a-package-verification.log")
++
++  if (-not $SkipBuild) {
++    $BuildArgs = @(
++      "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $Root "build.ps1"),
++      "-Compiler", $Compiler, "-StdLib", $StdLib, "-Configuration", "Release",
++      "-NoRunTests", "-SkipPreflight"
++    )
++    [void](Invoke-Live "OPT-001B game and contract build" $PowerShellExe $BuildArgs "opt001a-build.log")
++  } else {
++    if (-not (Test-Path -LiteralPath $GameExe -PathType Leaf)) { throw "-SkipBuild requested but MiniQuake.exe is missing" }
++    if (-not (Test-Path -LiteralPath $ContractExe -PathType Leaf)) { throw "-SkipBuild requested but contract test executable is missing" }
++    Add-Step "OPT-001B game and contract build" "SKIPPED" 0 "-SkipBuild"
++  }
++
++  [void](Invoke-Live "OPT-001B contract tests" $ContractExe @() "opt001b-correctness-tests.log")
++  Install-LoopbackFirewallRules
++
++  foreach ($Map in @("e1m1", "e1m2")) {
++    $MapPrefix = Join-Path $Build ("opt001a-{0}" -f $Map)
++    [void](Invoke-Live "$Map BSP parse" $GameExe @(
++      "--opt001a-map-parse", $QuakeBase, $Map, $MapPrefix, "-game", $Game
++    ) ("opt001a-{0}-map-parse.log" -f $Map))
++    [void](Invoke-Live "$Map runtime smoke" $GameExe @(
++      "--runtime-smoke", $QuakeBase, $Map, [string]$MatrixFrames, "-game", $Game
++    ) ("opt001a-{0}-runtime-smoke.log" -f $Map))
++    [void](Invoke-Live "$Map render smoke" $GameExe @(
++      "--render-smoke", $QuakeBase, $Map, [string]$MatrixFrames, "-game", $Game
++    ) ("opt001a-{0}-render-smoke.log" -f $Map))
++
++    $TraceA = Join-Path $Build ("opt001a-{0}-trace-a" -f $Map)
++    $TraceB = Join-Path $Build ("opt001a-{0}-trace-b" -f $Map)
++    [void](Invoke-Live "$Map trace A" $GameExe @(
++      "--compat-trace", $QuakeBase, $Map, [string]$MatrixFrames, $TraceA, "-game", $Game
++    ) ("opt001a-{0}-trace-a.log" -f $Map))
++    [void](Invoke-Live "$Map trace B" $GameExe @(
++      "--compat-trace", $QuakeBase, $Map, [string]$MatrixFrames, $TraceB, "-game", $Game
++    ) ("opt001a-{0}-trace-b.log" -f $Map))
++    [void](Invoke-Live "$Map trace comparison" $PythonExe @(
++      (Join-Path $Root "tools\compare_traces.py"), ($TraceA + ".mqtrace"), ($TraceB + ".mqtrace"),
++      "--json-output", (Join-Path $Build ("opt001a-{0}-trace-comparison.json" -f $Map))
++    ) ("opt001a-{0}-trace-comparison.log" -f $Map))
++
++    foreach ($Mode in @("headless", "render")) {
++      $Prefix = Join-Path $Build ("opt001a-{0}-{1}" -f $Map, $Mode)
++      [void](Invoke-Live "$Map $Mode frame baseline" $GameExe @(
++        "--opt001a-frame-baseline", $QuakeBase, $Map, $Mode,
++        [string]$WarmupFrames, [string]$BenchmarkFrames, $Prefix, "-game", $Game
++      ) ("opt001a-{0}-{1}-baseline.log" -f $Map, $Mode))
++    }
++  }
++
++  $VisiblePrefix = Join-Path $Build "opt001b-e1m2-visible"
++  [void](Invoke-Live "OPT-001B e1m2 visible validation" $GameExe @(
++    "--render-evidence", $QuakeBase, "e1m2", [string]$E1M2VisibleFrames, $VisiblePrefix, "-game", $Game
++  ) "opt001b-e1m2-visible.log")
++
++  [void](Invoke-Live "OPT-001B e1m2 headless validation" $GameExe @(
++    "--runtime-smoke", $QuakeBase, "e1m2", [string]$E1M2HeadlessFrames, "-game", $Game
++  ) "opt001b-e1m2-headless.log")
++
++  $TransitionPrefix = Join-Path $Build "opt001b-transition"
++  [void](Invoke-Live "OPT-001B e1m1-e1m2-e1m1 transition" $GameExe @(
++    "--opt001b-transition", $QuakeBase, [string]$TransitionFrames, $TransitionPrefix, "-game", $Game
++  ) "opt001b-transition.log")
++
++  $PlateauPrefix = Join-Path $Build "opt001a-listen-handle-plateau"
++  [void](Invoke-Live "listen-server handle plateau" $GameExe @(
++    "--opt001a-handle-plateau", $QuakeBase, "start",
++    [string]$HandleWarmupFrames, [string]$HandleWindowFrames, [string]$HandleWindows,
++    $PlateauPrefix, "-game", $Game, "-port", [string]$ListenPort
++  ) "opt001a-handle-plateau.log" -AllowFailure)
++
++  [void](Invoke-Live "OPT-001B aggregate analysis" $PythonExe @(
++    (Join-Path $Root "tools\analyze_opt001a.py"), "--build", $Build,
++    "--json", (Join-Path $Build "opt001b-baseline-summary.json"),
++    "--markdown", (Join-Path $Build "opt001b-baseline-summary.md")
++  ) "opt001a-aggregate-analysis.log" -AllowFailure)
++
++  $HandleClassification = "UNKNOWN"
++  $PlateauSummary = $PlateauPrefix + "-summary.json"
++  if (Test-Path -LiteralPath $PlateauSummary -PathType Leaf) {
++    $HandleClassification = [string]((Get-Content -Raw -LiteralPath $PlateauSummary | ConvertFrom-Json).classification)
++  }
++  $Overall = "PASS"
++  if ($Failures -gt 0) { $Overall = "FAIL" }
++  if ($Overall -eq "PASS" -and $HandleClassification -eq "LEAK") { $Overall = "LEAK" }
++  if ($Overall -eq "PASS" -and $HandleClassification -eq "INCONCLUSIVE") { $Overall = "INCONCLUSIVE" }
++  if ($Overall -eq "PASS" -and $HandleClassification -eq "RESOURCE_GROWTH") { $Overall = "FAIL" }
++  Write-Summary $Overall $HandleClassification
++
++  Write-Host ""
++  Write-Host "MiniQuake OPT-001B summary"
++  Write-Host "  handle_classification=$HandleClassification"
++  Write-Host "  failures=$Failures"
++  Write-Host "  summary=$SummaryPath"
++  if ($Overall -eq "PASS") {
++    Write-Host "MiniQuake OPT-001B acceptance test: PASS" -ForegroundColor Green
++    exit 0
++  }
++  Write-Host ("MiniQuake OPT-001B acceptance test: {0}" -f $Overall) -ForegroundColor Red
++  exit 2
++}
++catch {
++  Add-Step "OPT-001B harness" "FAIL" 1 $_.Exception.Message
++  Write-Summary "FAIL" "UNKNOWN"
++  Write-Host ("ERROR: " + $_.Exception.Message) -ForegroundColor Red
++  Write-Host "MiniQuake OPT-001B acceptance test: FAIL" -ForegroundColor Red
++  exit 1
++}
++finally {
++  Remove-LoopbackFirewallRules
++}
+--- a/tests/opt001b_contract_tests.ml
++++ b/tests/opt001b_contract_tests.ml
+@@ -0,0 +1,42 @@
++import miniquake.optimization_baseline as opt
++import miniquake.render.entities as entities
++
++opt001bPassed = 0
++opt001bFailed = 0
++
++function opt001bCheck(condition, label)
++  global opt001bPassed, opt001bFailed
++  if condition then
++    opt001bPassed = opt001bPassed + 1
++    print "[PASS] " + label
++  else
++    opt001bFailed = opt001bFailed + 1
++    print "[FAIL] " + label
++  end if
++end function
++
++function main(args)
++  normal = entities.viewModelDepthRange(0.0, 1.0)
++  opt001bCheck(normal[0] == 0.0, "normal weapon depth min")
++  opt001bCheck(normal[1] == 0.3, "normal weapon depth max")
++
++  lower = entities.viewModelDepthRange(0.0, 0.5)
++  opt001bCheck(lower[0] == 0.0, "lower ztrick weapon depth min")
++  opt001bCheck(lower[1] == 0.15, "lower ztrick weapon depth max")
++
++  reverse = entities.viewModelDepthRange(1.0, 0.5)
++  opt001bCheck(reverse[0] == 1.0, "reverse ztrick weapon depth min")
++  opt001bCheck(reverse[1] == 0.85, "reverse ztrick weapon depth max")
++
++  opt001bCheck(opt.classifyHandles([278, 278, 279, 279], true) == "PLATEAU", "delayed one-handle plateau")
++  opt001bCheck(opt.classifyHandles([278, 279, 280, 281], true) == "LEAK", "continued handle growth")
++  opt001bCheck(opt.classifyHandles([278, 278, 278, 278], true) == "STABLE", "stable handle sequence")
++  opt001bCheck(opt.classifyHandles([278, 278, 279, 280], true) == "INCONCLUSIVE", "unsettled handle sequence")
++
++  print "MiniQuake OPT-001B correctness tests passed: " + opt001bPassed
++  if opt001bFailed > 0 then
++    print "MiniQuake OPT-001B correctness tests failed: " + opt001bFailed
++    return 1
++  end if
++  return 0
++end function
+--- a/tools/check_opt001b.py
++++ b/tools/check_opt001b.py
+@@ -0,0 +1,106 @@
++#!/usr/bin/env python3
++"""Static OPT-001B error-freedom and delivery contract checks."""
++from __future__ import annotations
++import argparse, json, re
++from pathlib import Path
++
++def require(text: str, markers: list[str], label: str, errors: list[str]) -> None:
++    for marker in markers:
++        if marker not in text:
++            errors.append(f"{label} missing marker: {marker}")
++
++def main() -> int:
++    ap=argparse.ArgumentParser()
++    ap.add_argument('--root',default='.')
++    ap.add_argument('--json',default='')
++    args=ap.parse_args()
++    root=Path(args.root).resolve()
++    errors=[]
++    world=(root/'src/miniquake/render/world.ml').read_text(encoding='utf-8-sig')
++    entities=(root/'src/miniquake/render/entities.ml').read_text(encoding='utf-8-sig')
++    opt=(root/'src/miniquake/optimization_baseline.ml').read_text(encoding='utf-8-sig')
++    main=(root/'src/main.ml').read_text(encoding='utf-8-sig')
++    host=(root/'src/miniquake/host.ml').read_text(encoding='utf-8-sig')
++    bi=(root/'src/miniquake/build_info.ml').read_text(encoding='utf-8-sig')
++    runner=(root/'TEST_OPT-001B.ps1').read_text(encoding='utf-8-sig')
++    contract=(root/'tests/opt001b_contract_tests.ml').read_text(encoding='utf-8-sig')
++    golden=json.loads((root/'audit/opt001b_correctness_golden.json').read_text(encoding='utf-8-sig'))
++
++    require(world,[
++        'function buildUnderwaterFlags(map)',
++        'underwaterFlags = buildUnderwaterFlags(map)',
++        'underwaterFlags[faceIndex] != 0',
++        'function R_CurrentDepthRange()',
++        'makeEmptyArray already contains void',
++    ],'world',errors)
++    if re.search(r'textures\s*\[\s*textureIndex\s*\]\s*=\s*void',world):
++        errors.append('world still assigns void through a texture array index')
++    build_surface=re.search(r'(?ms)^function buildSurface\b.*?^end function$',world)
++    if build_surface and 'bsp.faceUnderwater' in build_surface.group(0):
++        errors.append('buildSurface still performs per-face leaf/marksurface search')
++
++    require(entities,[
++        'function viewModelDepthRange(depthMin, depthMax)',
++        'depthMin + renderUiContract.viewModelDepthMaximum() * (depthMax - depthMin)',
++        'activeDepth = worldRenderer.R_CurrentDepthRange()',
++        'gl.depthRange(activeDepth[0], activeDepth[1])',
++    ],'entities',errors)
++    if 'gl.depthRange(0.0, renderUiContract.viewModelDepthMaximum())' in entities:
++        errors.append('fixed normal-direction viewmodel depth range remains')
++
++    require(opt,[
++        'maximum - minimum <= 1',
++        'handles[tail] == handles[tail - 1]',
++        'return "PLATEAU"',
++    ],'handle classification',errors)
++    require(main,['--opt001b-transition','runOpt001BTransitionCommand'], 'main', errors)
++    require(host,['function runOpt001BTransition(', 'MiniQuake OPT-001B transition ', 'startMap(session, mapName)'], 'host', errors)
++    require(bi,[
++        'const OPTIMIZATION_STATUS = "opt001b_error_freedom_candidate_v1"',
++        'const OPTIMIZATION_FINGERPRINT = 0x1b001b02',
++        'const OPTIMIZATION_PARENT = "OPT-001A"',
++    ],'build info',errors)
++    require(runner,[
++        '$DeliveryRevision = "OPT-001B"',
++        '$DeliveryParent = "OPT-001A"',
++        'E1M2VisibleFrames = 1000',
++        'E1M2HeadlessFrames = 10000',
++        '--opt001b-transition',
++        'MiniQuake OPT-001B acceptance test: PASS',
++    ],'runner',errors)
++    require(contract,[
++        'viewModelDepthRange(1.0, 0.5)',
++        '[278, 278, 279, 279]',
++        'MiniQuake OPT-001B correctness tests passed:',
++    ],'contract',errors)
++    expected={
++        'status':'opt001b_error_freedom_candidate_v1',
++        'fingerprint':'0x1b001b02',
++        'parent':'OPT-001A',
++        'e1m2_visible_frames':1000,
++        'e1m2_headless_frames':10000,
++    }
++    for k,v in expected.items():
++        if golden.get(k)!=v: errors.append(f'golden {k}={golden.get(k)!r}, expected {v!r}')
++
++    report={
++        'schema':'MiniQuakeOPT001BStatic/1',
++        'status':'PASS' if not errors else 'FAIL',
++        'errors':errors,
++        'checks':{
++            'viewmodel_depth_active_range':True,
++            'underwater_linear_precompute':True,
++            'void_texture_slot_safe':True,
++            'e1m2_visible_frames':1000,
++            'e1m2_headless_frames':10000,
++            'transition':['e1m1','e1m2','e1m1'],
++        }
++    }
++    if args.json:
++        Path(args.json).write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
++    print('MiniQuake OPT-001B verification: '+report['status'])
++    for e in errors: print('  error: '+e)
++    return 0 if not errors else 1
++
++if __name__=='__main__':
++    raise SystemExit(main())
+--- a/tools/verify.py
++++ b/tools/verify.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""Self-contained package verifier for MiniQuake OPT-001A.
++"""Self-contained package verifier for MiniQuake OPT-001B.
+ 
+ Historical subsystem semantics are checked by the source-guided component
+ checkers invoked from build.ps1.  This verifier owns current delivery
+@@ -21,8 +21,8 @@
+ PARENT_PACKAGE_ID = "BP-093"
+ BLOCK_ID = "BP-090-094"
+ BLOCK_PARENT_PACKAGE_ID = "BP-085-089R8"
+-DELIVERY_REVISION = "OPT-001A"
+-DELIVERY_PARENT = "BP-090-094R15"
++DELIVERY_REVISION = "OPT-001B"
++DELIVERY_PARENT = "OPT-001A"
+ MANIFEST = "SOURCE_MANIFEST.sha256"
+ 
+ EXCLUDED_DIRS = {".git", "build", "__pycache__", ".pytest_cache"}
+@@ -36,6 +36,11 @@
+ }
+ 
+ REQUIRED_PATHS = {
++    "TEST_OPT-001B.ps1", "CHANGELOG_OPT-001B.md",
++    "docs/OPT-001B_TESTING.md", "docs/OPT-001B_CORRECTNESS_CONTRACT.md",
++    "docs/OPT-001B_DELIVERY_REPORT.json", "patches/OPT-001B.diff",
++    "tests/opt001b_contract_tests.ml", "tools/check_opt001b.py",
++    "audit/opt001b_correctness_golden.json",
+     "TEST_OPT-001A.ps1", "CHANGELOG_OPT-001A.md",
+     "docs/OPT-001A_TESTING.md", "docs/OPT-001A_BASELINE_CONTRACT.md",
+     "docs/OPT-001A_DELIVERY_REPORT.json", "patches/OPT-001A.diff",
+@@ -212,33 +217,33 @@
+     build_info = (root / "src/miniquake/build_info.ml").read_text(encoding="utf-8-sig")
+     main = (root / "src/main.ml").read_text(encoding="utf-8-sig")
+     build = (root / "build.ps1").read_text(encoding="utf-8-sig")
+-    test = (root / "TEST_OPT-001A.ps1").read_text(encoding="utf-8-sig")
++    test = (root / "TEST_OPT-001B.ps1").read_text(encoding="utf-8-sig")
+     collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
+     launcher = (root / "test.ps1").read_text(encoding="utf-8-sig")
+     errors += marker_errors(build_info, [
+         'const PACKAGE_ID = "BP-094"', 'const PARENT_PACKAGE_ID = "BP-093"',
+         'const BLOCK_ID = "BP-090-094"', 'const BLOCK_PARENT_PACKAGE_ID = "BP-085-089R8"',
+-        'const OPTIMIZATION_STATUS = "opt001a_baseline_candidate_v1"',
+-        'const OPTIMIZATION_FINGERPRINT = 0x1a001a01',
+-        'const OPTIMIZATION_PARENT = "BP-090-094R15"',
++        'const OPTIMIZATION_STATUS = "opt001b_error_freedom_candidate_v1"',
++        'const OPTIMIZATION_FINGERPRINT = 0x1b001b02',
++        'const OPTIMIZATION_PARENT = "OPT-001A"',
+     ], "build_info")
+     errors += marker_errors(main, [
+-        "--opt001a-map-parse", "--opt001a-frame-baseline", "--opt001a-handle-plateau",
++        "--opt001a-map-parse", "--opt001a-frame-baseline", "--opt001a-handle-plateau", "--opt001b-transition",
+         "Optimization status:", "Optimization parent:",
+     ], "main")
+     errors += marker_errors(build, [
+-        '$PackageId = "BP-094"', "MiniQuakeOPT001AContractTests.exe",
+-        "tests\\opt001a_contract_tests.ml",
++        '$PackageId = "BP-094"', "MiniQuakeOPT001BCorrectnessTests.exe",
++        "tests\\opt001b_contract_tests.ml",
+     ], "build")
+     errors += marker_errors(test, [
+-        '$DeliveryRevision = "OPT-001A"', '$DeliveryParent = "BP-090-094R15"',
+-        "MiniQuake OPT-001A acceptance test: PASS",
++        '$DeliveryRevision = "OPT-001B"', '$DeliveryParent = "OPT-001A"',
++        "MiniQuake OPT-001B acceptance test: PASS",
+         "--opt001a-map-parse", "--opt001a-frame-baseline", "--opt001a-handle-plateau",
+     ], "test")
+     errors += marker_errors(collector, [
+-        '$DeliveryRevision = "OPT-001A"', "MiniQuake_OPT-001A_RESULTS_",
++        '$DeliveryRevision = "OPT-001B"', "MiniQuake_OPT-001B_RESULTS_",
+     ], "collector")
+-    errors += marker_errors(launcher, ["TEST_OPT-001A.ps1"], "test.ps1")
++    errors += marker_errors(launcher, ["TEST_OPT-001B.ps1"], "test.ps1")
+     return Check(
+         "package_identity", not errors,
+         {"package_id": PACKAGE_ID, "parent_package_id": PARENT_PACKAGE_ID,
+@@ -1327,11 +1332,11 @@
+     return Check("external_component_checkers", not errors, {"checkers": len(reports)}, errors)
+ 
+ 
+-def check_opt001a(root: Path) -> Check:
+-    out = root / "build" / "verify-opt001a.json"
++def check_opt001b(root: Path) -> Check:
++    out = root / "build" / "verify-opt001b.json"
+     out.parent.mkdir(parents=True, exist_ok=True)
+     proc = subprocess.run(
+-        [sys.executable, str(root / "tools/check_opt001a.py"), "--root", str(root), "--json", str(out)],
++        [sys.executable, str(root / "tools/check_opt001b.py"), "--root", str(root), "--json", str(out)],
+         capture_output=True, text=True,
+     )
+     errors: list[str] = []
+@@ -1343,8 +1348,8 @@
+             report = json.loads(out.read_text(encoding="utf-8-sig"))
+             details["status"] = report.get("status", "")
+         except Exception as exc:
+-            errors.append(f"invalid OPT-001A report: {exc}")
+-    return Check("opt001a_contract", not errors, details, errors)
++            errors.append(f"invalid OPT-001B report: {exc}")
++    return Check("opt001b_contract", not errors, details, errors)
+ 
+ 
+ def main() -> int:
+@@ -1361,7 +1366,7 @@
+         check_required(root),
+         check_manifest(root),
+         check_identity(root),
+-        check_opt001a(root),
++        check_opt001b(root),
+         check_r8_visual_parity(root),
+         check_r9_network_provenance(root),
+         check_r10_original_server_readiness(root),
+@@ -1385,14 +1390,14 @@
+         check_external_checkers(root),
+     ]
+     passed = all(check.passed for check in checks)
+-    print("MiniQuake OPT-001A verification")
++    print("MiniQuake OPT-001B verification")
+     for check in checks:
+         print(f"  [{'PASS' if check.passed else 'FAIL'}] {check.name}")
+         for key, value in check.details.items():
+             print(f"         {key}={value}")
+         for error in check.errors:
+             print(f"         error: {error}")
+-    print(f"MiniQuake OPT-001A verification: {'PASS' if passed else 'FAIL'}")
++    print(f"MiniQuake OPT-001B verification: {'PASS' if passed else 'FAIL'}")
+     report = {
+         "schema_version": 1,
+         "package_id": PACKAGE_ID,

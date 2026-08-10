@@ -1,0 +1,33 @@
+{
+  "block_id": "BP-090-094",
+  "classification": "external visual evidence simulation timestep mismatch",
+  "comparator_changed": false,
+  "delivery_revision": "BP-090-094R15",
+  "engine_sources_changed": false,
+  "fix": {
+    "miniquake_frame_step": 0.02,
+    "original_host_framerate": 0.02,
+    "simulation_timestep": "fixed_0.02_seconds"
+  },
+  "minimum_candidate_ssim": 0.95,
+  "minimum_reference_ssim": 0.98,
+  "native_bridges_changed": false,
+  "normalization": "none",
+  "package_id": "BP-094",
+  "parent_delivery": "BP-090-094R14",
+  "r14_evidence": {
+    "best_frame": 255,
+    "best_worst_reference_ssim": 0.871158394398681,
+    "changed_pixels": 307169,
+    "edge_alignment_dy": -4,
+    "mae": 4.468786892361111,
+    "psnr": 30.192584754777872,
+    "reference_ssim": 0.9999947891783205,
+    "scenario": "demo3-256"
+  },
+  "root_cause": "original timedemo used real host_frametime while MiniQuake evidence used a fixed 0.02-second frame step; view damage kick and cshift decay therefore represented different times",
+  "schema_version": 1,
+  "status": "candidate",
+  "temporal_search_radius": 2,
+  "threshold_changed": false
+}

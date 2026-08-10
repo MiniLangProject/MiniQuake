@@ -160,3 +160,5 @@ EXPORTS
   mq_gl_finish
   mq_gl_flush
   mq_gl_draw_buffer
+    mq_gl_static_geometry_call
+    mq_gl_static_geometry_clear

@@ -17,20 +17,9 @@ end struct
 
 function makeFilledArray(count, value)
   if count < 0 then return error(1180, "negative array size") end if
-  if count == 0 then return [] end if
-
-  // Build power-of-two chunks, then concatenate the chunks selected by the
-  // binary representation of count.  The total copied element count is linear
-  // instead of quadratic.
-  result = []
-  chunk = [value]
-  remaining = count
-  while remaining > 0
-    if (remaining & 1) != 0 then result = result + chunk end if
-    remaining = remaining >> 1
-    if remaining > 0 then chunk = chunk + chunk end if
-  end while
-  return result
+  // MiniLang now exposes exact-sized native array allocation.  Avoid the
+  // historical chunk-concatenation fallback and allocate the final array once.
+  return array(count, value)
 end function
 
 function makeEmptyArray(count)
@@ -38,9 +27,10 @@ function makeEmptyArray(count)
 end function
 
 function copyArrayLinear(source)
-  result = makeEmptyArray(len(source))
+  sourceCount = len(source)
+  result = makeEmptyArray(sourceCount)
   index = 0
-  while index < len(source)
+  while index < sourceCount
     result[index] = source[index]
     index = index + 1
   end while
@@ -69,8 +59,9 @@ function growArrayTo(source, requiredCount, fillValue)
   end while
 
   result = makeFilledArray(capacity, fillValue)
+  sourceCount = len(source)
   index = 0
-  while index < len(source)
+  while index < sourceCount
     result[index] = source[index]
     index = index + 1
   end while

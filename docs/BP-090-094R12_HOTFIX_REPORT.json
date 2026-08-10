@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "delivery_revision": "BP-090-094R12",
+  "parent_delivery": "BP-090-094R11",
+  "classification": "original_protocol3_connect_handshake",
+  "r11_result": {
+    "status": "FAIL",
+    "first_error": "MiniQuake client did not complete signon with original GLQuake server a after 6 attempts",
+    "server_info_readiness": "PASS",
+    "connect_accept_observed": false
+  },
+  "changes": [
+    "persistent UDP source endpoint",
+    "500 ms CCREQ_CONNECT resends",
+    "raw control-packet diagnostics",
+    "strict interop path without startup +connect fallback"
+  ],
+  "normal_network_semantics_changed": false,
+  "native_bridges_changed": false
+}

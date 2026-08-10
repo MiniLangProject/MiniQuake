@@ -1,4 +1,4 @@
-/* Frozen GLQuake 1.09 special-render and evidence-corpus contract. */
+/* Frozen MiniQuake 1.09 special-render and evidence-corpus contract. */
 package miniquake.render_special_contract
 
 import miniquake.render.special_paths as special
@@ -20,11 +20,11 @@ const SPECIAL_RENDER_STAGE_COUNT = 12
 const ORIGINAL_REFERENCE_EXTERNAL = 1
 const PARENT_STATUS = "model_ui_render_109_frozen_v1"
 
-function status()
+function inline status()
   return STATUS
 end function
 
-function fingerprint()
+function inline fingerprint()
   return FINGERPRINT
 end function
 

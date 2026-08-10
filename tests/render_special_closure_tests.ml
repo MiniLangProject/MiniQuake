@@ -1,4 +1,4 @@
-/* BP-054: frozen GLQuake special-render and evidence-corpus contract. */
+/* BP-054: frozen MiniQuake special-render and evidence-corpus contract. */
 import miniquake.render_special_contract as bp054Contract
 import miniquake.render.special_paths as bp054Special
 import miniquake.render_evidence_corpus as bp054Corpus

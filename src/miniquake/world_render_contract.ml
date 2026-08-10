@@ -1,6 +1,6 @@
 package miniquake.world_render_contract
 
-// BP-044: the authoritative GLQuake 1.09 world-render contract.  Modern
+// BP-044: the authoritative MiniQuake 1.09 world-render contract.  Modern
 // backends may consume the same render handoff, but compatibility mode keeps
 // these observable constants and pass ordering fixed.
 const STATUS = "world_render_109_frozen_v1"
@@ -20,11 +20,11 @@ const STAGE_VIEWMODEL = 5
 const STAGE_WATER = 6
 const STAGE_POLYBLEND = 7
 
-function status()
+function inline status()
   return STATUS
 end function
 
-function fingerprint()
+function inline fingerprint()
   return FINGERPRINT
 end function
 

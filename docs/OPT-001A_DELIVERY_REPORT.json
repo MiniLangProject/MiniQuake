@@ -1,0 +1,25 @@
+{
+  "schema": "MiniQuakeOPT001ADelivery/1",
+  "delivery_revision": "OPT-001A",
+  "parent": "BP-090-094R15",
+  "status": "candidate",
+  "diagnostic_only": true,
+  "maps": [
+    "e1m1",
+    "e1m2"
+  ],
+  "defaults": {
+    "matrix": 64,
+    "warmup": 300,
+    "benchmark": 3000,
+    "handle_warmup": 1200,
+    "handle_window": 5000,
+    "handle_windows": 3
+  },
+  "next": [
+    "OPT-001B",
+    "OPT-001C",
+    "OPT-001D",
+    "OPT-001E"
+  ]
+}

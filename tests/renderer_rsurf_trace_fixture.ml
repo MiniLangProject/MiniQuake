@@ -40,7 +40,7 @@ function emitCommands(scene, functionName, commands)
   return sequence
 end function
 
-function fnvByte(hash, value)
+function inline fnvByte(hash, value)
   return ((hash ^ (value & 255)) * 16777619) & 4294967295
 end function
 

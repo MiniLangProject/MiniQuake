@@ -1,0 +1,22 @@
+{
+  "schema": "MiniQuakeOPT001CR3R7AudioTransitionHotpath/1",
+  "delivery_revision": "OPT-001CR3R7",
+  "delivery_parent": "OPT-001CR3R6",
+  "status": "opt001cr3r7_audio_transition_hotpath_candidate_v1",
+  "fingerprint": "0x1c001c0d",
+  "changes": [
+    "default _snd_mixahead 0.2",
+    "unconditional renderer teardown on map transitions",
+    "same-leaf PVS reuse",
+    "frame-local hot Cvar cache",
+    "audio loop length hoists",
+    "audio cost analysis"
+  ],
+  "runtime_gates": [
+    "e1m1/e1m2 matrix",
+    "1500 visible e1m2 frames",
+    "10000 headless e1m2 frames",
+    "256-frame e1m1-e1m2-e1m1 transition",
+    "handle plateau"
+  ]
+}

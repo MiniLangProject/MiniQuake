@@ -15,7 +15,7 @@ function bp088Equal(actual, expected, label)
   return bp088Check(actual == expected, label + ": expected " + expected + ", got " + actual)
 end function
 
-function bp088Snapshot()
+function inline bp088Snapshot()
   return [100, 100000, 50000, 10000, 90, 85, 1, 1, 7, 0, 0, 0, 1, 0, 4, 50]
 end function
 

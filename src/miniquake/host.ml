@@ -52,6 +52,13 @@ import miniquake.compat_diagnostics as compatDiagnostics
 import miniquake.host_timing as hostTiming
 import miniquake.host_command_numbers as hostNumbers
 import miniquake.stability_contract as stability
+import miniquake.external_reference_contract as externalReference
+import miniquake.optimization_baseline as optBaseline
+import std.fs as fs
+
+titleFpsInitialized = false
+titleFpsLastFrame = 0
+titleFpsLastRealtime = 0.0
 
 function commandNeverExists(name)
   return false
@@ -201,7 +208,7 @@ function createCvars(commandLine, registered)
   registerCvar(registry, "ambient_level", "0.3", false, false)
   registerCvar(registry, "ambient_fade", "100", false, false)
   registerCvar(registry, "volume", "0.7", true, false)
-  registerCvar(registry, "_snd_mixahead", "0.1", true, false)
+  registerCvar(registry, "_snd_mixahead", "0.35", true, false)
   registerCvar(registry, "bgmvolume", "1", true, false)
   registerCvar(registry, "gamma", "1", true, false)
   registerCvar(registry, "viewsize", "100", true, false)
@@ -385,6 +392,7 @@ function restartLevel(session, mapName)
 end function
 
 function finishLocalMapConnection(session, preserveClients)
+  opt001dCvarDeveloper = cvar.variableValue(session.cvars, "developer")
   session.client.name = cvar.variableString(session.cvars, "_cl_name")
   session.client.colors = native.trunc(cvar.variableValue(session.cvars, "_cl_color"))
   if not preserveClients then
@@ -422,7 +430,7 @@ function finishLocalMapConnection(session, preserveClients)
   if session.mixer.enabled then
     mixer.setListenerEntity(session.mixer, session.client.viewEntity)
     soundPrecache = mixer.precache(session.mixer, session.client.soundPrecache)
-    if soundPrecache[1] > 0 and cvar.variableValue(session.cvars, "developer") != 0.0 then
+    if soundPrecache[1] > 0 and opt001dCvarDeveloper != 0.0 then
       print "sound precache: " + soundPrecache[0] + " loaded, " + soundPrecache[1] + " failed"
     end if
   end if
@@ -431,7 +439,7 @@ function finishLocalMapConnection(session, preserveClients)
   print session.statusMessage
   for each line in session.server.diagnostics
     console.appendLine(session.console, line)
-    if cvar.variableValue(session.cvars, "developer") != 0.0 then print line end if
+    if opt001dCvarDeveloper != 0.0 then print line end if
   end for
   session.server.diagnostics = []
   return true
@@ -462,6 +470,7 @@ function transitionMap(session, mapName, preserveClients, saveChangeParms, defer
       session.timing.frameTime,
       session.cvars,
       session.client.connected,
+      session.server.active,
       session.client.signon,
       session.server.paused,
       session.client.lastMessageTime,
@@ -472,7 +481,7 @@ function transitionMap(session, mapName, preserveClients, saveChangeParms, defer
     )
     glvid.GL_EndRendering()
   end if
-  if session.renderer is not void and session.renderer.uploaded then worldRenderer.destroy(session.renderer) end if
+  if session.renderer is not void then worldRenderer.destroy(session.renderer) end if
   if session.entityRenderer is not void then entityRenderer.destroy(session.entityRenderer) end if
   session.renderer = void
   session.entityRenderer = void
@@ -497,11 +506,13 @@ function transitionMap(session, mapName, preserveClients, saveChangeParms, defer
   skill = cvar.variableValue(session.cvars, "skill")
   session.server.deathmatch = cvar.variableValue(session.cvars, "deathmatch") != 0.0
   session.server.coop = cvar.variableValue(session.cvars, "coop") != 0.0
+  spawned = true
   if session.qcEnabled then
-    server.spawnRuntime(session.server, session.filesystem, mapName, skill, session.cvars, session.commands)
+    spawned = try(server.spawnRuntime(session.server, session.filesystem, mapName, skill, session.cvars, session.commands))
   else
-    server.spawn(session.server, session.filesystem, mapName, skill)
+    spawned = try(server.spawn(session.server, session.filesystem, mapName, skill))
   end if
+  if spawned is error then return spawned end if
   if preserveClients then server.finishChangeLevel(session.server, preserved) end if
   session.player.origin = math.copy(session.server.spawnPoint)
   session.player.viewAngles = math.copy(session.server.spawnAngles)
@@ -521,12 +532,18 @@ function transitionMap(session, mapName, preserveClients, saveChangeParms, defer
   // render-surface and client-model copies.  The original host keeps renderer
   // initialization behind the video boundary as well.
   if not session.headless then
-    palette = qfs.readFile(session.filesystem, "gfx/palette.lmp")
+    palette = try(qfs.readFile(session.filesystem, "gfx/palette.lmp"))
+    if palette is error then return palette end if
     videoState = glvid.VID_State()
     if videoState.initialized then palette = videoState.palette end if
-    session.renderer = worldRenderer.create(session.server.worldModel, palette)
-    session.entityRenderer = entityRenderer.create(session.filesystem, palette, session.server.modelPrecache)
-    if session.windowCreated then screen.initialize(session.console, session.menu, session.filesystem, palette, session.width, session.height, session.cvars) end if
+    session.renderer = try(worldRenderer.create(session.server.worldModel, palette))
+    if session.renderer is error then return session.renderer end if
+    session.entityRenderer = try(entityRenderer.create(session.filesystem, palette, session.server.modelPrecache))
+    if session.entityRenderer is error then return session.entityRenderer end if
+    if session.windowCreated then
+      screenInitialized = try(screen.initialize(session.console, session.menu, session.filesystem, palette, session.width, session.height, session.cvars))
+      if screenInitialized is error then return screenInitialized end if
+    end if
   end if
   screen.SCR_EndLoadingPlaque(session.console)
   session.startMap = session.server.mapName
@@ -625,7 +642,7 @@ function Host_ShutdownServer(session, crash)
   if session.client.connected then client.disconnect(session.client) end if
   // Flush score/name/final-print messages before the disconnect broadcast.
   // A blocked reliable channel is polled for ACKs for at most three seconds,
-  // exactly as Host_ShutdownServer does in GLQuake.
+  // exactly as Host_ShutdownServer does in MiniQuake.
   pending = Host_FlushPendingClientMessages(session, 3.0)
   if pending > 0 then print "Host_ShutdownServer: pending reliable messages for " + pending + " clients" end if
   disconnectMessage = sz.alloc(4)
@@ -827,7 +844,7 @@ function beginDemoRecording(session, arguments)
   if plan is error then return plan end if
   name = plan[0]
   recording = plan[1]
-  // GLQuake executes the optional map command before opening the demo file.
+  // MiniQuake executes the optional map command before opening the demo file.
   // A failed map therefore leaves no empty recording behind; an open failure
   // occurs after the requested map transition and simply does not record it.
   if len(arguments) >= 3 then
@@ -844,7 +861,7 @@ end function
 
 function destroyScene(session)
   if session.entityRenderer is not void then entityRenderer.destroy(session.entityRenderer); session.entityRenderer = void end if
-  if session.renderer is not void and session.renderer.uploaded then worldRenderer.destroy(session.renderer) end if
+  if session.renderer is not void then worldRenderer.destroy(session.renderer) end if
   session.renderer = void
   return true
 end function
@@ -893,6 +910,26 @@ function connectRemoteHost(session, hostName)
   // Host_Reconnect_f reconnects to cls.servername in the original engine.
   session.lastRemoteHost = hostName
   connected = client.connectHost(remoteClient, session.network, hostName)
+  if connected is error then return connected end if
+  session.client = remoteClient
+  session.statusMessage = "connected to " + hostName
+  print session.statusMessage
+  return true
+end function
+
+function connectRemoteHostInterop(session, hostName, timeoutMilliseconds, resendMilliseconds)
+  if session.demoRecording is not void then stopDemoRecording(session) end if
+  if session.demoPlayback is not void then finishDemoPlayback(session) end if
+  session.demoNumber = -1
+  if session.client.connected then client.disconnect(session.client) end if
+  if session.server.active then Host_ShutdownServer(session, false) end if
+  destroyScene(session)
+  remoteClient = client.create(session.player)
+  remoteClient.name = cvar.variableString(session.cvars, "_cl_name")
+  remoteClient.colors = native.trunc(cvar.variableValue(session.cvars, "_cl_color"))
+  remoteClient.localAuthoritative = false
+  session.lastRemoteHost = hostName
+  connected = client.connectHostInterop(remoteClient, session.network, hostName, timeoutMilliseconds, resendMilliseconds)
   if connected is error then return connected end if
   session.client = remoteClient
   session.statusMessage = "connected to " + hostName
@@ -1171,7 +1208,7 @@ function Host_Loadgame_f(session, arguments)
 end function
 
 function Host_Changelevel2_f(session, arguments)
-  // QUAKE2-only in GLQuake 1.09.  Retain the transition entry point while the
+  // QUAKE2-only in MiniQuake 1.09.  Retain the transition entry point while the
   // target build deliberately omits .gip hub-state semantics.
   return Host_Changelevel_f(session, arguments)
 end function
@@ -1408,7 +1445,7 @@ end function
 
 function Host_Demos_f(session)
   if common.hasParm(session.arguments, "-dedicated") then return false end if
-  // GLQuake resumes a stopped loop at slot one; CL_NextDemo wraps to zero if
+  // MiniQuake resumes a stopped loop at slot one; CL_NextDemo wraps to zero if
   // the second slot is empty.
   if session.demoNumber == -1 then session.demoNumber = 1 end if
   if session.demoPlayback is not void then return finishDemoPlayback(session) end if
@@ -2070,10 +2107,25 @@ function Host_Init(session)
 
   queueStartupCommands(session)
   executeCommandBuffer(session, 4096)
+
+  // The strict original-binary interop client must connect before the
+  // standalone fallback can start a local map or demo.  Normal launches do
+  // not carry this private option and therefore retain their exact behavior.
+  originalInteropTarget = common.parmValue(session.arguments, "-original-interop-target", "")
+  if originalInteropTarget != "" and not session.server.active and session.demoPlayback is void and not session.client.connected then
+    print "MiniQuake original interop pre-fallback connect"
+    print "  target=" + originalInteropTarget + " local_server_active=false"
+    interopConnected = try(connectRemoteHostInterop(session, originalInteropTarget, 20000, 500))
+    if interopConnected is error then return interopConnected end if
+  end if
+
   if not session.server.active and session.demoPlayback is void and not session.client.connected then
     fallbackMap = session.startMap
     if fallbackMap == "" and qfs.fileExists(session.filesystem, "maps/start.bsp") then fallbackMap = "start" end if
-    if fallbackMap != "" then startMap(session, fallbackMap) end if
+    if fallbackMap != "" then
+      started = try(startMap(session, fallbackMap))
+      if started is error then return started end if
+    end if
   end if
   session.lastTicks = win.ticks()
   session.timing.oldRealtime = 0.0
@@ -2166,6 +2218,7 @@ function consumeRelinkParticleEffects(session)
 end function
 
 function consumeQuakeCControl(session)
+  opt001dCvarDeveloper = cvar.variableValue(session.cvars, "developer")
   count = 0
   for each line in session.server.diagnostics
     source = bytes(line)
@@ -2174,7 +2227,7 @@ function consumeQuakeCControl(session)
       if common.hasParm(session.arguments, "-dedicated") then print sysLine end if
     else
       console.append(session.console, line)
-      if cvar.variableValue(session.cvars, "developer") != 0.0 then print line end if
+      if opt001dCvarDeveloper != 0.0 then print line end if
     end if
     count = count + 1
   end for
@@ -2183,7 +2236,7 @@ function consumeQuakeCControl(session)
   contextValue = session.server.machine.context
   for each line in contextValue.consoleLines
     console.append(session.console, line)
-    if cvar.variableValue(session.cvars, "developer") != 0.0 then print line end if
+    if opt001dCvarDeveloper != 0.0 then print line end if
     count = count + 1
   end for
   contextValue.consoleLines = []
@@ -2635,17 +2688,34 @@ function processConsoleInput(session)
 end function
 
 function updateTitle(session)
+  global titleFpsInitialized, titleFpsLastFrame, titleFpsLastRealtime
   if not session.windowCreated then return end if
-  if session.timing.frameCount % 30 != 0 then return end if
-  title = "MiniQuake - " + session.server.mapName + "  (" + session.player.origin.x + ", " + session.player.origin.y + ", " + session.player.origin.z + ")"
-  win.setTitle(title)
+
+  frameCount = session.timing.frameCount
+  realtime = session.timing.realtime
+  if not titleFpsInitialized or frameCount < titleFpsLastFrame or realtime < titleFpsLastRealtime then
+    titleFpsInitialized = true
+    titleFpsLastFrame = frameCount
+    titleFpsLastRealtime = realtime
+    win.setTitle(glvid.VID_WindowTitleForFps(0))
+    return
+  end if
+
+  frameDelta = frameCount - titleFpsLastFrame
+  if frameDelta < 30 then return end if
+  elapsed = realtime - titleFpsLastRealtime
+  fps = 0
+  if elapsed > 0.000001 then fps = native.trunc(frameDelta / elapsed) end if
+  win.setTitle(glvid.VID_WindowTitleForFps(fps))
+  titleFpsLastFrame = frameCount
+  titleFpsLastRealtime = realtime
 end function
 
 // Live Win32 button polling is a convenience layer for the interactive port.
 // It must never participate in a headless/deterministic run: unlike original
 // WinQuake's window-message input, GetAsyncKeyState-style polling can observe
 // keys pressed in another application and make two identical traces diverge.
-function shouldPollLiveButtonBindings(headless, destinationIsGame, consoleActive, menuActive)
+function inline shouldPollLiveButtonBindings(headless, destinationIsGame, consoleActive, menuActive)
   return not headless and destinationIsGame and not consoleActive and not menuActive
 end function
 
@@ -2734,7 +2804,7 @@ function _Host_Frame(session, elapsedSeconds)
     compatDiagnostics.filteredFrame(session)
     return false
   end if
-  session.frameTrace = []
+  if session.diagnosticContextPath != "" then session.frameTrace = [] end if
   compatDiagnostics.checkpoint(session, "filter")
   console.Con_SetRealtime(session.console, session.timing.realtime)
 
@@ -2870,6 +2940,7 @@ function _Host_Frame(session, elapsedSeconds)
       session.timing.frameTime,
       session.cvars,
       session.client.connected,
+      session.server.active,
       session.client.signon,
       session.server.paused,
       session.client.lastMessageTime,
@@ -2881,23 +2952,49 @@ function _Host_Frame(session, elapsedSeconds)
     glvid.GL_EndRendering()
   end if
 
+  frameMixAhead = 0.0
+  if session.mixer.enabled then frameMixAhead = cvar.variableValue(session.cvars, "_snd_mixahead") end if
+
+  // Top up the queued audio before the potentially expensive world/entity/UI
+  // render.  The mixer is demand-driven, so a full queue makes this a cheap
+  // no-op while a starving queue receives additional 512-frame blocks.
+  if session.mixer.enabled and session.renderer is not void then
+    mixer.update(session.mixer, session.timing.frameTime, frameMixAhead)
+  end if
+
   if session.renderer is not void and session.windowCreated and not screen.SCR_ShouldSkipUpdate(session.timing.realtime) then
     screen.SCR_ConfigureClient(session.client)
-    session.renderer.fullbright = cvar.variableValue(session.cvars, "r_fullbright") != 0.0
-    session.renderer.wireframe = cvar.variableValue(session.cvars, "r_wireframe") != 0.0
-    session.renderer.waterAlpha = cvar.variableValue(session.cvars, "r_wateralpha")
+    // Frame-local hot-Cvar cache: command execution for this frame is already
+    // complete, so repeated linear string lookups below can safely share values.
+    rFullbright = cvar.variableValue(session.cvars, "r_fullbright")
+    rWireframe = cvar.variableValue(session.cvars, "r_wireframe")
+    rWaterAlpha = cvar.variableValue(session.cvars, "r_wateralpha")
+    glCshiftPercent = cvar.variableValue(session.cvars, "gl_cshiftpercent")
+    glCull = cvar.variableValue(session.cvars, "gl_cull")
+    noRefresh = cvar.variableValue(session.cvars, "r_norefresh") != 0.0
+    rMirrorAlpha = cvar.variableValue(session.cvars, "r_mirroralpha")
+    glClear = cvar.variableValue(session.cvars, "gl_clear")
+    glZTrick = cvar.variableValue(session.cvars, "gl_ztrick")
+    glFinish = cvar.variableValue(session.cvars, "gl_finish")
+    rDrawEntities = cvar.variableValue(session.cvars, "r_drawentities") != 0.0
+    rDrawViewModel = cvar.variableValue(session.cvars, "r_drawviewmodel") != 0.0
+    glPolyBlend = cvar.variableValue(session.cvars, "gl_polyblend") != 0.0
+    crosshairEnabled = cvar.variableValue(session.cvars, "crosshair") != 0.0
+
+    session.renderer.fullbright = rFullbright != 0.0
+    session.renderer.wireframe = rWireframe != 0.0
+    session.renderer.waterAlpha = rWaterAlpha
     width = win.width()
     height = win.height()
     screenRefdef = screen.SCR_CalcRefdef(width, height, session.cvars, screen.SCR_IntermissionMode())
     view.V_SetContentsColor(session.view, worldRenderer.ViewContents(session.renderer, session.view.origin))
-    view.V_CalcBlend(session.view, cvar.variableValue(session.cvars, "gl_cshiftpercent"))
-    worldRenderer.R_SetCullCompatibility(cvar.variableValue(session.cvars, "gl_cull") != 0.0)
-    noRefresh = cvar.variableValue(session.cvars, "r_norefresh") != 0.0
+    view.V_CalcBlend(session.view, glCshiftPercent)
+    worldRenderer.R_SetCullCompatibility(glCull != 0.0)
     worldRenderer.R_ConfigureSpecialCompatibility(
-      cvar.variableValue(session.cvars, "r_mirroralpha"),
-      cvar.variableValue(session.cvars, "gl_clear") != 0.0,
-      cvar.variableValue(session.cvars, "gl_ztrick") != 0.0,
-      cvar.variableValue(session.cvars, "gl_finish") != 0.0,
+      rMirrorAlpha,
+      glClear != 0.0,
+      glZTrick != 0.0,
+      glFinish != 0.0,
       noRefresh,
     )
     renderEntities = []
@@ -2913,7 +3010,7 @@ function _Host_Frame(session, elapsedSeconds)
         visibleEntities = client.CL_ActiveVisibleEntities(session.client)
         temporaryModels = renderHandoff.currentTemporaryEntities()
         entityRenderer.synchronize(session.entityRenderer, session.client.modelPrecache)
-        if cvar.variableValue(session.cvars, "r_drawentities") != 0.0 then
+        if rDrawEntities then
           renderEntities = renderHandoff.submitEntities(visibleEntities, temporaryModels)
           // CL_RelinkEntities already applies first-person/chase filtering.
           entityRenderer.renderSubmitted(session.entityRenderer, session.renderer, renderEntities, void, session.view.right, session.view.up, session.client.time)
@@ -2923,7 +3020,7 @@ function _Host_Frame(session, elapsedSeconds)
         session.particles, session.renderer.palette,
         session.view.origin, session.view.forward, session.view.up, session.view.right,
       )
-      if session.entityRenderer is not void and cvar.variableValue(session.cvars, "r_drawviewmodel") != 0.0 then
+      if session.entityRenderer is not void and rDrawViewModel then
         entityRenderer.renderViewModel(session.entityRenderer, session.player, session.view, session.client.time)
       end if
       // R_RenderView draws the deferred translucent/unsorted water pass after
@@ -2941,7 +3038,7 @@ function _Host_Frame(session, elapsedSeconds)
             client.CL_Dlights(), session.client.lightStyles, session.client.time,
             session.timing.realtime, session.timing.frameTime, session.view.blend,
           )
-          if session.entityRenderer is not void and cvar.variableValue(session.cvars, "r_drawentities") != 0.0 then
+          if session.entityRenderer is not void and rDrawEntities then
             viewEntity = void
             if session.client.viewEntity >= 0 and session.client.viewEntity < len(session.client.entities) then
               viewEntity = session.client.entities[session.client.viewEntity]
@@ -2962,7 +3059,7 @@ function _Host_Frame(session, elapsedSeconds)
       end if
       worldRenderer.R_PolyBlendProduction(
         session.view.blend,
-        cvar.variableValue(session.cvars, "gl_polyblend") != 0.0,
+        glPolyBlend,
       )
     end if
     screen.SCR_UpdateScreen(
@@ -2973,11 +3070,12 @@ function _Host_Frame(session, elapsedSeconds)
       width,
       height,
       session.server.mapName,
-      cvar.variableValue(session.cvars, "crosshair") != 0.0,
+      crosshairEnabled,
       session.timing.realtime,
       session.timing.frameTime,
       session.cvars,
       session.client.connected,
+      session.server.active,
       session.client.signon,
       session.server.paused,
       session.client.lastMessageTime,
@@ -2989,12 +3087,6 @@ function _Host_Frame(session, elapsedSeconds)
     capturedEvidence = try(renderEvidence.captureIfRequested(session.timing.frameCount, width, height))
     if capturedEvidence is error then return capturedEvidence end if
     glvid.GL_EndRendering()
-    // WinQuake performs S_ExtraUpdate around expensive rendering work.  A
-    // second non-blocking top-up keeps waveOut fed when a frame takes longer
-    // than one 512-sample block.
-    if session.mixer.enabled then
-      mixer.update(session.mixer, session.timing.frameTime, cvar.variableValue(session.cvars, "_snd_mixahead"))
-    end if
     session.renderedFrames = session.renderedFrames + 1
     updateTitle(session)
   end if
@@ -3004,7 +3096,7 @@ function _Host_Frame(session, elapsedSeconds)
   // particle/light integration uses that final cl.time-cl.oldtime interval.
   client.CL_DecayLightsAt(session.client.time, clientFrameTime)
   compatDiagnostics.checkpoint(session, "dlight_decay")
-  // GLQuake draws every active particle before applying that frame's motion,
+  // MiniQuake draws every active particle before applying that frame's motion,
   // ramp and gravity update inside R_DrawParticles.  Advancing before the
   // renderer made explosions one simulation step too old and too dispersed.
   // Headless modes still reach this common post-render update.
@@ -3028,17 +3120,19 @@ function _Host_Frame(session, elapsedSeconds)
     mixer.updateListener(session.mixer, session.view.origin, session.view.forward, session.view.right)
     mixer.setListenerEntity(session.mixer, session.client.viewEntity)
     mixer.updateEntityOrigins(session.mixer, session.client.entities)
+    ambientLevel = cvar.variableValue(session.cvars, "ambient_level")
+    ambientFade = cvar.variableValue(session.cvars, "ambient_fade")
     if session.server.worldModel is not void then
       mixer.updateAmbient(
         session.mixer,
         session.server.worldModel,
         session.view.origin,
         session.timing.frameTime,
-        cvar.variableValue(session.cvars, "ambient_level"),
-        cvar.variableValue(session.cvars, "ambient_fade"),
+        ambientLevel,
+        ambientFade,
       )
     end if
-    mixer.update(session.mixer, session.timing.frameTime, cvar.variableValue(session.cvars, "_snd_mixahead"))
+    mixer.update(session.mixer, session.timing.frameTime, frameMixAhead)
   end if
   compatDiagnostics.checkpoint(session, "audio")
   compatDiagnostics.completeFrame(session)
@@ -3077,7 +3171,7 @@ function Host_Shutdown(session)
   end if
   if session.demoPlayback is not void then finishDemoPlayback(session) end if
   if session.entityRenderer is not void then entityRenderer.destroy(session.entityRenderer); session.entityRenderer = void end if
-  if session.renderer is not void and session.renderer.uploaded then worldRenderer.destroy(session.renderer) end if
+  if session.renderer is not void then worldRenderer.destroy(session.renderer) end if
   session.renderer = void
   screen.shutdown(session.console, session.menu)
   if session.audioStarted then
@@ -3445,6 +3539,313 @@ function runDemoModeSoak(args, demoName, frameCount)
   return true
 end function
 
+
+function opt001aResourceHeader()
+  return "sample,frame,heap_live,heap_high_water_bytes,heap_live_bytes,heap_free_bytes,edicts,client_entities,active_clients,active_qsockets,free_qsockets,queued_messages,queued_bytes,poll_procedures,udp_endpoints,audio_queued,audio_channels,process_handles,particles,temporary_entities\n"
+end function
+
+function opt001aResourceRow(sampleName, frameIndex, values)
+  result = sampleName + "," + frameIndex
+  index = 0
+  while index < len(values)
+    result = result + "," + values[index]
+    index = index + 1
+  end while
+  return result + "\n"
+end function
+
+function opt001aResourceJson(values)
+  result = "["
+  index = 0
+  while index < len(values)
+    if index > 0 then result = result + "," end if
+    result = result + values[index]
+    index = index + 1
+  end while
+  return result + "]"
+end function
+
+function opt001aNonHandleStable(before, after)
+  checks = stability.longChecks(before, after)
+  index = 0
+  while index < 8
+    if not checks[index] then return false end if
+    index = index + 1
+  end while
+  return true
+end function
+
+function opt001aMapParse(baseDirectory, gameDirectory, mapName, outputPrefix)
+  commandLine = common.create(["-basedir", baseDirectory, "-game", gameDirectory])
+  filesystem = qfs.initializeArguments(baseDirectory, commandLine)
+  path = "maps/" + mapName + ".bsp"
+  started = native.winTicks()
+  data = try(qfs.readFile(filesystem, path))
+  readFinished = native.winTicks()
+  if data is error then
+    qfs.release(filesystem)
+    return data
+  end if
+  parsed = try(bsp.parse(data, path))
+  parseFinished = native.winTicks()
+  if parsed is error then
+    qfs.release(filesystem)
+    return parsed
+  end if
+
+  json = "{"
+  json = json + "\"schema\":\"MiniQuakeOPT001AMapParse/1\","
+  json = json + "\"map\":\"" + mapName + "\","
+  json = json + "\"game\":\"" + gameDirectory + "\","
+  json = json + "\"bytes\":" + len(data) + ","
+  json = json + "\"read_ms\":" + (readFinished - started) + ","
+  json = json + "\"parse_ms\":" + (parseFinished - readFinished) + ","
+  json = json + "\"total_ms\":" + (parseFinished - started) + ","
+  json = json + "\"entities\":" + len(parsed.entities) + ","
+  json = json + "\"models\":" + len(parsed.models) + ","
+  json = json + "\"planes\":" + len(parsed.planes) + ","
+  json = json + "\"vertices\":" + len(parsed.vertices) + ","
+  json = json + "\"faces\":" + len(parsed.faces) + ","
+  json = json + "\"leafs\":" + len(parsed.leafs) + ","
+  json = json + "\"mark_surfaces\":" + len(parsed.markSurfaces) + ","
+  json = json + "\"textures\":" + len(parsed.textures) + ","
+  json = json + "\"clipnodes\":" + len(parsed.clipNodes)
+  json = json + "}\n"
+  written = try(fs.writeAllText(outputPrefix + "-map-parse.json", json))
+  qfs.release(filesystem)
+  if written is error then return written end if
+
+  print "MiniQuake OPT-001A map parse"
+  print "  map=" + mapName + " game=" + gameDirectory
+  print "  bytes=" + len(data)
+  print "  read_ms=" + (readFinished - started)
+  print "  parse_ms=" + (parseFinished - readFinished)
+  print "  total_ms=" + (parseFinished - started)
+  print "  faces=" + len(parsed.faces) + " leafs=" + len(parsed.leafs) + " marksurfaces=" + len(parsed.markSurfaces)
+  print "  result=PASS"
+  return true
+end function
+
+function opt001aSessionArguments(baseDirectory, gameDirectory, mapName, mode, port)
+  if mode == "render" then
+    return [
+      "-basedir", baseDirectory,
+      "-game", gameDirectory,
+      "-window",
+      "-nosound",
+      "-nolan",
+      "-nomouse",
+      "-nojoy",
+      "-noinput",
+      "-width", "640",
+      "-height", "480",
+      "+vid_wait", "0",
+      "+gl_finish", "0",
+      "+map", mapName,
+    ]
+  end if
+  if mode == "listen" then
+    return [
+      "-basedir", baseDirectory,
+      "-game", gameDirectory,
+      "-headless",
+      "-nosound",
+      "-listen", "8",
+      "-ip", "127.0.0.1",
+      "-port", "" + port,
+      "+map", mapName,
+    ]
+  end if
+  return [
+    "-basedir", baseDirectory,
+    "-game", gameDirectory,
+    "-headless",
+    "-nosound",
+    "+map", mapName,
+  ]
+end function
+
+function opt001aRunFrames(session, frameCount, phase)
+  index = 0
+  checkpoint = 500
+  while index < frameCount
+    result = try(frame(session, 0.02))
+    if result is error then return soakFrameError(session, phase, index, result) end if
+    index = index + 1
+    if index == checkpoint or index == frameCount then
+      print "  " + phase + "_progress=" + index + "/" + frameCount
+      checkpoint = checkpoint + 500
+    end if
+  end while
+  return true
+end function
+
+function runOpt001AFrameBaseline(baseDirectory, gameDirectory, mapName, mode, warmupFrames, measureFrames, outputPrefix)
+  if mode != "headless" and mode != "render" then return error(3800, "OPT-001A baseline mode must be headless or render") end if
+  session = create(opt001aSessionArguments(baseDirectory, gameDirectory, mapName, mode, 26000))
+  initialized = try(initialize(session))
+  if initialized is error then shutdown(session); return initialized end if
+  if not session.server.active then shutdown(session); return error(3801, "OPT-001A baseline did not start map " + mapName) end if
+  if mode == "render" and (not session.windowCreated or session.renderer is void) then
+    shutdown(session)
+    return error(3802, "OPT-001A render baseline requires a window and renderer")
+  end if
+
+  print "MiniQuake OPT-001A baseline warm-up"
+  print "  mode=" + mode + " map=" + mapName + " frames=" + warmupFrames
+  warmed = try(opt001aRunFrames(session, warmupFrames, "warmup"))
+  if warmed is error then shutdown(session); return warmed end if
+
+  gc_collect()
+  before = resourceSnapshot(session)
+  optBaseline.configure(measureFrames)
+  print "MiniQuake OPT-001A baseline measurement"
+  print "  mode=" + mode + " map=" + mapName + " frames=" + measureFrames
+  measured = try(opt001aRunFrames(session, measureFrames, "measure"))
+  optBaseline.disable()
+  if measured is error then shutdown(session); return measured end if
+  gc_collect()
+  after = resourceSnapshot(session)
+
+  written = try(optBaseline.writeReports(outputPrefix, mode, mapName, before, after))
+  if written is error then shutdown(session); return written end if
+  stats = optBaseline.printSummary(mode, mapName)
+  print "  heap_live=" + before[0] + "->" + after[0]
+  print "  heap_live_bytes=" + before[2] + "->" + after[2]
+  print "  process_handles=" + before[15] + "->" + after[15]
+  if stats[0] == measureFrames then print "  result=PASS" else print "  result=FAIL" end if
+  shutdown(session)
+  if stats[0] == measureFrames then return true end if
+  return error(3803, "OPT-001A frame baseline recorded an unexpected frame count")
+end function
+
+function runOpt001BTransition(baseDirectory, gameDirectory, frameCount, outputPrefix)
+  session = create(opt001aSessionArguments(baseDirectory, gameDirectory, "e1m1", "render", 26000))
+  initialized = try(initialize(session))
+  if initialized is error then shutdown(session); return initialized end if
+  if not session.server.active or session.renderer is void then
+    shutdown(session)
+    return error(3820, "OPT-001B transition did not initialize e1m1 renderer")
+  end if
+
+  maps = ["e1m1", "e1m2", "e1m1"]
+  json = "{\"schema\":\"MiniQuakeOPT001BTransition/1\",\"maps\":["
+  mapIndex = 0
+  while mapIndex < len(maps)
+    mapName = maps[mapIndex]
+    if mapIndex > 0 then
+      changed = try(startMap(session, mapName))
+      if changed is error then shutdown(session); return changed end if
+    end if
+    if session.server.mapName != mapName then
+      shutdown(session)
+      return error(3821, "OPT-001B transition expected " + mapName + " got " + session.server.mapName)
+    end if
+    if session.renderer is void or not session.windowCreated then
+      shutdown(session)
+      return error(3822, "OPT-001B transition missing renderer for " + mapName)
+    end if
+    ran = try(opt001aRunFrames(session, frameCount, "transition_" + mapName))
+    if ran is error then shutdown(session); return ran end if
+    if mapIndex > 0 then json = json + "," end if
+    json = json + "{\"map\":\"" + mapName + "\",\"frames\":" + frameCount + ",\"renderer\":true}"
+    print "MiniQuake OPT-001B transition " + mapName + ": PASS"
+    mapIndex = mapIndex + 1
+  end while
+  json = json + "],\"result\":\"PASS\"}\n"
+  written = try(fs.writeAllText(outputPrefix + "-summary.json", json))
+  shutdown(session)
+  if written is error then return written end if
+  return true
+end function
+
+function runOpt001AHandlePlateau(baseDirectory, gameDirectory, mapName, warmupFrames, windowFrames, windowCount, port, outputPrefix)
+  if windowCount < 3 then windowCount = 3 end if
+  session = create(opt001aSessionArguments(baseDirectory, gameDirectory, mapName, "listen", port))
+  initialized = try(initialize(session))
+  if initialized is error then shutdown(session); return initialized end if
+  if not session.server.active then shutdown(session); return error(3810, "OPT-001A plateau test did not start map " + mapName) end if
+
+  print "MiniQuake OPT-001A handle plateau warm-up"
+  print "  map=" + mapName + " frames=" + warmupFrames
+  warmed = try(opt001aRunFrames(session, warmupFrames, "plateau_warmup"))
+  if warmed is error then shutdown(session); return warmed end if
+
+  gc_collect()
+  endpoints = array(windowCount + 1)
+  handles = array(windowCount + 1, 0)
+  baseline = resourceSnapshot(session)
+  endpoints[0] = baseline
+  handles[0] = baseline[15]
+  csv = opt001aResourceHeader()
+  csv = csv + opt001aResourceRow("baseline", 0, baseline)
+
+  window = 0
+  absoluteFrame = 0
+  while window < windowCount
+    print "MiniQuake OPT-001A handle window"
+    print "  window=" + (window + 1) + "/" + windowCount + " frames=" + windowFrames
+    frameIndex = 0
+    while frameIndex < windowFrames
+      result = try(frame(session, 0.02))
+      if result is error then
+        failure = soakFrameError(session, "plateau window " + window, frameIndex, result)
+        shutdown(session)
+        return failure
+      end if
+      frameIndex = frameIndex + 1
+      absoluteFrame = absoluteFrame + 1
+      if frameIndex % 100 == 0 or frameIndex == windowFrames then
+        sample = resourceSnapshot(session)
+        csv = csv + opt001aResourceRow("window" + (window + 1), absoluteFrame, sample)
+      end if
+      if frameIndex % 1000 == 0 or frameIndex == windowFrames then
+        print "  plateau_progress=" + frameIndex + "/" + windowFrames
+      end if
+    end while
+    gc_collect()
+    endpoint = resourceSnapshot(session)
+    endpoints[window + 1] = endpoint
+    handles[window + 1] = endpoint[15]
+    csv = csv + opt001aResourceRow("window" + (window + 1) + "_end", absoluteFrame, endpoint)
+    print "  window_handles=" + endpoint[15]
+    window = window + 1
+  end while
+
+  finalSnapshot = endpoints[windowCount]
+  nonHandleStable = opt001aNonHandleStable(baseline, finalSnapshot)
+  classification = optBaseline.classifyHandles(handles, nonHandleStable)
+  pass = classification == "STABLE" or classification == "PLATEAU"
+
+  csvResult = try(fs.writeAllText(outputPrefix + "-resources.csv", csv))
+  if csvResult is error then shutdown(session); return csvResult end if
+
+  json = "{"
+  json = json + "\"schema\":\"MiniQuakeOPT001AHandlePlateau/1\","
+  json = json + "\"map\":\"" + mapName + "\","
+  json = json + "\"warmup_frames\":" + warmupFrames + ","
+  json = json + "\"window_frames\":" + windowFrames + ","
+  json = json + "\"window_count\":" + windowCount + ","
+  json = json + "\"handle_sequence\":\"" + optBaseline.handleSequenceText(handles) + "\","
+  json = json + "\"classification\":\"" + classification + "\","
+  json = json + "\"non_handle_stable\":" + optBaseline.boolText(nonHandleStable) + ","
+  json = json + "\"baseline\":" + opt001aResourceJson(baseline) + ","
+  json = json + "\"final\":" + opt001aResourceJson(finalSnapshot)
+  json = json + "}\n"
+  jsonResult = try(fs.writeAllText(outputPrefix + "-summary.json", json))
+  if jsonResult is error then shutdown(session); return jsonResult end if
+
+  print "MiniQuake OPT-001A handle plateau"
+  print "  handles=" + optBaseline.handleSequenceText(handles)
+  print "  non_handle_stable=" + nonHandleStable
+  print "  classification=" + classification
+  if pass then print "  result=PASS" else print "  result=FAIL" end if
+  shutdown(session)
+  if pass then return true end if
+  return error(3811, "OPT-001A handle classification " + classification)
+end function
+
+
 function runLongSoak(baseDirectory, gameDirectory, mode, target, frameCount, port)
   if mode == "listen" then
     return runServerModeSoak([
@@ -3545,8 +3946,8 @@ function runRenderEvidence(args, frameCount, outputPrefix)
     renderEvidence.reset()
     return 2
   end if
-  if not session.server.active then
-    print "MiniQuake render evidence: no map started"
+  if not session.server.active and session.demoPlayback is void then
+    print "MiniQuake render evidence: no map or demo started"
     shutdown(session)
     renderEvidence.reset()
     return 2
@@ -3594,6 +3995,352 @@ function runRenderEvidence(args, frameCount, outputPrefix)
   print "  tga=" + result[0]
   print "  summary=" + result[1]
   return 0
+end function
+
+
+
+function interopBool(value)
+  if value then return "true" end if
+  return "false"
+end function
+
+function interopWriteSummary(
+  outputPrefix,
+  mode,
+  success,
+  frames,
+  address,
+  port,
+  mapName,
+  connected,
+  spawned,
+  signon,
+  clientName,
+  viewEntity,
+  modelCount,
+  soundCount,
+  activeClients,
+  errorText,
+)
+  path = outputPrefix + "-summary.json"
+  text = "{\n"
+  text = text + "  \"schema_version\": 1,\n"
+  text = text + "  \"mode\": " + compatDiagnostics.jsonString(mode) + ",\n"
+  text = text + "  \"success\": " + interopBool(success) + ",\n"
+  text = text + "  \"frames\": " + frames + ",\n"
+  text = text + "  \"address\": " + compatDiagnostics.jsonString(address) + ",\n"
+  text = text + "  \"port\": " + port + ",\n"
+  text = text + "  \"map\": " + compatDiagnostics.jsonString(mapName) + ",\n"
+  text = text + "  \"connected\": " + interopBool(connected) + ",\n"
+  text = text + "  \"spawned\": " + interopBool(spawned) + ",\n"
+  text = text + "  \"signon\": " + signon + ",\n"
+  text = text + "  \"client_name\": " + compatDiagnostics.jsonString(clientName) + ",\n"
+  text = text + "  \"view_entity\": " + viewEntity + ",\n"
+  text = text + "  \"model_count\": " + modelCount + ",\n"
+  text = text + "  \"sound_count\": " + soundCount + ",\n"
+  text = text + "  \"active_clients\": " + activeClients + ",\n"
+  text = text + "  \"protocol\": " + c.PROTOCOL_VERSION + ",\n"
+  text = text + "  \"control_protocol\": " + externalReference.ORIGINAL_CONTROL_PROTOCOL + ",\n"
+  text = text + "  \"error\": " + compatDiagnostics.jsonString(errorText) + "\n"
+  text = text + "}\n"
+  written = try(fs.writeAllText(path, text))
+  if written is error then return written end if
+  return path
+end function
+
+function interopWriteReady(outputPrefix, port, mapName)
+  path = outputPrefix + "-ready.json"
+  text = "{\n"
+  text = text + "  \"schema_version\": 1,\n"
+  text = text + "  \"ready\": true,\n"
+  text = text + "  \"port\": " + port + ",\n"
+  text = text + "  \"map\": " + compatDiagnostics.jsonString(mapName) + "\n"
+  text = text + "}\n"
+  written = try(fs.writeAllText(path, text))
+  if written is error then return written end if
+  return path
+end function
+
+function firstRemoteServerClient(session)
+  for each serverClient in session.server.clients
+    if serverClient.active and serverClient.socket is not void and serverClient.socket.transport == "udp" then
+      return serverClient
+    end if
+  end for
+  return void
+end function
+
+function runOriginalInteropServer(args, maximumFrames, outputPrefix)
+  session = create(args)
+  initialized = try(initialize(session))
+  if initialized is error then
+    reportError = try(interopWriteSummary(
+      outputPrefix,
+      "miniquake_server_original_client",
+      false,
+      0,
+      "",
+      0,
+      "",
+      false,
+      false,
+      0,
+      "",
+      0,
+      0,
+      0,
+      0,
+      initialized.message,
+    ))
+    shutdown(session)
+    print "MiniQuake original-client interop server: " + initialized.message
+    return 3
+  end if
+  if not session.server.active or session.network.listener is void then
+    reportError = try(interopWriteSummary(
+      outputPrefix,
+      "miniquake_server_original_client",
+      false,
+      0,
+      "",
+      0,
+      session.server.mapName,
+      false,
+      false,
+      0,
+      "",
+      0,
+      0,
+      0,
+      0,
+      "dedicated UDP server did not start",
+    ))
+    shutdown(session)
+    print "MiniQuake original-client interop server: dedicated UDP server did not start"
+    return 3
+  end if
+
+  port = session.network.listener.port
+  readyReport = try(interopWriteReady(outputPrefix, port, session.server.mapName))
+  if readyReport is error then
+    shutdown(session)
+    print "MiniQuake original-client interop server: " + readyReport.message
+    return 3
+  end if
+  print "MiniQuake original-client interop server"
+  print "  ready=true port=" + port + " map=" + session.server.mapName
+  print "  ready_report=" + readyReport
+  index = 0
+  postFrames = 0
+  success = false
+  failure = ""
+  remote = void
+  while index < maximumFrames
+    frameResult = try(frame(session, 0.02))
+    if frameResult is error then failure = frameResult.message; break end if
+    remote = firstRemoteServerClient(session)
+    if remote is not void and remote.spawned then
+      postFrames = postFrames + 1
+      if postFrames >= externalReference.ORIGINAL_INTEROP_POST_FRAMES then success = true; break end if
+    end if
+    win.sleep(1)
+    index = index + 1
+  end while
+
+  address = ""
+  name = ""
+  signon = 0
+  spawned = false
+  connected = false
+  if remote is not void then
+    connected = remote.active
+    spawned = remote.spawned
+    signon = remote.signonStage
+    name = remote.name
+    if remote.socket is not void then address = remote.socket.address + ":" + remote.socket.port end if
+  end if
+  if not success and failure == "" then failure = "original client did not complete signon" end if
+  report = try(interopWriteSummary(
+    outputPrefix,
+    "miniquake_server_original_client",
+    success,
+    index,
+    address,
+    port,
+    session.server.mapName,
+    connected,
+    spawned,
+    signon,
+    name,
+    0,
+    len(session.server.modelPrecache),
+    len(session.server.soundPrecache),
+    activeServerClients(session),
+    failure,
+  ))
+  shutdown(session)
+  if report is error then print "MiniQuake original-client interop server: " + report.message; return 3 end if
+  print "  connected=" + interopBool(connected) + " spawned=" + interopBool(spawned) + " signon=" + signon
+  print "  client=" + name + " address=" + address
+  print "  summary=" + report
+  if success then print "  result=PASS"; return 0 end if
+  print "  error=" + failure
+  print "  result=FAIL"
+  return 3
+end function
+
+function originalInteropClientNetworkProvenance(session, controlAddress)
+  transport = "none"
+  remoteAddress = ""
+  if session.client.socket is not void then
+    transport = session.client.socket.transport
+    remoteAddress = session.client.socket.address
+  end if
+  return externalReference.originalServerInteropNetworkProvenance(
+    transport,
+    remoteAddress,
+    controlAddress,
+    session.server.active,
+    session.client.localAuthoritative,
+    session.client.demoPlayback,
+  )
+end function
+
+function runOriginalInteropClient(args, maximumFrames, outputPrefix, controlAddress, controlPort)
+  session = create(args)
+  initialized = try(initialize(session))
+  if initialized is error then
+    reportError = try(interopWriteSummary(
+      outputPrefix,
+      "miniquake_client_original_server",
+      false,
+      0,
+      controlAddress,
+      controlPort,
+      "",
+      false,
+      false,
+      0,
+      "",
+      0,
+      0,
+      0,
+      0,
+      initialized.message,
+    ))
+    shutdown(session)
+    print "MiniQuake original-server interop client: " + initialized.message
+    return 3
+  end if
+
+  targetHost = controlAddress + ":" + controlPort
+  // R13 normally establishes this connection during Host_Init, before the
+  // local fallback. Keep the explicit call as a defensive compatibility
+  // path for direct callers that do not pass -original-interop-target.
+  strictConnection = true
+  if not session.client.connected then
+    strictConnection = try(connectRemoteHostInterop(session, targetHost, 20000, 500))
+  else
+    print "MiniQuake original interop connection established during Host_Init"
+  end if
+  if strictConnection is error then
+    reportError = try(interopWriteSummary(
+      outputPrefix,
+      "miniquake_client_original_server",
+      false,
+      0,
+      controlAddress,
+      controlPort,
+      "",
+      false,
+      false,
+      0,
+      "",
+      0,
+      0,
+      0,
+      0,
+      strictConnection.message,
+    ))
+    shutdown(session)
+    print "MiniQuake original-server interop client"
+    print "  target=" + targetHost
+    print "  error=" + strictConnection.message
+    print "  result=FAIL"
+    return 3
+  end if
+
+  print "MiniQuake original-server interop client"
+  print "  target=" + controlAddress + ":" + controlPort
+  index = 0
+  postFrames = 0
+  success = false
+  failure = ""
+  while index < maximumFrames
+    frameResult = try(frame(session, 0.02))
+    if frameResult is error then failure = frameResult.message; break end if
+    if session.client.connected and session.client.signon == c.SIGNONS and session.client.spawned then
+      if not originalInteropClientNetworkProvenance(session, controlAddress) then
+        failure = "original-server interop completed signon without target UDP provenance"
+        break
+      end if
+      postFrames = postFrames + 1
+      if postFrames >= externalReference.ORIGINAL_INTEROP_POST_FRAMES then success = true; break end if
+    end if
+    win.sleep(1)
+    index = index + 1
+  end while
+  if not success and failure == "" then failure = "MiniQuake client did not complete original-server signon" end if
+  report = try(interopWriteSummary(
+    outputPrefix,
+    "miniquake_client_original_server",
+    success,
+    index,
+    controlAddress,
+    controlPort,
+    session.client.levelName,
+    session.client.connected,
+    session.client.spawned,
+    session.client.signon,
+    session.client.name,
+    session.client.viewEntity,
+    len(session.client.modelPrecache),
+    len(session.client.soundPrecache),
+    0,
+    failure,
+  ))
+  connected = session.client.connected
+  spawned = session.client.spawned
+  signon = session.client.signon
+  levelName = session.client.levelName
+  viewEntity = session.client.viewEntity
+  modelCount = len(session.client.modelPrecache)
+  soundCount = len(session.client.soundPrecache)
+  transport = "none"
+  remoteAddress = ""
+  remotePort = 0
+  if session.client.socket is not void then
+    transport = session.client.socket.transport
+    remoteAddress = session.client.socket.address
+    remotePort = session.client.socket.port
+  end if
+  localServerActive = session.server.active
+  localAuthoritative = session.client.localAuthoritative
+  demoPlayback = session.client.demoPlayback
+  networkProvenance = originalInteropClientNetworkProvenance(session, controlAddress)
+  shutdown(session)
+  if report is error then print "MiniQuake original-server interop client: " + report.message; return 3 end if
+  print "  connected=" + interopBool(connected) + " spawned=" + interopBool(spawned) + " signon=" + signon
+  print "  level=" + levelName + " view_entity=" + viewEntity
+  print "  models=" + modelCount + " sounds=" + soundCount
+  print "  transport=" + transport + " remote=" + remoteAddress + ":" + remotePort
+  print "  local_server_active=" + interopBool(localServerActive) + " local_authoritative=" + interopBool(localAuthoritative) + " demo_playback=" + interopBool(demoPlayback)
+  if networkProvenance then print "  network_provenance=target_udp" else print "  network_provenance=invalid" end if
+  print "  summary=" + report
+  if success then print "  result=PASS"; return 0 end if
+  print "  error=" + failure
+  print "  result=FAIL"
+  return 3
 end function
 
 function runHeadlessFrames(args, frameCount)

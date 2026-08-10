@@ -1,0 +1,14 @@
+{
+  "schema": "MiniQuakeOPT001CR3R1Hotfix/1",
+  "revision": "OPT-001CR3R1",
+  "parent": "OPT-001CR3",
+  "result_archive_sha256": "a57053a39cc4cb26a71cf638c2004374007380f89c7f20d525065bc4c4e78af8",
+  "classification": "build_failure_with_missing_build_diagnostics_and_harness_follow_on",
+  "fixes": [
+    "python subprocess live tee",
+    "build failure dependency barrier",
+    "compiler-safe inline subset",
+    "hotpath compile test before game"
+  ],
+  "engine_semantics": "unchanged except retained performance-only CR3 transformations and reduced inline expansion"
+}

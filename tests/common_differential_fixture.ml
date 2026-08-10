@@ -59,7 +59,7 @@ function writeAngleEvent(buffer)
   msg.MSG_WriteAngle(buffer, 90.75)
 end function
 
-function basePath()
+function inline basePath()
   return "build/common_differential/mlfs"
 end function
 

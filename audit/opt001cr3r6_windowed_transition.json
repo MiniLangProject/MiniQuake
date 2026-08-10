@@ -1,0 +1,29 @@
+{
+  "delivery_parent": "OPT-001CR3R5",
+  "delivery_revision": "OPT-001CR3R6",
+  "fingerprint": "0x1c001c0c",
+  "fixes": [
+    "remove malformed R5 main-level window argument mutation",
+    "default to windowed mode inside VID_FindRequestedMode",
+    "preserve explicit fullscreen selectors",
+    "freeze OPT-001C identity independently of downstream revisions",
+    "reset map-owned renderer compatibility state on destroy",
+    "make accepted OPT-001B comparison mandatory and CR2 incremental comparison diagnostic"
+  ],
+  "performance_features_retained": [
+    "three conservative inline functions",
+    "native exact array allocation",
+    "visible entity builder",
+    "particle preallocation",
+    "diagnostic trace fast paths"
+  ],
+  "runtime_gates": [
+    "e1m1/e1m2 matrix",
+    "e1m1-e1m2-e1m1 transition",
+    "1000 visible e1m2 frames",
+    "10000 headless e1m2 frames",
+    "handle plateau"
+  ],
+  "schema": "MiniQuakeOPT001CR3R6WindowedTransition/1",
+  "status": "opt001cr3r6_windowed_transition_candidate_v1"
+}

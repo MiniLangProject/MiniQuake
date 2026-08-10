@@ -1,0 +1,672 @@
+{
+  "schema": "MiniQuakeOPT001CR2AcceptedBaseline/1",
+  "source_revision": "OPT-001CR2",
+  "source_result_archive": "MiniQuake_OPT-001CR2_RESULTS_20260808-212127.zip",
+  "source_result_sha256": "96f49066bc9fa54b3af4e26afc3697bc296bf514f4fe9a302028704996b6f7bb",
+  "status": "PASS",
+  "handle_classification": "PLATEAU",
+  "maps": {
+    "e1m1": {
+      "parse": {
+        "schema": "MiniQuakeOPT001AMapParse/1",
+        "map": "e1m1",
+        "game": "id1",
+        "bytes": 1365176,
+        "read_ms": 0,
+        "parse_ms": 15,
+        "total_ms": 15,
+        "entities": 369,
+        "models": 58,
+        "planes": 1810,
+        "vertices": 7358,
+        "faces": 5516,
+        "leafs": 1531,
+        "mark_surfaces": 7073,
+        "textures": 81,
+        "clipnodes": 5408
+      },
+      "trace": {
+        "sha256_a": "2cd0f88d05c4844dcfd86479eb8a6ffeaec6152988b65daed7934f0db8412d9e",
+        "sha256_b": "2cd0f88d05c4844dcfd86479eb8a6ffeaec6152988b65daed7934f0db8412d9e",
+        "byte_identical": true
+      },
+      "headless": {
+        "schema": "MiniQuakeOPT001AFrameBaseline/1",
+        "mode": "headless",
+        "map": "e1m1",
+        "frames": 3000,
+        "total_ms": 62656,
+        "median_ms": 16,
+        "p95_ms": 32,
+        "p99_ms": 32,
+        "max_ms": 32,
+        "stage_totals": [
+          {
+            "name": "filter",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "commands",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "net_poll",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "send",
+            "total_ms": 141,
+            "hits": 3000
+          },
+          {
+            "name": "console",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "server",
+            "total_ms": 61720,
+            "hits": 3000
+          },
+          {
+            "name": "host_time",
+            "total_ms": 16,
+            "hits": 3000
+          },
+          {
+            "name": "client_read",
+            "total_ms": 341,
+            "hits": 3000
+          },
+          {
+            "name": "demo_scene",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "entity_relink",
+            "total_ms": 140,
+            "hits": 3000
+          },
+          {
+            "name": "entity_effects",
+            "total_ms": 16,
+            "hits": 3000
+          },
+          {
+            "name": "client_events",
+            "total_ms": 31,
+            "hits": 3000
+          },
+          {
+            "name": "qc_control",
+            "total_ms": 16,
+            "hits": 3000
+          },
+          {
+            "name": "centerprint",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "view",
+            "total_ms": 219,
+            "hits": 3000
+          },
+          {
+            "name": "screen",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "dlight_decay",
+            "total_ms": 16,
+            "hits": 3000
+          },
+          {
+            "name": "particles",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "audio",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "other",
+            "total_ms": 0,
+            "hits": 3000
+          }
+        ],
+        "resources_before": [
+          114779,
+          118601672,
+          115401432,
+          3200240,
+          165,
+          150,
+          1,
+          2,
+          0,
+          1,
+          93,
+          0,
+          0,
+          0,
+          0,
+          274,
+          0,
+          0
+        ],
+        "resources_after": [
+          114785,
+          118601672,
+          115425664,
+          3176008,
+          165,
+          150,
+          1,
+          2,
+          0,
+          1,
+          93,
+          0,
+          0,
+          0,
+          0,
+          275,
+          0,
+          0
+        ]
+      },
+      "render": {
+        "schema": "MiniQuakeOPT001AFrameBaseline/1",
+        "mode": "render",
+        "map": "e1m1",
+        "frames": 3000,
+        "total_ms": 212187,
+        "median_ms": 78,
+        "p95_ms": 79,
+        "p99_ms": 79,
+        "max_ms": 94,
+        "stage_totals": [
+          {
+            "name": "filter",
+            "total_ms": 48,
+            "hits": 3000
+          },
+          {
+            "name": "commands",
+            "total_ms": 16,
+            "hits": 3000
+          },
+          {
+            "name": "net_poll",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "send",
+            "total_ms": 347,
+            "hits": 3000
+          },
+          {
+            "name": "console",
+            "total_ms": 31,
+            "hits": 3000
+          },
+          {
+            "name": "server",
+            "total_ms": 74764,
+            "hits": 3000
+          },
+          {
+            "name": "host_time",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "client_read",
+            "total_ms": 404,
+            "hits": 3000
+          },
+          {
+            "name": "demo_scene",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "entity_relink",
+            "total_ms": 220,
+            "hits": 3000
+          },
+          {
+            "name": "entity_effects",
+            "total_ms": 15,
+            "hits": 3000
+          },
+          {
+            "name": "client_events",
+            "total_ms": 16,
+            "hits": 3000
+          },
+          {
+            "name": "qc_control",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "centerprint",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "view",
+            "total_ms": 280,
+            "hits": 3000
+          },
+          {
+            "name": "screen",
+            "total_ms": 136014,
+            "hits": 3000
+          },
+          {
+            "name": "dlight_decay",
+            "total_ms": 32,
+            "hits": 3000
+          },
+          {
+            "name": "particles",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "audio",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "other",
+            "total_ms": 0,
+            "hits": 3000
+          }
+        ],
+        "resources_before": [
+          349024,
+          151546712,
+          137502608,
+          14044104,
+          165,
+          150,
+          1,
+          2,
+          0,
+          1,
+          93,
+          0,
+          0,
+          0,
+          0,
+          339,
+          0,
+          0
+        ],
+        "resources_after": [
+          349030,
+          151530736,
+          137526840,
+          14003896,
+          165,
+          150,
+          1,
+          2,
+          0,
+          1,
+          93,
+          0,
+          0,
+          0,
+          0,
+          336,
+          0,
+          0
+        ]
+      }
+    },
+    "e1m2": {
+      "parse": {
+        "schema": "MiniQuakeOPT001AMapParse/1",
+        "map": "e1m2",
+        "game": "id1",
+        "bytes": 1332228,
+        "read_ms": 0,
+        "parse_ms": 16,
+        "total_ms": 16,
+        "entities": 555,
+        "models": 62,
+        "planes": 2079,
+        "vertices": 7558,
+        "faces": 5404,
+        "leafs": 1505,
+        "mark_surfaces": 7021,
+        "textures": 60,
+        "clipnodes": 8148
+      },
+      "trace": {
+        "sha256_a": "18b74a7a9a9fa277356d3e3b833ac3360513492192a337c6de889ab12cc632e4",
+        "sha256_b": "18b74a7a9a9fa277356d3e3b833ac3360513492192a337c6de889ab12cc632e4",
+        "byte_identical": true
+      },
+      "headless": {
+        "schema": "MiniQuakeOPT001AFrameBaseline/1",
+        "mode": "headless",
+        "map": "e1m2",
+        "frames": 3000,
+        "total_ms": 79533,
+        "median_ms": 31,
+        "p95_ms": 32,
+        "p99_ms": 32,
+        "max_ms": 47,
+        "stage_totals": [
+          {
+            "name": "filter",
+            "total_ms": 31,
+            "hits": 3000
+          },
+          {
+            "name": "commands",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "net_poll",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "send",
+            "total_ms": 143,
+            "hits": 3000
+          },
+          {
+            "name": "console",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "server",
+            "total_ms": 78730,
+            "hits": 3000
+          },
+          {
+            "name": "host_time",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "client_read",
+            "total_ms": 235,
+            "hits": 3000
+          },
+          {
+            "name": "demo_scene",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "entity_relink",
+            "total_ms": 173,
+            "hits": 3000
+          },
+          {
+            "name": "entity_effects",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "client_events",
+            "total_ms": 32,
+            "hits": 3000
+          },
+          {
+            "name": "qc_control",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "centerprint",
+            "total_ms": 16,
+            "hits": 3000
+          },
+          {
+            "name": "view",
+            "total_ms": 142,
+            "hits": 3000
+          },
+          {
+            "name": "screen",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "dlight_decay",
+            "total_ms": 31,
+            "hits": 3000
+          },
+          {
+            "name": "particles",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "audio",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "other",
+            "total_ms": 0,
+            "hits": 3000
+          }
+        ],
+        "resources_before": [
+          121209,
+          118629696,
+          115613072,
+          3016624,
+          228,
+          208,
+          1,
+          2,
+          0,
+          1,
+          118,
+          0,
+          0,
+          0,
+          0,
+          274,
+          0,
+          0
+        ],
+        "resources_after": [
+          121211,
+          118629696,
+          115637056,
+          2992640,
+          228,
+          208,
+          1,
+          2,
+          0,
+          1,
+          110,
+          0,
+          0,
+          0,
+          0,
+          275,
+          0,
+          0
+        ]
+      },
+      "render": {
+        "schema": "MiniQuakeOPT001AFrameBaseline/1",
+        "mode": "render",
+        "map": "e1m2",
+        "frames": 3000,
+        "total_ms": 201968,
+        "median_ms": 63,
+        "p95_ms": 78,
+        "p99_ms": 79,
+        "max_ms": 94,
+        "stage_totals": [
+          {
+            "name": "filter",
+            "total_ms": 109,
+            "hits": 3000
+          },
+          {
+            "name": "commands",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "net_poll",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "send",
+            "total_ms": 343,
+            "hits": 3000
+          },
+          {
+            "name": "console",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "server",
+            "total_ms": 71444,
+            "hits": 3000
+          },
+          {
+            "name": "host_time",
+            "total_ms": 15,
+            "hits": 3000
+          },
+          {
+            "name": "client_read",
+            "total_ms": 609,
+            "hits": 3000
+          },
+          {
+            "name": "demo_scene",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "entity_relink",
+            "total_ms": 296,
+            "hits": 3000
+          },
+          {
+            "name": "entity_effects",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "client_events",
+            "total_ms": 30,
+            "hits": 3000
+          },
+          {
+            "name": "qc_control",
+            "total_ms": 16,
+            "hits": 3000
+          },
+          {
+            "name": "centerprint",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "view",
+            "total_ms": 172,
+            "hits": 3000
+          },
+          {
+            "name": "screen",
+            "total_ms": 128823,
+            "hits": 3000
+          },
+          {
+            "name": "dlight_decay",
+            "total_ms": 79,
+            "hits": 3000
+          },
+          {
+            "name": "particles",
+            "total_ms": 32,
+            "hits": 3000
+          },
+          {
+            "name": "audio",
+            "total_ms": 0,
+            "hits": 3000
+          },
+          {
+            "name": "other",
+            "total_ms": 0,
+            "hits": 3000
+          }
+        ],
+        "resources_before": [
+          392537,
+          152173320,
+          139976152,
+          12197168,
+          228,
+          208,
+          1,
+          2,
+          0,
+          1,
+          118,
+          0,
+          0,
+          0,
+          0,
+          339,
+          0,
+          0
+        ],
+        "resources_after": [
+          392543,
+          152187720,
+          140000448,
+          12187272,
+          228,
+          208,
+          1,
+          2,
+          0,
+          1,
+          110,
+          0,
+          0,
+          0,
+          0,
+          336,
+          0,
+          0
+        ]
+      }
+    }
+  }
+}

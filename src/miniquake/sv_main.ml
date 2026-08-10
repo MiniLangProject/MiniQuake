@@ -706,6 +706,9 @@ end function
 // SV_DropClient is declared by server.h and implemented by host.c in the
 // original tree; it lives here because all message lifecycle decisions call it.
 function SV_DropClient(state, clientValue, crashed)
+  if clientValue.lastMessage <= 0 then
+    return
+  end if
   clientIndex = clientValue.edictIndex - 1
   connected = clientValue.active and clientValue.socket is not void
   if clientValue.socket is not void and not crashed and netmain.NET_CanSendMessage(clientValue.socket) then
@@ -880,6 +883,7 @@ end function
 // loads and settles QuakeC through the shared low-level runtime, then restarts
 // the four-stage signon on the new map.
 function SV_SpawnServer(state, filesystem, mapName, skill, registry, commandSystem)
+  gc_collect()
   snapshot = []
   changing = state.server.active
   if changing then
@@ -893,11 +897,11 @@ function SV_SpawnServer(state, filesystem, mapName, skill, registry, commandSyst
   return state.server
 end function
 
-// Protocol-15 has no QuakeWorld multicast opcode.  The stock GLQuake server
+// Protocol-15 has no QuakeWorld multicast opcode.  The stock MiniQuake server
 // routes transient events through datagram/reliable_datagram.  This helper
 // exposes equivalent target selection for private engine producers: ALL is a
 // reliable broadcast, PVS/PHS append only to active clients in the selected
-// visibility set.  PHS falls back to PVS because GLQuake 1.09 does not build a
+// visibility set.  PHS falls back to PVS because MiniQuake 1.09 does not build a
 // separate hearability table.
 function SV_Multicast(state, origin, source, mode)
   if mode == MULTICAST_ALL then

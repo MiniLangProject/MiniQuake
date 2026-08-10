@@ -23,7 +23,7 @@ const EXPECTED_LOCALSTACK_SIZE = 2048
 const FNV_OFFSET = 2166136261
 const FNV_PRIME = 16777619
 
-function hashByte(hash, value)
+function inline hashByte(hash, value)
   return ((hash ^ (value & 255)) * FNV_PRIME) & 0xffffffff
 end function
 

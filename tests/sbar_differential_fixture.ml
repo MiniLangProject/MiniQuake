@@ -8,7 +8,7 @@ import miniquake.player_move as player_move
 import miniquake.array_util as arrayutil
 import miniquake.native as native
 
-function fnvByte(hash, value)
+function inline fnvByte(hash, value)
   return ((hash ^ (value & 255)) * 16777619) & 4294967295
 end function
 

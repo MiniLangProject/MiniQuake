@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "MiniQuake",
-  "current_package": "BP-089",
-  "current_delivery_revision": "BP-085-089R8",
-  "delivery_parent": "BP-085-089R7",
-  "parent_package": "BP-088",
+  "current_package": "BP-094",
+  "current_delivery_revision": "BP-090-094R15",
+  "delivery_parent": "BP-090-094R14",
+  "parent_package": "BP-093",
   "compatibility_target": {
     "reference": "WinQuake/GLQuake 1.09",
     "profile": "compat_109",
@@ -70,32 +70,25 @@
     "network_evidence": "2 UDP control pairs plus loopback PASS"
   },
   "package": {
-    "id": "BP-089",
-    "parent": "BP-088",
-    "block_id": "BP-085-089",
-    "block_parent": "BP-080-084R2",
-    "date": "2026-07-31",
-    "title": "compat_109 game-profile, artifact, stability and release-candidate closure",
-    "status": "Windows R8 acceptance pending",
-    "game_profile_status": "game_profile_109_frozen_v1",
-    "game_profile_fingerprint": "0x7a03b68d",
-    "mod_runtime_status": "mod_runtime_109_frozen_v1",
-    "mod_runtime_fingerprint": "0x4649813d",
-    "artifact_compat_status": "artifact_compat_109_frozen_v1",
-    "artifact_compat_fingerprint": "0x59531091",
-    "stability_status": "stability_109_frozen_v1",
-    "stability_fingerprint": "0xd0e3c03f",
-    "compat_release_status": "compat_109_release_candidate_v1",
-    "compat_release_fingerprint": "0x29b72a98",
-    "pending_external_gates": [
+    "id": "BP-094",
+    "parent": "BP-093",
+    "block_id": "BP-090-094",
+    "block_parent": "BP-085-089R8",
+    "date": "2026-08-01",
+    "title": "original GLQuake provenance, bidirectional binary interop and external visual-reference closure",
+    "status": "Windows acceptance pending; R14 passed bidirectional original binary interop and demo1/demo2 visual parity; R15 aligns original and MiniQuake visual simulation timesteps for demo3",
+    "original_reference_status": "original_reference_109_candidate_v1",
+    "original_reference_fingerprint": "0xdc355175",
+    "compat_final_status": "compat_109_final_candidate_v1",
+    "compat_final_fingerprint": "0xe04a7727",
+    "original_glquake_sha256": "04862c835c399bc9184f62101ae0390c2a758c21656ec06dcc0384e0f373d588",
+    "external_gates": [
       "original_binary_interop",
       "external_glquake_visual_reference"
     ],
-    "delivery_revision": "BP-085-089R8",
-    "delivery_parent": "BP-085-089R7",
-    "artifact_evidence_revision": "sequential_exact_fixed6_signedzero_v3",
-    "savegame_high_water_preserved": true,
-    "listen_soak_client_entity_policy": "server_high_water_plus_existing_static_offset"
+    "fixtures": 104,
+    "original_binary_redistributed": false,
+    "quake_game_data_redistributed": false
   },
   "diagnostic_schemas": {
     "trace": "MiniQuakeCompatTrace|schema=1",
@@ -110,7 +103,7 @@
   },
   "port_units": {
     "total": 63,
-    "state": "All 1,094 selected compat_109 source definitions are classified and Windows-accepted. BP-085..089 add game profiles, mod runtime, retail artifacts and stability; external original-binary and GLQuake visual-reference gates remain explicit.",
+    "state": "All 1,094 selected compat_109 source definitions are classified and Windows-accepted. BP-090..094 add exact original reference provenance, bidirectional original-binary Protocol-15 interop and raw external visual-reference gates; Windows acceptance of those external gates is pending.",
     "reclassified_units": [
       {
         "unit": 5,
@@ -186,7 +179,7 @@
     "the original GLQuake screenshot corpus is not bundled; BP-048 currently proves cross-process MiniQuake framebuffer determinism",
     "the final >95% original-vs-MiniQuake image claim requires a separately captured external GLQuake reference corpus"
   ],
-  "next_package": "BP-085-089R8 Windows acceptance; then continue external interop/visual gates or BP-090+",
+  "next_package": "Windows acceptance of BP-090-094; if green, final release packaging/cleanup without widening the compatibility claim.",
   "bp001r2_acceptance": {
     "result_archive": "MiniQuake_BP-001R2_RESULTS_20260724-181843.zip",
     "result_archive_sha256": "a6373b21653760800af9cc67fc969b07a7b7f385e409e5c5f9bced718262816c",
@@ -1964,13 +1957,16 @@
     "r1_fix": "sequential Host sessions, exact parsed-save roundtrip, preserved edict high-water mark and production load synchronization"
   },
   "current_delivery": {
-    "revision": "BP-085-089R8",
-    "parent": "BP-085-089R7",
+    "revision": "BP-090-094R3",
+    "parent": "BP-090-094R2",
     "status": "candidate",
-    "purpose": "correct listen-server stability classification for sparse client entity high-water without weakening leak-sensitive gates",
-    "result_parent_archive_sha256": "73d687753608117190a7527ac7a84f7ef7a0d57755ebe6e5887574a272710560",
-    "stability_fingerprint": "0xd0e3c03f",
-    "client_entity_policy": "server_high_water_plus_existing_static_offset"
+    "purpose": "close original-binary interoperability and external GLQuake visual-reference gates",
+    "original_reference_status": "original_reference_109_candidate_v1",
+    "original_reference_fingerprint": "0xdc355175",
+    "compat_final_status": "compat_109_final_candidate_v1",
+    "compat_final_fingerprint": "0xe04a7727",
+    "fixtures": 104,
+    "external_visual_policy": "raw_full_frame_mean_luminance_ssim_8x8_min_0.95_no_normalization"
   },
   "artifact_evidence_revision": "sequential_exact_fixed6_signedzero_v3",
   "fixed_six_formatter": "msvcrt_percent_f",
@@ -2084,5 +2080,164 @@
     "host_soak": "5000/5000 PASS",
     "listen_soak": "5000 frames completed; server 67->67, client table 66->67; all leak-sensitive gates stable",
     "classification": "false positive in client table zero-growth predicate"
+  },
+  "bp085089r8_acceptance": {
+    "result_archive": "MiniQuake_BP-085-089R8_RESULTS_20260801-165823.zip",
+    "result_archive_sha256": "f15f674ade75d82ef2221390f2d1180292b263e3d0dd8c9d1afc1d56a5c7dab6",
+    "status": "PASS",
+    "id1_rogue_hipnotic": "PASS",
+    "retail_demo_save": "A/B byte-identical PASS",
+    "main_trace_sha256": "b6e1d92f614cae73e43782dcb94a0233769a6e5dc70dad9f7c1da636d391219c",
+    "black_port_corpus": "start/e1m1/e1m2/e1m3 all A/B byte-identical",
+    "host_soak": "5000/5000 PASS",
+    "listen_soak": "5000/5000 PASS; all leak-sensitive gates true",
+    "render_evidence": "A/B byte-identical, SSIM 1.0",
+    "protocol3_pairs": "2/2 PASS",
+    "udp_loopback": "PASS",
+    "compat_release_status": "compat_109_release_candidate_v1",
+    "compat_release_fingerprint": "0x29b72a98"
+  },
+  "bp090094_candidate": {
+    "status": "Windows acceptance pending",
+    "steps": {
+      "BP-090": {
+        "fixtures": 20,
+        "scope": "verified original GLQuake provenance"
+      },
+      "BP-091": {
+        "fixtures": 20,
+        "scope": "original server to MiniQuake client",
+        "pairs": 2
+      },
+      "BP-092": {
+        "fixtures": 20,
+        "scope": "MiniQuake server to original client",
+        "pairs": 2
+      },
+      "BP-093": {
+        "fixtures": 20,
+        "scope": "raw external visual reference",
+        "scenarios": 3,
+        "minimum_ssim": 0.95
+      },
+      "BP-094": {
+        "fixtures": 24,
+        "scope": "external compatibility closure"
+      }
+    },
+    "original_glquake": {
+      "bytes": 435712,
+      "pe_machine": "0x014c",
+      "sha256": "04862c835c399bc9184f62101ae0390c2a758c21656ec06dcc0384e0f373d588",
+      "redistributed": false
+    },
+    "required_windows_evidence": [
+      "two original-server/MiniQuake-client pairs",
+      "two MiniQuake-server/original-client pairs",
+      "demo1/demo2/demo3 raw full-frame SSIM >= 0.95"
+    ]
+  },
+  "bp090094r3_hotfix": {
+    "status": "candidate",
+    "classification": "external original-binary harness",
+    "changed_engine_code": false,
+    "changed_native_code": false,
+    "original_server_process_mode": "listen",
+    "requires_video_context": true,
+    "dedicated_glquake_map_load_supported": false,
+    "reason": "GLQuake dedicated mode skips VID_Init while the GL BSP loader uploads textures during map load"
+  },
+  "bp090094r3_windows_result": {
+    "result_archive": "MiniQuake_BP-090-094R3_RESULTS_20260802-165602.zip",
+    "status": "FAIL before map startup in original GLQuake process",
+    "internal_build_and_tests": "PASS",
+    "original_reference": "PASS",
+    "exit_code": "0xc0000005",
+    "last_stage": "GL_Init after GL_EXTENSIONS debug logging",
+    "classification": "original 1024-byte Con_DebugLog vsprintf overflow triggered by -condebug on modern extension string"
+  },
+  "bp090094r4_hotfix": {
+    "status": "candidate",
+    "changed_engine_code": false,
+    "changed_native_code": false,
+    "condebug_enabled": false,
+    "server_readiness": "Protocol-3 retry plus Protocol-15 signon 4",
+    "client_evidence": "MiniQuake server summary and original process liveness",
+    "visual_evidence": "original TGA screenshot",
+    "compat_final_fingerprint": "0xe04a7727"
+  },
+  "delivery_revision": "BP-090-094R15",
+  "external_interop_firewall_policy": "temporary_exact_program_udp_loopback_only",
+  "bp090094r10_windows_result": {
+    "result_archive": "MiniQuake_BP-090-094R10_RESULTS_20260804-173941.zip",
+    "status": "FAIL after full internal build and tests, before original staging",
+    "internal_build_and_tests": "PASS",
+    "failure": "prepare_original_reference.py received neither --archive nor --exe",
+    "classification": "external original-reference source-selector handoff"
+  },
+  "bp090094r11_hotfix": {
+    "status": "candidate",
+    "changed_engine_code": false,
+    "changed_native_code": false,
+    "source_resolution": "before elevation and build",
+    "source_selectors": [
+      "--archive",
+      "--exe"
+    ],
+    "environment_fallback": [
+      "MINIQUAKE_ORIGINAL_SOURCE",
+      "MINIQUAKE_ORIGINAL_EXE"
+    ],
+    "downloads_fallback": true,
+    "project_internal_reference_rejected": true,
+    "argument_report": "build/bp090-094r11-original-reference-input.json"
+  },
+  "bp090094r13_hotfix": {
+    "status": "candidate",
+    "changed_engine_code": true,
+    "changed_native_code": false,
+    "pre_fallback_external_connect": true,
+    "readiness_guard_open_during_signon": true,
+    "guard_close_order": "after_original_process_stop",
+    "normal_game_start_changed": false
+  },
+  "bp090094r14_hotfix": {
+    "status": "candidate",
+    "changed_engine_code": false,
+    "changed_native_code": false,
+    "capture_completion": "validated_tga_size_hash_stability",
+    "original_runs_per_scenario": 2,
+    "minimum_reference_ssim": 0.98,
+    "candidate_reference_aggregation": "minimum_ssim",
+    "minimum_candidate_ssim": 0.95
+  },
+  "optimization_delivery_revision": "OPT-001CR2",
+  "opt001c_windows_result": {
+    "status": "FAIL at compile gate; superseded by OPT-001CR1",
+    "result_archive": "MiniQuake_OPT-001C_RESULTS_20260807-180739.zip",
+    "first_error": "src/miniquake/render/world.ml delimiter mismatch"
+  },
+  "opt001cr1_hotfix": {
+    "status": "candidate",
+    "changed_native_code": false,
+    "optimization_contract_changed": false,
+    "delimiter_preflight": true
+  },
+  "opt001cr1_windows_result": {
+    "status": "all product/correctness gates PASS; harness analysis false FAIL",
+    "result_archive": "MiniQuake_OPT-001CR1_RESULTS_20260807-212403.zip",
+    "result_sha256": "d362d3f02385916cbff55dd854f3e2eb28a5d66b6ebae2098a0d5832e0090e01",
+    "performance_reconstruction": "TARGET_MET",
+    "handle_sequence": "275,275,275,276",
+    "handle_classification": "INCONCLUSIVE"
+  },
+  "opt001cr2_hotfix": {
+    "status": "candidate",
+    "changed_engine_code": false,
+    "changed_native_code": false,
+    "artifact_prefix": "opt001cr2",
+    "prefix_aware_analyzers": true,
+    "handle_confirmation_windows": 1,
+    "next_revision_after_pass": "OPT-001D"
   }
 }

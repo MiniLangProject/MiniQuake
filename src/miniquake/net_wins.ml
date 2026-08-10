@@ -329,14 +329,18 @@ function PartialIPAddress(input, hostaddr)
     (localHost >> 8) & 255,
     localHost & 255,
   ]
-  combined = []
+  combined = array(4, 0)
   prefixCount = 4 - len(suffix)
   index = 0
   while index < prefixCount
-    combined = combined + [localParts[index]]
+    combined[index] = localParts[index]
     index = index + 1
   end while
-  combined = combined + suffix
+  suffixIndex = 0
+  while suffixIndex < len(suffix)
+    combined[prefixCount + suffixIndex] = suffix[suffixIndex]
+    suffixIndex = suffixIndex + 1
+  end while
   hostOrder = ((combined[0] & 255) << 24) | ((combined[1] & 255) << 16) | ((combined[2] & 255) << 8) | (combined[3] & 255)
   hostaddr.family = AF_INET
   hostaddr.address = htonl(hostOrder)

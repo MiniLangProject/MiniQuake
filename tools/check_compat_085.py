@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, json, pathlib, sys
+import argparse, json, pathlib, re, sys
 
 EXPECTED_STATUS = 'game_profile_109_frozen_v1'
 EXPECTED_FINGERPRINT = '0x7a03b68d'
@@ -12,10 +12,16 @@ def fnv1a32(data: bytes) -> int:
         value = (value * 0x01000193) & 0xFFFFFFFF
     return value
 
+def _const_string(source: str, name: str) -> str:
+    match = re.search(rf'^const\s+{re.escape(name)}\s*=\s*"([^"]+)"\s*$', source, flags=re.M)
+    return match.group(1) if match else ""
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=".")
     ap.add_argument("--json", default="")
+    ap.add_argument("--allow-downstream-package", action="store_true")
     ns = ap.parse_args()
     root = pathlib.Path(ns.root).resolve()
     errors = []
@@ -41,13 +47,29 @@ def main() -> int:
     for text in [f'const STATUS = "{EXPECTED_STATUS}"', f'const FINGERPRINT = {EXPECTED_FINGERPRINT}']:
         if text not in source: errors.append("missing module marker: " + text)
     if 'MiniQuake BP-085 game-profile tests passed: 22' not in test: errors.append("runtime success marker missing")
-    for text in ['const PACKAGE_ID = "BP-089"', 'const BLOCK_ID = "BP-085-089"']:
-        if text not in build_info: errors.append("missing build marker: " + text)
+    package_id = _const_string(build_info, "PACKAGE_ID")
+    parent_package_id = _const_string(build_info, "PARENT_PACKAGE_ID")
+    block_id = _const_string(build_info, "BLOCK_ID")
+    if ns.allow_downstream_package:
+        if not package_id: errors.append("downstream build info has no PACKAGE_ID")
+        if not parent_package_id: errors.append("downstream build info has no PARENT_PACKAGE_ID")
+        if not block_id: errors.append("downstream build info has no BLOCK_ID")
+    else:
+        for text in [
+            'const PACKAGE_ID = "BP-089"',
+            'const PARENT_PACKAGE_ID = "BP-088"',
+            'const BLOCK_ID = "BP-085-089"',
+        ]:
+            if text not in build_info: errors.append("missing build marker: " + text)
     report = {
         "schema_version": 1,
-        "package": "BP-085",
+        "package": "BP-094" if ns.allow_downstream_package else "BP-085",
         "status": "PASS" if not errors else "FAIL",
         "errors": errors,
+        "downstream_package": bool(ns.allow_downstream_package),
+        "build_package_id": package_id,
+        "build_parent_package_id": parent_package_id,
+        "build_block_id": block_id,
         "contract_status": golden.get("status"),
         "fingerprint": calculated,
         "fixtures": EXPECTED_FIXTURES,
@@ -55,7 +77,11 @@ def main() -> int:
     if ns.json:
         pathlib.Path(ns.json).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print("MiniQuake BP-085 game profile verification: " + report["status"])
-    if not errors: print(f"  status={EXPECTED_STATUS} fingerprint={EXPECTED_FINGERPRINT} fixtures={EXPECTED_FIXTURES}")
+    if not errors:
+        print(
+            f"  status={EXPECTED_STATUS} fingerprint={EXPECTED_FINGERPRINT} fixtures={EXPECTED_FIXTURES} "
+            f"downstream={str(bool(ns.allow_downstream_package)).lower()} package={package_id} block={block_id}"
+        )
     for error in errors: print("  [FAIL] " + error)
     return 0 if not errors else 1
 

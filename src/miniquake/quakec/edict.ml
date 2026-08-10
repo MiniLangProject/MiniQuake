@@ -247,6 +247,7 @@ function className(machine, entityIndex)
 end function
 
 function loadMapEntitiesFrom(machine, map, skill, deathmatch, firstDynamicIndex)
+  gc_collect()
   if len(map.entities) == 0 then return error(2601, "ED_LoadFromFile: no worldspawn entity") end if
   if firstDynamicIndex < 1 then firstDynamicIndex = 1 end if
   machine.edictFree[0] = false
@@ -289,6 +290,7 @@ function loadMapEntitiesFrom(machine, map, skill, deathmatch, firstDynamicIndex)
 end function
 
 function loadMapEntities(machine, map, skill, deathmatch)
+  gc_collect()
   return loadMapEntitiesFrom(machine, map, skill, deathmatch, 1)
 end function
 
@@ -690,7 +692,7 @@ function newString(text)
   return protocolText.decodeBytes(slice(output, 0, outputIndex))
 end function
 
-// Explicit GLQuake entry-point names provide a one-to-one code-location map.
+// Explicit MiniQuake entry-point names provide a one-to-one code-location map.
 function ED_ClearEdict(machine, entityIndex)
   vm.clearEntity(machine, entityIndex)
   machine.edictFree[entityIndex] = false
@@ -831,7 +833,7 @@ function PR_LoadProgs(data, filename)
   program = try(progs.parse(data, filename))
   if program is error then return program end if
   // PROGHEADER_CRC: the generated system globals/fields must retain the
-  // stock ABI.  GLQuake rejects v6 programs that changed that header layout.
+  // stock ABI.  MiniQuake rejects v6 programs that changed that header layout.
   if program.crc != c.PROGHEADER_CRC then return error(2609, filename + ": system vars have been modified; progdefs CRC is " + program.crc) end if
   return program
 end function

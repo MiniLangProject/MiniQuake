@@ -1,0 +1,27 @@
+{
+  "delivery_parent": "BP-090-094R8",
+  "delivery_revision": "BP-090-094R9",
+  "fixes": [
+    "MiniQuake requires target UDP provenance",
+    "PowerShell independently checks provenance markers",
+    "failed fallback attempts are retried"
+  ],
+  "native_changed": false,
+  "observed_pair_a": {
+    "actual_provenance": "local_fallback",
+    "model_count": 86,
+    "sound_count": 86,
+    "udp_connect_timed_out": true,
+    "view_entity": 1
+  },
+  "observed_pair_b": {
+    "actual_provenance": "target_udp",
+    "model_count": 102,
+    "sound_count": 81,
+    "udp_connected": true,
+    "view_entity": 2
+  },
+  "root_cause": "failed remote UDP connection fell through to local demo/start and was misclassified as original-server signon",
+  "schema_version": 1,
+  "status": "candidate"
+}

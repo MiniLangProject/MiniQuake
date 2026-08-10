@@ -1,7 +1,7 @@
 /*
 Copyright (C) 2026 MiniQuake contributors
 
-Source-guided GLQuake 1.09 special rendering paths.  This module keeps the
+Source-guided MiniQuake 1.09 special rendering paths.  This module keeps the
 mirror, z-trick, envmap and time-refresh equations in one compiler-friendly
 place so the integrated renderer and isolated differential fixtures use the
 same Binary32 boundaries.

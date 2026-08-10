@@ -90,7 +90,7 @@ function R_SetRandomSeed(system, seed)
   return system.randomSeed
 end function
 
-// GLQuake's Win32 build uses the Microsoft C runtime rand() sequence.
+// MiniQuake's Win32 build uses the Microsoft C runtime rand() sequence.
 function R_Rand(system)
   system.randomSeed = (system.randomSeed * 214013 + 2531011) & 0xffffffff
   return (system.randomSeed >> 16) & 0x7fff
@@ -523,33 +523,47 @@ function updateParticlePhysics(particle, frameTime, gravity)
   return particle
 end function
 
-// Produces the fixed-function GLQuake command trace and advances particles in
+// Produces the fixed-function MiniQuake command trace and advances particles in
 // the same draw-before-simulate order as R_DrawParticles.
 function R_DrawParticles(system, currentTime, oldTime, gravity, viewOrigin, viewForward, viewUp, viewRight)
-  commands = [
-    ["GL_Bind", "particletexture"],
-    ["glEnable", "GL_BLEND"],
-    ["glTexEnv", "GL_MODULATE"],
-    ["glBegin", "GL_TRIANGLES"],
-  ]
+  activeCount = len(system.active)
+  commandBuffer = array(activeCount + 7, void)
+  commandCount = 0
+  commandBuffer[commandCount] = ["GL_Bind", "particletexture"]
+  commandCount = commandCount + 1
+  commandBuffer[commandCount] = ["glEnable", "GL_BLEND"]
+  commandCount = commandCount + 1
+  commandBuffer[commandCount] = ["glTexEnv", "GL_MODULATE"]
+  commandCount = commandCount + 1
+  commandBuffer[commandCount] = ["glBegin", "GL_TRIANGLES"]
+  commandCount = commandCount + 1
+
   scaledUp = math.VectorScale(viewUp, 1.5)
   scaledRight = math.VectorScale(viewRight, 1.5)
   frameTime = currentTime - oldTime
-  alive = []
-  for each particle in system.active
+  aliveBuffer = array(activeCount, void)
+  aliveCount = 0
+  index = 0
+  while index < activeCount
+    particle = system.active[index]
     if particle.die >= currentTime then
-      commands = commands + [particleDrawCommand(particle, viewOrigin, viewForward, scaledUp, scaledRight)]
+      commandBuffer[commandCount] = particleDrawCommand(particle, viewOrigin, viewForward, scaledUp, scaledRight)
+      commandCount = commandCount + 1
       updateParticlePhysics(particle, frameTime, gravity)
-      alive = alive + [particle]
+      aliveBuffer[aliveCount] = particle
+      aliveCount = aliveCount + 1
     end if
-  end for
-  system.active = alive
-  commands = commands + [
-    ["glEnd"],
-    ["glDisable", "GL_BLEND"],
-    ["glTexEnv", "GL_REPLACE"],
-  ]
-  return commands
+    index = index + 1
+  end while
+  system.active = arrays.copyArrayPrefix(aliveBuffer, aliveCount)
+
+  commandBuffer[commandCount] = ["glEnd"]
+  commandCount = commandCount + 1
+  commandBuffer[commandCount] = ["glDisable", "GL_BLEND"]
+  commandCount = commandCount + 1
+  commandBuffer[commandCount] = ["glTexEnv", "GL_REPLACE"]
+  commandCount = commandCount + 1
+  return arrays.copyArrayPrefix(commandBuffer, commandCount)
 end function
 
 function compatibilitySystem()

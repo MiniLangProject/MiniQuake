@@ -579,7 +579,7 @@ function Sbar_SortFrags(scores)
   return fragsort
 end function
 
-function Sbar_ColorForMap(mapColor)
+function inline Sbar_ColorForMap(mapColor)
   return mapColor + 8
 end function
 
@@ -760,7 +760,7 @@ function Sbar_DrawInventory()
     index = index + 1
   end while
   if sbarHipnotic then
-    // GLQuake 1.09 tests raw inventory bits 24 and 25 here.  Keep that
+    // MiniQuake 1.09 tests raw inventory bits 24 and 25 here.  Keep that
     // historical behavior even though the mission-pack symbolic constants
     // call later bits HIT_WETSUIT/HIT_EMPATHY_SHIELDS.
     if (items & (1 << 24)) != 0 then Sbar_DrawPic(288, -16, loadedSbarPicture("sb_wsuit")); itemNeedsRefresh(24, currentTime) end if

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "delivery_revision": "BP-090-094R10",
+  "delivery_parent": "BP-090-094R9",
+  "result_archive": "MiniQuake_BP-090-094R9_RESULTS_20260804-090239.zip",
+  "result_archive_sha256": "7ed83829da1d775fe33d72b794af92994faa7798a6934665f1752812ebf9616c",
+  "classification": "external original-server interop cold-start/readiness race",
+  "observed": {
+    "original_process_alive": true,
+    "original_process_stderr_empty": true,
+    "target": "127.0.0.1:35090",
+    "client_attempts": 4,
+    "client_attempt_result": "UDP timeout followed by correctly rejected local fallback",
+    "network_provenance": "invalid",
+    "signon_complete_with_target_udp": false
+  },
+  "fix": {
+    "readiness_evidence": "protocol3_server_info_response",
+    "request": "CCREQ_SERVER_INFO / QUAKE / protocol 3",
+    "required_response": "CCREP_SERVER_INFO from exact 127.0.0.1 target port",
+    "default_timeout_ms": 180000,
+    "client_launch_after_readiness_only": true,
+    "port_selection": "loopback bind probe",
+    "timeout_classification": "INFRA_FAILURE",
+    "report_pattern": "build/bp090-094r10-original-server-*-readiness.json"
+  },
+  "changed_engine_code": false,
+  "changed_native_code": false,
+  "network_provenance_contract_preserved": true,
+  "visual_threshold_preserved": 0.95,
+  "status": "candidate"
+}

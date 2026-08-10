@@ -66,7 +66,7 @@ end function
 
 // WinQuake reserves a conservative 16-byte tail before looking up the sound.
 // Equality is accepted; only cursize > MAX_DATAGRAM-16 drops the event.
-function canWriteDynamicSound(buffer)
+function inline canWriteDynamicSound(buffer)
   return buffer.curSize <= c.MAX_DATAGRAM - 16
 end function
 

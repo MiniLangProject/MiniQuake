@@ -138,7 +138,7 @@ function testSixteenBitPaintAndLoop()
   loopChannel.endTime = 4
   loopState.totalChannels = 1
   sndmix.S_PaintChannels(loopState, 6)
-  // GLQuake restarts a cue inside the same paint block at paintbuffer[0].
+  // MiniQuake restarts a cue inside the same paint block at paintbuffer[0].
   // Preserve that observable 1.09 quirk instead of offsetting by localTime.
   assertEqual(bio.i16(loopDma.buffer, 0), 400, "loop cue overwrites from paintbuffer zero")
   assertEqual(bio.i16(loopDma.buffer, 4), 600, "loop cue second accumulated sample")

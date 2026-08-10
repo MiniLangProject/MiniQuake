@@ -186,8 +186,8 @@ function testProductionProjectionDepth()
   commands = gl.Trace_End()
   for each command in commands
     if command[0] == "frustum" then
-      equal(command[1][4], 4.0, "GLQuake projection near plane")
-      equal(command[1][5], 4096.0, "GLQuake projection far plane")
+      equal(command[1][4], 4.0, "MiniQuake projection near plane")
+      equal(command[1][5], 4096.0, "MiniQuake projection far plane")
       return true
     end if
   end for

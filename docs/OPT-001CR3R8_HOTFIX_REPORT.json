@@ -1,0 +1,22 @@
+{
+  "schema": "MiniQuakeOPT001CR3R8PerformanceAudioUiFix/2",
+  "delivery_revision": "OPT-001CR3R8",
+  "delivery_parent": "OPT-001CR3R7",
+  "classification": "product_performance_audio_ui_revision",
+  "changes": [
+    "default _snd_mixahead 0.35",
+    "pre-render audio queue top-up",
+    "same-leaf PVS reuse",
+    "frame-local hot Cvar cache",
+    "aggressive scalar inline budget of at least 20 functions",
+    "local/disconnected net icon suppression",
+    "stable MiniQuake FPS window title",
+    "audio loop length hoists",
+    "audio cost analysis"
+  ],
+  "notes": [
+    "No visual or protocol compatibility threshold was relaxed.",
+    "Fullscreen remains available explicitly; windowed remains the default.",
+    "The disconnected icon remains available for stale established remote connections."
+  ]
+}

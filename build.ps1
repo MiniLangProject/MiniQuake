@@ -29,12 +29,12 @@ $Root = $PSScriptRoot
 $Output = Join-Path $Root "build"
 $Source = Join-Path $Root "src"
 $Parent = Split-Path -Parent $Root
-$PackageId = "BP-089"
-$ParentPackageId = "BP-088"
+$PackageId = "BP-094"
+$ParentPackageId = "BP-093"
 $NativeTextAbi = "caller_owned_bytes_v1"
 $ProtocolTextAbi = "quake_latin1_cstring_v1"
-$BlockId = "BP-085-089"
-$BlockParentPackageId = "BP-080-084R2"
+$BlockId = "BP-090-094"
+$BlockParentPackageId = "BP-085-089R8"
 $ProtocolStatus = "protocol15_frozen_v1"
 $QuakeCStatus = "quakec_109_frozen_v1"
 $WorldPhysicsStatus = "world_physics_109_frozen_v1"
@@ -54,6 +54,8 @@ $ModRuntimeStatus = "mod_runtime_109_frozen_v1"
 $ArtifactCompatStatus = "artifact_compat_109_frozen_v1"
 $StabilityStatus = "stability_109_frozen_v1"
 $CompatReleaseStatus = "compat_109_release_candidate_v1"
+$OriginalReferenceStatus = "original_reference_109_candidate_v1"
+$CompatFinalStatus = "compat_109_final_candidate_v1"
 
 function Resolve-CommandOrFile {
   param(
@@ -377,6 +379,10 @@ New-Item -ItemType Directory -Force -Path $Output | Out-Null
 # for current BP-044 products by the result collector.
 $PackageBuildArtifacts = @(
   "MiniQuake.exe",
+  "MiniQuakeOPT001AContractTests.exe",
+  "MiniQuakeOPT001BCorrectnessTests.exe",
+  "MiniQuakeOPT001CAllocationTests.exe",
+  "MiniQuakeOPT001CR3HotpathTests.exe",
   "MiniQuakeTests.exe",
   "MiniQuakeMilestoneTests.exe",
   "MiniQuakeCompatTraceTests.exe",
@@ -467,6 +473,11 @@ $PackageBuildArtifacts = @(
   "MiniQuakeArtifactCompatTests.exe",
   "MiniQuakeStabilityTests.exe",
   "MiniQuakeCompatibilityReleaseTests.exe",
+  "MiniQuakeOriginalReferenceTests.exe",
+  "MiniQuakeOriginalServerInteropTests.exe",
+  "MiniQuakeOriginalClientInteropTests.exe",
+  "MiniQuakeOriginalVisualReferenceTests.exe",
+  "MiniQuakeExternalCompatibilityClosureTests.exe",
   "MiniQuakeArtifactRetailEvidence.exe"
 )
 foreach ($ArtifactName in $PackageBuildArtifacts) {
@@ -500,7 +511,7 @@ if (-not $SkipPreflight -and $null -ne $PythonExe) {
     throw "Baseline verifier is missing: $Verifier"
   }
 
-  & $PythonExe @PythonPrefixArgs $Verifier $Root
+  & $PythonExe @PythonPrefixArgs $Verifier --root $Root
   if ($LASTEXITCODE -ne 0) {
     throw "$PackageId diagnostics preflight failed. The source tree or manifest is inconsistent."
   }
@@ -872,13 +883,31 @@ if (-not $SkipPreflight -and $null -ne $PythonExe) {
     if (-not (Test-Path -LiteralPath $CheckerPath -PathType Leaf)) { throw ($Checker.Name + " checker is missing: " + $CheckerPath) }
     $ReportName = ([IO.Path]::GetFileNameWithoutExtension($Checker.Path) + "-report.json")
     $ReportPath = Join-Path $Output $ReportName
+    $CheckerArgs = @("--root", $Root, "--json", $ReportPath, "--allow-downstream-package")
+    & $PythonExe @PythonPrefixArgs $CheckerPath @CheckerArgs
+    if ($LASTEXITCODE -ne 0) { throw ($PackageId + " " + $Checker.Name + " preflight failed.") }
+  }
+
+
+  $ExternalReferenceCheckers = @(
+    [ordered]@{ Name = "BP-090 original reference"; Path = "tools\check_external_090.py" },
+    [ordered]@{ Name = "BP-091 original server interop"; Path = "tools\check_external_091.py" },
+    [ordered]@{ Name = "BP-092 original client interop"; Path = "tools\check_external_092.py" },
+    [ordered]@{ Name = "BP-093 original visual reference"; Path = "tools\check_external_093.py" },
+    [ordered]@{ Name = "BP-094 external compatibility closure"; Path = "tools\check_external_094.py" }
+  )
+  foreach ($Checker in $ExternalReferenceCheckers) {
+    $CheckerPath = Join-Path $Root $Checker.Path
+    if (-not (Test-Path -LiteralPath $CheckerPath -PathType Leaf)) { throw ($Checker.Name + " checker is missing: " + $CheckerPath) }
+    $ReportName = ([IO.Path]::GetFileNameWithoutExtension($Checker.Path) + "-report.json")
+    $ReportPath = Join-Path $Output $ReportName
     & $PythonExe @PythonPrefixArgs $CheckerPath --root $Root --json $ReportPath
     if ($LASTEXITCODE -ne 0) { throw ($PackageId + " " + $Checker.Name + " preflight failed.") }
   }
 } elseif ($SkipPreflight) {
   Write-Warning "$PackageId diagnostics preflight was explicitly skipped."
 } else {
-  Write-Warning "$PackageId static diagnostics preflight requires Python and is skipped for the native compiler. Pass -Python PATH or run 'python tools\verify.py .' separately."
+  Write-Warning "$PackageId static diagnostics preflight requires Python and is skipped for the native compiler. Pass -Python PATH or run 'python tools\verify.py --root .' separately."
 }
 
 if ($RebuildNative) {
@@ -942,13 +971,30 @@ if ($Listings) {
   $CommonArgs += @("--asm", "--asm-pe", "--asm-data")
 }
 
+$Opt001CR3HotpathExe = Join-Path $Output "MiniQuakeOPT001CR3HotpathTests.exe"
+Write-Host "[MiniQuake] compiling $Opt001CR3HotpathExe"
+Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\opt001cr3_hotpath_tests.ml") -OutputFile $Opt001CR3HotpathExe -CompilerArguments $CommonArgs -Label "opt001cr3-hotpath-tests"
+
 $GameExe = Join-Path $Output "MiniQuake.exe"
 Write-Host "[MiniQuake] compiling $GameExe"
 Invoke-MiniLangCompile -InputFile (Join-Path $Source "main.ml") -OutputFile $GameExe -CompilerArguments $CommonArgs -Label "game"
 
+$Opt001AContractExe = Join-Path $Output "MiniQuakeOPT001AContractTests.exe"
+Write-Host "[MiniQuake] compiling $Opt001AContractExe"
+Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\opt001a_contract_tests.ml") -OutputFile $Opt001AContractExe -CompilerArguments $CommonArgs -Label "opt001a-contract-tests"
+
+$Opt001BContractExe = Join-Path $Output "MiniQuakeOPT001BCorrectnessTests.exe"
+Write-Host "[MiniQuake] compiling $Opt001BContractExe"
+Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\opt001b_contract_tests.ml") -OutputFile $Opt001BContractExe -CompilerArguments $CommonArgs -Label "opt001b-correctness-tests"
+
+$Opt001CContractExe = Join-Path $Output "MiniQuakeOPT001CAllocationTests.exe"
+Write-Host "[MiniQuake] compiling $Opt001CContractExe"
+Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\opt001c_contract_tests.ml") -OutputFile $Opt001CContractExe -CompilerArguments $CommonArgs -Label "opt001c-allocation-tests"
+
+
 if (-not $NoRunTests) {
   Write-Host "[MiniQuake] checking executable package identity"
-  $VersionResult = Invoke-LiveCapturedProcess -Executable $GameExe -Arguments @("--version") -LogPath (Join-Path $Output "bp080-084-build-version.txt")
+  $VersionResult = Invoke-LiveCapturedProcess -Executable $GameExe -Arguments @("--version") -LogPath (Join-Path $Output "bp090-094-build-version.txt")
   $VersionOutput = @($VersionResult.lines)
   $VersionExitCode = [int]$VersionResult.exit_code
   if ($VersionExitCode -ne 0) {
@@ -1022,6 +1068,18 @@ if (-not $NoRunTests) {
   }
   if (-not (($VersionOutput -join "`n") -match [regex]::Escape("Black-port source fingerprint: 0x309b0737"))) {
     throw "Compiled executable does not identify black-port source fingerprint 0x309b0737."
+  }
+  if (-not (($VersionOutput -join "`n") -match [regex]::Escape("Original reference status: $OriginalReferenceStatus"))) {
+    throw "Compiled executable does not identify original reference status $OriginalReferenceStatus."
+  }
+  if (-not (($VersionOutput -join "`n") -match [regex]::Escape("Original reference fingerprint: 0xdc355175"))) {
+    throw "Compiled executable does not identify original reference fingerprint 0xdc355175."
+  }
+  if (-not (($VersionOutput -join "`n") -match [regex]::Escape("Final compatibility status: $CompatFinalStatus"))) {
+    throw "Compiled executable does not identify final compatibility status $CompatFinalStatus."
+  }
+  if (-not (($VersionOutput -join "`n") -match [regex]::Escape("Final compatibility fingerprint: 0xe04a7727"))) {
+    throw "Compiled executable does not identify final compatibility fingerprint 0xe04a7727."
   }
 }
 
@@ -1167,6 +1225,11 @@ $ModRuntimeTestStatus = "SKIPPED"
 $ArtifactCompatTestStatus = "SKIPPED"
 $StabilityTestStatus = "SKIPPED"
 $CompatibilityReleaseTestStatus = "SKIPPED"
+$OriginalReferenceTestStatus = "SKIPPED"
+$OriginalServerInteropTestStatus = "SKIPPED"
+$OriginalClientInteropTestStatus = "SKIPPED"
+$OriginalVisualReferenceTestStatus = "SKIPPED"
+$ExternalCompatibilityClosureTestStatus = "SKIPPED"
 $ArtifactRetailEvidenceStatus = "SKIPPED"
 $NetworkTestStatus = "SKIPPED"
 
@@ -1623,6 +1686,32 @@ if (-not $SkipTests) {
   Write-Host "[MiniQuake] compiling $CompatibilityReleaseTestExe"
   Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\compatibility_release_closure_tests.ml") -OutputFile $CompatibilityReleaseTestExe -CompilerArguments $CommonArgs -Label "compatibility-release-tests"
   $CompatibilityReleaseTestStatus = "COMPILED"
+
+
+  $OriginalReferenceTestExe = Join-Path $Output "MiniQuakeOriginalReferenceTests.exe"
+  Write-Host "[MiniQuake] compiling $OriginalReferenceTestExe"
+  Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\original_reference_provenance_tests.ml") -OutputFile $OriginalReferenceTestExe -CompilerArguments $CommonArgs -Label "original-reference-tests"
+  $OriginalReferenceTestStatus = "COMPILED"
+
+  $OriginalServerInteropTestExe = Join-Path $Output "MiniQuakeOriginalServerInteropTests.exe"
+  Write-Host "[MiniQuake] compiling $OriginalServerInteropTestExe"
+  Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\original_server_interop_tests.ml") -OutputFile $OriginalServerInteropTestExe -CompilerArguments $CommonArgs -Label "original-server-interop-tests"
+  $OriginalServerInteropTestStatus = "COMPILED"
+
+  $OriginalClientInteropTestExe = Join-Path $Output "MiniQuakeOriginalClientInteropTests.exe"
+  Write-Host "[MiniQuake] compiling $OriginalClientInteropTestExe"
+  Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\original_client_interop_tests.ml") -OutputFile $OriginalClientInteropTestExe -CompilerArguments $CommonArgs -Label "original-client-interop-tests"
+  $OriginalClientInteropTestStatus = "COMPILED"
+
+  $OriginalVisualReferenceTestExe = Join-Path $Output "MiniQuakeOriginalVisualReferenceTests.exe"
+  Write-Host "[MiniQuake] compiling $OriginalVisualReferenceTestExe"
+  Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\original_visual_reference_tests.ml") -OutputFile $OriginalVisualReferenceTestExe -CompilerArguments $CommonArgs -Label "original-visual-reference-tests"
+  $OriginalVisualReferenceTestStatus = "COMPILED"
+
+  $ExternalCompatibilityClosureTestExe = Join-Path $Output "MiniQuakeExternalCompatibilityClosureTests.exe"
+  Write-Host "[MiniQuake] compiling $ExternalCompatibilityClosureTestExe"
+  Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\external_compat_closure_tests.ml") -OutputFile $ExternalCompatibilityClosureTestExe -CompilerArguments $CommonArgs -Label "external-compatibility-closure-tests"
+  $ExternalCompatibilityClosureTestStatus = "COMPILED"
 
   $ArtifactRetailEvidenceExe = Join-Path $Output "MiniQuakeArtifactRetailEvidence.exe"
   Write-Host "[MiniQuake] compiling $ArtifactRetailEvidenceExe"
@@ -2156,6 +2245,37 @@ if (-not $SkipTests) {
       -Executable $CompatibilityReleaseTestExe `
       -ProgressHint "The last printed [NN/24] line identifies the active release-matrix fixture."
     $CompatibilityReleaseTestStatus = "PASS"
+
+
+    Invoke-MiniQuakeTestBinary `
+      -Label "BP-090 original reference tests" `
+      -Executable $OriginalReferenceTestExe `
+      -ProgressHint "The last printed [NN/20] line identifies the active original-reference provenance fixture."
+    $OriginalReferenceTestStatus = "PASS"
+
+    Invoke-MiniQuakeTestBinary `
+      -Label "BP-091 original server interop tests" `
+      -Executable $OriginalServerInteropTestExe `
+      -ProgressHint "The last printed [NN/20] line identifies the active MiniQuake-client/original-server fixture."
+    $OriginalServerInteropTestStatus = "PASS"
+
+    Invoke-MiniQuakeTestBinary `
+      -Label "BP-092 original client interop tests" `
+      -Executable $OriginalClientInteropTestExe `
+      -ProgressHint "The last printed [NN/20] line identifies the active original-client/MiniQuake-server fixture."
+    $OriginalClientInteropTestStatus = "PASS"
+
+    Invoke-MiniQuakeTestBinary `
+      -Label "BP-093 original visual reference tests" `
+      -Executable $OriginalVisualReferenceTestExe `
+      -ProgressHint "The last printed [NN/20] line identifies the active raw full-frame visual-reference fixture."
+    $OriginalVisualReferenceTestStatus = "PASS"
+
+    Invoke-MiniQuakeTestBinary `
+      -Label "BP-094 external compatibility closure tests" `
+      -Executable $ExternalCompatibilityClosureTestExe `
+      -ProgressHint "The last printed [NN/24] line identifies the active external compatibility-closure fixture."
+    $ExternalCompatibilityClosureTestStatus = "PASS"
   }
 }
 
@@ -2172,6 +2292,6 @@ if ($NetworkTests -and -not $NoRunTests) {
   $NetworkTestStatus = "COMPILED-NOT-RUN"
 }
 
-Write-Host "[MiniQuake] test summary: core=$CoreTestStatus milestone=$MilestoneTestStatus diagnostics=$DiagnosticsTestStatus protocol15=$ProtocolTestStatus protocol15_commands=$ProtocolCommandTestStatus protocol15_serverdata=$ProtocolServerDataTestStatus protocol15_events=$ProtocolEventTestStatus protocol15_runtime_events=$ProtocolRuntimeEventTestStatus protocol15_signon=$ProtocolSignonTestStatus protocol15_delivery=$ProtocolDeliveryTestStatus protocol15_datagram=$ProtocolDatagramTestStatus protocol15_demo=$ProtocolDemoTestStatus protocol15_closure=$ProtocolClosureTestStatus quakec_progs=$QuakeCProgsTestStatus quakec_vm=$QuakeCVMTestStatus quakec_edicts=$QuakeCEdictTestStatus quakec_builtins=$QuakeCBuiltinTestStatus quakec_closure=$QuakeCClosureTestStatus quakec_stock=$QuakeCStockTestStatus world_hull=$WorldHullTestStatus world_trace=$WorldTraceTestStatus world_link=$WorldLinkTestStatus server_move=$ServerMoveTestStatus server_physics=$ServerPhysicsTestStatus sv_user_movement=$SvUserMovementTestStatus server_user=$ServerUserTestStatus world_physics_closure=$WorldPhysicsClosureTestStatus host_timing=$HostTimingTestStatus command_cvar=$CommandCvarTestStatus demo_lifecycle=$DemoLifecycleTestStatus savegame_v5=$SavegameV5TestStatus host_lifecycle_closure=$HostLifecycleClosureTestStatus client_state_render=$ClientStateRenderTestStatus view_state=$ViewStateTestStatus temporary_beams=$TemporaryBeamTestStatus particle_runtime=$ParticleRuntimeTestStatus client_render_closure=$ClientRenderClosureTestStatus world_surfaces=$WorldSurfaceRenderTestStatus lightmap_atlas=$LightmapAtlasTestStatus dynamic_light_render=$DynamicLightRenderTestStatus sky_water=$SkyWaterRenderTestStatus world_render_closure=$WorldRenderClosureTestStatus alias_model=$AliasModelTestStatus sprite_sync=$SpriteSyncTestStatus render_ui_hud=$RenderUiHudTestStatus render_evidence=$RenderEvidenceTestStatus model_ui_render_closure=$ModelUiRenderClosureTestStatus mirror_special=$MirrorSpecialTestStatus render_clear_special=$RenderClearSpecialTestStatus envmap_timerefresh=$EnvmapTimeRefreshTestStatus render_evidence_corpus=$RenderEvidenceCorpusTestStatus render_special_closure=$RenderSpecialClosureTestStatus audio_memory=$AudioMemoryTestStatus audio_dma=$AudioDmaTestStatus audio_mixer=$AudioMixerTestStatus audio_win=$AudioWinTestStatus audio_closure=$AudioClosureTestStatus audio_retail_evidence=$AudioRetailEvidenceStatus network_main=$NetworkMainTestStatus network_control=$NetworkControlTestStatus network_wins=$NetworkWinsAddressTestStatus system_platform=$SystemPlatformTestStatus network_platform_closure=$NetworkPlatformClosureTestStatus network_platform_evidence=$NetworkPlatformEvidenceStatus key_focus=$KeyFocusTestStatus input_device=$InputDeviceTestStatus console_screen=$ConsoleScreenTestStatus menu_lifecycle=$MenuLifecycleTestStatus frontend_closure=$FrontendClosureTestStatus common_core=$CommonCoreTestStatus filesystem_pack=$FilesystemPackTestStatus wad_graphics=$WadGraphicsTestStatus model_assets=$ModelAssetTestStatus core_assets_memory=$CoreAssetsMemoryTestStatus core_asset_retail_evidence=$CoreAssetRetailEvidenceStatus gameplay_math_chase=$GameplayMathChaseTestStatus gameplay_view=$GameplayViewTestStatus gameplay_screen=$GameplayScreenTestStatus gameplay_statusbar=$GameplayStatusbarTestStatus gameplay_presentation_closure=$GameplayPresentationClosureTestStatus cvar_source_surface=$CvarSourceSurfaceTestStatus cd_audio_source_surface=$CdAudioSourceSurfaceTestStatus source_inventory=$SourceFunctionInventoryTestStatus black_port_corpus=$BlackPortCorpusTestStatus black_port_source_closure=$BlackPortSourceClosureTestStatus game_profile=$GameProfileTestStatus mod_runtime=$ModRuntimeTestStatus artifact_compat=$ArtifactCompatTestStatus stability=$StabilityTestStatus compat_release=$CompatibilityReleaseTestStatus artifact_retail_evidence=$ArtifactRetailEvidenceStatus network=$NetworkTestStatus"
+Write-Host "[MiniQuake] test summary: core=$CoreTestStatus milestone=$MilestoneTestStatus diagnostics=$DiagnosticsTestStatus protocol15=$ProtocolTestStatus protocol15_commands=$ProtocolCommandTestStatus protocol15_serverdata=$ProtocolServerDataTestStatus protocol15_events=$ProtocolEventTestStatus protocol15_runtime_events=$ProtocolRuntimeEventTestStatus protocol15_signon=$ProtocolSignonTestStatus protocol15_delivery=$ProtocolDeliveryTestStatus protocol15_datagram=$ProtocolDatagramTestStatus protocol15_demo=$ProtocolDemoTestStatus protocol15_closure=$ProtocolClosureTestStatus quakec_progs=$QuakeCProgsTestStatus quakec_vm=$QuakeCVMTestStatus quakec_edicts=$QuakeCEdictTestStatus quakec_builtins=$QuakeCBuiltinTestStatus quakec_closure=$QuakeCClosureTestStatus quakec_stock=$QuakeCStockTestStatus world_hull=$WorldHullTestStatus world_trace=$WorldTraceTestStatus world_link=$WorldLinkTestStatus server_move=$ServerMoveTestStatus server_physics=$ServerPhysicsTestStatus sv_user_movement=$SvUserMovementTestStatus server_user=$ServerUserTestStatus world_physics_closure=$WorldPhysicsClosureTestStatus host_timing=$HostTimingTestStatus command_cvar=$CommandCvarTestStatus demo_lifecycle=$DemoLifecycleTestStatus savegame_v5=$SavegameV5TestStatus host_lifecycle_closure=$HostLifecycleClosureTestStatus client_state_render=$ClientStateRenderTestStatus view_state=$ViewStateTestStatus temporary_beams=$TemporaryBeamTestStatus particle_runtime=$ParticleRuntimeTestStatus client_render_closure=$ClientRenderClosureTestStatus world_surfaces=$WorldSurfaceRenderTestStatus lightmap_atlas=$LightmapAtlasTestStatus dynamic_light_render=$DynamicLightRenderTestStatus sky_water=$SkyWaterRenderTestStatus world_render_closure=$WorldRenderClosureTestStatus alias_model=$AliasModelTestStatus sprite_sync=$SpriteSyncTestStatus render_ui_hud=$RenderUiHudTestStatus render_evidence=$RenderEvidenceTestStatus model_ui_render_closure=$ModelUiRenderClosureTestStatus mirror_special=$MirrorSpecialTestStatus render_clear_special=$RenderClearSpecialTestStatus envmap_timerefresh=$EnvmapTimeRefreshTestStatus render_evidence_corpus=$RenderEvidenceCorpusTestStatus render_special_closure=$RenderSpecialClosureTestStatus audio_memory=$AudioMemoryTestStatus audio_dma=$AudioDmaTestStatus audio_mixer=$AudioMixerTestStatus audio_win=$AudioWinTestStatus audio_closure=$AudioClosureTestStatus audio_retail_evidence=$AudioRetailEvidenceStatus network_main=$NetworkMainTestStatus network_control=$NetworkControlTestStatus network_wins=$NetworkWinsAddressTestStatus system_platform=$SystemPlatformTestStatus network_platform_closure=$NetworkPlatformClosureTestStatus network_platform_evidence=$NetworkPlatformEvidenceStatus key_focus=$KeyFocusTestStatus input_device=$InputDeviceTestStatus console_screen=$ConsoleScreenTestStatus menu_lifecycle=$MenuLifecycleTestStatus frontend_closure=$FrontendClosureTestStatus common_core=$CommonCoreTestStatus filesystem_pack=$FilesystemPackTestStatus wad_graphics=$WadGraphicsTestStatus model_assets=$ModelAssetTestStatus core_assets_memory=$CoreAssetsMemoryTestStatus core_asset_retail_evidence=$CoreAssetRetailEvidenceStatus gameplay_math_chase=$GameplayMathChaseTestStatus gameplay_view=$GameplayViewTestStatus gameplay_screen=$GameplayScreenTestStatus gameplay_statusbar=$GameplayStatusbarTestStatus gameplay_presentation_closure=$GameplayPresentationClosureTestStatus cvar_source_surface=$CvarSourceSurfaceTestStatus cd_audio_source_surface=$CdAudioSourceSurfaceTestStatus source_inventory=$SourceFunctionInventoryTestStatus black_port_corpus=$BlackPortCorpusTestStatus black_port_source_closure=$BlackPortSourceClosureTestStatus game_profile=$GameProfileTestStatus mod_runtime=$ModRuntimeTestStatus artifact_compat=$ArtifactCompatTestStatus stability=$StabilityTestStatus compat_release=$CompatibilityReleaseTestStatus original_reference=$OriginalReferenceTestStatus original_server_interop=$OriginalServerInteropTestStatus original_client_interop=$OriginalClientInteropTestStatus original_visual_reference=$OriginalVisualReferenceTestStatus external_compat_closure=$ExternalCompatibilityClosureTestStatus artifact_retail_evidence=$ArtifactRetailEvidenceStatus network=$NetworkTestStatus"
 Write-Host "[MiniQuake] build completed: $GameExe"
 exit 0

@@ -185,6 +185,13 @@ function createVideoState()
   )
 end function
 
+function inline VID_WindowTitleForFps(fps)
+  safeFps = native.trunc(fps)
+  if safeFps < 0 then safeFps = 0 end if
+  if safeFps > 9999 then safeFps = 9999 end if
+  return "MiniQuake - " + safeFps + " FPS"
+end function
+
 function VID_UseState(state)
   global currentVideoState
   currentVideoState = state
@@ -292,7 +299,7 @@ end function
 
 function VID_ModeExists(modes, candidate)
   for each existing in modes
-    // GLQuake's vmode_t has no refresh-rate field. EnumDisplaySettings can
+    // MiniQuake's vmode_t has no refresh-rate field. EnumDisplaySettings can
     // report the same width/height/depth several times, but the original mode
     // list collapses every such refresh variant into one entry.
     if existing.width == candidate.width and existing.height == candidate.height and existing.bpp == candidate.bpp then return true end if
@@ -318,7 +325,7 @@ function VID_SetWindowedMode(modeNumber, createNative)
   if createNative then
     if win.contextReady() then win.destroy() end if
     if not win.configureDisplayMode(mode.width, mode.height, 0, 0, false, false) then return error(3901, "VID_SetWindowedMode: display configuration failed") end if
-    created = try(win.create("GLQuake", mode.width, mode.height, 0))
+    created = try(win.create(VID_WindowTitleForFps(0), mode.width, mode.height, 0))
     if created is error then return created end if
   end if
   VID_UpdateWindowStatus()
@@ -348,7 +355,7 @@ function VID_SetFullDIBMode(modeNumber, createNative)
     if not win.configureDisplayMode(physicalWidth, mode.height, mode.bpp, mode.frequency, true, state.leaveCurrentMode) then
       return error(3903, "VID_SetFullDIBMode: mode unavailable")
     end if
-    created = try(win.create("GLQuake", mode.width, mode.height, 1))
+    created = try(win.create(VID_WindowTitleForFps(0), mode.width, mode.height, 1))
     if created is error then return created end if
   end if
   VID_UpdateWindowStatus()
@@ -543,7 +550,7 @@ function VID_SetPalette(palette)
 end function
 
 function VID_ShiftPalette(palette)
-  // The GLQuake source intentionally leaves SetDeviceGammaRamp commented out.
+  // The MiniQuake source intentionally leaves SetDeviceGammaRamp commented out.
   return false
 end function
 
@@ -842,9 +849,26 @@ function VID_ApplyGammaRamp(gamma)
   return state.gammaWorks
 end function
 
+function VID_WindowedRequested(arguments)
+  return common.hasParm(arguments, "-window") or
+    common.hasParm(arguments, "-windowed") or
+    common.hasParm(arguments, "-startwindowed")
+end function
+
+function VID_FullscreenRequested(arguments)
+  return common.hasParm(arguments, "-fullscreen") or
+    common.hasParm(arguments, "-mode") or
+    common.hasParm(arguments, "-current") or
+    common.hasParm(arguments, "-bpp") or
+    common.hasParm(arguments, "-force")
+end function
+
 function VID_FindRequestedMode(arguments)
   state = VID_State()
-  if common.hasParm(arguments, "-window") or common.hasParm(arguments, "-startwindowed") then state.windowed = true; return MODE_WINDOWED end if
+  if VID_WindowedRequested(arguments) or not VID_FullscreenRequested(arguments) then
+    state.windowed = true
+    return MODE_WINDOWED
+  end if
   state.windowed = false
   if common.hasParm(arguments, "-mode") then
     requested = common.integerOption(arguments, "-mode", MODE_FULLSCREEN_DEFAULT)

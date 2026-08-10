@@ -156,10 +156,10 @@ function validQuakeRequest(parsed)
   return true
 end function
 
-function validConnectRequest(parsed)
+function inline validConnectRequest(parsed)
   return parsed[0] == CCREQ_CONNECT and parsed[1][0] == GAME_NAME and parsed[1][1] == NET_PROTOCOL_VERSION
 end function
 
-function validServerInfoRequest(parsed)
+function inline validServerInfoRequest(parsed)
   return parsed[0] == CCREQ_SERVER_INFO and parsed[1][0] == GAME_NAME
 end function

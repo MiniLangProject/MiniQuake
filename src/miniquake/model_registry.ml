@@ -39,7 +39,7 @@ function create()
   return t.ModelRegistry([], [], [], [], [], bytes(1024, 255))
 end function
 
-// strcmp, not Q_strcasecmp: model identity is case-sensitive in GLQuake.
+// strcmp, not Q_strcasecmp: model identity is case-sensitive in MiniQuake.
 function findIndex(registry, name)
   i = 0
   while i < len(registry.names)

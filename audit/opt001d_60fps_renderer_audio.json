@@ -1,0 +1,333 @@
+{
+  "schema": "MiniQuakeOPT001DOptimization/1",
+  "revision": "OPT-001D",
+  "parent": "OPT-001CR3R8",
+  "goal": {
+    "minimum_render_fps": 60,
+    "median_ms": 16.67,
+    "p95_ms": 20.0,
+    "p99_ms": 25.0
+  },
+  "parent_result": {
+    "overall": "FAIL",
+    "failures": 1,
+    "handle": "PLATEAU"
+  },
+  "transformations": {
+    "inline_functions_added": 50,
+    "inline_candidates": [
+      {
+        "file": "src/miniquake/runtime_validation.ml",
+        "name": "append",
+        "calls": 69,
+        "expression": "messages + [level + \" \" + text]"
+      },
+      {
+        "file": "src/miniquake/game_validation.ml",
+        "name": "append",
+        "calls": 69,
+        "expression": "messages + [level + \" \" + text]"
+      },
+      {
+        "file": "tests/filesystem_pack_parity_tests.ml",
+        "name": "bp071Root",
+        "calls": 20,
+        "expression": "\"build\\\\bp071_fs\""
+      },
+      {
+        "file": "tests/view_differential_fixture.ml",
+        "name": "noCounters",
+        "calls": 19,
+        "expression": "[0, 0, 0, 0, 0, 0, 0]"
+      },
+      {
+        "file": "tests/filesystem_pak_parity_tests.ml",
+        "name": "bp071FixtureRoot",
+        "calls": 18,
+        "expression": "\"build\\\\bp071-filesystem\""
+      },
+      {
+        "file": "src/miniquake/message.ml",
+        "name": "remaining",
+        "calls": 12,
+        "expression": "len(reader.data) - reader.readCount"
+      },
+      {
+        "file": "src/miniquake/world_render_contract.ml",
+        "name": "status",
+        "calls": 9,
+        "expression": "STATUS"
+      },
+      {
+        "file": "src/miniquake/render_special_contract.ml",
+        "name": "status",
+        "calls": 9,
+        "expression": "STATUS"
+      },
+      {
+        "file": "src/miniquake/model_ui_render_contract.ml",
+        "name": "status",
+        "calls": 9,
+        "expression": "STATUS"
+      },
+      {
+        "file": "src/miniquake/audio_contract.ml",
+        "name": "status",
+        "calls": 9,
+        "expression": "STATUS"
+      },
+      {
+        "file": "src/miniquake/client_render_contract.ml",
+        "name": "status",
+        "calls": 9,
+        "expression": "CONTRACT_STATUS"
+      },
+      {
+        "file": "tests/renderer_rmain_trace_fixture.ml",
+        "name": "entity",
+        "calls": 9,
+        "expression": "[origin, angles]"
+      },
+      {
+        "file": "tests/chase_rpart_tests.ml",
+        "name": "firstGenerated",
+        "calls": 10,
+        "expression": "system.active[len(system.active) - 1]"
+      },
+      {
+        "file": "src/miniquake/net_loop.ml",
+        "name": "IntAlign",
+        "calls": 7,
+        "expression": "(value + 3) & ~3"
+      },
+      {
+        "file": "tests/sbar_differential_fixture.ml",
+        "name": "fnvByte",
+        "calls": 10,
+        "expression": "((hash ^ (value & 255)) * 16777619) & 4294967295"
+      },
+      {
+        "file": "tests/renderer_rsurf_trace_fixture.ml",
+        "name": "fnvByte",
+        "calls": 10,
+        "expression": "((hash ^ (value & 255)) * 16777619) & 4294967295"
+      },
+      {
+        "file": "tests/renderer_rmisc_trace_fixture.ml",
+        "name": "fnvByte",
+        "calls": 10,
+        "expression": "((hash ^ (value & 255)) * 16777619) & 4294967295"
+      },
+      {
+        "file": "tests/gl_draw_differential_fixture.ml",
+        "name": "fnvByte",
+        "calls": 10,
+        "expression": "((hash ^ (value & 255)) * 16777619) & 4294967295"
+      },
+      {
+        "file": "tests/stability_contract_tests.ml",
+        "name": "bp088Snapshot",
+        "calls": 11,
+        "expression": "[100, 100000, 50000, 10000, 90, 85, 1, 1, 7, 0, 0, 0, 1, 0, 4, 50]"
+      },
+      {
+        "file": "src/miniquake/console.ml",
+        "name": "Con_NotifyBoxPending",
+        "calls": 6,
+        "expression": "notifyBoxWaiting"
+      },
+      {
+        "file": "src/miniquake/net_main.ml",
+        "name": "NET_PollProcedureSnapshot",
+        "calls": 6,
+        "expression": "pollProcedureList"
+      },
+      {
+        "file": "src/miniquake/world_render_contract.ml",
+        "name": "fingerprint",
+        "calls": 5,
+        "expression": "FINGERPRINT"
+      },
+      {
+        "file": "src/miniquake/render_special_contract.ml",
+        "name": "fingerprint",
+        "calls": 5,
+        "expression": "FINGERPRINT"
+      },
+      {
+        "file": "src/miniquake/model_ui_render_contract.ml",
+        "name": "fingerprint",
+        "calls": 5,
+        "expression": "FINGERPRINT"
+      },
+      {
+        "file": "src/miniquake/audio_contract.ml",
+        "name": "fingerprint",
+        "calls": 5,
+        "expression": "FINGERPRINT"
+      },
+      {
+        "file": "src/miniquake/client_render_contract.ml",
+        "name": "fingerprint",
+        "calls": 5,
+        "expression": "CONTRACT_FINGERPRINT"
+      },
+      {
+        "file": "src/miniquake/protocol_delivery.ml",
+        "name": "keepaliveDue",
+        "calls": 4,
+        "expression": "elapsed > 5.0"
+      },
+      {
+        "file": "src/miniquake/sys_win.ml",
+        "name": "Sys_PopFPCW",
+        "calls": 3,
+        "expression": "true"
+      },
+      {
+        "file": "src/miniquake/sys_win.ml",
+        "name": "Sys_PushFPCW_SetHigh",
+        "calls": 3,
+        "expression": "true"
+      },
+      {
+        "file": "src/miniquake/render/world.ml",
+        "name": "R_GetTextureChains",
+        "calls": 4,
+        "expression": "rCompatTextureChains"
+      },
+      {
+        "file": "tests/common_differential_fixture.ml",
+        "name": "basePath",
+        "calls": 5,
+        "expression": "\"build/common_differential/mlfs\""
+      },
+      {
+        "file": "src/miniquake/protocol15_freeze.ml",
+        "name": "validClcCommands",
+        "calls": 3,
+        "expression": "[1, 2, 3, 4]"
+      },
+      {
+        "file": "src/miniquake/sound/snd_dma.ml",
+        "name": "SNDDMA_GetDMAPos",
+        "calls": 5,
+        "expression": "system.mixState.dma.samplePosition"
+      },
+      {
+        "file": "src/miniquake/crc.ml",
+        "name": "CRC_Init",
+        "calls": 3,
+        "expression": "CRC_INIT_VALUE"
+      },
+      {
+        "file": "src/miniquake/stability_contract.ml",
+        "name": "deltaStable",
+        "calls": 4,
+        "expression": "after <= before + allowance"
+      },
+      {
+        "file": "src/miniquake/stability_contract.ml",
+        "name": "modes",
+        "calls": 3,
+        "expression": "[\"host\", \"listen\"]"
+      },
+      {
+        "file": "src/miniquake/external_reference_contract.ml",
+        "name": "originalClientInteropComplete",
+        "calls": 7,
+        "expression": "activeClients > 0 and spawned and signon >= 3 and signon <= 4"
+      },
+      {
+        "file": "src/miniquake/render/world.ml",
+        "name": "R_WaterPassDeferred",
+        "calls": 3,
+        "expression": "textureSort and waterAlpha != 1.0"
+      },
+      {
+        "file": "src/miniquake/net_main.ml",
+        "name": "NET_PortState",
+        "calls": 3,
+        "expression": "[net_hostport, DEFAULTnet_hostport]"
+      },
+      {
+        "file": "src/miniquake/protocol_transients.ml",
+        "name": "canWriteDynamicSound",
+        "calls": 3,
+        "expression": "buffer.curSize <= c.MAX_DATAGRAM - 16"
+      },
+      {
+        "file": "src/miniquake/mod_compat.ml",
+        "name": "contractVector",
+        "calls": 4,
+        "expression": "[STATUS, FINGERPRINT, 6, 29, [\"id1\", \"rogue\", \"hipnotic\"]]"
+      },
+      {
+        "file": "src/miniquake/render/world.ml",
+        "name": "R_DynamicLightIsActive",
+        "calls": 5,
+        "expression": "light is not void and light.die >= currentTime and light.radius > 0.0"
+      },
+      {
+        "file": "src/miniquake/render/gl_rmain.ml",
+        "name": "Dot",
+        "calls": 4,
+        "expression": "left[0] * right[0] + left[1] * right[1] + left[2] * right[2]"
+      },
+      {
+        "file": "src/miniquake/host.ml",
+        "name": "shouldPollLiveButtonBindings",
+        "calls": 5,
+        "expression": "not headless and destinationIsGame and not consoleActive and not menuActive"
+      },
+      {
+        "file": "src/miniquake/sys_win.ml",
+        "name": "readU32",
+        "calls": 3,
+        "expression": "data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24)"
+      },
+      {
+        "file": "src/miniquake/net_control.ml",
+        "name": "validServerInfoRequest",
+        "calls": 3,
+        "expression": "parsed[0] == CCREQ_SERVER_INFO and parsed[1][0] == GAME_NAME"
+      },
+      {
+        "file": "src/miniquake/render/gl_rmisc.ml",
+        "name": "GetRefreshState",
+        "calls": 3,
+        "expression": "[rmiscRenderViews, rmiscLastYaw, rmiscLastDrawBuffer, rmiscEndRendering]"
+      },
+      {
+        "file": "src/miniquake/net_loop.ml",
+        "name": "ipv4Text",
+        "calls": 6,
+        "expression": "((value >> 24) & 255) + \".\" + ((value >> 16) & 255) + \".\" + ((value >> 8) & 255) + \".\" + (value & 255)"
+      },
+      {
+        "file": "src/miniquake/render/world.ml",
+        "name": "R_MirrorReady",
+        "calls": 3,
+        "expression": "mirror and mirror_plane is not void and len(rCompatMirrorChain) > 0 and rCompatMirrorAlpha != 1.0"
+      },
+      {
+        "file": "src/miniquake/net_control.ml",
+        "name": "validConnectRequest",
+        "calls": 3,
+        "expression": "parsed[0] == CCREQ_CONNECT and parsed[1][0] == GAME_NAME and parsed[1][1] == NET_PROTOCOL_VERSION"
+      }
+    ],
+    "array_append_fusions": 0,
+    "frame_local_cvar_cache_hits_removed": 10,
+    "disconnected_guards": 4,
+    "title_native_throttle": true,
+    "transition_cleanup_sites": 4,
+    "audio_default_mixahead_seconds": 0.5,
+    "static_geometry_cache": {
+      "enabled": false,
+      "reason": "no statically safe single-begin polygon function found"
+    },
+    "native_bridge_rebuilt": false
+  },
+  "native_build_log": []
+}

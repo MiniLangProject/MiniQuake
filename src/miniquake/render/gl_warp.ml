@@ -14,7 +14,7 @@ import miniquake.array_util as arrayutil
 const DEFAULT_SUBDIVIDE_SIZE = 128.0
 const TURBSCALE = 40.74366543152521
 
-// gl_model.c owns this archived cvar in GLQuake.  Keep its current numeric
+// gl_model.c owns this archived cvar in MiniQuake.  Keep its current numeric
 // value at the warp boundary so every subdivision path observes changes made
 // through the console instead of baking the default into generated polygons.
 gl_subdivide_size = DEFAULT_SUBDIVIDE_SIZE

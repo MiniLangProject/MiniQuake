@@ -1,0 +1,11 @@
+{
+  "schema": "MiniQuakeOPT001CR3R3Hotfix/1",
+  "status": "candidate",
+  "revision": "OPT-001CR3R3",
+  "parent": "OPT-001CR3R2",
+  "failure": "StdLib path misbound to Configuration by PowerShell array splatting",
+  "fix": "direct powershell.exe -File build.ps1 with named arguments",
+  "live_output": "python_binary_passthrough_named_build_binding",
+  "engine_optimizations_preserved": true,
+  "native_changed": false
+}

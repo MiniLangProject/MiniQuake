@@ -31,7 +31,7 @@ function validSvcCommands()
   ]
 end function
 
-function validClcCommands()
+function inline validClcCommands()
   return [1, 2, 3, 4]
 end function
 
@@ -94,7 +94,7 @@ function combineMask(values)
   return result
 end function
 
-function fingerprintValue(current, value)
+function inline fingerprintValue(current, value)
   return ((current ^ (value & 0xffffffff)) * 16777619) & 0xffffffff
 end function
 

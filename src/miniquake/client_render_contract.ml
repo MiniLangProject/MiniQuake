@@ -13,11 +13,11 @@ const CHASE_REFDEF_PRESERVATION = 1
 const EFRAG_FRAME_ACCUMULATION = 1
 const PARTICLE_FLOAT_STORAGE = 1
 
-function status()
+function inline status()
   return CONTRACT_STATUS
 end function
 
-function fingerprint()
+function inline fingerprint()
   return CONTRACT_FINGERPRINT
 end function
 

@@ -1,4 +1,4 @@
-/* BP-049: frozen GLQuake 1.09 model/UI/render-evidence contract. */
+/* BP-049: frozen MiniQuake 1.09 model/UI/render-evidence contract. */
 package miniquake.model_ui_render_contract
 
 const STATUS = "model_ui_render_109_frozen_v1"
@@ -22,11 +22,11 @@ const CAPTURE_AFTER_UI_BEFORE_SWAP = 1
 const CLIENT_RENDER_PARENT = "client_render_109_frozen_v1"
 const WORLD_RENDER_PARENT = "world_render_109_frozen_v1"
 
-function status()
+function inline status()
   return STATUS
 end function
 
-function fingerprint()
+function inline fingerprint()
   return FINGERPRINT
 end function
 

@@ -1,0 +1,26 @@
+{
+  "schema": "MiniQuakeOPT001CR3R8PerformanceAudioUiFix/2",
+  "delivery_revision": "OPT-001D",
+  "delivery_parent": "OPT-001CR3R7",
+  "status": "opt001d_performance_audio_ui_candidate_v1",
+  "fingerprint": "0x1c001c10",
+  "changes": [
+    "default _snd_mixahead 0.35",
+    "pre-render audio queue top-up",
+    "same-leaf PVS reuse",
+    "frame-local hot Cvar cache",
+    "aggressive scalar inline budget of at least 20 functions",
+    "local/disconnected net icon suppression",
+    "stable MiniQuake FPS window title",
+    "audio loop length hoists",
+    "audio cost analysis"
+  ],
+  "runtime_gates": [
+    "e1m1/e1m2 matrix",
+    "1500 visible e1m2 frames",
+    "10000 headless e1m2 frames",
+    "256-frame e1m1-e1m2-e1m1 transition",
+    "handle plateau",
+    "window title and net-icon contract tests"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "schema": "MiniQuakeOPT001CR1Hotfix/1",
+  "delivery_revision": "OPT-001CR1",
+  "delivery_parent": "OPT-001C",
+  "result_archive": "MiniQuake_OPT-001C_RESULTS_20260807-180739.zip",
+  "result_archive_sha256": "46030ff06931e660ba025453fd03f92488846dd42d5341bff353a5f82e844c81",
+  "classification": "delivery-time MiniLang delimiter error",
+  "failure": {
+    "target": "MiniQuake.exe",
+    "path": "src/miniquake/render/world.ml",
+    "line": 1581,
+    "message": "Expected RBRACK, got RPAREN",
+    "performance_measured": false,
+    "handle_classification": "UNKNOWN"
+  },
+  "fix": {
+    "named_trace_hash_locals": 2,
+    "forbidden_fragment": "rectangle[3)",
+    "all_minilang_delimiter_preflight": true,
+    "unique_delivery_identity": true
+  },
+  "optimization_contract_changed": false,
+  "native_code_changed": false
+}

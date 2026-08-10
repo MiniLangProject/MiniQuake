@@ -1,0 +1,36 @@
+{
+  "changed_engine_code": false,
+  "changed_native_code": false,
+  "classification": "external original-reference source-selector handoff",
+  "delivery_parent": "BP-090-094R10",
+  "delivery_revision": "BP-090-094R11",
+  "fix": {
+    "argument_report": "build/bp090-094r11-original-reference-input.json",
+    "downloads_fallback": true,
+    "environment_fallback": true,
+    "exactly_one_selector_required": true,
+    "explicit_parameter_forwarding": true,
+    "project_internal_reference_rejected": true,
+    "python_environment_variables": [
+      "MINIQUAKE_ORIGINAL_SOURCE",
+      "MINIQUAKE_ORIGINAL_EXE"
+    ],
+    "resolution_before_elevation": true
+  },
+  "observed": {
+    "compiled_targets": 97,
+    "full_build": "PASS",
+    "internal_test_matrix": "PASS",
+    "original_interop_started": false,
+    "package_identity": "PASS",
+    "prepare_tool_failure": "neither --archive nor --exe reached argparse",
+    "visual_reference_started": false
+  },
+  "r10_readiness_preserved": true,
+  "r8_visual_parity_preserved": true,
+  "r9_network_provenance_preserved": true,
+  "result_archive": "MiniQuake_BP-090-094R10_RESULTS_20260804-173941.zip",
+  "result_archive_sha256": "5d7f3daa22678c5494427030f93e91ae022118bb53daf162223dc06c73d106d4",
+  "schema_version": 1,
+  "status": "candidate"
+}

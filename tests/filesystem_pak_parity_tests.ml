@@ -41,7 +41,7 @@ function bp071MakePak(firstName, firstData, secondName, secondData)
   bio.putI32(data,directoryOffset+120,secondOffset); bio.putI32(data,directoryOffset+124,len(secondData))
   return data
 end function
-function bp071FixtureRoot()
+function inline bp071FixtureRoot()
   return "build\\bp071-filesystem"
 end function
 function bp071PrepareLoose()

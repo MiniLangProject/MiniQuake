@@ -75,6 +75,6 @@ function validSummary(summary)
   return summary[2] > 0 and summary[3] == 6 and summary[8] == 29 and summary[5] > 0 and summary[9] > 0
 end function
 
-function contractVector()
+function inline contractVector()
   return [STATUS, FINGERPRINT, 6, 29, ["id1", "rogue", "hipnotic"]]
 end function

@@ -186,7 +186,7 @@ function readAngle(reader)
   return readChar(reader) * (360.0 / 256.0)
 end function
 
-function remaining(reader)
+function inline remaining(reader)
   return len(reader.data) - reader.readCount
 end function
 

@@ -1,0 +1,13 @@
+{
+  "schema": "MiniQuakeOPT001BDelivery/1",
+  "revision": "OPT-001B",
+  "parent": "OPT-001A",
+  "status": "windows_acceptance_pending",
+  "changes": [
+    "viewmodel active depth range",
+    "e1m2 void texture slot fix",
+    "linear underwater face precomputation",
+    "delayed handle plateau classification",
+    "e1m1-e1m2-e1m1 transition gate"
+  ]
+}

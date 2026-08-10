@@ -1,0 +1,22 @@
+{
+  "block_id": "BP-090-094",
+  "candidate_reference_aggregation": "minimum_ssim",
+  "capture_completion": "validated_tga_size_hash_stability",
+  "classification": "original visual capture completion race and bounded reference-run variance",
+  "delivery_revision": "BP-090-094R14",
+  "engine_sources_changed": false,
+  "minimum_candidate_ssim": 0.95,
+  "minimum_reference_ssim": 0.98,
+  "native_bridges_changed": false,
+  "normalization": "none",
+  "original_runs_per_scenario": 2,
+  "package_id": "BP-094",
+  "parent_delivery": "BP-090-094R13",
+  "r13_demo1_ssim": 0.9925682095193431,
+  "r13_demo2_ssim": 0.9881631168023142,
+  "r13_first_failure": "original GLQuake captures differ for demo3-256",
+  "r13_result_archive_sha256": "ddf5fef3706347e805d6ae0db3ac2b82905c0be5dc229bebfb1a50e20a7bfb28",
+  "schema_version": 1,
+  "stable_polls_required": 3,
+  "status": "candidate"
+}

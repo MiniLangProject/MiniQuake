@@ -82,7 +82,7 @@ function testGlquakeFraming()
   near(recording.messages[0].viewAngles.y, -2.5, 0.000001, "view angle y")
   near(recording.messages[0].viewAngles.z, 90.0, 0.000001, "view angle z")
   bytesEqual(recording.messages[0].payload, byteFixture([c.SVC_NOP, c.SVC_PRINT, 0]), "payload")
-  bytesEqual(demo.serialize(recording), fixture, "GLQuake roundtrip")
+  bytesEqual(demo.serialize(recording), fixture, "MiniQuake roundtrip")
   return true
 end function
 
@@ -211,7 +211,7 @@ function main(args)
   print "MiniQuake cl_demo port tests starting: 7"
   result = try(testGlquakeFraming())
   if result is error then print "FAIL framing: " + result.message; return 1 end if
-  print "[1/7] GLQuake framing roundtrip"
+  print "[1/7] MiniQuake framing roundtrip"
   result = try(testRecordWriteStop())
   if result is error then print "FAIL record: " + result.message; return 1 end if
   print "[2/7] record / write / stop"

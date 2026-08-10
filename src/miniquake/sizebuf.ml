@@ -34,7 +34,7 @@ function clear(buffer)
 end function
 
 function free(buffer)
-  // SZ_Free did not release its hunk allocation in GLQuake 1.09; only the
+  // SZ_Free did not release its hunk allocation in MiniQuake 1.09; only the
   // logical contents became empty.
   buffer.curSize = 0
   return buffer

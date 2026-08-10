@@ -20,6 +20,10 @@ function Trace_End()
   return diagnosticTrace
 end function
 
+function inline traceEnabled()
+  return diagnosticTraceEnabled
+end function
+
 function traceCommand(name, arguments)
   global diagnosticTrace
   if not diagnosticTraceEnabled then return false end if
@@ -27,7 +31,7 @@ function traceCommand(name, arguments)
   return true
 end function
 
-// GLQuake 1.09 allocates every renderer texture from the single global
+// MiniQuake 1.09 allocates every renderer texture from the single global
 // texture_extension_number namespace.  Keeping that namespace here prevents
 // independently ported world, entity and 2-D upload paths from reusing and
 // overwriting each other's OpenGL object names.
@@ -39,7 +43,7 @@ function reserveTextureNames(count)
   return first
 end function
 
-function nextTextureNameValue()
+function inline nextTextureNameValue()
   return nextTextureName
 end function
 
@@ -108,37 +112,37 @@ function bits(value)
 end function
 
 function begin(mode)
-  if traceCommand("begin", [mode]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("begin", [mode]) then return void end if
   native.glBegin(mode)
 end function
 
 function finishPrimitive()
-  if traceCommand("end", []) then return void end if
+  if diagnosticTraceEnabled and traceCommand("end", []) then return void end if
   native.glEnd()
 end function
 
 function vertex2(x, y)
-  if traceCommand("vertex", [x, y]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("vertex", [x, y]) then return void end if
   native.glVertex2(bits(x), bits(y))
 end function
 
 function vertex3(x, y, z)
-  if traceCommand("vertex", [x, y, z]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("vertex", [x, y, z]) then return void end if
   native.glVertex3(bits(x), bits(y), bits(z))
 end function
 
 function texcoord2(s, t)
-  if traceCommand("texcoord", [s, t]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("texcoord", [s, t]) then return void end if
   native.glTexcoord2(bits(s), bits(t))
 end function
 
 function color(red, green, blue, alpha)
-  if traceCommand("color", [red / 255.0, green / 255.0, blue / 255.0, alpha / 255.0]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("color", [red / 255.0, green / 255.0, blue / 255.0, alpha / 255.0]) then return void end if
   native.glColor4ub(red, green, blue, alpha)
 end function
 
 function colorFloat(red, green, blue, alpha)
-  if traceCommand("color", [red, green, blue, alpha]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("color", [red, green, blue, alpha]) then return void end if
   native.glColor4ub(
     native.trunc(red * 255.0),
     native.trunc(green * 255.0),
@@ -148,78 +152,78 @@ function colorFloat(red, green, blue, alpha)
 end function
 
 function clearColor(red, green, blue, alpha)
-  if traceCommand("clear_color", [bits(red), bits(green), bits(blue), bits(alpha)]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("clear_color", [bits(red), bits(green), bits(blue), bits(alpha)]) then return void end if
   native.glClearColor(bits(red), bits(green), bits(blue), bits(alpha))
 end function
 
 function clear(mask)
-  if traceCommand("clear", [mask]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("clear", [mask]) then return void end if
   native.glClear(mask)
 end function
 
 function enable(capability)
-  if traceCommand("enable", [capability]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("enable", [capability]) then return void end if
   native.glEnable(capability)
 end function
 
 function disable(capability)
-  if traceCommand("disable", [capability]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("disable", [capability]) then return void end if
   native.glDisable(capability)
 end function
 
 function blendFunc(source, destination)
-  if traceCommand("blend_function", [source, destination]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("blend_function", [source, destination]) then return void end if
   native.glBlendFunc(source, destination)
 end function
 
 function depthFunc(value)
-  if traceCommand("depth_func", [value]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("depth_func", [value]) then return void end if
   native.glDepthFunc(value)
 end function
 
 function depthMask(enabled)
-  if enabled and traceCommand("depth_mask", [1]) then return void end if
-  if not enabled and traceCommand("depth_mask", [0]) then return void end if
+  if diagnosticTraceEnabled and enabled and traceCommand("depth_mask", [1]) then return void end if
+  if diagnosticTraceEnabled and not enabled and traceCommand("depth_mask", [0]) then return void end if
   if enabled then native.glDepthMask(1) else native.glDepthMask(0) end if
 end function
 
 function depthRange(nearValue, farValue)
-  if traceCommand("depth_range", [bits(nearValue), bits(farValue)]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("depth_range", [bits(nearValue), bits(farValue)]) then return void end if
   native.glDepthRange(bits(nearValue), bits(farValue))
 end function
 
 function viewport(x, y, width, height)
-  if traceCommand("viewport", [x, y, width, height]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("viewport", [x, y, width, height]) then return void end if
   native.glViewport(x, y, width, height)
 end function
 
 function matrixMode(mode)
-  if traceCommand("matrix_mode", [mode]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("matrix_mode", [mode]) then return void end if
   native.glMatrixMode(mode)
 end function
 
 function loadIdentity()
-  if traceCommand("load_identity", []) then return void end if
+  if diagnosticTraceEnabled and traceCommand("load_identity", []) then return void end if
   native.glLoadIdentity()
 end function
 
 function pushMatrix()
-  if traceCommand("push_matrix", []) then return void end if
+  if diagnosticTraceEnabled and traceCommand("push_matrix", []) then return void end if
   native.glPushMatrix()
 end function
 
 function popMatrix()
-  if traceCommand("pop_matrix", []) then return void end if
+  if diagnosticTraceEnabled and traceCommand("pop_matrix", []) then return void end if
   native.glPopMatrix()
 end function
 
 function translate(x, y, z)
-  if traceCommand("translate", [x, y, z]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("translate", [x, y, z]) then return void end if
   native.glTranslate(bits(x), bits(y), bits(z))
 end function
 
 function rotate(angle, x, y, z)
-  if traceCommand("rotate", [angle, x, y, z]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("rotate", [angle, x, y, z]) then return void end if
   native.glRotate(bits(angle), bits(x), bits(y), bits(z))
 end function
 
@@ -228,12 +232,12 @@ function scale(x, y, z)
 end function
 
 function ortho(left, right, bottom, top, nearValue, farValue)
-  if traceCommand("ortho", [left, right, bottom, top, nearValue, farValue]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("ortho", [left, right, bottom, top, nearValue, farValue]) then return void end if
   native.glOrtho(bits(left), bits(right), bits(bottom), bits(top), bits(nearValue), bits(farValue))
 end function
 
 function frustum(left, right, bottom, top, nearValue, farValue)
-  if traceCommand("frustum", [left, right, bottom, top, nearValue, farValue]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("frustum", [left, right, bottom, top, nearValue, farValue]) then return void end if
   native.glFrustum(bits(left), bits(right), bits(bottom), bits(top), bits(nearValue), bits(farValue))
 end function
 
@@ -242,7 +246,7 @@ function polygonMode(face, mode)
 end function
 
 function shadeModel(mode)
-  if traceCommand("shade_model", [mode]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("shade_model", [mode]) then return void end if
   native.glShadeModel(mode)
 end function
 
@@ -288,14 +292,14 @@ function alphaFunc(functionName, reference)
 end function
 
 function cullFace(mode)
-  if traceCommand("cull_face", [mode]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("cull_face", [mode]) then return void end if
   native.glCullFace(mode)
 end function
 
 function bindTexture(texture)
   global boundTextureName
   boundTextureName = texture
-  if traceCommand("bind_texture", [GL_TEXTURE_2D, texture]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("bind_texture", [GL_TEXTURE_2D, texture]) then return void end if
   native.glBindTexture(GL_TEXTURE_2D, texture)
 end function
 
@@ -313,27 +317,27 @@ function deleteTexture(texture)
 end function
 
 function textureParameter(name, value)
-  if traceCommand("texture_parameter", [GL_TEXTURE_2D, name, value]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("texture_parameter", [GL_TEXTURE_2D, name, value]) then return void end if
   native.glTexParameterI(GL_TEXTURE_2D, name, value)
 end function
 
 function textureEnvironment(mode)
-  if traceCommand("texture_environment", [GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, mode]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("texture_environment", [GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, mode]) then return void end if
   native.glTexEnvI(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, mode)
 end function
 
 function uploadRgba(width, height, pixels)
-  if traceCommand("upload_rgba", [0, GL_RGBA, width, height, pixels]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("upload_rgba", [0, GL_RGBA, width, height, pixels]) then return void end if
   native.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels)
 end function
 
 function uploadRgbaLevel(level, internalFormat, width, height, pixels)
-  if traceCommand("upload_rgba", [level, internalFormat, width, height, pixels]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("upload_rgba", [level, internalFormat, width, height, pixels]) then return void end if
   native.glTexImage2D(GL_TEXTURE_2D, level, internalFormat, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels)
 end function
 
 function uploadIndexedLevel(level, width, height, pixels)
-  if traceCommand("upload_indexed", [level, width, height, pixels]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("upload_indexed", [level, width, height, pixels]) then return void end if
   native.glTexImage2D(GL_TEXTURE_2D, level, GL_COLOR_INDEX8_EXT, width, height, 0, GL_COLOR_INDEX, GL_UNSIGNED_BYTE, pixels)
 end function
 
@@ -342,12 +346,12 @@ function uploadRgb(width, height, pixels)
 end function
 
 function uploadLuminance(width, height, pixels)
-  if traceCommand("upload_luminance", [width, height]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("upload_luminance", [width, height]) then return void end if
   native.glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, pixels)
 end function
 
 function uploadLuminanceSubImage(x, y, width, height, pixels)
-  if traceCommand("upload_luminance_subimage", [x, y, width, height]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("upload_luminance_subimage", [x, y, width, height]) then return void end if
   native.glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_LUMINANCE, GL_UNSIGNED_BYTE, pixels)
 end function
 
@@ -359,11 +363,19 @@ function readPixelsRgba(x, y, width, height)
 end function
 
 function finish()
-  if traceCommand("finish", []) then return void end if
+  if diagnosticTraceEnabled and traceCommand("finish", []) then return void end if
   native.glFinish()
 end function
 
 function drawBuffer(mode)
-  if traceCommand("draw_buffer", [mode]) then return void end if
+  if diagnosticTraceEnabled and traceCommand("draw_buffer", [mode]) then return void end if
   native.glDrawBuffer(mode)
+end function
+
+function staticGeometryCall(objectValue, passId)
+  return native.glStaticGeometryCall(nativeRawValue(objectValue), passId) != 0
+end function
+
+function clearStaticGeometryCache()
+  native.glStaticGeometryClear()
 end function

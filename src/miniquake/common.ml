@@ -456,7 +456,7 @@ end function
 
 // C va() is a transient 1024-byte vsprintf buffer. MiniLang strings are
 // immutable, so callers pass the variadic values as an array and receive an
-// owned string. This covers every conversion used by the GLQuake target.
+// owned string. This covers every conversion used by the MiniQuake target.
 function va(format, arguments)
   source = bytes(format)
   output = ""

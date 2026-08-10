@@ -117,7 +117,7 @@ end function
 function testExactFrameBytes()
   recording = t.Demo(4, [], "4\n")
   demo.CL_WriteDemoMessage(recording, bytes([1, 2, 3]), t.Vec3(1.0, -2.5, 90.0))
-  equal(hex(demo.serialize(recording)), "340a030000000000803f000020c00000b442010203", "GLQuake frame bytes")
+  equal(hex(demo.serialize(recording)), "340a030000000000803f000020c00000b442010203", "MiniQuake frame bytes")
   return true
 end function
 
@@ -312,7 +312,7 @@ end function
 
 function testTrackHeaderPlaybackArithmetic()
   whitespace = demo.parse(bytes("  2\n"))
-  equal(whitespace.forcedTrack, -1758, "GLQuake bytewise whitespace arithmetic")
+  equal(whitespace.forcedTrack, -1758, "MiniQuake bytewise whitespace arithmetic")
   negative = demo.parse(bytes("-12\n"))
   equal(negative.forcedTrack, -12, "negative playback track")
   return true

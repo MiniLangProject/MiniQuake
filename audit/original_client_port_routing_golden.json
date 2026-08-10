@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "status": "original_client_port_routing_v1",
+  "delivery_revision": "BP-090-094R7",
+  "command_tokenizer": "Cmd_TokenizeString_COM_Parse",
+  "colon_is_punctuation": true,
+  "host_connect_argument": "Cmd_Argv(1)",
+  "connect_token": "127.0.0.1",
+  "remote_port_source": "-port_to_net_hostport",
+  "default_port_without_fix": 26000
+}

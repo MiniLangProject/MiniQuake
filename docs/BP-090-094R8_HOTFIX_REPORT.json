@@ -1,0 +1,37 @@
+{
+  "block": "BP-090-094",
+  "changed_engine_code": true,
+  "changed_native_code": false,
+  "classification": "renderer parity / external visual-reference correction",
+  "delivery_parent": "BP-090-094R7",
+  "delivery_revision": "BP-090-094R8",
+  "fixes": [
+    "MiniQuake evidence startup -gamma 1",
+    "GLQuake red clear colour",
+    "canonical brush-model renderer",
+    "per-bmodel lightmap chain reset",
+    "GL_ONE_MINUS_SRC_COLOR LUMINANCE blend",
+    "entity.frame alternate texture animation"
+  ],
+  "minimum_ssim": 0.95,
+  "normalization": "none",
+  "package": "BP-094",
+  "r7_evidence": {
+    "best_frame": 254,
+    "bottom_miniquake_rgb": [
+      0,
+      0,
+      0
+    ],
+    "bottom_original_rgb": [
+      255,
+      0,
+      0
+    ],
+    "platform_luminance_correlation": -0.5478464763094254,
+    "scenario": "demo1-256",
+    "ssim": 0.5773750816123187
+  },
+  "schema_version": 1,
+  "status": "candidate"
+}

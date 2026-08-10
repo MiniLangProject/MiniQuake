@@ -1,0 +1,10 @@
+{
+  "schema": "MiniQuakeOPT001CR3Delivery/1",
+  "revision": "OPT-001CR3",
+  "parent": "OPT-001CR2",
+  "source_result_archive": "MiniQuake_OPT-001CR2_RESULTS_20260808-212127.zip",
+  "source_result_sha256": "96f49066bc9fa54b3af4e26afc3697bc296bf514f4fe9a302028704996b6f7bb",
+  "parent_status": "PASS",
+  "live_output": "attached_console_live",
+  "runtime_validation": "pending Windows"
+}

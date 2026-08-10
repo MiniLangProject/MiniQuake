@@ -3,7 +3,7 @@ Copyright (C) 2026 MiniQuake contributors
 
 Cumulative compatibility release-candidate matrix.  The status deliberately
 remains a release candidate: original executable interoperability and an
-external GLQuake visual reference corpus remain separate final gates.
+external MiniQuake visual reference corpus remain separate final gates.
 */
 
 package miniquake.compatibility_matrix

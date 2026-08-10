@@ -16,7 +16,7 @@ function emit(scene, functionName, sequence, operation, arguments)
   print "{\"schema\":\"miniquake.renderer.gl.v1\",\"scene\":\"" + scene + "\",\"function\":\"" + functionName + "\",\"seq\":" + sequence + ",\"op\":\"" + operation + "\",\"args\":" + arguments + "}"
 end function
 
-function fnvByte(hash, value)
+function inline fnvByte(hash, value)
   return ((hash ^ (value & 255)) * 16777619) & 4294967295
 end function
 

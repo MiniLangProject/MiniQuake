@@ -35,7 +35,7 @@ function emit(scene, functionName, extras)
   print "{\"schema\":\"miniquake.renderer.gl.v1\",\"scene\":\"" + scene + "\",\"function\":\"" + functionName + "\",\"seq\":0,\"op\":\"state\",\"args\":" + arguments + "}"
 end function
 
-function entity(origin, angles)
+function inline entity(origin, angles)
   return [origin, angles]
 end function
 

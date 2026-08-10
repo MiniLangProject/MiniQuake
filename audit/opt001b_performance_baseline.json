@@ -1,0 +1,52 @@
+{
+  "schema": "MiniQuakeOPT001BPerformanceBaseline/1",
+  "source_revision": "OPT-001B",
+  "source_result_archive": "MiniQuake_OPT-001B_RESULTS_20260807-000043.zip",
+  "source_result_sha256": "86f5923329e463e573c6a0499736e5b536c6cf1c9f4617e897c70f2264b5bf3e",
+  "warmup_frames": 300,
+  "measurement_frames": 3000,
+  "maps": {
+    "e1m1": {
+      "headless": {
+        "frames": 3000,
+        "total_ms": 118609,
+        "median_ms": 46,
+        "p95_ms": 47,
+        "p99_ms": 63,
+        "max_ms": 78
+      },
+      "render": {
+        "frames": 3000,
+        "total_ms": 332016,
+        "median_ms": 109,
+        "p95_ms": 140,
+        "p99_ms": 141,
+        "max_ms": 406
+      }
+    },
+    "e1m2": {
+      "headless": {
+        "frames": 3000,
+        "total_ms": 104938,
+        "median_ms": 31,
+        "p95_ms": 110,
+        "p99_ms": 188,
+        "max_ms": 360
+      },
+      "render": {
+        "frames": 3000,
+        "total_ms": 389234,
+        "median_ms": 125,
+        "p95_ms": 172,
+        "p99_ms": 203,
+        "max_ms": 453
+      }
+    }
+  },
+  "targets": {
+    "median_improvement_percent": 35.0,
+    "throughput_ratio": 1.5,
+    "p99_improvement_percent": 30.0,
+    "regression_limit_percent": 10.0
+  }
+}

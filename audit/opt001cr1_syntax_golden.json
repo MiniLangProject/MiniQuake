@@ -1,0 +1,13 @@
+{
+  "schema": "MiniQuakeOPT001CR1SyntaxGolden/1",
+  "revision": "OPT-001CR1",
+  "parent": "OPT-001C",
+  "classification": "delivery-time MiniLang delimiter error in guarded lightmap upload trace",
+  "source": "src/miniquake/render/world.ml",
+  "required_trace_hash_assignments": 2,
+  "forbidden_fragments": [
+    "rectangle[3)",
+    "compatHashLightmapRows(page, rectangle[1], rectangle[3),"
+  ],
+  "delimiter_check": "all project .ml files"
+}

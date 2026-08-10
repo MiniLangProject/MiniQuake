@@ -72,7 +72,7 @@ function setVectorValue(machine, offset, value)
   setFloat(machine, offset + 2, value.z)
 end function
 
-function parameterOffset(index)
+function inline parameterOffset(index)
   return op.OFS_PARM0 + index * 3
 end function
 
@@ -252,7 +252,7 @@ end function
 
 function setMinMaxSize(machine, entityIndex, mins, maxs, rotate)
   if mins.x > maxs.x or mins.y > maxs.y or mins.z > maxs.z then return error(2652, "PF_setsize: backwards mins/maxs") end if
-  // GLQuake's SetMinMaxSize forcibly disables rotation despite accepting the
+  // MiniQuake's SetMinMaxSize forcibly disables rotation despite accepting the
   // parameter, so the stored axis-aligned bounds are always the input bounds.
   setEntityVector(machine, entityIndex, "mins", mins)
   setEntityVector(machine, entityIndex, "maxs", maxs)
@@ -276,7 +276,7 @@ function modelBounds(machine, modelName)
   lowerData = bytes(lower)
   if len(lowerData) >= 4 then
     suffix = decode(slice(lowerData, len(lowerData) - 4, 4))
-    // Mod_LoadAliasModel in GLQuake explicitly uses this fixed FIXME box.
+    // Mod_LoadAliasModel in MiniQuake explicitly uses this fixed FIXME box.
     if suffix == ".mdl" then
       return [t.Vec3(-16.0, -16.0, -16.0), t.Vec3(16.0, 16.0, 16.0)]
     end if
@@ -1264,7 +1264,7 @@ function install(machine, contextValue)
   return machine
 end function
 
-// GLQuake pr_cmds.c entry points.  These names intentionally mirror the C
+// MiniQuake pr_cmds.c entry points.  These names intentionally mirror the C
 // source so every target function has a concrete, searchable MiniLang pendant.
 function PF_VarString(machine, first)
   return varString(machine, first)
@@ -1355,7 +1355,7 @@ function PF_TraceToss(machine)
 end function
 
 function PF_checkpos(machine)
-  // The GLQuake function body is intentionally empty and is not installed in
+  // The MiniQuake function body is intentionally empty and is not installed in
   // the stock builtin table (slot 5 remains PF_Fixme).
   return true
 end function

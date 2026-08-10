@@ -1,0 +1,38 @@
+{
+  "schema": "MiniQuakeOPT001CR3R2LiveExitCode/2",
+  "revision": "OPT-001CR3R2",
+  "parent": "OPT-001CR3R1",
+  "status": "candidate_binary_safe_hotfix",
+  "root_cause": "native process stdout was emitted into the PowerShell function success stream, so the nominal exit-code variable became an array of log lines plus 0",
+  "observed_result": {
+    "package_step": "PASS",
+    "summary_overall": "FAIL",
+    "summary_failures": 0,
+    "executed_steps": 1,
+    "build_started": false
+  },
+  "fix": {
+    "output_consumption": "ForEach-Object -> Console.Out.WriteLine + Flush",
+    "authoritative_exit_code": "per-process status JSON written by run_process_live.py",
+    "function_return": "single int only",
+    "array_guard": "package verifier exit result rejected if array",
+    "dependent_test_barrier": true
+  },
+  "engine_sources_changed": false,
+  "native_binaries_changed": false,
+  "optimization_sources_preserved": true,
+  "second_observed_failure": {
+    "package_step": "PASS",
+    "build_step": "live_runner_traceback_before_child_diagnostics",
+    "visible_error": "Traceback (most recent call last):",
+    "evidence_limit": "full Python traceback was not preserved in the pasted console output"
+  },
+  "binary_safe_hotfix": {
+    "child_stream": "binary, no decode/re-encode round trip",
+    "forwarding": "os.read -> stdout.buffer + binary log",
+    "exception_policy": "catch BaseException, terminate child, write full traceback to log/status",
+    "powershell_consumption": "2>&1 | Out-Host with temporary ErrorActionPreference=Continue",
+    "child_powershell_encoding": "UTF-8 without BOM",
+    "status_schema": "MiniQuakeLiveProcessStatus/2"
+  }
+}

@@ -13,7 +13,7 @@ const STOP_EPSILON = 0.1
 const STEP_SIZE = 18.0
 const MAX_CLIP_PLANES = 5
 // These two movetypes are present in the QUAKE2-conditioned half of the
-// pinned GLQuake source.  Keep them private to this pendant so the shared
+// pinned MiniQuake source.  Keep them private to this pendant so the shared
 // protocol/constants surface remains the stock Quake 1 one.
 const MOVETYPE_BOUNCEMISSILE_COMPAT = 11
 const MOVETYPE_FOLLOW_COMPAT = 12
@@ -23,7 +23,7 @@ function zeroVector()
 end function
 
 // The compatibility profile in this port is the unconditioned WinQuake /
-// GLQuake 1.09 source, never the optional QUAKE2 preprocessor branch.
+// MiniQuake 1.09 source, never the optional QUAKE2 preprocessor branch.
 function strictQuake109()
   return true
 end function
@@ -565,7 +565,7 @@ end function
 // sv_phys.c compatibility surface
 //
 // The lower-case helpers above are the convenient PlayerState API used by the
-// local client.  The functions below are the edict-oriented GLQuake API.  They
+// local client.  The functions below are the edict-oriented MiniQuake API.  They
 // intentionally keep the original names and ordering rules so protocol tests,
 // QuakeC and server code can use the same behavioral units as sv_phys.c.
 
@@ -589,7 +589,7 @@ function physicsVectorIsZero(value)
   return value.x == 0.0 and value.y == 0.0 and value.z == 0.0
 end function
 
-// The QUAKE2-conditioned GLQuake branches use the presence of the extended
+// The QUAKE2-conditioned MiniQuake branches use the presence of the extended
 // entvars layout.  Testing the field is the MiniLang equivalent: stock v6
 // progs.dat files have no basevelocity and therefore stay on the 1.09 path.
 function physicsRefreshConveyorVelocity(server, entityIndex)
@@ -668,7 +668,7 @@ function physicsExecuteNamedFunction(server, functionName, entityIndex)
   return true
 end function
 
-// SV_CheckAllEnts is a diagnostic pass in GLQuake. Return the offending edict
+// SV_CheckAllEnts is a diagnostic pass in MiniQuake. Return the offending edict
 // indexes as well as appending the original diagnostic text.
 function SV_CheckAllEnts(server)
   invalid = []
@@ -866,7 +866,7 @@ function SV_PushMove(server, pusherIndex, moveTime)
 end function
 
 // QUAKE2 kept a rotating-pusher sibling in this source file. It is not used by
-// GLQuake 1.09, but retaining it makes the source-file pendant complete.
+// MiniQuake 1.09, but retaining it makes the source-file pendant complete.
 function SV_PushRotate(server, pusherIndex, moveTime)
   angularVelocity = collision.entityVector(server, pusherIndex, "avelocity", zeroVector())
   oldLocalTime = collision.entityFloat(server, pusherIndex, "ltime", 0.0)
@@ -962,7 +962,7 @@ function SV_Physics_Pusher(server, entityIndex, frameTime)
     if moveTime < 0.0 then moveTime = 0.0 end if
   end if
   if moveTime != 0.0 then
-    // GLQuake 1.09 is compiled without QUAKE2: angular velocity never selects
+    // MiniQuake 1.09 is compiled without QUAKE2: angular velocity never selects
     // the alternate rotating-pusher body.
     SV_PushMove(server, entityIndex, moveTime)
   end if
@@ -1153,7 +1153,7 @@ function SV_Physics_Step(server, entityIndex, frameTime, gravity, maxVelocity)
 end function
 
 // The alternate QUAKE2 body is retained as a named compatibility entry point;
-// GLQuake 1.09 dispatches the non-QUAKE2 SV_Physics_Step above.
+// MiniQuake 1.09 dispatches the non-QUAKE2 SV_Physics_Step above.
 function SV_Physics_Step_Quake2(server, entityIndex, frameTime, gravity, maxVelocity)
   physicsRefreshConveyorVelocity(server, entityIndex)
   SV_CheckVelocity(server, entityIndex, maxVelocity)

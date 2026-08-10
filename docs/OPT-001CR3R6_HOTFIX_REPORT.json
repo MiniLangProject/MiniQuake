@@ -1,0 +1,11 @@
+{
+  "schema": "MiniQuakeOPT001CR3R6Hotfix/1",
+  "delivery_revision": "OPT-001CR3R6",
+  "delivery_parent": "OPT-001CR3R5",
+  "result_archive_sha256": "9e01b7c03601080191146bcea2e9e76846fd77e258c8ce24acf9df22ef73acbb",
+  "first_failure": "src/main.ml:559 missing then",
+  "default_video_mode": "windowed",
+  "explicit_fullscreen": true,
+  "transition_fix": "reset map-owned renderer compatibility state",
+  "opt001c_identity": "frozen downstream constants"
+}

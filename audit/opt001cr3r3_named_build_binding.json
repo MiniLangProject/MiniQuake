@@ -1,0 +1,24 @@
+{
+  "schema": "MiniQuakeOPT001CR3R3NamedBuildBinding/1",
+  "revision": "OPT-001CR3R3",
+  "parent": "OPT-001CR3R2",
+  "source_evidence": "Eingef\u00fcgter Text.txt",
+  "package_verification": "PASS",
+  "failure_stage": "game and contract build parameter binding",
+  "exception": "System.Management.Automation.ParameterBindingValidationException",
+  "misbound_parameter": "Configuration",
+  "misbound_value": "C:\\Users\\nilsk\\Desktop\\MiniLangCompilerPy",
+  "valid_configuration_values": [
+    "Release",
+    "Debug"
+  ],
+  "root_cause": "Named build options were placed in an array and array-splatted into build.ps1, which PowerShell treated positionally/misaligned.",
+  "fix": {
+    "invocation": "powershell.exe -File build.ps1 with each named parameter as a separate subprocess argument",
+    "encoded_command_removed": true,
+    "array_splat_removed": true,
+    "live_output": "python_binary_passthrough_named_build_binding",
+    "dependent_test_barrier": true
+  },
+  "optimization_sources_preserved": true
+}

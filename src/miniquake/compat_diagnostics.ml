@@ -12,6 +12,7 @@ package miniquake.compat_diagnostics
 import miniquake.build_info as buildInfo
 import miniquake.types as t
 import miniquake.native as native
+import miniquake.optimization_baseline as optBaseline
 import std.fs as fs
 
 const CONTEXT_SCHEMA = 1
@@ -244,6 +245,7 @@ function persist(session, phase, errorText)
 end function
 
 function beginFrame(session)
+  optBaseline.beginFrame()
   if session.diagnosticContextPath == "" then return true end if
   // Clear only in explicit diagnostics mode. The production path retains the
   // original host-owned frameTrace lifecycle and has no added file I/O.
@@ -253,19 +255,24 @@ function beginFrame(session)
 end function
 
 function checkpoint(session, stage)
-  session.frameTrace = session.frameTrace + [stage]
+  optBaseline.checkpoint(stage)
   session.diagnosticLastStage = stage
-  if session.diagnosticContextPath != "" then persist(session, "in_frame", "") end if
+  if session.diagnosticContextPath != "" then
+    session.frameTrace = session.frameTrace + [stage]
+    persist(session, "in_frame", "")
+  end if
   return true
 end function
 
 function filteredFrame(session)
+  optBaseline.filteredFrame()
   session.diagnosticLastStage = "filtered"
   if session.diagnosticContextPath != "" then persist(session, "filtered", "") end if
   return true
 end function
 
 function completeFrame(session)
+  optBaseline.completeFrame()
   session.diagnosticLastStage = "complete"
   if session.diagnosticContextPath != "" then persist(session, "frame_complete", "") end if
   return true

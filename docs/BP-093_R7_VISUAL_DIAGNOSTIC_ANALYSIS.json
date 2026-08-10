@@ -1,0 +1,47 @@
+{
+  "best_r7_mini_frame": 254,
+  "best_r7_mini_tga_sha256": "4201f203463f1f531c84ce742afd60a82abd55e7f53de3ff3db0db5d7247f9ed",
+  "bottom_48_miniquake_rgb": [
+    0,
+    0,
+    0
+  ],
+  "bottom_48_original_rgb": [
+    255,
+    0,
+    0
+  ],
+  "brush_diagnostic": {
+    "classification": "inverted_lightmap_multiplication",
+    "platform_luminance_correlation_after_gamma_correction": -0.5478464763094254
+  },
+  "dimensions": [
+    640,
+    480
+  ],
+  "expected_original_backbuffer_offset": -2,
+  "gamma_diagnostic": {
+    "mini_command_line_gamma_before_fix": 0.7,
+    "original_command_line_gamma": 1.0,
+    "static_wall_ssim_after_approximate_gamma_correction": 0.9367044348791399
+  },
+  "original_tga_sha256": "bc14e99e10d0cb33a2c8407094ec1b613be90619e2fdd85456cfd6d6d3c63c50",
+  "r7_raw_ssim": 0.5773750816123187,
+  "root_causes": [
+    "MiniQuake evidence launch omitted command-line -gamma 1",
+    "renderViewport replaced GLQuake red clear colour with black",
+    "simplified brush renderer used GL_ZERO/GL_SRC_COLOR for inverted LUMINANCE lightmaps",
+    "simplified brush renderer ignored entity.frame alternate texture animation"
+  ],
+  "scenario": "demo1-256",
+  "schema_version": 1,
+  "source_archive": "BP093_demo1_visual_diagnostics.zip",
+  "status_strip_rows": [
+    432,
+    479
+  ],
+  "view_rows": [
+    0,
+    431
+  ]
+}

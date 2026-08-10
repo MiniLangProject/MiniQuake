@@ -26,7 +26,7 @@ capturePrefix = ""
 captureDone = false
 captureResult = void
 
-function hashByte(state, value)
+function inline hashByte(state, value)
   return (((state & 0xffffffff) ^ (value & 255)) * FNV_PRIME) & 0xffffffff
 end function
 

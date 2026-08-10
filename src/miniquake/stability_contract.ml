@@ -18,11 +18,11 @@ const LISTEN_SOAK_FRAMES = 5000
 const LIVE_BLOCK_ALLOWANCE = 512
 const LIVE_BYTE_ALLOWANCE = 65536
 
-function modes()
+function inline modes()
   return ["host", "listen"]
 end function
 
-function deltaStable(before, after, allowance)
+function inline deltaStable(before, after, allowance)
   return after <= before + allowance
 end function
 

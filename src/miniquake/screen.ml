@@ -333,8 +333,15 @@ function SCR_DrawTurtle(frameTime)
   return draw.Draw_Pic(scr_vrect[0], scr_vrect[1], scr_turtle)
 end function
 
-function SCR_DrawNet(realtime, lastMessageTime, demoPlayback)
-  if realtime - lastMessageTime < 0.3 or demoPlayback or scr_net is void then return false end if
+function inline SCR_ShouldDrawNet(realtime, lastMessageTime, demoPlayback, connected, localServerActive)
+  if not connected or localServerActive or demoPlayback then return false end if
+  if lastMessageTime <= 0.0 or realtime - lastMessageTime < 0.3 then return false end if
+  return true
+end function
+
+function SCR_DrawNet(realtime, lastMessageTime, demoPlayback, connected, localServerActive)
+  if not SCR_ShouldDrawNet(realtime, lastMessageTime, demoPlayback, connected, localServerActive) then return false end if
+  if scr_net is void then return false end if
   return draw.Draw_Pic(scr_vrect[0] + 64, scr_vrect[1], scr_net)
 end function
 
@@ -455,7 +462,7 @@ function screenshotName(filesystem)
 end function
 
 function SCR_ScreenshotFailure()
-  // GLQuake writes a TGA but preserves this historical PCX diagnostic text.
+  // MiniQuake writes a TGA but preserves this historical PCX diagnostic text.
   return error(3402, "SCR_ScreenShot_f: Couldn't create a PCX file")
 end function
 
@@ -540,7 +547,7 @@ function SCR_TileClear(width, height)
     draw.Draw_TileClear(0, 0, x, height - sb_lines)
     commands = commands + [[0, 0, x, height - sb_lines]]
     rightX = x + viewWidth
-    // Preserve GLQuake 1.09's historical width expression verbatim.
+    // Preserve MiniQuake 1.09's historical width expression verbatim.
     rightWidth = width - x + viewWidth
     if rightWidth > 0 then draw.Draw_TileClear(rightX, 0, rightWidth, height - sb_lines); commands = commands + [[rightX, 0, rightWidth, height - sb_lines]] end if
   end if
@@ -562,7 +569,7 @@ function SCR_SetIntermission(mode, text, consoleState, currentTime)
   return scr_intermission
 end function
 
-function SCR_IntermissionMode()
+function inline SCR_IntermissionMode()
   return scr_intermission
 end function
 
@@ -678,6 +685,7 @@ function SCR_UpdateScreen(
   frameTime,
   registry,
   connected,
+  localServerActive,
   signon,
   paused,
   lastMessageTime,
@@ -731,7 +739,7 @@ function SCR_UpdateScreen(
       lastScreenCommands = lastScreenCommands + [["crosshair"]]
     end if
     if SCR_DrawRam(cacheThrash) then lastScreenCommands = lastScreenCommands + [["ram"]] end if
-    if SCR_DrawNet(realtime, lastMessageTime, demoPlayback) then lastScreenCommands = lastScreenCommands + [["net"]] end if
+    if SCR_DrawNet(realtime, lastMessageTime, demoPlayback, connected, localServerActive) then lastScreenCommands = lastScreenCommands + [["net"]] end if
     if SCR_DrawTurtle(frameTime) then lastScreenCommands = lastScreenCommands + [["turtle"]] end if
     if SCR_DrawPause(paused, width, height) then lastScreenCommands = lastScreenCommands + [["pause"]] end if
     SCR_CheckDrawCenterString(width, height, realtime, frameTime, gameInput)

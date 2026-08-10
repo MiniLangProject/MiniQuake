@@ -114,7 +114,28 @@ function textureFlags(textureName, faceSide)
   return flags
 end function
 
-function buildSurface(map, faceIndex)
+function buildUnderwaterFlags(map)
+  flags = bytes(len(map.faces), 0)
+  leafIndex = 0
+  while leafIndex < len(map.leafs)
+    leaf = map.leafs[leafIndex]
+    if leaf.contents != c.CONTENTS_EMPTY then
+      mark = 0
+      while mark < leaf.numMarkSurfaces
+        markIndex = leaf.firstMarkSurface + mark
+        if markIndex >= 0 and markIndex < len(map.markSurfaces) then
+          faceIndex = map.markSurfaces[markIndex]
+          if faceIndex >= 0 and faceIndex < len(flags) then flags[faceIndex] = 1 end if
+        end if
+        mark = mark + 1
+      end while
+    end if
+    leafIndex = leafIndex + 1
+  end while
+  return flags
+end function
+
+function buildSurface(map, faceIndex, underwaterFlags)
   if faceIndex < 0 or faceIndex >= len(map.faces) then return error(2704, "R_BuildSurface: bad face") end if
   face = map.faces[faceIndex]
   if face.texInfo < 0 or face.texInfo >= len(map.texInfo) then return error(2705, "R_BuildSurface: bad texinfo") end if
@@ -177,7 +198,7 @@ function buildSurface(map, faceIndex)
 
   flags = textureFlags(textureName, face.side)
   if (info.flags & c.TEX_SPECIAL) != 0 then flags = flags | c.SURF_DRAWTILED end if
-  if bsp.faceUnderwater(map, faceIndex) then flags = flags | c.SURF_UNDERWATER end if
+  if faceIndex < len(underwaterFlags) and underwaterFlags[faceIndex] != 0 then flags = flags | c.SURF_UNDERWATER end if
   return t.RenderSurface(
     faceIndex,
     textureIndex,
@@ -221,26 +242,29 @@ end function
 
 function create(map, palette)
   if len(palette) < 768 then return error(2706, "R_NewMap: invalid palette") end if
+  gl.clearStaticGeometryCache()
   textures = arrayutil.makeEmptyArray(len(map.textures))
   textureIndex = 0
   while textureIndex < len(map.textures)
     sourceTexture = map.textures[textureIndex]
-    if sourceTexture is void then
-      textures[textureIndex] = void
-    else
+    // makeEmptyArray already contains void.  Reassigning void through an
+    // array index is invalid under strict MiniLang void handling and caused
+    // e1m2 to abort for an intentionally empty BSP texture slot.
+    if sourceTexture is not void then
       transparent = startsWith(sourceTexture.name, "{")
       textures[textureIndex] = t.RenderTexture(sourceTexture.name, sourceTexture.width, sourceTexture.height, 0, sourceTexture.pixels, transparent)
     end if
     textureIndex = textureIndex + 1
   end while
+  underwaterFlags = buildUnderwaterFlags(map)
   surfaces = arrayutil.makeEmptyArray(len(map.faces))
   faceIndex = 0
   while faceIndex < len(map.faces)
-    surfaces[faceIndex] = buildSurface(map, faceIndex)
+    surfaces[faceIndex] = buildSurface(map, faceIndex, underwaterFlags)
     faceIndex = faceIndex + 1
   end while
   visible = bytes(len(map.faces), 1)
-  return t.WorldRenderer(map, palette, textures, surfaces, [], false, 0, false, false, 0, visible, 0, 1.0)
+  return t.WorldRenderer(map, palette, textures, surfaces, [], false, 0, false, false, -1, visible, 0, 1.0)
 end function
 
 function upload(renderer)
@@ -288,6 +312,7 @@ end function
 
 function destroy(renderer)
   if renderer is void then return false end if
+  gl.clearStaticGeometryCache()
   if renderer.noTextureId != 0 then gl.deleteTexture(renderer.noTextureId); renderer.noTextureId = 0 end if
   for each texture in renderer.textures
     if texture is not void and texture.glId != 0 then gl.deleteTexture(texture.glId); texture.glId = 0 end if
@@ -302,6 +327,7 @@ function destroy(renderer)
     surface.lightmapId = 0
   end for
   renderer.uploaded = false
+  if rCompatRenderer == renderer then R_ResetWorldCompatibility() end if
   return true
 end function
 
@@ -326,13 +352,29 @@ end function
 
 function markAllVisible(renderer)
   renderer.visibleFaces = bytes(len(renderer.map.faces), 1)
+  // Invalidate the cached leaf so returning from r_novis recomputes the PVS.
+  renderer.viewLeaf = -1
   return len(renderer.map.faces)
+end function
+
+function countVisibleFaces(visibleFaces)
+  count = 0
+  index = 0
+  faceCount = len(visibleFaces)
+  while index < faceCount
+    if visibleFaces[index] != 0 then count = count + 1 end if
+    index = index + 1
+  end while
+  return count
 end function
 
 function markVisible(renderer, viewOrigin)
   map = renderer.map
   if len(map.leafs) <= 1 or len(map.models) == 0 then return markAllVisible(renderer) end if
   currentLeaf = world.leafForPoint(map, viewOrigin)
+  if currentLeaf == renderer.viewLeaf and len(renderer.visibleFaces) == len(map.faces) then
+    return countVisibleFaces(renderer.visibleFaces)
+  end if
   renderer.viewLeaf = currentLeaf
   visibleFaces = bytes(len(map.faces), 0)
   rowBytes = (map.models[0].visibleLeafs + 7) >> 3
@@ -428,7 +470,7 @@ function R_ViewportRect(viewX, viewY, width, height, screenWidth, screenHeight)
   x2 = viewX + width
   y = screenHeight - viewY
   y2 = screenHeight - viewY - height
-  // GLQuake expands fractional view rectangles by one pixel at the open
+  // MiniQuake expands fractional view rectangles by one pixel at the open
   // borders. With MiniQuake's one-to-one framebuffer scale these are the
   // exact integer branches from R_SetupGL.
   if x > 0 then x = x - 1 end if
@@ -444,7 +486,7 @@ function R_SetCullCompatibility(enabled)
   return rCompatCull
 end function
 
-// Configure GLQuake's frame-clear and special-render cvars without changing the
+// Configure MiniQuake's frame-clear and special-render cvars without changing the
 // public renderViewport signature used by older compatibility fixtures.
 function R_ConfigureSpecialCompatibility(mirrorAlpha, clearColor, zTrick, finishBeforeRender, noRefresh)
   global rCompatMirrorAlpha, rCompatClearColor, rCompatZTrick
@@ -463,6 +505,10 @@ function R_SpecialCompatibilityState()
     rCompatFinish, rCompatNoRefresh, rCompatTrickFrame,
     rCompatMirrorTexture, rCompatLastClearPlan,
   ]
+end function
+
+function R_CurrentDepthRange()
+  return [rCompatDepthMin, rCompatDepthMax]
 end function
 
 function R_ClearProduction()
@@ -488,7 +534,7 @@ function R_ResetMirrorCompatibility()
   return rCompatMirrorTexture
 end function
 
-function R_MirrorReady()
+function inline R_MirrorReady()
   return mirror and mirror_plane is not void and len(rCompatMirrorChain) > 0 and rCompatMirrorAlpha != 1.0
 end function
 
@@ -550,7 +596,7 @@ function setupViewRect(viewX, viewY, width, height, screenWidth, screenHeight, f
   gl.viewport(viewport[0], viewport[1], viewport[2], viewport[3])
   gl.matrixMode(gl.GL_PROJECTION)
   gl.loadIdentity()
-  // GLQuake 1.09 R_SetupGL uses zNear 4 and zFar 4096.  Keep this exact:
+  // MiniQuake 1.09 R_SetupGL uses zNear 4 and zFar 4096.  Keep this exact:
   // the ratio is observable through depth precision and polygon rejection.
   gl.frustum(-horizontal, horizontal, -vertical, vertical, nearValue, 4096.0)
   gl.matrixMode(gl.GL_MODELVIEW)
@@ -588,7 +634,10 @@ function renderViewport(renderer, width, height, viewRect, origin, angles, dynam
   R_BeginWorldFrame()
   R_MarkLeaves()
   gl.viewport(0, 0, width, height)
-  gl.clearColor(0.0, 0.0, 0.0, 1.0)
+  // GL_Init in MiniQuake fixes the diagnostic clear colour to opaque red.
+  // Do not silently replace it with black before gl_clear is evaluated: the
+  // unused status-bar strip is observable in raw framebuffer evidence.
+  gl.clearColor(1.0, 0.0, 0.0, 0.0)
   R_ClearProduction()
   gl.enable(gl.GL_DEPTH_TEST)
   gl.cullFace(gl.GL_FRONT)
@@ -639,12 +688,12 @@ function renderMirrorViewport(renderer, width, height, viewRect, origin, angles,
 end function
 
 // =============================================================================
-// Canonical GLQuake 1.09 renderer surface/light/warp entry points.
+// Canonical MiniQuake 1.09 renderer surface/light/warp entry points.
 //
 // The C renderer stores the active world, view vectors, light styles and
 // dynamic lights in translation-unit globals. MiniLang keeps the same state
 // explicitly in package globals and refreshes it from Host_Frame through
-// R_ConfigureWorldCompatibility. Lightmaps retain GLQuake's 128x128 atlas,
+// R_ConfigureWorldCompatibility. Lightmaps retain MiniQuake's 128x128 atlas,
 // allocation and dirty-rectangle semantics; surface-local arrays below replace
 // only C pointer fields, not observable allocation or upload behavior.
 // =============================================================================
@@ -708,7 +757,7 @@ rCompatMirrorTexture = -1
 rCompatMirrorChain = []
 rCompatLastClearPlan = [gl.GL_DEPTH_BUFFER_BIT, 0.0, 1.0, gl.GL_LEQUAL, 0]
 
-// Original GLQuake globals retained under their public names.
+// Original MiniQuake globals retained under their public names.
 skytexturenum = -1
 lightmap_bytes = 1
 lightmap_textures = 0
@@ -735,6 +784,91 @@ c_brush_polys = 0
 nColinElim = 0
 mirror = false
 mirror_plane = void
+
+function R_ResetWorldCompatibility()
+  global rCompatRenderer, rCompatViewOrigin, rCompatViewAngles, rCompatViewForward
+  global rCompatViewRight, rCompatViewUp, rCompatDlights, rCompatLightStyles
+  global rCompatBlend, rCompatTime, rCompatRealtime, rCompatFrameTime
+  global rCompatSurfaceDlightBits, rCompatSurfaceDlightFrame, rCompatSurfaceCachedLight
+  global rCompatSurfaceCachedDlight, rCompatSurfaceLightmapPage, rCompatSurfaceLightS, rCompatSurfaceLightT
+  global rCompatLightmapAllocated, rCompatLightmapModified, rCompatLightmapRectChange
+  global rCompatWarpPolys, rCompatSurfaceWarpPolys, rCompatSkyTexture, rCompatAlphaSkyTexture
+  global rCompatSkyChain, rCompatWaterChain, rCompatTextureChains, rCompatMultiTextureEnabled
+  global rCompatDepthMin, rCompatDepthMax, rCompatLightSpot, rCompatLightPlane
+  global rCompatMirrorTexture, rCompatMirrorChain, rCompatLastClearPlan
+  global skytexturenum, lightmap_textures, active_lightmaps, blocklights
+  global lightmap_polys, lightmap_modified, lightmap_rectchange, allocated, lightmaps
+  global skychain, waterchain, mtexenabled, r_dlightframecount, d_lightstylevalue
+  global lightspot, lightplane, speedscale, solidskytexture, alphaskytexture
+  global r_framecount, r_visframecount, c_brush_polys, nColinElim, mirror, mirror_plane
+  global currentTextureFrame
+
+  rCompatRenderer = void
+  rCompatViewOrigin = void
+  rCompatViewAngles = void
+  rCompatViewForward = void
+  rCompatViewRight = void
+  rCompatViewUp = void
+  rCompatDlights = []
+  rCompatLightStyles = []
+  rCompatBlend = [0.0, 0.0, 0.0, 0.0]
+  rCompatTime = 0.0
+  rCompatRealtime = 0.0
+  rCompatFrameTime = 0.0
+  rCompatSurfaceDlightBits = []
+  rCompatSurfaceDlightFrame = []
+  rCompatSurfaceCachedLight = []
+  rCompatSurfaceCachedDlight = []
+  rCompatSurfaceLightmapPage = []
+  rCompatSurfaceLightS = []
+  rCompatSurfaceLightT = []
+  rCompatLightmapAllocated = []
+  rCompatLightmapModified = []
+  rCompatLightmapRectChange = []
+  rCompatWarpPolys = []
+  rCompatSurfaceWarpPolys = []
+  rCompatSkyTexture = 0
+  rCompatAlphaSkyTexture = 0
+  rCompatSkyChain = []
+  rCompatWaterChain = []
+  rCompatTextureChains = []
+  rCompatMultiTextureEnabled = false
+  rCompatDepthMin = 0.0
+  rCompatDepthMax = 1.0
+  rCompatLightSpot = void
+  rCompatLightPlane = void
+  rCompatMirrorTexture = -1
+  rCompatMirrorChain = []
+  rCompatLastClearPlan = [gl.GL_DEPTH_BUFFER_BIT, 0.0, 1.0, gl.GL_LEQUAL, 0]
+
+  skytexturenum = -1
+  lightmap_textures = 0
+  active_lightmaps = 0
+  blocklights = []
+  lightmap_polys = []
+  lightmap_modified = []
+  lightmap_rectchange = []
+  allocated = []
+  lightmaps = bytes()
+  skychain = []
+  waterchain = []
+  mtexenabled = false
+  r_dlightframecount = 0
+  d_lightstylevalue = []
+  lightspot = void
+  lightplane = void
+  speedscale = 0.0
+  solidskytexture = 0
+  alphaskytexture = 0
+  r_framecount = 0
+  r_visframecount = 0
+  c_brush_polys = 0
+  nColinElim = 0
+  mirror = false
+  mirror_plane = void
+  currentTextureFrame = 0
+  return true
+end function
 
 function compatZeroVector()
   return t.Vec3(0.0, 0.0, 0.0)
@@ -813,7 +947,7 @@ function compatEnsureWorldState()
 end function
 
 // Private compatibility-state adapters used by deterministic renderer oracles
-// and by the higher-level GLQuake host integration.
+// and by the higher-level MiniQuake host integration.
 function R_SetSurfaceCompatibilityState(index, bitsValue, dlightFrame, cachedValues, cachedDlight, page, lightS, lightT)
   global rCompatSurfaceDlightBits, rCompatSurfaceDlightFrame, rCompatSurfaceCachedLight
   global rCompatSurfaceCachedDlight, rCompatSurfaceLightmapPage
@@ -899,7 +1033,7 @@ function R_ResetTextureChains()
   return len(rCompatTextureChains)
 end function
 
-function R_GetTextureChains()
+function inline R_GetTextureChains()
   return rCompatTextureChains
 end function
 
@@ -933,7 +1067,7 @@ function R_BrushSurfaceFacesViewer(surface, planeDistance)
   return planeDistance > GLQUAKE_BACKFACE_EPSILON
 end function
 
-function R_WaterPassDeferred(textureSort, waterAlpha)
+function inline R_WaterPassDeferred(textureSort, waterAlpha)
   return textureSort and waterAlpha != 1.0
 end function
 
@@ -980,7 +1114,7 @@ function R_GetDynamicLightCompatibilityState(index)
   return [rCompatSurfaceDlightBits[index], rCompatSurfaceDlightFrame[index]]
 end function
 
-function R_DynamicLightIsActive(light, currentTime)
+function inline R_DynamicLightIsActive(light, currentTime)
   return light is not void and light.die >= currentTime and light.radius > 0.0
 end function
 
@@ -1222,7 +1356,7 @@ function R_RenderDlights()
   return count
 end function
 
-// Production GLQuake R_PolyBlend.  Host invokes this after entities,
+// Production MiniQuake R_PolyBlend.  Host invokes this after entities,
 // viewmodel and particles, while the 3-D viewport/projection from R_SetupGL
 // is still active and before gl_screen switches to its full-screen 2-D
 // projection.  Drawing this as a 2-D quad would incorrectly tint the HUD and
@@ -1291,11 +1425,10 @@ function R_BeginWorldFrame()
   return [frame, r_dlightframecount, marked]
 end function
 
-function R_MarkBrushModelLights(entity)
+function R_MarkBrushModelLightsForSubmodel(entity, submodelIndex)
   if rCompatRenderer is void or entity is void or rCompatFlashBlend or not rCompatDynamic then return 0 end if
-  modelIndex = entity.modelIndex
-  if modelIndex < 1 or modelIndex >= len(rCompatRenderer.map.models) then return 0 end if
-  model = rCompatRenderer.map.models[modelIndex]
+  if submodelIndex < 1 or submodelIndex >= len(rCompatRenderer.map.models) then return 0 end if
+  model = rCompatRenderer.map.models[submodelIndex]
   // firstFace == 0 denotes the world/non-instanced model in WinQuake.
   if model.firstFace == 0 or len(model.headNodes) == 0 then return 0 end if
   root = model.headNodes[0]
@@ -1307,6 +1440,11 @@ function R_MarkBrushModelLights(entity)
     index = index + 1
   end while
   return marked
+end function
+
+function R_MarkBrushModelLights(entity)
+  if entity is void then return 0 end if
+  return R_MarkBrushModelLightsForSubmodel(entity, entity.modelIndex)
 end function
 
 function R_AddDynamicLights(surface)
@@ -1511,7 +1649,7 @@ function GL_DisableMultitexture()
   global rCompatMultiTextureEnabled, mtexenabled
   if rCompatMultiTextureEnabled then
     gl.disable(gl.GL_TEXTURE_2D)
-    gl.traceCommand("select_texture", [0x835E])
+    if gl.traceEnabled() then gl.traceCommand("select_texture", [0x835E]) end if
   end if
   rCompatMultiTextureEnabled = false
   mtexenabled = false
@@ -1521,7 +1659,7 @@ end function
 function GL_EnableMultitexture()
   global rCompatMultiTextureEnabled, mtexenabled
   if not rCompatMultiTextureAvailable then return false end if
-  gl.traceCommand("select_texture", [0x835F])
+  if gl.traceEnabled() then gl.traceCommand("select_texture", [0x835F]) end if
   gl.enable(gl.GL_TEXTURE_2D)
   rCompatMultiTextureEnabled = true
   mtexenabled = true
@@ -1535,7 +1673,7 @@ function R_DrawSequentialPoly(surface)
   if (value.flags & c.SURF_DRAWTURB) != 0 then return EmitWaterPolys(value) end if
   R_RenderDynamicLightmaps(value)
   if rCompatMultiTextureAvailable then
-    gl.traceCommand("select_texture", [0x835E])
+    if gl.traceEnabled() then gl.traceCommand("select_texture", [0x835E]) end if
     gl.bindTexture(textureIdForSurface(rCompatRenderer, value))
     gl.textureEnvironment(gl.GL_REPLACE)
     GL_EnableMultitexture()
@@ -1544,11 +1682,14 @@ function R_DrawSequentialPoly(surface)
     if index >= 0 and rCompatLightmapModified[rCompatSurfaceLightmapPage[index]] then
       page = rCompatSurfaceLightmapPage[index]
       rectangle = rCompatLightmapRectChange[page]
-      tracedUpload = gl.traceCommand("upload_subimage", [
-        gl.GL_TEXTURE_2D, 0, 0, rectangle[1], GLQUAKE_BLOCK_WIDTH,
-        rectangle[3], gl.GL_LUMINANCE, gl.GL_UNSIGNED_BYTE,
-        compatHashLightmapRows(page, rectangle[1], rectangle[3]),
-      ])
+      tracedUpload = false
+      if gl.traceEnabled() then
+        traceHash = compatHashLightmapRows(page, rectangle[1], rectangle[3])
+        tracedUpload = gl.traceCommand("upload_subimage", [
+          gl.GL_TEXTURE_2D, 0, 0, rectangle[1], GLQUAKE_BLOCK_WIDTH,
+          rectangle[3], gl.GL_LUMINANCE, gl.GL_UNSIGNED_BYTE, traceHash,
+        ])
+      end if
       if not tracedUpload and rectangle[3] > 0 then
         uploadOffset = (page * GLQUAKE_BLOCK_HEIGHT + rectangle[1]) * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
         uploadLength = rectangle[3] * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
@@ -1560,8 +1701,8 @@ function R_DrawSequentialPoly(surface)
     gl.textureEnvironment(gl.GL_BLEND)
     gl.begin(gl.GL_POLYGON)
     for each vertex in value.vertices
-      gl.traceCommand("multitexcoord", [0x835E, vertex.s, vertex.t])
-      gl.traceCommand("multitexcoord", [0x835F, vertex.lightS, vertex.lightT])
+      if gl.traceEnabled() then gl.traceCommand("multitexcoord", [0x835E, vertex.s, vertex.t]) end if
+      if gl.traceEnabled() then gl.traceCommand("multitexcoord", [0x835F, vertex.lightS, vertex.lightT]) end if
       gl.vertex3(vertex.position.x, vertex.position.y, vertex.position.z)
     end for
     gl.finishPrimitive()
@@ -1570,12 +1711,14 @@ function R_DrawSequentialPoly(surface)
     DrawGLPoly(value)
     gl.bindTexture(value.lightmapId)
     gl.enable(gl.GL_BLEND)
-    gl.begin(gl.GL_POLYGON)
-    for each vertex in value.vertices
-      gl.texcoord2(vertex.lightS, vertex.lightT)
-      gl.vertex3(vertex.position.x, vertex.position.y, vertex.position.z)
-    end for
-    gl.finishPrimitive()
+    if not gl.staticGeometryCall(value, 1) then
+      gl.begin(gl.GL_POLYGON)
+      for each vertex in value.vertices
+        gl.texcoord2(vertex.lightS, vertex.lightT)
+        gl.vertex3(vertex.position.x, vertex.position.y, vertex.position.z)
+      end for
+      gl.finishPrimitive()
+    end if
     gl.disable(gl.GL_BLEND)
   end if
   return true
@@ -1614,6 +1757,7 @@ end function
 function DrawGLPoly(poly)
   value = compatSurface(poly)
   if value is void or len(value.vertices) < 3 then return false end if
+  if gl.staticGeometryCall(value, 0) then return true end if
   gl.begin(gl.GL_POLYGON)
   for each vertex in value.vertices
     gl.texcoord2(vertex.s, vertex.t)
@@ -1636,11 +1780,14 @@ function R_BlendLightmaps()
       gl.bindTexture(lightmap_textures + page)
       if rCompatLightmapModified[page] then
         rectangle = rCompatLightmapRectChange[page]
-        tracedUpload = gl.traceCommand("upload_subimage", [
-          gl.GL_TEXTURE_2D, 0, 0, rectangle[1], GLQUAKE_BLOCK_WIDTH,
-          rectangle[3], gl.GL_LUMINANCE, gl.GL_UNSIGNED_BYTE,
-          compatHashLightmapRows(page, rectangle[1], rectangle[3]),
-        ])
+        tracedUpload = false
+        if gl.traceEnabled() then
+          traceHash = compatHashLightmapRows(page, rectangle[1], rectangle[3])
+          tracedUpload = gl.traceCommand("upload_subimage", [
+            gl.GL_TEXTURE_2D, 0, 0, rectangle[1], GLQUAKE_BLOCK_WIDTH,
+            rectangle[3], gl.GL_LUMINANCE, gl.GL_UNSIGNED_BYTE, traceHash,
+          ])
+        end if
         if not tracedUpload and rectangle[3] > 0 then
           uploadOffset = (page * GLQUAKE_BLOCK_HEIGHT + rectangle[1]) * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
           uploadLength = rectangle[3] * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
@@ -1653,12 +1800,14 @@ function R_BlendLightmaps()
         if (surface.flags & GLQUAKE_SURF_UNDERWATER) != 0 then
           DrawGLWaterPolyLightmap(surface)
         else
-          gl.begin(gl.GL_POLYGON)
-          for each vertex in surface.vertices
-            gl.texcoord2(vertex.lightS, vertex.lightT)
-            gl.vertex3(vertex.position.x, vertex.position.y, vertex.position.z)
-          end for
-          gl.finishPrimitive()
+          if not gl.staticGeometryCall(surface, 1) then
+            gl.begin(gl.GL_POLYGON)
+            for each vertex in surface.vertices
+              gl.texcoord2(vertex.lightS, vertex.lightT)
+              gl.vertex3(vertex.position.x, vertex.position.y, vertex.position.z)
+            end for
+            gl.finishPrimitive()
+          end if
         end if
         count = count + 1
       end for
@@ -1753,8 +1902,8 @@ function R_DrawWaterSurfaces()
   if rCompatTextureSort and alpha == 1.0 then return 0 end if
 
   // The world matrix is stable in this compatibility layer; the trace hash is
-  // the FNV-1a value of GLQuake's identity fixture matrix.
-  gl.traceCommand("load_matrix", [2358302629])
+  // the FNV-1a value of MiniQuake's identity fixture matrix.
+  if gl.traceEnabled() then gl.traceCommand("load_matrix", [2358302629]) end if
   if alpha < 1.0 then
     gl.enable(gl.GL_BLEND)
     gl.colorFloat(1.0, 1.0, 1.0, alpha)
@@ -1852,19 +2001,31 @@ function compatBrushModelOrigin(entity)
   )
 end function
 
-function R_DrawBrushModel(entity)
+function R_ClearLightmapChains()
+  global lightmap_polys
+  lightmap_polys = arrayutil.makeFilledArray(GLQUAKE_MAX_LIGHTMAPS, [])
+  return true
+end function
+
+function R_DrawBrushModelForSubmodel(entity, submodelIndex)
+  global currentTextureFrame
   if rCompatRenderer is void or entity is void then return 0 end if
-  submodelIndex = entity.modelIndex
   if submodelIndex < 1 or submodelIndex >= len(rCompatRenderer.map.models) then return 0 end if
   submodel = rCompatRenderer.map.models[submodelIndex]
   modelOrigin = compatBrushModelOrigin(entity)
-  R_MarkBrushModelLights(entity)
+  previousTextureFrame = currentTextureFrame
+  currentTextureFrame = entity.frame
+  // MiniQuake clears the per-model lightmap chains before every bmodel.  Sharing
+  // the world chains here redraws unrelated surfaces and makes the inverted
+  // LUMINANCE pass observable as a large bright/dark rectangle.
+  R_ClearLightmapChains()
+  R_MarkBrushModelLightsForSubmodel(entity, submodelIndex)
   gl.colorFloat(1.0, 1.0, 1.0, 1.0)
   gl.pushMatrix()
   gl.translate(entity.origin.x, entity.origin.y, entity.origin.z)
   gl.rotate(entity.angles.y, 0.0, 0.0, 1.0)
   // R_DrawBrushModel negates pitch before and after R_RotateForEntity in the
-  // original GLQuake source, so the observable brush-model rotation is +pitch.
+  // original MiniQuake source, so the observable brush-model rotation is +pitch.
   gl.rotate(entity.angles.x, 0.0, 1.0, 0.0)
   gl.rotate(entity.angles.z, 1.0, 0.0, 0.0)
   faceIndex = submodel.firstFace
@@ -1884,9 +2045,17 @@ function R_DrawBrushModel(entity)
     end if
     faceIndex = faceIndex + 1
   end while
+  // R_BlendLightmaps uses GL_ZERO / GL_ONE_MINUS_SRC_COLOR for GL_LUMINANCE,
+  // matching the inverted bytes produced by R_BuildLightMap.
   R_BlendLightmaps()
   gl.popMatrix()
+  currentTextureFrame = previousTextureFrame
   return count
+end function
+
+function R_DrawBrushModel(entity)
+  if entity is void then return 0 end if
+  return R_DrawBrushModelForSubmodel(entity, entity.modelIndex)
 end function
 
 function R_RecursiveWorldNode(nodeNumber)
@@ -1930,7 +2099,7 @@ function R_DrawWorld()
   global lightmap_polys, skychain, waterchain
   if rCompatRenderer is void or len(rCompatRenderer.map.models) == 0 then return 0 end if
   gl.colorFloat(1.0, 1.0, 1.0, 1.0)
-  lightmap_polys = arrayutil.makeFilledArray(GLQUAKE_MAX_LIGHTMAPS, [])
+  R_ClearLightmapChains()
   skychain = []
   waterchain = []
   R_ResetTextureChains()
@@ -1992,7 +2161,7 @@ function BuildSurfaceDisplayList(surface)
   value = compatSurface(surface)
   if value is void then return error(3764, "BuildSurfaceDisplayList: bad surface") end if
   // buildSurface reconstructed the exact edge loop and both texture coordinate
-  // sets at model-load time. Remove strictly collinear points as GLQuake does.
+  // sets at model-load time. Remove strictly collinear points as MiniQuake does.
   if (value.flags & GLQUAKE_SURF_UNDERWATER) != 0 or len(value.vertices) < 3 then return value end if
   output = arrayutil.createArrayBuilder(len(value.vertices))
   count = len(value.vertices)
@@ -2029,7 +2198,7 @@ function GL_CreateSurfaceLightmap(surface)
   rCompatSurfaceLightS[index] = xOut[0]
   rCompatSurfaceLightT[index] = yOut[0]
   value.lightmapId = lightmap_textures + page
-  // BuildSurfaceDisplayList in GLQuake stores lightmap coordinates in the
+  // BuildSurfaceDisplayList in MiniQuake stores lightmap coordinates in the
   // shared 128x128 atlas, including the block allocated above.  buildSurface
   // initially has only surface-local coordinates, so retaining those here
   // samples unrelated atlas tiles and darkens most of the world.
@@ -2081,11 +2250,14 @@ function GL_BuildLightmaps()
     gl.textureParameter(gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)
     pageOffset = page * GLQUAKE_BLOCK_WIDTH * GLQUAKE_BLOCK_HEIGHT * lightmap_bytes
     pageLength = GLQUAKE_BLOCK_WIDTH * GLQUAKE_BLOCK_HEIGHT * lightmap_bytes
-    tracedUpload = gl.traceCommand("upload_lightmap", [
-      gl.GL_TEXTURE_2D, 0, lightmap_bytes, GLQUAKE_BLOCK_WIDTH,
-      GLQUAKE_BLOCK_HEIGHT, 0, gl.GL_LUMINANCE, gl.GL_UNSIGNED_BYTE,
-      compatFnv1a(lightmaps, pageOffset, pageLength),
-    ])
+    tracedUpload = false
+    if gl.traceEnabled() then
+      tracedUpload = gl.traceCommand("upload_lightmap", [
+        gl.GL_TEXTURE_2D, 0, lightmap_bytes, GLQUAKE_BLOCK_WIDTH,
+        GLQUAKE_BLOCK_HEIGHT, 0, gl.GL_LUMINANCE, gl.GL_UNSIGNED_BYTE,
+        compatFnv1a(lightmaps, pageOffset, pageLength),
+      ])
+    end if
     if not tracedUpload then gl.uploadLuminance(GLQUAKE_BLOCK_WIDTH, GLQUAKE_BLOCK_HEIGHT, slice(lightmaps, pageOffset, pageLength)) end if
     page = page + 1
   end while
@@ -2141,7 +2313,7 @@ function EmitWaterPolys(surface)
   value = compatSurface(surface)
   if value is void then return false end if
   if rCompatAbstractSurfaceCalls then
-    gl.traceCommand("emit_water", [value.flags])
+    if gl.traceEnabled() then gl.traceCommand("emit_water", [value.flags]) end if
     return 1
   end if
   polygons = GL_SubdivideSurface(value)
@@ -2182,7 +2354,7 @@ function EmitBothSkyLayers(surface)
   value = compatSurface(surface)
   if value is void then return false end if
   if rCompatAbstractSurfaceCalls then
-    gl.traceCommand("emit_both_sky", [value.flags])
+    if gl.traceEnabled() then gl.traceCommand("emit_both_sky", [value.flags]) end if
     return 1
   end if
   GL_DisableMultitexture()
@@ -2202,7 +2374,7 @@ function R_DrawSkyChain(chain)
   if chain is void then return 0 end if
   if t.concreteTypeNameMatches(chain, "RenderSurface", "miniquake.types.RenderSurface") then chain = [chain] end if
   if rCompatAbstractSurfaceCalls then
-    gl.traceCommand("draw_sky_chain", [len(chain)])
+    if gl.traceEnabled() then gl.traceCommand("draw_sky_chain", [len(chain)]) end if
     return len(chain)
   end if
   GL_DisableMultitexture()
@@ -2233,7 +2405,7 @@ function R_InitSky(texture)
   solidRgba = pixels[0]
   alphaRgba = pixels[1]
 
-  // Match GLQuake: allocate each texture once, reuse it on later maps, use
+  // Match MiniQuake: allocate each texture once, reuse it on later maps, use
   // internal formats 3/4, and force linear filtering for both sky layers.
   if solidskytexture == 0 then solidskytexture = gl.generateTexture() end if
   gl.bindTexture(solidskytexture)

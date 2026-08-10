@@ -113,7 +113,7 @@ function SNDDMA_Init(system)
   return system.dmaOpened
 end function
 
-function SNDDMA_GetDMAPos(system)
+function inline SNDDMA_GetDMAPos(system)
   return system.mixState.dma.samplePosition
 end function
 
@@ -323,7 +323,7 @@ function SND_Spatialize(system, channel)
 end function
 
 function nextRandom(system)
-  // WinQuake/GLQuake uses the Microsoft C runtime rand() sequence.
+  // WinQuake/MiniQuake uses the Microsoft C runtime rand() sequence.
   system.randomSeed = (system.randomSeed * 214013 + 2531011) & 0xffffffff
   return (system.randomSeed >> 16) & 0x7fff
 end function

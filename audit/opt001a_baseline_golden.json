@@ -1,0 +1,25 @@
+{
+  "schema": "MiniQuakeOPT001ABaselineGolden/1",
+  "status": "opt001a_baseline_candidate_v1",
+  "fingerprint": "0x1a001a01",
+  "parent": "BP-090-094R15",
+  "maps": [
+    "e1m1",
+    "e1m2"
+  ],
+  "matrix_frames": 64,
+  "warmup_frames": 300,
+  "benchmark_frames": 3000,
+  "handle_warmup_frames": 1200,
+  "handle_window_frames": 5000,
+  "handle_windows": 3,
+  "handle_sample_interval": 100,
+  "classifications": [
+    "STABLE",
+    "PLATEAU",
+    "LEAK",
+    "RESOURCE_GROWTH",
+    "INCONCLUSIVE"
+  ],
+  "diagnostic_only": true
+}

@@ -8,17 +8,17 @@ back to an exact source baseline.
 
 package miniquake.build_info
 
-const PACKAGE_ID = "BP-089"
-const PARENT_PACKAGE_ID = "BP-088"
-const PACKAGE_DATE = "2026-08-01"
+const PACKAGE_ID = "BP-094"
+const PARENT_PACKAGE_ID = "BP-093"
+const PACKAGE_DATE = "2026-08-09"
 const COMPATIBILITY_PROFILE = "compat_109"
 const NATIVE_TEXT_ABI = "caller_owned_bytes_v1"
 const PROTOCOL_TEXT_ABI = "quake_latin1_cstring_v1"
 const BASE_ARCHIVE = "MiniQuake_Source24.07.2026.zip"
 const BASE_ARCHIVE_SHA256 = "bb2b5bf173fe687cada6e7fec2dcdb8b2099589f2ebc039417a5571ced9729d3"
 const MANIFEST_FORMAT = 1
-const BLOCK_ID = "BP-085-089"
-const BLOCK_PARENT_PACKAGE_ID = "BP-080-084R2"
+const BLOCK_ID = "BP-090-094"
+const BLOCK_PARENT_PACKAGE_ID = "BP-085-089R8"
 const PROTOCOL_STATUS = "protocol15_frozen_v1"
 const QUAKEC_STATUS = "quakec_109_frozen_v1"
 const WORLD_PHYSICS_STATUS = "world_physics_109_frozen_v1"
@@ -54,4 +54,22 @@ const STABILITY_STATUS = "stability_109_frozen_v1"
 const STABILITY_FINGERPRINT = 0xd0e3c03f
 const COMPAT_RELEASE_STATUS = "compat_109_release_candidate_v1"
 const COMPAT_RELEASE_FINGERPRINT = 0x29b72a98
-const PACKAGE_PURPOSE = "Stable in-place QuakeC Edict mirror, artifact evidence, resource soaks and cumulative compat_109 release-candidate matrix"
+const ORIGINAL_REFERENCE_STATUS = "original_reference_109_candidate_v1"
+const ORIGINAL_REFERENCE_FINGERPRINT = 0xdc355175
+const COMPAT_FINAL_STATUS = "compat_109_final_candidate_v1"
+const COMPAT_FINAL_FINGERPRINT = 0xe04a7727
+const PACKAGE_PURPOSE = "Verified original MiniQuake provenance, bidirectional binary interop, external visual-reference corpus and final compat_109 candidate"
+
+const OPT001C_STATUS = "opt001c_frame_allocation_candidate_v1"
+const OPT001C_FINGERPRINT = 0x1c001c03
+const OPT001C_PARENT = "OPT-001B"
+
+const OPTIMIZATION_STATUS = "opt001d_performance_audio_ui_candidate_v1"
+const OPTIMIZATION_FINGERPRINT = 0x1c001c10
+const OPTIMIZATION_PARENT = "OPT-001CR3R7"
+const OPTIMIZATION_DELIVERY_REVISION = "OPT-001D"
+const OPTIMIZATION_DELIVERY_PARENT = "OPT-001CR3R7"
+
+OPT001D_STATUS = "opt001d_60fps_candidate_v1"
+OPT001D_PARENT = "OPT-001CR3R8"
+OPT001D_FINGERPRINT = 0x1d0060f0

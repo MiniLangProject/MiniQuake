@@ -1,0 +1,23 @@
+{
+  "bind_address": "127.0.0.1",
+  "condebug_enabled": false,
+  "control_protocol": 3,
+  "elevation_requested_before_build": true,
+  "evidence_source": "miniquake_server_protocol15_summary",
+  "firewall_prompt_expected": false,
+  "firewall_rule_cleanup_required": true,
+  "firewall_rule_count": 4,
+  "firewall_rule_scope": "exact_program_udp_loopback_only",
+  "fixtures": 20,
+  "maximum_frames": 10000,
+  "mode": "miniquake_server_original_client",
+  "network_scope": "loopback_only",
+  "original_process_alive_required": true,
+  "post_frames": 32,
+  "protocol": 15,
+  "qconsole_required": false,
+  "required_server_signon": 3,
+  "schema_version": 1,
+  "step": "BP-092",
+  "temporary_firewall_rules": true
+}

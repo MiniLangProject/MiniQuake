@@ -72,7 +72,7 @@ function emit(scene, functionName, state, counters, extras)
   print "{\"schema\":\"miniquake.view.v1\",\"scene\":\"" + scene + "\",\"function\":\"" + functionName + "\",\"seq\":0,\"op\":\"state\",\"args\":" + arguments + "}"
 end function
 
-function noCounters()
+function inline noCounters()
   return [0, 0, 0, 0, 0, 0, 0]
 end function
 

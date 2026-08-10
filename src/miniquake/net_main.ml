@@ -252,7 +252,7 @@ function NET_SlistFlags()
   return [slistInProgress, slistSilent, slistLocal]
 end function
 
-function NET_PollProcedureSnapshot()
+function inline NET_PollProcedureSnapshot()
   return pollProcedureList
 end function
 
@@ -304,7 +304,7 @@ function NET_QueueSnapshot()
   ]
 end function
 
-function NET_PortState()
+function inline NET_PortState()
   return [net_hostport, DEFAULTnet_hostport]
 end function
 
@@ -442,6 +442,21 @@ function NET_Connect(state, host, timeoutMilliseconds)
     target = hostcache[0][0]
   end if
   result = netloop.Datagram_ConnectPort(state, target, timeoutMilliseconds, net_hostport)
+  if result is not error and result is not void then
+    tracked = NET_TrackSocket(result)
+    if tracked is error then return tracked end if
+  end if
+  return result
+end function
+
+// Strict external-reference connection path.  Unlike the regular Quake
+// menu connection, this keeps one UDP source endpoint alive and resends the
+// Protocol-3 request at a short interval until the original server accepts.
+function NET_ConnectInterop(state, host, timeoutMilliseconds, resendMilliseconds)
+  SetNetTime()
+  if host == "" then return error(3448, "NET_ConnectInterop requires a host") end if
+  target = cachedAddress(state, host)
+  result = netloop.Datagram_ConnectPersistent(state, target, timeoutMilliseconds, resendMilliseconds, net_hostport)
   if result is not error and result is not void then
     tracked = NET_TrackSocket(result)
     if tracked is error then return tracked end if

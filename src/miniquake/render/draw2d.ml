@@ -358,7 +358,7 @@ function GL_Bind(texnum)
   global currenttexture
   syncDrawCvars()
   if gl_nobind != 0.0 then texnum = char_texture end if
-  // Other renderer modules share GLQuake's texture namespace but do not own
+  // Other renderer modules share MiniQuake's texture namespace but do not own
   // this legacy cache variable.  Verify the actual wrapper state as well so a
   // world/entity/particle bind between 2-D frames cannot make us skip the
   // charset or HUD bind.
@@ -641,7 +641,7 @@ function GL_LoadTexture(identifier, width, height, data, mipmap, alpha)
   GL_Bind(texture)
   uploaded = GL_Upload8(data, width, height, mipmap, alpha)
   if uploaded is error then return uploaded end if
-  // Preserve GLQuake 1.09's observable registry quirk: only anonymous
+  // Preserve MiniQuake 1.09's observable registry quirk: only anonymous
   // textures advance numgltextures. Named cache misses are uploaded into the
   // provisional slot but are not made searchable by GL_FindTexture.
   if identifier == "" then
@@ -712,7 +712,7 @@ function Scrap_AllocBlock(width, height)
     bestX = 0
     bestY = 0
     x = 0
-    // Preserve GLQuake's strict '< BLOCK_WIDTH-w' upper bound.
+    // Preserve MiniQuake's strict '< BLOCK_WIDTH-w' upper bound.
     while x < SCRAP_WIDTH - width
       best2 = 0
       column = 0

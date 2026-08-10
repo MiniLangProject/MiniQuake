@@ -1,0 +1,10 @@
+{
+  "schema": "MiniQuakeOPT001CR2Delivery/1",
+  "revision": "OPT-001CR2",
+  "parent": "OPT-001CR1",
+  "purpose": "formalize the already measured OPT-001C improvement and confirm the late handle plateau",
+  "flat_zip_required": true,
+  "source_semantics_changed": false,
+  "performance_target": "TARGET_MET",
+  "windows_runtime_status": "pending"
+}

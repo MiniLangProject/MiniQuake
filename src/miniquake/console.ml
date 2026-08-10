@@ -67,7 +67,7 @@ function create(maxLines)
   return state
 end function
 
-function backscroll()
+function inline backscroll()
   return backscrollLines
 end function
 
@@ -93,7 +93,7 @@ function Con_ClearNotify(state)
 end function
 
 function Con_CheckResize(state, pixelWidth)
-  // con_x is deliberately not reset by GLQuake's Con_CheckResize.  A resize
+  // con_x is deliberately not reset by MiniQuake's Con_CheckResize.  A resize
   // reformats the circular backing store but the next printed byte continues
   // at the same logical column.
   oldCursorX = state.cursorX
@@ -436,7 +436,7 @@ function Con_NotifyBox(state, text)
   return true
 end function
 
-function Con_NotifyBoxPending()
+function inline Con_NotifyBoxPending()
   return notifyBoxWaiting
 end function
 

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "package_id": "BP-094",
+  "block_id": "BP-090-094",
+  "delivery_revision": "BP-090-094R13",
+  "parent_delivery": "BP-090-094R12",
+  "classification": "original-server interop startup sequencing and readiness socket lifetime",
+  "changes": {
+    "pre_fallback_external_connect": true,
+    "single_persistent_control_handshake": true,
+    "readiness_guard_open_during_signon": true,
+    "guard_close_order": "after_original_process_stop",
+    "strict_request_length_bytes": 12
+  },
+  "normal_game_start_changed": false,
+  "native_bridges_changed": false,
+  "windows_acceptance": "pending"
+}

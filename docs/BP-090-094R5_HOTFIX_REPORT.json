@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "package_id": "BP-094",
+  "block_id": "BP-090-094",
+  "delivery_revision": "BP-090-094R5",
+  "delivery_parent": "BP-090-094R4",
+  "classification": "test infrastructure and interop-only CLI isolation",
+  "reported_failure": "unattended run blocked by Windows network-access approval dialog",
+  "root_cause": "original GLQuake interoperability sockets were opened without -ip and therefore bound INADDR_ANY",
+  "changes": {
+    "original_server_bind": "127.0.0.1",
+    "original_client_bind": "127.0.0.1",
+    "miniquake_server_bind": "127.0.0.1",
+    "miniquake_client_bind": "127.0.0.1",
+    "original_visual_network": "disabled",
+    "persistent_firewall_rules": false,
+    "elevation_required": false
+  },
+  "engine_change_scope": [
+    "src/main.ml interop-only command modes"
+  ],
+  "native_code_changed": false,
+  "compatibility_status": "compat_109_final_candidate_v1",
+  "compatibility_fingerprint": "0xe04a7727"
+}

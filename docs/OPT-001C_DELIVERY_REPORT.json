@@ -1,0 +1,22 @@
+{
+  "schema": "MiniQuakeOPT001CDelivery/1",
+  "revision": "OPT-001C",
+  "parent": "OPT-001B",
+  "status": "windows_acceptance_pending",
+  "optimization_status": "opt001c_frame_allocation_candidate_v1",
+  "optimization_fingerprint": "0x1c001c03",
+  "changes": [
+    "short-circuit GL trace argument arrays",
+    "guard world trace-only hashes and arrays",
+    "preserve enabled trace format",
+    "automatic comparison to accepted OPT-001B performance baseline",
+    "retain OPT-001B e1m2 and resource correctness gates"
+  ],
+  "deferred": [
+    "persistent entity and viewmodel buffers",
+    "particle and audio scratch buffers",
+    "hot Cvar cache",
+    "PVS/BSP traversal restructuring",
+    "QuakeC and collision optimizations"
+  ]
+}

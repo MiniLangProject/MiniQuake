@@ -1,4 +1,4 @@
-/* BP-045: GLQuake alias model, shadow-origin and texture-unit parity. */
+/* BP-045: MiniQuake alias model, shadow-origin and texture-unit parity. */
 
 import miniquake.render.alias_mesh as aliasMesh
 import miniquake.render.world as worldRender

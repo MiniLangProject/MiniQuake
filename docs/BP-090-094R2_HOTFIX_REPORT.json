@@ -1,0 +1,25 @@
+{
+  "block_id": "BP-090-094",
+  "classification": "verifier CLI / delivery preflight hotfix",
+  "compat_final_fingerprint": "0xe04a7727",
+  "compat_final_status": "compat_109_final_candidate_v1",
+  "delivery_parent": "BP-090-094R1",
+  "delivery_revision": "BP-090-094R2",
+  "engine_changed": false,
+  "failure": {
+    "command_form": "verify.py <root>",
+    "error": "usage: verify.py [-h] [--root ROOT] [--json JSON]",
+    "mini_lang_targets_compiled": 0,
+    "stage": "build diagnostics preflight"
+  },
+  "fix": {
+    "ambiguous_dual_root_rejected": true,
+    "canonical_form": "verify.py --root <root>",
+    "contract": "verifier_cli_compatibility",
+    "legacy_form_supported": "verify.py <root>"
+  },
+  "native_changed": false,
+  "package_id": "BP-094",
+  "schema_version": 1,
+  "status": "candidate"
+}

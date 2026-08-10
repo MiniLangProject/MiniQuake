@@ -20,7 +20,7 @@ function assertTrue(value, name)
 end function
 
 function modeFixture()
-  arguments = common.create(["-width", "800", "-height", "600", "-bpp", "16"])
+  arguments = common.create(["-fullscreen", "-width", "800", "-height", "600", "-bpp", "16"])
   state = video.createVideoState()
   video.VID_UseState(state)
   state.arguments = arguments
@@ -45,8 +45,11 @@ function testModeEnumeration()
   assertEqual(video.VID_GetModePtr(4).width, 2560, "dual-screen aspect adjustment")
   assertEqual(video.VID_GetModePtr(4).halfscreen, 1, "dual-screen halfscreen flag")
   assertEqual(video.VID_GetModePtr(99).description, "Bad mode", "bad mode sentinel")
-  assertEqual(video.VID_FindRequestedMode(state.arguments), 3, "width/height/bpp selection")
-  assertEqual(video.VID_GetModePtr(1).frequency, 0, "refresh rate is not part of GLQuake vmode_t")
+  assertEqual(video.VID_FindRequestedMode(state.arguments), 3, "explicit fullscreen width/height/bpp selection")
+  assertEqual(video.VID_FindRequestedMode(common.create([])), video.MODE_WINDOWED, "default startup is windowed")
+  assertEqual(video.VID_FindRequestedMode(common.create(["-width", "1024", "-height", "768"])), video.MODE_WINDOWED, "window dimensions do not imply fullscreen")
+  assertEqual(video.VID_FindRequestedMode(common.create(["-fullscreen", "-width", "800", "-height", "600", "-bpp", "16"])), 3, "explicit fullscreen override")
+  assertEqual(video.VID_GetModePtr(1).frequency, 0, "refresh rate is not part of MiniQuake vmode_t")
   windowArgs = common.create(["-startwindowed", "-width", "1024", "-height", "768"])
   assertEqual(video.VID_FindRequestedMode(windowArgs), video.MODE_WINDOWED, "startwindowed alias")
 

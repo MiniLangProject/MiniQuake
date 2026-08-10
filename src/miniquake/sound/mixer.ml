@@ -200,8 +200,9 @@ function precache(mixer, names)
   if mixer is void or not mixer.enabled then return [0, 0] end if
   loaded = 0
   failed = 0
+  nameCount = len(names)
   index = 0
-  while index < len(names)
+  while index < nameCount
     name = names[index]
     if name != "" then
       result = try(loadEffect(mixer, name))
@@ -236,8 +237,9 @@ end function
 function removeChannelAt(mixer, victim)
   if victim < 0 or victim >= len(mixer.channels) then return false end if
   builder = arrays.createArrayBuilder(len(mixer.channels) - 1)
+  channelCount = len(mixer.channels)
   index = 0
-  while index < len(mixer.channels)
+  while index < channelCount
     if index != victim then arrays.pushArrayBuilder(builder, mixer.channels[index]) end if
     index = index + 1
   end while
@@ -253,8 +255,9 @@ function pickDynamicChannel(mixer, newEntityNumber, newChannelNumber)
   currentDynamicCount = dynamicChannelCount(mixer)
   victim = -1
   shortest = 0x7fffffff
+  channelCount = len(mixer.channels)
   index = 0
-  while index < len(mixer.channels)
+  while index < channelCount
     channel = mixer.channels[index]
     eligible = isDynamicChannel(channel)
     if eligible then
@@ -285,7 +288,7 @@ end function
 
 function nextRandom()
   global randomSeed
-  // GLQuake's Win32 build uses the Microsoft C runtime rand sequence.
+  // MiniQuake's Win32 build uses the Microsoft C runtime rand sequence.
   randomSeed = (randomSeed * 214013 + 2531011) & 0xffffffff
   return (randomSeed >> 16) & 0x7fff
 end function
@@ -656,10 +659,12 @@ function mix(mixer, frameCount)
   // Accumulate all channels at full precision and clamp only once.  Clamping
   // the output buffer after every channel made the result depend on channel
   // order and could crush effects when several torches/doors overlapped.
-  accumulator = arrays.makeFilledArray(frameCount * 2, 0)
-  volumeOverrides = arrays.makeFilledArray(len(mixer.channels), void)
+  accumulatorCount = frameCount * 2
+  accumulator = arrays.makeFilledArray(accumulatorCount, 0)
+  channelCount = len(mixer.channels)
+  volumeOverrides = arrays.makeFilledArray(channelCount, void)
   channelIndex = 0
-  while channelIndex < len(mixer.channels)
+  while channelIndex < channelCount
     channel = mixer.channels[channelIndex]
     volumes = channelVolumes(mixer, channel)
     if channel.channelNumber == STATIC_CHANNEL and channel.effect is not void then
@@ -680,9 +685,9 @@ function mix(mixer, frameCount)
     channelIndex = channelIndex + 1
   end while
 
-  alive = arrays.createArrayBuilder(len(mixer.channels))
+  alive = arrays.createArrayBuilder(channelCount)
   channelIndex = 0
-  while channelIndex < len(mixer.channels)
+  while channelIndex < channelCount
     channel = mixer.channels[channelIndex]
     volumes = volumeOverrides[channelIndex]
     if channel.active and volumes[0] == 0 and volumes[1] == 0 then
@@ -699,7 +704,7 @@ function mix(mixer, frameCount)
   // sound channels have accumulated into the paint buffer.
   transferVolume = native.trunc(mixer.masterVolume * 256.0)
   sampleIndex = 0
-  while sampleIndex < len(accumulator)
+  while sampleIndex < accumulatorCount
     accumulator[sampleIndex] = (accumulator[sampleIndex] * transferVolume) >> 8
     sampleIndex = sampleIndex + 1
   end while
@@ -751,7 +756,7 @@ function desiredQueuedBuffers(mixer, frameTime, mixAhead)
   if mixAhead < 0.0 then mixAhead = 0.0 end if
   if frameTime < 0.0 then frameTime = 0.0 end if
   bufferSeconds = MIX_FRAMES * 1.0 / mixer.sampleRate
-  // _snd_mixahead is the sole GLQuake paint horizon.  Host frame time must
+  // _snd_mixahead is the sole MiniQuake paint horizon.  Host frame time must
   // not silently add multiple 512-frame blocks to the observable latency.
   wantedSeconds = mixAhead
   target = native.trunc(wantedSeconds / bufferSeconds)

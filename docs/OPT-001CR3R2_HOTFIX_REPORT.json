@@ -1,0 +1,28 @@
+{
+  "schema": "MiniQuakeOPT001CR3R2Hotfix/1",
+  "revision": "OPT-001CR3R2",
+  "parent": "OPT-001CR3R1",
+  "classification": "test_harness_success_stream_contamination",
+  "engine_code_changed": false,
+  "native_code_changed": false,
+  "optimization_code_preserved": true,
+  "fixes": [
+    "consume native stdout before function return",
+    "flush each console line",
+    "authoritative per-child status JSON",
+    "scalar exit-code guard",
+    "dependent executable barrier retained"
+  ],
+  "binary_safe_live_runner_hotfix": {
+    "date": "2026-08-09",
+    "symptom": "package verification PASS followed by Python Traceback at build process start",
+    "classification": "test-harness live-stream failure; engine build not diagnosed",
+    "changes": [
+      "binary child stream forwarding",
+      "broad exception/status capture",
+      "PowerShell Out-Host consumption",
+      "UTF-8 child PowerShell output",
+      "full top-level harness diagnostics"
+    ]
+  }
+}

@@ -3,7 +3,7 @@ Copyright (C) 1996-1997 Id Software, Inc.
 Copyright (C) 2026 MiniQuake contributors
 
 MiniLang pendant for WinQuake/chase.c.  chase.h does not exist in the pinned
-GLQuake tree; the four public routines and cvars are all defined in chase.c.
+MiniQuake tree; the four public routines and cvars are all defined in chase.c.
 */
 
 package miniquake.chase
@@ -25,7 +25,7 @@ function create()
   return t.ChaseState(false, CHASE_BACK_DEFAULT, CHASE_UP_DEFAULT, CHASE_RIGHT_DEFAULT)
 end function
 
-// Chase_Init registers the same four non-archived, non-server cvars as GLQuake
+// Chase_Init registers the same four non-archived, non-server cvars as MiniQuake
 // and returns the value state used by the data-oriented MiniLang renderer.
 function Chase_Init(registry)
   cvar.register(registry, cvar.create("chase_back", "100", false, false), commandNeverExists)

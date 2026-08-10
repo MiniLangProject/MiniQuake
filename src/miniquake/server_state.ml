@@ -4,12 +4,7 @@ import miniquake.types as t
 import miniquake.sizebuf as sz
 
 function create(maxClients)
-  clients = []
-  i = 0
-  while i < maxClients
-    clients = clients + [void]
-    i = i + 1
-  end while
+  clients = array(maxClients, void)
   return t.ServerState(false, 0.0, "", clients, [], sz.allocOverflowing(8192))
 end function
 

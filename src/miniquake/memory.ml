@@ -54,7 +54,7 @@ struct MemoryManager
   zoneBacking
 end struct
 
-function align16(value)
+function inline align16(value)
   return (value + 15) & ~15
 end function
 
@@ -98,7 +98,7 @@ function used(state)
   return hunkPayloadUsed(state) + cachePayloadUsed(state) + zonePayloadUsed(state)
 end function
 
-function freeHunkBytes(state)
+function inline freeHunkBytes(state)
   return state.capacity - state.lowUsed - state.highUsed
 end function
 
@@ -626,7 +626,7 @@ function memoryInitArguments(capacity, commandLine)
 end function
 
 // Explicit zone.c entry points. MemoryManager replaces the original global
-// hunk/cache variables, while marks remain byte offsets as in GLQuake.
+// hunk/cache variables, while marks remain byte offsets as in MiniQuake.
 function Hunk_Check(state)
   return hunkCheck(state)
 end function

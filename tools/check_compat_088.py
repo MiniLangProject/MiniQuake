@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, json, pathlib, sys
+import argparse, json, pathlib, re, sys
 
 EXPECTED_STATUS = "stability_109_frozen_v1"
 EXPECTED_FINGERPRINT = "0xd0e3c03f"
@@ -35,10 +35,16 @@ def case_stable(case: dict) -> bool:
     return server_stable and limit >= 0 and case['entities_after'] <= limit
 
 
+def _const_string(source: str, name: str) -> str:
+    match = re.search(rf'^const\s+{re.escape(name)}\s*=\s*"([^"]+)"\s*$', source, flags=re.M)
+    return match.group(1) if match else ""
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument('--root', default='.')
     ap.add_argument('--json', default='')
+    ap.add_argument('--allow-downstream-package', action='store_true')
     ns = ap.parse_args()
     root = pathlib.Path(ns.root).resolve()
     errors = []
@@ -89,12 +95,25 @@ def main() -> int:
         'MiniQuake BP-088 stability tests passed: 20',
     ]:
         if marker not in test: errors.append('missing runtime marker: ' + marker)
+    package_id = _const_string(build_info, "PACKAGE_ID")
+    parent_package_id = _const_string(build_info, "PARENT_PACKAGE_ID")
+    block_id = _const_string(build_info, "BLOCK_ID")
     for marker in [
-        'const PACKAGE_ID = "BP-089"',
-        'const BLOCK_ID = "BP-085-089"',
+        'const STABILITY_STATUS = "stability_109_frozen_v1"',
         f'const STABILITY_FINGERPRINT = {EXPECTED_FINGERPRINT}',
     ]:
         if marker not in build_info: errors.append('missing build marker: ' + marker)
+    if ns.allow_downstream_package:
+        if not package_id: errors.append("downstream build info has no PACKAGE_ID")
+        if not parent_package_id: errors.append("downstream build info has no PARENT_PACKAGE_ID")
+        if not block_id: errors.append("downstream build info has no BLOCK_ID")
+    else:
+        for marker in [
+            'const PACKAGE_ID = "BP-089"',
+            'const PARENT_PACKAGE_ID = "BP-088"',
+            'const BLOCK_ID = "BP-085-089"',
+        ]:
+            if marker not in build_info: errors.append('missing build marker: ' + marker)
 
     case_results = []
     for case in golden.get('client_entity_cases', []):
@@ -106,9 +125,13 @@ def main() -> int:
 
     report = {
         'schema_version': 1,
-        'package': 'BP-088',
+        'package': package_id if ns.allow_downstream_package else 'BP-088',
+        'downstream_package': bool(ns.allow_downstream_package),
         'status': 'PASS' if not errors else 'FAIL',
         'errors': errors,
+        'build_package_id': package_id,
+        'build_parent_package_id': parent_package_id,
+        'build_block_id': block_id,
         'contract_status': golden.get('status'),
         'fingerprint': calculated,
         'fixtures': EXPECTED_FIXTURES,
@@ -124,6 +147,7 @@ def main() -> int:
         print(f'  status={EXPECTED_STATUS} fingerprint={EXPECTED_FINGERPRINT} fixtures={EXPECTED_FIXTURES}')
         print('  client_entity_policy=server_high_water_plus_existing_static_offset')
         print('  server_edict_growth_during_idle_soak=rejected')
+        print(f"  downstream={str(bool(ns.allow_downstream_package)).lower()} package={package_id} block={block_id}")
     for error in errors: print('  [FAIL] ' + error)
     return 0 if not errors else 1
 

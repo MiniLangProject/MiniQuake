@@ -1,0 +1,21 @@
+{
+  "schema": "MiniQuakeOPT001CR2Hotfix/1",
+  "delivery_revision": "OPT-001CR2",
+  "delivery_parent": "OPT-001CR1",
+  "classification": "test_harness_artifact_prefix_and_confirmation_fix",
+  "engine_sources_changed": false,
+  "native_sources_changed": false,
+  "root_causes": [
+    "analyze_opt001a.py assumed the opt001a artifact prefix",
+    "compare_opt001c_performance.py assumed the opt001c artifact prefix",
+    "three handle windows ended immediately after a delayed one-time handle appeared"
+  ],
+  "fixes": [
+    "explicit analyzer --prefix argument",
+    "revision-specific prefix opt001cr2",
+    "one additional handle confirmation window",
+    "requested and effective handle-window counts in the summary"
+  ],
+  "opt001cr1_performance_target_reconstructed": true,
+  "next_revision_after_pass": "OPT-001D"
+}

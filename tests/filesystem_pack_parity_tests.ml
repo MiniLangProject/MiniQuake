@@ -30,7 +30,7 @@ function bp071Run(index,name,callback)
   if result is error then print "FAIL: " + result.message; return false end if
   return true
 end function
-function bp071Root()
+function inline bp071Root()
   return "build\\bp071_fs"
 end function
 function bp071Game()

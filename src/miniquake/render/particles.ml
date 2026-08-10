@@ -2,7 +2,7 @@
 Copyright (C) 1996-1997 Id Software, Inc.
 Copyright (C) 2026 MiniQuake contributors
 
-GLQuake fixed-function particle drawing and particle-texture bridge.
+MiniQuake fixed-function particle drawing and particle-texture bridge.
 */
 
 package miniquake.render.particles

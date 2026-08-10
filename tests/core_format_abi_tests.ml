@@ -2,7 +2,7 @@
 Copyright (C) 1996-1997 Id Software, Inc.
 Copyright (C) 2026 MiniQuake contributors
 
-Branch and binary-layout checks for the header-only GLQuake logical units:
+Branch and binary-layout checks for the header-only MiniQuake logical units:
 bspfile.h, modelgen.h, spritegn.h, protocol.h, pr_comp.h, progdefs.h,
 progs.h, and the shared quakedef.h constants consumed by those formats.
 */

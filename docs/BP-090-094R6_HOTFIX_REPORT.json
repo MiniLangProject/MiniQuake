@@ -1,0 +1,29 @@
+{
+  "auto_elevation_before_build": true,
+  "automatic_cleanup": true,
+  "block_id": "BP-090-094",
+  "classification": "external interop infrastructure / unattended Windows Defender Firewall authorization",
+  "compatibility_fingerprint": "0xe04a7727",
+  "compatibility_status": "compat_109_final_candidate_v1",
+  "delivery_parent": "BP-090-094R5",
+  "delivery_revision": "BP-090-094R6",
+  "engine_code_changed": false,
+  "native_code_changed": false,
+  "package_id": "BP-094",
+  "persistent_rules_intended": false,
+  "r5_evidence": {
+    "build": "PASS",
+    "mini_server_ready": true,
+    "original_client_signon_summary_present": false,
+    "original_server_to_mini_client_pairs": 2,
+    "original_server_to_mini_client_status": "PASS",
+    "ready_port": 47070,
+    "user_observed_interactive_firewall_prompt": true
+  },
+  "reported_failure": "INFRA_FAILURE: MiniQuake original-client server a timed out after 45000 ms",
+  "root_cause": "loopback binding alone did not suppress first-use per-program Windows Defender Firewall approval on the tested host",
+  "rule_count": 4,
+  "rule_scope": "exact_program_udp_loopback_only",
+  "schema_version": 1,
+  "temporary_rules": true
+}

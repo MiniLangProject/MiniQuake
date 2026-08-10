@@ -1,0 +1,64 @@
+{
+  "alignment": "temporal_candidate_selection_only",
+  "brush_lightmap_blend": "GL_ZERO_GL_ONE_MINUS_SRC_COLOR",
+  "brush_lightmap_chains_reset_per_model": true,
+  "brush_render_path": "canonical_R_DrawBrushModelForSubmodel",
+  "brush_texture_frame_source": "entity.frame",
+  "candidate_reference_aggregation": "minimum_ssim",
+  "capture_completion": "validated_tga_size_hash_stability",
+  "capture_height": 480,
+  "capture_width": 640,
+  "comparison_schema_version": 3,
+  "condebug_enabled": false,
+  "evidence_source": "original_tga_screenshot",
+  "expected_original_backbuffer_offset": -2,
+  "firewall_prompt_expected": false,
+  "fixtures": 20,
+  "gl_clear_color_rgba": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "metric": "mean_luminance_ssim_8x8",
+  "mini_startup_gamma": 1.0,
+  "minimum_reference_ssim": 0.98,
+  "minimum_ssim": 0.95,
+  "miniquake_frame_step": 0.02,
+  "network_scope": "disabled",
+  "normalization": "none",
+  "original_host_framerate": 0.02,
+  "original_pair_failure_policy": "fail_below_reference_ssim",
+  "original_reference_runs": 2,
+  "qconsole_required": false,
+  "r14_demo3_best_frame_before_fix": 255,
+  "r14_demo3_best_ssim_before_fix": 0.871158394398681,
+  "r14_demo3_diagnosis": "time_dependent_view_damage_kick_and_cshift_decay_used_different_frame_steps",
+  "r14_demo3_edge_alignment_dy": -4,
+  "r14_demo3_full_frame_mae": 4.468786892361111,
+  "r14_demo3_reference_ssim": 0.9999947891783205,
+  "r7_demo1_best_frame_before_fix": 254,
+  "r7_demo1_best_ssim_before_fix": 0.5773750816123187,
+  "reference_consistency_mode": "exact_or_dual_reference_ssim",
+  "requires_original_ab_determinism": false,
+  "scenarios": [
+    {
+      "demo": "demo1",
+      "frame": 256
+    },
+    {
+      "demo": "demo2",
+      "frame": 256
+    },
+    {
+      "demo": "demo3",
+      "frame": 256
+    }
+  ],
+  "schema_version": 1,
+  "search_radius": 2,
+  "simulation_timestep": "fixed_0.02_seconds",
+  "step": "BP-093",
+  "tga_origin_handling": "decoded_per_file_header",
+  "udp_disabled": true
+}

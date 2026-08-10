@@ -36,7 +36,7 @@ function assertVec(value, x, y, z, name)
   assertNear(value.z, z, name + ".z")
 end function
 
-function firstGenerated(system)
+function inline firstGenerated(system)
   return system.active[len(system.active) - 1]
 end function
 

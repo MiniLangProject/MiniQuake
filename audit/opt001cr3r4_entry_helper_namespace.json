@@ -1,0 +1,27 @@
+{
+  "schema": "MiniQuakeOPT001CR3R4EntryHelperNamespace/1",
+  "revision": "OPT-001CR3R4",
+  "parent": "OPT-001CR3R3",
+  "status": "opt001cr3r4_entry_helper_namespace_candidate_v1",
+  "fingerprint": "0x1c001c09",
+  "failure": {
+    "entry": "tests/opt001cr3_hotpath_tests.ml",
+    "global_helper": "check",
+    "entry_arity": 2,
+    "imported_target": "miniquake.zone.check",
+    "imported_arity": 1,
+    "compiler_error": "Function check expects 2 args, got 1"
+  },
+  "fix": {
+    "helper": "opt001cr3r4Check",
+    "globals": [
+      "opt001cr3r4Passed",
+      "opt001cr3r4Failed"
+    ],
+    "entry_prefix": "opt001cr3r4",
+    "general_arity_collision_scan": true,
+    "current_entry_namespace_scan": true
+  },
+  "engine_code_changed": false,
+  "native_code_changed": false
+}

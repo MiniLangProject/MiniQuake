@@ -1,6 +1,6 @@
 package miniquake.source_profile_contract
 
-// Deterministic inventory of the WinQuake/GLQuake 1.09 source profile used by
+// Deterministic inventory of the WinQuake/MiniQuake 1.09 source profile used by
 // the source-guided black port. Static helpers are counted as well as public
 // functions; positive QUAKE2-only regions are outside compat_109.
 

@@ -1,0 +1,424 @@
+diff --git a/audit/original_reference_golden.json b/audit/original_reference_golden.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..f6b6b4d5c1296762242067a153d20fa3ae6e5a25
+--- /dev/null
++++ b/audit/original_reference_golden.json
+@@ -0,0 +1,12 @@
++{
++  "contract_sha256_input": "referenceContractText",
++  "fingerprint": "0xdc355175",
++  "fixtures": 20,
++  "redistributed": false,
++  "reference_bytes": 435712,
++  "reference_pe_machine": "0x014c",
++  "reference_sha256": "04862c835c399bc9184f62101ae0390c2a758c21656ec06dcc0384e0f373d588",
++  "schema_version": 1,
++  "status": "original_reference_109_candidate_v1",
++  "step": "BP-090"
++}
+diff --git a/src/miniquake/external_reference_contract.ml b/src/miniquake/external_reference_contract.ml
+new file mode 100644
+index 0000000000000000000000000000000000000000..b8cee09016d209293bc7f6f804848b9adcfa20a8
+--- /dev/null
++++ b/src/miniquake/external_reference_contract.ml
+@@ -0,0 +1,135 @@
++/*
++Copyright (C) 2026 MiniQuake contributors
++
++Original GLQuake reference, binary interoperability and raw visual-reference
++contract. The original executable is supplied by the tester and is never
++redistributed in the MiniQuake source package or result archive.
++*/
++
++package miniquake.external_reference_contract
++
++const ORIGINAL_GLQUAKE_SHA256 = "04862c835c399bc9184f62101ae0390c2a758c21656ec06dcc0384e0f373d588"
++const ORIGINAL_GLQUAKE_BYTES = 435712
++const ORIGINAL_GLQUAKE_PE_MACHINE = 0x014c
++const ORIGINAL_CONTROL_PROTOCOL = 3
++const ORIGINAL_GAME_PROTOCOL = 15
++const ORIGINAL_CAPTURE_WIDTH = 640
++const ORIGINAL_CAPTURE_HEIGHT = 480
++const ORIGINAL_CAPTURE_MIN_SSIM = 0.95
++const ORIGINAL_CAPTURE_MIN_SSIM_MILLI = 950
++const ORIGINAL_CAPTURE_SEARCH_RADIUS = 2
++const ORIGINAL_INTEROP_POST_FRAMES = 32
++const ORIGINAL_INTEROP_MAX_FRAMES = 10000
++
++const ORIGINAL_REFERENCE_STATUS = "original_reference_109_candidate_v1"
++const ORIGINAL_REFERENCE_FINGERPRINT = 0xdc355175
++const COMPAT_FINAL_STATUS = "compat_109_final_candidate_v1"
++const COMPAT_FINAL_FINGERPRINT = 0xe04a7727
++
++function referenceValues()
++  return [
++    ORIGINAL_GLQUAKE_BYTES,
++    ORIGINAL_GLQUAKE_PE_MACHINE,
++    ORIGINAL_CONTROL_PROTOCOL,
++    ORIGINAL_GAME_PROTOCOL,
++    ORIGINAL_CAPTURE_WIDTH,
++    ORIGINAL_CAPTURE_HEIGHT,
++    ORIGINAL_CAPTURE_MIN_SSIM,
++    ORIGINAL_CAPTURE_SEARCH_RADIUS,
++    ORIGINAL_INTEROP_POST_FRAMES,
++    ORIGINAL_INTEROP_MAX_FRAMES,
++  ]
++end function
++
++function visualScenarios()
++  return [
++    ["demo1", 256],
++    ["demo2", 256],
++    ["demo3", 256],
++  ]
++end function
++
++function visualThreshold()
++  return ORIGINAL_CAPTURE_MIN_SSIM
++end function
++
++function requiredExternalGates()
++  return [
++    "original_binary_interop",
++    "external_glquake_visual_reference",
++  ]
++end function
++
++function originalServerInteropComplete(connected, spawned, signon, modelCount, soundCount)
++  return connected and
++    spawned and
++    signon == 4 and
++    modelCount > 1 and
++    soundCount > 1
++end function
++
++function originalClientInteropComplete(activeClients, spawned, signon)
++  return activeClients > 0 and spawned and signon >= 3 and signon <= 4
++end function
++
++function referenceContractText()
++  return "original_sha256=" + ORIGINAL_GLQUAKE_SHA256 + "\n" +
++    "original_bytes=435712\n" +
++    "pe_machine=332\n" +
++    "control_protocol=3\n" +
++    "game_protocol=15\n" +
++    "capture_width=640\n" +
++    "capture_height=480\n" +
++    "minimum_ssim_milli=950\n" +
++    "search_radius=2\n" +
++    "post_frames=32\n" +
++    "maximum_frames=10000\n" +
++    "visual_scenarios=demo1:256,demo2:256,demo3:256\n" +
++    "redistributed=0\n" +
++    "system_opengl=1\n"
++end function
++
++function finalContractText()
++  return "parent_status=compat_109_release_candidate_v1\n" +
++    "parent_fingerprint=0x29b72a98\n" +
++    "original_reference_status=original_reference_109_candidate_v1\n" +
++    "original_reference_fingerprint=0xdc355175\n" +
++    "external_gate_1=original_binary_interop\n" +
++    "external_gate_2=external_glquake_visual_reference\n" +
++    "bidirectional_protocol15=1\n" +
++    "visual_scenarios=3\n" +
++    "minimum_ssim_milli=950\n" +
++    "raw_full_frame=1\n" +
++    "normalization=none\n" +
++    "status=compat_109_final_candidate_v1\n"
++end function
++
++function referenceContractHasRequiredFields()
++  text = referenceContractText()
++  return len(bytes(text)) > 256 and
++    ORIGINAL_GLQUAKE_SHA256 != "" and
++    ORIGINAL_GLQUAKE_BYTES == 435712
++end function
++
++function finalContractHasRequiredFields()
++  text = finalContractText()
++  return len(bytes(text)) > 256 and
++    len(requiredExternalGates()) == 2 and
++    COMPAT_FINAL_STATUS == "compat_109_final_candidate_v1"
++end function
++
++function validateReferenceContract()
++  return len(referenceValues()) == 10 and
++    len(visualScenarios()) == 3 and
++    len(requiredExternalGates()) == 2 and
++    ORIGINAL_CONTROL_PROTOCOL == 3 and
++    ORIGINAL_GAME_PROTOCOL == 15 and
++    ORIGINAL_CAPTURE_WIDTH == 640 and
++    ORIGINAL_CAPTURE_HEIGHT == 480 and
++    ORIGINAL_CAPTURE_MIN_SSIM == 0.95 and
++    ORIGINAL_CAPTURE_SEARCH_RADIUS == 2 and
++    ORIGINAL_REFERENCE_STATUS == "original_reference_109_candidate_v1" and
++    referenceContractHasRequiredFields() and
++    COMPAT_FINAL_STATUS == "compat_109_final_candidate_v1" and
++    finalContractHasRequiredFields()
++end function
+diff --git a/tests/original_reference_provenance_tests.ml b/tests/original_reference_provenance_tests.ml
+new file mode 100644
+index 0000000000000000000000000000000000000000..60faac71ad64ce9d091485cdf95b9ee85671b698
+--- /dev/null
++++ b/tests/original_reference_provenance_tests.ml
+@@ -0,0 +1,41 @@
++import miniquake.external_reference_contract as reference
++import miniquake.build_info as buildInfo
++
++passed = 0
++failed = 0
++
++function bp090Check(condition, label)
++  global passed, failed
++  if condition then passed = passed + 1; print "[" + passed + "/20] " + label; return true end if
++  failed = failed + 1
++  print "FAIL: " + label
++  return false
++end function
++
++function main(args)
++  global passed, failed
++  values = reference.referenceValues()
++  bp090Check(reference.ORIGINAL_GLQUAKE_SHA256 == "04862c835c399bc9184f62101ae0390c2a758c21656ec06dcc0384e0f373d588", "reference SHA-256")
++  bp090Check(reference.ORIGINAL_GLQUAKE_BYTES == 435712, "reference byte count")
++  bp090Check(reference.ORIGINAL_GLQUAKE_PE_MACHINE == 0x014c, "reference PE machine")
++  bp090Check(reference.ORIGINAL_CONTROL_PROTOCOL == 3, "control protocol")
++  bp090Check(reference.ORIGINAL_GAME_PROTOCOL == 15, "game protocol")
++  bp090Check(reference.ORIGINAL_CAPTURE_WIDTH == 640, "capture width")
++  bp090Check(reference.ORIGINAL_CAPTURE_HEIGHT == 480, "capture height")
++  bp090Check(reference.ORIGINAL_CAPTURE_MIN_SSIM == 0.95, "visual threshold")
++  bp090Check(reference.ORIGINAL_CAPTURE_SEARCH_RADIUS == 2, "temporal radius")
++  bp090Check(reference.ORIGINAL_INTEROP_POST_FRAMES == 32, "post-signon frames")
++  bp090Check(reference.ORIGINAL_INTEROP_MAX_FRAMES == 10000, "interop frame budget")
++  bp090Check(reference.ORIGINAL_REFERENCE_STATUS == "original_reference_109_candidate_v1", "reference status")
++  bp090Check(reference.ORIGINAL_REFERENCE_FINGERPRINT == 0xdc355175, "reference fingerprint")
++  bp090Check(reference.COMPAT_FINAL_STATUS == "compat_109_final_candidate_v1", "final status")
++  bp090Check(reference.COMPAT_FINAL_FINGERPRINT == 0xe04a7727, "final fingerprint")
++  bp090Check(len(values) == 10, "reference value count")
++  bp090Check(reference.referenceContractHasRequiredFields(), "reference contract fields")
++  bp090Check(reference.finalContractHasRequiredFields(), "final contract fields")
++  bp090Check(buildInfo.ORIGINAL_REFERENCE_STATUS == reference.ORIGINAL_REFERENCE_STATUS, "build reference status")
++  bp090Check(reference.validateReferenceContract(), "complete reference contract")
++  if failed > 0 then print "MiniQuake BP-090 original reference tests failed: " + failed + "/20"; return 1 end if
++  print "MiniQuake BP-090 original reference tests passed: 20"
++  return 0
++end function
+diff --git a/tools/check_external_090.py b/tools/check_external_090.py
+new file mode 100755
+index 0000000000000000000000000000000000000000..884baa3f074826b899b40ee8dd0cb2c99a7bc7fb
+--- /dev/null
++++ b/tools/check_external_090.py
+@@ -0,0 +1,40 @@
++#!/usr/bin/env python3
++from __future__ import annotations
++import argparse, json, pathlib, sys
++
++EXPECTED_SHA = "04862c835c399bc9184f62101ae0390c2a758c21656ec06dcc0384e0f373d588"
++
++def main() -> int:
++    ap=argparse.ArgumentParser(); ap.add_argument('--root',default='.'); ap.add_argument('--json',default=''); ns=ap.parse_args()
++    root=pathlib.Path(ns.root).resolve(); errors=[]
++    required=[
++        'src/miniquake/external_reference_contract.ml','tests/original_reference_provenance_tests.ml',
++        'tools/prepare_original_reference.py','audit/original_reference_golden.json',
++        'TEST_BP-090-094.ps1'
++    ]
++    for rel in required:
++        if not (root/rel).is_file(): errors.append('missing file: '+rel)
++    def read(rel): return (root/rel).read_text(encoding='utf-8-sig') if (root/rel).is_file() else ''
++    contract=read(required[0]); test=read(required[1]); tool=read(required[2]); harness=read(required[-1])
++    markers=[
++        f'const ORIGINAL_GLQUAKE_SHA256 = "{EXPECTED_SHA}"',
++        'const ORIGINAL_GLQUAKE_BYTES = 435712','const ORIGINAL_GLQUAKE_PE_MACHINE = 0x014c',
++        'const ORIGINAL_REFERENCE_FINGERPRINT = 0xdc355175',
++        'function referenceContractText()','function referenceContractHasRequiredFields()',
++        'referenceContractHasRequiredFields() and',
++    ]
++    for marker in markers:
++        if marker not in contract: errors.append('missing contract marker: '+marker)
++    if 'MiniQuake BP-090 original reference tests passed: 20' not in test: errors.append('runtime marker missing')
++    for marker in [f'EXPECTED_SHA256 = "{EXPECTED_SHA}"','EXPECTED_SIZE = 435_712','EXPECTED_MACHINE = 0x014C','EXPECTED_MEMBER = "kit/GLQUAKE.EXE"','legacy_opengl32_staged": False']:
++        if marker not in tool: errors.append('stager marker missing: '+marker)
++    for marker in ['prepare_original_reference.py','-OriginalQuakeSourceArchive','-OriginalGLQuakeExe','verified original GLQuake reference']:
++        if marker not in harness: errors.append('acceptance marker missing: '+marker)
++    forbidden=[p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file() and p.name.lower()=='glquake.exe']
++    if forbidden: errors.append('original GLQUAKE.EXE must not be redistributed: '+', '.join(forbidden))
++    report={'schema_version':1,'package':'BP-094','step':'BP-090','status':'PASS' if not errors else 'FAIL','errors':errors,'fixtures':20,'reference_sha256':EXPECTED_SHA,'redistributed':False}
++    if ns.json: pathlib.Path(ns.json).write_text(json.dumps(report,indent=2,sort_keys=True)+'\n',encoding='utf-8')
++    print('MiniQuake BP-090 original reference verification: '+report['status'])
++    for e in errors: print('  [FAIL] '+e)
++    return 0 if not errors else 1
++if __name__=='__main__': sys.exit(main())
+diff --git a/tools/prepare_original_reference.py b/tools/prepare_original_reference.py
+new file mode 100755
+index 0000000000000000000000000000000000000000..c4e9ab3e7a4c3d3487503ca00b640ec152dfc51f
+--- /dev/null
++++ b/tools/prepare_original_reference.py
+@@ -0,0 +1,166 @@
++#!/usr/bin/env python3
++"""Verify and stage the original GLQuake 1.09 binary for external tests.
++
++The binary is read from a user-supplied original Quake source archive (or an
++explicit executable), verified by SHA-256/size/PE machine, and copied into a
++build-only staging directory.  MiniQuake never redistributes the executable or
++Quake game data in its source package.
++"""
++from __future__ import annotations
++
++import argparse
++import hashlib
++import json
++import os
++import shutil
++import struct
++import sys
++import tempfile
++import zipfile
++from pathlib import Path
++
++EXPECTED_SHA256 = "04862c835c399bc9184f62101ae0390c2a758c21656ec06dcc0384e0f373d588"
++EXPECTED_SIZE = 435_712
++EXPECTED_MACHINE = 0x014C
++EXPECTED_MEMBER = "kit/GLQUAKE.EXE"
++SCHEMA_VERSION = 1
++
++
++def sha256_bytes(data: bytes) -> str:
++    return hashlib.sha256(data).hexdigest()
++
++
++def pe_machine(data: bytes) -> int:
++    if len(data) < 0x40 or data[:2] != b"MZ":
++        raise ValueError("reference is not an MZ executable")
++    pe_offset = struct.unpack_from("<I", data, 0x3C)[0]
++    if pe_offset + 6 > len(data) or data[pe_offset : pe_offset + 4] != b"PE\0\0":
++        raise ValueError("reference has no valid PE header")
++    return struct.unpack_from("<H", data, pe_offset + 4)[0]
++
++
++def find_archive_member(zf: zipfile.ZipFile) -> str:
++    wanted = EXPECTED_MEMBER.lower()
++    matches = [name for name in zf.namelist() if name.replace("\\", "/").lower() == wanted]
++    if not matches:
++        matches = [name for name in zf.namelist() if Path(name).name.lower() == "glquake.exe"]
++    if len(matches) != 1:
++        raise ValueError(f"archive must contain exactly one GLQUAKE.EXE, found {len(matches)}")
++    return matches[0]
++
++
++def load_reference(archive: Path | None, executable: Path | None) -> tuple[bytes, str, str]:
++    if archive is not None:
++        with zipfile.ZipFile(archive) as zf:
++            member = find_archive_member(zf)
++            return zf.read(member), "archive", member.replace("\\", "/")
++    assert executable is not None
++    return executable.read_bytes(), "executable", executable.name
++
++
++def link_or_copy(source: Path, destination: Path) -> str:
++    destination.parent.mkdir(parents=True, exist_ok=True)
++    try:
++        os.link(source, destination)
++        return "hardlink"
++    except OSError:
++        shutil.copy2(source, destination)
++        return "copy"
++
++
++def main() -> int:
++    parser = argparse.ArgumentParser()
++    source = parser.add_mutually_exclusive_group(required=True)
++    source.add_argument("--archive", type=Path, help="OriginalQuakeSourceCode.zip")
++    source.add_argument("--exe", type=Path, help="original GLQUAKE.EXE")
++    parser.add_argument("--quake-base", type=Path, required=True)
++    parser.add_argument("--stage", type=Path, required=True)
++    parser.add_argument("--json", type=Path)
++    args = parser.parse_args()
++
++    if args.archive is not None and not args.archive.is_file():
++        parser.error(f"archive not found: {args.archive}")
++    if args.exe is not None and not args.exe.is_file():
++        parser.error(f"executable not found: {args.exe}")
++    pak0 = args.quake_base / "id1" / "pak0.pak"
++    if not pak0.is_file():
++        parser.error(f"Quake data not found: {pak0}")
++
++    try:
++        data, source_kind, source_member = load_reference(args.archive, args.exe)
++        digest = sha256_bytes(data)
++        machine = pe_machine(data)
++    except (OSError, ValueError, zipfile.BadZipFile) as exc:
++        print(f"ERROR: {exc}", file=sys.stderr)
++        return 2
++
++    errors: list[str] = []
++    if len(data) != EXPECTED_SIZE:
++        errors.append(f"byte count {len(data)} != {EXPECTED_SIZE}")
++    if digest != EXPECTED_SHA256:
++        errors.append(f"SHA-256 {digest} != {EXPECTED_SHA256}")
++    if machine != EXPECTED_MACHINE:
++        errors.append(f"PE machine 0x{machine:04x} != 0x{EXPECTED_MACHINE:04x}")
++    if errors:
++        for error in errors:
++            print(f"ERROR: {error}", file=sys.stderr)
++        return 3
++
++    stage = args.stage.resolve()
++    if stage.exists():
++        shutil.rmtree(stage)
++    (stage / "bin").mkdir(parents=True)
++    (stage / "basedir" / "id1").mkdir(parents=True)
++    exe_path = stage / "bin" / "GLQUAKE.EXE"
++    exe_path.write_bytes(data)
++
++    pak_records: list[dict[str, object]] = []
++    for pak in sorted((args.quake_base / "id1").glob("pak*.pak"), key=lambda p: p.name.lower()):
++        destination = stage / "basedir" / "id1" / pak.name
++        method = link_or_copy(pak.resolve(), destination)
++        pak_records.append(
++            {
++                "name": pak.name,
++                "bytes": pak.stat().st_size,
++                "sha256": hashlib.sha256(pak.read_bytes()).hexdigest(),
++                "stage_method": method,
++            }
++        )
++
++    report = {
++        "schema_version": SCHEMA_VERSION,
++        "status": "PASS",
++        "source_kind": source_kind,
++        "source_member": source_member,
++        "reference_filename": "GLQUAKE.EXE",
++        "reference_sha256": digest,
++        "reference_bytes": len(data),
++        "reference_pe_machine": f"0x{machine:04x}",
++        "expected_sha256": EXPECTED_SHA256,
++        "system_opengl": True,
++        "legacy_opengl32_staged": False,
++        "pak_count": len(pak_records),
++        "paks": pak_records,
++        "paths": {
++            "executable": str(exe_path),
++            "basedir": str(stage / "basedir"),
++        },
++    }
++    json_path = args.json or (stage / "provenance.json")
++    json_path.parent.mkdir(parents=True, exist_ok=True)
++    json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
++
++    print("MiniQuake BP-090 original GLQuake reference")
++    print(f"  source={source_kind}:{source_member}")
++    print(f"  sha256={digest}")
++    print(f"  bytes={len(data)} machine=0x{machine:04x}")
++    print(f"  executable={exe_path}")
++    print(f"  basedir={stage / 'basedir'}")
++    print(f"  pak_count={len(pak_records)}")
++    print(f"  provenance={json_path}")
++    print("  result=PASS")
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())

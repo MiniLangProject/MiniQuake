@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, json, pathlib, sys
+import argparse, json, pathlib, re, sys
 
 EXPECTED_FINGERPRINT = 0x309B0737
 
@@ -9,6 +9,11 @@ def fnv1a32(data: bytes) -> int:
         value ^= byte
         value = (value * 0x01000193) & 0xFFFFFFFF
     return value
+
+def _const_string(source: str, name: str) -> str:
+    match = re.search(rf'^const\s+{re.escape(name)}\s*=\s*"([^"]+)"\s*$', source, flags=re.M)
+    return match.group(1) if match else ""
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -54,13 +59,30 @@ def main():
         'const BLACK_PORT_SOURCE_STATUS = "black_port_source_109_frozen_v1"',
         "const BLACK_PORT_SOURCE_FINGERPRINT = 0x309b0737",
     ]
-    if ns.allow_downstream_package:
-        required_build_markers += ['const PACKAGE_ID = "BP-089"', 'const BLOCK_ID = "BP-085-089"']
-    else:
-        required_build_markers += ['const PACKAGE_ID = "BP-084"', 'const BLOCK_ID = "BP-080-084"']
     for marker in required_build_markers:
         if marker not in build_info:
             errors.append("missing build marker: " + marker)
+
+    package_id = _const_string(build_info, "PACKAGE_ID")
+    parent_package_id = _const_string(build_info, "PARENT_PACKAGE_ID")
+    block_id = _const_string(build_info, "BLOCK_ID")
+    if ns.allow_downstream_package:
+        # Later packages inherit the frozen BP-084 source-surface contract under
+        # their own independently verified delivery identity.
+        if not package_id:
+            errors.append("downstream build info has no PACKAGE_ID")
+        if not parent_package_id:
+            errors.append("downstream build info has no PARENT_PACKAGE_ID")
+        if not block_id:
+            errors.append("downstream build info has no BLOCK_ID")
+    else:
+        for marker in [
+            'const PACKAGE_ID = "BP-084"',
+            'const PARENT_PACKAGE_ID = "BP-083"',
+            'const BLOCK_ID = "BP-080-084"',
+        ]:
+            if marker not in build_info:
+                errors.append("missing build marker: " + marker)
     if "Black-port source status:" not in main_source:
         errors.append("version output marker missing")
     if "MiniQuake BP-084 source black-port closure tests passed: 24" not in test:
@@ -68,8 +90,11 @@ def main():
 
     report = {
         "schema_version": 1,
-        "package": "BP-089" if ns.allow_downstream_package else "BP-084",
+        "package": package_id if ns.allow_downstream_package else "BP-084",
         "downstream_package": ns.allow_downstream_package,
+        "build_package_id": package_id,
+        "build_parent_package_id": parent_package_id,
+        "build_block_id": block_id,
         "status": "PASS" if not errors else "FAIL",
         "errors": errors,
         "contract_status": golden.get("status"),
@@ -82,7 +107,11 @@ def main():
         pathlib.Path(ns.json).write_text(json.dumps(report, indent=2) + "\n")
     print("MiniQuake BP-084 source black-port closure verification: " + report["status"])
     if not errors:
-        print("  status=black_port_source_109_frozen_v1 fingerprint=0x309b0737 functions=1094 missing=0")
+        print(
+            "  status=black_port_source_109_frozen_v1 fingerprint=0x309b0737 "
+            f"functions=1094 missing=0 downstream={str(bool(ns.allow_downstream_package)).lower()} "
+            f"package={package_id} block={block_id}"
+        )
     for error in errors:
         print("  [FAIL] " + error)
     return 0 if not errors else 1

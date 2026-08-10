@@ -1,224 +1,306 @@
 {
   "schema_version": 1,
-  "project": "MiniQuake",
-  "block_id": "BP-085-089",
-  "parent_delivery": "BP-080-084R2",
-  "final_package_id": "BP-089",
-  "delivery_revision": "BP-085-089R8",
+  "block_id": "BP-090-094",
+  "package_id": "BP-094",
+  "parent_package_id": "BP-093",
+  "block_parent_package_id": "BP-085-089R8",
+  "parent_status": "compat_109_release_candidate_v1",
+  "parent_fingerprint": "0x29b72a98",
+  "candidate_status": "compat_109_final_candidate_v1",
+  "candidate_fingerprint": "0xe04a7727",
+  "reference_sha256": "04862c835c399bc9184f62101ae0390c2a758c21656ec06dcc0384e0f373d588",
+  "reference_bytes": 435712,
+  "reference_pe_machine": "0x014c",
+  "external_gates": [
+    "original_binary_interop",
+    "external_glquake_visual_reference"
+  ],
   "steps": [
     {
-      "package_id": "BP-085",
-      "title": "game/search-path profile closure",
-      "patch": "patches/BP-085.diff",
-      "runtime_fixtures": 22,
+      "id": "BP-090",
+      "title": "Verified original GLQuake 1.09 reference",
+      "fixtures": 20,
       "status": "candidate"
     },
     {
-      "package_id": "BP-086",
-      "title": "mod and mission-pack runtime compatibility",
-      "patch": "patches/BP-086.diff",
-      "runtime_fixtures": 22,
-      "status": "candidate"
+      "id": "BP-091",
+      "title": "Original GLQuake server to MiniQuake client",
+      "fixtures": 20,
+      "process_pairs": 2,
+      "status": "candidate",
+      "original_server_process_mode": "listen",
+      "requires_video_context": true,
+      "dedicated_mode_supported": false,
+      "condebug_enabled": false,
+      "readiness_evidence": "protocol3_server_info_then_target_udp_protocol15_signon4",
+      "network_scope": "loopback_only",
+      "bind_address": "127.0.0.1",
+      "firewall_prompt_expected": false,
+      "temporary_firewall_rules": true,
+      "firewall_rule_scope": "exact_program_udp_loopback_only",
+      "firewall_rule_count": 4,
+      "firewall_cleanup": "automatic",
+      "network_provenance_required": true,
+      "required_transport": "udp",
+      "local_fallback_rejected": true,
+      "demo_fallback_rejected": true,
+      "remote_address_must_match_target": true,
+      "readiness_probe_timeout_ms": 180000,
+      "port_selection": "loopback_bind_probe",
+      "cold_start_safe": true
     },
     {
-      "package_id": "BP-087",
-      "title": "demo and savegame artifact compatibility",
-      "patch": "patches/BP-087.diff",
-      "runtime_fixtures": 24,
-      "status": "candidate"
+      "id": "BP-092",
+      "title": "MiniQuake server to original GLQuake client",
+      "fixtures": 20,
+      "process_pairs": 2,
+      "status": "candidate",
+      "condebug_enabled": false,
+      "evidence_source": "miniquake_server_protocol15_summary",
+      "network_scope": "loopback_only",
+      "bind_address": "127.0.0.1",
+      "firewall_prompt_expected": false,
+      "temporary_firewall_rules": true,
+      "firewall_rule_scope": "exact_program_udp_loopback_only",
+      "firewall_rule_count": 4,
+      "firewall_cleanup": "automatic",
+      "original_command_parser": "Cmd_TokenizeString_COM_Parse",
+      "connect_token": "127.0.0.1",
+      "remote_port_source": "-port_to_net_hostport",
+      "default_port_without_fix": 26000
     },
     {
-      "package_id": "BP-088",
-      "title": "long-run resource stability",
-      "patch": "patches/BP-088.diff",
-      "runtime_fixtures": 20,
-      "status": "candidate"
+      "id": "BP-093",
+      "title": "Raw external GLQuake visual reference",
+      "fixtures": 20,
+      "scenarios": [
+        "demo1",
+        "demo2",
+        "demo3"
+      ],
+      "frame": 256,
+      "search_radius": 2,
+      "minimum_ssim": 0.95,
+      "normalization": "none",
+      "status": "candidate",
+      "condebug_enabled": false,
+      "evidence_source": "original_tga_screenshot",
+      "network_scope": "disabled",
+      "udp_disabled": true,
+      "firewall_prompt_expected": false,
+      "mini_startup_gamma": 1.0,
+      "clear_color_rgba": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "brush_render_path": "canonical_R_DrawBrushModelForSubmodel",
+      "brush_lightmap_blend": "GL_ZERO_GL_ONE_MINUS_SRC_COLOR",
+      "brush_texture_frame_source": "entity.frame",
+      "expected_original_backbuffer_offset": -2,
+      "capture_completion": "validated_tga_size_hash_stability",
+      "original_runs_per_scenario": 2,
+      "reference_consistency_mode": "exact_or_dual_reference_ssim",
+      "minimum_reference_ssim": 0.98,
+      "candidate_reference_aggregation": "minimum_ssim",
+      "requires_exact_original_pair": false
     },
     {
-      "package_id": "BP-089",
-      "title": "cumulative compat_109 release candidate",
-      "patch": "patches/BP-089.diff",
-      "runtime_fixtures": 24,
+      "id": "BP-094",
+      "title": "External compatibility closure",
+      "fixtures": 24,
       "status": "candidate"
     }
   ],
-  "block_runtime_fixtures": 112,
-  "accepted_parent": {
-    "delivery_revision": "BP-080-084R2",
-    "status": "PASS",
-    "result_archive_sha256": "7d4969d9ed05877fbbcc7c071ea8d1d52f8d0892f3fa57a667df03d083503ef7",
-    "trace_sha256": "e91f4c9e32c8c9df39d7cb4ceaf83efaa78c51057516323da2ba6cc3412f0c7b",
-    "source_inventory_sha256": "31f437bb54a84fa690ff96011c50f8ca3e7dfabde05b4f450e58049eae5d8837",
-    "source_target_functions": 1094,
-    "source_missing_functions": 0
-  },
-  "contracts": {
-    "game_profile": {
-      "status": "game_profile_109_frozen_v1",
-      "fingerprint": "0x7a03b68d"
-    },
-    "mod_runtime": {
-      "status": "mod_runtime_109_frozen_v1",
-      "fingerprint": "0x4649813d"
-    },
-    "artifact_compat": {
-      "status": "artifact_compat_109_frozen_v1",
-      "fingerprint": "0x59531091",
-      "evidence_revision": "sequential_exact_fixed6_signedzero_v3",
-      "semantic_boundary": "parsed_save_domain",
-      "stable_reserialize_required": true,
-      "exact_roundtrip_required": true,
-      "preserves_edict_high_water": true,
-      "sequential_host_sessions": true,
-      "fixed_six_formatter": "msvcrt_percent_f",
-      "fixed_six_large_positive": "4097.000000",
-      "fixed_six_large_negative": "-4097.000000",
-      "text_bridge_export": "mqt_f32_to_fixed6",
-      "preserves_signed_zero": true,
-      "float_parser": "msvcrt_strtod_f32"
-    },
-    "stability": {
-      "status": "stability_109_frozen_v1",
-      "fingerprint": "0xd0e3c03f",
-      "client_entity_policy": "server_high_water_plus_existing_static_offset"
-    },
-    "release_candidate": {
-      "status": "compat_109_release_candidate_v1",
-      "fingerprint": "0x29b72a98"
-    }
-  },
-  "release_matrix": {
-    "accepted_contracts": [
-      "protocol15_frozen_v1",
-      "quakec_109_frozen_v1",
-      "world_physics_109_frozen_v1",
-      "host_lifecycle_109_frozen_v1",
-      "client_render_109_frozen_v1",
-      "world_render_109_frozen_v1",
-      "model_ui_render_109_frozen_v1",
-      "render_special_109_frozen_v1",
-      "audio_109_frozen_v1",
-      "network_platform_109_frozen_v1",
-      "frontend_109_frozen_v1",
-      "core_assets_memory_109_frozen_v1",
-      "gameplay_presentation_109_frozen_v1",
-      "black_port_source_109_frozen_v1",
-      "game_profile_109_frozen_v1",
-      "mod_runtime_109_frozen_v1",
-      "artifact_compat_109_frozen_v1",
-      "stability_109_frozen_v1"
-    ],
-    "pending_external_gates": [
-      "original_binary_interop",
-      "external_glquake_visual_reference"
-    ]
-  },
-  "evidence": {
-    "required_game": "id1",
-    "optional_games": [
-      "rogue",
-      "hipnotic"
-    ],
-    "retail_demos": 3,
-    "artifact_runs": 2,
-    "host_soak_frames": 5000,
-    "listen_soak_frames": 5000,
-    "black_port_maps": 4
-  },
-  "delivery_parent": "BP-085-089R7",
-  "block_parent_delivery": "BP-080-084R2",
+  "delivery_revision": "OPT-001CR3R4",
+  "delivery_parent": "OPT-001CR3R3",
   "hotfixes": [
     {
-      "revision": "BP-085-089R1",
-      "status": "FAIL in retail artifact evidence; superseded by R2",
-      "failure_source": "BP-087 retail artifact evidence",
-      "fix": "sequential Host sessions, exact parsed-save roundtrip, preserved edict high-water mark and production load synchronization",
-      "result_archive_sha256": "169be14543a5defb984fb52e3390b8eb1b0c546d72d17cc24c74085f5104ed2a"
+      "revision": "BP-090-094R1",
+      "classification": "PowerShell parser / delivery infrastructure",
+      "changed_engine_code": false,
+      "changed_native_code": false,
+      "fix": "brace Scenario interpolation before a literal colon and add package-wide verifier protection",
+      "status": "candidate"
     },
     {
-      "revision": "BP-085-089R2",
-      "status": "FAIL in inherited BP-022 preflight; superseded by R3",
-      "failure_source": "historical QuakeC edict source checker",
-      "root_cause": "integer-scaled six-decimal formatting overflowed signed i32 for ordinary Quake value 4097.0",
-      "fix": "MSVCRT-compatible %.6f text bridge, updated QuakeC/Cvar/savegame writers and explicit 4097 regression evidence",
-      "result_archive_sha256": "f39e82b46494d815fe4fbafc361ddd4cf6d8d305222f9c9b29b64b0ccf4958f6"
+      "revision": "BP-090-094R2",
+      "classification": "Verifier CLI / delivery preflight",
+      "changed_engine_code": false,
+      "changed_native_code": false,
+      "fix": "use canonical --root invocation and retain the historical positional root as a compatibility alias",
+      "status": "candidate"
     },
     {
-      "revision": "BP-085-089R3",
-      "status": "FAIL in inherited BP-031 preflight; superseded by R4",
-      "failure_source": "historical command/cvar source checker",
-      "root_cause": "historical checker required the removed i32-scaled formatter after migration to MSVCRT %.6f",
-      "fix": "strict historical BP-022 lineage fixed; R3 then exposed the equivalent BP-031 lineage mismatch",
-      "result_archive_sha256": "9713654070c733ff44f56fe98bee6e860e2717e162d2b706daed102316598703"
+      "revision": "BP-090-094R3",
+      "classification": "External original-binary harness / GL-capable server launch mode",
+      "changed_engine_code": false,
+      "changed_native_code": false,
+      "fix": "run verified GLQUAKE.EXE as a windowed listen server because GL map loading requires a WGL context; add remote-client and early-exit diagnostics",
+      "status": "candidate"
     },
     {
-      "revision": "BP-085-089R4",
-      "status": "FAIL in BP-087 retail save evidence; superseded by R5",
-      "failure_source": "first Quake-v5 save load",
-      "root_cause": "toNumber normalized -0.000000 to positive zero before Binary32 storage",
-      "fix": "native C-atof/strtod parser for scalar and vector save/edict values",
-      "production_source_changed": false,
-      "native_source_changed": false,
-      "runtime_fixtures": 20,
-      "patch": "patches/BP-089R4.diff",
-      "result_archive_sha256": "407953ec4856166f9717620b9cbc8feaab00fab01b5f83f8544798c253c368fb"
+      "revision": "BP-090-094R4",
+      "classification": "External original-binary harness / legacy debug-log overflow",
+      "changed_engine_code": false,
+      "changed_native_code": false,
+      "fix": "omit -condebug for all original GLQuake GUI runs and replace qconsole evidence with Protocol summaries, process liveness and screenshot files",
+      "status": "candidate"
     },
     {
-      "revision": "BP-085-089R5",
-      "status": "FAIL in compatibility trace B; superseded by R6",
-      "failure_source": "deterministic compatibility trace B frame 81",
-      "root_cause": "remaining unrooted Vec3/QuakeEdict return-to-field/array handoff in the per-frame QuakeC mirror",
-      "fix": "root all synchronized vectors, baselines, Edicts and player mirror values before heap writes; add actual syncQuakeCEdicts forced-GC regression",
-      "production_source_changed": true,
-      "native_binary_changed": false,
-      "runtime_fixtures": 24,
-      "patch": "patches/BP-089R5.diff",
-      "result_archive_sha256": "e869baa6928241d5fed8b145e3b2184cee844b5f94dfdfc6bc8ec523ba6f454e"
+      "revision": "BP-090-094R5",
+      "classification": "External original-binary harness / unattended firewall isolation",
+      "changed_engine_code": true,
+      "changed_native_code": false,
+      "engine_change_scope": "interop-only CLI modes bind 127.0.0.1",
+      "fix": "bind original and MiniQuake interop endpoints exclusively to 127.0.0.1; disable UDP for original visual runs so Windows Firewall does not require an interactive approval prompt",
+      "status": "candidate"
     },
     {
-      "revision": "BP-085-089R6",
-      "status": "PARTIAL PASS; e1m2 corpus trace B failed; superseded by R7",
-      "failure_source": "compatibility trace B frame 81",
-      "root_cause": "returned heap-backed vectors and Edicts were still transferred directly through RHS expression temporaries",
-      "fix": "named GC roots for QuakeC vector, baseline, Edict and player synchronization plus forced periodic-GC production-path regression",
-      "production_source_changed": true,
-      "native_binary_changed": false,
-      "runtime_fixtures": 112,
-      "patch": "patches/BP-089R6.diff",
-      "result_archive_sha256": "5a15b18f20b6d0ae867657c025ca7d0564aa09115b8580554ebd0f6a9fda2df1",
-      "trace_a_status": "e1m2 64/64 PASS",
-      "trace_b_status": "e1m2 56/64; server edict 77 origin became unknown at trace_canonical"
+      "revision": "BP-090-094R6",
+      "classification": "external original-binary harness / temporary Windows Defender Firewall authorization",
+      "changed_engine_code": false,
+      "changed_native_code": false,
+      "fix": "request elevation before build, install four exact-program UDP loopback-only rules, remove them in finally, and preserve timeout logs",
+      "status": "candidate"
     },
     {
-      "revision": "BP-085-089R7",
-      "status": "PARTIAL PASS; listen-server soak predicate false positive; superseded by R8",
-      "failure_source": "5000-frame listen-server resource soak",
-      "root_cause": "client entity high-water advanced from 66 to the existing server Edict high-water 67; every leak-sensitive resource gate remained within limits",
-      "fix": "R8 models cl_num_entities as a bounded high-water and permits only catch-up to server high-water plus the static offset present at the measurement baseline",
-      "production_source_changed": true,
-      "native_binary_changed": false,
-      "runtime_fixtures": 112,
-      "patch": "patches/BP-089R7.diff",
-      "result_archive_sha256": "73d687753608117190a7527ac7a84f7ef7a0d57755ebe6e5887574a272710560",
-      "trace_a_status": "primary and all four corpus A traces PASS",
-      "trace_b_status": "primary and all four corpus B traces PASS",
-      "trace_status": "all A/B pairs byte-identical",
-      "host_soak_status": "5000/5000 PASS",
-      "listen_soak_status": "5000/5000 frames completed; false-positive client-entity zero-growth gate"
+      "revision": "BP-090-094R7",
+      "classification": "external original-binary harness / original console port tokenization",
+      "changed_engine_code": false,
+      "changed_native_code": false,
+      "fix": "pass the original client target port through -port/net_hostport and execute connect 127.0.0.1 without a colon; add parallel process diagnostics",
+      "status": "candidate"
     },
     {
-      "revision": "BP-085-089R8",
-      "status": "candidate",
-      "failure_source": "R7 listen-server resource classification",
-      "root_cause": "dynamic sparse client entity prefix was treated as a non-growing live resource instead of WinQuake cl_num_entities high-water",
-      "fix": "server high-water plus baseline static-offset limit; server Edict growth stays rejected; production and fixture share the same rule",
-      "production_source_changed": true,
-      "native_binary_changed": false,
-      "runtime_fixtures": 112,
-      "patch": "patches/BP-089R8.diff",
-      "observed_case": "server 67->67, client 66->67, limit 67",
-      "stability_fingerprint": "0xd0e3c03f",
-      "client_entity_policy": "server_high_water_plus_existing_static_offset"
+      "revision": "BP-090-094R8",
+      "classification": "renderer parity / original visual-reference diagnostics",
+      "changed_engine_code": true,
+      "changed_native_code": false,
+      "engine_change_scope": "startup evidence gamma, GL clear colour and brush-model render handoff",
+      "fix": "match original -gamma 1 startup palette, preserve red GL clear colour, and route brush entities through canonical animated GL_LUMINANCE lightmap rendering",
+      "status": "candidate"
+    },
+    {
+      "revision": "BP-090-094R9",
+      "classification": "external original-server interop / false-positive local fallback",
+      "changed_engine_code": true,
+      "changed_native_code": false,
+      "engine_change_scope": "interop-only client provenance validation",
+      "fix": "require the accepted signon-4 client to use UDP to the requested peer and reject local-server, local-authoritative and demo fallbacks; independently enforce the same markers in PowerShell",
+      "status": "candidate"
+    },
+    {
+      "revision": "BP-090-094R10",
+      "classification": "external original-server interop / cold-start readiness race",
+      "changed_engine_code": false,
+      "changed_native_code": false,
+      "fix": "wait for a real CCREP_SERVER_INFO response from the exact original-server UDP endpoint before launching the full MiniQuake client; bind-test random loopback ports and emit readiness diagnostics",
+      "status": "candidate"
+    },
+    {
+      "revision": "BP-090-094R11",
+      "classification": "external original-reference source-selector handoff",
+      "changed_engine_code": false,
+      "changed_native_code": false,
+      "fix": "resolve and validate the external reference before elevation/build, forward it explicitly and via environment fallback, require exactly one selector, and record the effective argument contract",
+      "status": "candidate"
+    },
+    {
+      "revision": "BP-090-094R12",
+      "classification": "external original-server Protocol-3 connect handshake",
+      "changed_engine_code": true,
+      "changed_native_code": false,
+      "engine_change_scope": "interop-only persistent control socket and strict connection path",
+      "fix": "reuse one UDP source endpoint, resend CCREQ_CONNECT every 500 ms, bypass startup +connect fallback, and emit raw packet diagnostics",
+      "status": "candidate"
+    },
+    {
+      "revision": "BP-090-094R13",
+      "classification": "external original-server startup sequencing and readiness guard lifetime",
+      "changed_engine_code": true,
+      "changed_native_code": false,
+      "engine_change_scope": "interop-only pre-fallback connect path",
+      "fix": "consume the private original target during Host_Init before standalone fallback, reuse the same persistent handshake, and keep the readiness UDP guard open until after the original process stops",
+      "status": "candidate"
+    },
+    {
+      "revision": "BP-090-094R14",
+      "classification": "external original-TGA completion race and bounded reference-run variance",
+      "changed_engine_code": false,
+      "changed_native_code": false,
+      "fix": "wait for complete byte-stable TGAs and use a dual-reference minimum-SSIM gate",
+      "status": "candidate"
+    },
+    {
+      "revision": "BP-090-094R15",
+      "classification": "external original/MiniQuake visual simulation timestep parity",
+      "changed_engine_code": false,
+      "changed_native_code": false,
+      "fix": "set original host_framerate to 0.02 before timedemo so time-dependent damage kick and cshift decay match MiniQuake evidence",
+      "status": "candidate"
     }
-  ]
+  ],
+  "optimization": {
+    "status": "opt001cr3r3_named_build_binding_candidate_v1",
+    "fingerprint": "0x1c001c08",
+    "parent": "OPT-001CR3R2",
+    "parent_windows_status": "PASS",
+    "parent_handle_classification": "PLATEAU",
+    "scope": "CR3 inline/array hotpaths plus binary live output and exact named build parameter binding",
+    "maps": [
+      "e1m1",
+      "e1m2"
+    ],
+    "baseline_revision": "OPT-001B",
+    "next": [
+      "OPT-001CR3R3 Windows acceptance",
+      "OPT-001D",
+      "OPT-001E"
+    ],
+    "delivery_revision": "OPT-001CR3R3",
+    "delivery_parent": "OPT-001CR3R2",
+    "opt001c_windows_result": {
+      "result_archive": "MiniQuake_OPT-001C_RESULTS_20260807-180739.zip",
+      "status": "FAIL before first MiniLang target compiled",
+      "failure": "world.ml delimiter mismatch: Expected RBRACK, got RPAREN",
+      "performance_classification": "UNKNOWN",
+      "superseded_by": "OPT-001CR1"
+    },
+    "r1_fix": "named trace-hash locals plus whole-tree MiniLang delimiter preflight",
+    "opt001cr1_windows_result": {
+      "result_archive": "MiniQuake_OPT-001CR1_RESULTS_20260807-212403.zip",
+      "status": "all product and correctness gates PASS; harness analyzers false FAIL",
+      "performance_classification_reconstructed": "TARGET_MET",
+      "handle_sequence": "275,275,275,276",
+      "handle_classification": "INCONCLUSIVE"
+    },
+    "r2_fix": "consume native stdout for live console, use per-child status JSON, return one integer exit code",
+    "cr3r1_windows_result": {
+      "result_archive": "MiniQuake_OPT-001CR3R1_RESULTS_20260809-094348.zip",
+      "status": "package verification PASS; harness false FAIL before build",
+      "failure": "native child stdout contaminated PowerShell function return stream",
+      "steps_executed": 1,
+      "failures_recorded": 0
+    },
+    "cr3r2_windows_result": {
+      "status": "package verification PASS; build parameter binding FAIL before MiniLang compilation",
+      "failure": "StdLib path misbound to Configuration",
+      "fix": "direct named -File invocation"
+    }
+  },
+  "optimization_candidate": {
+    "status": "opt001cr3r4_entry_helper_namespace_candidate_v1",
+    "fingerprint": "0x1c001c09",
+    "parent": "OPT-001CR3",
+    "delivery_revision": "OPT-001CR3R4",
+    "delivery_parent": "OPT-001CR3R3",
+    "windows_acceptance": "pending"
+  },
+  "opt001cr3r4_hotfix": {
+    "status": "candidate; Windows build pending",
+    "root_cause": "package-free test helper check/2 shadowed miniquake.zone.check/1",
+    "fix": "entry helper namespace plus transitive import-closure arity collision verifier"
+  }
 }

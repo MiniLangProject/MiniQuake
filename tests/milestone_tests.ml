@@ -408,7 +408,7 @@ function testKeyBindings()
   assertEqual(ordered[5][0], -1, "focus event sentinel")
   assertEqual(ordered[5][1], false, "focus loss event")
 
-  // WinMM joystick mapping and thresholds follow GLQuake's default X=turn,
+  // WinMM joystick mapping and thresholds follow MiniQuake's default X=turn,
   // Y=forward map and use the same absolute-axis frame scaling.
   joystickVariables = host.createCvars(void, false)
   gameInput.configurePlatform(joystickVariables, true, false, false)
@@ -752,7 +752,7 @@ function testSoftwareMixer()
   loopEffect = t.SoundEffect("loop", samples, 22050, 2, 1, 0)
   state.channels = [t.MixerChannel(1, 1, loopEffect, t.Vec3(0.0, 0.0, 0.0), 1.0, 0.0, 0, true, true, state.paintedTime + 2)]
   looped = mixer.mix(state, 5)
-  // GLQuake's SND_PaintChannelFrom16 restarts at paintbuffer[0] whenever a
+  // MiniQuake's SND_PaintChannelFrom16 restarts at paintbuffer[0] whenever a
   // cue loops inside one paint block, accumulating the repeated passes there.
   assertEqual(bio.i16(looped, 0), 2988, "loop cue accumulated sample 0")
   assertEqual(bio.i16(looped, 4), -1994, "loop cue accumulated sample 1")

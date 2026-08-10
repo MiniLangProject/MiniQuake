@@ -136,6 +136,7 @@ function fromEntity(number, entity)
 end function
 
 function loadMapEntities(map)
+  gc_collect()
   if len(map.entities) == 0 then
     worldEntity = t.Entity([t.EntityPair("classname", "worldspawn")])
     return [fromEntity(0, worldEntity)]

@@ -1,4 +1,4 @@
-/* BP-052: GLQuake envmap and timerefresh special paths. */
+/* BP-052: MiniQuake envmap and timerefresh special paths. */
 import miniquake.render.special_paths as bp052Special
 import miniquake.render.gl_rmisc as bp052Rmisc
 import miniquake.native as bp052Native

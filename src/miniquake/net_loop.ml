@@ -66,14 +66,18 @@ function expandPartialIPAddress(address)
   if parts is void or len(parts) == 4 then return address end if
   localParts = numericAddressParts(udp.localAddress())
   if localParts is void or len(localParts) != 4 then return address end if
-  combined = []
+  combined = array(4, 0)
   prefix = 4 - len(parts)
   index = 0
   while index < prefix
-    combined = combined + [localParts[index]]
+    combined[index] = localParts[index]
     index = index + 1
   end while
-  combined = combined + parts
+  partIndex = 0
+  while partIndex < len(parts)
+    combined[prefix + partIndex] = parts[partIndex]
+    partIndex = partIndex + 1
+  end while
   return combined[0] + "." + combined[1] + "." + combined[2] + "." + combined[3]
 end function
 
@@ -142,7 +146,7 @@ function StrAddr(address, port)
   return address + ":" + port
 end function
 
-function ipv4Text(value)
+function inline ipv4Text(value)
   return ((value >> 24) & 255) + "." + ((value >> 16) & 255) + "." + ((value >> 8) & 255) + "." + (value & 255)
 end function
 
@@ -261,6 +265,86 @@ function connectRemote(state, address, port, timeoutMilliseconds)
   end while
   udp.close(udpSocket)
   return error(3433, "UDP connect timed out")
+end function
+
+// External original-binary interoperability needs a persistent control
+// socket.  Reusing the same source endpoint and resending inside Quake's
+// two-second duplicate window lets the original server repeat CCREP_ACCEPT
+// instead of treating each short-lived process as a crashed client.
+function connectRemotePersistent(state, address, port, timeoutMilliseconds, resendMilliseconds)
+  if not state.lanEnabled then return error(3436, "Datagram networking disabled by -nolan") end if
+  compactRemoteSockets(state)
+  socketResult = try(udp.open(0))
+  if socketResult is error then return socketResult end if
+  udpSocket = socketResult
+  request = control.requestConnect()
+  if timeoutMilliseconds < 1 then timeoutMilliseconds = 1 end if
+  if resendMilliseconds < 1 then resendMilliseconds = 1 end if
+  requestedAddress = normalizeAddress(address)
+  if not isNumericAddress(requestedAddress) then
+    resolved = try(udp.resolveName(requestedAddress))
+    if resolved is error then udp.close(udpSocket); return resolved end if
+    requestedAddress = resolved
+  end if
+
+  started = win.ticks()
+  lastSend = started - resendMilliseconds
+  sends = 0
+  receives = 0
+  ignored = 0
+  print "MiniQuake Protocol-3 persistent connect"
+  print "  local=" + udpSocket.bindAddress + ":" + udpSocket.port + " target=" + requestedAddress + ":" + port
+  print "  request=" + hex(request) + " timeout_ms=" + timeoutMilliseconds + " resend_ms=" + resendMilliseconds
+
+  while win.ticks() - started < timeoutMilliseconds
+    now = win.ticks()
+    if sends == 0 or now - lastSend >= resendMilliseconds then
+      sent = try(udp.send(udpSocket, requestedAddress, port, request))
+      if sent is error then udp.close(udpSocket); return sent end if
+      if sent != len(request) then
+        udp.close(udpSocket)
+        return error(3437, "UDP control request was partially sent: " + sent + "/" + len(request))
+      end if
+      sends = sends + 1
+      lastSend = now
+    end if
+
+    incoming = try(udp.receive(udpSocket, 2048))
+    if incoming is error then udp.close(udpSocket); return incoming end if
+    if incoming is void then
+      win.sleep(1)
+    else
+      receives = receives + 1
+      if incoming[2] == port and incoming[1] == requestedAddress then
+        parsed = try(control.parse(incoming[0]))
+        if parsed is error then
+          ignored = ignored + 1
+          print "  ignored=parse_error from=" + incoming[1] + ":" + incoming[2] + " bytes=" + len(incoming[0]) + " wire=" + hex(incoming[0])
+        else if parsed[0] == control.CCREP_ACCEPT then
+          remotePort = parsed[1][0]
+          if remotePort < 1 or remotePort > 65535 then udp.close(udpSocket); return error(3431, "server returned invalid UDP port") end if
+          remote = createRemoteSocket(udpSocket, incoming[1], remotePort)
+          state.client = remote
+          state.remoteSockets = state.remoteSockets + [remote]
+          print "  accepted=true control_port=" + port + " game_port=" + remotePort + " sends=" + sends + " receives=" + receives
+          return remote
+        else if parsed[0] == control.CCREP_REJECT then
+          udp.close(udpSocket)
+          return error(3432, parsed[1][0])
+        else
+          ignored = ignored + 1
+          print "  ignored=command_" + parsed[0] + " from=" + incoming[1] + ":" + incoming[2] + " wire=" + hex(incoming[0])
+        end if
+      else
+        ignored = ignored + 1
+        print "  ignored=endpoint from=" + incoming[1] + ":" + incoming[2] + " bytes=" + len(incoming[0])
+      end if
+    end if
+  end while
+
+  localPort = udpSocket.port
+  udp.close(udpSocket)
+  return error(3433, "UDP persistent connect timed out: local_port=" + localPort + " target=" + requestedAddress + ":" + port + " sends=" + sends + " receives=" + receives + " ignored=" + ignored)
 end function
 
 function listen(state, port)
@@ -533,7 +617,7 @@ function arrayTail(values)
   return result
 end function
 
-function IntAlign(value)
+function inline IntAlign(value)
   return (value + 3) & ~3
 end function
 
@@ -759,6 +843,12 @@ end function
 
 function Datagram_ConnectPort(state, host, timeoutMilliseconds, defaultPort)
   return _Datagram_ConnectPort(state, host, timeoutMilliseconds, defaultPort)
+end function
+
+function Datagram_ConnectPersistent(state, host, timeoutMilliseconds, resendMilliseconds, defaultPort)
+  parsed = resolveDatagramTarget(state, host, defaultPort)
+  if parsed is error then return parsed end if
+  return connectRemotePersistent(state, parsed[0], parsed[1], timeoutMilliseconds, resendMilliseconds)
 end function
 
 // Compatibility wrapper for callers that intentionally use the historical

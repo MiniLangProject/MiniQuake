@@ -1,4 +1,4 @@
-/* BP-050: GLQuake mirror selection, reflection and entity handoff. */
+/* BP-050: MiniQuake mirror selection, reflection and entity handoff. */
 import miniquake.render.special_paths as bp050Special
 import miniquake.client_render_handoff as bp050Handoff
 import miniquake.types as bp050Types

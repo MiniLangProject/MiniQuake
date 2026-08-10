@@ -2,7 +2,7 @@
 Copyright (C) 2026 MiniQuake contributors
 
 Deterministic render-evidence corpus shared by BP-053 runtime tests and the
-optional Original-GLQuake comparison gate.  Scenario records are plain arrays
+optional Original-MiniQuake comparison gate.  Scenario records are plain arrays
 so the command-line runner and MiniLang fixtures can consume the same stable
 layout without introducing another runtime object type.
 */

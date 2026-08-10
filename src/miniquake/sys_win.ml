@@ -75,13 +75,7 @@ end struct
 sysWinState = void
 
 function emptyHandles()
-  result = []
-  index = 0
-  while index < MAX_HANDLES
-    result = result + [0]
-    index = index + 1
-  end while
-  return result
+  return array(MAX_HANDLES, 0)
 end function
 
 function Sys_CreateState(useNative)
@@ -146,7 +140,7 @@ function readI32(data, offset)
   return signed32(value)
 end function
 
-function readU32(data)
+function inline readU32(data)
   return data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24)
 end function
 
@@ -291,11 +285,11 @@ function Sys_SetFPCW()
   return true
 end function
 
-function Sys_PushFPCW_SetHigh()
+function inline Sys_PushFPCW_SetHigh()
   return true
 end function
 
-function Sys_PopFPCW()
+function inline Sys_PopFPCW()
   return true
 end function
 
@@ -468,7 +462,7 @@ function Sys_ConsoleInput()
   state = Sys_State()
   if not state.isDedicated then return void end if
   /*
-  GLQuake gives QHOST a dedicated RequestProc thread.  MiniLang keeps the
+  MiniQuake gives QHOST a dedicated RequestProc thread.  MiniLang keeps the
   command decoding in MiniLang and uses a non-blocking native event wait, so
   service one synchronous QHOST request from every dedicated-console pass.
   QHOST waits for the child event before issuing another request.

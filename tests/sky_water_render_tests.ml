@@ -1,4 +1,4 @@
-/* BP-043: GLQuake sky/water binary32 math and subdivision boundaries. */
+/* BP-043: MiniQuake sky/water binary32 math and subdivision boundaries. */
 
 import miniquake.render.gl_warp as warp
 import miniquake.types as t

@@ -1,4 +1,4 @@
-/* BP-044: central GLQuake viewport, culling, pass order and freeze contract. */
+/* BP-044: central MiniQuake viewport, culling, pass order and freeze contract. */
 
 import miniquake.render.world as worldRender
 import miniquake.world_render_contract as contract

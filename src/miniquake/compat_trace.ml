@@ -35,7 +35,7 @@ function qcFunctionIndex(session)
   return session.server.machine.currentFunction
 end function
 
-function hashByte(state, value)
+function inline hashByte(state, value)
   return (((state & 0xffffffff) ^ (value & 255)) * FNV_PRIME) & 0xffffffff
 end function
 

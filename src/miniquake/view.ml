@@ -497,6 +497,13 @@ function smoothStairStep(state, player, frameTime)
 end function
 
 function V_CalcRefdef(state, player, viewAngles, idealPitch, forwardMove, forwardSpeed, clientTime, frameTime, stepFrameTime, demoPlayback, registry)
+  opt001dCvarVIpitchLevel = cvar.variableValue(registry, "v_ipitch_level")
+  opt001dCvarVIrollLevel = cvar.variableValue(registry, "v_iroll_level")
+  opt001dCvarVIyawLevel = cvar.variableValue(registry, "v_iyaw_level")
+  opt001dCvarVIpitchCycle = cvar.variableValue(registry, "v_ipitch_cycle")
+  opt001dCvarVIrollCycle = cvar.variableValue(registry, "v_iroll_cycle")
+  opt001dCvarVIyawCycle = cvar.variableValue(registry, "v_iyaw_cycle")
+  opt001dCvarVIdlescale = cvar.variableValue(registry, "v_idlescale")
   V_DriftPitch(
     state,
     viewAngles,
@@ -541,13 +548,13 @@ function V_CalcRefdef(state, player, viewAngles, idealPitch, forwardMove, forwar
   V_AddIdle(
     state,
     clientTime,
-    cvar.variableValue(registry, "v_idlescale"),
-    cvar.variableValue(registry, "v_iyaw_cycle"),
-    cvar.variableValue(registry, "v_iroll_cycle"),
-    cvar.variableValue(registry, "v_ipitch_cycle"),
-    cvar.variableValue(registry, "v_iyaw_level"),
-    cvar.variableValue(registry, "v_iroll_level"),
-    cvar.variableValue(registry, "v_ipitch_level"),
+    opt001dCvarVIdlescale,
+    opt001dCvarVIyawCycle,
+    opt001dCvarVIrollCycle,
+    opt001dCvarVIpitchCycle,
+    opt001dCvarVIyawLevel,
+    opt001dCvarVIrollLevel,
+    opt001dCvarVIpitchLevel,
   )
 
   offsetAngles = math.copy(player.renderAngles)
@@ -569,13 +576,13 @@ function V_CalcRefdef(state, player, viewAngles, idealPitch, forwardMove, forwar
     state,
     clientTime,
     frameTime,
-    cvar.variableValue(registry, "v_idlescale"),
-    cvar.variableValue(registry, "v_iyaw_cycle"),
-    cvar.variableValue(registry, "v_iroll_cycle"),
-    cvar.variableValue(registry, "v_ipitch_cycle"),
-    cvar.variableValue(registry, "v_iyaw_level"),
-    cvar.variableValue(registry, "v_iroll_level"),
-    cvar.variableValue(registry, "v_ipitch_level"),
+    opt001dCvarVIdlescale,
+    opt001dCvarVIyawCycle,
+    opt001dCvarVIrollCycle,
+    opt001dCvarVIpitchCycle,
+    opt001dCvarVIyawLevel,
+    opt001dCvarVIrollLevel,
+    opt001dCvarVIpitchLevel,
   )
   state.gunOrigin = math.copy(player.origin)
   state.gunOrigin.z = state.gunOrigin.z + player.viewHeight

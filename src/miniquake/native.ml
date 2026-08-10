@@ -294,3 +294,5 @@ end function
 function atan2(y, x)
   return bitsFloat(f32Atan2(floatBits(y), floatBits(x)))
 end function
+extern function glStaticGeometryCall(keyValue as u64, passValue as i32) from "miniquake_native.dll" symbol "mq_gl_static_geometry_call" returns i32
+extern function glStaticGeometryClear() from "miniquake_native.dll" symbol "mq_gl_static_geometry_clear" returns void

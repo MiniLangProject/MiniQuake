@@ -2,7 +2,7 @@
 Copyright (C) 1996-1997 Id Software, Inc.
 Copyright (C) 2026 MiniQuake contributors
 
-Focused GLQuake common.c/common.h compatibility tests.
+Focused MiniQuake common.c/common.h compatibility tests.
 */
 
 import miniquake.types as t

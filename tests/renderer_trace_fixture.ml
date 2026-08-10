@@ -2,7 +2,7 @@
 Copyright (C) 1996-1997 Id Software, Inc.
 Copyright (C) 2026 MiniQuake contributors
 
-Deterministic MiniQuake side of the GLQuake Draw_TileClear renderer oracle.
+Deterministic MiniQuake side of the MiniQuake Draw_TileClear renderer oracle.
 Tracing is explicitly enabled here and is inert in release rendering.
 */
 

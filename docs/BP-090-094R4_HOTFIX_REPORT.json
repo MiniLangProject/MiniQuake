@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "package_id": "BP-094",
+  "block_id": "BP-090-094",
+  "delivery_revision": "BP-090-094R4",
+  "delivery_parent": "BP-090-094R3",
+  "classification": "external original-binary harness / legacy debug-log overflow",
+  "windows_result": {
+    "status": "FAIL",
+    "exit_code_signed": -1073741819,
+    "exit_code_hex": "0xc0000005",
+    "last_stage": "original GLQuake GL_Init after GL_EXTENSIONS logging",
+    "miniquake_build_and_internal_tests": "PASS"
+  },
+  "root_cause": {
+    "original_function": "Con_DebugLog",
+    "buffer_bytes": 1024,
+    "formatter": "vsprintf",
+    "observed_gl_extensions_line_bytes": 2580,
+    "trigger": "-condebug"
+  },
+  "fix": {
+    "original_binary_modified": false,
+    "miniquake_engine_modified": false,
+    "native_bridges_modified": false,
+    "condebug_enabled": false,
+    "server_readiness": "bounded MiniQuake Protocol-3 retry plus Protocol-15 signon 4",
+    "client_evidence": "MiniQuake server summary plus original process liveness",
+    "visual_evidence": "original TGA screenshot file"
+  },
+  "compat_final_status": "compat_109_final_candidate_v1",
+  "compat_final_fingerprint": "0xe04a7727"
+}

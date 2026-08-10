@@ -18,7 +18,7 @@ function vec3Origin()
 end function
 
 // mathlib.h macro counterparts.
-function DotProduct(a, b)
+function inline DotProduct(a, b)
   return a.x * b.x + a.y * b.y + a.z * b.z
 end function
 

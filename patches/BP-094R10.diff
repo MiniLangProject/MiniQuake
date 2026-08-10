@@ -1,0 +1,3368 @@
+diff --git a/BLOCK_LEDGER.json b/BLOCK_LEDGER.json
+index 1aaa7f3..cdf6161 100644
+--- a/BLOCK_LEDGER.json
++++ b/BLOCK_LEDGER.json
+@@ -32,7 +32,7 @@
+       "requires_video_context": true,
+       "dedicated_mode_supported": false,
+       "condebug_enabled": false,
+-      "readiness_evidence": "miniquake_target_udp_provenance_and_protocol15_signon4",
++      "readiness_evidence": "protocol3_server_info_then_target_udp_protocol15_signon4",
+       "network_scope": "loopback_only",
+       "bind_address": "127.0.0.1",
+       "firewall_prompt_expected": false,
+@@ -44,7 +44,10 @@
+       "required_transport": "udp",
+       "local_fallback_rejected": true,
+       "demo_fallback_rejected": true,
+-      "remote_address_must_match_target": true
++      "remote_address_must_match_target": true,
++      "readiness_probe_timeout_ms": 180000,
++      "port_selection": "loopback_bind_probe",
++      "cold_start_safe": true
+     },
+     {
+       "id": "BP-092",
+@@ -104,8 +107,8 @@
+       "status": "candidate"
+     }
+   ],
+-  "delivery_revision": "BP-090-094R9",
+-  "delivery_parent": "BP-090-094R8",
++  "delivery_revision": "BP-090-094R10",
++  "delivery_parent": "BP-090-094R9",
+   "hotfixes": [
+     {
+       "revision": "BP-090-094R1",
+@@ -181,6 +184,14 @@
+       "engine_change_scope": "interop-only client provenance validation",
+       "fix": "require the accepted signon-4 client to use UDP to the requested peer and reject local-server, local-authoritative and demo fallbacks; independently enforce the same markers in PowerShell",
+       "status": "candidate"
++    },
++    {
++      "revision": "BP-090-094R10",
++      "classification": "external original-server interop / cold-start readiness race",
++      "changed_engine_code": false,
++      "changed_native_code": false,
++      "fix": "wait for a real CCREP_SERVER_INFO response from the exact original-server UDP endpoint before launching the full MiniQuake client; bind-test random loopback ports and emit readiness diagnostics",
++      "status": "candidate"
+     }
+   ]
+ }
+diff --git a/CHANGELOG_BP-090-094R10.md b/CHANGELOG_BP-090-094R10.md
+new file mode 100644
+index 0000000..e0c1ba0
+--- /dev/null
++++ b/CHANGELOG_BP-090-094R10.md
+@@ -0,0 +1,25 @@
++# MiniQuake BP-090–BP-094R10
++
++## Ausgangspunkt
++
++R9 lehnte den lokalen Demo-/Map-Fallback korrekt als ungültige Originalserver-Interop ab. Im Windows-Lauf antwortete der noch aktive Original-GLQuake-Prozess jedoch innerhalb des bisherigen 30-Sekunden-Harnessfensters nicht auf die vier vollständigen Clientversuche.
++
++## Änderungen
++
++- neuer Protocol-3-Readiness-Probe über `CCREQ_SERVER_INFO` / `CCREP_SERVER_INFO`,
++- vollständiger MiniQuake-Interopclient startet erst nach bestätigter Originalserverbereitschaft,
++- Standard-Readiness-Timeout 180 Sekunden, konfigurierbar über `-OriginalServerReadyTimeoutMs`,
++- exakte Prüfung von Antwortadresse, Antwortport, Control-Flag, Paketlänge, Kommando und Protokollversion,
++- maschinenlesbare Readiness-Berichte pro Prozesspaar,
++- Prozess- und UDP-Endpunktdiagnose bei Timeout,
++- bind-getestete zufällige Loopbackports für beide Interoperabilitätsrichtungen,
++- generische Testlauncher und Collector auf R10 aktualisiert,
++- neuer statischer R10-Vertrag im Paketverifier.
++
++## Nicht verändert
++
++- kein MiniLang-Produktionscode unter `src/`,
++- kein nativer Code oder DLL unter `native/`,
++- keine Contract-Fingerprints,
++- keine Bildvergleichsschwelle,
++- keine Lockerung der R9-Netzwerkprovenienz.
+diff --git a/COLLECT_RESULTS.ps1 b/COLLECT_RESULTS.ps1
+index aa7acb8..80cc643 100755
+--- a/COLLECT_RESULTS.ps1
++++ b/COLLECT_RESULTS.ps1
+@@ -1,587 +1,593 @@
+-﻿[CmdletBinding()]
+-param([switch]$IncludeAllCurrentDocs)
+-
+-$ErrorActionPreference = "Stop"
+-Set-StrictMode -Version Latest
+-$Root = $PSScriptRoot
+-$Build = Join-Path $Root "build"
+-$PackageId = "BP-094"
+-$BlockId = "BP-090-094"
+-$DeliveryRevision = "BP-090-094R9"
+-$DeliveryParent = "BP-090-094R7"
+-$Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+-# original_reference_binary_in_result_archive=$false
+-# historical external staging marker retained for contract verification: bp090-094-original-reference
+-# quake_game_data_in_result_archive=$false
+-$Staging = Join-Path $Build (".bp090-094r9-results-{0}" -f $Timestamp)
+-$Archive = Join-Path $Build ("MiniQuake_BP-090-094R9_RESULTS_{0}.zip" -f $Timestamp)
+-
+-if (-not (Test-Path -LiteralPath $Build -PathType Container)) { throw "build directory does not exist: $Build" }
+-if (Test-Path -LiteralPath $Staging) { Remove-Item -Recurse -Force -LiteralPath $Staging }
+-New-Item -ItemType Directory -Force -Path $Staging | Out-Null
+-
+-$AllowedBuildExtensions = @(".log", ".json", ".txt", ".csv", ".mqtrace", ".md")
+-$ForbiddenNames = @("pak0.pak", "pak1.pak", "progs.dat", "config.cfg", "autoexec.cfg", "gfx.wad", "glquake.exe", "opengl32.dll")
+-$SyntheticBuildRoots = @("bp071_fs", "bp071-filesystem", "bp072-wad", "sys_win_differential")
+-$SkippedBuildArtifacts = @()
+-
+-function Get-BuildArtifactExclusionReason([string]$Relative) {
+-  $Normalized = $Relative.Replace('/', '\').TrimStart('\')
+-  $Leaf = [IO.Path]::GetFileName($Normalized).ToLowerInvariant()
+-
+-  if ($Normalized -match '(?i)^bp090-094(?:r[0-9]+)?-original-reference(?:\\|$)') {
+-    return "build-only original GLQuake/Quake-data staging area"
+-  }
+-  if (($Normalized -match '(?i)^bp090-094(?:r[0-9]+)?-original-visual(?:\\|$)') -and
+-      $Leaf.EndsWith(".tga")) {
+-    return "external framebuffer image"
+-  }
+-
+-  foreach ($Prefix in $SyntheticBuildRoots) {
+-    if ($Normalized.Equals($Prefix, [StringComparison]::OrdinalIgnoreCase) -or
+-        $Normalized.StartsWith(($Prefix + "\"), [StringComparison]::OrdinalIgnoreCase)) {
+-      return "synthetic test workspace"
+-    }
+-  }
+-  if ($ForbiddenNames -contains $Leaf) { return "forbidden Quake filename" }
+-  if ($Normalized -match '(?i)(^|\\)(id1|hipnotic|rogue)(\\|$)') { return "Quake game-directory path" }
+-  return ""
+-}
+-
+-function Copy-SafeFile([string]$Source, [string]$Relative) {
+-  if (-not (Test-Path -LiteralPath $Source -PathType Leaf)) { return }
+-  $Leaf = [IO.Path]::GetFileName($Source).ToLowerInvariant()
+-  if ($ForbiddenNames -contains $Leaf) { throw "refusing to collect Quake game data: $Source" }
+-  $Normalized = $Relative.Replace('/', '\')
+-  if ($Normalized -match '(?i)(^|\\)(id1|hipnotic|rogue)(\\|$)') { throw "refusing to collect Quake game-directory content: $Relative" }
+-  $Destination = Join-Path $Staging $Normalized
+-  $Parent = Split-Path -Parent $Destination
+-  if (-not [string]::IsNullOrWhiteSpace($Parent)) { New-Item -ItemType Directory -Force -Path $Parent | Out-Null }
+-  Copy-Item -Force -LiteralPath $Source -Destination $Destination
+-}
+-
+-Get-ChildItem -LiteralPath $Build -Recurse -File | ForEach-Object {
+-  if ($_.FullName.StartsWith($Staging, [StringComparison]::OrdinalIgnoreCase)) { return }
+-  if ($_.FullName -eq $Archive) { return }
+-  if ($AllowedBuildExtensions -contains $_.Extension.ToLowerInvariant()) {
+-    $Relative = $_.FullName.Substring($Build.Length).TrimStart('\', '/')
+-    $Reason = Get-BuildArtifactExclusionReason $Relative
+-    if (-not [string]::IsNullOrWhiteSpace($Reason)) {
+-      $SkippedBuildArtifacts += [pscustomobject]@{
+-        path = (Join-Path "build" $Relative)
+-        reason = $Reason
+-      }
+-      return
+-    }
+-    Copy-SafeFile $_.FullName (Join-Path "build" $Relative)
+-  }
+-}
+-
+-$RootFiles = @(
+-  "TEST_BP-085-089.ps1",
+-  "CHANGELOG_BP-085.md",
+-  "CHANGELOG_BP-086.md",
+-  "CHANGELOG_BP-087.md",
+-  "CHANGELOG_BP-088.md",
+-  "CHANGELOG_BP-089.md",
+-  "CHANGELOG_BP-085-089.md",
+-  "docs\BP-085_GAME_PROFILE_AUDIT.md",
+-  "docs\BP-086_MOD_RUNTIME_AUDIT.md",
+-  "docs\BP-087_ARTIFACT_COMPAT_AUDIT.md",
+-  "docs\BP-088_STABILITY_AUDIT.md",
+-  "docs\BP-089_COMPAT_RELEASE_CANDIDATE.md",
+-  "docs\BP-085-089_TESTING.md",
+-  "TEST_BP-085-089R8.ps1",
+-  "CHANGELOG_BP-085-089R8.md",
+-  "docs\BP-085-089R8_TESTING.md",
+-  "docs\BP-085-089R8_RESULT_ANALYSIS.md",
+-  "docs\BP-085-089R8_HOTFIX_REPORT.json",
+-  "docs\BP-085-089R8_BLOCK_LEDGER.json",
+-  "patches\BP-089R8.diff",
+-  "TEST_BP-085-089R7.ps1",
+-  "CHANGELOG_BP-085-089R7.md",
+-  "docs\BP-085-089R7_TESTING.md",
+-  "docs\BP-085-089R7_RESULT_ANALYSIS.md",
+-  "docs\BP-085-089R7_HOTFIX_REPORT.json",
+-  "docs\BP-085-089R7_BLOCK_LEDGER.json",
+-  "patches\BP-089R7.diff",
+-  "TEST_BP-085-089R6.ps1",
+-  "CHANGELOG_BP-085-089R6.md",
+-  "docs\BP-085-089R6_TESTING.md",
+-  "docs\BP-085-089R6_RESULT_ANALYSIS.md",
+-  "docs\BP-085-089R6_HOTFIX_REPORT.json",
+-  "docs\BP-085-089R6_BLOCK_LEDGER.json",
+-  "patches\BP-089R6.diff",
+-  "TEST_BP-085-089R5.ps1",
+-  "CHANGELOG_BP-085-089R5.md",
+-  "docs\BP-085-089R5_TESTING.md",
+-  "docs\BP-085-089R5_RESULT_ANALYSIS.md",
+-  "docs\BP-085-089R5_HOTFIX_REPORT.json",
+-  "docs\BP-085-089R5_BLOCK_LEDGER.json",
+-  "patches\BP-089R5.diff",
+-  "TEST_BP-085-089R4.ps1",
+-  "CHANGELOG_BP-085-089R4.md",
+-  "docs\BP-085-089R4_TESTING.md",
+-  "docs\BP-085-089R4_RESULT_ANALYSIS.md",
+-  "docs\BP-085-089R4_HOTFIX_REPORT.json",
+-  "docs\BP-085-089R4_BLOCK_LEDGER.json",
+-  "TEST_BP-085-089R3.ps1",
+-  "CHANGELOG_BP-085-089R3.md",
+-  "docs\BP-085-089R3_TESTING.md",
+-  "docs\BP-085-089R3_RESULT_ANALYSIS.md",
+-  "docs\BP-085-089R3_HOTFIX_REPORT.json",
+-  "docs\BP-085-089R3_BLOCK_LEDGER.json",
+-  "TEST_BP-085-089R2.ps1",
+-  "CHANGELOG_BP-085-089R2.md",
+-  "docs\BP-085-089R2_TESTING.md",
+-  "docs\BP-085-089R2_RESULT_ANALYSIS.md",
+-  "docs\BP-085-089R2_HOTFIX_REPORT.json",
+-  "docs\BP-085-089R2_BLOCK_LEDGER.json",
+-  "TEST_BP-085-089R1.ps1",
+-  "CHANGELOG_BP-085-089R1.md",
+-  "docs\BP-085-089R1_TESTING.md",
+-  "docs\BP-085-089R1_RESULT_ANALYSIS.md",
+-  "docs\BP-085-089R1_HOTFIX_REPORT.json",
+-  "docs\BP-085-089R1_BLOCK_LEDGER.json",
+-  "docs\BP-080-084R2_ACCEPTANCE_ANALYSIS.md",
+-  "docs\BP-085-089_BLOCK_LEDGER.json",
+-  "audit\game_profile_golden.json",
+-  "audit\mod_runtime_golden.json",
+-  "audit\artifact_compat_golden.json",
+-  "audit\savegame_v5_golden.json",
+-  "audit\savegame_fixed6_golden.json",
+-  "audit\stability_golden.json",
+-  "audit\compat_release_golden.json",
+-  "src\miniquake\game_profile.ml",
+-  "src\miniquake\mod_compat.ml",
+-  "src\miniquake\artifact_compat.ml",
+-  "src\miniquake\common.ml",
+-  "src\miniquake\format\bsp.ml",
+-  "src\miniquake\native.ml",
+-  "src\miniquake\quakec\edict.ml",
+-  "src\miniquake\cvar.ml",
+-  "src\miniquake\savegame.ml",
+-  "src\miniquake\savegame_runtime.ml",
+-  "src\miniquake\host.ml",
+-  "src\miniquake\server.ml",
+-  "src\miniquake\types.ml",
+-  "tests\compat_trace_tests.ml",
+-  "tools\check_world_physics_closure.py",
+-  "tools\check_protocol15_serverdata.py",
+-  "src\miniquake\stability_contract.ml",
+-  "src\miniquake\compatibility_matrix.ml",
+-  "tests\game_profile_compat_tests.ml",
+-  "tests\mod_runtime_compat_tests.ml",
+-  "tests\artifact_compat_tests.ml",
+-  "tests\quakec_edict_tests.ml",
+-  "tests\command_cvar_lifecycle_tests.ml",
+-  "tests\savegame_v5_parity_tests.ml",
+-  "tests\stability_contract_tests.ml",
+-  "tests\compatibility_release_closure_tests.ml",
+-  "tests\artifact_retail_evidence.ml",
+-  "tools\check_compat_085.py",
+-  "tools\check_compat_086.py",
+-  "tools\check_compat_087.py",
+-  "tools\check_savegame_v5.py",
+-  "tools\oracle\savegame_v5_oracle.c",
+-  "tools\oracle\savegame_fixed6_oracle.c",
+-  "native\miniquake_text.c",
+-  "native\miniquake_text.def",
+-  "native\README.md",
+-  "tools\check_compat_088.py",
+-  "tools\check_compat_089.py",
+-  "patches\BP-085.diff",
+-  "patches\BP-086.diff",
+-  "patches\BP-087.diff",
+-  "patches\BP-088.diff",
+-  "patches\BP-089.diff",
+-  "patches\BP-089R1.diff",
+-  "patches\BP-089R3.diff",
+-  "patches\BP-089R4.diff",
+-  "patches\BP-089R2.diff",
+-  # BP-090--BP-094 external-reference closure. Original binary/game data are not included.
+-  "TEST_BP-090-094R8.ps1",
+-  "TEST_BP-090-094R9.ps1",
+-  "CHANGELOG_BP-090-094R8.md",
+-  "CHANGELOG_BP-090-094R9.md",
+-  "docs\BP-090-094R8_TESTING.md",
+-  "docs\BP-090-094R9_TESTING.md",
+-  "docs\BP-090-094R9_RESULT_ANALYSIS.md",
+-  "docs\BP-090-094R9_HOTFIX_REPORT.json",
+-  "docs\BP-090-094R8_RESULT_ANALYSIS.md",
+-  "docs\BP-090-094R8_HOTFIX_REPORT.json",
+-  "docs\BP-093_R7_VISUAL_DIAGNOSTIC_ANALYSIS.md",
+-  "docs\BP-093_R7_VISUAL_DIAGNOSTIC_ANALYSIS.json",
+-  "patches\BP-094R8.diff",
+-  "TEST_BP-090-094R7.ps1",
+-  "CHANGELOG_BP-090-094R7.md",
+-  "docs\BP-090-094R7_TESTING.md",
+-  "docs\BP-090-094R7_RESULT_ANALYSIS.md",
+-  "docs\BP-090-094R7_HOTFIX_REPORT.json",
+-  "patches\BP-094R7.diff",
+-  "TEST_BP-090-094R6.ps1",
+-  "CHANGELOG_BP-090-094R6.md",
+-  "docs\BP-090-094R6_TESTING.md",
+-  "docs\BP-090-094R6_RESULT_ANALYSIS.md",
+-  "docs\BP-090-094R6_HOTFIX_REPORT.json",
+-  "patches\BP-094R6.diff",
+-  "TEST_BP-090-094R5.ps1",
+-  "CHANGELOG_BP-090-094R5.md",
+-  "docs\BP-090-094R5_TESTING.md",
+-  "docs\BP-090-094R5_RESULT_ANALYSIS.md",
+-  "docs\BP-090-094R5_HOTFIX_REPORT.json",
+-  "patches\BP-094R5.diff",
+-  "TEST_BP-090-094R4.ps1",
+-  "CHANGELOG_BP-090-094R4.md",
+-  "docs\BP-090-094R4_TESTING.md",
+-  "docs\BP-090-094R4_RESULT_ANALYSIS.md",
+-  "docs\BP-090-094R4_HOTFIX_REPORT.json",
+-  "patches\BP-094R4.diff",
+-  "TEST_BP-090-094R3.ps1",
+-  "CHANGELOG_BP-090-094R3.md",
+-  "docs\BP-090-094R3_TESTING.md",
+-  "docs\BP-090-094R3_RESULT_ANALYSIS.md",
+-  "docs\BP-090-094R3_HOTFIX_REPORT.json",
+-  "patches\BP-094R3.diff",
+-  "TEST_BP-090-094R2.ps1",
+-  "CHANGELOG_BP-090-094R2.md",
+-  "docs\BP-090-094R2_TESTING.md",
+-  "docs\BP-090-094R2_RESULT_ANALYSIS.md",
+-  "docs\BP-090-094R2_HOTFIX_REPORT.json",
+-  "patches\BP-094R2.diff",
+-  "TEST_BP-090-094R1.ps1",
+-  "CHANGELOG_BP-090-094R1.md",
+-  "docs\BP-090-094R1_TESTING.md",
+-  "docs\BP-090-094R1_RESULT_ANALYSIS.md",
+-  "docs\BP-090-094R1_HOTFIX_REPORT.json",
+-  "patches\BP-094R1.diff",
+-  "TEST_BP-090-094.ps1",
+-  "CHANGELOG_BP-090-094.md",
+-  "docs\BP-090-094_TESTING.md",
+-  "docs\BP-085-089R8_ACCEPTANCE_ANALYSIS.md",
+-  "src\miniquake\external_reference_contract.ml",
+-  "tests\original_reference_provenance_tests.ml",
+-  "tests\original_server_interop_tests.ml",
+-  "tests\original_client_interop_tests.ml",
+-  "tests\original_visual_reference_tests.ml",
+-  "tests\external_compat_closure_tests.ml",
+-  "tools\prepare_original_reference.py",
+-  "tools\compare_original_reference.py",
+-  "tools\check_external_090.py",
+-  "tools\check_external_091.py",
+-  "tools\check_external_092.py",
+-  "tools\check_external_093.py",
+-  "tools\check_external_094.py",
+-  "audit\original_reference_golden.json",
+-  "audit\original_server_interop_golden.json",
+-  "audit\original_client_interop_golden.json",
+-  "audit\original_visual_reference_golden.json",
+-  "audit\external_compat_closure_golden.json",
+-  "patches\BP-090.diff",
+-  "patches\BP-091.diff",
+-  "patches\BP-092.diff",
+-  "patches\BP-093.diff",
+-  "patches\BP-094.diff",
+-  "SOURCE_MANIFEST.sha256",
+-  "BLOCK_LEDGER.json",
+-  "PORT_LEDGER.json",
+-  "PORT_STATUS.md",
+-  "README.md",
+-  "build.ps1",
+-  "COLLECT_RESULTS.ps1",
+-  "test.ps1",
+-  "TEST_BP-080-084.ps1",
+-  "TEST_BP-080-084R1.ps1",
+-  "TEST_BP-080-084R2.ps1",
+-  "CHANGELOG_BP-080.md",
+-  "CHANGELOG_BP-081.md",
+-  "CHANGELOG_BP-082.md",
+-  "CHANGELOG_BP-083.md",
+-  "CHANGELOG_BP-084.md",
+-  "CHANGELOG_BP-080-084.md",
+-  "CHANGELOG_BP-080-084R1.md",
+-  "CHANGELOG_BP-080-084R2.md",
+-  "docs\BP-080_CVAR_SOURCE_SURFACE_AUDIT.md",
+-  "docs\BP-081_CD_AUDIO_SOURCE_SURFACE_AUDIT.md",
+-  "docs\BP-082_SOURCE_FUNCTION_INVENTORY.md",
+-  "docs\BP-083_BLACK_PORT_CORPUS.md",
+-  "docs\BP-084_SOURCE_BLACK_PORT_CLOSURE.md",
+-  "docs\BP-080-084_TESTING.md",
+-  "docs\BP-080-084R1_TESTING.md",
+-  "docs\BP-080-084R1_RESULT_ANALYSIS.md",
+-  "docs\BP-080-084R1_HOTFIX_REPORT.json",
+-  "docs\BP-080-084R1_BLOCK_LEDGER.json",
+-  "docs\BP-080-084R2_TESTING.md",
+-  "docs\BP-080-084R2_RESULT_ANALYSIS.md",
+-  "docs\BP-080-084R2_HOTFIX_REPORT.json",
+-  "docs\BP-080-084R2_BLOCK_LEDGER.json",
+-  "docs\BP-075-079R3_ACCEPTANCE_ANALYSIS.md",
+-  "audit\cvar_source_surface_golden.json",
+-  "audit\cd_audio_source_surface_golden.json",
+-  "audit\source_function_inventory.json",
+-  "audit\black_port_corpus_golden.json",
+-  "audit\black_port_source_closure_golden.json",
+-  "tests\cvar_source_surface_tests.ml",
+-  "tests\cd_audio_source_surface_tests.ml",
+-  "tests\source_function_inventory_tests.ml",
+-  "tests\black_port_corpus_tests.ml",
+-  "tests\black_port_source_closure_tests.ml",
+-  "src\miniquake\source_profile_contract.ml",
+-  "src\miniquake\black_port_corpus.ml",
+-  "src\miniquake\black_port_source_contract.ml",
+-  "tools\generate_source_inventory.py",
+-  "tools\check_source_080.py",
+-  "tools\check_source_081.py",
+-  "tools\check_source_082.py",
+-  "tools\check_source_083.py",
+-  "tools\check_source_084.py",
+-  "patches\BP-080.diff",
+-  "patches\BP-081.diff",
+-  "patches\BP-082.diff",
+-  "patches\BP-083.diff",
+-  "patches\BP-084.diff",
+-  "patches\BP-084R1.diff",
+-  "patches\BP-084R2.diff",
+-  "TEST_BP-075-079.ps1",
+-  "TEST_BP-075-079R3.ps1",
+-  "CHANGELOG_BP-075-079R3.md",
+-  "docs\BP-075-079R3_TESTING.md",
+-  "docs\BP-075-079R3_RESULT_ANALYSIS.md",
+-  "docs\BP-075-079R3_HOTFIX_REPORT.json",
+-  "docs\BP-075-079R3_BLOCK_LEDGER.json",
+-  "patches\BP-079R3.diff",
+-  "TEST_BP-075-079R2.ps1",
+-  "CHANGELOG_BP-075-079R2.md",
+-  "docs\BP-075-079R2_TESTING.md",
+-  "docs\BP-075-079R2_RESULT_ANALYSIS.md",
+-  "docs\BP-075-079R2_HOTFIX_REPORT.json",
+-  "docs\BP-075-079R2_BLOCK_LEDGER.json",
+-  "patches\BP-079R2.diff",
+-  "TEST_BP-075-079R1.ps1",
+-  "CHANGELOG_BP-075-079R1.md",
+-  "docs\BP-075-079R1_TESTING.md",
+-  "docs\BP-075-079R1_RESULT_ANALYSIS.md",
+-  "docs\BP-075-079R1_HOTFIX_REPORT.json",
+-  "docs\BP-075-079R1_BLOCK_LEDGER.json",
+-  "patches\BP-079R1.diff",
+-  "CHANGELOG_BP-075.md",
+-  "CHANGELOG_BP-076.md",
+-  "CHANGELOG_BP-077.md",
+-  "CHANGELOG_BP-078.md",
+-  "CHANGELOG_BP-079.md",
+-  "CHANGELOG_BP-075-079.md",
+-  "docs\BP-075-079_TESTING.md",
+-  "docs\BP-070-074R6_ACCEPTANCE_ANALYSIS.md",
+-  "docs\BP-075_MATH_CHASE_AUDIT.md",
+-  "docs\BP-076_VIEW_PALETTE_AUDIT.md",
+-  "docs\BP-077_SCREEN_LOADING_AUDIT.md",
+-  "docs\BP-078_STATUSBAR_SCOREBOARD_AUDIT.md",
+-  "docs\BP-079_GAMEPLAY_PRESENTATION_AUDIT.md",
+-  "docs\BP-075-079_BLOCK_LEDGER.json",
+-  "patches\BP-075.diff",
+-  "patches\BP-076.diff",
+-  "patches\BP-077.diff",
+-  "patches\BP-078.diff",
+-  "patches\BP-079.diff",
+-  "tools\check_gameplay_075.py",
+-  "tools\check_gameplay_076.py",
+-  "tools\check_gameplay_077.py",
+-  "tools\check_gameplay_078.py",
+-  "tools\check_gameplay_079.py",
+-  "tools\oracle\gameplay_math_chase_oracle.c",
+-  "tools\oracle\gameplay_view_oracle.c",
+-  "tools\oracle\gameplay_screen_oracle.c",
+-  "tools\oracle\gameplay_statusbar_oracle.c",
+-  "tools\oracle\gameplay_presentation_oracle.c",
+-  "audit\gameplay_math_chase_golden.json",
+-  "audit\gameplay_view_golden.json",
+-  "audit\gameplay_screen_golden.json",
+-  "audit\gameplay_statusbar_golden.json",
+-  "audit\gameplay_presentation_golden.json",
+-  "tests\gameplay_math_chase_tests.ml",
+-  "tests\gameplay_view_tests.ml",
+-  "tests\gameplay_screen_tests.ml",
+-  "tests\gameplay_statusbar_tests.ml",
+-  "tests\gameplay_presentation_closure_tests.ml",
+-  "src\miniquake\host_command_numbers.ml",
+-  "src\miniquake\gameplay_presentation_contract.ml",
+-  "TEST_BP-070-074.ps1",
+-  "TEST_BP-070-074R6.ps1",
+-  "CHANGELOG_BP-070-074R6.md",
+-  "docs\BP-070-074R6_RESULT_ANALYSIS.md",
+-  "docs\BP-070-074R6_BLOCK_LEDGER.json",
+-  "docs\BP-070-074R6_TESTING.md",
+-  "docs\BP-070-074R6_HOTFIX_REPORT.json",
+-  "patches\BP-074R6.diff",
+-  "TEST_BP-070-074R5.ps1",
+-  "CHANGELOG_BP-070-074R5.md",
+-  "docs\BP-070-074R5_RESULT_ANALYSIS.md",
+-  "docs\BP-070-074R5_BLOCK_LEDGER.json",
+-  "docs\BP-070-074R5_TESTING.md",
+-  "docs\BP-070-074R5_HOTFIX_REPORT.json",
+-  "patches\BP-074R5.diff",
+-  "TEST_BP-070-074R4.ps1",
+-  "CHANGELOG_BP-070-074R4.md",
+-  "docs\BP-070-074R4_RESULT_ANALYSIS.md",
+-  "docs\BP-070-074R4_BLOCK_LEDGER.json",
+-  "docs\BP-070-074R4_TESTING.md",
+-  "docs\BP-070-074R4_HOTFIX_REPORT.json",
+-  "patches\BP-074R4.diff",
+-  "TEST_BP-070-074R3.ps1",
+-  "CHANGELOG_BP-070-074R3.md",
+-  "docs\BP-070-074R3_RESULT_ANALYSIS.md",
+-  "docs\BP-070-074R3_BLOCK_LEDGER.json",
+-  "docs\BP-070-074R3_TESTING.md",
+-  "docs\BP-070-074R3_HOTFIX_REPORT.json",
+-  "patches\BP-074R3.diff",
+-  "TEST_BP-070-074R2.ps1",
+-  "CHANGELOG_BP-070-074R2.md",
+-  "docs\BP-070-074R2_RESULT_ANALYSIS.md",
+-  "docs\BP-070-074R2_BLOCK_LEDGER.json",
+-  "docs\BP-070-074R2_TESTING.md",
+-  "docs\BP-070-074R2_HOTFIX_REPORT.json",
+-  "patches\BP-074R2.diff",
+-  "TEST_BP-070-074R1.ps1",
+-  "CHANGELOG_BP-070-074R1.md",
+-  "docs\BP-070-074_RESULT_ANALYSIS.md",
+-  "docs\BP-070-074R1_RESULT_ANALYSIS.md",
+-  "docs\BP-070-074R1_BLOCK_LEDGER.json",
+-  "docs\BP-070-074R1_TESTING.md",
+-  "docs\BP-070-074R1_HOTFIX_REPORT.json",
+-  "patches\BP-074R1.diff",
+-  "CHANGELOG_BP-070.md",
+-  "CHANGELOG_BP-071.md",
+-  "CHANGELOG_BP-072.md",
+-  "CHANGELOG_BP-073.md",
+-  "CHANGELOG_BP-074.md",
+-  "CHANGELOG_BP-070-074.md",
+-  "docs\BP-065-069R1_ACCEPTANCE_ANALYSIS.md",
+-  "docs\BP-070_COMMON_CRC_AUDIT.md",
+-  "docs\BP-071_FILESYSTEM_PACK_AUDIT.md",
+-  "docs\BP-072_WAD_GRAPHICS_AUDIT.md",
+-  "docs\BP-073_MODEL_ASSET_AUDIT.md",
+-  "docs\BP-074_CORE_ASSETS_MEMORY_AUDIT.md",
+-  "docs\BP-070-074_TESTING.md",
+-  "docs\BP-070-074_BLOCK_LEDGER.json",
+-  "patches\BP-070.diff",
+-  "patches\BP-071.diff",
+-  "patches\BP-072.diff",
+-  "patches\BP-073.diff",
+-  "patches\BP-074.diff",
+-  "tools\verify.py",
+-  "tools\check_core_070.py",
+-  "tools\check_asset_071.py",
+-  "tools\check_core_072.py",
+-  "tools\check_core_073.py",
+-  "tools\check_core_074.py",
+-  "tools\oracle\common_crc_oracle.c",
+-  "tools\oracle\filesystem_pack_oracle.c",
+-  "tools\oracle\wad_graphics_oracle.c",
+-  "tools\oracle\model_asset_oracle.c",
+-  "tools\oracle\core_assets_memory_oracle.c",
+-  "audit\common_crc_golden.json",
+-  "audit\filesystem_pack_golden.json",
+-  "audit\wad_graphics_golden.json",
+-  "audit\model_asset_golden.json",
+-  "audit\core_assets_memory_golden.json",
+-  "tests\common_asset_parity_tests.ml",
+-  "tests\filesystem_pack_parity_tests.ml",
+-  "tests\wad_graphics_parity_tests.ml",
+-  "tests\model_asset_parity_tests.ml",
+-  "tests\core_assets_memory_closure_tests.ml",
+-  "tests\core_asset_retail_evidence.ml",
+-  "src\miniquake\core_assets_memory_contract.ml",
+-  # Historical BP-012 source-contract evidence: keep these exact markers.
+-  "tests\protocol15_serverdata_tests.ml",
+-  "docs\BP-012_PROTOCOL15_SERVERDATA_AUDIT.md",
+-  "audit\protocol15_serverdata_golden.json",
+-  "TEST_BP-065-069R1.ps1",
+-  "docs\BP-065-069R1_BLOCK_LEDGER.json",
+-  "patches\BP-069R1.diff"
+-)
+-foreach ($Relative in $RootFiles) { Copy-SafeFile (Join-Path $Root $Relative) $Relative }
+-
+-if ($IncludeAllCurrentDocs) {
+-  Get-ChildItem -LiteralPath (Join-Path $Root "docs") -File | ForEach-Object {
+-    Copy-SafeFile $_.FullName (Join-Path "docs" $_.Name)
+-  }
+-}
+-
+-$BinaryNames = @(
+-  "MiniQuakeOriginalReferenceTests.exe",
+-  "MiniQuakeOriginalServerInteropTests.exe",
+-  "MiniQuakeOriginalClientInteropTests.exe",
+-  "MiniQuakeOriginalVisualReferenceTests.exe",
+-  "MiniQuakeExternalCompatibilityClosureTests.exe",
+-  "MiniQuake.exe",
+-  "MiniQuakeProtocol15ServerDataTests.exe",
+-  "MiniQuakeCommonCoreTests.exe",
+-  "MiniQuakeFilesystemPackTests.exe",
+-  "MiniQuakeWadGraphicsTests.exe",
+-  "MiniQuakeModelAssetTests.exe",
+-  "MiniQuakeCoreAssetsMemoryTests.exe",
+-  "MiniQuakeCoreAssetRetailEvidence.exe",
+-  "MiniQuakeGameplayMathChaseTests.exe",
+-  "MiniQuakeGameplayViewTests.exe",
+-  "MiniQuakeGameplayScreenTests.exe",
+-  "MiniQuakeGameplayStatusbarTests.exe",
+-  "MiniQuakeGameplayPresentationClosureTests.exe",
+-  "MiniQuakeCvarSourceSurfaceTests.exe",
+-  "MiniQuakeCdAudioSourceSurfaceTests.exe",
+-  "MiniQuakeSourceFunctionInventoryTests.exe",
+-  "MiniQuakeBlackPortCorpusTests.exe",
+-  "MiniQuakeBlackPortSourceClosureTests.exe",
+-  "MiniQuakeGameProfileTests.exe",
+-  "MiniQuakeModRuntimeTests.exe",
+-  "MiniQuakeArtifactCompatTests.exe",
+-  "MiniQuakeStabilityTests.exe",
+-  "MiniQuakeCompatibilityReleaseTests.exe",
+-  "MiniQuakeArtifactRetailEvidence.exe",
+-  "MiniQuakeAudioRetailEvidence.exe",
+-  "MiniQuakeNetworkPlatformEvidence.exe",
+-  "miniquake_native.dll",
+-  "miniquake_text.dll"
+-)
+-$BinaryState = @()
+-foreach ($Name in $BinaryNames) {
+-  $Path = Join-Path $Build $Name
+-  $Entry = [ordered]@{
+-    name = $Name
+-    present = (Test-Path -LiteralPath $Path -PathType Leaf)
+-    sha256 = ""
+-    bytes = 0
+-  }
+-  if ($Entry.present) {
+-    $Entry.sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant()
+-    $Entry.bytes = (Get-Item -LiteralPath $Path).Length
+-  }
+-  $BinaryState += $Entry
+-}
+-
+-$Meta = [ordered]@{
+-  schema = "MiniQuakeResultCollection/1"
+-  package_id = $PackageId
+-  block_id = $BlockId
+-  delivery_revision = $DeliveryRevision
+-  delivery_parent = $DeliveryParent
+-  created_utc = (Get-Date).ToUniversalTime().ToString("o")
+-  machine = $env:COMPUTERNAME
+-  user = $env:USERNAME
+-  source_root = $Root
+-  binaries = $BinaryState
+-  skipped_build_artifacts = $SkippedBuildArtifacts
+-  original_reference_binary_in_result_archive = $false
+-  quake_game_data_in_result_archive = $false
+-  framebuffer_images_in_result_archive = $false
+-}
+-$Meta | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $Staging "collection.json") -Encoding UTF8
+-
+-if (Test-Path -LiteralPath $Archive) { Remove-Item -Force -LiteralPath $Archive }
+-Compress-Archive -Path (Join-Path $Staging "*") -DestinationPath $Archive -CompressionLevel Optimal
+-Remove-Item -Recurse -Force -LiteralPath $Staging
+-$Hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Archive).Hash.ToLowerInvariant()
+-Write-Host "MiniQuake $DeliveryRevision result archive"
+-Write-Host "  path=$Archive"
+-Write-Host "  sha256=$Hash"
+-Write-Host ("  skipped_unsafe_build_artifacts={0}" -f $SkippedBuildArtifacts.Count)
+-Write-Host "  Original GLQuake binary, Quake PAK/model/map/audio data, TGAs, synthetic asset workspaces and compiled binaries were not included."
++﻿[CmdletBinding()]
++param([switch]$IncludeAllCurrentDocs)
++
++$ErrorActionPreference = "Stop"
++Set-StrictMode -Version Latest
++$Root = $PSScriptRoot
++$Build = Join-Path $Root "build"
++$PackageId = "BP-094"
++$BlockId = "BP-090-094"
++$DeliveryRevision = "BP-090-094R10"
++$DeliveryParent = "BP-090-094R9"
++$Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
++# original_reference_binary_in_result_archive=$false
++# historical external staging marker retained for contract verification: bp090-094-original-reference
++# quake_game_data_in_result_archive=$false
++$Staging = Join-Path $Build (".bp090-094r10-results-{0}" -f $Timestamp)
++$Archive = Join-Path $Build ("MiniQuake_BP-090-094R10_RESULTS_{0}.zip" -f $Timestamp)
++
++if (-not (Test-Path -LiteralPath $Build -PathType Container)) { throw "build directory does not exist: $Build" }
++if (Test-Path -LiteralPath $Staging) { Remove-Item -Recurse -Force -LiteralPath $Staging }
++New-Item -ItemType Directory -Force -Path $Staging | Out-Null
++
++$AllowedBuildExtensions = @(".log", ".json", ".txt", ".csv", ".mqtrace", ".md")
++$ForbiddenNames = @("pak0.pak", "pak1.pak", "progs.dat", "config.cfg", "autoexec.cfg", "gfx.wad", "glquake.exe", "opengl32.dll")
++$SyntheticBuildRoots = @("bp071_fs", "bp071-filesystem", "bp072-wad", "sys_win_differential")
++$SkippedBuildArtifacts = @()
++
++function Get-BuildArtifactExclusionReason([string]$Relative) {
++  $Normalized = $Relative.Replace('/', '\').TrimStart('\')
++  $Leaf = [IO.Path]::GetFileName($Normalized).ToLowerInvariant()
++
++  if ($Normalized -match '(?i)^bp090-094(?:r[0-9]+)?-original-reference(?:\\|$)') {
++    return "build-only original GLQuake/Quake-data staging area"
++  }
++  if (($Normalized -match '(?i)^bp090-094(?:r[0-9]+)?-original-visual(?:\\|$)') -and
++      $Leaf.EndsWith(".tga")) {
++    return "external framebuffer image"
++  }
++
++  foreach ($Prefix in $SyntheticBuildRoots) {
++    if ($Normalized.Equals($Prefix, [StringComparison]::OrdinalIgnoreCase) -or
++        $Normalized.StartsWith(($Prefix + "\"), [StringComparison]::OrdinalIgnoreCase)) {
++      return "synthetic test workspace"
++    }
++  }
++  if ($ForbiddenNames -contains $Leaf) { return "forbidden Quake filename" }
++  if ($Normalized -match '(?i)(^|\\)(id1|hipnotic|rogue)(\\|$)') { return "Quake game-directory path" }
++  return ""
++}
++
++function Copy-SafeFile([string]$Source, [string]$Relative) {
++  if (-not (Test-Path -LiteralPath $Source -PathType Leaf)) { return }
++  $Leaf = [IO.Path]::GetFileName($Source).ToLowerInvariant()
++  if ($ForbiddenNames -contains $Leaf) { throw "refusing to collect Quake game data: $Source" }
++  $Normalized = $Relative.Replace('/', '\')
++  if ($Normalized -match '(?i)(^|\\)(id1|hipnotic|rogue)(\\|$)') { throw "refusing to collect Quake game-directory content: $Relative" }
++  $Destination = Join-Path $Staging $Normalized
++  $Parent = Split-Path -Parent $Destination
++  if (-not [string]::IsNullOrWhiteSpace($Parent)) { New-Item -ItemType Directory -Force -Path $Parent | Out-Null }
++  Copy-Item -Force -LiteralPath $Source -Destination $Destination
++}
++
++Get-ChildItem -LiteralPath $Build -Recurse -File | ForEach-Object {
++  if ($_.FullName.StartsWith($Staging, [StringComparison]::OrdinalIgnoreCase)) { return }
++  if ($_.FullName -eq $Archive) { return }
++  if ($AllowedBuildExtensions -contains $_.Extension.ToLowerInvariant()) {
++    $Relative = $_.FullName.Substring($Build.Length).TrimStart('\', '/')
++    $Reason = Get-BuildArtifactExclusionReason $Relative
++    if (-not [string]::IsNullOrWhiteSpace($Reason)) {
++      $SkippedBuildArtifacts += [pscustomobject]@{
++        path = (Join-Path "build" $Relative)
++        reason = $Reason
++      }
++      return
++    }
++    Copy-SafeFile $_.FullName (Join-Path "build" $Relative)
++  }
++}
++
++$RootFiles = @(
++  "TEST_BP-085-089.ps1",
++  "CHANGELOG_BP-085.md",
++  "CHANGELOG_BP-086.md",
++  "CHANGELOG_BP-087.md",
++  "CHANGELOG_BP-088.md",
++  "CHANGELOG_BP-089.md",
++  "CHANGELOG_BP-085-089.md",
++  "docs\BP-085_GAME_PROFILE_AUDIT.md",
++  "docs\BP-086_MOD_RUNTIME_AUDIT.md",
++  "docs\BP-087_ARTIFACT_COMPAT_AUDIT.md",
++  "docs\BP-088_STABILITY_AUDIT.md",
++  "docs\BP-089_COMPAT_RELEASE_CANDIDATE.md",
++  "docs\BP-085-089_TESTING.md",
++  "TEST_BP-085-089R8.ps1",
++  "CHANGELOG_BP-085-089R8.md",
++  "docs\BP-085-089R8_TESTING.md",
++  "docs\BP-085-089R8_RESULT_ANALYSIS.md",
++  "docs\BP-085-089R8_HOTFIX_REPORT.json",
++  "docs\BP-085-089R8_BLOCK_LEDGER.json",
++  "patches\BP-089R8.diff",
++  "TEST_BP-085-089R7.ps1",
++  "CHANGELOG_BP-085-089R7.md",
++  "docs\BP-085-089R7_TESTING.md",
++  "docs\BP-085-089R7_RESULT_ANALYSIS.md",
++  "docs\BP-085-089R7_HOTFIX_REPORT.json",
++  "docs\BP-085-089R7_BLOCK_LEDGER.json",
++  "patches\BP-089R7.diff",
++  "TEST_BP-085-089R6.ps1",
++  "CHANGELOG_BP-085-089R6.md",
++  "docs\BP-085-089R6_TESTING.md",
++  "docs\BP-085-089R6_RESULT_ANALYSIS.md",
++  "docs\BP-085-089R6_HOTFIX_REPORT.json",
++  "docs\BP-085-089R6_BLOCK_LEDGER.json",
++  "patches\BP-089R6.diff",
++  "TEST_BP-085-089R5.ps1",
++  "CHANGELOG_BP-085-089R5.md",
++  "docs\BP-085-089R5_TESTING.md",
++  "docs\BP-085-089R5_RESULT_ANALYSIS.md",
++  "docs\BP-085-089R5_HOTFIX_REPORT.json",
++  "docs\BP-085-089R5_BLOCK_LEDGER.json",
++  "patches\BP-089R5.diff",
++  "TEST_BP-085-089R4.ps1",
++  "CHANGELOG_BP-085-089R4.md",
++  "docs\BP-085-089R4_TESTING.md",
++  "docs\BP-085-089R4_RESULT_ANALYSIS.md",
++  "docs\BP-085-089R4_HOTFIX_REPORT.json",
++  "docs\BP-085-089R4_BLOCK_LEDGER.json",
++  "TEST_BP-085-089R3.ps1",
++  "CHANGELOG_BP-085-089R3.md",
++  "docs\BP-085-089R3_TESTING.md",
++  "docs\BP-085-089R3_RESULT_ANALYSIS.md",
++  "docs\BP-085-089R3_HOTFIX_REPORT.json",
++  "docs\BP-085-089R3_BLOCK_LEDGER.json",
++  "TEST_BP-085-089R2.ps1",
++  "CHANGELOG_BP-085-089R2.md",
++  "docs\BP-085-089R2_TESTING.md",
++  "docs\BP-085-089R2_RESULT_ANALYSIS.md",
++  "docs\BP-085-089R2_HOTFIX_REPORT.json",
++  "docs\BP-085-089R2_BLOCK_LEDGER.json",
++  "TEST_BP-085-089R1.ps1",
++  "CHANGELOG_BP-085-089R1.md",
++  "docs\BP-085-089R1_TESTING.md",
++  "docs\BP-085-089R1_RESULT_ANALYSIS.md",
++  "docs\BP-085-089R1_HOTFIX_REPORT.json",
++  "docs\BP-085-089R1_BLOCK_LEDGER.json",
++  "docs\BP-080-084R2_ACCEPTANCE_ANALYSIS.md",
++  "docs\BP-085-089_BLOCK_LEDGER.json",
++  "audit\game_profile_golden.json",
++  "audit\mod_runtime_golden.json",
++  "audit\artifact_compat_golden.json",
++  "audit\savegame_v5_golden.json",
++  "audit\savegame_fixed6_golden.json",
++  "audit\stability_golden.json",
++  "audit\compat_release_golden.json",
++  "src\miniquake\game_profile.ml",
++  "src\miniquake\mod_compat.ml",
++  "src\miniquake\artifact_compat.ml",
++  "src\miniquake\common.ml",
++  "src\miniquake\format\bsp.ml",
++  "src\miniquake\native.ml",
++  "src\miniquake\quakec\edict.ml",
++  "src\miniquake\cvar.ml",
++  "src\miniquake\savegame.ml",
++  "src\miniquake\savegame_runtime.ml",
++  "src\miniquake\host.ml",
++  "src\miniquake\server.ml",
++  "src\miniquake\types.ml",
++  "tests\compat_trace_tests.ml",
++  "tools\check_world_physics_closure.py",
++  "tools\check_protocol15_serverdata.py",
++  "src\miniquake\stability_contract.ml",
++  "src\miniquake\compatibility_matrix.ml",
++  "tests\game_profile_compat_tests.ml",
++  "tests\mod_runtime_compat_tests.ml",
++  "tests\artifact_compat_tests.ml",
++  "tests\quakec_edict_tests.ml",
++  "tests\command_cvar_lifecycle_tests.ml",
++  "tests\savegame_v5_parity_tests.ml",
++  "tests\stability_contract_tests.ml",
++  "tests\compatibility_release_closure_tests.ml",
++  "tests\artifact_retail_evidence.ml",
++  "tools\check_compat_085.py",
++  "tools\check_compat_086.py",
++  "tools\check_compat_087.py",
++  "tools\check_savegame_v5.py",
++  "tools\oracle\savegame_v5_oracle.c",
++  "tools\oracle\savegame_fixed6_oracle.c",
++  "native\miniquake_text.c",
++  "native\miniquake_text.def",
++  "native\README.md",
++  "tools\check_compat_088.py",
++  "tools\check_compat_089.py",
++  "patches\BP-085.diff",
++  "patches\BP-086.diff",
++  "patches\BP-087.diff",
++  "patches\BP-088.diff",
++  "patches\BP-089.diff",
++  "patches\BP-089R1.diff",
++  "patches\BP-089R3.diff",
++  "patches\BP-089R4.diff",
++  "patches\BP-089R2.diff",
++  # BP-090--BP-094 external-reference closure. Original binary/game data are not included.
++  "TEST_BP-090-094R10.ps1",
++  "CHANGELOG_BP-090-094R10.md",
++  "docs\BP-090-094R10_TESTING.md",
++  "docs\BP-090-094R10_RESULT_ANALYSIS.md",
++  "docs\BP-090-094R10_HOTFIX_REPORT.json",
++  "patches\BP-094R10.diff",
++  "TEST_BP-090-094R8.ps1",
++  "TEST_BP-090-094R9.ps1",
++  "CHANGELOG_BP-090-094R8.md",
++  "CHANGELOG_BP-090-094R9.md",
++  "docs\BP-090-094R8_TESTING.md",
++  "docs\BP-090-094R9_TESTING.md",
++  "docs\BP-090-094R9_RESULT_ANALYSIS.md",
++  "docs\BP-090-094R9_HOTFIX_REPORT.json",
++  "docs\BP-090-094R8_RESULT_ANALYSIS.md",
++  "docs\BP-090-094R8_HOTFIX_REPORT.json",
++  "docs\BP-093_R7_VISUAL_DIAGNOSTIC_ANALYSIS.md",
++  "docs\BP-093_R7_VISUAL_DIAGNOSTIC_ANALYSIS.json",
++  "patches\BP-094R8.diff",
++  "TEST_BP-090-094R7.ps1",
++  "CHANGELOG_BP-090-094R7.md",
++  "docs\BP-090-094R7_TESTING.md",
++  "docs\BP-090-094R7_RESULT_ANALYSIS.md",
++  "docs\BP-090-094R7_HOTFIX_REPORT.json",
++  "patches\BP-094R7.diff",
++  "TEST_BP-090-094R6.ps1",
++  "CHANGELOG_BP-090-094R6.md",
++  "docs\BP-090-094R6_TESTING.md",
++  "docs\BP-090-094R6_RESULT_ANALYSIS.md",
++  "docs\BP-090-094R6_HOTFIX_REPORT.json",
++  "patches\BP-094R6.diff",
++  "TEST_BP-090-094R5.ps1",
++  "CHANGELOG_BP-090-094R5.md",
++  "docs\BP-090-094R5_TESTING.md",
++  "docs\BP-090-094R5_RESULT_ANALYSIS.md",
++  "docs\BP-090-094R5_HOTFIX_REPORT.json",
++  "patches\BP-094R5.diff",
++  "TEST_BP-090-094R4.ps1",
++  "CHANGELOG_BP-090-094R4.md",
++  "docs\BP-090-094R4_TESTING.md",
++  "docs\BP-090-094R4_RESULT_ANALYSIS.md",
++  "docs\BP-090-094R4_HOTFIX_REPORT.json",
++  "patches\BP-094R4.diff",
++  "TEST_BP-090-094R3.ps1",
++  "CHANGELOG_BP-090-094R3.md",
++  "docs\BP-090-094R3_TESTING.md",
++  "docs\BP-090-094R3_RESULT_ANALYSIS.md",
++  "docs\BP-090-094R3_HOTFIX_REPORT.json",
++  "patches\BP-094R3.diff",
++  "TEST_BP-090-094R2.ps1",
++  "CHANGELOG_BP-090-094R2.md",
++  "docs\BP-090-094R2_TESTING.md",
++  "docs\BP-090-094R2_RESULT_ANALYSIS.md",
++  "docs\BP-090-094R2_HOTFIX_REPORT.json",
++  "patches\BP-094R2.diff",
++  "TEST_BP-090-094R1.ps1",
++  "CHANGELOG_BP-090-094R1.md",
++  "docs\BP-090-094R1_TESTING.md",
++  "docs\BP-090-094R1_RESULT_ANALYSIS.md",
++  "docs\BP-090-094R1_HOTFIX_REPORT.json",
++  "patches\BP-094R1.diff",
++  "TEST_BP-090-094.ps1",
++  "CHANGELOG_BP-090-094.md",
++  "docs\BP-090-094_TESTING.md",
++  "docs\BP-085-089R8_ACCEPTANCE_ANALYSIS.md",
++  "src\miniquake\external_reference_contract.ml",
++  "tests\original_reference_provenance_tests.ml",
++  "tests\original_server_interop_tests.ml",
++  "tests\original_client_interop_tests.ml",
++  "tests\original_visual_reference_tests.ml",
++  "tests\external_compat_closure_tests.ml",
++  "tools\prepare_original_reference.py",
++  "tools\compare_original_reference.py",
++  "tools\check_external_090.py",
++  "tools\check_external_091.py",
++  "tools\check_external_092.py",
++  "tools\check_external_093.py",
++  "tools\check_external_094.py",
++  "audit\original_reference_golden.json",
++  "audit\original_server_interop_golden.json",
++  "audit\original_client_interop_golden.json",
++  "audit\original_visual_reference_golden.json",
++  "audit\external_compat_closure_golden.json",
++  "patches\BP-090.diff",
++  "patches\BP-091.diff",
++  "patches\BP-092.diff",
++  "patches\BP-093.diff",
++  "patches\BP-094.diff",
++  "SOURCE_MANIFEST.sha256",
++  "BLOCK_LEDGER.json",
++  "PORT_LEDGER.json",
++  "PORT_STATUS.md",
++  "README.md",
++  "build.ps1",
++  "COLLECT_RESULTS.ps1",
++  "test.ps1",
++  "TEST_BP-080-084.ps1",
++  "TEST_BP-080-084R1.ps1",
++  "TEST_BP-080-084R2.ps1",
++  "CHANGELOG_BP-080.md",
++  "CHANGELOG_BP-081.md",
++  "CHANGELOG_BP-082.md",
++  "CHANGELOG_BP-083.md",
++  "CHANGELOG_BP-084.md",
++  "CHANGELOG_BP-080-084.md",
++  "CHANGELOG_BP-080-084R1.md",
++  "CHANGELOG_BP-080-084R2.md",
++  "docs\BP-080_CVAR_SOURCE_SURFACE_AUDIT.md",
++  "docs\BP-081_CD_AUDIO_SOURCE_SURFACE_AUDIT.md",
++  "docs\BP-082_SOURCE_FUNCTION_INVENTORY.md",
++  "docs\BP-083_BLACK_PORT_CORPUS.md",
++  "docs\BP-084_SOURCE_BLACK_PORT_CLOSURE.md",
++  "docs\BP-080-084_TESTING.md",
++  "docs\BP-080-084R1_TESTING.md",
++  "docs\BP-080-084R1_RESULT_ANALYSIS.md",
++  "docs\BP-080-084R1_HOTFIX_REPORT.json",
++  "docs\BP-080-084R1_BLOCK_LEDGER.json",
++  "docs\BP-080-084R2_TESTING.md",
++  "docs\BP-080-084R2_RESULT_ANALYSIS.md",
++  "docs\BP-080-084R2_HOTFIX_REPORT.json",
++  "docs\BP-080-084R2_BLOCK_LEDGER.json",
++  "docs\BP-075-079R3_ACCEPTANCE_ANALYSIS.md",
++  "audit\cvar_source_surface_golden.json",
++  "audit\cd_audio_source_surface_golden.json",
++  "audit\source_function_inventory.json",
++  "audit\black_port_corpus_golden.json",
++  "audit\black_port_source_closure_golden.json",
++  "tests\cvar_source_surface_tests.ml",
++  "tests\cd_audio_source_surface_tests.ml",
++  "tests\source_function_inventory_tests.ml",
++  "tests\black_port_corpus_tests.ml",
++  "tests\black_port_source_closure_tests.ml",
++  "src\miniquake\source_profile_contract.ml",
++  "src\miniquake\black_port_corpus.ml",
++  "src\miniquake\black_port_source_contract.ml",
++  "tools\generate_source_inventory.py",
++  "tools\check_source_080.py",
++  "tools\check_source_081.py",
++  "tools\check_source_082.py",
++  "tools\check_source_083.py",
++  "tools\check_source_084.py",
++  "patches\BP-080.diff",
++  "patches\BP-081.diff",
++  "patches\BP-082.diff",
++  "patches\BP-083.diff",
++  "patches\BP-084.diff",
++  "patches\BP-084R1.diff",
++  "patches\BP-084R2.diff",
++  "TEST_BP-075-079.ps1",
++  "TEST_BP-075-079R3.ps1",
++  "CHANGELOG_BP-075-079R3.md",
++  "docs\BP-075-079R3_TESTING.md",
++  "docs\BP-075-079R3_RESULT_ANALYSIS.md",
++  "docs\BP-075-079R3_HOTFIX_REPORT.json",
++  "docs\BP-075-079R3_BLOCK_LEDGER.json",
++  "patches\BP-079R3.diff",
++  "TEST_BP-075-079R2.ps1",
++  "CHANGELOG_BP-075-079R2.md",
++  "docs\BP-075-079R2_TESTING.md",
++  "docs\BP-075-079R2_RESULT_ANALYSIS.md",
++  "docs\BP-075-079R2_HOTFIX_REPORT.json",
++  "docs\BP-075-079R2_BLOCK_LEDGER.json",
++  "patches\BP-079R2.diff",
++  "TEST_BP-075-079R1.ps1",
++  "CHANGELOG_BP-075-079R1.md",
++  "docs\BP-075-079R1_TESTING.md",
++  "docs\BP-075-079R1_RESULT_ANALYSIS.md",
++  "docs\BP-075-079R1_HOTFIX_REPORT.json",
++  "docs\BP-075-079R1_BLOCK_LEDGER.json",
++  "patches\BP-079R1.diff",
++  "CHANGELOG_BP-075.md",
++  "CHANGELOG_BP-076.md",
++  "CHANGELOG_BP-077.md",
++  "CHANGELOG_BP-078.md",
++  "CHANGELOG_BP-079.md",
++  "CHANGELOG_BP-075-079.md",
++  "docs\BP-075-079_TESTING.md",
++  "docs\BP-070-074R6_ACCEPTANCE_ANALYSIS.md",
++  "docs\BP-075_MATH_CHASE_AUDIT.md",
++  "docs\BP-076_VIEW_PALETTE_AUDIT.md",
++  "docs\BP-077_SCREEN_LOADING_AUDIT.md",
++  "docs\BP-078_STATUSBAR_SCOREBOARD_AUDIT.md",
++  "docs\BP-079_GAMEPLAY_PRESENTATION_AUDIT.md",
++  "docs\BP-075-079_BLOCK_LEDGER.json",
++  "patches\BP-075.diff",
++  "patches\BP-076.diff",
++  "patches\BP-077.diff",
++  "patches\BP-078.diff",
++  "patches\BP-079.diff",
++  "tools\check_gameplay_075.py",
++  "tools\check_gameplay_076.py",
++  "tools\check_gameplay_077.py",
++  "tools\check_gameplay_078.py",
++  "tools\check_gameplay_079.py",
++  "tools\oracle\gameplay_math_chase_oracle.c",
++  "tools\oracle\gameplay_view_oracle.c",
++  "tools\oracle\gameplay_screen_oracle.c",
++  "tools\oracle\gameplay_statusbar_oracle.c",
++  "tools\oracle\gameplay_presentation_oracle.c",
++  "audit\gameplay_math_chase_golden.json",
++  "audit\gameplay_view_golden.json",
++  "audit\gameplay_screen_golden.json",
++  "audit\gameplay_statusbar_golden.json",
++  "audit\gameplay_presentation_golden.json",
++  "tests\gameplay_math_chase_tests.ml",
++  "tests\gameplay_view_tests.ml",
++  "tests\gameplay_screen_tests.ml",
++  "tests\gameplay_statusbar_tests.ml",
++  "tests\gameplay_presentation_closure_tests.ml",
++  "src\miniquake\host_command_numbers.ml",
++  "src\miniquake\gameplay_presentation_contract.ml",
++  "TEST_BP-070-074.ps1",
++  "TEST_BP-070-074R6.ps1",
++  "CHANGELOG_BP-070-074R6.md",
++  "docs\BP-070-074R6_RESULT_ANALYSIS.md",
++  "docs\BP-070-074R6_BLOCK_LEDGER.json",
++  "docs\BP-070-074R6_TESTING.md",
++  "docs\BP-070-074R6_HOTFIX_REPORT.json",
++  "patches\BP-074R6.diff",
++  "TEST_BP-070-074R5.ps1",
++  "CHANGELOG_BP-070-074R5.md",
++  "docs\BP-070-074R5_RESULT_ANALYSIS.md",
++  "docs\BP-070-074R5_BLOCK_LEDGER.json",
++  "docs\BP-070-074R5_TESTING.md",
++  "docs\BP-070-074R5_HOTFIX_REPORT.json",
++  "patches\BP-074R5.diff",
++  "TEST_BP-070-074R4.ps1",
++  "CHANGELOG_BP-070-074R4.md",
++  "docs\BP-070-074R4_RESULT_ANALYSIS.md",
++  "docs\BP-070-074R4_BLOCK_LEDGER.json",
++  "docs\BP-070-074R4_TESTING.md",
++  "docs\BP-070-074R4_HOTFIX_REPORT.json",
++  "patches\BP-074R4.diff",
++  "TEST_BP-070-074R3.ps1",
++  "CHANGELOG_BP-070-074R3.md",
++  "docs\BP-070-074R3_RESULT_ANALYSIS.md",
++  "docs\BP-070-074R3_BLOCK_LEDGER.json",
++  "docs\BP-070-074R3_TESTING.md",
++  "docs\BP-070-074R3_HOTFIX_REPORT.json",
++  "patches\BP-074R3.diff",
++  "TEST_BP-070-074R2.ps1",
++  "CHANGELOG_BP-070-074R2.md",
++  "docs\BP-070-074R2_RESULT_ANALYSIS.md",
++  "docs\BP-070-074R2_BLOCK_LEDGER.json",
++  "docs\BP-070-074R2_TESTING.md",
++  "docs\BP-070-074R2_HOTFIX_REPORT.json",
++  "patches\BP-074R2.diff",
++  "TEST_BP-070-074R1.ps1",
++  "CHANGELOG_BP-070-074R1.md",
++  "docs\BP-070-074_RESULT_ANALYSIS.md",
++  "docs\BP-070-074R1_RESULT_ANALYSIS.md",
++  "docs\BP-070-074R1_BLOCK_LEDGER.json",
++  "docs\BP-070-074R1_TESTING.md",
++  "docs\BP-070-074R1_HOTFIX_REPORT.json",
++  "patches\BP-074R1.diff",
++  "CHANGELOG_BP-070.md",
++  "CHANGELOG_BP-071.md",
++  "CHANGELOG_BP-072.md",
++  "CHANGELOG_BP-073.md",
++  "CHANGELOG_BP-074.md",
++  "CHANGELOG_BP-070-074.md",
++  "docs\BP-065-069R1_ACCEPTANCE_ANALYSIS.md",
++  "docs\BP-070_COMMON_CRC_AUDIT.md",
++  "docs\BP-071_FILESYSTEM_PACK_AUDIT.md",
++  "docs\BP-072_WAD_GRAPHICS_AUDIT.md",
++  "docs\BP-073_MODEL_ASSET_AUDIT.md",
++  "docs\BP-074_CORE_ASSETS_MEMORY_AUDIT.md",
++  "docs\BP-070-074_TESTING.md",
++  "docs\BP-070-074_BLOCK_LEDGER.json",
++  "patches\BP-070.diff",
++  "patches\BP-071.diff",
++  "patches\BP-072.diff",
++  "patches\BP-073.diff",
++  "patches\BP-074.diff",
++  "tools\verify.py",
++  "tools\check_core_070.py",
++  "tools\check_asset_071.py",
++  "tools\check_core_072.py",
++  "tools\check_core_073.py",
++  "tools\check_core_074.py",
++  "tools\oracle\common_crc_oracle.c",
++  "tools\oracle\filesystem_pack_oracle.c",
++  "tools\oracle\wad_graphics_oracle.c",
++  "tools\oracle\model_asset_oracle.c",
++  "tools\oracle\core_assets_memory_oracle.c",
++  "audit\common_crc_golden.json",
++  "audit\filesystem_pack_golden.json",
++  "audit\wad_graphics_golden.json",
++  "audit\model_asset_golden.json",
++  "audit\core_assets_memory_golden.json",
++  "tests\common_asset_parity_tests.ml",
++  "tests\filesystem_pack_parity_tests.ml",
++  "tests\wad_graphics_parity_tests.ml",
++  "tests\model_asset_parity_tests.ml",
++  "tests\core_assets_memory_closure_tests.ml",
++  "tests\core_asset_retail_evidence.ml",
++  "src\miniquake\core_assets_memory_contract.ml",
++  # Historical BP-012 source-contract evidence: keep these exact markers.
++  "tests\protocol15_serverdata_tests.ml",
++  "docs\BP-012_PROTOCOL15_SERVERDATA_AUDIT.md",
++  "audit\protocol15_serverdata_golden.json",
++  "TEST_BP-065-069R1.ps1",
++  "docs\BP-065-069R1_BLOCK_LEDGER.json",
++  "patches\BP-069R1.diff"
++)
++foreach ($Relative in $RootFiles) { Copy-SafeFile (Join-Path $Root $Relative) $Relative }
++
++if ($IncludeAllCurrentDocs) {
++  Get-ChildItem -LiteralPath (Join-Path $Root "docs") -File | ForEach-Object {
++    Copy-SafeFile $_.FullName (Join-Path "docs" $_.Name)
++  }
++}
++
++$BinaryNames = @(
++  "MiniQuakeOriginalReferenceTests.exe",
++  "MiniQuakeOriginalServerInteropTests.exe",
++  "MiniQuakeOriginalClientInteropTests.exe",
++  "MiniQuakeOriginalVisualReferenceTests.exe",
++  "MiniQuakeExternalCompatibilityClosureTests.exe",
++  "MiniQuake.exe",
++  "MiniQuakeProtocol15ServerDataTests.exe",
++  "MiniQuakeCommonCoreTests.exe",
++  "MiniQuakeFilesystemPackTests.exe",
++  "MiniQuakeWadGraphicsTests.exe",
++  "MiniQuakeModelAssetTests.exe",
++  "MiniQuakeCoreAssetsMemoryTests.exe",
++  "MiniQuakeCoreAssetRetailEvidence.exe",
++  "MiniQuakeGameplayMathChaseTests.exe",
++  "MiniQuakeGameplayViewTests.exe",
++  "MiniQuakeGameplayScreenTests.exe",
++  "MiniQuakeGameplayStatusbarTests.exe",
++  "MiniQuakeGameplayPresentationClosureTests.exe",
++  "MiniQuakeCvarSourceSurfaceTests.exe",
++  "MiniQuakeCdAudioSourceSurfaceTests.exe",
++  "MiniQuakeSourceFunctionInventoryTests.exe",
++  "MiniQuakeBlackPortCorpusTests.exe",
++  "MiniQuakeBlackPortSourceClosureTests.exe",
++  "MiniQuakeGameProfileTests.exe",
++  "MiniQuakeModRuntimeTests.exe",
++  "MiniQuakeArtifactCompatTests.exe",
++  "MiniQuakeStabilityTests.exe",
++  "MiniQuakeCompatibilityReleaseTests.exe",
++  "MiniQuakeArtifactRetailEvidence.exe",
++  "MiniQuakeAudioRetailEvidence.exe",
++  "MiniQuakeNetworkPlatformEvidence.exe",
++  "miniquake_native.dll",
++  "miniquake_text.dll"
++)
++$BinaryState = @()
++foreach ($Name in $BinaryNames) {
++  $Path = Join-Path $Build $Name
++  $Entry = [ordered]@{
++    name = $Name
++    present = (Test-Path -LiteralPath $Path -PathType Leaf)
++    sha256 = ""
++    bytes = 0
++  }
++  if ($Entry.present) {
++    $Entry.sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant()
++    $Entry.bytes = (Get-Item -LiteralPath $Path).Length
++  }
++  $BinaryState += $Entry
++}
++
++$Meta = [ordered]@{
++  schema = "MiniQuakeResultCollection/1"
++  package_id = $PackageId
++  block_id = $BlockId
++  delivery_revision = $DeliveryRevision
++  delivery_parent = $DeliveryParent
++  created_utc = (Get-Date).ToUniversalTime().ToString("o")
++  machine = $env:COMPUTERNAME
++  user = $env:USERNAME
++  source_root = $Root
++  binaries = $BinaryState
++  skipped_build_artifacts = $SkippedBuildArtifacts
++  original_reference_binary_in_result_archive = $false
++  quake_game_data_in_result_archive = $false
++  framebuffer_images_in_result_archive = $false
++}
++$Meta | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $Staging "collection.json") -Encoding UTF8
++
++if (Test-Path -LiteralPath $Archive) { Remove-Item -Force -LiteralPath $Archive }
++Compress-Archive -Path (Join-Path $Staging "*") -DestinationPath $Archive -CompressionLevel Optimal
++Remove-Item -Recurse -Force -LiteralPath $Staging
++$Hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Archive).Hash.ToLowerInvariant()
++Write-Host "MiniQuake $DeliveryRevision result archive"
++Write-Host "  path=$Archive"
++Write-Host "  sha256=$Hash"
++Write-Host ("  skipped_unsafe_build_artifacts={0}" -f $SkippedBuildArtifacts.Count)
++Write-Host "  Original GLQuake binary, Quake PAK/model/map/audio data, TGAs, synthetic asset workspaces and compiled binaries were not included."
+diff --git a/PORT_LEDGER.json b/PORT_LEDGER.json
+index 194c725..4a2907a 100644
+--- a/PORT_LEDGER.json
++++ b/PORT_LEDGER.json
+@@ -2,8 +2,8 @@
+   "schema_version": 1,
+   "project": "MiniQuake",
+   "current_package": "BP-094",
+-  "current_delivery_revision": "BP-090-094R6",
+-  "delivery_parent": "BP-090-094R5",
++  "current_delivery_revision": "BP-090-094R10",
++  "delivery_parent": "BP-090-094R9",
+   "parent_package": "BP-093",
+   "compatibility_target": {
+     "reference": "WinQuake/GLQuake 1.09",
+@@ -76,7 +76,7 @@
+     "block_parent": "BP-085-089R8",
+     "date": "2026-08-01",
+     "title": "original GLQuake provenance, bidirectional binary interop and external visual-reference closure",
+-    "status": "Windows acceptance pending",
++    "status": "Windows acceptance pending; R9 rejected local fallback correctly but original-server cold-start readiness was not established within the 30-second harness window",
+     "original_reference_status": "original_reference_109_candidate_v1",
+     "original_reference_fingerprint": "0xdc355175",
+     "compat_final_status": "compat_109_final_candidate_v1",
+diff --git a/TEST_BP-090-094.ps1 b/TEST_BP-090-094.ps1
+index 1bedd80..dff2be5 100755
+--- a/TEST_BP-090-094.ps1
++++ b/TEST_BP-090-094.ps1
+@@ -1 +1 @@
+-﻿& "$PSScriptRoot\TEST_BP-090-094R9.ps1" @args
++﻿& "$PSScriptRoot\TEST_BP-090-094R10.ps1" @args
+diff --git a/TEST_BP-090-094R10.ps1 b/TEST_BP-090-094R10.ps1
+new file mode 100755
+index 0000000..d961b56
+--- /dev/null
++++ b/TEST_BP-090-094R10.ps1
+@@ -0,0 +1,1573 @@
++﻿[CmdletBinding()]
++param(
++  [string]$Compiler = "",
++  [Alias("StdLibPath", "ImportRoot")]
++  [string]$StdLib = "",
++  [string]$Python = "",
++  [string]$QuakeBase = "",
++  [string]$Game = "id1",
++  [string]$Map = "start",
++  [ValidateRange(1, 1000000)]
++  [int]$Frames = 300,
++  [ValidateRange(1, 1000000)]
++  [int]$TraceFrames = 128,
++  [ValidateRange(1, 1000000)]
++  [int]$BlackPortCorpusFrames = 64,
++  [ValidateRange(1, 1000000)]
++  [int]$RenderEvidenceFrame = 128,
++  [ValidateRange(1, 2000000000)]
++  [int]$SoakFrames = 5000,
++  [ValidateRange(1, 2000000000)]
++  [int]$ListenSoakFrames = 5000,
++  [string]$OriginalQuakeSourceArchive = "",
++  [string]$OriginalGLQuakeExe = "",
++  [ValidateRange(1, 1000000)]
++  [int]$OriginalInteropFrames = 10000,
++  [ValidateRange(1000, 600000)]
++  [int]$OriginalServerReadyTimeoutMs = 180000,
++  [ValidateRange(1, 1000000)]
++  [int]$OriginalVisualFrame = 256,
++  [switch]$SkipOriginalInterop,
++  [switch]$SkipOriginalVisualReference,
++  [switch]$SkipTemporaryFirewallRules,
++  [switch]$KeepTemporaryFirewallRules,
++  [switch]$ElevatedRelaunch,
++  [ValidateSet("Release", "Debug")]
++  [string]$Configuration = "Release",
++  [switch]$SkipBuild,
++  [switch]$SkipGameValidation,
++  [switch]$SkipTraceValidation,
++  [switch]$SkipRenderEvidence,
++  [switch]$SkipBlackPortCorpus,
++  [switch]$SkipAudioEvidence,
++  [switch]$SkipArtifactEvidence,
++  [switch]$SkipMissionPackEvidence,
++  [switch]$SkipSoak,
++  [switch]$SkipNetworkEvidence,
++  [switch]$NetworkTests,
++  [switch]$RebuildNative,
++  [switch]$Listings,
++  [switch]$ContinueIndependentTests = $true,
++  [switch]$BisectOnFailure
++)
++
++$ErrorActionPreference = "Stop"
++Set-StrictMode -Version Latest
++
++# Force Python tools and the Python MiniLang compiler to flush every line.
++# The PowerShell wrappers below also forward every received line immediately.
++$env:PYTHONUNBUFFERED = "1"
++
++$PackageId = "BP-094"
++$ParentPackageId = "BP-093"
++$BlockId = "BP-090-094"
++$DeliveryRevision = "BP-090-094R10"
++$DeliveryParent = "BP-090-094R9"
++$BlockParentPackageId = "BP-085-089R8"
++$Root = $PSScriptRoot
++$Build = Join-Path $Root "build"
++$BuildScript = Join-Path $Root "build.ps1"
++$GameExe = Join-Path $Build "MiniQuake.exe"
++$EvidenceExe = Join-Path $Build "MiniQuakeNetworkPlatformEvidence.exe"
++$CoreAssetEvidenceExe = Join-Path $Build "MiniQuakeCoreAssetRetailEvidence.exe"
++$ArtifactEvidenceExe = Join-Path $Build "MiniQuakeArtifactRetailEvidence.exe"
++$TraceComparator = Join-Path $Root "tools\compare_traces.py"
++$RenderComparator = Join-Path $Root "tools\compare_render_evidence.py"
++$OriginalPrepareTool = Join-Path $Root "tools\prepare_original_reference.py"
++$OriginalVisualComparator = Join-Path $Root "tools\compare_original_reference.py"
++$Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
++$TranscriptPath = Join-Path $Build ("bp090-094r10-test-{0}.log" -f $Timestamp)
++$SummaryPath = Join-Path $Build "bp090-094r10-test-summary.json"
++$Steps = New-Object System.Collections.Generic.List[object]
++$FirewallReportPath = Join-Path $Build "bp090-094r10-temporary-firewall-rules.json"
++$FirewallRulePrefix = "MiniQuake-BP090094R10-Temporary"
++$FirewallDisplayGroup = "MiniQuake BP-090-094R10 temporary loopback interop"
++$FirewallRuleNames = @()
++$FirewallRulesInstalled = $false
++$FirewallCleanupStatus = "not_installed"
++$FirewallSetupStatus = "not_requested"
++$FirewallSetupError = ""
++$ScriptInvocationParameters = @{}
++foreach ($Entry in $PSBoundParameters.GetEnumerator()) {
++  $InvocationKey = [string]$Entry.Key
++  $ScriptInvocationParameters[$InvocationKey] = $Entry.Value
++}
++
++function Test-IsAdministrator() {
++  $Identity = [Security.Principal.WindowsIdentity]::GetCurrent()
++  $Principal = New-Object Security.Principal.WindowsPrincipal($Identity)
++  return $Principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
++}
++
++function Quote-ElevationArgument([string]$Value) {
++  if ($Value -notmatch '[\s"]') { return $Value }
++  $Escaped = [regex]::Replace($Value, '(\\*)"', '$1$1\"')
++  $Escaped = [regex]::Replace($Escaped, '(\\+)$', '$1$1')
++  return '"' + $Escaped + '"'
++}
++
++function Join-ElevationArguments([string[]]$Values) {
++  return (($Values | ForEach-Object { Quote-ElevationArgument ([string]$_) }) -join ' ')
++}
++
++function Relaunch-ElevatedForInteropIfNeeded() {
++  if ($SkipOriginalInterop -or $SkipTemporaryFirewallRules) { return $false }
++  if (Test-IsAdministrator) { return $false }
++  if ($ElevatedRelaunch) {
++    throw 'INFRA_FAILURE: elevated relaunch was requested, but the current PowerShell process is not running as administrator.'
++  }
++
++  Write-Host '[MiniQuake] requesting administrator rights before the long build so temporary loopback-only firewall rules can be installed unattended' -ForegroundColor Yellow
++  $Arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $PSCommandPath, '-ElevatedRelaunch')
++  foreach ($Entry in $script:ScriptInvocationParameters.GetEnumerator()) {
++    $Name = [string]$Entry.Key
++    if ($Name -eq 'ElevatedRelaunch') { continue }
++    $Value = $Entry.Value
++    if ($Value -is [System.Management.Automation.SwitchParameter]) {
++      if ($Value.IsPresent) { $Arguments += ('-' + $Name) }
++      continue
++    }
++    $Arguments += ('-' + $Name)
++    $Arguments += [string]$Value
++  }
++
++  $PowerShellExe = (Get-Process -Id $PID).Path
++  $ArgumentText = Join-ElevationArguments $Arguments
++  try {
++    $Child = Start-Process -FilePath $PowerShellExe -ArgumentList $ArgumentText -WorkingDirectory $Root -Verb RunAs -Wait -PassThru
++  } catch {
++    throw ('INFRA_FAILURE: administrator elevation was declined or failed: ' + $_.Exception.Message)
++  }
++  exit [int]$Child.ExitCode
++}
++
++function Write-TemporaryFirewallReport([string]$Status, [string]$ErrorText) {
++  $Rules = @()
++  foreach ($RuleName in $script:FirewallRuleNames) {
++    $Rules += [ordered]@{ name = $RuleName }
++  }
++  [ordered]@{
++    schema_version = 1
++    delivery_revision = 'BP-090-094R10'
++    status = $Status
++    elevated = [bool](Test-IsAdministrator)
++    setup_status = $script:FirewallSetupStatus
++    cleanup_status = $script:FirewallCleanupStatus
++    error = $ErrorText
++    display_group = $FirewallDisplayGroup
++    rule_prefix = $FirewallRulePrefix
++    protocol = 'UDP'
++    local_address = '127.0.0.1'
++    remote_address = '127.0.0.1'
++    programs = @($GameExe, $OriginalExe)
++    persistent_rules_intended = $false
++    rules = $Rules
++  } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $FirewallReportPath -Encoding UTF8
++}
++
++function Remove-StaleMiniQuakeFirewallRules() {
++  $Existing = @(Get-NetFirewallRule -Name ($FirewallRulePrefix + '-*') -ErrorAction SilentlyContinue)
++  if ($Existing.Count -gt 0) {
++    $Existing | Remove-NetFirewallRule -Confirm:$false -ErrorAction Stop
++  }
++}
++
++function Install-TemporaryLoopbackFirewallRules() {
++  if ($SkipOriginalInterop) {
++    $script:FirewallSetupStatus = 'not_required'
++    $script:FirewallCleanupStatus = 'not_required'
++    Write-TemporaryFirewallReport -Status 'SKIPPED' -ErrorText ''
++    return
++  }
++  if ($SkipTemporaryFirewallRules) {
++    $script:FirewallSetupStatus = 'explicitly_skipped'
++    $script:FirewallCleanupStatus = 'not_installed'
++    Write-TemporaryFirewallReport -Status 'SKIPPED' -ErrorText 'caller supplied -SkipTemporaryFirewallRules'
++    Add-Step 'temporary loopback firewall rules' 'SKIPPED' 0 '-SkipTemporaryFirewallRules; existing host policy must permit both exact executables'
++    return
++  }
++  if (-not (Test-IsAdministrator)) {
++    throw 'INFRA_FAILURE: temporary loopback firewall rules require an elevated PowerShell process.'
++  }
++  foreach ($CommandName in @('Get-NetFirewallRule', 'New-NetFirewallRule', 'Remove-NetFirewallRule')) {
++    if ($null -eq (Get-Command $CommandName -ErrorAction SilentlyContinue)) {
++      throw ('INFRA_FAILURE: required Windows Defender Firewall cmdlet is unavailable: ' + $CommandName)
++    }
++  }
++  if (-not (Test-Path -LiteralPath $GameExe -PathType Leaf)) { throw ('INFRA_FAILURE: MiniQuake executable missing before firewall setup: ' + $GameExe) }
++  if (-not (Test-Path -LiteralPath $OriginalExe -PathType Leaf)) { throw ('INFRA_FAILURE: original GLQuake executable missing before firewall setup: ' + $OriginalExe) }
++
++  try {
++    Remove-StaleMiniQuakeFirewallRules
++    $script:FirewallRuleNames = @()
++    $Specs = @(
++      [ordered]@{ suffix = 'MiniQuake-In'; program = $GameExe; direction = 'Inbound' },
++      [ordered]@{ suffix = 'MiniQuake-Out'; program = $GameExe; direction = 'Outbound' },
++      [ordered]@{ suffix = 'GLQuake-In'; program = $OriginalExe; direction = 'Inbound' },
++      [ordered]@{ suffix = 'GLQuake-Out'; program = $OriginalExe; direction = 'Outbound' }
++    )
++    foreach ($Spec in $Specs) {
++      $RuleName = ('{0}-{1}-{2}' -f $FirewallRulePrefix, $PID, $Spec.suffix)
++      New-NetFirewallRule `
++        -Name $RuleName `
++        -DisplayName $RuleName `
++        -Group $FirewallDisplayGroup `
++        -Direction $Spec.direction `
++        -Action Allow `
++        -Enabled True `
++        -Profile Any `
++        -Program $Spec.program `
++        -Protocol UDP `
++        -LocalAddress '127.0.0.1' `
++        -RemoteAddress '127.0.0.1' `
++        -ErrorAction Stop | Out-Null
++      $script:FirewallRuleNames += $RuleName
++    }
++    foreach ($RuleName in $script:FirewallRuleNames) {
++      if ($null -eq (Get-NetFirewallRule -Name $RuleName -ErrorAction SilentlyContinue)) {
++        throw ('created firewall rule could not be read back: ' + $RuleName)
++      }
++    }
++    $script:FirewallRulesInstalled = $true
++    $script:FirewallSetupStatus = 'installed'
++    $script:FirewallCleanupStatus = 'pending'
++    Write-TemporaryFirewallReport -Status 'INSTALLED' -ErrorText ''
++    Add-Step 'temporary loopback firewall rules' 'PASS' 0 ('rules=' + $script:FirewallRuleNames.Count + ' programs=2 addresses=127.0.0.1/127.0.0.1')
++    Write-Host '[MiniQuake] temporary Windows Defender Firewall rules installed for exact MiniQuake/GLQUAKE paths; UDP is limited to loopback and rules will be removed in finally' -ForegroundColor Cyan
++  } catch {
++    $script:FirewallSetupStatus = 'failed'
++    $script:FirewallSetupError = $_.Exception.Message
++    try { Remove-StaleMiniQuakeFirewallRules } catch { }
++    Write-TemporaryFirewallReport -Status 'FAIL' -ErrorText $script:FirewallSetupError
++    throw ('INFRA_FAILURE: temporary loopback firewall rule setup failed: ' + $script:FirewallSetupError)
++  }
++}
++
++function Remove-TemporaryLoopbackFirewallRules() {
++  if (-not $script:FirewallRulesInstalled) { return }
++  if ($KeepTemporaryFirewallRules) {
++    $script:FirewallCleanupStatus = 'kept_by_request'
++    Write-TemporaryFirewallReport -Status 'KEPT' -ErrorText ''
++    Write-Host '[MiniQuake] temporary firewall rules retained because -KeepTemporaryFirewallRules was supplied' -ForegroundColor Yellow
++    return
++  }
++  try {
++    foreach ($RuleName in $script:FirewallRuleNames) {
++      $Rule = Get-NetFirewallRule -Name $RuleName -ErrorAction SilentlyContinue
++      if ($null -ne $Rule) { $Rule | Remove-NetFirewallRule -Confirm:$false -ErrorAction Stop }
++    }
++    $Remaining = @(Get-NetFirewallRule -Name ($FirewallRulePrefix + '-*') -ErrorAction SilentlyContinue)
++    if ($Remaining.Count -gt 0) { throw ('temporary firewall rules remain after cleanup: ' + $Remaining.Count) }
++    $script:FirewallRulesInstalled = $false
++    $script:FirewallCleanupStatus = 'removed'
++    Write-TemporaryFirewallReport -Status 'REMOVED' -ErrorText ''
++    Write-Host '[MiniQuake] temporary loopback-only firewall rules removed' -ForegroundColor Green
++  } catch {
++    $script:FirewallCleanupStatus = 'failed'
++    Write-TemporaryFirewallReport -Status 'CLEANUP_FAIL' -ErrorText $_.Exception.Message
++    throw ('INFRA_FAILURE: temporary firewall rule cleanup failed: ' + $_.Exception.Message)
++  }
++}
++
++function Resolve-Tool([string]$Value, [string]$Label) {
++  if (-not [string]::IsNullOrWhiteSpace($Value) -and (Test-Path -LiteralPath $Value -PathType Leaf)) {
++    return [IO.Path]::GetFullPath($Value)
++  }
++  if (-not [string]::IsNullOrWhiteSpace($Value)) {
++    $Command = Get-Command $Value -ErrorAction SilentlyContinue | Select-Object -First 1
++    if ($null -ne $Command) { return $Command.Path }
++  }
++  throw "$Label not found: $Value"
++}
++
++function Add-Step([string]$Name, [string]$Status, [int]$ExitCode, [string]$Detail) {
++  $Steps.Add([ordered]@{ name = $Name; status = $Status; exit_code = $ExitCode; detail = $Detail })
++  $Color = if ($Status -eq "PASS") { "Green" } elseif ($Status -eq "SKIPPED") { "Yellow" } else { "Red" }
++  Write-Host ("[{0}] {1} - {2}" -f $Status, $Name, $Detail) -ForegroundColor $Color
++}
++
++function Failure-Marker([string]$Text) {
++  if ([string]::IsNullOrWhiteSpace($Text)) { return "" }
++  foreach ($Line in ($Text -split "`r?`n")) {
++    if ($Line -match '^\s*FAIL:\s*' -or $Line -match 'tests failed:\s*[1-9]' -or $Line -match 'evidence:\s*FAIL') { return $Line.Trim() }
++  }
++  return ""
++}
++
++function Invoke-LiveProcess(
++  [string]$Executable,
++  [string[]]$Arguments,
++  [string]$LogPath
++) {
++  $Lines = [System.Collections.Generic.List[string]]::new()
++  $Encoding = [System.Text.UTF8Encoding]::new($false)
++  $Writer = [System.IO.StreamWriter]::new($LogPath, $false, $Encoding)
++  $Code = 1
++  try {
++    & $Executable @Arguments 2>&1 |
++      ForEach-Object {
++        $Line = [string]$_
++        $Lines.Add($Line)
++        $Writer.WriteLine($Line)
++        $Writer.Flush()
++        Write-Host $Line
++      }
++    $Code = [int]$LASTEXITCODE
++  } finally {
++    $Writer.Flush()
++    $Writer.Dispose()
++  }
++  $Text = [string]::Join("`n", $Lines.ToArray())
++  return [pscustomobject]@{
++    exit_code = $Code
++    text = $Text
++  }
++}
++
++function Run-Logged([string]$Name, [string]$Executable, [string[]]$Arguments, [string]$LogName, [string]$RequiredMarker = "") {
++  $LogPath = Join-Path $Build $LogName
++  Write-Host ("[MiniQuake] starting {0}" -f $Name) -ForegroundColor Cyan
++  $Result = Invoke-LiveProcess -Executable $Executable -Arguments $Arguments -LogPath $LogPath
++  $Code = [int]$Result.exit_code
++  $Text = [string]$Result.text
++  $Marker = Failure-Marker $Text
++  if ($Code -eq 0 -and -not [string]::IsNullOrWhiteSpace($Marker)) { $Code = 1 }
++  if ($Code -eq 0 -and -not [string]::IsNullOrWhiteSpace($RequiredMarker) -and $Text -notmatch [regex]::Escape($RequiredMarker)) { $Code = 1; $Marker = "missing marker: $RequiredMarker" }
++  if ($Code -ne 0) { Add-Step $Name "FAIL" $Code ("log=" + $LogName + " " + $Marker); throw "$Name failed with exit code $Code" }
++  Add-Step $Name "PASS" 0 ("log=" + $LogName)
++  return $Text
++}
++
++function Start-BackgroundCapturedProcess(
++  [string]$Executable,
++  [string]$ArgumentsText,
++  [string]$Label
++) {
++  $StartInfo = New-Object System.Diagnostics.ProcessStartInfo
++  $StartInfo.FileName = $Executable
++  $StartInfo.Arguments = $ArgumentsText
++  $StartInfo.WorkingDirectory = $Root
++  $StartInfo.UseShellExecute = $false
++  $StartInfo.CreateNoWindow = $true
++  $StartInfo.RedirectStandardOutput = $true
++  $StartInfo.RedirectStandardError = $true
++  $StartInfo.RedirectStandardInput = $true
++
++  $Process = New-Object System.Diagnostics.Process
++  $Process.StartInfo = $StartInfo
++  try {
++    if (-not $Process.Start()) {
++      throw "process start returned false"
++    }
++  } catch {
++    $Process.Dispose()
++    throw ("INFRA_FAILURE: could not start {0}: {1}" -f $Label, $_.Exception.Message)
++  }
++
++  # Drain both redirected streams asynchronously while the server runs. This
++  # avoids a pipe deadlock without buffering any foreground compiler/test job.
++  $StdoutTask = $Process.StandardOutput.ReadToEndAsync()
++  $StderrTask = $Process.StandardError.ReadToEndAsync()
++  return [pscustomobject]@{
++    process = $Process
++    stdout_task = $StdoutTask
++    stderr_task = $StderrTask
++    label = $Label
++  }
++}
++
++function Stop-BackgroundCapturedProcess([pscustomobject]$Handle) {
++  if ($null -eq $Handle -or $null -eq $Handle.process) { return }
++  $Process = [System.Diagnostics.Process]$Handle.process
++  try {
++    if (-not $Process.HasExited) { $Process.Kill() }
++  } catch { }
++  try { $Process.WaitForExit() } catch { }
++}
++
++function Complete-BackgroundCapturedProcess(
++  [pscustomobject]$Handle,
++  [int]$TimeoutMilliseconds,
++  [string]$StdoutPath,
++  [string]$StderrPath
++) {
++  $Process = [System.Diagnostics.Process]$Handle.process
++  $Label = [string]$Handle.label
++  $Exited = $false
++  try {
++    $Exited = $Process.WaitForExit($TimeoutMilliseconds)
++  } catch {
++    Stop-BackgroundCapturedProcess $Handle
++    throw ("INFRA_FAILURE: waiting for {0} failed: {1}" -f $Label, $_.Exception.Message)
++  }
++  if (-not $Exited) {
++    Stop-BackgroundCapturedProcess $Handle
++    try { $Process.WaitForExit() } catch { }
++    try {
++      $TimedOutStdout = [string]$Handle.stdout_task.Result
++      $TimedOutStderr = [string]$Handle.stderr_task.Result
++      $TimedOutEncoding = New-Object System.Text.UTF8Encoding($false)
++      [System.IO.File]::WriteAllText($StdoutPath, $TimedOutStdout, $TimedOutEncoding)
++      [System.IO.File]::WriteAllText($StderrPath, $TimedOutStderr, $TimedOutEncoding)
++    } catch { }
++    throw ("INFRA_FAILURE: {0} timed out after {1} ms; captured logs: {2}, {3}" -f $Label, $TimeoutMilliseconds, [IO.Path]::GetFileName($StdoutPath), [IO.Path]::GetFileName($StderrPath))
++  }
++
++  # The parameterless wait synchronizes redirected-stream completion on
++  # Windows PowerShell 5.1. Refresh before reading ExitCode so the process
++  # object cannot retain the blank/null status observed in R5.
++  $Process.WaitForExit()
++  $Process.Refresh()
++
++  try {
++    $Stdout = [string]$Handle.stdout_task.Result
++    $Stderr = [string]$Handle.stderr_task.Result
++  } catch {
++    $Process.Dispose()
++    throw ("INFRA_FAILURE: collecting {0} output failed: {1}" -f $Label, $_.Exception.Message)
++  }
++
++  $Encoding = New-Object System.Text.UTF8Encoding($false)
++  [System.IO.File]::WriteAllText($StdoutPath, $Stdout, $Encoding)
++  [System.IO.File]::WriteAllText($StderrPath, $Stderr, $Encoding)
++
++  try {
++    $Code = [int]$Process.ExitCode
++  } catch {
++    $Process.Dispose()
++    throw ("INFRA_FAILURE: {0} exit code unavailable after process completion: {1}" -f $Label, $_.Exception.Message)
++  }
++  $Process.Dispose()
++
++  return [pscustomobject]@{
++    exit_code = $Code
++    stdout = $Stdout
++    stderr = $Stderr
++    timed_out = $false
++  }
++}
++
++function Write-NetworkEvidenceOutput([string]$Suffix, [string]$Stdout, [string]$Stderr) {
++  if (-not [string]::IsNullOrWhiteSpace($Stdout)) {
++    Write-Host ("[MiniQuake] network evidence server {0} stdout" -f $Suffix) -ForegroundColor Cyan
++    foreach ($Line in ($Stdout -split "`r?`n")) {
++      if (-not [string]::IsNullOrEmpty($Line)) { Write-Host $Line }
++    }
++  }
++  if (-not [string]::IsNullOrWhiteSpace($Stderr)) {
++    Write-Host ("[MiniQuake] network evidence server {0} stderr" -f $Suffix) -ForegroundColor Yellow
++    foreach ($Line in ($Stderr -split "`r?`n")) {
++      if (-not [string]::IsNullOrEmpty($Line)) { Write-Host $Line -ForegroundColor Yellow }
++    }
++  }
++}
++
++function Run-NetworkEvidencePair([string]$Suffix, [int]$Port) {
++  $ServerOut = Join-Path $Build ("bp090-094r10-network-server-{0}.log" -f $Suffix)
++  $ServerErr = Join-Path $Build ("bp090-094r10-network-server-{0}.err.log" -f $Suffix)
++  $ClientLog = Join-Path $Build ("bp090-094r10-network-client-{0}.log" -f $Suffix)
++  $PairJson = Join-Path $Build ("bp090-094r10-network-pair-{0}.json" -f $Suffix)
++  Remove-Item -Force -ErrorAction SilentlyContinue $ServerOut, $ServerErr, $ClientLog, $PairJson
++
++  Write-Host ("[MiniQuake] starting network evidence server {0} on UDP port {1}" -f $Suffix, $Port) -ForegroundColor Cyan
++  $ServerHandle = Start-BackgroundCapturedProcess -Executable $EvidenceExe -ArgumentsText ("server {0}" -f $Port) -Label ("network evidence server {0}" -f $Suffix)
++  $ClientResult = $null
++  $ServerResult = $null
++  try {
++    Start-Sleep -Milliseconds 300
++    Write-Host ("[MiniQuake] starting network evidence client {0}" -f $Suffix) -ForegroundColor Cyan
++    $ClientResult = Invoke-LiveProcess -Executable $EvidenceExe -Arguments @("client", [string]$Port) -LogPath $ClientLog
++    $ServerResult = Complete-BackgroundCapturedProcess -Handle $ServerHandle -TimeoutMilliseconds 7000 -StdoutPath $ServerOut -StderrPath $ServerErr
++  } catch {
++    Stop-BackgroundCapturedProcess $ServerHandle
++    throw
++  }
++
++  $ClientCode = [int]$ClientResult.exit_code
++  $ClientText = [string]$ClientResult.text
++  $ServerCode = [int]$ServerResult.exit_code
++  $ServerText = [string]$ServerResult.stdout
++  $ServerErrorText = [string]$ServerResult.stderr
++  Write-NetworkEvidenceOutput -Suffix $Suffix -Stdout $ServerText -Stderr $ServerErrorText
++
++  $ServerPassed = $ServerText -match 'network platform evidence server: PASS'
++  $ClientPassed = $ClientText -match 'network platform evidence: PASS'
++  $PairSummary = [ordered]@{
++    schema_version = 1
++    suffix = $Suffix
++    port = $Port
++    server_exit_code = $ServerCode
++    client_exit_code = $ClientCode
++    server_pass_marker = [bool]$ServerPassed
++    client_pass_marker = [bool]$ClientPassed
++    server_stderr_empty = [string]::IsNullOrWhiteSpace($ServerErrorText)
++    status = if ($ServerCode -eq 0 -and $ClientCode -eq 0 -and $ServerPassed -and $ClientPassed) { "PASS" } else { "FAIL" }
++  }
++  $PairSummary | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $PairJson -Encoding UTF8
++
++  if ($ServerCode -ne 0 -or $ClientCode -ne 0) {
++    throw "network evidence pair $Suffix failed: server=$ServerCode client=$ClientCode"
++  }
++  if (-not $ServerPassed) { throw "network evidence server $Suffix did not report PASS" }
++  if (-not $ClientPassed) { throw "network evidence client $Suffix did not report PASS" }
++  return $ClientLog
++}
++
++function Quote-NativeArgument([string]$Value) {
++  if ($Value -notmatch '[\s"]') { return $Value }
++  return '"' + ($Value -replace '"', '\"') + '"'
++}
++
++function Join-NativeArguments([string[]]$Values) {
++  return (($Values | ForEach-Object { Quote-NativeArgument ([string]$_) }) -join ' ')
++}
++
++function Start-GuiProcess([string]$Executable, [string[]]$Arguments, [string]$WorkingDirectory, [string]$Label) {
++  $Info = New-Object System.Diagnostics.ProcessStartInfo
++  $Info.FileName = $Executable
++  $Info.Arguments = Join-NativeArguments $Arguments
++  $Info.WorkingDirectory = $WorkingDirectory
++  $Info.UseShellExecute = $false
++  $Info.CreateNoWindow = $false
++  $Process = New-Object System.Diagnostics.Process
++  $Process.StartInfo = $Info
++  try {
++    if (-not $Process.Start()) { throw 'process start returned false' }
++  } catch {
++    $Process.Dispose()
++    throw ("INFRA_FAILURE: could not start {0}: {1}" -f $Label, $_.Exception.Message)
++  }
++  return $Process
++}
++
++function Stop-GuiProcess([System.Diagnostics.Process]$Process) {
++  if ($null -eq $Process) { return }
++  try { if (-not $Process.HasExited) { $Process.Kill() } } catch { }
++  try { $Process.WaitForExit() } catch { }
++  try { $Process.Dispose() } catch { }
++}
++
++function Wait-ForFileText([string]$Path, [string]$Pattern, [int]$TimeoutMilliseconds) {
++  $Deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMilliseconds)
++  while ([DateTime]::UtcNow -lt $Deadline) {
++    if (Test-Path -LiteralPath $Path -PathType Leaf) {
++      $Text = Get-Content -LiteralPath $Path -Raw -ErrorAction SilentlyContinue
++      if ($null -ne $Text -and $Text -match $Pattern) { return $true }
++    }
++    Start-Sleep -Milliseconds 100
++  }
++  return $false
++}
++
++function Read-JsonFile([string]$Path) {
++  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "missing JSON report: $Path" }
++  return Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
++}
++
++
++function Read-QuakeCString([byte[]]$Data, [int]$Offset) {
++  $DataLength = 0
++  if ($null -ne $Data) { $DataLength = $Data.Length }
++  if ($null -eq $Data -or $Offset -lt 0 -or $Offset -ge $DataLength) {
++    throw ("invalid Quake string offset {0} for packet length {1}" -f $Offset, $DataLength)
++  }
++  $End = $Offset
++  while ($End -lt $Data.Length -and $Data[$End] -ne 0) { $End = $End + 1 }
++  if ($End -ge $Data.Length) { throw "unterminated Quake string in control packet" }
++  $Value = [Text.Encoding]::ASCII.GetString($Data, $Offset, $End - $Offset)
++  return [pscustomobject]@{
++    value = $Value
++    next_offset = $End + 1
++  }
++}
++
++function Get-AvailableLoopbackUdpPort([int]$Minimum, [int]$Maximum) {
++  if ($Minimum -lt 1 -or $Maximum -gt 65535 -or $Minimum -gt $Maximum) {
++    throw ("invalid UDP port range {0}..{1}" -f $Minimum, $Maximum)
++  }
++  for ($Attempt = 1; $Attempt -le 128; $Attempt++) {
++    $Candidate = Get-Random -Minimum $Minimum -Maximum ($Maximum + 1)
++    $Probe = $null
++    try {
++      $Probe = New-Object System.Net.Sockets.UdpClient
++      $Endpoint = New-Object System.Net.IPEndPoint -ArgumentList ([Net.IPAddress]::Parse('127.0.0.1')), $Candidate
++      $Probe.Client.Bind($Endpoint)
++      return $Candidate
++    } catch {
++      # A concurrently used port is simply skipped.
++    } finally {
++      if ($null -ne $Probe) { try { $Probe.Close() } catch { } }
++    }
++  }
++  throw ("INFRA_FAILURE: could not find a free loopback UDP port in range {0}..{1}" -f $Minimum, $Maximum)
++}
++
++function Wait-OriginalServerControlReady(
++  [pscustomobject]$Handle,
++  [string]$Suffix,
++  [int]$Port,
++  [int]$TimeoutMilliseconds,
++  [string]$ReportPath
++) {
++  # Quake control packet: NETFLAG_CTL | length(12), CCREQ_SERVER_INFO,
++  # "QUAKE\\0", NET_PROTOCOL_VERSION(3).  Waiting for CCREP_SERVER_INFO
++  # proves that the original process has completed WGL startup, opened the
++  # requested UDP accept socket and entered its network event loop.
++  [byte[]]$Request = @(0x80, 0x00, 0x00, 0x0c, 0x02, 0x51, 0x55, 0x41, 0x4b, 0x45, 0x00, 0x03)
++  $Started = [DateTime]::UtcNow
++  $Deadline = $Started.AddMilliseconds($TimeoutMilliseconds)
++  $Attempts = 0
++  $LastError = ''
++  $LastRemote = ''
++  $ResponseBytes = 0
++  $ServerAddress = ''
++  $HostName = ''
++  $MapName = ''
++  $CurrentPlayers = -1
++  $MaximumPlayers = -1
++  $Protocol = -1
++  $Ready = $false
++  $Udp = $null
++
++  Write-Host ("[MiniQuake] waiting for original GLQuake server {0} Protocol-3 readiness on 127.0.0.1:{1} (timeout {2} ms)" -f $Suffix, $Port, $TimeoutMilliseconds) -ForegroundColor Cyan
++
++  try {
++    $Udp = New-Object System.Net.Sockets.UdpClient
++    $Udp.Client.ReceiveTimeout = 750
++    $Target = New-Object System.Net.IPEndPoint -ArgumentList ([Net.IPAddress]::Parse('127.0.0.1')), $Port
++
++    while ([DateTime]::UtcNow -lt $Deadline -and -not $Ready) {
++      if ($Handle.process.HasExited) {
++        $Handle.process.WaitForExit()
++        $Handle.process.Refresh()
++        $LastError = "original process exited with code " + [int]$Handle.process.ExitCode
++        break
++      }
++
++      $Attempts = $Attempts + 1
++      try {
++        [void]$Udp.Send($Request, $Request.Length, $Target)
++        $Remote = New-Object System.Net.IPEndPoint -ArgumentList ([Net.IPAddress]::Any), 0
++        [byte[]]$Response = $Udp.Receive([ref]$Remote)
++        $LastRemote = $Remote.Address.ToString() + ':' + $Remote.Port
++        $ResponseBytes = $Response.Length
++        if ($Remote.Address.ToString() -ne '127.0.0.1' -or $Remote.Port -ne $Port) {
++          throw ("server-info response came from unexpected endpoint {0}" -f $LastRemote)
++        }
++
++        if ($Response.Length -lt 8) { throw "server-info response is too short" }
++        $WireLength = ([int]$Response[2] -shl 8) -bor [int]$Response[3]
++        if ($Response[0] -ne 0x80 -or $Response[1] -ne 0x00) { throw "response is not NETFLAG_CTL" }
++        if ($WireLength -ne $Response.Length) { throw ("response length field {0} does not match {1}" -f $WireLength, $Response.Length) }
++        if ($Response[4] -ne 0x83) { throw ("response command is 0x{0:x2}, expected CCREP_SERVER_INFO" -f $Response[4]) }
++
++        $Cursor = 5
++        $Field = Read-QuakeCString -Data $Response -Offset $Cursor
++        $ServerAddress = [string]$Field.value
++        $Cursor = [int]$Field.next_offset
++        $Field = Read-QuakeCString -Data $Response -Offset $Cursor
++        $HostName = [string]$Field.value
++        $Cursor = [int]$Field.next_offset
++        $Field = Read-QuakeCString -Data $Response -Offset $Cursor
++        $MapName = [string]$Field.value
++        $Cursor = [int]$Field.next_offset
++        if ($Cursor + 3 -gt $Response.Length) { throw "server-info response is truncated after map name" }
++        $CurrentPlayers = [int]$Response[$Cursor]
++        $MaximumPlayers = [int]$Response[$Cursor + 1]
++        $Protocol = [int]$Response[$Cursor + 2]
++        if ($Protocol -ne 3) { throw ("server-info control protocol is {0}, expected 3" -f $Protocol) }
++        if ([string]::IsNullOrWhiteSpace($MapName)) { throw "server-info response has no active map name" }
++        $Ready = $true
++      } catch [System.Net.Sockets.SocketException] {
++        # WSAETIMEDOUT is expected while the original process is still
++        # creating its window, OpenGL context and world textures.
++        $LastError = $_.Exception.Message
++      } catch {
++        $LastError = $_.Exception.Message
++      }
++
++      if (-not $Ready -and [DateTime]::UtcNow -lt $Deadline) {
++        Start-Sleep -Milliseconds 250
++      }
++    }
++  } finally {
++    if ($null -ne $Udp) { try { $Udp.Close() } catch { } }
++  }
++
++  $Elapsed = [int]([DateTime]::UtcNow - $Started).TotalMilliseconds
++  $ProcessAlive = $false
++  $ExitCode = $null
++  try {
++    $ProcessAlive = -not $Handle.process.HasExited
++    if (-not $ProcessAlive) {
++      $Handle.process.WaitForExit()
++      $Handle.process.Refresh()
++      $ExitCode = [int]$Handle.process.ExitCode
++    }
++  } catch { }
++
++  $Endpoints = @()
++  try {
++    if ($null -ne (Get-Command Get-NetUDPEndpoint -ErrorAction SilentlyContinue)) {
++      $Endpoints = @(
++        Get-NetUDPEndpoint -OwningProcess $Handle.process.Id -ErrorAction SilentlyContinue |
++          Select-Object LocalAddress, LocalPort
++      )
++    }
++  } catch { }
++
++  $Report = [ordered]@{
++    schema_version = 1
++    suffix = $Suffix
++    status = if ($Ready) { 'PASS' } else { 'FAIL' }
++    evidence = 'protocol3_server_info_response'
++    target_address = '127.0.0.1'
++    target_port = $Port
++    timeout_ms = $TimeoutMilliseconds
++    elapsed_ms = $Elapsed
++    probe_attempts = $Attempts
++    response_bytes = $ResponseBytes
++    response_remote = $LastRemote
++    server_address = $ServerAddress
++    hostname = $HostName
++    map = $MapName
++    current_players = $CurrentPlayers
++    maximum_players = $MaximumPlayers
++    control_protocol = $Protocol
++    process_id = $Handle.process.Id
++    process_alive = [bool]$ProcessAlive
++    process_exit_code = $ExitCode
++    process_udp_endpoints = $Endpoints
++    last_error = $LastError
++  }
++  $Report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $ReportPath -Encoding UTF8
++
++  if (-not $Ready) {
++    throw ("INFRA_FAILURE: original GLQuake server {0} did not answer a Protocol-3 server-info probe on 127.0.0.1:{1} within {2} ms; report={3}" -f $Suffix, $Port, $TimeoutMilliseconds, $ReportPath)
++  }
++
++  Write-Host ("[MiniQuake] original GLQuake server {0} ready: probes={1} elapsed_ms={2} map={3} host={4} protocol={5}" -f $Suffix, $Attempts, $Elapsed, $MapName, $HostName, $Protocol) -ForegroundColor Green
++  return [pscustomobject]$Report
++}
++
++function Stop-OriginalServer([pscustomobject]$Handle, [string]$StdoutPath, [string]$StderrPath) {
++  try {
++    if (-not $Handle.process.HasExited) {
++      $Handle.process.StandardInput.WriteLine('quit')
++      $Handle.process.StandardInput.Flush()
++    }
++  } catch { }
++  $Exited = $false
++  try { $Exited = $Handle.process.WaitForExit(2500) } catch { }
++  if (-not $Exited) { Stop-BackgroundCapturedProcess $Handle }
++  else { $Handle.process.WaitForExit(); $Handle.process.Refresh() }
++  try {
++    $Stdout = [string]$Handle.stdout_task.Result
++    $Stderr = [string]$Handle.stderr_task.Result
++    [IO.File]::WriteAllText($StdoutPath, $Stdout, [Text.UTF8Encoding]::new($false))
++    [IO.File]::WriteAllText($StderrPath, $Stderr, [Text.UTF8Encoding]::new($false))
++  } catch { }
++  try { $Handle.process.Dispose() } catch { }
++}
++
++function Write-OriginalVisualConfig([string]$Path, [string]$Demo, [int]$Frame) {
++  $Lines = New-Object System.Collections.Generic.List[string]
++  foreach ($Line in @(
++    'unbindall',
++    'viewsize 100',
++    'fov 90',
++    'gamma 1',
++    'crosshair 0',
++    'gl_picmip 0',
++    'gl_polyblend 1',
++    'gl_ztrick 0',
++    'gl_clear 1',
++    'gl_finish 1',
++    ('timedemo ' + $Demo)
++  )) { $Lines.Add($Line) }
++  for ($Index = 0; $Index -lt $Frame; $Index++) { $Lines.Add('wait') }
++  $Lines.Add('screenshot')
++  $Lines.Add('wait')
++  $Lines.Add('quit')
++  [IO.File]::WriteAllLines($Path, $Lines.ToArray(), [Text.Encoding]::ASCII)
++}
++
++function New-OriginalGameDirectory([string]$Name) {
++  $Path = Join-Path $OriginalBase $Name
++  Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue
++  New-Item -ItemType Directory -Force -Path $Path | Out-Null
++  return $Path
++}
++
++function Copy-TextArtifact([string]$Source, [string]$Destination) {
++  if (Test-Path -LiteralPath $Source -PathType Leaf) {
++    Copy-Item -LiteralPath $Source -Destination $Destination -Force
++  }
++}
++
++function Write-NormalizedInteropSummary([string]$InputPath, [string]$Direction, [string]$OutputPath) {
++  $Value = Read-JsonFile $InputPath
++  if ($Direction -eq 'original_server_mini_client') {
++    $Normalized = [ordered]@{
++      schema_version = 1
++      direction = $Direction
++      success = [bool]$Value.success
++      map = [string]$Value.map
++      connected = [bool]$Value.connected
++      spawned = [bool]$Value.spawned
++      signon = [int]$Value.signon
++      view_entity = [int]$Value.view_entity
++      model_count = [int]$Value.model_count
++      sound_count = [int]$Value.sound_count
++      protocol = [int]$Value.protocol
++      control_protocol = [int]$Value.control_protocol
++      network_provenance = 'target_udp'
++    }
++  } else {
++    $Normalized = [ordered]@{
++      schema_version = 1
++      direction = $Direction
++      success = [bool]$Value.success
++      map = [string]$Value.map
++      connected = [bool]$Value.connected
++      spawned = [bool]$Value.spawned
++      signon = [int]$Value.signon
++      model_count = [int]$Value.model_count
++      sound_count = [int]$Value.sound_count
++      active_clients = [int]$Value.active_clients
++      protocol = [int]$Value.protocol
++      control_protocol = [int]$Value.control_protocol
++    }
++  }
++  $Normalized | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $OutputPath -Encoding UTF8
++  return $OutputPath
++}
++
++function Run-OriginalServerMiniClientPair([string]$Suffix, [int]$Port) {
++  $GameName = 'bp091_' + $Suffix
++  $GameDirectory = New-OriginalGameDirectory $GameName
++  $OriginalServerOut = Join-Path $Build ("bp090-094r10-original-server-{0}-stdout.log" -f $Suffix)
++  $OriginalServerErr = Join-Path $Build ("bp090-094r10-original-server-{0}-stderr.log" -f $Suffix)
++  $ProcessReportPath = Join-Path $Build ("bp090-094r10-original-server-{0}-process.json" -f $Suffix)
++  $ReadinessReportPath = Join-Path $Build ("bp090-094r10-original-server-{0}-readiness.json" -f $Suffix)
++  Remove-Item -Force -ErrorAction SilentlyContinue $ReadinessReportPath
++
++  # Never pass -condebug to the 1997 GLQUAKE.EXE on modern OpenGL drivers.
++  # console.c::Con_DebugLog owns a fixed 1024-byte buffer and uses vsprintf.
++  # Modern GL_EXTENSIONS strings are commonly much longer and corrupt memory
++  # before map startup. Readiness and connection evidence therefore come from
++  # process lifetime plus a real Protocol-3/Protocol-15 MiniQuake handshake.
++  $OriginalServerArgs = Join-NativeArguments @(
++    '-listen', '4', '-basedir', $OriginalBase, '-game', $GameName,
++    '-window', '-width', '640', '-height', '480', '-heapsize', '32768',
++    '-nosound', '-nocdaudio', '-nojoy', '-nomouse', '-noipx',
++    '-ip', '127.0.0.1', '-port', [string]$Port,
++    '+developer', '1', '+unbindall', '+map', 'start'
++  )
++  Write-Host ("[MiniQuake] starting original GLQuake loopback-only listen server {0} on 127.0.0.1:{1} without -condebug" -f $Suffix, $Port) -ForegroundColor Cyan
++  $OriginalServer = Start-BackgroundCapturedProcess -Executable $OriginalExe -ArgumentsText $OriginalServerArgs -Label ("original GLQuake listen server {0}" -f $Suffix)
++  $Readiness = $null
++
++  $Attempt = 0
++  $AttemptLogs = @()
++  $SignonComplete = $false
++  $SuccessfulSummaryPath = ""
++  $LastClientCode = -1
++  $LastClientText = ""
++  $ProcessAliveAfterSignon = $false
++
++  try {
++    # A cold 1997 GLQuake startup on a modern driver may spend tens of seconds
++    # creating its WGL context and uploading textures.  Do not launch the full
++    # MiniQuake interop client until a real CCREP_SERVER_INFO proves that the
++    # requested UDP socket and network event loop are ready.
++    $Readiness = Wait-OriginalServerControlReady -Handle $OriginalServer -Suffix $Suffix -Port $Port -TimeoutMilliseconds $OriginalServerReadyTimeoutMs -ReportPath $ReadinessReportPath
++    $Deadline = [DateTime]::UtcNow.AddMilliseconds(45000)
++
++    while ([DateTime]::UtcNow -lt $Deadline -and -not $SignonComplete) {
++      if ($OriginalServer.process.HasExited) {
++        $OriginalServer.process.WaitForExit()
++        $OriginalServer.process.Refresh()
++        throw ("original GLQuake listen server {0} exited before Protocol-15 signon: exit={1}" -f $Suffix, [int]$OriginalServer.process.ExitCode)
++      }
++
++      $Attempt = $Attempt + 1
++      $AttemptPrefix = Join-Path $Build ("bp090-094r10-miniquake-client-original-server-{0}-attempt-{1}" -f $Suffix, $Attempt)
++      $AttemptLogName = "bp090-094r10-miniquake-client-original-server-{0}-attempt-{1}.log" -f $Suffix, $Attempt
++      $AttemptLogPath = Join-Path $Build $AttemptLogName
++      $AttemptLogs += $AttemptLogName
++      Remove-Item -Force -ErrorAction SilentlyContinue ($AttemptPrefix + '-summary.json'), $AttemptLogPath
++
++      Write-Host ("[MiniQuake] starting MiniQuake client attempt {0} for original server {1}" -f $Attempt, $Suffix) -ForegroundColor Cyan
++      $ClientResult = Invoke-LiveProcess -Executable $GameExe -Arguments @(
++        '--original-interop-client', $QuakeBase, '127.0.0.1', [string]$Port,
++        [string]$OriginalInteropFrames, $AttemptPrefix, '-game', $Game
++      ) -LogPath $AttemptLogPath
++
++      $LastClientCode = [int]$ClientResult.exit_code
++      $LastClientText = [string]$ClientResult.text
++      $AttemptSummaryPath = $AttemptPrefix + '-summary.json'
++      if ($LastClientCode -eq 0 -and $LastClientText -match 'result=PASS' -and (Test-Path -LiteralPath $AttemptSummaryPath -PathType Leaf)) {
++        $AttemptSummary = Read-JsonFile $AttemptSummaryPath
++        $HasTargetUdpProvenance = (
++          $LastClientText -match 'network_provenance=target_udp' -and
++          $LastClientText -match 'transport=udp' -and
++          $LastClientText -match 'local_server_active=false' -and
++          $LastClientText -match 'local_authoritative=false' -and
++          $LastClientText -match 'demo_playback=false'
++        )
++        if ($AttemptSummary.success -and $AttemptSummary.connected -and $AttemptSummary.spawned -and [int]$AttemptSummary.signon -eq 4 -and [int]$AttemptSummary.protocol -eq 15 -and $HasTargetUdpProvenance) {
++          $SignonComplete = $true
++          $SuccessfulSummaryPath = $AttemptSummaryPath
++          break
++        }
++      }
++
++      if ([DateTime]::UtcNow -lt $Deadline) { Start-Sleep -Milliseconds 250 }
++    }
++
++    if (-not $SignonComplete) {
++      $LastLine = '<none>'
++      $ClientLines = @($LastClientText -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
++      if ($ClientLines.Count -gt 0) { $LastLine = [string]$ClientLines[$ClientLines.Count - 1] }
++      throw ("MiniQuake client did not complete signon with original GLQuake server {0} after {1} attempts: exit={2} last={3}" -f $Suffix, $Attempt, $LastClientCode, $LastLine)
++    }
++
++    if ($OriginalServer.process.HasExited) {
++      $OriginalServer.process.WaitForExit()
++      $OriginalServer.process.Refresh()
++      throw ("original GLQuake listen server {0} exited immediately after signon: exit={1}" -f $Suffix, [int]$OriginalServer.process.ExitCode)
++    }
++    $ProcessAliveAfterSignon = $true
++
++    $Summary = Read-JsonFile $SuccessfulSummaryPath
++    $Normalized = Join-Path $Build ("bp090-094r10-original-server-mini-client-{0}-normalized.json" -f $Suffix)
++    [void](Write-NormalizedInteropSummary -InputPath $SuccessfulSummaryPath -Direction 'original_server_mini_client' -OutputPath $Normalized)
++    return $Normalized
++  } finally {
++    $AliveBeforeStop = $false
++    $ExitCodeBeforeStop = $null
++    try {
++      $AliveBeforeStop = -not $OriginalServer.process.HasExited
++      if (-not $AliveBeforeStop) {
++        $OriginalServer.process.WaitForExit()
++        $OriginalServer.process.Refresh()
++        $ExitCodeBeforeStop = [int]$OriginalServer.process.ExitCode
++      }
++    } catch { }
++    try {
++      [ordered]@{
++        schema_version = 1
++        suffix = $Suffix
++        port = $Port
++        process_mode = 'listen_with_video_context'
++        condebug_enabled = $false
++        network_scope = 'loopback_only'
++        bind_address = '127.0.0.1'
++        firewall_prompt_expected = $false
++        readiness_evidence = 'protocol3_server_info_then_target_udp_protocol15_signon4'
++        readiness_report = [IO.Path]::GetFileName($ReadinessReportPath)
++        readiness_status = if ($null -eq $Readiness) { 'not_completed' } else { [string]$Readiness.status }
++        readiness_probe_attempts = if ($null -eq $Readiness) { 0 } else { [int]$Readiness.probe_attempts }
++        readiness_elapsed_ms = if ($null -eq $Readiness) { 0 } else { [int]$Readiness.elapsed_ms }
++        readiness_map = if ($null -eq $Readiness) { '' } else { [string]$Readiness.map }
++        readiness_control_protocol = if ($null -eq $Readiness) { -1 } else { [int]$Readiness.control_protocol }
++        attempts = $Attempt
++        attempt_logs = $AttemptLogs
++        network_provenance_required = $true
++        local_fallback_rejected = $true
++        signon_complete = [bool]$SignonComplete
++        process_alive_after_signon = [bool]$ProcessAliveAfterSignon
++        process_alive_before_stop = [bool]$AliveBeforeStop
++        exit_code_before_stop = $ExitCodeBeforeStop
++      } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $ProcessReportPath -Encoding UTF8
++    } catch { }
++    Stop-OriginalServer -Handle $OriginalServer -StdoutPath $OriginalServerOut -StderrPath $OriginalServerErr
++  }
++}
++
++function Run-MiniServerOriginalClientPair([string]$Suffix, [int]$Port) {
++  $Prefix = Join-Path $Build ("bp090-094r10-miniquake-server-original-client-{0}" -f $Suffix)
++  $ReadyPath = $Prefix + '-ready.json'
++  $SummaryPath = $Prefix + '-summary.json'
++  $ServerOut = Join-Path $Build ("bp090-094r10-miniquake-server-original-client-{0}.log" -f $Suffix)
++  $ServerErr = Join-Path $Build ("bp090-094r10-miniquake-server-original-client-{0}.err.log" -f $Suffix)
++  $ProcessReportPath = Join-Path $Build ("bp090-094r10-original-client-{0}-process.json" -f $Suffix)
++  Remove-Item -Force -ErrorAction SilentlyContinue $ReadyPath, $SummaryPath, $ProcessReportPath
++  $ServerArgs = Join-NativeArguments @(
++    '--original-interop-server', $QuakeBase, 'start', [string]$Port,
++    [string]$OriginalInteropFrames, $Prefix, '-game', $Game
++  )
++  Write-Host ("[MiniQuake] starting MiniQuake original-client server {0} on UDP port {1}" -f $Suffix, $Port) -ForegroundColor Cyan
++  $Server = Start-BackgroundCapturedProcess -Executable $GameExe -ArgumentsText $ServerArgs -Label ("MiniQuake original-client server {0}" -f $Suffix)
++  $OriginalClient = $null
++  $GameName = 'bp092_' + $Suffix
++  $GameDirectory = New-OriginalGameDirectory $GameName
++  $ConfigName = 'interop.cfg'
++  $ConfigPath = Join-Path $GameDirectory $ConfigName
++  $ClientAliveAtSignon = $false
++  $ClientExitCode = $null
++  $ClientExitedBeforeSignon = $false
++  $ServerResult = $null
++  $FailureText = ''
++  try {
++    if (-not (Wait-ForFileText -Path $ReadyPath -Pattern '"ready"\s*:\s*true' -TimeoutMilliseconds 15000)) {
++      if ($Server.process.HasExited) { throw "MiniQuake interop server $Suffix exited before readiness" }
++      throw "MiniQuake interop server $Suffix did not report readiness within 15 seconds"
++    }
++
++    # Original Quake's Cmd_TokenizeString uses COM_Parse, where ':' is a
++    # standalone punctuation token. Host_Connect_f consumes only Cmd_Argv(1),
++    # so a host-colon-port console token silently drops PORT and targets 26000.
++    # Route the remote port through NET_Init's historical -port option and keep
++    # the console connect token free of a colon.
++    [IO.File]::WriteAllLines(
++      $ConfigPath,
++      @('unbindall', 'developer 1', 'name original_ref', 'color 0 0', 'connect 127.0.0.1'),
++      [Text.Encoding]::ASCII
++    )
++
++    # -condebug is intentionally omitted. The original Con_DebugLog uses an
++    # unsafe 1024-byte vsprintf buffer which modern GL extension strings exceed.
++    Write-Host ("[MiniQuake] starting original GLQuake client {0}: connect 127.0.0.1 via -port {1}" -f $Suffix, $Port) -ForegroundColor Cyan
++    $OriginalClient = Start-GuiProcess -Executable $OriginalExe -Arguments @(
++      '-basedir', $OriginalBase, '-game', $GameName,
++      '-window', '-width', '640', '-height', '480',
++      '-nosound', '-nocdaudio', '-nomouse', '-nojoy', '-noipx',
++      '-ip', '127.0.0.1', '-port', [string]$Port,
++      '+exec', $ConfigName
++    ) -WorkingDirectory (Join-Path $OriginalStage 'bin') -Label ("original GLQuake client {0}" -f $Suffix)
++
++    # Monitor both processes and the protocol summary. This preserves the
++    # foreground live output while giving a precise client status on failure.
++    $Deadline = [DateTime]::UtcNow.AddSeconds(60)
++    while ([DateTime]::UtcNow -lt $Deadline) {
++      if (Test-Path -LiteralPath $SummaryPath -PathType Leaf) { break }
++      if ($OriginalClient.HasExited) {
++        $OriginalClient.WaitForExit()
++        $OriginalClient.Refresh()
++        $ClientExitedBeforeSignon = $true
++        $ClientExitCode = [int]$OriginalClient.ExitCode
++        throw ("original GLQuake client {0} exited before completed signon: exit={1}" -f $Suffix, $ClientExitCode)
++      }
++      if ($Server.process.HasExited) { break }
++      Start-Sleep -Milliseconds 100
++    }
++
++    $Remaining = 5000
++    if (-not $Server.process.HasExited -and -not (Test-Path -LiteralPath $SummaryPath -PathType Leaf)) {
++      throw ("MiniQuake original-client server {0} timed out waiting for a Protocol-15 summary; original client alive={1}" -f $Suffix, (-not $OriginalClient.HasExited))
++    }
++    $ServerResult = Complete-BackgroundCapturedProcess -Handle $Server -TimeoutMilliseconds $Remaining -StdoutPath $ServerOut -StderrPath $ServerErr
++    if ([int]$ServerResult.exit_code -ne 0 -or [string]$ServerResult.stdout -notmatch 'result=PASS') {
++      throw "MiniQuake original-client server $Suffix failed: exit=$($ServerResult.exit_code)"
++    }
++    if ($OriginalClient.HasExited) {
++      $OriginalClient.WaitForExit()
++      $OriginalClient.Refresh()
++      $ClientExitCode = [int]$OriginalClient.ExitCode
++      throw ("original GLQuake client {0} exited before completed signon: exit={1}" -f $Suffix, $ClientExitCode)
++    }
++    $ClientAliveAtSignon = $true
++
++    $Summary = Read-JsonFile $SummaryPath
++    if (-not $Summary.success -or [int]$Summary.active_clients -lt 1 -or -not $Summary.spawned -or [int]$Summary.signon -lt 3 -or [int]$Summary.protocol -ne 15) {
++      throw "original client/MiniQuake server pair $Suffix did not prove complete signon"
++    }
++
++    [ordered]@{
++      schema_version = 1
++      suffix = $Suffix
++      port = $Port
++      condebug_enabled = $false
++      network_scope = 'loopback_only'
++      bind_address = '127.0.0.1'
++      firewall_prompt_expected = $false
++      evidence_source = 'miniquake_server_protocol15_summary'
++      original_command_parser = 'COM_Parse_colon_punctuation'
++      connect_token = '127.0.0.1'
++      remote_port_source = '-port'
++      remote_port = $Port
++      config_path = $ConfigPath
++      process_alive_at_completed_signon = [bool]$ClientAliveAtSignon
++      client_exited_before_signon = [bool]$ClientExitedBeforeSignon
++      client_exit_code = $ClientExitCode
++      active_clients = [int]$Summary.active_clients
++      spawned = [bool]$Summary.spawned
++      signon = [int]$Summary.signon
++      protocol = [int]$Summary.protocol
++      status = 'PASS'
++    } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $ProcessReportPath -Encoding UTF8
++
++    $Normalized = Join-Path $Build ("bp090-094r10-mini-server-original-client-{0}-normalized.json" -f $Suffix)
++    [void](Write-NormalizedInteropSummary -InputPath $SummaryPath -Direction 'mini_server_original_client' -OutputPath $Normalized)
++    return $Normalized
++  } catch {
++    $FailureText = $_.Exception.Message
++    try {
++      if ($null -ne $OriginalClient) {
++        if ($OriginalClient.HasExited) {
++          $OriginalClient.WaitForExit()
++          $OriginalClient.Refresh()
++          $ClientExitCode = [int]$OriginalClient.ExitCode
++          $ClientExitedBeforeSignon = $true
++        }
++      }
++      [ordered]@{
++        schema_version = 1
++        suffix = $Suffix
++        port = $Port
++        condebug_enabled = $false
++        network_scope = 'loopback_only'
++        bind_address = '127.0.0.1'
++        firewall_prompt_expected = $false
++        evidence_source = 'miniquake_server_protocol15_summary'
++        original_command_parser = 'COM_Parse_colon_punctuation'
++        connect_token = '127.0.0.1'
++        remote_port_source = '-port'
++        remote_port = $Port
++        config_path = $ConfigPath
++        process_started = ($null -ne $OriginalClient)
++        process_alive_at_failure = ($null -ne $OriginalClient -and -not $OriginalClient.HasExited)
++        client_exited_before_signon = [bool]$ClientExitedBeforeSignon
++        client_exit_code = $ClientExitCode
++        summary_exists = (Test-Path -LiteralPath $SummaryPath -PathType Leaf)
++        server_exited = [bool]$Server.process.HasExited
++        failure = $FailureText
++        status = 'FAIL'
++      } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $ProcessReportPath -Encoding UTF8
++    } catch { }
++    throw
++  } finally {
++    Stop-GuiProcess $OriginalClient
++    if ($null -ne $Server -and -not $Server.process.HasExited) { Stop-BackgroundCapturedProcess $Server }
++  }
++}
++
++function Run-OriginalVisualCapture([string]$Demo, [int]$Frame, [string]$Suffix, [string]$ScenarioRoot) {
++  $GameName = "bp093_{0}_{1}" -f $Demo, $Suffix
++  $GameDirectory = New-OriginalGameDirectory $GameName
++  $ConfigName = 'visual.cfg'
++  $ProcessReportPath = Join-Path $Build ("bp090-094r10-original-visual-{0}-{1}-process.json" -f $Demo, $Suffix)
++  Write-OriginalVisualConfig -Path (Join-Path $GameDirectory $ConfigName) -Demo $Demo -Frame $Frame
++
++  # Screenshot production is the evidence channel. -condebug is omitted to
++  # avoid the original fixed-size debug-log overflow on modern GL drivers.
++  $Process = Start-GuiProcess -Executable $OriginalExe -Arguments @(
++    '-basedir', $OriginalBase, '-game', $GameName,
++    '-window', '-width', '640', '-height', '480', '-gamma', '1',
++    '-nosound', '-nocdaudio', '-nomouse', '-nojoy', '-noudp', '-noipx',
++    '+exec', $ConfigName
++  ) -WorkingDirectory (Join-Path $OriginalStage 'bin') -Label ("original visual {0}-{1}" -f $Demo, $Suffix)
++
++  $Screenshot = ''
++  $ExitedBeforeCapture = $false
++  $ExitCodeBeforeCapture = $null
++  try {
++    $Deadline = [DateTime]::UtcNow.AddSeconds(90)
++    while ([DateTime]::UtcNow -lt $Deadline) {
++      $Found = Get-ChildItem -LiteralPath $GameDirectory -Filter 'quake*.tga' -File -ErrorAction SilentlyContinue | Sort-Object Name | Select-Object -First 1
++      if ($null -ne $Found) { $Screenshot = $Found.FullName; break }
++      if ($Process.HasExited) {
++        $Process.WaitForExit()
++        $Process.Refresh()
++        $ExitedBeforeCapture = $true
++        $ExitCodeBeforeCapture = [int]$Process.ExitCode
++        break
++      }
++      Start-Sleep -Milliseconds 100
++    }
++    if ([string]::IsNullOrWhiteSpace($Screenshot)) {
++      throw ("original GLQuake screenshot was not produced for {0}/{1}; exited={2} exit={3}" -f $Demo, $Suffix, $ExitedBeforeCapture, $ExitCodeBeforeCapture)
++    }
++    $Target = Join-Path $ScenarioRoot ("original-{0}.tga" -f $Suffix)
++    Copy-Item -LiteralPath $Screenshot -Destination $Target -Force
++    [ordered]@{
++      schema_version = 1
++      demo = $Demo
++      frame = $Frame
++      suffix = $Suffix
++      condebug_enabled = $false
++      network_scope = 'disabled'
++      bind_address = ''
++      firewall_prompt_expected = $false
++      evidence_source = 'original_tga_screenshot'
++      screenshot_produced = $true
++      screenshot_name = [IO.Path]::GetFileName($Screenshot)
++      process_exited_before_capture = [bool]$ExitedBeforeCapture
++      exit_code_before_capture = $ExitCodeBeforeCapture
++    } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $ProcessReportPath -Encoding UTF8
++    return $Target
++  } finally {
++    Stop-GuiProcess $Process
++  }
++}
++
++[void](Relaunch-ElevatedForInteropIfNeeded)
++
++New-Item -ItemType Directory -Force -Path $Build | Out-Null
++Start-Transcript -Path $TranscriptPath -Force | Out-Null
++$Failure = ""
++try {
++  Write-Host "MiniQuake BP-090-094R10 acceptance test"
++  Write-Host "  parent: $BlockParentPackageId"
++  Write-Host "  root:   $Root"
++  if ($BisectOnFailure) { Write-Host "  logical bisect markers enabled" }
++
++  if ([string]::IsNullOrWhiteSpace($Python)) { $Python = "python" }
++  $PythonExe = Resolve-Tool $Python "Python"
++
++  if (-not $SkipBuild) {
++    $PowerShellExe = (Get-Process -Id $PID).Path
++    $Arguments = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $BuildScript)
++    if (-not [string]::IsNullOrWhiteSpace($Compiler)) { $Arguments += @("-Compiler", $Compiler) }
++    if (-not [string]::IsNullOrWhiteSpace($StdLib)) { $Arguments += @("-StdLib", $StdLib) }
++    $Arguments += @("-Python", $PythonExe, "-Configuration", $Configuration)
++    if ($NetworkTests) { $Arguments += "-NetworkTests" }
++    if ($RebuildNative) { $Arguments += "-RebuildNative" }
++    if ($Listings) { $Arguments += "-Listings" }
++    [void](Run-Logged "single cumulative build and unit-test suite" $PowerShellExe $Arguments "bp090-094r10-build-child.log" "MiniQuake BP-094 external compatibility closure tests passed: 24")
++  } else {
++    Add-Step "single cumulative build and unit-test suite" "SKIPPED" 0 "-SkipBuild"
++  }
++
++  foreach ($Path in @($GameExe, $EvidenceExe, $CoreAssetEvidenceExe, $ArtifactEvidenceExe)) { if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "required executable missing: $Path" } }
++
++  $Version = Run-Logged "package identity" $GameExe @("--version") "bp090-094r10-version.txt" "Compatibility release status: compat_109_release_candidate_v1"
++  if ($Version -notmatch 'Package: BP-094' -or $Version -notmatch 'Parent package: BP-093' -or $Version -notmatch 'Block: BP-090-094' -or $Version -notmatch 'Block parent package: BP-085-089R8') { throw "compiled package identity mismatch" }
++  if ($Version -notmatch 'Core assets/memory status: core_assets_memory_109_frozen_v1' -or $Version -notmatch 'Core assets/memory fingerprint: 0x6c8d974d') { throw "compiled core assets/memory identity mismatch" }
++  if ($Version -notmatch 'Gameplay/presentation status: gameplay_presentation_109_frozen_v1' -or $Version -notmatch 'Gameplay/presentation fingerprint: 0xad91624c') { throw "compiled gameplay/presentation identity mismatch" }
++  if ($Version -notmatch 'Black-port source status: black_port_source_109_frozen_v1' -or $Version -notmatch 'Black-port source fingerprint: 0x309b0737') { throw "compiled black-port source identity mismatch" }
++  if ($Version -notmatch 'Game profile status: game_profile_109_frozen_v1' -or $Version -notmatch 'Game profile fingerprint: 0x7a03b68d') { throw "compiled game-profile identity mismatch" }
++  if ($Version -notmatch 'Mod runtime status: mod_runtime_109_frozen_v1' -or $Version -notmatch 'Mod runtime fingerprint: 0x4649813d') { throw "compiled mod-runtime identity mismatch" }
++  if ($Version -notmatch 'Artifact compatibility status: artifact_compat_109_frozen_v1' -or $Version -notmatch 'Artifact compatibility fingerprint: 0x59531091') { throw "compiled artifact identity mismatch" }
++  if ($Version -notmatch 'Stability status: stability_109_frozen_v1' -or $Version -notmatch 'Stability fingerprint: 0xd0e3c03f') { throw "compiled stability identity mismatch" }
++  if ($Version -notmatch 'Compatibility release status: compat_109_release_candidate_v1' -or $Version -notmatch 'Compatibility release fingerprint: 0x29b72a98') { throw "compiled release-candidate identity mismatch" }
++  if ($Version -notmatch 'Original reference status: original_reference_109_candidate_v1' -or $Version -notmatch 'Original reference fingerprint: 0xdc355175') { throw "compiled original-reference identity mismatch" }
++  if ($Version -notmatch 'Final compatibility status: compat_109_final_candidate_v1' -or $Version -notmatch 'Final compatibility fingerprint: 0xe04a7727') { throw "compiled final-candidate identity mismatch" }
++
++  $CanUseGame = -not $SkipGameValidation -and -not [string]::IsNullOrWhiteSpace($QuakeBase) -and (Test-Path -LiteralPath (Join-Path $QuakeBase 'id1\pak0.pak') -PathType Leaf)
++
++  $NeedOriginalReference = -not $SkipOriginalInterop -or -not $SkipOriginalVisualReference
++  $OriginalStage = Join-Path $Build 'bp090-094r10-original-reference'
++  $OriginalExe = ''
++  $OriginalBase = ''
++  if ($NeedOriginalReference) {
++    if (-not $CanUseGame) { throw 'original reference gates require a valid -QuakeBase' }
++    if ($OriginalVisualFrame -ne 256 -and -not $SkipOriginalVisualReference) { throw 'BP-093 binds the original visual reference at frame 256' }
++    if ([string]::IsNullOrWhiteSpace($OriginalQuakeSourceArchive) -and [string]::IsNullOrWhiteSpace($OriginalGLQuakeExe)) {
++      if (-not [string]::IsNullOrWhiteSpace($env:MINIQUAKE_ORIGINAL_SOURCE)) {
++        $OriginalQuakeSourceArchive = $env:MINIQUAKE_ORIGINAL_SOURCE
++      } elseif (Test-Path -LiteralPath (Join-Path $Root 'OriginalQuakeSourceCode.zip') -PathType Leaf) {
++        $OriginalQuakeSourceArchive = Join-Path $Root 'OriginalQuakeSourceCode.zip'
++      } elseif (Test-Path -LiteralPath (Join-Path (Split-Path -Parent $Root) 'OriginalQuakeSourceCode.zip') -PathType Leaf) {
++        $OriginalQuakeSourceArchive = Join-Path (Split-Path -Parent $Root) 'OriginalQuakeSourceCode.zip'
++      }
++    }
++    if ([string]::IsNullOrWhiteSpace($OriginalQuakeSourceArchive) -and [string]::IsNullOrWhiteSpace($OriginalGLQuakeExe)) {
++      throw 'Pass -OriginalQuakeSourceArchive PATH or -OriginalGLQuakeExe PATH for BP-090 through BP-094.'
++    }
++    $PrepareArguments = @($OriginalPrepareTool, '--quake-base', $QuakeBase, '--stage', $OriginalStage, '--json', (Join-Path $Build 'bp090-094r10-original-reference-provenance.json'))
++    if (-not [string]::IsNullOrWhiteSpace($OriginalQuakeSourceArchive)) { $PrepareArguments += @('--archive', $OriginalQuakeSourceArchive) }
++    else { $PrepareArguments += @('--exe', $OriginalGLQuakeExe) }
++    [void](Run-Logged 'verified original GLQuake reference' $PythonExe $PrepareArguments 'bp090-094r10-original-reference.log' 'result=PASS')
++    $OriginalExe = Join-Path $OriginalStage 'bin\GLQUAKE.EXE'
++    $OriginalBase = Join-Path $OriginalStage 'basedir'
++    if (-not (Test-Path -LiteralPath $OriginalExe -PathType Leaf)) { throw "staged original GLQuake executable missing: $OriginalExe" }
++  } else { Add-Step 'verified original GLQuake reference' 'SKIPPED' 0 'both external gates explicitly skipped' }
++
++  Install-TemporaryLoopbackFirewallRules
++
++  if (-not $SkipOriginalInterop) {
++    $A1 = Run-OriginalServerMiniClientPair -Suffix 'a' -Port (Get-AvailableLoopbackUdpPort -Minimum 30000 -Maximum 36000)
++    $A2 = Run-OriginalServerMiniClientPair -Suffix 'b' -Port (Get-AvailableLoopbackUdpPort -Minimum 36001 -Maximum 42000)
++    $AHash1 = (Get-FileHash -LiteralPath $A1 -Algorithm SHA256).Hash.ToLowerInvariant()
++    $AHash2 = (Get-FileHash -LiteralPath $A2 -Algorithm SHA256).Hash.ToLowerInvariant()
++    if ($AHash1 -ne $AHash2) { throw "original-server/MiniQuake-client normalized reports differ: $AHash1 vs $AHash2" }
++    Add-Step 'original GLQuake server to MiniQuake client interop' 'PASS' 0 ("mode=listen condebug=false pairs=2 sha256=" + $AHash1)
++
++    $B1 = Run-MiniServerOriginalClientPair -Suffix 'a' -Port (Get-AvailableLoopbackUdpPort -Minimum 42001 -Maximum 50000)
++    $B2 = Run-MiniServerOriginalClientPair -Suffix 'b' -Port (Get-AvailableLoopbackUdpPort -Minimum 50001 -Maximum 60000)
++    $BHash1 = (Get-FileHash -LiteralPath $B1 -Algorithm SHA256).Hash.ToLowerInvariant()
++    $BHash2 = (Get-FileHash -LiteralPath $B2 -Algorithm SHA256).Hash.ToLowerInvariant()
++    if ($BHash1 -ne $BHash2) { throw "MiniQuake-server/original-client normalized reports differ: $BHash1 vs $BHash2" }
++    Add-Step 'MiniQuake server to original GLQuake client interop' 'PASS' 0 ("pairs=2 sha256=" + $BHash1)
++    Add-Step 'bidirectional original binary interop' 'PASS' 0 'two deterministic pairs in each Protocol-15 direction'
++  } else { Add-Step 'bidirectional original binary interop' 'SKIPPED' 0 '-SkipOriginalInterop' }
++
++  if (-not $SkipOriginalVisualReference) {
++    $VisualRoot = Join-Path $Build 'bp090-094r10-original-visual'
++    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $VisualRoot
++    New-Item -ItemType Directory -Force -Path $VisualRoot | Out-Null
++    $VisualResults = @()
++    foreach ($DemoName in @('demo1', 'demo2', 'demo3')) {
++      $Scenario = $DemoName + '-256'
++      $ScenarioRoot = Join-Path $VisualRoot $Scenario
++      New-Item -ItemType Directory -Force -Path $ScenarioRoot | Out-Null
++      $OriginalA = Run-OriginalVisualCapture -Demo $DemoName -Frame 256 -Suffix 'a' -ScenarioRoot $ScenarioRoot
++      $OriginalB = Run-OriginalVisualCapture -Demo $DemoName -Frame 256 -Suffix 'b' -ScenarioRoot $ScenarioRoot
++      $OriginalHashA = (Get-FileHash -LiteralPath $OriginalA -Algorithm SHA256).Hash.ToLowerInvariant()
++      $OriginalHashB = (Get-FileHash -LiteralPath $OriginalB -Algorithm SHA256).Hash.ToLowerInvariant()
++      if ($OriginalHashA -ne $OriginalHashB) { throw "original GLQuake captures differ for ${Scenario}: $OriginalHashA vs $OriginalHashB" }
++      Add-Step ("original GLQuake deterministic capture {0}" -f $Scenario) 'PASS' 0 ("sha256=" + $OriginalHashA)
++
++      $Candidates = @()
++      for ($Offset = -2; $Offset -le 2; $Offset++) {
++        $FrameNumber = 256 + $Offset
++        $Prefix = Join-Path $ScenarioRoot ("miniquake-{0}" -f $FrameNumber)
++        [void](Run-Logged ("MiniQuake demo capture {0} frame {1}" -f $DemoName, $FrameNumber) $GameExe @(
++          '--render-demo-evidence', $QuakeBase, $DemoName, [string]$FrameNumber, $Prefix, '-game', $Game
++        ) ("bp090-094r10-{0}-frame-{1}.log" -f $DemoName, $FrameNumber) 'MiniQuake render evidence: PASS')
++        $Candidates += @('--candidate', ("{0}:{1}.tga" -f $FrameNumber, $Prefix))
++      }
++      $VisualJson = Join-Path $ScenarioRoot 'comparison.json'
++      $CompareArgs = @($OriginalVisualComparator, $OriginalA, '--scenario', $Scenario, '--min-ssim', '0.95', '--json-out', $VisualJson) + $Candidates
++      [void](Run-Logged ("raw original visual comparison {0}" -f $Scenario) $PythonExe $CompareArgs ("bp090-094r10-{0}-comparison.log" -f $Scenario) 'result=PASS')
++      $Comparison = Read-JsonFile $VisualJson
++      if ($Comparison.status -ne 'PASS' -or [double]$Comparison.best.ssim -lt 0.95 -or $Comparison.normalization -ne 'none') { throw "original visual reference failed for $Scenario" }
++      $VisualResults += [ordered]@{ scenario=$Scenario; original_sha256=$OriginalHashA; best_frame=[int]$Comparison.best.frame; ssim=[double]$Comparison.best.ssim; mae=[double]$Comparison.best.mae; psnr=[double]$Comparison.best.psnr; report=$VisualJson }
++    }
++    $VisualSummary = Join-Path $Build 'bp090-094r10-original-visual-summary.json'
++    [ordered]@{ schema_version=1; status='PASS'; minimum_ssim=0.95; normalization='none'; scenarios=$VisualResults } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $VisualSummary -Encoding UTF8
++    Add-Step 'external GLQuake visual reference corpus' 'PASS' 0 ("scenarios=" + $VisualResults.Count + " min_ssim=0.95")
++  } else { Add-Step 'external GLQuake visual reference corpus' 'SKIPPED' 0 '-SkipOriginalVisualReference' }
++
++  if ($CanUseGame) {
++    if (-not (Test-Path -LiteralPath (Join-Path $QuakeBase "id1\pak0.pak") -PathType Leaf)) { throw "Quake data not found: $QuakeBase\id1\pak0.pak" }
++    [void](Run-Logged "installed Quake data validation" $GameExe @("--validate-game", $QuakeBase, $Map, "-game", $Game) "bp090-094r10-game-validation.log" "Validation result: PASS")
++    [void](Run-Logged "headless runtime validation" $GameExe @("--validate-runtime", $QuakeBase, $Map, [string]$Frames, "-game", $Game) "bp090-094r10-runtime-validation.log")
++  } else {
++    Add-Step "installed Quake data validation" "SKIPPED" 0 "no usable -QuakeBase or skipped"
++    Add-Step "headless runtime validation" "SKIPPED" 0 "no usable -QuakeBase or skipped"
++  }
++
++  if (-not $SkipMissionPackEvidence -and $CanUseGame) {
++    foreach ($Mission in @("rogue", "hipnotic")) {
++      $MissionDirectory = Join-Path $QuakeBase $Mission
++      $MissionPak = Get-ChildItem -LiteralPath $MissionDirectory -File -Filter "pak*.pak" -ErrorAction SilentlyContinue | Select-Object -First 1
++      if ($null -eq $MissionPak) {
++        Add-Step ("optional mission-pack {0}" -f $Mission) "SKIPPED" 0 "directory or PAK not installed"
++        continue
++      }
++      $MissionFlag = "-" + $Mission
++      [void](Run-Logged ("mission-pack {0} game validation" -f $Mission) $GameExe @("--validate-game", $QuakeBase, "start", $MissionFlag) ("bp090-094r10-{0}-validation.log" -f $Mission) "Validation result: PASS")
++      [void](Run-Logged ("mission-pack {0} headless runtime" -f $Mission) $GameExe @("-basedir", $QuakeBase, $MissionFlag, "-headless", "-nosound", "-maxframes", "128", "+map", "start") ("bp090-094r10-{0}-runtime.log" -f $Mission))
++    }
++  } else {
++    Add-Step "optional mission-pack validation" "SKIPPED" 0 "skipped or no usable Quake data"
++  }
++
++  if ($CanUseGame) {
++    $CoreA = Join-Path $Build "bp090-094r10-core-assets-a.log"
++    $CoreB = Join-Path $Build "bp090-094r10-core-assets-b.log"
++    [void](Run-Logged "retail core asset evidence A" $CoreAssetEvidenceExe @($QuakeBase, $Game) ([IO.Path]::GetFileName($CoreA)) "result=PASS")
++    [void](Run-Logged "retail core asset evidence B" $CoreAssetEvidenceExe @($QuakeBase, $Game) ([IO.Path]::GetFileName($CoreB)) "result=PASS")
++    $CoreHashA = (Get-FileHash -Algorithm SHA256 -LiteralPath $CoreA).Hash.ToLowerInvariant()
++    $CoreHashB = (Get-FileHash -Algorithm SHA256 -LiteralPath $CoreB).Hash.ToLowerInvariant()
++    if ($CoreHashA -ne $CoreHashB) { throw "retail core asset evidence differs: A=$CoreHashA B=$CoreHashB" }
++    Add-Step "byte-identical retail core asset evidence" "PASS" 0 ("sha256=" + $CoreHashA)
++  } else {
++    Add-Step "retail core asset evidence" "SKIPPED" 0 "no usable -QuakeBase"
++  }
++
++  if (-not $SkipAudioEvidence -and $CanUseGame) {
++    $AudioExe = Join-Path $Build "MiniQuakeAudioRetailEvidence.exe"
++    $A = Join-Path $Build "bp090-094r10-audio-a.log"; $B = Join-Path $Build "bp090-094r10-audio-b.log"
++    $TextA = Run-Logged "retail audio evidence A" $AudioExe @($QuakeBase, $Game) ([IO.Path]::GetFileName($A)) "MiniQuake BP-059 retail audio evidence: PASS"
++    $TextB = Run-Logged "retail audio evidence B" $AudioExe @($QuakeBase, $Game) ([IO.Path]::GetFileName($B)) "MiniQuake BP-059 retail audio evidence: PASS"
++    $HashA = (Get-FileHash -Algorithm SHA256 -LiteralPath $A).Hash.ToLowerInvariant(); $HashB = (Get-FileHash -Algorithm SHA256 -LiteralPath $B).Hash.ToLowerInvariant()
++    if ($HashA -ne $HashB) { throw "retail audio evidence differs" }
++    Add-Step "byte-identical retail audio evidence" "PASS" 0 ("sha256=" + $HashA)
++  } else { Add-Step "retail audio evidence" "SKIPPED" 0 "skipped or no Quake data" }
++
++  if (-not $SkipArtifactEvidence -and $CanUseGame) {
++    $ArtifactA = Join-Path $Build "bp090-094r10-artifacts-a.log"
++    $ArtifactB = Join-Path $Build "bp090-094r10-artifacts-b.log"
++    $ArtifactTextA = Run-Logged "retail demo/save artifact evidence A" $ArtifactEvidenceExe @($QuakeBase, $Game, $Map) ([IO.Path]::GetFileName($ArtifactA)) "result=PASS"
++    $ArtifactTextB = Run-Logged "retail demo/save artifact evidence B" $ArtifactEvidenceExe @($QuakeBase, $Game, $Map) ([IO.Path]::GetFileName($ArtifactB)) "result=PASS"
++    foreach ($ArtifactText in @($ArtifactTextA, $ArtifactTextB)) {
++      if ($ArtifactText -notmatch 'first_pass_exact=true' -or
++          $ArtifactText -notmatch 'semantic=true' -or
++          $ArtifactText -notmatch 'stable_exact=true' -or
++          $ArtifactText -notmatch 'stable_semantic=true' -or
++          $ArtifactText -notmatch 'save_float_format=4097:4097\.000000 negative:-4097\.000000' -or
++          $ArtifactText -notmatch 'save_float_parse=-0\.000000:80000000') {
++        throw "retail artifact evidence did not prove exact, semantic, stable, signed-zero and overflow-safe save roundtrip"
++      }
++    }
++    $ArtifactHashA = (Get-FileHash -Algorithm SHA256 -LiteralPath $ArtifactA).Hash.ToLowerInvariant()
++    $ArtifactHashB = (Get-FileHash -Algorithm SHA256 -LiteralPath $ArtifactB).Hash.ToLowerInvariant()
++    if ($ArtifactHashA -ne $ArtifactHashB) { throw "retail artifact evidence differs: A=$ArtifactHashA B=$ArtifactHashB" }
++    Add-Step "byte-identical retail demo/save evidence" "PASS" 0 ("sha256=" + $ArtifactHashA)
++  } else {
++    Add-Step "retail demo/save artifact evidence" "SKIPPED" 0 "skipped or no usable Quake data"
++  }
++
++  if (-not $SkipTraceValidation -and $CanUseGame) {
++    $TraceDir = Join-Path $Build "bp090-094r10-traces"; Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $TraceDir; New-Item -ItemType Directory -Force -Path $TraceDir | Out-Null
++    $PrefixA = Join-Path $TraceDir "run-a"; $PrefixB = Join-Path $TraceDir "run-b"
++    [void](Run-Logged "compatibility trace A" $GameExe @("--compat-trace", $QuakeBase, $Map, [string]$TraceFrames, $PrefixA, "-game", $Game) "bp090-094r10-trace-a.log")
++    [void](Run-Logged "compatibility trace B" $GameExe @("--compat-trace", $QuakeBase, $Map, [string]$TraceFrames, $PrefixB, "-game", $Game) "bp090-094r10-trace-b.log")
++    [void](Run-Logged "byte-identical trace comparison" $PythonExe @($TraceComparator, ("{0}.mqtrace" -f $PrefixA), ("{0}.mqtrace" -f $PrefixB), "--json-output", (Join-Path $Build "bp090-094r10-trace-comparison.json")) "bp090-094r10-trace-comparison.log")
++  } else { Add-Step "deterministic compatibility traces" "SKIPPED" 0 "skipped or no Quake data" }
++
++  if (-not $SkipBlackPortCorpus -and $CanUseGame) {
++    $CorpusRoot = Join-Path $Build "bp090-094r10-black-port-corpus"
++    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $CorpusRoot
++    New-Item -ItemType Directory -Force -Path $CorpusRoot | Out-Null
++    $CorpusScenarios = @(
++      [ordered]@{ name = "start-064"; map = "start" },
++      [ordered]@{ name = "e1m1-064"; map = "e1m1" },
++      [ordered]@{ name = "e1m2-064"; map = "e1m2" },
++      [ordered]@{ name = "e1m3-064"; map = "e1m3" }
++    )
++    $CorpusReport = @()
++    foreach ($Scenario in $CorpusScenarios) {
++      $ScenarioName = [string]$Scenario.name
++      $ScenarioMap = [string]$Scenario.map
++      $ScenarioDirectory = Join-Path $CorpusRoot $ScenarioName
++      New-Item -ItemType Directory -Force -Path $ScenarioDirectory | Out-Null
++      $PrefixA = Join-Path $ScenarioDirectory "run-a"
++      $PrefixB = Join-Path $ScenarioDirectory "run-b"
++      [void](Run-Logged ("black-port corpus {0} trace A" -f $ScenarioName) $GameExe @("--compat-trace", $QuakeBase, $ScenarioMap, [string]$BlackPortCorpusFrames, $PrefixA, "-game", $Game) ("bp090-094r10-corpus-{0}-a.log" -f $ScenarioName))
++      [void](Run-Logged ("black-port corpus {0} trace B" -f $ScenarioName) $GameExe @("--compat-trace", $QuakeBase, $ScenarioMap, [string]$BlackPortCorpusFrames, $PrefixB, "-game", $Game) ("bp090-094r10-corpus-{0}-b.log" -f $ScenarioName))
++      $ComparisonJson = Join-Path $Build ("bp090-094r10-corpus-{0}-comparison.json" -f $ScenarioName)
++      [void](Run-Logged ("black-port corpus {0} comparison" -f $ScenarioName) $PythonExe @($TraceComparator, ("{0}.mqtrace" -f $PrefixA), ("{0}.mqtrace" -f $PrefixB), "--json-output", $ComparisonJson) ("bp090-094r10-corpus-{0}-comparison.log" -f $ScenarioName))
++      $TraceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath ("{0}.mqtrace" -f $PrefixA)).Hash.ToLowerInvariant()
++      $CorpusReport += [ordered]@{
++        name = $ScenarioName
++        map = $ScenarioMap
++        frames = $BlackPortCorpusFrames
++        trace_sha256 = $TraceHash
++        comparison = [IO.Path]::GetFileName($ComparisonJson)
++      }
++    }
++    $CorpusSummaryPath = Join-Path $Build "bp090-094r10-black-port-corpus-summary.json"
++    [ordered]@{
++      schema_version = 1
++      status = "PASS"
++      frames_per_scenario = $BlackPortCorpusFrames
++      scenario_count = $CorpusReport.Count
++      scenarios = $CorpusReport
++    } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $CorpusSummaryPath -Encoding UTF8
++    Add-Step "four-map deterministic black-port corpus" "PASS" 0 ("summary=" + [IO.Path]::GetFileName($CorpusSummaryPath))
++  } else {
++    Add-Step "four-map deterministic black-port corpus" "SKIPPED" 0 "skipped or no Quake data"
++  }
++
++  if (-not $SkipSoak -and $CanUseGame) {
++    [void](Run-Logged "5000-frame host soak" $GameExe @("--soak", $QuakeBase, $Map, [string]$SoakFrames, "-game", $Game) "bp090-094r10-host-soak.log" "result=PASS")
++    $SoakPort = Get-Random -Minimum 30000 -Maximum 60000
++    [void](Run-Logged "5000-frame listen-server resource soak" $GameExe @("--long-soak", "listen", $QuakeBase, $Map, [string]$ListenSoakFrames, "-game", $Game, "-port", [string]$SoakPort) "bp090-094r10-listen-soak.log" "result=PASS")
++  } else {
++    Add-Step "resource stability soaks" "SKIPPED" 0 "skipped or no usable Quake data"
++  }
++
++  if (-not $SkipRenderEvidence -and $CanUseGame) {
++    $EvidenceDir = Join-Path $Build "bp090-094r10-render"; Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $EvidenceDir; New-Item -ItemType Directory -Force -Path $EvidenceDir | Out-Null
++    $EA = Join-Path $EvidenceDir "a"; $EB = Join-Path $EvidenceDir "b"
++    [void](Run-Logged "render evidence A" $GameExe @("--render-evidence", $QuakeBase, $Map, [string]$RenderEvidenceFrame, $EA, "-game", $Game) "bp090-094r10-render-a.log")
++    [void](Run-Logged "render evidence B" $GameExe @("--render-evidence", $QuakeBase, $Map, [string]$RenderEvidenceFrame, $EB, "-game", $Game) "bp090-094r10-render-b.log")
++    [void](Run-Logged "byte-identical render evidence" $PythonExe @($RenderComparator, ("{0}.tga" -f $EA), ("{0}.tga" -f $EB), "--require-exact", "--json-out", (Join-Path $Build "bp090-094r10-render-comparison.json")) "bp090-094r10-render-comparison.log")
++  } else { Add-Step "deterministic framebuffer evidence" "SKIPPED" 0 "skipped or no Quake data" }
++
++  if (-not $SkipNetworkEvidence) {
++    $PortA = Get-Random -Minimum 30000 -Maximum 45000
++    $PortB = Get-Random -Minimum 45001 -Maximum 60000
++    $ClientA = Run-NetworkEvidencePair "a" $PortA
++    $ClientB = Run-NetworkEvidencePair "b" $PortB
++    $HashA = (Get-FileHash -Algorithm SHA256 -LiteralPath $ClientA).Hash.ToLowerInvariant(); $HashB = (Get-FileHash -Algorithm SHA256 -LiteralPath $ClientB).Hash.ToLowerInvariant()
++    if ($HashA -ne $HashB) { throw "network evidence client reports differ: A=$HashA B=$HashB" }
++    Add-Step "two independent UDP control handshakes" "PASS" 0 ("sha256=" + $HashA)
++  } else { Add-Step "two independent UDP control handshakes" "SKIPPED" 0 "-SkipNetworkEvidence" }
++
++  if ($NetworkTests) { [void](Run-Logged "Winsock UDP loopback smoke" $GameExe @("--udp-smoke", "2000") "bp090-094r10-udp-smoke.log" "result=PASS") }
++  else { Add-Step "Winsock UDP loopback smoke" "SKIPPED" 0 "-NetworkTests not supplied" }
++
++  $Failed = @($Steps | Where-Object { $_.status -eq "FAIL" })
++  if ($Failed.Count -gt 0) { throw "independent test groups failed: $($Failed.Count)" }
++  if ($SkipOriginalInterop -or $SkipOriginalVisualReference) {
++    throw "final BP-090-094R10 acceptance requires original binary interop and external GLQuake visual-reference gates"
++  }
++  Add-Step "MiniQuake BP-090-094R10 acceptance" "PASS" 0 "all internal and external gates passed"
++} catch {
++  $Failure = $_.Exception.Message
++  Write-Host ("ERROR: " + $Failure) -ForegroundColor Red
++} finally {
++  try {
++    Remove-TemporaryLoopbackFirewallRules
++  } catch {
++    $CleanupFailure = $_.Exception.Message
++    Write-Host ("ERROR: " + $CleanupFailure) -ForegroundColor Red
++    if ([string]::IsNullOrWhiteSpace($Failure)) { $Failure = $CleanupFailure }
++    else { $Failure = $Failure + "; " + $CleanupFailure }
++  }
++  $Status = if ([string]::IsNullOrWhiteSpace($Failure)) { "PASS" } else { "FAIL" }
++  $Summary = [ordered]@{
++    schema_version = 1
++    package_id = $PackageId
++    parent_package_id = $ParentPackageId
++    block_id = $BlockId
++    block_parent_package_id = $BlockParentPackageId
++    delivery_revision = $DeliveryRevision
++    delivery_parent = $DeliveryParent
++    network_platform_status = "network_platform_109_frozen_v1"
++    network_platform_fingerprint = "0xb3ec7589"
++    frontend_status = "frontend_109_frozen_v1"
++    frontend_fingerprint = "0x924251fa"
++    core_assets_memory_status = "core_assets_memory_109_frozen_v1"
++    core_assets_memory_fingerprint = "0x6c8d974d"
++    gameplay_presentation_status = "gameplay_presentation_109_frozen_v1"
++    gameplay_presentation_fingerprint = "0xad91624c"
++    black_port_source_status = "black_port_source_109_frozen_v1"
++    black_port_source_fingerprint = "0x309b0737"
++    black_port_source_target_functions = 1094
++    black_port_source_missing_functions = 0
++    black_port_corpus_scenarios = 4
++    game_profile_status = "game_profile_109_frozen_v1"
++    game_profile_fingerprint = "0x7a03b68d"
++    mod_runtime_status = "mod_runtime_109_frozen_v1"
++    mod_runtime_fingerprint = "0x4649813d"
++    artifact_compat_status = "artifact_compat_109_frozen_v1"
++    artifact_compat_fingerprint = "0x59531091"
++    stability_status = "stability_109_frozen_v1"
++    stability_fingerprint = "0xd0e3c03f"
++    compat_release_status = "compat_109_release_candidate_v1"
++    compat_release_fingerprint = "0x29b72a98"
++    original_reference_status = "original_reference_109_candidate_v1"
++    original_reference_fingerprint = "0xdc355175"
++    compat_final_status = "compat_109_final_candidate_v1"
++    compat_final_fingerprint = "0xe04a7727"
++    external_gates_required = @("original_binary_interop", "external_glquake_visual_reference")
++    original_server_mode = "listen_with_video_context"
++    original_server_readiness = "protocol3_server_info_response"
++    original_server_ready_timeout_ms = $OriginalServerReadyTimeoutMs
++    original_network_scope = "loopback_only"
++    original_bind_address = "127.0.0.1"
++    original_visual_network = "disabled"
++    unattended_firewall_prompt_expected = $false
++    temporary_firewall_rules = if ($SkipTemporaryFirewallRules) { "skipped_by_request" } elseif ($SkipOriginalInterop) { "not_required" } else { "exact_program_loopback_udp" }
++    temporary_firewall_rule_report = [IO.Path]::GetFileName($FirewallReportPath)
++    temporary_firewall_setup_status = $FirewallSetupStatus
++    temporary_firewall_cleanup_status = $FirewallCleanupStatus
++    original_condebug_enabled = $false
++    original_evidence_mode = "protocol_summaries_and_screenshot_files"
++    status = $Status
++    failure = $Failure
++    created_utc = (Get-Date).ToUniversalTime().ToString("o")
++    quake_base_supplied = -not [string]::IsNullOrWhiteSpace($QuakeBase)
++    steps = $Steps
++  }
++  $Summary | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $SummaryPath -Encoding UTF8
++  Stop-Transcript | Out-Null
++}
++
++if (-not [string]::IsNullOrWhiteSpace($Failure)) {
++  Write-Host "MiniQuake BP-090-094R10 acceptance test: FAIL" -ForegroundColor Red
++  Write-Host "Run .\COLLECT_RESULTS.ps1 and upload the generated ZIP."
++  exit 1
++}
++Write-Host "MiniQuake BP-090-094R10 acceptance test: PASS" -ForegroundColor Green
++Write-Host "Result summary: $SummaryPath"
++Write-Host "For feedback, run .\COLLECT_RESULTS.ps1 and upload the generated ZIP."
++exit 0
+diff --git a/docs/BP-090-094R10_HOTFIX_REPORT.json b/docs/BP-090-094R10_HOTFIX_REPORT.json
+new file mode 100644
+index 0000000..d71543e
+--- /dev/null
++++ b/docs/BP-090-094R10_HOTFIX_REPORT.json
+@@ -0,0 +1,32 @@
++{
++  "schema_version": 1,
++  "delivery_revision": "BP-090-094R10",
++  "delivery_parent": "BP-090-094R9",
++  "result_archive": "MiniQuake_BP-090-094R9_RESULTS_20260804-090239.zip",
++  "result_archive_sha256": "7ed83829da1d775fe33d72b794af92994faa7798a6934665f1752812ebf9616c",
++  "classification": "external original-server interop cold-start/readiness race",
++  "observed": {
++    "original_process_alive": true,
++    "original_process_stderr_empty": true,
++    "target": "127.0.0.1:35090",
++    "client_attempts": 4,
++    "client_attempt_result": "UDP timeout followed by correctly rejected local fallback",
++    "network_provenance": "invalid",
++    "signon_complete_with_target_udp": false
++  },
++  "fix": {
++    "readiness_evidence": "protocol3_server_info_response",
++    "request": "CCREQ_SERVER_INFO / QUAKE / protocol 3",
++    "required_response": "CCREP_SERVER_INFO from exact 127.0.0.1 target port",
++    "default_timeout_ms": 180000,
++    "client_launch_after_readiness_only": true,
++    "port_selection": "loopback bind probe",
++    "timeout_classification": "INFRA_FAILURE",
++    "report_pattern": "build/bp090-094r10-original-server-*-readiness.json"
++  },
++  "changed_engine_code": false,
++  "changed_native_code": false,
++  "network_provenance_contract_preserved": true,
++  "visual_threshold_preserved": 0.95,
++  "status": "candidate"
++}
+diff --git a/docs/BP-090-094R10_RESULT_ANALYSIS.md b/docs/BP-090-094R10_RESULT_ANALYSIS.md
+new file mode 100644
+index 0000000..287305b
+--- /dev/null
++++ b/docs/BP-090-094R10_RESULT_ANALYSIS.md
+@@ -0,0 +1,126 @@
++# MiniQuake BP-090–BP-094R10 – Ergebnisanalyse des R9-Windows-Laufs
++
++## Ergebnisarchiv
++
++```text
++MiniQuake_BP-090-094R9_RESULTS_20260804-090239.zip
++SHA-256: 7ed83829da1d775fe33d72b794af92994faa7798a6934665f1752812ebf9616c
++```
++
++## Bestätigter Stand
++
++Der vollständige kumulative Build und sämtliche internen Testgruppen bis einschließlich BP-094 waren erfolgreich. Die verifizierte Originaldatei `GLQUAKE.EXE` wurde korrekt vorbereitet, die temporären Loopback-Firewallregeln wurden eingerichtet und anschließend wieder entfernt.
++
++Der Lauf brach beim ersten externen Prozesspaar in der Richtung
++
++```text
++Original-GLQuake-Server → MiniQuake-Client
++```
++
++ab.
++
++## Exakte Fehlergrenze
++
++Der Originalprozess blieb während der gesamten Prüfung aktiv und erzeugte weder Standardausgabe noch Standardfehler. Vier MiniQuake-Clientprozesse versuchten innerhalb des bisherigen 30-Sekunden-Fensters die Verbindung zu:
++
++```text
++127.0.0.1:35090
++```
++
++Alle vier meldeten zunächst:
++
++```text
++UDP connect timed out
++```
++
++Danach startete jeweils der normale lokale Demo-/Map-Fallback. R9 erkannte diesen Zustand korrekt und lehnte ihn ab:
++
++```text
++transport=loop
++remote=localhost:0
++local_server_active=true
++local_authoritative=true
++demo_playback=false
++network_provenance=invalid
++result=FAIL
++```
++
++Die vier Summarys waren semantisch identisch:
++
++```text
++success=false
++connected=true
++spawned=true
++signon=4
++view_entity=1
++model_count=86
++sound_count=86
++error=original-server interop completed signon without target UDP provenance
++```
++
++Damit ist die R9-Provenienzkorrektur bestätigt: Ein lokaler Signon kann nicht mehr fälschlich als Original-Binary-Interop gelten.
++
++## Ursachenklassifikation
++
++Der vorhandene R9-Harness gab dem 1997er GLQuake-Prozess nur 750 ms Vorlauf und anschließend insgesamt 30 Sekunden für vier vollständige MiniQuake-Verbindungsversuche. Er prüfte vor diesen Versuchen nicht, ob der Originalprozess bereits
++
++1. sein Fenster und den WGL-Kontext erstellt,
++2. die Welttexturen hochgeladen,
++3. den UDP-Accept-Socket auf dem angeforderten Port gebunden und
++4. seine Protocol-3-Ereignisschleife erreicht hatte.
++
++Aus dem R9-Archiv lässt sich nicht beweisen, in welcher dieser Startphasen der Originalprozess noch war, weil `-condebug` wegen des bestätigten 1024-Byte-Pufferüberlaufs nicht verwendet werden darf. Fest steht jedoch:
++
++- der Prozess war noch aktiv,
++- es gab keinen Exitcode und keinen Stderr-Fehler,
++- innerhalb des kurzen Zeitfensters kam keine UDP-Control-Antwort,
++- frühere R7-Läufe haben denselben verifizierten Original-Binary-Pfad erfolgreich verbunden.
++
++Die belastbarste Klassifikation lautet daher: **zeitabhängige Cold-Start-/Readiness-Lücke im externen Test-Harness**, nicht nachgewiesener Protocol- oder Enginefehler.
++
++## R10-Korrektur
++
++R10 startet keinen vollständigen MiniQuake-Client mehr, bevor ein echter Quake-Control-Handshake die Bereitschaft des Originalservers bewiesen hat.
++
++Der Harness sendet wiederholt das originale Protocol-3-Paket:
++
++```text
++NETFLAG_CTL | length 12
++CCREQ_SERVER_INFO
++"QUAKE\0"
++NET_PROTOCOL_VERSION = 3
++```
++
++Akzeptiert wird ausschließlich eine Antwort vom exakten Zielendpunkt mit:
++
++```text
++CCREP_SERVER_INFO
++control protocol = 3
++nicht leerem Mapnamen
++```
++
++Erst danach beginnt der Protocol-15-Interopclient. Der Standard-Readiness-Timeout beträgt 180 Sekunden und kann über `-OriginalServerReadyTimeoutMs` angepasst werden.
++
++Zusätzlich werden die zufälligen Interopports vor dem Prozessstart durch eine echte Loopback-Bindung auf Verfügbarkeit geprüft.
++
++Für jedes Originalserver-Paar entsteht ein Bericht:
++
++```text
++build/bp090-094r10-original-server-<a|b>-readiness.json
++```
++
++Dieser enthält unter anderem:
++
++- Probeanzahl und Laufzeit,
++- Antwortendpunkt,
++- Serveradresse, Hostname und Map,
++- Spielerzahlen und Control-Protokoll,
++- Originalprozess-ID und Prozessstatus,
++- beobachtete UDP-Endpunkte,
++- letzte Socketdiagnose.
++
++Ein Readiness-Timeout wird als `INFRA_FAILURE` eingeordnet und nicht MiniQuakes Protocol-15-Code zugerechnet.
++
++## Änderungsgrenze
++
++R10 verändert weder `src/` noch `native/`. MiniQuake-Engine, Renderer, Netzwerkprotokolle und native Bridges bleiben gegenüber R9 byteidentisch. Geändert werden ausschließlich Abnahme-Harness, Liefermetadaten, Dokumentation und Verifier-Vertrag.
+diff --git a/docs/BP-090-094R10_TESTING.md b/docs/BP-090-094R10_TESTING.md
+new file mode 100644
+index 0000000..a34f5f9
+--- /dev/null
++++ b/docs/BP-090-094R10_TESTING.md
+@@ -0,0 +1,127 @@
++# MiniQuake BP-090–BP-094R10 – Windows-Test
++
++## Zweck
++
++R10 schließt die Cold-Start-/Readiness-Lücke beim Start des verifizierten Original-GLQuake-Listenservers. Vor dem vollständigen MiniQuake-Interopclient muss nun eine echte Protocol-3-Serverinfoantwort vom exakten Zielport vorliegen.
++
++## Voraussetzungen
++
++Das MiniQuake-Paket in einen neuen, leeren Ordner entpacken. `OriginalQuakeSourceCode.zip` muss außerhalb des Projektordners liegen.
++
++PowerShell als Administrator starten, damit die temporären, ausschließlich auf Loopback begrenzten Firewallregeln ohne spätere Interaktion eingerichtet und wieder entfernt werden können.
++
++```powershell
++Get-Process GLQUAKE, MiniQuake -ErrorAction SilentlyContinue |
++  Stop-Process -Force
++
++Get-ChildItem -Recurse -File | Unblock-File
++
++$QuakeBase = "C:\Users\nilsk\Dropbox\Quake"
++$CompilerRoot = "C:\Users\nilsk\Desktop\MiniLangCompilerPy"
++$OriginalSource = "$env:USERPROFILE\Downloads\OriginalQuakeSourceCode.zip"
++```
++
++Prüfen:
++
++```powershell
++Test-Path "$QuakeBase\id1\pak0.pak"
++Test-Path "$CompilerRoot\mlc_win64.py"
++Test-Path $OriginalSource
++Test-Path ".\OriginalQuakeSourceCode.zip"
++```
++
++Erwartet:
++
++```text
++True
++True
++True
++False
++```
++
++## Vollständiger Lauf
++
++```powershell
++.\TEST_BP-090-094R10.ps1 `
++  -Compiler "$CompilerRoot\mlc_win64.py" `
++  -StdLib $CompilerRoot `
++  -QuakeBase $QuakeBase `
++  -OriginalQuakeSourceArchive $OriginalSource `
++  -Game id1 `
++  -Map start `
++  -Frames 300 `
++  -TraceFrames 128 `
++  -BlackPortCorpusFrames 64 `
++  -SoakFrames 5000 `
++  -ListenSoakFrames 5000 `
++  -OriginalInteropFrames 10000 `
++  -OriginalServerReadyTimeoutMs 180000 `
++  -OriginalVisualFrame 256 `
++  -NetworkTests `
++  -ContinueIndependentTests `
++  -BisectOnFailure
++```
++
++Die Ausgabe bleibt live und wird gleichzeitig in die jeweiligen Logs geschrieben.
++
++## Neue entscheidende Ausgabe
++
++Vor jedem Originalserver-/MiniQuake-Client-Paar muss zunächst erscheinen:
++
++```text
++waiting for original GLQuake server a Protocol-3 readiness ...
++original GLQuake server a ready: probes=<N> elapsed_ms=<MS> map=start ... protocol=3
++```
++
++Danach erst:
++
++```text
++transport=udp
++local_server_active=false
++local_authoritative=false
++demo_playback=false
++network_provenance=target_udp
++result=PASS
++```
++
++Die Readiness-Berichte liegen unter:
++
++```text
++build\bp090-094r10-original-server-a-readiness.json
++build\bp090-094r10-original-server-b-readiness.json
++```
++
++Bei einem erneuten Timeout muss der Bericht Prozessstatus und erkannte UDP-Endpunkte enthalten. Der Fehler wird als `INFRA_FAILURE` klassifiziert.
++
++## Gesamterwartung
++
++```text
++Original-GLQuake-Server -> MiniQuake-Client pair A: PASS
++Original-GLQuake-Server -> MiniQuake-Client pair B: PASS
++MiniQuake-Server -> Original-GLQuake-Client pair A: PASS
++MiniQuake-Server -> Original-GLQuake-Client pair B: PASS
++```
++
++Danach folgen die drei unveränderten Rohbildvergleiche mit:
++
++```text
++SSIM >= 0.95
++```
++
++Das gewünschte Ende lautet:
++
++```text
++MiniQuake BP-090-094R10 acceptance test: PASS
++```
++
++Anschließend:
++
++```powershell
++.\COLLECT_RESULTS.ps1
++```
++
++Erzeugtes Archiv:
++
++```text
++build\MiniQuake_BP-090-094R10_RESULTS_*.zip
++```
+diff --git a/test.ps1 b/test.ps1
+index 1bedd80..dff2be5 100755
+--- a/test.ps1
++++ b/test.ps1
+@@ -1 +1 @@
+-﻿& "$PSScriptRoot\TEST_BP-090-094R9.ps1" @args
++﻿& "$PSScriptRoot\TEST_BP-090-094R10.ps1" @args
+diff --git a/tools/verify.py b/tools/verify.py
+index 8f0ee50..b196f08 100755
+--- a/tools/verify.py
++++ b/tools/verify.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""Self-contained package verifier for MiniQuake BP-094 / BP-090--BP-094R9.
++"""Self-contained package verifier for MiniQuake BP-094 / BP-090--BP-094R10.
+ 
+ Historical subsystem semantics are checked by the source-guided component
+ checkers invoked from build.ps1.  This verifier owns current delivery
+@@ -21,8 +21,8 @@ PACKAGE_ID = "BP-094"
+ PARENT_PACKAGE_ID = "BP-093"
+ BLOCK_ID = "BP-090-094"
+ BLOCK_PARENT_PACKAGE_ID = "BP-085-089R8"
+-DELIVERY_REVISION = "BP-090-094R9"
+-DELIVERY_PARENT = "BP-090-094R8"
++DELIVERY_REVISION = "BP-090-094R10"
++DELIVERY_PARENT = "BP-090-094R9"
+ MANIFEST = "SOURCE_MANIFEST.sha256"
+ 
+ EXCLUDED_DIRS = {".git", "build", "__pycache__", ".pytest_cache"}
+@@ -38,6 +38,9 @@ FORBIDDEN_NAMES = {
+ REQUIRED_PATHS = {
+     "COPYING", "README.md", "build.ps1", "COLLECT_RESULTS.ps1", "test.ps1",
+     "TEST_BP-090-094.ps1", "CHANGELOG_BP-090-094.md",
++    "TEST_BP-090-094R10.ps1", "CHANGELOG_BP-090-094R10.md",
++    "docs/BP-090-094R10_TESTING.md", "docs/BP-090-094R10_RESULT_ANALYSIS.md",
++    "docs/BP-090-094R10_HOTFIX_REPORT.json", "patches/BP-094R10.diff",
+     "TEST_BP-090-094R9.ps1", "CHANGELOG_BP-090-094R9.md",
+     "docs/BP-090-094R9_TESTING.md", "docs/BP-090-094R9_RESULT_ANALYSIS.md",
+     "docs/BP-090-094R9_HOTFIX_REPORT.json", "patches/BP-094R9.diff",
+@@ -188,7 +191,7 @@ def check_identity(root: Path) -> Check:
+     build_info = (root / "src/miniquake/build_info.ml").read_text(encoding="utf-8-sig")
+     main = (root / "src/main.ml").read_text(encoding="utf-8-sig")
+     build = (root / "build.ps1").read_text(encoding="utf-8-sig")
+-    test = (root / "TEST_BP-090-094R9.ps1").read_text(encoding="utf-8-sig")
++    test = (root / "TEST_BP-090-094R10.ps1").read_text(encoding="utf-8-sig")
+     collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
+     launcher = (root / "test.ps1").read_text(encoding="utf-8-sig")
+     errors += marker_errors(build_info, [
+@@ -208,16 +211,16 @@ def check_identity(root: Path) -> Check:
+         "MiniQuakeOriginalReferenceTests.exe", "MiniQuakeExternalCompatibilityClosureTests.exe",
+     ], "build")
+     errors += marker_errors(test, [
+-        '$PackageId = "BP-094"', '$BlockId = "BP-090-094"', '$DeliveryRevision = "BP-090-094R9"',
+-        '$DeliveryParent = "BP-090-094R8"',
+-        "MiniQuake BP-090-094R9 acceptance test: PASS", "bidirectional original binary interop",
++        '$PackageId = "BP-094"', '$BlockId = "BP-090-094"', '$DeliveryRevision = "BP-090-094R10"',
++        '$DeliveryParent = "BP-090-094R9"',
++        "MiniQuake BP-090-094R10 acceptance test: PASS", "bidirectional original binary interop",
+         "Install-TemporaryLoopbackFirewallRules", "Remove-TemporaryLoopbackFirewallRules",
+         "external GLQuake visual reference corpus", "OriginalQuakeSourceArchive",
+     ], "test")
+     errors += marker_errors(collector, [
+-        "MiniQuake_BP-090-094R9_RESULTS_", "original_reference_binary_in_result_archive", "quake_game_data_in_result_archive",
++        "MiniQuake_BP-090-094R10_RESULTS_", "original_reference_binary_in_result_archive", "quake_game_data_in_result_archive",
+     ], "collector")
+-    errors += marker_errors(launcher, ["TEST_BP-090-094R9.ps1"], "test.ps1")
++    errors += marker_errors(launcher, ["TEST_BP-090-094R10.ps1"], "test.ps1")
+     return Check(
+         "package_identity", not errors,
+         {"package_id": PACKAGE_ID, "parent_package_id": PARENT_PACKAGE_ID, "block_id": BLOCK_ID, "delivery_revision": DELIVERY_REVISION},
+@@ -270,7 +273,7 @@ def check_r9_network_provenance(root: Path) -> Check:
+     host = (root / "src/miniquake/host.ml").read_text(encoding="utf-8-sig")
+     contract = (root / "src/miniquake/external_reference_contract.ml").read_text(encoding="utf-8-sig")
+     fixture = (root / "tests/original_server_interop_tests.ml").read_text(encoding="utf-8-sig")
+-    runner = (root / "TEST_BP-090-094R9.ps1").read_text(encoding="utf-8-sig")
++    runner = (root / "TEST_BP-090-094R10.ps1").read_text(encoding="utf-8-sig")
+     golden = json.loads((root / "audit/original_server_interop_golden.json").read_text(encoding="utf-8-sig"))
+     required = [
+         ("function originalInteropClientNetworkProvenance(", host, "host provenance helper"),
+@@ -306,6 +309,74 @@ def check_r9_network_provenance(root: Path) -> Check:
+     )
+ 
+ 
++
++def check_r10_original_server_readiness(root: Path) -> Check:
++    errors: list[str] = []
++    runner = (root / "TEST_BP-090-094R10.ps1").read_text(encoding="utf-8-sig")
++    testing = (root / "docs/BP-090-094R10_TESTING.md").read_text(encoding="utf-8-sig")
++    analysis = (root / "docs/BP-090-094R10_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
++    hotfix = json.loads((root / "docs/BP-090-094R10_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig"))
++    required = [
++        ("[int]$OriginalServerReadyTimeoutMs = 180000", runner, "readiness timeout parameter"),
++        ("function Wait-OriginalServerControlReady(", runner, "readiness probe helper"),
++        ("function Read-QuakeCString(", runner, "control response string parser"),
++        ("function Get-AvailableLoopbackUdpPort(", runner, "loopback port selection"),
++        ("CCREQ_SERVER_INFO", runner, "Protocol-3 request contract"),
++        ("CCREP_SERVER_INFO", runner, "Protocol-3 response contract"),
++        ("protocol3_server_info_response", runner, "readiness evidence marker"),
++        ("$Remote.Port -ne $Port", runner, "exact response port validation"),
++        ("$Response[4] -ne 0x83", runner, "server-info command validation"),
++        ("$Protocol -ne 3", runner, "control protocol validation"),
++        ("Wait-OriginalServerControlReady -Handle $OriginalServer", runner, "probe before full client"),
++        ("bp090-094r10-original-server-{0}-readiness.json", runner, "readiness report path"),
++        ("INFRA_FAILURE: original GLQuake server", runner, "timeout classification"),
++        ("Get-NetUDPEndpoint", runner, "timeout endpoint diagnostics"),
++        ("OriginalServerReadyTimeoutMs 180000", testing, "testing command"),
++        ("Cold-Start-/Readiness-Lücke", analysis, "result analysis classification"),
++    ]
++    for marker, text, label in required:
++        if marker not in text:
++            errors.append(f"{label} missing marker: {marker}")
++    pair_start = runner.find("function Run-OriginalServerMiniClientPair(")
++    pair_end = runner.find("function Run-MiniServerOriginalClientPair(", pair_start)
++    if pair_start < 0 or pair_end < 0:
++        errors.append("could not isolate Run-OriginalServerMiniClientPair")
++    else:
++        body = runner[pair_start:pair_end]
++        ready_at = body.find("Wait-OriginalServerControlReady -Handle $OriginalServer")
++        client_at = body.find("Invoke-LiveProcess -Executable $GameExe")
++        if ready_at < 0 or client_at < 0 or ready_at > client_at:
++            errors.append("full MiniQuake client may be launched before original-server readiness is established")
++    expected = {
++        "delivery_revision": "BP-090-094R10",
++        "delivery_parent": "BP-090-094R9",
++        "classification": "external original-server interop cold-start/readiness race",
++        "changed_engine_code": False,
++        "changed_native_code": False,
++        "network_provenance_contract_preserved": True,
++    }
++    for key, value in expected.items():
++        if hotfix.get(key) != value:
++            errors.append(f"hotfix {key}={hotfix.get(key)!r}, expected {value!r}")
++    fix = hotfix.get("fix", {})
++    if fix.get("readiness_evidence") != "protocol3_server_info_response":
++        errors.append("hotfix readiness evidence is not protocol3_server_info_response")
++    if fix.get("default_timeout_ms") != 180000:
++        errors.append("hotfix default readiness timeout is not 180000 ms")
++    if fix.get("client_launch_after_readiness_only") is not True:
++        errors.append("hotfix does not require client launch after readiness")
++    return Check(
++        "bp090094r10_original_server_readiness_contract", not errors,
++        {
++            "readiness_evidence": "CCREP_SERVER_INFO",
++            "default_timeout_ms": 180000,
++            "exact_endpoint": "127.0.0.1:<selected-port>",
++            "cold_start_safe": True,
++            "engine_code_changed": False,
++        },
++        errors,
++    )
++
+ def check_no_game_data(root: Path) -> Check:
+     errors: list[str] = []
+     scanned = 0
+@@ -631,7 +702,7 @@ def check_original_glquake_runtime_safety(root: Path) -> Check:
+             "video_context_required": True,
+             "condebug_enabled": False,
+             "qconsole_required": False,
+-            "server_readiness": "protocol3_retry_plus_protocol15_signon4",
++            "server_readiness": "protocol3_server_info_then_target_udp_protocol15_signon4",
+             "network_scope": "loopback_only",
+             "bind_address": "127.0.0.1",
+             "visual_network": "disabled",
+@@ -889,6 +960,7 @@ def main() -> int:
+         check_identity(root),
+         check_r8_visual_parity(root),
+         check_r9_network_provenance(root),
++        check_r10_original_server_readiness(root),
+         check_no_game_data(root),
+         check_native(root),
+         check_minilang(root),
+@@ -904,14 +976,14 @@ def main() -> int:
+         check_external_checkers(root),
+     ]
+     passed = all(check.passed for check in checks)
+-    print("MiniQuake BP-090-094R9 verification")
++    print("MiniQuake BP-090-094R10 verification")
+     for check in checks:
+         print(f"  [{'PASS' if check.passed else 'FAIL'}] {check.name}")
+         for key, value in check.details.items():
+             print(f"         {key}={value}")
+         for error in check.errors:
+             print(f"         error: {error}")
+-    print(f"MiniQuake BP-090-094R9 verification: {'PASS' if passed else 'FAIL'}")
++    print(f"MiniQuake BP-090-094R10 verification: {'PASS' if passed else 'FAIL'}")
+     report = {
+         "schema_version": 1,
+         "package_id": PACKAGE_ID,

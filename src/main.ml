@@ -14,6 +14,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See COPYING.
 
 import miniquake.constants as c
 import miniquake.build_info as buildInfo
+import miniquake.external_reference_contract as externalReference
 import miniquake.crc as crc
 import miniquake.pak as pak
 import miniquake.wad as wad
@@ -79,10 +80,24 @@ function printUsage()
   print "                             run the textured host and exit automatically"
   print "  --render-evidence BASE MAP FRAME PREFIX [-game DIR]"
   print "                             capture deterministic TGA after UI and before swap"
+  print "  --render-demo-evidence BASE DEMO FRAME PREFIX [-game DIR]"
+  print "                             capture a deterministic demo frame for external comparison"
+  print "  --original-interop-server BASE MAP PORT FRAMES PREFIX [-game DIR]"
+  print "                             run MiniQuake server for an original MiniQuake client"
+  print "  --original-interop-client BASE HOST PORT FRAMES PREFIX [-game DIR]"
+  print "                             connect MiniQuake client to an original MiniQuake server"
   print "  --soak BASE MAP [FRAMES] [-game DIR]"
   print "                             run GC/heap stability validation (default 10000)"
   print "  --long-soak MODE BASE TARGET [FRAMES] [-game DIR] [-port N]"
   print "                             100k-frame listen/dedicated/demo resource soak"
+  print "  --opt001a-map-parse BASE MAP PREFIX [-game DIR]"
+  print "                             parse a retail map and write start metrics"
+  print "  --opt001a-frame-baseline BASE MAP MODE WARMUP MEASURE PREFIX [-game DIR]"
+  print "                             record headless/render frame-time and stage baseline"
+  print "  --opt001a-handle-plateau BASE MAP WARMUP WINDOW WINDOWS PREFIX [-game DIR] [-port N]"
+  print "                             classify process handles as STABLE, PLATEAU or LEAK"
+  print "  --opt001b-transition BASE FRAMES PREFIX [-game DIR]"
+  print "                             render e1m1 -> e1m2 -> e1m1 in one session"
   print "  --udp-smoke [TIMEOUT_MS]   exchange a datagram through Winsock loopback"
   print "  --music-smoke BASE GAME TRACK"
   print "                             decode and mix an OGG replacement track"
@@ -358,6 +373,107 @@ function runRenderEvidenceCommand(arguments)
   ], frames, arguments[4])
 end function
 
+function runRenderDemoEvidenceCommand(arguments)
+  frames = boundedInteger(arguments[3], 256, 1, 1000000)
+  return host.runRenderEvidence([
+    "-basedir", arguments[1],
+    "-game", gameOption(arguments),
+    "-window",
+    "-nosound",
+    "-nolan",
+    "-nomouse",
+    "-nojoy",
+    "-noinput",
+    // Match MiniQuake's startup palette transform.  The runtime +gamma cvar is
+    // separate from gl_vidnt::Check_Gamma and does not affect uploaded textures.
+    "-gamma", "1",
+    "-width", "640",
+    "-height", "480",
+    "-maxframes", "" + frames,
+    "+viewsize", "100",
+    "+fov", "90",
+    "+gamma", "1",
+    "+crosshair", "0",
+    "+gl_picmip", "0",
+    "+gl_polyblend", "1",
+    "+gl_ztrick", "0",
+    "+gl_clear", "1",
+    "+gl_finish", "1",
+    "+timedemo", arguments[2],
+  ], frames, arguments[4])
+end function
+
+function runOriginalInteropServerCommand(arguments)
+  port = boundedInteger(arguments[3], 26000, 1, 65534)
+  frames = boundedInteger(arguments[4], externalReference.ORIGINAL_INTEROP_MAX_FRAMES, 1, 1000000)
+  return host.runOriginalInteropServer([
+    "-basedir", arguments[1],
+    "-game", gameOption(arguments),
+    "-dedicated", "1",
+    "-nosound",
+    "-ip", "127.0.0.1",
+    "-port", "" + port,
+    "+map", arguments[2],
+  ], frames, arguments[5])
+end function
+
+function runOriginalInteropClientCommand(arguments)
+  port = boundedInteger(arguments[3], 26000, 1, 65534)
+  frames = boundedInteger(arguments[4], externalReference.ORIGINAL_INTEROP_MAX_FRAMES, 1, 1000000)
+  return host.runOriginalInteropClient([
+    "-basedir", arguments[1],
+    "-game", gameOption(arguments),
+    "-headless",
+    "-nosound",
+    "-ip", "127.0.0.1",
+    "-nomouse",
+    "-nojoy",
+    "-noinput",
+    // Private BP-090 interop option. Host_Init consumes this before the
+    // normal standalone map/demo fallback, so an external-connect failure
+    // cannot first build and tear down a local loopback server.
+    "-original-interop-target", arguments[2] + ":" + port,
+  ], frames, arguments[5], arguments[2], port)
+end function
+
+
+function runOpt001AMapParseCommand(arguments)
+  result = try(host.opt001aMapParse(arguments[1], gameOption(arguments), arguments[2], arguments[3]))
+  if result is error then print "MiniQuake OPT-001A map parse: " + result.message; return 3 end if
+  return 0
+end function
+
+function runOpt001AFrameBaselineCommand(arguments)
+  warmup = boundedInteger(arguments[4], 300, 1, 1000000)
+  measure = boundedInteger(arguments[5], 3000, 1, 1000000)
+  result = try(host.runOpt001AFrameBaseline(
+    arguments[1], gameOption(arguments), arguments[2], bio.lower(arguments[3]),
+    warmup, measure, arguments[6],
+  ))
+  if result is error then print "MiniQuake OPT-001A frame baseline: " + result.message; return 3 end if
+  return 0
+end function
+
+function runOpt001AHandlePlateauCommand(arguments)
+  warmup = boundedInteger(arguments[3], 1200, 1, 1000000)
+  windowFrames = boundedInteger(arguments[4], 5000, 1, 100000000)
+  windows = boundedInteger(arguments[5], 3, 3, 16)
+  port = integerNamedOption(arguments, "-port", 26000, 1, 65534)
+  result = try(host.runOpt001AHandlePlateau(
+    arguments[1], gameOption(arguments), arguments[2],
+    warmup, windowFrames, windows, port, arguments[6],
+  ))
+  if result is error then print "MiniQuake OPT-001A handle plateau: " + result.message; return 3 end if
+  return 0
+end function
+
+function runOpt001BTransitionCommand(arguments)
+  frames = boundedInteger(arguments[2], 64, 1, 1000000)
+  result = try(host.runOpt001BTransition(arguments[1], gameOption(arguments), frames, arguments[3]))
+  if result is error then print "MiniQuake OPT-001B transition: " + result.message; return 3 end if
+  return 0
+end function
+
 function runUdpSmoke(arguments)
   timeout = 1000
   if len(arguments) >= 2 then timeout = boundedInteger(arguments[1], timeout, 1, 60000) end if
@@ -418,6 +534,13 @@ function runSelfCheck()
   print "Stability fingerprint: 0xd0e3c03f"
   print "Compatibility release status: " + buildInfo.COMPAT_RELEASE_STATUS
   print "Compatibility release fingerprint: 0x29b72a98"
+  print "Original reference status: " + buildInfo.ORIGINAL_REFERENCE_STATUS
+  print "Original reference fingerprint: 0xdc355175"
+  print "Final compatibility status: " + buildInfo.COMPAT_FINAL_STATUS
+  print "Final compatibility fingerprint: 0xe04a7727"
+  print "Optimization status: " + buildInfo.OPTIMIZATION_STATUS
+  print "Optimization fingerprint: 0x1c001c0c"
+  print "Optimization parent: " + buildInfo.OPTIMIZATION_PARENT
   print "Package purpose: " + buildInfo.PACKAGE_PURPOSE
   print "Compatibility profile: " + buildInfo.COMPATIBILITY_PROFILE
   print "Native text ABI: " + buildInfo.NATIVE_TEXT_ABI
@@ -425,9 +548,10 @@ function runSelfCheck()
   print "Package date: " + buildInfo.PACKAGE_DATE
   print "Baseline archive SHA-256: " + buildInfo.BASE_ARCHIVE_SHA256
   print "Core CRC self-check: 0x" + hex(bytes([(check >> 8) & 255, check & 255]))
-  print "Port status: BP-089 is the cumulative compat_109 release candidate; original-binary interoperability and an external GLQuake visual reference remain explicit final gates."
+  print "Port status: BP-094 is the external-reference compat_109 candidate; original binary interop and visual-reference gates are runnable and pending Windows acceptance."
   return 0
 end function
+
 
 function main(args)
   if len(args) == 0 then
@@ -463,8 +587,15 @@ function main(args)
   if command == "--validate-runtime" and len(args) >= 3 then return runRuntimeValidationCommand(args) end if
   if command == "--render-smoke" and len(args) >= 3 then return renderSmoke(args) end if
   if command == "--render-evidence" and len(args) >= 5 then return runRenderEvidenceCommand(args) end if
+  if command == "--render-demo-evidence" and len(args) >= 5 then return runRenderDemoEvidenceCommand(args) end if
+  if command == "--original-interop-server" and len(args) >= 6 then return runOriginalInteropServerCommand(args) end if
+  if command == "--original-interop-client" and len(args) >= 6 then return runOriginalInteropClientCommand(args) end if
   if command == "--soak" and len(args) >= 3 then return runSoakCommand(args) end if
   if command == "--long-soak" and len(args) >= 4 then return runLongSoakCommand(args) end if
+  if command == "--opt001a-map-parse" and len(args) >= 4 then return runOpt001AMapParseCommand(args) end if
+  if command == "--opt001a-frame-baseline" and len(args) >= 7 then return runOpt001AFrameBaselineCommand(args) end if
+  if command == "--opt001a-handle-plateau" and len(args) >= 7 then return runOpt001AHandlePlateauCommand(args) end if
+  if command == "--opt001b-transition" and len(args) >= 4 then return runOpt001BTransitionCommand(args) end if
   if command == "--udp-smoke" and len(args) <= 2 then return runUdpSmoke(args) end if
   if command == "--music-smoke" and len(args) == 4 then return musicSmoke(args[1], args[2], args[3]) end if
   if command == "--play" and len(args) == 3 then return sysWin.WinMain(args, host.run) end if

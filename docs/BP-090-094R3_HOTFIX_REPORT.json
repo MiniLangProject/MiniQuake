@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "package_id": "BP-094",
+  "block_id": "BP-090-094",
+  "delivery_revision": "BP-090-094R3",
+  "delivery_parent": "BP-090-094R2",
+  "classification": "external original-binary harness / source-guided launch-mode correction",
+  "changed_engine_code": false,
+  "changed_native_code": false,
+  "r2_result_archive_sha256": "b7bd3030a7c27ada2c318452c2d8b85027c2c3ef0589e8ec8d545ed5aa43dd3e",
+  "failure": {
+    "gate": "original GLQuake server to MiniQuake client",
+    "process_mode": "dedicated",
+    "last_qconsole_line": "Programs occupy 403K.",
+    "last_stdout_line": "PackFile: .../id1/pak0.pak : maps/start.bsp",
+    "mini_client_started": false
+  },
+  "cause": {
+    "host_init": "ca_dedicated skips VID_Init",
+    "model_loader": "gl_model.c Mod_LoadTextures calls GL_LoadTexture during BSP loading",
+    "conclusion": "the verified GLQUAKE.EXE requires a graphics context while loading a map and is unsuitable for this dedicated-mode gate"
+  },
+  "fix": {
+    "original_server_process_mode": "listen",
+    "requires_video_context": true,
+    "local_loopback_client_expected": true,
+    "dedicated_glquake_map_load_supported": false,
+    "window": "640x480",
+    "quake_heap_kib": 32768,
+    "startup_timeout_ms": 30000,
+    "external_remote_client_log_required": true
+  }
+}

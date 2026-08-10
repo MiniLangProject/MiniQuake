@@ -1,0 +1,63 @@
+{
+  "schema": "MiniQuakeOPT001CR3Hotpath/1",
+  "revision": "OPT-001CR3",
+  "parent": "OPT-001CR2",
+  "purpose": "attached-console live output plus selective inlining and removal of O(n^2) MiniLang array concatenations",
+  "inline_functions": [
+    {
+      "path": "src/miniquake/native.ml",
+      "function": "floatBits"
+    },
+    {
+      "path": "src/miniquake/native.ml",
+      "function": "bitsFloat"
+    },
+    {
+      "path": "src/miniquake/mathlib.ml",
+      "function": "DotProduct"
+    },
+    {
+      "path": "src/miniquake/client.ml",
+      "function": "clientFloat"
+    },
+    {
+      "path": "src/miniquake/particles.ml",
+      "function": "particleFloat"
+    },
+    {
+      "path": "src/miniquake/sound/snd_dma.ml",
+      "function": "soundF32"
+    },
+    {
+      "path": "src/miniquake/sound/mixer.ml",
+      "function": "mixerF32"
+    },
+    {
+      "path": "src/miniquake/render/gl_warp.ml",
+      "function": "warpFloat"
+    },
+    {
+      "path": "src/miniquake/client_render_handoff.ml",
+      "function": "renderFloat"
+    },
+    {
+      "path": "src/miniquake/render/gl_rmain.ml",
+      "function": "F32"
+    }
+  ],
+  "optimizations": [
+    "array_util uses exact native array(count, fill) allocation",
+    "visible entity builders use geometric/preallocated ArrayBuilder",
+    "particle command and alive lists use exact-sized buffers",
+    "known-size zero/identity/client arrays use array(count, fill)",
+    "frameTrace is only accumulated for explicit compatibility diagnostics",
+    "IPv4 partial-address assembly uses fixed four-element arrays"
+  ],
+  "live_output": "attached_console_live",
+  "incremental_baseline": {
+    "archive": "MiniQuake_OPT-001CR2_RESULTS_20260808-212127.zip",
+    "sha256": "96f49066bc9fa54b3af4e26afc3697bc296bf514f4fe9a302028704996b6f7bb",
+    "overall": "PASS",
+    "handle_classification": "PLATEAU"
+  }
+}

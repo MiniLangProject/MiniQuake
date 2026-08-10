@@ -36,7 +36,7 @@ function AddLightBlend(blend, red, green, blue, alpha2)
   result[3] = alpha
   if alpha == 0.0 then return result end if
   fraction = alpha2 / alpha
-  // Preserve the shipped GLQuake source quirk: red accumulates from green.
+  // Preserve the shipped MiniQuake source quirk: red accumulates from green.
   result[0] = result[1] * (1.0 - fraction) + red * fraction
   result[1] = result[1] * (1.0 - fraction) + green * fraction
   result[2] = result[2] * (1.0 - fraction) + blue * fraction

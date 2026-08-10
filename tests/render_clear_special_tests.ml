@@ -1,4 +1,4 @@
-/* BP-051: GLQuake R_Clear, z-trick, finish and no-refresh contract. */
+/* BP-051: MiniQuake R_Clear, z-trick, finish and no-refresh contract. */
 import miniquake.render.special_paths as bp051Special
 import miniquake.render.world as bp051World
 import miniquake.render.gl11 as bp051Gl

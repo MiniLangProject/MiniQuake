@@ -6,7 +6,7 @@ import miniquake.byteio as bio
 import miniquake.wad as wad
 import miniquake.cvar as cvar
 
-function fnvByte(hash, value)
+function inline fnvByte(hash, value)
   return ((hash ^ (value & 255)) * 16777619) & 4294967295
 end function
 

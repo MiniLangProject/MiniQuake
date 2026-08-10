@@ -1,0 +1,20 @@
+{
+  "external_gates": [
+    "original_binary_interop",
+    "external_glquake_visual_reference"
+  ],
+  "fingerprint": "0xe04a7727",
+  "fixtures": 24,
+  "original_bind_address": "127.0.0.1",
+  "original_network_scope": "loopback_only",
+  "original_visual_network": "disabled",
+  "parent_fingerprint": "0x29b72a98",
+  "parent_status": "compat_109_release_candidate_v1",
+  "raw_full_frame": true,
+  "reference_fingerprint": "0xdc355175",
+  "schema_version": 1,
+  "status": "compat_109_final_candidate_v1",
+  "step": "BP-094",
+  "unattended_firewall_prompt_expected": false,
+  "visual_metric": "mean_luminance_ssim_8x8"
+}

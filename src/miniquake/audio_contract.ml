@@ -32,11 +32,11 @@ const DISTINCT_RING_REGIONS = 1
 const QUAKE_ATOI_CD = 1
 const RETAIL_EVIDENCE_SOUNDS = 2
 
-function status()
+function inline status()
   return STATUS
 end function
 
-function fingerprint()
+function inline fingerprint()
   return FINGERPRINT
 end function
 

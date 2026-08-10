@@ -1,0 +1,23 @@
+{
+  "block_id": "BP-090-094",
+  "classification": "PowerShell parser / delivery infrastructure hotfix",
+  "compat_final_fingerprint": "0xe04a7727",
+  "compat_final_status": "compat_109_final_candidate_v1",
+  "delivery_parent": "BP-090-094",
+  "delivery_revision": "BP-090-094R1",
+  "engine_changed": false,
+  "failure": {
+    "error": "InvalidVariableReferenceWithDrive",
+    "expression": "$Scenario:",
+    "line": 683,
+    "script": "TEST_BP-090-094.ps1"
+  },
+  "fix": {
+    "expression": "${Scenario}:",
+    "package_wide_guard": "powershell_variable_colon_interpolation"
+  },
+  "native_changed": false,
+  "package_id": "BP-094",
+  "schema_version": 1,
+  "status": "candidate"
+}

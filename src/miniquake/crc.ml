@@ -11,7 +11,7 @@ const CRC_INIT_VALUE = 0xffff
 const CRC_XOR_VALUE = 0x0000
 const CRC_POLYNOMIAL = 0x1021
 
-function CRC_Init()
+function inline CRC_Init()
   return CRC_INIT_VALUE
 end function
 

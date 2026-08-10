@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, json, pathlib, sys
+import argparse, json, pathlib, re, sys
 
 EXPECTED_STATUS = 'artifact_compat_109_frozen_v1'
 EXPECTED_FINGERPRINT = '0x59531091'
@@ -15,10 +15,16 @@ def fnv1a32(data: bytes) -> int:
     return value
 
 
+def _const_string(source: str, name: str) -> str:
+    match = re.search(rf'^const\s+{re.escape(name)}\s*=\s*"([^"]+)"\s*$', source, flags=re.M)
+    return match.group(1) if match else ""
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=".")
     ap.add_argument("--json", default="")
+    ap.add_argument("--allow-downstream-package", action="store_true")
     ns = ap.parse_args()
     root = pathlib.Path(ns.root).resolve()
     errors = []
@@ -210,11 +216,32 @@ def main() -> int:
         for marker in markers:
             if marker not in signed_zero_texts[label]:
                 errors.append(f"{label} missing signed-zero marker: {marker}")
-    for text in ['const PACKAGE_ID = "BP-089"', 'const BLOCK_ID = "BP-085-089"']:
+    package_id = _const_string(build_info, "PACKAGE_ID")
+    parent_package_id = _const_string(build_info, "PARENT_PACKAGE_ID")
+    block_id = _const_string(build_info, "BLOCK_ID")
+    for text in [
+        'const ARTIFACT_COMPAT_STATUS = "artifact_compat_109_frozen_v1"',
+        'const ARTIFACT_COMPAT_FINGERPRINT = 0x59531091',
+    ]:
         if text not in build_info: errors.append("missing build marker: " + text)
+    if ns.allow_downstream_package:
+        if not package_id: errors.append("downstream build info has no PACKAGE_ID")
+        if not parent_package_id: errors.append("downstream build info has no PARENT_PACKAGE_ID")
+        if not block_id: errors.append("downstream build info has no BLOCK_ID")
+    else:
+        for text in [
+            'const PACKAGE_ID = "BP-089"',
+            'const PARENT_PACKAGE_ID = "BP-088"',
+            'const BLOCK_ID = "BP-085-089"',
+        ]:
+            if text not in build_info: errors.append("missing build marker: " + text)
     report = {
         "schema_version": 1,
-        "package": "BP-087",
+        "package": package_id if ns.allow_downstream_package else "BP-087",
+        "downstream_package": ns.allow_downstream_package,
+        "build_package_id": package_id,
+        "build_parent_package_id": parent_package_id,
+        "build_block_id": block_id,
         "status": "PASS" if not errors else "FAIL",
         "errors": errors,
         "contract_status": golden.get("status"),
@@ -241,6 +268,7 @@ def main() -> int:
         print(f"  evidence_revision={EXPECTED_EVIDENCE_REVISION} semantic_boundary=parsed_save_domain exact_roundtrip=true preserves_edict_high_water=true preserves_signed_zero=true sequential_sessions=true")
         print("  float_parser=msvcrt_strtod_f32")
         print("  fixed_six_formatter=msvcrt_percent_f text_bridge_export=mqt_f32_to_fixed6 fixed_six_cases=8")
+        print(f"  downstream={str(bool(ns.allow_downstream_package)).lower()} package={package_id} block={block_id}")
     for error in errors: print("  [FAIL] " + error)
     return 0 if not errors else 1
 

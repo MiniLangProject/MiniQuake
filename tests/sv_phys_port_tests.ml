@@ -86,7 +86,7 @@ function physicsFieldDefinitions()
     t.QuakeCDef(c.EV_ENTITY, 45, 0, "aiment"),
     t.QuakeCDef(c.EV_STRING, 46, 0, "classname"),
     t.QuakeCDef(c.EV_STRING, 47, 0, "model"),
-    // Extended entvars used by the QUAKE2-conditioned GLQuake branches.
+    // Extended entvars used by the QUAKE2-conditioned MiniQuake branches.
     t.QuakeCDef(c.EV_VECTOR, 48, 0, "basevelocity"),
     t.QuakeCDef(c.EV_FLOAT, 51, 0, "speed"),
   ]
@@ -235,7 +235,7 @@ function testWaterAndToss()
 end function
 
 function testStrictQuakeOneDispatch()
-  // The pinned WinQuake/GLQuake 1.09 build is compiled without QUAKE2.
+  // The pinned WinQuake/MiniQuake 1.09 build is compiled without QUAKE2.
   // Merely exposing extended fields must not activate currents, conveyors,
   // MOVETYPE_FOLLOW or MOVETYPE_BOUNCEMISSILE.
   game = makePhysicsFixture(5)

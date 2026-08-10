@@ -5,7 +5,7 @@ import miniquake.host as host
 import miniquake.world_bsp as world
 import miniquake.mathlib as math
 
-function append(messages, level, text)
+function inline append(messages, level, text)
   return messages + [level + " " + text]
 end function
 

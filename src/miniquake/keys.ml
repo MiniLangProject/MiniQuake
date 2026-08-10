@@ -62,20 +62,14 @@ registeredCommandNames = []
 pendingReleaseCommands = ""
 
 function zeroValues(count)
-  result = []
-  index = 0
-  while index < count
-    result = result + [0]
-    index = index + 1
-  end while
-  return result
+  return array(count, 0)
 end function
 
 function identityValues(count)
-  result = []
+  result = array(count, 0)
   index = 0
   while index < count
-    result = result + [index]
+    result[index] = index
     index = index + 1
   end while
   return result
@@ -87,7 +81,7 @@ function setDestination(destination)
   return keyDest
 end function
 
-function destination()
+function inline destination()
   return keyDest
 end function
 
@@ -503,7 +497,7 @@ end function
 
 // Consumes the ordered Win32 message queue. Packed native event types are:
 // keyboard=1 (legacy raw VK), mouse button=2, wheel=3, focus=4, and
-// keyboard=5 (GLQuake hardware scan code).
+// keyboard=5 (MiniQuake hardware scan code).
 function PollEvents()
   if len(keyDownStates) != 256 then Key_Init() end if
   events = []

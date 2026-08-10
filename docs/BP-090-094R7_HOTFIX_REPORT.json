@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "package_id": "BP-094",
+  "block_id": "BP-090-094",
+  "delivery_revision": "BP-090-094R7",
+  "delivery_parent": "BP-090-094R6",
+  "status": "READY_FOR_WINDOWS_ACCEPTANCE",
+  "result_archive_sha256": "e1988837c2599e81f4e73236308fd3f776a94461b5ccc8c4cffd46505d53cb04",
+  "root_cause": "Original Cmd_TokenizeString uses COM_Parse, which tokenizes colon separately; Host_Connect_f consumes only Cmd_Argv(1), so connect 127.0.0.1:PORT silently targets default net_hostport 26000.",
+  "connect_token": "127.0.0.1",
+  "remote_port_source": "-port_to_net_hostport",
+  "default_port_without_fix": 26000,
+  "temporary_rules": true,
+  "rule_scope": "exact_program_udp_loopback_only",
+  "rule_count": 4,
+  "automatic_cleanup": true,
+  "auto_elevation_before_build": true,
+  "engine_code_changed": false,
+  "native_code_changed": false,
+  "parallel_process_monitoring": true,
+  "failure_process_report": true
+}

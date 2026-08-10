@@ -1,3 +1,46 @@
+> Current delivery: **OPT-001C frame-allocation optimization**, parent **OPT-001B**.
+> OPT-001B is the Windows-accepted error-freedom baseline (`e1m2` visible/headless/transition PASS, handles PLATEAU).
+
+# MiniQuake – BP-090–BP-094
+
+> Accepted Windows parent: BP-085–BP-089R8.
+>
+> This delivery closes the two deliberately external `compat_109` gates: direct
+> process interoperability with the verified original GLQuake 1.09 executable
+> and a raw, unnormalized visual-reference comparison against original GLQuake.
+
+```text
+compat_109_final_candidate_v1
+fingerprint=0xe04a7727
+original_glquake_sha256=04862c835c399bc9184f62101ae0390c2a758c21656ec06dcc0384e0f373d588
+original_glquake_bytes=435712
+original_glquake_pe_machine=0x014c
+minimum_raw_ssim=0.95
+interop_directions=2
+visual_scenarios=3
+```
+
+The original executable and all Quake game data are supplied by the tester and
+are never bundled in this source package or result archive. R7 retains R6's
+four temporary exact-program UDP firewall rules limited to `127.0.0.1` and
+corrects the original-client port route: Quake receives `connect 127.0.0.1`
+while the selected target port is supplied through the historical `-port`
+option and `net_hostport`. Run `TEST_BP-090-094R7.ps1`; see
+`docs/BP-090-094R7_TESTING.md`. Output remains live and unbuffered.
+
+---
+
+
+## BP-090–BP-094R8 visual parity hotfix
+
+R8 keeps the verified bidirectional original-binary interoperability from R7
+and corrects the three concrete renderer mismatches identified from the
+external `demo1` diagnostic captures: MiniQuake now starts demo evidence with
+command-line `-gamma 1`, preserves GLQuake's red clear colour, and renders BSP
+brush entities through the canonical `R_DrawBrushModelForSubmodel` path with
+per-entity alternate texture animation and `GL_ONE_MINUS_SRC_COLOR` lightmap
+blending. Run `TEST_BP-090-094R9.ps1`. Output remains live and unbuffered.
+
 # MiniQuake – BP-085–BP-089R8
 
 > Accepted Windows parent: BP-080–BP-084R2.
@@ -540,7 +583,7 @@ und ohne Binärdateien. EXE- und DLL-Hashes werden nur in Metadaten festgehalten
 ## Statische Verifikation
 
 ```powershell
-python .\tools\verify.py .
+python .\tools\verify.py --root .
 python .\tools\bp045_alias_model_checker.py --root .
 python .\tools\bp046_sprite_sync_checker.py --root .
 python .\tools\bp047_render_ui_checker.py --root .

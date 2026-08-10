@@ -147,7 +147,7 @@ function R_ConfigureCompatibility(
     compatBoolCvar("gl_affinemodels", 0.0),
     compatBoolCvar("r_shadows", 0.0),
     compatBoolCvar("gl_nocolors", 0.0),
-    // GLQuake 1.09 exposes this misspelled cvar name.
+    // MiniQuake 1.09 exposes this misspelled cvar name.
     compatBoolCvar("gl_doubleeys", 1.0),
   )
   compatRmainWorld.R_SetSubdivideSize(compatCvarValue("gl_subdivide_size", 128.0))

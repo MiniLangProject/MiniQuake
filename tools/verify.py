@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Self-contained verifier for MiniQuake BP-089 / BP-085-089R8.
+"""Self-contained package verifier for MiniQuake OPT-001D.
 
-Historical semantic component checkers are executed by build.ps1. This verifier
-owns current package integrity, imports, native bridge identity, delivery
-scripts, game-data exclusion and the source-guided black-port closure.
+Historical subsystem semantics are checked by the source-guided component
+checkers invoked from build.ps1.  This verifier owns current delivery
+integrity, identity, import/entrypoint hygiene, native bridge identity,
+external-reference policy and the BP-090--BP-094 source contracts.
 """
-
 from __future__ import annotations
 
 import argparse
@@ -15,14 +15,14 @@ import re
 import subprocess
 import sys
 from dataclasses import asdict, dataclass
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
-PACKAGE_ID = "BP-089"
-PARENT_PACKAGE_ID = "BP-088"
-BLOCK_ID = "BP-085-089"
-BLOCK_PARENT_PACKAGE_ID = "BP-080-084R2"
-DELIVERY_REVISION = "BP-085-089R8"
-DELIVERY_PARENT = "BP-085-089R7"
+PACKAGE_ID = "BP-094"
+PARENT_PACKAGE_ID = "BP-093"
+BLOCK_ID = "BP-090-094"
+BLOCK_PARENT_PACKAGE_ID = "BP-085-089R8"
+DELIVERY_REVISION = "OPT-001D"
+DELIVERY_PARENT = "OPT-001CR3R7"
 MANIFEST = "SOURCE_MANIFEST.sha256"
 
 EXCLUDED_DIRS = {".git", "build", "__pycache__", ".pytest_cache"}
@@ -30,94 +30,136 @@ FORBIDDEN_SUFFIXES = {
     ".pak", ".bsp", ".mdl", ".spr", ".wad", ".dem", ".sav", ".lmp",
     ".pcx", ".tga", ".ogg", ".wav", ".lit", ".vis",
 }
-FORBIDDEN_NAMES = {"progs.dat", "gfx.wad", "palette.lmp", "colormap.lmp"}
+FORBIDDEN_NAMES = {
+    "progs.dat", "gfx.wad", "palette.lmp", "colormap.lmp",
+    "glquake.exe", "opengl32.dll", "originalquakesourcecode.zip",
+}
 
 REQUIRED_PATHS = {
+    "TEST_OPT-001D.ps1", "CHANGELOG_OPT-001D.md",
+    "docs/OPT-001D_TESTING.md", "docs/OPT-001D_CHANGELOG.md",
+    "docs/OPT-001D_RESULT_ANALYSIS.md", "docs/OPT-001D_HOTFIX_REPORT.json",
+    "audit/opt001d_audio_transition_hotpath.json", "tools/check_opt001d.py",
+    "tools/analyze_opt001d_audio.py", "patches/OPT-001D.diff",
+    "TEST_OPT-001CR3R6.ps1", "CHANGELOG_OPT-001CR3R6.md",
+    "docs/OPT-001CR3R6_TESTING.md", "docs/OPT-001CR3R6_CHANGELOG.md",
+    "docs/OPT-001CR3R6_RESULT_ANALYSIS.md", "docs/OPT-001CR3R6_HOTFIX_REPORT.json",
+    "audit/opt001cr3r6_windowed_transition.json", "tools/check_opt001cr3r6.py",
+    "patches/OPT-001CR3R6.diff",
+    "TEST_OPT-001CR3R2.ps1", "CHANGELOG_OPT-001CR3R2.md",
+    "docs/OPT-001CR3R2_TESTING.md", "docs/OPT-001CR3R2_CHANGELOG.md",
+    "docs/OPT-001CR3R2_RESULT_ANALYSIS.md", "docs/OPT-001CR3R2_HOTFIX_REPORT.json",
+    "tools/run_process_live.py", "audit/opt001cr3r2_live_exitcode.json",
+    "patches/OPT-001CR3R2.diff",
+    "TEST_OPT-001CR3R1.ps1", "CHANGELOG_OPT-001CR3R1.md",
+    "docs/OPT-001CR3R1_TESTING.md", "docs/OPT-001CR3R1_CHANGELOG.md",
+    "docs/OPT-001CR3R1_RESULT_ANALYSIS.md", "docs/OPT-001CR3R1_HOTFIX_REPORT.json",
+    "audit/opt001cr3r1_compiler_safe_inline.json", "patches/OPT-001CR3R1.diff",
+    "TEST_OPT-001CR3.ps1", "CHANGELOG_OPT-001CR3.md",
+    "docs/OPT-001CR3_TESTING.md", "docs/OPT-001CR3_CHANGELOG.md",
+    "docs/OPT-001CR3_DELIVERY_REPORT.json", "patches/OPT-001CR3.diff",
+    "tests/opt001cr3_hotpath_tests.ml", "tools/check_opt001cr3.py",
+    "tools/compare_opt001cr3_performance.py", "audit/opt001cr3_inline_array_hotpath.json",
+    "audit/opt001cr2_accepted_baseline.json",
+    "TEST_OPT-001CR2.ps1", "CHANGELOG_OPT-001CR2.md",
+    "docs/OPT-001CR2_TESTING.md", "docs/OPT-001CR2_RESULT_ANALYSIS.md",
+    "docs/OPT-001CR2_HOTFIX_REPORT.json", "docs/OPT-001CR2_DELIVERY_REPORT.json",
+    "patches/OPT-001CR2.diff", "tools/check_opt001cr2.py",
+    "audit/opt001cr2_harness_golden.json",
+    "TEST_OPT-001CR1.ps1", "CHANGELOG_OPT-001CR1.md",
+    "docs/OPT-001CR1_TESTING.md", "docs/OPT-001CR1_RESULT_ANALYSIS.md",
+    "docs/OPT-001CR1_HOTFIX_REPORT.json", "docs/OPT-001CR1_DELIVERY_REPORT.json",
+    "patches/OPT-001CR1.diff", "tools/check_opt001cr1.py",
+    "tools/check_minilang_delimiters.py", "audit/opt001cr1_syntax_golden.json",
+    "TEST_OPT-001C.ps1", "CHANGELOG_OPT-001C.md",
+    "docs/OPT-001C_TESTING.md", "docs/OPT-001C_ALLOCATION_CONTRACT.md",
+    "docs/OPT-001C_DELIVERY_REPORT.json", "patches/OPT-001C.diff",
+    "tests/opt001c_contract_tests.ml", "tools/check_opt001c.py",
+    "tools/compare_opt001c_performance.py",
+    "audit/opt001c_allocation_golden.json", "audit/opt001b_performance_baseline.json",
+    "TEST_OPT-001B.ps1", "CHANGELOG_OPT-001B.md",
+    "docs/OPT-001B_TESTING.md", "docs/OPT-001B_CORRECTNESS_CONTRACT.md",
+    "docs/OPT-001B_DELIVERY_REPORT.json", "patches/OPT-001B.diff",
+    "tests/opt001b_contract_tests.ml", "tools/check_opt001b.py",
+    "audit/opt001b_correctness_golden.json",
+    "TEST_OPT-001A.ps1", "CHANGELOG_OPT-001A.md",
+    "docs/OPT-001A_TESTING.md", "docs/OPT-001A_BASELINE_CONTRACT.md",
+    "docs/OPT-001A_DELIVERY_REPORT.json", "patches/OPT-001A.diff",
+    "src/miniquake/optimization_baseline.ml", "tests/opt001a_contract_tests.ml",
+    "tools/check_opt001a.py", "tools/analyze_opt001a.py",
+    "audit/opt001a_baseline_golden.json",
     "COPYING", "README.md", "build.ps1", "COLLECT_RESULTS.ps1", "test.ps1",
-    "TEST_BP-080-084.ps1", "TEST_BP-080-084R1.ps1", "TEST_BP-080-084R2.ps1",
-    "CHANGELOG_BP-080-084R1.md", "CHANGELOG_BP-080-084R2.md",
-    "docs/BP-080-084R1_TESTING.md",
-    "docs/BP-080-084R1_RESULT_ANALYSIS.md",
-    "docs/BP-080-084R1_HOTFIX_REPORT.json",
-    "docs/BP-080-084R1_BLOCK_LEDGER.json",
-    "docs/BP-080-084R2_TESTING.md",
-    "docs/BP-080-084R2_RESULT_ANALYSIS.md",
-    "docs/BP-080-084R2_HOTFIX_REPORT.json",
-    "docs/BP-080-084R2_BLOCK_LEDGER.json",
-    "BLOCK_LEDGER.json", "PORT_LEDGER.json",
-    "PORT_STATUS.md", MANIFEST,
-    "src/main.ml", "src/miniquake/build_info.ml",
-    "src/miniquake/cvar.ml", "src/miniquake/sound/cd_audio.ml",
-    "src/miniquake/source_profile_contract.ml",
-    "src/miniquake/black_port_corpus.ml",
-    "src/miniquake/black_port_source_contract.ml",
-    "tests/cvar_source_surface_tests.ml",
-    "tests/cd_audio_source_surface_tests.ml",
-    "tests/source_function_inventory_tests.ml",
-    "tests/black_port_corpus_tests.ml",
-    "tests/black_port_source_closure_tests.ml",
-    "audit/cvar_source_surface_golden.json",
-    "audit/cd_audio_source_surface_golden.json",
-    "audit/source_function_inventory.json",
-    "audit/black_port_corpus_golden.json",
-    "audit/black_port_source_closure_golden.json",
-    "tools/generate_source_inventory.py",
-    "tools/check_source_080.py", "tools/check_source_081.py",
-    "tools/check_source_082.py", "tools/check_source_083.py",
-    "tools/check_source_084.py",
+    "TEST_BP-090-094.ps1", "CHANGELOG_BP-090-094.md",
+    "TEST_BP-090-094R15.ps1", "CHANGELOG_BP-090-094R15.md",
+    "docs/BP-090-094R15_TESTING.md", "docs/BP-090-094R15_RESULT_ANALYSIS.md",
+    "docs/BP-090-094R15_HOTFIX_REPORT.json", "patches/BP-094R15.diff",
+    "TEST_BP-090-094R14.ps1", "CHANGELOG_BP-090-094R14.md",
+    "docs/BP-090-094R14_TESTING.md", "docs/BP-090-094R14_RESULT_ANALYSIS.md",
+    "docs/BP-090-094R14_HOTFIX_REPORT.json", "patches/BP-094R14.diff",
+    "TEST_BP-090-094R13.ps1", "CHANGELOG_BP-090-094R13.md",
+    "docs/BP-090-094R13_TESTING.md", "docs/BP-090-094R13_RESULT_ANALYSIS.md",
+    "docs/BP-090-094R13_HOTFIX_REPORT.json", "patches/BP-094R13.diff",
+    "TEST_BP-090-094R12.ps1", "CHANGELOG_BP-090-094R12.md",
+    "docs/BP-090-094R12_TESTING.md", "docs/BP-090-094R12_RESULT_ANALYSIS.md",
+    "docs/BP-090-094R12_HOTFIX_REPORT.json", "patches/BP-094R12.diff",
+    "TEST_BP-090-094R11.ps1", "CHANGELOG_BP-090-094R11.md",
+    "docs/BP-090-094R11_TESTING.md", "docs/BP-090-094R11_RESULT_ANALYSIS.md",
+    "docs/BP-090-094R11_HOTFIX_REPORT.json", "patches/BP-094R11.diff",
+    "TEST_BP-090-094R10.ps1", "CHANGELOG_BP-090-094R10.md",
+    "docs/BP-090-094R10_TESTING.md", "docs/BP-090-094R10_RESULT_ANALYSIS.md",
+    "docs/BP-090-094R10_HOTFIX_REPORT.json", "patches/BP-094R10.diff",
+    "TEST_BP-090-094R9.ps1", "CHANGELOG_BP-090-094R9.md",
+    "docs/BP-090-094R9_TESTING.md", "docs/BP-090-094R9_RESULT_ANALYSIS.md",
+    "docs/BP-090-094R9_HOTFIX_REPORT.json", "patches/BP-094R9.diff",
+    "TEST_BP-090-094R8.ps1", "CHANGELOG_BP-090-094R8.md",
+    "docs/BP-090-094R8_TESTING.md", "docs/BP-090-094R8_RESULT_ANALYSIS.md",
+    "docs/BP-090-094R8_HOTFIX_REPORT.json", "docs/BP-093_R7_VISUAL_DIAGNOSTIC_ANALYSIS.md",
+    "docs/BP-093_R7_VISUAL_DIAGNOSTIC_ANALYSIS.json", "patches/BP-094R8.diff",
+    "TEST_BP-090-094R7.ps1", "CHANGELOG_BP-090-094R7.md",
+    "docs/BP-090-094R7_TESTING.md", "docs/BP-090-094R7_RESULT_ANALYSIS.md",
+    "docs/BP-090-094R7_HOTFIX_REPORT.json", "patches/BP-094R7.diff",
+    "TEST_BP-090-094R6.ps1", "CHANGELOG_BP-090-094R6.md",
+    "docs/BP-090-094R6_TESTING.md", "docs/BP-090-094R6_RESULT_ANALYSIS.md",
+    "docs/BP-090-094R6_HOTFIX_REPORT.json", "patches/BP-094R6.diff",
+    "TEST_BP-090-094R5.ps1", "CHANGELOG_BP-090-094R5.md",
+    "docs/BP-090-094R5_TESTING.md", "docs/BP-090-094R5_RESULT_ANALYSIS.md",
+    "docs/BP-090-094R5_HOTFIX_REPORT.json", "patches/BP-094R5.diff",
+    "TEST_BP-090-094R4.ps1", "CHANGELOG_BP-090-094R4.md",
+    "docs/BP-090-094R4_TESTING.md", "docs/BP-090-094R4_RESULT_ANALYSIS.md",
+    "docs/BP-090-094R4_HOTFIX_REPORT.json", "patches/BP-094R4.diff",
+    "TEST_BP-090-094R3.ps1", "CHANGELOG_BP-090-094R3.md",
+    "docs/BP-090-094R3_TESTING.md", "docs/BP-090-094R3_RESULT_ANALYSIS.md",
+    "docs/BP-090-094R3_HOTFIX_REPORT.json", "patches/BP-094R3.diff",
+    "TEST_BP-090-094R2.ps1", "CHANGELOG_BP-090-094R2.md",
+    "docs/BP-090-094R2_TESTING.md", "docs/BP-090-094R2_RESULT_ANALYSIS.md",
+    "docs/BP-090-094R2_HOTFIX_REPORT.json", "patches/BP-094R2.diff",
+    "TEST_BP-090-094R1.ps1", "CHANGELOG_BP-090-094R1.md",
+    "docs/BP-090-094R1_TESTING.md", "docs/BP-090-094R1_RESULT_ANALYSIS.md",
+    "docs/BP-090-094R1_HOTFIX_REPORT.json", "patches/BP-094R1.diff",
+    "BLOCK_LEDGER.json",
+    "PORT_LEDGER.json", "PORT_STATUS.md", MANIFEST,
+    "docs/BP-090-094_TESTING.md", "docs/BP-085-089R8_ACCEPTANCE_ANALYSIS.md",
+    "src/main.ml", "src/miniquake/build_info.ml", "src/miniquake/host.ml",
+    "src/miniquake/external_reference_contract.ml",
+    "tests/original_reference_provenance_tests.ml",
+    "tests/original_server_interop_tests.ml",
+    "tests/original_client_interop_tests.ml",
+    "tests/original_visual_reference_tests.ml",
+    "tests/external_compat_closure_tests.ml",
+    "tools/prepare_original_reference.py", "tools/compare_original_reference.py",
+    "tools/check_external_090.py", "tools/check_external_091.py",
+    "tools/check_external_092.py", "tools/check_external_093.py",
+    "tools/check_external_094.py",
+    "audit/original_reference_golden.json",
+    "audit/original_server_interop_golden.json",
+    "audit/original_client_interop_golden.json",
+    "audit/original_client_port_routing_golden.json",
+    "audit/original_visual_reference_golden.json",
+    "audit/external_compat_closure_golden.json",
     "native/miniquake_native.dll", "native/miniquake_native.def",
     "native/miniquake_text.dll", "native/miniquake_text.def",
-    "patches/BP-080.diff", "patches/BP-081.diff", "patches/BP-082.diff",
-    "patches/BP-083.diff", "patches/BP-084.diff",
-    "patches/BP-084R1.diff", "patches/BP-084R2.diff",
-    "TEST_BP-085-089.ps1", "CHANGELOG_BP-085-089.md",
-    "docs/BP-085-089_TESTING.md", "docs/BP-080-084R2_ACCEPTANCE_ANALYSIS.md",
-    "docs/BP-085-089_BLOCK_LEDGER.json",
-    "TEST_BP-085-089R1.ps1", "CHANGELOG_BP-085-089R1.md",
-    "docs/BP-085-089R1_TESTING.md", "docs/BP-085-089R1_RESULT_ANALYSIS.md",
-    "docs/BP-085-089R1_HOTFIX_REPORT.json", "docs/BP-085-089R1_BLOCK_LEDGER.json",
-    "TEST_BP-085-089R8.ps1", "CHANGELOG_BP-085-089R8.md",
-    "docs/BP-085-089R8_TESTING.md", "docs/BP-085-089R8_RESULT_ANALYSIS.md",
-    "docs/BP-085-089R8_HOTFIX_REPORT.json", "docs/BP-085-089R8_BLOCK_LEDGER.json",
-    "TEST_BP-085-089R7.ps1", "CHANGELOG_BP-085-089R7.md",
-    "docs/BP-085-089R7_TESTING.md", "docs/BP-085-089R7_RESULT_ANALYSIS.md",
-    "docs/BP-085-089R7_HOTFIX_REPORT.json", "docs/BP-085-089R7_BLOCK_LEDGER.json",
-    "TEST_BP-085-089R5.ps1", "CHANGELOG_BP-085-089R5.md",
-    "docs/BP-085-089R5_TESTING.md", "docs/BP-085-089R5_RESULT_ANALYSIS.md",
-    "docs/BP-085-089R5_HOTFIX_REPORT.json", "docs/BP-085-089R5_BLOCK_LEDGER.json",
-    "TEST_BP-085-089R4.ps1", "CHANGELOG_BP-085-089R4.md",
-    "docs/BP-085-089R4_TESTING.md", "docs/BP-085-089R4_RESULT_ANALYSIS.md",
-    "docs/BP-085-089R4_HOTFIX_REPORT.json", "docs/BP-085-089R4_BLOCK_LEDGER.json",
-    "TEST_BP-085-089R3.ps1", "CHANGELOG_BP-085-089R3.md",
-    "docs/BP-085-089R3_TESTING.md", "docs/BP-085-089R3_RESULT_ANALYSIS.md",
-    "docs/BP-085-089R3_HOTFIX_REPORT.json", "docs/BP-085-089R3_BLOCK_LEDGER.json",
-    "TEST_BP-085-089R2.ps1", "CHANGELOG_BP-085-089R2.md",
-    "docs/BP-085-089R2_TESTING.md", "docs/BP-085-089R2_RESULT_ANALYSIS.md",
-    "docs/BP-085-089R2_HOTFIX_REPORT.json", "docs/BP-085-089R2_BLOCK_LEDGER.json",
-    "src/miniquake/server.ml", "src/miniquake/types.ml",
-    "tests/compat_trace_tests.ml",
-    "src/miniquake/game_profile.ml", "src/miniquake/mod_compat.ml",
-    "src/miniquake/artifact_compat.ml", "src/miniquake/common.ml",
-    "src/miniquake/format/bsp.ml", "src/miniquake/savegame_runtime.ml",
-    "src/miniquake/stability_contract.ml",
-    "src/miniquake/compatibility_matrix.ml",
-    "tests/game_profile_compat_tests.ml", "tests/mod_runtime_compat_tests.ml",
-    "tests/artifact_compat_tests.ml", "tests/stability_contract_tests.ml",
-    "tests/compatibility_release_closure_tests.ml", "tests/artifact_retail_evidence.ml",
-    "audit/game_profile_golden.json", "audit/mod_runtime_golden.json",
-    "audit/artifact_compat_golden.json", "audit/savegame_v5_golden.json",
-    "audit/savegame_fixed6_golden.json", "audit/stability_golden.json",
-    "audit/compat_release_golden.json",
-    "tools/check_compat_085.py", "tools/check_compat_086.py",
-    "tools/check_compat_087.py", "tools/check_compat_088.py", "tools/check_compat_089.py",
-    "tools/check_savegame_v5.py", "tools/oracle/savegame_v5_oracle.c",
-    "tools/oracle/savegame_fixed6_oracle.c", "native/miniquake_text.c", "native/README.md",
-    "tools/check_command_cvar.py", "tools/oracle/command_cvar_oracle.c",
-    "audit/command_cvar_golden.json", "tests/command_cvar_lifecycle_tests.ml",
-    "patches/BP-085.diff", "patches/BP-086.diff", "patches/BP-087.diff",
-    "patches/BP-088.diff", "patches/BP-089.diff", "patches/BP-089R1.diff", "patches/BP-089R2.diff",
-    "patches/BP-089R3.diff", "patches/BP-089R4.diff", "patches/BP-089R5.diff", "patches/BP-089R6.diff",
-    "patches/BP-089R7.diff", "patches/BP-089R8.diff",
+    "patches/BP-090.diff", "patches/BP-091.diff", "patches/BP-092.diff",
+    "patches/BP-093.diff", "patches/BP-094.diff",
 }
 
 EXPECTED_NATIVE = {
@@ -138,37 +180,32 @@ EXPECTED_NATIVE = {
 class Check:
     name: str
     passed: bool
-    details: dict
+    details: dict[str, object]
     errors: list[str]
 
 
-def digest(path: Path) -> str:
-    value = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            value.update(block)
-    return value.hexdigest()
+def sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for block in iter(lambda: fh.read(1024 * 1024), b""):
+            h.update(block)
+    return h.hexdigest()
 
 
-def all_package_files(root: Path) -> list[Path]:
+def package_files(root: Path) -> list[Path]:
     result: list[Path] = []
     for path in root.rglob("*"):
         if not path.is_file():
             continue
-        relative = path.relative_to(root)
-        if any(part in EXCLUDED_DIRS for part in relative.parts):
+        rel = path.relative_to(root)
+        if any(part in EXCLUDED_DIRS for part in rel.parts):
             continue
-        if relative.as_posix() == MANIFEST:
+        if rel.as_posix() == MANIFEST:
             continue
-        if relative.parts[:2] in (("native", "build"), ("native", "text_build")):
+        if rel.parts[:2] in (("native", "build"), ("native", "text_build")):
             continue
         result.append(path)
-    return sorted(result, key=lambda item: item.relative_to(root).as_posix().lower())
-
-
-def check_required(root: Path) -> Check:
-    missing = sorted(path for path in REQUIRED_PATHS if not (root / path).is_file())
-    return Check("required_paths", not missing, {"required": len(REQUIRED_PATHS)}, [f"missing: {x}" for x in missing])
+    return sorted(result, key=lambda p: p.relative_to(root).as_posix().lower())
 
 
 def parse_manifest(path: Path) -> dict[str, str]:
@@ -179,11 +216,16 @@ def parse_manifest(path: Path) -> dict[str, str]:
         match = re.fullmatch(r"([0-9a-fA-F]{64})\s+\*?(.+)", raw)
         if not match:
             raise ValueError(f"invalid manifest line {number}: {raw!r}")
-        relative = match.group(2).replace("\\", "/")
-        if relative in values:
-            raise ValueError(f"duplicate manifest path: {relative}")
-        values[relative] = match.group(1).lower()
+        rel = match.group(2).replace("\\", "/")
+        if rel in values:
+            raise ValueError(f"duplicate manifest path: {rel}")
+        values[rel] = match.group(1).lower()
     return values
+
+
+def check_required(root: Path) -> Check:
+    missing = sorted(rel for rel in REQUIRED_PATHS if not (root / rel).is_file())
+    return Check("required_paths", not missing, {"required": len(REQUIRED_PATHS)}, [f"missing: {x}" for x in missing])
 
 
 def check_manifest(root: Path) -> Check:
@@ -192,23 +234,23 @@ def check_manifest(root: Path) -> Check:
         listed = parse_manifest(root / MANIFEST)
     except Exception as exc:
         return Check("source_manifest", False, {}, [str(exc)])
-    actual_paths = [path.relative_to(root).as_posix() for path in all_package_files(root)]
-    actual = set(actual_paths)
-    expected = set(listed)
-    for path in sorted(actual - expected):
-        errors.append(f"file is not listed in manifest: {path}")
-    for path in sorted(expected - actual):
-        errors.append(f"manifest path is missing: {path}")
-    for relative in sorted(actual & expected):
-        found = digest(root / relative)
-        if found != listed[relative]:
-            errors.append(f"hash mismatch: {relative}")
-    details = {
-        "listed_files": len(listed),
-        "actual_files": len(actual),
-        "manifest_sha256": digest(root / MANIFEST),
-    }
-    return Check("source_manifest", not errors, details, errors)
+    actual = {p.relative_to(root).as_posix(): p for p in package_files(root)}
+    for rel in sorted(set(actual) - set(listed)):
+        errors.append(f"file is not listed in manifest: {rel}")
+    for rel in sorted(set(listed) - set(actual)):
+        errors.append(f"manifest path is missing: {rel}")
+    for rel in sorted(set(actual) & set(listed)):
+        if sha256(actual[rel]) != listed[rel]:
+            errors.append(f"hash mismatch: {rel}")
+    return Check(
+        "source_manifest", not errors,
+        {"listed_files": len(listed), "actual_files": len(actual), "manifest_sha256": sha256(root / MANIFEST)},
+        errors,
+    )
+
+
+def marker_errors(text: str, markers: list[str], label: str) -> list[str]:
+    return [f"{label} missing marker: {m}" for m in markers if m not in text]
 
 
 def check_identity(root: Path) -> Check:
@@ -216,164 +258,595 @@ def check_identity(root: Path) -> Check:
     build_info = (root / "src/miniquake/build_info.ml").read_text(encoding="utf-8-sig")
     main = (root / "src/main.ml").read_text(encoding="utf-8-sig")
     build = (root / "build.ps1").read_text(encoding="utf-8-sig")
-    test = (root / "TEST_BP-085-089R8.ps1").read_text(encoding="utf-8-sig")
+    test = (root / "TEST_OPT-001D.ps1").read_text(encoding="utf-8-sig")
     collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
     launcher = (root / "test.ps1").read_text(encoding="utf-8-sig")
-    markers = {
-        "build_info": [
-            'const PACKAGE_ID = "BP-089"', 'const PARENT_PACKAGE_ID = "BP-088"',
-            'const BLOCK_ID = "BP-085-089"',
-            'const BLOCK_PARENT_PACKAGE_ID = "BP-080-084R2"',
-            'const GAME_PROFILE_STATUS = "game_profile_109_frozen_v1"',
-            'const MOD_RUNTIME_STATUS = "mod_runtime_109_frozen_v1"',
-            'const ARTIFACT_COMPAT_STATUS = "artifact_compat_109_frozen_v1"',
-            'const STABILITY_STATUS = "stability_109_frozen_v1"',
-            'const COMPAT_RELEASE_STATUS = "compat_109_release_candidate_v1"',
-            'const COMPAT_RELEASE_FINGERPRINT = 0x29b72a98',
-        ],
-        "main": [
-            "Game profile status:", "Mod runtime status:",
-            "Artifact compatibility status:", "Stability status:",
-            "Compatibility release status:", "Port status: BP-089",
-        ],
-        "build": [
-            '$PackageId = "BP-089"', '$ParentPackageId = "BP-088"',
-            '$BlockId = "BP-085-089"', '$CompatReleaseStatus = "compat_109_release_candidate_v1"',
-            "MiniQuakeCompatibilityReleaseTests.exe", "MiniQuakeArtifactRetailEvidence.exe",
-        ],
-        "test": [
-            '$PackageId = "BP-089"', '$BlockId = "BP-085-089"',
-            '$DeliveryRevision = "BP-085-089R8"',
-            '$DeliveryParent = "BP-085-089R7"',
-            "MiniQuake BP-085-089R8 acceptance test: PASS",
-            "retail demo/save artifact evidence A", "5000-frame host soak",
-        ],
-        "collector": [
-            '$PackageId = "BP-089"', '$BlockId = "BP-085-089"',
-            '$DeliveryRevision = "BP-085-089R8"',
-            '$DeliveryParent = "BP-085-089R7"',
-            "MiniQuake_BP-085-089R8_RESULTS_",
-            "MiniQuakeArtifactRetailEvidence.exe",
-        ],
-        "launcher": ["TEST_BP-085-089R8.ps1"],
+    errors += marker_errors(build_info, [
+        'const PACKAGE_ID = "BP-094"', 'const PARENT_PACKAGE_ID = "BP-093"',
+        'const BLOCK_ID = "BP-090-094"', 'const BLOCK_PARENT_PACKAGE_ID = "BP-085-089R8"',
+        'const OPTIMIZATION_STATUS = "opt001d_performance_audio_ui_candidate_v1"',
+        'const OPTIMIZATION_FINGERPRINT = 0x1c001c10',
+        'const OPTIMIZATION_PARENT = "OPT-001CR3R7"',
+        'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001D"',
+        'const OPTIMIZATION_DELIVERY_PARENT = "OPT-001CR3R7"',
+    ], "build_info")
+    errors += marker_errors(main, [
+        "--opt001a-map-parse", "--opt001a-frame-baseline", "--opt001a-handle-plateau", "--opt001b-transition",
+        "Optimization status:", "Optimization parent:",
+    ], "main")
+    errors += marker_errors(build, [
+        '$PackageId = "BP-094"', "MiniQuakeOPT001CAllocationTests.exe",
+        "MiniQuakeOPT001CR3HotpathTests.exe", "tests\\opt001cr3_hotpath_tests.ml",
+    ], "build")
+    errors += marker_errors(test, [
+        '$DeliveryRevision = "OPT-001D"', '$DeliveryParent = "OPT-001CR3R7"',
+        "MiniQuake OPT-001D acceptance test: PASS", "output_mode=python_binary_passthrough_named_build_binding",
+        "--opt001a-map-parse", "--opt001a-frame-baseline", "--opt001a-handle-plateau",
+    ], "test")
+    errors += marker_errors(collector, [
+        '$DeliveryRevision = "OPT-001D"', "MiniQuake_OPT-001D_RESULTS_",
+    ], "collector")
+    errors += marker_errors(launcher, ["TEST_OPT-001D.ps1"], "test.ps1")
+    return Check(
+        "package_identity", not errors,
+        {"package_id": PACKAGE_ID, "parent_package_id": PARENT_PACKAGE_ID,
+         "block_id": BLOCK_ID, "delivery_revision": DELIVERY_REVISION},
+        errors,
+    )
+
+
+def check_r8_visual_parity(root: Path) -> Check:
+    errors: list[str] = []
+    main = (root / "src/main.ml").read_text(encoding="utf-8-sig")
+    world = (root / "src/miniquake/render/world.ml").read_text(encoding="utf-8-sig")
+    entities = (root / "src/miniquake/render/entities.ml").read_text(encoding="utf-8-sig")
+    test = (root / "TEST_BP-090-094R8.ps1").read_text(encoding="utf-8-sig")
+    analysis = (root / "docs/BP-093_R7_VISUAL_DIAGNOSTIC_ANALYSIS.md").read_text(encoding="utf-8-sig")
+    required = [
+        ('"-gamma", "1"', main, "main startup gamma"),
+        ("gl.clearColor(1.0, 0.0, 0.0, 0.0)", world, "GL clear colour"),
+        ("function R_DrawBrushModelForSubmodel(entity, submodelIndex)", world, "canonical brush helper"),
+        ("currentTextureFrame = entity.frame", world, "brush alternate animation"),
+        ("R_ClearLightmapChains()", world, "per-model lightmap chain reset"),
+        ("gl.blendFunc(gl.GL_ZERO, gl.GL_ONE_MINUS_SRC_COLOR)", world, "LUMINANCE blend"),
+        ("worldRenderer.R_DrawBrushModelForSubmodel(entity, submodelIndex)", entities, "brush handoff"),
+        ("MiniQuake BP-090-094R8 acceptance test: PASS", test, "R8 runner"),
+        ("brush_lightmap_inversion=confirmed", analysis, "diagnostic evidence"),
+    ]
+    for value, text, label in required:
+        if value not in text:
+            errors.append(f"{label} missing marker: {value}")
+    brush_match = re.search(r"(?ms)^function drawBrush\b.*?^end function$", entities)
+    if brush_match and "gl.GL_SRC_COLOR" in brush_match.group(0):
+        errors.append("simplified brush path still uses GL_SRC_COLOR")
+    viewport_match = re.search(r"(?ms)^function renderViewport\b.*?^end function$", world)
+    if viewport_match and "gl.clearColor(0.0, 0.0, 0.0" in viewport_match.group(0):
+        errors.append("renderViewport still overrides clear colour with black")
+    return Check(
+        "bp090094r8_visual_parity_contract", not errors,
+        {
+            "startup_gamma": 1,
+            "clear_color": "1,0,0,0",
+            "brush_path": "canonical_R_DrawBrushModelForSubmodel",
+            "brush_lightmap_blend": "GL_ZERO/GL_ONE_MINUS_SRC_COLOR",
+            "texture_frame": "entity.frame",
+        },
+        errors,
+    )
+
+
+def check_r9_network_provenance(root: Path) -> Check:
+    errors: list[str] = []
+    host = (root / "src/miniquake/host.ml").read_text(encoding="utf-8-sig")
+    contract = (root / "src/miniquake/external_reference_contract.ml").read_text(encoding="utf-8-sig")
+    fixture = (root / "tests/original_server_interop_tests.ml").read_text(encoding="utf-8-sig")
+    runner = (root / "TEST_BP-090-094R12.ps1").read_text(encoding="utf-8-sig")
+    golden = json.loads((root / "audit/original_server_interop_golden.json").read_text(encoding="utf-8-sig"))
+    required = [
+        ("function originalInteropClientNetworkProvenance(", host, "host provenance helper"),
+        ("originalServerInteropNetworkProvenance(", contract, "contract provenance helper"),
+        ("original-server interop completed signon without target UDP provenance", host, "fallback rejection"),
+        ("network_provenance=target_udp", host, "runtime provenance marker"),
+        ("target UDP provenance", fixture, "runtime fixture"),
+        ("local fallback rejected", fixture, "fallback fixture"),
+        ("$HasTargetUdpProvenance", runner, "PowerShell provenance gate"),
+        ("transport=udp", runner, "UDP transport gate"),
+        ("local_server_active=false", runner, "local server rejection"),
+        ("local_authoritative=false", runner, "local authoritative rejection"),
+        ("demo_playback=false", runner, "demo fallback rejection"),
+    ]
+    for marker, text, label in required:
+        if marker not in text:
+            errors.append(f"{label} missing marker: {marker}")
+    expected = {
+        "network_provenance_required": True,
+        "required_transport": "udp",
+        "local_fallback_rejected": True,
+        "demo_fallback_rejected": True,
+        "remote_address_must_match_target": True,
+        "normalized_pair_evidence": "target_udp_signon4",
     }
-    texts = {
-        "build_info": build_info, "main": main, "build": build,
-        "test": test, "collector": collector, "launcher": launcher,
+    for key, value in expected.items():
+        if golden.get(key) != value:
+            errors.append(f"golden {key}={golden.get(key)!r}, expected {value!r}")
+    return Check(
+        "bp090094r9_network_provenance_contract", not errors,
+        {"network_provenance": "target_udp", "local_fallback_rejected": True, "fixtures": 20},
+        errors,
+    )
+
+
+
+def check_r10_original_server_readiness(root: Path) -> Check:
+    errors: list[str] = []
+    runner = (root / "TEST_BP-090-094R12.ps1").read_text(encoding="utf-8-sig")
+    testing = (root / "docs/BP-090-094R10_TESTING.md").read_text(encoding="utf-8-sig")
+    analysis = (root / "docs/BP-090-094R10_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
+    hotfix = json.loads((root / "docs/BP-090-094R10_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig"))
+    required = [
+        ("[int]$OriginalServerReadyTimeoutMs = 180000", runner, "readiness timeout parameter"),
+        ("function Wait-OriginalServerControlReady(", runner, "readiness probe helper"),
+        ("function Read-QuakeCString(", runner, "control response string parser"),
+        ("function Get-AvailableLoopbackUdpPort(", runner, "loopback port selection"),
+        ("CCREQ_SERVER_INFO", runner, "Protocol-3 request contract"),
+        ("CCREP_SERVER_INFO", runner, "Protocol-3 response contract"),
+        ("protocol3_server_info_response", runner, "readiness evidence marker"),
+        ("$Remote.Port -ne $Port", runner, "exact response port validation"),
+        ("$Response[4] -ne 0x83", runner, "server-info command validation"),
+        ("$Protocol -ne 3", runner, "control protocol validation"),
+        ("Wait-OriginalServerControlReady -Handle $OriginalServer", runner, "probe before full client"),
+        ("bp090-094r12-original-server-{0}-readiness.json", runner, "readiness report path"),
+        ("INFRA_FAILURE: original GLQuake server", runner, "timeout classification"),
+        ("Get-NetUDPEndpoint", runner, "timeout endpoint diagnostics"),
+        ("OriginalServerReadyTimeoutMs 180000", testing, "testing command"),
+        ("Cold-Start-/Readiness-Lücke", analysis, "result analysis classification"),
+    ]
+    for marker, text, label in required:
+        if marker not in text:
+            errors.append(f"{label} missing marker: {marker}")
+    pair_start = runner.find("function Run-OriginalServerMiniClientPair(")
+    pair_end = runner.find("function Run-MiniServerOriginalClientPair(", pair_start)
+    if pair_start < 0 or pair_end < 0:
+        errors.append("could not isolate Run-OriginalServerMiniClientPair")
+    else:
+        body = runner[pair_start:pair_end]
+        ready_at = body.find("Wait-OriginalServerControlReady -Handle $OriginalServer")
+        client_at = body.find("Invoke-LiveProcess -Executable $GameExe")
+        if ready_at < 0 or client_at < 0 or ready_at > client_at:
+            errors.append("full MiniQuake client may be launched before original-server readiness is established")
+    expected = {
+        "delivery_revision": "BP-090-094R10",
+        "delivery_parent": "BP-090-094R9",
+        "classification": "external original-server interop cold-start/readiness race",
+        "changed_engine_code": False,
+        "changed_native_code": False,
+        "network_provenance_contract_preserved": True,
     }
-    for label, wanted in markers.items():
-        for marker in wanted:
-            if marker not in texts[label]:
-                errors.append(f"{label} missing marker: {marker}")
-    return Check("package_identity", not errors, {
-        "package_id": PACKAGE_ID,
-        "parent_package_id": PARENT_PACKAGE_ID,
-        "block_id": BLOCK_ID,
-        "block_parent_package_id": BLOCK_PARENT_PACKAGE_ID,
-    }, errors)
+    for key, value in expected.items():
+        if hotfix.get(key) != value:
+            errors.append(f"hotfix {key}={hotfix.get(key)!r}, expected {value!r}")
+    fix = hotfix.get("fix", {})
+    if fix.get("readiness_evidence") != "protocol3_server_info_response":
+        errors.append("hotfix readiness evidence is not protocol3_server_info_response")
+    if fix.get("default_timeout_ms") != 180000:
+        errors.append("hotfix default readiness timeout is not 180000 ms")
+    if fix.get("client_launch_after_readiness_only") is not True:
+        errors.append("hotfix does not require client launch after readiness")
+    return Check(
+        "bp090094r10_original_server_readiness_contract", not errors,
+        {
+            "readiness_evidence": "CCREP_SERVER_INFO",
+            "default_timeout_ms": 180000,
+            "exact_endpoint": "127.0.0.1:<selected-port>",
+            "cold_start_safe": True,
+            "engine_code_changed": False,
+        },
+        errors,
+    )
+
+
+
+def check_r11_original_reference_handoff(root: Path) -> Check:
+    errors: list[str] = []
+    runner = (root / "TEST_BP-090-094R12.ps1").read_text(encoding="utf-8-sig")
+    prepare = (root / "tools/prepare_original_reference.py").read_text(encoding="utf-8-sig")
+    testing = (root / "docs/BP-090-094R11_TESTING.md").read_text(encoding="utf-8-sig")
+    analysis = (root / "docs/BP-090-094R11_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
+    hotfix = json.loads(
+        (root / "docs/BP-090-094R11_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig")
+    )
+
+    required = [
+        ("function Resolve-OriginalReferenceInput()", runner, "early source resolver"),
+        (
+            "Resolve-OriginalReferenceInput\n[void](Relaunch-ElevatedForInteropIfNeeded)",
+            runner,
+            "resolution before elevation",
+        ),
+        ("Downloads\\OriginalQuakeSourceCode.zip", runner, "Downloads fallback"),
+        ("Test-PathInsideProject", runner, "project-boundary rejection"),
+        ("MINIQUAKE_ORIGINAL_SOURCE", runner, "archive environment handoff"),
+        ("MINIQUAKE_ORIGINAL_EXE", runner, "executable environment handoff"),
+        (
+            "bp090-094r12-original-reference-input.json",
+            runner,
+            "source argument report",
+        ),
+        ("$SelectorCount -ne 1", runner, "exactly-one selector check"),
+        (
+            '-Name "verified original GLQuake reference"',
+            runner,
+            "named live-process call",
+        ),
+        (
+            "-Arguments $PrepareArguments",
+            runner,
+            "explicit prepare argument array",
+        ),
+        (
+            "add_mutually_exclusive_group(required=False)",
+            prepare,
+            "Python optional CLI group",
+        ),
+        (
+            "MINIQUAKE_ORIGINAL_SOURCE",
+            prepare,
+            "Python archive environment fallback",
+        ),
+        (
+            "MINIQUAKE_ORIGINAL_EXE",
+            prepare,
+            "Python executable environment fallback",
+        ),
+        ("source_selector", prepare, "Python selector report"),
+        ("OriginalQuakeSourceCode.zip", testing, "testing source path"),
+        ("Quellselektor", analysis, "result analysis"),
+    ]
+    for marker, text, label in required:
+        if marker not in text:
+            errors.append(f"{label} missing marker: {marker}")
+
+    resolve_at = runner.find(
+        "Resolve-OriginalReferenceInput\n[void](Relaunch-ElevatedForInteropIfNeeded)"
+    )
+    build_at = runner.find("starting single cumulative build and unit-test suite")
+    if resolve_at < 0:
+        errors.append("original reference is not resolved immediately before elevation")
+    if build_at >= 0 and resolve_at > build_at:
+        errors.append("original reference resolution occurs after the long build")
+
+    prepare_stage = runner.find("$OriginalStage =")
+    if prepare_stage >= 0:
+        late_region = runner[prepare_stage:]
+        if "Join-Path $Root 'OriginalQuakeSourceCode.zip'" in late_region:
+            errors.append("late post-build project-root source fallback is still present")
+
+    expected = {
+        "delivery_revision": "BP-090-094R11",
+        "delivery_parent": "BP-090-094R10",
+        "classification": "external original-reference source-selector handoff",
+        "changed_engine_code": False,
+        "changed_native_code": False,
+        "r10_readiness_preserved": True,
+    }
+    for key, value in expected.items():
+        if hotfix.get(key) != value:
+            errors.append(f"hotfix {key}={hotfix.get(key)!r}, expected {value!r}")
+
+    fix = hotfix.get("fix", {})
+    for key in (
+        "resolution_before_elevation",
+        "explicit_parameter_forwarding",
+        "environment_fallback",
+        "downloads_fallback",
+        "project_internal_reference_rejected",
+        "exactly_one_selector_required",
+    ):
+        if fix.get(key) is not True:
+            errors.append(f"hotfix fix.{key} is not true")
+
+    return Check(
+        "bp090094r11_original_reference_handoff",
+        not errors,
+        {
+            "resolution_before_elevation": True,
+            "cli_selectors": 2,
+            "environment_fallbacks": 2,
+            "downloads_fallback": True,
+            "project_internal_reference_rejected": True,
+            "argument_report": "bp090-094r12-original-reference-input.json",
+            "engine_code_changed": False,
+        },
+        errors,
+    )
+
+
+def check_r12_persistent_original_connect(root: Path) -> Check:
+    errors: list[str] = []
+    main = (root / "src/main.ml").read_text(encoding="utf-8-sig")
+    host = (root / "src/miniquake/host.ml").read_text(encoding="utf-8-sig")
+    client = (root / "src/miniquake/client.ml").read_text(encoding="utf-8-sig")
+    net_main = (root / "src/miniquake/net_main.ml").read_text(encoding="utf-8-sig")
+    net_loop = (root / "src/miniquake/net_loop.ml").read_text(encoding="utf-8-sig")
+    runner = (root / "TEST_BP-090-094R12.ps1").read_text(encoding="utf-8-sig")
+    testing = (root / "docs/BP-090-094R12_TESTING.md").read_text(encoding="utf-8-sig")
+    analysis = (root / "docs/BP-090-094R12_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
+    hotfix = json.loads((root / "docs/BP-090-094R12_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig"))
+
+    required = [
+        ("function connectRemotePersistent(", net_loop, "persistent UDP connector"),
+        ("resendMilliseconds", net_loop, "resend interval"),
+        ("request=\" + hex(request)", net_loop, "raw request diagnostic"),
+        ("accepted=true control_port=", net_loop, "accept diagnostic"),
+        ("UDP persistent connect timed out:", net_loop, "timeout diagnostic"),
+        ("function Datagram_ConnectPersistent(", net_loop, "public persistent datagram path"),
+        ("function NET_ConnectInterop(", net_main, "NET interop path"),
+        ("function CL_EstablishInteropConnection(", client, "client interop establishment"),
+        ("function connectHostInterop(", client, "client interop wrapper"),
+        ("function connectRemoteHostInterop(", host, "host strict interop path"),
+        ("connectRemoteHostInterop(session, targetHost, 20000, 500)", host, "strict persistent call"),
+        ("original-server interop completed signon without target UDP provenance", host, "provenance rejection retained"),
+        ("return host.runOriginalInteropClient([", main, "interop command"),
+        ("persistent_control_socket = $true", runner, "process report marker"),
+        ("connect_resend_ms = 500", runner, "process resend report"),
+        ("MiniQuake Protocol-3 persistent connect", testing, "testing diagnostic"),
+        ("two-second duplicate window", analysis, "original duplicate-window rationale"),
+    ]
+    for marker, text, label in required:
+        if marker not in text:
+            errors.append(f"{label} missing marker: {marker}")
+
+    start = main.find("function runOriginalInteropClientCommand(")
+    end = main.find("function runUdpSmoke(", start)
+    if start < 0 or end < 0:
+        errors.append("could not isolate runOriginalInteropClientCommand")
+    else:
+        body = main[start:end]
+        if '"+connect"' in body:
+            errors.append("strict original interop still queues startup +connect")
+
+    if hotfix.get("delivery_revision") != "BP-090-094R12":
+        errors.append("hotfix delivery revision mismatch")
+    if hotfix.get("parent_delivery") != "BP-090-094R11":
+        errors.append("hotfix parent delivery mismatch")
+    if hotfix.get("normal_network_semantics_changed") is not False:
+        errors.append("hotfix must preserve normal network semantics")
+    if hotfix.get("native_bridges_changed") is not False:
+        errors.append("hotfix must not claim native bridge changes")
+
+    return Check(
+        "bp090094r12_persistent_original_connect_contract",
+        not errors,
+        {
+            "persistent_control_socket": True,
+            "connect_timeout_ms": 20000,
+            "resend_ms": 500,
+            "startup_connect_fallback": False,
+            "raw_packet_diagnostics": True,
+        },
+        errors,
+    )
+
+
+
+def check_r13_pre_fallback_readiness_guard(root: Path) -> Check:
+    errors: list[str] = []
+    main = (root / "src/main.ml").read_text(encoding="utf-8-sig")
+    host = (root / "src/miniquake/host.ml").read_text(encoding="utf-8-sig")
+    net_loop = (root / "src/miniquake/net_loop.ml").read_text(encoding="utf-8-sig")
+    runner = (root / "TEST_BP-090-094R13.ps1").read_text(encoding="utf-8-sig")
+    testing = (root / "docs/BP-090-094R13_TESTING.md").read_text(encoding="utf-8-sig")
+    analysis = (root / "docs/BP-090-094R13_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
+    hotfix = json.loads((root / "docs/BP-090-094R13_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig"))
+
+    required = [
+        ('"-original-interop-target", arguments[2] + ":" + port', main, "private pre-fallback target option"),
+        ('originalInteropTarget = common.parmValue(session.arguments, "-original-interop-target", "")', host, "Host_Init target read"),
+        ('MiniQuake original interop pre-fallback connect', host, "pre-fallback diagnostic"),
+        ('connectRemoteHostInterop(session, originalInteropTarget, 20000, 500)', host, "pre-fallback persistent connect"),
+        ('if not session.client.connected then', host, "single-handshake reuse"),
+        ('UDP control request was partially sent:', net_loop, "strict send length"),
+        ('udpSocket.bindAddress', net_loop, "actual local bind diagnostic"),
+        ('protocol3_server_info_response_with_open_guard', runner, "open readiness guard evidence"),
+        ('guard_socket_open_during_signon', runner, "guard lifetime report"),
+        ("guard_close_order = 'after_original_process_stop'", runner, "guard close order"),
+        ('original GLQuake readiness guard {0} closed after server stop', runner, "guard close diagnostic"),
+        ('TEST_BP-090-094R13.ps1', testing, "testing command"),
+        ('pre-fallback', analysis.lower(), "analysis rationale"),
+    ]
+    for marker, source, label in required:
+        if marker not in source:
+            errors.append(f"{label} missing marker: {marker}")
+
+    # The private target must appear before the normal standalone fallback.
+    target_pos = host.find('originalInteropTarget = common.parmValue')
+    fallback_pos = host.find('fallbackMap = session.startMap')
+    if target_pos < 0 or fallback_pos < 0 or target_pos >= fallback_pos:
+        errors.append("original interop target is not handled before standalone fallback")
+
+    # The readiness socket must not be unconditionally closed inside the
+    # readiness helper anymore.
+    wait_start = runner.find('function Wait-OriginalServerControlReady(')
+    wait_end = runner.find('function Stop-OriginalServer(', wait_start)
+    if wait_start < 0 or wait_end < 0:
+        errors.append("could not isolate readiness helper")
+    else:
+        body = runner[wait_start:wait_end]
+        if 'if ($null -ne $Udp) { try { $Udp.Close() } catch { } }' in body:
+            errors.append("readiness helper still unconditionally closes guard socket")
+        if '$KeepGuardOpen = $true' not in body:
+            errors.append("readiness helper does not retain successful guard socket")
+
+    if hotfix.get("delivery_revision") != "BP-090-094R13":
+        errors.append("hotfix delivery revision mismatch")
+    if hotfix.get("parent_delivery") != "BP-090-094R12":
+        errors.append("hotfix parent delivery mismatch")
+    if hotfix.get("normal_game_start_changed") is not False:
+        errors.append("hotfix must preserve normal game start semantics")
+    if hotfix.get("native_bridges_changed") is not False:
+        errors.append("hotfix must not claim native bridge changes")
+
+    return Check(
+        "bp090094r13_pre_fallback_readiness_guard_contract",
+        not errors,
+        {
+            "pre_fallback_connect": True,
+            "single_persistent_handshake": True,
+            "readiness_guard_open_during_signon": True,
+            "guard_close_order": "after_original_process_stop",
+            "strict_connect_request_bytes": 12,
+        },
+        errors,
+    )
+
+
+def check_r14_original_capture_ensemble(root: Path) -> Check:
+    errors=[]
+    runner=(root/'TEST_BP-090-094R14.ps1').read_text(encoding='utf-8-sig')
+    comparator=(root/'tools/compare_original_reference.py').read_text(encoding='utf-8-sig')
+    golden=json.loads((root/'audit/original_visual_reference_golden.json').read_text(encoding='utf-8-sig'))
+    testing=(root/'docs/BP-090-094R14_TESTING.md').read_text(encoding='utf-8-sig')
+    analysis=(root/'docs/BP-090-094R14_RESULT_ANALYSIS.md').read_text(encoding='utf-8-sig')
+    hotfix=json.loads((root/'docs/BP-090-094R14_HOTFIX_REPORT.json').read_text(encoding='utf-8-sig'))
+    for marker in ['function Get-OriginalTgaState(','function Wait-OriginalTgaComplete(','validated_tga_size_hash_stability','expected_tga_bytes','stable_polls',"'--original-alt',$OriginalB", "'--min-reference-ssim','0.98'",'bounded_dual_reference_ensemble',"reference_aggregation='minimum_ssim'",'original_reference_ssim','MiniQuake BP-090-094R14 acceptance test: PASS']:
+        if marker not in runner: errors.append('R14 runner missing marker: '+marker)
+    if 'if ($OriginalHashA -ne $OriginalHashB) { throw' in runner: errors.append('R14 runner still rejects non-identical original captures before measuring similarity')
+    for marker in ['--original-alt','--min-reference-ssim','default=0.98','"schema_version":3','"reference_aggregation":"minimum_ssim"','reference_consistency','ssim_min','ssim_mean','expected exactly']:
+        if marker.replace(' ','') not in comparator.replace(' ',''): errors.append('R14 comparator missing marker: '+marker)
+    expected={'comparison_schema_version':3,'requires_original_ab_determinism':False,'capture_completion':'validated_tga_size_hash_stability','minimum_reference_ssim':0.98,'reference_consistency_mode':'exact_or_dual_reference_ssim','candidate_reference_aggregation':'minimum_ssim','original_reference_runs':2}
+    for k,v in expected.items():
+        if golden.get(k)!=v: errors.append(f'R14 golden {k}={golden.get(k)!r}, expected {v!r}')
+    for marker,source,label in [('complete stable TGA',analysis,'result analysis'),('--min-reference-ssim 0.98',testing,'testing guide'),('TEST_BP-090-094R14.ps1',testing,'testing command')]:
+        if marker.lower() not in source.lower(): errors.append(f'{label} missing marker: {marker}')
+    if hotfix.get('delivery_revision')!='BP-090-094R14': errors.append('R14 hotfix delivery revision mismatch')
+    if hotfix.get('parent_delivery')!='BP-090-094R13': errors.append('R14 hotfix parent delivery mismatch')
+    if hotfix.get('engine_sources_changed') is not False: errors.append('R14 hotfix must not claim engine source changes')
+    if hotfix.get('native_bridges_changed') is not False: errors.append('R14 hotfix must not claim native bridge changes')
+    return Check('bp090094r14_original_capture_ensemble_contract',not errors,{'capture_completion':'validated_tga_size_hash_stability','original_runs':2,'minimum_reference_ssim':0.98,'candidate_reference_aggregation':'minimum_ssim','minimum_candidate_ssim':0.95},errors)
+
+def check_r15_visual_timestep_parity(root: Path) -> Check:
+    errors: list[str] = []
+    runner = (root / "TEST_BP-090-094R15.ps1").read_text(encoding="utf-8-sig")
+    host = (root / "src/miniquake/host.ml").read_text(encoding="utf-8-sig")
+    golden = json.loads((root / "audit/original_visual_reference_golden.json").read_text(encoding="utf-8-sig"))
+    testing = (root / "docs/BP-090-094R15_TESTING.md").read_text(encoding="utf-8-sig")
+    analysis = (root / "docs/BP-090-094R15_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
+    hotfix = json.loads((root / "docs/BP-090-094R15_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig"))
+
+    config_match = re.search(r"(?ms)^function Write-OriginalVisualConfig\b.*?^}\s*$", runner)
+    config = config_match.group(0) if config_match else ""
+    if not config:
+        errors.append("R15 runner is missing Write-OriginalVisualConfig")
+    for marker in ["'host_framerate 0.02'", "('timedemo ' + $Demo)"]:
+        if marker not in config:
+            errors.append("R15 visual config missing marker: " + marker)
+    if config and config.find("'host_framerate 0.02'") > config.find("('timedemo ' + $Demo)"):
+        errors.append("R15 host_framerate must be set before timedemo")
+
+    for marker in [
+        "simulation_timestep='fixed_host_framerate'",
+        "original_host_framerate=0.02",
+        "miniquake_frame_step=0.02",
+        "simulation_timestep='fixed_0.02_seconds'",
+        "MiniQuake BP-090-094R15 acceptance test: PASS",
+    ]:
+        if marker not in runner:
+            errors.append("R15 runner missing marker: " + marker)
+
+    if "frame(session, 0.02)" not in host:
+        errors.append("MiniQuake evidence path no longer contains the fixed 0.02-second frame step")
+
+    expected = {
+        "simulation_timestep": "fixed_0.02_seconds",
+        "original_host_framerate": 0.02,
+        "miniquake_frame_step": 0.02,
+        "minimum_ssim": 0.95,
+        "minimum_reference_ssim": 0.98,
+        "candidate_reference_aggregation": "minimum_ssim",
+        "normalization": "none",
+        "r14_demo3_best_frame_before_fix": 255,
+        "r14_demo3_best_ssim_before_fix": 0.871158394398681,
+        "r14_demo3_diagnosis": "time_dependent_view_damage_kick_and_cshift_decay_used_different_frame_steps",
+    }
+    for key, value in expected.items():
+        if golden.get(key) != value:
+            errors.append(f"R15 golden {key}={golden.get(key)!r}, expected {value!r}")
+
+    for marker in [
+        "Host_FilterTime", "V_CalcViewRoll", "V_UpdatePalette",
+        "vier Pixel", "host_framerate 0.02", "keine Änderung unter `src/` oder `native/`",
+    ]:
+        if marker.lower() not in analysis.lower():
+            errors.append("R15 analysis missing marker: " + marker)
+    for marker in ["TEST_BP-090-094R15.ps1", "host_framerate 0.02", "SSIM"]:
+        if marker.lower() not in testing.lower():
+            errors.append("R15 testing guide missing marker: " + marker)
+
+    if hotfix.get("delivery_revision") != "BP-090-094R15":
+        errors.append("R15 hotfix delivery revision mismatch")
+    if hotfix.get("parent_delivery") != "BP-090-094R14":
+        errors.append("R15 hotfix parent delivery mismatch")
+    if hotfix.get("engine_sources_changed") is not False:
+        errors.append("R15 hotfix must not claim engine source changes")
+    if hotfix.get("native_bridges_changed") is not False:
+        errors.append("R15 hotfix must not claim native bridge changes")
+    if hotfix.get("threshold_changed") is not False:
+        errors.append("R15 hotfix must not relax visual thresholds")
+
+    return Check(
+        "bp090094r15_visual_timestep_parity_contract",
+        not errors,
+        {
+            "simulation_timestep": "fixed_0.02_seconds",
+            "original_host_framerate": 0.02,
+            "miniquake_frame_step": 0.02,
+            "minimum_reference_ssim": 0.98,
+            "minimum_candidate_ssim": 0.95,
+            "normalization": "none",
+        },
+        errors,
+    )
+
+
+def check_no_game_data(root: Path) -> Check:
+    errors: list[str] = []
+    scanned = 0
+    for path in package_files(root):
+        scanned += 1
+        name = path.name.lower()
+        if name in FORBIDDEN_NAMES or path.suffix.lower() in FORBIDDEN_SUFFIXES:
+            errors.append(f"forbidden game/reference data: {path.relative_to(root).as_posix()}")
+    return Check("no_quake_or_original_binary_data", not errors, {"files_scanned": scanned}, errors)
+
+
+def def_exports(path: Path) -> list[str]:
+    exports: list[str] = []
+    in_exports = False
+    for raw in path.read_text(encoding="utf-8-sig").splitlines():
+        line = raw.split(";", 1)[0].strip()
+        if not line:
+            continue
+        if line.upper() == "EXPORTS":
+            in_exports = True
+            continue
+        if in_exports:
+            exports.append(line.split()[0])
+    return exports
+
+
+def pe_machine(path: Path) -> int:
+    data = path.read_bytes()
+    if len(data) < 0x40 or data[:2] != b"MZ":
+        raise ValueError("not MZ")
+    offset = int.from_bytes(data[0x3C:0x40], "little")
+    if data[offset:offset + 4] != b"PE\0\0":
+        raise ValueError("not PE")
+    return int.from_bytes(data[offset + 4:offset + 6], "little")
+
 
 
 PACKAGE_RE = re.compile(r"(?m)^\s*package\s+([A-Za-z_][A-Za-z0-9_.]*)\s*$")
-MAIN_RE = re.compile(r"(?m)^\s*function\s+main\s*\(")
-IMPORT_RE = re.compile(
-    r'(?m)^\s*import\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_.]*))'
-    r'(?:\s+as\s+[A-Za-z_][A-Za-z0-9_]*)?\s*$'
-)
-
-
-def check_minilang_imports(root: Path) -> Check:
-    errors: list[str] = []
-    package_to_path: dict[str, str] = {}
-    ml_files = sorted((root / "src").rglob("*.ml")) + sorted((root / "tests").rglob("*.ml"))
-    for path in ml_files:
-        text = path.read_text(encoding="utf-8-sig", errors="replace")
-        match = PACKAGE_RE.search(text)
-        if not match:
-            # Entry files and many legacy tests intentionally live in the
-            # global package. They remain valid MiniLang sources and still
-            # participate in import validation below.
-            continue
-        package = match.group(1)
-        previous = package_to_path.get(package)
-        relative = path.relative_to(root).as_posix()
-        if previous and previous != relative:
-            errors.append(f"duplicate package {package}: {previous}, {relative}")
-        package_to_path[package] = relative
-
-    imports_checked = 0
-    for path in ml_files:
-        text = path.read_text(encoding="utf-8-sig", errors="replace")
-        for match in IMPORT_RE.finditer(text):
-            imports_checked += 1
-            quoted, module = match.groups()
-            if module:
-                if module.startswith("std."):
-                    continue
-                if module not in package_to_path:
-                    errors.append(f"{path.relative_to(root).as_posix()}: unresolved import {module}")
-            else:
-                candidate = (path.parent / quoted).resolve()
-                if not candidate.is_file():
-                    candidate = (root / "src" / quoted).resolve()
-                if not candidate.is_file():
-                    errors.append(f"{path.relative_to(root).as_posix()}: unresolved file import {quoted}")
-    return Check("minilang_packages_imports", not errors, {
-        "ml_files": len(ml_files),
-        "declared_packages": len(package_to_path),
-        "imports_checked": imports_checked,
-    }, errors)
-
-
-
-def check_minilang_main_scope(root: Path) -> Check:
-    """Reject MiniLang entrypoints declared inside a package.
-
-    The native compiler requires main(args) to live in the global top-level
-    scope.  Package modules may be imported by an entry file, but an entry file
-    itself must not declare a package when it owns main(args).
-    """
-    errors: list[str] = []
-    entry_files: list[str] = []
-    packaged_entries: list[str] = []
-    required_entries = {
-        "tests/cvar_source_surface_tests.ml",
-        "tests/cd_audio_source_surface_tests.ml",
-        "tests/source_function_inventory_tests.ml",
-        "tests/black_port_corpus_tests.ml",
-        "tests/black_port_source_closure_tests.ml",
-        "tests/game_profile_compat_tests.ml",
-        "tests/mod_runtime_compat_tests.ml",
-        "tests/artifact_compat_tests.ml",
-        "tests/stability_contract_tests.ml",
-        "tests/compatibility_release_closure_tests.ml",
-        "tests/artifact_retail_evidence.ml",
-    }
-    seen_required: set[str] = set()
-    ml_files = sorted((root / "src").rglob("*.ml")) + sorted((root / "tests").rglob("*.ml"))
-    for path in ml_files:
-        text = path.read_text(encoding="utf-8-sig", errors="replace")
-        if not MAIN_RE.search(text):
-            continue
-        relative = path.relative_to(root).as_posix()
-        entry_files.append(relative)
-        if relative in required_entries:
-            seen_required.add(relative)
-        package = PACKAGE_RE.search(text)
-        if package:
-            packaged_entries.append(relative)
-            errors.append(
-                f"{relative}: main(args) is declared in package {package.group(1)}; "
-                "MiniLang requires a global top-level entrypoint"
-            )
-    for relative in sorted(required_entries - seen_required):
-        errors.append(f"{relative}: required main(args) entrypoint is missing")
-    return Check("minilang_main_entry_scope", not errors, {
-        "entry_files": len(entry_files),
-        "required_current_entries": len(seen_required),
-        "packaged_entries": len(packaged_entries),
-    }, errors)
-
-
+MAIN_RE = re.compile(r"(?m)^\s*function\s+main\s*\(\s*args\s*\)")
 FUNCTION_RE = re.compile(
     r"(?m)^\s*(?:static\s+)?function(?:\s+inline)?\s+"
     r"([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)"
@@ -385,81 +858,53 @@ def strip_minilang_comments(text: str) -> str:
     return re.sub(r"//[^\n]*", "", text)
 
 
-def check_minilang_entry_helper_namespace(root: Path) -> Check:
-    """Require block-local prefixes for helpers in the five global entry files.
-
-    MiniLang merges a global entry file and its imported package closure. Generic
-    helper names in the entry can therefore shadow unqualified package-internal
-    calls. BP-080..084 use explicit per-step prefixes to keep their global main
-    entrypoints collision-free.
-    """
-    required = {
-        "tests/cvar_source_surface_tests.ml": "bp080",
-        "tests/cd_audio_source_surface_tests.ml": "bp081",
-        "tests/source_function_inventory_tests.ml": "bp082",
-        "tests/black_port_corpus_tests.ml": "bp083",
-        "tests/black_port_source_closure_tests.ml": "bp084",
-        "tests/game_profile_compat_tests.ml": "bp085",
-        "tests/mod_runtime_compat_tests.ml": "bp086",
-        "tests/artifact_compat_tests.ml": "bp087",
-        "tests/stability_contract_tests.ml": "bp088",
-        "tests/compatibility_release_closure_tests.ml": "bp089",
-        "tests/artifact_retail_evidence.ml": "bp087",
-    }
+def check_current_entry_helper_namespace(root: Path) -> Check:
+    relative = "tests/opt001cr3_hotpath_tests.ml"
+    path = root / relative
+    clean = strip_minilang_comments(path.read_text(encoding="utf-8"))
+    functions = [match.group(1) for match in FUNCTION_RE.finditer(clean)]
     errors: list[str] = []
-    helpers_checked = 0
-    for relative, prefix in required.items():
-        path = root / relative
-        clean = strip_minilang_comments(path.read_text(encoding="utf-8-sig", errors="replace"))
-        functions = [match.group(1) for match in FUNCTION_RE.finditer(clean)]
-        if "main" not in functions:
-            errors.append(f"{relative}: main(args) is missing")
-        for name in functions:
-            if name == "main":
-                continue
-            helpers_checked += 1
-            if not name.startswith(prefix):
-                errors.append(
-                    f"{relative}: global helper '{name}' is not namespaced with prefix '{prefix}'"
-                )
-    return Check("minilang_entry_helper_namespace", not errors, {
-        "entry_files": len(required),
-        "helpers_checked": helpers_checked,
-        "generic_helpers": len(errors),
+    helpers = [name for name in functions if name != "main"]
+    for name in helpers:
+        if not name.startswith("opt001d"):
+            errors.append(f"{relative}: global helper '{name}' is not namespaced with prefix 'opt001d'")
+    if "main" not in functions:
+        errors.append(f"{relative}: main(args) is missing")
+    for generic in ("check", "equal", "require", "passed", "failed"):
+        if re.search(rf"(?m)^\s*(?:function\s+)?{re.escape(generic)}\b", clean):
+            errors.append(f"{relative}: generic entry-level name remains: {generic}")
+    return Check("current_entry_helper_namespace", not errors, {
+        "entry": relative,
+        "helpers_checked": len(helpers),
+        "required_prefix": "opt001d",
+        "generic_names": 0 if not errors else len(errors),
     }, errors)
 
 
 def check_minilang_entry_function_shadow_arity(root: Path) -> Check:
-    """Reject package-free entry helpers that change an imported internal call.
-
-    The native compiler merges the entry and complete import closure. A global
-    entry helper can then be selected for an unqualified call inside an imported
-    package. The observed R1 failure was check/2 shadowing miniquake.zone.check/1.
-    """
+    """Reject global entry helpers that change an imported internal call's arity."""
     errors: list[str] = []
     src_files = sorted((root / "src").rglob("*.ml"))
     test_files = sorted((root / "tests").rglob("*.ml"))
     all_files = src_files + test_files
-
     package_to_path: dict[str, Path] = {}
     imports_by_file: dict[Path, list[str]] = {}
     functions_by_file: dict[Path, dict[str, int]] = {}
     internal_calls_by_file: dict[Path, set[str]] = {}
     clean_by_file: dict[Path, str] = {}
-
     import_pattern = re.compile(
         r'(?m)^\s*import\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_.]*))'
         r'(?:\s+as\s+[A-Za-z_][A-Za-z0-9_]*)?\s*$'
     )
     for path in all_files:
-        clean = strip_minilang_comments(path.read_text(encoding="utf-8-sig", errors="replace"))
+        clean = strip_minilang_comments(path.read_text(encoding="utf-8", errors="replace"))
         clean_by_file[path] = clean
         package_match = PACKAGE_RE.search(clean)
         if package_match:
             package_to_path[package_match.group(1)] = path
         imports: list[str] = []
         for match in import_pattern.finditer(clean):
-            quoted, module = match.groups()
+            _quoted, module = match.groups()
             if module:
                 imports.append(module)
         imports_by_file[path] = imports
@@ -468,7 +913,6 @@ def check_minilang_entry_function_shadow_arity(root: Path) -> Check:
             args = [item for item in match.group(2).split(",") if item.strip()]
             functions[match.group(1)] = len(args)
         functions_by_file[path] = functions
-
     for path, functions in functions_by_file.items():
         clean = clean_by_file[path]
         calls: set[str] = set()
@@ -484,12 +928,13 @@ def check_minilang_entry_function_shadow_arity(root: Path) -> Check:
                     calls.add(name)
                     break
         internal_calls_by_file[path] = calls
-
-    entries = [path for path in test_files if MAIN_RE.search(clean_by_file[path]) and not PACKAGE_RE.search(clean_by_file[path])]
+    entries = [
+        path for path in test_files
+        if MAIN_RE.search(clean_by_file[path]) and not PACKAGE_RE.search(clean_by_file[path])
+    ]
     main_file = root / "src/main.ml"
     if main_file.is_file():
         entries.append(main_file)
-
     bindings_checked = 0
     largest_closure = 0
     for entry in entries:
@@ -505,7 +950,6 @@ def check_minilang_entry_function_shadow_arity(root: Path) -> Check:
                 if imported is not None and imported not in closure:
                     pending.append(imported)
         largest_closure = max(largest_closure, len(closure))
-
         for entry_name, entry_arity in functions_by_file.get(entry, {}).items():
             if entry_name == "main":
                 continue
@@ -526,7 +970,6 @@ def check_minilang_entry_function_shadow_arity(root: Path) -> Check:
                         f"{entry.relative_to(root).as_posix()}: entry function '{entry_name}'/{entry_arity} "
                         f"shadows internally called {imported_name}.{entry_name}/{imported_arity}"
                     )
-
     return Check("minilang_entry_function_shadow_arity", not errors, {
         "entrypoints_checked": len(entries),
         "project_packages": len(package_to_path),
@@ -535,764 +978,884 @@ def check_minilang_entry_function_shadow_arity(root: Path) -> Check:
         "largest_import_closure": largest_closure,
     }, errors)
 
-
-def check_current_test_global_bindings(root: Path) -> Check:
-    """Require explicit MiniLang global declarations in current fixtures."""
-    errors: list[str] = []
-    tests = {
-        "tests/game_profile_compat_tests.ml": "bp085Check",
-        "tests/mod_runtime_compat_tests.ml": "bp086Check",
-        "tests/artifact_compat_tests.ml": "bp087Check",
-        "tests/stability_contract_tests.ml": "bp088Check",
-        "tests/compatibility_release_closure_tests.ml": "bp089Check",
-    }
-    checked = 0
-    for relative, helper in tests.items():
-        text = (root / relative).read_text(encoding="utf-8-sig", errors="replace")
-        checked += 1
-        if "passed = 0" not in text or "failed = 0" not in text:
-            errors.append(f"{relative}: missing top-level fixture counters")
-        helper_pattern = re.compile(
-            rf"function\s+{re.escape(helper)}\s*\([^)]*\)\s*\n\s*global\s+passed\s*,\s*failed",
-            re.MULTILINE,
-        )
-        main_pattern = re.compile(
-            r"function\s+main\s*\(args\)\s*\n\s*global\s+passed\s*,\s*failed",
-            re.MULTILINE,
-        )
-        if not helper_pattern.search(text):
-            errors.append(f"{relative}: {helper} does not declare global passed, failed")
-        if not main_pattern.search(text):
-            errors.append(f"{relative}: main(args) does not declare global passed, failed")
-    return Check(
-        "current_test_global_bindings",
-        not errors,
-        {"tests_checked": checked, "global_counter_bindings": checked * 2},
-        errors,
-    )
-
-def check_artifact_roundtrip_hotfix(root: Path) -> Check:
-    """Bind the BP-087 sequential, exact Quake-v5 roundtrip correction."""
-    errors: list[str] = []
-    artifact = (root / "src/miniquake/artifact_compat.ml").read_text(encoding="utf-8-sig")
-    runtime = (root / "src/miniquake/savegame_runtime.ml").read_text(encoding="utf-8-sig")
-    savegame = (root / "src/miniquake/savegame.ml").read_text(encoding="utf-8-sig")
-    common = (root / "src/miniquake/common.ml").read_text(encoding="utf-8-sig")
-    bsp = (root / "src/miniquake/format/bsp.ml").read_text(encoding="utf-8-sig")
-    qcedict = (root / "src/miniquake/quakec/edict.ml").read_text(encoding="utf-8-sig")
-    host = (root / "src/miniquake/host.ml").read_text(encoding="utf-8-sig")
-    evidence = (root / "tests/artifact_retail_evidence.ml").read_text(encoding="utf-8-sig")
-    golden = json.loads((root / "audit/artifact_compat_golden.json").read_text(encoding="utf-8-sig"))
-
-    markers = {
-        "artifact": [
-            "function saveSemanticDifference(left, right)",
-            "function firstByteDifference(left, right)",
-        ],
-        "runtime": [
-            "function synchronizeLoadedServer(server)",
-            "savedCount = server.numEdicts",
-            "serverRuntime.syncLoadedQuakeCEdicts(server, savedCount)",
-            "collision.linkEntity(server, index, false)",
-        ],
-        "savegame": [
-            "server.mapName = saved.mapName",
-            "return [common.cAtof(line[0]), line[1]]",
-        ],
-        "common": [
-            "function cAtof(text)",
-            "return native.bitsFloat(native.f32FromText(text))",
-        ],
-        "bsp": [
-            "values[valueCount] = common.cAtof(decode(slice(source, start, i - start)))",
-        ],
-        "qcedict": [
-            "vm.setGlobalFloat(machine, definition.offset, common.cAtof(value))",
-            "vm.setEntityFloat(machine, entityIndex, definition.offset, common.cAtof(actualValue))",
-        ],
-        "host": [
-            "import miniquake.savegame_runtime as saveRuntime",
-            "saveRuntime.synchronizeLoadedServer(session.server)",
-        ],
-        "evidence": [
-            'cleanA = try(bp087Shutdown(sessionA, "source"))',
-            'cleanB = try(bp087Shutdown(sessionB, "target"))',
-            'cleanC = try(bp087Shutdown(sessionC, "stability"))',
-            "exactFirstPass = artifacts.bytesEqual(saveA, saveB)",
-            "save byte roundtrip mismatch at offset",
-            "stableExact = artifacts.bytesEqual(saveB, saveC)",
-            "save_float_parse=-0.000000:",
-            "diagnostics.u32Hex(signedZeroBits)",
-            "C atof did not preserve negative zero",
-        ],
-    }
-    texts = {
-        "artifact": artifact,
-        "runtime": runtime,
-        "savegame": savegame,
-        "common": common,
-        "bsp": bsp,
-        "qcedict": qcedict,
-        "host": host,
-        "evidence": evidence,
-    }
-    for label, wanted in markers.items():
-        for marker in wanted:
-            if marker not in texts[label]:
-                errors.append(f"{label} missing marker: {marker}")
-
-    load_start = host.find("function loadGame(")
-    load_end = host.find("function setPlayerFlag(", load_start)
-    load_body = host[load_start:load_end] if load_start >= 0 and load_end > load_start else ""
-    if "server.syncQuakeCEdicts(session.server)" in load_body:
-        errors.append("loadGame still recomputes and trims the saved edict high-water mark")
-
-    order = [
-        evidence.find('cleanA = try(bp087Shutdown(sessionA, "source"))'),
-        evidence.find("sessionB = host.create("),
-        evidence.find('cleanB = try(bp087Shutdown(sessionB, "target"))'),
-        evidence.find("sessionC = host.create("),
-        evidence.find('cleanC = try(bp087Shutdown(sessionC, "stability"))'),
-    ]
-    if min(order) < 0 or order != sorted(order):
-        errors.append("retail save evidence does not use strictly sequential Host sessions")
-
-
-    current_test = (root / "TEST_BP-085-089R8.ps1").read_text(encoding="utf-8-sig")
-    if "first_pass_exact=true" not in current_test:
-        errors.append("acceptance script does not require exact A/B save roundtrip")
-    collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
-    for marker in [
-        "src\\miniquake\\savegame.ml",
-        "src\\miniquake\\savegame_runtime.ml",
-        "src\\miniquake\\host.ml",
-        "src\\miniquake\\common.ml",
-        "src\\miniquake\\format\\bsp.ml",
-        "tools\\check_savegame_v5.py",
-        "audit\\savegame_v5_golden.json",
-        "patches\\BP-089R5.diff",
-        "patches\\BP-089R6.diff",
-        "patches\\BP-089R8.diff",
-    ]:
-        if marker not in collector:
-            errors.append(f"collector missing save hotfix marker: {marker}")
-
-    expected_golden = {
-        "evidence_revision": "sequential_exact_fixed6_signedzero_v3",
-        "semantic_boundary": "parsed_save_domain",
-        "requires_exact_roundtrip": True,
-        "requires_stable_reserialize": True,
-        "preserves_edict_high_water": True,
-        "live_vm_hashes_are_diagnostic": True,
-        "simultaneous_host_sessions": False,
-        "preserves_signed_zero": True,
-        "float_parser": "msvcrt_strtod_f32",
-    }
-    for key, value in expected_golden.items():
-        if golden.get(key) != value:
-            errors.append(f"artifact golden {key} differs: {golden.get(key)!r}")
-
-    fixed_golden = json.loads((root / "audit/savegame_fixed6_golden.json").read_text(encoding="utf-8-sig"))
-    native_module = (root / "src/miniquake/native.ml").read_text(encoding="utf-8-sig")
-    edict = (root / "src/miniquake/quakec/edict.ml").read_text(encoding="utf-8-sig")
-    cvar = (root / "src/miniquake/cvar.ml").read_text(encoding="utf-8-sig")
-    text_bridge = (root / "native/miniquake_text.c").read_text(encoding="utf-8-sig")
-    text_def = (root / "native/miniquake_text.def").read_text(encoding="utf-8-sig")
-    if golden.get("fixed_six_formatter") != "msvcrt_percent_f":
-        errors.append("artifact golden fixed_six_formatter differs")
-    if golden.get("fixed_six_large_positive") != "4097.000000" or golden.get("fixed_six_large_negative") != "-4097.000000":
-        errors.append("artifact golden fixed-six 4097 values differ")
-    if golden.get("text_bridge_export") != "mqt_f32_to_fixed6":
-        errors.append("artifact golden text bridge export differs")
-    if fixed_golden.get("formatter") != "msvcrt_percent_f" or fixed_golden.get("format") != "%.6f" or len(fixed_golden.get("cases", [])) != 8:
-        errors.append("fixed-six golden corpus differs")
-    required_fixed_markers = [
-        (native_module, 'symbol "mqt_f32_to_fixed6"'),
-        (native_module, "function fixedSixText(value)"),
-        (edict, "return native.f32ToFixed6(rawWord & 0xffffffff)"),
-        (cvar, "return native.fixedSixText(value)"),
-        (text_bridge, "mqt_f32_to_fixed6"),
-        (text_bridge, 'mq_crt_proc("sprintf")'),
-        (text_bridge, '"%.6f"'),
-        (text_def, "mqt_f32_to_fixed6"),
-        (evidence, "save_float_format=4097:"),
-    ]
-    for text_value, marker in required_fixed_markers:
-        if marker not in text_value:
-            errors.append(f"fixed-six marker missing: {marker}")
-    if "scaled = native.trunc(magnitude * 1000000.0 + 0.5)" in edict or "scaled = native.trunc(magnitude * 1000000.0 + 0.5)" in cvar:
-        errors.append("legacy overflow-prone fixed-six formatter remains")
-    if r"save_float_format=4097:4097\.000000 negative:-4097\.000000" not in current_test:
-        errors.append("acceptance script does not require fixed-six 4097 evidence")
-    if r"save_float_parse=-0\.000000:80000000" not in current_test:
-        errors.append("acceptance script does not require signed-zero parse evidence")
-
-    return Check(
-        "artifact_save_roundtrip_hotfix",
-        not errors,
-        {
-            "evidence_revision": golden.get("evidence_revision"),
-            "semantic_boundary": golden.get("semantic_boundary"),
-            "exact_roundtrip": golden.get("requires_exact_roundtrip"),
-            "preserves_edict_high_water": golden.get("preserves_edict_high_water"),
-            "sequential_host_sessions": golden.get("simultaneous_host_sessions") is False,
-            "fixed_six_formatter": golden.get("fixed_six_formatter"),
-            "fixed_six_cases": len(fixed_golden.get("cases", [])),
-            "text_bridge_export": golden.get("text_bridge_export"),
-            "preserves_signed_zero": golden.get("preserves_signed_zero"),
-            "float_parser": golden.get("float_parser"),
-        },
-        errors,
-    )
-
-
-
-def check_quakec_edict_lineage(root: Path) -> Check:
-    errors: list[str] = []
-    checker = root / "tools/check_quakec_edict.py"
-    report_path = root / "build/verify-quakec-edict-downstream.json"
-    report_path.parent.mkdir(exist_ok=True)
-    downstream = subprocess.run(
-        [
-            sys.executable,
-            str(checker),
-            "--root", str(root),
-            "--allow-downstream-package",
-            "--json-output", str(report_path),
-        ],
-        text=True,
-        capture_output=True,
-    )
-    if downstream.returncode != 0:
-        errors.append("downstream BP-022 checker failed: " + (downstream.stdout + downstream.stderr).strip())
-    strict = subprocess.run(
-        [sys.executable, str(checker), "--root", str(root)],
-        text=True,
-        capture_output=True,
-    )
-    if strict.returncode == 0:
-        errors.append("historical BP-022 checker unexpectedly accepted the downstream formatter")
-    report: dict[str, object] = {}
-    if report_path.is_file():
-        report = json.loads(report_path.read_text(encoding="utf-8-sig"))
-        if report.get("downstream_package") is not True:
-            errors.append("BP-022 downstream report does not identify downstream mode")
-        if report.get("fixed_six_formatter") != "native_msvcrt_percent_f":
-            errors.append("BP-022 downstream report has the wrong fixed-six formatter")
-        if report.get("runtime_fixtures") != 22:
-            errors.append("BP-022 runtime fixture count differs")
-    else:
-        errors.append("BP-022 downstream report was not created")
-    build = (root / "build.ps1").read_text(encoding="utf-8-sig")
-    wanted = "$QuakeCEdictChecker --root $Root --allow-downstream-package"
-    if wanted not in build:
-        errors.append("build.ps1 does not select the BP-022 downstream checker mode")
-    return Check(
-        "quakec_edict_downstream_lineage",
-        not errors,
-        {
-            "downstream_passed": downstream.returncode == 0,
-            "historical_rejected": strict.returncode != 0,
-            "fixed_six_formatter": report.get("fixed_six_formatter"),
-            "runtime_fixtures": report.get("runtime_fixtures"),
-        },
-        errors,
-    )
-
-def check_command_cvar_lineage(root: Path) -> Check:
-    errors: list[str] = []
-    checker = root / "tools/check_command_cvar.py"
-    report_path = root / "build/verify-command-cvar-downstream.json"
-    report_path.parent.mkdir(exist_ok=True)
-    downstream = subprocess.run(
-        [
-            sys.executable,
-            str(checker),
-            "--root", str(root),
-            "--allow-downstream-package",
-            "--json-output", str(report_path),
-        ],
-        text=True,
-        capture_output=True,
-    )
-    if downstream.returncode != 0:
-        errors.append("downstream BP-031 checker failed: " + (downstream.stdout + downstream.stderr).strip())
-    strict = subprocess.run(
-        [sys.executable, str(checker), "--root", str(root)],
-        text=True,
-        capture_output=True,
-    )
-    if strict.returncode == 0:
-        errors.append("historical BP-031 checker unexpectedly accepted the downstream formatter")
-    report: dict[str, object] = {}
-    if report_path.is_file():
-        report = json.loads(report_path.read_text(encoding="utf-8-sig"))
-        if report.get("downstream_package") is not True:
-            errors.append("BP-031 downstream report does not identify downstream mode")
-        if report.get("fixed_six_formatter") != "native_msvcrt_percent_f":
-            errors.append("BP-031 downstream report has the wrong fixed-six formatter")
-        if report.get("runtime_fixtures") != 20:
-            errors.append("BP-031 runtime fixture count differs")
-    else:
-        errors.append("BP-031 downstream report was not created")
-    build = (root / "build.ps1").read_text(encoding="utf-8-sig")
-    if r'$Checker.Path -eq "tools\check_command_cvar.py"' not in build:
-        errors.append("build.ps1 does not identify the BP-031 checker for downstream mode")
-    if '$CheckerArguments += "--allow-downstream-package"' not in build:
-        errors.append("build.ps1 does not select the BP-031 downstream checker mode")
-    return Check(
-        "command_cvar_downstream_lineage",
-        not errors,
-        {
-            "downstream_passed": downstream.returncode == 0,
-            "historical_rejected": strict.returncode != 0,
-            "fixed_six_formatter": report.get("fixed_six_formatter"),
-            "runtime_fixtures": report.get("runtime_fixtures"),
-        },
-        errors,
-    )
-
-
-
-def check_savegame_v5_lineage(root: Path) -> Check:
-    errors: list[str] = []
-    checker = root / "tools/check_savegame_v5.py"
-    report_path = root / "build/verify-savegame-v5-downstream.json"
-    report_path.parent.mkdir(exist_ok=True)
-    downstream = subprocess.run(
-        [
-            sys.executable,
-            str(checker),
-            "--root", str(root),
-            "--allow-downstream-package",
-            "--json-output", str(report_path),
-        ],
-        text=True,
-        capture_output=True,
-    )
-    if downstream.returncode != 0:
-        errors.append("downstream BP-033 checker failed: " + (downstream.stdout + downstream.stderr).strip())
-    strict = subprocess.run(
-        [sys.executable, str(checker), "--root", str(root)],
-        text=True,
-        capture_output=True,
-    )
-    if strict.returncode == 0:
-        errors.append("historical BP-033 checker unexpectedly accepted the downstream C-atof parser")
-    report: dict[str, object] = {}
-    if report_path.is_file():
-        report = json.loads(report_path.read_text(encoding="utf-8-sig"))
-        if report.get("downstream_package") is not True:
-            errors.append("BP-033 downstream report does not identify downstream mode")
-        if report.get("float_parser") != "native_strtod_f32":
-            errors.append("BP-033 downstream report has the wrong float parser")
-        if report.get("preserves_signed_zero") is not True:
-            errors.append("BP-033 downstream report does not preserve signed zero")
-        if report.get("runtime_fixtures") != 24:
-            errors.append("BP-033 runtime fixture count differs")
-    else:
-        errors.append("BP-033 downstream report was not created")
-    build = (root / "build.ps1").read_text(encoding="utf-8-sig")
-    if r'$Checker.Path -eq "tools\check_savegame_v5.py"' not in build:
-        errors.append("build.ps1 does not identify the BP-033 checker for downstream mode")
-    if '$CheckerArguments += "--allow-downstream-package"' not in build:
-        errors.append("build.ps1 does not select downstream checker mode")
-    return Check(
-        "savegame_v5_downstream_lineage",
-        not errors,
-        {
-            "downstream_passed": downstream.returncode == 0,
-            "historical_rejected": strict.returncode != 0,
-            "float_parser": report.get("float_parser"),
-            "preserves_signed_zero": report.get("preserves_signed_zero"),
-            "runtime_fixtures": report.get("runtime_fixtures"),
-        },
-        errors,
-    )
-
-def check_quakec_sync_gc_roots(root: Path) -> Check:
-    """Bind the R7 stable in-place QuakeC-to-server/player mirror."""
-    errors: list[str] = []
-    server = (root / "src/miniquake/server.ml").read_text(encoding="utf-8-sig")
-    types = (root / "src/miniquake/types.ml").read_text(encoding="utf-8-sig")
-    save_runtime = (root / "src/miniquake/savegame_runtime.ml").read_text(encoding="utf-8-sig")
-    diagnostics = (root / "tests/compat_trace_tests.ml").read_text(encoding="utf-8-sig")
-    test = (root / "TEST_BP-085-089R8.ps1").read_text(encoding="utf-8-sig")
-    collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
-
-    type_markers = [
-        "function isEntityBaselineValue(value)",
-        '"miniquake.types.EntityBaseline"',
-        "function isQuakeEdictValue(value)",
-        '"miniquake.types.QuakeEdict"',
-    ]
-    for marker in type_markers:
-        if marker not in types:
-            errors.append(f"stable mirror type marker missing: {marker}")
-
-    server_markers = [
-        "function requireSynchronizedVector(value, entityIndex, fieldName)",
-        "function synchronizedVectorTarget(value, entityIndex, fieldName, x, y, z)",
-        "function setSynchronizedVector(value, entityIndex, fieldName, x, y, z)",
-        "function syncQcVectorInto(machine, entityIndex, fieldName, target, x, y, z)",
-        "function resizeSynchronizedEdictArray(server, requiredCount)",
-        "function ensureSynchronizedBaseline(item, entityIndex)",
-        "function ensureSynchronizedEdict(server, entityIndex)",
-        "function syncQuakeCEdictRange(server, count)",
-        "function syncLoadedQuakeCEdicts(server, savedCount)",
-        "result = synchronizedVectorTarget(target, entityIndex, fieldName, x, y, z)",
-        "item = ensureSynchronizedEdict(server, entityIndex)",
-        "server.edicts[index] = synchronized",
-        "count = runtime.numEdicts",
-        "return syncQuakeCEdictRange(server, count)",
-        "return syncQuakeCEdictRange(server, savedCount)",
-        "player.origin = origin",
-        "player.viewHeight = vm.entityFloat(machine, entityIndex, viewOffset + 2)",
-    ]
-    for marker in server_markers:
-        if marker not in server:
-            errors.append(f"stable mirror server marker missing: {marker}")
-
-    forbidden = [
-        "result = arrayutil.makeEmptyArray(server.numEdicts)",
-        "result[index] = syncQuakeCEdict(server, index)",
-        'item.origin = qcVector(machine, entityIndex, "origin",',
-        'player.origin = qcVector(server.machine, entityIndex, "origin",',
-        "highest = server.maxClients",
-    ]
-    for marker in forbidden:
-        if marker in server:
-            errors.append(f"allocation-sensitive mirror pattern remains: {marker}")
-
-    if "serverRuntime.syncLoadedQuakeCEdicts(server, savedCount)" not in save_runtime:
-        errors.append("savegame runtime does not restore the explicit edict high-water mark through the stable mirror")
-
-    diagnostic_markers = [
-        "function bp001TestSynchronizedEdictGcRoots()",
-        "entityCount = 227",
-        "runtime.numEdicts = entityCount",
-        "gc_set_limit(256)",
-        "while pass < 80",
-        "stableEdictRaw = nativeRawValue(stableEdict)",
-        'assertEqual(nativeRawValue(item), stableEdictRaw, "stable QuakeEdict identity")',
-        'assertEqual(nativeRawValue(item.origin), stableOriginRaw, "stable origin identity")',
-        'assertEqual(item.origin.x, 77.25 + pass, "stable origin refresh")',
-        'assertEqual(synchronizedCount, entityCount, "freed tail keeps high-water mark")',
-        'assertEqual(len(game.edicts), entityCount, "freed tail keeps stable array length")',
-        "gc_set_limit(1048576)",
-    ]
-    for marker in diagnostic_markers:
-        if marker not in diagnostics:
-            errors.append(f"stable mirror diagnostic marker missing: {marker}")
-
-    build = (root / "build.ps1").read_text(encoding="utf-8-sig")
-    if r'Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\compat_trace_tests.ml")' not in build:
-        errors.append("build.ps1 does not compile the diagnostics regression")
-    if '-Label "BP-001R3 diagnostics regression tests"' not in build:
-        errors.append("build.ps1 does not execute the diagnostics regression")
-    if "single cumulative build and unit-test suite" not in test:
-        errors.append("R7 acceptance script does not run the cumulative diagnostics-bearing build")
-    for marker in [
-        "TEST_BP-085-089R8.ps1",
-        "docs\\BP-085-089R8_RESULT_ANALYSIS.md",
-        "patches\\BP-089R8.diff",
-    ]:
-        if marker not in collector:
-            errors.append(f"collector missing R7 marker: {marker}")
-
-    return Check(
-        "quakec_stable_edict_mirror",
-        not errors,
-        {
-            "mirrored_edicts": 227,
-            "forced_sync_passes": 80,
-            "periodic_gc_limit": 256,
-            "stable_identity_checks": 4,
-            "preserves_high_water_mark": True,
-            "public_diagnostics_tests": 10,
-        },
-        errors,
-    )
-
-
-def check_listen_soak_highwater(root: Path) -> Check:
-    """Bind the R8 listen-server entity high-water stability correction."""
-    errors: list[str] = []
-    stability = (root / "src/miniquake/stability_contract.ml").read_text(encoding="utf-8-sig")
-    host = (root / "src/miniquake/host.ml").read_text(encoding="utf-8-sig")
-    tests = (root / "tests/stability_contract_tests.ml").read_text(encoding="utf-8-sig")
-    checker = (root / "tools/check_compat_088.py").read_text(encoding="utf-8-sig")
-    golden = json.loads((root / "audit/stability_golden.json").read_text(encoding="utf-8-sig"))
-    acceptance = (root / "TEST_BP-085-089R8.ps1").read_text(encoding="utf-8-sig")
-    collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
-
-    stability_markers = [
-        "function clientEntityLimit(serverBefore, serverAfter, entitiesBefore)",
-        "staticOffset = entitiesBefore - serverBefore",
-        "function clientEntityHighWaterStable(serverBefore, serverAfter, entitiesBefore, entitiesAfter)",
-        "entitiesStable = clientEntityHighWaterStable(before[4], after[4], before[5], after[5])",
-        "function longChecks(before, after)",
-        "after[4] <= before[4]",
-        "const FINGERPRINT = 0xd0e3c03f",
-    ]
-    for marker in stability_markers:
-        if marker not in stability:
-            errors.append(f"stability contract missing R8 marker: {marker}")
-
-    host_markers = [
-        "import miniquake.stability_contract as stability",
-        "return stability.longStable(before, after)",
-        "client entity high-water limit=",
-        "stability gates: heap=",
-    ]
-    for marker in host_markers:
-        if marker not in host:
-            errors.append(f"host soak missing R8 marker: {marker}")
-
-    test_markers = [
-        "[15/20] client entity high-water catch-up",
-        "stability.clientEntityLimit(67, 67, 66) == 67",
-        "[16/20] topology growth rejected",
-        "not stability.longStable(catchupBefore, serverGrowth)",
-    ]
-    for marker in test_markers:
-        if marker not in tests:
-            errors.append(f"stability fixture missing R8 marker: {marker}")
-
-    if golden.get("client_entity_policy") != "server_high_water_plus_existing_static_offset":
-        errors.append("R8 client entity policy differs")
-    cases = golden.get("client_entity_cases")
-    if not isinstance(cases, list) or len(cases) != 5:
-        errors.append("R8 client entity golden corpus differs")
-    else:
-        observed = next((case for case in cases if case.get("name") == "r7_listen_catch_up"), None)
-        if observed != {
-            "name": "r7_listen_catch_up",
-            "server_before": 67,
-            "server_after": 67,
-            "entities_before": 66,
-            "entities_after": 67,
-            "expected_limit": 67,
-            "stable": True,
-        }:
-            errors.append("R7 observed listen catch-up golden differs")
-
-    if "r7_observed_case_passes" not in checker:
-        errors.append("BP-088 checker does not bind the observed R7 case")
-    if '$DeliveryRevision = "BP-085-089R8"' not in acceptance or "5000-frame listen-server resource soak" not in acceptance:
-        errors.append("R8 acceptance script does not run the listen-server soak")
-    for marker in [
-        "TEST_BP-085-089R8.ps1",
-        r"docs\BP-085-089R8_RESULT_ANALYSIS.md",
-        r"patches\BP-089R8.diff",
-    ]:
-        if marker not in collector:
-            errors.append(f"collector missing R8 marker: {marker}")
-
-    return Check(
-        "listen_soak_entity_highwater",
-        not errors,
-        {
-            "policy": golden.get("client_entity_policy"),
-            "observed_server_highwater": 67,
-            "observed_client_before": 66,
-            "observed_client_after": 67,
-            "observed_limit": 67,
-            "leak_sensitive_limits_unchanged": True,
-        },
-        errors,
-    )
-
-
 def check_native(root: Path) -> Check:
     errors: list[str] = []
     details: dict[str, object] = {}
-    for relative, (expected_hash, expected_count, def_relative) in EXPECTED_NATIVE.items():
-        path = root / relative
-        found = digest(path)
-        if found != expected_hash:
-            errors.append(f"native hash mismatch: {relative}")
-        exports = []
-        in_exports = False
-        for raw in (root / def_relative).read_text(encoding="ascii", errors="replace").splitlines():
-            line = raw.strip()
-            if line.upper() == "EXPORTS":
-                in_exports = True
-                continue
-            if in_exports and line and not line.startswith(";"):
-                exports.append(line.split()[0])
+    for rel, (expected_hash, expected_count, def_rel) in EXPECTED_NATIVE.items():
+        path = root / rel
+        try:
+            actual_hash = sha256(path)
+            exports = def_exports(root / def_rel)
+            machine = pe_machine(path)
+        except Exception as exc:
+            errors.append(f"{rel}: {exc}")
+            continue
+        if actual_hash != expected_hash:
+            errors.append(f"{rel}: SHA-256 {actual_hash} != {expected_hash}")
         if len(exports) != expected_count:
-            errors.append(f"{def_relative}: expected {expected_count} exports, got {len(exports)}")
-        data = path.read_bytes()
-        if data[:2] != b"MZ":
-            errors.append(f"{relative}: not a PE image")
-        details[relative] = {"sha256": found, "def_exports": len(exports), "bytes": len(data)}
+            errors.append(f"{def_rel}: exports {len(exports)} != {expected_count}")
+        if machine != 0x8664:
+            errors.append(f"{rel}: PE machine 0x{machine:04x} != 0x8664")
+        details[rel] = {"sha256": actual_hash, "exports": len(exports), "machine": f"0x{machine:04x}"}
     return Check("native_bridges", not errors, details, errors)
 
 
-def check_no_game_data(root: Path) -> Check:
-    errors: list[str] = []
-    scanned = 0
-    for path in all_package_files(root):
-        scanned += 1
-        relative = path.relative_to(root)
-        name = path.name.lower()
-        if name in FORBIDDEN_NAMES or path.suffix.lower() in FORBIDDEN_SUFFIXES:
-            # Documentation images are not part of this delivery; any matching
-            # binary-looking source-tree file is therefore suspicious.
-            errors.append(f"forbidden Quake game-data-shaped file: {relative.as_posix()}")
-        if any(part.lower() in {"id1", "hipnotic", "rogue"} for part in relative.parts):
-            errors.append(f"forbidden Quake game-directory path: {relative.as_posix()}")
-    return Check("no_quake_game_data", not errors, {"files_scanned": scanned}, errors)
+def ml_files(root: Path) -> list[Path]:
+    return sorted([*root.glob("src/**/*.ml"), *root.glob("tests/**/*.ml")])
 
 
-def check_powershell(root: Path) -> Check:
+def check_minilang(root: Path) -> Check:
     errors: list[str] = []
-    current_names = [
-        "build.ps1",
-        "TEST_BP-085-089R8.ps1",
-        "COLLECT_RESULTS.ps1",
-        "test.ps1",
+    package_by_name: dict[str, Path] = {}
+    main_files = 0
+    imports = 0
+    package_re = re.compile(r"^\s*package\s+([A-Za-z_][A-Za-z0-9_.]*)\s*$", re.M)
+    import_re = re.compile(r"^\s*import\s+([A-Za-z_][A-Za-z0-9_.]*|\"[^\"]+\")(?:\s+as\s+[A-Za-z_][A-Za-z0-9_]*)?\s*$", re.M)
+    for path in ml_files(root):
+        text = path.read_text(encoding="utf-8-sig")
+        package = package_re.search(text)
+        if package:
+            name = package.group(1)
+            if name in package_by_name and package_by_name[name] != path:
+                errors.append(f"duplicate package {name}: {package_by_name[name].relative_to(root)} and {path.relative_to(root)}")
+            package_by_name[name] = path
+        if re.search(r"^\s*function\s+main\s*\(\s*args\s*\)", text, re.M):
+            main_files += 1
+            if package:
+                errors.append(f"main(args) must be global, but file has package: {path.relative_to(root)}")
+        imports += len(import_re.findall(text))
+    for path in ml_files(root):
+        text = path.read_text(encoding="utf-8-sig")
+        for token in import_re.findall(text):
+            if token.startswith('"'):
+                candidate = (path.parent / token.strip('"')).resolve()
+                if not candidate.is_file():
+                    errors.append(f"missing quoted import in {path.relative_to(root)}: {token}")
+            elif token not in package_by_name and not token.startswith("std."):
+                errors.append(f"unknown package import in {path.relative_to(root)}: {token}")
+    return Check(
+        "minilang_packages_and_entries", not errors,
+        {"ml_files": len(ml_files(root)), "packages": len(package_by_name), "main_entry_files": main_files, "imports": imports},
+        errors,
+    )
+
+
+def check_external_contract(root: Path) -> Check:
+    errors: list[str] = []
+    contract = (root / "src/miniquake/external_reference_contract.ml").read_text(encoding="utf-8-sig")
+    test = (root / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
+    collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
+    prepare = (root / "tools/prepare_original_reference.py").read_text(encoding="utf-8-sig")
+    comparator = (root / "tools/compare_original_reference.py").read_text(encoding="utf-8-sig")
+    errors += marker_errors(contract, [
+        'const ORIGINAL_GLQUAKE_SHA256 = "04862c835c399bc9184f62101ae0390c2a758c21656ec06dcc0384e0f373d588"',
+        "const ORIGINAL_GLQUAKE_BYTES = 435712", "const ORIGINAL_GLQUAKE_PE_MACHINE = 0x014c",
+        "const ORIGINAL_CAPTURE_MIN_SSIM = 0.95", "const ORIGINAL_CAPTURE_SEARCH_RADIUS = 2",
+        '["demo1", 256]', '["demo2", 256]', '["demo3", 256]',
+        'const COMPAT_FINAL_STATUS = "compat_109_final_candidate_v1"', "const COMPAT_FINAL_FINGERPRINT = 0xe04a7727",
+    ], "external contract")
+    errors += marker_errors(prepare, ["EXPECTED_SIZE = 435_712", "EXPECTED_MACHINE = 0x014C", '"legacy_opengl32_staged": False'], "reference stager")
+    errors += marker_errors(comparator, ['"normalization": "none"', '"alignment": "temporal_candidate_selection_only"', "default=0.95"], "visual comparator")
+    errors += marker_errors(test, [
+        "Run-OriginalServerMiniClientPair", "Run-MiniServerOriginalClientPair", "Run-OriginalVisualCapture",
+        "two deterministic pairs in each Protocol-15 direction", "original GLQuake deterministic capture",
+        "--render-demo-evidence", "min_ssim=0.95",
+    ], "acceptance runner")
+    errors += marker_errors(collector, [
+        "bp090-094-original-reference", "original_reference_binary_in_result_archive=$false",
+        "quake_game_data_in_result_archive=$false",
+    ], "collector")
+    return Check(
+        "external_reference_contract", not errors,
+        {"reference_sha256": "04862c...d588", "minimum_ssim": 0.95, "interop_directions": 2, "visual_scenarios": 3},
+        errors,
+    )
+
+
+
+def check_named_build_parameter_binding(root: Path) -> Check:
+    errors: list[str] = []
+    current = (root / "TEST_OPT-001D.ps1").read_text(encoding="utf-8-sig")
+    errors += marker_errors(current, [
+        'function Invoke-LiveBuild(', '"-File", $ScriptPath',
+        '"-Compiler", $Compiler', '"-StdLib", $StdLib',
+        '"-Configuration", "Release"', '"-NoRunTests"', '"-SkipPreflight"',
+        'output_mode=python_binary_passthrough_named_build_binding',
+    ], "current runner")
+    for forbidden in ('$BuildArguments =', '@BuildArguments', '-EncodedCommand', 'Invoke-LivePowerShellScript'):
+        if forbidden in current:
+            errors.append(f"current runner retains unsafe parameter binding marker: {forbidden}")
+    # Ensure the named tokens occur in the actual subprocess argument list, not only in comments.
+    build_fn = re.search(r'(?ms)^function Invoke-LiveBuild\b.*?^}', current)
+    block = build_fn.group(0) if build_fn else ""
+    sequence = ['"-File", $ScriptPath', '"-Compiler", $Compiler', '"-StdLib", $StdLib', '"-Configuration", "Release"']
+    positions = [block.find(item) for item in sequence]
+    if not block or any(pos < 0 for pos in positions) or positions != sorted(positions):
+        errors.append("Invoke-LiveBuild does not pass ordered named build parameters")
+    return Check(
+        "named_build_parameter_binding", not errors,
+        {
+            "mode": "powershell_file_named_arguments",
+            "encoded_command": False,
+            "array_splat": False,
+            "configuration": "Release",
+        },
+        errors,
+    )
+
+def check_live_output(root: Path) -> Check:
+    errors: list[str] = []
+    historical_test = (root / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
+    current_test = (root / "TEST_OPT-001D.ps1").read_text(encoding="utf-8-sig")
+    live_runner = (root / "tools/run_process_live.py").read_text(encoding="utf-8-sig")
+    build = (root / "build.ps1").read_text(encoding="utf-8-sig")
+    for label, script_text in (("historical test", historical_test), ("current test", current_test), ("build", build)):
+        if "PYTHONUNBUFFERED" not in script_text:
+            errors.append(f"{label} script does not force unbuffered Python")
+    if "@(& $Executable @Arguments 2>&1)" in historical_test:
+        errors.append("historical acceptance runner reintroduced full-process output buffering")
+    required = [
+        "tools\\run_process_live.py", "output_mode=python_binary_passthrough_named_build_binding",
+        "Invoke-ExternalProcessLive", "dependent tests skipped because build failed",
+        "Show-LogTail", "Get-Content -LiteralPath $LogPath -Tail",
     ]
-    scripts = [root / name for name in current_names]
-    comma_pattern = re.compile(r",\s*(?:\r?\n\s*)?\)")
+    errors += marker_errors(current_test, required, "current runner")
+    if "Tee-Object" in current_test:
+        errors.append("current runner reintroduced a PowerShell Tee-Object pipeline")
+    errors += marker_errors(live_runner, [
+        "subprocess.Popen(", "stderr=subprocess.STDOUT", "text=False",
+        "os.read(fd, 4096)", "stream_mode=binary_passthrough",
+        "except BaseException:", "child_exit_code=", "--status-json", "write_status(",
+    ], "live process runner")
+    errors += marker_errors(current_test, [
+        "2>&1 | Out-Host", '$SavedErrorActionPreference = $ErrorActionPreference',
+        '$ErrorActionPreference = "Continue"', '$StatusPath = $LogPath + ".status.json"',
+        "$PackageVerifyCode -is [array]",
+    ], "scalar live runner")
+    if re.search(r"(?m)^\s*& \$PythonExe @RunnerArguments\s*$", current_test):
+        errors.append("current runner leaks native stdout into the function return stream")
+    return Check(
+        "live_output", not errors,
+        {"python_unbuffered": True, "current_build_output_mode": "python_binary_passthrough_named_build_binding", "dependent_test_barrier": True},
+        errors,
+    )
+
+
+
+def check_powershell_elseif_syntax(root: Path) -> Check:
+    """Reject the common PowerShell parser error `else if (...)`.
+
+    PowerShell uses the single keyword `elseif`; unlike C-like languages,
+    `else if` without a statement block after `else` is a parse error.
+    """
+    errors: list[str] = []
+    scripts = sorted(
+        [*root.rglob("*.ps1"), *root.rglob("*.psm1")],
+        key=lambda path: path.relative_to(root).as_posix().lower(),
+    )
+    pattern = re.compile(r"\belse\s+if\s*\(", re.IGNORECASE)
     for path in scripts:
-        text = path.read_text(encoding="utf-8-sig", errors="replace")
-        if comma_pattern.search(text):
-            errors.append(f"{path.name}: comma immediately before closing parenthesis")
-        if re.search(r"\$\w+\s*=\s*@\(\s*&\s+", text):
-            errors.append(f"{path.name}: fully buffered child-process output")
-    current_test = (root / "TEST_BP-085-089R8.ps1").read_text(encoding="utf-8-sig")
-    if "Invoke-LiveProcess" not in current_test or "$Writer.Flush()" not in current_test:
-        errors.append("current acceptance script does not stream and flush output")
-    return Check("powershell_delivery", not errors, {"scripts_checked": len(scripts)}, errors)
+        rel = path.relative_to(root).as_posix()
+        source = path.read_text(encoding="utf-8-sig", errors="replace")
+        for line_number, line in enumerate(source.splitlines(), 1):
+            # Ignore full-line comments.  The package scripts do not use this
+            # phrase inside here-strings, so a source-level check is deliberate.
+            if line.lstrip().startswith("#"):
+                continue
+            if pattern.search(line):
+                errors.append(
+                    f"{rel}:{line_number}: invalid PowerShell `else if`; use `elseif`"
+                )
+    current = root / "TEST_OPT-001D.ps1"
+    if current.is_file():
+        source = current.read_text(encoding="utf-8-sig", errors="replace")
+        if "} elseif ($AllowFailure) {" not in source:
+            errors.append(
+                "TEST_OPT-001D.ps1 is missing the validated AllowFailure elseif branch"
+            )
+    return Check(
+        "powershell_elseif_syntax",
+        not errors,
+        {"scripts_checked": len(scripts), "invalid_else_if": len(errors)},
+        errors,
+    )
 
 
-def check_source_contract(root: Path) -> Check:
+def check_powershell_interpolation_safety(root: Path) -> Check:
+    """Reject the `$Variable:` parser trap inside expandable strings.
+
+    Scope/provider-qualified forms such as `$env:NAME` remain valid. Braced
+    interpolation (`${Variable}:`) is the required form before a literal colon.
+    """
     errors: list[str] = []
-    reports: dict[str, object] = {}
-    for number in range(80, 85):
-        script = root / "tools" / f"check_source_{number:03d}.py"
-        report = root / "build" / f"verify-source-{number:03d}.json"
-        report.parent.mkdir(exist_ok=True)
-        command = [sys.executable, str(script), "--root", str(root), "--json", str(report)]
-        if number == 84:
-            command.append("--allow-downstream-package")
-        process = subprocess.run(
-            command,
-            text=True,
-            capture_output=True,
-        )
-        if process.returncode != 0:
-            errors.append(f"{script.name} failed: {process.stdout}{process.stderr}".strip())
-        if report.is_file():
-            reports[f"BP-{number:03d}"] = json.loads(report.read_text())
-    inventory = json.loads((root / "audit/source_function_inventory.json").read_text())
-    if inventory.get("missing_names") != []:
-        errors.append("source inventory contains unclassified functions")
-    if inventory.get("target_definitions") != 1094:
-        errors.append("source inventory target definition count differs")
-    return Check("black_port_source_contract", not errors, {
-        "reports": reports,
-        "target_definitions": inventory.get("target_definitions"),
-        "coverage_percent": inventory.get("coverage_percent"),
-        "inventory_sha256": inventory.get("inventory_sha256"),
-    }, errors)
-
-
-def check_compatibility_contracts(root: Path) -> Check:
-    errors: list[str] = []
-    reports: dict[str, object] = {}
-    for number in range(85, 90):
-        script = root / "tools" / f"check_compat_{number:03d}.py"
-        report = root / "build" / f"verify-compat-{number:03d}.json"
-        report.parent.mkdir(exist_ok=True)
-        process = subprocess.run(
-            [sys.executable, str(script), "--root", str(root), "--json", str(report)],
-            text=True,
-            capture_output=True,
-        )
-        if process.returncode != 0:
-            errors.append(f"{script.name} failed: {process.stdout}{process.stderr}".strip())
-        if report.is_file():
-            reports[f"BP-{number:03d}"] = json.loads(report.read_text())
-    matrix = json.loads((root / "audit/compat_release_golden.json").read_text())
-    if matrix.get("status") != "compat_109_release_candidate_v1":
-        errors.append("compatibility release status differs")
-    if matrix.get("pending_external_gates") != ["original_binary_interop", "external_glquake_visual_reference"]:
-        errors.append("pending external gate list differs")
-    accepted = matrix.get("accepted_contracts")
-    if not isinstance(accepted, list) or len(accepted) != 18:
-        errors.append("accepted compatibility contract list differs")
-    required_contracts = {
-        "protocol15_frozen_v1", "quakec_109_frozen_v1",
-        "world_physics_109_frozen_v1", "host_lifecycle_109_frozen_v1",
-        "client_render_109_frozen_v1", "world_render_109_frozen_v1",
-        "model_ui_render_109_frozen_v1", "render_special_109_frozen_v1",
-        "audio_109_frozen_v1", "network_platform_109_frozen_v1",
-        "frontend_109_frozen_v1", "core_assets_memory_109_frozen_v1",
-        "gameplay_presentation_109_frozen_v1", "black_port_source_109_frozen_v1",
-        "game_profile_109_frozen_v1", "mod_runtime_109_frozen_v1",
-        "artifact_compat_109_frozen_v1", "stability_109_frozen_v1",
+    allowed_qualifiers = {
+        "env", "global", "local", "private", "script", "using",
+        "variable", "function", "alias",
     }
-    if set(accepted or []) != required_contracts:
-        errors.append("accepted compatibility contract contents differ")
-    return Check("compatibility_release_contract", not errors, {
-        "reports": reports,
-        "accepted_contracts": accepted,
-        "pending_external_gates": matrix.get("pending_external_gates"),
-        "fingerprint": matrix.get("fingerprint"),
-    }, errors)
+    pattern = re.compile(r"(?<!`)\$([A-Za-z_][A-Za-z0-9_]*)\:")
+    files = sorted(root.rglob("*.ps1"))
+    matches = 0
+    for path in files:
+        rel = path.relative_to(root).as_posix()
+        text = path.read_text(encoding="utf-8-sig")
+        for line_number, line in enumerate(text.splitlines(), 1):
+            for match in pattern.finditer(line):
+                name = match.group(1)
+                if name.lower() in allowed_qualifiers:
+                    continue
+                matches += 1
+                errors.append(
+                    f"{rel}:{line_number}: ambiguous ${name}: interpolation; "
+                    f"use ${{{name}}}: before a literal colon"
+                )
+    runner = (root / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
+    if '${Scenario}: $OriginalHashA vs $OriginalHashB' not in runner:
+        errors.append("R7 runner does not contain the braced Scenario interpolation")
+    if '$Scenario: $OriginalHashA vs $OriginalHashB' in runner:
+        errors.append("R7 runner still contains the invalid unbraced Scenario interpolation")
+    return Check(
+        "powershell_variable_colon_interpolation",
+        not errors,
+        {"scripts_checked": len(files), "ambiguous_interpolations": matches},
+        errors,
+    )
+
+def check_verifier_cli_compatibility(root: Path) -> Check:
+    """Bind the canonical build call and the backward-compatible CLI alias."""
+    errors: list[str] = []
+    build = (root / "build.ps1").read_text(encoding="utf-8-sig")
+    verifier = (root / "tools/verify.py").read_text(encoding="utf-8-sig")
+    docs = (root / "docs/BP-090-094R7_TESTING.md").read_text(encoding="utf-8-sig")
+    canonical = "& $PythonExe @PythonPrefixArgs $Verifier --root $Root"
+    legacy_build = "& $PythonExe @PythonPrefixArgs $Verifier $Root"
+    if canonical not in build:
+        errors.append("build.ps1 does not use the canonical verifier --root option")
+    if legacy_build in build:
+        errors.append("build.ps1 still passes the verifier root as an unlabelled positional argument")
+    parser_patterns = [
+        (r'^\s*parser\.add_argument\("legacy_root", nargs="\?"\)\s*$', 'legacy positional root argument'),
+        (r'^\s*parser\.add_argument\("--root", default=""\)\s*$', 'canonical --root argument'),
+        (r'^\s*root_value = args\.root or args\.legacy_root or "\."\s*$', 'root precedence'),
+        (r'^\s*if args\.root and args\.legacy_root:\s*$', 'ambiguous dual-root rejection'),
+    ]
+    for pattern, label in parser_patterns:
+        if re.search(pattern, verifier, re.M) is None:
+            errors.append(f"verifier CLI compatibility marker missing: {label}")
+    if "python .\\tools\\verify.py --root ." not in docs:
+        errors.append("R7 testing guide lacks the canonical verifier example")
+    if "python .\\tools\\verify.py ." not in docs:
+        errors.append("R7 testing guide lacks the historical positional compatibility example")
+    return Check(
+        "verifier_cli_compatibility",
+        not errors,
+        {"canonical_form": "--root", "legacy_positional_root": True},
+        errors,
+    )
+
+
+def check_original_glquake_runtime_safety(root: Path) -> Check:
+    """Bind the modern-driver-safe launch and evidence policy for GLQUAKE.EXE."""
+    errors: list[str] = []
+    runner = (root / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
+    historical_analysis = (root / "docs/BP-090-094R4_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
+    current_analysis = (root / "docs/BP-090-094R7_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
+    try:
+        server_golden = json.loads((root / "audit/original_server_interop_golden.json").read_text(encoding="utf-8-sig"))
+        client_golden = json.loads((root / "audit/original_client_interop_golden.json").read_text(encoding="utf-8-sig"))
+        visual_golden = json.loads((root / "audit/original_visual_reference_golden.json").read_text(encoding="utf-8-sig"))
+    except Exception as exc:
+        return Check("original_glquake_runtime_safety", False, {}, [f"invalid golden file: {exc}"])
+
+    required = [
+        "'-listen', '4'",
+        "'-window', '-width', '640', '-height', '480'",
+        "'-heapsize', '32768'",
+        "starting original GLQuake loopback-only listen server",
+        "without -condebug",
+        "miniquake_protocol3_retry_and_protocol15_signon4",
+        "process_alive_after_signon",
+        "miniquake_server_protocol15_summary",
+        "process_alive_at_completed_signon",
+        "original_tga_screenshot",
+        "screenshot_produced = $true",
+        "condebug_enabled = $false",
+        'original_condebug_enabled = $false',
+        'original_evidence_mode = "protocol_summaries_and_screenshot_files"',
+        'original_network_scope = "loopback_only"',
+        'original_bind_address = "127.0.0.1"',
+        'original_visual_network = "disabled"',
+        'unattended_firewall_prompt_expected = $false',
+        "'-ip', '127.0.0.1'",
+        "'-noudp', '-noipx'",
+    ]
+    errors += marker_errors(runner, required, "R7 runner")
+    if "'-condebug'" in runner:
+        errors.append("R7 runner passes the unsafe -condebug flag to GLQUAKE.EXE")
+    for stale in ["qconsole.log", "Server spawned\\.", "Connection accepted", "CL_SignonReply:\\\\s*4"]:
+        if stale in runner:
+            errors.append("R6 evidence still depends on unsafe qconsole logging: " + stale)
+    if "'-dedicated', '4'" in runner:
+        errors.append("R7 runner reintroduced GLQUAKE.EXE dedicated mode")
+
+    expected_server = {
+        "original_server_process_mode": "listen",
+        "requires_video_context": True,
+        "dedicated_glquake_map_load_supported": False,
+        "server_start_timeout_ms": 30000,
+        "condebug_enabled": False,
+        "readiness_evidence": "miniquake_protocol3_retry_and_protocol15_signon4",
+        "remote_connection_evidence": "miniquake_signon4_summary",
+        "qconsole_required": False,
+        "legacy_debug_log_buffer_bytes": 1024,
+        "observed_modern_extensions_line_bytes": 2580,
+        "network_scope": "loopback_only",
+        "bind_address": "127.0.0.1",
+        "firewall_prompt_expected": False,
+    }
+    for key, value in expected_server.items():
+        if server_golden.get(key) != value:
+            errors.append(f"server golden {key}={server_golden.get(key)!r}, expected {value!r}")
+    for golden, label, expected in [
+        (client_golden, "client", {
+            "condebug_enabled": False,
+            "qconsole_required": False,
+            "evidence_source": "miniquake_server_protocol15_summary",
+            "network_scope": "loopback_only",
+            "bind_address": "127.0.0.1",
+            "firewall_prompt_expected": False,
+        }),
+        (visual_golden, "visual", {
+            "condebug_enabled": False,
+            "qconsole_required": False,
+            "evidence_source": "original_tga_screenshot",
+            "network_scope": "disabled",
+            "udp_disabled": True,
+            "firewall_prompt_expected": False,
+        }),
+    ]:
+        for key, value in expected.items():
+            if golden.get(key) != value:
+                errors.append(f"{label} golden {key}={golden.get(key)!r}, expected {value!r}")
+
+    errors += marker_errors(historical_analysis, [
+        "Con_DebugLog",
+        "1024-byte",
+        "vsprintf",
+        "2580 bytes",
+        "0xC0000005",
+        "not a Protocol-3, Protocol-15 or MiniQuake gameplay failure",
+    ], "R4 historical analysis")
+    errors += marker_errors(current_analysis, [
+        "Windows Defender Firewall",
+        "INADDR_ANY",
+        "127.0.0.1",
+        "-noudp -noipx",
+        "unattended",
+    ], "R7 analysis")
+    return Check(
+        "original_glquake_runtime_safety",
+        not errors,
+        {
+            "process_mode": "listen",
+            "video_context_required": True,
+            "condebug_enabled": False,
+            "qconsole_required": False,
+            "server_readiness": "protocol3_server_info_then_target_udp_protocol15_signon4",
+            "network_scope": "loopback_only",
+            "bind_address": "127.0.0.1",
+            "visual_network": "disabled",
+            "firewall_prompt_expected": False,
+        },
+        errors,
+    )
+
+
+def check_original_loopback_isolation(root: Path) -> Check:
+    """Require unattended original-binary tests to stay on loopback only."""
+    errors: list[str] = []
+    runner = (root / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
+    main = (root / "src/main.ml").read_text(encoding="utf-8-sig")
+    required_runner = [
+        "'-ip', '127.0.0.1', '-port'",
+        "'-ip', '127.0.0.1',",
+        "'-noudp', '-noipx'",
+        "network_scope = 'loopback_only'",
+        "bind_address = '127.0.0.1'",
+        "firewall_prompt_expected = $false",
+        'original_network_scope = "loopback_only"',
+        'original_visual_network = "disabled"',
+        'unattended_firewall_prompt_expected = $false',
+    ]
+    errors += marker_errors(runner, required_runner, "R7 loopback harness")
+    required_main = [
+        '"-ip", "127.0.0.1",\n    "-port"',
+        '"-headless",\n    "-nosound",\n    "-ip", "127.0.0.1"',
+    ]
+    errors += marker_errors(main, required_main, "R7 MiniQuake interop CLI")
+    # Original visual evidence must not initialize UDP at all.
+    visual_start = runner.find("function Run-OriginalVisualCapture")
+    visual_end = runner.find("New-Item -ItemType Directory", visual_start)
+    visual = runner[visual_start:visual_end] if visual_start >= 0 and visual_end > visual_start else ""
+    if "'-noudp'" not in visual:
+        errors.append("original visual harness does not disable UDP")
+    # Original interop processes must never bind INADDR_ANY through a missing -ip.
+    if "'-listen', '4'" in runner and "'-ip', '127.0.0.1'" not in runner:
+        errors.append("original listen server lacks loopback-only -ip binding")
+    return Check(
+        "original_loopback_isolation", not errors,
+        {
+            "original_server_bind": "127.0.0.1",
+            "original_client_bind": "127.0.0.1",
+            "miniquake_server_bind": "127.0.0.1",
+            "miniquake_client_bind": "127.0.0.1",
+            "visual_udp": "disabled",
+            "unattended_firewall_prompt_expected": False,
+        },
+        errors,
+    )
+
+def check_temporary_loopback_firewall_rules(root: Path) -> Check:
+    """Require exact-program, loopback-only, temporary firewall authorization."""
+    errors: list[str] = []
+    runner = (root / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
+    testing = (root / "docs/BP-090-094R7_TESTING.md").read_text(encoding="utf-8-sig")
+    analysis = (root / "docs/BP-090-094R7_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
+    hotfix = json.loads((root / "docs/BP-090-094R7_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig"))
+    required = [
+        "function Test-IsAdministrator()",
+        "function Relaunch-ElevatedForInteropIfNeeded()",
+        "function Install-TemporaryLoopbackFirewallRules()",
+        "function Remove-TemporaryLoopbackFirewallRules()",
+        "New-NetFirewallRule",
+        "Remove-NetFirewallRule",
+        "-Program $Spec.program",
+        "-Protocol UDP",
+        "-LocalAddress '127.0.0.1'",
+        "-RemoteAddress '127.0.0.1'",
+        "temporary loopback firewall rules",
+        "exact_program_loopback_udp",
+        "Remove-TemporaryLoopbackFirewallRules",
+        "Start-Process -FilePath $PowerShellExe",
+        "-Verb RunAs",
+    ]
+    errors += marker_errors(runner, required, "R7 firewall harness")
+    for forbidden in [
+        "Set-NetFirewallProfile",
+        "Disable-NetFirewallRule",
+        "netsh advfirewall set",
+        "-LocalAddress 'Any'",
+        "-RemoteAddress 'Any'",
+    ]:
+        if forbidden in runner:
+            errors.append(f"R7 firewall harness contains forbidden broad operation: {forbidden}")
+    # The privilege check must occur before build/transcript work so UAC is
+    # requested immediately instead of after a long unattended compile.
+    relaunch = runner.find("[void](Relaunch-ElevatedForInteropIfNeeded)")
+    build_dir = runner.find("New-Item -ItemType Directory -Force -Path $Build")
+    if relaunch < 0 or build_dir < 0 or relaunch > build_dir:
+        errors.append("administrator relaunch is not performed before build/transcript setup")
+    install = runner.find("Install-TemporaryLoopbackFirewallRules")
+    interop = runner.find("if (-not $SkipOriginalInterop)", install + 1)
+    if install < 0 or interop < 0 or install > interop:
+        errors.append("temporary rules are not installed before original interop")
+    finally_pos = runner.find("} finally {")
+    cleanup_after = runner.find("Remove-TemporaryLoopbackFirewallRules", finally_pos)
+    if finally_pos < 0 or cleanup_after < 0:
+        errors.append("temporary firewall rules are not removed from finally")
+    errors += marker_errors(testing, [
+        "administrator", "UAC", "temporary", "127.0.0.1", "automatically removed",
+    ], "R7 testing")
+    errors += marker_errors(analysis, [
+        "45000 ms", "ready.json", "Windows Defender Firewall", "loopback", "temporary rules",
+    ], "R7 analysis")
+    expected = {
+        "temporary_rules": True,
+        "rule_scope": "exact_program_udp_loopback_only",
+        "rule_count": 4,
+        "automatic_cleanup": True,
+        "auto_elevation_before_build": True,
+        "engine_code_changed": False,
+        "native_code_changed": False,
+    }
+    for key, value in expected.items():
+        if hotfix.get(key) != value:
+            errors.append(f"R7 hotfix {key}={hotfix.get(key)!r}, expected {value!r}")
+    return Check(
+        "temporary_loopback_firewall_rules",
+        not errors,
+        {
+            "rules": 4,
+            "programs": 2,
+            "directions": 2,
+            "protocol": "UDP",
+            "local_address": "127.0.0.1",
+            "remote_address": "127.0.0.1",
+            "auto_elevation_before_build": True,
+            "automatic_cleanup": True,
+        },
+        errors,
+    )
+
+
+
+def check_original_client_port_routing(root: Path) -> Check:
+    """Bind the original Quake console tokenizer and net_hostport routing fix."""
+    errors: list[str] = []
+    runner = (root / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
+    testing = (root / "docs/BP-090-094R7_TESTING.md").read_text(encoding="utf-8-sig")
+    analysis = (root / "docs/BP-090-094R7_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
+    golden = json.loads((root / "audit/original_client_port_routing_golden.json").read_text(encoding="utf-8-sig"))
+    required = [
+        "COM_Parse, where ':' is a",
+        "Host_Connect_f consumes only Cmd_Argv(1)",
+        "'connect 127.0.0.1'",
+        "'-ip', '127.0.0.1', '-port', [string]$Port",
+        "original_command_parser = 'COM_Parse_colon_punctuation'",
+        "connect_token = '127.0.0.1'",
+        "remote_port_source = '-port'",
+        "starting original GLQuake client",
+        "process_alive_at_failure",
+        "summary_exists",
+    ]
+    errors += marker_errors(runner, required, "R7 original-client port harness")
+    if "connect 127.0.0.1:" in runner:
+        errors.append("R7 harness still embeds a port in the original Quake console connect token")
+    if "'-port', [string]$Port" not in runner:
+        errors.append("R7 harness does not route the selected UDP port through original NET_Init -port")
+    errors += marker_errors(testing, [
+        "connect 127.0.0.1", "-port", "COM_Parse", "Host_Connect_f", "Cmd_Argv(1)",
+    ], "R7 testing")
+    errors += marker_errors(analysis, [
+        "connect 127.0.0.1:42773", "26000", "COM_Parse", "Host_Connect_f", "Cmd_Argv(1)",
+    ], "R7 analysis")
+    expected = {
+        "schema_version": 1,
+        "status": "original_client_port_routing_v1",
+        "delivery_revision": "BP-090-094R7",
+        "command_tokenizer": "Cmd_TokenizeString_COM_Parse",
+        "colon_is_punctuation": True,
+        "host_connect_argument": "Cmd_Argv(1)",
+        "connect_token": "127.0.0.1",
+        "remote_port_source": "-port_to_net_hostport",
+        "default_port_without_fix": 26000,
+    }
+    for key, value in expected.items():
+        if golden.get(key) != value:
+            errors.append(f"port-routing golden {key}={golden.get(key)!r}, expected {value!r}")
+    return Check(
+        "original_client_port_routing",
+        not errors,
+        {
+            "command_token": "127.0.0.1",
+            "port_source": "-port/net_hostport",
+            "default_without_fix": 26000,
+            "colon_console_token": "forbidden",
+            "failure_process_report": True,
+        },
+        errors,
+    )
+
+def check_inherited_contract_lineage(root: Path) -> Check:
+    errors: list[str] = []
+    build = (root / "build.ps1").read_text(encoding="utf-8-sig")
+    collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
+    errors += marker_errors(collector, [
+        "MiniQuakeProtocol15ServerDataTests.exe",
+        "BP-012_PROTOCOL15_SERVERDATA_AUDIT.md",
+        "protocol15_serverdata_golden.json",
+    ], "collector")
+    errors += marker_errors(build, [
+        r'tools\check_source_084.py',
+        r'tools\check_compat_085.py',
+        r'tools\check_compat_086.py',
+        r'tools\check_compat_087.py',
+        r'tools\check_compat_088.py',
+        r'tools\check_compat_089.py',
+        '--allow-downstream-package',
+    ], "build")
+    scripts = [root / "tools/check_source_084.py"] + [
+        root / f"tools/check_compat_0{step}.py" for step in range(85, 90)
+    ]
+    for script in scripts:
+        text = script.read_text(encoding="utf-8-sig")
+        if "--allow-downstream-package" not in text:
+            errors.append(f"{script.relative_to(root)} lacks downstream-package mode")
+    return Check(
+        "inherited_contract_lineage",
+        not errors,
+        {"downstream_checkers": len(scripts), "historical_collector_markers": 3},
+        errors,
+    )
+
+def check_external_checkers(root: Path) -> Check:
+    errors: list[str] = []
+    reports: dict[str, object] = {}
+    for step in range(90, 95):
+        script = root / f"tools/check_external_0{step}.py"
+        out = root / "build" / f"verify-external-{step}.json"
+        out.parent.mkdir(exist_ok=True)
+        proc = subprocess.run([sys.executable, str(script), "--root", str(root), "--json", str(out)], text=True, capture_output=True)
+        if proc.returncode != 0:
+            errors.append(f"BP-{step:03d} checker failed: {(proc.stdout + proc.stderr).strip()}")
+        elif out.is_file():
+            reports[f"BP-{step:03d}"] = json.loads(out.read_text(encoding="utf-8-sig"))
+    return Check("external_component_checkers", not errors, {"checkers": len(reports)}, errors)
+
+
+def check_opt001b(root: Path) -> Check:
+    out = root / "build" / "verify-opt001b.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    proc = subprocess.run(
+        [sys.executable, str(root / "tools/check_opt001b.py"), "--root", str(root), "--json", str(out), "--allow-downstream-package"],
+        capture_output=True, text=True,
+    )
+    errors: list[str] = []
+    if proc.returncode != 0:
+        errors.append((proc.stdout + "\n" + proc.stderr).strip())
+    details: dict[str, object] = {"return_code": proc.returncode}
+    if out.is_file():
+        try:
+            report = json.loads(out.read_text(encoding="utf-8-sig"))
+            details["status"] = report.get("status", "")
+        except Exception as exc:
+            errors.append(f"invalid OPT-001B report: {exc}")
+    return Check("opt001b_contract", not errors, details, errors)
+
+
+def check_minilang_utf8_no_bom(root: Path) -> Check:
+    errors: list[str] = []
+    checked = 0
+    bom_files: list[str] = []
+    invalid_utf8: list[str] = []
+    for path in sorted(root.rglob("*.ml"), key=lambda p: p.relative_to(root).as_posix().lower()):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(root)
+        if any(part in EXCLUDED_DIRS for part in rel.parts):
+            continue
+        checked += 1
+        raw = path.read_bytes()
+        rel_text = rel.as_posix()
+        if raw.startswith(b"\xef\xbb\xbf"):
+            bom_files.append(rel_text)
+            errors.append(f"UTF-8 BOM is not accepted by the MiniLang compiler: {rel_text}")
+        try:
+            raw.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            invalid_utf8.append(rel_text)
+            errors.append(f"invalid UTF-8 MiniLang source {rel_text}: {exc}")
+    return Check(
+        "minilang_utf8_no_bom",
+        not errors,
+        {"files_checked": checked, "bom_files": len(bom_files), "invalid_utf8_files": len(invalid_utf8)},
+        errors,
+    )
+
+
+def check_minilang_delimiters(root: Path) -> Check:
+    out = root / "build" / "verify-minilang-delimiters.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    proc = subprocess.run(
+        [sys.executable, str(root / "tools/check_minilang_delimiters.py"),
+         "--root", str(root), "--json", str(out)],
+        capture_output=True, text=True,
+    )
+    errors: list[str] = []
+    details: dict[str, object] = {"return_code": proc.returncode}
+    if proc.returncode != 0:
+        errors.append((proc.stdout + "\n" + proc.stderr).strip())
+    if out.is_file():
+        try:
+            report = json.loads(out.read_text(encoding="utf-8-sig"))
+            details["files_checked"] = report.get("files_checked", 0)
+            details["issues"] = len(report.get("issues", []))
+        except Exception as exc:
+            errors.append(f"invalid delimiter report: {exc}")
+    return Check("minilang_delimiter_balance", not errors, details, errors)
+
+
+def check_opt001cr1(root: Path) -> Check:
+    out = root / "build" / "verify-opt001cr1.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    proc = subprocess.run(
+        [sys.executable, str(root / "tools/check_opt001cr1.py"),
+         "--root", str(root), "--json", str(out)],
+        capture_output=True, text=True,
+    )
+    errors: list[str] = []
+    details: dict[str, object] = {"return_code": proc.returncode}
+    if proc.returncode != 0:
+        errors.append((proc.stdout + "\n" + proc.stderr).strip())
+    if out.is_file():
+        try:
+            report = json.loads(out.read_text(encoding="utf-8-sig"))
+            details["status"] = report.get("status", "")
+            details["trace_hash_assignments"] = report.get("trace_hash_assignments", 0)
+            details["delimiter_return_code"] = report.get("delimiter_return_code", -1)
+        except Exception as exc:
+            errors.append(f"invalid OPT-001CR1 report: {exc}")
+    return Check("opt001cr1_syntax_hotfix", not errors, details, errors)
+
+
+def check_opt001cr2(root: Path) -> Check:
+    out = root / "build" / "verify-opt001cr2.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    proc = subprocess.run(
+        [sys.executable, str(root / "tools/check_opt001cr2.py"),
+         "--root", str(root), "--json", str(out), "--allow-downstream-package"],
+        capture_output=True, text=True,
+    )
+    errors: list[str] = []
+    details: dict[str, object] = {"return_code": proc.returncode}
+    if proc.returncode != 0:
+        errors.append((proc.stdout + "\n" + proc.stderr).strip())
+    if out.is_file():
+        try:
+            report = json.loads(out.read_text(encoding="utf-8-sig"))
+            details["status"] = report.get("status", "")
+            details["artifact_prefix"] = report.get("artifact_prefix", "")
+            details["effective_handle_windows"] = report.get("effective_handle_windows", 0)
+        except Exception as exc:
+            errors.append(f"invalid OPT-001CR2 report: {exc}")
+    return Check("opt001cr2_harness_hotfix", not errors, details, errors)
+
+
+def check_opt001c(root: Path) -> Check:
+    out = root / "build" / "verify-opt001c.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    proc = subprocess.run(
+        [sys.executable, str(root / "tools/check_opt001c.py"), "--root", str(root), "--json", str(out), "--allow-downstream-package"],
+        capture_output=True, text=True,
+    )
+    errors: list[str] = []
+    if proc.returncode != 0:
+        errors.append((proc.stdout + "\n" + proc.stderr).strip())
+    details: dict[str, object] = {"return_code": proc.returncode}
+    if out.is_file():
+        try:
+            report = json.loads(out.read_text(encoding="utf-8-sig"))
+            details["status"] = report.get("status", "")
+            details["gl11_guarded_trace_calls"] = report.get("checks", {}).get("gl11_guarded_trace_calls", 0)
+            details["world_guarded_trace_calls"] = report.get("checks", {}).get("world_guarded_trace_calls", 0)
+        except Exception as exc:
+            errors.append(f"invalid OPT-001C report: {exc}")
+    return Check("opt001c_contract", not errors, details, errors)
+
+
+
+
+def check_opt001d(root: Path) -> Check:
+    out = root / "build" / "verify-opt001d.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    proc = subprocess.run([sys.executable, str(root / "tools/check_opt001d.py"), "--root", str(root), "--json", str(out)], capture_output=True, text=True)
+    errors=[]; details={"return_code": proc.returncode}
+    if proc.returncode != 0:
+        errors.append((proc.stdout + "\n" + proc.stderr).strip())
+    if out.is_file():
+        try:
+            report=json.loads(out.read_text(encoding="utf-8")); details["status"]=report.get("status",""); details["audio_mixahead"]=report.get("audio_mixahead",0); details["pvs_cache"]=report.get("pvs_cache",False)
+        except Exception as exc: errors.append(f"invalid OPT-001D report: {exc}")
+    return Check("opt001d_performance_audio_ui", not errors, details, errors)
+
+def check_opt001cr3r6(root: Path) -> Check:
+    out = root / "build" / "verify-opt001cr3r6.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    proc = subprocess.run([sys.executable, str(root / "tools/check_opt001cr3r6.py"), "--root", str(root), "--json", str(out)], capture_output=True, text=True)
+    errors=[]
+    details={"return_code": proc.returncode}
+    if proc.returncode != 0:
+        errors.append((proc.stdout + "\n" + proc.stderr).strip())
+    if out.is_file():
+        try:
+            report=json.loads(out.read_text(encoding="utf-8")); details["status"]=report.get("status",""); details["default_video_mode"]=report.get("default_video_mode",""); details["renderer_reset"]=report.get("renderer_reset",False)
+        except Exception as exc: errors.append(f"invalid OPT-001CR3R6 report: {exc}")
+    return Check("opt001cr3r6_windowed_transition", not errors, details, errors)
+
+
+def check_opt001cr3(root: Path) -> Check:
+    out = root / "build" / "verify-opt001cr3.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    proc = subprocess.run([sys.executable, str(root / "tools/check_opt001cr3.py"), "--root", str(root), "--json", str(out)], capture_output=True, text=True)
+    errors=[]
+    details={"return_code": proc.returncode}
+    if proc.returncode != 0:
+        errors.append((proc.stdout + "\n" + proc.stderr).strip())
+    if out.is_file():
+        try:
+            report=json.loads(out.read_text(encoding="utf-8-sig")); details["status"]=report.get("status",""); details["inline_functions"]=report.get("inline_functions",0)
+        except Exception as exc: errors.append(f"invalid OPT-001CR3 report: {exc}")
+    return Check("opt001cr3_inline_array_hotpaths", not errors, details, errors)
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("root", nargs="?", default=".")
+    parser.add_argument("legacy_root", nargs="?")
+    parser.add_argument("--root", default="")
     parser.add_argument("--json", default="")
     args = parser.parse_args()
-    root = Path(args.root).resolve()
-
+    if args.root and args.legacy_root:
+        parser.error("specify the project root either positionally or with --root, not both")
+    root_value = args.root or args.legacy_root or "."
+    root = Path(root_value).resolve()
     checks = [
         check_required(root),
         check_manifest(root),
         check_identity(root),
-        check_minilang_imports(root),
-        check_minilang_main_scope(root),
-        check_minilang_entry_helper_namespace(root),
+        check_minilang_utf8_no_bom(root),
+        check_current_entry_helper_namespace(root),
         check_minilang_entry_function_shadow_arity(root),
-        check_current_test_global_bindings(root),
-        check_artifact_roundtrip_hotfix(root),
-        check_quakec_edict_lineage(root),
-        check_command_cvar_lineage(root),
-        check_savegame_v5_lineage(root),
-        check_quakec_sync_gc_roots(root),
-        check_listen_soak_highwater(root),
-        check_native(root),
+        check_minilang_delimiters(root),
+        check_opt001cr1(root),
+        check_opt001cr2(root),
+        check_opt001d(root),
+        check_opt001cr3(root),
+        check_opt001b(root),
+        check_opt001c(root),
+        check_r8_visual_parity(root),
+        check_r9_network_provenance(root),
+        check_r10_original_server_readiness(root),
+        check_r11_original_reference_handoff(root),
+        check_r12_persistent_original_connect(root),
+        check_r13_pre_fallback_readiness_guard(root),
+        check_r14_original_capture_ensemble(root),
+        check_r15_visual_timestep_parity(root),
         check_no_game_data(root),
-        check_powershell(root),
-        check_source_contract(root),
-        check_compatibility_contracts(root),
+        check_native(root),
+        check_minilang(root),
+        check_external_contract(root),
+        check_live_output(root),
+        check_named_build_parameter_binding(root),
+        check_powershell_elseif_syntax(root),
+        check_powershell_interpolation_safety(root),
+        check_verifier_cli_compatibility(root),
+        check_original_glquake_runtime_safety(root),
+        check_original_loopback_isolation(root),
+        check_temporary_loopback_firewall_rules(root),
+        check_original_client_port_routing(root),
+        check_inherited_contract_lineage(root),
+        check_external_checkers(root),
     ]
     passed = all(check.passed for check in checks)
+    print("MiniQuake OPT-001D verification")
     for check in checks:
-        label = "PASS" if check.passed else "FAIL"
-        print(f"  [{label}] {check.name}")
+        print(f"  [{'PASS' if check.passed else 'FAIL'}] {check.name}")
         for key, value in check.details.items():
-            if key != "reports":
-                print(f"         {key}={value}")
+            print(f"         {key}={value}")
         for error in check.errors:
             print(f"         error: {error}")
-    print(f"MiniQuake BP-085-089R8 verification: {'PASS' if passed else 'FAIL'}")
-
-    document = {
+    print(f"MiniQuake OPT-001D verification: {'PASS' if passed else 'FAIL'}")
+    report = {
         "schema_version": 1,
         "package_id": PACKAGE_ID,
+        "parent_package_id": PARENT_PACKAGE_ID,
+        "block_id": BLOCK_ID,
+        "block_parent_package_id": BLOCK_PARENT_PACKAGE_ID,
         "delivery_revision": DELIVERY_REVISION,
-        "root": str(root),
-        "passed": passed,
+        "delivery_parent": DELIVERY_PARENT,
+        "status": "PASS" if passed else "FAIL",
         "checks": [asdict(check) for check in checks],
     }
     if args.json:
-        Path(args.json).write_text(json.dumps(document, indent=2) + "\n")
+        Path(args.json).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return 0 if passed else 1
 
 
