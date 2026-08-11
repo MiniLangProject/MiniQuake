@@ -548,6 +548,7 @@ function transitionMap(session, mapName, preserveClients, saveChangeParms, defer
     end if
     session.renderer = try(worldRenderer.create(session.server.worldModel, palette))
     if session.renderer is error then return session.renderer end if
+    worldRenderer.R_SetMultitextureCompatibility(videoState.multitexture, false)
     if session.windowCreated then
       uploadedWorld = try(worldRenderer.upload(session.renderer))
       if uploadedWorld is error then return error(3930, "startup world upload: " + uploadedWorld.message) end if
@@ -561,6 +562,10 @@ function transitionMap(session, mapName, preserveClients, saveChangeParms, defer
       updateTitle(session)
     end if
   end if
+  // Reclaim parser/precache temporaries while the loading plaque is still
+  // active. Gameplay then starts from a compact heap with the real-time
+  // periodic collector disabled above.
+  gc_collect()
   screen.SCR_EndLoadingPlaque(session.console)
   session.startMap = session.server.mapName
 
@@ -901,6 +906,7 @@ function prepareDemoScene(session)
     videoState = glvid.VID_State()
     if videoState.initialized then palette = videoState.palette end if
     session.renderer = worldRenderer.create(worldModel, palette)
+    worldRenderer.R_SetMultitextureCompatibility(videoState.multitexture, false)
     session.entityRenderer = entityRenderer.create(session.filesystem, palette, session.client.modelPrecache)
     if session.windowCreated then screen.initialize(session.console, session.menu, session.filesystem, palette, session.width, session.height, session.cvars) end if
   end if
@@ -2053,6 +2059,13 @@ function queueStartupCommands(session)
 end function
 
 function Host_Init(session)
+  // MiniLang's default small-object threshold runs a complete mark/sweep
+  // collection after 8 MiB of tiny allocations. Scanning Quake's live map,
+  // VM and renderer graph in the middle of Host_Frame creates visible
+  // 50-200 ms pauses. MiniQuake owns a 1 GiB reserved heap and explicit safe
+  // collection points in validation/loading flows; allocation-failure GC
+  // remains enabled by the runtime.
+  gc_set_limit(0)
   localInit = try(Host_InitLocal(session))
   if localInit is error then return localInit end if
   vcrInit = try(Host_InitVCR(session))

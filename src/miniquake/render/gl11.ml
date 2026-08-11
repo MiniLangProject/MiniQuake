@@ -284,6 +284,14 @@ const GL_REPEAT = 0x2901
 const GL_CLAMP = 0x2900
 const GL_TEXTURE_ENV = 0x2300
 const GL_TEXTURE_ENV_MODE = 0x2200
+const GL_TEXTURE = 0x1702
+const GL_COMBINE = 0x8570
+const GL_COMBINE_RGB = 0x8571
+const GL_SOURCE0_RGB = 0x8580
+const GL_SOURCE1_RGB = 0x8581
+const GL_OPERAND0_RGB = 0x8590
+const GL_OPERAND1_RGB = 0x8591
+const GL_PREVIOUS = 0x8578
 const GL_REPLACE = 0x1E01
 const GL_MODULATE = 0x2100
 
@@ -325,6 +333,10 @@ end function
 function textureEnvironment(mode)
   if diagnosticTraceEnabled and traceCommand("texture_environment", [GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, mode]) then return void end if
   native.glTexEnvI(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, mode)
+end function
+
+function textureEnvironmentParameter(name, value)
+  native.glTexEnvI(GL_TEXTURE_ENV, name, value)
 end function
 
 function uploadRgba(width, height, pixels)
@@ -373,12 +385,38 @@ function drawBuffer(mode)
   native.glDrawBuffer(mode)
 end function
 
+function multitextureAvailable()
+  return native.glMultitextureAvailable() != 0
+end function
+
+function worldProgramAvailable()
+  return native.glWorldProgramAvailable() != 0
+end function
+
+function worldProgramEnable(enabled)
+  value = 0
+  if enabled then value = 1 end if
+  native.glWorldProgramEnable(value)
+end function
+
+function activeTexture(unit)
+  native.glActiveTexture(unit)
+end function
+
+function multiTexCoord2(unit, s, t)
+  native.glMultiTexCoord2(unit, bits(s), bits(t))
+end function
+
 function staticGeometryCall(objectValue, passId)
   return native.glStaticGeometryCall(nativeRawValue(objectValue), passId) != 0
 end function
 
 function staticGeometryCallBatch(keys, passId)
   return native.glStaticGeometryCallBatch(keys, len(keys), passId) > 0
+end function
+
+function staticGeometryCallMultitextureBatch(records)
+  return native.glStaticGeometryCallMultitextureBatch(records, len(records)) > 0
 end function
 
 function staticGeometryPrepare(objectValue, passId)

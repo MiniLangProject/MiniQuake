@@ -79,6 +79,11 @@ rCompatDepthMax = 1.0
 rCompatTrickFrame = 0
 rCompatLeafEfrags = []
 rCompatEntityEfrags = []
+rCompatEfragValid = []
+rCompatEfragModel = []
+rCompatEfragOriginX = []
+rCompatEfragOriginY = []
+rCompatEfragOriginZ = []
 rCompatEfragTopNode = void
 rCompatAddEntity = void
 rCompatEntityMins = compatRmainTypes.Vec3(0.0, 0.0, 0.0)
@@ -183,11 +188,15 @@ end function
 
 function compatEnsureEfragState()
   global rCompatLeafEfrags, rCompatEntityEfrags
+  global rCompatEfragValid, rCompatEfragModel
+  global rCompatEfragOriginX, rCompatEfragOriginY, rCompatEfragOriginZ
   leafCount = 0
   entityCount = 0
+  resetEntities = false
   if rCompatRenderer is not void then leafCount = len(rCompatRenderer.map.leafs) end if
   if rCompatClient is not void then entityCount = len(rCompatClient.entities) end if
   if len(rCompatLeafEfrags) != leafCount then
+    resetEntities = true
     rCompatLeafEfrags = compatRmainArrays.makeEmptyArray(leafCount)
     index = 0
     while index < leafCount
@@ -207,6 +216,13 @@ function compatEnsureEfragState()
       rCompatEntityEfrags[index] = []
       index = index + 1
     end while
+  end if
+  if resetEntities or len(rCompatEfragValid) != entityCount then
+    rCompatEfragValid = compatRmainArrays.makeFilledArray(entityCount, false)
+    rCompatEfragModel = compatRmainArrays.makeFilledArray(entityCount, -1)
+    rCompatEfragOriginX = compatRmainArrays.makeFilledArray(entityCount, 0.0)
+    rCompatEfragOriginY = compatRmainArrays.makeFilledArray(entityCount, 0.0)
+    rCompatEfragOriginZ = compatRmainArrays.makeFilledArray(entityCount, 0.0)
   end if
   return true
 end function
@@ -340,22 +356,48 @@ end function
 
 function compatCollectVisibleEfrags()
   global cl_visedicts, cl_numvisedicts
+  global rCompatEfragValid, rCompatEfragModel
+  global rCompatEfragOriginX, rCompatEfragOriginY, rCompatEfragOriginZ
   compatEnsureEfragState()
   if rCompatClient is void then return [] end if
   index = 0
   while index < len(rCompatClient.entities)
     entity = rCompatClient.entities[index]
-    if entity is not void and entity.modelIndex > 0 then R_AddEfrags(entity) end if
+    if entity is not void then
+      number = entity.number
+      if number >= 0 and number < len(rCompatEfragValid) then
+        if entity.modelIndex > 0 then
+          changed = not rCompatEfragValid[number] or
+            rCompatEfragModel[number] != entity.modelIndex or
+            rCompatEfragOriginX[number] != entity.origin.x or
+            rCompatEfragOriginY[number] != entity.origin.y or
+            rCompatEfragOriginZ[number] != entity.origin.z
+          if changed then
+            R_AddEfrags(entity)
+            rCompatEfragValid[number] = true
+            rCompatEfragModel[number] = entity.modelIndex
+            rCompatEfragOriginX[number] = entity.origin.x
+            rCompatEfragOriginY[number] = entity.origin.y
+            rCompatEfragOriginZ[number] = entity.origin.z
+          end if
+        else if rCompatEfragValid[number] then
+          R_RemoveEfrags(entity)
+          rCompatEfragValid[number] = false
+          rCompatEfragModel[number] = -1
+        end if
+      else if entity.modelIndex > 0 then
+        R_AddEfrags(entity)
+      end if
+    end if
     index = index + 1
   end while
   builder = compatRmainArrays.createArrayBuilder(compatRmainConstants.MAX_VISEDICTS)
+  pvs = void
+  if rCompatRenderer is not void then pvs = compatRmainBsp.leafPvs(rCompatRenderer.map, rCompatRenderer.viewLeaf) end if
   leafIndex = 0
   while leafIndex < len(rCompatLeafEfrags)
     visible = true
-    if rCompatRenderer is not void and leafIndex > 0 then
-      pvs = compatRmainBsp.leafPvs(rCompatRenderer.map, rCompatRenderer.viewLeaf)
-      visible = compatRmainBsp.leafVisible(pvs, leafIndex)
-    end if
+    if pvs is not void and leafIndex > 0 then visible = compatRmainBsp.leafVisible(pvs, leafIndex) end if
     if visible then
       for each reference in rCompatLeafEfrags[leafIndex]
         compatStoreReference(reference, builder)
@@ -855,6 +897,7 @@ end function
 
 function R_NewMap()
   global r_worldentity, r_viewleaf, r_oldviewleaf, mirrortexturenum, mirror, mirror_plane
+  global rCompatEntityEfrags, rCompatEfragValid, rCompatEfragModel
   if rCompatRenderer is void then return false end if
   compatRmainWorld.R_ResetLightStyles(264)
   r_worldentity = rCompatRenderer.map.models[0]
@@ -868,6 +911,13 @@ function R_NewMap()
   while leaf < len(rCompatLeafEfrags)
     rCompatLeafEfrags[leaf] = []
     leaf = leaf + 1
+  end while
+  index = 0
+  while index < len(rCompatEntityEfrags)
+    rCompatEntityEfrags[index] = []
+    if index < len(rCompatEfragValid) then rCompatEfragValid[index] = false end if
+    if index < len(rCompatEfragModel) then rCompatEfragModel[index] = -1 end if
+    index = index + 1
   end while
   compatRmainWorld.GL_BuildLightmaps()
   index = 0

@@ -66,6 +66,8 @@ IMPORTS: dict[str, list[str]] = {
         "glMatrixMode", "glLoadIdentity", "glPushMatrix", "glPopMatrix", "glTranslatef",
         "glRotatef", "glScalef", "glOrtho", "glFrustum", "glBindTexture", "glGenTextures",
         "glDeleteTextures", "glGenLists", "glNewList", "glEndList", "glCallList", "glCallLists", "glDeleteLists",
+        "glInterleavedArrays", "glDrawArrays", "glVertexPointer", "glTexCoordPointer",
+        "glEnableClientState", "glDisableClientState",
         "glTexParameteri", "glTexImage2D", "glTexSubImage2D",
         "glTexEnvi", "glReadPixels", "glGetString", "glGetError", "glFinish", "glFlush", "glDrawBuffer",
     ],

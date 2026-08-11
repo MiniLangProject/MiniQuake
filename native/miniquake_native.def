@@ -160,9 +160,15 @@ EXPORTS
   mq_gl_finish
   mq_gl_flush
   mq_gl_draw_buffer
+  mq_gl_multitexture_available
+  mq_gl_world_program_available
+  mq_gl_world_program_enable
+  mq_gl_active_texture
+  mq_gl_multi_tex_coord2
   mq_gl_draw_alias_batch
   mq_gl_draw_alias_model
   mq_gl_static_geometry_call
   mq_gl_static_geometry_call_batch
+  mq_gl_static_geometry_call_multitexture_batch
   mq_gl_static_geometry_prepare
   mq_gl_static_geometry_clear

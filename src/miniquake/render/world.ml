@@ -480,8 +480,22 @@ function textureIdForSurface(renderer, surface)
   if surface.textureIndex >= 0 and surface.textureIndex < len(renderer.textures) then
     texture = renderer.textures[surface.textureIndex]
     if texture is not void then
-      animated = R_TextureAnimation(texture)
-      if animated is not void and animated.glId != 0 then return animated.glId end if
+      // The surface already carries the canonical BSP texture index. Calling
+      // R_TextureAnimation(texture) here searched the complete renderer texture
+      // array to rediscover that index for every visible polygon. Resolve the
+      // animation directly; this is behavior-identical and makes the batched
+      // one-pass path linear in visible surfaces.
+      target = bsp.textureAnimationIndex(
+        renderer.map.textures,
+        surface.textureIndex,
+        rCompatTime,
+        currentTextureFrame != 0,
+      )
+      if not (target is error) and target >= 0 and target < len(renderer.textures) then
+        animated = renderer.textures[target]
+        if animated is not void and animated.glId != 0 then return animated.glId end if
+      end if
+      if texture.glId != 0 then return texture.glId end if
     end if
   end if
   return renderer.noTextureId
@@ -808,6 +822,7 @@ rCompatWaterChain = []
 rCompatTextureChains = []
 rCompatMultiTextureEnabled = false
 rCompatMultiTextureAvailable = false
+rCompatUseMultitexture = false
 rCompatDepthMin = 0.0
 rCompatDepthMax = 1.0
 rCompatLightSpot = void
@@ -836,8 +851,17 @@ lightmap_modified = []
 lightmap_rectchange = []
 allocated = []
 lightmaps = bytes()
+rCompatLightmapScratch = bytes()
 skychain = []
 waterchain = []
+rCompatLightmapBuilders = []
+rCompatSequentialSurfaces = []
+rCompatSequentialBuilder = void
+rCompatCollectSequential = false
+rCompatMtexRecordFaces = []
+rCompatMtexRecords = bytes()
+rCompatMtexRecordStamp = -1
+rCompatMtexTextureIds = []
 mtexenabled = false
 r_dlightframecount = 0
 d_lightstylevalue = []
@@ -862,16 +886,16 @@ function R_ResetWorldCompatibility()
   global rCompatLightmapAllocated, rCompatLightmapModified, rCompatLightmapRectChange
   global rCompatWarpPolys, rCompatSurfaceWarpPolys, rCompatSkyTexture, rCompatAlphaSkyTexture
   global rCompatSkyChain, rCompatWaterChain, rCompatTextureChains
-  global rCompatMultiTextureEnabled
+  global rCompatMultiTextureEnabled, rCompatUseMultitexture
   global rCompatDepthMin, rCompatDepthMax, rCompatLightSpot, rCompatLightPlane
   global rCompatMirrorTexture, rCompatMirrorChain, rCompatLastClearPlan
   global skytexturenum, lightmap_textures, active_lightmaps, blocklights
-  global lightmap_polys
-  global lightmap_modified, lightmap_rectchange, allocated, lightmaps
+  global lightmap_polys, rCompatLightmapBuilders
+  global lightmap_modified, lightmap_rectchange, allocated, lightmaps, rCompatLightmapScratch
   global skychain, waterchain, mtexenabled, r_dlightframecount, d_lightstylevalue
   global lightspot, lightplane, speedscale, solidskytexture, alphaskytexture
   global r_framecount, r_visframecount, c_brush_polys, nColinElim, mirror, mirror_plane
-  global currentTextureFrame
+  global currentTextureFrame, rCompatMtexRecordFaces, rCompatMtexRecords, rCompatMtexRecordStamp, rCompatMtexTextureIds
 
   rCompatRenderer = void
   rCompatViewOrigin = void
@@ -903,6 +927,7 @@ function R_ResetWorldCompatibility()
   rCompatWaterChain = []
   rCompatTextureChains = []
   rCompatMultiTextureEnabled = false
+  rCompatUseMultitexture = false
   rCompatDepthMin = 0.0
   rCompatDepthMax = 1.0
   rCompatLightSpot = void
@@ -916,12 +941,18 @@ function R_ResetWorldCompatibility()
   active_lightmaps = 0
   blocklights = []
   lightmap_polys = []
+  rCompatLightmapBuilders = []
   lightmap_modified = []
   lightmap_rectchange = []
   allocated = []
   lightmaps = bytes()
+  rCompatLightmapScratch = bytes()
   skychain = []
   waterchain = []
+  rCompatMtexRecordFaces = []
+  rCompatMtexRecords = bytes()
+  rCompatMtexRecordStamp = -1
+  rCompatMtexTextureIds = []
   mtexenabled = false
   r_dlightframecount = 0
   d_lightstylevalue = []
@@ -974,8 +1005,8 @@ function compatEnsureWorldState()
   global rCompatSurfaceLightS, rCompatSurfaceLightT
   global rCompatSurfaceWarpPolys, rCompatTextureChains
   global rCompatLightmapAllocated, rCompatLightmapModified, rCompatLightmapRectChange
-  global blocklights, lightmap_polys
-  global lightmap_modified, lightmap_rectchange, allocated, lightmaps
+  global blocklights, lightmap_polys, rCompatLightmapBuilders
+  global lightmap_modified, lightmap_rectchange, allocated, lightmaps, rCompatLightmapScratch
   global d_lightstylevalue
   if rCompatRenderer is void then return false end if
   count = len(rCompatRenderer.surfaces)
@@ -1010,10 +1041,15 @@ function compatEnsureWorldState()
   allocated = rCompatLightmapAllocated
   lightmap_modified = rCompatLightmapModified
   lightmap_rectchange = rCompatLightmapRectChange
-  lightmap_polys = arrayutil.makeFilledArray(GLQUAKE_MAX_LIGHTMAPS, [])
+  // R_ClearLightmapChains owns the once-per-render-pass reset. Reinitializing
+  // this array from R_BuildLightMap would erase surfaces already collected for
+  // blending whenever a 10 Hz animated lightstyle changes.
+  if len(lightmap_polys) != GLQUAKE_MAX_LIGHTMAPS then lightmap_polys = arrayutil.makeFilledArray(GLQUAKE_MAX_LIGHTMAPS, []) end if
+  if len(rCompatLightmapBuilders) != GLQUAKE_MAX_LIGHTMAPS then rCompatLightmapBuilders = arrayutil.makeFilledArray(GLQUAKE_MAX_LIGHTMAPS, false) end if
   if len(lightmaps) != GLQUAKE_MAX_LIGHTMAPS * GLQUAKE_BLOCK_WIDTH * GLQUAKE_BLOCK_HEIGHT * 4 then
     lightmaps = bytes(GLQUAKE_MAX_LIGHTMAPS * GLQUAKE_BLOCK_WIDTH * GLQUAKE_BLOCK_HEIGHT * 4)
   end if
+  if len(rCompatLightmapScratch) != 18 * 18 * 4 then rCompatLightmapScratch = bytes(18 * 18 * 4) end if
   return true
 end function
 
@@ -1036,9 +1072,13 @@ function R_SetSurfaceCompatibilityState(index, bitsValue, dlightFrame, cachedVal
 end function
 
 function R_SetMultitextureCompatibility(available, enabled)
-  global rCompatMultiTextureAvailable, rCompatMultiTextureEnabled, mtexenabled
+  global rCompatMultiTextureAvailable, rCompatMultiTextureEnabled, rCompatUseMultitexture, rCompatTextureSort, mtexenabled
   rCompatMultiTextureAvailable = available
   rCompatMultiTextureEnabled = enabled
+  rCompatUseMultitexture = false
+  // Start in the compatible two-pass mode; R_AnimateLight selects the one-pass
+  // path once the current renderer state is available.
+  rCompatTextureSort = true
   mtexenabled = enabled
   return true
 end function
@@ -1076,8 +1116,43 @@ function R_SetLightmapDirtyCompatibility(page, rectangle, modified)
 end function
 
 function R_SetLightmapChainCompatibility(page, surfaces)
+  rCompatLightmapBuilders[page] = false
   lightmap_polys[page] = surfaces
   return true
+end function
+
+function compatAddLightmapPoly(page, value)
+  global rCompatLightmapBuilders, lightmap_polys
+  builder = rCompatLightmapBuilders[page]
+  if builder is bool then
+    existing = lightmap_polys[page]
+    capacity = len(existing) + 32
+    builder = arrayutil.createArrayBuilder(capacity)
+    index = len(existing) - 1
+    while index >= 0
+      arrayutil.pushArrayBuilder(builder, existing[index])
+      index = index - 1
+    end while
+    lightmap_polys[page] = []
+    rCompatLightmapBuilders[page] = builder
+  end if
+  arrayutil.pushArrayBuilder(builder, value)
+  return true
+end function
+
+function compatFinishLightmapChain(page)
+  global rCompatLightmapBuilders, lightmap_polys
+  builder = rCompatLightmapBuilders[page]
+  if builder is bool then return lightmap_polys[page] end if
+  result = arrayutil.makeEmptyArray(builder.count)
+  index = 0
+  while index < builder.count
+    result[index] = builder.values[builder.count - 1 - index]
+    index = index + 1
+  end while
+  lightmap_polys[page] = result
+  rCompatLightmapBuilders[page] = false
+  return result
 end function
 
 function R_SetAbstractSurfaceCalls(enabled)
@@ -1161,10 +1236,12 @@ function R_GetSurfaceCompatibilityState(index)
 end function
 
 function R_GetLightmapCompatibilityState(page)
+  surfaces = compatFinishLightmapChain(page)
   return [
     rCompatLightmapModified[page],
     rCompatLightmapRectChange[page],
     c_brush_polys,
+    len(surfaces),
   ]
 end function
 
@@ -1191,7 +1268,7 @@ end function
 
 function R_ResetLightmapCompatibility()
   global rCompatLightmapAllocated, rCompatLightmapModified, rCompatLightmapRectChange
-  global allocated, lightmap_modified, lightmap_rectchange, lightmap_polys, lightmaps
+  global allocated, lightmap_modified, lightmap_rectchange, lightmap_polys, lightmaps, rCompatLightmapBuilders
   global c_brush_polys, nColinElim, mirror, mirror_plane
   rCompatLightmapAllocated = compatFreshLightmapAllocation()
   rCompatLightmapModified = arrayutil.makeFilledArray(GLQUAKE_MAX_LIGHTMAPS, false)
@@ -1205,6 +1282,7 @@ function R_ResetLightmapCompatibility()
   lightmap_modified = rCompatLightmapModified
   lightmap_rectchange = rCompatLightmapRectChange
   lightmap_polys = arrayutil.makeFilledArray(GLQUAKE_MAX_LIGHTMAPS, [])
+  rCompatLightmapBuilders = arrayutil.makeFilledArray(GLQUAKE_MAX_LIGHTMAPS, false)
   lightmaps = bytes(4 * GLQUAKE_MAX_LIGHTMAPS * GLQUAKE_BLOCK_WIDTH * GLQUAKE_BLOCK_HEIGHT)
   c_brush_polys = 0
   nColinElim = 0
@@ -1352,9 +1430,14 @@ end function
 // -----------------------------------------------------------------------------
 
 function R_AnimateLight()
-  global d_lightstylevalue
+  global d_lightstylevalue, rCompatUseMultitexture, rCompatTextureSort
   compatEnsureWorldState()
-  d_lightstylevalue = glRlight.R_AnimateLight(rCompatLightStyles, rCompatTime)
+  d_lightstylevalue = glRlight.R_AnimateLightInto(rCompatLightStyles, rCompatTime, d_lightstylevalue)
+  // GLQuake's one-pass multitexture equation preserves every animated
+  // lightmap frame without the second full-screen world pass. Systems without
+  // multitexture retain the original sorted two-pass fallback below.
+  rCompatUseMultitexture = rCompatMultiTextureAvailable and rCompatRenderer is not void and not rCompatRenderer.fullbright
+  rCompatTextureSort = not rCompatUseMultitexture
   return d_lightstylevalue
 end function
 
@@ -1726,8 +1809,10 @@ currentTextureFrame = 0
 function GL_DisableMultitexture()
   global rCompatMultiTextureEnabled, mtexenabled
   if rCompatMultiTextureEnabled then
+    if not gl.traceEnabled() then gl.activeTexture(1) end if
     gl.disable(gl.GL_TEXTURE_2D)
     if gl.traceEnabled() then gl.traceCommand("select_texture", [0x835E]) end if
+    if not gl.traceEnabled() then gl.activeTexture(0) end if
   end if
   rCompatMultiTextureEnabled = false
   mtexenabled = false
@@ -1738,6 +1823,7 @@ function GL_EnableMultitexture()
   global rCompatMultiTextureEnabled, mtexenabled
   if not rCompatMultiTextureAvailable then return false end if
   if gl.traceEnabled() then gl.traceCommand("select_texture", [0x835F]) end if
+  if not gl.traceEnabled() then gl.activeTexture(1) end if
   gl.enable(gl.GL_TEXTURE_2D)
   rCompatMultiTextureEnabled = true
   mtexenabled = true
@@ -1745,13 +1831,19 @@ function GL_EnableMultitexture()
 end function
 
 function R_DrawSequentialPoly(surface)
+  global rCompatSequentialSurfaces, rCompatSequentialBuilder
   value = compatSurface(surface)
   if value is void then return false end if
   if (value.flags & c.SURF_DRAWSKY) != 0 then return R_DrawSkyChain([value]) end if
   if (value.flags & c.SURF_DRAWTURB) != 0 then return EmitWaterPolys(value) end if
+  if rCompatCollectSequential then
+    arrayutil.pushArrayBuilder(rCompatSequentialBuilder, value)
+    return true
+  end if
   R_RenderDynamicLightmaps(value)
-  if rCompatMultiTextureAvailable then
+  if rCompatUseMultitexture then
     if gl.traceEnabled() then gl.traceCommand("select_texture", [0x835E]) end if
+    if not gl.traceEnabled() then gl.activeTexture(0) end if
     gl.bindTexture(textureIdForSurface(rCompatRenderer, value))
     gl.textureEnvironment(gl.GL_REPLACE)
     GL_EnableMultitexture()
@@ -1779,8 +1871,13 @@ function R_DrawSequentialPoly(surface)
     gl.textureEnvironment(gl.GL_BLEND)
     gl.begin(gl.GL_POLYGON)
     for each vertex in value.vertices
-      if gl.traceEnabled() then gl.traceCommand("multitexcoord", [0x835E, vertex.s, vertex.t]) end if
-      if gl.traceEnabled() then gl.traceCommand("multitexcoord", [0x835F, vertex.lightS, vertex.lightT]) end if
+      if gl.traceEnabled() then
+        gl.traceCommand("multitexcoord", [0x835E, vertex.s, vertex.t])
+        gl.traceCommand("multitexcoord", [0x835F, vertex.lightS, vertex.lightT])
+      else
+        gl.multiTexCoord2(0, vertex.s, vertex.t)
+        gl.multiTexCoord2(1, vertex.lightS, vertex.lightT)
+      end if
       gl.vertex3(vertex.position.x, vertex.position.y, vertex.position.z)
     end for
     gl.finishPrimitive()
@@ -1876,7 +1973,21 @@ function precacheStaticGeometry(renderer)
         end for
         gl.finishPrimitive()
       end if
-      count = count + 2
+
+      if gl.multitextureAvailable() then
+        prepared = gl.staticGeometryPrepare(surface, 2)
+        if prepared < 0 then return count end if
+        if prepared == 0 then
+          gl.begin(gl.GL_POLYGON)
+          for each vertex in surface.vertices
+            gl.multiTexCoord2(0, vertex.s, vertex.t)
+            gl.multiTexCoord2(1, vertex.lightS, vertex.lightT)
+            gl.vertex3(vertex.position.x, vertex.position.y, vertex.position.z)
+          end for
+          gl.finishPrimitive()
+        end if
+      end if
+      count = count + 3
     end if
     index = index + 1
   end while
@@ -1895,15 +2006,132 @@ function compatSurfaceBatchKeys(surfaces)
   return keys
 end function
 
+function compatMultitextureRecords(surfaces)
+  global rCompatMtexRecordFaces, rCompatMtexRecords, rCompatMtexRecordStamp, rCompatMtexTextureIds
+  alternate = 0
+  if currentTextureFrame != 0 then alternate = 1 end if
+  stamp = floorValue(rCompatTime * 10.0) * 2 + alternate
+  sameSurfaces = not gl.traceEnabled() and len(rCompatMtexRecordFaces) == len(surfaces)
+  index = 0
+  while sameSurfaces and index < len(surfaces)
+    if rCompatMtexRecordFaces[index] != surfaces[index].faceIndex then sameSurfaces = false end if
+    index = index + 1
+  end while
+  if sameSurfaces and stamp == rCompatMtexRecordStamp then return rCompatMtexRecords end if
+
+  if sameSurfaces and len(rCompatMtexTextureIds) == len(rCompatRenderer.textures) then
+    checked = arrayutil.makeFilledArray(len(rCompatRenderer.textures), false)
+    changed = false
+    for each surface in surfaces
+      textureIndex = surface.textureIndex
+      if textureIndex >= 0 and textureIndex < len(checked) and not checked[textureIndex] then
+        checked[textureIndex] = true
+        textureId = textureIdForSurface(rCompatRenderer, surface)
+        if rCompatMtexTextureIds[textureIndex] != textureId then
+          rCompatMtexTextureIds[textureIndex] = textureId
+          changed = true
+        end if
+      end if
+    end for
+    if changed then
+      index = 0
+      while index < len(surfaces)
+        textureIndex = surfaces[index].textureIndex
+        textureId = rCompatRenderer.noTextureId
+        if textureIndex >= 0 and textureIndex < len(rCompatMtexTextureIds) then textureId = rCompatMtexTextureIds[textureIndex] end if
+        byteio.putU32(rCompatMtexRecords, index * 16 + 8, textureId)
+        index = index + 1
+      end while
+    end if
+    rCompatMtexRecordStamp = stamp
+    return rCompatMtexRecords
+  end if
+
+  records = bytes(len(surfaces) * 16)
+  faces = arrayutil.makeFilledArray(len(surfaces), -1)
+  textureIds = arrayutil.makeFilledArray(len(rCompatRenderer.textures), -1)
+  index = 0
+  while index < len(surfaces)
+    surface = surfaces[index]
+    faces[index] = surface.faceIndex
+    key = nativeRawValue(surface)
+    offset = index * 16
+    byteio.putU32(records, offset, key & 0xffffffff)
+    byteio.putU32(records, offset + 4, (key >> 32) & 0xffffffff)
+    textureId = textureIdForSurface(rCompatRenderer, surface)
+    byteio.putU32(records, offset + 8, textureId)
+    byteio.putU32(records, offset + 12, surface.lightmapId)
+    if surface.textureIndex >= 0 and surface.textureIndex < len(textureIds) then textureIds[surface.textureIndex] = textureId end if
+    index = index + 1
+  end while
+  rCompatMtexRecordFaces = faces
+  rCompatMtexRecords = records
+  rCompatMtexRecordStamp = stamp
+  rCompatMtexTextureIds = textureIds
+  return records
+end function
+
+function R_DrawMultitextureBatch(surfaces)
+  if len(surfaces) == 0 then return 0 end if
+  for each surface in surfaces
+    compatRenderDynamicLightmaps(surface, false)
+  end for
+
+  // Accumulate the complete dirty rectangle before uploading. Uploading as
+  // soon as each surface changed caused the same atlas page to be sliced and
+  // transferred hundreds of times on a single animated-light frame.
+  if not gl.traceEnabled() then gl.activeTexture(1) end if
+  page = 0
+  while page < active_lightmaps
+    if rCompatLightmapModified[page] then
+      rectangle = rCompatLightmapRectChange[page]
+      gl.bindTexture(lightmap_textures + page)
+      if rectangle[3] > 0 then
+        uploadOffset = (page * GLQUAKE_BLOCK_HEIGHT + rectangle[1]) * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
+        uploadLength = rectangle[3] * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
+        gl.uploadLuminanceSubImage(0, rectangle[1], GLQUAKE_BLOCK_WIDTH, rectangle[3], slice(lightmaps, uploadOffset, uploadLength))
+      end if
+      rCompatLightmapModified[page] = false
+      rCompatLightmapRectChange[page] = [GLQUAKE_BLOCK_WIDTH, GLQUAKE_BLOCK_HEIGHT, 0, 0]
+    end if
+    page = page + 1
+  end while
+
+  if not gl.traceEnabled() then gl.activeTexture(0) end if
+  gl.textureEnvironment(gl.GL_REPLACE)
+  GL_EnableMultitexture()
+  useWorldProgram = not gl.traceEnabled() and gl.worldProgramAvailable()
+  if useWorldProgram then
+    gl.worldProgramEnable(true)
+  else
+    gl.textureEnvironment(gl.GL_COMBINE)
+    gl.textureEnvironmentParameter(gl.GL_COMBINE_RGB, gl.GL_MODULATE)
+    gl.textureEnvironmentParameter(gl.GL_SOURCE0_RGB, gl.GL_PREVIOUS)
+    gl.textureEnvironmentParameter(gl.GL_OPERAND0_RGB, gl.GL_SRC_COLOR)
+    gl.textureEnvironmentParameter(gl.GL_SOURCE1_RGB, gl.GL_TEXTURE)
+    gl.textureEnvironmentParameter(gl.GL_OPERAND1_RGB, gl.GL_ONE_MINUS_SRC_COLOR)
+  end if
+
+  records = compatMultitextureRecords(surfaces)
+  batched = gl.staticGeometryCallMultitextureBatch(records)
+  if useWorldProgram then gl.worldProgramEnable(false) end if
+  GL_DisableMultitexture()
+  if batched then return len(surfaces) end if
+  for each surface in surfaces
+    R_DrawSequentialPoly(surface)
+  end for
+  return len(surfaces)
+end function
+
 function R_BlendLightmaps()
-  if rCompatRenderer is void or rCompatRenderer.fullbright or not rCompatTextureSort then return 0 end if
+  if rCompatRenderer is void or rCompatRenderer.fullbright or not rCompatTextureSort or rCompatUseMultitexture then return 0 end if
   gl.depthMask(false)
   gl.blendFunc(gl.GL_ZERO, gl.GL_ONE_MINUS_SRC_COLOR)
   gl.enable(gl.GL_BLEND)
   count = 0
   page = 0
   while page < len(lightmap_polys)
-    surfaces = lightmap_polys[page]
+    surfaces = compatFinishLightmapChain(page)
     if len(surfaces) > 0 then
       gl.bindTexture(lightmap_textures + page)
       if rCompatLightmapModified[page] then
@@ -1968,7 +2196,7 @@ function compatRenderDynamicLightmaps(surface, addToChain)
   if addToChain then c_brush_polys = c_brush_polys + 1 end if
   if (value.flags & (c.SURF_DRAWSKY | c.SURF_DRAWTURB)) != 0 then return false end if
   page = rCompatSurfaceLightmapPage[index]
-  if addToChain then lightmap_polys[page] = [value] + lightmap_polys[page] end if
+  if addToChain then compatAddLightmapPoly(page, value) end if
   face = compatFace(value)
   changed = false
   mapNumber = 0
@@ -1996,7 +2224,7 @@ function compatRenderDynamicLightmaps(surface, addToChain)
   end if
   if rectangle[2] + rectangle[0] < lightS + value.lightWidth then rectangle[2] = lightS - rectangle[0] + value.lightWidth end if
   if rectangle[3] + rectangle[1] < lightT + value.lightHeight then rectangle[3] = lightT - rectangle[1] + value.lightHeight end if
-  pixels = R_BuildLightMap(value, bytes(value.lightWidth * value.lightHeight * lightmap_bytes), value.lightWidth * lightmap_bytes)
+  pixels = R_BuildLightMap(value, rCompatLightmapScratch, value.lightWidth * lightmap_bytes)
   compatCopySurfaceLightmapToAtlas(value, pixels)
   return true
 end function
@@ -2019,7 +2247,7 @@ function R_RenderBrushPoly(surface)
   if (value.flags & GLQUAKE_SURF_UNDERWATER) != 0 then DrawGLWaterPoly(value) else DrawGLPoly(value) end if
   index = compatSurfaceIndex(value)
   page = rCompatSurfaceLightmapPage[index]
-  lightmap_polys[page] = [value] + lightmap_polys[page]
+  compatAddLightmapPoly(page, value)
   if rCompatDynamic then compatRenderDynamicLightmaps(value, false) end if
   return true
 end function
@@ -2031,7 +2259,7 @@ function compatPrepareBatchedBrushPoly(surface)
   c_brush_polys = c_brush_polys + 1
   index = compatSurfaceIndex(value)
   page = rCompatSurfaceLightmapPage[index]
-  lightmap_polys[page] = [value] + lightmap_polys[page]
+  compatAddLightmapPoly(page, value)
   if rCompatDynamic then compatRenderDynamicLightmaps(value, false) end if
   return true
 end function
@@ -2172,8 +2400,9 @@ function compatBrushModelOrigin(entity)
 end function
 
 function R_ClearLightmapChains()
-  global lightmap_polys
+  global lightmap_polys, rCompatLightmapBuilders
   lightmap_polys = arrayutil.makeFilledArray(GLQUAKE_MAX_LIGHTMAPS, [])
+  rCompatLightmapBuilders = arrayutil.makeFilledArray(GLQUAKE_MAX_LIGHTMAPS, false)
   return true
 end function
 
@@ -2266,15 +2495,22 @@ function R_RecursiveWorldNode(nodeNumber)
 end function
 
 function R_DrawWorld()
-  global lightmap_polys, skychain, waterchain
+  global lightmap_polys, skychain, waterchain, rCompatSequentialSurfaces, rCompatSequentialBuilder, rCompatCollectSequential
   if rCompatRenderer is void or len(rCompatRenderer.map.models) == 0 then return 0 end if
   gl.colorFloat(1.0, 1.0, 1.0, 1.0)
   R_ClearLightmapChains()
   skychain = []
   waterchain = []
+  rCompatSequentialSurfaces = []
+  rCompatCollectSequential = rCompatUseMultitexture and not rCompatTextureSort
+  if rCompatCollectSequential then rCompatSequentialBuilder = arrayutil.createArrayBuilder(512) end if
   R_ResetTextureChains()
   root = rCompatRenderer.map.models[0].headNodes[0]
   count = R_RecursiveWorldNode(root)
+  collectedSequential = rCompatCollectSequential
+  rCompatCollectSequential = false
+  if collectedSequential then rCompatSequentialSurfaces = arrayutil.finishArrayBuilder(rCompatSequentialBuilder) end if
+  if collectedSequential then R_DrawMultitextureBatch(rCompatSequentialSurfaces) end if
   count = count + DrawTextureChains()
   R_BlendLightmaps()
   return count
@@ -2432,7 +2668,7 @@ function GL_CreateSurfaceLightmap(surface)
     vertex.lightT = atlasT / GLQUAKE_BLOCK_HEIGHT
     vertexIndex = vertexIndex + 1
   end while
-  pixels = try(R_BuildLightMap(value, bytes(value.lightWidth * value.lightHeight * lightmap_bytes), value.lightWidth * lightmap_bytes))
+  pixels = try(R_BuildLightMap(value, rCompatLightmapScratch, value.lightWidth * lightmap_bytes))
   if pixels is error then return error(3917, "initial surface pixels: " + pixels.message) end if
   copied = try(compatCopySurfaceLightmapToAtlas(value, pixels))
   if copied is error then return error(3918, "initial surface atlas copy: " + copied.message) end if

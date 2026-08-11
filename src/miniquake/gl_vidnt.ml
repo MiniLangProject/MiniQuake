@@ -431,7 +431,9 @@ function CheckMultiTextureExtensions()
   state = VID_State()
   disabled = false
   if state.arguments is not void then disabled = common.hasParm(state.arguments, "-nomtex") end if
-  state.multitexture = hasText(state.glExtensions, "GL_SGIS_multitexture ") and not disabled
+  // The reference used SGIS_multitexture. Modern ICDs expose the equivalent
+  // fixed-function texture units through core/ARB entry points instead.
+  state.multitexture = gl.multitextureAvailable() and not disabled
   return state.multitexture
 end function
 

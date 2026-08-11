@@ -27,6 +27,36 @@ aliasAffineModels = false
 aliasShadows = false
 aliasNoColors = false
 aliasDoubleEyes = true
+aliasShadeCacheValid = []
+aliasShadeCacheStamp = []
+aliasShadeCacheModel = []
+aliasShadeCacheColormap = []
+aliasShadeCacheViewModel = []
+aliasShadeCacheOriginX = []
+aliasShadeCacheOriginY = []
+aliasShadeCacheOriginZ = []
+aliasShadeCacheShade = []
+aliasShadeCacheAmbient = []
+aliasShadeCacheSpot = []
+
+function resetAliasShadeCache()
+  global aliasShadeCacheValid, aliasShadeCacheStamp, aliasShadeCacheModel
+  global aliasShadeCacheColormap, aliasShadeCacheViewModel
+  global aliasShadeCacheOriginX, aliasShadeCacheOriginY, aliasShadeCacheOriginZ
+  global aliasShadeCacheShade, aliasShadeCacheAmbient, aliasShadeCacheSpot
+  aliasShadeCacheValid = arrayutil.makeFilledArray(c.MAX_EDICTS, false)
+  aliasShadeCacheStamp = arrayutil.makeFilledArray(c.MAX_EDICTS, -1)
+  aliasShadeCacheModel = arrayutil.makeFilledArray(c.MAX_EDICTS, "")
+  aliasShadeCacheColormap = arrayutil.makeFilledArray(c.MAX_EDICTS, 0)
+  aliasShadeCacheViewModel = arrayutil.makeFilledArray(c.MAX_EDICTS, false)
+  aliasShadeCacheOriginX = arrayutil.makeFilledArray(c.MAX_EDICTS, 0.0)
+  aliasShadeCacheOriginY = arrayutil.makeFilledArray(c.MAX_EDICTS, 0.0)
+  aliasShadeCacheOriginZ = arrayutil.makeFilledArray(c.MAX_EDICTS, 0.0)
+  aliasShadeCacheShade = arrayutil.makeFilledArray(c.MAX_EDICTS, 0.0)
+  aliasShadeCacheAmbient = arrayutil.makeFilledArray(c.MAX_EDICTS, 0.0)
+  aliasShadeCacheSpot = arrayutil.makeEmptyArray(c.MAX_EDICTS)
+  return true
+end function
 
 function ConfigureAliasRendering(smoothModels, affineModels, shadows, noColors, doubleEyes)
   global aliasSmoothModels, aliasAffineModels, aliasShadows, aliasNoColors, aliasDoubleEyes
@@ -94,6 +124,7 @@ end function
 function create(filesystem, palette, modelPrecache)
   global renderModelRegistry
   aliasMesh.clearCaches()
+  resetAliasShadeCache()
   renderModelRegistry = modelRegistry.Mod_Init(modelRegistry.create(), void)
   draw2d.Draw_SetPalette(palette)
   renderer = t.EntityRenderer(filesystem, palette, [], 0)
@@ -311,9 +342,31 @@ function aliasVertex(source, packed)
 end function
 
 function aliasShade(model, entity, time, viewModel)
+  global aliasShadeCacheValid, aliasShadeCacheStamp, aliasShadeCacheModel
+  global aliasShadeCacheColormap, aliasShadeCacheViewModel
+  global aliasShadeCacheOriginX, aliasShadeCacheOriginY, aliasShadeCacheOriginZ
+  global aliasShadeCacheShade, aliasShadeCacheAmbient, aliasShadeCacheSpot
+  lights = worldRenderer.R_ActiveDynamicLights()
+  hasActiveLight = false
+  for each light in lights
+    if light is not void and light.radius > 0.0 and light.die >= time then hasActiveLight = true end if
+  end for
+  number = entity.number
+  stamp = native.trunc(time * 10.0)
+  cacheable = not hasActiveLight and number >= 0 and number < len(aliasShadeCacheValid)
+  if cacheable and aliasShadeCacheValid[number] and
+    aliasShadeCacheStamp[number] == stamp and
+    aliasShadeCacheModel[number] == model.name and
+    aliasShadeCacheColormap[number] == entity.colormap and
+    aliasShadeCacheViewModel[number] == viewModel and
+    aliasShadeCacheOriginX[number] == entity.origin.x and
+    aliasShadeCacheOriginY[number] == entity.origin.y and
+    aliasShadeCacheOriginZ[number] == entity.origin.z then
+    return [aliasShadeCacheShade[number], aliasShadeCacheAmbient[number], aliasShadeCacheSpot[number]]
+  end if
   ambient = worldRenderer.R_LightPoint(entity.origin)
   shade = ambient
-  for each light in worldRenderer.R_ActiveDynamicLights()
+  for each light in lights
     if light.radius > 0.0 and light.die >= time then
       deltaX = entity.origin.x - light.origin.x
       deltaY = entity.origin.y - light.origin.y
@@ -328,7 +381,22 @@ function aliasShade(model, entity, time, viewModel)
   if ambient + shade > 192.0 then shade = 192.0 - ambient end if
   if entity.colormap != 0 and ambient < 8.0 then ambient = 8.0; shade = 8.0 end if
   if model.name == "progs/flame.mdl" or model.name == "progs/flame2.mdl" then ambient = 256.0; shade = 256.0 end if
-  return [shade / 200.0, ambient]
+  shadeValue = shade / 200.0
+  spot = worldRenderer.lightspot
+  if cacheable then
+    aliasShadeCacheValid[number] = true
+    aliasShadeCacheStamp[number] = stamp
+    aliasShadeCacheModel[number] = model.name
+    aliasShadeCacheColormap[number] = entity.colormap
+    aliasShadeCacheViewModel[number] = viewModel
+    aliasShadeCacheOriginX[number] = entity.origin.x
+    aliasShadeCacheOriginY[number] = entity.origin.y
+    aliasShadeCacheOriginZ[number] = entity.origin.z
+    aliasShadeCacheShade[number] = shadeValue
+    aliasShadeCacheAmbient[number] = ambient
+    if spot is not void then aliasShadeCacheSpot[number] = math.copy(spot) end if
+  end if
+  return [shadeValue, ambient, spot]
 end function
 
 function drawAlias(renderer, model, entity, time, viewModel)
@@ -354,7 +422,7 @@ function drawAlias(renderer, model, entity, time, viewModel)
   if not aliasNoColors and entity.colormap != 0 and translated != 0 then texture = translated end if
   if texture != 0 then gl.bindTexture(texture) end if
   lighting = aliasShade(model, entity, time, viewModel)
-  aliasMesh.configureAliasLighting(lighting[0], lighting[1], entity.angles.y, worldRenderer.lightspot)
+  aliasMesh.configureAliasLighting(lighting[0], lighting[1], entity.angles.y, lighting[2])
   mesh = aliasMesh.GL_MakeAliasModelDisplayLists(source, source)
   doubleEyes = model.name == "progs/eyes.mdl" and aliasDoubleEyes
   drawn = 0

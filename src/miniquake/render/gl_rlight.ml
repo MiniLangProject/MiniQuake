@@ -12,11 +12,12 @@ import miniquake.mathlib as math
 import miniquake.native as native
 import miniquake.array_util as arrayutil
 
-function R_AnimateLight(lightStyles, currentTime)
-  values = arrayutil.makeFilledArray(c.MAX_LIGHTSTYLES, 256)
+function R_AnimateLightInto(lightStyles, currentTime, values)
+  if values is void or len(values) != c.MAX_LIGHTSTYLES then values = arrayutil.makeFilledArray(c.MAX_LIGHTSTYLES, 256) end if
   tick = native.trunc(currentTime * 10.0)
   index = 0
   while index < c.MAX_LIGHTSTYLES
+    values[index] = 256
     style = ""
     if index < len(lightStyles) then style = lightStyles[index] end if
     data = bytes(style)
@@ -27,6 +28,10 @@ function R_AnimateLight(lightStyles, currentTime)
     index = index + 1
   end while
   return values
+end function
+
+function R_AnimateLight(lightStyles, currentTime)
+  return R_AnimateLightInto(lightStyles, currentTime, arrayutil.makeFilledArray(c.MAX_LIGHTSTYLES, 256))
 end function
 
 function AddLightBlend(blend, red, green, blue, alpha2)

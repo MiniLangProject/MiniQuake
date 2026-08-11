@@ -21,7 +21,7 @@ function byteEqual(data, offset, expected, name)
 end function
 
 function run(number, name, fn)
-  print "[" + number + "/22] " + name
+  print "[" + number + "/23] " + name
   result = try(fn())
   if result is error then print "FAIL: " + result.message; return false end if
   return true
@@ -176,6 +176,15 @@ function testCachedStyle()
   return true
 end function
 
+function testBuildPreservesChain()
+  setupValue = standardFixture()
+  worldRender.R_SetLightmapCompatibility(500, 1)
+  worldRender.R_SetLightmapChainCompatibility(0, [setupValue[1], setupValue[1]])
+  worldRender.R_BuildLightMap(setupValue[1], bytes(4), 2)
+  equal(worldRender.R_GetLightmapCompatibilityState(0)[3], 2, "animated rebuild preserves chain")
+  return true
+end function
+
 function collectorRenderer(pageIds, surfaceIds)
   renderer = setup(bytes(), -1, true)[0]
   renderer.lightmaps = pageIds
@@ -250,13 +259,14 @@ if run(12, "fullbright lightmap", testFullbright) then passed = passed + 1 end i
 if run(13, "missing lightdata", testMissingLightData) then passed = passed + 1 end if
 if run(14, "negative sample offset", testNegativeLightOffset) then passed = passed + 1 end if
 if run(15, "cached style update", testCachedStyle) then passed = passed + 1 end if
-if run(16, "atlas page ownership", testCollectorPages) then passed = passed + 1 end if
-if run(17, "legacy surface ownership", testCollectorSurfaces) then passed = passed + 1 end if
-if run(18, "shared page deduplication", testCollectorDeduplicates) then passed = passed + 1 end if
-if run(19, "zero texture ignored", testCollectorIgnoresZero) then passed = passed + 1 end if
-if run(20, "texture deletion order", testCollectorOrder) then passed = passed + 1 end if
-if run(21, "void renderer ownership", testCollectorVoid) then passed = passed + 1 end if
-if run(22, "empty lightmap dimensions", testRequiredEmpty) then passed = passed + 1 end if
+if run(16, "animated rebuild preserves chain", testBuildPreservesChain) then passed = passed + 1 end if
+if run(17, "atlas page ownership", testCollectorPages) then passed = passed + 1 end if
+if run(18, "legacy surface ownership", testCollectorSurfaces) then passed = passed + 1 end if
+if run(19, "shared page deduplication", testCollectorDeduplicates) then passed = passed + 1 end if
+if run(20, "zero texture ignored", testCollectorIgnoresZero) then passed = passed + 1 end if
+if run(21, "texture deletion order", testCollectorOrder) then passed = passed + 1 end if
+if run(22, "void renderer ownership", testCollectorVoid) then passed = passed + 1 end if
+if run(23, "empty lightmap dimensions", testRequiredEmpty) then passed = passed + 1 end if
 
-if passed != 22 then error(4199, "BP-041 lightmap tests failed: " + passed + "/22") end if
-print "MiniQuake BP-041 lightmap atlas tests passed: 22"
+if passed != 23 then error(4199, "BP-041 lightmap tests failed: " + passed + "/23") end if
+print "MiniQuake BP-041 lightmap atlas tests passed: 23"
