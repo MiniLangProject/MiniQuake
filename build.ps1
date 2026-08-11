@@ -959,9 +959,14 @@ $CommonArgs = @(
   "-I", $Source,
   "-I", $StdImportRoot,
   "--keep-going", "--max-errors", "50",
-  "--heap-reserve", "512m",
-  "--heap-commit", "32m",
-  "--heap-grow", "4m"
+  # Retail maps keep the BSP, alias frames and renderer command caches live at
+  # once.  A 32 MiB initial commit left only ~10 MiB free after e1m1 startup,
+  # forcing a full mark/sweep every rendered frame.  Reserve virtual space and
+  # commit enough physical backing for several seconds of frame temporaries;
+  # this removes GC cadence from the 60 Hz server/render loop on x64 Windows.
+  "--heap-reserve", "1g",
+  "--heap-commit", "512m",
+  "--heap-grow", "64m"
 )
 
 if ($Configuration -ieq "Debug") {

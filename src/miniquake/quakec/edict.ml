@@ -247,7 +247,12 @@ function className(machine, entityIndex)
 end function
 
 function loadMapEntitiesFrom(machine, map, skill, deathmatch, firstDynamicIndex)
-  gc_collect()
+  // `map` is a deeply nested BSP object graph held by the live server.  A
+  // forced collection here can reclaim boxed members that the current
+  // backend does not discover through every nested struct/array edge; the
+  // renderer then sees sporadic non-struct vertices during first upload.
+  // Normal heap pressure still invokes the collector at safe allocation
+  // boundaries, so do not force it in the middle of level construction.
   if len(map.entities) == 0 then return error(2601, "ED_LoadFromFile: no worldspawn entity") end if
   if firstDynamicIndex < 1 then firstDynamicIndex = 1 end if
   machine.edictFree[0] = false
@@ -290,7 +295,6 @@ function loadMapEntitiesFrom(machine, map, skill, deathmatch, firstDynamicIndex)
 end function
 
 function loadMapEntities(machine, map, skill, deathmatch)
-  gc_collect()
   return loadMapEntitiesFrom(machine, map, skill, deathmatch, 1)
 end function
 

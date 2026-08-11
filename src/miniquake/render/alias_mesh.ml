@@ -4,6 +4,7 @@ import miniquake.types as compatAliasTypes
 import miniquake.native as compatAliasNative
 import miniquake.mathlib as compatAliasMath
 import miniquake.array_util as compatAliasArrays
+import miniquake.byteio as compatAliasBytes
 import miniquake.render.gl11 as compatAliasGl
 import miniquake.render.alias_normals as compatAliasNormals
 
@@ -27,6 +28,9 @@ struct AliasMesh
   numOrder
 end struct
 
+const ALIAS_MESH_CACHE_SIZE = 256
+const ALIAS_BATCH_CACHE_SIZE = 2048
+
 aliasmodel = void
 paliashdr = void
 triangles = []
@@ -46,10 +50,15 @@ shadelight = 1.0
 ambientlight = 0.0
 shadevector = compatAliasTypes.Vec3(0.0, 0.0, 1.0)
 shadedots = compatAliasNormals.shadeDots[0]
+shadeRow = 0
 lightspot = compatAliasTypes.Vec3(0.0, 0.0, 0.0)
 currentAliasFrame = void
-meshCacheNames = []
-meshCacheValues = []
+meshCacheModelKeys = array(ALIAS_MESH_CACHE_SIZE, 0)
+meshCacheValues = array(ALIAS_MESH_CACHE_SIZE)
+aliasBatchFrameKeys = array(ALIAS_BATCH_CACHE_SIZE, 0)
+aliasBatchMeshKeys = array(ALIAS_BATCH_CACHE_SIZE, 0)
+aliasBatchValues = array(ALIAS_BATCH_CACHE_SIZE)
+aliasShadeDotRows = array(16, void)
 
 function triangleVertex(triangle, index)
   if index == 0 then return triangle.vertex0 end if
@@ -74,10 +83,11 @@ function shadeDotRow(yaw)
 end function
 
 function configureAliasLighting(lightValue, ambientValue, yaw, spot)
-  global shadelight, ambientlight, shadevector, shadedots, lightspot
+  global shadelight, ambientlight, shadevector, shadedots, shadeRow, lightspot
   shadelight = lightValue
   ambientlight = ambientValue
   row = shadeDotRow(yaw)
+  shadeRow = row
   shadedots = compatAliasNormals.shadeDots[row]
   angle = yaw * compatAliasMath.DEG_TO_RAD
   shadevector = compatAliasMath.normalize(
@@ -274,24 +284,24 @@ function BuildTris()
 end function
 
 function cachedMesh(model)
-  index = 0
-  while index < len(meshCacheNames)
-    if meshCacheNames[index] == model.filename then return meshCacheValues[index] end if
-    index = index + 1
-  end while
+  key = nativeRawValue(model)
+  slot = ((key >> 3) ^ (key >> 13)) & (ALIAS_MESH_CACHE_SIZE - 1)
+  if meshCacheModelKeys[slot] == key and meshCacheValues[slot] is not void then return meshCacheValues[slot] end if
   return void
 end function
 
 function GL_MakeAliasModelDisplayLists(model, header)
-  global meshCacheNames, meshCacheValues, paliashdr
+  global meshCacheModelKeys, meshCacheValues, paliashdr
   existing = cachedMesh(model)
   if existing is not void then return existing end if
   configureAliasModel(model)
   if header is not void then paliashdr = header end if
   result = BuildTris()
   if result is error then return result end if
-  meshCacheNames = meshCacheNames + [model.filename]
-  meshCacheValues = meshCacheValues + [result]
+  key = nativeRawValue(model)
+  slot = ((key >> 3) ^ (key >> 13)) & (ALIAS_MESH_CACHE_SIZE - 1)
+  meshCacheModelKeys[slot] = key
+  meshCacheValues[slot] = result
   return result
 end function
 
@@ -314,8 +324,74 @@ function clampByte(value)
   return result
 end function
 
+function aliasBatchData(frame, mesh)
+  global aliasBatchFrameKeys, aliasBatchMeshKeys, aliasBatchValues
+  frameKey = nativeRawValue(frame)
+  meshKey = nativeRawValue(mesh)
+  cacheIndex = ((frameKey >> 3) ^ (frameKey >> 17) ^ (meshKey >> 7)) & (ALIAS_BATCH_CACHE_SIZE - 1)
+  if aliasBatchFrameKeys[cacheIndex] == frameKey and aliasBatchMeshKeys[cacheIndex] == meshKey and aliasBatchValues[cacheIndex] is not void then
+    return aliasBatchValues[cacheIndex]
+  end if
+
+  byteCount = 4
+  for each command in mesh.commands
+    if command.count == 0 then break end if
+    count = command.count
+    if count < 0 then count = -count end if
+    byteCount = byteCount + 4 + count * 12
+  end for
+  data = bytes(byteCount)
+  offset = 0
+  for each command in mesh.commands
+    compatAliasBytes.putU32(data, offset, command.count & 4294967295)
+    offset = offset + 4
+    if command.count == 0 then break end if
+    count = command.count
+    if count < 0 then count = -count end if
+    index = 0
+    while index < count
+      item = command.vertices[index]
+      compatAliasBytes.putF32(data, offset, item.s)
+      compatAliasBytes.putF32(data, offset + 4, item.t)
+      if item.vertexIndex >= 0 and item.vertexIndex < len(frame.vertices) then
+        packed = frame.vertices[item.vertexIndex]
+        compatAliasBytes.putU8(data, offset + 8, packed.x)
+        compatAliasBytes.putU8(data, offset + 9, packed.y)
+        compatAliasBytes.putU8(data, offset + 10, packed.z)
+        compatAliasBytes.putU8(data, offset + 11, packed.normalIndex)
+      end if
+      offset = offset + 12
+      index = index + 1
+    end while
+  end for
+  aliasBatchFrameKeys[cacheIndex] = frameKey
+  aliasBatchMeshKeys[cacheIndex] = meshKey
+  aliasBatchValues[cacheIndex] = data
+  return data
+end function
+
+function aliasShadeDotData(row)
+  global aliasShadeDotRows
+  existing = aliasShadeDotRows[row]
+  if existing is not void then return existing end if
+  values = compatAliasNormals.shadeDots[row]
+  data = bytes(len(values) * 4)
+  index = 0
+  while index < len(values)
+    compatAliasBytes.putF32(data, index * 4, values[index])
+    index = index + 1
+  end while
+  aliasShadeDotRows[row] = data
+  return data
+end function
+
 function drawAliasMesh(model, frame, mesh)
   if frame is void or mesh is void then return 0 end if
+  if not compatAliasGl.traceEnabled() then
+    batch = aliasBatchData(frame, mesh)
+    dots = aliasShadeDotData(shadeRow)
+    return compatAliasNative.glDrawAliasBatch(batch, len(batch), dots, len(shadedots), compatAliasNative.floatBits(shadelight))
+  end if
   drawn = 0
   for each command in mesh.commands
     if command.count == 0 then break end if
@@ -342,6 +418,23 @@ function drawAliasMesh(model, frame, mesh)
     drawn = drawn + count - 2
   end for
   return drawn
+end function
+
+function drawAliasModelBatch(model, frame, mesh, origin, angles, doubleEyes, smooth)
+  batch = aliasBatchData(frame, mesh)
+  dots = aliasShadeDotData(shadeRow)
+  eyesValue = 0
+  smoothValue = 0
+  if doubleEyes then eyesValue = 1 end if
+  if smooth then smoothValue = 1 end if
+  return compatAliasNative.glDrawAliasModel(
+    batch, len(batch), dots, len(shadedots), compatAliasNative.floatBits(shadelight),
+    compatAliasNative.floatBits(origin.x), compatAliasNative.floatBits(origin.y), compatAliasNative.floatBits(origin.z),
+    compatAliasNative.floatBits(angles.x), compatAliasNative.floatBits(angles.y), compatAliasNative.floatBits(angles.z),
+    compatAliasNative.floatBits(model.scaleOrigin.x), compatAliasNative.floatBits(model.scaleOrigin.y), compatAliasNative.floatBits(model.scaleOrigin.z),
+    compatAliasNative.floatBits(model.scale.x), compatAliasNative.floatBits(model.scale.y), compatAliasNative.floatBits(model.scale.z),
+    eyesValue, smoothValue,
+  )
 end function
 
 function GL_DrawAliasFrame(header, posenum)

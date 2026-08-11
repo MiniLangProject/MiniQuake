@@ -10,6 +10,35 @@ import miniquake.protocol_text as protocolText
 const MAX_STACK_DEPTH = 32
 const LOCALSTACK_SIZE = 2048
 const TEMP_STRING_HANDLE = 0xffffffff
+const LOOKUP_CACHE_SIZE = 512
+
+lookupMachine = void
+fieldLookupKeys = array(LOOKUP_CACHE_SIZE)
+fieldLookupRawKeys = array(LOOKUP_CACHE_SIZE, 0)
+fieldLookupValues = array(LOOKUP_CACHE_SIZE, -2)
+functionLookupKeys = array(LOOKUP_CACHE_SIZE)
+functionLookupRawKeys = array(LOOKUP_CACHE_SIZE, 0)
+functionLookupValues = array(LOOKUP_CACHE_SIZE, -2)
+
+function ensureLookupMachine(machine)
+  global lookupMachine, fieldLookupKeys, fieldLookupRawKeys, fieldLookupValues
+  global functionLookupKeys, functionLookupRawKeys, functionLookupValues
+  if lookupMachine is not void and nativeRawValue(lookupMachine) == nativeRawValue(machine) then return true end if
+  lookupMachine = machine
+  // Keep the names themselves rooted.  Caching only a raw heap address would
+  // let a later allocation reuse that address after GC and create a false hit.
+  fieldLookupKeys = array(LOOKUP_CACHE_SIZE)
+  fieldLookupRawKeys = array(LOOKUP_CACHE_SIZE, 0)
+  fieldLookupValues = array(LOOKUP_CACHE_SIZE, -2)
+  functionLookupKeys = array(LOOKUP_CACHE_SIZE)
+  functionLookupRawKeys = array(LOOKUP_CACHE_SIZE, 0)
+  functionLookupValues = array(LOOKUP_CACHE_SIZE, -2)
+  return true
+end function
+
+function inline lookupSlot(key)
+  return ((key >> 3) ^ (key >> 13) ^ (key >> 23)) & (LOOKUP_CACHE_SIZE - 1)
+end function
 
 function zeroArray(count)
   return arrayutil.makeFilledArray(count, 0)
@@ -665,9 +694,22 @@ function setContext(machine, context)
 end function
 
 function fieldOffset(machine, name)
+  global fieldLookupKeys, fieldLookupRawKeys, fieldLookupValues
+  ensureLookupMachine(machine)
+  key = nativeRawValue(name)
+  slot = lookupSlot(key)
+  if fieldLookupValues[slot] != -2 and fieldLookupKeys[slot] is not void and fieldLookupRawKeys[slot] == key then return fieldLookupValues[slot] end if
   for each definition in machine.program.fieldDefs
-    if definition.name == name then return definition.offset end if
+    if definition.name == name then
+      fieldLookupKeys[slot] = name
+      fieldLookupRawKeys[slot] = key
+      fieldLookupValues[slot] = definition.offset
+      return definition.offset
+    end if
   end for
+  fieldLookupKeys[slot] = name
+  fieldLookupRawKeys[slot] = key
+  fieldLookupValues[slot] = -1
   return -1
 end function
 
@@ -679,11 +721,24 @@ function globalOffset(machine, name)
 end function
 
 function functionIndex(machine, name)
+  global functionLookupKeys, functionLookupRawKeys, functionLookupValues
+  ensureLookupMachine(machine)
+  key = nativeRawValue(name)
+  slot = lookupSlot(key)
+  if functionLookupValues[slot] != -2 and functionLookupKeys[slot] is not void and functionLookupRawKeys[slot] == key then return functionLookupValues[slot] end if
   index = 0
   while index < len(machine.program.functions)
-    if machine.program.functions[index].name == name then return index end if
+    if machine.program.functions[index].name == name then
+      functionLookupKeys[slot] = name
+      functionLookupRawKeys[slot] = key
+      functionLookupValues[slot] = index
+      return index
+    end if
     index = index + 1
   end while
+  functionLookupKeys[slot] = name
+  functionLookupRawKeys[slot] = key
+  functionLookupValues[slot] = 0
   return 0
 end function
 

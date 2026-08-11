@@ -536,10 +536,18 @@ function transitionMap(session, mapName, preserveClients, saveChangeParms, defer
     if palette is error then return palette end if
     videoState = glvid.VID_State()
     if videoState.initialized then palette = videoState.palette end if
-    session.renderer = try(worldRenderer.create(session.server.worldModel, palette))
-    if session.renderer is error then return session.renderer end if
+    // Alias/sprite precaching performs the largest burst of heap allocation
+    // during map startup.  Complete it before constructing the deeply nested
+    // world-surface graph so no later model-load allocation can invalidate
+    // boxed vertex members.
     session.entityRenderer = try(entityRenderer.create(session.filesystem, palette, session.server.modelPrecache))
     if session.entityRenderer is error then return session.entityRenderer end if
+    session.renderer = try(worldRenderer.create(session.server.worldModel, palette))
+    if session.renderer is error then return session.renderer end if
+    if session.windowCreated then
+      uploadedWorld = try(worldRenderer.upload(session.renderer))
+      if uploadedWorld is error then return error(3930, "startup world upload: " + uploadedWorld.message) end if
+    end if
     if session.windowCreated then
       screenInitialized = try(screen.initialize(session.console, session.menu, session.filesystem, palette, session.width, session.height, session.cvars))
       if screenInitialized is error then return screenInitialized end if
@@ -3001,11 +3009,13 @@ function _Host_Frame(session, elapsedSeconds)
     visibleEntities = []
     temporaryModels = []
     if not noRefresh then
-      worldRenderer.renderViewport(
+      worldResult = try(worldRenderer.renderViewport(
         session.renderer, width, height, screenRefdef, session.view.origin, session.view.angles,
         client.CL_Dlights(), session.client.lightStyles, session.client.time,
         session.timing.realtime, session.timing.frameTime, session.view.blend,
-      )
+      ))
+      if worldResult is error then return error(3890, "screen_world: " + worldResult.message) end if
+      compatDiagnostics.checkpoint(session, "screen_world")
       if session.entityRenderer is not void then
         visibleEntities = client.CL_ActiveVisibleEntities(session.client)
         temporaryModels = renderHandoff.currentTemporaryEntities()
@@ -3013,19 +3023,25 @@ function _Host_Frame(session, elapsedSeconds)
         if rDrawEntities then
           renderEntities = renderHandoff.submitEntities(visibleEntities, temporaryModels)
           // CL_RelinkEntities already applies first-person/chase filtering.
-          entityRenderer.renderSubmitted(session.entityRenderer, session.renderer, renderEntities, void, session.view.right, session.view.up, session.client.time)
+          entityResult = try(entityRenderer.renderSubmitted(session.entityRenderer, session.renderer, renderEntities, void, session.view.right, session.view.up, session.client.time))
+          if entityResult is error then return error(3891, "screen_entities: " + entityResult.message) end if
         end if
       end if
+      compatDiagnostics.checkpoint(session, "screen_entities")
       particleRenderer.renderView(
         session.particles, session.renderer.palette,
         session.view.origin, session.view.forward, session.view.up, session.view.right,
       )
+      compatDiagnostics.checkpoint(session, "screen_particles_draw")
       if session.entityRenderer is not void and rDrawViewModel then
-        entityRenderer.renderViewModel(session.entityRenderer, session.player, session.view, session.client.time)
+        viewModelResult = try(entityRenderer.renderViewModel(session.entityRenderer, session.player, session.view, session.client.time))
+        if viewModelResult is error then return error(3892, "screen_viewmodel: " + viewModelResult.message) end if
       end if
+      compatDiagnostics.checkpoint(session, "screen_viewmodel")
       // R_RenderView draws the deferred translucent/unsorted water pass after
       // particles and the view model, before mirrors and the final polyblend.
       worldRenderer.R_DrawWaterSurfaces()
+      compatDiagnostics.checkpoint(session, "screen_water")
       if worldRenderer.R_MirrorReady() then
         reflected = try(worldRenderer.R_MirrorView(session.view.origin, session.view.angles))
         if reflected is error then return reflected end if
@@ -3057,10 +3073,20 @@ function _Host_Frame(session, elapsedSeconds)
           worldRenderer.R_DrawMirrorOverlay(width, height, screenRefdef, session.view.origin, session.view.angles)
         end if
       end if
+      compatDiagnostics.checkpoint(session, "screen_mirror")
       worldRenderer.R_PolyBlendProduction(
         session.view.blend,
         glPolyBlend,
       )
+      compatDiagnostics.checkpoint(session, "screen_polyblend")
+    else
+      compatDiagnostics.checkpoint(session, "screen_world")
+      compatDiagnostics.checkpoint(session, "screen_entities")
+      compatDiagnostics.checkpoint(session, "screen_particles_draw")
+      compatDiagnostics.checkpoint(session, "screen_viewmodel")
+      compatDiagnostics.checkpoint(session, "screen_water")
+      compatDiagnostics.checkpoint(session, "screen_mirror")
+      compatDiagnostics.checkpoint(session, "screen_polyblend")
     end if
     screen.SCR_UpdateScreen(
       session.console,
@@ -3084,13 +3110,16 @@ function _Host_Frame(session, elapsedSeconds)
       keys.destination() == keys.KEY_GAME,
       keys.destination() == keys.KEY_CONSOLE,
     )
+    compatDiagnostics.checkpoint(session, "screen_ui")
     capturedEvidence = try(renderEvidence.captureIfRequested(session.timing.frameCount, width, height))
     if capturedEvidence is error then return capturedEvidence end if
+    compatDiagnostics.checkpoint(session, "screen_evidence")
     glvid.GL_EndRendering()
+    compatDiagnostics.checkpoint(session, "screen_swap")
     session.renderedFrames = session.renderedFrames + 1
     updateTitle(session)
+    compatDiagnostics.checkpoint(session, "screen_title")
   end if
-  compatDiagnostics.checkpoint(session, "screen")
   // Host_Frame decays client lights after SCR_UpdateScreen.  Relinking must
   // first be allowed to clamp cl.time to the latest message, because timedemo
   // particle/light integration uses that final cl.time-cl.oldtime interval.

@@ -292,7 +292,10 @@ function aliasShade(model, entity, time, viewModel)
   shade = ambient
   for each light in worldRenderer.R_ActiveDynamicLights()
     if light.radius > 0.0 and light.die >= time then
-      distance = math.Length(math.VectorSubtract(entity.origin, light.origin))
+      deltaX = entity.origin.x - light.origin.x
+      deltaY = entity.origin.y - light.origin.y
+      deltaZ = entity.origin.z - light.origin.z
+      distance = native.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ)
       addition = light.radius - distance
       if addition > 0.0 then ambient = ambient + addition; shade = shade + addition end if
     end if
@@ -328,36 +331,37 @@ function drawAlias(renderer, model, entity, time, viewModel)
   if not aliasNoColors and entity.colormap != 0 and translated != 0 then texture = translated end if
   if texture != 0 then gl.bindTexture(texture) end if
   lighting = aliasShade(model, entity, time, viewModel)
-  aliasMesh.configureAliasModel(source)
   aliasMesh.configureAliasLighting(lighting[0], lighting[1], entity.angles.y, worldRenderer.lightspot)
   mesh = aliasMesh.GL_MakeAliasModelDisplayLists(source, source)
-  gl.pushMatrix()
-  gl.translate(entity.origin.x, entity.origin.y, entity.origin.z)
-  gl.rotate(entity.angles.y, 0.0, 0.0, 1.0)
-  gl.rotate(-entity.angles.x, 0.0, 1.0, 0.0)
-  gl.rotate(entity.angles.z, 1.0, 0.0, 0.0)
-  if model.name == "progs/eyes.mdl" and aliasDoubleEyes then
-    gl.translate(source.scaleOrigin.x, source.scaleOrigin.y, source.scaleOrigin.z - 30.0)
-    gl.scale(source.scale.x * 2.0, source.scale.y * 2.0, source.scale.z * 2.0)
+  doubleEyes = model.name == "progs/eyes.mdl" and aliasDoubleEyes
+  drawn = 0
+  if not gl.traceEnabled() then
+    drawn = aliasMesh.drawAliasModelBatch(source, frame, mesh, entity.origin, entity.angles, doubleEyes, aliasSmoothModels)
   else
-    gl.translate(source.scaleOrigin.x, source.scaleOrigin.y, source.scaleOrigin.z)
-    gl.scale(source.scale.x, source.scale.y, source.scale.z)
+    gl.pushMatrix()
+    gl.translate(entity.origin.x, entity.origin.y, entity.origin.z)
+    gl.rotate(entity.angles.y, 0.0, 0.0, 1.0)
+    gl.rotate(-entity.angles.x, 0.0, 1.0, 0.0)
+    gl.rotate(entity.angles.z, 1.0, 0.0, 0.0)
+    if doubleEyes then
+      gl.translate(source.scaleOrigin.x, source.scaleOrigin.y, source.scaleOrigin.z - 30.0)
+      gl.scale(source.scale.x * 2.0, source.scale.y * 2.0, source.scale.z * 2.0)
+    else
+      gl.translate(source.scaleOrigin.x, source.scaleOrigin.y, source.scaleOrigin.z)
+      gl.scale(source.scale.x, source.scale.y, source.scale.z)
+    end if
+    // Diagnostic traces retain the scalar fixed-function command sequence.
+    gl.cullFace(gl.GL_FRONT)
+    gl.enable(gl.GL_CULL_FACE)
+    if aliasSmoothModels then gl.shadeModel(gl.GL_SMOOTH) end if
+    gl.textureEnvironment(gl.GL_MODULATE)
+    drawn = aliasMesh.drawAliasMesh(source, frame, mesh)
+    gl.textureEnvironment(gl.GL_REPLACE)
+    gl.shadeModel(gl.GL_FLAT)
+    gl.color(255, 255, 255, 255)
+    gl.disable(gl.GL_CULL_FACE)
+    gl.popMatrix()
   end if
-  // R_SetupGL leaves front-face culling enabled for alias models.  The
-  // production world path deliberately draws BSP polygons two-sided, so
-  // restore the MiniQuake alias state locally instead of inheriting that state.
-  // Without this, normally hidden weapon backfaces can win the depth test and
-  // expose unrelated parts of the skin.
-  gl.cullFace(gl.GL_FRONT)
-  gl.enable(gl.GL_CULL_FACE)
-  if aliasSmoothModels then gl.shadeModel(gl.GL_SMOOTH) end if
-  gl.textureEnvironment(gl.GL_MODULATE)
-  drawn = aliasMesh.drawAliasMesh(source, frame, mesh)
-  gl.textureEnvironment(gl.GL_REPLACE)
-  gl.shadeModel(gl.GL_FLAT)
-  gl.color(255, 255, 255, 255)
-  gl.disable(gl.GL_CULL_FACE)
-  gl.popMatrix()
   if aliasShadows then
     gl.pushMatrix()
     gl.translate(entity.origin.x, entity.origin.y, entity.origin.z)
@@ -464,10 +468,12 @@ function renderSubmitted(renderer, worldRendererValue, entities, hiddenEntityNum
     if entity is not void and (hiddenEntityNumber is void or entity.number != hiddenEntityNumber) and entity.modelIndex > 0 and entity.modelIndex < len(renderer.models) then
       model = renderer.models[entity.modelIndex]
       if model.kind == MODEL_BRUSH then
-        drawBrush(worldRendererValue, model, entity)
+        drawResult = try(drawBrush(worldRendererValue, model, entity))
+        if drawResult is error then return error(3893, "brush " + model.name + " entity " + entity.number + ": " + drawResult.message) end if
         rendered = rendered + 1
       else if model.kind == MODEL_ALIAS then
-        drawAlias(renderer, model, entity, time, false)
+        drawResult = try(drawAlias(renderer, model, entity, time, false))
+        if drawResult is error then return error(3894, "alias " + model.name + " entity " + entity.number + ": " + drawResult.message) end if
         rendered = rendered + 1
       end if
     end if
@@ -479,7 +485,8 @@ function renderSubmitted(renderer, worldRendererValue, entities, hiddenEntityNum
     if entity is not void and (hiddenEntityNumber is void or entity.number != hiddenEntityNumber) and entity.modelIndex > 0 and entity.modelIndex < len(renderer.models) then
       model = renderer.models[entity.modelIndex]
       if model.kind == MODEL_SPRITE then
-        drawSprite(renderer, model, entity, viewRight, viewUp, time)
+        drawResult = try(drawSprite(renderer, model, entity, viewRight, viewUp, time))
+        if drawResult is error then return error(3895, "sprite " + model.name + " entity " + entity.number + ": " + drawResult.message) end if
         rendered = rendered + 1
       end if
     end if

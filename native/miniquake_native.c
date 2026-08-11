@@ -411,6 +411,9 @@ MQ_DLLIMPORT BOOL MQ_WINAPI SetDeviceGammaRamp(HDC dc, const void *ramp);
 MQ_DLLIMPORT HGLRC MQ_WINAPI wglCreateContext(HDC dc);
 MQ_DLLIMPORT BOOL MQ_WINAPI wglDeleteContext(HGLRC context);
 MQ_DLLIMPORT BOOL MQ_WINAPI wglMakeCurrent(HDC dc, HGLRC context);
+MQ_DLLIMPORT void *MQ_WINAPI wglGetProcAddress(const char *name);
+
+typedef BOOL (MQ_WINAPI *mq_wgl_swap_interval_proc)(mq_i32 interval);
 
 /* winmm */
 MQ_DLLIMPORT MMRESULT MQ_WINAPI waveOutOpen(HWAVEOUT *output, UINT device_id, const MQ_WAVEFORMATEX *format, ULONG_PTR callback, ULONG_PTR instance, DWORD flags);
@@ -489,12 +492,14 @@ MQ_DLLIMPORT mq_u32 MQ_WINAPI glGenLists(mq_i32 range);
 MQ_DLLIMPORT void MQ_WINAPI glNewList(mq_u32 list_id, mq_u32 mode);
 MQ_DLLIMPORT void MQ_WINAPI glEndList(void);
 MQ_DLLIMPORT void MQ_WINAPI glCallList(mq_u32 list_id);
+MQ_DLLIMPORT void MQ_WINAPI glCallLists(mq_i32 count, mq_u32 type, const void *lists);
 MQ_DLLIMPORT void MQ_WINAPI glDeleteLists(mq_u32 list_id, mq_i32 range);
 
 #ifndef GL_COMPILE_AND_EXECUTE
 #define GL_COMPILE_AND_EXECUTE 0x1301
 #endif
 #define MQ_STATIC_GEOMETRY_CACHE_MAX 32768
+#define MQ_STATIC_GEOMETRY_HASH_SIZE 65536
 
 typedef struct mq_static_geometry_entry_s {
     mq_u64 key;
@@ -503,21 +508,43 @@ typedef struct mq_static_geometry_entry_s {
 } mq_static_geometry_entry_t;
 
 static mq_static_geometry_entry_t mq_static_geometry_cache[MQ_STATIC_GEOMETRY_CACHE_MAX];
+/* Open-addressed index (entry index + 1; zero means empty).  The render loop
+ * asks for every visible base and lightmap polygon on every frame, so the old
+ * linear search made an otherwise cached scene quadratic in surface count. */
+static mq_u32 mq_static_geometry_hash[MQ_STATIC_GEOMETRY_HASH_SIZE];
 static mq_i32 mq_static_geometry_count = 0;
 static mq_i32 mq_static_geometry_pending = 0;
 static mq_i32 mq_static_geometry_recording = 0;
 static mq_u32 mq_static_geometry_pending_list = 0;
 
+static mq_i32 mq_static_geometry_find(mq_u64 key, mq_i32 pass, mq_u32 *slot_out) {
+    mq_u64 mixed = key ^ (key >> 33) ^ ((mq_u64)(mq_u32)pass * 0x9E3779B185EBCA87ull);
+    mq_u32 slot;
+    mixed ^= mixed >> 29;
+    slot = (mq_u32)mixed & (MQ_STATIC_GEOMETRY_HASH_SIZE - 1u);
+    while (mq_static_geometry_hash[slot] != 0u) {
+        mq_u32 entry_index = mq_static_geometry_hash[slot] - 1u;
+        if (mq_static_geometry_cache[entry_index].key == key &&
+            mq_static_geometry_cache[entry_index].pass == pass) {
+            if (slot_out != (mq_u32 *)0) *slot_out = slot;
+            return (mq_i32)entry_index;
+        }
+        slot = (slot + 1u) & (MQ_STATIC_GEOMETRY_HASH_SIZE - 1u);
+    }
+    if (slot_out != (mq_u32 *)0) *slot_out = slot;
+    return -1;
+}
+
 MQ_EXPORT mq_i32 mq_gl_static_geometry_call(mq_u64 key_value, mq_i32 pass_value) {
     mq_u64 key = key_value;
     mq_i32 pass = pass_value;
-    mq_i32 i;
+    mq_u32 slot;
+    mq_i32 found;
     if (mq_static_geometry_pending || mq_static_geometry_recording) return 0;
-    for (i = 0; i < mq_static_geometry_count; ++i) {
-        if (mq_static_geometry_cache[i].key == key && mq_static_geometry_cache[i].pass == pass) {
-            glCallList(mq_static_geometry_cache[i].list_id);
-            return 1;
-        }
+    found = mq_static_geometry_find(key, pass, &slot);
+    if (found >= 0) {
+        glCallList(mq_static_geometry_cache[found].list_id);
+        return 1;
     }
     if (mq_static_geometry_count >= MQ_STATIC_GEOMETRY_CACHE_MAX) return 0;
     {
@@ -526,11 +553,43 @@ MQ_EXPORT mq_i32 mq_gl_static_geometry_call(mq_u64 key_value, mq_i32 pass_value)
         mq_static_geometry_cache[mq_static_geometry_count].key = key;
         mq_static_geometry_cache[mq_static_geometry_count].pass = pass;
         mq_static_geometry_cache[mq_static_geometry_count].list_id = list_id;
+        mq_static_geometry_hash[slot] = (mq_u32)mq_static_geometry_count + 1u;
         mq_static_geometry_count += 1;
         mq_static_geometry_pending_list = list_id;
         mq_static_geometry_pending = 1;
     }
     return 0;
+}
+
+MQ_EXPORT mq_i32 mq_gl_static_geometry_call_batch(
+    const mq_u8 *keys,
+    mq_u32 byte_count,
+    mq_i32 pass
+) {
+    static mq_u32 list_ids[MQ_STATIC_GEOMETRY_CACHE_MAX];
+    mq_u32 count;
+    mq_u32 index;
+    if (keys == (const mq_u8 *)0 || (byte_count & 7u) != 0u ||
+        mq_static_geometry_pending || mq_static_geometry_recording) return 0;
+    count = byte_count >> 3;
+    if (count == 0u || count > MQ_STATIC_GEOMETRY_CACHE_MAX) return 0;
+    for (index = 0; index < count; ++index) {
+        mq_u32 offset = index << 3;
+        mq_u64 key =
+            (mq_u64)keys[offset] |
+            ((mq_u64)keys[offset + 1u] << 8) |
+            ((mq_u64)keys[offset + 2u] << 16) |
+            ((mq_u64)keys[offset + 3u] << 24) |
+            ((mq_u64)keys[offset + 4u] << 32) |
+            ((mq_u64)keys[offset + 5u] << 40) |
+            ((mq_u64)keys[offset + 6u] << 48) |
+            ((mq_u64)keys[offset + 7u] << 56);
+        mq_i32 found = mq_static_geometry_find(key, pass, (mq_u32 *)0);
+        if (found < 0) return 0;
+        list_ids[index] = mq_static_geometry_cache[found].list_id;
+    }
+    glCallLists((mq_i32)count, 0x1405u /* GL_UNSIGNED_INT */, list_ids);
+    return (mq_i32)count;
 }
 
 MQ_EXPORT void mq_gl_static_geometry_clear(void) {
@@ -542,6 +601,7 @@ MQ_EXPORT void mq_gl_static_geometry_clear(void) {
     for (i = 0; i < mq_static_geometry_count; ++i) {
         if (mq_static_geometry_cache[i].list_id != 0) glDeleteLists(mq_static_geometry_cache[i].list_id, 1);
     }
+    for (i = 0; i < MQ_STATIC_GEOMETRY_HASH_SIZE; ++i) mq_static_geometry_hash[i] = 0u;
     mq_static_geometry_count = 0;
     mq_static_geometry_pending = 0;
     mq_static_geometry_pending_list = 0;
@@ -1411,6 +1471,22 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
         return MQ_NULL;
     }
 
+    /* GLQuake predates driver-controlled swap synchronization and never
+     * requests it.  Explicitly select interval zero when WGL_EXT_swap_control
+     * is available, otherwise modern driver defaults can add a full refresh
+     * period after an already complete frame and cap the port below 60 FPS. */
+    {
+        mq_wgl_swap_interval_proc swap_interval =
+            (mq_wgl_swap_interval_proc)wglGetProcAddress("wglSwapIntervalEXT");
+        if (swap_interval != MQ_NULL &&
+            swap_interval != (mq_wgl_swap_interval_proc)1 &&
+            swap_interval != (mq_wgl_swap_interval_proc)2 &&
+            swap_interval != (mq_wgl_swap_interval_proc)3 &&
+            swap_interval != (mq_wgl_swap_interval_proc)-1) {
+            swap_interval(0);
+        }
+    }
+
     ShowWindow(mq_window, MQ_SW_SHOW);
     UpdateWindow(mq_window);
     mq_clear_input_events();
@@ -1706,6 +1782,16 @@ MQ_EXPORT mq_u32 mq_win_joy_warrior_curve_f32(mq_i32 raw_value) {
 }
 
 MQ_EXPORT mq_u32 mq_win_ticks(void) {
+    static mq_i64 frequency = 0;
+    mq_i64 counter = 0;
+    if (frequency == 0 && !QueryPerformanceFrequency(&frequency)) {
+        frequency = -1;
+    }
+    if (frequency > 0 && QueryPerformanceCounter(&counter)) {
+        /* Preserve the public 32-bit millisecond/wrap ABI while matching the
+         * high-resolution timer selected by GLQuake's Sys_DoubleTime. */
+        return (mq_u32)(((mq_u64)counter * 1000ull) / (mq_u64)frequency);
+    }
     return GetTickCount();
 }
 
@@ -2487,3 +2573,120 @@ MQ_EXPORT mq_u32 mq_gl_get_error(void) { return glGetError(); }
 MQ_EXPORT void mq_gl_finish(void) { glFinish(); }
 MQ_EXPORT void mq_gl_flush(void) { glFlush(); }
 MQ_EXPORT void mq_gl_draw_buffer(mq_u32 mode) { glDrawBuffer(mode); }
+
+/*
+ * Execute one MiniLang-prepared alias-model frame as a single bridge call.
+ * MiniLang remains responsible for pose selection, strip/fan construction,
+ * lighting and transforms.  The bridge only decodes the compact OpenGL
+ * command stream and emits the same fixed-function calls that the scalar ABI
+ * would otherwise perform hundreds of times per model.
+ *
+ * Stream: repeated { i32 signed_count; count *
+ *   { u32 s_bits; u32 t_bits; u8 x,y,z,normal } }, terminated by count 0.
+ */
+MQ_EXPORT mq_i32 mq_gl_draw_alias_batch(
+    const mq_u8 *data,
+    mq_u32 byte_count,
+    const mq_u8 *shade_dots,
+    mq_u32 shade_dot_count,
+    mq_u32 shade_light_bits
+) {
+    mq_u32 offset = 0;
+    mq_i32 triangles = 0;
+    float shade_light = mq_bits_to_float(shade_light_bits);
+    if (data == MQ_NULL || shade_dots == MQ_NULL) return 0;
+    while (offset + 4u <= byte_count) {
+        mq_u32 raw_count =
+            (mq_u32)data[offset] |
+            ((mq_u32)data[offset + 1u] << 8) |
+            ((mq_u32)data[offset + 2u] << 16) |
+            ((mq_u32)data[offset + 3u] << 24);
+        mq_i32 signed_count = (mq_i32)raw_count;
+        mq_u32 count;
+        mq_u32 vertex;
+        mq_u32 mode;
+        offset += 4u;
+        if (signed_count == 0) break;
+        count = signed_count < 0 ? (mq_u32)(-signed_count) : (mq_u32)signed_count;
+        mode = signed_count < 0 ? 0x0006u : 0x0005u; /* GL_TRIANGLE_FAN/STRIP */
+        if (count > (byte_count - offset) / 12u) return triangles;
+        glBegin(mode);
+        for (vertex = 0; vertex < count; ++vertex) {
+            mq_u32 s_bits =
+                (mq_u32)data[offset] |
+                ((mq_u32)data[offset + 1u] << 8) |
+                ((mq_u32)data[offset + 2u] << 16) |
+                ((mq_u32)data[offset + 3u] << 24);
+            mq_u32 t_bits =
+                (mq_u32)data[offset + 4u] |
+                ((mq_u32)data[offset + 5u] << 8) |
+                ((mq_u32)data[offset + 6u] << 16) |
+                ((mq_u32)data[offset + 7u] << 24);
+            mq_u32 normal = data[offset + 11u];
+            float light = shade_light;
+            mq_i32 color_value;
+            mq_u8 color;
+            if (normal < shade_dot_count) {
+                mq_u32 dot_offset = normal * 4u;
+                mq_u32 dot_bits =
+                    (mq_u32)shade_dots[dot_offset] |
+                    ((mq_u32)shade_dots[dot_offset + 1u] << 8) |
+                    ((mq_u32)shade_dots[dot_offset + 2u] << 16) |
+                    ((mq_u32)shade_dots[dot_offset + 3u] << 24);
+                light = mq_bits_to_float(dot_bits) * shade_light;
+            }
+            color_value = (mq_i32)(light * 255.0f);
+            if (color_value < 0) color_value = 0;
+            if (color_value > 255) color_value = 255;
+            color = (mq_u8)color_value;
+            glColor4ub(color, color, color, 255u);
+            glTexCoord2f(mq_bits_to_float(s_bits), mq_bits_to_float(t_bits));
+            glVertex3f((float)data[offset + 8u], (float)data[offset + 9u], (float)data[offset + 10u]);
+            offset += 12u;
+        }
+        glEnd();
+        triangles += (mq_i32)count - 2;
+    }
+    return triangles;
+}
+
+MQ_EXPORT mq_i32 mq_gl_draw_alias_model(
+    const mq_u8 *data, mq_u32 byte_count,
+    const mq_u8 *shade_dots, mq_u32 shade_dot_count, mq_u32 shade_light_bits,
+    mq_u32 origin_x, mq_u32 origin_y, mq_u32 origin_z,
+    mq_u32 angle_x, mq_u32 angle_y, mq_u32 angle_z,
+    mq_u32 scale_origin_x, mq_u32 scale_origin_y, mq_u32 scale_origin_z,
+    mq_u32 scale_x, mq_u32 scale_y, mq_u32 scale_z,
+    mq_i32 double_eyes, mq_i32 smooth
+) {
+    float sox = mq_bits_to_float(scale_origin_x);
+    float soy = mq_bits_to_float(scale_origin_y);
+    float soz = mq_bits_to_float(scale_origin_z);
+    float sx = mq_bits_to_float(scale_x);
+    float sy = mq_bits_to_float(scale_y);
+    float sz = mq_bits_to_float(scale_z);
+    mq_i32 triangles;
+    glPushMatrix();
+    glTranslatef(mq_bits_to_float(origin_x), mq_bits_to_float(origin_y), mq_bits_to_float(origin_z));
+    glRotatef(mq_bits_to_float(angle_y), 0.0f, 0.0f, 1.0f);
+    glRotatef(-mq_bits_to_float(angle_x), 0.0f, 1.0f, 0.0f);
+    glRotatef(mq_bits_to_float(angle_z), 1.0f, 0.0f, 0.0f);
+    if (double_eyes) {
+        glTranslatef(sox, soy, soz - 30.0f);
+        glScalef(sx * 2.0f, sy * 2.0f, sz * 2.0f);
+    } else {
+        glTranslatef(sox, soy, soz);
+        glScalef(sx, sy, sz);
+    }
+    glCullFace(0x0404u); /* GL_FRONT */
+    glEnable(0x0B44u);  /* GL_CULL_FACE */
+    if (smooth) glShadeModel(0x1D01u); /* GL_SMOOTH */
+    glTexEnvi(0x2300u, 0x2200u, 0x2100u); /* TEXTURE_ENV/MODE/MODULATE */
+    triangles = mq_gl_draw_alias_batch(data, byte_count, shade_dots, shade_dot_count, shade_light_bits);
+    glTexEnvi(0x2300u, 0x2200u, 0x1E01u); /* GL_REPLACE */
+    glShadeModel(0x1D00u); /* GL_FLAT */
+    glColor4ub(255u, 255u, 255u, 255u);
+    glDisable(0x0B44u);
+    glPopMatrix();
+    return triangles;
+}

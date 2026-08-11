@@ -298,6 +298,7 @@ end function
 
 function bindTexture(texture)
   global boundTextureName
+  if texture == boundTextureName then return void end if
   boundTextureName = texture
   if diagnosticTraceEnabled and traceCommand("bind_texture", [GL_TEXTURE_2D, texture]) then return void end if
   native.glBindTexture(GL_TEXTURE_2D, texture)
@@ -374,6 +375,10 @@ end function
 
 function staticGeometryCall(objectValue, passId)
   return native.glStaticGeometryCall(nativeRawValue(objectValue), passId) != 0
+end function
+
+function staticGeometryCallBatch(keys, passId)
+  return native.glStaticGeometryCallBatch(keys, len(keys), passId) > 0
 end function
 
 function clearStaticGeometryCache()

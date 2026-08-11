@@ -244,21 +244,29 @@ function persist(session, phase, errorText)
   return true
 end function
 
+function inline stageTraceEnabled(session)
+  // Headless sessions are also the deterministic diagnostics/test path.  Keep
+  // their historical frame-stage contract, while the interactive renderer
+  // avoids allocating a new trace array at every checkpoint.
+  return session.diagnosticContextPath != "" or session.headless
+end function
+
 function beginFrame(session)
   optBaseline.beginFrame()
-  if session.diagnosticContextPath == "" then return true end if
-  // Clear only in explicit diagnostics mode. The production path retains the
-  // original host-owned frameTrace lifecycle and has no added file I/O.
+  if not stageTraceEnabled(session) then return true end if
   session.frameTrace = []
   session.diagnosticLastStage = "before_filter"
+  if session.diagnosticContextPath == "" then return true end if
   return persist(session, "before_frame", "")
 end function
 
 function checkpoint(session, stage)
   optBaseline.checkpoint(stage)
   session.diagnosticLastStage = stage
-  if session.diagnosticContextPath != "" then
+  if stageTraceEnabled(session) then
     session.frameTrace = session.frameTrace + [stage]
+  end if
+  if session.diagnosticContextPath != "" then
     persist(session, "in_frame", "")
   end if
   return true

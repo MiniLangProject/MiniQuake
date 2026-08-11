@@ -185,8 +185,28 @@ function traceLine(map, start, finish)
 end function
 
 function truePointContents(map, point)
-  hull = createHull(map, 0)
-  return pointContents(hull, point)
+  if map is void or len(map.models) == 0 or len(map.nodes) == 0 then return error(2513, "Mod_PointInLeaf: bad model") end if
+  number = map.models[0].headNodes[0]
+  while number >= 0
+    if number >= len(map.nodes) then return error(2514, "Mod_PointInLeaf: bad node") end if
+    node = map.nodes[number]
+    if node.planeIndex < 0 or node.planeIndex >= len(map.planes) then return error(2515, "Mod_PointInLeaf: bad plane") end if
+    plane = map.planes[node.planeIndex]
+    distance = 0.0
+    if plane.type == 0 then
+      distance = point.x - plane.dist
+    else if plane.type == 1 then
+      distance = point.y - plane.dist
+    else if plane.type == 2 then
+      distance = point.z - plane.dist
+    else
+      distance = point.x * plane.normal.x + point.y * plane.normal.y + point.z * plane.normal.z - plane.dist
+    end if
+    if distance < 0.0 then number = node.child1 else number = node.child0 end if
+  end while
+  leafIndex = -1 - number
+  if leafIndex < 0 or leafIndex >= len(map.leafs) then return error(2516, "Mod_PointInLeaf: bad leaf") end if
+  return map.leafs[leafIndex].contents
 end function
 
 function pointContentsWorld(map, point)

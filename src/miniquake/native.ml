@@ -167,6 +167,8 @@ extern function glGetError() from "miniquake_native.dll" symbol "mq_gl_get_error
 extern function glFinish() from "miniquake_native.dll" symbol "mq_gl_finish" returns void
 extern function glFlush() from "miniquake_native.dll" symbol "mq_gl_flush" returns void
 extern function glDrawBuffer(mode as u32) from "miniquake_native.dll" symbol "mq_gl_draw_buffer" returns void
+extern function glDrawAliasBatch(data as bytes, byteCount as u32, shadeDots as bytes, shadeDotCount as u32, shadeLightBits as u32) from "miniquake_native.dll" symbol "mq_gl_draw_alias_batch" returns i32
+extern function glDrawAliasModel(data as bytes, byteCount as u32, shadeDots as bytes, shadeDotCount as u32, shadeLightBits as u32, originX as u32, originY as u32, originZ as u32, angleX as u32, angleY as u32, angleZ as u32, scaleOriginX as u32, scaleOriginY as u32, scaleOriginZ as u32, scaleX as u32, scaleY as u32, scaleZ as u32, doubleEyes as i32, smooth as i32) from "miniquake_native.dll" symbol "mq_gl_draw_alias_model" returns i32
 
 // Win64-safe native text bridge.
 //
@@ -295,4 +297,5 @@ function atan2(y, x)
   return bitsFloat(f32Atan2(floatBits(y), floatBits(x)))
 end function
 extern function glStaticGeometryCall(keyValue as u64, passValue as i32) from "miniquake_native.dll" symbol "mq_gl_static_geometry_call" returns i32
+extern function glStaticGeometryCallBatch(keys as bytes, byteCount as u32, passValue as i32) from "miniquake_native.dll" symbol "mq_gl_static_geometry_call_batch" returns i32
 extern function glStaticGeometryClear() from "miniquake_native.dll" symbol "mq_gl_static_geometry_clear" returns void

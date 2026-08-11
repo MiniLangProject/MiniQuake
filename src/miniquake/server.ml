@@ -1759,12 +1759,33 @@ function runNonClientPhysicsWithRetouch(server, frameTime, registry, forceRetouc
   parameters = physicsFrameParameters(registry)
   gravity = parameters[0]
   maxVelocity = parameters[1]
+  machine = server.machine
+  moveTypeOffset = vm.fieldOffset(machine, "movetype")
+  nextThinkOffset = vm.fieldOffset(machine, "nextthink")
   moved = 0
   index = server.maxClients + 1
-  while index < server.machine.context.edicts.numEdicts
-    if not server.machine.context.edicts.freeFlags[index] then
+  while index < machine.context.edicts.numEdicts
+    if not machine.context.edicts.freeFlags[index] then
       physics.SV_ForceRetouchEntity(server, index, forceRetouch)
-      if physics.SV_Physics_NonClientEntity(server, index, frameTime, gravity, maxVelocity) then moved = moved + 1 end if
+      // Most map entities are MOVETYPE_NONE and have no think scheduled for
+      // this frame.  The C engine reads those two entvars directly.  Avoid the
+      // generic name-based collision adapter and full dispatch for this exact
+      // no-op case; due thinks and every moving physics class still enter the
+      // original SV_Physics_NonClientEntity implementation unchanged.
+      directNoOp = false
+      if moveTypeOffset >= 0 and nextThinkOffset >= 0 then
+        fields = machine.edicts[index]
+        moveType = native.trunc(native.bitsFloat(fields[moveTypeOffset]))
+        if moveType == c.MOVETYPE_NONE then
+          thinkTime = native.bitsFloat(fields[nextThinkOffset])
+          directNoOp = thinkTime <= 0.0 or thinkTime > server.time + frameTime
+        end if
+      end if
+      if directNoOp then
+        moved = moved + 1
+      else if physics.SV_Physics_NonClientEntity(server, index, frameTime, gravity, maxVelocity) then
+        moved = moved + 1
+      end if
     end if
     index = index + 1
   end while
@@ -2222,6 +2243,50 @@ function qcString(machine, entityIndex, fieldName, fallback)
   return value
 end function
 
+function qcFloatAt(machine, entityIndex, offset, fallback)
+  if offset < 0 then return fallback end if
+  return vm.entityFloat(machine, entityIndex, offset)
+end function
+
+function qcWordAt(machine, entityIndex, offset, fallback)
+  if offset < 0 then return fallback end if
+  return vm.entityField(machine, entityIndex, offset)
+end function
+
+function qcStringAt(machine, entityIndex, offset, fallback)
+  if offset < 0 then return fallback end if
+  value = vm.entityString(machine, entityIndex, offset)
+  if value == "" then return fallback end if
+  return value
+end function
+
+// The C engine resolves ddef_t offsets while loading progs.dat and then uses
+// direct word offsets for every edict.  Resolve the MiniLang mirror's fixed
+// synchronization set once per range instead of scanning fieldDefs 18 times
+// for every live edict on every server frame.
+function synchronizedEdictOffsets(machine)
+  return [
+    vm.fieldOffset(machine, "classname"),
+    vm.fieldOffset(machine, "model"),
+    vm.fieldOffset(machine, "modelindex"),
+    vm.fieldOffset(machine, "frame"),
+    vm.fieldOffset(machine, "skin"),
+    vm.fieldOffset(machine, "colormap"),
+    vm.fieldOffset(machine, "effects"),
+    vm.fieldOffset(machine, "origin"),
+    vm.fieldOffset(machine, "angles"),
+    vm.fieldOffset(machine, "velocity"),
+    vm.fieldOffset(machine, "mins"),
+    vm.fieldOffset(machine, "maxs"),
+    vm.fieldOffset(machine, "view_ofs"),
+    vm.fieldOffset(machine, "movetype"),
+    vm.fieldOffset(machine, "solid"),
+    vm.fieldOffset(machine, "flags"),
+    vm.fieldOffset(machine, "health"),
+    vm.fieldOffset(machine, "groundentity"),
+  ]
+end function
+
 function requireSynchronizedVector(value, entityIndex, fieldName)
   if t.isVec3Value(value) then return value end if
   return error(
@@ -2254,6 +2319,20 @@ end function
 function syncQcVectorInto(machine, entityIndex, fieldName, target, x, y, z)
   result = synchronizedVectorTarget(target, entityIndex, fieldName, x, y, z)
   offset = vm.fieldOffset(machine, fieldName)
+  if offset >= 0 then
+    result.x = vm.entityFloat(machine, entityIndex, offset)
+    result.y = vm.entityFloat(machine, entityIndex, offset + 1)
+    result.z = vm.entityFloat(machine, entityIndex, offset + 2)
+  else
+    result.x = x
+    result.y = y
+    result.z = z
+  end if
+  return requireSynchronizedVector(result, entityIndex, fieldName)
+end function
+
+function syncQcVectorIntoAt(machine, entityIndex, offset, fieldName, target, x, y, z)
+  result = synchronizedVectorTarget(target, entityIndex, fieldName, x, y, z)
   if offset >= 0 then
     result.x = vm.entityFloat(machine, entityIndex, offset)
     result.y = vm.entityFloat(machine, entityIndex, offset + 1)
@@ -2326,7 +2405,7 @@ function ensureSynchronizedEdict(server, entityIndex)
   return item
 end function
 
-function syncQuakeCEdict(server, entityIndex)
+function syncQuakeCEdictAt(server, entityIndex, offsets)
   machine = server.machine
   runtime = machine.context.edicts
   item = ensureSynchronizedEdict(server, entityIndex)
@@ -2334,34 +2413,34 @@ function syncQuakeCEdict(server, entityIndex)
   if entityIndex < len(runtime.freeTimes) then item.freeTime = runtime.freeTimes[entityIndex] end if
   if item.free then return item end if
 
-  item.className = qcString(machine, entityIndex, "classname", "")
-  item.model = qcString(machine, entityIndex, "model", "")
-  item.modelIndex = native.trunc(qcFloat(machine, entityIndex, "modelindex", 0.0))
-  item.frame = native.trunc(qcFloat(machine, entityIndex, "frame", 0.0))
-  item.skin = native.trunc(qcFloat(machine, entityIndex, "skin", 0.0))
-  item.colormap = native.trunc(qcFloat(machine, entityIndex, "colormap", 0.0))
-  item.effects = native.trunc(qcFloat(machine, entityIndex, "effects", 0.0))
+  item.className = qcStringAt(machine, entityIndex, offsets[0], "")
+  item.model = qcStringAt(machine, entityIndex, offsets[1], "")
+  item.modelIndex = native.trunc(qcFloatAt(machine, entityIndex, offsets[2], 0.0))
+  item.frame = native.trunc(qcFloatAt(machine, entityIndex, offsets[3], 0.0))
+  item.skin = native.trunc(qcFloatAt(machine, entityIndex, offsets[4], 0.0))
+  item.colormap = native.trunc(qcFloatAt(machine, entityIndex, offsets[5], 0.0))
+  item.effects = native.trunc(qcFloatAt(machine, entityIndex, offsets[6], 0.0))
 
   // Copy the VM's raw vector words into the already-rooted nested structs.
   // After the first synchronization this hot path performs no Vec3 or Edict
   // allocation, matching the stable edict storage of WinQuake.
-  origin = syncQcVectorInto(
-    machine, entityIndex, "origin", item.origin, 0.0, 0.0, 0.0
+  origin = syncQcVectorIntoAt(
+    machine, entityIndex, offsets[7], "origin", item.origin, 0.0, 0.0, 0.0
   )
-  angles = syncQcVectorInto(
-    machine, entityIndex, "angles", item.angles, 0.0, 0.0, 0.0
+  angles = syncQcVectorIntoAt(
+    machine, entityIndex, offsets[8], "angles", item.angles, 0.0, 0.0, 0.0
   )
-  velocity = syncQcVectorInto(
-    machine, entityIndex, "velocity", item.velocity, 0.0, 0.0, 0.0
+  velocity = syncQcVectorIntoAt(
+    machine, entityIndex, offsets[9], "velocity", item.velocity, 0.0, 0.0, 0.0
   )
-  mins = syncQcVectorInto(
-    machine, entityIndex, "mins", item.mins, 0.0, 0.0, 0.0
+  mins = syncQcVectorIntoAt(
+    machine, entityIndex, offsets[10], "mins", item.mins, 0.0, 0.0, 0.0
   )
-  maxs = syncQcVectorInto(
-    machine, entityIndex, "maxs", item.maxs, 0.0, 0.0, 0.0
+  maxs = syncQcVectorIntoAt(
+    machine, entityIndex, offsets[11], "maxs", item.maxs, 0.0, 0.0, 0.0
   )
-  viewOffset = syncQcVectorInto(
-    machine, entityIndex, "view_ofs", item.viewOffset,
+  viewOffset = syncQcVectorIntoAt(
+    machine, entityIndex, offsets[12], "view_ofs", item.viewOffset,
     0.0, 0.0, c.DEFAULT_VIEWHEIGHT
   )
   item.origin = origin
@@ -2371,13 +2450,17 @@ function syncQuakeCEdict(server, entityIndex)
   item.maxs = maxs
   item.viewOffset = viewOffset
 
-  item.moveType = native.trunc(qcFloat(machine, entityIndex, "movetype", c.MOVETYPE_NONE))
-  item.solid = native.trunc(qcFloat(machine, entityIndex, "solid", c.SOLID_NOT))
-  item.flags = native.trunc(qcFloat(machine, entityIndex, "flags", 0.0))
-  item.health = qcFloat(machine, entityIndex, "health", 0.0)
+  item.moveType = native.trunc(qcFloatAt(machine, entityIndex, offsets[13], c.MOVETYPE_NONE))
+  item.solid = native.trunc(qcFloatAt(machine, entityIndex, offsets[14], c.SOLID_NOT))
+  item.flags = native.trunc(qcFloatAt(machine, entityIndex, offsets[15], 0.0))
+  item.health = qcFloatAt(machine, entityIndex, offsets[16], 0.0)
   item.onGround = (item.flags & c.FL_ONGROUND) != 0
-  item.groundEntity = qcWord(machine, entityIndex, "groundentity", -1)
+  item.groundEntity = qcWordAt(machine, entityIndex, offsets[17], -1)
   return item
+end function
+
+function syncQuakeCEdict(server, entityIndex)
+  return syncQuakeCEdictAt(server, entityIndex, synchronizedEdictOffsets(server.machine))
 end function
 
 function recomputeEdictCount(server)
@@ -2397,10 +2480,11 @@ end function
 function syncQuakeCEdictRange(server, count)
   resizeSynchronizedEdictArray(server, count)
   server.numEdicts = count
+  offsets = synchronizedEdictOffsets(server.machine)
 
   index = 0
   while index < count
-    synchronized = syncQuakeCEdict(server, index)
+    synchronized = syncQuakeCEdictAt(server, index, offsets)
     server.edicts[index] = synchronized
     index = index + 1
   end while

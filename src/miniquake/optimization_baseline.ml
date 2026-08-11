@@ -11,7 +11,8 @@ package miniquake.optimization_baseline
 import miniquake.native as native
 import std.fs as fs
 
-const STAGE_COUNT = 20
+const STAGE_COUNT = 31
+const OTHER_STAGE_INDEX = 19
 
 stageNames = [
   "filter",
@@ -34,7 +35,21 @@ stageNames = [
   "particles",
   "audio",
   "other",
+  "screen_world",
+  "screen_entities",
+  "screen_particles_draw",
+  "screen_viewmodel",
+  "screen_water",
+  "screen_mirror",
+  "screen_polyblend",
+  "screen_ui",
+  "screen_evidence",
+  "screen_swap",
+  "screen_title",
 ]
+
+stageLookupKeys = array(64, 0)
+stageLookupValues = array(64, -1)
 
 profileEnabled = false
 profileCapacity = 0
@@ -63,13 +78,23 @@ function normalizeStage(stage)
 end function
 
 function stageIndex(stage)
+  global stageLookupKeys, stageLookupValues
+  key = nativeRawValue(stage)
+  slot = ((key >> 3) ^ (key >> 11)) & 63
+  if stageLookupValues[slot] >= 0 and stageLookupKeys[slot] == key then return stageLookupValues[slot] end if
   target = normalizeStage(stage)
   index = 0
   while index < len(stageNames)
-    if stageNames[index] == target then return index end if
+    if stageNames[index] == target then
+      stageLookupKeys[slot] = key
+      stageLookupValues[slot] = index
+      return index
+    end if
     index = index + 1
   end while
-  return STAGE_COUNT - 1
+  stageLookupKeys[slot] = key
+  stageLookupValues[slot] = OTHER_STAGE_INDEX
+  return OTHER_STAGE_INDEX
 end function
 
 function configure(frameCapacity)
@@ -132,8 +157,8 @@ function completeFrame()
   if not profileEnabled or not profileFrameActive then return true end if
   now = native.winTicks()
   remainder = now - profileLastTick
-  profileStageTotals[STAGE_COUNT - 1] = profileStageTotals[STAGE_COUNT - 1] + remainder
-  profileStageHits[STAGE_COUNT - 1] = profileStageHits[STAGE_COUNT - 1] + 1
+  profileStageTotals[OTHER_STAGE_INDEX] = profileStageTotals[OTHER_STAGE_INDEX] + remainder
+  profileStageHits[OTHER_STAGE_INDEX] = profileStageHits[OTHER_STAGE_INDEX] + 1
   if profileFrameCount < profileCapacity then
     profileDurations[profileFrameCount] = now - profileFrameStart
     profileFrameCount = profileFrameCount + 1

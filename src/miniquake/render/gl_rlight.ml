@@ -223,3 +223,111 @@ function R_LightPoint(map, surfaces, lightStyleValues, rootNode, point)
   if result[0] < 0 then result[0] = 0 end if
   return result
 end function
+
+// Allocation-free production variant.  Alias lighting traces a vertical ray,
+// so x/y remain constant and only the z interval changes during BSP descent.
+// Keeping the recursive result scalar avoids one Vec3 plus one three-element
+// result array at every visited node for every visible alias entity.
+fastLightSpotZ = 0.0
+fastLightPlane = void
+fastLightHit = false
+
+function fastPlaneDistance(plane, x, y, z)
+  if plane.type == 0 then return x - plane.dist end if
+  if plane.type == 1 then return y - plane.dist end if
+  if plane.type == 2 then return z - plane.dist end if
+  return x * plane.normal.x + y * plane.normal.y + z * plane.normal.z - plane.dist
+end function
+
+function RecursiveLightPointValue(map, surfaces, lightStyleValues, nodeNumber, x, y, startZ, finishZ)
+  global fastLightSpotZ, fastLightPlane, fastLightHit
+  if nodeNumber < 0 or nodeNumber >= len(map.nodes) then return -1 end if
+  node = map.nodes[nodeNumber]
+  if node.planeIndex < 0 or node.planeIndex >= len(map.planes) then return -1 end if
+  plane = map.planes[node.planeIndex]
+  front = fastPlaneDistance(plane, x, y, startZ)
+  back = fastPlaneDistance(plane, x, y, finishZ)
+  side = 0
+  if front < 0.0 then side = 1 end if
+  sameSide = (back < 0.0 and side == 1) or (back >= 0.0 and side == 0)
+  if sameSide then
+    child = node.child0
+    if side == 1 then child = node.child1 end if
+    return RecursiveLightPointValue(map, surfaces, lightStyleValues, child, x, y, startZ, finishZ)
+  end if
+
+  fraction = front / (front - back)
+  middleZ = startZ + (finishZ - startZ) * fraction
+  frontChild = node.child0
+  if side == 1 then frontChild = node.child1 end if
+  result = RecursiveLightPointValue(map, surfaces, lightStyleValues, frontChild, x, y, startZ, middleZ)
+  if result >= 0 then return result end if
+
+  faceIndex = node.firstFace
+  lastFace = faceIndex + node.numFaces
+  while faceIndex < lastFace and faceIndex < len(surfaces)
+    if faceIndex >= 0 then
+      surface = surfaces[faceIndex]
+      if (surface.flags & c.SURF_DRAWTILED) == 0 and surface.faceIndex >= 0 and surface.faceIndex < len(map.faces) then
+        face = map.faces[surface.faceIndex]
+        if face.texInfo >= 0 and face.texInfo < len(map.texInfo) then
+          info = map.texInfo[face.texInfo]
+          coordinateS = native.trunc(x * info.s[0] + y * info.s[1] + middleZ * info.s[2] + info.s[3])
+          coordinateT = native.trunc(x * info.t[0] + y * info.t[1] + middleZ * info.t[2] + info.t[3])
+          if coordinateS >= surface.textureMins.x and coordinateT >= surface.textureMins.y then
+            ds = coordinateS - surface.textureMins.x
+            dt = coordinateT - surface.textureMins.y
+            if ds <= surface.extents.x and dt <= surface.extents.y then
+              fastLightSpotZ = middleZ
+              fastLightPlane = plane
+              fastLightHit = true
+              if surface.lightOffset < 0 or len(map.lighting) == 0 then return 0 end if
+              ds = native.trunc(ds) >> 4
+              dt = native.trunc(dt) >> 4
+              size = surface.lightWidth * surface.lightHeight
+              offset = surface.lightOffset + dt * surface.lightWidth + ds
+              total = 0
+              mapNumber = 0
+              while mapNumber < len(face.styles) and mapNumber < 4 and face.styles[mapNumber] != 255
+                style = face.styles[mapNumber]
+                scaleValue = 256
+                if style >= 0 and style < len(lightStyleValues) then scaleValue = lightStyleValues[style] end if
+                sampleOffset = offset + mapNumber * size
+                if sampleOffset < len(map.lighting) then total = total + map.lighting[sampleOffset] * scaleValue end if
+                mapNumber = mapNumber + 1
+              end while
+              return total >> 8
+            end if
+          end if
+        end if
+      end if
+    end if
+    faceIndex = faceIndex + 1
+  end while
+
+  backChild = node.child1
+  if side == 1 then backChild = node.child0 end if
+  return RecursiveLightPointValue(map, surfaces, lightStyleValues, backChild, x, y, middleZ, finishZ)
+end function
+
+function R_LightPointValue(map, surfaces, lightStyleValues, rootNode, point)
+  global fastLightHit, fastLightPlane
+  if len(map.lighting) == 0 then fastLightHit = false; fastLightPlane = void; return 255 end if
+  fastLightHit = false
+  fastLightPlane = void
+  result = RecursiveLightPointValue(map, surfaces, lightStyleValues, rootNode, point.x, point.y, point.z, point.z - 2048.0)
+  if result < 0 then return 0 end if
+  return result
+end function
+
+function FastLightHit()
+  return fastLightHit
+end function
+
+function FastLightSpotZ()
+  return fastLightSpotZ
+end function
+
+function FastLightPlane()
+  return fastLightPlane
+end function

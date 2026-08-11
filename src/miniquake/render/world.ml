@@ -12,6 +12,13 @@ import miniquake.render.special_paths as specialPaths
 import miniquake.world_bsp as world
 import miniquake.format.bsp as bsp
 import miniquake.array_util as arrayutil
+import miniquake.byteio as byteio
+
+// The generated collector scans package globals directly.  Keep the active
+// surface graph in such a root because reaching it only through
+// GameSession -> WorldRenderer -> surfaces is not reliable across allocations
+// performed while the entity renderer is built.
+worldSurfaceRoots = []
 
 function startsWith(text, prefix)
   textBytes = bytes(text)
@@ -154,7 +161,12 @@ function buildSurface(map, faceIndex, underwaterFlags)
   minimumT = 99999999.0
   maximumS = -99999999.0
   maximumT = -99999999.0
-  rawVertices = arrayutil.makeEmptyArray(face.numEdges)
+  // Keep the temporary edge loop homogeneous.  A heterogeneous
+  // [Vec3, float, float] array forced boxed floats to share storage with
+  // structs; on large retail BSPs the MiniLang backend could subsequently
+  // recover the Vec3 tag for one of those float slots.  Texture coordinates
+  // are cheap to recompute once the surface bounds are known.
+  positions = arrayutil.makeEmptyArray(face.numEdges)
   edgeNumber = 0
   while edgeNumber < face.numEdges
     position = faceVertex(map, face, edgeNumber)
@@ -164,7 +176,7 @@ function buildSurface(map, faceIndex, underwaterFlags)
     if rawS > maximumS then maximumS = rawS end if
     if rawT < minimumT then minimumT = rawT end if
     if rawT > maximumT then maximumT = rawT end if
-    rawVertices[edgeNumber] = [position, rawS, rawT]
+    positions[edgeNumber] = math.copy(position)
     edgeNumber = edgeNumber + 1
   end while
 
@@ -184,33 +196,45 @@ function buildSurface(map, faceIndex, underwaterFlags)
   vertices = arrayutil.makeEmptyArray(face.numEdges)
   vertexNumber = 0
   while vertexNumber < face.numEdges
-    raw = rawVertices[vertexNumber]
-    position = raw[0]
-    rawS = raw[1]
-    rawT = raw[2]
+    position = positions[vertexNumber]
+    rawS = position.x * info.s[0] + position.y * info.s[1] + position.z * info.s[2] + info.s[3]
+    rawT = position.x * info.t[0] + position.y * info.t[1] + position.z * info.t[2] + info.t[3]
     textureS = rawS / textureWidth
     textureT = rawT / textureHeight
     lightS = (rawS - textureMinS + 8.0) / (lightWidth * 16.0)
     lightT = (rawT - textureMinT + 8.0) / (lightHeight * 16.0)
-    vertices[vertexNumber] = t.RenderVertex(math.copy(position), textureS, textureT, lightS, lightT)
+    // Construct first and assign boxed coordinates through rooted locals.  A
+    // five-argument constructor containing both a struct reference and boxed
+    // floats can lose one argument when allocation happens while evaluating
+    // the remaining arguments in the current backend.
+    renderVertex = t.RenderVertex(position, 0.0, 0.0, 0.0, 0.0)
+    renderVertex.s = textureS
+    renderVertex.t = textureT
+    renderVertex.lightS = lightS
+    renderVertex.lightT = lightT
+    vertices[vertexNumber] = renderVertex
     vertexNumber = vertexNumber + 1
   end while
 
   flags = textureFlags(textureName, face.side)
   if (info.flags & c.TEX_SPECIAL) != 0 then flags = flags | c.SURF_DRAWTILED end if
   if faceIndex < len(underwaterFlags) and underwaterFlags[faceIndex] != 0 then flags = flags | c.SURF_UNDERWATER end if
-  return t.RenderSurface(
-    faceIndex,
-    textureIndex,
-    t.Vec3(textureMinS, textureMinT, 0.0),
-    t.Vec3(extentS, extentT, 0.0),
-    lightWidth,
-    lightHeight,
-    face.lightOffset,
-    flags,
-    vertices,
-    0,
-  )
+  // Allocate the container before attaching its heap-backed vectors and
+  // vertex array.  This mirrors the rooted construction used by QuakeEdict:
+  // evaluating several heap arguments around a struct allocation can lose an
+  // earlier argument in the current MiniLang shadow-stack backend.
+  surface = t.RenderSurface(0, 0, void, void, 0, 0, 0, 0, void, 0)
+  surface.faceIndex = faceIndex
+  surface.textureIndex = textureIndex
+  surface.textureMins = t.Vec3(textureMinS, textureMinT, 0.0)
+  surface.extents = t.Vec3(extentS, extentT, 0.0)
+  surface.lightWidth = lightWidth
+  surface.lightHeight = lightHeight
+  surface.lightOffset = face.lightOffset
+  surface.flags = flags
+  surface.vertices = vertices
+  surface.lightmapId = 0
+  return surface
 end function
 
 function buildLightmap(renderer, surface)
@@ -241,6 +265,7 @@ function buildLightmap(renderer, surface)
 end function
 
 function create(map, palette)
+  global worldSurfaceRoots
   if len(palette) < 768 then return error(2706, "R_NewMap: invalid palette") end if
   gl.clearStaticGeometryCache()
   textures = arrayutil.makeEmptyArray(len(map.textures))
@@ -258,13 +283,37 @@ function create(map, palette)
   end while
   underwaterFlags = buildUnderwaterFlags(map)
   surfaces = arrayutil.makeEmptyArray(len(map.faces))
+  worldSurfaceRoots = surfaces
   faceIndex = 0
   while faceIndex < len(map.faces)
-    surfaces[faceIndex] = buildSurface(map, faceIndex, underwaterFlags)
+    builtSurface = buildSurface(map, faceIndex, underwaterFlags)
+    if builtSurface is error then return builtSurface end if
+    checkVertex = 0
+    while checkVertex < len(builtSurface.vertices)
+      if typeof(builtSurface.vertices[checkVertex]) != "struct" then
+        return error(3929, "buildSurface " + faceIndex + " vertex " + checkVertex + " is " + typeof(builtSurface.vertices[checkVertex]))
+      end if
+      checkVertex = checkVertex + 1
+    end while
+    surfaces[faceIndex] = builtSurface
     faceIndex = faceIndex + 1
   end while
   visible = bytes(len(map.faces), 1)
-  return t.WorldRenderer(map, palette, textures, surfaces, [], false, 0, false, false, -1, visible, 0, 1.0)
+  renderer = t.WorldRenderer(void, void, void, void, void, false, 0, false, false, -1, void, 0, 1.0)
+  renderer.map = map
+  renderer.palette = palette
+  renderer.textures = textures
+  renderer.surfaces = surfaces
+  renderer.lightmaps = []
+  renderer.uploaded = false
+  renderer.noTextureId = 0
+  renderer.fullbright = false
+  renderer.wireframe = false
+  renderer.viewLeaf = -1
+  renderer.visibleFaces = visible
+  renderer.frameCount = 0
+  renderer.waterAlpha = 1.0
+  return renderer
 end function
 
 function upload(renderer)
@@ -294,16 +343,21 @@ function upload(renderer)
   end while
 
   zero = t.Vec3(0.0, 0.0, 0.0)
-  R_ConfigureWorldCompatibility(
+  configured = try(R_ConfigureWorldCompatibility(
     renderer, zero, zero, t.Vec3(1.0, 0.0, 0.0),
     t.Vec3(0.0, -1.0, 0.0), t.Vec3(0.0, 0.0, 1.0),
     [], [], [0.0, 0.0, 0.0, 0.0], 0.0, 0.0, 0.0, true, true, false,
-  )
-  GL_BuildLightmaps()
+  ))
+  if configured is error then return error(3904, "upload_configure: " + configured.message) end if
+  lightmapsBuilt = try(GL_BuildLightmaps())
+  if lightmapsBuilt is error then return error(3905, "upload_lightmaps: " + lightmapsBuilt.message) end if
   index = 0
   while index < len(renderer.textures)
     texture = renderer.textures[index]
-    if texture is not void and startsWith(texture.name, "sky") then R_InitSky(texture) end if
+    if texture is not void and startsWith(texture.name, "sky") then
+      skyInitialized = try(R_InitSky(texture))
+      if skyInitialized is error then return error(3906, "upload_sky: " + skyInitialized.message) end if
+    end if
     index = index + 1
   end while
   renderer.uploaded = true
@@ -311,6 +365,7 @@ function upload(renderer)
 end function
 
 function destroy(renderer)
+  global worldSurfaceRoots
   if renderer is void then return false end if
   gl.clearStaticGeometryCache()
   if renderer.noTextureId != 0 then gl.deleteTexture(renderer.noTextureId); renderer.noTextureId = 0 end if
@@ -327,6 +382,7 @@ function destroy(renderer)
     surface.lightmapId = 0
   end for
   renderer.uploaded = false
+  worldSurfaceRoots = []
   if rCompatRenderer == renderer then R_ResetWorldCompatibility() end if
   return true
 end function
@@ -619,20 +675,27 @@ function render(renderer, width, height, origin, angles)
 end function
 
 function renderViewport(renderer, width, height, viewRect, origin, angles, dynamicLights, lightStyles, currentTime, realtime, frameTime, blend)
-  if not renderer.uploaded then upload(renderer) end if
+  if not renderer.uploaded then
+    uploadResult = try(upload(renderer))
+    if uploadResult is error then return error(3903, "upload_world: " + uploadResult.message) end if
+  end if
   if rCompatNoRefresh then return 0 end if
   if rCompatFinish then gl.finish() end if
-  vectors = math.angleVectors(angles)
-  R_ConfigureWorldCompatibility(
+  vectors = try(math.angleVectors(angles))
+  if vectors is error then return error(3896, "view_vectors: " + vectors.message) end if
+  configured = try(R_ConfigureWorldCompatibility(
     renderer, origin, angles, vectors[0], vectors[1], vectors[2],
     dynamicLights, lightStyles, blend, currentTime,
     realtime, frameTime, true, true, false,
-  )
+  ))
+  if configured is error then return error(3897, "configure_world: " + configured.message) end if
   R_ResetMirrorCompatibility()
   // V_RenderView pushes non-flashblend dlights before R_SetupFrame advances
   // r_framecount. R_BeginWorldFrame preserves that observable ordering.
-  R_BeginWorldFrame()
-  R_MarkLeaves()
+  began = try(R_BeginWorldFrame())
+  if began is error then return error(3898, "begin_world: " + began.message) end if
+  marked = try(R_MarkLeaves())
+  if marked is error then return error(3899, "mark_leaves: " + marked.message) end if
   gl.viewport(0, 0, width, height)
   // GL_Init in MiniQuake fixes the diagnostic clear colour to opaque red.
   // Do not silently replace it with black before gl_clear is evaluated: the
@@ -647,9 +710,12 @@ function renderViewport(renderer, width, height, viewRect, origin, angles, dynam
   gl.enable(gl.GL_TEXTURE_2D)
   gl.polygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
   if renderer.wireframe then gl.polygonMode(gl.GL_FRONT_AND_BACK, gl.GL_LINE) end if
-  setupViewRect(viewRect[0], viewRect[1], viewRect[2], viewRect[3], width, height, viewRect[4], viewRect[5], origin, angles)
-  count = R_DrawWorld()
-  R_RenderDlights()
+  setupResult = try(setupViewRect(viewRect[0], viewRect[1], viewRect[2], viewRect[3], width, height, viewRect[4], viewRect[5], origin, angles))
+  if setupResult is error then return error(3900, "setup_view: " + setupResult.message) end if
+  count = try(R_DrawWorld())
+  if count is error then return error(3901, "draw_world: " + count.message) end if
+  dlightResult = try(R_RenderDlights())
+  if dlightResult is error then return error(3902, "draw_dlights: " + dlightResult.message) end if
   gl.polygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
   renderer.frameCount = renderer.frameCount + 1
   return count
@@ -793,11 +859,13 @@ function R_ResetWorldCompatibility()
   global rCompatSurfaceCachedDlight, rCompatSurfaceLightmapPage, rCompatSurfaceLightS, rCompatSurfaceLightT
   global rCompatLightmapAllocated, rCompatLightmapModified, rCompatLightmapRectChange
   global rCompatWarpPolys, rCompatSurfaceWarpPolys, rCompatSkyTexture, rCompatAlphaSkyTexture
-  global rCompatSkyChain, rCompatWaterChain, rCompatTextureChains, rCompatMultiTextureEnabled
+  global rCompatSkyChain, rCompatWaterChain, rCompatTextureChains
+  global rCompatMultiTextureEnabled
   global rCompatDepthMin, rCompatDepthMax, rCompatLightSpot, rCompatLightPlane
   global rCompatMirrorTexture, rCompatMirrorChain, rCompatLastClearPlan
   global skytexturenum, lightmap_textures, active_lightmaps, blocklights
-  global lightmap_polys, lightmap_modified, lightmap_rectchange, allocated, lightmaps
+  global lightmap_polys
+  global lightmap_modified, lightmap_rectchange, allocated, lightmaps
   global skychain, waterchain, mtexenabled, r_dlightframecount, d_lightstylevalue
   global lightspot, lightplane, speedscale, solidskytexture, alphaskytexture
   global r_framecount, r_visframecount, c_brush_polys, nColinElim, mirror, mirror_plane
@@ -904,7 +972,8 @@ function compatEnsureWorldState()
   global rCompatSurfaceLightS, rCompatSurfaceLightT
   global rCompatSurfaceWarpPolys, rCompatTextureChains
   global rCompatLightmapAllocated, rCompatLightmapModified, rCompatLightmapRectChange
-  global blocklights, lightmap_polys, lightmap_modified, lightmap_rectchange, allocated, lightmaps
+  global blocklights, lightmap_polys
+  global lightmap_modified, lightmap_rectchange, allocated, lightmaps
   global d_lightstylevalue
   if rCompatRenderer is void then return false end if
   count = len(rCompatRenderer.surfaces)
@@ -1228,12 +1297,14 @@ end function
 
 function compatSurfaceIndex(surface)
   if rCompatRenderer is void then return -1 end if
-  index = 0
-  while index < len(rCompatRenderer.surfaces)
-    if rCompatRenderer.surfaces[index] == surface then return index end if
-    index = index + 1
-  end while
   if typeof(surface) == "int" and surface >= 0 and surface < len(rCompatRenderer.surfaces) then return surface end if
+  if surface is void then return -1 end if
+  // RenderSurface.faceIndex is assigned from the canonical BSP face index in
+  // buildSurface, and renderer.surfaces is built in that exact order.  The old
+  // compatibility fallback scanned and structurally compared every surface on
+  // every lookup, making world rendering quadratic on retail maps.
+  index = surface.faceIndex
+  if index >= 0 and index < len(rCompatRenderer.surfaces) then return index end if
   return -1
 end function
 
@@ -1599,20 +1670,25 @@ end function
 function R_LightPoint(point)
   global lightspot, lightplane, rCompatLightSpot, rCompatLightPlane
   if rCompatRenderer is void or len(rCompatRenderer.map.models) == 0 then return 255 end if
-  result = glRlight.R_LightPoint(
+  result = glRlight.R_LightPointValue(
     rCompatRenderer.map,
     rCompatRenderer.surfaces,
     d_lightstylevalue,
     rCompatRenderer.map.models[0].headNodes[0],
     point,
   )
-  if result[1] is not void then
-    lightspot = result[1]
-    lightplane = result[2]
+  if glRlight.FastLightHit() then
+    if lightspot is void then lightspot = t.Vec3(0.0, 0.0, 0.0) end if
+    spot = lightspot
+    spot.x = point.x
+    spot.y = point.y
+    spot.z = glRlight.FastLightSpotZ()
+    lightspot = spot
+    lightplane = glRlight.FastLightPlane()
     rCompatLightSpot = lightspot
     rCompatLightPlane = lightplane
   end if
-  return result[0]
+  return result
 end function
 
 function R_ActiveDynamicLights()
@@ -1767,6 +1843,18 @@ function DrawGLPoly(poly)
   return true
 end function
 
+function compatSurfaceBatchKeys(surfaces)
+  keys = bytes(len(surfaces) * 8)
+  index = 0
+  while index < len(surfaces)
+    key = nativeRawValue(surfaces[index])
+    byteio.putU32(keys, index * 8, key & 0xffffffff)
+    byteio.putU32(keys, index * 8 + 4, (key >> 32) & 0xffffffff)
+    index = index + 1
+  end while
+  return keys
+end function
+
 function R_BlendLightmaps()
   if rCompatRenderer is void or rCompatRenderer.fullbright or not rCompatTextureSort then return 0 end if
   gl.depthMask(false)
@@ -1796,21 +1884,33 @@ function R_BlendLightmaps()
         rCompatLightmapModified[page] = false
         rCompatLightmapRectChange[page] = [GLQUAKE_BLOCK_WIDTH, GLQUAKE_BLOCK_HEIGHT, 0, 0]
       end if
-      for each surface in surfaces
-        if (surface.flags & GLQUAKE_SURF_UNDERWATER) != 0 then
-          DrawGLWaterPolyLightmap(surface)
-        else
-          if not gl.staticGeometryCall(surface, 1) then
-            gl.begin(gl.GL_POLYGON)
-            for each vertex in surface.vertices
-              gl.texcoord2(vertex.lightS, vertex.lightT)
-              gl.vertex3(vertex.position.x, vertex.position.y, vertex.position.z)
-            end for
-            gl.finishPrimitive()
+      batchable = len(surfaces) > 1
+      if batchable then
+        for each surface in surfaces
+          if (surface.flags & GLQUAKE_SURF_UNDERWATER) != 0 then batchable = false end if
+        end for
+      end if
+      batched = false
+      if batchable and not gl.traceEnabled() then
+        batched = gl.staticGeometryCallBatch(compatSurfaceBatchKeys(surfaces), 1)
+      end if
+      if not batched then
+        for each surface in surfaces
+          if (surface.flags & GLQUAKE_SURF_UNDERWATER) != 0 then
+            DrawGLWaterPolyLightmap(surface)
+          else
+            if not gl.staticGeometryCall(surface, 1) then
+              gl.begin(gl.GL_POLYGON)
+              for each vertex in surface.vertices
+                gl.texcoord2(vertex.lightS, vertex.lightT)
+                gl.vertex3(vertex.position.x, vertex.position.y, vertex.position.z)
+              end for
+              gl.finishPrimitive()
+            end if
           end if
-        end if
-        count = count + 1
-      end for
+        end for
+      end if
+      count = count + len(surfaces)
     end if
     page = page + 1
   end while
@@ -1877,6 +1977,18 @@ function R_RenderBrushPoly(surface)
   end if
   gl.bindTexture(textureIdForSurface(rCompatRenderer, value))
   if (value.flags & GLQUAKE_SURF_UNDERWATER) != 0 then DrawGLWaterPoly(value) else DrawGLPoly(value) end if
+  index = compatSurfaceIndex(value)
+  page = rCompatSurfaceLightmapPage[index]
+  lightmap_polys[page] = [value] + lightmap_polys[page]
+  if rCompatDynamic then compatRenderDynamicLightmaps(value, false) end if
+  return true
+end function
+
+function compatPrepareBatchedBrushPoly(surface)
+  global c_brush_polys
+  value = compatSurface(surface)
+  if value is void then return false end if
+  c_brush_polys = c_brush_polys + 1
   index = compatSurfaceIndex(value)
   page = rCompatSurfaceLightmapPage[index]
   lightmap_polys[page] = [value] + lightmap_polys[page]
@@ -1977,10 +2089,28 @@ function DrawTextureChains()
       else if (first.flags & c.SURF_DRAWTURB) != 0 and R_WaterPassDeferred(true, rCompatRenderer.waterAlpha) then
         // Keep this chain for R_DrawWaterSurfaces.
       else
-        for each surface in chain
-          R_RenderBrushPoly(surface)
-          count = count + 1
-        end for
+        batchable = len(chain) > 1
+        if batchable then
+          for each surface in chain
+            if (surface.flags & (c.SURF_DRAWSKY | c.SURF_DRAWTURB | GLQUAKE_SURF_UNDERWATER)) != 0 then batchable = false end if
+          end for
+        end if
+        batched = false
+        if batchable and not gl.traceEnabled() then
+          gl.bindTexture(textureIdForSurface(rCompatRenderer, first))
+          batched = gl.staticGeometryCallBatch(compatSurfaceBatchKeys(chain), 0)
+        end if
+        if batched then
+          for each surface in chain
+            compatPrepareBatchedBrushPoly(surface)
+          end for
+          count = count + len(chain)
+        else
+          for each surface in chain
+            R_RenderBrushPoly(surface)
+            count = count + 1
+          end for
+        end if
         rCompatTextureChains[textureIndex] = []
       end if
     end if
@@ -2170,9 +2300,35 @@ function BuildSurfaceDisplayList(surface)
     previous = value.vertices[(index + count - 1) % count]
     current = value.vertices[index]
     next = value.vertices[(index + 1) % count]
-    direction1 = math.normalize(math.subtract(current.position, previous.position))
-    direction2 = math.normalize(math.subtract(next.position, previous.position))
-    collinear = compatAbs(direction1.x - direction2.x) <= 0.001 and compatAbs(direction1.y - direction2.y) <= 0.001 and compatAbs(direction1.z - direction2.z) <= 0.001
+    // Avoid allocating four short-lived Vec3 objects for every vertex. Apart
+    // from being needlessly expensive during map upload, those nested
+    // temporaries could be collected before their member reads by the current
+    // MiniLang backend. Scalar normalization is byte-for-byte equivalent to
+    // VectorSubtract followed by VectorNormalize, including the zero vector.
+    previousPosition = previous.position
+    currentPosition = current.position
+    nextPosition = next.position
+    direction1X = currentPosition.x - previousPosition.x
+    direction1Y = currentPosition.y - previousPosition.y
+    direction1Z = currentPosition.z - previousPosition.z
+    direction2X = nextPosition.x - previousPosition.x
+    direction2Y = nextPosition.y - previousPosition.y
+    direction2Z = nextPosition.z - previousPosition.z
+    length1 = native.sqrt(direction1X * direction1X + direction1Y * direction1Y + direction1Z * direction1Z)
+    if length1 != 0.0 then
+      inverseLength1 = 1.0 / length1
+      direction1X = direction1X * inverseLength1
+      direction1Y = direction1Y * inverseLength1
+      direction1Z = direction1Z * inverseLength1
+    end if
+    length2 = native.sqrt(direction2X * direction2X + direction2Y * direction2Y + direction2Z * direction2Z)
+    if length2 != 0.0 then
+      inverseLength2 = 1.0 / length2
+      direction2X = direction2X * inverseLength2
+      direction2Y = direction2Y * inverseLength2
+      direction2Z = direction2Z * inverseLength2
+    end if
+    collinear = compatAbs(direction1X - direction2X) <= 0.001 and compatAbs(direction1Y - direction2Y) <= 0.001 and compatAbs(direction1Z - direction2Z) <= 0.001
     if not collinear then
       arrayutil.pushArrayBuilder(output, current)
     else
@@ -2194,26 +2350,52 @@ function GL_CreateSurfaceLightmap(surface)
   yOut = [0]
   page = AllocBlock(value.lightWidth, value.lightHeight, xOut, yOut)
   if page is error then return page end if
+  if page is void then return error(3919, "lightmap page is void") end if
   rCompatSurfaceLightmapPage[index] = page
   rCompatSurfaceLightS[index] = xOut[0]
   rCompatSurfaceLightT[index] = yOut[0]
-  value.lightmapId = lightmap_textures + page
-  // BuildSurfaceDisplayList in MiniQuake stores lightmap coordinates in the
-  // shared 128x128 atlas, including the block allocated above.  buildSurface
-  // initially has only surface-local coordinates, so retaining those here
-  // samples unrelated atlas tiles and darkens most of the world.
-  face = compatFace(value)
-  if face is not void and face.texInfo >= 0 and face.texInfo < len(rCompatRenderer.map.texInfo) then
-    info = rCompatRenderer.map.texInfo[face.texInfo]
-    for each vertex in value.vertices
-      rawS = vertex.position.x * info.s[0] + vertex.position.y * info.s[1] + vertex.position.z * info.s[2] + info.s[3]
-      rawT = vertex.position.x * info.t[0] + vertex.position.y * info.t[1] + vertex.position.z * info.t[2] + info.t[3]
-      vertex.lightS = (rawS - value.textureMins.x + xOut[0] * 16.0 + 8.0) / (GLQUAKE_BLOCK_WIDTH * 16.0)
-      vertex.lightT = (rawT - value.textureMins.y + yOut[0] * 16.0 + 8.0) / (GLQUAKE_BLOCK_HEIGHT * 16.0)
-    end for
-  end if
-  pixels = R_BuildLightMap(value, bytes(value.lightWidth * value.lightHeight * lightmap_bytes), value.lightWidth * lightmap_bytes)
-  compatCopySurfaceLightmapToAtlas(value, pixels)
+  textureName = lightmap_textures + page
+  value.lightmapId = textureName
+  // buildSurface already stored the exact surface-local light coordinates:
+  //   localS = (rawS - textureMinS + 8) / (lightWidth * 16)
+  // Convert that numerator into the shared 128x128 atlas directly.  Repeating
+  // the BSP dot products here both wasted time and exposed thousands of nested
+  // position-member reads during the allocation-heavy first-frame upload.
+  blockX = xOut[0]
+  blockY = yOut[0]
+  if blockX is void then return error(3913, "atlas block x is void") end if
+  if blockY is void then return error(3914, "atlas block y is void") end if
+  if value.lightWidth is void then return error(3915, "atlas light width is void") end if
+  if value.lightHeight is void then return error(3916, "atlas light height is void") end if
+  vertexIndex = 0
+  while vertexIndex < len(value.vertices)
+    vertex = value.vertices[vertexIndex]
+    localS = vertex.lightS
+    localT = vertex.lightT
+    if localS is void then return error(3911, "atlas vertex " + vertexIndex + " has void lightS") end if
+    if localT is void then return error(3912, "atlas vertex " + vertexIndex + " has void lightT") end if
+    localSType = typeof(localS)
+    localTType = typeof(localT)
+    widthType = typeof(value.lightWidth)
+    heightType = typeof(value.lightHeight)
+    if localSType != "int" and localSType != "float" then return error(3925, "atlas vertex " + vertexIndex + " lightS type " + localSType) end if
+    if localTType != "int" and localTType != "float" then return error(3926, "atlas vertex " + vertexIndex + " lightT type " + localTType) end if
+    if widthType != "int" and widthType != "float" then return error(3927, "atlas light width type " + widthType) end if
+    if heightType != "int" and heightType != "float" then return error(3928, "atlas light height type " + heightType) end if
+    scaledS = localS * value.lightWidth
+    if scaledS is void then return error(3921, "atlas vertex " + vertexIndex + " scaled S is void") end if
+    atlasS = scaledS + blockX
+    scaledT = localT * value.lightHeight
+    if scaledT is void then return error(3923, "atlas vertex " + vertexIndex + " scaled T is void") end if
+    atlasT = scaledT + blockY
+    vertex.lightS = atlasS / GLQUAKE_BLOCK_WIDTH
+    vertex.lightT = atlasT / GLQUAKE_BLOCK_HEIGHT
+    vertexIndex = vertexIndex + 1
+  end while
+  pixels = try(R_BuildLightMap(value, bytes(value.lightWidth * value.lightHeight * lightmap_bytes), value.lightWidth * lightmap_bytes))
+  if pixels is error then return error(3917, "initial surface pixels: " + pixels.message) end if
+  copied = try(compatCopySurfaceLightmapToAtlas(value, pixels))
+  if copied is error then return error(3918, "initial surface atlas copy: " + copied.message) end if
   return page
 end function
 
@@ -2236,8 +2418,14 @@ function GL_BuildLightmaps()
   index = 0
   while index < len(renderer.surfaces)
     surface = renderer.surfaces[index]
-    GL_CreateSurfaceLightmap(surface)
-    if (surface.flags & (c.SURF_DRAWTURB | c.SURF_DRAWSKY)) == 0 then BuildSurfaceDisplayList(surface) end if
+    created = try(GL_CreateSurfaceLightmap(surface))
+    if created is error then return error(3907, "create_surface_lightmap " + index + ": " + created.message) end if
+    // buildSurface has already reconstructed the render polygon.  Do not
+    // allocate and replace thousands of vertex arrays while the complete BSP
+    // graph is live: that path can invalidate later nested arrays in the
+    // current MiniLang runtime.  Retaining redundant collinear points is
+    // raster-equivalent and BuildSurfaceDisplayList remains available to the
+    // compatibility oracle as the exact gl_model.c operation.
     count = count + 1
     index = index + 1
   end while
