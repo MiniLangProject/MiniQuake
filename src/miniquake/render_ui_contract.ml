@@ -22,6 +22,11 @@ function statusbarXOffset(width, gameType)
   return native.trunc((width - STATUSBAR_WIDTH) / 2)
 end function
 
+function statusbarScaledXOffset(width, gameType, scale)
+  if gameType == c.GAME_DEATHMATCH then return 0 end if
+  return native.trunc((width - STATUSBAR_WIDTH * scale) / 2)
+end function
+
 function overlayOrder(dialog, loading, intermission, gameInput)
   if dialog then return ["set2d", "tileclear", "dialog", "hud", "fade", "notify-string"] end if
   if loading then return ["set2d", "tileclear", "loading", "hud"] end if
@@ -62,6 +67,13 @@ function consoleScale(width, height)
   return virtualCanvasScale(width, height)
 end function
 
+// The status bar, inventory strip and their 8-pixel glyphs are authored for
+// the same 320-pixel Quake canvas as the menus.  Keeping one integral scale
+// avoids a tiny HUD at high resolutions and prevents filtered indexed art.
+function statusbarScale(width, height)
+  return virtualCanvasScale(width, height)
+end function
+
 function consoleLogicalWidth(width, height)
   return native.trunc(width / consoleScale(width, height))
 end function
@@ -99,4 +111,8 @@ function statusbarLines(viewSize, intermission)
   if viewSize >= 120.0 then return 0 end if
   if viewSize >= 110.0 then return STATUSBAR_HEIGHT end if
   return STATUSBAR_HEIGHT + INVENTORY_HEIGHT
+end function
+
+function statusbarPhysicalLines(width, height, viewSize, intermission)
+  return native.trunc(statusbarLines(viewSize, intermission) * statusbarScale(width, height))
 end function

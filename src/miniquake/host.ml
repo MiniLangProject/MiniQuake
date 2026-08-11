@@ -18,6 +18,7 @@ import miniquake.player_move as movement
 import miniquake.input as input
 import miniquake.keys as keys
 import miniquake.render.world as worldRenderer
+import miniquake.render.gl11 as gl
 import miniquake.render.entities as entityRenderer
 import miniquake.render.particles as particleRenderer
 import miniquake.client_render_handoff as renderHandoff
@@ -3087,6 +3088,10 @@ function _Host_Frame(session, elapsedSeconds)
       glFinish != 0.0,
       noRefresh,
     )
+    if screen.SCR_ConsumeTransitionClear() then
+      gl.clearColor(0.0, 0.0, 0.0, 1.0)
+      gl.clear(gl.GL_COLOR_BUFFER_BIT)
+    end if
     renderEntities = []
     visibleEntities = []
     temporaryModels = []
@@ -4071,6 +4076,16 @@ function captureUiResolutionScene(session, outputPrefix, expectedWidth, expected
   return result
 end function
 
+function warmUiResolutionScene(session)
+  index = 0
+  while index < 3
+    warmed = try(frame(session, 0.02))
+    if warmed is error then return warmed end if
+    index = index + 1
+  end while
+  return true
+end function
+
 function runUiResolutionMatrix(baseDirectory, gameDirectory, outputPrefix)
   session = create([
     "-basedir", baseDirectory,
@@ -4143,8 +4158,10 @@ function runUiResolutionMatrix(baseDirectory, gameDirectory, outputPrefix)
     warmed = try(frame(session, 0.02))
     if warmed is error then shutdown(session); return warmed end if
     console.Con_Print(session.console, "UI LEGIBILITY " + label + "\n", session.timing.realtime)
+    screen.SCR_CenterPrint(session.console, "GAMEPLAY OVERLAY\nREADABLE AT " + label, session.client.time)
     hudResult = try(captureUiResolutionScene(session, prefix + "-hud", width, height))
     if hudResult is error then shutdown(session); return hudResult end if
+    screen.SCR_CenterPrint(session.console, "", session.client.time)
 
     setMenuActive(session, true)
     menu.M_Menu_Main_f(session.menu)
@@ -4168,12 +4185,28 @@ function runUiResolutionMatrix(baseDirectory, gameDirectory, outputPrefix)
 
     setConsoleActive(session, false)
     screen.SCR_DifferentialSetConsole(0.0, 0.0)
+    // V_CalcIntermissionRefdef deliberately uses the entity origin without
+    // adding viewheight because a real svc_intermission first moves the
+    // player to info_intermission.  This matrix changes only the UI mode, so
+    // provide the already valid eye position and angles while it captures
+    // the synthetic endscreen scenes; otherwise the camera sits in the BSP
+    // floor and exposes the diagnostic red clear colour at some aspect ratios.
+    savedPlayerOrigin = math.copy(session.player.origin)
+    savedPlayerAngles = math.copy(session.player.renderAngles)
+    session.player.origin = math.copy(session.view.origin)
+    session.player.renderAngles = math.copy(session.view.angles)
     screen.SCR_SetIntermission(1, "", session.console, session.client.time)
+    intermissionWarm = try(warmUiResolutionScene(session))
+    if intermissionWarm is error then shutdown(session); return intermissionWarm end if
     intermissionResult = try(captureUiResolutionScene(session, prefix + "-intermission", width, height))
     if intermissionResult is error then shutdown(session); return intermissionResult end if
     screen.SCR_SetIntermission(2, "THE DIMENSION OF THE DOOMED\nIS COMPLETE", session.console, session.client.time)
+    finaleWarm = try(warmUiResolutionScene(session))
+    if finaleWarm is error then shutdown(session); return finaleWarm end if
     finaleResult = try(captureUiResolutionScene(session, prefix + "-finale", width, height))
     if finaleResult is error then shutdown(session); return finaleResult end if
+    session.player.origin = savedPlayerOrigin
+    session.player.renderAngles = savedPlayerAngles
     screen.SCR_SetIntermission(0, "", session.console, session.client.time)
 
     if tested > 0 then summary = summary + "," end if

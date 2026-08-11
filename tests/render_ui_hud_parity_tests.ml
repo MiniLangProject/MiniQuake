@@ -27,6 +27,7 @@ function bp047Coop320()
 end function
 function bp047Coop640()
   bp047Equal(ui.statusbarXOffset(640, c.GAME_COOP), 160, "coop 640")
+  bp047Equal(ui.statusbarScaledXOffset(1920, c.GAME_COOP, 2.0), 640, "scaled coop 1920")
   return true
 end function
 function bp047Coop800()
@@ -59,6 +60,9 @@ function bp047Finale()
   bp047Equal(ui.consoleScale(2048, 1152), 2.0, "high-DPI console scale")
   bp047Equal(ui.consoleLogicalWidth(2048, 1152), 1024, "high-DPI console width")
   bp047Equal(ui.consoleLogicalHeight(2048, 1152, 576), 288, "high-DPI console height")
+  bp047Equal(ui.statusbarScale(1920, 1080), 2.0, "high-DPI HUD scale")
+  bp047Equal(ui.statusbarPhysicalLines(1920, 1080, 100.0, 0), 96, "scaled inventory and status lines")
+  bp047Equal(ui.statusbarPhysicalLines(1920, 1080, 110.0, 0), 48, "scaled status lines")
   return true
 end function
 function bp047NormalCount()

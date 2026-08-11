@@ -14,6 +14,8 @@ const STAT_MINUS = 10
 sb_updates = 0
 sb_showscores = false
 sb_lines = 48
+sbarLogicalLines = 48
+sbarScale = 1.0
 sbarInitialized = false
 sbarHipnotic = false
 sbarRogue = false
@@ -250,8 +252,7 @@ end function
 function render(state, fontTexture, player, width, height, viewSize, clientState, teamplay)
   if state is void or player is void or fontTexture == 0 then return false end if
   if picture(state, "sbar") is void then return false end if
-  lines = 48
-  if viewSize >= 120.0 then lines = 0 else if viewSize >= 110.0 then lines = 24 end if
+  lines = renderUiContract.statusbarPhysicalLines(width, height, viewSize, 0)
   Sbar_Configure(state, fontTexture, player, clientState, width, height, lines, teamplay)
   return Sbar_Draw()
 end function
@@ -375,7 +376,7 @@ end function
 // Production functions remain the code under test; only their globals/assets
 // are arranged without requiring retail gfx.wad or an OpenGL context.
 function Sbar_DifferentialReset(pictures)
-  global sb_updates, sb_showscores, sb_lines, sbarInitialized, sbarHipnotic, sbarRogue
+  global sb_updates, sb_showscores, sb_lines, sbarLogicalLines, sbarScale, sbarInitialized, sbarHipnotic, sbarRogue
   global sbarState, sbarFontTexture, sbarPlayer, sbarClient, sbarWidth, sbarHeight
   global sbarGameType, sbarTeamplay, sbarPictures, sbarPictureNames, sbarInjectedPictures
   global fragsort, scoreboardtext, scoreboardtop, scoreboardbottom, scoreboardlines
@@ -384,6 +385,8 @@ function Sbar_DifferentialReset(pictures)
   sb_updates = 0
   sb_showscores = false
   sb_lines = 48
+  sbarLogicalLines = 48
+  sbarScale = 1.0
   sbarInitialized = false
   sbarHipnotic = false
   sbarRogue = false
@@ -436,7 +439,7 @@ function Sbar_DifferentialClearTrace()
 end function
 
 function Sbar_Configure(state, fontTexture, player, clientState, width, height, lines, teamplay)
-  global sbarState, sbarFontTexture, sbarPlayer, sbarClient, sbarWidth, sbarHeight, sb_lines, sbarGameType, sbarTeamplay
+  global sbarState, sbarFontTexture, sbarPlayer, sbarClient, sbarWidth, sbarHeight, sb_lines, sbarLogicalLines, sbarScale, sbarGameType, sbarTeamplay
   sbarState = state
   sbarFontTexture = fontTexture
   sbarPlayer = player
@@ -444,6 +447,8 @@ function Sbar_Configure(state, fontTexture, player, clientState, width, height, 
   sbarWidth = width
   sbarHeight = height
   sb_lines = lines
+  sbarScale = renderUiContract.statusbarScale(width, height)
+  sbarLogicalLines = native.trunc(lines / sbarScale)
   sbarTeamplay = teamplay
   sbarGameType = c.GAME_COOP
   if clientState is not void then sbarGameType = clientState.gameType end if
@@ -451,7 +456,7 @@ function Sbar_Configure(state, fontTexture, player, clientState, width, height, 
 end function
 
 function sbarXOffset()
-  return renderUiContract.statusbarXOffset(sbarWidth, sbarGameType)
+  return renderUiContract.statusbarScaledXOffset(sbarWidth, sbarGameType, sbarScale)
 end function
 
 function traceSbar(command)
@@ -494,32 +499,36 @@ end function
 
 function Sbar_DrawPic(x, y, pic)
   if pic is void then return false end if
-  drawX = x + sbarXOffset()
-  drawY = y + sbarHeight - SBAR_HEIGHT
+  drawX = sbarXOffset() + x * sbarScale
+  drawY = sbarHeight + (y - SBAR_HEIGHT) * sbarScale
   traceSbar(["pic", pic.name, drawX, drawY])
-  return draw.Draw_Pic(drawX, drawY, pic)
+  if sbarScale <= 1.0 then return draw.Draw_Pic(drawX, drawY, pic) end if
+  return draw.Draw_PicSizedNearest(pic, drawX, drawY, pic.width * sbarScale, pic.height * sbarScale, 255)
 end function
 
 function Sbar_DrawTransPic(x, y, pic)
   if pic is void then return false end if
-  drawX = x + sbarXOffset()
-  drawY = y + sbarHeight - SBAR_HEIGHT
+  drawX = sbarXOffset() + x * sbarScale
+  drawY = sbarHeight + (y - SBAR_HEIGHT) * sbarScale
   traceSbar(["transpic", pic.name, drawX, drawY])
-  return draw.Draw_TransPic(drawX, drawY, pic)
+  if sbarScale <= 1.0 then return draw.Draw_TransPic(drawX, drawY, pic) end if
+  return draw.Draw_PicSizedNearest(pic, drawX, drawY, pic.width * sbarScale, pic.height * sbarScale, 255)
 end function
 
 function Sbar_DrawCharacter(x, y, num)
-  drawX = x + sbarXOffset() + 4
-  drawY = y + sbarHeight - SBAR_HEIGHT
+  drawX = sbarXOffset() + (x + 4) * sbarScale
+  drawY = sbarHeight + (y - SBAR_HEIGHT) * sbarScale
   traceSbar(["char", num, drawX, drawY])
-  return draw.Draw_Character(drawX, drawY, num)
+  if sbarScale <= 1.0 then return draw.Draw_Character(drawX, drawY, num) end if
+  return draw.character(sbarFontTexture, drawX, drawY, num, sbarScale, 255)
 end function
 
 function Sbar_DrawString(x, y, text)
-  drawX = x + sbarXOffset()
-  drawY = y + sbarHeight - SBAR_HEIGHT
+  drawX = sbarXOffset() + x * sbarScale
+  drawY = sbarHeight + (y - SBAR_HEIGHT) * sbarScale
   traceSbar(["string", text, drawX, drawY])
-  return draw.Draw_String(drawX, drawY, text)
+  if sbarScale <= 1.0 then return draw.Draw_String(drawX, drawY, text) end if
+  return draw.string(sbarFontTexture, drawX, drawY, text, sbarScale, 255)
 end function
 
 // The C routine fills a caller buffer and returns its length.  MiniLang
@@ -793,10 +802,10 @@ function Sbar_DrawFrags()
   while index < count
     clientIndex = fragsort[index]
     score = scores[clientIndex]
-    fillX = sbarXOffset() + x * 8 + 10
-    fillY = sbarHeight - SBAR_HEIGHT - 23
-    sbarDirectFill(fillX, fillY, 28, 4, Sbar_ColorForMap(score.colors & 0xf0))
-    sbarDirectFill(fillX, fillY + 4, 28, 3, Sbar_ColorForMap((score.colors & 15) << 4))
+    fillX = sbarXOffset() + (x * 8 + 10) * sbarScale
+    fillY = sbarHeight + (-SBAR_HEIGHT - 23) * sbarScale
+    sbarDirectFill(fillX, fillY, 28 * sbarScale, 4 * sbarScale, Sbar_ColorForMap(score.colors & 0xf0))
+    sbarDirectFill(fillX, fillY + 4 * sbarScale, 28 * sbarScale, 3 * sbarScale, Sbar_ColorForMap((score.colors & 15) << 4))
     text = fragGlyphs(score.frags)
     Sbar_DrawCharacter((x + 1) * 8, -24, text[0])
     Sbar_DrawCharacter((x + 2) * 8, -24, text[1])
@@ -814,10 +823,10 @@ function Sbar_DrawFace()
   items = sbarItems()
   if sbarRogue and sbarClient is not void and sbarClient.maxClients != 1 and sbarTeamplay > 3.0 and sbarTeamplay < 7.0 and sbarClient.viewEntity > 0 and sbarClient.viewEntity <= len(sbarClient.scores) then
     score = sbarClient.scores[sbarClient.viewEntity - 1]
-    xOffset = sbarXOffset() + 113
+    xOffset = sbarXOffset() + 113 * sbarScale
     Sbar_DrawPic(112, 0, loadedSbarPicture("r_teambord"))
-    sbarDirectFill(xOffset, sbarHeight - SBAR_HEIGHT + 3, 22, 9, Sbar_ColorForMap(score.colors & 0xf0))
-    sbarDirectFill(xOffset, sbarHeight - SBAR_HEIGHT + 12, 22, 9, Sbar_ColorForMap((score.colors & 15) << 4))
+    sbarDirectFill(xOffset, sbarHeight + (-SBAR_HEIGHT + 3) * sbarScale, 22 * sbarScale, 9 * sbarScale, Sbar_ColorForMap(score.colors & 0xf0))
+    sbarDirectFill(xOffset, sbarHeight + (-SBAR_HEIGHT + 12) * sbarScale, 22 * sbarScale, 9 * sbarScale, Sbar_ColorForMap((score.colors & 15) << 4))
     text = fragGlyphs(score.frags)
     top = Sbar_ColorForMap(score.colors & 0xf0)
     if top == 8 then
@@ -871,7 +880,7 @@ function Sbar_Draw()
   if sb_lines != 0 and sbarWidth > 320 then
     sbarDirectTileClear(0, sbarHeight - sb_lines, sbarWidth, sb_lines)
   end if
-  if sb_lines > 24 then
+  if sbarLogicalLines > 24 then
     Sbar_DrawInventory()
     if sbarClient is not void and sbarClient.maxClients != 1 then Sbar_DrawFrags() end if
   end if
@@ -949,6 +958,45 @@ function sbarOverlayPic(x, y, pic, transform, transparent)
   )
 end function
 
+function sbarCanvasPic(x, y, pic, transform)
+  if pic is void then return false end if
+  if transform[2] <= 1.0 then
+    return sbarDirectPic(
+      native.trunc(transform[0] + x),
+      native.trunc(transform[1] + y),
+      pic,
+    )
+  end if
+  return sbarOverlayPic(x, y, pic, transform, false)
+end function
+
+function sbarCanvasCharacter(x, y, num, transform)
+  drawX = transform[0] + x * transform[2]
+  drawY = transform[1] + y * transform[2]
+  if transform[2] <= 1.0 then return sbarDirectCharacter(native.trunc(drawX), native.trunc(drawY), num) end if
+  traceSbar(["char", num, drawX, drawY])
+  return draw.character(sbarFontTexture, drawX, drawY, num, transform[2], 255)
+end function
+
+function sbarCanvasString(x, y, text, transform)
+  drawX = transform[0] + x * transform[2]
+  drawY = transform[1] + y * transform[2]
+  if transform[2] <= 1.0 then return sbarDirectString(native.trunc(drawX), native.trunc(drawY), text) end if
+  traceSbar(["string", text, drawX, drawY])
+  return draw.string(sbarFontTexture, drawX, drawY, text, transform[2], 255)
+end function
+
+function sbarCanvasFill(x, y, width, height, color, transform)
+  drawX = transform[0] + x * transform[2]
+  drawY = transform[1] + y * transform[2]
+  drawWidth = width * transform[2]
+  drawHeight = height * transform[2]
+  if transform[2] <= 1.0 then
+    return sbarDirectFill(native.trunc(drawX), native.trunc(drawY), native.trunc(drawWidth), native.trunc(drawHeight), color)
+  end if
+  return sbarDirectFill(drawX, drawY, drawWidth, drawHeight, color)
+end function
+
 function Sbar_IntermissionNumberScaled(x, y, num, digits, color, transform)
   converted = Sbar_itoa(num)
   text = bytes(converted[0])
@@ -971,23 +1019,24 @@ function Sbar_DeathmatchOverlay()
   if sbarClient is void then return false end if
   sbarCopyEverything = true
   sbarFullUpdate = 0
+  transform = menu.layout(sbarWidth, sbarHeight)
   ranking = try(draw.Draw_CachePic("gfx/ranking.lmp"))
-  if ranking is not error then sbarDirectPic(native.trunc((sbarWidth - ranking.width) / 2), 8, ranking) end if
+  if ranking is not error then sbarCanvasPic((320.0 - ranking.width) * 0.5, 8, ranking, transform) end if
   scores = sbarClient.scores
   Sbar_SortFrags(scores)
-  x = 80 + native.trunc((sbarWidth - 320) / 2)
+  x = 80
   y = 40
   index = 0
   while index < scoreboardlines
     clientIndex = fragsort[index]
     score = scores[clientIndex]
-    sbarDirectFill(x, y, 40, 4, Sbar_ColorForMap(score.colors & 0xf0))
-    sbarDirectFill(x, y + 4, 40, 4, Sbar_ColorForMap((score.colors & 15) << 4))
+    sbarCanvasFill(x, y, 40, 4, Sbar_ColorForMap(score.colors & 0xf0), transform)
+    sbarCanvasFill(x, y + 4, 40, 4, Sbar_ColorForMap((score.colors & 15) << 4), transform)
     text = fragGlyphs(score.frags)
-    sbarDirectCharacter(x + 8, y, text[0]); sbarDirectCharacter(x + 16, y, text[1]); sbarDirectCharacter(x + 24, y, text[2])
-    if clientIndex == sbarClient.viewEntity - 1 then sbarDirectCharacter(x - 8, y, 12) end if
-    sbarDirectString(x + 64, y, score.name)
-    traceSbar(["score", clientIndex, score.frags, score.name, x, y])
+    sbarCanvasCharacter(x + 8, y, text[0], transform); sbarCanvasCharacter(x + 16, y, text[1], transform); sbarCanvasCharacter(x + 24, y, text[2], transform)
+    if clientIndex == sbarClient.viewEntity - 1 then sbarCanvasCharacter(x - 8, y, 12, transform) end if
+    sbarCanvasString(x + 64, y, score.name, transform)
+    traceSbar(["score", clientIndex, score.frags, score.name, transform[0] + x * transform[2], transform[1] + y * transform[2]])
     y = y + 10
     index = index + 1
   end while
@@ -996,12 +1045,12 @@ end function
 
 function Sbar_MiniDeathmatchOverlay()
   global sbarCopyEverything, sbarFullUpdate
-  if sbarClient is void or sbarWidth < 512 or sb_lines == 0 then return false end if
+  if sbarClient is void or sbarWidth < 512 * sbarScale or sb_lines == 0 then return false end if
   sbarCopyEverything = true
   sbarFullUpdate = 0
   scores = sbarClient.scores
   Sbar_SortFrags(scores)
-  numLines = native.trunc(sb_lines / 8)
+  numLines = native.trunc(sbarLogicalLines / 8)
   if numLines < 3 then return false end if
   current = 0
   while current < scoreboardlines and fragsort[current] != sbarClient.viewEntity - 1
@@ -1011,19 +1060,20 @@ function Sbar_MiniDeathmatchOverlay()
   if current == scoreboardlines then start = 0 end if
   if start > scoreboardlines - numLines then start = scoreboardlines - numLines end if
   if start < 0 then start = 0 end if
+  transform = [0.0, 0.0, sbarScale]
   x = 324
-  y = sbarHeight - sb_lines
+  y = (sbarHeight - sb_lines) / sbarScale
   index = start
-  while index < scoreboardlines and y < sbarHeight - 8
+  while index < scoreboardlines and y < sbarHeight / sbarScale - 8
     clientIndex = fragsort[index]
     score = scores[clientIndex]
-    sbarDirectFill(x, y + 1, 40, 3, Sbar_ColorForMap(score.colors & 0xf0))
-    sbarDirectFill(x, y + 4, 40, 4, Sbar_ColorForMap((score.colors & 15) << 4))
+    sbarCanvasFill(x, y + 1, 40, 3, Sbar_ColorForMap(score.colors & 0xf0), transform)
+    sbarCanvasFill(x, y + 4, 40, 4, Sbar_ColorForMap((score.colors & 15) << 4), transform)
     text = fragGlyphs(score.frags)
-    sbarDirectCharacter(x + 8, y, text[0]); sbarDirectCharacter(x + 16, y, text[1]); sbarDirectCharacter(x + 24, y, text[2])
-    if clientIndex == sbarClient.viewEntity - 1 then sbarDirectCharacter(x, y, 16); sbarDirectCharacter(x + 32, y, 17) end if
-    sbarDirectString(x + 48, y, score.name)
-    traceSbar(["miniscore", clientIndex, score.frags, score.name, x, y])
+    sbarCanvasCharacter(x + 8, y, text[0], transform); sbarCanvasCharacter(x + 16, y, text[1], transform); sbarCanvasCharacter(x + 24, y, text[2], transform)
+    if clientIndex == sbarClient.viewEntity - 1 then sbarCanvasCharacter(x, y, 16, transform); sbarCanvasCharacter(x + 32, y, 17, transform) end if
+    sbarCanvasString(x + 48, y, score.name, transform)
+    traceSbar(["miniscore", clientIndex, score.frags, score.name, x * sbarScale, y * sbarScale])
     y = y + 8
     index = index + 1
   end while

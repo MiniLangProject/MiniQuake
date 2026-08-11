@@ -50,6 +50,7 @@ scr_notifystring = ""
 scr_drawdialog = false
 scr_turtle_count = 0
 scr_intermission = 0
+scr_transition_clear_frames = 0
 screenFilesystem = void
 screenRegistry = void
 screenClient = void
@@ -155,11 +156,27 @@ end function
 function drawCenter(consoleState, width, height)
   if consoleState is void or consoleState.textureId == 0 or consoleState.centerText == "" then return false end if
   data = bytes(consoleState.centerText)
+  transform = menu.layout(width, height)
+  if transform[2] <= 1.0 then
+    lineWidth = len(data) * 8.0
+    x = (width - lineWidth) * 0.5
+    if x < 8.0 then x = 8.0 end if
+    y = height * 0.35
+    draw.string(consoleState.textureId, x, y, consoleState.centerText, 1.0, 255)
+    return true
+  end if
   lineWidth = len(data) * 8.0
-  x = (width - lineWidth) * 0.5
+  x = (320.0 - lineWidth) * 0.5
   if x < 8.0 then x = 8.0 end if
-  y = height * 0.35
-  draw.string(consoleState.textureId, x, y, consoleState.centerText, 1.0, 255)
+  y = 70.0
+  draw.string(
+    consoleState.textureId,
+    transform[0] + x * transform[2],
+    transform[1] + y * transform[2],
+    consoleState.centerText,
+    transform[2],
+    255,
+  )
   return true
 end function
 
@@ -281,7 +298,7 @@ end function
 
 function SCR_CalcRefdef(width, height, registry, intermission)
   global scr_fullupdate, sb_lines, scr_vrect, oldscreensize, oldfov, screenRegistry
-  global oldRefdefWidth, oldRefdefHeight, oldRefdefIntermission
+  global oldRefdefWidth, oldRefdefHeight, oldRefdefIntermission, scr_transition_clear_frames
   if registry is not void then screenRegistry = registry end if
   viewSize = screenCvar("viewsize", 100.0)
   fov = screenCvar("fov", 90.0)
@@ -293,6 +310,7 @@ function SCR_CalcRefdef(width, height, registry, intermission)
   oldRefdefIntermission = intermission
   if refdefChanged then
     scr_fullupdate = 0
+    scr_transition_clear_frames = 3
     statusbar.Sbar_Changed()
   end if
   if viewSize < 30.0 then viewSize = 30.0; if screenRegistry is not void then cvar.setValue(screenRegistry, "viewsize", viewSize) end if end if
@@ -302,10 +320,7 @@ function SCR_CalcRefdef(width, height, registry, intermission)
 
   size = viewSize
   if intermission != 0 then size = 120.0 end if
-  if size >= 120.0 then sb_lines = 0
-  else if size >= 110.0 then sb_lines = 24
-  else sb_lines = 48
-  end if
+  sb_lines = renderUiContract.statusbarPhysicalLines(width, height, size, intermission)
 
   full = false
   if viewSize >= 100.0 then full = true; size = 100.0 else size = viewSize end if
@@ -560,9 +575,32 @@ function SCR_EndLoadingPlaque(consoleState)
 end function
 
 function SCR_DrawNotifyString(width, height)
-  commands = CenterStringTrace(scr_notifystring, width, height, 1, 9999)
+  transform = menu.layout(width, height)
+  if transform[2] <= 1.0 then
+    commands = CenterStringTrace(scr_notifystring, width, height, 1, 9999)
+    for each command in commands
+      draw.Draw_Character(command[0], command[1], command[2])
+    end for
+    return len(commands)
+  end if
+  commands = CenterStringTrace(scr_notifystring, 320, 200, 1, 9999)
   for each command in commands
-    draw.Draw_Character(command[0], command[1], command[2])
+    if screenConsole is void or screenConsole.textureId == 0 then
+      draw.Draw_Character(
+        transform[0] + command[0] * transform[2],
+        transform[1] + command[1] * transform[2],
+        command[2],
+      )
+    else
+      draw.character(
+        screenConsole.textureId,
+        transform[0] + command[0] * transform[2],
+        transform[1] + command[1] * transform[2],
+        command[2],
+        transform[2],
+        255,
+      )
+    end if
   end for
   return len(commands)
 end function
@@ -620,10 +658,25 @@ function SCR_TileClear(width, height)
 end function
 
 function SCR_SetIntermission(mode, text, consoleState, currentTime)
-  global scr_intermission
+  global scr_intermission, scr_fullupdate, scr_transition_clear_frames
+  if mode != scr_intermission then
+    scr_fullupdate = 0
+    scr_transition_clear_frames = 3
+    statusbar.Sbar_Changed()
+  end if
   scr_intermission = mode
   if text != "" then SCR_CenterPrint(void, text, currentTime) end if
   return scr_intermission
+end function
+
+// Refdef and overlay transitions can expose pixels that belonged to a smaller
+// viewport or an older status bar on another swap-chain page. Clear each
+// buffered page once; steady-state frames retain GLQuake's gl_clear behavior.
+function SCR_ConsumeTransitionClear()
+  global scr_transition_clear_frames
+  if scr_transition_clear_frames <= 0 then return false end if
+  scr_transition_clear_frames = scr_transition_clear_frames - 1
+  return true
 end function
 
 function inline SCR_IntermissionMode()

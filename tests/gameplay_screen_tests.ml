@@ -195,6 +195,12 @@ function testOverlayNormal()
   equal(len(order), 11, "normal stages")
   equal(order[0], "set2d", "first stage")
   equal(order[10], "menu", "last stage")
+  screen.SCR_SetIntermission(1, "", void, 0.0)
+  yes(screen.SCR_ConsumeTransitionClear(), "intermission clears first buffered page")
+  yes(screen.SCR_ConsumeTransitionClear(), "intermission clears second buffered page")
+  yes(screen.SCR_ConsumeTransitionClear(), "intermission clears third buffered page")
+  no(screen.SCR_ConsumeTransitionClear(), "steady intermission does not keep clearing")
+  screen.SCR_SetIntermission(0, "", void, 0.0)
   return true
 end function
 
