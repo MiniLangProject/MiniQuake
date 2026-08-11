@@ -35,7 +35,10 @@ end function
 // horizontally. Modern high-DPI modes need enlargement, but fractional or
 // unbounded stretching makes the indexed font and qpics visibly uneven. Use a
 // conservative integral scale: original size around 640x480, 2x around 1080p,
-// and at most 4x on very large displays.
+// and at most 4x on very large displays. Some valid widescreen modes (for
+// example 1176x664) fall just below the legacy 1.5x ratio threshold despite
+// having ample room for a 2x 320x200 canvas; promote those explicitly so the
+// original 8-pixel menu font does not become needlessly tiny.
 function virtualCanvasScale(width, height)
   safeWidth = width
   safeHeight = height
@@ -46,6 +49,7 @@ function virtualCanvasScale(width, height)
   ratio = ratioX
   if ratioY < ratio then ratio = ratioY end if
   value = native.trunc(ratio + 0.5)
+  if value == 1 and safeWidth >= 960 and safeHeight >= 600 then value = 2 end if
   if value < 1 then value = 1 end if
   if value > 4 then value = 4 end if
   return value * 1.0

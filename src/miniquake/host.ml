@@ -4046,6 +4046,154 @@ function runEndscreenEvidence(baseDirectory, gameDirectory, width, height, outpu
   return true
 end function
 
+function captureUiResolutionScene(session, outputPrefix, expectedWidth, expectedHeight)
+  renderEvidence.reset()
+  targetFrame = session.timing.frameCount + 1
+  configured = try(renderEvidence.configure(outputPrefix, targetFrame))
+  if configured is error then return configured end if
+  captured = try(frame(session, 0.02))
+  if captured is error then renderEvidence.reset(); return captured end if
+  result = renderEvidence.lastResult()
+  if not renderEvidence.captured() or result is void then
+    renderEvidence.reset()
+    return error(3835, "UI resolution matrix framebuffer was not captured")
+  end if
+  if result[3] != expectedWidth or result[4] != expectedHeight then
+    renderEvidence.reset()
+    return error(
+      3836,
+      "UI resolution matrix captured " + result[3] + "x" + result[4] +
+      " instead of " + expectedWidth + "x" + expectedHeight,
+    )
+  end if
+  if result[8] <= 0 then renderEvidence.reset(); return error(3837, "UI resolution matrix captured an empty framebuffer") end if
+  renderEvidence.reset()
+  return result
+end function
+
+function runUiResolutionMatrix(baseDirectory, gameDirectory, outputPrefix)
+  session = create([
+    "-basedir", baseDirectory,
+    "-game", gameDirectory,
+    "-window",
+    "-nosound",
+    "-nolan",
+    "-nomouse",
+    "-nojoy",
+    "-noinput",
+    "-width", "640",
+    "-height", "480",
+    "-maxframes", "1",
+    "+vid_wait", "0",
+    "+gl_finish", "0",
+    "+map", "e1m1",
+  ])
+  initialized = try(initialize(session))
+  if initialized is error then shutdown(session); return initialized end if
+  if not session.server.active or session.renderer is void or not session.windowCreated then
+    shutdown(session)
+    return error(3838, "UI resolution matrix requires a rendered e1m1 session")
+  end if
+
+  videoState = glvid.VID_State()
+  modeCount = glvid.VID_MenuModeCount()
+  if modeCount < 1 then shutdown(session); return error(3839, "UI resolution matrix found no offered display modes") end if
+  seenWidths = []
+  seenHeights = []
+  tested = 0
+  captures = 0
+  summary = "{\"schema\":\"MiniQuakeUIResolutionMatrix/1\",\"modes\":["
+  cvar.setValue(session.cvars, "scr_printspeed", 1000.0)
+
+  modeIndex = 1
+  while modeIndex <= modeCount and modeIndex < len(videoState.modes)
+    mode = videoState.modes[modeIndex]
+    duplicate = false
+    seenIndex = 0
+    while seenIndex < len(seenWidths)
+      if seenWidths[seenIndex] == mode.width and seenHeights[seenIndex] == mode.height then duplicate = true end if
+      seenIndex = seenIndex + 1
+    end while
+    if duplicate then modeIndex = modeIndex + 1; continue end if
+
+    applied = try(glvid.VID_ApplyResolution(modeIndex))
+    if applied is error then shutdown(session); renderEvidence.reset(); return applied end if
+    win.poll()
+    width = win.width()
+    height = win.height()
+    if width != mode.width or height != mode.height then
+      shutdown(session)
+      renderEvidence.reset()
+      return error(3840, "UI resolution matrix resize produced " + width + "x" + height + " for " + mode.width + "x" + mode.height)
+    end if
+    seenWidths = seenWidths + [width]
+    seenHeights = seenHeights + [height]
+    label = "" + width + "x" + height
+    prefix = outputPrefix + "-" + label
+    print "MiniQuake UI resolution matrix " + label
+
+    // The first frame after a Win32 client resize consumes vid.recalc_refdef.
+    // Render it before the HUD evidence frame so the matrix judges the stable
+    // viewport rather than the intentionally cleared resize backbuffer.
+    screen.SCR_SetIntermission(0, "", session.console, session.client.time)
+    setMenuActive(session, false)
+    setConsoleActive(session, false)
+    screen.SCR_DifferentialSetConsole(0.0, 0.0)
+    screen.SCR_CenterPrint(session.console, "", session.client.time)
+    warmed = try(frame(session, 0.02))
+    if warmed is error then shutdown(session); return warmed end if
+    console.Con_Print(session.console, "UI LEGIBILITY " + label + "\n", session.timing.realtime)
+    hudResult = try(captureUiResolutionScene(session, prefix + "-hud", width, height))
+    if hudResult is error then shutdown(session); return hudResult end if
+
+    setMenuActive(session, true)
+    menu.M_Menu_Main_f(session.menu)
+    mainResult = try(captureUiResolutionScene(session, prefix + "-menu-main", width, height))
+    if mainResult is error then shutdown(session); return mainResult end if
+    menu.M_Menu_Options_f(session.menu)
+    optionsResult = try(captureUiResolutionScene(session, prefix + "-menu-options", width, height))
+    if optionsResult is error then shutdown(session); return optionsResult end if
+    menu.M_Menu_Video_f(session.menu)
+    videoResult = try(captureUiResolutionScene(session, prefix + "-menu-video", width, height))
+    if videoResult is error then shutdown(session); return videoResult end if
+    menu.M_Menu_Help_f(session.menu)
+    helpResult = try(captureUiResolutionScene(session, prefix + "-menu-help", width, height))
+    if helpResult is error then shutdown(session); return helpResult end if
+
+    setMenuActive(session, false)
+    setConsoleActive(session, true)
+    screen.SCR_DifferentialSetConsole(height / 2.0, height / 2.0)
+    consoleResult = try(captureUiResolutionScene(session, prefix + "-console", width, height))
+    if consoleResult is error then shutdown(session); return consoleResult end if
+
+    setConsoleActive(session, false)
+    screen.SCR_DifferentialSetConsole(0.0, 0.0)
+    screen.SCR_SetIntermission(1, "", session.console, session.client.time)
+    intermissionResult = try(captureUiResolutionScene(session, prefix + "-intermission", width, height))
+    if intermissionResult is error then shutdown(session); return intermissionResult end if
+    screen.SCR_SetIntermission(2, "THE DIMENSION OF THE DOOMED\nIS COMPLETE", session.console, session.client.time)
+    finaleResult = try(captureUiResolutionScene(session, prefix + "-finale", width, height))
+    if finaleResult is error then shutdown(session); return finaleResult end if
+    screen.SCR_SetIntermission(0, "", session.console, session.client.time)
+
+    if tested > 0 then summary = summary + "," end if
+    summary = summary + "{\"mode\":" + modeIndex + ",\"width\":" + width + ",\"height\":" + height + ",\"scenes\":8,\"ok\":true}"
+    tested = tested + 1
+    captures = captures + 8
+    modeIndex = modeIndex + 1
+  end while
+
+  summary = summary + "],\"tested_resolutions\":" + tested + ",\"captures\":" + captures + ",\"result\":\"PASS\"}\n"
+  written = try(fs.writeAllText(outputPrefix + "-summary.json", summary))
+  shutdown(session)
+  renderEvidence.reset()
+  if written is error then return written end if
+  print "MiniQuake UI resolution matrix: PASS"
+  print "  resolutions=" + tested + " captures=" + captures
+  print "  summary=" + outputPrefix + "-summary.json"
+  return true
+end function
+
 function runOpt001AHandlePlateau(baseDirectory, gameDirectory, mapName, warmupFrames, windowFrames, windowCount, port, outputPrefix)
   if windowCount < 3 then windowCount = 3 end if
   session = create(opt001aSessionArguments(baseDirectory, gameDirectory, mapName, "listen", port))

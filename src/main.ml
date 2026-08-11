@@ -82,6 +82,8 @@ function printUsage()
   print "                             capture deterministic TGA after UI and before swap"
   print "  --endscreen-evidence BASE PREFIX [-game DIR] [-width N] [-height N]"
   print "                             capture the real e1m1 QuakeC intermission overlay"
+  print "  --ui-resolution-matrix BASE PREFIX [-game DIR]"
+  print "                             capture every UI surface at every offered resolution"
   print "  --render-demo-evidence BASE DEMO FRAME PREFIX [-game DIR]"
   print "                             capture a deterministic demo frame for external comparison"
   print "  --original-interop-server BASE MAP PORT FRAMES PREFIX [-game DIR]"
@@ -396,6 +398,12 @@ function runEndscreenEvidenceCommand(arguments)
   return 0
 end function
 
+function runUiResolutionMatrixCommand(arguments)
+  result = try(host.runUiResolutionMatrix(arguments[1], gameOption(arguments), arguments[2]))
+  if result is error then print "MiniQuake UI resolution matrix: " + result.message; return 3 end if
+  return 0
+end function
+
 function runRenderDemoEvidenceCommand(arguments)
   frames = boundedInteger(arguments[3], 256, 1, 1000000)
   return host.runRenderEvidence([
@@ -611,6 +619,7 @@ function main(args)
   if command == "--render-smoke" and len(args) >= 3 then return renderSmoke(args) end if
   if command == "--render-evidence" and len(args) >= 5 then return runRenderEvidenceCommand(args) end if
   if command == "--endscreen-evidence" and len(args) >= 3 then return runEndscreenEvidenceCommand(args) end if
+  if command == "--ui-resolution-matrix" and len(args) >= 3 then return runUiResolutionMatrixCommand(args) end if
   if command == "--render-demo-evidence" and len(args) >= 5 then return runRenderDemoEvidenceCommand(args) end if
   if command == "--original-interop-server" and len(args) >= 6 then return runOriginalInteropServerCommand(args) end if
   if command == "--original-interop-client" and len(args) >= 6 then return runOriginalInteropClientCommand(args) end if
