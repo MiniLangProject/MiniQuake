@@ -236,7 +236,7 @@ function main(args)
   state.currentMode = 1
   menuTrace = video.VID_MenuDraw()
   print "{\"function\":\"VID_MenuDraw\",\"case\":\"two-modes\"," +
-    "\"prints\":7,\"wmodes\":" + (len(menuTrace) - 6) + "}"
+    "\"prints\":8,\"wmodes\":" + (len(menuTrace) - 7) + "}"
   video.VID_MenuKey(keys.K_ESCAPE)
   print "{\"function\":\"VID_MenuKey\",\"case\":\"escape\",\"options\":1}"
   return 0

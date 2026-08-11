@@ -379,6 +379,7 @@ MQ_DLLIMPORT BOOL MQ_WINAPI ShowWindow(HWND window, mq_i32 command);
 MQ_DLLIMPORT BOOL MQ_WINAPI UpdateWindow(HWND window);
 MQ_DLLIMPORT BOOL MQ_WINAPI SetWindowTextW(HWND window, LPCWSTR title);
 MQ_DLLIMPORT BOOL MQ_WINAPI SetWindowPos(HWND window, HWND insert_after, mq_i32 x, mq_i32 y, mq_i32 width, mq_i32 height, UINT flags);
+MQ_DLLIMPORT LONG_PTR MQ_WINAPI SetWindowLongPtrW(HWND window, mq_i32 index, LONG_PTR value);
 MQ_DLLIMPORT mq_i32 MQ_WINAPI GetSystemMetrics(mq_i32 index);
 MQ_DLLIMPORT BOOL MQ_WINAPI AdjustWindowRectEx(MQ_RECT *rect, DWORD style, BOOL has_menu, DWORD ex_style);
 MQ_DLLIMPORT BOOL MQ_WINAPI GetClientRect(HWND window, MQ_RECT *rect);
@@ -1299,6 +1300,7 @@ MQ_EXPORT void mq_gl_static_geometry_clear(void) {
 #define MQ_WS_POPUP 0x80000000u
 #define MQ_WS_VISIBLE 0x10000000u
 #define MQ_WS_EX_APPWINDOW 0x00040000u
+#define MQ_GWL_STYLE (-16)
 #define MQ_CW_USEDEFAULT ((mq_i32)0x80000000u)
 #define MQ_SW_SHOW 5
 #define MQ_SW_SHOWNORMAL 1
@@ -1417,6 +1419,7 @@ static mq_i32 mq_minimized = 0;
 static mq_i32 mq_window_x_value = 0;
 static mq_i32 mq_window_y_value = 0;
 static mq_i32 mq_display_fullscreen = 0;
+static mq_i32 mq_window_style_fullscreen = 0;
 static mq_i32 mq_display_use_current = 0;
 static mq_i32 mq_display_changed = 0;
 static mq_i32 mq_display_suspended = 0;
@@ -1935,13 +1938,18 @@ MQ_EXPORT mq_i32 mq_win_configure_display_mode(
     mq_i32 fullscreen,
     mq_i32 use_current
 ) {
+    MQ_DEVMODEW requested_mode;
+    mq_prepare_display_mode(&requested_mode, width, height, bpp, frequency);
+    /* Validate first.  Restoring the active mode before a failed test would
+     * leave a fullscreen window stranded on the desktop display mode. */
+    if (fullscreen && !use_current &&
+        ChangeDisplaySettingsW(&requested_mode, MQ_CDS_TEST | MQ_CDS_FULLSCREEN) != MQ_DISP_CHANGE_SUCCESSFUL) {
+        return 0;
+    }
     mq_restore_requested_display_mode();
     mq_display_fullscreen = fullscreen != 0;
     mq_display_use_current = use_current != 0;
-    mq_prepare_display_mode(&mq_requested_display_mode, width, height, bpp, frequency);
-    if (mq_display_fullscreen && !mq_display_use_current) {
-        return ChangeDisplaySettingsW(&mq_requested_display_mode, MQ_CDS_TEST | MQ_CDS_FULLSCREEN) == MQ_DISP_CHANGE_SUCCESSFUL;
-    }
+    mq_requested_display_mode = requested_mode;
     return 1;
 }
 
@@ -2231,6 +2239,7 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
     mq_running = 1;
     mq_active_app = 1;
     mq_minimized = 0;
+    mq_window_style_fullscreen = fullscreen != 0;
     return mq_window;
 }
 
@@ -2267,6 +2276,7 @@ MQ_EXPORT void mq_win_destroy(void) {
     }
     mq_restore_requested_display_mode();
     mq_display_fullscreen = 0;
+    mq_window_style_fullscreen = 0;
     mq_display_use_current = 0;
     mq_running = 0;
     mq_active_app = 0;
@@ -2364,21 +2374,29 @@ MQ_EXPORT mq_i32 mq_win_client_height(void) {
     return rectangle.bottom - rectangle.top;
 }
 
-/* Resize the existing window without replacing its HDC/WGL context.  Runtime
- * video changes can therefore preserve every uploaded Quake texture, display
- * list and VBO.  The window style is fixed at startup; this function only
- * changes the resolution within the active windowed/fullscreen mode. */
+/* Resize or restyle the existing window without replacing its HDC/WGL
+ * context.  Runtime video changes therefore preserve every uploaded Quake
+ * texture, display list and VBO while switching between windowed and
+ * fullscreen presentation. */
 MQ_EXPORT mq_i32 mq_win_resize_client(mq_i32 width, mq_i32 height) {
     MQ_RECT rectangle;
     DWORD style;
     DWORD ex_style = MQ_WS_EX_APPWINDOW;
     mq_i32 outer_width;
     mq_i32 outer_height;
+    mq_i32 window_x = 0;
+    mq_i32 window_y = 0;
+    mq_i32 style_changed;
     UINT flags = MQ_SWP_NOZORDER | MQ_SWP_NOACTIVATE | MQ_SWP_FRAMECHANGED;
     if (mq_window == MQ_NULL || width < 320 || height < 200) {
         return 0;
     }
+    style_changed = mq_window_style_fullscreen != mq_display_fullscreen;
     if (mq_display_fullscreen) {
+        style = MQ_WS_POPUP | MQ_WS_VISIBLE;
+        if (style_changed) {
+            SetWindowLongPtrW(mq_window, MQ_GWL_STYLE, (LONG_PTR)style);
+        }
         if (!mq_apply_requested_display_mode()) {
             return 0;
         }
@@ -2389,6 +2407,9 @@ MQ_EXPORT mq_i32 mq_win_resize_client(mq_i32 width, mq_i32 height) {
         }
     } else {
         style = MQ_WS_OVERLAPPEDWINDOW | MQ_WS_VISIBLE;
+        if (style_changed) {
+            SetWindowLongPtrW(mq_window, MQ_GWL_STYLE, (LONG_PTR)style);
+        }
         rectangle.left = 0;
         rectangle.top = 0;
         rectangle.right = width;
@@ -2398,13 +2419,22 @@ MQ_EXPORT mq_i32 mq_win_resize_client(mq_i32 width, mq_i32 height) {
         }
         outer_width = rectangle.right - rectangle.left;
         outer_height = rectangle.bottom - rectangle.top;
+        if (style_changed) {
+            window_x = (GetSystemMetrics(MQ_SM_CXSCREEN) - outer_width) / 2;
+            window_y = (GetSystemMetrics(MQ_SM_CYSCREEN) - outer_height) / 2;
+            if (window_x < 0) window_x = 0;
+            if (window_y < 0) window_y = 0;
+        } else {
+            flags |= MQ_SWP_NOMOVE;
+        }
         ShowWindow(mq_window, MQ_SW_SHOWNORMAL);
         if (!SetWindowPos(
-                mq_window, MQ_NULL, 0, 0, outer_width, outer_height,
-                flags | MQ_SWP_NOMOVE)) {
+                mq_window, MQ_NULL, window_x, window_y, outer_width, outer_height,
+                flags)) {
             return 0;
         }
     }
+    mq_window_style_fullscreen = mq_display_fullscreen;
     mq_minimized = 0;
     mq_mouse_ready = 0;
     if (mq_cursor_captured) {

@@ -172,6 +172,7 @@ function createCvars(commandLine, registered)
   registerCvar(registry, "vid_width", "0", true, false)
   registerCvar(registry, "vid_height", "0", true, false)
   registerCvar(registry, "vid_bpp", "0", true, false)
+  registerCvar(registry, "vid_fullscreen", "0", true, false)
   registerCvar(registry, "vid_wait", "0", false, false)
   registerCvar(registry, "vid_nopageflip", "0", true, false)
   registerCvar(registry, "_vid_wait_override", "0", true, false)
@@ -2628,6 +2629,19 @@ function handleExactMenuAction(session, result)
     if maximumClients < 2 then maximumClients = 4 end if
     menu.M_Menu_GameOptions_f(session.menu, maximumClients, session.gameDirectory)
     playMenuSound(session, "misc/menu2.wav")
+    return true
+  end if
+  if result == "mode_applied" then
+    videoState = glvid.VID_State()
+    session.fullscreen = videoState.modeState == glvid.MS_FULLDIB
+    session.width = videoState.windowWidth
+    session.height = videoState.windowHeight
+    updateMouseCapture(session)
+    playMenuSound(session, "misc/menu2.wav")
+    return true
+  end if
+  if result == "mode_error" then
+    playMenuSound(session, "misc/menu3.wav")
     return true
   end if
   if result == "menu_single" or result == "menu_multi" or result == "menu_options" or result == "menu_help" or result == "menu_quit" or result == "new_game" or result == "load_game" or result == "save_game" or result == "player_setup" or result == "customize_controls" or result == "open_console" or result == "reset_defaults" or result == "video_options" or result == "bind_selected" or result == "load_slot" or result == "save_slot" or result == "video_option" or result == "adjust_option" or result == "help_next" then

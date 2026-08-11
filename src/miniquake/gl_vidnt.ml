@@ -111,6 +111,7 @@ end struct
 
 currentVideoState = void
 videoMenuSelection = NO_MODE
+videoMenuDisplayFocus = true
 
 function makeMode(type, width, height, bpp, frequency, halfscreen)
   description = "" + width + "x" + height
@@ -961,8 +962,9 @@ function VID_MenuModeCount()
 end function
 
 function VID_MenuReset()
-  global videoMenuSelection
+  global videoMenuSelection, videoMenuDisplayFocus
   state = VID_State()
+  videoMenuDisplayFocus = true
   count = VID_MenuModeCount()
   if count == 0 then videoMenuSelection = NO_MODE; return videoMenuSelection end if
   selected = state.currentMode
@@ -1008,29 +1010,68 @@ function VID_MenuMove(delta)
   return videoMenuSelection
 end function
 
+function VID_MenuDisplayFocused()
+  global videoMenuDisplayFocus
+  return videoMenuDisplayFocus
+end function
+
 function VID_SaveResolutionCvars(state, width, height, bpp)
   if state.registry is void then return false end if
   if cvar.find(state.registry, "vid_width") is not void then cvar.setValue(state.registry, "vid_width", width) end if
   if cvar.find(state.registry, "vid_height") is not void then cvar.setValue(state.registry, "vid_height", height) end if
   if cvar.find(state.registry, "vid_bpp") is not void then cvar.setValue(state.registry, "vid_bpp", bpp) end if
   if cvar.find(state.registry, "vid_mode") is not void then cvar.setValue(state.registry, "vid_mode", state.currentMode) end if
+  if cvar.find(state.registry, "vid_fullscreen") is not void then
+    fullscreenValue = 0.0
+    if state.modeState == MS_FULLDIB then fullscreenValue = 1.0 end if
+    cvar.setValue(state.registry, "vid_fullscreen", fullscreenValue)
+  end if
   return true
 end function
 
-// Apply a new resolution while preserving the window, HDC and WGL context.
-// Windowed/fullscreen style remains the one selected at startup.
-function VID_ApplyResolution(modeNumber)
+function VID_RestoreNativeMode(state, wasFullscreen, previousWidth, previousHeight, previousBpp, previousFrequency, previousHalfscreen)
+  if not state.createNative then return true end if
+  if wasFullscreen then
+    win.configureDisplayMode(previousWidth << previousHalfscreen, previousHeight, previousBpp, previousFrequency, true, false)
+  else
+    win.configureDisplayMode(previousWidth, previousHeight, 0, 0, false, false)
+  end if
+  return win.resizeClient(previousWidth, previousHeight)
+end function
+
+// Change resolution and presentation style on the existing HWND/HDC/WGL
+// context.  Keeping the context alive is essential: all map textures, display
+// lists and renderer caches remain valid across the menu operation.
+function VID_ApplyDisplayMode(modeNumber, fullscreen)
   state = VID_State()
   if modeNumber < 1 or modeNumber >= len(state.modes) then return error(3912, "Video resolution is unavailable") end if
   mode = state.modes[modeNumber]
-  if state.modeState == MS_FULLDIB and state.createNative then
+  previousFullscreen = state.modeState == MS_FULLDIB
+  previousWidth = state.windowWidth
+  previousHeight = state.windowHeight
+  previousBpp = 0
+  previousFrequency = 0
+  previousHalfscreen = 0
+  if previousFullscreen and state.currentMode >= 1 and state.currentMode < len(state.modes) then
+    previousMode = state.modes[state.currentMode]
+    previousBpp = previousMode.bpp
+    previousFrequency = previousMode.frequency
+    previousHalfscreen = previousMode.halfscreen
+  end if
+
+  if state.createNative then
     physicalWidth = mode.width << mode.halfscreen
-    if not win.configureDisplayMode(physicalWidth, mode.height, mode.bpp, mode.frequency, true, false) then
+    configured = false
+    if fullscreen then configured = win.configureDisplayMode(physicalWidth, mode.height, mode.bpp, mode.frequency, true, false)
+    else configured = win.configureDisplayMode(mode.width, mode.height, 0, 0, false, false)
+    end if
+    if not configured then
       return error(3913, "Fullscreen resolution is unavailable")
     end if
-  end if
-  if state.createNative and not win.resizeClient(mode.width, mode.height) then
-    return error(3914, "Window resize failed")
+    if not win.resizeClient(mode.width, mode.height) then
+      VID_RestoreNativeMode(state, previousFullscreen, previousWidth, previousHeight, previousBpp, previousFrequency, previousHalfscreen)
+      return error(3914, "Display mode switch failed")
+    end if
   end if
 
   state.dibWidth = mode.width
@@ -1039,11 +1080,13 @@ function VID_ApplyResolution(modeNumber)
   state.windowHeight = mode.height
   state.width = mode.width
   state.height = mode.height
-  if state.modeState == MS_FULLDIB then
+  if fullscreen then
+    state.modeState = MS_FULLDIB
     state.currentMode = modeNumber
     state.realMode = modeNumber
     state.windowed = false
   else
+    state.modeState = MS_WINDOWED
     state.modes[MODE_WINDOWED].width = mode.width
     state.modes[MODE_WINDOWED].height = mode.height
     state.modes[MODE_WINDOWED].description = "" + mode.width + "x" + mode.height
@@ -1055,8 +1098,20 @@ function VID_ApplyResolution(modeNumber)
   VID_UpdateWindowStatus()
   VID_SaveResolutionCvars(state, mode.width, mode.height, mode.bpp)
   ClearAllStates()
-  state.lastModeMessage = "Resolution " + mode.width + "x" + mode.height + " applied."
+  modeName = "WINDOWED"
+  if fullscreen then modeName = "FULLSCREEN" end if
+  state.lastModeMessage = modeName + " " + mode.width + "x" + mode.height + " applied."
   return true
+end function
+
+function VID_ApplyResolution(modeNumber)
+  return VID_ApplyDisplayMode(modeNumber, VID_State().modeState == MS_FULLDIB)
+end function
+
+function VID_ToggleFullscreen()
+  selected = VID_MenuSelection()
+  if selected == NO_MODE then return error(3915, "No fullscreen resolution is available") end if
+  return VID_ApplyDisplayMode(selected, VID_State().modeState != MS_FULLDIB)
 end function
 
 // config.cfg is executed after VID_Init.  Apply a resolution previously chosen
@@ -1070,17 +1125,25 @@ function VID_ApplyConfiguredResolution()
     commandLineOverride = common.hasParm(state.arguments, "-width") or common.hasParm(state.arguments, "-height")
     commandLineOverride = commandLineOverride or common.hasParm(state.arguments, "-mode") or common.hasParm(state.arguments, "-current")
     commandLineOverride = commandLineOverride or common.hasParm(state.arguments, "-bpp") or common.hasParm(state.arguments, "-force")
-    if commandLineOverride then return false end if
+    commandLineOverride = commandLineOverride or VID_WindowedRequested(state.arguments) or common.hasParm(state.arguments, "-fullscreen")
+    if commandLineOverride then
+      currentBpp = 0
+      if state.currentMode >= 1 and state.currentMode < len(state.modes) then currentBpp = state.modes[state.currentMode].bpp end if
+      VID_SaveResolutionCvars(state, state.windowWidth, state.windowHeight, currentBpp)
+      return false
+    end if
   end if
   wantedWidth = native.trunc(cvar.variableValue(state.registry, "vid_width"))
   wantedHeight = native.trunc(cvar.variableValue(state.registry, "vid_height"))
   wantedBpp = native.trunc(cvar.variableValue(state.registry, "vid_bpp"))
+  wantedFullscreen = false
+  if cvar.find(state.registry, "vid_fullscreen") is not void then wantedFullscreen = cvar.variableValue(state.registry, "vid_fullscreen") != 0.0 end if
   if wantedWidth < 320 or wantedHeight < 200 then return false end if
   index = 1
   while index < len(state.modes)
     mode = state.modes[index]
     if mode.width == wantedWidth and mode.height == wantedHeight and (wantedBpp <= 0 or mode.bpp == wantedBpp) then
-      applied = try(VID_ApplyResolution(index))
+      applied = try(VID_ApplyDisplayMode(index, wantedFullscreen))
       if applied is error then state.lastModeMessage = applied.message; return false end if
       return true
     end if
@@ -1093,7 +1156,7 @@ function VID_ApplyConfiguredResolution()
     while index < len(state.modes)
       mode = state.modes[index]
       if mode.width == wantedWidth and mode.height == wantedHeight then
-        applied = try(VID_ApplyResolution(index))
+        applied = try(VID_ApplyDisplayMode(index, wantedFullscreen))
         if applied is error then state.lastModeMessage = applied.message; return false end if
         return true
       end if
@@ -1107,32 +1170,56 @@ end function
 function VID_MenuDraw()
   state = VID_State()
   selection = VID_MenuSelection()
-  commands = [["picture", "gfx/vidmodes.lmp"], ["heading", "Available Resolutions (WIDTHxHEIGHTxBPP)"]]
+  modeName = "WINDOWED"
+  if state.modeState == MS_FULLDIB then modeName = "FULLSCREEN" end if
+  commands = [
+    ["picture", "gfx/vidmodes.lmp"],
+    ["heading", "Video Mode"],
+    ["display", modeName, VID_MenuDisplayFocused()],
+  ]
   count = 0
   index = 1
   while index < len(state.modes) and count < MAX_MODEDESCS
     mode = state.modes[index]
     current = index == state.currentMode
     if state.modeState == MS_WINDOWED and mode.width == state.windowWidth and mode.height == state.windowHeight then current = true end if
-    commands = commands + [["mode", index, mode.description, current, count % VID_ROW_SIZE, native.trunc(count / VID_ROW_SIZE), index == selection]]
+    commands = commands + [["mode", index, mode.description, current, count % VID_ROW_SIZE, native.trunc(count / VID_ROW_SIZE), index == selection and not VID_MenuDisplayFocused()]]
     count = count + 1
     index = index + 1
   end while
   commands = commands + [
     ["help", "Arrow keys select a resolution"],
     ["help", "ENTER applies it immediately"],
-    ["help", "Window mode is selected at startup"],
+    ["help", "Display mode changes without restart"],
   ]
   state.drawTrace = commands
   return commands
 end function
 
 function VID_MenuKey(key)
+  global videoMenuDisplayFocus
   if key == keys.K_ESCAPE then return "options" end if
+  if videoMenuDisplayFocus then
+    if key == keys.K_UPARROW or key == keys.K_DOWNARROW then videoMenuDisplayFocus = false; return "move" end if
+    if key == keys.K_LEFTARROW or key == keys.K_RIGHTARROW or key == keys.K_ENTER then
+      toggled = try(VID_ToggleFullscreen())
+      if toggled is error then VID_State().lastModeMessage = toggled.message; return "mode_error" end if
+      return "mode_applied"
+    end if
+    return "none"
+  end if
+  selected = VID_MenuSelection()
+  count = VID_MenuModeCount()
   if key == keys.K_LEFTARROW then VID_MenuMove(-1); return "move" end if
   if key == keys.K_RIGHTARROW then VID_MenuMove(1); return "move" end if
-  if key == keys.K_UPARROW then VID_MenuMove(-VID_ROW_SIZE); return "move" end if
-  if key == keys.K_DOWNARROW then VID_MenuMove(VID_ROW_SIZE); return "move" end if
+  if key == keys.K_UPARROW then
+    if selected <= VID_ROW_SIZE then videoMenuDisplayFocus = true else VID_MenuMove(-VID_ROW_SIZE) end if
+    return "move"
+  end if
+  if key == keys.K_DOWNARROW then
+    if selected + VID_ROW_SIZE > count then videoMenuDisplayFocus = true else VID_MenuMove(VID_ROW_SIZE) end if
+    return "move"
+  end if
   if key == keys.K_ENTER then
     selected = VID_MenuSelection()
     if selected == NO_MODE then return "none" end if

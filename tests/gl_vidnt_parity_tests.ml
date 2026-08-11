@@ -8,6 +8,7 @@ Deterministic gl_vidnt.c mode, gamma, palette, focus and command fixtures.
 import miniquake.gl_vidnt as video
 import miniquake.common as common
 import miniquake.keys as keys
+import miniquake.cvar as cvar
 
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9700, name + ": expected " + expected + ", got " + actual) end if
@@ -70,6 +71,14 @@ function testDescriptionsAndMenu()
   state = modeFixture()
   state.currentMode = 3
   state.modeState = video.MS_FULLDIB
+  state.registry = cvar.createRegistry()
+  state.registry.variables = [
+    cvar.create("vid_mode", "3", false, false),
+    cvar.create("vid_width", "800", true, false),
+    cvar.create("vid_height", "600", true, false),
+    cvar.create("vid_bpp", "16", true, false),
+    cvar.create("vid_fullscreen", "1", true, false),
+  ]
   assertEqual(video.VID_GetModeDescription(3), "800x600x16", "mode description")
   assertEqual(video.VID_GetExtModeDescription(3), "800x600x16 fullscreen", "extended fullscreen description")
   assertEqual(video.VID_DescribeCurrentMode_f(), "800x600x16 fullscreen", "current mode command")
@@ -78,13 +87,24 @@ function testDescriptionsAndMenu()
   assertEqual(len(video.VID_DescribeModes_f()), 4, "describe modes excludes windowed mode")
   trace = video.VID_MenuDraw()
   assertEqual(trace[0][0], "picture", "video menu picture")
-  assertEqual(trace[4][3], true, "video menu current mode highlight")
+  assertEqual(trace[2][0], "display", "video menu display selector")
+  assertEqual(trace[5][3], true, "video menu current mode highlight")
   assertEqual(video.VID_MenuReset(), 3, "video menu starts on current resolution")
+  assertEqual(video.VID_MenuDisplayFocused(), true, "video menu starts on display selector")
+  assertEqual(video.VID_MenuKey(keys.K_ENTER), "mode_applied", "display selector switches to windowed")
+  assertEqual(state.modeState, video.MS_WINDOWED, "windowed display mode committed")
+  assertEqual(cvar.variableValue(state.registry, "vid_fullscreen"), 0.0, "windowed display mode archived")
+  assertEqual(video.VID_MenuKey(keys.K_DOWNARROW), "move", "video menu enters resolution grid")
   assertEqual(video.VID_MenuKey(keys.K_RIGHTARROW), "move", "video menu resolution navigation")
   assertEqual(video.VID_MenuSelection(), 4, "video menu selected resolution")
   assertEqual(video.VID_MenuKey(keys.K_ENTER), "mode_applied", "video menu applies resolution")
   assertEqual(state.windowWidth, 2560, "video menu applied width")
   assertEqual(state.windowHeight, 1440, "video menu applied height")
+  assertEqual(video.VID_MenuKey(keys.K_UPARROW), "move", "video menu moves to first resolution row")
+  assertEqual(video.VID_MenuKey(keys.K_UPARROW), "move", "video menu returns to display selector")
+  assertEqual(video.VID_MenuKey(keys.K_ENTER), "mode_applied", "display selector switches to fullscreen")
+  assertEqual(state.modeState, video.MS_FULLDIB, "fullscreen display mode committed")
+  assertEqual(cvar.variableValue(state.registry, "vid_fullscreen"), 1.0, "fullscreen display mode archived")
   assertEqual(video.VID_MenuKey(keys.K_ESCAPE), "options", "video menu escape callback")
   return true
 end function

@@ -1142,24 +1142,26 @@ end function
 
 function drawVideo(state, texture, transform, realtime)
   virtualCenteredPicture(state, "gfx/vidmodes.lmp", 4.0, transform, 255)
-  modeName = "WINDOWED"
-  if glvid.VID_State().modeState == glvid.MS_FULLDIB then modeName = "FULLSCREEN" end if
-  virtualCenteredString(texture, 28.0, modeName + " - SELECT RESOLUTION", transform, 255)
-  virtualString(texture, 8.0, 40.0, "WIDTHxHEIGHTxBPP", transform, 220)
   modes = glvid.VID_MenuDraw()
   for each command in modes
-    if command[0] == "mode" then
+    if command[0] == "display" then
+      displayText = "DISPLAY: < " + command[1] + " >"
+      if command[2] then virtualCenteredString(texture, 36.0, displayText, transform, 255)
+      else virtualCenteredString(texture, 36.0, displayText, transform, 180)
+      end if
+    else if command[0] == "mode" then
       x = 8.0 + command[4] * 104.0
-      y = 52.0 + command[5] * 8.0
+      y = 68.0 + command[5] * 8.0
       if len(command) > 6 and command[6] then virtualWhiteString(texture, x - 8.0, y, ">", transform, 255) end if
       if command[3] then virtualWhiteString(texture, x, y, command[2], transform, 255)
       else virtualString(texture, x, y, command[2], transform, 255)
       end if
     end if
   end for
-  virtualCenteredString(texture, 140.0, "ARROWS SELECT", transform, 255)
-  virtualCenteredString(texture, 148.0, "ENTER APPLIES IMMEDIATELY", transform, 255)
-  virtualCenteredString(texture, 164.0, "ESC RETURNS TO OPTIONS", transform, 220)
+  virtualString(texture, 8.0, 56.0, "WIDTHxHEIGHTxBPP", transform, 220)
+  virtualCenteredString(texture, 148.0, "UP/DOWN SELECT", transform, 255)
+  virtualCenteredString(texture, 156.0, "LEFT/RIGHT OR ENTER CHANGES", transform, 255)
+  virtualCenteredString(texture, 172.0, "ESC RETURNS TO OPTIONS", transform, 220)
 end function
 
 function drawHelp(state, texture, transform)

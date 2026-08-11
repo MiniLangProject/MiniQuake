@@ -32,7 +32,7 @@ IMPORTS: dict[str, list[str]] = {
     "user32.dll": [
         "RegisterClassExW", "UnregisterClassW", "CreateWindowExW", "DestroyWindow",
         "DefWindowProcW", "PostQuitMessage", "PeekMessageW", "TranslateMessage",
-        "DispatchMessageW", "ShowWindow", "UpdateWindow", "SetWindowTextW", "SetWindowPos",
+        "DispatchMessageW", "ShowWindow", "UpdateWindow", "SetWindowTextW", "SetWindowPos", "SetWindowLongPtrW",
         "GetSystemMetrics", "AdjustWindowRectEx", "GetClientRect", "GetAsyncKeyState",
         "GetForegroundWindow", "GetCursorPos", "SetCursorPos", "ClientToScreen",
         "ShowCursor", "LoadCursorW", "LoadIconW", "GetDC", "ReleaseDC",
