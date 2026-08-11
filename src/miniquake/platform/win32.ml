@@ -44,6 +44,10 @@ function height()
   return native.winClientHeight()
 end function
 
+function resizeClient(widthValue, heightValue)
+  return native.winResizeClient(widthValue, heightValue) != 0
+end function
+
 function windowX()
   return native.winWindowX()
 end function

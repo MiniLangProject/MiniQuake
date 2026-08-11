@@ -22,6 +22,7 @@ EXPORTS
   mq_win_has_focus
   mq_win_client_width
   mq_win_client_height
+  mq_win_resize_client
   mq_win_window_x
   mq_win_window_y
   mq_win_is_minimized

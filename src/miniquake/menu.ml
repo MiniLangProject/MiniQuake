@@ -105,7 +105,7 @@ function itemsForPage(page)
   if page == PAGE_KEYS then return keyItems() end if
   if page == PAGE_LOAD or page == PAGE_SAVE then return saveSlotItems() end if
   if page == PAGE_SETUP then return ["Hostname", "Your name", "Shirt color", "Pants color", "Accept Changes"] end if
-  if page == PAGE_VIDEO then return ["Windowed mode", "Resolution", "Apply on restart"] end if
+  if page == PAGE_VIDEO then return ["Resolution"] end if
   if page == PAGE_NET then return ["Modem", "Direct Connect", "IPX", "TCP/IP"] end if
   if page == PAGE_LAN then return ["Port", "Search for local games...", "Join game at:"] end if
   if page == PAGE_GAME_OPTIONS then return ["begin game", "Max players", "Game Type", "Teamplay", "Skill", "Frag Limit", "Time Limit", "Episode", "Level"] end if
@@ -513,9 +513,20 @@ function shutdown(state)
 end function
 
 function layout(width, height)
-  // menu.c's M_DrawCharacter/M_DrawPic only add (vid.width-320)>>1.
-  // Coordinates and artwork remain in unscaled 320x200 pixels at every mode.
-  return [menuNative.trunc((width - 320.0) * 0.5), 0.0, 1.0]
+  // Keep the original 320x200 menu coordinate system, but scale that canvas
+  // uniformly to the current client area.  This preserves Quake's aspect and
+  // prevents wide or tall windows from stretching the artwork.
+  safeWidth = width
+  safeHeight = height
+  if safeWidth < 1 then safeWidth = 1 end if
+  if safeHeight < 1 then safeHeight = 1 end if
+  scaleX = safeWidth / 320.0
+  scaleY = safeHeight / 200.0
+  scale = scaleX
+  if scaleY < scale then scale = scaleY end if
+  offsetX = (safeWidth - 320.0 * scale) * 0.5
+  offsetY = (safeHeight - 200.0 * scale) * 0.5
+  return [offsetX, offsetY, scale]
 end function
 
 function virtualPicture(state, name, x, y, transform, alpha)
@@ -1143,21 +1154,24 @@ end function
 
 function drawVideo(state, texture, transform, realtime)
   virtualCenteredPicture(state, "gfx/vidmodes.lmp", 4.0, transform, 255)
-  virtualString(texture, 16.0, 36.0, "Fullscreen Modes (WIDTHxHEIGHTxBPP)", transform, 255)
+  modeName = "WINDOWED"
+  if glvid.VID_State().modeState == glvid.MS_FULLDIB then modeName = "FULLSCREEN" end if
+  virtualCenteredString(texture, 28.0, modeName + " - SELECT RESOLUTION", transform, 255)
+  virtualString(texture, 8.0, 40.0, "WIDTHxHEIGHTxBPP", transform, 220)
   modes = glvid.VID_MenuDraw()
   for each command in modes
     if command[0] == "mode" then
       x = 8.0 + command[4] * 104.0
       y = 52.0 + command[5] * 8.0
+      if len(command) > 6 and command[6] then virtualWhiteString(texture, x - 8.0, y, ">", transform, 255) end if
       if command[3] then virtualWhiteString(texture, x, y, command[2], transform, 255)
       else virtualString(texture, x, y, command[2], transform, 255)
       end if
     end if
   end for
-  virtualString(texture, 24.0, 140.0, "Video modes must be set from the", transform, 255)
-  virtualString(texture, 24.0, 148.0, "command line with -width <width>", transform, 255)
-  virtualString(texture, 24.0, 156.0, "and -bpp <bits-per-pixel>", transform, 255)
-  virtualString(texture, 24.0, 172.0, "Select windowed mode with -window", transform, 255)
+  virtualCenteredString(texture, 140.0, "ARROWS SELECT", transform, 255)
+  virtualCenteredString(texture, 148.0, "ENTER APPLIES IMMEDIATELY", transform, 255)
+  virtualCenteredString(texture, 164.0, "ESC RETURNS TO OPTIONS", transform, 220)
 end function
 
 function drawHelp(state, texture, transform)
@@ -1408,6 +1422,7 @@ end function
 
 function M_Menu_Video_f(state)
   openPage(state, PAGE_VIDEO)
+  glvid.VID_MenuReset()
   state.active = true
   state.enterSound = true
   return true
@@ -1845,6 +1860,11 @@ function M_Video_Key(state, key)
   if state.videoKeyCallback is not void then
     action = state.videoKeyCallback(key)
     if action == "options" then M_Menu_Options_f(state); return "back" end if
+    if action == "mode_applied" or action == "mode_error" then
+      setStatus(state, glvid.VID_State().lastModeMessage)
+      state.enterSound = action == "mode_applied"
+      return action
+    end if
     if action != "none" then return action end if
   end if
   if key == menuKeys.K_ESCAPE then M_Menu_Options_f(state); return "back" end if

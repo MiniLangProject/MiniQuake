@@ -378,6 +378,7 @@ MQ_DLLIMPORT LRESULT MQ_WINAPI DispatchMessageW(const MQ_MSG *message);
 MQ_DLLIMPORT BOOL MQ_WINAPI ShowWindow(HWND window, mq_i32 command);
 MQ_DLLIMPORT BOOL MQ_WINAPI UpdateWindow(HWND window);
 MQ_DLLIMPORT BOOL MQ_WINAPI SetWindowTextW(HWND window, LPCWSTR title);
+MQ_DLLIMPORT BOOL MQ_WINAPI SetWindowPos(HWND window, HWND insert_after, mq_i32 x, mq_i32 y, mq_i32 width, mq_i32 height, UINT flags);
 MQ_DLLIMPORT mq_i32 MQ_WINAPI GetSystemMetrics(mq_i32 index);
 MQ_DLLIMPORT BOOL MQ_WINAPI AdjustWindowRectEx(MQ_RECT *rect, DWORD style, BOOL has_menu, DWORD ex_style);
 MQ_DLLIMPORT BOOL MQ_WINAPI GetClientRect(HWND window, MQ_RECT *rect);
@@ -1302,6 +1303,10 @@ MQ_EXPORT void mq_gl_static_geometry_clear(void) {
 #define MQ_SW_SHOW 5
 #define MQ_SW_SHOWNORMAL 1
 #define MQ_SW_SHOWMINNOACTIVE 7
+#define MQ_SWP_NOMOVE 0x0002u
+#define MQ_SWP_NOZORDER 0x0004u
+#define MQ_SWP_NOACTIVATE 0x0010u
+#define MQ_SWP_FRAMECHANGED 0x0020u
 #define MQ_PM_REMOVE 0x0001u
 #define MQ_WM_DESTROY 0x0002u
 #define MQ_WM_MOVE 0x0003u
@@ -2357,6 +2362,59 @@ MQ_EXPORT mq_i32 mq_win_client_height(void) {
         return 0;
     }
     return rectangle.bottom - rectangle.top;
+}
+
+/* Resize the existing window without replacing its HDC/WGL context.  Runtime
+ * video changes can therefore preserve every uploaded Quake texture, display
+ * list and VBO.  The window style is fixed at startup; this function only
+ * changes the resolution within the active windowed/fullscreen mode. */
+MQ_EXPORT mq_i32 mq_win_resize_client(mq_i32 width, mq_i32 height) {
+    MQ_RECT rectangle;
+    DWORD style;
+    DWORD ex_style = MQ_WS_EX_APPWINDOW;
+    mq_i32 outer_width;
+    mq_i32 outer_height;
+    UINT flags = MQ_SWP_NOZORDER | MQ_SWP_NOACTIVATE | MQ_SWP_FRAMECHANGED;
+    if (mq_window == MQ_NULL || width < 320 || height < 200) {
+        return 0;
+    }
+    if (mq_display_fullscreen) {
+        if (!mq_apply_requested_display_mode()) {
+            return 0;
+        }
+        outer_width = width;
+        outer_height = height;
+        if (!SetWindowPos(mq_window, MQ_NULL, 0, 0, outer_width, outer_height, flags)) {
+            return 0;
+        }
+    } else {
+        style = MQ_WS_OVERLAPPEDWINDOW | MQ_WS_VISIBLE;
+        rectangle.left = 0;
+        rectangle.top = 0;
+        rectangle.right = width;
+        rectangle.bottom = height;
+        if (!AdjustWindowRectEx(&rectangle, style, MQ_FALSE, ex_style)) {
+            return 0;
+        }
+        outer_width = rectangle.right - rectangle.left;
+        outer_height = rectangle.bottom - rectangle.top;
+        ShowWindow(mq_window, MQ_SW_SHOWNORMAL);
+        if (!SetWindowPos(
+                mq_window, MQ_NULL, 0, 0, outer_width, outer_height,
+                flags | MQ_SWP_NOMOVE)) {
+            return 0;
+        }
+    }
+    mq_minimized = 0;
+    mq_mouse_ready = 0;
+    if (mq_cursor_captured) {
+        mq_update_clip_cursor();
+    }
+    if (!GetClientRect(mq_window, &rectangle)) {
+        return 0;
+    }
+    return rectangle.right - rectangle.left == width &&
+        rectangle.bottom - rectangle.top == height;
 }
 
 MQ_EXPORT void mq_win_set_title(const unsigned short *title) {

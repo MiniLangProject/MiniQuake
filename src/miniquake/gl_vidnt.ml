@@ -110,6 +110,7 @@ struct VideoState
 end struct
 
 currentVideoState = void
+videoMenuSelection = NO_MODE
 
 function makeMode(type, width, height, bpp, frequency, halfscreen)
   description = "" + width + "x" + height
@@ -952,22 +953,175 @@ function VID_Init(arguments, registry, palette, createNative)
   return state
 end function
 
+function VID_MenuModeCount()
+  count = len(VID_State().modes) - 1
+  if count < 0 then count = 0 end if
+  if count > MAX_MODEDESCS then count = MAX_MODEDESCS end if
+  return count
+end function
+
+function VID_MenuReset()
+  global videoMenuSelection
+  state = VID_State()
+  count = VID_MenuModeCount()
+  if count == 0 then videoMenuSelection = NO_MODE; return videoMenuSelection end if
+  selected = state.currentMode
+  if selected < 1 or selected > count then
+    selected = 1
+    currentWidth = state.windowWidth
+    currentHeight = state.windowHeight
+    if state.createNative and win.contextReady() then
+      currentWidth = win.width()
+      currentHeight = win.height()
+    end if
+    index = 1
+    while index <= count
+      mode = state.modes[index]
+      if mode.width == currentWidth and mode.height == currentHeight then selected = index end if
+      index = index + 1
+    end while
+  end if
+  videoMenuSelection = selected
+  return videoMenuSelection
+end function
+
+function VID_MenuSelection()
+  global videoMenuSelection
+  count = VID_MenuModeCount()
+  if count == 0 then return NO_MODE end if
+  if videoMenuSelection < 1 or videoMenuSelection > count then return VID_MenuReset() end if
+  return videoMenuSelection
+end function
+
+function VID_MenuMove(delta)
+  global videoMenuSelection
+  count = VID_MenuModeCount()
+  if count == 0 then videoMenuSelection = NO_MODE; return videoMenuSelection end if
+  selected = VID_MenuSelection() - 1 + delta
+  while selected < 0
+    selected = selected + count
+  end while
+  while selected >= count
+    selected = selected - count
+  end while
+  videoMenuSelection = selected + 1
+  return videoMenuSelection
+end function
+
+function VID_SaveResolutionCvars(state, width, height, bpp)
+  if state.registry is void then return false end if
+  if cvar.find(state.registry, "vid_width") is not void then cvar.setValue(state.registry, "vid_width", width) end if
+  if cvar.find(state.registry, "vid_height") is not void then cvar.setValue(state.registry, "vid_height", height) end if
+  if cvar.find(state.registry, "vid_bpp") is not void then cvar.setValue(state.registry, "vid_bpp", bpp) end if
+  if cvar.find(state.registry, "vid_mode") is not void then cvar.setValue(state.registry, "vid_mode", state.currentMode) end if
+  return true
+end function
+
+// Apply a new resolution while preserving the window, HDC and WGL context.
+// Windowed/fullscreen style remains the one selected at startup.
+function VID_ApplyResolution(modeNumber)
+  state = VID_State()
+  if modeNumber < 1 or modeNumber >= len(state.modes) then return error(3912, "Video resolution is unavailable") end if
+  mode = state.modes[modeNumber]
+  if state.modeState == MS_FULLDIB and state.createNative then
+    physicalWidth = mode.width << mode.halfscreen
+    if not win.configureDisplayMode(physicalWidth, mode.height, mode.bpp, mode.frequency, true, false) then
+      return error(3913, "Fullscreen resolution is unavailable")
+    end if
+  end if
+  if state.createNative and not win.resizeClient(mode.width, mode.height) then
+    return error(3914, "Window resize failed")
+  end if
+
+  state.dibWidth = mode.width
+  state.dibHeight = mode.height
+  state.windowWidth = mode.width
+  state.windowHeight = mode.height
+  state.width = mode.width
+  state.height = mode.height
+  if state.modeState == MS_FULLDIB then
+    state.currentMode = modeNumber
+    state.realMode = modeNumber
+    state.windowed = false
+  else
+    state.modes[MODE_WINDOWED].width = mode.width
+    state.modes[MODE_WINDOWED].height = mode.height
+    state.modes[MODE_WINDOWED].description = "" + mode.width + "x" + mode.height
+    state.currentMode = MODE_WINDOWED
+    state.realMode = MODE_WINDOWED
+    state.windowed = true
+  end if
+  state.recalcRefdef = true
+  VID_UpdateWindowStatus()
+  VID_SaveResolutionCvars(state, mode.width, mode.height, mode.bpp)
+  ClearAllStates()
+  state.lastModeMessage = "Resolution " + mode.width + "x" + mode.height + " applied."
+  return true
+end function
+
+// config.cfg is executed after VID_Init.  Apply a resolution previously chosen
+// in the menu once the archived cvars have been read, unless command-line video
+// arguments explicitly override it.
+function VID_ApplyConfiguredResolution()
+  state = VID_State()
+  if state.registry is void then return false end if
+  if cvar.find(state.registry, "vid_width") is void or cvar.find(state.registry, "vid_height") is void then return false end if
+  if state.arguments is not void then
+    commandLineOverride = common.hasParm(state.arguments, "-width") or common.hasParm(state.arguments, "-height")
+    commandLineOverride = commandLineOverride or common.hasParm(state.arguments, "-mode") or common.hasParm(state.arguments, "-current")
+    commandLineOverride = commandLineOverride or common.hasParm(state.arguments, "-bpp") or common.hasParm(state.arguments, "-force")
+    if commandLineOverride then return false end if
+  end if
+  wantedWidth = native.trunc(cvar.variableValue(state.registry, "vid_width"))
+  wantedHeight = native.trunc(cvar.variableValue(state.registry, "vid_height"))
+  wantedBpp = native.trunc(cvar.variableValue(state.registry, "vid_bpp"))
+  if wantedWidth < 320 or wantedHeight < 200 then return false end if
+  index = 1
+  while index < len(state.modes)
+    mode = state.modes[index]
+    if mode.width == wantedWidth and mode.height == wantedHeight and (wantedBpp <= 0 or mode.bpp == wantedBpp) then
+      applied = try(VID_ApplyResolution(index))
+      if applied is error then state.lastModeMessage = applied.message; return false end if
+      return true
+    end if
+    index = index + 1
+  end while
+  // If a saved color depth is no longer enumerated, width and height remain a
+  // safe fallback using the first currently available depth.
+  if wantedBpp > 0 then
+    index = 1
+    while index < len(state.modes)
+      mode = state.modes[index]
+      if mode.width == wantedWidth and mode.height == wantedHeight then
+        applied = try(VID_ApplyResolution(index))
+        if applied is error then state.lastModeMessage = applied.message; return false end if
+        return true
+      end if
+      index = index + 1
+    end while
+  end if
+  state.lastModeMessage = "Saved resolution " + wantedWidth + "x" + wantedHeight + " is unavailable."
+  return false
+end function
+
 function VID_MenuDraw()
   state = VID_State()
-  commands = [["picture", "gfx/vidmodes.lmp"], ["heading", "Fullscreen Modes (WIDTHxHEIGHTxBPP)"]]
+  selection = VID_MenuSelection()
+  commands = [["picture", "gfx/vidmodes.lmp"], ["heading", "Available Resolutions (WIDTHxHEIGHTxBPP)"]]
   count = 0
   index = 1
   while index < len(state.modes) and count < MAX_MODEDESCS
     mode = state.modes[index]
-    commands = commands + [["mode", index, mode.description, index == state.currentMode, count % VID_ROW_SIZE, native.trunc(count / VID_ROW_SIZE)]]
+    current = index == state.currentMode
+    if state.modeState == MS_WINDOWED and mode.width == state.windowWidth and mode.height == state.windowHeight then current = true end if
+    commands = commands + [["mode", index, mode.description, current, count % VID_ROW_SIZE, native.trunc(count / VID_ROW_SIZE), index == selection]]
     count = count + 1
     index = index + 1
   end while
   commands = commands + [
-    ["help", "Video modes must be set from the"],
-    ["help", "command line with -width <width>"],
-    ["help", "and -bpp <bits-per-pixel>"],
-    ["help", "Select windowed mode with -window"],
+    ["help", "Arrow keys select a resolution"],
+    ["help", "ENTER applies it immediately"],
+    ["help", "Window mode is selected at startup"],
   ]
   state.drawTrace = commands
   return commands
@@ -975,6 +1129,17 @@ end function
 
 function VID_MenuKey(key)
   if key == keys.K_ESCAPE then return "options" end if
+  if key == keys.K_LEFTARROW then VID_MenuMove(-1); return "move" end if
+  if key == keys.K_RIGHTARROW then VID_MenuMove(1); return "move" end if
+  if key == keys.K_UPARROW then VID_MenuMove(-VID_ROW_SIZE); return "move" end if
+  if key == keys.K_DOWNARROW then VID_MenuMove(VID_ROW_SIZE); return "move" end if
+  if key == keys.K_ENTER then
+    selected = VID_MenuSelection()
+    if selected == NO_MODE then return "none" end if
+    applied = try(VID_ApplyResolution(selected))
+    if applied is error then VID_State().lastModeMessage = applied.message; return "mode_error" end if
+    return "mode_applied"
+  end if
   return "none"
 end function
 

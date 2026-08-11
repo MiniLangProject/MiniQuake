@@ -168,6 +168,9 @@ function createCvars(commandLine, registered)
   registerCvar(registry, "scr_printspeed", "8", false, false)
   registerCvar(registry, "gl_triplebuffer", "1", true, false)
   registerCvar(registry, "vid_mode", "0", false, false)
+  registerCvar(registry, "vid_width", "0", true, false)
+  registerCvar(registry, "vid_height", "0", true, false)
+  registerCvar(registry, "vid_bpp", "0", true, false)
   registerCvar(registry, "vid_wait", "0", false, false)
   registerCvar(registry, "vid_nopageflip", "0", true, false)
   registerCvar(registry, "_vid_wait_override", "0", true, false)
@@ -554,6 +557,8 @@ function transitionMap(session, mapName, preserveClients, saveChangeParms, defer
       if uploadedWorld is error then return error(3930, "startup world upload: " + uploadedWorld.message) end if
     end if
     if session.windowCreated then
+      session.width = win.width()
+      session.height = win.height()
       screenInitialized = try(screen.initialize(session.console, session.menu, session.filesystem, palette, session.width, session.height, session.cvars))
       if screenInitialized is error then return screenInitialized end if
       // SetWindowText and the compositor's first title repaint can each block
@@ -904,7 +909,11 @@ function prepareDemoScene(session)
     session.renderer = worldRenderer.create(worldModel, palette)
     worldRenderer.R_SetMultitextureCompatibility(videoState.multitexture, false)
     session.entityRenderer = entityRenderer.create(session.filesystem, palette, session.client.modelPrecache)
-    if session.windowCreated then screen.initialize(session.console, session.menu, session.filesystem, palette, session.width, session.height, session.cvars) end if
+    if session.windowCreated then
+      session.width = win.width()
+      session.height = win.height()
+      screen.initialize(session.console, session.menu, session.filesystem, palette, session.width, session.height, session.cvars)
+    end if
   end if
   if session.mixer.enabled then
     mixer.stopAll(session.mixer)
@@ -2132,6 +2141,11 @@ function Host_Init(session)
 
   queueStartupCommands(session)
   executeCommandBuffer(session, 4096)
+  if not session.headless and session.windowCreated then
+    if glvid.VID_ApplyConfiguredResolution() then print glvid.VID_State().lastModeMessage end if
+    session.width = win.width()
+    session.height = win.height()
+  end if
 
   // The strict original-binary interop client must connect before the
   // standalone fallback can start a local map or demo.  Normal launches do

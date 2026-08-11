@@ -24,6 +24,7 @@ extern function winTextPop() from "miniquake_native.dll" symbol "mq_win_text_pop
 extern function winHasFocus() from "miniquake_native.dll" symbol "mq_win_has_focus" returns i32
 extern function winClientWidth() from "miniquake_native.dll" symbol "mq_win_client_width" returns i32
 extern function winClientHeight() from "miniquake_native.dll" symbol "mq_win_client_height" returns i32
+extern function winResizeClient(width as i32, height as i32) from "miniquake_native.dll" symbol "mq_win_resize_client" returns i32
 extern function winWindowX() from "miniquake_native.dll" symbol "mq_win_window_x" returns i32
 extern function winWindowY() from "miniquake_native.dll" symbol "mq_win_window_y" returns i32
 extern function winIsMinimized() from "miniquake_native.dll" symbol "mq_win_is_minimized" returns i32

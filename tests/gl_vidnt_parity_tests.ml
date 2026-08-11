@@ -79,6 +79,12 @@ function testDescriptionsAndMenu()
   trace = video.VID_MenuDraw()
   assertEqual(trace[0][0], "picture", "video menu picture")
   assertEqual(trace[4][3], true, "video menu current mode highlight")
+  assertEqual(video.VID_MenuReset(), 3, "video menu starts on current resolution")
+  assertEqual(video.VID_MenuKey(keys.K_RIGHTARROW), "move", "video menu resolution navigation")
+  assertEqual(video.VID_MenuSelection(), 4, "video menu selected resolution")
+  assertEqual(video.VID_MenuKey(keys.K_ENTER), "mode_applied", "video menu applies resolution")
+  assertEqual(state.windowWidth, 2560, "video menu applied width")
+  assertEqual(state.windowHeight, 1440, "video menu applied height")
   assertEqual(video.VID_MenuKey(keys.K_ESCAPE), "options", "video menu escape callback")
   return true
 end function
