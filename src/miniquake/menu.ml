@@ -12,6 +12,7 @@ import miniquake.keys as menuKeys
 import miniquake.net_main as menuNet
 import miniquake.gl_vidnt as glvid
 import miniquake.mathlib as menuMath
+import miniquake.render_ui_contract as menuUiContract
 
 const PAGE_MAIN = "main"
 const PAGE_SINGLE = "singleplayer"
@@ -513,20 +514,7 @@ function shutdown(state)
 end function
 
 function layout(width, height)
-  // Keep the original 320x200 menu coordinate system, but scale that canvas
-  // uniformly to the current client area.  This preserves Quake's aspect and
-  // prevents wide or tall windows from stretching the artwork.
-  safeWidth = width
-  safeHeight = height
-  if safeWidth < 1 then safeWidth = 1 end if
-  if safeHeight < 1 then safeHeight = 1 end if
-  scaleX = safeWidth / 320.0
-  scaleY = safeHeight / 200.0
-  scale = scaleX
-  if scaleY < scale then scale = scaleY end if
-  offsetX = (safeWidth - 320.0 * scale) * 0.5
-  offsetY = (safeHeight - 200.0 * scale) * 0.5
-  return [offsetX, offsetY, scale]
+  return menuUiContract.virtualCanvasLayout(width, height)
 end function
 
 function virtualPicture(state, name, x, y, transform, alpha)

@@ -448,6 +448,23 @@ function finishLocalMapConnection(session, preserveClients)
   return true
 end function
 
+function failedMapTransition(session, result)
+  // A failed create/upload may leave either the error value itself or a
+  // partially initialized renderer in the session.  Never let the following
+  // frame mistake that value for a live renderer, and release any companion
+  // renderer that was already created during this transition.
+  if session.renderer is not void and session.renderer is not error then worldRenderer.destroy(session.renderer) end if
+  if session.entityRenderer is not void and session.entityRenderer is not error then entityRenderer.destroy(session.entityRenderer) end if
+  session.renderer = void
+  session.entityRenderer = void
+  screen.SCR_EndLoadingPlaque(session.console)
+  session.statusMessage = result.message
+  line = "Map transition failed: " + result.message
+  console.appendLine(session.console, line)
+  print line
+  return result
+end function
+
 function transitionMap(session, mapName, preserveClients, saveChangeParms, deferLocalConnection)
   screen.SCR_SetIntermission(0, "", session.console, session.client.time)
   // gl_screen.c stops every active sound before it even checks whether the
@@ -484,13 +501,17 @@ function transitionMap(session, mapName, preserveClients, saveChangeParms, defer
     )
     glvid.GL_EndRendering()
   end if
+  // Keep the Win32 queue responsive between the synchronous loading phases.
+  // The expensive parsers remain deterministic, while resize/focus/close
+  // messages no longer wait until the complete new map has been installed.
+  if session.windowCreated then win.poll() end if
   if session.renderer is not void then worldRenderer.destroy(session.renderer) end if
   if session.entityRenderer is not void then entityRenderer.destroy(session.entityRenderer) end if
   session.renderer = void
   session.entityRenderer = void
   preserved = void
   if preserveClients then
-    if not session.server.active then return error(3002, "Only the server may changelevel") end if
+    if not session.server.active then return failedMapTransition(session, error(3002, "Only the server may changelevel")) end if
     if saveChangeParms then
       preserved = server.beginChangeLevel(session.server)
     else
@@ -515,7 +536,8 @@ function transitionMap(session, mapName, preserveClients, saveChangeParms, defer
   else
     spawned = try(server.spawn(session.server, session.filesystem, mapName, skill))
   end if
-  if spawned is error then return spawned end if
+  if spawned is error then return failedMapTransition(session, spawned) end if
+  if session.windowCreated then win.poll() end if
   if preserveClients then server.finishChangeLevel(session.server, preserved) end if
   session.player.origin = math.copy(session.server.spawnPoint)
   session.player.viewAngles = math.copy(session.server.spawnAngles)
@@ -536,7 +558,7 @@ function transitionMap(session, mapName, preserveClients, saveChangeParms, defer
   // initialization behind the video boundary as well.
   if not session.headless then
     palette = try(qfs.readFile(session.filesystem, "gfx/palette.lmp"))
-    if palette is error then return palette end if
+    if palette is error then return failedMapTransition(session, palette) end if
     videoState = glvid.VID_State()
     if videoState.initialized then palette = videoState.palette end if
     // Alias/sprite precaching performs the largest burst of heap allocation
@@ -544,23 +566,25 @@ function transitionMap(session, mapName, preserveClients, saveChangeParms, defer
     // world-surface graph so no later model-load allocation can invalidate
     // boxed vertex members.
     session.entityRenderer = try(entityRenderer.create(session.filesystem, palette, session.server.modelPrecache))
-    if session.entityRenderer is error then return session.entityRenderer end if
+    if session.entityRenderer is error then return failedMapTransition(session, session.entityRenderer) end if
     if session.windowCreated then
       precachedEntities = try(entityRenderer.precache(session.entityRenderer))
-      if precachedEntities is error then return error(3931, "startup entity precache: " + precachedEntities.message) end if
+      if precachedEntities is error then return failedMapTransition(session, error(3931, "startup entity precache: " + precachedEntities.message)) end if
+      win.poll()
     end if
     session.renderer = try(worldRenderer.create(session.server.worldModel, palette))
-    if session.renderer is error then return session.renderer end if
+    if session.renderer is error then return failedMapTransition(session, session.renderer) end if
     worldRenderer.R_SetMultitextureCompatibility(videoState.multitexture, false)
     if session.windowCreated then
       uploadedWorld = try(worldRenderer.upload(session.renderer))
-      if uploadedWorld is error then return error(3930, "startup world upload: " + uploadedWorld.message) end if
+      if uploadedWorld is error then return failedMapTransition(session, error(3930, "startup world upload: " + uploadedWorld.message)) end if
+      win.poll()
     end if
     if session.windowCreated then
       session.width = win.width()
       session.height = win.height()
       screenInitialized = try(screen.initialize(session.console, session.menu, session.filesystem, palette, session.width, session.height, session.cvars))
-      if screenInitialized is error then return screenInitialized end if
+      if screenInitialized is error then return failedMapTransition(session, screenInitialized) end if
       // SetWindowText and the compositor's first title repaint can each block
       // for several milliseconds.  Initialize the FPS title under the loading
       // plaque instead of charging it to the first playable frame.
@@ -578,7 +602,9 @@ function transitionMap(session, mapName, preserveClients, saveChangeParms, defer
   end if
 
   if deferLocalConnection then return true end if
-  return finishLocalMapConnection(session, preserveClients)
+  connected = try(finishLocalMapConnection(session, preserveClients))
+  if connected is error then return failedMapTransition(session, connected) end if
+  return connected
 end function
 
 function writeConfiguration(session)
@@ -2043,8 +2069,17 @@ function executeCommandBuffer(session, maximumCommands)
   while len(session.commands.text) > 0 and executed < maximumCommands
     split = cmd.splitFirstCommand(session.commands.text)
     session.commands.text = split[1]
-    executeCommand(session, split[0])
+    commandResult = try(executeCommand(session, split[0]))
     executed = executed + 1
+    if commandResult is error then
+      screen.SCR_EndLoadingPlaque(session.console)
+      if session.statusMessage != commandResult.message then
+        session.statusMessage = commandResult.message
+        console.appendLine(session.console, commandResult.message)
+        print commandResult.message
+      end if
+      break
+    end if
     if session.commands.wait then break end if
   end while
   return executed
@@ -2193,8 +2228,10 @@ function consumeClientEvents(session)
       screen.SCR_CenterPrint(void, item.payload, session.client.time)
     else if item.command == "svc_intermission" then
       screen.SCR_SetIntermission(1, "", session.console, session.client.time)
-    else if item.command == "svc_finale" or item.command == "svc_cutscene" then
+    else if item.command == "svc_finale" then
       screen.SCR_SetIntermission(2, item.payload, session.console, session.client.time)
+    else if item.command == "svc_cutscene" then
+      screen.SCR_SetIntermission(3, item.payload, session.console, session.client.time)
     end if
   end for
   result = clientEffects.process(
@@ -3784,8 +3821,65 @@ function runOpt001AFrameBaseline(baseDirectory, gameDirectory, mapName, mode, wa
   return error(3803, "OPT-001A frame baseline recorded an unexpected frame count")
 end function
 
+function runOpt001BQuakeCExit(session, destination, maximumFrames)
+  if session.server.machine is void then return error(3823, "OPT-001B QuakeC VM is unavailable") end if
+  triggerIndex = -1
+  index = session.server.maxClients + 1
+  while index < session.server.numEdicts
+    if not session.server.machine.context.edicts.freeFlags[index] then
+      className = server.qcString(session.server.machine, index, "classname", "")
+      mapName = server.qcString(session.server.machine, index, "map", "")
+      if className == "trigger_changelevel" and mapName == destination then
+        triggerIndex = index
+        break
+      end if
+    end if
+    index = index + 1
+  end while
+  if triggerIndex < 0 then return error(3823, "OPT-001B trigger_changelevel to " + destination + " is missing") end if
+
+  clientIndex = session.server.clients[0].edictIndex
+  if not server.runQcTouch(session.server, triggerIndex, clientIndex) then
+    return error(3824, "OPT-001B trigger_changelevel has no touch function")
+  end if
+  source = session.server.mapName
+  frames = 0
+  while session.server.mapName == source and frames < maximumFrames
+    // Stock Quake leaves a normal intermission after five seconds when the
+    // player presses attack or jump. Feed that edge directly to the local
+    // server command in this deterministic harness; the ordinary input/network
+    // path is independently covered and -noinput must remain in force here.
+    if frames == 260 then
+      session.server.clients[0].command.buttons = c.BUTTON_ATTACK
+      forced = try(server.frameMode(session.server, session.player, 0.02, session.cvars, true))
+      if forced is error then return forced end if
+      session.server.clients[0].command.buttons = 0
+    end if
+    advanced = try(frame(session, 0.02))
+    if advanced is error then return advanced end if
+    frames = frames + 1
+  end while
+  if session.server.mapName != destination then
+    return error(
+      3825,
+      "OPT-001B QuakeC exit stopped after " + frames + " frames on " +
+        session.server.mapName + " (intermission " + screen.SCR_IntermissionMode() +
+        ", button0 " + server.qcFloat(session.server.machine, clientIndex, "button0", -1.0) +
+        ", running " + qcvm.namedGlobalFloat(session.server.machine, "intermission_running") +
+        ", exit " + qcvm.namedGlobalFloat(session.server.machine, "intermission_exittime") +
+        ", time " + session.server.time + ")",
+    )
+  end if
+  print "  quakec_exit_frames=" + frames
+  return frames
+end function
+
 function runOpt001BTransition(baseDirectory, gameDirectory, frameCount, outputPrefix)
-  session = create(opt001aSessionArguments(baseDirectory, gameDirectory, "start", "render", 26000))
+  transitionArguments = []
+  for each argument in opt001aSessionArguments(baseDirectory, gameDirectory, "start", "render", 26000)
+    if argument != "-nosound" then transitionArguments = transitionArguments + [argument] end if
+  end for
+  session = create(transitionArguments)
   initialized = try(initialize(session))
   if initialized is error then shutdown(session); return initialized end if
   if not session.server.active or session.renderer is void then
@@ -3801,7 +3895,10 @@ function runOpt001BTransition(baseDirectory, gameDirectory, frameCount, outputPr
   while mapIndex < len(maps)
     mapName = maps[mapIndex]
     if mapIndex > 0 then
-      changed = try(changeLevel(session, mapName))
+      changed = true
+      if mapIndex <= 2 then changed = try(runOpt001BQuakeCExit(session, mapName, 512))
+      else changed = try(changeLevel(session, mapName))
+      end if
       if changed is error then shutdown(session); return changed end if
     end if
     if session.server.mapName != mapName then

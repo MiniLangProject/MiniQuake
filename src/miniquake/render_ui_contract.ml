@@ -27,7 +27,36 @@ function overlayOrder(dialog, loading, intermission, gameInput)
   if loading then return ["set2d", "tileclear", "loading", "hud"] end if
   if intermission == 1 and gameInput then return ["set2d", "tileclear", "intermission"] end if
   if intermission == 2 and gameInput then return ["set2d", "tileclear", "finale", "center"] end if
+  if intermission == 3 and gameInput then return ["set2d", "tileclear", "center"] end if
   return ["set2d", "tileclear", "crosshair", "ram", "net", "turtle", "pause", "center", "hud", "console", "menu"]
+end function
+
+// GLQuake's menu helpers retain a 320-pixel logical canvas and only center it
+// horizontally. Modern high-DPI modes need enlargement, but fractional or
+// unbounded stretching makes the indexed font and qpics visibly uneven. Use a
+// conservative integral scale: original size around 640x480, 2x around 1080p,
+// and at most 4x on very large displays.
+function virtualCanvasScale(width, height)
+  safeWidth = width
+  safeHeight = height
+  if safeWidth < 1 then safeWidth = 1 end if
+  if safeHeight < 1 then safeHeight = 1 end if
+  ratioX = safeWidth / 640.0
+  ratioY = safeHeight / 480.0
+  ratio = ratioX
+  if ratioY < ratio then ratio = ratioY end if
+  value = native.trunc(ratio + 0.5)
+  if value < 1 then value = 1 end if
+  if value > 4 then value = 4 end if
+  return value * 1.0
+end function
+
+function virtualCanvasLayout(width, height)
+  scale = virtualCanvasScale(width, height)
+  offsetX = (width - 320.0 * scale) * 0.5
+  offsetY = 0.0
+  if scale > 1.0 then offsetY = (height - 200.0 * scale) * 0.5 end if
+  return [offsetX, offsetY, scale]
 end function
 
 function set2dStateOrder()

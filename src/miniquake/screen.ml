@@ -213,10 +213,34 @@ function SCR_DrawCenterString(width, height, currentTime)
     remaining = native.trunc(screenCvar("scr_printspeed", 8.0) * (currentTime - scr_centertime_start))
   end if
   scr_erase_center = 0
-  commands = CenterStringTrace(scr_centerstring, width, height, scr_center_lines, remaining)
-  for each command in commands
-    draw.Draw_Character(command[0], command[1], command[2])
-  end for
+  transform = menu.layout(width, height)
+  commands = []
+  if transform[2] <= 1.0 then
+    commands = CenterStringTrace(scr_centerstring, width, height, scr_center_lines, remaining)
+    for each command in commands
+      draw.Draw_Character(command[0], command[1], command[2])
+    end for
+  else
+    commands = CenterStringTrace(scr_centerstring, 320, 200, scr_center_lines, remaining)
+    for each command in commands
+      if screenConsole is not void and screenConsole.textureId != 0 then
+        draw.character(
+          screenConsole.textureId,
+          transform[0] + command[0] * transform[2],
+          transform[1] + command[1] * transform[2],
+          command[2],
+          transform[2],
+          255,
+        )
+      else
+        draw.Draw_Character(
+          transform[0] + command[0] * transform[2],
+          transform[1] + command[1] * transform[2],
+          command[2],
+        )
+      end if
+    end for
+  end if
   return len(commands)
 end function
 
@@ -733,6 +757,9 @@ function SCR_UpdateScreen(
     statusbar.Sbar_FinaleOverlay()
     SCR_CheckDrawCenterString(width, height, realtime, frameTime, gameInput)
     lastScreenCommands = lastScreenCommands + [["finale"], ["center"]]
+  else if scr_intermission == 3 and gameInput then
+    SCR_CheckDrawCenterString(width, height, realtime, frameTime, gameInput)
+    lastScreenCommands = lastScreenCommands + [["center"]]
   else
     if showCrosshair then
       draw.Draw_Character(scr_vrect[0] + native.trunc(scr_vrect[2] / 2), scr_vrect[1] + native.trunc(scr_vrect[3] / 2), 43)

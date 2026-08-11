@@ -932,6 +932,40 @@ function Sbar_IntermissionNumber(x, y, num, digits, color)
   return true
 end function
 
+function sbarOverlayPic(x, y, pic, transform, transparent)
+  if pic is void then return false end if
+  drawX = transform[0] + x * transform[2]
+  drawY = transform[1] + y * transform[2]
+  command = "pic"
+  if transparent then command = "transpic" end if
+  traceSbar([command, pic.name, drawX, drawY, transform[2]])
+  return draw.Draw_PicSized(
+    pic,
+    drawX,
+    drawY,
+    pic.width * transform[2],
+    pic.height * transform[2],
+    255,
+  )
+end function
+
+function Sbar_IntermissionNumberScaled(x, y, num, digits, color, transform)
+  converted = Sbar_itoa(num)
+  text = bytes(converted[0])
+  start = 0
+  if len(text) > digits then start = len(text) - digits end if
+  if len(text) < digits then x = x + (digits - len(text)) * 24 end if
+  index = start
+  while index < len(text)
+    frame = text[index] - 48
+    if text[index] == 45 then frame = STAT_MINUS end if
+    sbarOverlayPic(x, y, numberPicture(color, frame), transform, true)
+    x = x + 24
+    index = index + 1
+  end while
+  return true
+end function
+
 function Sbar_DeathmatchOverlay()
   global sbarCopyEverything, sbarFullUpdate
   if sbarClient is void then return false end if
@@ -1003,22 +1037,38 @@ function Sbar_IntermissionOverlay()
   if sbarGameType == c.GAME_DEATHMATCH then return Sbar_DeathmatchOverlay() end if
   complete = try(draw.Draw_CachePic("gfx/complete.lmp"))
   inter = try(draw.Draw_CachePic("gfx/inter.lmp"))
-  if complete is not error then sbarDirectPic(64, 24, complete) end if
-  if inter is not error then sbarDirectTransPic(0, 56, inter) end if
   completed = 0.0
   if sbarClient is not void then completed = sbarClient.completedTime end if
   minutes = native.trunc(completed / 60.0)
   seconds = native.trunc(completed - minutes * 60)
-  Sbar_IntermissionNumber(160, 64, minutes, 3, 0)
-  sbarDirectTransPic(234, 64, loadedSbarPicture("num_colon"))
-  sbarDirectTransPic(246, 64, numberPicture(0, native.trunc(seconds / 10)))
-  sbarDirectTransPic(266, 64, numberPicture(0, seconds % 10))
-  Sbar_IntermissionNumber(160, 104, stat(c.STAT_SECRETS, 0), 3, 0)
-  sbarDirectTransPic(232, 104, loadedSbarPicture("num_slash"))
-  Sbar_IntermissionNumber(240, 104, stat(c.STAT_TOTALSECRETS, 0), 3, 0)
-  Sbar_IntermissionNumber(160, 144, stat(c.STAT_MONSTERS, 0), 3, 0)
-  sbarDirectTransPic(232, 144, loadedSbarPicture("num_slash"))
-  Sbar_IntermissionNumber(240, 144, stat(c.STAT_TOTALMONSTERS, 0), 3, 0)
+  transform = menu.layout(sbarWidth, sbarHeight)
+  if transform[2] <= 1.0 then
+    if complete is not error then sbarDirectPic(64, 24, complete) end if
+    if inter is not error then sbarDirectTransPic(0, 56, inter) end if
+    Sbar_IntermissionNumber(160, 64, minutes, 3, 0)
+    sbarDirectTransPic(234, 64, loadedSbarPicture("num_colon"))
+    sbarDirectTransPic(246, 64, numberPicture(0, native.trunc(seconds / 10)))
+    sbarDirectTransPic(266, 64, numberPicture(0, seconds % 10))
+    Sbar_IntermissionNumber(160, 104, stat(c.STAT_SECRETS, 0), 3, 0)
+    sbarDirectTransPic(232, 104, loadedSbarPicture("num_slash"))
+    Sbar_IntermissionNumber(240, 104, stat(c.STAT_TOTALSECRETS, 0), 3, 0)
+    Sbar_IntermissionNumber(160, 144, stat(c.STAT_MONSTERS, 0), 3, 0)
+    sbarDirectTransPic(232, 144, loadedSbarPicture("num_slash"))
+    Sbar_IntermissionNumber(240, 144, stat(c.STAT_TOTALMONSTERS, 0), 3, 0)
+  else
+    if complete is not error then sbarOverlayPic(64, 24, complete, transform, false) end if
+    if inter is not error then sbarOverlayPic(0, 56, inter, transform, true) end if
+    Sbar_IntermissionNumberScaled(160, 64, minutes, 3, 0, transform)
+    sbarOverlayPic(234, 64, loadedSbarPicture("num_colon"), transform, true)
+    sbarOverlayPic(246, 64, numberPicture(0, native.trunc(seconds / 10)), transform, true)
+    sbarOverlayPic(266, 64, numberPicture(0, seconds % 10), transform, true)
+    Sbar_IntermissionNumberScaled(160, 104, stat(c.STAT_SECRETS, 0), 3, 0, transform)
+    sbarOverlayPic(232, 104, loadedSbarPicture("num_slash"), transform, true)
+    Sbar_IntermissionNumberScaled(240, 104, stat(c.STAT_TOTALSECRETS, 0), 3, 0, transform)
+    Sbar_IntermissionNumberScaled(160, 144, stat(c.STAT_MONSTERS, 0), 3, 0, transform)
+    sbarOverlayPic(232, 144, loadedSbarPicture("num_slash"), transform, true)
+    Sbar_IntermissionNumberScaled(240, 144, stat(c.STAT_TOTALMONSTERS, 0), 3, 0, transform)
+  end if
   traceSbar(["intermission", minutes, seconds])
   return true
 end function
@@ -1028,8 +1078,16 @@ function Sbar_FinaleOverlay()
   sbarCopyEverything = true
   finale = try(draw.Draw_CachePic("gfx/finale.lmp"))
   if finale is error then return finale end if
-  sbarDirectTransPic(native.trunc((sbarWidth - finale.width) / 2), 16, finale)
-  traceSbar(["finale", native.trunc((sbarWidth - finale.width) / 2), 16])
+  transform = menu.layout(sbarWidth, sbarHeight)
+  if transform[2] <= 1.0 then
+    drawX = native.trunc((sbarWidth - finale.width) / 2)
+    sbarDirectTransPic(drawX, 16, finale)
+    traceSbar(["finale", drawX, 16])
+  else
+    virtualX = (320.0 - finale.width) * 0.5
+    sbarOverlayPic(virtualX, 16, finale, transform, true)
+    traceSbar(["finale", transform[0] + virtualX * transform[2], transform[1] + 16.0 * transform[2], transform[2]])
+  end if
   return true
 end function
 

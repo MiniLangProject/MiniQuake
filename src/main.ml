@@ -78,7 +78,7 @@ function printUsage()
   print "                             report signon, QuakeC, collision and heap checks"
   print "  --render-smoke BASE MAP [FRAMES] [-game DIR]"
   print "                             run the textured host and exit automatically"
-  print "  --render-evidence BASE MAP FRAME PREFIX [-game DIR]"
+  print "  --render-evidence BASE MAP FRAME PREFIX [-game DIR] [-width N] [-height N] [-menu]"
   print "                             capture deterministic TGA after UI and before swap"
   print "  --render-demo-evidence BASE DEMO FRAME PREFIX [-game DIR]"
   print "                             capture a deterministic demo frame for external comparison"
@@ -282,6 +282,14 @@ function integerNamedOption(arguments, name, fallback, minimum, maximum)
   return fallback
 end function
 
+function hasNamedOption(arguments, name)
+  wanted = bio.lower(name)
+  for each argument in arguments
+    if bio.lower(argument) == wanted then return true end if
+  end for
+  return false
+end function
+
 function optionalFrameCount(arguments, index, fallback, maximum)
   if index >= len(arguments) then return fallback end if
   value = toNumber(arguments[index])
@@ -357,7 +365,9 @@ end function
 
 function runRenderEvidenceCommand(arguments)
   frames = boundedInteger(arguments[3], 128, 1, 1000000)
-  return host.runRenderEvidence([
+  width = integerNamedOption(arguments, "-width", 640, 320, 8192)
+  height = integerNamedOption(arguments, "-height", 480, 200, 8192)
+  renderArguments = [
     "-basedir", arguments[1],
     "-game", gameOption(arguments),
     "-window",
@@ -366,11 +376,13 @@ function runRenderEvidenceCommand(arguments)
     "-nomouse",
     "-nojoy",
     "-noinput",
-    "-width", "640",
-    "-height", "480",
+    "-width", "" + width,
+    "-height", "" + height,
     "-maxframes", "" + frames,
     "+map", arguments[2],
-  ], frames, arguments[4])
+  ]
+  if hasNamedOption(arguments, "-menu") then renderArguments = renderArguments + ["+menu_main"] end if
+  return host.runRenderEvidence(renderArguments, frames, arguments[4])
 end function
 
 function runRenderDemoEvidenceCommand(arguments)
