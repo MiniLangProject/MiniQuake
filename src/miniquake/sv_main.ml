@@ -883,7 +883,6 @@ end function
 // loads and settles QuakeC through the shared low-level runtime, then restarts
 // the four-stage signon on the new map.
 function SV_SpawnServer(state, filesystem, mapName, skill, registry, commandSystem)
-  gc_collect()
   snapshot = []
   changing = state.server.active
   if changing then

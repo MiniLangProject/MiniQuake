@@ -1043,9 +1043,6 @@ function readMove(server, reader, client)
 end function
 
 function dropClient(server, client, crashed)
-  if client.lastMessage <= 0 then
-    return
-  end if
   wasConnected = client.active and client.socket is not void
   if client.socket is not void and not crashed and netmain.NET_CanSendMessage(client.socket) then
     protocolEvents.writeDisconnect(client.message)

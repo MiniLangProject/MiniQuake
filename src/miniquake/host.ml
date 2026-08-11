@@ -562,10 +562,6 @@ function transitionMap(session, mapName, preserveClients, saveChangeParms, defer
       updateTitle(session)
     end if
   end if
-  // Reclaim parser/precache temporaries while the loading plaque is still
-  // active. Gameplay then starts from a compact heap with the real-time
-  // periodic collector disabled above.
-  gc_collect()
   screen.SCR_EndLoadingPlaque(session.console)
   session.startMap = session.server.mapName
 
@@ -2063,7 +2059,7 @@ function Host_Init(session)
   // collection after 8 MiB of tiny allocations. Scanning Quake's live map,
   // VM and renderer graph in the middle of Host_Frame creates visible
   // 50-200 ms pauses. MiniQuake owns a 1 GiB reserved heap and explicit safe
-  // collection points in validation/loading flows; allocation-failure GC
+  // collection points in diagnostic/validation flows; allocation-failure GC
   // remains enabled by the runtime.
   gc_set_limit(0)
   localInit = try(Host_InitLocal(session))
@@ -3141,6 +3137,7 @@ function _Host_Frame(session, elapsedSeconds)
     updateTitle(session)
     compatDiagnostics.checkpoint(session, "screen_title")
   end if
+  compatDiagnostics.checkpoint(session, "screen")
   // Host_Frame decays client lights after SCR_UpdateScreen.  Relinking must
   // first be allowed to clamp cl.time to the latest message, because timedemo
   // particle/light integration uses that final cl.time-cl.oldtime interval.
