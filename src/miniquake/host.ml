@@ -3834,7 +3834,7 @@ function runOpt001AFrameBaseline(baseDirectory, gameDirectory, mapName, mode, wa
   return error(3803, "OPT-001A frame baseline recorded an unexpected frame count")
 end function
 
-function runOpt001BQuakeCExit(session, destination, maximumFrames)
+function opt001bChangeLevelTrigger(session, destination)
   if session.server.machine is void then return error(3823, "OPT-001B QuakeC VM is unavailable") end if
   triggerIndex = -1
   index = session.server.maxClients + 1
@@ -3850,6 +3850,12 @@ function runOpt001BQuakeCExit(session, destination, maximumFrames)
     index = index + 1
   end while
   if triggerIndex < 0 then return error(3823, "OPT-001B trigger_changelevel to " + destination + " is missing") end if
+  return triggerIndex
+end function
+
+function runOpt001BQuakeCExit(session, destination, maximumFrames)
+  triggerIndex = try(opt001bChangeLevelTrigger(session, destination))
+  if triggerIndex is error then return triggerIndex end if
 
   clientIndex = session.server.clients[0].edictIndex
   if not server.runQcTouch(session.server, triggerIndex, clientIndex) then
@@ -3947,6 +3953,96 @@ function runOpt001BTransition(baseDirectory, gameDirectory, frameCount, outputPr
   written = try(fs.writeAllText(outputPrefix + "-summary.json", json))
   shutdown(session)
   if written is error then return written end if
+  return true
+end function
+
+function runEndscreenEvidence(baseDirectory, gameDirectory, width, height, outputPrefix)
+  renderEvidence.reset()
+  session = create([
+    "-basedir", baseDirectory,
+    "-game", gameDirectory,
+    "-window",
+    "-nosound",
+    "-nolan",
+    "-nomouse",
+    "-nojoy",
+    "-noinput",
+    "-width", "" + width,
+    "-height", "" + height,
+    "+vid_wait", "0",
+    "+gl_finish", "0",
+    "+map", "e1m1",
+  ])
+  initialized = try(initialize(session))
+  if initialized is error then shutdown(session); return initialized end if
+  if not session.server.active or session.renderer is void or not session.windowCreated then
+    shutdown(session)
+    return error(3829, "endscreen evidence did not initialize e1m1 renderer")
+  end if
+
+  triggerIndex = try(opt001bChangeLevelTrigger(session, "e1m2"))
+  if triggerIndex is error then shutdown(session); return triggerIndex end if
+  clientIndex = session.server.clients[0].edictIndex
+  if not server.runQcTouch(session.server, triggerIndex, clientIndex) then
+    shutdown(session)
+    return error(3830, "endscreen evidence could not touch the e1m2 changelevel trigger")
+  end if
+
+  targetFrame = session.timing.frameCount + 24
+  configured = try(renderEvidence.configure(outputPrefix, targetFrame))
+  if configured is error then shutdown(session); renderEvidence.reset(); return configured end if
+  index = 0
+  failure = void
+  while index < 48 and not renderEvidence.captured()
+    frameResult = try(frame(session, 0.02))
+    if frameResult is error then failure = frameResult; break end if
+    index = index + 1
+  end while
+  result = renderEvidence.lastResult()
+  captured = renderEvidence.captured()
+  intermission = screen.SCR_IntermissionMode()
+  if failure is error then shutdown(session); renderEvidence.reset(); return failure end if
+  if intermission != 1 then shutdown(session); renderEvidence.reset(); return error(3831, "endscreen evidence expected intermission mode 1, got " + intermission) end if
+  if not captured or result is void then shutdown(session); renderEvidence.reset(); return error(3832, "endscreen evidence framebuffer was not captured") end if
+
+  // Exercise the other endscreen path as well.  The real svc_finale handler
+  // installs the text through SCR_SetIntermission; a high print speed makes
+  // the complete deterministic sample visible in the next few frames.
+  renderEvidence.reset()
+  cvar.setValue(session.cvars, "scr_printspeed", 1000.0)
+  screen.SCR_SetIntermission(2, "THE DIMENSION OF THE DOOMED\nIS COMPLETE", session.console, session.client.time)
+  finaleTarget = session.timing.frameCount + 4
+  finaleConfigured = try(renderEvidence.configure(outputPrefix + "-finale", finaleTarget))
+  if finaleConfigured is error then shutdown(session); renderEvidence.reset(); return finaleConfigured end if
+  finaleIndex = 0
+  finaleFailure = void
+  while finaleIndex < 8 and not renderEvidence.captured()
+    finaleFrame = try(frame(session, 0.02))
+    if finaleFrame is error then finaleFailure = finaleFrame; break end if
+    finaleIndex = finaleIndex + 1
+  end while
+  finaleResult = renderEvidence.lastResult()
+  finaleCaptured = renderEvidence.captured()
+  if finaleFailure is error then shutdown(session); renderEvidence.reset(); return finaleFailure end if
+  if screen.SCR_IntermissionMode() != 2 then shutdown(session); renderEvidence.reset(); return error(3833, "endscreen evidence lost finale mode") end if
+  if not finaleCaptured or finaleResult is void then shutdown(session); renderEvidence.reset(); return error(3834, "finale evidence framebuffer was not captured") end if
+
+  completePicture = try(draw2d.Draw_CachePic("gfx/complete.lmp"))
+  interPicture = try(draw2d.Draw_CachePic("gfx/inter.lmp"))
+  numberPicture = statusbar.loadedSbarPicture("num_0")
+  slashPicture = statusbar.loadedSbarPicture("num_slash")
+  if completePicture is not error then print "  complete_texture=" + completePicture.textureId + " size=" + completePicture.width + "x" + completePicture.height end if
+  if interPicture is not error then print "  inter_texture=" + interPicture.textureId + " size=" + interPicture.width + "x" + interPicture.height end if
+  if numberPicture is not void then print "  number_texture=" + numberPicture.textureId + " size=" + numberPicture.width + "x" + numberPicture.height end if
+  if slashPicture is not void then print "  slash_texture=" + slashPicture.textureId + " size=" + slashPicture.width + "x" + slashPicture.height end if
+  shutdown(session)
+  renderEvidence.reset()
+  print "MiniQuake endscreen evidence: PASS"
+  print "  frame=" + result[2] + " dimensions=" + result[3] + "x" + result[4]
+  print "  tga=" + result[0]
+  print "  summary=" + result[1]
+  print "  finale_tga=" + finaleResult[0]
+  print "  finale_summary=" + finaleResult[1]
   return true
 end function
 

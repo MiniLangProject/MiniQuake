@@ -1105,6 +1105,23 @@ function Draw_PicSized(picture, x, y, width, height, alpha)
   return drawPictureQuad(picture, x, y, width, height, alpha)
 end function
 
+function Draw_PicSizedNearest(picture, x, y, width, height, alpha)
+  if scrap_dirty then
+    uploaded = Scrap_Upload()
+    if uploaded is error then return uploaded end if
+  end if
+  // Integer-scaled Quake UI art must not sample across neighboring entries in
+  // the shared scrap atlas.  Temporarily use nearest filtering for the draw,
+  // then restore the user's ordinary texture mode for native-size pictures.
+  GL_Bind(picture.textureId)
+  gl.textureParameter(gl.GL_TEXTURE_MIN_FILTER, gl.GL_NEAREST)
+  gl.textureParameter(gl.GL_TEXTURE_MAG_FILTER, gl.GL_NEAREST)
+  result = drawPictureQuad(picture, x, y, width, height, alpha)
+  gl.textureParameter(gl.GL_TEXTURE_MIN_FILTER, gl_filter_max)
+  gl.textureParameter(gl.GL_TEXTURE_MAG_FILTER, gl_filter_max)
+  return result
+end function
+
 function Draw_TransPic(x, y, picture)
   if x < 0 or x + picture.width > drawVideoWidth or y < 0 or y + picture.height > drawVideoHeight then
     return error(3335, "Draw_TransPic: bad coordinates")
@@ -1369,6 +1386,21 @@ function Draw_EndDisc()
 end function
 
 function GL_Set2D()
+  global currenttexture
+  // Native world batches can leave texture unit 1 enabled even after the
+  // compatibility renderer has logically ended its multitexture pass.  A 2-D
+  // qpic would then be combined with the last world/lightmap texture, turning
+  // intermission words and digits into striped blocks.  Establish the same
+  // single-texture state that GLQuake's Draw paths assume, and invalidate both
+  // binding caches because they do not track native batch binds per unit.
+  if gl.multitextureAvailable() then
+    gl.activeTexture(1)
+    gl.disable(gl.GL_TEXTURE_2D)
+    gl.activeTexture(0)
+    gl.enable(gl.GL_TEXTURE_2D)
+  end if
+  gl.setBoundTextureForCompatibility(-1)
+  currenttexture = -1
   gl.viewport(drawViewport[0], drawViewport[1], drawViewport[2], drawViewport[3])
   gl.matrixMode(gl.GL_PROJECTION)
   gl.loadIdentity()

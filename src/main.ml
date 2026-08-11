@@ -80,6 +80,8 @@ function printUsage()
   print "                             run the textured host and exit automatically"
   print "  --render-evidence BASE MAP FRAME PREFIX [-game DIR] [-width N] [-height N] [-menu]"
   print "                             capture deterministic TGA after UI and before swap"
+  print "  --endscreen-evidence BASE PREFIX [-game DIR] [-width N] [-height N]"
+  print "                             capture the real e1m1 QuakeC intermission overlay"
   print "  --render-demo-evidence BASE DEMO FRAME PREFIX [-game DIR]"
   print "                             capture a deterministic demo frame for external comparison"
   print "  --original-interop-server BASE MAP PORT FRAMES PREFIX [-game DIR]"
@@ -385,6 +387,14 @@ function runRenderEvidenceCommand(arguments)
   return host.runRenderEvidence(renderArguments, frames, arguments[4])
 end function
 
+function runEndscreenEvidenceCommand(arguments)
+  width = integerNamedOption(arguments, "-width", 2048, 320, 8192)
+  height = integerNamedOption(arguments, "-height", 1152, 200, 8192)
+  result = try(host.runEndscreenEvidence(arguments[1], gameOption(arguments), width, height, arguments[2]))
+  if result is error then print "MiniQuake endscreen evidence: " + result.message; return 3 end if
+  return 0
+end function
+
 function runRenderDemoEvidenceCommand(arguments)
   frames = boundedInteger(arguments[3], 256, 1, 1000000)
   return host.runRenderEvidence([
@@ -599,6 +609,7 @@ function main(args)
   if command == "--validate-runtime" and len(args) >= 3 then return runRuntimeValidationCommand(args) end if
   if command == "--render-smoke" and len(args) >= 3 then return renderSmoke(args) end if
   if command == "--render-evidence" and len(args) >= 5 then return runRenderEvidenceCommand(args) end if
+  if command == "--endscreen-evidence" and len(args) >= 3 then return runEndscreenEvidenceCommand(args) end if
   if command == "--render-demo-evidence" and len(args) >= 5 then return runRenderDemoEvidenceCommand(args) end if
   if command == "--original-interop-server" and len(args) >= 6 then return runOriginalInteropServerCommand(args) end if
   if command == "--original-interop-client" and len(args) >= 6 then return runOriginalInteropClientCommand(args) end if

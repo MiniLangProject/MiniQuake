@@ -939,7 +939,7 @@ function sbarOverlayPic(x, y, pic, transform, transparent)
   command = "pic"
   if transparent then command = "transpic" end if
   traceSbar([command, pic.name, drawX, drawY, transform[2]])
-  return draw.Draw_PicSized(
+  return draw.Draw_PicSizedNearest(
     pic,
     drawX,
     drawY,
