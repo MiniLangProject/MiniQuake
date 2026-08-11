@@ -1060,6 +1060,10 @@ function Draw_PicTrace(x, y, picture, width, height, alpha)
 end function
 
 function Draw_AlphaPic(x, y, picture, alpha)
+  return Draw_AlphaPicSized(x, y, picture, picture.width, picture.height, alpha)
+end function
+
+function Draw_AlphaPicSized(x, y, picture, width, height, alpha)
   if scrap_dirty then
     uploaded = Scrap_Upload()
     if uploaded is error then return uploaded end if
@@ -1071,9 +1075,9 @@ function Draw_AlphaPic(x, y, picture, alpha)
   GL_Bind(picture.textureId)
   gl.begin(gl.GL_QUADS)
   gl.texcoord2(coordinates[0], coordinates[1]); gl.vertex2(x, y)
-  gl.texcoord2(coordinates[2], coordinates[1]); gl.vertex2(x + picture.width, y)
-  gl.texcoord2(coordinates[2], coordinates[3]); gl.vertex2(x + picture.width, y + picture.height)
-  gl.texcoord2(coordinates[0], coordinates[3]); gl.vertex2(x, y + picture.height)
+  gl.texcoord2(coordinates[2], coordinates[1]); gl.vertex2(x + width, y)
+  gl.texcoord2(coordinates[2], coordinates[3]); gl.vertex2(x + width, y + height)
+  gl.texcoord2(coordinates[0], coordinates[3]); gl.vertex2(x, y + height)
   gl.finishPrimitive()
   gl.colorFloat(1.0, 1.0, 1.0, 1.0)
   gl.enable(gl.GL_ALPHA_TEST)
@@ -1187,9 +1191,9 @@ end function
 function Draw_ConsoleBackground(lines)
   if conback is void then return false end if
   threshold = (drawVideoHeight * 3) >> 2
-  if lines > threshold then return Draw_Pic(0, lines - drawVideoHeight, conback) end if
+  if lines > threshold then return Draw_PicSized(conback, 0, lines - drawVideoHeight, drawVideoWidth, drawVideoHeight, 255) end if
   alpha = 1.2 * lines / threshold
-  return Draw_AlphaPic(0, lines - drawVideoHeight, conback, alpha)
+  return Draw_AlphaPicSized(0, lines - drawVideoHeight, conback, drawVideoWidth, drawVideoHeight, alpha)
 end function
 
 function Draw_TileClear(x, y, width, height)

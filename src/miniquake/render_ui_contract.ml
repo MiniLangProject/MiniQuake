@@ -51,6 +51,21 @@ function virtualCanvasScale(width, height)
   return value * 1.0
 end function
 
+// Console glyphs use the same nearest-neighbour integer enlargement as the
+// other indexed Quake UI art.  Keep the backing text buffer in logical pixels
+// so a resize changes wrapping at the same scale that is actually rendered.
+function consoleScale(width, height)
+  return virtualCanvasScale(width, height)
+end function
+
+function consoleLogicalWidth(width, height)
+  return native.trunc(width / consoleScale(width, height))
+end function
+
+function consoleLogicalHeight(width, height, physicalHeight)
+  return native.trunc(physicalHeight / consoleScale(width, height))
+end function
+
 function virtualCanvasLayout(width, height)
   scale = virtualCanvasScale(width, height)
   offsetX = (width - 320.0 * scale) * 0.5

@@ -335,6 +335,16 @@ function main(args)
   gl.Trace_Begin()
   draw.Draw_ConsoleBackground(100)
   commands = gl.Trace_End()
+  consoleVertices = []
+  for each command in commands
+    if command[0] == "vertex" then consoleVertices = consoleVertices + [command[1]] end if
+  end for
+  if len(consoleVertices) != 4 or consoleVertices[1][0] != 640 or consoleVertices[2][0] != 640 then
+    error(3398, "Draw_ConsoleBackground did not follow the resized video width")
+  end if
+  if consoleVertices[0][1] != -100 or consoleVertices[2][1] != 100 then
+    error(3399, "Draw_ConsoleBackground did not follow the resized video height")
+  end if
   emit("Draw_ConsoleBackground", "ui-console", "\"alphaPath\":[" + countCommand(commands, "disable") + "," + countCommand(commands, "enable") + "," + countCommand(commands, "vertex") + "]")
   draw.Draw_TraceSetBacktile(pic)
   gl.Trace_Begin()

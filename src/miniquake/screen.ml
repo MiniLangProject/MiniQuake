@@ -121,16 +121,33 @@ end function
 
 function drawNotify(consoleState, width, height)
   if consoleState is void or consoleState.textureId == 0 or consoleState.active then return false end if
+  scale = renderUiContract.consoleScale(width, height)
   messageMode = keys.destination() == keys.KEY_MESSAGE
   commands = console.Con_DrawNotify(consoleState, screenRealtime, screenCvar("con_notifytime", 3.0), messageMode, keys.chatBuffer)
   for each command in commands
     data = command[3]
     index = 0
     while index < len(data)
-      draw.Draw_Character(command[1] + index * 8, command[2], data[index])
+      draw.character(
+        consoleState.textureId,
+        (command[1] + index * 8) * scale,
+        command[2] * scale,
+        data[index],
+        scale,
+        255,
+      )
       index = index + 1
     end while
-    if command[0] == "chat" then draw.Draw_Character(command[1] + len(data) * 8, command[2], command[4]) end if
+    if command[0] == "chat" then
+      draw.character(
+        consoleState.textureId,
+        (command[1] + len(data) * 8) * scale,
+        command[2] * scale,
+        command[4],
+        scale,
+        255,
+      )
+    end if
   end for
   return true
 end function
@@ -416,23 +433,39 @@ end function
 
 function drawConsoleHeight(consoleState, width, height, visibleHeight)
   if consoleState is void or consoleState.textureId == 0 or visibleHeight <= 0 then return false end if
-  lines = native.trunc(visibleHeight)
-  commands = console.Con_DrawConsole(consoleState, lines, true, screenRealtime)
+  scale = renderUiContract.consoleScale(width, height)
+  physicalLines = native.trunc(visibleHeight)
+  logicalLines = renderUiContract.consoleLogicalHeight(width, height, physicalLines)
+  commands = console.Con_DrawConsole(consoleState, logicalLines, true, screenRealtime)
   for each command in commands
     if command[0] == "background" then
-      draw.Draw_ConsoleBackground(command[1])
+      draw.Draw_ConsoleBackground(physicalLines)
     else if command[0] == "text" then
       data = command[3]
       index = 0
       while index < len(data)
-        draw.Draw_Character(command[1] + index * 8, command[2], data[index])
+        draw.character(
+          consoleState.textureId,
+          (command[1] + index * 8) * scale,
+          command[2] * scale,
+          data[index],
+          scale,
+          255,
+        )
         index = index + 1
       end while
     else if command[0] == "input" then
       data = command[1]
       index = 0
       while index < len(data)
-        draw.Draw_Character(8 + index * 8, lines - 16, data[index])
+        draw.character(
+          consoleState.textureId,
+          (8 + index * 8) * scale,
+          (logicalLines - 16) * scale,
+          data[index],
+          scale,
+          255,
+        )
         index = index + 1
       end while
     end if
@@ -726,7 +759,7 @@ function SCR_UpdateScreen(
   scr_copytop = 0
   scr_copyeverything = 0
   draw.SetVideoSize(width, height)
-  console.Con_CheckResize(consoleState, width)
+  console.Con_CheckResize(consoleState, renderUiContract.consoleLogicalWidth(width, height))
   refdef = SCR_CalcRefdef(width, height, registry, scr_intermission)
   if refdef is error then return refdef end if
   numPages = 2 + native.trunc(screenCvar("gl_triplebuffer", 1.0))

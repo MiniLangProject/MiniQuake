@@ -78,7 +78,7 @@ function printUsage()
   print "                             report signon, QuakeC, collision and heap checks"
   print "  --render-smoke BASE MAP [FRAMES] [-game DIR]"
   print "                             run the textured host and exit automatically"
-  print "  --render-evidence BASE MAP FRAME PREFIX [-game DIR] [-width N] [-height N] [-menu]"
+  print "  --render-evidence BASE MAP FRAME PREFIX [-game DIR] [-width N] [-height N] [-menu] [-console]"
   print "                             capture deterministic TGA after UI and before swap"
   print "  --endscreen-evidence BASE PREFIX [-game DIR] [-width N] [-height N]"
   print "                             capture the real e1m1 QuakeC intermission overlay"
@@ -384,6 +384,7 @@ function runRenderEvidenceCommand(arguments)
     "+map", arguments[2],
   ]
   if hasNamedOption(arguments, "-menu") then renderArguments = renderArguments + ["+menu_main"] end if
+  if hasNamedOption(arguments, "-console") then renderArguments = renderArguments + ["+toggleconsole"] end if
   return host.runRenderEvidence(renderArguments, frames, arguments[4])
 end function
 

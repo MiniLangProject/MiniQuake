@@ -54,6 +54,9 @@ function bp047Finale()
   bp047Array(ui.overlayOrder(false, false, 3, true), ["set2d","tileclear","center"], "cutscene")
   bp047Equal(ui.virtualCanvasScale(640, 480), 1.0, "original UI scale")
   bp047Equal(ui.virtualCanvasScale(2048, 1152), 2.0, "high-DPI integral UI scale")
+  bp047Equal(ui.consoleScale(2048, 1152), 2.0, "high-DPI console scale")
+  bp047Equal(ui.consoleLogicalWidth(2048, 1152), 1024, "high-DPI console width")
+  bp047Equal(ui.consoleLogicalHeight(2048, 1152, 576), 288, "high-DPI console height")
   return true
 end function
 function bp047NormalCount()
