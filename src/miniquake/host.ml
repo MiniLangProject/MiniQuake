@@ -2279,11 +2279,12 @@ function consumeQuakeCControl(session)
     count = count + 1
   end for
   contextValue.consoleLines = []
-  if contextValue.changeLevel != "" then
-    cmd.addText(session.commands, "changelevel \"" + contextValue.changeLevel + "\"\n")
-    contextValue.changeLevel = ""
-    count = count + 1
-  end if
+  // PF_changelevel mirrors the original C builtin and has already appended
+  // exactly one changelevel command to the host command buffer.  Keep its
+  // context marker set for the lifetime of this server, just like the C
+  // builtin's spawn-count guard.  Re-appending and clearing it here made a
+  // QuakeC exit execute the transition twice on the following frame: the first
+  // reached the new map, then the second left its loading plaque over it.
   return count
 end function
 
@@ -3784,21 +3785,23 @@ function runOpt001AFrameBaseline(baseDirectory, gameDirectory, mapName, mode, wa
 end function
 
 function runOpt001BTransition(baseDirectory, gameDirectory, frameCount, outputPrefix)
-  session = create(opt001aSessionArguments(baseDirectory, gameDirectory, "e1m1", "render", 26000))
+  session = create(opt001aSessionArguments(baseDirectory, gameDirectory, "start", "render", 26000))
   initialized = try(initialize(session))
   if initialized is error then shutdown(session); return initialized end if
   if not session.server.active or session.renderer is void then
     shutdown(session)
-    return error(3820, "OPT-001B transition did not initialize e1m1 renderer")
+    return error(3820, "OPT-001B transition did not initialize start renderer")
   end if
 
-  maps = ["e1m1", "e1m2", "e1m1"]
+  // Exercise the real preserved-client changelevel path, beginning with the
+  // start-map exit that exposed the duplicate PF_changelevel dispatch.
+  maps = ["start", "e1m1", "e1m2", "e1m1"]
   json = "{\"schema\":\"MiniQuakeOPT001BTransition/1\",\"maps\":["
   mapIndex = 0
   while mapIndex < len(maps)
     mapName = maps[mapIndex]
     if mapIndex > 0 then
-      changed = try(startMap(session, mapName))
+      changed = try(changeLevel(session, mapName))
       if changed is error then shutdown(session); return changed end if
     end if
     if session.server.mapName != mapName then

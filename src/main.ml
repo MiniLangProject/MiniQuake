@@ -97,7 +97,7 @@ function printUsage()
   print "  --opt001a-handle-plateau BASE MAP WARMUP WINDOW WINDOWS PREFIX [-game DIR] [-port N]"
   print "                             classify process handles as STABLE, PLATEAU or LEAK"
   print "  --opt001b-transition BASE FRAMES PREFIX [-game DIR]"
-  print "                             render e1m1 -> e1m2 -> e1m1 in one session"
+  print "                             render start -> e1m1 -> e1m2 -> e1m1 via changelevel"
   print "  --udp-smoke [TIMEOUT_MS]   exchange a datagram through Winsock loopback"
   print "  --music-smoke BASE GAME TRACK"
   print "                             decode and mix an OGG replacement track"

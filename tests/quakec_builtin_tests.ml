@@ -13,6 +13,7 @@ import miniquake.sizebuf as sz
 import miniquake.cvar as cvar
 import miniquake.cmd as cmd
 import miniquake.server as server
+import miniquake.host as host
 import miniquake.quakec.opcodes as op
 import miniquake.quakec.vm as vm
 import miniquake.quakec.builtins as qc
@@ -334,10 +335,22 @@ function testChangeLevelOneShot()
   setParmString(machine, 0, "e1m2")
   qc.PF_changelevel(machine)
   firstText = contextValue.commands.text
+  equal(firstText, "changelevel e1m2\n", "one command queued")
   setParmString(machine, 0, "e1m3")
   qc.PF_changelevel(machine)
   equal(contextValue.changeLevel, "e1m2", "first level retained")
   equal(contextValue.commands.text, firstText, "second command suppressed")
+
+  // The host consumes diagnostics after the server frame. It must neither
+  // enqueue PF_changelevel again nor clear its per-server one-shot marker.
+  session = host.create(["-headless", "-nosound", "-nolan"])
+  session.commands = contextValue.commands
+  session.server.machine = machine
+  host.consumeQuakeCControl(session)
+  equal(contextValue.changeLevel, "e1m2", "one-shot marker retained")
+  equal(session.commands.text, firstText, "host does not duplicate command")
+  qc.PF_changelevel(machine)
+  equal(session.commands.text, firstText, "later frame remains suppressed")
   return true
 end function
 
