@@ -2213,7 +2213,19 @@ end function
 
 function consumeClientEvents(session)
   pending = client.consumeMessages(session.client)
+  processable = []
   for each item in pending
+    suppress = false
+    if item.command == "svc_stufftext" and session.server.active and session.client.connected and session.client.signon == c.SIGNONS then
+      // SV_SpawnServer sends every preserved client "reconnect\n" before it
+      // builds the replacement server.  MiniQuake completes its local
+      // loopback signon synchronously inside transitionMap; by the time this
+      // queued stufftext reaches CL_NextDemo/command execution it is stale.
+      // Executing it again resets the already-active client to signon 0 and
+      // leaves SCR_BeginLoadingPlaque frozen over the new map.  Remote clients
+      // and incomplete local signons still consume the original command.
+      if item.payload == "reconnect\n" then suppress = true end if
+    end if
     if item.command == "svc_cdtrack" and session.mixer.enabled and not common.hasParm(session.arguments, "-nocdaudio") then
       track = item.payload[0]
       if session.demoPlayback is not void and session.demoPlayback.recording.forcedTrack != -1 then
@@ -2233,9 +2245,10 @@ function consumeClientEvents(session)
     else if item.command == "svc_cutscene" then
       screen.SCR_SetIntermission(3, item.payload, session.console, session.client.time)
     end if
+    if not suppress then processable = processable + [item] end if
   end for
   result = clientEffects.process(
-    pending,
+    processable,
     session.client,
     session.player,
     session.mixer,
@@ -3909,8 +3922,22 @@ function runOpt001BTransition(baseDirectory, gameDirectory, frameCount, outputPr
       shutdown(session)
       return error(3822, "OPT-001B transition missing renderer for " + mapName)
     end if
+    renderedBefore = session.renderedFrames
     ran = try(opt001aRunFrames(session, frameCount, "transition_" + mapName))
     if ran is error then shutdown(session); return ran end if
+    if session.client.signon != c.SIGNONS then
+      shutdown(session)
+      return error(3826, "OPT-001B transition left " + mapName + " at client signon " + session.client.signon)
+    end if
+    if screen.SCR_ShouldSkipUpdate(session.timing.realtime) then
+      shutdown(session)
+      return error(3827, "OPT-001B transition left the loading plaque active on " + mapName)
+    end if
+    renderedDelta = session.renderedFrames - renderedBefore
+    if renderedDelta != frameCount then
+      shutdown(session)
+      return error(3828, "OPT-001B transition rendered " + renderedDelta + "/" + frameCount + " playable frames on " + mapName)
+    end if
     if mapIndex > 0 then json = json + "," end if
     json = json + "{\"map\":\"" + mapName + "\",\"frames\":" + frameCount + ",\"renderer\":true}"
     print "MiniQuake OPT-001B transition " + mapName + ": PASS"
