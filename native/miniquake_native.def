@@ -164,4 +164,5 @@ EXPORTS
   mq_gl_draw_alias_model
   mq_gl_static_geometry_call
   mq_gl_static_geometry_call_batch
+  mq_gl_static_geometry_prepare
   mq_gl_static_geometry_clear

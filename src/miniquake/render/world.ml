@@ -351,6 +351,8 @@ function upload(renderer)
   if configured is error then return error(3904, "upload_configure: " + configured.message) end if
   lightmapsBuilt = try(GL_BuildLightmaps())
   if lightmapsBuilt is error then return error(3905, "upload_lightmaps: " + lightmapsBuilt.message) end if
+  staticGeometryBuilt = try(precacheStaticGeometry(renderer))
+  if staticGeometryBuilt is error then return error(3932, "upload_static_geometry: " + staticGeometryBuilt.message) end if
   index = 0
   while index < len(renderer.textures)
     texture = renderer.textures[index]
@@ -1841,6 +1843,44 @@ function DrawGLPoly(poly)
   end for
   gl.finishPrimitive()
   return true
+end function
+
+function precacheStaticGeometry(renderer)
+  if renderer is void or gl.traceEnabled() then return 0 end if
+  count = 0
+  index = 0
+  while index < len(renderer.surfaces)
+    surface = renderer.surfaces[index]
+    if surface is not void and len(surface.vertices) >= 3 and (surface.flags & (c.SURF_DRAWSKY | c.SURF_DRAWTURB | GLQUAKE_SURF_UNDERWATER)) == 0 then
+      prepared = gl.staticGeometryPrepare(surface, 0)
+      // Cache exhaustion or a driver allocation failure must never make an
+      // otherwise valid BSP unloadable. Remaining surfaces stay on the
+      // immediate-mode fallback path used before this startup optimization.
+      if prepared < 0 then return count end if
+      if prepared == 0 then
+        gl.begin(gl.GL_POLYGON)
+        for each vertex in surface.vertices
+          gl.texcoord2(vertex.s, vertex.t)
+          gl.vertex3(vertex.position.x, vertex.position.y, vertex.position.z)
+        end for
+        gl.finishPrimitive()
+      end if
+
+      prepared = gl.staticGeometryPrepare(surface, 1)
+      if prepared < 0 then return count end if
+      if prepared == 0 then
+        gl.begin(gl.GL_POLYGON)
+        for each vertex in surface.vertices
+          gl.texcoord2(vertex.lightS, vertex.lightT)
+          gl.vertex3(vertex.position.x, vertex.position.y, vertex.position.z)
+        end for
+        gl.finishPrimitive()
+      end if
+      count = count + 2
+    end if
+    index = index + 1
+  end while
+  return count
 end function
 
 function compatSurfaceBatchKeys(surfaces)

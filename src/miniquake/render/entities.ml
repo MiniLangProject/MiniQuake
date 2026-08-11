@@ -93,6 +93,7 @@ end function
 
 function create(filesystem, palette, modelPrecache)
   global renderModelRegistry
+  aliasMesh.clearCaches()
   renderModelRegistry = modelRegistry.Mod_Init(modelRegistry.create(), void)
   draw2d.Draw_SetPalette(palette)
   renderer = t.EntityRenderer(filesystem, palette, [], 0)
@@ -225,6 +226,28 @@ function upload(renderer, model)
   if model.kind == MODEL_ALIAS then return uploadAlias(renderer, model) end if
   if model.kind == MODEL_SPRITE then return uploadSprite(renderer, model) end if
   return false
+end function
+
+function precache(renderer)
+  if renderer is void then return error(3940, "entity precache: renderer is void") end if
+  count = 0
+  index = 0
+  while index < len(renderer.models)
+    model = renderer.models[index]
+    if model is not void and model.kind == MODEL_ALIAS then
+      uploaded = try(uploadAlias(renderer, model))
+      if uploaded is error then return error(3941, "alias upload " + model.name + ": " + uploaded.message) end if
+      prepared = try(aliasMesh.precacheAliasModel(model.aliasModel))
+      if prepared is error then return error(3942, "alias mesh " + model.name + ": " + prepared.message) end if
+      count = count + prepared
+    else if model is not void and model.kind == MODEL_SPRITE then
+      uploaded = try(uploadSprite(renderer, model))
+      if uploaded is error then return error(3943, "sprite upload " + model.name + ": " + uploaded.message) end if
+      count = count + 1
+    end if
+    index = index + 1
+  end while
+  return count
 end function
 
 function cycleIndex(intervals, time, count)

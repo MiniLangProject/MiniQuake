@@ -28,8 +28,8 @@ struct AliasMesh
   numOrder
 end struct
 
-const ALIAS_MESH_CACHE_SIZE = 256
-const ALIAS_BATCH_CACHE_SIZE = 2048
+const ALIAS_MESH_CACHE_SIZE = 512
+const ALIAS_BATCH_CACHE_SIZE = 4096
 
 aliasmodel = void
 paliashdr = void
@@ -59,6 +59,16 @@ aliasBatchFrameKeys = array(ALIAS_BATCH_CACHE_SIZE, 0)
 aliasBatchMeshKeys = array(ALIAS_BATCH_CACHE_SIZE, 0)
 aliasBatchValues = array(ALIAS_BATCH_CACHE_SIZE)
 aliasShadeDotRows = array(16, void)
+
+function clearCaches()
+  global meshCacheModelKeys, meshCacheValues, aliasBatchFrameKeys, aliasBatchMeshKeys, aliasBatchValues
+  meshCacheModelKeys = array(ALIAS_MESH_CACHE_SIZE, 0)
+  meshCacheValues = array(ALIAS_MESH_CACHE_SIZE)
+  aliasBatchFrameKeys = array(ALIAS_BATCH_CACHE_SIZE, 0)
+  aliasBatchMeshKeys = array(ALIAS_BATCH_CACHE_SIZE, 0)
+  aliasBatchValues = array(ALIAS_BATCH_CACHE_SIZE)
+  return true
+end function
 
 function triangleVertex(triangle, index)
   if index == 0 then return triangle.vertex0 end if
@@ -286,7 +296,12 @@ end function
 function cachedMesh(model)
   key = nativeRawValue(model)
   slot = ((key >> 3) ^ (key >> 13)) & (ALIAS_MESH_CACHE_SIZE - 1)
-  if meshCacheModelKeys[slot] == key and meshCacheValues[slot] is not void then return meshCacheValues[slot] end if
+  start = slot
+  while meshCacheValues[slot] is not void
+    if meshCacheModelKeys[slot] == key then return meshCacheValues[slot] end if
+    slot = (slot + 1) & (ALIAS_MESH_CACHE_SIZE - 1)
+    if slot == start then return void end if
+  end while
   return void
 end function
 
@@ -300,6 +315,11 @@ function GL_MakeAliasModelDisplayLists(model, header)
   if result is error then return result end if
   key = nativeRawValue(model)
   slot = ((key >> 3) ^ (key >> 13)) & (ALIAS_MESH_CACHE_SIZE - 1)
+  start = slot
+  while meshCacheValues[slot] is not void and meshCacheModelKeys[slot] != key
+    slot = (slot + 1) & (ALIAS_MESH_CACHE_SIZE - 1)
+    if slot == start then break end if
+  end while
   meshCacheModelKeys[slot] = key
   meshCacheValues[slot] = result
   return result
@@ -329,9 +349,15 @@ function aliasBatchData(frame, mesh)
   frameKey = nativeRawValue(frame)
   meshKey = nativeRawValue(mesh)
   cacheIndex = ((frameKey >> 3) ^ (frameKey >> 17) ^ (meshKey >> 7)) & (ALIAS_BATCH_CACHE_SIZE - 1)
-  if aliasBatchFrameKeys[cacheIndex] == frameKey and aliasBatchMeshKeys[cacheIndex] == meshKey and aliasBatchValues[cacheIndex] is not void then
-    return aliasBatchValues[cacheIndex]
-  end if
+  cacheStart = cacheIndex
+  cacheFull = false
+  while aliasBatchValues[cacheIndex] is not void
+    if aliasBatchFrameKeys[cacheIndex] == frameKey and aliasBatchMeshKeys[cacheIndex] == meshKey then
+      return aliasBatchValues[cacheIndex]
+    end if
+    cacheIndex = (cacheIndex + 1) & (ALIAS_BATCH_CACHE_SIZE - 1)
+    if cacheIndex == cacheStart then cacheFull = true; break end if
+  end while
 
   byteCount = 4
   for each command in mesh.commands
@@ -364,10 +390,25 @@ function aliasBatchData(frame, mesh)
       index = index + 1
     end while
   end for
+  if cacheFull then cacheIndex = cacheStart end if
   aliasBatchFrameKeys[cacheIndex] = frameKey
   aliasBatchMeshKeys[cacheIndex] = meshKey
   aliasBatchValues[cacheIndex] = data
   return data
+end function
+
+function precacheAliasModel(model)
+  if model is void then return 0 end if
+  mesh = try(GL_MakeAliasModelDisplayLists(model, model))
+  if mesh is error then return mesh end if
+  count = 0
+  for each frameSet in model.frames
+    for each frame in frameSet.frames
+      aliasBatchData(frame, mesh)
+      count = count + 1
+    end for
+  end for
+  return count
 end function
 
 function aliasShadeDotData(row)

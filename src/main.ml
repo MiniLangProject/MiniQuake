@@ -444,7 +444,7 @@ function runOpt001AMapParseCommand(arguments)
 end function
 
 function runOpt001AFrameBaselineCommand(arguments)
-  warmup = boundedInteger(arguments[4], 300, 1, 1000000)
+  warmup = boundedInteger(arguments[4], 300, 0, 1000000)
   measure = boundedInteger(arguments[5], 3000, 1, 1000000)
   result = try(host.runOpt001AFrameBaseline(
     arguments[1], gameOption(arguments), arguments[2], bio.lower(arguments[3]),

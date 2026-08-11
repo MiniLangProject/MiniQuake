@@ -381,6 +381,10 @@ function staticGeometryCallBatch(keys, passId)
   return native.glStaticGeometryCallBatch(keys, len(keys), passId) > 0
 end function
 
+function staticGeometryPrepare(objectValue, passId)
+  return native.glStaticGeometryPrepare(nativeRawValue(objectValue), passId)
+end function
+
 function clearStaticGeometryCache()
   native.glStaticGeometryClear()
 end function

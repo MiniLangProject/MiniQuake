@@ -542,6 +542,10 @@ function transitionMap(session, mapName, preserveClients, saveChangeParms, defer
     // boxed vertex members.
     session.entityRenderer = try(entityRenderer.create(session.filesystem, palette, session.server.modelPrecache))
     if session.entityRenderer is error then return session.entityRenderer end if
+    if session.windowCreated then
+      precachedEntities = try(entityRenderer.precache(session.entityRenderer))
+      if precachedEntities is error then return error(3931, "startup entity precache: " + precachedEntities.message) end if
+    end if
     session.renderer = try(worldRenderer.create(session.server.worldModel, palette))
     if session.renderer is error then return session.renderer end if
     if session.windowCreated then
@@ -551,6 +555,10 @@ function transitionMap(session, mapName, preserveClients, saveChangeParms, defer
     if session.windowCreated then
       screenInitialized = try(screen.initialize(session.console, session.menu, session.filesystem, palette, session.width, session.height, session.cvars))
       if screenInitialized is error then return screenInitialized end if
+      // SetWindowText and the compositor's first title repaint can each block
+      // for several milliseconds.  Initialize the FPS title under the loading
+      // plaque instead of charging it to the first playable frame.
+      updateTitle(session)
     end if
   end if
   screen.SCR_EndLoadingPlaque(session.console)
@@ -3725,7 +3733,10 @@ function runOpt001AFrameBaseline(baseDirectory, gameDirectory, mapName, mode, wa
   warmed = try(opt001aRunFrames(session, warmupFrames, "warmup"))
   if warmed is error then shutdown(session); return warmed end if
 
-  gc_collect()
+  // A zero-warmup run measures the real post-load first frame.  Do not insert
+  // a synthetic full collection that the interactive engine never performs at
+  // this boundary; warmed leak/plateau measurements retain the GC barrier.
+  if warmupFrames > 0 then gc_collect() end if
   before = resourceSnapshot(session)
   optBaseline.configure(measureFrames)
   print "MiniQuake OPT-001A baseline measurement"

@@ -516,6 +516,7 @@ static mq_i32 mq_static_geometry_count = 0;
 static mq_i32 mq_static_geometry_pending = 0;
 static mq_i32 mq_static_geometry_recording = 0;
 static mq_u32 mq_static_geometry_pending_list = 0;
+static mq_i32 mq_static_geometry_pending_execute = 1;
 
 static mq_i32 mq_static_geometry_find(mq_u64 key, mq_i32 pass, mq_u32 *slot_out) {
     mq_u64 mixed = key ^ (key >> 33) ^ ((mq_u64)(mq_u32)pass * 0x9E3779B185EBCA87ull);
@@ -556,6 +557,33 @@ MQ_EXPORT mq_i32 mq_gl_static_geometry_call(mq_u64 key_value, mq_i32 pass_value)
         mq_static_geometry_hash[slot] = (mq_u32)mq_static_geometry_count + 1u;
         mq_static_geometry_count += 1;
         mq_static_geometry_pending_list = list_id;
+        mq_static_geometry_pending_execute = 1;
+        mq_static_geometry_pending = 1;
+    }
+    return 0;
+}
+
+/* Create a list without executing its geometry.  Map loading uses this to
+ * move driver display-list compilation out of the first playable frames. */
+MQ_EXPORT mq_i32 mq_gl_static_geometry_prepare(mq_u64 key_value, mq_i32 pass_value) {
+    mq_u64 key = key_value;
+    mq_i32 pass = pass_value;
+    mq_u32 slot;
+    mq_i32 found;
+    if (mq_static_geometry_pending || mq_static_geometry_recording) return -1;
+    found = mq_static_geometry_find(key, pass, &slot);
+    if (found >= 0) return 1;
+    if (mq_static_geometry_count >= MQ_STATIC_GEOMETRY_CACHE_MAX) return -1;
+    {
+        mq_u32 list_id = glGenLists(1);
+        if (list_id == 0) return -1;
+        mq_static_geometry_cache[mq_static_geometry_count].key = key;
+        mq_static_geometry_cache[mq_static_geometry_count].pass = pass;
+        mq_static_geometry_cache[mq_static_geometry_count].list_id = list_id;
+        mq_static_geometry_hash[slot] = (mq_u32)mq_static_geometry_count + 1u;
+        mq_static_geometry_count += 1;
+        mq_static_geometry_pending_list = list_id;
+        mq_static_geometry_pending_execute = 0;
         mq_static_geometry_pending = 1;
     }
     return 0;
@@ -605,6 +633,7 @@ MQ_EXPORT void mq_gl_static_geometry_clear(void) {
     mq_static_geometry_count = 0;
     mq_static_geometry_pending = 0;
     mq_static_geometry_pending_list = 0;
+    mq_static_geometry_pending_execute = 1;
 }
 
 #define MQ_FALSE 0
@@ -1489,6 +1518,25 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
 
     ShowWindow(mq_window, MQ_SW_SHOW);
     UpdateWindow(mq_window);
+    /* Pay the one-time DWM/ICD present cost while the window is still in its
+     * startup phase, not on the first playable map frame. */
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(0x00004000u | 0x00000100u); /* GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT */
+    SwapBuffers(mq_window_dc);
+    glClear(0x00004000u | 0x00000100u);
+    /* Some ICDs apply their default interval on the first present.  Assert the
+     * GLQuake interval again after that present so gameplay is not recapped. */
+    {
+        mq_wgl_swap_interval_proc swap_interval =
+            (mq_wgl_swap_interval_proc)wglGetProcAddress("wglSwapIntervalEXT");
+        if (swap_interval != MQ_NULL &&
+            swap_interval != (mq_wgl_swap_interval_proc)1 &&
+            swap_interval != (mq_wgl_swap_interval_proc)2 &&
+            swap_interval != (mq_wgl_swap_interval_proc)3 &&
+            swap_interval != (mq_wgl_swap_interval_proc)-1) {
+            swap_interval(0);
+        }
+    }
     mq_clear_input_events();
     mq_running = 1;
     mq_active_app = 1;
@@ -2522,7 +2570,10 @@ MQ_EXPORT const char *mq_udp_reverse_name(const char *address_text) {
 
 MQ_EXPORT void mq_gl_begin(mq_u32 mode) {
     if (mq_static_geometry_pending && !mq_static_geometry_recording) {
-        glNewList(mq_static_geometry_pending_list, GL_COMPILE_AND_EXECUTE);
+        glNewList(
+            mq_static_geometry_pending_list,
+            mq_static_geometry_pending_execute ? GL_COMPILE_AND_EXECUTE : 0x1300u /* GL_COMPILE */
+        );
         mq_static_geometry_pending = 0;
         mq_static_geometry_recording = 1;
     }
@@ -2532,6 +2583,7 @@ MQ_EXPORT void mq_gl_end(void) { glEnd();
         glEndList();
         mq_static_geometry_recording = 0;
         mq_static_geometry_pending_list = 0;
+        mq_static_geometry_pending_execute = 1;
     }
 }
 MQ_EXPORT void mq_gl_vertex2(mq_u32 x_bits, mq_u32 y_bits) { glVertex2f(mq_bits_to_float(x_bits), mq_bits_to_float(y_bits)); }

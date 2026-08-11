@@ -33,10 +33,10 @@ function opt001cr3r8VideoState()
 end function
 
 function main(args)
-  opt001cr3r8Check(buildInfo.OPTIMIZATION_STATUS == "opt001cr3r8_performance_audio_ui_candidate_v1", "optimization status")
+  opt001cr3r8Check(buildInfo.OPTIMIZATION_STATUS == "opt001d_performance_audio_ui_candidate_v1", "optimization status")
   opt001cr3r8Check(buildInfo.OPTIMIZATION_FINGERPRINT == 0x1c001c10, "optimization fingerprint")
   opt001cr3r8Check(buildInfo.OPTIMIZATION_PARENT == "OPT-001CR3R7", "optimization parent")
-  opt001cr3r8Check(buildInfo.OPTIMIZATION_DELIVERY_REVISION == "OPT-001CR3R8", "optimization delivery revision")
+  opt001cr3r8Check(buildInfo.OPTIMIZATION_DELIVERY_REVISION == "OPT-001D", "optimization delivery revision")
   opt001cr3r8Check(buildInfo.OPTIMIZATION_DELIVERY_PARENT == "OPT-001CR3R7", "optimization delivery parent")
   opt001cr3r8Check(buildInfo.OPT001C_STATUS == "opt001c_frame_allocation_candidate_v1", "frozen OPT-001C status")
   opt001cr3r8Check(buildInfo.OPT001C_FINGERPRINT == 0x1c001c03, "frozen OPT-001C fingerprint")
