@@ -16,6 +16,7 @@ import miniquake.input as input
 import miniquake.platform.win32 as win
 import miniquake.render.gl11 as gl
 import miniquake.native as native
+import miniquake.byteio as bio
 import miniquake.sound.mixer as sound
 import std.math as stdmath
 import std.string as string
@@ -112,6 +113,39 @@ end struct
 currentVideoState = void
 videoMenuSelection = NO_MODE
 videoMenuDisplayFocus = true
+videoMenuRendererFocus = false
+rendererSelectionOverride = -1
+
+function VID_RendererFromName(name)
+  lowered = bio.lower(name)
+  if lowered == "direct3d" or lowered == "direct3d9" or lowered == "directx" or lowered == "d3d9" or lowered == "dx9" then return win.RENDER_DIRECT3D9 end if
+  return win.RENDER_OPENGL
+end function
+
+function VID_RendererName(backend)
+  if backend == win.RENDER_DIRECT3D9 then return "DIRECT3D 9" end if
+  return "OPENGL"
+end function
+
+function VID_CommandLineRenderer(arguments)
+  if common.hasParm(arguments, "-directx") or common.hasParm(arguments, "-d3d9") then return win.RENDER_DIRECT3D9 end if
+  if common.hasParm(arguments, "-opengl") then return win.RENDER_OPENGL end if
+  named = common.parmValue(arguments, "-renderer", "")
+  if named != "" then return VID_RendererFromName(named) end if
+  return -1
+end function
+
+function VID_SelectConfiguredRenderer(arguments, registry)
+  global rendererSelectionOverride
+  selected = rendererSelectionOverride
+  rendererSelectionOverride = -1
+  if selected < 0 then selected = VID_CommandLineRenderer(arguments) end if
+  if selected < 0 and registry is not void and cvar.find(registry, "vid_renderer") is not void then selected = VID_RendererFromName(cvar.variableString(registry, "vid_renderer")) end if
+  if selected < 0 then selected = win.RENDER_OPENGL end if
+  if not win.rendererAvailable(selected) then return error(3916, VID_RendererName(selected) + " is not available") end if
+  if not win.selectRenderer(selected) then return error(3917, "Could not select " + VID_RendererName(selected)) end if
+  return selected
+end function
 
 function makeMode(type, width, height, bpp, frequency, halfscreen)
   description = "" + width + "x" + height
@@ -917,6 +951,10 @@ function VID_FindRequestedMode(arguments)
 end function
 
 function VID_Init(arguments, registry, palette, createNative)
+  if createNative then
+    selectedRenderer = try(VID_SelectConfiguredRenderer(arguments, registry))
+    if selectedRenderer is error then return selectedRenderer end if
+  end if
   state = createVideoState()
   VID_UseState(state)
   state.arguments = arguments
@@ -954,6 +992,67 @@ function VID_Init(arguments, registry, palette, createNative)
   return state
 end function
 
+function VID_RestartRenderer(backend)
+  global rendererSelectionOverride
+  state = VID_State()
+  if backend == win.renderer() then
+    state.lastModeMessage = VID_RendererName(backend) + " renderer active."
+    return true
+  end if
+  if backend != win.RENDER_OPENGL and backend != win.RENDER_DIRECT3D9 then return error(3918, "Unknown renderer") end if
+  if not win.rendererAvailable(backend) then return error(3919, VID_RendererName(backend) + " is not available") end if
+  oldBackend = win.renderer()
+  oldWidth = state.windowWidth
+  oldHeight = state.windowHeight
+  oldFullscreen = state.modeState == MS_FULLDIB
+  oldPalette = state.palette
+  oldArguments = state.arguments
+  oldRegistry = state.registry
+  oldCreateNative = state.createNative
+  oldMixer = state.soundMixer
+  VID_Shutdown()
+  rendererSelectionOverride = backend
+  restarted = VID_Init(oldArguments, oldRegistry, oldPalette, oldCreateNative)
+  if restarted is error then
+    rendererSelectionOverride = oldBackend
+    recovered = VID_Init(oldArguments, oldRegistry, oldPalette, oldCreateNative)
+    if recovered is error then return error(3920, "Renderer switch and rollback failed: " + restarted.message) end if
+    VID_State().soundMixer = oldMixer
+    VID_State().soundBlocked = true
+    AppActivate(true, false)
+    return restarted
+  end if
+  state = VID_State()
+  state.soundMixer = oldMixer
+  state.soundBlocked = true
+  modeNumber = NO_MODE
+  index = 1
+  while index < len(state.modes)
+    mode = state.modes[index]
+    if mode.width == oldWidth and mode.height == oldHeight and modeNumber == NO_MODE then modeNumber = index end if
+    index = index + 1
+  end while
+  if modeNumber != NO_MODE then
+    applied = VID_ApplyDisplayMode(modeNumber, oldFullscreen)
+    if applied is error then state.lastModeMessage = applied.message end if
+  end if
+  if oldRegistry is not void and cvar.find(oldRegistry, "vid_renderer") is not void then cvar.set(oldRegistry, "vid_renderer", VID_RendererName(backend)) end if
+  AppActivate(true, false)
+  state.lastModeMessage = VID_RendererName(backend) + " renderer active."
+  return true
+end function
+
+function VID_ApplyConfiguredRenderer()
+  state = VID_State()
+  if state.registry is void then return false end if
+  if VID_CommandLineRenderer(state.arguments) >= 0 then return false end if
+  target = VID_RendererFromName(cvar.variableString(state.registry, "vid_renderer"))
+  if target == win.renderer() then return false end if
+  applied = VID_RestartRenderer(target)
+  if applied is error then state.lastModeMessage = applied.message; return false end if
+  return true
+end function
+
 function VID_MenuModeCount()
   count = len(VID_State().modes) - 1
   if count < 0 then count = 0 end if
@@ -962,9 +1061,10 @@ function VID_MenuModeCount()
 end function
 
 function VID_MenuReset()
-  global videoMenuSelection, videoMenuDisplayFocus
+  global videoMenuSelection, videoMenuDisplayFocus, videoMenuRendererFocus
   state = VID_State()
   videoMenuDisplayFocus = true
+  videoMenuRendererFocus = false
   count = VID_MenuModeCount()
   if count == 0 then videoMenuSelection = NO_MODE; return videoMenuSelection end if
   selected = state.currentMode
@@ -1013,6 +1113,11 @@ end function
 function VID_MenuDisplayFocused()
   global videoMenuDisplayFocus
   return videoMenuDisplayFocus
+end function
+
+function VID_MenuRendererFocused()
+  global videoMenuRendererFocus
+  return videoMenuRendererFocus
 end function
 
 function VID_SaveResolutionCvars(state, width, height, bpp)
@@ -1175,6 +1280,7 @@ function VID_MenuDraw()
   commands = [
     ["picture", "gfx/vidmodes.lmp"],
     ["heading", "Video Mode"],
+    ["renderer", VID_RendererName(win.renderer()), VID_MenuRendererFocused()],
     ["display", modeName, VID_MenuDisplayFocused()],
   ]
   count = 0
@@ -1197,10 +1303,21 @@ function VID_MenuDraw()
 end function
 
 function VID_MenuKey(key)
-  global videoMenuDisplayFocus
+  global videoMenuDisplayFocus, videoMenuRendererFocus
   if key == keys.K_ESCAPE then return "options" end if
+  if videoMenuRendererFocus then
+    if key == keys.K_DOWNARROW then videoMenuRendererFocus = false; videoMenuDisplayFocus = true; return "move" end if
+    if key == keys.K_UPARROW then videoMenuRendererFocus = false; videoMenuDisplayFocus = false; return "move" end if
+    if key == keys.K_LEFTARROW or key == keys.K_RIGHTARROW or key == keys.K_ENTER then
+      target = win.RENDER_DIRECT3D9
+      if win.renderer() == win.RENDER_DIRECT3D9 then target = win.RENDER_OPENGL end if
+      return ["renderer_switch", target]
+    end if
+    return "none"
+  end if
   if videoMenuDisplayFocus then
-    if key == keys.K_UPARROW or key == keys.K_DOWNARROW then videoMenuDisplayFocus = false; return "move" end if
+    if key == keys.K_UPARROW then videoMenuDisplayFocus = false; videoMenuRendererFocus = true; return "move" end if
+    if key == keys.K_DOWNARROW then videoMenuDisplayFocus = false; return "move" end if
     if key == keys.K_LEFTARROW or key == keys.K_RIGHTARROW or key == keys.K_ENTER then
       toggled = try(VID_ToggleFullscreen())
       if toggled is error then VID_State().lastModeMessage = toggled.message; return "mode_error" end if

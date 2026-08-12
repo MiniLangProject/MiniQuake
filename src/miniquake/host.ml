@@ -173,6 +173,7 @@ function createCvars(commandLine, registered)
   registerCvar(registry, "vid_height", "0", true, false)
   registerCvar(registry, "vid_bpp", "0", true, false)
   registerCvar(registry, "vid_fullscreen", "0", true, false)
+  registerCvar(registry, "vid_renderer", "OPENGL", true, false)
   registerCvar(registry, "vid_wait", "0", false, false)
   registerCvar(registry, "vid_nopageflip", "0", true, false)
   registerCvar(registry, "_vid_wait_override", "0", true, false)
@@ -913,6 +914,43 @@ function destroyScene(session)
   if session.entityRenderer is not void then entityRenderer.destroy(session.entityRenderer); session.entityRenderer = void end if
   if session.renderer is not void then worldRenderer.destroy(session.renderer) end if
   session.renderer = void
+  return true
+end function
+
+function rebuildRendererResources(session)
+  videoState = glvid.VID_State()
+  palette = videoState.palette
+  modelPrecache = session.server.modelPrecache
+  if len(session.client.modelPrecache) > 1 then modelPrecache = session.client.modelPrecache end if
+  if session.server.worldModel is not void then
+    session.entityRenderer = try(entityRenderer.create(session.filesystem, palette, modelPrecache))
+    if session.entityRenderer is error then return session.entityRenderer end if
+    precached = try(entityRenderer.precache(session.entityRenderer))
+    if precached is error then return precached end if
+    session.renderer = try(worldRenderer.create(session.server.worldModel, palette))
+    if session.renderer is error then return session.renderer end if
+    worldRenderer.R_SetMultitextureCompatibility(videoState.multitexture, false)
+    uploaded = try(worldRenderer.upload(session.renderer))
+    if uploaded is error then return uploaded end if
+  end if
+  session.width = win.width()
+  session.height = win.height()
+  initialized = try(screen.initialize(session.console, session.menu, session.filesystem, palette, session.width, session.height, session.cvars))
+  if initialized is error then return initialized end if
+  menu.M_SetVideoCallbacks(session.menu, glvid.VID_MenuDrawCallback, glvid.VID_MenuKeyCallback)
+  screen.SCR_ConfigureClient(session.client)
+  return true
+end function
+
+function restartRenderer(session, backend)
+  destroyScene(session)
+  screen.shutdown(session.console, session.menu)
+  switched = glvid.VID_RestartRenderer(backend)
+  rebuilt = rebuildRendererResources(session)
+  if rebuilt is error then return error(3933, "Renderer resource rebuild failed: " + rebuilt.message) end if
+  session.fullscreen = glvid.VID_State().modeState == glvid.MS_FULLDIB
+  updateMouseCapture(session)
+  if switched is error then return switched end if
   return true
 end function
 
@@ -1676,6 +1714,13 @@ function executeCommand(session, text)
     print "Wrote " + shot
     return true
   end if
+  if name == "vid_restart" then
+    if session.headless or not session.windowCreated then return error(3934, "vid_restart requires an active video device") end if
+    restarted = restartRenderer(session, glvid.VID_RendererFromName(cvar.variableString(session.cvars, "vid_renderer")))
+    if restarted is error then return restarted end if
+    print glvid.VID_State().lastModeMessage
+    return true
+  end if
   if name == "+showscores" then statusbar.Sbar_ShowScores(); return true end if
   if name == "-showscores" then statusbar.Sbar_DontShowScores(); return true end if
   inputButton = input.commandButton(name)
@@ -2179,6 +2224,7 @@ function Host_Init(session)
   queueStartupCommands(session)
   executeCommandBuffer(session, 4096)
   if not session.headless and session.windowCreated then
+    if glvid.VID_ApplyConfiguredRenderer() then print glvid.VID_State().lastModeMessage end if
     if glvid.VID_ApplyConfiguredResolution() then print glvid.VID_State().lastModeMessage end if
     session.width = win.width()
     session.height = win.height()
@@ -2568,6 +2614,17 @@ end function
 function handleExactMenuAction(session, result)
   if result is array then
     if len(result) == 0 then return false end if
+    if result[0] == "renderer_switch" then
+      changed = restartRenderer(session, result[1])
+      if changed is error then
+        menu.setStatus(session.menu, changed.message)
+        playMenuSound(session, "misc/menu3.wav")
+      else
+        menu.setStatus(session.menu, glvid.VID_State().lastModeMessage)
+        playMenuSound(session, "misc/menu2.wav")
+      end if
+      return true
+    end if
     if result[0] == "setup_accept" then
       cvar.set(session.cvars, "hostname", result[1])
       cvar.set(session.cvars, "_cl_name", result[2])

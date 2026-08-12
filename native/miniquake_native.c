@@ -10,9 +10,28 @@
  * IEEE-754 values cross the ABI as their 32-bit bit patterns.
  */
 #include "miniquake_native.h"
+#include "miniquake_d3d9.h"
 #define MQ_DLLIMPORT __declspec(dllimport)
 #define MQ_WINAPI __stdcall
 #define MQ_CDECL __cdecl
+
+#define MQ_RENDER_OPENGL 0
+#define MQ_RENDER_DIRECT3D9 1
+static mq_i32 mq_render_backend_value = MQ_RENDER_OPENGL;
+
+MQ_EXPORT mq_i32 mq_render_select(mq_i32 backend) {
+    if (backend != MQ_RENDER_OPENGL && backend != MQ_RENDER_DIRECT3D9) return 0;
+    if (backend == MQ_RENDER_DIRECT3D9 && !mq_d3d9_available()) return 0;
+    mq_render_backend_value = backend;
+    return 1;
+}
+
+MQ_EXPORT mq_i32 mq_render_backend(void) { return mq_render_backend_value; }
+MQ_EXPORT mq_i32 mq_render_available(mq_i32 backend) {
+    if (backend == MQ_RENDER_OPENGL) return 1;
+    if (backend == MQ_RENDER_DIRECT3D9) return mq_d3d9_available();
+    return 0;
+}
 
 /* Minimal Win32 declarations; no Windows SDK is required to build this DLL. */
 typedef mq_ptr HANDLE;
@@ -757,9 +776,17 @@ MQ_EXPORT mq_i32 mq_gl_static_geometry_call(mq_u64 key_value, mq_i32 pass_value)
     if (mq_static_geometry_pending || mq_static_geometry_recording) return 0;
     found = mq_static_geometry_find(key, pass, &slot);
     if (found >= 0) {
+        if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+            const mq_static_geometry_entry_t *entry = &mq_static_geometry_cache[found];
+            if (entry->vertex_count == 0u) return 0;
+            return mq_d3d9_draw_interleaved_t2f_v3f(
+                &mq_static_geometry_vertices[entry->vertex_offset * MQ_STATIC_GEOMETRY_VERTEX_FLOATS],
+                entry->vertex_count) > 0;
+        }
         glCallList(mq_static_geometry_cache[found].list_id);
         return 1;
     }
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return 0;
     if (mq_static_geometry_count >= MQ_STATIC_GEOMETRY_CACHE_MAX) return 0;
     {
         mq_u32 list_id = glGenLists(1);
@@ -792,6 +819,22 @@ MQ_EXPORT mq_i32 mq_gl_static_geometry_prepare(mq_u64 key_value, mq_i32 pass_val
     found = mq_static_geometry_find(key, pass, &slot);
     if (found >= 0) return 1;
     if (mq_static_geometry_count >= MQ_STATIC_GEOMETRY_CACHE_MAX) return -1;
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+        mq_static_geometry_cache[mq_static_geometry_count].key = key;
+        mq_static_geometry_cache[mq_static_geometry_count].pass = pass;
+        mq_static_geometry_cache[mq_static_geometry_count].list_id = 0u;
+        mq_static_geometry_cache[mq_static_geometry_count].vertex_offset = 0u;
+        mq_static_geometry_cache[mq_static_geometry_count].vertex_count = 0u;
+        mq_static_geometry_cache[mq_static_geometry_count].multi_vertex_offset = 0u;
+        mq_static_geometry_cache[mq_static_geometry_count].multi_vertex_count = 0u;
+        mq_static_geometry_hash[slot] = (mq_u32)mq_static_geometry_count + 1u;
+        mq_static_geometry_pending_entry = mq_static_geometry_count;
+        mq_static_geometry_count += 1;
+        mq_static_geometry_pending_list = 0u;
+        mq_static_geometry_pending_execute = 0;
+        mq_static_geometry_pending = 1;
+        return 0;
+    }
     {
         mq_u32 list_id = glGenLists(1);
         if (list_id == 0) return -1;
@@ -859,10 +902,15 @@ MQ_EXPORT mq_i32 mq_gl_static_geometry_call_batch(
             );
             destination_vertex += entry->vertex_count;
         }
-        glInterleavedArrays(0x2A27u /* GL_T2F_V3F */, 0, mq_static_geometry_batch);
-        glDrawArrays(0x0004u /* GL_TRIANGLES */, 0, (mq_i32)batch_vertex_count);
+        if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+            if (mq_d3d9_draw_interleaved_t2f_v3f(mq_static_geometry_batch, batch_vertex_count) <= 0) return 0;
+        } else {
+            glInterleavedArrays(0x2A27u /* GL_T2F_V3F */, 0, mq_static_geometry_batch);
+            glDrawArrays(0x0004u /* GL_TRIANGLES */, 0, (mq_i32)batch_vertex_count);
+        }
         return (mq_i32)count;
     }
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return 0;
     glCallLists((mq_i32)count, 0x1405u /* GL_UNSIGNED_INT */, list_ids);
     return (mq_i32)count;
 }
@@ -977,6 +1025,7 @@ MQ_EXPORT mq_i32 mq_gl_static_geometry_call_multitexture_batch(
     mq_u32 index;
     mq_u32 group_count = 0u;
     mq_u32 total_vertices = 0u;
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return 0;
     if (records == (const mq_u8 *)0 || (byte_count & 15u) != 0u ||
         !mq_valid_wgl_proc((const void *)mq_gl_active_texture_value) ||
         !mq_valid_wgl_proc((const void *)mq_gl_client_active_texture_value) ||
@@ -1255,6 +1304,22 @@ MQ_EXPORT mq_i32 mq_gl_static_geometry_call_multitexture_batch(
 
 MQ_EXPORT void mq_gl_static_geometry_clear(void) {
     mq_i32 i;
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+        for (i = 0; i < MQ_STATIC_GEOMETRY_HASH_SIZE; ++i) mq_static_geometry_hash[i] = 0u;
+        mq_static_geometry_count = 0;
+        mq_static_geometry_pending = 0;
+        mq_static_geometry_pending_list = 0;
+        mq_static_geometry_pending_execute = 1;
+        mq_static_geometry_pending_entry = -1;
+        mq_static_geometry_recording = 0;
+        mq_static_geometry_vertex_count = 0u;
+        mq_static_geometry_multi_vertex_count = 0u;
+        mq_static_multitexture_list_count = 0u;
+        mq_static_multitexture_vbo_count = 0u;
+        mq_alias_list_count = 0u;
+        mq_alias_vbo_count = 0u;
+        return;
+    }
     if (mq_static_geometry_recording) {
         glEndList();
         mq_static_geometry_recording = 0;
@@ -1997,10 +2062,12 @@ MQ_EXPORT mq_i32 mq_win_set_gamma_ramp(const mq_u8 *ramp, mq_u32 byte_count) {
 }
 
 MQ_EXPORT mq_i32 mq_win_context_ready(void) {
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return mq_d3d9_ready();
     return mq_window_dc != MQ_NULL && mq_gl_context != MQ_NULL;
 }
 
 MQ_EXPORT mq_i32 mq_win_make_current(void) {
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return mq_d3d9_ready();
     return mq_window_dc != MQ_NULL && mq_gl_context != MQ_NULL && wglMakeCurrent(mq_window_dc, mq_gl_context);
 }
 
@@ -2126,6 +2193,12 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
         return MQ_NULL;
     }
 
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+        if (!mq_d3d9_initialize(mq_window, width, height)) {
+            mq_win_destroy();
+            return MQ_NULL;
+        }
+    } else {
     pixel_format.nSize = (WORD)sizeof(pixel_format);
     pixel_format.nVersion = 1;
     pixel_format.dwFlags = MQ_PFD_DRAW_TO_WINDOW | MQ_PFD_SUPPORT_OPENGL | MQ_PFD_DOUBLEBUFFER;
@@ -2213,11 +2286,18 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
             swap_interval(0);
         }
     }
+    }
 
     ShowWindow(mq_window, MQ_SW_SHOW);
     UpdateWindow(mq_window);
     /* Pay the one-time DWM/ICD present cost while the window is still in its
      * startup phase, not on the first playable map frame. */
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+        mq_d3d9_clear_color(0u, 0u, 0u, 0x3f800000u);
+        mq_d3d9_clear(0x00004000u | 0x00000100u);
+        mq_d3d9_present();
+        mq_d3d9_clear(0x00004000u | 0x00000100u);
+    } else {
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(0x00004000u | 0x00000100u); /* GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT */
     SwapBuffers(mq_window_dc);
@@ -2234,6 +2314,7 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
             swap_interval != (mq_wgl_swap_interval_proc)-1) {
             swap_interval(0);
         }
+    }
     }
     mq_clear_input_events();
     mq_running = 1;
@@ -2255,6 +2336,9 @@ MQ_EXPORT void mq_win_destroy(void) {
             }
         }
         mq_original_gamma_valid = 0;
+    }
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+        mq_d3d9_shutdown();
     }
     if (mq_gl_context != MQ_NULL) {
         if (mq_gl_world_program != 0u && mq_valid_wgl_proc((const void *)mq_gl_delete_program_value)) {
@@ -2325,6 +2409,10 @@ MQ_EXPORT mq_i32 mq_win_poll(void) {
 }
 
 MQ_EXPORT void mq_win_swap(void) {
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+        mq_d3d9_present();
+        return;
+    }
     if (mq_window_dc != MQ_NULL) {
         SwapBuffers(mq_window_dc);
     }
@@ -2443,8 +2531,9 @@ MQ_EXPORT mq_i32 mq_win_resize_client(mq_i32 width, mq_i32 height) {
     if (!GetClientRect(mq_window, &rectangle)) {
         return 0;
     }
-    return rectangle.right - rectangle.left == width &&
-        rectangle.bottom - rectangle.top == height;
+    if (rectangle.right - rectangle.left != width || rectangle.bottom - rectangle.top != height) return 0;
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9 && !mq_d3d9_resize(width, height)) return 0;
+    return 1;
 }
 
 MQ_EXPORT void mq_win_set_title(const unsigned short *title) {
@@ -3348,6 +3437,14 @@ MQ_EXPORT const char *mq_udp_reverse_name(const char *address_text) {
 
 MQ_EXPORT void mq_gl_begin(mq_u32 mode) {
     if (mq_static_geometry_pending && !mq_static_geometry_recording) {
+        if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+            mq_static_geometry_pending = 0;
+            mq_static_geometry_recording = 1;
+            mq_static_geometry_capture_count = 0u;
+            mq_static_geometry_capture_mode = mode;
+            mq_static_geometry_capture_valid = 1;
+            return;
+        }
         glNewList(
             mq_static_geometry_pending_list,
             mq_static_geometry_pending_execute ? GL_COMPILE_AND_EXECUTE : 0x1300u /* GL_COMPILE */
@@ -3358,8 +3455,23 @@ MQ_EXPORT void mq_gl_begin(mq_u32 mode) {
         mq_static_geometry_capture_mode = mode;
         mq_static_geometry_capture_valid = 1;
     }
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_begin(mode); return; }
  glBegin(mode); }
-MQ_EXPORT void mq_gl_end(void) { glEnd(); 
+MQ_EXPORT void mq_gl_end(void) {
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+        if (mq_static_geometry_recording) {
+            mq_static_geometry_finish_capture();
+            mq_static_geometry_recording = 0;
+            mq_static_geometry_pending_list = 0;
+            mq_static_geometry_pending_execute = 1;
+            mq_static_geometry_pending_entry = -1;
+            mq_static_geometry_capture_valid = 0;
+        } else {
+            mq_d3d9_end();
+        }
+        return;
+    }
+    glEnd();
     if (mq_static_geometry_recording) {
         mq_static_geometry_finish_capture();
         glEndList();
@@ -3370,7 +3482,7 @@ MQ_EXPORT void mq_gl_end(void) { glEnd();
         mq_static_geometry_capture_valid = 0;
     }
 }
-MQ_EXPORT void mq_gl_vertex2(mq_u32 x_bits, mq_u32 y_bits) { glVertex2f(mq_bits_to_float(x_bits), mq_bits_to_float(y_bits)); }
+MQ_EXPORT void mq_gl_vertex2(mq_u32 x_bits, mq_u32 y_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_vertex2(x_bits, y_bits); return; } glVertex2f(mq_bits_to_float(x_bits), mq_bits_to_float(y_bits)); }
 MQ_EXPORT void mq_gl_vertex3(mq_u32 x_bits, mq_u32 y_bits, mq_u32 z_bits) {
     float x = mq_bits_to_float(x_bits);
     float y = mq_bits_to_float(y_bits);
@@ -3396,6 +3508,10 @@ MQ_EXPORT void mq_gl_vertex3(mq_u32 x_bits, mq_u32 y_bits, mq_u32 z_bits) {
             mq_static_geometry_capture_valid = 0;
         }
     }
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+        if (!mq_static_geometry_recording) mq_d3d9_vertex3(x_bits, y_bits, z_bits);
+        return;
+    }
     glVertex3f(x, y, z);
 }
 MQ_EXPORT void mq_gl_texcoord2(mq_u32 s_bits, mq_u32 t_bits) {
@@ -3403,47 +3519,53 @@ MQ_EXPORT void mq_gl_texcoord2(mq_u32 s_bits, mq_u32 t_bits) {
     mq_static_geometry_t = mq_bits_to_float(t_bits);
     mq_static_geometry_multi_s[0] = mq_static_geometry_s;
     mq_static_geometry_multi_t[0] = mq_static_geometry_t;
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+        if (!mq_static_geometry_recording) mq_d3d9_texcoord2(s_bits, t_bits);
+        return;
+    }
     glTexCoord2f(mq_static_geometry_s, mq_static_geometry_t);
 }
-MQ_EXPORT void mq_gl_color4ub(mq_u32 r, mq_u32 g, mq_u32 b, mq_u32 a) { glColor4ub((mq_u8)r, (mq_u8)g, (mq_u8)b, (mq_u8)a); }
-MQ_EXPORT void mq_gl_clear_color(mq_u32 r_bits, mq_u32 g_bits, mq_u32 b_bits, mq_u32 a_bits) { glClearColor(mq_bits_to_float(r_bits), mq_bits_to_float(g_bits), mq_bits_to_float(b_bits), mq_bits_to_float(a_bits)); }
-MQ_EXPORT void mq_gl_clear(mq_u32 mask) { glClear(mask); }
-MQ_EXPORT void mq_gl_enable(mq_u32 capability) { glEnable(capability); }
-MQ_EXPORT void mq_gl_disable(mq_u32 capability) { glDisable(capability); }
-MQ_EXPORT void mq_gl_blend_func(mq_u32 source, mq_u32 destination) { glBlendFunc(source, destination); }
-MQ_EXPORT void mq_gl_depth_func(mq_u32 function_name) { glDepthFunc(function_name); }
-MQ_EXPORT void mq_gl_depth_mask(mq_i32 enabled) { glDepthMask((mq_u8)(enabled != 0)); }
-MQ_EXPORT void mq_gl_depth_range(mq_u32 near_bits, mq_u32 far_bits) { glDepthRange((double)mq_bits_to_float(near_bits), (double)mq_bits_to_float(far_bits)); }
-MQ_EXPORT void mq_gl_alpha_func(mq_u32 function_name, mq_u32 reference_bits) { glAlphaFunc(function_name, mq_bits_to_float(reference_bits)); }
-MQ_EXPORT void mq_gl_cull_face(mq_u32 mode) { glCullFace(mode); }
-MQ_EXPORT void mq_gl_shade_model(mq_u32 mode) { glShadeModel(mode); }
-MQ_EXPORT void mq_gl_polygon_mode(mq_u32 face, mq_u32 mode) { glPolygonMode(face, mode); }
-MQ_EXPORT void mq_gl_viewport(mq_i32 x, mq_i32 y, mq_i32 width, mq_i32 height) { glViewport(x, y, width, height); }
-MQ_EXPORT void mq_gl_matrix_mode(mq_u32 mode) { glMatrixMode(mode); }
-MQ_EXPORT void mq_gl_load_identity(void) { glLoadIdentity(); }
-MQ_EXPORT void mq_gl_push_matrix(void) { glPushMatrix(); }
-MQ_EXPORT void mq_gl_pop_matrix(void) { glPopMatrix(); }
-MQ_EXPORT void mq_gl_translate(mq_u32 x_bits, mq_u32 y_bits, mq_u32 z_bits) { glTranslatef(mq_bits_to_float(x_bits), mq_bits_to_float(y_bits), mq_bits_to_float(z_bits)); }
-MQ_EXPORT void mq_gl_rotate(mq_u32 angle_bits, mq_u32 x_bits, mq_u32 y_bits, mq_u32 z_bits) { glRotatef(mq_bits_to_float(angle_bits), mq_bits_to_float(x_bits), mq_bits_to_float(y_bits), mq_bits_to_float(z_bits)); }
-MQ_EXPORT void mq_gl_scale(mq_u32 x_bits, mq_u32 y_bits, mq_u32 z_bits) { glScalef(mq_bits_to_float(x_bits), mq_bits_to_float(y_bits), mq_bits_to_float(z_bits)); }
-MQ_EXPORT void mq_gl_ortho(mq_u32 left_bits, mq_u32 right_bits, mq_u32 bottom_bits, mq_u32 top_bits, mq_u32 near_bits, mq_u32 far_bits) { glOrtho((double)mq_bits_to_float(left_bits), (double)mq_bits_to_float(right_bits), (double)mq_bits_to_float(bottom_bits), (double)mq_bits_to_float(top_bits), (double)mq_bits_to_float(near_bits), (double)mq_bits_to_float(far_bits)); }
-MQ_EXPORT void mq_gl_frustum(mq_u32 left_bits, mq_u32 right_bits, mq_u32 bottom_bits, mq_u32 top_bits, mq_u32 near_bits, mq_u32 far_bits) { glFrustum((double)mq_bits_to_float(left_bits), (double)mq_bits_to_float(right_bits), (double)mq_bits_to_float(bottom_bits), (double)mq_bits_to_float(top_bits), (double)mq_bits_to_float(near_bits), (double)mq_bits_to_float(far_bits)); }
-MQ_EXPORT void mq_gl_bind_texture(mq_u32 target, mq_u32 texture) { glBindTexture(target, texture); }
-MQ_EXPORT void mq_gl_gen_textures(mq_i32 count, void *texture_ids) { glGenTextures(count, (mq_u32 *)texture_ids); }
-MQ_EXPORT void mq_gl_delete_textures(mq_i32 count, const void *texture_ids) { glDeleteTextures(count, (const mq_u32 *)texture_ids); }
-MQ_EXPORT void mq_gl_tex_parameter_i(mq_u32 target, mq_u32 name, mq_i32 value) { glTexParameteri(target, name, value); }
-MQ_EXPORT void mq_gl_tex_env_i(mq_u32 target, mq_u32 name, mq_i32 value) { glTexEnvi(target, name, value); }
-MQ_EXPORT void mq_gl_tex_image_2d(mq_u32 target, mq_i32 level, mq_i32 internal_format, mq_i32 width, mq_i32 height, mq_i32 border, mq_u32 format, mq_u32 type, const void *pixels) { glTexImage2D(target, level, internal_format, width, height, border, format, type, pixels); }
+MQ_EXPORT void mq_gl_color4ub(mq_u32 r, mq_u32 g, mq_u32 b, mq_u32 a) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_color4ub(r, g, b, a); return; } glColor4ub((mq_u8)r, (mq_u8)g, (mq_u8)b, (mq_u8)a); }
+MQ_EXPORT void mq_gl_clear_color(mq_u32 r_bits, mq_u32 g_bits, mq_u32 b_bits, mq_u32 a_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_clear_color(r_bits, g_bits, b_bits, a_bits); return; } glClearColor(mq_bits_to_float(r_bits), mq_bits_to_float(g_bits), mq_bits_to_float(b_bits), mq_bits_to_float(a_bits)); }
+MQ_EXPORT void mq_gl_clear(mq_u32 mask) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_clear(mask); return; } glClear(mask); }
+MQ_EXPORT void mq_gl_enable(mq_u32 capability) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_enable(capability); return; } glEnable(capability); }
+MQ_EXPORT void mq_gl_disable(mq_u32 capability) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_disable(capability); return; } glDisable(capability); }
+MQ_EXPORT void mq_gl_blend_func(mq_u32 source, mq_u32 destination) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_blend_func(source, destination); return; } glBlendFunc(source, destination); }
+MQ_EXPORT void mq_gl_depth_func(mq_u32 function_name) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_depth_func(function_name); return; } glDepthFunc(function_name); }
+MQ_EXPORT void mq_gl_depth_mask(mq_i32 enabled) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_depth_mask(enabled); return; } glDepthMask((mq_u8)(enabled != 0)); }
+MQ_EXPORT void mq_gl_depth_range(mq_u32 near_bits, mq_u32 far_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_depth_range(near_bits, far_bits); return; } glDepthRange((double)mq_bits_to_float(near_bits), (double)mq_bits_to_float(far_bits)); }
+MQ_EXPORT void mq_gl_alpha_func(mq_u32 function_name, mq_u32 reference_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_alpha_func(function_name, reference_bits); return; } glAlphaFunc(function_name, mq_bits_to_float(reference_bits)); }
+MQ_EXPORT void mq_gl_cull_face(mq_u32 mode) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_cull_face(mode); return; } glCullFace(mode); }
+MQ_EXPORT void mq_gl_shade_model(mq_u32 mode) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_shade_model(mode); return; } glShadeModel(mode); }
+MQ_EXPORT void mq_gl_polygon_mode(mq_u32 face, mq_u32 mode) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_polygon_mode(face, mode); return; } glPolygonMode(face, mode); }
+MQ_EXPORT void mq_gl_viewport(mq_i32 x, mq_i32 y, mq_i32 width, mq_i32 height) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_viewport(x, y, width, height); return; } glViewport(x, y, width, height); }
+MQ_EXPORT void mq_gl_matrix_mode(mq_u32 mode) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_matrix_mode(mode); return; } glMatrixMode(mode); }
+MQ_EXPORT void mq_gl_load_identity(void) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_load_identity(); return; } glLoadIdentity(); }
+MQ_EXPORT void mq_gl_push_matrix(void) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_push_matrix(); return; } glPushMatrix(); }
+MQ_EXPORT void mq_gl_pop_matrix(void) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_pop_matrix(); return; } glPopMatrix(); }
+MQ_EXPORT void mq_gl_translate(mq_u32 x_bits, mq_u32 y_bits, mq_u32 z_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_translate(x_bits, y_bits, z_bits); return; } glTranslatef(mq_bits_to_float(x_bits), mq_bits_to_float(y_bits), mq_bits_to_float(z_bits)); }
+MQ_EXPORT void mq_gl_rotate(mq_u32 angle_bits, mq_u32 x_bits, mq_u32 y_bits, mq_u32 z_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_rotate(angle_bits, x_bits, y_bits, z_bits); return; } glRotatef(mq_bits_to_float(angle_bits), mq_bits_to_float(x_bits), mq_bits_to_float(y_bits), mq_bits_to_float(z_bits)); }
+MQ_EXPORT void mq_gl_scale(mq_u32 x_bits, mq_u32 y_bits, mq_u32 z_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_scale(x_bits, y_bits, z_bits); return; } glScalef(mq_bits_to_float(x_bits), mq_bits_to_float(y_bits), mq_bits_to_float(z_bits)); }
+MQ_EXPORT void mq_gl_ortho(mq_u32 left_bits, mq_u32 right_bits, mq_u32 bottom_bits, mq_u32 top_bits, mq_u32 near_bits, mq_u32 far_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_ortho(left_bits, right_bits, bottom_bits, top_bits, near_bits, far_bits); return; } glOrtho((double)mq_bits_to_float(left_bits), (double)mq_bits_to_float(right_bits), (double)mq_bits_to_float(bottom_bits), (double)mq_bits_to_float(top_bits), (double)mq_bits_to_float(near_bits), (double)mq_bits_to_float(far_bits)); }
+MQ_EXPORT void mq_gl_frustum(mq_u32 left_bits, mq_u32 right_bits, mq_u32 bottom_bits, mq_u32 top_bits, mq_u32 near_bits, mq_u32 far_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_frustum(left_bits, right_bits, bottom_bits, top_bits, near_bits, far_bits); return; } glFrustum((double)mq_bits_to_float(left_bits), (double)mq_bits_to_float(right_bits), (double)mq_bits_to_float(bottom_bits), (double)mq_bits_to_float(top_bits), (double)mq_bits_to_float(near_bits), (double)mq_bits_to_float(far_bits)); }
+MQ_EXPORT void mq_gl_bind_texture(mq_u32 target, mq_u32 texture) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_bind_texture(target, texture); return; } glBindTexture(target, texture); }
+MQ_EXPORT void mq_gl_gen_textures(mq_i32 count, void *texture_ids) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_gen_textures(count, texture_ids); return; } glGenTextures(count, (mq_u32 *)texture_ids); }
+MQ_EXPORT void mq_gl_delete_textures(mq_i32 count, const void *texture_ids) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_delete_textures(count, texture_ids); return; } glDeleteTextures(count, (const mq_u32 *)texture_ids); }
+MQ_EXPORT void mq_gl_tex_parameter_i(mq_u32 target, mq_u32 name, mq_i32 value) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_tex_parameter_i(target, name, value); return; } glTexParameteri(target, name, value); }
+MQ_EXPORT void mq_gl_tex_env_i(mq_u32 target, mq_u32 name, mq_i32 value) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_tex_env_i(target, name, value); return; } glTexEnvi(target, name, value); }
+MQ_EXPORT void mq_gl_tex_image_2d(mq_u32 target, mq_i32 level, mq_i32 internal_format, mq_i32 width, mq_i32 height, mq_i32 border, mq_u32 format, mq_u32 type, const void *pixels) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_tex_image_2d(target, level, internal_format, width, height, border, format, type, pixels); return; } glTexImage2D(target, level, internal_format, width, height, border, format, type, pixels); }
 MQ_EXPORT void mq_gl_tex_sub_image_2d(mq_u32 target, mq_i32 level, mq_i32 x_offset, mq_i32 y_offset, mq_i32 width, mq_i32 height, mq_u32 format, mq_u32 type, const void *pixels) {
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_tex_sub_image_2d(target, level, x_offset, y_offset, width, height, format, type, pixels); return; }
     glTexSubImage2D(target, level, x_offset, y_offset, width, height, format, type, pixels);
 }
-MQ_EXPORT void mq_gl_read_pixels(mq_i32 x, mq_i32 y, mq_i32 width, mq_i32 height, mq_u32 format, mq_u32 type, void *pixels) { glReadPixels(x, y, width, height, format, type, pixels); }
-MQ_EXPORT const char *mq_gl_get_string(mq_u32 name) { return (const char *)glGetString(name); }
-MQ_EXPORT mq_u32 mq_gl_get_error(void) { return glGetError(); }
-MQ_EXPORT void mq_gl_finish(void) { glFinish(); }
-MQ_EXPORT void mq_gl_flush(void) { glFlush(); }
-MQ_EXPORT void mq_gl_draw_buffer(mq_u32 mode) { glDrawBuffer(mode); }
+MQ_EXPORT void mq_gl_read_pixels(mq_i32 x, mq_i32 y, mq_i32 width, mq_i32 height, mq_u32 format, mq_u32 type, void *pixels) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_read_pixels(x, y, width, height, format, type, pixels); return; } glReadPixels(x, y, width, height, format, type, pixels); }
+MQ_EXPORT const char *mq_gl_get_string(mq_u32 name) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return mq_d3d9_get_string(name); return (const char *)glGetString(name); }
+MQ_EXPORT mq_u32 mq_gl_get_error(void) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return mq_d3d9_get_error(); return glGetError(); }
+MQ_EXPORT void mq_gl_finish(void) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_finish(); return; } glFinish(); }
+MQ_EXPORT void mq_gl_flush(void) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_flush(); return; } glFlush(); }
+MQ_EXPORT void mq_gl_draw_buffer(mq_u32 mode) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_draw_buffer(mode); return; } glDrawBuffer(mode); }
 MQ_EXPORT mq_i32 mq_gl_multitexture_available(void) {
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return 0;
     return mq_valid_wgl_proc((const void *)mq_gl_active_texture_value) &&
         mq_valid_wgl_proc((const void *)mq_gl_client_active_texture_value) &&
         mq_valid_wgl_proc((const void *)mq_gl_multi_tex_coord2f_value);
@@ -3455,16 +3577,19 @@ MQ_EXPORT mq_i32 mq_gl_world_program_available(void) {
     return 0;
 }
 MQ_EXPORT void mq_gl_world_program_enable(mq_i32 enabled) {
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return;
     if (!mq_valid_wgl_proc((const void *)mq_gl_use_program_value)) return;
     if (enabled && mq_gl_create_world_program()) mq_gl_use_program_value(mq_gl_world_program);
     else mq_gl_use_program_value(0u);
 }
 MQ_EXPORT void mq_gl_active_texture(mq_i32 unit) {
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return;
     if (!mq_valid_wgl_proc((const void *)mq_gl_active_texture_value)) return;
     mq_gl_active_texture_value(0x84C0u /* GL_TEXTURE0 */ + (mq_u32)(unit > 0 ? 1 : 0));
 }
 MQ_EXPORT void mq_gl_multi_tex_coord2(mq_i32 unit, mq_u32 s_bits, mq_u32 t_bits) {
     mq_i32 index = unit > 0 ? 1 : 0;
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return;
     if (!mq_valid_wgl_proc((const void *)mq_gl_multi_tex_coord2f_value)) return;
     mq_static_geometry_multi_s[index] = mq_bits_to_float(s_bits);
     mq_static_geometry_multi_t[index] = mq_bits_to_float(t_bits);
@@ -3633,6 +3758,13 @@ MQ_EXPORT mq_i32 mq_gl_draw_alias_batch(
     mq_u32 cache_index;
     mq_u32 list_id = 0u;
     if (data == MQ_NULL || shade_dots == MQ_NULL) return 0;
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+        mq_u32 vertex_count = 0u;
+        mq_i32 triangle_count = 0;
+        if (!mq_alias_build_triangles(data, byte_count, shade_dots, shade_dot_count, shade_light, &vertex_count, &triangle_count)) return 0;
+        if (mq_d3d9_draw_interleaved_t2f_c4ub_v3f(mq_alias_triangle_vertices, vertex_count) <= 0) return 0;
+        return triangle_count;
+    }
     shade_key_count = shade_dot_count > 256u ? 256u : shade_dot_count;
     for (cache_index = 0u; cache_index < byte_count; ++cache_index) {
         mq_alias_hash_byte(data[cache_index], &hash, &signature);
@@ -3788,6 +3920,31 @@ MQ_EXPORT mq_i32 mq_gl_draw_alias_model(
     float sy = mq_bits_to_float(scale_y);
     float sz = mq_bits_to_float(scale_z);
     mq_i32 triangles;
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+        mq_d3d9_push_matrix();
+        mq_d3d9_translate(origin_x, origin_y, origin_z);
+        mq_d3d9_rotate(angle_y, mq_float_to_bits(0.0f), mq_float_to_bits(0.0f), mq_float_to_bits(1.0f));
+        mq_d3d9_rotate(mq_float_to_bits(-mq_bits_to_float(angle_x)), mq_float_to_bits(0.0f), mq_float_to_bits(1.0f), mq_float_to_bits(0.0f));
+        mq_d3d9_rotate(angle_z, mq_float_to_bits(1.0f), mq_float_to_bits(0.0f), mq_float_to_bits(0.0f));
+        if (double_eyes) {
+            mq_d3d9_translate(scale_origin_x, scale_origin_y, mq_float_to_bits(soz - 30.0f));
+            mq_d3d9_scale(mq_float_to_bits(sx * 2.0f), mq_float_to_bits(sy * 2.0f), mq_float_to_bits(sz * 2.0f));
+        } else {
+            mq_d3d9_translate(scale_origin_x, scale_origin_y, scale_origin_z);
+            mq_d3d9_scale(scale_x, scale_y, scale_z);
+        }
+        mq_d3d9_cull_face(0x0404u);
+        mq_d3d9_enable(0x0B44u);
+        if (smooth) mq_d3d9_shade_model(0x1D01u);
+        mq_d3d9_tex_env_i(0x2300u, 0x2200u, 0x2100u);
+        triangles = mq_gl_draw_alias_batch(data, byte_count, shade_dots, shade_dot_count, shade_light_bits);
+        mq_d3d9_tex_env_i(0x2300u, 0x2200u, 0x1E01u);
+        mq_d3d9_shade_model(0x1D00u);
+        mq_d3d9_color4ub(255u, 255u, 255u, 255u);
+        mq_d3d9_disable(0x0B44u);
+        mq_d3d9_pop_matrix();
+        return triangles;
+    }
     glPushMatrix();
     glTranslatef(mq_bits_to_float(origin_x), mq_bits_to_float(origin_y), mq_bits_to_float(origin_z));
     glRotatef(mq_bits_to_float(angle_y), 0.0f, 0.0f, 1.0f);

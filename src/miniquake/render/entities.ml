@@ -426,7 +426,7 @@ function drawAlias(renderer, model, entity, time, viewModel)
   mesh = aliasMesh.GL_MakeAliasModelDisplayLists(source, source)
   doubleEyes = model.name == "progs/eyes.mdl" and aliasDoubleEyes
   drawn = 0
-  if not gl.traceEnabled() then
+  if not gl.traceEnabled() and gl.nativeBatchAvailable() then
     drawn = aliasMesh.drawAliasModelBatch(source, frame, mesh, entity.origin, entity.angles, doubleEyes, aliasSmoothModels)
   else
     gl.pushMatrix()

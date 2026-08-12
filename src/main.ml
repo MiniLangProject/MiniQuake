@@ -46,6 +46,7 @@ function printUsage()
   print "package " + buildInfo.PACKAGE_ID + " / profile " + buildInfo.COMPATIBILITY_PROFILE
   print "usage: MiniQuake.exe [-basedir PATH] [-game DIR] [+map MAP] [options]"
   print "       MiniQuake.exe COMMAND [arguments]"
+  print "renderer: -renderer opengl|direct3d9 (aliases: -opengl, -directx, -d3d9)"
   print ""
   print "Inspection and validation commands:"
   print "  --pak FILE                 inspect a Quake PACK archive"
@@ -60,7 +61,7 @@ function printUsage()
   print "  --demo-verify FILE         replay every demo message through the client"
   print "  --message FILE             parse a raw protocol-15 server message"
   print ""
-  print "Windows/OpenGL and integrated-engine diagnostics:"
+  print "Windows/rendering and integrated-engine diagnostics:"
   print "  --gl-smoke                 create a Win32/WGL window and draw a triangle"
   print "  --gl-smoke-frames N        run the OpenGL smoke test for N frames"
   print "  --bsp-view BSP PALETTE     display BSP geometry with palette.lmp"
@@ -294,6 +295,16 @@ function hasNamedOption(arguments, name)
   return false
 end function
 
+function namedOption(arguments, name, fallback)
+  wanted = bio.lower(name)
+  index = 1
+  while index + 1 < len(arguments)
+    if bio.lower(arguments[index]) == wanted then return arguments[index + 1] end if
+    index = index + 1
+  end while
+  return fallback
+end function
+
 function optionalFrameCount(arguments, index, fallback, maximum)
   if index >= len(arguments) then return fallback end if
   value = toNumber(arguments[index])
@@ -387,6 +398,8 @@ function runRenderEvidenceCommand(arguments)
   ]
   if hasNamedOption(arguments, "-menu") then renderArguments = renderArguments + ["+menu_main"] end if
   if hasNamedOption(arguments, "-console") then renderArguments = renderArguments + ["+toggleconsole"] end if
+  renderer = namedOption(arguments, "-renderer", "")
+  if renderer != "" then renderArguments = renderArguments + ["-renderer", renderer] end if
   return host.runRenderEvidence(renderArguments, frames, arguments[4])
 end function
 

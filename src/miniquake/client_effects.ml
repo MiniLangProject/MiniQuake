@@ -98,6 +98,14 @@ function pruneTemporary(currentTemporary, currentTime)
   return transients.activeCompactBeamList(currentTemporary, currentTime)
 end function
 
+function serverInfoRuleText()
+  return "\n\n\u001d\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001f\n\n"
+end function
+
+function serverInfoLevelText(levelName)
+  return "\u0002" + levelName + "\n"
+end function
+
 function process(events, client, player, mixer, viewState, consoleState, commandSystem, currentParticles, currentTemporary, currentTime, registry)
   currentTemporary = retainTemporarySlots(currentTemporary)
   for each item in events
@@ -105,6 +113,11 @@ function process(events, client, player, mixer, viewState, consoleState, command
     payload = item.payload
     if name == "svc_print" then
       console.Con_Printf(consoleState, payload, consoleState.dedicated, false)
+    else if name == "svc_serverinfo" then
+      // WinQuake separates these calls so the level title receives the brown
+      // alternate-font mask while the decorative rule does not.
+      console.Con_Printf(consoleState, serverInfoRuleText(), consoleState.dedicated, false)
+      console.Con_Printf(consoleState, serverInfoLevelText(payload[3]), consoleState.dedicated, false)
     else if name == "svc_centerprint" then
       console.centerPrint(consoleState, payload, currentTime, 2.0)
     else if name == "svc_stufftext" then

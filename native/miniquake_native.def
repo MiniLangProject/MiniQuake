@@ -12,6 +12,9 @@ EXPORTS
   mq_i32_to_f32
   mq_ascii_code
   mq_ascii_char
+  mq_render_select
+  mq_render_backend
+  mq_render_available
   mq_win_create
   mq_win_destroy
   mq_win_poll

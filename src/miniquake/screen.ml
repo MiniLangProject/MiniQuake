@@ -58,6 +58,7 @@ screenConsole = void
 screenBasePalette = void
 lastScreenCommands = []
 screenRealtime = 0.0
+screenVideoWidth = 320
 
 function initialize(consoleState, menuState, filesystem, palette, width, height, registry)
   global screenConsole, screenBasePalette
@@ -86,11 +87,20 @@ function SCR_ConfigureClient(clientState)
 end function
 
 function shutdown(consoleState, menuState)
+  global scr_initialized, scr_ram, scr_net, scr_turtle, screenFilesystem, screenRegistry, screenClient, screenConsole, screenBasePalette
   if menuState is not void then menu.shutdown(menuState) end if
-  if consoleState is not void and consoleState.textureId != 0 then
-    gl.deleteTexture(consoleState.textureId)
-    consoleState.textureId = 0
-  end if
+  if consoleState is not void then consoleState.textureId = 0 end if
+  draw.Draw_Shutdown()
+  statusbar.Sbar_Shutdown()
+  scr_initialized = false
+  scr_ram = void
+  scr_net = void
+  scr_turtle = void
+  screenFilesystem = void
+  screenRegistry = void
+  screenClient = void
+  screenConsole = void
+  screenBasePalette = void
   return true
 end function
 
@@ -360,9 +370,10 @@ function SCR_SizeDown()
 end function
 
 function SCR_Init(filesystem, registry, width, height)
-  global scr_initialized, scr_ram, scr_net, scr_turtle, screenFilesystem, screenRegistry
+  global scr_initialized, scr_ram, scr_net, scr_turtle, screenFilesystem, screenRegistry, screenVideoWidth
   screenFilesystem = filesystem
   screenRegistry = registry
+  screenVideoWidth = width
   draw.SetVideoSize(width, height)
   scr_ram = try(draw.Draw_PicFromWad("ram"))
   if scr_ram is error then return scr_ram end if
@@ -373,6 +384,18 @@ function SCR_Init(filesystem, registry, width, height)
   SCR_CalcRefdef(width, height, registry, 0)
   scr_initialized = true
   return true
+end function
+
+// scr_conspeed is expressed in the original UI's logical pixels per second.
+// The console itself is enlarged by an integral factor on high-resolution
+// displays, so its physical travel must use that same factor. Otherwise a
+// 1080p/4K console takes two to four times as long to open or close.
+function SCR_ConsoleSlidePixels(width, height, frameTime, registry)
+  if registry is not void then
+    variable = cvar.find(registry, "scr_conspeed")
+    if variable is not void then return variable.value * frameTime * renderUiContract.consoleScale(width, height) end if
+  end if
+  return 300.0 * frameTime * renderUiContract.consoleScale(width, height)
 end function
 
 function SCR_DrawRam(cacheThrash)
@@ -416,7 +439,7 @@ function SCR_DrawLoading(width, height)
 end function
 
 function SCR_SetUpToDrawConsole(consoleState, height, frameTime, registry, forcedUp, consoleInput, numPages)
-  global scr_conlines, scr_con_current, clearconsole, clearnotify, screenRegistry
+  global scr_conlines, scr_con_current, clearconsole, clearnotify, screenRegistry, screenVideoWidth
   if registry is not void then screenRegistry = registry end if
   if consoleState is not void then consoleState.forcedUp = forcedUp end if
   if scr_drawloading then return scr_con_current end if
@@ -426,7 +449,7 @@ function SCR_SetUpToDrawConsole(consoleState, height, frameTime, registry, force
   else if consoleInput then scr_conlines = height / 2.0
   else scr_conlines = 0.0
   end if
-  speed = screenCvar("scr_conspeed", 300.0) * frameTime
+  speed = SCR_ConsoleSlidePixels(screenVideoWidth, height, frameTime, registry)
   if scr_conlines < scr_con_current then
     scr_con_current = scr_con_current - speed
     if scr_conlines > scr_con_current then scr_con_current = scr_conlines end if
@@ -804,8 +827,9 @@ function SCR_UpdateScreen(
   gameInput,
   consoleInput
 )
-  global scr_copytop, scr_copyeverything, lastScreenCommands, scr_fullupdate, scr_loading_pending, scr_drawloading, scr_disabled_for_loading, scr_disabled_time, screenRealtime
+  global scr_copytop, scr_copyeverything, lastScreenCommands, scr_fullupdate, scr_loading_pending, scr_drawloading, scr_disabled_for_loading, scr_disabled_time, screenRealtime, screenVideoWidth
   screenRealtime = realtime
+  screenVideoWidth = width
   lastScreenCommands = []
   if block_drawing or scr_skipupdate or not scr_initialized then return lastScreenCommands end if
   if SCR_ShouldSkipUpdate(realtime) then lastScreenCommands = [["skip-loading"]]; return lastScreenCommands end if

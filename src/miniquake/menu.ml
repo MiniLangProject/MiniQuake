@@ -1144,10 +1144,15 @@ function drawVideo(state, texture, transform, realtime)
   virtualCenteredPicture(state, "gfx/vidmodes.lmp", 4.0, transform, 255)
   modes = glvid.VID_MenuDraw()
   for each command in modes
-    if command[0] == "display" then
+    if command[0] == "renderer" then
+      rendererText = "RENDERER: < " + command[1] + " >"
+      if command[2] then virtualCenteredString(texture, 28.0, rendererText, transform, 255)
+      else virtualCenteredString(texture, 28.0, rendererText, transform, 180)
+      end if
+    else if command[0] == "display" then
       displayText = "DISPLAY: < " + command[1] + " >"
-      if command[2] then virtualCenteredString(texture, 36.0, displayText, transform, 255)
-      else virtualCenteredString(texture, 36.0, displayText, transform, 180)
+      if command[2] then virtualCenteredString(texture, 40.0, displayText, transform, 255)
+      else virtualCenteredString(texture, 40.0, displayText, transform, 180)
       end if
     else if command[0] == "mode" then
       x = 8.0 + command[4] * 104.0

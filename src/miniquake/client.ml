@@ -1072,7 +1072,11 @@ function applyEvent(client, item)
     pendingMessages = client.messages
     pendingPrintLog = client.printLog
     CL_ClearState(client)
-    client.messages = pendingMessages
+    // CL_ParseServerInfo prints the decorative rule and level title after the
+    // leading svc_print banner. Preserve that parse-order side effect as an
+    // internal event so the banner's deliberately unterminated CRC line is
+    // closed before later QuakeC bprints arrive.
+    client.messages = pendingMessages + [item]
     client.printLog = pendingPrintLog
     client.maxClients = payload[1]
     client.gameType = payload[2]

@@ -10,6 +10,7 @@ import miniquake.sizebuf as sz
 import miniquake.message as msg
 import miniquake.view as view
 import miniquake.particles as particles
+import miniquake.client_effects as clientEffects
 
 function require(value, name)
   if value != true then return error(9860, name) end if
@@ -89,10 +90,12 @@ function testServerInfoPreservesEarlierPrint()
   ])
   require(client.applyEvent(localClient, banner), "apply server banner")
   require(client.applyEvent(localClient, info), "apply serverinfo")
-  equal(len(localClient.messages), 1, "pre-serverinfo event retained")
+  equal(len(localClient.messages), 2, "pre-serverinfo event and title retained")
   equal(localClient.messages[0].command, "svc_print", "retained event kind")
+  equal(localClient.messages[1].command, "svc_serverinfo", "serverinfo display event kind")
   equal(len(localClient.printLog), 1, "pre-serverinfo print retained")
   equal(localClient.printLog[0], banner.payload, "retained banner")
+  equal(clientEffects.serverInfoLevelText(info.payload[3]), "\u0002The Slipgate Complex\n", "serverinfo title terminates line")
   return true
 end function
 

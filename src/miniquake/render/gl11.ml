@@ -24,6 +24,15 @@ function inline traceEnabled()
   return diagnosticTraceEnabled
 end function
 
+function inline nativeBatchAvailable()
+  return true
+end function
+
+function backendName()
+  if native.renderBackend() == 1 then return "Direct3D 9" end if
+  return "OpenGL"
+end function
+
 function traceCommand(name, arguments)
   global diagnosticTrace
   if not diagnosticTraceEnabled then return false end if

@@ -2,6 +2,21 @@ package miniquake.platform.win32
 
 import miniquake.native as native
 
+const RENDER_OPENGL = 0
+const RENDER_DIRECT3D9 = 1
+
+function selectRenderer(backend)
+  return native.renderSelect(backend) != 0
+end function
+
+function renderer()
+  return native.renderBackend()
+end function
+
+function rendererAvailable(backend)
+  return native.renderAvailable(backend) != 0
+end function
+
 function create(title, width, height, fullscreen)
   handle = native.winCreate(title, width, height, fullscreen)
   if handle is void then return error(2300, "Win32/WGL window creation failed") end if

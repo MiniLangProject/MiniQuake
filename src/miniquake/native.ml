@@ -14,6 +14,10 @@ extern function i32ToF32(value as i32) from "miniquake_native.dll" symbol "mq_i3
 extern function asciiCode(text as cstr) from "miniquake_native.dll" symbol "mq_ascii_code" returns i32
 extern function asciiCharRaw(value as i32, output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_ascii_char" returns u32
 
+extern function renderSelect(backend as i32) from "miniquake_native.dll" symbol "mq_render_select" returns i32
+extern function renderBackend() from "miniquake_native.dll" symbol "mq_render_backend" returns i32
+extern function renderAvailable(backend as i32) from "miniquake_native.dll" symbol "mq_render_available" returns i32
+
 extern function winCreate(title as wstr, width as i32, height as i32, fullscreen as i32) from "miniquake_native.dll" symbol "mq_win_create" returns ptr
 extern function winDestroy() from "miniquake_native.dll" symbol "mq_win_destroy" returns void
 extern function winPoll() from "miniquake_native.dll" symbol "mq_win_poll" returns i32

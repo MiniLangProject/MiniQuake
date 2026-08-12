@@ -428,7 +428,7 @@ end function
 
 function drawAliasMesh(model, frame, mesh)
   if frame is void or mesh is void then return 0 end if
-  if not compatAliasGl.traceEnabled() then
+  if not compatAliasGl.traceEnabled() and compatAliasGl.nativeBatchAvailable() then
     batch = aliasBatchData(frame, mesh)
     dots = aliasShadeDotData(shadeRow)
     return compatAliasNative.glDrawAliasBatch(batch, len(batch), dots, len(shadedots), compatAliasNative.floatBits(shadelight))

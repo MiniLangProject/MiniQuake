@@ -87,10 +87,13 @@ function testCalcFovHighError()
 end function
 
 function testCalcRefdef()
-  refdef = screen.SCR_CalcRefdef(320, 200, makeRegistry(), 0)
+  registry = makeRegistry()
+  refdef = screen.SCR_CalcRefdef(320, 200, registry, 0)
   equal(refdef[0], 0, "refdef x")
   equal(refdef[2], 320, "refdef width")
   yes(refdef[3] < 200, "statusbar reserves height")
+  near(screen.SCR_ConsoleSlidePixels(640, 480, 0.05, registry), 15.0, 0.0001, "classic console speed")
+  near(screen.SCR_ConsoleSlidePixels(1920, 1080, 0.05, registry), 30.0, 0.0001, "scaled console speed")
   return true
 end function
 

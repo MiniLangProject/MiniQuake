@@ -359,6 +359,17 @@ function Sbar_Init(gameDirectory)
   return true
 end function
 
+function Sbar_Shutdown()
+  global sbarInitialized, sbarPictures, sbarPictureNames, sbarLoadTrace, sbarState, sbarFontTexture
+  sbarInitialized = false
+  sbarPictures = []
+  sbarPictureNames = []
+  sbarLoadTrace = []
+  sbarState = void
+  sbarFontTexture = 0
+  return true
+end function
+
 function Sbar_SetFrameState(consoleCurrent, numPages)
   global sbarConsoleCurrent, sbarNumPages
   sbarConsoleCurrent = consoleCurrent

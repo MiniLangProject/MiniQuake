@@ -983,6 +983,70 @@ function Draw_Init(filesystem, palette, width, height, cvars)
   return true
 end function
 
+function Draw_Shutdown()
+  global drawFilesystem, drawPalette, drawWad, drawCvars, draw_chars, draw_disc, draw_backtile, conback, menuplyr_pixels
+  global char_texture, translate_texture, currenttexture, menu_cachepics, wad_cachepics
+  global drawPictureObjects, drawPictureCoordinates, drawPicturePixels
+  global glTextureNames, glTextureIds, glTextureWidths, glTextureHeights, glTextureMipmaps, texture_extension_number
+  global glMultiTextureAvailable, oldTextureTarget, currentTextureSlots
+  textureIds = []
+  if char_texture != 0 then textureIds = textureIds + [char_texture] end if
+  if translate_texture != 0 then textureIds = textureIds + [translate_texture] end if
+  for each texture in scrap_textures
+    if texture != 0 then textureIds = textureIds + [texture] end if
+  end for
+  for each texture in glTextureIds
+    if texture != 0 then textureIds = textureIds + [texture] end if
+  end for
+  if conback is not void and conback.textureId != 0 then textureIds = textureIds + [conback.textureId] end if
+  if draw_disc is not void and draw_disc.textureId != 0 then textureIds = textureIds + [draw_disc.textureId] end if
+  if draw_backtile is not void and draw_backtile.textureId != 0 then textureIds = textureIds + [draw_backtile.textureId] end if
+  for each picture in menu_cachepics
+    if picture is not void and picture.textureId != 0 then textureIds = textureIds + [picture.textureId] end if
+  end for
+  for each picture in wad_cachepics
+    if picture is not void and picture.textureId != 0 then textureIds = textureIds + [picture.textureId] end if
+  end for
+  deleted = []
+  for each texture in textureIds
+    seen = false
+    for each previous in deleted
+      if previous == texture then seen = true end if
+    end for
+    if not seen then gl.deleteTexture(texture); deleted = deleted + [texture] end if
+  end for
+  drawFilesystem = void
+  drawPalette = bytes()
+  drawWad = void
+  drawCvars = void
+  draw_chars = bytes()
+  draw_disc = void
+  draw_backtile = void
+  conback = void
+  menuplyr_pixels = bytes(4096)
+  char_texture = 0
+  translate_texture = 0
+  currenttexture = -1
+  menu_cachepics = []
+  wad_cachepics = []
+  drawPictureObjects = []
+  drawPictureCoordinates = []
+  drawPicturePixels = []
+  glTextureNames = []
+  glTextureIds = []
+  glTextureWidths = []
+  glTextureHeights = []
+  glTextureMipmaps = []
+  texture_extension_number = 1
+  gl.resetTextureNames(1)
+  gl.setBoundTextureForCompatibility(-1)
+  glMultiTextureAvailable = false
+  oldTextureTarget = gl.GL_TEXTURE0_SGIS
+  currentTextureSlots = [-1, -1]
+  ResetScrap([])
+  return true
+end function
+
 function CharTexture()
   return char_texture
 end function

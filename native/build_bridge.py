@@ -71,6 +71,9 @@ IMPORTS: dict[str, list[str]] = {
         "glTexParameteri", "glTexImage2D", "glTexSubImage2D",
         "glTexEnvi", "glReadPixels", "glGetString", "glGetError", "glFinish", "glFlush", "glDrawBuffer",
     ],
+    "d3d9.dll": [
+        "Direct3DCreate9",
+    ],
 }
 
 
@@ -168,6 +171,8 @@ def main() -> int:
     obj = build / "miniquake_native.obj"
     ogg_source = root / "miniquake_ogg.c"
     ogg_obj = build / "miniquake_ogg.obj"
+    d3d_source = root / "miniquake_d3d9.c"
+    d3d_obj = build / "miniquake_d3d9.obj"
     output = root / "miniquake_native.dll"
     import_library = build / "miniquake_native.lib"
 
@@ -182,12 +187,17 @@ def main() -> int:
         f"/Fo{ogg_obj}", str(ogg_source),
     ]
     run(ogg_flags, root)
+    d3d_flags = [
+        compiler, "/nologo", "/c", "/W4", "/GS-", "/Zl", "/fp:precise",
+        "/Od" if args.debug else "/O2", f"/Fo{d3d_obj}", str(d3d_source),
+    ]
+    run(d3d_flags, root)
 
     link_flags = [
         linker, "/dll", "/noentry", "/machine:x64", "/subsystem:windows,6.0",
         "/nodefaultlib", "/dynamicbase", "/nxcompat", "/opt:ref", "/opt:icf",
         f"/def:{root / 'miniquake_native.def'}", f"/out:{output}",
-        f"/implib:{import_library}", str(obj), str(ogg_obj), *(str(path) for path in libraries),
+        f"/implib:{import_library}", str(obj), str(ogg_obj), str(d3d_obj), *(str(path) for path in libraries),
     ]
     run(link_flags, root)
     print(f"built {output} ({output.stat().st_size} bytes)")

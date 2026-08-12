@@ -103,7 +103,7 @@ no Quake game data.
 MiniQuake ist ein MiniLang-Portierungsprojekt auf Basis des unter GPL
 veröffentlichten WinQuake-/GLQuake-Quellcodes. Binärformate, Protocol 15,
 QuakeC-Wörter, BSP-Konventionen und zentrale Engine-Abläufe orientieren sich am
-Original. Win32, WGL/OpenGL 1.1, `waveOut`, Winsock und notwendige ABI-Helfer
+Original. Win32, WGL/OpenGL 1.1, Direct3D 9, `waveOut`, Winsock und notwendige ABI-Helfer
 liegen in schmalen nativen AMD64-Bridges; die Engine-Logik bleibt in MiniLang.
 
 Quake-Spieldaten (`pak0.pak`, Maps, Sounds, Grafiken usw.) sind nicht enthalten.
@@ -503,6 +503,13 @@ $QuakeBase = "C:\Program Files (x86)\Steam\steamapps\common\Quake"
 
 & .\build\MiniQuake.exe --play $QuakeBase start
 ```
+
+Der Renderer kann unter `Options` → `Video Mode` zwischen `OPENGL` und
+`DIRECT3D 9` umgeschaltet werden. Die Auswahl wird in `config.cfg` gespeichert.
+Alternativ stehen die Startoptionen `-renderer opengl`,
+`-renderer direct3d9`, `-opengl`, `-directx` und `-d3d9` zur Verfügung. In der
+Konsole lässt sich die archivierte Auswahl mit `vid_renderer` setzen und mit
+`vid_restart` ohne Programmneustart aktivieren.
 
 Ausgeschrieben und mit Fenstergröße:
 
