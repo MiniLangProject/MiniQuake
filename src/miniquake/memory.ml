@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.memory.
+*/
 package miniquake.memory
 
 import miniquake.zone as zone
@@ -54,21 +61,25 @@ struct MemoryManager
   zoneBacking
 end struct
 
+// Provide align16 behavior for the active subsystem.
 function inline align16(value)
   return (value + 15) & ~15
 end function
 
+// Return truncate name derived from the active module state.
 function truncateName(name, count)
   data = quakeText.encodeBytes(name)
   if len(data) <= count then return quakeText.decodeBytes(data) end if
   return quakeText.decodeBytes(slice(data, 0, count))
 end function
 
+// Create and initialize the module state.
 function create(capacity)
   if capacity < 0 then return error(1600, "negative memory capacity") end if
   return MemoryManager(capacity, [], 0, 0, 0, false, 0, [], 0, 1, void, void)
 end function
 
+// Provide hunk payload used behavior for the active subsystem.
 function hunkPayloadUsed(state)
   total = 0
   for each block in state.blocks
@@ -77,6 +88,7 @@ function hunkPayloadUsed(state)
   return total
 end function
 
+// Provide cache payload used behavior for the active subsystem.
 function cachePayloadUsed(state)
   total = 0
   for each block in state.caches
@@ -85,6 +97,7 @@ function cachePayloadUsed(state)
   return total
 end function
 
+// Provide zone payload used behavior for the active subsystem.
 function zonePayloadUsed(state)
   if state.mainZone is void then return 0 end if
   total = 0
@@ -94,14 +107,17 @@ function zonePayloadUsed(state)
   return total
 end function
 
+// Provide used behavior for the active subsystem.
 function used(state)
   return hunkPayloadUsed(state) + cachePayloadUsed(state) + zonePayloadUsed(state)
 end function
 
+// Release state for free hunk bytes.
 function inline freeHunkBytes(state)
   return state.capacity - state.lowUsed - state.highUsed
 end function
 
+// Create and initialize hunk block.
 function newHunkBlock(state, requestedSize, name, kind, side, start, span)
   block = HunkBlock(
     kind,
@@ -121,10 +137,12 @@ function newHunkBlock(state, requestedSize, name, kind, side, start, span)
   return block
 end function
 
+// Provide low mark behavior for the active subsystem.
 function lowMark(state)
   return state.lowUsed
 end function
 
+// Provide high mark behavior for the active subsystem.
 function highMark(state)
   if state.tempActive then
     mark = state.tempMark
@@ -134,6 +152,7 @@ function highMark(state)
   return state.highUsed
 end function
 
+// Return hunk alloc name derived from the active module state.
 function hunkAllocName(state, size, name)
   if size < 0 then return error(1601, "Hunk_Alloc: bad size: " + size) end if
   span = HUNK_HEADER_SIZE + align16(size)
@@ -144,10 +163,12 @@ function hunkAllocName(state, size, name)
   return newHunkBlock(state, size, name, "hunk", "low", start, span)
 end function
 
+// Provide hunk alloc behavior for the active subsystem.
 function hunkAlloc(state, size)
   return hunkAllocName(state, size, "unknown")
 end function
 
+// Return hunk high alloc name derived from the active module state.
 function hunkHighAllocName(state, size, name)
   if size < 0 then return error(1604, "Hunk_HighAllocName: bad size: " + size) end if
   if state.tempActive then
@@ -163,6 +184,7 @@ function hunkHighAllocName(state, size, name)
   return newHunkBlock(state, size, name, "hunk", "high", start, span)
 end function
 
+// Provide hunk temp alloc behavior for the active subsystem.
 function hunkTempAlloc(state, size, name)
   aligned = align16(size)
   if state.tempActive then
@@ -180,6 +202,7 @@ function hunkTempAlloc(state, size, name)
   return block
 end function
 
+// Release state for free to low mark.
 function freeToLowMark(state, mark)
   if mark < 0 or mark > state.lowUsed then return error(1603, "Hunk_FreeToLowMark: bad mark " + mark) end if
   for each block in state.blocks
@@ -192,6 +215,7 @@ function freeToLowMark(state, mark)
   return true
 end function
 
+// Release state for free to high mark.
 function freeToHighMark(state, mark)
   if state.tempActive then
     tempRestore = state.tempMark
@@ -209,6 +233,7 @@ function freeToHighMark(state, mark)
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function hunkCheck(state)
   expected = 0
   for each block in state.blocks
@@ -224,6 +249,7 @@ function hunkCheck(state)
   return true
 end function
 
+// Provide hunk print behavior for the active subsystem.
 function hunkPrint(state, all)
   text = "          :" + state.capacity + " total hunk size\n-------------------------"
   totalBlocks = 0
@@ -287,6 +313,7 @@ function hunkPrint(state, all)
   return text
 end function
 
+// Return cache start index derived from the active module state.
 function cacheStartIndex(state, block)
   index = 0
   while index < len(state.caches)
@@ -296,6 +323,7 @@ function cacheStartIndex(state, block)
   return -1
 end function
 
+// Add state for insert cache sorted.
 function insertCacheSorted(state, block)
   index = 0
   while index < len(state.caches) and state.caches[index].start < block.start
@@ -316,6 +344,7 @@ function insertCacheSorted(state, block)
   state.caches = result
 end function
 
+// Release state for remove cache at.
 function removeCacheAt(state, index)
   result = array(len(state.caches) - 1)
   sourceIndex = 0
@@ -330,6 +359,7 @@ function removeCacheAt(state, index)
   state.caches = result
 end function
 
+// Provide cache try alloc behavior for the active subsystem.
 function cacheTryAlloc(state, span, noBottom)
   if span <= 0 then return -1 end if
   if len(state.caches) == 0 then
@@ -379,10 +409,12 @@ function cacheTryAllocBlock(state, span, noBottom)
   return block
 end function
 
+// Create and initialize cache user.
 function newCacheUser(state)
   return CacheUser(void, state)
 end function
 
+// Create and initialize lru.
 function makeLru(block)
   if block is void or not block.alive then return error(1609, "Cache_MakeLRU: NULL link") end if
   if block.lruStamp != 0 then return error(1610, "Cache_MakeLRU: active link") end if
@@ -392,6 +424,7 @@ function makeLru(block)
   return block
 end function
 
+// Provide unlink lru behavior for the active subsystem.
 function unlinkLru(block)
   if block is void or not block.alive or block.lruStamp == 0 then
     return error(1611, "Cache_UnlinkLRU: NULL link")
@@ -400,6 +433,7 @@ function unlinkLru(block)
   return block
 end function
 
+// Provide least recently used behavior for the active subsystem.
 function leastRecentlyUsed(state)
   result = void
   for each block in state.caches
@@ -408,6 +442,7 @@ function leastRecentlyUsed(state)
   return result
 end function
 
+// Provide cache free behavior for the active subsystem.
 function cacheFree(user)
   if user is void or user.block is void or not user.block.alive then
     return error(1630, "Cache_Free: not allocated")
@@ -424,6 +459,7 @@ function cacheFree(user)
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function cacheCheck(state, user)
   if user is void or user.block is void or not user.block.alive then return void end if
   unlinkLru(user.block)
@@ -431,6 +467,7 @@ function cacheCheck(state, user)
   return user.block.data
 end function
 
+// Provide cache alloc user behavior for the active subsystem.
 function cacheAllocUser(state, user, size, name)
   if user.block is not void and user.block.alive then return error(1632, "Cache_Alloc: already allocated") end if
   if size <= 0 then return error(1633, "Cache_Alloc: size " + size) end if
@@ -466,6 +503,7 @@ function cacheAllocUser(state, user, size, name)
   return block.data
 end function
 
+// Provide cache alloc behavior for the active subsystem.
 function cacheAlloc(state, size, name)
   user = newCacheUser(state)
   allocated = cacheAllocUser(state, user, size, name)
@@ -473,6 +511,7 @@ function cacheAlloc(state, size, name)
   return user
 end function
 
+// Provide cache move behavior for the active subsystem.
 function cacheMove(block)
   if block is void or not block.alive then return false end if
   state = block.owner
@@ -490,6 +529,7 @@ function cacheMove(block)
   return true
 end function
 
+// Provide cache free low behavior for the active subsystem.
 function cacheFreeLow(state, newLowHunk)
   while len(state.caches) > 0
     block = state.caches[0]
@@ -499,6 +539,7 @@ function cacheFreeLow(state, newLowHunk)
   return true
 end function
 
+// Provide cache free high behavior for the active subsystem.
 function cacheFreeHigh(state, newHighHunk)
   while len(state.caches) > 0
     block = state.caches[len(state.caches) - 1]
@@ -510,6 +551,7 @@ function cacheFreeHigh(state, newHighHunk)
   return true
 end function
 
+// Provide cache flush behavior for the active subsystem.
 function cacheFlush(state)
   while len(state.caches) > 0
     cacheFree(state.caches[0].user)
@@ -517,6 +559,7 @@ function cacheFlush(state)
   return true
 end function
 
+// Provide cache print behavior for the active subsystem.
 function cachePrint(state)
   text = ""
   for each block in state.caches
@@ -525,14 +568,17 @@ function cachePrint(state)
   return text
 end function
 
+// Provide cache report behavior for the active subsystem.
 function cacheReport(state)
   return freeHunkBytes(state) / (1024.0 * 1024.0)
 end function
 
+// Provide cache compact behavior for the active subsystem.
 function cacheCompact(state)
   return true
 end function
 
+// Update subsystem state for cache init.
 function cacheInit(state)
   for each block in state.caches
     block.alive = false
@@ -544,11 +590,13 @@ function cacheInit(state)
   return state
 end function
 
+// Return zone state derived from the active module state.
 function zoneState(state)
   if state.mainZone is void then state.mainZone = zone.create(state.capacity) end if
   return state.mainZone
 end function
 
+// Provide zone tag malloc behavior for the active subsystem.
 function zoneTagMalloc(state, size, tag, name)
   block = zone.tagMalloc(zoneState(state), size, tag)
   if block is void or block is error then return block end if
@@ -557,6 +605,7 @@ function zoneTagMalloc(state, size, tag, name)
   return block
 end function
 
+// Provide zone malloc behavior for the active subsystem.
 function zoneMalloc(state, size, name)
   zone.check(zoneState(state))
   block = zoneTagMalloc(state, size, 1, name)
@@ -564,26 +613,32 @@ function zoneMalloc(state, size, name)
   return block
 end function
 
+// Provide zone free behavior for the active subsystem.
 function zoneFree(block)
   return zone.free(block)
 end function
 
+// Assert that the condition holds and identify a failing test.
 function zoneCheck(state)
   return zone.check(zoneState(state))
 end function
 
+// Provide zone print behavior for the active subsystem.
 function zonePrint(state)
   return zone.printHeap(zoneState(state))
 end function
 
+// Provide zone dump heap behavior for the active subsystem.
 function zoneDumpHeap(state)
   return zone.dumpHeap(zoneState(state))
 end function
 
+// Provide zone free memory behavior for the active subsystem.
 function zoneFreeMemory(state)
   return zone.freeMemory(zoneState(state))
 end function
 
+// Allocate and initialize the requested value.
 function allocate(state, size, name, kind)
   if kind == "zone" then return zoneMalloc(state, size, name) end if
   if kind == "temp" then return hunkTempAlloc(state, size, name) end if
@@ -591,6 +646,7 @@ function allocate(state, size, name, kind)
   return hunkAllocName(state, size, name)
 end function
 
+// Update subsystem state for memory init.
 function memoryInit(capacity, zoneSize)
   state = create(capacity)
   cacheInit(state)
@@ -601,6 +657,7 @@ function memoryInit(capacity, zoneSize)
   return state
 end function
 
+// Provide memory init arguments behavior for the active subsystem.
 function memoryInitArguments(capacity, commandLine)
   zoneSize = zone.DYNAMIC_SIZE
   position = 0
@@ -631,98 +688,122 @@ function Hunk_Check(state)
   return hunkCheck(state)
 end function
 
+// Mirror Quake's Hunk_Print routine and its observable state changes.
 function Hunk_Print(state, all)
   return hunkPrint(state, all)
 end function
 
+// Mirror Quake's Hunk_AllocName routine and its observable state changes.
 function Hunk_AllocName(state, size, name)
   return hunkAllocName(state, size, name)
 end function
 
+// Mirror Quake's Hunk_Alloc routine and its observable state changes.
 function Hunk_Alloc(state, size)
   return hunkAlloc(state, size)
 end function
 
+// Mirror Quake's Hunk_LowMark routine and its observable state changes.
 function Hunk_LowMark(state)
   return lowMark(state)
 end function
 
+// Mirror Quake's Hunk_FreeToLowMark routine and its observable state changes.
 function Hunk_FreeToLowMark(state, mark)
   return freeToLowMark(state, mark)
 end function
 
+// Mirror Quake's Hunk_HighMark routine and its observable state changes.
 function Hunk_HighMark(state)
   return highMark(state)
 end function
 
+// Mirror Quake's Hunk_FreeToHighMark routine and its observable state changes.
 function Hunk_FreeToHighMark(state, mark)
   return freeToHighMark(state, mark)
 end function
 
+// Mirror Quake's Hunk_HighAllocName routine and its observable state changes.
 function Hunk_HighAllocName(state, size, name)
   return hunkHighAllocName(state, size, name)
 end function
 
+// Mirror Quake's Hunk_TempAlloc routine and its observable state changes.
 function Hunk_TempAlloc(state, size)
   return hunkTempAlloc(state, size, "")
 end function
 
+// Mirror Quake's Cache_Move routine and its observable state changes.
 function Cache_Move(block)
   return cacheMove(block)
 end function
 
+// Mirror Quake's Cache_FreeLow routine and its observable state changes.
 function Cache_FreeLow(state, newLowHunk)
   return cacheFreeLow(state, newLowHunk)
 end function
 
+// Mirror Quake's Cache_FreeHigh routine and its observable state changes.
 function Cache_FreeHigh(state, newHighHunk)
   return cacheFreeHigh(state, newHighHunk)
 end function
 
+// Mirror Quake's Cache_UnlinkLRU routine and its observable state changes.
 function Cache_UnlinkLRU(block)
   return unlinkLru(block)
 end function
 
+// Mirror Quake's Cache_MakeLRU routine and its observable state changes.
 function Cache_MakeLRU(block)
   return makeLru(block)
 end function
 
+// Mirror Quake's Cache_TryAlloc routine and its observable state changes.
 function Cache_TryAlloc(state, size, noBottom)
   return cacheTryAllocBlock(state, size, noBottom)
 end function
 
+// Mirror Quake's Cache_Flush routine and its observable state changes.
 function Cache_Flush(state)
   return cacheFlush(state)
 end function
 
+// Mirror Quake's Cache_Print routine and its observable state changes.
 function Cache_Print(state)
   return cachePrint(state)
 end function
 
+// Mirror Quake's Cache_Report routine and its observable state changes.
 function Cache_Report(state)
   return cacheReport(state)
 end function
 
+// Mirror Quake's Cache_Compact routine and its observable state changes.
 function Cache_Compact(state)
   return cacheCompact(state)
 end function
 
+// Mirror Quake's Cache_Init routine and its observable state changes.
 function Cache_Init(state)
   return cacheInit(state)
 end function
 
+// Mirror Quake's Cache_Free routine and its observable state changes.
 function Cache_Free(user)
   return cacheFree(user)
 end function
 
+// Assert that the condition holds and identify a failing test.
 function Cache_Check(state, user)
   return cacheCheck(state, user)
 end function
 
+// Mirror Quake's Cache_Alloc routine and its observable state changes.
 function Cache_Alloc(state, user, size, name)
   return cacheAllocUser(state, user, size, name)
 end function
 
+// Mirror Quake's Memory_Init routine and its observable state changes.
 function Memory_Init(capacity, zoneSize)
   return memoryInit(capacity, zoneSize)
 end function

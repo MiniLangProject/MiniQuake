@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.world_bsp.
+*/
 package miniquake.world_bsp
 
 import miniquake.types as t
@@ -6,14 +13,28 @@ import miniquake.mathlib as math
 import miniquake.format.bsp as bsp
 import miniquake.array_util as arrayutil
 
+// The original engine keeps one decompression buffer, but MiniQuake's immutable
+// protocol/render consumers otherwise allocate and expand the same leaf row on
+// every server frame and whenever the camera enters a new leaf.  Populate this
+// map-local table while the loading plaque is visible.
+leafPvsCacheMapKey = 0
+leafPvsCache = []
+fatPvsScratchMapKey = 0
+fatPvsScratch = bytes()
+collisionHullCacheMapKey = 0
+collisionHullCache = []
+
+// Create the zero-initialized state for vector.
 function zeroVector()
   return t.Vec3(0.0, 0.0, 0.0)
 end function
 
+// Provide empty plane behavior for the active subsystem.
 function emptyPlane()
   return t.Plane(zeroVector(), 0.0, 0, 0)
 end function
 
+// Provide drawing clip nodes behavior for the active subsystem.
 function drawingClipNodes(map)
   result = arrayutil.makeEmptyArray(len(map.nodes))
   index = 0
@@ -41,9 +62,14 @@ function drawingClipNodes(map)
   return result
 end function
 
+// Create and initialize hull.
 function createHull(map, hullIndex)
   if len(map.models) == 0 then return error(2500, "BSP has no world model") end if
   if hullIndex < 0 or hullIndex > 2 then return error(2501, "invalid BSP hull index") end if
+  mapKey = nativeRawValue(map)
+  if collisionHullCacheMapKey == mapKey and len(collisionHullCache) == 3 then
+    return collisionHullCache[hullIndex]
+  end if
   model = map.models[0]
   first = model.headNodes[hullIndex]
   nodes = map.clipNodes
@@ -62,6 +88,28 @@ function createHull(map, hullIndex)
   return t.BspCollisionHull(map, nodes, map.planes, first, len(nodes) - 1, clipMins, clipMaxs)
 end function
 
+// Build the three immutable world hull descriptors while the loading plaque
+// is active. Hull zero includes Mod_MakeHull0's expanded drawing nodes and was
+// previously rebuilt for every point trace, producing hundreds of kilobytes
+// of short-lived objects per gameplay frame.
+function precacheCollisionHulls(map)
+  global collisionHullCacheMapKey, collisionHullCache
+  if map is void or len(map.models) == 0 then
+    collisionHullCacheMapKey = 0
+    collisionHullCache = []
+    return 0
+  end if
+  collisionHullCacheMapKey = 0
+  collisionHullCache = []
+  hull0 = createHull(map, 0)
+  hull1 = createHull(map, 1)
+  hull2 = createHull(map, 2)
+  collisionHullCacheMapKey = nativeRawValue(map)
+  collisionHullCache = [hull0, hull1, hull2]
+  return 3
+end function
+
+// Provide plane distance behavior for the active subsystem.
 function planeDistance(plane, point)
   if plane.type == 0 then return point.x - plane.dist end if
   if plane.type == 1 then return point.y - plane.dist end if
@@ -69,11 +117,13 @@ function planeDistance(plane, point)
   return math.dot(plane.normal, point) - plane.dist
 end function
 
+// Provide child behavior for the active subsystem.
 function child(node, side)
   if side == 0 then return node.child0 end if
   return node.child1
 end function
 
+// Provide point contents from node behavior for the active subsystem.
 function pointContentsFromNode(hull, number, point)
   current = number
   while current >= 0
@@ -86,11 +136,14 @@ function pointContentsFromNode(hull, number, point)
   return current
 end function
 
+// Provide point contents behavior for the active subsystem.
 function pointContents(hull, point)
   return pointContentsFromNode(hull, hull.firstClipNode, point)
 end function
 
+// Assert that the condition holds and identify a failing test.
 function recursiveHullCheck(hull, number, p1Fraction, p2Fraction, p1, p2, trace)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if number < 0 then
     if number != c.CONTENTS_SOLID then
       trace.allSolid = false
@@ -156,12 +209,14 @@ function recursiveHullCheck(hull, number, p1Fraction, p2Fraction, p1, p2, trace)
   return false
 end function
 
+// Trace in hull through the collision world.
 function traceInHull(hull, start, finish)
   trace = t.Trace(true, false, false, false, 1.0, math.copy(finish), emptyPlane(), 0)
   recursiveHullCheck(hull, hull.firstClipNode, 0.0, 1.0, start, finish, trace)
   return trace
 end function
 
+// Provide hull for bounds behavior for the active subsystem.
 function hullForBounds(map, mins, maxs)
   sizeX = maxs.x - mins.x
   if sizeX < 3.0 then return createHull(map, 0) end if
@@ -169,6 +224,7 @@ function hullForBounds(map, mins, maxs)
   return createHull(map, 2)
 end function
 
+// Trace the requested value through the collision world.
 function trace(map, start, mins, maxs, finish)
   hull = hullForBounds(map, mins, maxs)
   offset = math.subtract(hull.clipMins, mins)
@@ -179,11 +235,13 @@ function trace(map, start, mins, maxs, finish)
   return result
 end function
 
+// Trace line through the collision world.
 function traceLine(map, start, finish)
   origin = zeroVector()
   return trace(map, start, origin, origin, finish)
 end function
 
+// Provide true point contents behavior for the active subsystem.
 function truePointContents(map, point)
   if map is void or len(map.models) == 0 or len(map.nodes) == 0 then return error(2513, "Mod_PointInLeaf: bad model") end if
   number = map.models[0].headNodes[0]
@@ -209,12 +267,14 @@ function truePointContents(map, point)
   return map.leafs[leafIndex].contents
 end function
 
+// Provide point contents world behavior for the active subsystem.
 function pointContentsWorld(map, point)
   contents = truePointContents(map, point)
   if contents <= -9 and contents >= -14 then return c.CONTENTS_WATER end if
   return contents
 end function
 
+// Provide leaf for point behavior for the active subsystem.
 function leafForPoint(map, point)
   if map is void or len(map.models) == 0 or len(map.nodes) == 0 then return error(2513, "Mod_PointInLeaf: bad model") end if
   number = map.models[0].headNodes[0]
@@ -230,11 +290,14 @@ function leafForPoint(map, point)
   return leafIndex
 end function
 
+// Mirror Quake's Mod_PointInLeaf routine and its observable state changes.
 function Mod_PointInLeaf(point, map)
   return leafForPoint(map, point)
 end function
 
-function leafPvs(map, leafIndex)
+// Decompress one leaf visibility row without consulting the level cache.
+function decompressLeafPvs(map, leafIndex)
+  if map is void then return bytes() end if
   rowBytes = 0
   // Quake's Mod_DecompressVis uses integer ceiling division:
   // (numleafs + 7) >> 3.  MiniLang '/' may produce a float when the
@@ -244,13 +307,46 @@ function leafPvs(map, leafIndex)
   if leafIndex <= 0 or leafIndex >= len(map.leafs) then return bytes(rowBytes, 255) end if
   leaf = map.leafs[leafIndex]
   if leaf.visibilityOffset < 0 then return bytes(rowBytes, 255) end if
+  // Small external BSP29 models have an empty visibility lump with visofs 0.
+  // They are not normally queried as a world PVS, but retain GLQuake's safe
+  // all-visible fallback if a caller does query one.
+  if len(map.visibility) == 0 then return bytes(rowBytes, 255) end if
   return bsp.decompressVisibility(map.visibility, leaf.visibilityOffset, rowBytes)
 end function
 
+// Pre-expand all visibility rows before gameplay starts.
+function precacheLeafPvs(map)
+  global leafPvsCacheMapKey, leafPvsCache, fatPvsScratchMapKey, fatPvsScratch
+  if map is void then leafPvsCacheMapKey = 0; leafPvsCache = []; fatPvsScratchMapKey = 0; fatPvsScratch = bytes(); return 0 end if
+  leafPvsCacheMapKey = nativeRawValue(map)
+  leafPvsCache = arrayutil.makeEmptyArray(len(map.leafs))
+  index = 0
+  while index < len(map.leafs)
+    leafPvsCache[index] = decompressLeafPvs(map, index)
+    index = index + 1
+  end while
+  fatPvsScratchMapKey = leafPvsCacheMapKey
+  fatPvsScratch = bytes((map.models[0].visibleLeafs + 31) >> 3)
+  return len(leafPvsCache)
+end function
+
+// Provide leaf pvs behavior for the active subsystem.
+function leafPvs(map, leafIndex)
+  if map is not void and nativeRawValue(map) == leafPvsCacheMapKey and
+      leafIndex >= 0 and leafIndex < len(leafPvsCache) and
+      leafPvsCache[leafIndex] is not void then
+    return leafPvsCache[leafIndex]
+  end if
+  return decompressLeafPvs(map, leafIndex)
+end function
+
+// Mirror Quake's Mod_LeafPVS routine and its observable state changes.
 function Mod_LeafPVS(leafIndex, map)
   return leafPvs(map, leafIndex)
 end function
 
+// Return the pre-expanded world-face visibility mask for one view leaf.
+// Report whether leaf visible holds for the active state.
 function leafVisible(pvs, leafIndex)
   if leafIndex <= 0 then return true end if
   bitIndex = leafIndex - 1
@@ -259,6 +355,140 @@ function leafVisible(pvs, leafIndex)
   return (pvs[byteIndex] & (1 << (bitIndex & 7))) != 0
 end function
 
+// SV_FindTouchedLeafs stores every non-solid world leaf intersected by an
+// entity's linked abs bounds (up to MAX_ENT_LEAFS).  Large doors and moving
+// walls often have their origin in a different PVS from the face seen by the
+// player, so testing only Mod_PointInLeaf(origin) makes a physically present
+// brush model disappear.
+function boxOnBspPlaneSide(mins, maxs, plane)
+  if plane.type == 0 then
+    if plane.dist <= mins.x then return 1 end if
+    if plane.dist >= maxs.x then return 2 end if
+    return 3
+  end if
+  if plane.type == 1 then
+    if plane.dist <= mins.y then return 1 end if
+    if plane.dist >= maxs.y then return 2 end if
+    return 3
+  end if
+  if plane.type == 2 then
+    if plane.dist <= mins.z then return 1 end if
+    if plane.dist >= maxs.z then return 2 end if
+    return 3
+  end if
+  positive = t.Vec3(mins.x, mins.y, mins.z)
+  negative = t.Vec3(maxs.x, maxs.y, maxs.z)
+  if plane.normal.x >= 0.0 then positive.x = maxs.x; negative.x = mins.x end if
+  if plane.normal.y >= 0.0 then positive.y = maxs.y; negative.y = mins.y end if
+  if plane.normal.z >= 0.0 then positive.z = maxs.z; negative.z = mins.z end if
+  sides = 0
+  if math.dot(plane.normal, positive) >= plane.dist then sides = sides | 1 end if
+  if math.dot(plane.normal, negative) < plane.dist then sides = sides | 2 end if
+  return sides
+end function
+
+// Add state for append touched leaves.
+function appendTouchedLeaves(map, nodeNumber, mins, maxs, limit, result)
+  if len(result) >= limit then return result end if
+  if nodeNumber < 0 then
+    leafIndex = -1 - nodeNumber
+    if leafIndex < 0 or leafIndex >= len(map.leafs) then return result end if
+    if map.leafs[leafIndex].contents != c.CONTENTS_SOLID then result = result + [leafIndex] end if
+    return result
+  end if
+  if nodeNumber >= len(map.nodes) then return result end if
+  node = map.nodes[nodeNumber]
+  if node.planeIndex < 0 or node.planeIndex >= len(map.planes) then return result end if
+  sides = boxOnBspPlaneSide(mins, maxs, map.planes[node.planeIndex])
+  if (sides & 1) != 0 then result = appendTouchedLeaves(map, node.child0, mins, maxs, limit, result) end if
+  if (sides & 2) != 0 and len(result) < limit then result = appendTouchedLeaves(map, node.child1, mins, maxs, limit, result) end if
+  return result
+end function
+
+// Provide touched leaves behavior for the active subsystem.
+function touchedLeaves(map, mins, maxs, limit)
+  if map is void or len(map.models) == 0 or len(map.nodes) == 0 or limit <= 0 then return [] end if
+  return appendTouchedLeaves(map, map.models[0].headNodes[0], mins, maxs, limit, [])
+end function
+
+// Report whether any leaf visible holds for the active state.
+function anyLeafVisible(pvs, leaves)
+  for each leafIndex in leaves
+    if leafVisible(pvs, leafIndex) then return true end if
+  end for
+  return false
+end function
+
+// Provide or visibility behavior for the active subsystem.
+function orVisibility(destination, source)
+  limit = len(destination)
+  if len(source) < limit then limit = len(source) end if
+  index = 0
+  while index < limit
+    destination[index] = destination[index] | source[index]
+    index = index + 1
+  end while
+  return destination
+end function
+
+// Add state for add to fat pvs.
+function addToFatPvs(map, origin, nodeNumber, destination)
+  current = nodeNumber
+  while true
+    if current < 0 then
+      leafIndex = -1 - current
+      if leafIndex > 0 and leafIndex < len(map.leafs) and map.leafs[leafIndex].contents != c.CONTENTS_SOLID then
+        orVisibility(destination, leafPvs(map, leafIndex))
+      end if
+      return destination
+    end if
+    if current >= len(map.nodes) then return destination end if
+    node = map.nodes[current]
+    if node.planeIndex < 0 or node.planeIndex >= len(map.planes) then return destination end if
+    distance = planeDistance(map.planes[node.planeIndex], origin)
+    if distance > 8.0 then
+      current = node.child0
+    else if distance < -8.0 then
+      current = node.child1
+    else
+      addToFatPvs(map, origin, node.child0, destination)
+      current = node.child1
+    end if
+  end while
+end function
+
+// SV_FatPVS merges the PVS on both sides of planes within eight units of the
+// view point.  This prevents entities on a doorway/portal boundary from
+// blinking out as the camera crosses it.
+function fatPvs(map, origin)
+  global fatPvsScratchMapKey, fatPvsScratch
+  if map is void or len(map.models) == 0 then return bytes() end if
+  count = (map.models[0].visibleLeafs + 31) >> 3
+  if count < 1 then count = 1 end if
+  mapKey = nativeRawValue(map)
+  if fatPvsScratchMapKey != mapKey or len(fatPvsScratch) != count then
+    fatPvsScratchMapKey = mapKey
+    fatPvsScratch = bytes(count)
+  else
+    index = 0
+    while index < count
+      fatPvsScratch[index] = 0
+      index = index + 1
+    end while
+  end if
+  result = fatPvsScratch
+  if len(map.nodes) == 0 then
+    index = 0
+    while index < count
+      result[index] = 255
+      index = index + 1
+    end while
+    return result
+  end if
+  return addToFatPvs(map, origin, map.models[0].headNodes[0], result)
+end function
+
+// Return player start.
 function findPlayerStart(map)
   for each entity in map.entities
     classname = bsp.entityValue(entity, "classname")
@@ -286,10 +516,12 @@ function playerHull(map)
   return createHull(map, 1)
 end function
 
+// Trace point through the collision world.
 function tracePoint(map, start, finish)
   return traceLine(map, start, finish)
 end function
 
+// Trace player through the collision world.
 function tracePlayer(map, start, finish)
   return trace(
     map,
@@ -300,10 +532,12 @@ function tracePlayer(map, start, finish)
   )
 end function
 
+// Provide world point contents behavior for the active subsystem.
 function worldPointContents(map, point)
   return pointContentsWorld(map, point)
 end function
 
+// Provide point leaf behavior for the active subsystem.
 function pointLeaf(map, point)
   return leafForPoint(map, point)
 end function
@@ -322,6 +556,7 @@ function hullIndexForBounds(mins, maxs)
   return 2
 end function
 
+// Create and initialize model hull.
 function createModelHull(map, modelIndex, hullIndex)
   if modelIndex < 0 or modelIndex >= len(map.models) then return error(2510, "bad BSP submodel index") end if
   if hullIndex < 0 or hullIndex > 2 then return error(2511, "bad BSP hull index") end if
@@ -343,6 +578,7 @@ function createModelHull(map, modelIndex, hullIndex)
   return t.BspCollisionHull(map, nodes, map.planes, first, len(nodes) - 1, clipMins, clipMaxs)
 end function
 
+// Trace brush model through the collision world.
 function traceBrushModel(map, modelIndex, entityOrigin, start, mins, maxs, finish)
   hullIndex = hullIndexForBounds(mins, maxs)
   hull = createModelHull(map, modelIndex, hullIndex)
@@ -359,11 +595,13 @@ function traceBrushModel(map, modelIndex, entityOrigin, start, mins, maxs, finis
   return result
 end function
 
+// Return absolute value derived from the active module state.
 function absoluteValue(value)
   if value < 0.0 then return -value end if
   return value
 end function
 
+// Provide radius from bounds behavior for the active subsystem.
 function RadiusFromBounds(mins, maxs)
   x = absoluteValue(mins.x)
   if absoluteValue(maxs.x) > x then x = absoluteValue(maxs.x) end if
@@ -374,6 +612,7 @@ function RadiusFromBounds(mins, maxs)
   return math.length(t.Vec3(x, y, z))
 end function
 
+// Mirror Quake's Mod_MakeHull0 routine and its observable state changes.
 function Mod_MakeHull0(map)
   return drawingClipNodes(map)
 end function

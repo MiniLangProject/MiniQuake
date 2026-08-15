@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Focused zone.c/zone.h behavioral tests.
 */
-
 import miniquake.zone as zone
 import miniquake.memory as memory
 
@@ -12,16 +12,19 @@ struct TestCommandLine
   args
 end struct
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9300, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9301, name + ": expected true") end if
   return true
 end function
 
+// Verify zone allocator against the expected Quake behavior.
 function testZoneAllocator()
   state = zone.create(512)
   initialFree = zone.Z_FreeMemory(state)
@@ -50,6 +53,7 @@ function testZoneAllocator()
   return true
 end function
 
+// Verify hunk allocator against the expected Quake behavior.
 function testHunkAllocator()
   state = memory.create(1024)
   low = memory.Hunk_LowMark(state)
@@ -89,6 +93,7 @@ function testHunkAllocator()
   return true
 end function
 
+// Verify cache lru and purge against the expected Quake behavior.
 function testCacheLruAndPurge()
   state = memory.create(512)
   first = memory.cacheAlloc(state, 64, "first")
@@ -122,6 +127,7 @@ function testCacheLruAndPurge()
   return true
 end function
 
+// Verify cache hunk collision against the expected Quake behavior.
 function testCacheHunkCollision()
   state = memory.create(512)
   first = memory.cacheAlloc(state, 64, "first")
@@ -153,6 +159,7 @@ function testCacheHunkCollision()
   return true
 end function
 
+// Verify memory init and zone wrappers against the expected Quake behavior.
 function testMemoryInitAndZoneWrappers()
   state = memory.Memory_Init(4096, 1024)
   assertEqual(memory.lowMark(state), 1040, "Memory_Init reserves zone on low hunk")
@@ -175,6 +182,7 @@ function testMemoryInitAndZoneWrappers()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "[1/5] zone allocator"
   result = try(testZoneAllocator())

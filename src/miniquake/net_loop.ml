@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.net_loop.
+*/
 package miniquake.net_loop
 
 import miniquake.types as t
@@ -16,26 +23,31 @@ unreliableMessagesReceived = 0
 const LOOP_MAX_MESSAGE = 8192
 const HOST_CACHE_SIZE = 8
 
+// Create and initialize state.
 function createState()
   return t.LoopState(void, void, void, void, void, "UNNAMED", "", 0, 1, [], [], 0, 0, [], [], true)
 end function
 
+// Create and initialize socket.
 function createSocket()
   now = win.ticks() / 1000.0
   return t.LoopSocket(void, [], [], true, false, "loop", void, "", 0, void, now, now, now, 0, 0)
 end function
 
+// Create and initialize remote socket.
 function createRemoteSocket(udpSocket, address, port)
   now = win.ticks() / 1000.0
   return t.LoopSocket(void, [], [], true, false, "udp", udpSocket, address, port, datagram.createChannel(), now, now, now, 1, 0)
 end function
 
+// Convert address into its canonical representation.
 function normalizeAddress(address)
   lowered = bio.lower(address)
   if lowered == "localhost" or lowered == "local" then return "127.0.0.1" end if
   return address
 end function
 
+// Provide numeric address parts behavior for the active subsystem.
 function numericAddressParts(address)
   source = bytes(address)
   if len(source) == 0 then return void end if
@@ -81,6 +93,7 @@ function expandPartialIPAddress(address)
   return combined[0] + "." + combined[1] + "." + combined[2] + "." + combined[3]
 end function
 
+// Read and validate address.
 function parseAddress(text, defaultPort)
   data = bytes(text)
   colon = -1
@@ -103,12 +116,14 @@ function parseAddress(text, defaultPort)
   return [address, port]
 end function
 
+// Provide short text behavior for the active subsystem.
 function shortText(text, maximum)
   data = bytes(text)
   if len(data) <= maximum then return text end if
   return decode(slice(data, 0, maximum))
 end function
 
+// Report whether is numeric address.
 function isNumericAddress(address)
   data = bytes(address)
   if len(data) == 0 then return false end if
@@ -123,6 +138,7 @@ function isNumericAddress(address)
   return dots == 3
 end function
 
+// Return ipv4 number derived from the active module state.
 function ipv4Number(address)
   data = bytes(address)
   parts = []
@@ -142,14 +158,17 @@ function ipv4Number(address)
   return ((parts[0] & 255) << 24) | ((parts[1] & 255) << 16) | ((parts[2] & 255) << 8) | (parts[3] & 255)
 end function
 
+// Provide str addr behavior for the active subsystem.
 function StrAddr(address, port)
   return address + ":" + port
 end function
 
+// Provide ipv4 text behavior for the active subsystem.
 function inline ipv4Text(value)
   return ((value >> 24) & 255) + "." + ((value >> 16) & 255) + "." + ((value >> 8) & 255) + "." + (value & 255)
 end function
 
+// Mirror Quake's NET_Ban_f routine and its observable state changes.
 function NET_Ban_f(state, arguments)
   if len(arguments) <= 1 then
     if state.banAddress == 0 then return "Banning not active" end if
@@ -172,6 +191,7 @@ function NET_Ban_f(state, arguments)
   return ""
 end function
 
+// Add state for address is banned.
 function addressIsBanned(state, address)
   if state.banAddress == 0 then return false end if
   numeric = ipv4Number(address)
@@ -179,6 +199,7 @@ function addressIsBanned(state, address)
   return (numeric & state.banMask) == state.banAddress
 end function
 
+// Provide compact remote sockets behavior for the active subsystem.
 function compactRemoteSockets(state)
   active = []
   for each socket in state.remoteSockets
@@ -188,6 +209,7 @@ function compactRemoteSockets(state)
   return len(active)
 end function
 
+// Establish the requested value using the active network transport.
 function connect(state, host)
   if host != "local" and host != "localhost" then
     target = host
@@ -221,7 +243,9 @@ function connect(state, host)
   return client
 end function
 
+// Establish remote using the active network transport.
 function connectRemote(state, address, port, timeoutMilliseconds)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if not state.lanEnabled then return error(3436, "Datagram networking disabled by -nolan") end if
   compactRemoteSockets(state)
   socketResult = try(udp.open(0))
@@ -272,6 +296,7 @@ end function
 // two-second duplicate window lets the original server repeat CCREP_ACCEPT
 // instead of treating each short-lived process as a crashed client.
 function connectRemotePersistent(state, address, port, timeoutMilliseconds, resendMilliseconds)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if not state.lanEnabled then return error(3436, "Datagram networking disabled by -nolan") end if
   compactRemoteSockets(state)
   socketResult = try(udp.open(0))
@@ -347,6 +372,7 @@ function connectRemotePersistent(state, address, port, timeoutMilliseconds, rese
   return error(3433, "UDP persistent connect timed out: local_port=" + localPort + " target=" + requestedAddress + ":" + port + " sends=" + sends + " receives=" + receives + " ignored=" + ignored)
 end function
 
+// Provide listen behavior for the active subsystem.
 function listen(state, port)
   if not state.lanEnabled then return error(3436, "Datagram networking disabled by -nolan") end if
   if state.listener is not void then return state.listener end if
@@ -356,6 +382,7 @@ function listen(state, port)
   return opened
 end function
 
+// Finalize state for stop listening.
 function stopListening(state)
   if state.listener is void then return false end if
   udp.close(state.listener)
@@ -364,6 +391,7 @@ function stopListening(state)
   return true
 end function
 
+// Update subsystem configuration for configure server.
 function configureServer(state, hostName, mapName, currentPlayers, maxPlayers)
   state.hostName = hostName
   state.mapName = mapName
@@ -372,12 +400,14 @@ function configureServer(state, hostName, mapName, currentPlayers, maxPlayers)
   return true
 end function
 
+// Update subsystem configuration for configure query data.
 function configureQueryData(state, players, rules)
   state.playerInfo = players
   state.serverRules = rules
   return true
 end function
 
+// Apply the Quake-compatible host name exists behavior.
 function hostNameExists(hosts, name)
   wanted = bio.lower(name)
   for each cached in hosts
@@ -386,6 +416,7 @@ function hostNameExists(hosts, name)
   return false
 end function
 
+// Return unique host name derived from the active module state.
 function uniqueHostName(hosts, requested)
   candidate = shortText(requested, 15)
   if candidate == "" then candidate = "UNNAMED" end if
@@ -405,6 +436,7 @@ function uniqueHostName(hosts, requested)
   return candidate
 end function
 
+// Provide discovered address behavior for the active subsystem.
 function discoveredAddress(fields, receivedAddress, receivedPort)
   parsed = try(parseAddress(fields[0], receivedPort))
   if parsed is error then return receivedAddress + ":" + receivedPort end if
@@ -412,6 +444,7 @@ function discoveredAddress(fields, receivedAddress, receivedPort)
   return parsed[0] + ":" + parsed[1]
 end function
 
+// Provide search hosts behavior for the active subsystem.
 function searchHosts(port, timeoutMilliseconds)
   opened = udp.open(0)
   if opened is error then return opened end if
@@ -421,6 +454,7 @@ function searchHosts(port, timeoutMilliseconds)
   return hosts
 end function
 
+// Provide datagram search for hosts behavior for the active subsystem.
 function _Datagram_SearchForHosts(searchSocket, hosts, port, timeoutMilliseconds, xmit)
   if xmit then
     sent = try(udp.broadcast(searchSocket, port, control.requestServerInfo()))
@@ -458,6 +492,7 @@ function _Datagram_SearchForHosts(searchSocket, hosts, port, timeoutMilliseconds
   return result
 end function
 
+// Mirror Quake's Datagram_SearchForHosts routine and its observable state changes.
 function Datagram_SearchForHosts(state, xmit, port, timeoutMilliseconds)
   if not state.lanEnabled then return error(3436, "Datagram networking disabled by -nolan") end if
   if xmit then state.hostCache = [] end if
@@ -470,16 +505,19 @@ function Datagram_SearchForHosts(state, xmit, port, timeoutMilliseconds)
   return result
 end function
 
+// Provide listener address behavior for the active subsystem.
 function listenerAddress(address, port)
   return address + ":" + port
 end function
 
+// Provide public listener address behavior for the active subsystem.
 function publicListenerAddress(state)
   address = state.listener.bindAddress
   if address == "" or address == "0.0.0.0" or address == "127.0.0.1" then address = udp.localAddress() end if
   return address + ":" + state.listener.port
 end function
 
+// Return next server rule for the active module state.
 function nextServerRule(rules, previous)
   start = 0
   if previous != "" then
@@ -501,6 +539,7 @@ function nextServerRule(rules, previous)
   return rules[start]
 end function
 
+// Provide matching remote behavior for the active subsystem.
 function matchingRemote(state, address)
   for each socket in state.remoteSockets
     if not socket.disconnected and socket.transport == "udp" and socket.address == address then return socket end if
@@ -508,12 +547,14 @@ function matchingRemote(state, address)
   return void
 end function
 
+// Provide connection request action behavior for the active subsystem.
 function connectionRequestAction(existing, port, now)
   if existing is void then return "new" end if
   if existing.port == port and now - existing.connectTime < 2.0 then return "duplicate" end if
   return "replace"
 end function
 
+// Advance listener by one processing step.
 function pumpListener(state)
   if state.listener is void then return 0 end if
   compactRemoteSockets(state)
@@ -603,10 +644,12 @@ function pumpListener(state)
   return processed
 end function
 
+// Validate new connections and report any incompatibility.
 function checkNewConnections(state)
   return Datagram_CheckNewConnections(state)
 end function
 
+// Provide array tail behavior for the active subsystem.
 function arrayTail(values)
   result = []
   i = 1
@@ -617,10 +660,12 @@ function arrayTail(values)
   return result
 end function
 
+// Provide int align behavior for the active subsystem.
 function inline IntAlign(value)
   return (value + 3) & ~3
 end function
 
+// Return loop queued bytes derived from the active module state.
 function loopQueuedBytes(socket)
   total = 0
   for each payload in socket.messages
@@ -629,6 +674,7 @@ function loopQueuedBytes(socket)
   return total
 end function
 
+// Send message through the active connection.
 function sendMessage(socket, buffer)
   global messagesSent
   if socket is void or socket.disconnected then return -1 end if
@@ -654,6 +700,7 @@ function sendMessage(socket, buffer)
   return 1
 end function
 
+// Send unreliable message through the active connection.
 function sendUnreliableMessage(socket, buffer)
   global unreliableMessagesSent
   if socket is void or socket.disconnected then return -1 end if
@@ -678,6 +725,7 @@ function sendUnreliableMessage(socket, buffer)
   return 1
 end function
 
+// Advance remote by one processing step.
 function pumpRemote(socket)
   if socket is void or socket.disconnected or socket.transport != "udp" then return 0 end if
   now = win.ticks() / 1000.0
@@ -716,6 +764,7 @@ function pumpRemote(socket)
   return processed
 end function
 
+// Return message.
 function getMessage(socket, destination)
   global messagesReceived, unreliableMessagesReceived
   if socket is void or socket.disconnected then return -1 end if
@@ -737,6 +786,7 @@ function getMessage(socket, destination)
   return messageType
 end function
 
+// Report whether can send message.
 function canSendMessage(socket)
   if socket is void or socket.disconnected then return false end if
   if socket.transport == "udp" then
@@ -747,6 +797,7 @@ function canSendMessage(socket)
   return socket.canSend
 end function
 
+// Provide timed out behavior for the active subsystem.
 function timedOut(socket, timeoutSeconds)
   if socket is void or socket.disconnected then return false end if
   if socket.transport != "udp" and socket.transport != "test-datagram" then return false end if
@@ -754,6 +805,7 @@ function timedOut(socket, timeoutSeconds)
   return win.ticks() / 1000.0 - socket.lastReceiveTime > timeoutSeconds
 end function
 
+// Release state for close.
 function close(socket)
   if socket is void then return end if
   socket.disconnected = true
@@ -765,6 +817,7 @@ function close(socket)
   socket.peer = void
 end function
 
+// Mirror Quake's Datagram_Init routine and its observable state changes.
 function Datagram_Init(state, noLan)
   global messagesSent, messagesReceived, unreliableMessagesSent, unreliableMessagesReceived
   datagram.resetStats()
@@ -777,6 +830,7 @@ function Datagram_Init(state, noLan)
   return 0
 end function
 
+// Mirror Quake's Datagram_Shutdown routine and its observable state changes.
 function Datagram_Shutdown(state)
   if state.listener is not void then stopListening(state) end if
   for each socket in state.remoteSockets
@@ -787,17 +841,20 @@ function Datagram_Shutdown(state)
   return true
 end function
 
+// Mirror Quake's Datagram_Close routine and its observable state changes.
 function Datagram_Close(socket)
   close(socket)
   return true
 end function
 
+// Mirror Quake's Datagram_Listen routine and its observable state changes.
 function Datagram_Listen(state, enabled, port)
   if enabled then return listen(state, port) end if
   stopListening(state)
   return void
 end function
 
+// Provide datagram check new connections behavior for the active subsystem.
 function _Datagram_CheckNewConnections(state)
   socket = state.pendingRemote
   state.pendingRemote = void
@@ -809,6 +866,7 @@ function _Datagram_CheckNewConnections(state)
   return socket
 end function
 
+// Mirror Quake's Datagram_CheckNewConnections routine and its observable state changes.
 function Datagram_CheckNewConnections(state)
   socket = state.pending
   state.pending = void
@@ -826,6 +884,7 @@ function Datagram_CheckNewConnections(state)
   return _Datagram_CheckNewConnections(state)
 end function
 
+// Provide resolve datagram target behavior for the active subsystem.
 function resolveDatagramTarget(state, host, defaultPort)
   target = host
   wanted = bio.lower(host)
@@ -835,16 +894,19 @@ function resolveDatagramTarget(state, host, defaultPort)
   return parseAddress(target, defaultPort)
 end function
 
+// Provide datagram connect port behavior for the active subsystem.
 function _Datagram_ConnectPort(state, host, timeoutMilliseconds, defaultPort)
   parsed = resolveDatagramTarget(state, host, defaultPort)
   if parsed is error then return parsed end if
   return connectRemote(state, parsed[0], parsed[1], timeoutMilliseconds)
 end function
 
+// Mirror Quake's Datagram_ConnectPort routine and its observable state changes.
 function Datagram_ConnectPort(state, host, timeoutMilliseconds, defaultPort)
   return _Datagram_ConnectPort(state, host, timeoutMilliseconds, defaultPort)
 end function
 
+// Mirror Quake's Datagram_ConnectPersistent routine and its observable state changes.
 function Datagram_ConnectPersistent(state, host, timeoutMilliseconds, resendMilliseconds, defaultPort)
   parsed = resolveDatagramTarget(state, host, defaultPort)
   if parsed is error then return parsed end if
@@ -857,10 +919,12 @@ function _Datagram_Connect(state, host, timeoutMilliseconds)
   return _Datagram_ConnectPort(state, host, timeoutMilliseconds, 26000)
 end function
 
+// Mirror Quake's Datagram_Connect routine and its observable state changes.
 function Datagram_Connect(state, host, timeoutMilliseconds)
   return Datagram_ConnectPort(state, host, timeoutMilliseconds, 26000)
 end function
 
+// Verify poll against the expected Quake behavior.
 function Test_Poll(socket, expectedAddress, expectedPort, timeoutMilliseconds)
   results = []
   elapsed = 0
@@ -878,6 +942,7 @@ function Test_Poll(socket, expectedAddress, expectedPort, timeoutMilliseconds)
   return results
 end function
 
+// Verify f against the expected Quake behavior.
 function Test_f(host, maximumPlayers, timeoutMilliseconds)
   parsedAddress = parseAddress(host, 26000)
   if parsedAddress is error then return parsedAddress end if
@@ -894,6 +959,7 @@ function Test_f(host, maximumPlayers, timeoutMilliseconds)
   return results
 end function
 
+// Mirror Quake's Test2_Poll routine and its observable state changes.
 function Test2_Poll(socket, expectedAddress, expectedPort, timeoutMilliseconds)
   elapsed = 0
   while elapsed < timeoutMilliseconds
@@ -909,6 +975,7 @@ function Test2_Poll(socket, expectedAddress, expectedPort, timeoutMilliseconds)
   return error(3434, "rule query timed out")
 end function
 
+// Mirror Quake's Test2_f routine and its observable state changes.
 function Test2_f(host, timeoutMilliseconds)
   parsedAddress = parseAddress(host, 26000)
   if parsedAddress is error then return parsedAddress end if
@@ -939,15 +1006,18 @@ function Loop_Init(dedicated)
   return 0
 end function
 
+// Mirror Quake's Loop_Shutdown routine and its observable state changes.
 function Loop_Shutdown()
   return true
 end function
 
+// Mirror Quake's Loop_Listen routine and its observable state changes.
 function Loop_Listen(state)
   // The loop driver is always available in a non-dedicated process.
   return state
 end function
 
+// Mirror Quake's Loop_SearchForHosts routine and its observable state changes.
 function Loop_SearchForHosts(state, serverActive, driverLevel)
   if not serverActive then return state.hostCache end if
   displayName = state.hostName
@@ -964,6 +1034,7 @@ function Loop_SearchForHosts(state, serverActive, driverLevel)
   return state.hostCache
 end function
 
+// Mirror Quake's Loop_Connect routine and its observable state changes.
 function Loop_Connect(state, host)
   // The original driver recognizes exactly "local"; "localhost" is a
   // MiniQuake NET_Connect convenience handled before this public entry point.
@@ -971,6 +1042,7 @@ function Loop_Connect(state, host)
   return connect(state, host)
 end function
 
+// Mirror Quake's Loop_CheckNewConnections routine and its observable state changes.
 function Loop_CheckNewConnections(state)
   socket = state.pending
   state.pending = void
@@ -986,26 +1058,32 @@ function Loop_CheckNewConnections(state)
   return socket
 end function
 
+// Mirror Quake's Loop_GetMessage routine and its observable state changes.
 function Loop_GetMessage(socket, destination)
   return getMessage(socket, destination)
 end function
 
+// Mirror Quake's Loop_SendMessage routine and its observable state changes.
 function Loop_SendMessage(socket, data)
   return sendMessage(socket, data)
 end function
 
+// Mirror Quake's Loop_SendUnreliableMessage routine and its observable state changes.
 function Loop_SendUnreliableMessage(socket, data)
   return sendUnreliableMessage(socket, data)
 end function
 
+// Mirror Quake's Loop_CanSendMessage routine and its observable state changes.
 function Loop_CanSendMessage(socket)
   return canSendMessage(socket)
 end function
 
+// Mirror Quake's Loop_CanSendUnreliableMessage routine and its observable state changes.
 function Loop_CanSendUnreliableMessage(socket)
   return true
 end function
 
+// Mirror Quake's Loop_Close routine and its observable state changes.
 function Loop_Close(socket)
   close(socket)
   return true

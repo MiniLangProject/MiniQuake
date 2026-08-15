@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.sv_main.
+*/
 package miniquake.sv_main
 
 // Functional pendant of WinQuake/sv_main.c and the public server.h lifecycle
@@ -44,10 +51,12 @@ struct SvMainState
   diagnostics
 end struct
 
+// Apply server-side zero spawn parms semantics.
 function svmZeroSpawnParms()
   return arrayutil.makeFilledArray(c.NUM_SPAWN_PARMS, 0.0)
 end function
 
+// Apply server-side local models semantics.
 function svmLocalModels()
   result = arrayutil.makeEmptyArray(c.MAX_MODELS)
   index = 0
@@ -84,28 +93,33 @@ function SV_Init(maxClients)
   )
 end function
 
+// Apply the Quake-compatible sv set network state behavior.
 function SV_SetNetworkState(state, network)
   state.network = network
   return network
 end function
 
+// Apply the Quake-compatible sv set realtime behavior.
 function SV_SetRealtime(state, value)
   state.realtime = value
   return value
 end function
 
+// Apply the Quake-compatible sv set standard quake behavior.
 function SV_SetStandardQuake(state, enabled)
   state.standardQuake = enabled
   state.server.standardQuake = enabled
   return enabled
 end function
 
+// Apply the Quake-compatible sv set client frags behavior.
 function SV_SetClientFrags(state, clientIndex, frags)
   if clientIndex < 0 or clientIndex >= len(state.clientFrags) then return error(2870, "SV_SetClientFrags: bad client") end if
   state.clientFrags[clientIndex] = protocolEvents.cFloat(frags)
   return state.clientFrags[clientIndex]
 end function
 
+// Apply server-side sound index semantics.
 function svmSoundIndex(server, sample)
   index = 1
   while index < len(server.soundPrecache) and index < 256
@@ -115,6 +129,7 @@ function svmSoundIndex(server, sample)
   return 0
 end function
 
+// Apply server-side entity center semantics.
 function svmEntityCenter(item)
   return transients.soundCenter(item.origin, item.mins, item.maxs)
 end function
@@ -151,12 +166,14 @@ function SV_StartSound(state, entityIndex, channel, sample, volume, attenuation)
   return true
 end function
 
+// Apply server-side progs crc semantics.
 function svmProgsCrc(server)
   if server.progs is not void then return progs.runtimeCrc(server.progs) end if
   if server.machine is not void and server.machine.program is not void then return progs.runtimeCrc(server.machine.program) end if
   return 0
 end function
 
+// Apply server-side append server info semantics.
 function svmAppendServerInfo(server, clientValue)
   gameType = c.GAME_COOP
   if not server.coop and server.deathmatch then gameType = c.GAME_DEATHMATCH end if
@@ -182,6 +199,7 @@ function SV_SendServerinfo(state, clientValue)
   return svmAppendServerInfo(state.server, clientValue)
 end function
 
+// Apply server-side reset client semantics.
 function svmResetClient(state, clientIndex, socket)
   clientValue = state.server.clients[clientIndex]
   savedSpawnParms = clientValue.spawnParms
@@ -222,6 +240,7 @@ function SV_ConnectClient(state, clientIndex, socket)
   return clientValue
 end function
 
+// Apply server-side free client index semantics.
 function svmFreeClientIndex(state)
   index = 0
   while index < len(state.server.clients)
@@ -265,6 +284,7 @@ function SV_ClearDatagram(state)
   return true
 end function
 
+// Apply server-side or bytes semantics.
 function svmOrBytes(destination, source, count)
   limit = count
   if len(destination) < limit then limit = len(destination) end if
@@ -327,20 +347,21 @@ function SV_FatPVS(state, origin)
   return state.fatPvs
 end function
 
+// Apply server-side box plane sides semantics.
 function svmBoxPlaneSides(mins, maxs, plane)
   if plane.type == 0 then
     if mins.x >= plane.dist then return 1 end if
-    if maxs.x < plane.dist then return 2 end if
+    if maxs.x <= plane.dist then return 2 end if
     return 3
   end if
   if plane.type == 1 then
     if mins.y >= plane.dist then return 1 end if
-    if maxs.y < plane.dist then return 2 end if
+    if maxs.y <= plane.dist then return 2 end if
     return 3
   end if
   if plane.type == 2 then
     if mins.z >= plane.dist then return 1 end if
-    if maxs.z < plane.dist then return 2 end if
+    if maxs.z <= plane.dist then return 2 end if
     return 3
   end if
   positive = t.Vec3(mins.x, mins.y, mins.z)
@@ -354,11 +375,17 @@ function svmBoxPlaneSides(mins, maxs, plane)
   return sides
 end function
 
+// Apply server-side touched leaves semantics.
 function svmTouchedLeaves(map, nodeIndex, mins, maxs, result)
   if len(result) >= 16 then return result end if
   if nodeIndex < 0 then
     leafIndex = -1 - nodeIndex
-    if leafIndex > 0 then result = result + [leafIndex] end if
+    // Leaf zero is the shared solid leaf in stock BSPs. Also check the
+    // contents explicitly so malformed or hand-authored maps cannot make a
+    // nonzero solid leaf participate in PVS visibility.
+    if leafIndex > 0 and leafIndex < len(map.leafs) and map.leafs[leafIndex].contents != c.CONTENTS_SOLID then
+      result = result + [leafIndex]
+    end if
     return result
   end if
   node = map.nodes[nodeIndex]
@@ -368,6 +395,7 @@ function svmTouchedLeaves(map, nodeIndex, mins, maxs, result)
   return result
 end function
 
+// Apply server-side leaf bit visible semantics.
 function svmLeafBitVisible(pvs, leafIndex)
   bitIndex = leafIndex - 1
   if bitIndex < 0 then return true end if
@@ -376,6 +404,7 @@ function svmLeafBitVisible(pvs, leafIndex)
   return (pvs[byteIndex] & (1 << (bitIndex & 7))) != 0
 end function
 
+// Apply server-side entity visible semantics.
 function svmEntityVisible(state, item, clientEdict, pvs)
   if item.number == clientEdict then return true end if
   if item.modelIndex == 0 or item.model == "" then return false end if
@@ -390,11 +419,13 @@ function svmEntityVisible(state, item, clientEdict, pvs)
   return false
 end function
 
+// Apply server-side absolute semantics.
 function svmAbsolute(value)
   if value < 0.0 then return -value end if
   return value
 end function
 
+// Apply server-side entity bits semantics.
 function svmEntityBits(item)
   return protocolUpdate.computeBits(
     item.number, item.baseline, item.modelIndex, item.frame, item.colormap, item.skin,
@@ -411,8 +442,9 @@ function SV_WriteEntityDelta(state, buffer, item)
   )
 end function
 
-// SV_WriteEntitiesToClient
-function SV_WriteEntitiesToClient(state, clientEntity, buffer)
+// SV_WriteEntitiesToClient with an optional tail budget supplied by
+// SV_SendClientDatagram for frame-local sounds and temporary entities.
+function SV_WriteEntitiesToClientReserved(state, clientEntity, buffer, reservedBytes)
   eye = math.add(clientEntity.origin, clientEntity.viewOffset)
   pvs = SV_FatPVS(state, eye)
   written = 0
@@ -421,7 +453,7 @@ function SV_WriteEntitiesToClient(state, clientEntity, buffer)
     item = state.server.edicts[index]
     if item is not void and not item.free and svmEntityVisible(state, item, clientEntity.number, pvs) then
       bits = svmEntityBits(item)
-      if not protocolUpdate.canWrite(buffer, bits) then
+      if not protocolUpdate.canWriteWithReservedTail(buffer, bits, reservedBytes) then
         state.diagnostics = state.diagnostics + ["packet overflow"]
         return written
       end if
@@ -434,6 +466,11 @@ function SV_WriteEntitiesToClient(state, clientEntity, buffer)
     index = index + 1
   end while
   return written
+end function
+
+// Apply the Quake-compatible sv write entities to client behavior.
+function SV_WriteEntitiesToClient(state, clientEntity, buffer)
+  return SV_WriteEntitiesToClientReserved(state, clientEntity, buffer, 0)
 end function
 
 // SV_CleanupEnts
@@ -452,16 +489,19 @@ function SV_CleanupEnts(state)
   return cleaned
 end function
 
+// Apply server-side qc float semantics.
 function svmQcFloat(state, entityIndex, fieldName, fallback)
   if state.server.machine is void or state.server.machine.context is void then return fallback end if
   return runtime.qcFloat(state.server.machine, entityIndex, fieldName, fallback)
 end function
 
+// Apply server-side qc vector semantics.
 function svmQcVector(state, entityIndex, fieldName, fallback)
   if state.server.machine is void or state.server.machine.context is void then return fallback end if
   return runtime.qcVector(state.server.machine, entityIndex, fieldName, fallback)
 end function
 
+// Apply server-side client items semantics.
 function svmClientItems(state, clientValue, player)
   entityIndex = clientValue.edictIndex
   items = native.trunc(svmQcFloat(state, entityIndex, "items", player.items))
@@ -474,6 +514,7 @@ function svmClientItems(state, clientValue, player)
   return items | (native.trunc(state.server.serverFlags) << 28)
 end function
 
+// Apply server-side weapon model index semantics.
 function svmWeaponModelIndex(state, entityIndex, fallback)
   if state.server.machine is void or state.server.machine.context is void then return fallback end if
   modelName = runtime.qcString(state.server.machine, entityIndex, "weaponmodel", "")
@@ -485,6 +526,7 @@ end function
 // player state outside QuakeC and is also written to the edict field when a VM
 // is active.
 function SV_SetIdealPitch(state, clientIndex, player, pitchScale)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if clientIndex < 0 or clientIndex >= len(state.idealPitches) then return error(2879, "SV_SetIdealPitch: bad client") end if
   if (player.flags & c.FL_ONGROUND) == 0 or state.server.worldModel is void then return state.idealPitches[clientIndex] end if
   radians = player.renderAngles.y * math.PI * 2.0 / 360.0
@@ -526,6 +568,7 @@ function SV_SetIdealPitch(state, clientIndex, player, pitchScale)
   return state.idealPitches[clientIndex]
 end function
 
+// Apply server-side clamp byte semantics.
 function svmClampByte(value)
   result = native.trunc(value)
   if result < 0 then result = 0 end if
@@ -533,6 +576,7 @@ function svmClampByte(value)
   return result
 end function
 
+// Apply server-side write damage semantics.
 function svmWriteDamage(state, clientValue, buffer)
   entityIndex = clientValue.edictIndex
   damageTake = native.trunc(svmQcFloat(state, entityIndex, "dmg_take", 0.0))
@@ -552,6 +596,7 @@ function svmWriteDamage(state, clientValue, buffer)
   return true
 end function
 
+// Apply server-side write fix angle semantics.
 function svmWriteFixAngle(state, clientValue, player, buffer)
   entityIndex = clientValue.edictIndex
   fixAngle = player.fixAngle
@@ -567,6 +612,7 @@ function svmWriteFixAngle(state, clientValue, player, buffer)
   return true
 end function
 
+// Apply server-side write damage and angle semantics.
 function svmWriteDamageAndAngle(state, clientValue, player, buffer)
   svmWriteDamage(state, clientValue, buffer)
   svmWriteFixAngle(state, clientValue, player, buffer)
@@ -625,6 +671,7 @@ function SV_WriteClientdataToMessage(state, clientValue, player, buffer)
   return result[0]
 end function
 
+// Apply server-side append datagram semantics.
 function svmAppendDatagram(destination, source)
   return serverData.appendDatagramIfFits(destination, source)
 end function
@@ -642,7 +689,7 @@ function SV_SendClientDatagram(state, clientValue, player)
     item.angles = math.copy(player.renderAngles)
     item.velocity = math.copy(player.velocity)
     item.viewOffset = t.Vec3(0.0, 0.0, player.viewHeight)
-    SV_WriteEntitiesToClient(state, item, buffer)
+    SV_WriteEntitiesToClientReserved(state, item, buffer, state.server.datagram.curSize)
   end if
   svmAppendDatagram(buffer, state.server.datagram)
   sent = netmain.NET_SendUnreliableMessage(clientValue.socket, buffer)
@@ -653,6 +700,7 @@ function SV_SendClientDatagram(state, clientValue, player)
   return true
 end function
 
+// Apply server-side current frags semantics.
 function svmCurrentFrags(state, clientIndex)
   clientValue = state.server.clients[clientIndex]
   if state.server.machine is not void and state.server.machine.context is not void then
@@ -706,9 +754,6 @@ end function
 // SV_DropClient is declared by server.h and implemented by host.c in the
 // original tree; it lives here because all message lifecycle decisions call it.
 function SV_DropClient(state, clientValue, crashed)
-  if clientValue.lastMessage <= 0 then
-    return
-  end if
   clientIndex = clientValue.edictIndex - 1
   connected = clientValue.active and clientValue.socket is not void
   if clientValue.socket is not void and not crashed and netmain.NET_CanSendMessage(clientValue.socket) then
@@ -739,6 +784,7 @@ function SV_DropClient(state, clientValue, crashed)
   return true
 end function
 
+// Apply the Quake-compatible sv set drop asap behavior.
 function SV_SetDropAsap(state, clientIndex, enabled)
   if clientIndex < 0 or clientIndex >= len(state.dropAsap) then return false end if
   state.dropAsap[clientIndex] = enabled
@@ -748,6 +794,7 @@ end function
 
 // SV_SendClientMessages
 function SV_SendClientMessages(state, player)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   SV_UpdateToReliableMessages(state)
   sent = 0
   index = 0
@@ -825,6 +872,7 @@ function SV_ModelIndex(state, name)
   return error(2878, "SV_ModelIndex: model " + name + " not precached")
 end function
 
+// Apply server-side write baseline semantics.
 function svmWriteBaseline(buffer, entityNumber, baseline)
   serverData.writeBaseline(buffer, entityNumber, baseline)
   return true
@@ -925,6 +973,7 @@ function SV_Multicast(state, origin, source, mode)
   return written
 end function
 
+// Apply the Quake-compatible sv client printf behavior.
 function SV_ClientPrintf(state, clientValue, text)
   if clientValue is void or not clientValue.active then return false end if
   msg.writeByte(clientValue.message, c.SVC_PRINT)
@@ -932,6 +981,7 @@ function SV_ClientPrintf(state, clientValue, text)
   return true
 end function
 
+// Apply the Quake-compatible sv broadcast printf behavior.
 function SV_BroadcastPrintf(state, text)
   count = 0
   for each clientValue in state.server.clients
@@ -943,30 +993,37 @@ function SV_BroadcastPrintf(state, text)
   return count
 end function
 
+// Apply the Quake-compatible sv add updates behavior.
 function SV_AddUpdates(state)
   return SV_UpdateToReliableMessages(state)
 end function
 
+// Apply the Quake-compatible sv check bottom behavior.
 function SV_CheckBottom(state, entityIndex)
   return serverMove.SV_CheckBottom(state.server, entityIndex)
 end function
 
+// Apply the Quake-compatible sv movestep behavior.
 function SV_movestep(state, entityIndex, movement, relink)
   return serverMove.SV_movestep(state.server, entityIndex, movement, relink)
 end function
 
+// Apply the Quake-compatible sv move to goal behavior.
 function SV_MoveToGoal(state, entityIndex, distance)
   return serverMove.SV_MoveToGoal(state.server, entityIndex, distance)
 end function
 
+// Apply the Quake-compatible sv run clients behavior.
 function SV_RunClients(state, player)
   return runtime.pumpClientMessages(state.server, player)
 end function
 
+// Apply the Quake-compatible sv client think behavior.
 function SV_ClientThink(state, player, frameTime, registry)
   return physics.moveServer(player, state.server, 1, state.server.clients[0].command, frameTime, registry)
 end function
 
+// Apply the Quake-compatible sv physics behavior.
 function SV_Physics(state, frameTime, gravity, maxVelocity)
   return physics.SV_Physics(state.server, frameTime, gravity, maxVelocity)
 end function

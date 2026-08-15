@@ -1,20 +1,22 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Deterministic platform-bridge branches which do not require real display,
 focus, mouse or controller hardware.
 */
-
 import miniquake.input as input
 import miniquake.keys as keys
 import miniquake.platform.win32 as win
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9750, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Verify scan code map against the expected Quake behavior.
 function testScanCodeMap()
   assertEqual(input.quakeKeyForScanCode(1), keys.K_ESCAPE, "escape")
   assertEqual(input.quakeKeyForScanCode(28), keys.K_ENTER, "enter")
@@ -31,6 +33,7 @@ function testScanCodeMap()
   return true
 end function
 
+// Verify ordered scan events against the expected Quake behavior.
 function testOrderedScanEvents()
   keys.Key_Init()
   win.inputTestPush(5, 30, 1)
@@ -46,6 +49,7 @@ function testOrderedScanEvents()
   return true
 end function
 
+// Verify legacy virtual key compatibility against the expected Quake behavior.
 function testLegacyVirtualKeyCompatibility()
   keys.Key_Init()
   win.inputTestPush(1, 65, 1)
@@ -57,6 +61,7 @@ function testLegacyVirtualKeyCompatibility()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   testScanCodeMap()
   testOrderedScanEvents()

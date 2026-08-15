@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.savegame.
+*/
 package miniquake.savegame
 
 import miniquake.types as t
@@ -13,12 +20,14 @@ import miniquake.protocol_text as protocolText
 const SAVEGAME_VERSION = 5
 const SAVEGAME_COMMENT_LENGTH = 39
 
+// Return type size derived from the active module state.
 function typeSize(valueType)
   if valueType == c.EV_VECTOR then return 3 end if
   if valueType == c.EV_VOID then return 1 end if
   return 1
 end function
 
+// Return vector component name derived from the active module state.
 function vectorComponentName(name)
   data = bytes(name)
   if len(data) < 2 then return false end if
@@ -27,6 +36,7 @@ function vectorComponentName(name)
   return data[len(data) - 2] == 95
 end function
 
+// Provide words are zero behavior for the active subsystem.
 function wordsAreZero(words, offset, count)
   index = 0
   while index < count
@@ -36,11 +46,13 @@ function wordsAreZero(words, offset, count)
   return true
 end function
 
+// Return function name derived from the active module state.
 function functionName(machine, index)
   if index < 0 or index >= len(machine.program.functions) then return "" end if
   return machine.program.functions[index].name
 end function
 
+// Return field name derived from the active module state.
 function fieldName(machine, offset)
   for each definition in machine.program.fieldDefs
     if definition.offset == offset then return definition.name end if
@@ -48,26 +60,31 @@ function fieldName(machine, offset)
   return ""
 end function
 
+// Return ugly value derived from the active module state.
 function uglyValue(machine, words, definition)
   return qcedict.PR_UglyValueString(machine, definition.type, words, definition.offset)
 end function
 
+// Encode and write definitions.
 function writeDefinitions(machine, words, definitions, globalsOnly)
   firstIndex = 0
   if not globalsOnly then firstIndex = 1 end if
   return qcedict.serializeDefinitions(machine, words, definitions, firstIndex, globalsOnly)
 end function
 
+// Encode and write globals.
 function writeGlobals(machine)
   return writeDefinitions(machine, machine.globals, machine.program.globalDefs, true)
 end function
 
+// Encode and write edict.
 function writeEdict(machine, entityIndex)
   if entityIndex < 0 or entityIndex >= len(machine.edicts) then return error(3700, "ED_Write: bad edict " + entityIndex) end if
   if machine.edictFree[entityIndex] then return "{\n}\n" end if
   return writeDefinitions(machine, machine.edicts[entityIndex], machine.program.fieldDefs, false)
 end function
 
+// Provide padded comment behavior for the active subsystem.
 function paddedComment(levelName, killed, total)
   output = arrayutil.makeFilledArray(SAVEGAME_COMMENT_LENGTH, 32)
   // Savegames are Quake byte streams, not UTF-8 text files.  Use the same
@@ -103,12 +120,14 @@ function paddedComment(levelName, killed, total)
   return protocolText.decodeBytes(bytes(output))
 end function
 
+// Provide named global float behavior for the active subsystem.
 function namedGlobalFloat(machine, name)
   offset = vm.globalOffset(machine, name)
   if offset < 0 then return 0.0 end if
   return vm.globalFloat(machine, offset)
 end function
 
+// Encode and write server.
 function serializeServer(server)
   if server.machine is void then return error(3701, "savegame requires an active QuakeC server") end if
   machine = server.machine
@@ -153,14 +172,17 @@ function serializeBytes(server)
   return protocolText.encodeBytes(text)
 end function
 
+// Encode and write text.
 function encodeText(text)
   return protocolText.encodeBytes(text)
 end function
 
+// Read and validate text.
 function decodeText(data)
   return protocolText.decodeBytes(data)
 end function
 
+// Read and validate line.
 function readLine(data, offset)
   if offset < 0 or offset > len(data) then return error(3702, "savegame line offset outside file") end if
   finish = offset
@@ -174,6 +196,7 @@ function readLine(data, offset)
   return [line, finish]
 end function
 
+// Provide number line behavior for the active subsystem.
 function numberLine(data, offset, label)
   line = readLine(data, offset)
   value = toNumber(line[0])
@@ -181,6 +204,7 @@ function numberLine(data, offset, label)
   return [value, line[1]]
 end function
 
+// Provide float line behavior for the active subsystem.
 function floatLine(data, offset, label)
   line = readLine(data, offset)
   validated = toNumber(line[0])
@@ -191,7 +215,9 @@ function floatLine(data, offset, label)
   return [common.cAtof(line[0]), line[1]]
 end function
 
+// Read and validate bytes.
 function parseBytes(data)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if data is not bytes then return error(3712, "savegame parser requires bytes") end if
   cursor = 0
   versionLine = numberLine(data, cursor, "version")
@@ -239,13 +265,16 @@ function parseBytes(data)
   return t.SaveGame(version, comment, spawnParms, skill, mapName, time, lightStyles, blocks[0], entities)
 end function
 
+// Read and validate the requested value.
 function parse(text)
   encoded = protocolText.encodeBytes(text)
   if encoded is error then return encoded end if
   return parseBytes(encoded)
 end function
 
+// Apply the requested value to the active subsystem state.
 function apply(server, saved)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if server.machine is void or server.machine.context is void then return error(3707, "loadgame requires a spawned QuakeC server") end if
   machine = server.machine
   if len(saved.entities) > len(machine.edicts) then return error(3708, "savegame has too many edicts: " + len(saved.entities)) end if
@@ -286,6 +315,7 @@ function apply(server, saved)
   return true
 end function
 
+// Provide display comment behavior for the active subsystem.
 function displayComment(comment)
   data = protocolText.encodeBytes(comment)
   index = 0
@@ -296,6 +326,7 @@ function displayComment(comment)
   return protocolText.decodeBytes(data)
 end function
 
+// Inspect comment bytes and emit its decoded metadata.
 function inspectCommentBytes(data)
   versionLine = numberLine(data, 0, "version")
   if native.trunc(versionLine[0]) != SAVEGAME_VERSION then return "" end if
@@ -303,12 +334,14 @@ function inspectCommentBytes(data)
   return displayComment(commentLine[0])
 end function
 
+// Inspect comment and emit its decoded metadata.
 function inspectComment(text)
   encoded = protocolText.encodeBytes(text)
   if encoded is error then return "" end if
   return inspectCommentBytes(encoded)
 end function
 
+// Report whether suffix insensitive.
 function hasSuffixInsensitive(text, suffix)
   left = bytes(text)
   right = bytes(suffix)
@@ -325,6 +358,7 @@ function hasSuffixInsensitive(text, suffix)
   return true
 end function
 
+// Provide filename behavior for the active subsystem.
 function filename(name)
   if name == "" then return error(3710, "empty savegame name") end if
   data = bytes(name)
@@ -346,20 +380,24 @@ function Host_SavegameComment(levelName, killed, total)
   return paddedComment(levelName, killed, total)
 end function
 
+// Encode and write gamestate.
 function SaveGamestate(server)
   return serializeServer(server)
 end function
 
+// Encode and write gamestate bytes.
 function SaveGamestateBytes(server)
   return serializeBytes(server)
 end function
 
+// Read and validate gamestate bytes.
 function LoadGamestateBytes(server, data)
   saved = parseBytes(data)
   if saved is error then return saved end if
   return apply(server, saved)
 end function
 
+// Read and validate gamestate.
 function LoadGamestate(server, text)
   saved = parse(text)
   if saved is error then return saved end if

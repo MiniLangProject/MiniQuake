@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.statusbar.
+*/
 package miniquake.statusbar
 
 import miniquake.constants as c
@@ -42,6 +49,7 @@ scoreboardbottom = []
 scoreboardlines = 0
 sbarTrace = []
 
+// Provide remember sbar picture behavior for the active subsystem.
 function rememberSbarPicture(name, value)
   global sbarPictures, sbarPictureNames
   if value is error then return value end if
@@ -50,6 +58,7 @@ function rememberSbarPicture(name, value)
   return value
 end function
 
+// Read and validate sbar picture.
 function loadSbarPicture(name)
   global sbarLoadTrace
   sbarLoadTrace = sbarLoadTrace + [name]
@@ -64,6 +73,7 @@ function loadSbarPicture(name)
   return rememberSbarPicture(name, draw.Draw_PicFromWad(name))
 end function
 
+// Provide loaded sbar picture behavior for the active subsystem.
 function loadedSbarPicture(name)
   index = 0
   while index < len(sbarPictureNames)
@@ -80,17 +90,20 @@ function loadedSbarPicture(name)
   return void
 end function
 
+// Provide picture behavior for the active subsystem.
 function picture(state, name)
   if state is void then return void end if
   return menu.findWadPicture(state, name)
 end function
 
+// Render picture.
 function drawPicture(state, name, x, y, scale, alpha)
   value = picture(state, name)
   if value is void or value.textureId == 0 then return false end if
   return draw.Draw_PicScaled(value, x, y, scale, alpha)
 end function
 
+// Provide scale for behavior for the active subsystem.
 function scaleFor(width, height)
   // The WinQuake status area is authored at 320 pixels. Use an integral scale
   // so the original indexed artwork remains crisp while avoiding an oversized
@@ -103,6 +116,7 @@ function scaleFor(width, height)
   return value * 1.0
 end function
 
+// Render number.
 function drawNumber(state, x, y, number, digits, alternate, scale)
   value = native.trunc(number)
   source = bytes("" + value)
@@ -126,12 +140,14 @@ function drawNumber(state, x, y, number, digits, alternate, scale)
   return true
 end function
 
+// Provide small ammo digit behavior for the active subsystem.
 function smallAmmoDigit(texture, x, y, digit, scale)
   if digit < 0 or digit > 9 then return false end if
   draw.character(texture, x, y, 18 + digit, scale, 255)
   return true
 end function
 
+// Render small ammo.
 function drawSmallAmmo(texture, x, y, number, scale)
   value = native.trunc(number)
   if value < 0 then value = 0 end if
@@ -145,6 +161,7 @@ function drawSmallAmmo(texture, x, y, number, scale)
   return true
 end function
 
+// Provide face name for behavior for the active subsystem.
 function faceNameFor(items, health)
   if (items & (c.IT_INVISIBILITY | c.IT_INVULNERABILITY)) == (c.IT_INVISIBILITY | c.IT_INVULNERABILITY) then return "face_inv2" end if
   if (items & c.IT_QUAD) != 0 then return "face_quad" end if
@@ -157,10 +174,12 @@ function faceNameFor(items, health)
   return "face5"
 end function
 
+// Return face name derived from the active module state.
 function faceName(player)
   return faceNameFor(native.trunc(player.items), native.trunc(player.health))
 end function
 
+// Return armor name derived from the active module state.
 function armorName(items)
   if (items & c.IT_ARMOR3) != 0 then return "sb_armor3" end if
   if (items & c.IT_ARMOR2) != 0 then return "sb_armor2" end if
@@ -168,6 +187,7 @@ function armorName(items)
   return ""
 end function
 
+// Return ammo name derived from the active module state.
 function ammoName(items)
   if (items & c.IT_SHELLS) != 0 then return "sb_shells" end if
   if (items & c.IT_NAILS) != 0 then return "sb_nails" end if
@@ -176,7 +196,9 @@ function ammoName(items)
   return ""
 end function
 
+// Render inventory.
 function drawInventory(state, fontTexture, player, x, y, scale)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   drawPicture(state, "ibar", x, y, scale, 255)
   items = native.trunc(player.items)
   active = native.trunc(player.activeWeapon)
@@ -226,6 +248,7 @@ function drawInventory(state, fontTexture, player, x, y, scale)
   return true
 end function
 
+// Render main bar.
 function drawMainBar(state, player, x, y, scale)
   drawPicture(state, "sbar", x, y, scale, 255)
   items = native.trunc(player.items)
@@ -269,6 +292,7 @@ function Sbar_ShowScores()
   return true
 end function
 
+// Mirror Quake's Sbar_DontShowScores routine and its observable state changes.
 function Sbar_DontShowScores()
   global sb_showscores, sb_updates
   sb_showscores = false
@@ -276,13 +300,16 @@ function Sbar_DontShowScores()
   return true
 end function
 
+// Mirror Quake's Sbar_Changed routine and its observable state changes.
 function Sbar_Changed()
   global sb_updates
   sb_updates = 0
   return true
 end function
 
+// Mirror Quake's Sbar_Init routine and its observable state changes.
 function Sbar_Init(gameDirectory)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global sbarInitialized, sbarHipnotic, sbarRogue, sbarPictureNames, sbarPictures, sbarLoadTrace
   if sbarInitialized and ((gameDirectory == "hipnotic") == sbarHipnotic) and ((gameDirectory == "rogue") == sbarRogue) then return true end if
   sbarHipnotic = bio.lower(gameDirectory) == "hipnotic"
@@ -359,6 +386,7 @@ function Sbar_Init(gameDirectory)
   return true
 end function
 
+// Mirror Quake's Sbar_Shutdown routine and its observable state changes.
 function Sbar_Shutdown()
   global sbarInitialized, sbarPictures, sbarPictureNames, sbarLoadTrace, sbarState, sbarFontTexture
   sbarInitialized = false
@@ -370,6 +398,7 @@ function Sbar_Shutdown()
   return true
 end function
 
+// Mirror Quake's Sbar_SetFrameState routine and its observable state changes.
 function Sbar_SetFrameState(consoleCurrent, numPages)
   global sbarConsoleCurrent, sbarNumPages
   sbarConsoleCurrent = consoleCurrent
@@ -377,6 +406,7 @@ function Sbar_SetFrameState(consoleCurrent, numPages)
   return true
 end function
 
+// Provide sbar items behavior for the active subsystem.
 function sbarItems()
   if sbarClient is not void then return native.trunc(sbarClient.items) end if
   if sbarPlayer is not void then return native.trunc(sbarPlayer.items) end if
@@ -426,6 +456,7 @@ function Sbar_DifferentialReset(pictures)
   return true
 end function
 
+// Mirror Quake's Sbar_DifferentialState routine and its observable state changes.
 function Sbar_DifferentialState()
   return [
     sb_updates, sb_showscores, sb_lines, sbarCopyEverything, sbarFullUpdate,
@@ -433,6 +464,7 @@ function Sbar_DifferentialState()
   ]
 end function
 
+// Mirror Quake's Sbar_DifferentialSetState routine and its observable state changes.
 function Sbar_DifferentialSetState(updates, showScores, hipnoticValue, rogueValue, teamplayValue)
   global sb_updates, sb_showscores, sbarHipnotic, sbarRogue, sbarTeamplay
   sb_updates = updates
@@ -443,12 +475,14 @@ function Sbar_DifferentialSetState(updates, showScores, hipnoticValue, rogueValu
   return true
 end function
 
+// Mirror Quake's Sbar_DifferentialClearTrace routine and its observable state changes.
 function Sbar_DifferentialClearTrace()
   global sbarTrace
   sbarTrace = []
   return true
 end function
 
+// Mirror Quake's Sbar_Configure routine and its observable state changes.
 function Sbar_Configure(state, fontTexture, player, clientState, width, height, lines, teamplay)
   global sbarState, sbarFontTexture, sbarPlayer, sbarClient, sbarWidth, sbarHeight, sb_lines, sbarLogicalLines, sbarScale, sbarGameType, sbarTeamplay
   sbarState = state
@@ -466,48 +500,57 @@ function Sbar_Configure(state, fontTexture, player, clientState, width, height, 
   return true
 end function
 
+// Provide sbar xoffset behavior for the active subsystem.
 function sbarXOffset()
   return renderUiContract.statusbarScaledXOffset(sbarWidth, sbarGameType, sbarScale)
 end function
 
+// Trace sbar through the collision world.
 function traceSbar(command)
   global sbarTrace
   sbarTrace = sbarTrace + [command]
   return true
 end function
 
+// Provide sbar direct pic behavior for the active subsystem.
 function sbarDirectPic(x, y, pic)
   if pic is void then return false end if
   traceSbar(["pic", pic.name, x, y])
   return draw.Draw_Pic(x, y, pic)
 end function
 
+// Provide sbar direct trans pic behavior for the active subsystem.
 function sbarDirectTransPic(x, y, pic)
   if pic is void then return false end if
   traceSbar(["transpic", pic.name, x, y])
   return draw.Draw_TransPic(x, y, pic)
 end function
 
+// Provide sbar direct character behavior for the active subsystem.
 function sbarDirectCharacter(x, y, num)
   traceSbar(["char", num, x, y])
   return draw.Draw_Character(x, y, num)
 end function
 
+// Provide sbar direct string behavior for the active subsystem.
 function sbarDirectString(x, y, text)
   traceSbar(["string", text, x, y])
   return draw.Draw_String(x, y, text)
 end function
 
+// Provide sbar direct fill behavior for the active subsystem.
 function sbarDirectFill(x, y, width, height, color)
   traceSbar(["fill", x, y, width, height, color])
   return draw.Draw_Fill(x, y, width, height, color)
 end function
 
+// Provide sbar direct tile clear behavior for the active subsystem.
 function sbarDirectTileClear(x, y, width, height)
   traceSbar(["tileclear", x, y, width, height])
   return draw.Draw_TileClear(x, y, width, height)
 end function
 
+// Mirror Quake's Sbar_DrawPic routine and its observable state changes.
 function Sbar_DrawPic(x, y, pic)
   if pic is void then return false end if
   drawX = sbarXOffset() + x * sbarScale
@@ -517,6 +560,7 @@ function Sbar_DrawPic(x, y, pic)
   return draw.Draw_PicSizedNearest(pic, drawX, drawY, pic.width * sbarScale, pic.height * sbarScale, 255)
 end function
 
+// Mirror Quake's Sbar_DrawTransPic routine and its observable state changes.
 function Sbar_DrawTransPic(x, y, pic)
   if pic is void then return false end if
   drawX = sbarXOffset() + x * sbarScale
@@ -526,6 +570,7 @@ function Sbar_DrawTransPic(x, y, pic)
   return draw.Draw_PicSizedNearest(pic, drawX, drawY, pic.width * sbarScale, pic.height * sbarScale, 255)
 end function
 
+// Mirror Quake's Sbar_DrawCharacter routine and its observable state changes.
 function Sbar_DrawCharacter(x, y, num)
   drawX = sbarXOffset() + (x + 4) * sbarScale
   drawY = sbarHeight + (y - SBAR_HEIGHT) * sbarScale
@@ -534,6 +579,7 @@ function Sbar_DrawCharacter(x, y, num)
   return draw.character(sbarFontTexture, drawX, drawY, num, sbarScale, 255)
 end function
 
+// Mirror Quake's Sbar_DrawString routine and its observable state changes.
 function Sbar_DrawString(x, y, text)
   drawX = sbarXOffset() + x * sbarScale
   drawY = sbarHeight + (y - SBAR_HEIGHT) * sbarScale
@@ -549,6 +595,7 @@ function Sbar_itoa(num)
   return [text, len(bytes(text))]
 end function
 
+// Provide number picture behavior for the active subsystem.
 function numberPicture(color, frame)
   prefix = "num_"
   if color != 0 then prefix = "anum_" end if
@@ -556,6 +603,7 @@ function numberPicture(color, frame)
   return loadedSbarPicture(prefix + frame)
 end function
 
+// Mirror Quake's Sbar_DrawNum routine and its observable state changes.
 function Sbar_DrawNum(x, y, num, digits, color)
   converted = Sbar_itoa(num)
   text = bytes(converted[0])
@@ -573,6 +621,7 @@ function Sbar_DrawNum(x, y, num, digits, color)
   return true
 end function
 
+// Mirror Quake's Sbar_SortFrags routine and its observable state changes.
 function Sbar_SortFrags(scores)
   global fragsort, scoreboardlines
   fragsort = []
@@ -599,10 +648,12 @@ function Sbar_SortFrags(scores)
   return fragsort
 end function
 
+// Mirror Quake's Sbar_ColorForMap routine and its observable state changes.
 function inline Sbar_ColorForMap(mapColor)
   return mapColor + 8
 end function
 
+// Provide pad frag behavior for the active subsystem.
 function padFrag(value)
   text = "" + native.trunc(value)
   while len(bytes(text)) < 3
@@ -611,10 +662,12 @@ function padFrag(value)
   return text
 end function
 
+// Provide frag glyphs behavior for the active subsystem.
 function fragGlyphs(value)
   return slice(bytes(padFrag(value)), 0, 3)
 end function
 
+// Mirror Quake's Sbar_UpdateScoreboard routine and its observable state changes.
 function Sbar_UpdateScoreboard()
   global scoreboardtext, scoreboardtop, scoreboardbottom
   scores = []
@@ -636,11 +689,13 @@ function Sbar_UpdateScoreboard()
   return scoreboardlines
 end function
 
+// Provide stat behavior for the active subsystem.
 function stat(index, fallback)
   if sbarClient is not void and index >= 0 and index < len(sbarClient.stats) then return sbarClient.stats[index] end if
   return fallback
 end function
 
+// Mirror Quake's Sbar_SoloScoreboard routine and its observable state changes.
 function Sbar_SoloScoreboard()
   monsters = stat(c.STAT_MONSTERS, 0)
   totalMonsters = stat(c.STAT_TOTALMONSTERS, 0)
@@ -658,12 +713,14 @@ function Sbar_SoloScoreboard()
   return true
 end function
 
+// Mirror Quake's Sbar_DrawScoreboard routine and its observable state changes.
 function Sbar_DrawScoreboard()
   Sbar_SoloScoreboard()
   if sbarGameType == c.GAME_DEATHMATCH then Sbar_DeathmatchOverlay() end if
   return true
 end function
 
+// Provide weapon flash behavior for the active subsystem.
 function weaponFlash(itemIndex, activeWeapon, currentTime)
   global sb_updates
   acquired = 0.0
@@ -678,12 +735,14 @@ function weaponFlash(itemIndex, activeWeapon, currentTime)
   return result
 end function
 
+// Return flash weapon name derived from the active module state.
 function flashWeaponName(prefix, weapon, flash)
   if flash == 0 then return "inv_" + weapon end if
   if flash == 1 then return "inv2_" + weapon end if
   return "inva" + (flash - 1) + "_" + weapon
 end function
 
+// Provide item needs refresh behavior for the active subsystem.
 function itemNeedsRefresh(itemIndex, currentTime)
   global sb_updates
   if sbarClient is void or itemIndex >= len(sbarClient.itemGetTime) then return false end if
@@ -695,11 +754,13 @@ function itemNeedsRefresh(itemIndex, currentTime)
   return false
 end function
 
+// Report whether sbar active weapon holds for the active state.
 function sbarActiveWeapon()
   if sbarPlayer is void then return 0 end if
   return native.trunc(stat(c.STAT_ACTIVEWEAPON, sbarPlayer.activeWeapon))
 end function
 
+// Mirror Quake's Sbar_DrawInventory routine and its observable state changes.
 function Sbar_DrawInventory()
   if sbarPlayer is void then return false end if
   items = sbarItems()
@@ -802,6 +863,7 @@ function Sbar_DrawInventory()
   return true
 end function
 
+// Mirror Quake's Sbar_DrawFrags routine and its observable state changes.
 function Sbar_DrawFrags()
   if sbarClient is void then return false end if
   scores = sbarClient.scores
@@ -828,6 +890,7 @@ function Sbar_DrawFrags()
   return true
 end function
 
+// Mirror Quake's Sbar_DrawFace routine and its observable state changes.
 function Sbar_DrawFace()
   global sb_updates
   if sbarPlayer is void then return false end if
@@ -862,6 +925,7 @@ function Sbar_DrawFace()
   return Sbar_DrawPic(112, 0, loadedSbarPicture(face))
 end function
 
+// Return rogue armor name derived from the active module state.
 function rogueArmorName(items)
   if (items & c.RIT_ARMOR3) != 0 then return "sb_armor3" end if
   if (items & c.RIT_ARMOR2) != 0 then return "sb_armor2" end if
@@ -869,6 +933,7 @@ function rogueArmorName(items)
   return ""
 end function
 
+// Return rogue ammo name derived from the active module state.
 function rogueAmmoName(items)
   if (items & c.RIT_SHELLS) != 0 then return "sb_shells" end if
   if (items & c.RIT_NAILS) != 0 then return "sb_nails" end if
@@ -880,12 +945,17 @@ function rogueAmmoName(items)
   return ""
 end function
 
+// Mirror Quake's Sbar_Draw routine and its observable state changes.
 function Sbar_Draw()
   global sb_updates, sbarTrace, sbarCopyEverything
   sbarTrace = []
   if sbarPlayer is void then return false end if
   if sbarConsoleCurrent == sbarHeight then return false end if
-  if sb_updates >= sbarNumPages then return false end if
+  // The original stops issuing status-bar draws after every buffered page has
+  // received one. MiniQuake rebuilds/clears the hardware frame every update,
+  // so retaining that optimization makes the HUD disappear after a few frames.
+  // Keep the counter bounded for differential observability but redraw always.
+  if sb_updates >= sbarNumPages then sb_updates = 0 end if
   sbarCopyEverything = true
   sb_updates = sb_updates + 1
   if sb_lines != 0 and sbarWidth > 320 then
@@ -935,6 +1005,7 @@ function Sbar_Draw()
   return true
 end function
 
+// Mirror Quake's Sbar_IntermissionNumber routine and its observable state changes.
 function Sbar_IntermissionNumber(x, y, num, digits, color)
   converted = Sbar_itoa(num)
   text = bytes(converted[0])
@@ -952,6 +1023,7 @@ function Sbar_IntermissionNumber(x, y, num, digits, color)
   return true
 end function
 
+// Provide sbar overlay pic behavior for the active subsystem.
 function sbarOverlayPic(x, y, pic, transform, transparent)
   if pic is void then return false end if
   drawX = transform[0] + x * transform[2]
@@ -969,6 +1041,7 @@ function sbarOverlayPic(x, y, pic, transform, transparent)
   )
 end function
 
+// Provide sbar canvas pic behavior for the active subsystem.
 function sbarCanvasPic(x, y, pic, transform)
   if pic is void then return false end if
   if transform[2] <= 1.0 then
@@ -981,6 +1054,7 @@ function sbarCanvasPic(x, y, pic, transform)
   return sbarOverlayPic(x, y, pic, transform, false)
 end function
 
+// Provide sbar canvas character behavior for the active subsystem.
 function sbarCanvasCharacter(x, y, num, transform)
   drawX = transform[0] + x * transform[2]
   drawY = transform[1] + y * transform[2]
@@ -989,6 +1063,7 @@ function sbarCanvasCharacter(x, y, num, transform)
   return draw.character(sbarFontTexture, drawX, drawY, num, transform[2], 255)
 end function
 
+// Provide sbar canvas string behavior for the active subsystem.
 function sbarCanvasString(x, y, text, transform)
   drawX = transform[0] + x * transform[2]
   drawY = transform[1] + y * transform[2]
@@ -997,6 +1072,7 @@ function sbarCanvasString(x, y, text, transform)
   return draw.string(sbarFontTexture, drawX, drawY, text, transform[2], 255)
 end function
 
+// Provide sbar canvas fill behavior for the active subsystem.
 function sbarCanvasFill(x, y, width, height, color, transform)
   drawX = transform[0] + x * transform[2]
   drawY = transform[1] + y * transform[2]
@@ -1008,6 +1084,7 @@ function sbarCanvasFill(x, y, width, height, color, transform)
   return sbarDirectFill(drawX, drawY, drawWidth, drawHeight, color)
 end function
 
+// Mirror Quake's Sbar_IntermissionNumberScaled routine and its observable state changes.
 function Sbar_IntermissionNumberScaled(x, y, num, digits, color, transform)
   converted = Sbar_itoa(num)
   text = bytes(converted[0])
@@ -1025,6 +1102,7 @@ function Sbar_IntermissionNumberScaled(x, y, num, digits, color, transform)
   return true
 end function
 
+// Mirror Quake's Sbar_DeathmatchOverlay routine and its observable state changes.
 function Sbar_DeathmatchOverlay()
   global sbarCopyEverything, sbarFullUpdate
   if sbarClient is void then return false end if
@@ -1054,6 +1132,7 @@ function Sbar_DeathmatchOverlay()
   return true
 end function
 
+// Mirror Quake's Sbar_MiniDeathmatchOverlay routine and its observable state changes.
 function Sbar_MiniDeathmatchOverlay()
   global sbarCopyEverything, sbarFullUpdate
   if sbarClient is void or sbarWidth < 512 * sbarScale or sb_lines == 0 then return false end if
@@ -1091,7 +1170,9 @@ function Sbar_MiniDeathmatchOverlay()
   return true
 end function
 
+// Mirror Quake's Sbar_IntermissionOverlay routine and its observable state changes.
 function Sbar_IntermissionOverlay()
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global sbarCopyEverything, sbarFullUpdate
   sbarCopyEverything = true
   sbarFullUpdate = 0
@@ -1134,6 +1215,7 @@ function Sbar_IntermissionOverlay()
   return true
 end function
 
+// Mirror Quake's Sbar_FinaleOverlay routine and its observable state changes.
 function Sbar_FinaleOverlay()
   global sbarCopyEverything
   sbarCopyEverything = true
@@ -1152,10 +1234,12 @@ function Sbar_FinaleOverlay()
   return true
 end function
 
+// Mirror Quake's Sbar_CommandTrace routine and its observable state changes.
 function Sbar_CommandTrace()
   return sbarTrace
 end function
 
+// Mirror Quake's Sbar_LayoutTrace routine and its observable state changes.
 function Sbar_LayoutTrace(gameDirectory, player, clientState, width, height, lines, teamplay)
   global sbarHipnotic, sbarRogue
   previousHipnotic = sbarHipnotic

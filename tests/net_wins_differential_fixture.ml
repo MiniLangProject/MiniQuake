@@ -1,17 +1,26 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/net_wins_differential_fixture.ml.
+*/
 import miniquake.net_wins as wins
 import miniquake.platform.win32 as win
 
+// Exercise bool int as part of this deterministic regression fixture.
 function boolInt(value)
   if value then return 1 end if
   return 0
 end function
 
+// Add the requested value to the destination state.
 function emit(functionName, caseName, result, index, value, count)
   print "{\"function\":\"" + functionName + "\",\"case\":\"" + caseName +
     "\",\"result\":" + result + ",\"index\":" + index +
     ",\"value\":" + value + ",\"count\":" + count + "}"
 end function
 
+// Return fatal mode derived from the active module state.
 function fatalMode(mode)
   wins.WINS_ResetState()
   result = void
@@ -36,7 +45,9 @@ function fatalMode(mode)
   return 0
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   if len(args) > 0 then return fatalMode(args[0]) end if
 
   wins.WINS_ResetState()

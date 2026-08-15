@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/cl_main_port_tests.ml.
+*/
 import miniquake.client as client
 import miniquake.types as t
 import miniquake.constants as c
@@ -12,16 +18,19 @@ import miniquake.view as view
 import miniquake.particles as particles
 import miniquake.client_effects as clientEffects
 
+// Assert that the condition holds and identify a failing test.
 function require(value, name)
   if value != true then return error(9860, name) end if
   return true
 end function
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(9861, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function near(actual, expected, tolerance, name)
   delta = actual - expected
   if delta < 0.0 then delta = -delta end if
@@ -29,6 +38,7 @@ function near(actual, expected, tolerance, name)
   return true
 end function
 
+// Create and initialize client.
 function newClient()
   player = movement.create(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
   result = client.create(player)
@@ -36,6 +46,7 @@ function newClient()
   return result
 end function
 
+// Verify init and clear against the expected Quake behavior.
 function testInitAndClear()
   localClient = newClient()
   registry = cvar.createRegistry()
@@ -59,6 +70,7 @@ function testInitAndClear()
   return true
 end function
 
+// Verify dynamic lights against the expected Quake behavior.
 function testDynamicLights()
   client.CL_ClearDlights()
   client.CL_SetDlightTime(0.75, 1.0)
@@ -77,6 +89,7 @@ function testDynamicLights()
   return true
 end function
 
+// Verify server info preserves earlier print against the expected Quake behavior.
 function testServerInfoPreservesEarlierPrint()
   localClient = newClient()
   banner = t.ProtocolEvent("svc_print", "\nMiniQuake 1.09 SERVER (protocol 15)\n")
@@ -99,6 +112,7 @@ function testServerInfoPreservesEarlierPrint()
   return true
 end function
 
+// Verify lerp and relink against the expected Quake behavior.
 function testLerpAndRelink()
   localClient = newClient()
   localClient.messageTimes = [2.0, 1.9]
@@ -144,6 +158,7 @@ function testLerpAndRelink()
   return true
 end function
 
+// Verify changelevel relink stability against the expected Quake behavior.
 function testChangelevelRelinkStability()
   localClient = newClient()
   iteration = 0
@@ -190,6 +205,7 @@ function testChangelevelRelinkStability()
   return true
 end function
 
+// Update subsystem configuration for configure effect entity.
 function configureEffectEntity(localClient, number)
   entity = client.ensureEntity(localClient, number)
   entity.modelIndex = number
@@ -203,6 +219,7 @@ function configureEffectEntity(localClient, number)
   return entity
 end function
 
+// Verify relink model effects against the expected Quake behavior.
 function testRelinkModelEffects()
   localClient = newClient()
   localClient.messageTimes = [2.0, 1.9]
@@ -272,6 +289,7 @@ function testRelinkModelEffects()
   return true
 end function
 
+// Verify demo and entity commands against the expected Quake behavior.
 function testDemoAndEntityCommands()
   commands = cmd.create()
   advanced = client.CL_NextDemo(commands, ["demo1", "demo2"], 0)
@@ -291,6 +309,7 @@ function testDemoAndEntityCommands()
   return true
 end function
 
+// Verify connection read send disconnect against the expected Quake behavior.
 function testConnectionReadSendDisconnect()
   network = netloop.createState()
   localClient = newClient()
@@ -301,6 +320,10 @@ function testConnectionReadSendDisconnect()
 
   localClient.signon = c.SIGNON_SERVERINFO
   require(client.CL_SignonReply(localClient), "stage-one signon reply")
+  // CL_SignonReply mirrors cl_main.c: it appends prespawn to cls.message.
+  // The following CL_SendCmd host phase performs the reliable transport.
+  equal(localClient.outgoing.curSize, 10, "prespawn queued for reliable send")
+  equal(client.CL_SendCmd(localClient, localClient.command), 1, "host frame sends prespawn")
   incoming = sz.alloc(128)
   equal(netmain.NET_GetMessage(serverSocket, incoming, 1.0), 1, "server receives prespawn")
   equal(incoming.data[0], c.CLC_STRINGCMD, "prespawn is string command")
@@ -328,6 +351,7 @@ function testConnectionReadSendDisconnect()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "MiniQuake cl_main port tests starting: 8"
   result = try(testInitAndClear())

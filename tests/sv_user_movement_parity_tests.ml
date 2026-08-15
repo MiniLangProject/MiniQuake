@@ -1,4 +1,9 @@
-/* BP-028: source-guided sv_user.c intention, angle and movement fixtures. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+BP-028: source-guided sv_user.c intention, angle and movement fixtures.
+*/
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.sv_user as svuser
@@ -7,29 +12,35 @@ import miniquake.player_move as movement
 import miniquake.message as msg
 import miniquake.sizebuf as sz
 
+// Report the requested value and return the corresponding failure status.
 function fail(text)
   return error(9281, text)
 end function
+// Assert floating-point equality within the requested tolerance.
 function near(actual, expected, text)
   delta = actual - expected
   if delta < 0.0 then delta = -delta end if
   if delta > 0.001 then return fail(text + ": expected " + expected + ", got " + actual) end if
   return true
 end function
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, text)
   if actual != expected then return fail(text + ": expected " + expected + ", got " + actual) end if
   return true
 end function
+// Assert that the condition holds and identify a failing test.
 function require(value, text)
   if not value then return fail(text) end if
   return true
 end function
+// Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
   print "[" + number + "/16] " + name
   result = try(fn())
   if result is error then print "FAIL: " + result.message; return false end if
   return true
 end function
+// Exercise state and command as part of this deterministic regression fixture.
 function stateAndCommand()
   game = server.create(1)
   state = svuser.SV_UserInit(game)
@@ -37,22 +48,26 @@ function stateAndCommand()
   svuser.SV_UserSetMovement(state, 320.0, 10.0, 4.0, 2.0, 100.0)
   return [game, state, game.clients[0].command]
 end function
+// Exercise player as part of this deterministic regression fixture.
 function player()
   value = movement.create(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
   value.health = 100.0
   return value
 end function
 
+// Verify frame clamp high against the expected Quake behavior.
 function testFrameClampHigh()
   pair = stateAndCommand()
   near(svuser.SV_UserSetFrameTime(pair[1], 1.0), 0.1, "high frame clamp")
   return true
 end function
+// Verify frame clamp low against the expected Quake behavior.
 function testFrameClampLow()
   pair = stateAndCommand()
   near(svuser.SV_UserSetFrameTime(pair[1], -1.0), 0.0, "low frame clamp")
   return true
 end function
+// Verify noclip pitch projection against the expected Quake behavior.
 function testNoclipPitchProjection()
   pair = stateAndCommand(); value = player(); command = pair[2]
   value.moveType = c.MOVETYPE_NOCLIP
@@ -64,6 +79,7 @@ function testNoclipPitchProjection()
   near(value.velocity.z, 25.0, "noclip upmove overrides forward z")
   return true
 end function
+// Verify walk pitch projection against the expected Quake behavior.
 function testWalkPitchProjection()
   pair = stateAndCommand(); value = player(); command = pair[2]
   value.moveType = c.MOVETYPE_WALK; value.onGround = true
@@ -74,6 +90,7 @@ function testWalkPitchProjection()
   near(value.velocity.z, 0.0, "walk discards vertical intention")
   return true
 end function
+// Verify teleport backward gate against the expected Quake behavior.
 function testTeleportBackwardGate()
   pair = stateAndCommand(); game = pair[0]; value = player(); command = pair[2]
   value.moveType = c.MOVETYPE_NOCLIP; value.teleportTime = 2.0
@@ -82,6 +99,7 @@ function testTeleportBackwardGate()
   near(value.velocity.x, 0.0, "teleport backward gate")
   return true
 end function
+// Verify noclip max speed against the expected Quake behavior.
 function testNoclipMaxSpeed()
   pair = stateAndCommand(); value = player(); command = pair[2]
   value.moveType = c.MOVETYPE_NOCLIP; command.forwardMove = 500.0
@@ -89,6 +107,7 @@ function testNoclipMaxSpeed()
   near(value.velocity.x, 320.0, "noclip maxspeed")
   return true
 end function
+// Verify side move basis against the expected Quake behavior.
 function testSideMoveBasis()
   pair = stateAndCommand(); value = player(); command = pair[2]
   value.moveType = c.MOVETYPE_NOCLIP; command.sideMove = 100.0
@@ -97,6 +116,7 @@ function testSideMoveBasis()
   near(value.velocity.y, -100.0, "side basis y")
   return true
 end function
+// Verify air acceleration cap against the expected Quake behavior.
 function testAirAccelerationCap()
   pair = stateAndCommand(); value = player(); command = pair[2]
   value.moveType = c.MOVETYPE_WALK; value.onGround = false; command.forwardMove = 100.0
@@ -104,12 +124,14 @@ function testAirAccelerationCap()
   near(value.velocity.x, 30.0, "air acceleration cap")
   return true
 end function
+// Verify idle water sink against the expected Quake behavior.
 function testIdleWaterSink()
   pair = stateAndCommand(); value = player(); command = pair[2]
   svuser.SV_WaterMove(pair[1], value, command)
   near(value.velocity.z, -42.0, "idle water sink")
   return true
 end function
+// Verify forward water acceleration against the expected Quake behavior.
 function testForwardWaterAcceleration()
   pair = stateAndCommand(); value = player(); command = pair[2]
   command.forwardMove = 100.0
@@ -117,6 +139,7 @@ function testForwardWaterAcceleration()
   near(value.velocity.x, 70.0, "forward water acceleration")
   return true
 end function
+// Verify water jump active against the expected Quake behavior.
 function testWaterJumpActive()
   pair = stateAndCommand(); game = pair[0]; value = player()
   value.flags = c.FL_WATERJUMP; value.waterLevel = 2; value.teleportTime = 10.0
@@ -127,6 +150,7 @@ function testWaterJumpActive()
   near(value.velocity.z, 5.0, "active waterjump z preserved")
   return true
 end function
+// Verify water jump expired against the expected Quake behavior.
 function testWaterJumpExpired()
   pair = stateAndCommand(); game = pair[0]; value = player()
   value.flags = c.FL_WATERJUMP; value.waterLevel = 2; value.teleportTime = 10.0
@@ -136,12 +160,14 @@ function testWaterJumpExpired()
   near(value.teleportTime, 0.0, "expired teleport time")
   return true
 end function
+// Verify ideal pitch integer steps against the expected Quake behavior.
 function testIdealPitchIntegerSteps()
   pair = stateAndCommand()
   pitch = svuser.SV_IdealPitchFromHeights(pair[1], [3.6, 4.8, 6.0, 7.2, 8.4, 9.6], 0)
   near(pitch, -0.8, "integer sampled ideal pitch")
   return true
 end function
+// Verify read client move against the expected Quake behavior.
 function testReadClientMove()
   pair = stateAndCommand(); game = pair[0]; state = pair[1]
   buffer = sz.alloc(64)
@@ -156,6 +182,7 @@ function testReadClientMove()
   equal(clientValue.command.buttons, 3, "move buttons"); equal(clientValue.command.impulse, 7, "move impulse")
   return true
 end function
+// Verify client think angles against the expected Quake behavior.
 function testClientThinkAngles()
   pair = stateAndCommand(); value = player(); clientValue = pair[0].clients[0]
   value.moveType = c.MOVETYPE_NOCLIP; value.viewAngles = t.Vec3(30.0, 40.0, 0.0)
@@ -164,6 +191,7 @@ function testClientThinkAngles()
   near(value.renderAngles.y, 40.0, "render yaw")
   return true
 end function
+// Verify punch decay against the expected Quake behavior.
 function testPunchDecay()
   pair = stateAndCommand(); value = player(); value.punchAngle = t.Vec3(3.0, 4.0, 0.0)
   svuser.SV_UserSetFrameTime(pair[1], 0.05); svuser.DropPunchAngle(pair[1], value)
@@ -171,6 +199,7 @@ function testPunchDecay()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   passed = 0
   if run(1,"frame clamp high",testFrameClampHigh) then passed=passed+1 else return 1 end if

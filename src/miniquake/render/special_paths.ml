@@ -1,12 +1,13 @@
 /*
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Source-guided MiniQuake 1.09 special rendering paths.  This module keeps the
 mirror, z-trick, envmap and time-refresh equations in one compiler-friendly
 place so the integrated renderer and isolated differential fixtures use the
 same Binary32 boundaries.
 */
-
 package miniquake.render.special_paths
 
 import miniquake.types as t
@@ -19,10 +20,12 @@ const ENVMAP_SIZE = 256
 const ENVMAP_FACES = 6
 const TIMEREFRESH_STEPS = 128
 
+// Read an IEEE-754 single-precision value from the byte buffer.
 function f32(value)
   return native.bitsFloat(native.floatBits(value))
 end function
 
+// Return mirror texture name derived from the active module state.
 function mirrorTextureName(name)
   source = bytes(name)
   prefix = bytes(MIRROR_TEXTURE_PREFIX)
@@ -35,6 +38,7 @@ function mirrorTextureName(name)
   return true
 end function
 
+// Return mirror texture.
 function findMirrorTexture(textures)
   index = 0
   while index < len(textures)
@@ -45,10 +49,12 @@ function findMirrorTexture(textures)
   return -1
 end function
 
+// Provide mirror distance behavior for the active subsystem.
 function mirrorDistance(point, normal, distance)
   return f32(math.dot(point, normal) - distance)
 end function
 
+// Provide reflect point behavior for the active subsystem.
 function reflectPoint(point, normal, distance)
   scalar = f32(-2.0 * mirrorDistance(point, normal, distance))
   return t.Vec3(
@@ -58,6 +64,7 @@ function reflectPoint(point, normal, distance)
   )
 end function
 
+// Return reflect vector derived from the active module state.
 function reflectVector(direction, normal)
   scalar = f32(-2.0 * f32(math.dot(direction, normal)))
   return t.Vec3(
@@ -67,6 +74,7 @@ function reflectVector(direction, normal)
   )
 end function
 
+// Return direction angles derived from the active module state.
 function directionAngles(direction, sourceRoll)
   horizontal = f32(native.sqrt(f32(direction.x * direction.x + direction.y * direction.y)))
   pitch = f32(-native.atan2(direction.z, horizontal) * math.RAD_TO_DEG)
@@ -75,6 +83,7 @@ function directionAngles(direction, sourceRoll)
   return t.Vec3(pitch, yaw, f32(-sourceRoll))
 end function
 
+// Provide reflect view behavior for the active subsystem.
 function reflectView(origin, angles, plane)
   if plane is void then return error(5000, "R_Mirror: missing mirror plane") end if
   vectors = math.angleVectors(angles)
@@ -84,13 +93,14 @@ function reflectView(origin, angles, plane)
   return [reflectedOrigin, reflectedAngles, reflectedForward]
 end function
 
+// Provide mirror projection scale behavior for the active subsystem.
 function mirrorProjectionScale(plane)
   if plane is void then return t.Vec3(1.0, 1.0, 1.0) end if
   if plane.normal.z != 0.0 then return t.Vec3(1.0, -1.0, 1.0) end if
   return t.Vec3(-1.0, 1.0, 1.0)
 end function
 
-// Return [clearMask, depthMin, depthMax, depthFunction, nextTrickFrame].
+// Update module state for plan.
 function clearPlan(mirrorAlpha, clearColor, zTrick, trickFrame)
   mask = gl.GL_DEPTH_BUFFER_BIT
   if clearColor then mask = mask | gl.GL_COLOR_BUFFER_BIT end if
@@ -109,6 +119,7 @@ function clearPlan(mirrorAlpha, clearColor, zTrick, trickFrame)
   return [mask, 0.0, 1.0, gl.GL_LEQUAL, trickFrame]
 end function
 
+// Provide envmap directions behavior for the active subsystem.
 function envmapDirections()
   return [
     t.Vec3(0.0, 0.0, 0.0),
@@ -120,24 +131,29 @@ function envmapDirections()
   ]
 end function
 
+// Return envmap byte count derived from the active module state.
 function envmapByteCount()
   return ENVMAP_SIZE * ENVMAP_SIZE * 4
 end function
 
+// Return envmap file name derived from the active module state.
 function envmapFileName(index)
   return "env" + index + ".rgb"
 end function
 
+// Provide time refresh yaw behavior for the active subsystem.
 function timeRefreshYaw(index)
   return f32(f32(index * 1.0 / TIMEREFRESH_STEPS) * 360.0)
 end function
 
+// Provide time refresh result behavior for the active subsystem.
 function timeRefreshResult(seconds)
   value = f32(seconds)
   if value <= 0.0 then return error(5001, "R_TimeRefresh_f: non-positive duration") end if
   return [value, f32(TIMEREFRESH_STEPS / value)]
 end function
 
+// Return time refresh angles derived from the active module state.
 function timeRefreshAngles(sourceAngles)
   result = []
   index = 0
@@ -149,6 +165,7 @@ function timeRefreshAngles(sourceAngles)
 end function
 
 
+// Provide special render stage order behavior for the active subsystem.
 function specialRenderStageOrder()
   return [
     "clear",

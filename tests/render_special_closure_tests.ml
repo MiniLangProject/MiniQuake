@@ -1,4 +1,9 @@
-/* BP-054: frozen MiniQuake special-render and evidence-corpus contract. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+BP-054: frozen MiniQuake special-render and evidence-corpus contract.
+*/
 import miniquake.render_special_contract as bp054Contract
 import miniquake.render.special_paths as bp054Special
 import miniquake.render_evidence_corpus as bp054Corpus
@@ -8,105 +13,129 @@ import miniquake.common as bp054Common
 import miniquake.cvar as bp054Cvar
 import miniquake.types as bp054Types
 
+// Assert exact equality and report both values on failure.
 function bp054Equal(actual, expected, name)
   if actual != expected then return error(5400, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
+// Assert that the condition holds and identify a failing test.
 function bp054Yes(value, name)
   if not value then return error(5401, name + ": expected true") end if
   return true
 end function
+// Execute one named test case and record its pass/fail result.
 function bp054Run(number, name, fn)
   print "[" + number + "/24] " + name
   result = try(fn())
   if result is error then print "FAIL: " + result.message; return false end if
   return true
 end function
+// Return status derived from the active module state.
 function bp054Status()
   bp054Equal(bp054Contract.status(), "render_special_109_frozen_v1", "status")
   return true
 end function
+// Return fingerprint for the active module state.
 function bp054Fingerprint()
   bp054Equal(bp054Contract.fingerprint(), 708673665, "fingerprint")
   return true
 end function
+// Validate the requested value and report any incompatibility.
 function bp054Verify()
   bp054Yes(bp054Contract.verify(), "contract verification")
   return true
 end function
+// Exercise the parent status test scenario and verify its expected result.
 function bp054ParentStatus()
   bp054Equal(bp054Parent.status(), "model_ui_render_109_frozen_v1", "parent status")
   return true
 end function
+// Exercise the mirror prefix test scenario and verify its expected result.
 function bp054MirrorPrefix()
   bp054Equal(bp054Contract.MIRROR_PREFIX_BYTES, 10, "mirror prefix bytes")
   return true
 end function
+// Exercise the mirror depth test scenario and verify its expected result.
 function bp054MirrorDepth()
   bp054Equal(bp054Contract.MIRROR_DEPTH_SPLIT_MILLI, 500, "mirror depth split")
   return true
 end function
+// Exercise the ztrick depth test scenario and verify its expected result.
 function bp054ZTrickDepth()
   bp054Equal(bp054Contract.ZTRICK_ODD_DEPTH_MICRO, 499990, "ztrick depth")
   return true
 end function
+// Exercise the envmap size test scenario and verify its expected result.
 function bp054EnvmapSize()
   bp054Equal(bp054Contract.ENVMAP_SIZE, 256, "envmap size")
   return true
 end function
+// Exercise the envmap faces test scenario and verify its expected result.
 function bp054EnvmapFaces()
   bp054Equal(bp054Contract.ENVMAP_FACES, 6, "envmap faces")
   return true
 end function
+// Exercise the time refresh test scenario and verify its expected result.
 function bp054TimeRefresh()
   bp054Equal(bp054Contract.TIMEREFRESH_STEPS, 128, "timerefresh steps")
   return true
 end function
+// Exercise the corpus count test scenario and verify its expected result.
 function bp054CorpusCount()
   bp054Equal(bp054Contract.EVIDENCE_SCENARIOS, 3, "corpus scenarios")
   return true
 end function
+// Exercise the ssim test scenario and verify its expected result.
 function bp054Ssim()
   bp054Equal(bp054Contract.ORIGINAL_SSIM_MILLI, 950, "original SSIM")
   return true
 end function
+// Exercise the exact pair test scenario and verify its expected result.
 function bp054ExactPair()
   bp054Equal(bp054Contract.EXACT_PAIR_REQUIRED, 1, "exact process pair")
   return true
 end function
+// Exercise the external reference test scenario and verify its expected result.
 function bp054ExternalReference()
   bp054Equal(bp054Contract.ORIGINAL_REFERENCE_EXTERNAL, 1, "external original reference")
   return true
 end function
+// Exercise the stage count test scenario and verify its expected result.
 function bp054StageCount()
   bp054Equal(len(bp054Special.specialRenderStageOrder()), 12, "stage count")
   return true
 end function
+// Exercise the stage clear test scenario and verify its expected result.
 function bp054StageClear()
   bp054Equal(bp054Special.specialRenderStageOrder()[0], "clear", "first stage")
   return true
 end function
+// Exercise the stage mirror test scenario and verify its expected result.
 function bp054StageMirror()
   stages = bp054Special.specialRenderStageOrder()
   bp054Equal(stages[6], "mirror_scene", "mirror scene stage")
   bp054Equal(stages[8], "mirror_overlay", "mirror overlay stage")
   return true
 end function
+// Exercise the stage capture test scenario and verify its expected result.
 function bp054StageCapture()
   stages = bp054Special.specialRenderStageOrder()
   bp054Equal(stages[11], "capture_before_swap", "capture stage")
   return true
 end function
+// Exercise the corpus dimensions test scenario and verify its expected result.
 function bp054CorpusDimensions()
   bp054Equal(bp054Corpus.CAPTURE_WIDTH, 640, "corpus width")
   bp054Equal(bp054Corpus.CAPTURE_HEIGHT, 480, "corpus height")
   return true
 end function
+// Exercise the corpus maps test scenario and verify its expected result.
 function bp054CorpusMaps()
   bp054Equal(bp054Corpus.mapName(0), "start", "start map")
   bp054Equal(bp054Corpus.mapName(2), "e1m1", "e1m1 map")
   return true
 end function
+// Exercise the cvars test scenario and verify its expected result.
 function bp054Cvars()
   commandLine = bp054Common.create([])
   registry = bp054Host.createCvars(commandLine, true)
@@ -116,16 +145,19 @@ function bp054Cvars()
   bp054Equal(bp054Cvar.variableValue(registry, "gl_clear"), 0.0, "clear default")
   return true
 end function
+// Exercise the projection floor test scenario and verify its expected result.
 function bp054ProjectionFloor()
   value = bp054Special.mirrorProjectionScale(bp054Types.Plane(bp054Types.Vec3(0.0, 0.0, 1.0), 0.0, 2, 0))
   bp054Equal(value.y, -1.0, "floor projection")
   return true
 end function
+// Update module state for odd.
 function bp054ClearOdd()
   value = bp054Special.clearPlan(1.0, false, true, 0)
   bp054Equal(value[4], 1, "odd trick frame")
   return true
 end function
+// Exercise the vector test scenario and verify its expected result.
 function bp054Vector()
   bp054Equal(len(bp054Contract.constants()), 11, "contract vector length")
   return true

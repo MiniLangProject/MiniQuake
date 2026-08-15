@@ -1,47 +1,58 @@
 /*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
 Deterministic MiniLang side of the original gl_rlight.c differential oracle.
 */
-
 import miniquake.render.gl_rlight as rlight
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.native as native
 import std.string as string
 
+// Add the requested value to the destination state.
 function emit(scene, functionName, sequence, operation, arguments)
   print "{\"schema\":\"miniquake.renderer.gl.v1\",\"scene\":\"" + scene + "\",\"function\":\"" + functionName + "\",\"seq\":" + sequence + ",\"op\":\"" + operation + "\",\"args\":" + arguments + "}"
 end function
 
+// Return json number derived from the active module state.
 function jsonNumber(value)
   integerValue = native.trunc(value)
   if value == integerValue then return "" + integerValue end if
   return string.replaceAll("" + value, ".e", "e")
 end function
 
+// Exercise vec arguments as part of this deterministic regression fixture.
 function vecArguments(vector)
   return jsonNumber(vector.x) + "," + jsonNumber(vector.y) + "," + jsonNumber(vector.z)
 end function
 
+// Exercise outside light as part of this deterministic regression fixture.
 function outsideLight()
   return t.DynamicLight(t.Vec3(100.0, 0.0, 0.0), 10.0, 1.0, 0.0, 0.0, 0)
 end function
 
+// Return view origin derived from the active module state.
 function viewOrigin()
   return t.Vec3(0.0, 0.0, 0.0)
 end function
 
+// Exercise view forward as part of this deterministic regression fixture.
 function viewForward()
   return t.Vec3(1.0, 0.0, 0.0)
 end function
 
+// Exercise view right as part of this deterministic regression fixture.
 function viewRight()
   return t.Vec3(0.0, 1.0, 0.0)
 end function
 
+// Exercise view up as part of this deterministic regression fixture.
 function viewUp()
   return t.Vec3(0.0, 0.0, 1.0)
 end function
 
+// Trace dlight fan through the collision world.
 function traceDlightFan(scene, functionName, vertices, firstSequence)
   sequence = firstSequence
   emit(scene, functionName, sequence, "begin", "[6]")
@@ -62,16 +73,19 @@ function traceDlightFan(scene, functionName, vertices, firstSequence)
   return sequence + 1
 end function
 
+// Trace animate through the collision world.
 function traceAnimate()
   values = rlight.R_AnimateLight(["az", "mmn"], 0.1)
   emit("rlight_animate", "R_AnimateLight", 0, "lightstyles", "[" + values[0] + "," + values[1] + "," + values[2] + "," + values[c.MAX_LIGHTSTYLES - 1] + "]")
 end function
 
+// Trace blend through the collision world.
 function traceBlend()
   blend = rlight.AddLightBlend([0.1, 0.2, 0.3, 0.4], 1.0, 0.5, 0.0, 0.25)
   emit("rlight_add_blend", "AddLightBlend", 0, "blend", "[" + jsonNumber(blend[0]) + "," + jsonNumber(blend[1]) + "," + jsonNumber(blend[2]) + "," + jsonNumber(blend[3]) + "]")
 end function
 
+// Trace render dlight through the collision world.
 function traceRenderDlight()
   result = rlight.R_RenderDlight(
     outsideLight(), 0.0, viewOrigin(), viewForward(), viewRight(), viewUp(),
@@ -80,6 +94,7 @@ function traceRenderDlight()
   traceDlightFan("rlight_render_dlight", "R_RenderDlight", result[2], 0)
 end function
 
+// Trace render dlight inside through the collision world.
 function traceRenderDlightInside()
   light = t.DynamicLight(t.Vec3(1.0, 0.0, 0.0), 20.0, 1.0, 0.0, 0.0, 0)
   result = rlight.R_RenderDlight(
@@ -90,6 +105,7 @@ function traceRenderDlightInside()
   emit("rlight_render_dlight_inside", "R_RenderDlight", 0, "blend", "[" + jsonNumber(blend[0]) + "," + jsonNumber(blend[1]) + "," + jsonNumber(blend[2]) + "," + jsonNumber(blend[3]) + "]")
 end function
 
+// Trace render dlights through the collision world.
 function traceRenderDlights()
   expired = t.DynamicLight(t.Vec3(1.0, 0.0, 0.0), 20.0, -1.0, 0.0, 0.0, 0)
   result = rlight.R_RenderDlights(
@@ -123,6 +139,7 @@ function traceRenderDlights()
   emit(scene, functionName, sequence, "dlight_frame", "[13]")
 end function
 
+// Build deterministic test data for world.
 function fixtureWorld(withLightData)
   zero = t.Vec3(0.0, 0.0, 0.0)
   plane = t.BspPlane(t.Vec3(0.0, 0.0, 1.0), 0.0, 2)
@@ -143,6 +160,7 @@ function fixtureWorld(withLightData)
   return [map, surface]
 end function
 
+// Trace mark lights through the collision world.
 function traceMarkLights()
   world = fixtureWorld(true)
   bits = [0]
@@ -151,6 +169,7 @@ function traceMarkLights()
   emit("rlight_mark_lights", "R_MarkLights", 0, "surface_mark", "[" + frames[0] + "," + bits[0] + "]")
 end function
 
+// Trace push dlights through the collision world.
 function tracePushDlights()
   world = fixtureWorld(true)
   bits = [0]
@@ -159,10 +178,12 @@ function tracePushDlights()
   emit("rlight_push_dlights", "R_PushDlights", 0, "surface_mark", "[" + frames[0] + "," + bits[0] + ",8]")
 end function
 
+// Exercise light styles as part of this deterministic regression fixture.
 function lightStyles()
   return rlight.R_AnimateLight(["az", "mmn"], 0.1)
 end function
 
+// Trace recursive light point through the collision world.
 function traceRecursiveLightPoint()
   world = fixtureWorld(true)
   result = rlight.RecursiveLightPoint(
@@ -172,6 +193,7 @@ function traceRecursiveLightPoint()
   emit("rlight_recursive_light_point", "RecursiveLightPoint", 0, "light_point", "[" + result[0] + "," + vecArguments(result[1]) + "," + vecArguments(result[2].normal) + "," + jsonNumber(result[2].dist) + "]")
 end function
 
+// Trace light point through the collision world.
 function traceLightPoint()
   world = fixtureWorld(true)
   result = rlight.R_LightPoint(
@@ -180,6 +202,7 @@ function traceLightPoint()
   emit("rlight_light_point", "R_LightPoint", 0, "light_point", "[" + result[0] + "," + vecArguments(result[1]) + "," + vecArguments(result[2].normal) + "," + jsonNumber(result[2].dist) + "]")
 end function
 
+// Trace light point no data through the collision world.
 function traceLightPointNoData()
   world = fixtureWorld(false)
   result = rlight.R_LightPoint(
@@ -188,6 +211,7 @@ function traceLightPointNoData()
   emit("rlight_light_point_no_data", "R_LightPoint", 0, "light_point", "[" + result[0] + "]")
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   traceAnimate()
   traceBlend()

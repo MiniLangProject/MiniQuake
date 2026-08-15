@@ -1,16 +1,17 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 MiniLang pendant for WinQuake/crc.c and crc.h.
 */
-
 package miniquake.crc
 
 const CRC_INIT_VALUE = 0xffff
 const CRC_XOR_VALUE = 0x0000
 const CRC_POLYNOMIAL = 0x1021
 
+// Compute crc init.
 function inline CRC_Init()
   return CRC_INIT_VALUE
 end function
@@ -31,10 +32,12 @@ function CRC_ProcessByte(crcValue, data)
   return value
 end function
 
+// Compute crc value.
 function CRC_Value(crcValue)
   return (crcValue ^ CRC_XOR_VALUE) & 0xffff
 end function
 
+// Compute crc block.
 function CRC_Block(data, offset, count)
   if typeof(data) != "bytes" then return error(1100, "CRC input must be bytes") end if
   if offset < 0 or count < 0 or offset > len(data) or count > len(data) - offset then
@@ -54,6 +57,7 @@ function processByte(value, data)
   return CRC_ProcessByte(value, data)
 end function
 
+// Provide block behavior for the active subsystem.
 function block(data, offset, count)
   return CRC_Block(data, offset, count)
 end function

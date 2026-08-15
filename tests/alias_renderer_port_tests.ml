@@ -1,26 +1,29 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Production-path branch tests for the alias/viewmodel part of gl_rmain.c.
 */
-
 import miniquake.types as t
 import miniquake.render.entities as entities
 import miniquake.render.gl11 as gl
 import miniquake.render.world as renderWorld
 import miniquake.render.alias_mesh as aliasMesh
 
+// Assert that the condition holds and identify a failing test.
 function require(value, name)
   if not value then return error(9950, name) end if
   return true
 end function
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(9951, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Return count command for the active module state.
 function countCommand(commands, name)
   count = 0
   for each command in commands
@@ -29,6 +32,7 @@ function countCommand(commands, name)
   return count
 end function
 
+// Return first texture for the active module state.
 function firstTexture(commands)
   for each command in commands
     if command[0] == "bind_texture" and len(command[1]) > 1 then return command[1][1] end if
@@ -36,6 +40,16 @@ function firstTexture(commands)
   return -1
 end function
 
+// Return last blend function for the active module state.
+function lastBlendFunction(commands)
+  result = []
+  for each command in commands
+    if command[0] == "blend_function" then result = command[1] end if
+  end for
+  return result
+end function
+
+// Report whether translate z.
 function hasTranslateZ(commands, expected)
   for each command in commands
     if command[0] == "translate" and len(command[1]) >= 3 and command[1][2] == expected then return true end if
@@ -43,6 +57,7 @@ function hasTranslateZ(commands, expected)
   return false
 end function
 
+// Exercise alias source as part of this deterministic regression fixture.
 function aliasSource(name)
   frame0 = t.MdlFrame("idle0", t.MdlVertex(0, 0, 0, 0), t.MdlVertex(2, 2, 1, 0), [
     t.MdlVertex(0, 0, 0, 0),
@@ -69,10 +84,12 @@ function aliasSource(name)
   )
 end function
 
+// Exercise alias model as part of this deterministic regression fixture.
 function aliasModel(name)
-  return t.ClientRenderModel(name, entities.MODEL_ALIAS, aliasSource(name), void, [[11, 12, 13, 14]], true)
+  return t.ClientRenderModel(name, entities.MODEL_ALIAS, aliasSource(name), void, void, [[11, 12, 13, 14]], true)
 end function
 
+// Exercise alias entity as part of this deterministic regression fixture.
 function aliasEntity(number, modelIndex, frame, colormap)
   return t.ClientEntityState(
     number, modelIndex, frame, colormap, 0, 0,
@@ -83,14 +100,16 @@ function aliasEntity(number, modelIndex, frame, colormap)
   )
 end function
 
+// Exercise sprite model as part of this deterministic regression fixture.
 function spriteModel()
   frame = t.SpriteFrame(1.0, 1.0, 2, 2, bytes(4))
   source = t.SpriteModel("progs/fixture.spr", bytes(), 1, 0, 2.0, 2, 2, 1, 0.0, 0, [
     t.SpriteFrameSet(false, [], [frame]),
   ])
-  return t.ClientRenderModel(source.filename, entities.MODEL_SPRITE, void, source, [[22]], true)
+  return t.ClientRenderModel(source.filename, entities.MODEL_SPRITE, void, source, void, [[22]], true)
 end function
 
+// Verify frame selection against the expected Quake behavior.
 function testFrameSelection()
   source = aliasSource("progs/fixture.mdl")
   equal(entities.aliasFrame(source, -1, 0.0).name, "idle0", "negative frame falls back")
@@ -100,6 +119,7 @@ function testFrameSelection()
   return true
 end function
 
+// Verify alias state branches against the expected Quake behavior.
 function testAliasStateBranches()
   palette = bytes(768)
   renderer = t.EntityRenderer(void, palette, [void, aliasModel("progs/fixture.mdl")], 0)
@@ -154,6 +174,7 @@ function testAliasStateBranches()
   return true
 end function
 
+// Verify opaque then sprite ordering against the expected Quake behavior.
 function testOpaqueThenSpriteOrdering()
   alias = aliasModel("progs/fixture.mdl")
   sprite = spriteModel()
@@ -177,6 +198,7 @@ function testOpaqueThenSpriteOrdering()
   return true
 end function
 
+// Verify production projection depth against the expected Quake behavior.
 function testProductionProjectionDepth()
   gl.Trace_Begin()
   renderWorld.setupViewRect(
@@ -194,6 +216,7 @@ function testProductionProjectionDepth()
   return error(9952, "production setupViewRect did not emit a frustum")
 end function
 
+// Verify mesh termination and cache branches against the expected Quake behavior.
 function testMeshTerminationAndCacheBranches()
   model = aliasSource("progs/cache-branch.mdl")
   model.texCoords = [
@@ -221,17 +244,79 @@ function testMeshTerminationAndCacheBranches()
   return true
 end function
 
+// Exercise external brush renderer as part of this deterministic regression fixture.
+function externalBrushRenderer()
+  normal = t.Vec3(1.0, 0.0, 0.0)
+  plane = t.BspPlane(normal, 0.0, 0)
+  face = t.BspFace(0, 0, 0, 3, 0, bytes([0, 255, 255, 255]), 0)
+  info = t.BspTexInfo([0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], 0, 0)
+  texture = t.BspTexture("medkit", 16, 16, [0, 0, 0, 0], bytes(256, 32))
+  vertices = [
+    t.BspVertex(t.Vec3(0.0, -8.0, -8.0)),
+    t.BspVertex(t.Vec3(0.0, 8.0, -8.0)),
+    t.BspVertex(t.Vec3(0.0, 0.0, 8.0)),
+  ]
+  edges = [t.BspEdge(0, 1), t.BspEdge(1, 2), t.BspEdge(2, 0)]
+  model = t.BspModel(
+    t.Vec3(0.0, -8.0, -8.0), t.Vec3(0.0, 8.0, 8.0),
+    t.Vec3(0.0, 0.0, 0.0), [0, 0, 0, 0], 0, 0, 1,
+  )
+  map = t.BspMap(
+    "maps/b_bh25.bsp", bytes(), 29, [], "", [], [plane], [texture], vertices,
+    bytes(), [], [info], [face], bytes([64, 64, 64, 64]), [], [], [], edges,
+    [0, 1, 2], [model],
+  )
+  palette = bytes(768, 64)
+  return renderWorld.createExternal(map, palette)
+end function
+
+// Verify external brush draw path against the expected Quake behavior.
+function testExternalBrushDrawPath()
+  brush = externalBrushRenderer()
+  model = t.ClientRenderModel("maps/b_bh25.bsp", entities.MODEL_BRUSH, void, void, brush, [], false)
+  entity = aliasEntity(9, 1, 0, 0)
+  entity.origin = t.Vec3(0.0, 0.0, 0.0)
+  entity.angles = t.Vec3(0.0, 0.0, 0.0)
+  activeWorld = t.WorldRenderer(void, bytes(), [], [], [], true, 0, false, false, 0, bytes(), 0, 1.0)
+  renderWorld.R_ConfigureWorldCompatibility(
+    activeWorld,
+    t.Vec3(10.0, 0.0, 0.0),
+    t.Vec3(0.0, 0.0, 0.0),
+    t.Vec3(1.0, 0.0, 0.0),
+    t.Vec3(0.0, -1.0, 0.0),
+    t.Vec3(0.0, 0.0, 1.0),
+    [], [], [0.0, 0.0, 0.0, 0.0], 0.0, 0.0, 0.0,
+    true, true, false,
+  )
+  gl.Trace_Begin()
+  drawn = entities.drawBrush(activeWorld, model, entity, 0.0)
+  commands = gl.Trace_End()
+  equal(drawn, 1, "external BSP visible face")
+  equal(countCommand(commands, "upload_luminance"), 1, "external BSP lightmap upload")
+  equal(countCommand(commands, "begin"), 2, "external BSP base and light passes")
+  equal(countCommand(commands, "blend_function"), 2, "external BSP light blend and state restore")
+  restoredBlend = lastBlendFunction(commands)
+  equal(len(restoredBlend), 2, "external BSP restored blend arity")
+  equal(restoredBlend[0], gl.GL_SRC_ALPHA, "external BSP restored source blend")
+  equal(restoredBlend[1], gl.GL_ONE_MINUS_SRC_ALPHA, "external BSP restored destination blend")
+  require(countCommand(commands, "bind_texture") >= 2, "external BSP binds base and lightmap")
+  return true
+end function
+
+// Parse command-line arguments and run the selected operation.
 function main(args)
   testFrameSelection()
-  print "[1/5] alias frame selection"
+  print "[1/6] alias frame selection"
   testAliasStateBranches()
-  print "[2/5] alias GL state / lighting branches"
+  print "[2/6] alias GL state / lighting branches"
   testOpaqueThenSpriteOrdering()
-  print "[3/5] opaque then sprite ordering"
+  print "[3/6] opaque then sprite ordering"
   testProductionProjectionDepth()
-  print "[4/5] production projection depth range"
+  print "[4/6] production projection depth range"
   testMeshTerminationAndCacheBranches()
-  print "[5/5] mesh termination and cache branches"
+  print "[5/6] mesh termination and cache branches"
+  testExternalBrushDrawPath()
+  print "[6/6] external BSP pickup draw path"
   print "Alias renderer port tests passed."
   return 0
 end function

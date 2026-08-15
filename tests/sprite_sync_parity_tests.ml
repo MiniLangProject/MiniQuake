@@ -1,5 +1,9 @@
-/* BP-046: sprite ST_SYNC/ST_RAND and entity syncbase parity. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
+BP-046: sprite ST_SYNC/ST_RAND and entity syncbase parity.
+*/
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.client as client
@@ -7,45 +11,54 @@ import miniquake.particles as particles
 import miniquake.native as native
 import miniquake.render.entities as entities
 
+// Assert that the condition holds and identify a failing test.
 function bp046Yes(value, name)
   if not value then return error(4600, name + ": expected true") end if
   return true
 end function
+// Assert exact equality and report both values on failure.
 function bp046Equal(actual, expected, name)
   if actual != expected then return error(4601, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
+// Execute one named test case and record its pass/fail result.
 function bp046Run(number, name, fn)
   print "[" + number + "/22] " + name
   result = try(fn())
   if result is error then print "FAIL: " + result.message; return false end if
   return true
 end function
+// Exercise the entity test scenario and verify its expected result.
 function bp046Entity(modelIndex)
   zero = t.Vec3(0.0, 0.0, 0.0)
   return t.ClientEntityState(1, modelIndex, 0, 0, 0, 0, zero, zero, 0.0, zero, zero, zero, zero, false, void, 0.0)
 end function
+// Exercise the sprite test scenario and verify its expected result.
 function bp046Sprite(syncType)
   first = t.SpriteFrame(0.0, 1.0, 1, 1, bytes(1))
   second = t.SpriteFrame(0.0, 1.0, 1, 1, bytes(1))
   set = t.SpriteFrameSet(true, [0.1, 0.2], [first, second])
   source = t.SpriteModel("fixture.spr", bytes(), 1, 0, 1.0, 1, 1, 1, 0.0, syncType, [set])
-  return t.ClientRenderModel("fixture.spr", entities.MODEL_SPRITE, void, source, [[101, 102]], true)
+  return t.ClientRenderModel("fixture.spr", entities.MODEL_SPRITE, void, source, void, [[101, 102]], true)
 end function
 
+// Update module state for types.
 function bp046SetTypes()
   bp046Equal(client.CL_SetModelSyncTypes([c.ST_SYNC, c.ST_RAND, c.ST_SYNC]), 3, "sync type count")
   return true
 end function
+// Read and validate types.
 function bp046ReadTypes()
   types = client.CL_ModelSyncTypes()
   bp046Equal(types[1], c.ST_RAND, "sync type value")
   return true
 end function
+// Exercise the unknown type test scenario and verify its expected result.
 function bp046UnknownType()
   bp046Equal(client.modelSyncTypeForIndex(99), c.ST_SYNC, "unknown model sync")
   return true
 end function
+// Update module state for model.
 function bp046SyncModel()
   client.CL_SetModelSyncTypes([c.ST_SYNC, c.ST_SYNC])
   entity = bp046Entity(1)
@@ -54,6 +67,7 @@ function bp046SyncModel()
   bp046Equal(native.floatBits(entity.syncBase), 0, "ST_SYNC base")
   return true
 end function
+// Exercise the rand first test scenario and verify its expected result.
 function bp046RandFirst()
   particles.resetRandom(1)
   client.CL_SetModelSyncTypes([c.ST_SYNC, c.ST_RAND])
@@ -62,6 +76,7 @@ function bp046RandFirst()
   bp046Equal(native.floatBits(entity.syncBase), 0x3aa40148, "first random syncbase")
   return true
 end function
+// Exercise the rand second test scenario and verify its expected result.
 function bp046RandSecond()
   particles.resetRandom(1)
   particles.compatRand()
@@ -71,6 +86,7 @@ function bp046RandSecond()
   bp046Equal(native.floatBits(entity.syncBase), 0x3f104721, "second random syncbase")
   return true
 end function
+// Exercise the same model preserves test scenario and verify its expected result.
 function bp046SameModelPreserves()
   client.CL_SetModelSyncTypes([c.ST_SYNC, c.ST_RAND])
   entity = bp046Entity(1)
@@ -79,6 +95,7 @@ function bp046SameModelPreserves()
   bp046Equal(entity.syncBase, 0.25, "same model preserves")
   return true
 end function
+// Exercise the null model resets test scenario and verify its expected result.
 function bp046NullModelResets()
   entity = bp046Entity(0)
   entity.syncBase = 0.25
@@ -86,22 +103,27 @@ function bp046NullModelResets()
   bp046Equal(entity.syncBase, 0.0, "null model resets")
   return true
 end function
+// Exercise the cycle first test scenario and verify its expected result.
 function bp046CycleFirst()
   bp046Equal(entities.cycleIndex([0.1, 0.2], 0.05, 2), 0, "cycle first")
   return true
 end function
+// Exercise the cycle second test scenario and verify its expected result.
 function bp046CycleSecond()
   bp046Equal(entities.cycleIndex([0.1, 0.2], 0.15, 2), 1, "cycle second")
   return true
 end function
+// Exercise the cycle wrap test scenario and verify its expected result.
 function bp046CycleWrap()
   bp046Equal(entities.cycleIndex([0.1, 0.2], 0.25, 2), 0, "cycle wrap")
   return true
 end function
+// Exercise the cycle exact boundary test scenario and verify its expected result.
 function bp046CycleExactBoundary()
   bp046Equal(entities.cycleIndex([0.1, 0.2], 0.1, 2), 1, "cycle exact boundary")
   return true
 end function
+// Exercise the sprite sync base first test scenario and verify its expected result.
 function bp046SpriteSyncBaseFirst()
   model = bp046Sprite(c.ST_RAND)
   entity = bp046Entity(1)
@@ -110,6 +132,7 @@ function bp046SpriteSyncBaseFirst()
   bp046Equal(selected[1], 101, "sprite first texture")
   return true
 end function
+// Exercise the sprite sync base second test scenario and verify its expected result.
 function bp046SpriteSyncBaseSecond()
   model = bp046Sprite(c.ST_RAND)
   entity = bp046Entity(1)
@@ -118,6 +141,7 @@ function bp046SpriteSyncBaseSecond()
   bp046Equal(selected[1], 102, "sprite syncbase texture")
   return true
 end function
+// Exercise the sprite wrap test scenario and verify its expected result.
 function bp046SpriteWrap()
   model = bp046Sprite(c.ST_RAND)
   entity = bp046Entity(1)
@@ -126,32 +150,39 @@ function bp046SpriteWrap()
   bp046Equal(selected[1], 101, "sprite wrapped texture")
   return true
 end function
+// Exercise the single cycle test scenario and verify its expected result.
 function bp046SingleCycle()
   bp046Equal(entities.cycleIndex([], 9.0, 1), 0, "single cycle")
   return true
 end function
+// Exercise the empty intervals test scenario and verify its expected result.
 function bp046EmptyIntervals()
   bp046Equal(entities.cycleIndex([], 9.0, 2), 0, "empty intervals")
   return true
 end function
+// Exercise the zero interval test scenario and verify its expected result.
 function bp046ZeroInterval()
   bp046Equal(entities.cycleIndex([0.0], 9.0, 2), 0, "zero interval")
   return true
 end function
+// Exercise the negative time test scenario and verify its expected result.
 function bp046NegativeTime()
   bp046Equal(entities.cycleIndex([0.1, 0.2], -0.05, 2), 0, "negative time compatibility")
   return true
 end function
+// Update module state for type constants.
 function bp046SyncTypeConstants()
   bp046Equal(c.ST_SYNC, 0, "ST_SYNC")
   bp046Equal(c.ST_RAND, 1, "ST_RAND")
   return true
 end function
+// Return first rand word for the active module state.
 function bp046FirstRandWord()
   particles.resetRandom(1)
   bp046Equal(particles.compatRand(), 41, "first MSVCRT rand")
   return true
 end function
+// Exercise the second rand word test scenario and verify its expected result.
 function bp046SecondRandWord()
   particles.resetRandom(1)
   particles.compatRand()

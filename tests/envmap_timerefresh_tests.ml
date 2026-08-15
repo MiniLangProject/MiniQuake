@@ -1,103 +1,129 @@
-/* BP-052: MiniQuake envmap and timerefresh special paths. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+BP-052: MiniQuake envmap and timerefresh special paths.
+*/
 import miniquake.render.special_paths as bp052Special
 import miniquake.render.gl_rmisc as bp052Rmisc
 import miniquake.native as bp052Native
 import miniquake.types as bp052Types
 
+// Assert exact equality and report both values on failure.
 function bp052Equal(actual, expected, name)
   if actual != expected then return error(5200, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
+// Assert that the condition holds and identify a failing test.
 function bp052Yes(value, name)
   if not value then return error(5201, name + ": expected true") end if
   return true
 end function
+// Assert floating-point equality within the requested tolerance.
 function bp052Near(actual, expected, tolerance, name)
   delta = actual - expected
   if delta < 0.0 then delta = -delta end if
   if delta > tolerance then return error(5202, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
+// Execute one named test case and record its pass/fail result.
 function bp052Run(number, name, fn)
   print "[" + number + "/20] " + name
   result = try(fn())
   if result is error then print "FAIL: " + result.message; return false end if
   return true
 end function
+// Exercise the direction count test scenario and verify its expected result.
 function bp052DirectionCount()
   bp052Equal(len(bp052Special.envmapDirections()), 6, "direction count")
   return true
 end function
+// Exercise the direction front test scenario and verify its expected result.
 function bp052DirectionFront()
   value = bp052Special.envmapDirections()[0]
   bp052Equal(value.x, 0.0, "front pitch")
   bp052Equal(value.y, 0.0, "front yaw")
   return true
 end function
+// Exercise the direction right test scenario and verify its expected result.
 function bp052DirectionRight()
   value = bp052Special.envmapDirections()[1]
   bp052Equal(value.y, 90.0, "right yaw")
   return true
 end function
+// Exercise the direction back test scenario and verify its expected result.
 function bp052DirectionBack()
   value = bp052Special.envmapDirections()[2]
   bp052Equal(value.y, 180.0, "back yaw")
   return true
 end function
+// Exercise the direction left test scenario and verify its expected result.
 function bp052DirectionLeft()
   value = bp052Special.envmapDirections()[3]
   bp052Equal(value.y, 270.0, "left yaw")
   return true
 end function
+// Exercise the direction up test scenario and verify its expected result.
 function bp052DirectionUp()
   value = bp052Special.envmapDirections()[4]
   bp052Equal(value.x, -90.0, "up pitch")
   return true
 end function
+// Exercise the direction down test scenario and verify its expected result.
 function bp052DirectionDown()
   value = bp052Special.envmapDirections()[5]
   bp052Equal(value.x, 90.0, "down pitch")
   return true
 end function
+// Exercise the byte count test scenario and verify its expected result.
 function bp052ByteCount()
   bp052Equal(bp052Special.envmapByteCount(), 262144, "envmap bytes")
   return true
 end function
+// Exercise the file zero test scenario and verify its expected result.
 function bp052FileZero()
   bp052Equal(bp052Special.envmapFileName(0), "env0.rgb", "envmap file zero")
   return true
 end function
+// Exercise the file five test scenario and verify its expected result.
 function bp052FileFive()
   bp052Equal(bp052Special.envmapFileName(5), "env5.rgb", "envmap file five")
   return true
 end function
+// Exercise the yaw zero test scenario and verify its expected result.
 function bp052YawZero()
   bp052Equal(bp052Special.timeRefreshYaw(0), 0.0, "yaw zero")
   return true
 end function
+// Exercise the yaw quarter test scenario and verify its expected result.
 function bp052YawQuarter()
   bp052Near(bp052Special.timeRefreshYaw(32), 90.0, 0.0001, "yaw quarter")
   return true
 end function
+// Exercise the yaw half test scenario and verify its expected result.
 function bp052YawHalf()
   bp052Near(bp052Special.timeRefreshYaw(64), 180.0, 0.0001, "yaw half")
   return true
 end function
+// Exercise the yaw last test scenario and verify its expected result.
 function bp052YawLast()
   bp052Near(bp052Special.timeRefreshYaw(127), 357.1875, 0.0001, "yaw last")
   return true
 end function
+// Exercise the result test scenario and verify its expected result.
 function bp052Result()
   value = bp052Special.timeRefreshResult(2.0)
   bp052Equal(value[0], 2.0, "refresh seconds")
   bp052Equal(value[1], 64.0, "refresh fps")
   return true
 end function
+// Exercise the result error test scenario and verify its expected result.
 function bp052ResultError()
   value = try(bp052Special.timeRefreshResult(0.0))
   bp052Yes(value is error, "non-positive duration")
   return true
 end function
+// Exercise the angle list test scenario and verify its expected result.
 function bp052AngleList()
   values = bp052Special.timeRefreshAngles(bp052Types.Vec3(5.0, 7.0, 9.0))
   bp052Equal(len(values), 128, "angle count")
@@ -105,6 +131,7 @@ function bp052AngleList()
   bp052Equal(values[127].z, 9.0, "roll preserved")
   return true
 end function
+// Exercise the rmisc envmap test scenario and verify its expected result.
 function bp052RmiscEnvmap()
   bp052Rmisc.ResetCompatibility()
   directions = bp052Rmisc.R_Envmap_f()
@@ -115,6 +142,7 @@ function bp052RmiscEnvmap()
   bp052Equal(state[3], 1, "rmisc end rendering")
   return true
 end function
+// Exercise the rmisc time refresh test scenario and verify its expected result.
 function bp052RmiscTimeRefresh()
   bp052Rmisc.ResetCompatibility()
   value = bp052Rmisc.R_TimeRefresh_f()
@@ -125,6 +153,7 @@ function bp052RmiscTimeRefresh()
   bp052Near(state[1], 357.1875, 0.0001, "rmisc last yaw")
   return true
 end function
+// Exercise the binary32 last yaw test scenario and verify its expected result.
 function bp052Binary32LastYaw()
   bp052Equal(bp052Native.floatBits(bp052Special.timeRefreshYaw(127)), bp052Native.floatBits(357.1875), "last yaw bits")
   return true

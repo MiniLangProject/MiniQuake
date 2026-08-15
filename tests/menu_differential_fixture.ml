@@ -1,13 +1,21 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/menu_differential_fixture.ml.
+*/
 import miniquake.menu as menu
 import miniquake.keys as keys
 import miniquake.common as common
 import miniquake.host as host
 import miniquake.net_loop as netloop
 
+// Add the requested value to the destination state.
 function emit(name)
   print "{\"function\":\"" + name + "\",\"scene\":\"execute\",\"executed\":1}"
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   state = menu.create()
   registry = host.createCvars(common.create([]), true)

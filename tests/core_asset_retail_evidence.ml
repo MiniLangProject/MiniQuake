@@ -1,4 +1,9 @@
-/* BP-074 retail-data evidence: reads but never copies Quake assets. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+BP-074 retail-data evidence: reads but never copies Quake assets.
+*/
 import miniquake.filesystem as qfs
 import miniquake.crc as crc
 import miniquake.wad as wad
@@ -6,10 +11,12 @@ import miniquake.format.bsp as bsp
 import miniquake.format.mdl as mdl
 import miniquake.format.progs as progs
 
+// Exercise the evidence line test scenario and verify its expected result.
 function bp074EvidenceLine(name,data)
   return name+"|bytes="+len(data)+"|crc="+crc.CRC_Block(data,0,len(data))
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   if len(args)<1 then print "usage: MiniQuakeCoreAssetRetailEvidence.exe BASE [game]"; return 2 end if
   game="id1"; if len(args)>1 then game=args[1] end if

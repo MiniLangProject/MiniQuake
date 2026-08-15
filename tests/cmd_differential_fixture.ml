@@ -1,19 +1,28 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/cmd_differential_fixture.ml.
+*/
 import miniquake.cmd as cmd
 import miniquake.sizebuf as sz
 
 callbackCalls = 0
 
+// Exercise bool text as part of this deterministic regression fixture.
 function boolText(value)
   if value then return "true" end if
   return "false"
 end function
 
+// Exercise mark callback as part of this deterministic regression fixture.
 function markCallback(arguments)
   global callbackCalls
   callbackCalls = callbackCalls + 1
   return true
 end function
 
+// Exercise repeated as part of this deterministic regression fixture.
 function repeated(value, count)
   result = ""
   index = 0
@@ -24,7 +33,9 @@ function repeated(value, count)
   return result
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   global callbackCalls
   waitSystem = cmd.create()
   cmd.Cmd_Wait_f(waitSystem)

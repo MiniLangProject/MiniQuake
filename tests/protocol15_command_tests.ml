@@ -1,13 +1,13 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-011 Protocol-15 signon, client/server command-stream and fast entity-update
 fixtures. Golden bytes are generated independently by the C oracle in
- tools/oracle/protocol15_commands_oracle.c and the Python model in
- tools/check_protocol15_commands.py.
+tools/oracle/protocol15_commands_oracle.c and the Python model in
+tools/check_protocol15_commands.py.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.sizebuf as sz
@@ -22,25 +22,30 @@ import miniquake.sv_main as svmain
 import miniquake.edict as edict
 import miniquake.player_move as movement
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9400, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9401, name + ": expected true") end if
   return true
 end function
 
+// Exercise assert false as part of this deterministic regression fixture.
 function assertFalse(value, name)
   if value != false then return error(9402, name + ": expected false") end if
   return true
 end function
 
+// Exercise assert hex as part of this deterministic regression fixture.
 function assertHex(data, expected, name)
   return assertEqual(hex(data), expected, name)
 end function
 
+// Execute one named test case and record its pass/fail result.
 function runTest(number, name, fn)
   print "  [" + number + "/14] " + name
   result = try(fn())
@@ -51,6 +56,7 @@ function runTest(number, name, fn)
   return true
 end function
 
+// Return baseline state derived from the active module state.
 function baselineState()
   return t.EntityBaseline(
     1,
@@ -63,14 +69,17 @@ function baselineState()
   )
 end function
 
+// Return full origin derived from the active module state.
 function fullOrigin()
   return t.Vec3(11.25, 18.75, 31.5)
 end function
 
+// Return full angles derived from the active module state.
 function fullAngles()
   return t.Vec3(12.0, 90.0, -45.0)
 end function
 
+// Verify client signon replies against the expected Quake behavior.
 function testClientSignonReplies()
   first = sz.alloc(128)
   assertEqual(signon.writeClientReply(first, c.SIGNON_SERVERINFO, "Ranger", 0x4d, "1 2 3"), 10, "stage one bytes")
@@ -90,6 +99,7 @@ function testClientSignonReplies()
   return true
 end function
 
+// Verify server signon stages against the expected Quake behavior.
 function testServerSignonStages()
   markers = sz.alloc(16)
   msg.writeByte(markers, c.SVC_SIGNONNUM); msg.writeByte(markers, c.SIGNON_SERVERINFO)
@@ -106,6 +116,7 @@ function testServerSignonStages()
   return true
 end function
 
+// Verify clc compound stream against the expected Quake behavior.
 function testClcCompoundStream()
   command = t.UserCommand(
     t.Vec3(12.75, 180.0, -90.9),
@@ -137,6 +148,7 @@ function testClcCompoundStream()
   return true
 end function
 
+// Verify clc disconnect against the expected Quake behavior.
 function testClcDisconnect()
   assertHex(bytes([c.CLC_DISCONNECT]), "02", "clc_disconnect")
   gameServer = server.create(1)
@@ -148,6 +160,7 @@ function testClcDisconnect()
   return true
 end function
 
+// Verify signed client end of message against the expected Quake behavior.
 function testSignedClientEndOfMessage()
   assertHex(bytes([0xff]), "ff", "clc_signed_eom")
   gameServer = server.create(1)
@@ -159,6 +172,7 @@ function testSignedClientEndOfMessage()
   return true
 end function
 
+// Verify malformed client commands against the expected Quake behavior.
 function testMalformedClientCommands()
   gameServer = server.create(1)
   serverClient = gameServer.clients[0]
@@ -175,6 +189,7 @@ function testMalformedClientCommands()
   return true
 end function
 
+// Verify effects aware fast update against the expected Quake behavior.
 function testEffectsAwareFastUpdate()
   baseline = baselineState()
   unchanged = sz.alloc(64)
@@ -196,6 +211,7 @@ function testEffectsAwareFastUpdate()
   return true
 end function
 
+// Verify step no lerp update against the expected Quake behavior.
 function testStepNoLerpUpdate()
   baseline = baselineState()
   buffer = sz.alloc(64)
@@ -208,6 +224,7 @@ function testStepNoLerpUpdate()
   return true
 end function
 
+// Verify full short fast update against the expected Quake behavior.
 function testFullShortFastUpdate()
   baseline = baselineState()
   buffer = sz.alloc(128)
@@ -225,6 +242,7 @@ function testFullShortFastUpdate()
   return true
 end function
 
+// Verify full long fast update against the expected Quake behavior.
 function testFullLongFastUpdate()
   baseline = baselineState()
   buffer = sz.alloc(128)
@@ -238,6 +256,7 @@ function testFullLongFastUpdate()
   return true
 end function
 
+// Verify svc catalog against the expected Quake behavior.
 function testSvcCatalog()
   encoded = "0102030240e20100040f00000005010006001100010800100018000700004841087072696e740a00096563686f20666978747572650a000a0740e00b0f00000001007374617274006d6170732f73746172742e6273700070726f67732f706c617965722e6d646c00006d6973632f6d656e75312e77617600000c006d000d0052616e676572000e0007000f0040785634120264000a0b0c0d0e0110110011004d1208001000180001fe0304051301022000280030001401020000080000100040180080160200010200000800001000401800801700380040004800180119011a63656e746572001b1c1d08001000180001ff401e1f66696e616c650020030321226375747363656e65008001"
   data = fromHex(encoded)
@@ -263,6 +282,7 @@ function testSvcCatalog()
   return true
 end function
 
+// Verify malformed server commands against the expected Quake behavior.
 function testMalformedServerCommands()
   reserved = try(protocol.parse(bytes([c.SVC_SPAWNBINARY])))
   assertTrue(reserved is error, "reserved svc_spawnbinary rejected")
@@ -273,6 +293,7 @@ function testMalformedServerCommands()
   return true
 end function
 
+// Verify first update completes signon against the expected Quake behavior.
 function testFirstUpdateCompletesSignon()
   player = movement.create(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
   localClient = client.create(player)
@@ -287,6 +308,7 @@ function testFirstUpdateCompletesSignon()
   return true
 end function
 
+// Verify shared production entity writer against the expected Quake behavior.
 function testSharedProductionEntityWriter()
   baseline = baselineState()
   item = edict.create(1)
@@ -313,6 +335,7 @@ function testSharedProductionEntityWriter()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "MiniQuake BP-011 Protocol 15 command tests"
   passed = 0

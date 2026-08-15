@@ -1,5 +1,7 @@
 /*
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Frozen WinQuake 1.09 audio compatibility contract.  The contract binds the
 observable software mixer, channel, DMA ring and CD-command semantics while
@@ -32,14 +34,17 @@ const DISTINCT_RING_REGIONS = 1
 const QUAKE_ATOI_CD = 1
 const RETAIL_EVIDENCE_SOUNDS = 2
 
+// Return the stable compatibility-contract status string.
 function inline status()
   return STATUS
 end function
 
+// Return the stable compatibility-contract fingerprint.
 function inline fingerprint()
   return FINGERPRINT
 end function
 
+// Return constants for the active module state.
 function constants()
   return [
     MAX_SFX,
@@ -62,6 +67,7 @@ function constants()
   ]
 end function
 
+// Validate the requested value and report any invalid state.
 function verify()
   if dma.MAX_SFX != MAX_SFX then return false end if
   if dma.MAX_CHANNELS != MAX_CHANNELS then return false end if

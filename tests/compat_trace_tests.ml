@@ -1,12 +1,12 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-001R3 deterministic-diagnostics unit tests. These tests require no Quake game
 assets and exercise the canonical hashing, JSON escaping and host checkpoint
 contract that the Windows acceptance test later uses with real id1 data.
 */
-
 import miniquake.types as t
 import miniquake.host as host
 import miniquake.client as client
@@ -17,16 +17,19 @@ import miniquake.constants as c
 import miniquake.compat_trace as trace
 import miniquake.compat_diagnostics as diagnostics
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9200, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9201, name + ": expected true") end if
   return true
 end function
 
+// Execute one named test case and record its pass/fail result.
 function runTest(number, name, fn)
   print "  [" + number + "/10] " + name
   result = try(fn())
@@ -37,18 +40,21 @@ function runTest(number, name, fn)
   return true
 end function
 
+// Verify fnv against the expected Quake behavior.
 function testFnv()
   assertEqual(trace.hashText("hello"), 0x4f9f2cab, "FNV-1a hello")
   assertEqual(trace.hashText("hello"), trace.hashText("hello"), "stable FNV")
   return true
 end function
 
+// Verify json escape against the expected Quake behavior.
 function testJsonEscape()
   assertEqual(diagnostics.jsonEscape("a\"b\\c\n"), "a\\\"b\\\\c\\n", "JSON escape")
   assertEqual(diagnostics.jsonString("quake"), "\"quake\"", "JSON string")
   return true
 end function
 
+// Verify float hex against the expected Quake behavior.
 function testFloatHex()
   assertEqual(diagnostics.f32Hex(0.0), "00000000", "zero float bits")
   assertEqual(diagnostics.f32Hex(12.5), "41480000", "12.5 float bits")
@@ -56,10 +62,12 @@ function testFloatHex()
   return true
 end function
 
+// Create and initialize session.
 function makeSession()
   return host.create(["-headless", "-nosound", "-nolan"])
 end function
 
+// Update module state for field definitions.
 function bp001SyncFieldDefinitions()
   return [
     t.QuakeCDef(c.EV_STRING, 0, 0, "classname"),
@@ -83,6 +91,7 @@ function bp001SyncFieldDefinitions()
   ]
 end function
 
+// Create and initialize sync machine.
 function bp001MakeSyncMachine(entityCount)
   dummy = t.QuakeCFunction(0, 0, 0, 0, "", "", 0, [])
   program = t.QuakeCProgram(
@@ -101,6 +110,7 @@ function bp001MakeSyncMachine(entityCount)
   return vm.create(program, entityCount)
 end function
 
+// Exercise the populate sync machine test scenario and verify its expected result.
 function bp001PopulateSyncMachine(machine, entityCount)
   index = 0
   while index < entityCount
@@ -131,6 +141,7 @@ function bp001PopulateSyncMachine(machine, entityCount)
   return true
 end function
 
+// Verify synchronized edict gc roots against the expected Quake behavior.
 function bp001TestSynchronizedEdictGcRoots()
   // e1m2 exposed the remaining bug with 227 server edicts after more than
   // fifty otherwise identical frames.  Reproduce that scale and duration
@@ -212,11 +223,31 @@ function bp001TestSynchronizedEdictGcRoots()
   assertEqual(synchronizedCount, entityCount, "freed tail keeps high-water mark")
   assertEqual(len(game.edicts), entityCount, "freed tail keeps stable array length")
 
+  // Stock pickup QuakeC hides an item with `self.model = string_null` while
+  // deliberately retaining modelindex for a possible later respawn. The
+  // frame-local snapshot mirror must preserve this two-field distinction or
+  // SV_WriteEntitiesToClient keeps sending the already collected item.
+  runtime.freeFlags[77] = false
+  machine.edictFree[77] = false
+  vm.setEntityFloat(machine, 77, 2, 5.0)
+  vm.setEntityString(machine, 77, 1, "progs/g_rock2.mdl")
+  serverRuntime.syncQuakeCSnapshotEdicts(game)
+  assertEqual(game.edicts[77].model, "progs/g_rock2.mdl", "pickup model enters snapshot")
+  assertEqual(game.edicts[77].modelIndex, 5, "pickup modelindex enters snapshot")
+  vm.setEntityField(machine, 77, 1, 0)
+  serverRuntime.syncQuakeCSnapshotEdicts(game)
+  assertEqual(game.edicts[77].model, "", "collected pickup model string clears")
+  assertEqual(game.edicts[77].modelIndex, 5, "collected pickup retains modelindex")
+  vm.setEntityString(machine, 77, 1, "progs/g_rock2.mdl")
+  serverRuntime.syncQuakeCSnapshotEdicts(game)
+  assertEqual(game.edicts[77].model, "progs/g_rock2.mdl", "respawned pickup model restores")
+
   gc_set_limit(1048576)
   serverRuntime.shutdown(game)
   return true
 end function
 
+// Verify canonical stable against the expected Quake behavior.
 function testCanonicalStable()
   session = makeSession()
   first = trace.canonicalFrame(session, 0, true)
@@ -271,6 +302,7 @@ function testCanonicalStable()
   return true
 end function
 
+// Verify canonical changes against the expected Quake behavior.
 function testCanonicalChanges()
   session = makeSession()
   before = trace.canonicalFrame(session, 0, true)
@@ -282,6 +314,7 @@ function testCanonicalChanges()
   return true
 end function
 
+// Verify checkpoint contract against the expected Quake behavior.
 function testCheckpointContract()
   session = makeSession()
   session.frameTrace = []
@@ -294,6 +327,7 @@ function testCheckpointContract()
   return true
 end function
 
+// Verify context json against the expected Quake behavior.
 function testContextJson()
   session = makeSession()
   session.diagnosticFrame = 7
@@ -308,6 +342,7 @@ function testContextJson()
 end function
 
 
+// Verify sparse client entities against the expected Quake behavior.
 function testSparseClientEntities()
   session = makeSession()
   firstEntity = client.createEntity(1)
@@ -336,6 +371,7 @@ function testSparseClientEntities()
   return true
 end function
 
+// Verify headless input isolation against the expected Quake behavior.
 function testHeadlessInputIsolation()
   assertEqual(host.shouldPollLiveButtonBindings(true, true, false, false), false, "headless game input disabled")
   assertEqual(host.shouldPollLiveButtonBindings(false, true, false, false), true, "interactive game input enabled")
@@ -345,6 +381,7 @@ function testHeadlessInputIsolation()
   return true
 end function
 
+// Verify trace schemas against the expected Quake behavior.
 function testTraceSchemas()
   session = makeSession()
   snapshot = trace.snapshotJson(session, 0, "unit", "")
@@ -355,6 +392,7 @@ function testTraceSchemas()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "MiniQuake BP-001R3 compatibility diagnostics tests"
   passed = 0

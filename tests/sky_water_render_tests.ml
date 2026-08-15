@@ -1,23 +1,31 @@
-/* BP-043: MiniQuake sky/water binary32 math and subdivision boundaries. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
+BP-043: MiniQuake sky/water binary32 math and subdivision boundaries.
+*/
 import miniquake.render.gl_warp as warp
 import miniquake.types as t
 import miniquake.native as native
 
+// Assert that the condition holds and identify a failing test.
 function yes(value, name)
   if not value then return error(4300, name + ": expected true") end if
   return true
 end function
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(4301, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Build deterministic test data for float bits.
 function fixtureFloatBits(value)
   return native.floatBits(value)
 end function
 
+// Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
   print "[" + number + "/22] " + name
   result = try(fn())
@@ -25,10 +33,12 @@ function run(number, name, fn)
   return true
 end function
 
+// Exercise vertex as part of this deterministic regression fixture.
 function vertex(x, y, z, s, tt)
   return t.RenderVertex(t.Vec3(x, y, z), s, tt, 0.0, 0.0)
 end function
 
+// Exercise quad as part of this deterministic regression fixture.
 function quad(size)
   return [
     vertex(-size, -size, 0.0, -size, -size),
@@ -38,72 +48,85 @@ function quad(size)
   ]
 end function
 
+// Verify warp float boundary against the expected Quake behavior.
 function testWarpFloatBoundary()
   equal(fixtureFloatBits(warp.warpFloat(16777217.0)), 0x4b800000, "float boundary")
   return true
 end function
 
+// Verify subdivide default against the expected Quake behavior.
 function testSubdivideDefault()
   equal(fixtureFloatBits(warp.SetSubdivideSize(0.0)), fixtureFloatBits(128.0), "default subdivide")
   return true
 end function
 
+// Verify subdivide float storage against the expected Quake behavior.
 function testSubdivideFloatStorage()
   equal(fixtureFloatBits(warp.SetSubdivideSize(16777217.0)), 0x4b800000, "subdivide float")
   return true
 end function
 
+// Verify water one s against the expected Quake behavior.
 function testWaterOneS()
   value = warp.WaterTexCoords(64.0, 32.0, 0.25)
   equal(fixtureFloatBits(value[0]), 0x3f636ab6, "water one s")
   return true
 end function
 
+// Verify water one t against the expected Quake behavior.
 function testWaterOneT()
   value = warp.WaterTexCoords(64.0, 32.0, 0.25)
   equal(fixtureFloatBits(value[1]), 0x3f1d906d, "water one t")
   return true
 end function
 
+// Verify water two s against the expected Quake behavior.
 function testWaterTwoS()
   value = warp.WaterTexCoords(-17.25, 93.5, 123.75)
   equal(fixtureFloatBits(value[0]), 0xbe9f8f9b, "water two s")
   return true
 end function
 
+// Verify water two t against the expected Quake behavior.
 function testWaterTwoT()
   value = warp.WaterTexCoords(-17.25, 93.5, 123.75)
   equal(fixtureFloatBits(value[1]), 0x3fc7d9f0, "water two t")
   return true
 end function
 
+// Verify solid speed wrap against the expected Quake behavior.
 function testSolidSpeedWrap()
   equal(fixtureFloatBits(warp.WrappedSpeedScale(20.0, 8.0)), 0x42000000, "solid speed")
   return true
 end function
 
+// Verify alpha speed wrap against the expected Quake behavior.
 function testAlphaSpeedWrap()
   equal(fixtureFloatBits(warp.WrappedSpeedScale(20.0, 16.0)), 0x42800000, "alpha speed")
   return true
 end function
 
+// Verify negative speed wrap against the expected Quake behavior.
 function testNegativeSpeedWrap()
   equal(fixtureFloatBits(warp.WrappedSpeedScale(-1.25, 8.0)), 0x42ec0000, "negative speed")
   return true
 end function
 
+// Verify sky general s against the expected Quake behavior.
 function testSkyGeneralS()
   value = warp.SkyTexCoords(t.Vec3(64.0, 32.0, 16.0), t.Vec3(3.0, -2.0, 1.0), 32.0)
   equal(fixtureFloatBits(value[0]), 0x401ac5d2, "sky general s")
   return true
 end function
 
+// Verify sky general t against the expected Quake behavior.
 function testSkyGeneralT()
   value = warp.SkyTexCoords(t.Vec3(64.0, 32.0, 16.0), t.Vec3(3.0, -2.0, 1.0), 32.0)
   equal(fixtureFloatBits(value[1]), 0x3fbab28e, "sky general t")
   return true
 end function
 
+// Verify sky axis against the expected Quake behavior.
 function testSkyAxis()
   value = warp.SkyTexCoords(t.Vec3(1.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), 0.0)
   equal(fixtureFloatBits(value[0]), 0x403d0000, "sky x axis")
@@ -111,6 +134,7 @@ function testSkyAxis()
   return true
 end function
 
+// Verify sky zero direction against the expected Quake behavior.
 function testSkyZeroDirection()
   value = warp.SkyTexCoords(t.Vec3(1.0, 2.0, 3.0), t.Vec3(1.0, 2.0, 3.0), 10.0)
   equal(value[0], 0.0, "zero sky s")
@@ -118,6 +142,7 @@ function testSkyZeroDirection()
   return true
 end function
 
+// Verify surface vectors ignore offset against the expected Quake behavior.
 function testSurfaceVectorsIgnoreOffset()
   values = warp.SurfaceWarpVertices([vertex(2.0, 3.0, 4.0, 0.0, 0.0)], [1.0, 2.0, 3.0, 999.0], [4.0, 5.0, 6.0, 999.0])
   equal(values[0].s, 20.0, "surface s")
@@ -125,6 +150,7 @@ function testSurfaceVectorsIgnoreOffset()
   return true
 end function
 
+// Verify subdivide vertex limit against the expected Quake behavior.
 function testSubdivideVertexLimit()
   values = []
   index = 0
@@ -137,6 +163,7 @@ function testSubdivideVertexLimit()
   return true
 end function
 
+// Verify small polygon no split against the expected Quake behavior.
 function testSmallPolygonNoSplit()
   polygon = [
     vertex(16.0, 16.0, 0.0, 16.0, 16.0),
@@ -148,23 +175,27 @@ function testSmallPolygonNoSplit()
   return true
 end function
 
+// Verify large polygon splits against the expected Quake behavior.
 function testLargePolygonSplits()
   yes(len(warp.SubdividePolygon(quad(128.0), 128.0)) > 1, "large polygon split")
   return true
 end function
 
+// Verify invalid sky size against the expected Quake behavior.
 function testInvalidSkySize()
   texture = t.BspTexture("bad", 128, 128, [0, 0, 0, 0], bytes(128 * 128))
   yes(try(warp.R_InitSky(texture, bytes(768))) is error, "sky size")
   return true
 end function
 
+// Verify invalid sky palette against the expected Quake behavior.
 function testInvalidSkyPalette()
   texture = t.BspTexture("bad", 256, 128, [0, 0, 0, 0], bytes(256 * 128))
   yes(try(warp.R_InitSky(texture, bytes(767))) is error, "sky palette")
   return true
 end function
 
+// Verify sky transparent average against the expected Quake behavior.
 function testSkyTransparentAverage()
   palette = bytes(768)
   palette[3] = 10; palette[4] = 20; palette[5] = 30
@@ -179,6 +210,7 @@ function testSkyTransparentAverage()
   return true
 end function
 
+// Verify layer speeds against the expected Quake behavior.
 function testLayerSpeeds()
   result = warp.EmitBothSkyLayers([quad(16.0)], t.Vec3(0.0, 0.0, 0.0), 20.0)
   equal(fixtureFloatBits(result[0]), 0x42000000, "solid layer speed")

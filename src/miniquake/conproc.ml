@@ -1,12 +1,12 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 MiniLang port of conproc.c/conproc.h.  The four QHOST commands and all state
 transitions remain here; native code only exposes Win32 mappings, events and
 console primitives.
 */
-
 package miniquake.conproc
 
 import miniquake.native as native
@@ -38,22 +38,26 @@ end struct
 
 conProcState = void
 
+// Create and initialize state.
 function createState()
   return ConProcState(0, 0, 0, 0, false, false, void, void, 80, 25, 200, 200, [], [], "", 0)
 end function
 
+// Mirror Quake's ConProc_UseState routine and its observable state changes.
 function ConProc_UseState(state)
   global conProcState
   conProcState = state
   return state
 end function
 
+// Mirror Quake's ConProc_State routine and its observable state changes.
 function ConProc_State()
   global conProcState
   if conProcState is void then conProcState = createState() end if
   return conProcState
 end function
 
+// Initialize state for init con proc.
 function InitConProc(fileHandle, parentEvent, childEvent, useNative)
   state = createState()
   ConProc_UseState(state)
@@ -73,6 +77,7 @@ function InitConProc(fileHandle, parentEvent, childEvent, useNative)
   return true
 end function
 
+// Release or remove state for con proc.
 function DeinitConProc()
   state = ConProc_State()
   if state.eventDone != 0 and state.useNative then native.conprocSetEvent(state.eventDone) end if
@@ -80,6 +85,7 @@ function DeinitConProc()
   return true
 end function
 
+// Return mapped buffer.
 function GetMappedBuffer(fileHandle)
   state = ConProc_State()
   if state.testBuffer is not void then state.mappedBuffer = state.testBuffer; return state.testBuffer end if
@@ -88,6 +94,7 @@ function GetMappedBuffer(fileHandle)
   return state.mappedBuffer
 end function
 
+// Release or remove state for mapped buffer.
 function ReleaseMappedBuffer(mapped)
   state = ConProc_State()
   if mapped is void then return false end if
@@ -96,6 +103,7 @@ function ReleaseMappedBuffer(mapped)
   return true
 end function
 
+// Return screen buffer lines.
 function GetScreenBufferLines()
   state = ConProc_State()
   if state.useNative then
@@ -105,10 +113,12 @@ function GetScreenBufferLines()
   return state.screenHeight
 end function
 
+// Update module state for screen buffer lines.
 function SetScreenBufferLines(lines)
   return SetConsoleCXCY(0, 80, lines)
 end function
 
+// Provide padded line behavior for the active subsystem.
 function paddedLine(text, width)
   source = bytes(text)
   output = bytes(width)
@@ -121,6 +131,7 @@ function paddedLine(text, width)
   return decode(output)
 end function
 
+// Read and validate text.
 function ReadText(beginLine, endLine)
   state = ConProc_State()
   if endLine < beginLine then return "" end if
@@ -136,11 +147,13 @@ function ReadText(beginLine, endLine)
   return result
 end function
 
+// Provide ascii upper behavior for the active subsystem.
 function asciiUpper(code)
   if code >= 97 and code <= 122 then return code - 32 end if
   return code
 end function
 
+// Provide char to code behavior for the active subsystem.
 function CharToCode(character)
   if character == 13 then return 28 end if
   upper = asciiUpper(character)
@@ -149,6 +162,7 @@ function CharToCode(character)
   return character
 end function
 
+// Encode and write text.
 function WriteText(text)
   state = ConProc_State()
   source = bytes(text)
@@ -177,6 +191,7 @@ function WriteText(text)
   return true
 end function
 
+// Update module state for console cxcy.
 function SetConsoleCXCY(stdoutHandle, width, height)
   state = ConProc_State()
   if width < 1 or height < 1 then return false end if
@@ -188,6 +203,7 @@ function SetConsoleCXCY(stdoutHandle, width, height)
   return true
 end function
 
+// Execute test request.
 function processTestRequest(state)
   buffer = state.testBuffer
   if buffer is void or len(buffer) == 0 then return false end if
@@ -209,6 +225,7 @@ function processTestRequest(state)
   return true
 end function
 
+// Execute native request.
 function processNativeRequest(state, mapped)
   command = native.conprocReadI32(mapped, 0)
   success = false
@@ -232,6 +249,7 @@ function processNativeRequest(state, mapped)
   return success
 end function
 
+// Provide request proc behavior for the active subsystem.
 function RequestProc(block)
   state = ConProc_State()
   if not state.active then return false end if
@@ -254,16 +272,19 @@ function RequestProc(block)
   return success
 end function
 
+// Mirror Quake's ConProc_SetTestBuffer routine and its observable state changes.
 function ConProc_SetTestBuffer(buffer)
   state = ConProc_State()
   state.testBuffer = buffer
   return buffer
 end function
 
+// Mirror Quake's ConProc_RequestBuffer routine and its observable state changes.
 function ConProc_RequestBuffer()
   return ConProc_State().testBuffer
 end function
 
+// Mirror Quake's ConProc_Poll routine and its observable state changes.
 function ConProc_Poll()
   return RequestProc(false)
 end function

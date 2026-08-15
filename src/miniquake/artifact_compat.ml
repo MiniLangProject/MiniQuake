@@ -1,12 +1,12 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Demo/savegame compatibility evidence helpers.  The actual retail evidence is
 executed from a separate test executable so no user game data enters builds or
 result archives.
 */
-
 package miniquake.artifact_compat
 
 import miniquake.crc as crc
@@ -19,10 +19,12 @@ const SAVEGAME_VERSION = 5
 const RETAIL_DEMO_COUNT = 3
 const SAVE_FLOAT_FORMAT = "msvcrt_percent_f"
 
+// Return retail demo names derived from the active module state.
 function retailDemoNames()
   return ["demo1.dem", "demo2.dem", "demo3.dem"]
 end function
 
+// Assert exact equality and report both values on failure.
 function bytesEqual(left, right)
   if left is not bytes or right is not bytes or len(left) != len(right) then return false end if
   index = 0
@@ -33,6 +35,7 @@ function bytesEqual(left, right)
   return true
 end function
 
+// Return bytes crc derived from the active module state.
 function bytesCrc(data)
   if data is not bytes then return -1 end if
   return crc.block(data, 0, len(data))
@@ -62,6 +65,7 @@ function pairListDifference(leftPairs, rightPairs, label)
   return ""
 end function
 
+// Encode and write semantic difference.
 function saveSemanticDifference(left, right)
   if left.version != right.version then return "version" end if
   if left.comment != right.comment then return "comment" end if
@@ -94,6 +98,7 @@ function saveSemanticDifference(left, right)
   return ""
 end function
 
+// Compare semantic equal.
 function saveSemanticEqual(left, right)
   return saveSemanticDifference(left, right) == ""
 end function
@@ -117,6 +122,7 @@ function firstByteDifference(left, right)
   return [index, leftValue, rightValue, len(left), len(right)]
 end function
 
+// Return demo summary derived from the active module state.
 function demoSummary(recording, report, sourceBytes)
   return [
     recording.forcedTrack,
@@ -131,10 +137,12 @@ function demoSummary(recording, report, sourceBytes)
   ]
 end function
 
+// Encode and write summary.
 function saveSummary(saveBytes, mapName, timeValue, edictHash, globalsHash)
   return [SAVEGAME_VERSION, mapName, timeValue, len(saveBytes), bytesCrc(saveBytes), edictHash, globalsHash]
 end function
 
+// Return contract vector derived from the active module state.
 function contractVector()
   return [STATUS, FINGERPRINT, SAVEGAME_VERSION, RETAIL_DEMO_COUNT, retailDemoNames(), SAVE_FLOAT_FORMAT]
 end function

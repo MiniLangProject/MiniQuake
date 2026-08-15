@@ -1,4 +1,9 @@
-/* BP-056: snd_dma.c channel, spatialization and production handoff parity. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+BP-056: snd_dma.c channel, spatialization and production handoff parity.
+*/
 import miniquake.sound.snd_dma as bp056Dma
 import miniquake.sound.snd_mem as bp056Mem
 import miniquake.sound.snd_mix as bp056Mix
@@ -7,20 +12,24 @@ import miniquake.types as bp056Types
 import miniquake.byteio as bp056Bio
 import miniquake.native as bp056Native
 
+// Assert exact equality and report both values on failure.
 function bp056Equal(actual, expected, name)
   if actual != expected then return error(5600, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
+// Assert that the condition holds and identify a failing test.
 function bp056Yes(value, name)
   if not value then return error(5601, name + ": expected true") end if
   return true
 end function
+// Execute one named test case and record its pass/fail result.
 function bp056Run(number, name, fn)
   print "[" + number + "/22] " + name
   result = try(fn())
   if result is error then print "FAIL: " + result.message; return false end if
   return true
 end function
+// Exercise the cache test scenario and verify its expected result.
 function bp056Cache(values, loopStart)
   data = bytes(len(values) * 2)
   index = 0
@@ -30,6 +39,7 @@ function bp056Cache(values, loopStart)
   end while
   return bp056Mem.SoundCache(len(values), loopStart, 22050, 2, 0, data)
 end function
+// Exercise the descriptor test scenario and verify its expected result.
 function bp056Descriptor(name, length)
   values = []
   index = 0
@@ -39,6 +49,7 @@ function bp056Descriptor(name, length)
   end while
   return bp056Mem.SoundDescriptor(name, bp056Cache(values, -1))
 end function
+// Exercise the system test scenario and verify its expected result.
 function bp056System()
   system = bp056Dma.create(void, 22050)
   system.initialized = true
@@ -51,6 +62,7 @@ function bp056System()
   system.mixState.paintedTime = 100
   return system
 end function
+// Exercise the effect test scenario and verify its expected result.
 function bp056Effect(name, length)
   data = bytes(length * 2)
   index = 0
@@ -60,10 +72,12 @@ function bp056Effect(name, length)
   end while
   return bp056Types.SoundEffect(name, data, 22050, 2, 1, -1)
 end function
+// Exercise the mixer channel test scenario and verify its expected result.
 function bp056MixerChannel(entity, channel, effect, sample)
   return bp056Types.MixerChannel(entity, channel, effect, bp056Types.Vec3(0.0,0.0,0.0), 1.0, 0.0, sample, false, true, len(effect.samples) / effect.width)
 end function
 
+// Return constants for the active module state.
 function bp056Constants()
   bp056Equal(bp056Dma.MAX_SFX, 512, "MAX_SFX")
   bp056Equal(bp056Dma.MAX_CHANNELS, 128, "MAX_CHANNELS")
@@ -71,6 +85,7 @@ function bp056Constants()
   bp056Equal(bp056Dma.NUM_AMBIENTS, 4, "ambient channels")
   return true
 end function
+// Exercise the override test scenario and verify its expected result.
 function bp056Override()
   system = bp056System()
   descriptor = bp056Descriptor("override.wav", 16)
@@ -83,6 +98,7 @@ function bp056Override()
   bp056Yes(picked.sfx is void, "matching channel cleared")
   return true
 end function
+// Exercise the minus one override test scenario and verify its expected result.
 function bp056MinusOneOverride()
   system = bp056System()
   channel = system.mixState.channels[bp056Dma.DYNAMIC_FIRST + 3]
@@ -93,6 +109,7 @@ function bp056MinusOneOverride()
   bp056Yes(picked == channel, "minus-one override")
   return true
 end function
+// Exercise the channel zero test scenario and verify its expected result.
 function bp056ChannelZero()
   system = bp056System()
   descriptor = bp056Descriptor("zero.wav", 16)
@@ -124,6 +141,7 @@ function bp056ChannelZero()
   bp056Yes(picked.sfx is void, "lifetime victim cleared")
   return true
 end function
+// Exercise the listener protected test scenario and verify its expected result.
 function bp056ListenerProtected()
   system = bp056System()
   descriptor = bp056Descriptor("protected.wav", 16)
@@ -143,6 +161,7 @@ function bp056ListenerProtected()
   bp056Yes(picked != listener, "listener protected")
   return true
 end function
+// Exercise the view entity volume test scenario and verify its expected result.
 function bp056ViewEntityVolume()
   system = bp056System()
   channel = bp056Mix.createChannel()
@@ -153,6 +172,7 @@ function bp056ViewEntityVolume()
   bp056Equal(result[1], 211, "view right")
   return true
 end function
+// Exercise the stereo right test scenario and verify its expected result.
 function bp056StereoRight()
   system = bp056System()
   channel = bp056Mix.createChannel()
@@ -165,6 +185,7 @@ function bp056StereoRight()
   bp056Equal(result[1], 459, "right source right")
   return true
 end function
+// Exercise the stereo left test scenario and verify its expected result.
 function bp056StereoLeft()
   system = bp056System()
   channel = bp056Mix.createChannel()
@@ -177,6 +198,7 @@ function bp056StereoLeft()
   bp056Equal(result[1], 0, "left source right")
   return true
 end function
+// Exercise the mono test scenario and verify its expected result.
 function bp056Mono()
   system = bp056System()
   system.mixState.dma.channels = 1
@@ -190,6 +212,7 @@ function bp056Mono()
   bp056Equal(result[1], 180, "mono right")
   return true
 end function
+// Exercise the distance cutoff test scenario and verify its expected result.
 function bp056DistanceCutoff()
   system = bp056System()
   channel = bp056Mix.createChannel()
@@ -202,11 +225,13 @@ function bp056DistanceCutoff()
   bp056Equal(result[1], 0, "cutoff right")
   return true
 end function
+// Exercise the distance word test scenario and verify its expected result.
 function bp056DistanceWord()
   value = bp056Dma.soundF32(1.0 / 1000.0)
   bp056Equal(bp056Native.floatBits(value), 0x3a83126f, "distance multiplier word")
   return true
 end function
+// Initialize state for master.
 function bp056StartMaster()
   system = bp056System()
   descriptor = bp056Descriptor("half.wav", 16)
@@ -216,6 +241,7 @@ function bp056StartMaster()
   bp056Equal(channel.masterVolume, 127, "half master")
   return true
 end function
+// Initialize state for distance word.
 function bp056StartDistanceWord()
   system = bp056System()
   descriptor = bp056Descriptor("distance.wav", 16)
@@ -224,6 +250,7 @@ function bp056StartDistanceWord()
   bp056Equal(bp056Native.floatBits(channel.distanceMultiplier), 0x3a449ba6, "0.75 distance word")
   return true
 end function
+// Exercise the duplicate offset test scenario and verify its expected result.
 function bp056DuplicateOffset()
   system = bp056System()
   descriptor = bp056Descriptor("duplicate.wav", 128)
@@ -232,6 +259,7 @@ function bp056DuplicateOffset()
   bp056Equal(system.mixState.channels[bp056Dma.DYNAMIC_FIRST + 1].position, 41, "MSVC duplicate skip")
   return true
 end function
+// Finalize state for quirk.
 function bp056StopQuirk()
   system = bp056System()
   descriptor = bp056Descriptor("stop.wav", 16)
@@ -247,6 +275,7 @@ function bp056StopQuirk()
   bp056Equal(bp056Dma.S_StopSound(system, 99, 2), false, "outside first eight")
   return true
 end function
+// Exercise the ambient off on test scenario and verify its expected result.
 function bp056AmbientOffOn()
   system = bp056System()
   bp056Equal(bp056Dma.S_AmbientOff(system), false, "ambient off")
@@ -254,6 +283,7 @@ function bp056AmbientOffOn()
   bp056Equal(bp056Dma.S_AmbientOn(system), true, "ambient on")
   return true
 end function
+// Exercise the ambient fade test scenario and verify its expected result.
 function bp056AmbientFade()
   system = bp056System()
   descriptor = bp056Descriptor("ambient.wav", 16)
@@ -263,6 +293,7 @@ function bp056AmbientFade()
   bp056Yes(system.mixState.channels[0].sfx == descriptor, "ambient source")
   return true
 end function
+// Exercise the soundtime test scenario and verify its expected result.
 function bp056Soundtime()
   system = bp056System()
   system.mixState.dma.samples = 16
@@ -273,6 +304,7 @@ function bp056Soundtime()
   bp056Equal(second, 9, "soundtime wrapped")
   return true
 end function
+// Update module state for ahead.
 function bp056UpdateAhead()
   system = bp056System()
   system.mixState.dma.speed = 1000
@@ -283,6 +315,7 @@ function bp056UpdateAhead()
   bp056Equal(result, 100, "mixahead end")
   return true
 end function
+// Exercise the production replacement test scenario and verify its expected result.
 function bp056ProductionReplacement()
   state = bp056Mixer.create(void, 22050)
   state.enabled = true
@@ -295,6 +328,7 @@ function bp056ProductionReplacement()
   bp056Equal(state.channels[0].sample, 0, "replacement restarted")
   return true
 end function
+// Exercise the production capacity test scenario and verify its expected result.
 function bp056ProductionCapacity()
   state = bp056Mixer.create(void, 22050)
   state.enabled = true
@@ -309,6 +343,7 @@ function bp056ProductionCapacity()
   bp056Equal(bp056Mixer.dynamicChannelCount(state), 8, "capacity remains eight")
   return true
 end function
+// Exercise the production volumes and local lifecycle test scenario and verify its expected result.
 function bp056ProductionVolumesAndLocalLifecycle()
   state = bp056Mixer.create(void, 22050)
   state.listenerEntity = 1

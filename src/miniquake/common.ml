@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.common.
+*/
 package miniquake.common
 
 import miniquake.types as t
@@ -6,18 +13,21 @@ import miniquake.constants as c
 import miniquake.native as native
 import miniquake.protocol_text as quakeText
 
+// Update module state for link.
 function clearLink(link)
   link.previous = link
   link.next = link
   return link
 end function
 
+// Release state for remove link.
 function removeLink(link)
   link.next.previous = link.previous
   link.previous.next = link.next
   return link
 end function
 
+// Add state for insert link before.
 function insertLinkBefore(link, before)
   link.next = before
   link.previous = before.previous
@@ -26,6 +36,7 @@ function insertLinkBefore(link, before)
   return link
 end function
 
+// Add state for insert link after.
 function insertLinkAfter(link, after)
   link.next = after.next
   link.previous = after
@@ -34,6 +45,7 @@ function insertLinkAfter(link, after)
   return link
 end function
 
+// Provide hex digit behavior for the active subsystem.
 function hexDigit(value)
   if value >= 48 and value <= 57 then return value - 48 end if
   if value >= 97 and value <= 102 then return value - 97 + 10 end if
@@ -59,6 +71,7 @@ end function
 // hexadecimal and character literal forms. It is not the host language's
 // stricter general-purpose number parser.
 function atof(text)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   data = quakeText.encodeBytes(text)
   index = 0
   sign = 1.0
@@ -106,6 +119,7 @@ function atof(text)
   return quakeFloat(value * sign)
 end function
 
+// Provide atoi behavior for the active subsystem.
 function atoi(text)
   data = quakeText.encodeBytes(text)
   index = 0
@@ -187,6 +201,7 @@ function memSet(destination, fill, count)
   return destination
 end function
 
+// Provide mem copy behavior for the active subsystem.
 function memCopy(destination, source, count)
   bio.requireRange(destination, 0, count)
   bio.requireRange(source, 0, count)
@@ -198,6 +213,7 @@ function memCopy(destination, source, count)
   return destination
 end function
 
+// Provide mem compare behavior for the active subsystem.
 function memCompare(first, second, count)
   bio.requireRange(first, 0, count)
   bio.requireRange(second, 0, count)
@@ -209,14 +225,17 @@ function memCompare(first, second, count)
   return 0
 end function
 
+// Return string length derived from the active module state.
 function stringLength(text)
   return len(quakeText.encodeBytes(text))
 end function
 
+// Provide string copy behavior for the active subsystem.
 function stringCopy(text)
   return quakeText.decodeBytes(quakeText.encodeBytes(text))
 end function
 
+// Return string copy count derived from the active module state.
 function stringCopyCount(text, count)
   if count <= 0 then return "" end if
   data = quakeText.encodeBytes(text)
@@ -224,10 +243,12 @@ function stringCopyCount(text, count)
   return quakeText.decodeBytes(slice(data, 0, count))
 end function
 
+// Provide string concat behavior for the active subsystem.
 function stringConcat(destination, source)
   return destination + source
 end function
 
+// Return string last index derived from the active module state.
 function stringLastIndex(text, character)
   data = quakeText.encodeBytes(text)
   index = len(data) - 1
@@ -238,6 +259,7 @@ function stringLastIndex(text, character)
   return -1
 end function
 
+// Return string compare count derived from the active module state.
 function stringCompareCount(first, second, count)
   firstData = quakeText.encodeBytes(first)
   secondData = quakeText.encodeBytes(second)
@@ -254,6 +276,7 @@ function stringCompareCount(first, second, count)
   return 0
 end function
 
+// Provide string compare behavior for the active subsystem.
 function stringCompare(first, second)
   firstLength = len(quakeText.encodeBytes(first))
   secondLength = len(quakeText.encodeBytes(second))
@@ -262,11 +285,13 @@ function stringCompare(first, second)
   return stringCompareCount(first, second, count + 1)
 end function
 
+// Convert data for upper ascii.
 function upperAscii(value)
   if value >= 97 and value <= 122 then return value - 32 end if
   return value
 end function
 
+// Return string compare insensitive count derived from the active module state.
 function stringCompareInsensitiveCount(first, second, count)
   firstData = quakeText.encodeBytes(first)
   secondData = quakeText.encodeBytes(second)
@@ -283,10 +308,12 @@ function stringCompareInsensitiveCount(first, second, count)
   return 0
 end function
 
+// Provide string compare insensitive behavior for the active subsystem.
 function stringCompareInsensitive(first, second)
   return stringCompareInsensitiveCount(first, second, 99999)
 end function
 
+// Provide substring behavior for the active subsystem.
 function substring(text, offset, count)
   data = quakeText.encodeBytes(text)
   if offset < 0 then offset = 0 end if
@@ -296,6 +323,7 @@ function substring(text, offset, count)
   return quakeText.decodeBytes(slice(data, offset, count))
 end function
 
+// Return skip path derived from the active module state.
 function skipPath(pathname)
   data = quakeText.encodeBytes(pathname)
   start = 0
@@ -307,6 +335,7 @@ function skipPath(pathname)
   return substring(pathname, start, len(data) - start)
 end function
 
+// Convert extension into its canonical representation.
 function stripExtension(pathname)
   data = quakeText.encodeBytes(pathname)
   index = 0
@@ -316,6 +345,7 @@ function stripExtension(pathname)
   return substring(pathname, 0, index)
 end function
 
+// Provide file extension behavior for the active subsystem.
 function fileExtension(pathname)
   data = quakeText.encodeBytes(pathname)
   index = 0
@@ -328,6 +358,7 @@ function fileExtension(pathname)
   return substring(pathname, index + 1, count)
 end function
 
+// Provide file base behavior for the active subsystem.
 function fileBase(pathname)
   data = quakeText.encodeBytes(pathname)
   if len(data) == 0 then return "?model?" end if
@@ -347,6 +378,7 @@ function fileBase(pathname)
   return substring(pathname, slash + 1, count)
 end function
 
+// Provide default extension behavior for the active subsystem.
 function defaultExtension(pathname, extension)
   data = quakeText.encodeBytes(pathname)
   index = len(data) - 1
@@ -357,6 +389,7 @@ function defaultExtension(pathname, extension)
   return pathname + extension
 end function
 
+// Provide punctuation behavior for the active subsystem.
 function punctuation(value)
   return value == 123 or value == 125 or value == 41 or value == 40 or value == 39 or value == 58
 end function
@@ -364,6 +397,7 @@ end function
 // COM_Parse returns a pointer to the remaining source.  Its MiniLang pendant
 // returns [token, nextOffset, eof], retaining punctuation and comment rules.
 function parseToken(text, startOffset)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   data = quakeText.encodeBytes(text)
   index = startOffset
   scanning = true
@@ -407,6 +441,7 @@ function parseToken(text, startOffset)
   return [quakeText.decodeBytes(slice(output, 0, count)), index, false]
 end function
 
+// Provide memory search behavior for the active subsystem.
 function memorySearch(data, count, search)
   bio.requireRange(data, 0, count)
   index = 0
@@ -417,6 +452,7 @@ function memorySearch(data, count, search)
   return -1
 end function
 
+// Provide fixed float behavior for the active subsystem.
 function fixedFloat(value)
   negative = value < 0.0
   magnitude = value
@@ -433,6 +469,7 @@ function fixedFloat(value)
   return output
 end function
 
+// Provide hexadecimal behavior for the active subsystem.
 function hexadecimal(value, upper)
   digits = "0123456789abcdef"
   if upper then digits = "0123456789ABCDEF" end if
@@ -448,6 +485,7 @@ function hexadecimal(value, upper)
   return output
 end function
 
+// Format and emit flag.
 function formatFlag(value)
   if value == 45 or value == 43 or value == 32 or value == 35 then return true end if
   if value >= 48 and value <= 57 then return true end if
@@ -458,6 +496,7 @@ end function
 // immutable, so callers pass the variadic values as an array and receive an
 // owned string. This covers every conversion used by the MiniQuake target.
 function va(format, arguments)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   source = bytes(format)
   output = ""
   sourceIndex = 0
@@ -506,12 +545,14 @@ function va(format, arguments)
   return output
 end function
 
+// Initialize state for starts with marker.
 function startsWithMarker(text, marker)
   data = bytes(text)
   if len(data) == 0 then return false end if
   return data[0] == marker
 end function
 
+// Provide join arguments behavior for the active subsystem.
 function joinArguments(args)
   text = ""
   index = 0
@@ -523,6 +564,7 @@ function joinArguments(args)
   return text
 end function
 
+// Create and initialize the module state.
 function create(args)
   safe = false
   rogue = false
@@ -560,6 +602,7 @@ function create(args)
   return t.CommandLine(finalArgs, reconstructed, safe, rogue, hipnotic, not rogue and not hipnotic)
 end function
 
+// Validate parm and report any incompatibility.
 function checkParm(commandLine, name)
   // MiniLang stores only arguments after argv[0].  Preserve COM_CheckParm's
   // externally visible one-based position by adding one to the array index.
@@ -571,10 +614,12 @@ function checkParm(commandLine, name)
   return 0
 end function
 
+// Report whether parm.
 function hasParm(commandLine, name)
   return checkParm(commandLine, name) != 0
 end function
 
+// Return parm value derived from the active module state.
 function parmValue(commandLine, name, fallback)
   position = checkParm(commandLine, name)
   if position != 0 and position < len(commandLine.args) then
@@ -583,26 +628,31 @@ function parmValue(commandLine, name, fallback)
   return fallback
 end function
 
+// Provide integer option behavior for the active subsystem.
 function integerOption(commandLine, name, fallback)
   text = parmValue(commandLine, name, "")
   if text == "" then return fallback end if
   return atoi(text)
 end function
 
+// Provide float option behavior for the active subsystem.
 function floatOption(commandLine, name, fallback)
   text = parmValue(commandLine, name, "")
   if text == "" then return fallback end if
   return atof(text)
 end function
 
+// Provide base directory behavior for the active subsystem.
 function baseDirectory(commandLine)
   return parmValue(commandLine, "-basedir", ".")
 end function
 
+// Provide game directory behavior for the active subsystem.
 function gameDirectory(commandLine)
   return parmValue(commandLine, "-game", "id1")
 end function
 
+// Convert data for quote command argument.
 function quoteCommandArgument(text)
   source = bytes(text)
   needsQuotes = false
@@ -617,6 +667,7 @@ function quoteCommandArgument(text)
   return output + "\""
 end function
 
+// Provide stuff commands behavior for the active subsystem.
 function stuffCommands(commandLine)
   combined = joinArguments(commandLine.args)
   source = bytes(combined)
@@ -644,89 +695,110 @@ function ClearLink(link)
   return clearLink(link)
 end function
 
+// Release state for remove link.
 function RemoveLink(link)
   return removeLink(link)
 end function
 
+// Add state for insert link before.
 function InsertLinkBefore(link, before)
   return insertLinkBefore(link, before)
 end function
 
+// Add state for insert link after.
 function InsertLinkAfter(link, after)
   return insertLinkAfter(link, after)
 end function
 
+// Provide the Quake-compatible memset entry point.
 function Q_memset(destination, fill, count)
   return memSet(destination, fill, count)
 end function
 
+// Provide the Quake-compatible memcpy entry point.
 function Q_memcpy(destination, source, count)
   return memCopy(destination, source, count)
 end function
 
+// Provide the Quake-compatible memcmp entry point.
 function Q_memcmp(first, second, count)
   return memCompare(first, second, count)
 end function
 
+// Provide the Quake-compatible strcpy entry point.
 function Q_strcpy(source)
   return stringCopy(source)
 end function
 
+// Provide the Quake-compatible strncpy entry point.
 function Q_strncpy(source, count)
   return stringCopyCount(source, count)
 end function
 
+// Provide the Quake-compatible strlen entry point.
 function Q_strlen(text)
   return stringLength(text)
 end function
 
+// Provide the Quake-compatible strrchr entry point.
 function Q_strrchr(text, character)
   return stringLastIndex(text, character)
 end function
 
+// Provide the Quake-compatible strcat entry point.
 function Q_strcat(destination, source)
   return stringConcat(destination, source)
 end function
 
+// Provide the Quake-compatible strcmp entry point.
 function Q_strcmp(first, second)
   return stringCompare(first, second)
 end function
 
+// Provide the Quake-compatible strncmp entry point.
 function Q_strncmp(first, second, count)
   return stringCompareCount(first, second, count)
 end function
 
+// Provide the Quake-compatible strncasecmp entry point.
 function Q_strncasecmp(first, second, count)
   return stringCompareInsensitiveCount(first, second, count)
 end function
 
+// Provide the Quake-compatible strcasecmp entry point.
 function Q_strcasecmp(first, second)
   return stringCompareInsensitive(first, second)
 end function
 
+// Provide the Quake-compatible atoi entry point.
 function Q_atoi(text)
   return atoi(text)
 end function
 
+// Provide the Quake-compatible atof entry point.
 function Q_atof(text)
   return atof(text)
 end function
 
+// Provide signed short behavior for the active subsystem.
 function signedShort(value)
   value = value & 65535
   if value >= 32768 then return value - 65536 end if
   return value
 end function
 
+// Convert byte order for short swap.
 function ShortSwap(value)
   value = value & 65535
   return signedShort(((value & 255) << 8) | ((value >> 8) & 255))
 end function
 
+// Convert byte order for short no swap.
 function ShortNoSwap(value)
   return signedShort(value)
 end function
 
+// Convert byte order for long swap.
 function LongSwap(value)
   input = bytes(4)
   output = bytes(4)
@@ -738,11 +810,13 @@ function LongSwap(value)
   return bio.i32(output, 0)
 end function
 
+// Convert byte order for long no swap.
 function LongNoSwap(value)
   // The C parameter is a signed 32-bit int. Preserve that call boundary.
   return quakeInt32(value)
 end function
 
+// Convert byte order for float swap.
 function FloatSwap(value)
   input = bytes(4)
   output = bytes(4)
@@ -754,43 +828,53 @@ function FloatSwap(value)
   return bio.f32(output, 0)
 end function
 
+// Convert byte order for float no swap.
 function FloatNoSwap(value)
   // The C parameter and return type are both float, not host double.
   return quakeFloat(value)
 end function
 
+// Mirror Quake's COM_SkipPath routine and its observable state changes.
 function COM_SkipPath(pathname)
   return skipPath(pathname)
 end function
 
+// Mirror Quake's COM_StripExtension routine and its observable state changes.
 function COM_StripExtension(pathname)
   return stripExtension(pathname)
 end function
 
+// Mirror Quake's COM_FileExtension routine and its observable state changes.
 function COM_FileExtension(pathname)
   return fileExtension(pathname)
 end function
 
+// Mirror Quake's COM_FileBase routine and its observable state changes.
 function COM_FileBase(pathname)
   return fileBase(pathname)
 end function
 
+// Mirror Quake's COM_DefaultExtension routine and its observable state changes.
 function COM_DefaultExtension(pathname, extension)
   return defaultExtension(pathname, extension)
 end function
 
+// Mirror Quake's COM_Parse routine and its observable state changes.
 function COM_Parse(text, startOffset)
   return parseToken(text, startOffset)
 end function
 
+// Mirror Quake's COM_CheckParm routine and its observable state changes.
 function COM_CheckParm(commandLine, name)
   return checkParm(commandLine, name)
 end function
 
+// Mirror Quake's COM_InitArgv routine and its observable state changes.
 function COM_InitArgv(arguments)
   return create(arguments)
 end function
 
+// Mirror Quake's COM_Init routine and its observable state changes.
 function COM_Init(basedir, arguments)
   commandLine = COM_InitArgv(arguments)
   // The C routine also selected little-endian conversion functions and
@@ -799,10 +883,12 @@ function COM_Init(basedir, arguments)
   return [commandLine, basedir, false, 2, 1]
 end function
 
+// Provide memsearch behavior for the active subsystem.
 function memsearch(data, count, search)
   return memorySearch(data, count, search)
 end function
 
+// Return plus value derived from the active module state.
 function plusValue(commandLine, commandName, fallback)
   wanted = "+" + bio.lower(commandName)
   index = 0
@@ -816,6 +902,7 @@ function plusValue(commandLine, commandName, fallback)
   return fallback
 end function
 
+// Inspect the requested value and emit its decoded metadata.
 function describe(commandLine)
   result = "argv=" + len(commandLine.args)
   if commandLine.safeMode then result = result + " safe" end if

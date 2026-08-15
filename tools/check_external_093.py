@@ -35,7 +35,7 @@ def main() -> int:
     tool = read("tools/compare_original_reference.py")
     test = read("tests/original_visual_reference_tests.ml")
     harness = read("TEST_BP-090-094R15.ps1")
-    analysis = read("docs/BP-093_R7_VISUAL_DIAGNOSTIC_ANALYSIS.md")
+    analysis = read("docs/archive/releases/BP-093_R7_VISUAL_DIAGNOSTIC_ANALYSIS.md")
     golden_path = root / "audit/original_visual_reference_golden.json"
     try:
         golden = json.loads(golden_path.read_text(encoding="utf-8-sig"))

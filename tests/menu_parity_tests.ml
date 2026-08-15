@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Focused menu.c state, transition, TCP/IP and mission-pack fixtures.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.common as common
@@ -13,20 +13,24 @@ import miniquake.menu as menu
 import miniquake.cvar as cvar
 import miniquake.keys as keys
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9500, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9501, name + ": expected true") end if
   return true
 end function
 
+// Exercise registry as part of this deterministic regression fixture.
 function registry()
   return host.createCvars(common.create([]), true)
 end function
 
+// Verify top level transitions against the expected Quake behavior.
 function testTopLevelTransitions()
   state = menu.create()
   assertEqual(len(menu.M_Init(state)), 12, "M_Init command count")
@@ -45,6 +49,7 @@ function testTopLevelTransitions()
   return true
 end function
 
+// Verify excluded paths against the expected Quake behavior.
 function testExcludedPaths()
   state = menu.create()
   excluded = menu.M_ExcludedPaths(state)
@@ -56,6 +61,7 @@ function testExcludedPaths()
   return true
 end function
 
+// Verify setup editing against the expected Quake behavior.
 function testSetupEditing()
   variables = registry()
   cvar.set(variables, "hostname", "RangerHost")
@@ -81,6 +87,7 @@ function testSetupEditing()
   return true
 end function
 
+// Verify lan and server list against the expected Quake behavior.
 function testLanAndServerList()
   state = menu.create()
   state.joiningGame = true
@@ -104,6 +111,7 @@ function testLanAndServerList()
   return true
 end function
 
+// Verify game options against the expected Quake behavior.
 function testGameOptions()
   variables = registry()
   state = menu.create()
@@ -128,6 +136,7 @@ function testGameOptions()
   return true
 end function
 
+// Verify draw and key dispatch against the expected Quake behavior.
 function testDrawAndKeyDispatch()
   variables = registry()
   state = menu.create()
@@ -151,6 +160,7 @@ function testDrawAndKeyDispatch()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   testTopLevelTransitions()
   testExcludedPaths()

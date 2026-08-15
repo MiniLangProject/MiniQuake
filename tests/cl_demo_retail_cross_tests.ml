@@ -1,7 +1,14 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/cl_demo_retail_cross_tests.ml.
+*/
 import miniquake.filesystem as qfs
 import miniquake.demo as demo
 import miniquake.demo_player as player
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   if len(args) != 3 then
     print "usage: ClDemoRetailCrossTests BASE GAME DEMO"

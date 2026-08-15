@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.net_main.
+*/
 package miniquake.net_main
 
 // Functional pendant of WinQuake/net_main.c.  Driver-specific packet framing
@@ -39,12 +46,14 @@ maximumClients = 1
 slistPort = 26000
 net_messagetimeout = 300.0
 
+// Update module state for net time.
 function SetNetTime()
   global net_time
   net_time = win.ticks() / 1000.0
   return net_time
 end function
 
+// Provide array tail behavior for the active subsystem.
 function arrayTail(values)
   result = []
   index = 1
@@ -55,6 +64,7 @@ function arrayTail(values)
   return result
 end function
 
+// Report whether compact active sockets holds for the active state.
 function compactActiveSockets()
   global net_activeSockets
   active = []
@@ -65,6 +75,7 @@ function compactActiveSockets()
   return len(active)
 end function
 
+// Update module state for qsocket.
 function resetQSocket(socket)
   now = SetNetTime()
   socket.peer = void
@@ -85,6 +96,7 @@ function resetQSocket(socket)
   return socket
 end function
 
+// Mirror Quake's NET_NewQSocket routine and its observable state changes.
 function NET_NewQSocket()
   global net_activeSockets, net_freeSockets
   compactActiveSockets()
@@ -97,6 +109,7 @@ function NET_NewQSocket()
   return socket
 end function
 
+// Ensure sufficient storage or state for socket pool.
 function ensureSocketPool()
   global net_numsockets, net_freeSockets
   if net_numsockets > 0 then return net_numsockets end if
@@ -111,6 +124,7 @@ function ensureSocketPool()
   return net_numsockets
 end function
 
+// Mirror Quake's NET_TrackSocket routine and its observable state changes.
 function NET_TrackSocket(socket)
   global net_activeSockets, net_freeSockets
   if socket is void or socket is error then return socket end if
@@ -125,6 +139,7 @@ function NET_TrackSocket(socket)
   return socket
 end function
 
+// Mirror Quake's NET_FreeQSocket routine and its observable state changes.
 function NET_FreeQSocket(socket)
   global net_activeSockets, net_freeSockets
   if socket is void then return false end if
@@ -144,18 +159,21 @@ function NET_FreeQSocket(socket)
   return true
 end function
 
+// Mirror Quake's NET_ConnectionAccepted routine and its observable state changes.
 function NET_ConnectionAccepted()
   global net_activeconnections
   net_activeconnections = net_activeconnections + 1
   return net_activeconnections
 end function
 
+// Mirror Quake's NET_ConnectionClosed routine and its observable state changes.
 function NET_ConnectionClosed()
   global net_activeconnections
   if net_activeconnections > 0 then net_activeconnections = net_activeconnections - 1 end if
   return net_activeconnections
 end function
 
+// Mirror Quake's NET_SetMaximumClients routine and its observable state changes.
 function NET_SetMaximumClients(count)
   global maximumClients
   maximumClients = count
@@ -163,6 +181,7 @@ function NET_SetMaximumClients(count)
   return maximumClients
 end function
 
+// Mirror Quake's NET_Listen_f routine and its observable state changes.
 function NET_Listen_f(state, enabled, port)
   global listening, net_hostport
   if enabled is void then return listening end if
@@ -173,6 +192,7 @@ function NET_Listen_f(state, enabled, port)
   return listening
 end function
 
+// Mirror Quake's MaxPlayers_f routine and its observable state changes.
 function MaxPlayers_f(currentPlayers, maximumLimit, serverActive, requested)
   if requested is void then return [currentPlayers, currentPlayers > 1, currentPlayers > 1, ""] end if
   if serverActive then return [currentPlayers, listening, currentPlayers > 1, "maxplayers can not be changed while a server is running."] end if
@@ -186,6 +206,7 @@ function MaxPlayers_f(currentPlayers, maximumLimit, serverActive, requested)
   return [count, count > 1, count > 1, message]
 end function
 
+// Mirror Quake's NET_Port_f routine and its observable state changes.
 function NET_Port_f(state, requested)
   global DEFAULTnet_hostport, net_hostport
   if requested is void then return net_hostport end if
@@ -201,12 +222,14 @@ function NET_Port_f(state, requested)
   return net_hostport
 end function
 
+// Format and emit slist header.
 function PrintSlistHeader()
   global slistLastShown
   slistLastShown = 0
   return ["Server          Map             Users", "--------------- --------------- -----"]
 end function
 
+// Format and emit slist.
 function PrintSlist()
   global slistLastShown
   lines = []
@@ -224,11 +247,13 @@ function PrintSlist()
   return lines
 end function
 
+// Format and emit slist trailer.
 function PrintSlistTrailer()
   if hostCacheCount > 0 then return ["== end list ==", ""] end if
   return ["No Quake servers found.", ""]
 end function
 
+// Mirror Quake's NET_ReplaceHostCache routine and its observable state changes.
 function NET_ReplaceHostCache(items)
   global hostcache, hostCacheCount
   hostcache = items
@@ -236,31 +261,37 @@ function NET_ReplaceHostCache(items)
   return hostCacheCount
 end function
 
+// Mirror Quake's NET_ClearPollProcedures routine and its observable state changes.
 function NET_ClearPollProcedures()
   global pollProcedureList
   pollProcedureList = []
   return true
 end function
 
+// Mirror Quake's NET_SetSlistStartTime routine and its observable state changes.
 function NET_SetSlistStartTime(value)
   global slistStartTime
   slistStartTime = value
   return slistStartTime
 end function
 
+// Mirror Quake's NET_SlistFlags routine and its observable state changes.
 function NET_SlistFlags()
   return [slistInProgress, slistSilent, slistLocal]
 end function
 
+// Mirror Quake's NET_PollProcedureSnapshot routine and its observable state changes.
 function inline NET_PollProcedureSnapshot()
   return pollProcedureList
 end function
 
+// Mirror Quake's NET_SocketCounts routine and its observable state changes.
 function NET_SocketCounts()
   compactActiveSockets()
   return [len(net_activeSockets), len(net_freeSockets), net_numsockets]
 end function
 
+// Return socket queued state derived from the active module state.
 function socketQueuedState(socket)
   if socket is void then return [0, 0] end if
   queuedMessages = 0
@@ -304,19 +335,23 @@ function NET_QueueSnapshot()
   ]
 end function
 
+// Mirror Quake's NET_PortState routine and its observable state changes.
 function inline NET_PortState()
   return [net_hostport, DEFAULTnet_hostport]
 end function
 
+// Mirror Quake's NET_IsListening routine and its observable state changes.
 function NET_IsListening()
   return listening
 end function
 
+// Mirror Quake's NET_MessageCounters routine and its observable state changes.
 function NET_MessageCounters()
   synchronizeCounters()
   return [messagesSent, messagesReceived, unreliableMessagesSent, unreliableMessagesReceived]
 end function
 
+// Provide schedule poll procedure behavior for the active subsystem.
 function SchedulePollProcedure(procedureName, timeOffset, argument)
   global pollProcedureList
   scheduled = SetNetTime() + timeOffset
@@ -338,6 +373,7 @@ function SchedulePollProcedure(procedureName, timeOffset, argument)
   return scheduled
 end function
 
+// Mirror Quake's NET_Slist_f routine and its observable state changes.
 function NET_Slist_f(state, silent, localOnly, port)
   global networkState, slistInProgress, slistSilent, slistLocal, slistStartTime, hostCacheCount, hostcache, slistPort
   if slistInProgress then return false end if
@@ -355,6 +391,7 @@ function NET_Slist_f(state, silent, localOnly, port)
   return true
 end function
 
+// Mirror Quake's Slist_Send routine and its observable state changes.
 function Slist_Send()
   global hostcache, hostCacheCount
   if not slistInProgress or networkState is void then return false end if
@@ -379,6 +416,7 @@ function Slist_Send()
   return result
 end function
 
+// Mirror Quake's Slist_Poll routine and its observable state changes.
 function Slist_Poll()
   global hostcache, hostCacheCount, slistInProgress, slistSilent, slistLocal
   if not slistInProgress or networkState is void then return false end if
@@ -395,6 +433,7 @@ function Slist_Poll()
   return false
 end function
 
+// Mirror Quake's NET_Poll routine and its observable state changes.
 function NET_Poll()
   global pollProcedureList
   SetNetTime()
@@ -409,6 +448,7 @@ function NET_Poll()
   return executed
 end function
 
+// Provide cached address behavior for the active subsystem.
 function cachedAddress(state, host)
   wanted = host
   for each cached in state.hostCache
@@ -417,6 +457,7 @@ function cachedAddress(state, host)
   return wanted
 end function
 
+// Mirror Quake's NET_Connect routine and its observable state changes.
 function NET_Connect(state, host, timeoutMilliseconds)
   SetNetTime()
   target = host
@@ -464,6 +505,7 @@ function NET_ConnectInterop(state, host, timeoutMilliseconds, resendMilliseconds
   return result
 end function
 
+// Mirror Quake's NET_CheckNewConnections routine and its observable state changes.
 function NET_CheckNewConnections(state)
   SetNetTime()
   result = netloop.Datagram_CheckNewConnections(state)
@@ -474,6 +516,7 @@ function NET_CheckNewConnections(state)
   return result
 end function
 
+// Mirror Quake's NET_Close routine and its observable state changes.
 function NET_Close(socket)
   if socket is void then return false end if
   SetNetTime()
@@ -490,6 +533,7 @@ function NET_Close(socket)
   return released
 end function
 
+// Update module state for counters.
 function synchronizeCounters()
   global messagesSent, messagesReceived, unreliableMessagesSent, unreliableMessagesReceived
   messagesSent = netloop.messagesSent
@@ -499,16 +543,19 @@ function synchronizeCounters()
   return true
 end function
 
+// Mirror Quake's NET_SetMessageTimeout routine and its observable state changes.
 function NET_SetMessageTimeout(timeoutSeconds)
   global net_messagetimeout
   net_messagetimeout = timeoutSeconds
   return net_messagetimeout
 end function
 
+// Mirror Quake's NET_SocketTimedOut routine and its observable state changes.
 function NET_SocketTimedOut(socket, timeoutSeconds)
   return netloop.timedOut(socket, timeoutSeconds)
 end function
 
+// Mirror Quake's NET_GetMessage routine and its observable state changes.
 function NET_GetMessage(socket, destination, timeoutSeconds)
   if socket is void or socket.disconnected then return -1 end if
   SetNetTime()
@@ -521,6 +568,7 @@ function NET_GetMessage(socket, destination, timeoutSeconds)
   return result
 end function
 
+// Mirror Quake's NET_SendMessage routine and its observable state changes.
 function NET_SendMessage(socket, data)
   if socket is void or socket.disconnected then return -1 end if
   SetNetTime()
@@ -529,6 +577,7 @@ function NET_SendMessage(socket, data)
   return result
 end function
 
+// Mirror Quake's NET_SendUnreliableMessage routine and its observable state changes.
 function NET_SendUnreliableMessage(socket, data)
   if socket is void or socket.disconnected then return -1 end if
   SetNetTime()
@@ -537,18 +586,22 @@ function NET_SendUnreliableMessage(socket, data)
   return result
 end function
 
+// Mirror Quake's NET_CanSendMessage routine and its observable state changes.
 function NET_CanSendMessage(socket)
   if socket is void or socket.disconnected then return false end if
   SetNetTime()
   return netloop.canSendMessage(socket)
 end function
 
+// Mirror Quake's NET_CanSendUnreliableMessage routine and its observable state changes.
 function NET_CanSendUnreliableMessage(socket)
   if socket is void or socket.disconnected then return false end if
   return true
 end function
 
+// Mirror Quake's NET_SendToAll routine and its observable state changes.
 function NET_SendToAll(clients, data, blocktime)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   state1 = []
   state2 = []
   count = 0
@@ -600,6 +653,7 @@ function NET_SendToAll(clients, data, blocktime)
   return count
 end function
 
+// Mirror Quake's NET_Init routine and its observable state changes.
 function NET_Init(state, maxClients, dedicated, listenRequested, requestedPort, noLan)
   global networkState, maximumClients, net_numsockets, net_activeSockets, net_freeSockets
   global net_activeconnections, listening, DEFAULTnet_hostport, net_hostport, pollProcedureList
@@ -630,6 +684,7 @@ function NET_Init(state, maxClients, dedicated, listenRequested, requestedPort, 
   return 0
 end function
 
+// Mirror Quake's NET_Shutdown routine and its observable state changes.
 function NET_Shutdown(state)
   global net_numsockets, net_activeSockets, net_freeSockets, net_activeconnections, listening, pollProcedureList
   for each socket in net_activeSockets
@@ -645,6 +700,7 @@ function NET_Shutdown(state)
   return true
 end function
 
+// Report whether is id.
 function IsID(address, idgodsEnabled)
   if not idgodsEnabled then return false end if
   numeric = netloop.ipv4Number(address)

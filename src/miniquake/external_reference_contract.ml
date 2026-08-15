@@ -1,11 +1,12 @@
 /*
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Original MiniQuake reference, binary interoperability and raw visual-reference
 contract. The original executable is supplied by the tester and is never
 redistributed in the MiniQuake source package or result archive.
 */
-
 package miniquake.external_reference_contract
 
 const ORIGINAL_GLQUAKE_SHA256 = "04862c835c399bc9184f62101ae0390c2a758c21656ec06dcc0384e0f373d588"
@@ -26,6 +27,7 @@ const ORIGINAL_REFERENCE_FINGERPRINT = 0xdc355175
 const COMPAT_FINAL_STATUS = "compat_109_final_candidate_v1"
 const COMPAT_FINAL_FINGERPRINT = 0xe04a7727
 
+// Return reference values derived from the active module state.
 function referenceValues()
   return [
     ORIGINAL_GLQUAKE_BYTES,
@@ -41,6 +43,7 @@ function referenceValues()
   ]
 end function
 
+// Provide visual scenarios behavior for the active subsystem.
 function visualScenarios()
   return [
     ["demo1", 256],
@@ -49,10 +52,12 @@ function visualScenarios()
   ]
 end function
 
+// Provide visual threshold behavior for the active subsystem.
 function visualThreshold()
   return ORIGINAL_CAPTURE_MIN_SSIM
 end function
 
+// Provide required external gates behavior for the active subsystem.
 function requiredExternalGates()
   return [
     "original_binary_interop",
@@ -60,6 +65,7 @@ function requiredExternalGates()
   ]
 end function
 
+// Provide original server interop complete behavior for the active subsystem.
 function originalServerInteropComplete(connected, spawned, signon, modelCount, soundCount)
   return connected and
     spawned and
@@ -87,10 +93,12 @@ function originalServerInteropNetworkProvenance(
     not demoPlayback
 end function
 
+// Provide original client interop complete behavior for the active subsystem.
 function inline originalClientInteropComplete(activeClients, spawned, signon)
   return activeClients > 0 and spawned and signon >= 3 and signon <= 4
 end function
 
+// Provide reference contract text behavior for the active subsystem.
 function referenceContractText()
   return "original_sha256=" + ORIGINAL_GLQUAKE_SHA256 + "\n" +
     "original_bytes=435712\n" +
@@ -108,6 +116,7 @@ function referenceContractText()
     "system_opengl=1\n"
 end function
 
+// Provide final contract text behavior for the active subsystem.
 function finalContractText()
   return "parent_status=compat_109_release_candidate_v1\n" +
     "parent_fingerprint=0x29b72a98\n" +
@@ -123,6 +132,7 @@ function finalContractText()
     "status=compat_109_final_candidate_v1\n"
 end function
 
+// Provide reference contract has required fields behavior for the active subsystem.
 function referenceContractHasRequiredFields()
   text = referenceContractText()
   return len(bytes(text)) > 256 and
@@ -130,6 +140,7 @@ function referenceContractHasRequiredFields()
     ORIGINAL_GLQUAKE_BYTES == 435712
 end function
 
+// Provide final contract has required fields behavior for the active subsystem.
 function finalContractHasRequiredFields()
   text = finalContractText()
   return len(bytes(text)) > 256 and
@@ -137,6 +148,7 @@ function finalContractHasRequiredFields()
     COMPAT_FINAL_STATUS == "compat_109_final_candidate_v1"
 end function
 
+// Validate reference contract and report any incompatibility.
 function validateReferenceContract()
   return len(referenceValues()) == 10 and
     len(visualScenarios()) == 3 and

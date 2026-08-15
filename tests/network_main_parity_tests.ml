@@ -1,16 +1,17 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-060: net_main.c public lifecycle, qsocket pool, polling and active-port parity.
 */
-
 import miniquake.net_main as netmain
 import miniquake.net_loop as netloop
 
 testIndex = 0
 failures = 0
 
+// Assert that the condition holds and identify a failing test.
 function bp060Check(value, name)
   global testIndex, failures
   testIndex = testIndex + 1
@@ -23,6 +24,7 @@ function bp060Check(value, name)
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   state = netloop.createState()
   bp060Check(netmain.DEFAULTnet_hostport == 26000, "historical default port")

@@ -1,20 +1,22 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-024 stock progs.dat compatibility gate. Requires user-owned Quake data.
 */
-
 import miniquake.filesystem as qfs
 import miniquake.format.progs as progs
 import miniquake.quakec.contract as contract
 
+// Report the requested value and return the corresponding failure status.
 function fail(message)
   print "MiniQuake BP-024 stock QuakeC test: FAIL"
   print "  " + message
   return 1
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   if len(args) < 1 then
     print "usage: MiniQuakeQuakeCStockTests.exe BASEDIR [GAME]"

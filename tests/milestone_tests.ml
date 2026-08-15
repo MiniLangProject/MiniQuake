@@ -1,13 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+MiniLang parity and regression tests for tests/milestone_tests.ml.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.launch as launch
@@ -45,16 +42,19 @@ import miniquake.quakec.vm as vm
 import miniquake.quakec.edict as quakecEdict
 import miniquake.platform.win32 as platformWin
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9100, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9101, name + ": expected true") end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function assertNear(actual, expected, tolerance, name)
   difference = actual - expected
   if difference < 0.0 then difference = -difference end if
@@ -62,6 +62,7 @@ function assertNear(actual, expected, tolerance, name)
   return true
 end function
 
+// Exercise receive udp as part of this deterministic regression fixture.
 function receiveUdp(socket, attempts)
   index = 0
   while index < attempts
@@ -74,6 +75,7 @@ function receiveUdp(socket, attempts)
   return error(9103, "UDP fixture timed out")
 end function
 
+// Verify launch parsing against the expected Quake behavior.
 function testLaunchParsing()
   options = launch.parse(["-basedir", "C:/Quake", "-game", "hipnotic", "-width", "1024", "-height", "768", "-nosound", "+map", "e1m1"])
   assertEqual(options.basedir, "C:/Quake", "basedir")
@@ -83,9 +85,18 @@ function testLaunchParsing()
   assertEqual(options.noSound, true, "nosound")
   assertEqual(options.startMap, "e1m1", "start map")
   assertTrue(len(options.plusCommands) == 1, "plus command count")
+  attract = launch.parse(["--play", "C:/Quake"])
+  assertEqual(attract.basedir, "C:/Quake", "directory-only play basedir")
+  assertEqual(attract.startMap, "", "directory-only play leaves map to startdemos")
+  assertEqual(len(attract.plusCommands), 0, "directory-only play has no map command")
+  direct = launch.parse(["--play", "C:/Quake", "e1m2", "-nosound"])
+  assertEqual(direct.startMap, "e1m2", "play optional map")
+  assertEqual(direct.noSound, true, "play options continue after optional map")
+  assertEqual(len(direct.plusCommands), 1, "play optional map command")
   return true
 end function
 
+// Verify host timing against the expected Quake behavior.
 function testHostTiming()
   timing = t.HostTiming(0.0, 0.0, 0.0, 0, 0)
   assertEqual(host.filterTime(timing, 0.001, 72.0, 0.0, false), false, "filtered short frame")
@@ -99,6 +110,7 @@ function testHostTiming()
   return true
 end function
 
+// Verify move command encoding against the expected Quake behavior.
 function testMoveCommandEncoding()
   // usercmd_t stores movement as float in WinQuake, while MSG_WriteShort takes
   // int. This verifies the same truncation at MiniQuake's protocol boundary.
@@ -129,6 +141,7 @@ function testMoveCommandEncoding()
   return true
 end function
 
+// Verify console state against the expected Quake behavior.
 function testConsoleState()
   state = console.create(32)
   index = 0
@@ -148,6 +161,7 @@ function testConsoleState()
   return true
 end function
 
+// Verify menu state against the expected Quake behavior.
 function testMenuState()
   state = menu.create()
   assertEqual(state.active, false, "menu initially closed")
@@ -183,6 +197,7 @@ function testMenuState()
   return true
 end function
 
+// Verify mouse scaling against the expected Quake behavior.
 function testMouseScaling()
   command = gameInput.createCommand()
   gameInput.applyMouseDelta(command, 100.0, 50.0, 3.0, 0.022, 0.022)
@@ -193,6 +208,7 @@ function testMouseScaling()
   return true
 end function
 
+// Verify key bindings against the expected Quake behavior.
 function testKeyBindings()
   gameInput.resetBindings()
   assertEqual(gameInput.commandForKey("W"), "+forward", "default W binding")
@@ -434,6 +450,7 @@ function testKeyBindings()
   return true
 end function
 
+// Verify status bar rules against the expected Quake behavior.
 function testStatusBarRules()
   player = movement.create(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
   player.health = 100.0
@@ -486,6 +503,7 @@ function testStatusBarRules()
   return true
 end function
 
+// Verify view math against the expected Quake behavior.
 function testViewMath()
   velocity = t.Vec3(160.0, 80.0, 0.0)
   bob = view.calcBob(0.15, velocity, 0.02, 0.6, 0.5)
@@ -516,6 +534,7 @@ function testViewMath()
   return true
 end function
 
+// Verify particle lifecycle against the expected Quake behavior.
 function testParticleLifecycle()
   spawned = particles.runEffect(t.Vec3(0.0, 0.0, 0.0), t.Vec3(1.0, 0.0, 0.0), 5000, 32, 1.0)
   assertEqual(len(spawned), particles.MAX_PARTICLES, "particle cap")
@@ -526,6 +545,7 @@ function testParticleLifecycle()
   return true
 end function
 
+// Verify temporary entity protocol against the expected Quake behavior.
 function testTemporaryEntityProtocol()
   buffer = sz.alloc(128)
   msg.writeByte(buffer, c.SVC_TEMP_ENTITY)
@@ -547,6 +567,7 @@ function testTemporaryEntityProtocol()
   return true
 end function
 
+// Verify client effects against the expected Quake behavior.
 function testClientEffects()
   client.CL_ClearDlights()
   explosion = t.TemporaryEntity(c.TE_EXPLOSION, t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), 0)
@@ -574,6 +595,7 @@ function testClientEffects()
   return true
 end function
 
+// Verify server event encoding against the expected Quake behavior.
 function testServerEventEncoding()
   gameServer = server.create(1)
   gameServer.soundPrecache = ["", "weapons/test.wav"]
@@ -596,6 +618,7 @@ function testServerEventEncoding()
   return true
 end function
 
+// Verify baseline encoding against the expected Quake behavior.
 function testBaselineEncoding()
   buffer = sz.alloc(128)
   msg.writeByte(buffer, c.SVC_SPAWNBASELINE)
@@ -623,6 +646,7 @@ function testBaselineEncoding()
   return true
 end function
 
+// Verify fast entity encoding against the expected Quake behavior.
 function testFastEntityEncoding()
   gameServer = server.create(1)
   item = edict.create(2)
@@ -666,6 +690,7 @@ function testFastEntityEncoding()
   return true
 end function
 
+// Verify local player precision against the expected Quake behavior.
 function testLocalPlayerPrecision()
   player = movement.create(t.Vec3(10.125, 20.25, 30.375), t.Vec3(0.0, 0.0, 0.0))
   localClient = client.create(player)
@@ -706,6 +731,7 @@ function testLocalPlayerPrecision()
   return true
 end function
 
+// Verify batched fast entity packet against the expected Quake behavior.
 function testBatchedFastEntityPacket()
   // A real server frame contains many fast updates in one datagram. This
   // packet is large enough to exercise the event collector with hundreds of
@@ -729,6 +755,7 @@ function testBatchedFastEntityPacket()
   return true
 end function
 
+// Verify software mixer against the expected Quake behavior.
 function testSoftwareMixer()
   samples = bytes(4)
   bio.putI16(samples, 0, 1000)
@@ -783,6 +810,7 @@ function testSoftwareMixer()
   return true
 end function
 
+// Verify datagram framing against the expected Quake behavior.
 function testDatagramFraming()
   datagram.resetStats()
   sender = datagram.createChannel()
@@ -984,6 +1012,7 @@ function testDatagramFraming()
   return true
 end function
 
+// Verify client inventory protocol against the expected Quake behavior.
 function testClientInventoryProtocol()
   sourcePlayer = movement.create(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
   sourcePlayer.viewHeight = 25.0
@@ -1032,6 +1061,7 @@ function testClientInventoryProtocol()
   return true
 end function
 
+// Verify loopback signon handshake against the expected Quake behavior.
 function testLoopbackSignonHandshake()
   allocationProgram = t.QuakeCProgram(
     "allocation.dat",
@@ -1140,6 +1170,7 @@ function testLoopbackSignonHandshake()
   return true
 end function
 
+// Verify demo playback against the expected Quake behavior.
 function testDemoPlayback()
   payload = sz.alloc(128)
   msg.writeByte(payload, c.SVC_VERSION)
@@ -1187,6 +1218,7 @@ function testDemoPlayback()
   return true
 end function
 
+// Verify savegame compatibility against the expected Quake behavior.
 function testSavegameCompatibility()
   globalDefs = [
     t.QuakeCDef(c.EV_FLOAT | c.DEF_SAVEGLOBAL, 40, 0, "serverflags"),
@@ -1247,6 +1279,7 @@ function testSavegameCompatibility()
   return true
 end function
 
+// Verify net main lifecycle against the expected Quake behavior.
 function testNetMainLifecycle()
   networkState = netloop.createState()
   initialized = netmain.NET_Init(networkState, 2, false, false, 26000, true)
@@ -1285,6 +1318,8 @@ function testNetMainLifecycle()
   assertEqual(netmain.NET_GetMessage(clientSocket, incoming, 300.0), 1, "initial serverinfo delivery")
   accepted.spawned = true
   accepted.spawnParms[0] = 42.0
+  accepted.playerState.origin.x = 123.0
+  preservedPlayerState = accepted.playerState
   preservedSocket = accepted.socket
   snapshot = server.beginChangeLevel(gameServer)
   assertEqual(netmain.NET_GetMessage(clientSocket, incoming, 300.0), 1, "changelevel reconnect delivery")
@@ -1299,6 +1334,8 @@ function testNetMainLifecycle()
   assertEqual(restored, 1, "active client restored after level spawn")
   assertTrue(gameServer.clients[0].socket == preservedSocket, "changelevel retains qsocket")
   assertNear(gameServer.clients[0].spawnParms[0], 42.0, 0.00001, "changelevel retains spawn parms")
+  assertTrue(gameServer.clients[0].playerState == preservedPlayerState, "changelevel retains player-state identity")
+  assertNear(gameServer.clients[0].playerState.origin.x, 123.0, 0.00001, "changelevel retains player state")
   assertEqual(gameServer.clients[0].spawned, false, "changelevel restarts signon")
 
   server.shutdown(gameServer)
@@ -1307,7 +1344,9 @@ function testNetMainLifecycle()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   passed = 0
   print "MiniQuake milestone tests starting: 24"
 

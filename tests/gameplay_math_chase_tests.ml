@@ -1,21 +1,28 @@
-/* BP-075: mathlib.c and chase.c gameplay/presentation parity. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
+BP-075: mathlib.c and chase.c gameplay/presentation parity.
+*/
 import miniquake.mathlib as math
 import miniquake.chase as chase
 import miniquake.types as t
 import miniquake.cvar as cvar
 import miniquake.native as native
 
+// Assert that the condition holds and identify a failing test.
 function yes(value, name)
   if not value then return error(10750, name + ": expected true") end if
   return true
 end function
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(10751, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function near(actual, expected, tolerance, name)
   difference = actual - expected
   if difference < 0.0 then difference = -difference end if
@@ -23,6 +30,7 @@ function near(actual, expected, tolerance, name)
   return true
 end function
 
+// Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
   print "[" + number + "/22] " + name
   result = try(fn())
@@ -30,16 +38,19 @@ function run(number, name, fn)
   return true
 end function
 
+// Verify anglemod wrap against the expected Quake behavior.
 function testAnglemodWrap()
   near(math.anglemod(450.0), 90.0, 0.000001, "anglemod wrap")
   return true
 end function
 
+// Verify anglemod negative against the expected Quake behavior.
 function testAnglemodNegative()
   near(math.anglemod(-1.0), 359.000244140625, 0.000001, "anglemod negative")
   return true
 end function
 
+// Verify angle vectors forward against the expected Quake behavior.
 function testAngleVectorsForward()
   values = math.AngleVectors(t.Vec3(0.0, 90.0, 0.0))
   near(values[0].x, 0.0, 0.00001, "forward x")
@@ -47,6 +58,7 @@ function testAngleVectorsForward()
   return true
 end function
 
+// Verify angle vectors right against the expected Quake behavior.
 function testAngleVectorsRight()
   values = math.AngleVectors(t.Vec3(0.0, 0.0, 0.0))
   near(values[1].x, 0.0, 0.00001, "right x")
@@ -54,6 +66,7 @@ function testAngleVectorsRight()
   return true
 end function
 
+// Verify vector normalize against the expected Quake behavior.
 function testVectorNormalize()
   value = t.Vec3(3.0, 4.0, 0.0)
   near(math.VectorNormalize(value), 5.0, 0.00001, "length")
@@ -62,12 +75,14 @@ function testVectorNormalize()
   return true
 end function
 
+// Verify project plane against the expected Quake behavior.
 function testProjectPlane()
   result = math.ProjectPointOnPlane(t.Vec3(1.0, 2.0, 3.0), t.Vec3(0.0, 0.0, 1.0))
   near(result.z, 0.0, 0.00001, "projected z")
   return true
 end function
 
+// Verify perpendicular against the expected Quake behavior.
 function testPerpendicular()
   result = math.PerpendicularVector(t.Vec3(0.0, 0.0, 1.0))
   near(math.DotProduct(result, t.Vec3(0.0, 0.0, 1.0)), 0.0, 0.00001, "perpendicular dot")
@@ -75,6 +90,7 @@ function testPerpendicular()
   return true
 end function
 
+// Verify rotate point against the expected Quake behavior.
 function testRotatePoint()
   result = math.RotatePointAroundVector(t.Vec3(0.0, 0.0, 1.0), t.Vec3(1.0, 0.0, 0.0), 90.0)
   near(result.x, 0.0, 0.0001, "rotated x")
@@ -82,6 +98,7 @@ function testRotatePoint()
   return true
 end function
 
+// Verify floor div mod against the expected Quake behavior.
 function testFloorDivMod()
   result = math.FloorDivMod(-7.0, 3.0)
   equal(result[0], -3, "quotient")
@@ -89,16 +106,19 @@ function testFloorDivMod()
   return true
 end function
 
+// Verify gcd against the expected Quake behavior.
 function testGcd()
   equal(math.GreatestCommonDivisor(462, 1071), 21, "gcd")
   return true
 end function
 
+// Verify log2 against the expected Quake behavior.
 function testLog2()
   equal(math.Q_log2(1025), 10, "qlog2")
   return true
 end function
 
+// Verify chase defaults against the expected Quake behavior.
 function testChaseDefaults()
   state = chase.create()
   equal(state.active, false, "active")
@@ -108,6 +128,7 @@ function testChaseDefaults()
   return true
 end function
 
+// Verify chase registration against the expected Quake behavior.
 function testChaseRegistration()
   registry = cvar.createRegistry()
   chase.Chase_Init(registry)
@@ -115,6 +136,7 @@ function testChaseRegistration()
   return true
 end function
 
+// Verify chase sync against the expected Quake behavior.
 function testChaseSync()
   registry = cvar.createRegistry()
   state = chase.Chase_Init(registry)
@@ -130,6 +152,7 @@ function testChaseSync()
   return true
 end function
 
+// Verify chase reset noop against the expected Quake behavior.
 function testChaseResetNoop()
   state = chase.create()
   result = chase.Chase_Reset(state)
@@ -137,6 +160,7 @@ function testChaseResetNoop()
   return true
 end function
 
+// Verify trace line clear against the expected Quake behavior.
 function testTraceLineClear()
   result = chase.TraceLine(void, t.Vec3(1.0, 2.0, 3.0), t.Vec3(4.0, 5.0, 6.0))
   near(result.x, 4.0, 0.0, "trace x")
@@ -145,6 +169,7 @@ function testTraceLineClear()
   return true
 end function
 
+// Verify chase destination against the expected Quake behavior.
 function testChaseDestination()
   state = chase.create()
   result = chase.Chase_UpdateRefdef(
@@ -160,6 +185,7 @@ function testChaseDestination()
   return true
 end function
 
+// Verify chase right offset against the expected Quake behavior.
 function testChaseRightOffset()
   state = chase.create()
   state.right = 10.0
@@ -168,6 +194,7 @@ function testChaseRightOffset()
   return true
 end function
 
+// Verify chase preserves yaw roll against the expected Quake behavior.
 function testChasePreservesYawRoll()
   state = chase.create()
   result = chase.Chase_UpdateRefdef(
@@ -182,6 +209,7 @@ function testChasePreservesYawRoll()
   return true
 end function
 
+// Verify chase pitch clear against the expected Quake behavior.
 function testChasePitchClear()
   state = chase.create()
   result = chase.Chase_Update(state, t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), void)
@@ -189,6 +217,7 @@ function testChasePitchClear()
   return true
 end function
 
+// Verify chase impact against the expected Quake behavior.
 function testChaseImpact()
   state = chase.create()
   result = chase.Chase_Update(state, t.Vec3(1.0, 2.0, 3.0), t.Vec3(0.0, 0.0, 0.0), void)
@@ -198,6 +227,7 @@ function testChaseImpact()
   return true
 end function
 
+// Verify chase convenience against the expected Quake behavior.
 function testChaseConvenience()
   state = chase.create()
   result = chase.update(state, t.Vec3(5.0, 6.0, 7.0), t.Vec3(0.0, 0.0, 0.0))
@@ -206,6 +236,7 @@ function testChaseConvenience()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   passed = 0
   if run(1, "anglemod wrap", testAnglemodWrap) then passed = passed + 1 end if

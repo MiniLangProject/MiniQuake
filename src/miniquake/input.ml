@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.input.
+*/
 package miniquake.input
 
 import miniquake.types as t
@@ -56,6 +63,12 @@ joystickStartupOverride = void
 joyPov = 65535
 joySnapshotButtons = 0
 bindings = []
+polledBindings = []
+polledKeyDownSnapshot = bytes(256)
+polledKeyPressedSnapshot = bytes(256)
+polledKeyQueryMask = bytes(256)
+gameplayTransitionBlocked = false
+gameplayTransitionHeldCodes = []
 
 // cl_input.c's kbutton_t is deliberately represented as a three-element
 // mutable value: two independently held key numbers followed by the original
@@ -82,6 +95,16 @@ pitchDriftStopRequested = false
 pitchDriftStartRequested = false
 lookSpringEnabled = false
 
+// Keep the stock kbutton command set in persistent storage.  Constructing this
+// array in buttonCommands used to allocate it multiple times in every gameplay
+// frame while the live binding poll was active.
+buttonCommandNames = [
+  "+klook", "+mlook", "+moveup", "+movedown", "+left", "+right",
+  "+forward", "+back", "+lookup", "+lookdown", "+moveleft",
+  "+moveright", "+speed", "+strafe", "+attack", "+use", "+jump",
+]
+
+// Create and initialize button.
 function createButton()
   return [0, 0, 0]
 end function
@@ -105,6 +128,7 @@ function KeyDown(button, key)
   return true
 end function
 
+// Provide key up behavior for the active subsystem.
 function KeyUp(button, key)
   if key is void then
     button[0] = 0
@@ -125,6 +149,7 @@ function KeyUp(button, key)
   return true
 end function
 
+// Apply the Quake-compatible cl key state behavior.
 function CL_KeyState(button)
   impulseDown = (button[2] & 2) != 0
   impulseUp = (button[2] & 4) != 0
@@ -141,45 +166,80 @@ function CL_KeyState(button)
   return value
 end function
 
+// Mirror Quake's IN_KLookDown routine and its observable state changes.
 function IN_KLookDown(key) return KeyDown(inKLook, key) end function
+// Mirror Quake's IN_KLookUp routine and its observable state changes.
 function IN_KLookUp(key) return KeyUp(inKLook, key) end function
+// Mirror Quake's IN_MLookDown routine and its observable state changes.
 function IN_MLookDown(key) return KeyDown(inMLook, key) end function
+// Mirror Quake's IN_MLookUp routine and its observable state changes.
 function IN_MLookUp(key)
   result = KeyUp(inMLook, key)
   if (inMLook[2] & 1) == 0 and lookSpringEnabled then requestStartPitchDrift() end if
   return result
 end function
+// Mirror Quake's IN_UpDown routine and its observable state changes.
 function IN_UpDown(key) return KeyDown(inUp, key) end function
+// Mirror Quake's IN_UpUp routine and its observable state changes.
 function IN_UpUp(key) return KeyUp(inUp, key) end function
+// Mirror Quake's IN_DownDown routine and its observable state changes.
 function IN_DownDown(key) return KeyDown(inDown, key) end function
+// Mirror Quake's IN_DownUp routine and its observable state changes.
 function IN_DownUp(key) return KeyUp(inDown, key) end function
+// Mirror Quake's IN_LeftDown routine and its observable state changes.
 function IN_LeftDown(key) return KeyDown(inLeft, key) end function
+// Mirror Quake's IN_LeftUp routine and its observable state changes.
 function IN_LeftUp(key) return KeyUp(inLeft, key) end function
+// Mirror Quake's IN_RightDown routine and its observable state changes.
 function IN_RightDown(key) return KeyDown(inRight, key) end function
+// Mirror Quake's IN_RightUp routine and its observable state changes.
 function IN_RightUp(key) return KeyUp(inRight, key) end function
+// Mirror Quake's IN_ForwardDown routine and its observable state changes.
 function IN_ForwardDown(key) return KeyDown(inForward, key) end function
+// Mirror Quake's IN_ForwardUp routine and its observable state changes.
 function IN_ForwardUp(key) return KeyUp(inForward, key) end function
+// Mirror Quake's IN_BackDown routine and its observable state changes.
 function IN_BackDown(key) return KeyDown(inBack, key) end function
+// Mirror Quake's IN_BackUp routine and its observable state changes.
 function IN_BackUp(key) return KeyUp(inBack, key) end function
+// Mirror Quake's IN_LookupDown routine and its observable state changes.
 function IN_LookupDown(key) return KeyDown(inLookup, key) end function
+// Mirror Quake's IN_LookupUp routine and its observable state changes.
 function IN_LookupUp(key) return KeyUp(inLookup, key) end function
+// Mirror Quake's IN_LookdownDown routine and its observable state changes.
 function IN_LookdownDown(key) return KeyDown(inLookdown, key) end function
+// Mirror Quake's IN_LookdownUp routine and its observable state changes.
 function IN_LookdownUp(key) return KeyUp(inLookdown, key) end function
+// Mirror Quake's IN_MoveleftDown routine and its observable state changes.
 function IN_MoveleftDown(key) return KeyDown(inMoveleft, key) end function
+// Mirror Quake's IN_MoveleftUp routine and its observable state changes.
 function IN_MoveleftUp(key) return KeyUp(inMoveleft, key) end function
+// Mirror Quake's IN_MoverightDown routine and its observable state changes.
 function IN_MoverightDown(key) return KeyDown(inMoveright, key) end function
+// Mirror Quake's IN_MoverightUp routine and its observable state changes.
 function IN_MoverightUp(key) return KeyUp(inMoveright, key) end function
+// Mirror Quake's IN_SpeedDown routine and its observable state changes.
 function IN_SpeedDown(key) return KeyDown(inSpeed, key) end function
+// Mirror Quake's IN_SpeedUp routine and its observable state changes.
 function IN_SpeedUp(key) return KeyUp(inSpeed, key) end function
+// Mirror Quake's IN_StrafeDown routine and its observable state changes.
 function IN_StrafeDown(key) return KeyDown(inStrafe, key) end function
+// Mirror Quake's IN_StrafeUp routine and its observable state changes.
 function IN_StrafeUp(key) return KeyUp(inStrafe, key) end function
+// Mirror Quake's IN_AttackDown routine and its observable state changes.
 function IN_AttackDown(key) return KeyDown(inAttack, key) end function
+// Mirror Quake's IN_AttackUp routine and its observable state changes.
 function IN_AttackUp(key) return KeyUp(inAttack, key) end function
+// Mirror Quake's IN_UseDown routine and its observable state changes.
 function IN_UseDown(key) return KeyDown(inUse, key) end function
+// Mirror Quake's IN_UseUp routine and its observable state changes.
 function IN_UseUp(key) return KeyUp(inUse, key) end function
+// Mirror Quake's IN_JumpDown routine and its observable state changes.
 function IN_JumpDown(key) return KeyDown(inJump, key) end function
+// Mirror Quake's IN_JumpUp routine and its observable state changes.
 function IN_JumpUp(key) return KeyUp(inJump, key) end function
 
+// Mirror Quake's IN_Impulse routine and its observable state changes.
 function IN_Impulse(value)
   global inImpulse
   if value is string then value = common.atoi(value) end if
@@ -187,18 +247,21 @@ function IN_Impulse(value)
   return inImpulse
 end function
 
+// Provide request stop pitch drift behavior for the active subsystem.
 function requestStopPitchDrift()
   global pitchDriftStopRequested
   pitchDriftStopRequested = true
   return true
 end function
 
+// Provide request start pitch drift behavior for the active subsystem.
 function requestStartPitchDrift()
   global pitchDriftStartRequested
   pitchDriftStartRequested = true
   return true
 end function
 
+// Consume pending state for consume pitch drift requests.
 function consumePitchDriftRequests()
   global pitchDriftStopRequested, pitchDriftStartRequested
   result = [pitchDriftStopRequested, pitchDriftStartRequested]
@@ -207,17 +270,21 @@ function consumePitchDriftRequests()
   return result
 end function
 
+// Update module state for look spring.
 function setLookSpring(enabled)
   global lookSpringEnabled
   lookSpringEnabled = enabled
   return lookSpringEnabled
 end function
 
+// Convert data for lower.
 function lower(text)
   return bio.lower(text)
 end function
 
+// Return key code for name derived from the active module state.
 function keyCodeForName(name)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   wanted = lower(name)
   if wanted == "tab" then return 9 end if
   if wanted == "enter" then return 13 end if
@@ -261,6 +328,7 @@ function keyCodeForName(name)
   return -1
 end function
 
+// Provide key name for code behavior for the active subsystem.
 function keyNameForCode(code)
   if code == -1 then return "<KEY NOT FOUND>" end if
   if code > 32 and code < 127 then return decode(bytes([code])) end if
@@ -292,6 +360,7 @@ function keyNameForCode(code)
   return "<UNKNOWN KEYNUM>"
 end function
 
+// Provide bind key behavior for the active subsystem.
 function bindKey(keyName, command)
   global bindings
   code = keyCodeForName(keyName)
@@ -299,6 +368,7 @@ function bindKey(keyName, command)
   return setBindingCode(code, command)
 end function
 
+// Update module state for binding code.
 function setBindingCode(code, command)
   global bindings
   if code < 0 or code > 255 then return false end if
@@ -306,14 +376,17 @@ function setBindingCode(code, command)
   while index < len(bindings)
     if bindings[index][0] == code then
       bindings[index] = [code, keyNameForCode(code), command]
+      rebuildPolledBindings()
       return true
     end if
     index = index + 1
   end while
   bindings = bindings + [[code, keyNameForCode(code), command]]
+  rebuildPolledBindings()
   return true
 end function
 
+// Provide binding for code behavior for the active subsystem.
 function bindingForCode(code)
   for each item in bindings
     if item[0] == code then return item[2] end if
@@ -321,6 +394,7 @@ function bindingForCode(code)
   return void
 end function
 
+// Report whether binding code.
 function hasBindingCode(code)
   for each item in bindings
     if item[0] == code then return true end if
@@ -328,6 +402,7 @@ function hasBindingCode(code)
   return false
 end function
 
+// Provide unbind key behavior for the active subsystem.
 function unbindKey(keyName)
   global bindings
   code = keyCodeForName(keyName)
@@ -337,15 +412,19 @@ function unbindKey(keyName)
     if item[0] != code then result = result + [item] end if
   end for
   bindings = result
+  rebuildPolledBindings()
   return true
 end function
 
+// Provide unbind all behavior for the active subsystem.
 function unbindAll()
   global bindings
   bindings = []
+  rebuildPolledBindings()
   return true
 end function
 
+// Update module state for bindings.
 function resetBindings()
   unbindAll()
   bindKey("`", "toggleconsole")
@@ -373,6 +452,7 @@ function resetBindings()
   return true
 end function
 
+// Provide bindings for command behavior for the active subsystem.
 function bindingsForCommand(command)
   wanted = lower(command)
   result = []
@@ -385,6 +465,7 @@ function bindingsForCommand(command)
   return result
 end function
 
+// Provide binding for command behavior for the active subsystem.
 function bindingForCommand(command)
   found = bindingsForCommand(command)
   if len(found) == 0 then return "???" end if
@@ -392,6 +473,7 @@ function bindingForCommand(command)
   return found[0] + " or " + found[1]
 end function
 
+// Provide unbind command behavior for the active subsystem.
 function unbindCommand(command)
   global bindings
   wanted = lower(command)
@@ -400,9 +482,11 @@ function unbindCommand(command)
     if lower(item[2]) != wanted then result = result + [item] end if
   end for
   bindings = result
+  rebuildPolledBindings()
   return true
 end function
 
+// Provide command for key behavior for the active subsystem.
 function commandForKey(keyName)
   code = keyCodeForName(keyName)
   binding = bindingForCode(code)
@@ -410,6 +494,7 @@ function commandForKey(keyName)
   return ""
 end function
 
+// Convert data for quote binding.
 function quoteBinding(text)
   source = bytes(text)
   result = ""
@@ -423,6 +508,7 @@ function quoteBinding(text)
   return result
 end function
 
+// Provide binding text behavior for the active subsystem.
 function bindingText()
   text = ""
   code = 0
@@ -436,15 +522,34 @@ function bindingText()
   return text
 end function
 
+// Provide key is down behavior for the active subsystem.
 function keyIsDown(code)
   if code == 200 then return (win.mouseButtons() & 1) != 0 end if
   if code == 201 then return (win.mouseButtons() & 2) != 0 end if
   if code == 202 then return (win.mouseButtons() & 4) != 0 end if
+  if code >= 203 and code <= 206 then return (joyOldButtonState & (1 << (code - 203))) != 0 end if
+  if code >= 211 and code <= 234 then return (joyOldButtonState & (1 << (code - 207))) != 0 end if
+  if code >= 235 and code <= 238 then return (joyOldPovState & (1 << (code - 235))) != 0 end if
   virtualKey = virtualKeyForCode(code)
   if virtualKey < 0 then return false end if
   return win.keyDown(virtualKey)
 end function
 
+// Test a physical key while reusing the mouse snapshot captured for this poll.
+// Keyboard and joystick semantics deliberately remain identical to keyIsDown.
+function keyIsDownWithMouseSnapshot(code, mouseButtons)
+  if code == 200 then return (mouseButtons & 1) != 0 end if
+  if code == 201 then return (mouseButtons & 2) != 0 end if
+  if code == 202 then return (mouseButtons & 4) != 0 end if
+  if code >= 203 and code <= 206 then return (joyOldButtonState & (1 << (code - 203))) != 0 end if
+  if code >= 211 and code <= 234 then return (joyOldButtonState & (1 << (code - 207))) != 0 end if
+  if code >= 235 and code <= 238 then return (joyOldPovState & (1 << (code - 235))) != 0 end if
+  virtualKey = virtualKeyForCode(code)
+  if virtualKey < 0 then return false end if
+  return win.keyDown(virtualKey)
+end function
+
+// Provide virtual key for code behavior for the active subsystem.
 function virtualKeyForCode(code)
   if code >= 97 and code <= 122 then return code - 32 end if
   if code >= 48 and code <= 57 then return code end if
@@ -479,6 +584,7 @@ function virtualKeyForCode(code)
   return -1
 end function
 
+// Provide quake key for virtual key behavior for the active subsystem.
 function quakeKeyForVirtualKey(virtualKey)
   if virtualKey >= 65 and virtualKey <= 90 then return virtualKey + 32 end if
   if virtualKey >= 48 and virtualKey <= 57 then return virtualKey end if
@@ -532,6 +638,7 @@ function quakeKeyForScanCode(scanCode)
   return table[scanCode]
 end function
 
+// Provide action down behavior for the active subsystem.
 function actionDown(command)
   wanted = lower(command)
   for each item in bindings
@@ -540,6 +647,7 @@ function actionDown(command)
   return false
 end function
 
+// Provide action pressed behavior for the active subsystem.
 function actionPressed(command)
   wanted = lower(command)
   for each item in bindings
@@ -551,6 +659,7 @@ function actionPressed(command)
   return false
 end function
 
+// Provide button for command behavior for the active subsystem.
 function buttonForCommand(command)
   wanted = lower(command)
   if wanted == "+klook" then return inKLook end if
@@ -573,14 +682,49 @@ function buttonForCommand(command)
   return void
 end function
 
-function buttonCommands()
-  return [
-    "+klook", "+mlook", "+moveup", "+movedown", "+left", "+right",
-    "+forward", "+back", "+lookup", "+lookdown", "+moveleft",
-    "+moveright", "+speed", "+strafe", "+attack", "+use", "+jump",
-  ]
+// Parse the exact canonical impulse binding accepted by the original polling
+// path.  Non-impulse and non-canonical command strings return zero.
+function impulseForCommand(command)
+  source = bytes(command)
+  if len(source) < 9 or decode(slice(source, 0, 8)) != "impulse " then return 0 end if
+  impulse = common.atoi(decode(slice(source, 8, len(source) - 8)))
+  if impulse < 1 or impulse > 255 or command != "impulse " + impulse then return 0 end if
+  return impulse
 end function
 
+// Rebuild the small, immutable-at-runtime subset needed by the live input poll.
+// Bind commands that are handled solely by Key_Event are intentionally absent.
+function rebuildPolledBindings()
+  global polledBindings
+  result = []
+  for each item in bindings
+    command = lower(item[2])
+    button = buttonForCommand(command)
+    impulse = 0
+    if button is void then impulse = impulseForCommand(command) end if
+    if button is not void or impulse != 0 then
+      result = result + [[item[0], button, impulse, command]]
+    end if
+  end for
+  polledBindings = result
+  index = 0
+  while index < len(polledKeyQueryMask)
+    polledKeyQueryMask[index] = 0
+    index = index + 1
+  end while
+  for each item in polledBindings
+    virtualKey = virtualKeyForCode(item[0])
+    if virtualKey >= 0 and virtualKey < len(polledKeyQueryMask) then polledKeyQueryMask[virtualKey] = 1 end if
+  end for
+  return true
+end function
+
+// Provide button commands behavior for the active subsystem.
+function buttonCommands()
+  return buttonCommandNames
+end function
+
+// Provide binding holds key behavior for the active subsystem.
 function bindingHoldsKey(command, key)
   if key == -1 then return true end if
   wanted = lower(command)
@@ -590,6 +734,39 @@ function bindingHoldsKey(command, key)
   return false
 end function
 
+// Check a held owner against the pre-normalized polling cache and current
+// physical snapshot without allocating or rescanning unrelated bind commands.
+function polledBindingHoldsKey(command, key, mouseButtons)
+  if key == -1 then return true end if
+  for each item in polledBindings
+    if item[0] == key and item[3] == command then
+      if polledKeyDownAt(key, mouseButtons) then return true end if
+    end if
+  end for
+  return false
+end function
+
+// Resolve a binding level from the frame-local bulk keyboard/mouse snapshot.
+function polledKeyDownAt(code, mouseButtons)
+  if code == 200 then return (mouseButtons & 1) != 0 end if
+  if code == 201 then return (mouseButtons & 2) != 0 end if
+  if code == 202 then return (mouseButtons & 4) != 0 end if
+  if code >= 203 and code <= 206 then return (joyOldButtonState & (1 << (code - 203))) != 0 end if
+  if code >= 211 and code <= 234 then return (joyOldButtonState & (1 << (code - 207))) != 0 end if
+  if code >= 235 and code <= 238 then return (joyOldPovState & (1 << (code - 235))) != 0 end if
+  virtualKey = virtualKeyForCode(code)
+  if virtualKey < 0 or virtualKey >= len(polledKeyDownSnapshot) then return false end if
+  return polledKeyDownSnapshot[virtualKey] != 0
+end function
+
+// Resolve a binding press edge from the frame-local bulk keyboard snapshot.
+function polledKeyPressedAt(code)
+  virtualKey = virtualKeyForCode(code)
+  if virtualKey < 0 or virtualKey >= len(polledKeyPressedSnapshot) then return false end if
+  return polledKeyPressedSnapshot[virtualKey] != 0
+end function
+
+// Provide key pressed for code behavior for the active subsystem.
 function keyPressedForCode(code)
   virtualKey = virtualKeyForCode(code)
   if virtualKey < 0 then return false end if
@@ -607,6 +784,12 @@ function synchronizeButton(command)
     if lower(item[2]) == wanted then
       code = item[0]
       if keyIsDown(code) then
+        // WM_KEYDOWN records an edge as well as the held state.  Key_Event has
+        // already delivered the matching +command, so consume that native edge
+        // while the key is still held.  Leaving it pending made the eventual
+        // key-up look like a complete tap and injected a spurious quarter-frame
+        // move (especially visible when releasing S / +back).
+        keyPressedForCode(code)
         KeyDown(button, code)
       else if keyPressedForCode(code) then
         KeyDown(button, code)
@@ -621,6 +804,7 @@ function synchronizeButton(command)
   return true
 end function
 
+// Return cvar value derived from the active module state.
 function cvarValue(name, fallback)
   if inputRegistry is void then return fallback end if
   variable = cv.find(inputRegistry, name)
@@ -628,6 +812,7 @@ function cvarValue(name, fallback)
   return variable.value
 end function
 
+// Mirror Quake's Joy_AdvancedUpdate_f routine and its observable state changes.
 function Joy_AdvancedUpdate_f()
   global joyAxisMap, joyControlMap, joyAdvancedInitialized
   joyAxisMap = [AXIS_NADA, AXIS_NADA, AXIS_NADA, AXIS_NADA, AXIS_NADA, AXIS_NADA]
@@ -649,11 +834,13 @@ function Joy_AdvancedUpdate_f()
   return joyAxisMap
 end function
 
+// Provide raw value pointer behavior for the active subsystem.
 function RawValuePointer(axis)
   if axis < 0 or axis >= JOY_MAX_AXES then return 32768 end if
   return joyAxes[axis]
 end function
 
+// Mirror Quake's IN_StartupJoystick routine and its observable state changes.
 function IN_StartupJoystick()
   global joyAvailable, joyAdvancedInitialized, joyHasPov, joyButtonCount
   global joyOldButtonState, joyOldPovState, joystickTestSnapshot
@@ -677,6 +864,7 @@ function IN_StartupJoystick()
   return true
 end function
 
+// Update module state for joystick snapshot.
 function setJoystickSnapshot(axes, buttons, pov, buttonCount, hasPov)
   global joyAxes, joyOldButtonState, joyOldPovState, joyButtonCount
   global joyHasPov, joyAvailable, joystickTestSnapshot, joyPov, joySnapshotButtons
@@ -692,6 +880,7 @@ function setJoystickSnapshot(axes, buttons, pov, buttonCount, hasPov)
   return true
 end function
 
+// Update module state for joystick snapshot.
 function updateJoystickSnapshot(axes, buttons, pov)
   global joyAxes, joyPov, joySnapshotButtons
   joyAxes = axes
@@ -700,6 +889,7 @@ function updateJoystickSnapshot(axes, buttons, pov)
   return joystickTestSnapshot
 end function
 
+// Update module state for joystick snapshot.
 function clearJoystickSnapshot()
   global joyAvailable, joystickTestSnapshot, joyOldButtonState, joyOldPovState
   joyAvailable = false
@@ -709,18 +899,21 @@ function clearJoystickSnapshot()
   return true
 end function
 
+// Mirror Quake's IN_DifferentialSetJoystickStartup routine and its observable state changes.
 function IN_DifferentialSetJoystickStartup(buttonCount, hasPov)
   global joystickStartupOverride
   joystickStartupOverride = [buttonCount, hasPov]
   return true
 end function
 
+// Mirror Quake's IN_DifferentialClearJoystickStartup routine and its observable state changes.
 function IN_DifferentialClearJoystickStartup()
   global joystickStartupOverride
   joystickStartupOverride = void
   return true
 end function
 
+// Mirror Quake's IN_ReadJoystick routine and its observable state changes.
 function IN_ReadJoystick()
   global joyAxes, joyPov
   if not joyAvailable then return false end if
@@ -736,6 +929,7 @@ function IN_ReadJoystick()
   return true
 end function
 
+// Mirror Quake's IN_Commands routine and its observable state changes.
 function IN_Commands()
   global joyOldButtonState, joyOldPovState
   events = []
@@ -778,18 +972,44 @@ function IN_Commands()
   return events
 end function
 
+// Mirror Quake's IN_PollButtonCommands routine and its observable state changes.
 function IN_PollButtonCommands()
-  for each command in buttonCommands()
-    synchronizeButton(command)
+  // Poll the bindings once.  The previous implementation performed 17 full
+  // binding scans for kbuttons plus another 255 full scans for impulses, which
+  // produced thousands of temporary strings per frame and visible GC hitches.
+  win.keySnapshot(polledKeyDownSnapshot, polledKeyPressedSnapshot, polledKeyQueryMask)
+  mouseButtons = win.mouseButtons()
+  for each item in polledBindings
+    button = item[1]
+    code = item[0]
+    if button is not void then
+      if polledKeyDownAt(code, mouseButtons) then
+        // Key_Event normally delivered the +command already.  Consume the
+        // parallel native edge so release cannot later become a false tap.
+        KeyDown(button, code)
+      else if polledKeyPressedAt(code) then
+        // Preserve a complete press/release occurring between host frames.
+        KeyDown(button, code)
+        KeyUp(button, code)
+      end if
+    else
+      if polledKeyPressedAt(code) then IN_Impulse(item[2]) end if
+    end if
   end for
-  impulse = 1
-  while impulse <= 255
-    if actionPressed("impulse " + impulse) then IN_Impulse(impulse) end if
-    impulse = impulse + 1
-  end while
+
+  // A binding can change while its key owns a kbutton.  Releasing stale owners
+  // after the single poll retains the original two-key ownership behavior.
+  for each command in buttonCommandNames
+    button = buttonForCommand(command)
+    first = button[0]
+    second = button[1]
+    if first != 0 and not polledBindingHoldsKey(command, first, mouseButtons) then KeyUp(button, first) end if
+    if second != 0 and not polledBindingHoldsKey(command, second, mouseButtons) then KeyUp(button, second) end if
+  end for
   return true
 end function
 
+// Return first pressed key for the active module state.
 function firstPressedKey()
   buttons = win.mouseButtons()
   if (buttons & 1) != 0 then return "MOUSE1" end if
@@ -803,10 +1023,12 @@ function firstPressedKey()
   return ""
 end function
 
+// Create and initialize command.
 function createCommand()
   return t.UserCommand(t.Vec3(0.0, 0.0, 0.0), 0.0, 0.0, 0.0, 0, 0, 0)
 end function
 
+// Update module state for button.
 function resetButton(button)
   button[0] = 0
   button[1] = 0
@@ -814,6 +1036,7 @@ function resetButton(button)
   return button
 end function
 
+// Update subsystem configuration for configure platform.
 function configurePlatform(registry, noMouse, noJoystick, useDirectInput)
   global inputRegistry, noMouseRequested, noJoystickRequested, directInputRequested
   inputRegistry = registry
@@ -823,6 +1046,7 @@ function configurePlatform(registry, noMouse, noJoystick, useDirectInput)
   return true
 end function
 
+// Mirror Quake's IN_DifferentialSetMouse routine and its observable state changes.
 function IN_DifferentialSetMouse(
   initialized,
   active,
@@ -853,6 +1077,7 @@ function IN_DifferentialSetMouse(
   return true
 end function
 
+// Mirror Quake's IN_DifferentialState routine and its observable state changes.
 function IN_DifferentialState()
   return [
     mouseInitialized,
@@ -875,16 +1100,19 @@ function IN_DifferentialState()
   ]
 end function
 
+// Mirror Quake's Force_CenterView_f routine and its observable state changes.
 function Force_CenterView_f(command)
   command.viewAngles.x = 0.0
   return command
 end function
 
+// Mirror Quake's IN_UpdateClipCursor routine and its observable state changes.
 function IN_UpdateClipCursor()
   if mouseInitialized and mouseActive and not directInput then return win.updateClipCursor() end if
   return false
 end function
 
+// Mirror Quake's IN_ShowMouse routine and its observable state changes.
 function IN_ShowMouse()
   global mouseShowToggle
   if not mouseShowToggle then
@@ -894,6 +1122,7 @@ function IN_ShowMouse()
   return mouseShowToggle
 end function
 
+// Mirror Quake's IN_HideMouse routine and its observable state changes.
 function IN_HideMouse()
   global mouseShowToggle
   if mouseShowToggle then
@@ -903,6 +1132,7 @@ function IN_HideMouse()
   return not mouseShowToggle
 end function
 
+// Mirror Quake's IN_ActivateMouse routine and its observable state changes.
 function IN_ActivateMouse()
   global mouseActivateToggle, mouseActive, mouseCaptured
   mouseActivateToggle = true
@@ -914,11 +1144,13 @@ function IN_ActivateMouse()
   return true
 end function
 
+// Mirror Quake's IN_SetQuakeMouseState routine and its observable state changes.
 function IN_SetQuakeMouseState()
   if mouseActivateToggle then return IN_ActivateMouse() end if
   return false
 end function
 
+// Mirror Quake's IN_DeactivateMouse routine and its observable state changes.
 function IN_DeactivateMouse()
   global mouseActivateToggle, mouseActive, mouseCaptured
   mouseActivateToggle = false
@@ -929,6 +1161,7 @@ function IN_DeactivateMouse()
   return true
 end function
 
+// Mirror Quake's IN_RestoreOriginalMouseState routine and its observable state changes.
 function IN_RestoreOriginalMouseState()
   global mouseActivateToggle
   reactivate = mouseActivateToggle
@@ -941,6 +1174,7 @@ function IN_RestoreOriginalMouseState()
   return true
 end function
 
+// Mirror Quake's IN_InitDInput routine and its observable state changes.
 function IN_InitDInput()
   // The x64 bridge uses the ordered Win32 message FIFO and centered relative
   // cursor sampling instead of loading the obsolete DirectInput 3 mouse COM
@@ -948,6 +1182,7 @@ function IN_InitDInput()
   return mouseInitialized
 end function
 
+// Mirror Quake's IN_StartupMouse routine and its observable state changes.
 function IN_StartupMouse()
   global mouseInitialized, directInput, mouseOldButtonState
   if noMouseRequested then mouseInitialized = false; return false end if
@@ -972,6 +1207,7 @@ function IN_ClearDeviceStates()
   return true
 end function
 
+// Mirror Quake's IN_ClearStates routine and its observable state changes.
 function IN_ClearStates()
   global inImpulse
   for each command in buttonCommands()
@@ -983,17 +1219,96 @@ function IN_ClearStates()
   return true
 end function
 
+// Consume native keyboard press edges while UI-to-game handoff is blocked.
+function IN_DiscardPolledKeyEdges()
+  win.keySnapshot(polledKeyDownSnapshot, polledKeyPressedSnapshot, polledKeyQueryMask)
+  index = 0
+  while index < len(polledKeyPressedSnapshot)
+    polledKeyPressedSnapshot[index] = 0
+    index = index + 1
+  end while
+  return true
+end function
+
+// Block live gameplay controls while a menu selection or a map transition is
+// still physically held.  Clearing kbutton_t alone is insufficient because
+// IN_PollButtonCommands would reconstruct +attack/+jump from the held Win32
+// key or mouse button on the first playable frame.
+function IN_BlockGameplayTransition()
+  global gameplayTransitionBlocked, gameplayTransitionHeldCodes
+  gameplayTransitionHeldCodes = captureGameplayTransitionHeldCodes()
+  IN_ClearStates()
+  IN_DiscardPolledKeyEdges()
+  gameplayTransitionBlocked = true
+  return true
+end function
+
+// Report whether a menu/map handoff is still suppressing live controls.
+function IN_GameplayTransitionBlocked()
+  return gameplayTransitionBlocked
+end function
+
+// Capture only the physical +command controls that were already held when the
+// UI/map transition began. Inputs first pressed after loading are intentional
+// gameplay and must never extend the suppression latch.
+function captureGameplayTransitionHeldCodes()
+  result = []
+  for each item in bindings
+    command = bytes(lower(item[2]))
+    if len(command) > 0 and command[0] == 43 and keyIsDown(item[0]) then
+      present = false
+      for each code in result
+        if code == item[0] then present = true; break end if
+      end for
+      if not present then result = result + [item[0]] end if
+    end if
+  end for
+  return result
+end function
+
+// Report whether a control captured at the transition boundary remains held.
+function IN_GameplayTransitionControlHeld()
+  for each code in gameplayTransitionHeldCodes
+    if keyIsDown(code) then return true end if
+  end for
+  return false
+end function
+
+// Release the transition latch only after every gameplay control has returned
+// to neutral.  The caller deliberately suppresses the release-detecting frame
+// as well, so queued native press edges cannot leak into the new level.
+function IN_ReleaseGameplayTransitionIfNeutral()
+  global gameplayTransitionBlocked, gameplayTransitionHeldCodes
+  if not gameplayTransitionBlocked then return true end if
+  // Menu navigation can produce keyboard edges without a gameplay poll. Drain
+  // them on every blocked frame, including the neutral release frame.
+  IN_DiscardPolledKeyEdges()
+  if IN_GameplayTransitionControlHeld() then return false end if
+  IN_ClearStates()
+  gameplayTransitionBlocked = false
+  gameplayTransitionHeldCodes = []
+  return true
+end function
+
+// Mirror Quake's IN_Init routine and its observable state changes.
 function IN_Init()
+  global gameplayTransitionBlocked, gameplayTransitionHeldCodes
+  gameplayTransitionBlocked = false
+  gameplayTransitionHeldCodes = []
   IN_ClearStates()
   IN_StartupMouse()
   IN_StartupJoystick()
   return true
 end function
 
+// Mirror Quake's IN_Shutdown routine and its observable state changes.
 function IN_Shutdown()
+  global gameplayTransitionBlocked, gameplayTransitionHeldCodes
   IN_DeactivateMouse()
   IN_ShowMouse()
   IN_ClearStates()
+  gameplayTransitionBlocked = false
+  gameplayTransitionHeldCodes = []
   return true
 end function
 
@@ -1012,6 +1327,7 @@ function CL_InitInput()
   ]
 end function
 
+// Provide command button behavior for the active subsystem.
 function commandButton(command)
   source = bytes(lower(command))
   if len(source) == 0 then return void end if
@@ -1022,6 +1338,7 @@ function commandButton(command)
   return buttonForCommand(command)
 end function
 
+// Execute input command.
 function dispatchInputCommand(command, key, value)
   wanted = lower(command)
   if wanted == "impulse" then return IN_Impulse(value) end if
@@ -1032,6 +1349,7 @@ function dispatchInputCommand(command, key, value)
   return KeyUp(button, key)
 end function
 
+// Apply the Quake-compatible cl adjust angles behavior.
 function CL_AdjustAngles(command, frameTime, yawSpeed, pitchSpeed, angleSpeedKey)
   speed = frameTime
   if (inSpeed[2] & 1) != 0 then speed = speed * angleSpeedKey end if
@@ -1059,6 +1377,7 @@ function CL_AdjustAngles(command, frameTime, yawSpeed, pitchSpeed, angleSpeedKey
   return command
 end function
 
+// Apply the Quake-compatible cl base move behavior.
 function CL_BaseMove(command, signon, frameTime, forwardSpeed, backSpeed, sideSpeed, upSpeed, moveSpeedKey, yawSpeed, pitchSpeed, angleSpeedKey)
   if signon != c.SIGNONS then return false end if
   CL_AdjustAngles(command, frameTime, yawSpeed, pitchSpeed, angleSpeedKey)
@@ -1109,6 +1428,7 @@ function setMouseCapture(enabled)
   return mouseCaptured
 end function
 
+// Provide filtered mouse delta behavior for the active subsystem.
 function filteredMouseDelta(filterEnabled)
   global oldMouseX, oldMouseY, mouseFilterReady, mouseAccumX, mouseAccumY
   if not mouseActive then return [0.0, 0.0] end if
@@ -1140,11 +1460,13 @@ function applyMouseDelta(command, deltaX, deltaY, mouseSensitivity, yawScale, pi
   return command
 end function
 
+// Apply mouse to the active subsystem state.
 function applyMouse(command, mouseSensitivity, yawScale, pitchScale, filterEnabled)
   delta = filteredMouseDelta(filterEnabled)
   return applyMouseDelta(command, delta[0], delta[1], mouseSensitivity, yawScale, pitchScale)
 end function
 
+// Mirror Quake's IN_MoveDelta routine and its observable state changes.
 function IN_MoveDelta(command, deltaX, deltaY, mouseSensitivity, yawScale, pitchScale, sideScale, forwardScale, lookStrafe, noclipAngleHack)
   mouseX = deltaX * mouseSensitivity
   mouseY = deltaY * mouseSensitivity
@@ -1166,6 +1488,7 @@ function IN_MoveDelta(command, deltaX, deltaY, mouseSensitivity, yawScale, pitch
   return command
 end function
 
+// Mirror Quake's IN_MouseEvent routine and its observable state changes.
 function IN_MouseEvent(mouseState)
   global mouseOldButtonState
   events = []
@@ -1185,6 +1508,7 @@ function IN_MouseEvent(mouseState)
   return events
 end function
 
+// Mirror Quake's IN_MouseMove routine and its observable state changes.
 function IN_MouseMove(command, mouseSensitivity, yawScale, pitchScale, filterEnabled, sideScale, forwardScale, lookStrafe, noclipAngleHack)
   delta = filteredMouseDelta(filterEnabled)
   moved = IN_MoveDelta(
@@ -1203,12 +1527,15 @@ function IN_MouseMove(command, mouseSensitivity, yawScale, pitchScale, filterEna
   return moved
 end function
 
+// Return absolute value derived from the active module state.
 function absoluteValue(value)
   if value < 0.0 then return -value end if
   return value
 end function
 
+// Mirror Quake's IN_JoyMove routine and its observable state changes.
 function IN_JoyMove(command, frameSeconds)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if not joyAdvancedInitialized then Joy_AdvancedUpdate_f() end if
   if not joyAvailable or cvarValue("joystick", 0.0) == 0.0 then return command end if
   if not IN_ReadJoystick() then return command end if
@@ -1275,6 +1602,7 @@ function IN_JoyMove(command, frameSeconds)
   return command
 end function
 
+// Mirror Quake's IN_Move routine and its observable state changes.
 function IN_Move(command, mouseSensitivity, yawScale, pitchScale, filterEnabled, sideScale, forwardScale, lookStrafe, noclipAngleHack, frameSeconds, active, minimized)
   if active and not minimized then
     IN_MouseMove(command, mouseSensitivity, yawScale, pitchScale, filterEnabled, sideScale, forwardScale, lookStrafe, noclipAngleHack)
@@ -1283,6 +1611,7 @@ function IN_Move(command, mouseSensitivity, yawScale, pitchScale, filterEnabled,
   return command
 end function
 
+// Mirror Quake's IN_Accumulate routine and its observable state changes.
 function IN_Accumulate()
   global mouseAccumX, mouseAccumY
   if not mouseActive or directInput then return false end if
@@ -1293,6 +1622,7 @@ function IN_Accumulate()
   return true
 end function
 
+// Apply the Quake-compatible cl button bits behavior.
 function CL_ButtonBits()
   bits = 0
   if (inAttack[2] & 3) != 0 then bits = bits | c.BUTTON_ATTACK end if
@@ -1302,6 +1632,7 @@ function CL_ButtonBits()
   return bits
 end function
 
+// Apply the Quake-compatible cl take impulse behavior.
 function CL_TakeImpulse()
   global inImpulse
   value = inImpulse
@@ -1309,12 +1640,14 @@ function CL_TakeImpulse()
   return value
 end function
 
+// Apply the Quake-compatible cl finish move behavior.
 function CL_FinishMove(command)
   command.buttons = CL_ButtonBits()
   command.impulse = CL_TakeImpulse()
   return command
 end function
 
+// Provide collect behavior for the active subsystem.
 function collect(command, frameMilliseconds, mouseSensitivity)
   applyMouse(command, mouseSensitivity, DEFAULT_M_YAW, DEFAULT_M_PITCH, false)
   command.forwardMove = 0.0
@@ -1336,6 +1669,7 @@ function collect(command, frameMilliseconds, mouseSensitivity)
   return command
 end function
 
+// Update module state for the requested operation.
 function clear(command)
   command.forwardMove = 0.0
   command.sideMove = 0.0
@@ -1345,6 +1679,7 @@ function clear(command)
   return command
 end function
 
+// Create and initialize original move.
 function buildOriginalMove(command, signon, frameMilliseconds, mouseSensitivity, yawScale, pitchScale, filterEnabled, forwardSpeed, backSpeed, sideSpeed, upSpeed, noclipAngleHack, pollButtonBindings, deviceActive, minimized)
   if pollButtonBindings then IN_PollButtonCommands() end if
   built = CL_BaseMove(
@@ -1380,6 +1715,7 @@ function buildOriginalMove(command, signon, frameMilliseconds, mouseSensitivity,
   return command
 end function
 
+// Provide collect game behavior for the active subsystem.
 function collectGame(command, frameMilliseconds, mouseSensitivity, yawScale, pitchScale, filterEnabled, forwardSpeed, backSpeed, sideSpeed, upSpeed)
   return buildOriginalMove(
     command,

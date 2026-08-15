@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.sv_user.
+*/
 package miniquake.sv_user
 
 // Functional pendant of WinQuake/sv_user.c.  This module owns the complete
@@ -36,10 +43,12 @@ struct SvUserState
   diagnostics
 end struct
 
+// Provide quake float behavior for the active subsystem.
 function quakeFloat(value)
   return native.bitsFloat(native.floatBits(value))
 end function
 
+// Apply the Quake-compatible sv user init behavior.
 function SV_UserInit(server)
   count = 1
   if server is not void then count = server.maxClients end if
@@ -61,6 +70,7 @@ function SV_UserInit(server)
   )
 end function
 
+// Apply the Quake-compatible sv user set frame time behavior.
 function SV_UserSetFrameTime(state, frameTime)
   state.frameTime = frameTime
   if state.frameTime < 0.0 then state.frameTime = 0.0 end if
@@ -68,6 +78,7 @@ function SV_UserSetFrameTime(state, frameTime)
   return state.frameTime
 end function
 
+// Apply the Quake-compatible sv user set movement behavior.
 function SV_UserSetMovement(state, maxSpeed, acceleration, friction, edgeFriction, stopSpeed)
   state.maxSpeed = maxSpeed
   state.acceleration = acceleration
@@ -77,17 +88,20 @@ function SV_UserSetMovement(state, maxSpeed, acceleration, friction, edgeFrictio
   return true
 end function
 
+// Apply the Quake-compatible sv user set paused behavior.
 function SV_UserSetPaused(state, paused, keyDestination)
   state.paused = paused
   state.keyDestination = keyDestination
   return paused
 end function
 
+// Apply the Quake-compatible sv user set frozen behavior.
 function SV_UserSetFrozen(state, frozen)
   state.frozen = frozen
   return frozen
 end function
 
+// Apply the Quake-compatible sv ideal pitch from heights behavior.
 function SV_IdealPitchFromHeights(state, heights, clientIndex)
   if clientIndex < 0 or clientIndex >= len(state.idealPitches) then return error(2880, "SV_SetIdealPitch: bad client") end if
   direction = 0
@@ -115,6 +129,7 @@ function SV_IdealPitchFromHeights(state, heights, clientIndex)
   return state.idealPitches[clientIndex]
 end function
 
+// Provide svu trace ideal pitch behavior for the active subsystem.
 function svuTraceIdealPitch(state, player, map, clientIndex)
   if clientIndex < 0 or clientIndex >= len(state.idealPitches) then return error(2880, "SV_SetIdealPitch: bad client") end if
   if (player.flags & c.FL_ONGROUND) == 0 or map is void then return state.idealPitches[clientIndex] end if
@@ -269,6 +284,7 @@ function SV_ReadClientMove(state, reader, clientValue, player)
   return clientTime
 end function
 
+// Provide svu starts with behavior for the active subsystem.
 function svuStartsWith(text, prefix)
   source = bytes(bio.lower(text))
   wanted = bytes(prefix)
@@ -281,6 +297,7 @@ function svuStartsWith(text, prefix)
   return true
 end function
 
+// Provide svu allowed command behavior for the active subsystem.
 function svuAllowedCommand(text)
   prefixes = [
     "status", "god", "notarget", "fly", "name", "noclip", "say",
@@ -293,6 +310,7 @@ function svuAllowedCommand(text)
   return false
 end function
 
+// Provide svu execute string behavior for the active subsystem.
 function svuExecuteString(state, clientValue, player, text)
   // sv_user.c initializes ret from privileged, then lets the whitelist replace
   // it with src_client.  A privileged client therefore still executes allowed
@@ -343,6 +361,7 @@ function SV_ReadClientMessage(state, clientValue, data, player)
   return true
 end function
 
+// Provide svu read network messages behavior for the active subsystem.
 function svuReadNetworkMessages(state, clientValue, player)
   if clientValue.socket is void then return true end if
   destination = sz.alloc(c.MAX_MSGLEN)

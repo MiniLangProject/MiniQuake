@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.quakec.edict.
+*/
 package miniquake.quakec.edict
 
 import miniquake.types as t
@@ -9,6 +16,7 @@ import miniquake.native as native
 import miniquake.common as common
 import miniquake.protocol_text as protocolText
 
+// Allocate and initialize the requested value.
 function allocate(machine, firstIndex)
   index = firstIndex
   if index < 1 then index = 1 end if
@@ -48,6 +56,7 @@ function allocate(machine, firstIndex)
   return error(2600, "ED_Alloc: no free edicts")
 end function
 
+// Release state for free.
 function free(machine, entityIndex)
   if entityIndex < 0 or entityIndex >= len(machine.edicts) then return false end if
   // ED_Free deliberately leaves most fields intact until ED_Alloc reuses the
@@ -73,6 +82,7 @@ function free(machine, entityIndex)
   return true
 end function
 
+// Provide field definition behavior for the active subsystem.
 function fieldDefinition(machine, name)
   for each definition in machine.program.fieldDefs
     if definition.name == name then return definition end if
@@ -80,6 +90,7 @@ function fieldDefinition(machine, name)
   return void
 end function
 
+// Provide global definition behavior for the active subsystem.
 function globalDefinition(machine, name)
   for each definition in machine.program.globalDefs
     if definition.name == name then return definition end if
@@ -87,6 +98,7 @@ function globalDefinition(machine, name)
   return void
 end function
 
+// Update module state for global by name.
 function setGlobalByName(machine, name, value)
   definition = globalDefinition(machine, name)
   if definition is void then return false end if
@@ -117,6 +129,7 @@ function setGlobalByName(machine, name, value)
   return true
 end function
 
+// Provide trim trailing spaces behavior for the active subsystem.
 function trimTrailingSpaces(text)
   data = bytes(text)
   count = len(data)
@@ -127,6 +140,7 @@ function trimTrailingSpaces(text)
   return decode(slice(data, 0, count))
 end function
 
+// Update module state for key value.
 function setKeyValue(machine, entityIndex, key, value)
   if key == "" then return false end if
   keyData = bytes(key)
@@ -169,11 +183,13 @@ function setKeyValue(machine, entityIndex, key, value)
   return true
 end function
 
+// Provide diagnostic behavior for the active subsystem.
 function diagnostic(machine, text)
   if machine.context is not void then machine.context.consoleLines = machine.context.consoleLines + [text] end if
   return false
 end function
 
+// Read and validate entity.
 function parseEntity(machine, entityIndex, entity)
   // ED_ParseEdict clears every non-world edict before consuming its pairs.
   if entityIndex != 0 then vm.clearEntity(machine, entityIndex) end if
@@ -188,16 +204,19 @@ function parseEntity(machine, entityIndex, entity)
   return entityIndex
 end function
 
+// Update module state for world vector.
 function setWorldVector(machine, name, value)
   definition = fieldDefinition(machine, name)
   if definition is not void then vm.setEntityVector(machine, 0, definition.offset, value) end if
 end function
 
+// Update module state for world float.
 function setWorldFloat(machine, name, value)
   definition = fieldDefinition(machine, name)
   if definition is not void then vm.setEntityFloat(machine, 0, definition.offset, value) end if
 end function
 
+// Update module state for world string.
 function setWorldString(machine, name, value)
   definition = fieldDefinition(machine, name)
   if definition is not void then vm.setEntityString(machine, 0, definition.offset, value) end if
@@ -228,6 +247,7 @@ function initializeWorldEntity(machine, map)
   return true
 end function
 
+// Report whether should inhibit.
 function shouldInhibit(machine, entityIndex, skill, deathmatch)
   spawnField = vm.fieldOffset(machine, "spawnflags")
   if spawnField < 0 then return false end if
@@ -240,12 +260,14 @@ function shouldInhibit(machine, entityIndex, skill, deathmatch)
   return false
 end function
 
+// Return class name derived from the active module state.
 function className(machine, entityIndex)
   field = vm.fieldOffset(machine, "classname")
   if field < 0 then return "" end if
   return vm.entityString(machine, entityIndex, field)
 end function
 
+// Read and validate map entities from.
 function loadMapEntitiesFrom(machine, map, skill, deathmatch, firstDynamicIndex)
   // `map` is a deeply nested BSP object graph held by the live server.  A
   // forced collection here can reclaim boxed members that the current
@@ -294,10 +316,12 @@ function loadMapEntitiesFrom(machine, map, skill, deathmatch, firstDynamicIndex)
   return [spawned, inhibited]
 end function
 
+// Read and validate map entities.
 function loadMapEntities(machine, map, skill, deathmatch)
   return loadMapEntitiesFrom(machine, map, skill, deathmatch, 1)
 end function
 
+// Initialize state for initialize globals.
 function initializeGlobals(machine, mapName, skill, deathmatch, coop, serverFlags)
   setGlobalByName(machine, "mapname", mapName)
   setGlobalByName(machine, "skill", "" + skill)
@@ -310,6 +334,7 @@ function initializeGlobals(machine, mapName, skill, deathmatch, coop, serverFlag
   return true
 end function
 
+// Provide baseline behavior for the active subsystem.
 function baseline(machine, entityIndex)
   modelField = vm.fieldOffset(machine, "modelindex")
   frameField = vm.fieldOffset(machine, "frame")
@@ -332,6 +357,7 @@ function baseline(machine, entityIndex)
   return [modelIndex, frame, colormap, skin, origin, angles]
 end function
 
+// Return type size derived from the active module state.
 function typeSize(valueType)
   valueType = valueType & 0x7fff
   if valueType == c.EV_VOID then return 1 end if
@@ -339,6 +365,7 @@ function typeSize(valueType)
   return 1
 end function
 
+// Return definition at offset derived from the active module state.
 function definitionAtOffset(definitions, offset)
   for each definition in definitions
     if definition.offset == offset then return definition end if
@@ -346,12 +373,14 @@ function definitionAtOffset(definitions, offset)
   return void
 end function
 
+// Provide vector component definition behavior for the active subsystem.
 function vectorComponentDefinition(name)
   data = bytes(name)
   if len(data) < 2 then return false end if
   return data[len(data) - 2] == 95
 end function
 
+// Provide words are zero behavior for the active subsystem.
 function wordsAreZero(words, offset, count)
   index = 0
   while index < count
@@ -361,18 +390,21 @@ function wordsAreZero(words, offset, count)
   return true
 end function
 
+// Provide edict floor behavior for the active subsystem.
 function edictFloor(value)
   truncated = native.trunc(value)
   if value < truncated then return truncated - 1 end if
   return truncated
 end function
 
+// Provide edict ceil behavior for the active subsystem.
 function edictCeil(value)
   truncated = native.trunc(value)
   if value > truncated then return truncated + 1 end if
   return truncated
 end function
 
+// Provide fixed one decimal behavior for the active subsystem.
 function fixedOneDecimal(value)
   scaled = 0
   if value >= 0.0 then
@@ -391,14 +423,17 @@ function fixedOneDecimal(value)
   return text
 end function
 
+// Provide fixed six decimals word behavior for the active subsystem.
 function fixedSixDecimalsWord(rawWord)
   return native.f32ToFixed6(rawWord & 0xffffffff)
 end function
 
+// Provide fixed six decimals behavior for the active subsystem.
 function fixedSixDecimals(value)
   return fixedSixDecimalsWord(native.floatBits(value))
 end function
 
+// Provide ugly vector string behavior for the active subsystem.
 function uglyVectorString(words, offset)
   result = fixedSixDecimalsWord(words[offset])
   result = result + " "
@@ -408,6 +443,7 @@ function uglyVectorString(words, offset)
   return result
 end function
 
+// Provide display vector string behavior for the active subsystem.
 function displayVectorString(words, offset)
   result = "'"
   result = result + fixedOneDecimal(native.bitsFloat(words[offset]))
@@ -419,6 +455,7 @@ function displayVectorString(words, offset)
   return result
 end function
 
+// Provide void value string behavior for the active subsystem.
 function voidValueString()
   // Construct the textual ev_void representation through the Quake byte
   // codec. This guarantees a real four-byte string at MiniLang's strict
@@ -426,7 +463,9 @@ function voidValueString()
   return protocolText.decodeBytes(bytes([118, 111, 105, 100]))
 end function
 
+// Provide value string behavior for the active subsystem.
 function valueString(machine, valueType, words, offset, ugly)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   valueType = valueType & 0x7fff
   if valueType == c.EV_STRING then
     text = vm.stringValue(machine, words[offset])
@@ -465,6 +504,7 @@ function valueString(machine, valueType, words, offset, ugly)
   return "bad type " + valueType
 end function
 
+// Add state for append quoted pair.
 function appendQuotedPair(prefix, name, value)
   if typeof(prefix) != "string" then return error(2610, "QuakeC serialization received a non-string prefix") end if
   if typeof(name) != "string" then return error(2611, "QuakeC serialization received a non-string field name") end if
@@ -510,10 +550,12 @@ function appendQuotedPair(prefix, name, value)
   return decoded
 end function
 
+// Provide quoted pair line behavior for the active subsystem.
 function quotedPairLine(name, value)
   return appendQuotedPair("", name, value)
 end function
 
+// Format and emit edict.
 function printEdict(machine, entityIndex)
   if entityIndex < 0 or entityIndex >= len(machine.edicts) then return error(2605, "ED_Print: bad edict " + entityIndex) end if
   if machine.edictFree[entityIndex] then return "FREE\n" end if
@@ -539,6 +581,7 @@ function printEdict(machine, entityIndex)
   return text
 end function
 
+// Provide definition should serialize behavior for the active subsystem.
 function definitionShouldSerialize(words, definition, globalsOnly)
   valueType = definition.type & 0x7fff
   size = typeSize(valueType)
@@ -564,6 +607,7 @@ function definitionShouldSerialize(words, definition, globalsOnly)
   return not wordsAreZero(words, definition.offset, size)
 end function
 
+// Return definition serialized length derived from the active module state.
 function definitionSerializedLength(machine, words, definition)
   serialized = try(valueString(machine, definition.type, words, definition.offset, true))
   if serialized is error then return serialized end if
@@ -577,6 +621,7 @@ function definitionSerializedLength(machine, words, definition)
   return len(nameData) + len(valueData) + 6
 end function
 
+// Encode and write definition bytes.
 function writeDefinitionBytes(machine, words, definition, output, cursor)
   serialized = try(valueString(machine, definition.type, words, definition.offset, true))
   if serialized is error then return serialized end if
@@ -607,6 +652,7 @@ function writeDefinitionBytes(machine, words, definition, output, cursor)
   return cursor + 2
 end function
 
+// Encode and write definitions.
 function serializeDefinitions(machine, words, definitions, firstIndex, globalsOnly)
   total = 4 // "{\n" plus "}\n"
   index = firstIndex
@@ -645,16 +691,19 @@ function serializeDefinitions(machine, words, definitions, firstIndex, globalsOn
   return decoded
 end function
 
+// Encode and write edict.
 function writeEdict(machine, entityIndex)
   if entityIndex < 0 or entityIndex >= len(machine.edicts) then return error(2606, "ED_Write: bad edict " + entityIndex) end if
   if machine.edictFree[entityIndex] then return "{\n}\n" end if
   return serializeDefinitions(machine, machine.edicts[entityIndex], machine.program.fieldDefs, 1, false)
 end function
 
+// Encode and write globals.
 function writeGlobals(machine)
   return serializeDefinitions(machine, machine.globals, machine.program.globalDefs, 0, true)
 end function
 
+// Return count edicts for the active module state.
 function countEdicts(machine)
   limit = len(machine.edicts)
   if machine.context is not void and machine.context.edicts is not void then limit = machine.context.edicts.numEdicts end if
@@ -678,6 +727,7 @@ function countEdicts(machine)
   return [limit, active, models, solid, step]
 end function
 
+// Create and initialize string.
 function newString(text)
   source = protocolText.encodeBytes(text)
   output = bytes(len(source))
@@ -703,48 +753,59 @@ function ED_ClearEdict(machine, entityIndex)
   return entityIndex
 end function
 
+// Mirror Quake's ED_Alloc routine and its observable state changes.
 function ED_Alloc(machine, firstIndex)
   return allocate(machine, firstIndex)
 end function
 
+// Mirror Quake's ED_Free routine and its observable state changes.
 function ED_Free(machine, entityIndex)
   return free(machine, entityIndex)
 end function
 
+// Mirror Quake's ED_GlobalAtOfs routine and its observable state changes.
 function ED_GlobalAtOfs(machine, offset)
   return definitionAtOffset(machine.program.globalDefs, offset)
 end function
 
+// Mirror Quake's ED_FieldAtOfs routine and its observable state changes.
 function ED_FieldAtOfs(machine, offset)
   return definitionAtOffset(machine.program.fieldDefs, offset)
 end function
 
+// Mirror Quake's ED_FindField routine and its observable state changes.
 function ED_FindField(machine, name)
   return fieldDefinition(machine, name)
 end function
 
+// Mirror Quake's ED_FindGlobal routine and its observable state changes.
 function ED_FindGlobal(machine, name)
   return globalDefinition(machine, name)
 end function
 
+// Mirror Quake's ED_FindFunction routine and its observable state changes.
 function ED_FindFunction(machine, name)
   return vm.functionIndex(machine, name)
 end function
 
+// Return edict field value.
 function GetEdictFieldValue(machine, entityIndex, name)
   definition = fieldDefinition(machine, name)
   if definition is void then return void end if
   return [definition.offset, vm.entityField(machine, entityIndex, definition.offset)]
 end function
 
+// Mirror Quake's PR_ValueString routine and its observable state changes.
 function PR_ValueString(machine, valueType, words, offset)
   return valueString(machine, valueType, words, offset, false)
 end function
 
+// Mirror Quake's PR_UglyValueString routine and its observable state changes.
 function PR_UglyValueString(machine, valueType, words, offset)
   return valueString(machine, valueType, words, offset, true)
 end function
 
+// Mirror Quake's PR_GlobalString routine and its observable state changes.
 function PR_GlobalString(machine, offset)
   definition = ED_GlobalAtOfs(machine, offset)
   text = ""
@@ -759,6 +820,7 @@ function PR_GlobalString(machine, offset)
   return text + " "
 end function
 
+// Mirror Quake's PR_GlobalStringNoContents routine and its observable state changes.
 function PR_GlobalStringNoContents(machine, offset)
   definition = ED_GlobalAtOfs(machine, offset)
   text = ""
@@ -769,18 +831,22 @@ function PR_GlobalStringNoContents(machine, offset)
   return text + " "
 end function
 
+// Mirror Quake's ED_Print routine and its observable state changes.
 function ED_Print(machine, entityIndex)
   return printEdict(machine, entityIndex)
 end function
 
+// Mirror Quake's ED_Write routine and its observable state changes.
 function ED_Write(machine, entityIndex)
   return writeEdict(machine, entityIndex)
 end function
 
+// Mirror Quake's ED_PrintNum routine and its observable state changes.
 function ED_PrintNum(machine, entityIndex)
   return printEdict(machine, entityIndex)
 end function
 
+// Mirror Quake's ED_PrintEdicts routine and its observable state changes.
 function ED_PrintEdicts(machine)
   counts = countEdicts(machine)
   text = counts[0] + " entities\n"
@@ -792,6 +858,7 @@ function ED_PrintEdicts(machine)
   return text
 end function
 
+// Mirror Quake's ED_PrintEdict_f routine and its observable state changes.
 function ED_PrintEdict_f(machine, entityIndex)
   limit = len(machine.edicts)
   if machine.context is not void and machine.context.edicts is not void then limit = machine.context.edicts.numEdicts end if
@@ -799,14 +866,17 @@ function ED_PrintEdict_f(machine, entityIndex)
   return printEdict(machine, entityIndex)
 end function
 
+// Mirror Quake's ED_Count routine and its observable state changes.
 function ED_Count(machine)
   return countEdicts(machine)
 end function
 
+// Mirror Quake's ED_WriteGlobals routine and its observable state changes.
 function ED_WriteGlobals(machine)
   return writeGlobals(machine)
 end function
 
+// Mirror Quake's ED_ParseGlobals routine and its observable state changes.
 function ED_ParseGlobals(machine, entity)
   for each pair in entity.pairs
     parsed = try(setGlobalByName(machine, pair.key, pair.value))
@@ -816,23 +886,28 @@ function ED_ParseGlobals(machine, entity)
   return true
 end function
 
+// Mirror Quake's ED_NewString routine and its observable state changes.
 function ED_NewString(text)
   return newString(text)
 end function
 
+// Mirror Quake's ED_ParseEpair routine and its observable state changes.
 function ED_ParseEpair(machine, entityIndex, definition, value, globalBase)
   if globalBase then return setGlobalByName(machine, definition.name, value) end if
   return setKeyValue(machine, entityIndex, definition.name, value)
 end function
 
+// Mirror Quake's ED_ParseEdict routine and its observable state changes.
 function ED_ParseEdict(machine, entityIndex, entity)
   return parseEntity(machine, entityIndex, entity)
 end function
 
+// Mirror Quake's ED_LoadFromFile routine and its observable state changes.
 function ED_LoadFromFile(machine, map, skill, deathmatch, firstDynamicIndex)
   return loadMapEntitiesFrom(machine, map, skill, deathmatch, firstDynamicIndex)
 end function
 
+// Mirror Quake's PR_LoadProgs routine and its observable state changes.
 function PR_LoadProgs(data, filename)
   program = try(progs.parse(data, filename))
   if program is error then return program end if
@@ -842,15 +917,18 @@ function PR_LoadProgs(data, filename)
   return program
 end function
 
+// Mirror Quake's PR_Init routine and its observable state changes.
 function PR_Init()
   return ["edict", "edicts", "edictcount", "profile"]
 end function
 
+// Mirror Quake's EDICT_NUM routine and its observable state changes.
 function EDICT_NUM(machine, entityIndex)
   if entityIndex < 0 or entityIndex >= len(machine.edicts) then return error(2607, "EDICT_NUM: bad number " + entityIndex) end if
   return entityIndex
 end function
 
+// Mirror Quake's NUM_FOR_EDICT routine and its observable state changes.
 function NUM_FOR_EDICT(machine, entityIndex)
   limit = len(machine.edicts)
   if machine.context is not void and machine.context.edicts is not void then limit = machine.context.edicts.numEdicts end if

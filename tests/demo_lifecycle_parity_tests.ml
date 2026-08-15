@@ -1,57 +1,74 @@
-/* BP-032: WinQuake demo recording, playback and timedemo lifecycle parity. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+BP-032: WinQuake demo recording, playback and timedemo lifecycle parity.
+*/
 import miniquake.demo as demo
 import miniquake.demo_player as playback
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.native as native
 
+// Assert that the condition holds and identify a failing test.
 function yes(value, name)
   if not value then return error(3200, name + ": expected true") end if
   return true
 end function
+// Exercise no as part of this deterministic regression fixture.
 function no(value, name)
   if value then return error(3201, name + ": expected false") end if
   return true
 end function
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(3202, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
+// Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
   print "[" + number + "/20] " + name
   result = try(fn())
   if result is error then print "FAIL: " + result.message; return false end if
   return true
 end function
+// Exercise message as part of this deterministic regression fixture.
 function message(value)
   payload = bytes(1, value)
   return t.DemoMessage(t.Vec3(1.25, -2.5, 180.0), payload)
 end function
+// Exercise recording as part of this deterministic regression fixture.
 function recording()
   return t.Demo(-1, [message(c.SVC_NOP), message(c.SVC_DISCONNECT)], "-1\n")
 end function
 
+// Verify track zero against the expected Quake behavior.
 function testTrackZero()
   equal(demo.parseTrack(bytes("0\n"))[0], 0, "track zero")
   return true
 end function
+// Verify track negative against the expected Quake behavior.
 function testTrackNegative()
   equal(demo.parseTrack(bytes("-12\n"))[0], -12, "negative track")
   return true
 end function
+// Verify track raw byte arithmetic against the expected Quake behavior.
 function testTrackRawByteArithmetic()
   equal(demo.parseTrack(bytes("A\n"))[0], 17, "raw byte arithmetic")
   return true
 end function
+// Verify track whitespace arithmetic against the expected Quake behavior.
 function testTrackWhitespaceArithmetic()
   equal(demo.parseTrack(bytes(" 1\n"))[0], -159, "retail whitespace arithmetic")
   return true
 end function
+// Verify track missing newline against the expected Quake behavior.
 function testTrackMissingNewline()
   value = try(demo.parseTrack(bytes("1")))
   yes(value is error, "missing newline")
   return true
 end function
+// Verify frame roundtrip against the expected Quake behavior.
 function testFrameRoundtrip()
   value = recording(); parsed = demo.parse(demo.serialize(value))
   equal(parsed.forcedTrack, -1, "forced track")
@@ -59,6 +76,7 @@ function testFrameRoundtrip()
   equal(parsed.messages[1].payload[0], c.SVC_DISCONNECT, "payload")
   return true
 end function
+// Verify angle binary32 against the expected Quake behavior.
 function testAngleBinary32()
   value = t.Demo(-1, [t.DemoMessage(t.Vec3(0.100000001, -0.0, 359.99999), bytes(0))], "-1\n")
   parsed = demo.parse(demo.serialize(value))
@@ -66,46 +84,55 @@ function testAngleBinary32()
   equal(native.floatBits(parsed.messages[0].viewAngles.z), native.floatBits(359.99999), "angle z")
   return true
 end function
+// Verify write copies binary32 against the expected Quake behavior.
 function testWriteCopiesBinary32()
   value = t.Demo(-1, [], "-1\n")
   demo.CL_WriteDemoMessage(value, bytes(0), t.Vec3(0.100000001, 2.0, 3.0))
   equal(native.floatBits(value.messages[0].viewAngles.x), native.floatBits(0.100000001), "write angle")
   return true
 end function
+// Verify oversize write against the expected Quake behavior.
 function testOversizeWrite()
   value = try(demo.CL_WriteDemoMessage(t.Demo(-1, [], "-1\n"), bytes(c.MAX_MSGLEN + 1), t.Vec3(0.0, 0.0, 0.0)))
   yes(value is error, "oversize message")
   return true
 end function
+// Verify truncated header against the expected Quake behavior.
 function testTruncatedHeader()
   value = try(demo.parse(bytes("-1\n123")))
   yes(value is error, "truncated header")
   return true
 end function
+// Verify invalid length against the expected Quake behavior.
 function testInvalidLength()
   data = bytes(20, 0); data[0] = 48; data[1] = 10; data[2] = 255; data[3] = 255; data[4] = 255; data[5] = 127
   value = try(demo.parse(data))
   yes(value is error, "invalid length")
   return true
 end function
+// Verify keepalive against the expected Quake behavior.
 function testKeepalive()
   yes(demo.isKeepalivePayload(bytes(1, c.SVC_NOP)), "single nop")
   return true
 end function
+// Verify mixed keepalive against the expected Quake behavior.
 function testMixedKeepalive()
   no(demo.isKeepalivePayload(bytes(2, c.SVC_NOP)), "multi-byte nop")
   return true
 end function
+// Verify record arguments against the expected Quake behavior.
 function testRecordArguments()
   value = try(demo.CL_Record_f(["record"], false))
   yes(value is error, "record usage")
   return true
 end function
+// Verify connected record rejected against the expected Quake behavior.
 function testConnectedRecordRejected()
   value = try(demo.CL_Record_f(["record", "x"], true))
   yes(value is error, "connected record")
   return true
 end function
+// Verify record map plan against the expected Quake behavior.
 function testRecordMapPlan()
   value = demo.CL_Record_f(["record", "x", "start", "2"], true)
   equal(value[0], "x.dem", "demo extension")
@@ -113,11 +140,13 @@ function testRecordMapPlan()
   equal(value[2], "start", "map plan")
   return true
 end function
+// Verify atoi track against the expected Quake behavior.
 function testAtoiTrack()
   equal(demo.recordTrackNumber("  -12.5"), -12, "atoi track")
   equal(demo.recordTrackNumber("text"), 0, "atoi no digits")
   return true
 end function
+// Verify stop adds disconnect against the expected Quake behavior.
 function testStopAddsDisconnect()
   value = t.Demo(-1, [], "-1\n")
   demo.CL_Stop_f(value, t.Vec3(0.0, 0.0, 0.0))
@@ -125,6 +154,7 @@ function testStopAddsDisconnect()
   equal(value.messages[0].payload[0], c.SVC_DISCONNECT, "stop opcode")
   return true
 end function
+// Verify timedemo frame gate against the expected Quake behavior.
 function testTimedemoFrameGate()
   state = playback.create(recording()); state.client.signon = c.SIGNONS
   playback.CL_TimeDemo_f(state, 10)
@@ -134,6 +164,7 @@ function testTimedemoFrameGate()
   equal(native.floatBits(state.startTime), native.floatBits(100.25), "second-frame start time")
   return true
 end function
+// Verify finish timedemo float against the expected Quake behavior.
 function testFinishTimedemoFloat()
   state = playback.create(recording()); state.timedemo = true; state.client.timedemo = true; state.startFrame = 10; state.startTime = 100.0
   result = playback.CL_FinishTimeDemo(state, 20, 102.50000001)
@@ -143,6 +174,7 @@ function testFinishTimedemoFloat()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   tests = [
     ["track zero",testTrackZero],["negative track",testTrackNegative],["raw track byte",testTrackRawByteArithmetic],["track whitespace",testTrackWhitespaceArithmetic],

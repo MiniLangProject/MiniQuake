@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.client_effects.
+*/
 package miniquake.client_effects
 
 import miniquake.constants as c
@@ -11,15 +18,31 @@ import miniquake.client as clientRuntime
 import miniquake.cvar as cvar
 import miniquake.protocol_transients as transients
 
+// Add state for append particles.
 function appendParticles(current, spawned)
   return particleSystem.appendLimited(current, spawned)
 end function
 
+// Return a validated safe sound value.
 function safeSound(mixer, entityNumber, channelNumber, name, origin, volume, attenuation)
   if mixer is void or not mixer.enabled or name == "" then return false end if
   result = try(sound.startSound(mixer, entityNumber, channelNumber, name, origin, volume, attenuation))
   if result is error then return false end if
   return result
+end function
+
+// Load the client-owned temporary-entity sounds that are not necessarily
+// named by a mod's QuakeC sound precache list.
+function precacheTemporarySounds(mixer)
+  return sound.precache(mixer, [
+    "wizard/hit.wav",
+    "hknight/hit.wav",
+    "weapons/tink1.wav",
+    "weapons/ric1.wav",
+    "weapons/ric2.wav",
+    "weapons/ric3.wav",
+    "weapons/r_exp3.wav",
+  ])
 end function
 
 // TE_SPIKE and TE_SUPERSPIKE share the engine-wide C rand() stream with the
@@ -34,6 +57,7 @@ function spikeImpactSound()
   return "weapons/ric3.wav"
 end function
 
+// Execute temporary.
 function processTemporary(value, mixer, currentParticles, currentTemporary, currentTime)
   spawned = []
   type = value.type
@@ -98,14 +122,17 @@ function pruneTemporary(currentTemporary, currentTime)
   return transients.activeCompactBeamList(currentTemporary, currentTime)
 end function
 
+// Provide server info rule text behavior for the active subsystem.
 function serverInfoRuleText()
   return "\n\n\u001d\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001f\n\n"
 end function
 
+// Provide server info level text behavior for the active subsystem.
 function serverInfoLevelText(levelName)
   return "\u0002" + levelName + "\n"
 end function
 
+// Execute the requested value.
 function process(events, client, player, mixer, viewState, consoleState, commandSystem, currentParticles, currentTemporary, currentTime, registry)
   currentTemporary = retainTemporarySlots(currentTemporary)
   for each item in events

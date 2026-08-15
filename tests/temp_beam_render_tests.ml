@@ -1,5 +1,9 @@
-/* BP-037: cl_tent.c beam pool, angles and 30-unit render segmentation. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
+BP-037: cl_tent.c beam pool, angles and 30-unit render segmentation.
+*/
 import miniquake.protocol_transients as transients
 import miniquake.temp_entities as temp
 import miniquake.types as t
@@ -9,21 +13,25 @@ import miniquake.player_move as playerMove
 import miniquake.client as client
 import miniquake.client_render_handoff as handoff
 
+// Assert that the condition holds and identify a failing test.
 function yes(value, name)
   if not value then return error(3700, name + ": expected true") end if
   return true
 end function
 
+// Exercise no as part of this deterministic regression fixture.
 function no(value, name)
   if value then return error(3701, name + ": expected false") end if
   return true
 end function
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(3702, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function near(actual, expected, tolerance, name)
   delta = actual - expected
   if delta < 0.0 then delta = -delta end if
@@ -31,6 +39,7 @@ function near(actual, expected, tolerance, name)
   return true
 end function
 
+// Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
   print "[" + number + "/22] " + name
   result = try(fn())
@@ -38,10 +47,12 @@ function run(number, name, fn)
   return true
 end function
 
+// Exercise beam as part of this deterministic regression fixture.
 function beam(entity, startPosition, endPosition)
   return t.TemporaryEntity(c.TE_LIGHTNING1, startPosition, endPosition, entity)
 end function
 
+// Verify horizontal angles against the expected Quake behavior.
 function testHorizontalAngles()
   angles = handoff.beamAngles(t.Vec3(0.0, 0.0, 0.0), t.Vec3(30.0, 0.0, 0.0))
   near(angles.x, 0.0, 0.0, "horizontal pitch")
@@ -49,54 +60,63 @@ function testHorizontalAngles()
   return true
 end function
 
+// Verify positive yaw against the expected Quake behavior.
 function testPositiveYaw()
   angles = handoff.beamAngles(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 30.0, 0.0))
   near(angles.y, 90.0, 0.0, "positive yaw")
   return true
 end function
 
+// Verify negative yaw against the expected Quake behavior.
 function testNegativeYaw()
   angles = handoff.beamAngles(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, -30.0, 0.0))
   near(angles.y, 270.0, 0.0, "negative yaw")
   return true
 end function
 
+// Verify vertical up against the expected Quake behavior.
 function testVerticalUp()
   angles = handoff.beamAngles(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 30.0))
   near(angles.x, 90.0, 0.0, "up pitch")
   return true
 end function
 
+// Verify vertical down against the expected Quake behavior.
 function testVerticalDown()
   angles = handoff.beamAngles(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, -30.0))
   near(angles.x, 270.0, 0.0, "down pitch")
   return true
 end function
 
+// Verify zero length against the expected Quake behavior.
 function testZeroLength()
   origins = handoff.beamSegmentOrigins(t.Vec3(1.0, 2.0, 3.0), t.Vec3(1.0, 2.0, 3.0), 64)
   equal(len(origins), 0, "zero length")
   return true
 end function
 
+// Verify one unit segment against the expected Quake behavior.
 function testOneUnitSegment()
   origins = handoff.beamSegmentOrigins(t.Vec3(0.0, 0.0, 0.0), t.Vec3(1.0, 0.0, 0.0), 64)
   equal(len(origins), 1, "one unit segment")
   return true
 end function
 
+// Verify exact thirty against the expected Quake behavior.
 function testExactThirty()
   origins = handoff.beamSegmentOrigins(t.Vec3(0.0, 0.0, 0.0), t.Vec3(30.0, 0.0, 0.0), 64)
   equal(len(origins), 1, "exact thirty")
   return true
 end function
 
+// Verify thirty one against the expected Quake behavior.
 function testThirtyOne()
   origins = handoff.beamSegmentOrigins(t.Vec3(0.0, 0.0, 0.0), t.Vec3(31.0, 0.0, 0.0), 64)
   equal(len(origins), 2, "thirty one")
   return true
 end function
 
+// Verify segment positions against the expected Quake behavior.
 function testSegmentPositions()
   origins = handoff.beamSegmentOrigins(t.Vec3(5.0, 0.0, 0.0), t.Vec3(70.0, 0.0, 0.0), 64)
   equal(len(origins), 3, "segment count")
@@ -106,12 +126,14 @@ function testSegmentPositions()
   return true
 end function
 
+// Verify segment limit against the expected Quake behavior.
 function testSegmentLimit()
   origins = handoff.beamSegmentOrigins(t.Vec3(0.0, 0.0, 0.0), t.Vec3(1000.0, 0.0, 0.0), 4)
   equal(len(origins), 4, "segment limit")
   return true
 end function
 
+// Verify compact view start against the expected Quake behavior.
 function testCompactViewStart()
   value = beam(7, t.Vec3(1.0, 2.0, 3.0), t.Vec3(10.0, 2.0, 3.0))
   start = handoff.compactBeamStart(value, 7, t.Vec3(9.0, 8.0, 7.0))
@@ -120,6 +142,7 @@ function testCompactViewStart()
   return true
 end function
 
+// Verify non view start against the expected Quake behavior.
 function testNonViewStart()
   value = beam(7, t.Vec3(1.0, 2.0, 3.0), t.Vec3(10.0, 2.0, 3.0))
   start = handoff.compactBeamStart(value, 8, t.Vec3(9.0, 8.0, 7.0))
@@ -127,6 +150,7 @@ function testNonViewStart()
   return true
 end function
 
+// Verify full state view override against the expected Quake behavior.
 function testFullStateViewOverride()
   state = temp.CL_InitTEnts(void)
   item = state.beams[0]
@@ -141,16 +165,19 @@ function testFullStateViewOverride()
   return true
 end function
 
+// Verify expiry equality against the expected Quake behavior.
 function testExpiryEquality()
   yes(transients.beamAlive(transients.beamEndTime(1.0), 1.2), "expiry equality")
   return true
 end function
 
+// Verify strict expiry against the expected Quake behavior.
 function testStrictExpiry()
   no(transients.beamAlive(transients.beamEndTime(1.0), 1.2001), "strict expiry")
   return true
 end function
 
+// Verify temp entity cap against the expected Quake behavior.
 function testTempEntityCap()
   state = temp.CL_InitTEnts(void)
   item = state.beams[0]
@@ -164,6 +191,7 @@ function testTempEntityCap()
   return true
 end function
 
+// Verify same entity slot against the expected Quake behavior.
 function testSameEntitySlot()
   first = beam(5, t.Vec3(0.0, 0.0, 0.0), t.Vec3(30.0, 0.0, 0.0))
   result = transients.updateCompactBeamListResult([], first, 1.0)
@@ -175,6 +203,7 @@ function testSameEntitySlot()
 end function
 
 
+// Render client.
 function renderClient()
   value = client.create(playerMove.create(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0)))
   value.modelPrecache = [""]
@@ -184,11 +213,13 @@ function renderClient()
   return value
 end function
 
+// Report whether active beam records holds for the active state.
 function activeBeamRecords(type, entity, startPosition, endPosition)
   value = t.TemporaryEntity(type, startPosition, endPosition, entity)
   return transients.updateCompactBeamList([], value, 1.0)
 end function
 
+// Verify model beam segments against the expected Quake behavior.
 function testModelBeamSegments()
   particles.resetRandom(1)
   value = renderClient()
@@ -200,6 +231,7 @@ function testModelBeamSegments()
   return true
 end function
 
+// Verify model beam view origin against the expected Quake behavior.
 function testModelBeamViewOrigin()
   particles.resetRandom(1)
   value = renderClient()
@@ -210,6 +242,7 @@ function testModelBeamViewOrigin()
   return true
 end function
 
+// Verify model beam visible cap against the expected Quake behavior.
 function testModelBeamVisibleCap()
   particles.resetRandom(1)
   value = renderClient()
@@ -219,6 +252,7 @@ function testModelBeamVisibleCap()
   return true
 end function
 
+// Verify submission order against the expected Quake behavior.
 function testSubmissionOrder()
   value = renderClient()
   visible = [client.createEntity(1), client.createEntity(2)]
@@ -230,6 +264,7 @@ function testSubmissionOrder()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   tests = [
     ["horizontal angles", testHorizontalAngles],

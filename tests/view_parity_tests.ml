@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Focused view.c differential-math and command-trace fixtures.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.common as common
@@ -14,11 +14,13 @@ import miniquake.player_move as movement
 import miniquake.cvar as cvar
 import miniquake.view as view
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9400, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function assertNear(actual, expected, tolerance, name)
   delta = actual - expected
   if delta < 0.0 then delta = -delta end if
@@ -26,6 +28,7 @@ function assertNear(actual, expected, tolerance, name)
   return true
 end function
 
+// Verify roll and bob against the expected Quake behavior.
 function testRollAndBob()
   angles = t.Vec3(0.0, 0.0, 0.0)
   assertNear(view.V_CalcRoll(angles, t.Vec3(0.0, 100.0, 0.0), 2.0, 200.0), -1.0, 0.00001, "V_CalcRoll proportional side")
@@ -34,6 +37,7 @@ function testRollAndBob()
   return true
 end function
 
+// Verify damage and palette against the expected Quake behavior.
 function testDamageAndPalette()
   state = view.create()
   view.V_ParseDamage(
@@ -71,6 +75,7 @@ function testDamageAndPalette()
   return true
 end function
 
+// Verify pitch drift against the expected Quake behavior.
 function testPitchDrift()
   state = view.create()
   angles = t.Vec3(20.0, 0.0, 0.0)
@@ -83,6 +88,7 @@ function testPitchDrift()
   return true
 end function
 
+// Verify refdef and trace against the expected Quake behavior.
 function testRefdefAndTrace()
   registry = host.createCvars(common.create([]), false)
   player = movement.create(t.Vec3(10.0, 20.0, 30.0), t.Vec3(0.0, 90.0, 0.0))
@@ -117,6 +123,7 @@ function testRefdefAndTrace()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   testRollAndBob()
   testDamageAndPalette()

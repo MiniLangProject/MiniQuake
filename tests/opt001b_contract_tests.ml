@@ -1,9 +1,16 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/opt001b_contract_tests.ml.
+*/
 import miniquake.optimization_baseline as opt
 import miniquake.render.entities as entities
 
 opt001bPassed = 0
 opt001bFailed = 0
 
+// Assert that the condition holds and identify a failing test.
 function opt001bCheck(condition, label)
   global opt001bPassed, opt001bFailed
   if condition then
@@ -15,6 +22,7 @@ function opt001bCheck(condition, label)
   end if
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   normal = entities.viewModelDepthRange(0.0, 1.0)
   opt001bCheck(normal[0] == 0.0, "normal weapon depth min")

@@ -1,12 +1,12 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Windows x64 MiniLang port of WinQuake/gl_vidnt.c and vid.h.  Display, WGL and
 device-gamma calls remain in the native bridge; all selection and compatibility
 semantics live here.
 */
-
 package miniquake.gl_vidnt
 
 import miniquake.common as common
@@ -112,22 +112,35 @@ end struct
 
 currentVideoState = void
 videoMenuSelection = NO_MODE
-videoMenuDisplayFocus = true
+videoMenuDisplayFocus = false
 videoMenuRendererFocus = false
 rendererSelectionOverride = -1
 
+// Apply the Quake-compatible vid renderer from name behavior.
 function VID_RendererFromName(name)
   lowered = bio.lower(name)
-  if lowered == "direct3d" or lowered == "direct3d9" or lowered == "directx" or lowered == "d3d9" or lowered == "dx9" then return win.RENDER_DIRECT3D9 end if
+  if lowered == "vulkan" or lowered == "vk" then return win.RENDER_VULKAN end if
+  if lowered == "direct3d" or lowered == "direct3d9" or lowered == "direct3d 9" or lowered == "directx" or lowered == "d3d9" or lowered == "dx9" then return win.RENDER_DIRECT3D9 end if
   return win.RENDER_OPENGL
 end function
 
+// Apply the Quake-compatible vid renderer name behavior.
 function VID_RendererName(backend)
+  if backend == win.RENDER_VULKAN then return "VULKAN" end if
   if backend == win.RENDER_DIRECT3D9 then return "DIRECT3D 9" end if
   return "OPENGL"
 end function
 
+// Return the stable token written to config.cfg for a renderer backend.
+function VID_RendererConfigName(backend)
+  if backend == win.RENDER_VULKAN then return "vulkan" end if
+  if backend == win.RENDER_DIRECT3D9 then return "direct3d9" end if
+  return "opengl"
+end function
+
+// Apply the Quake-compatible vid command line renderer behavior.
 function VID_CommandLineRenderer(arguments)
+  if common.hasParm(arguments, "-vulkan") or common.hasParm(arguments, "-vk") then return win.RENDER_VULKAN end if
   if common.hasParm(arguments, "-directx") or common.hasParm(arguments, "-d3d9") then return win.RENDER_DIRECT3D9 end if
   if common.hasParm(arguments, "-opengl") then return win.RENDER_OPENGL end if
   named = common.parmValue(arguments, "-renderer", "")
@@ -135,6 +148,7 @@ function VID_CommandLineRenderer(arguments)
   return -1
 end function
 
+// Apply the Quake-compatible vid select configured renderer behavior.
 function VID_SelectConfiguredRenderer(arguments, registry)
   global rendererSelectionOverride
   selected = rendererSelectionOverride
@@ -147,12 +161,14 @@ function VID_SelectConfiguredRenderer(arguments, registry)
   return selected
 end function
 
+// Create and initialize mode.
 function makeMode(type, width, height, bpp, frequency, halfscreen)
   description = "" + width + "x" + height
   if type == MS_FULLDIB then description = description + "x" + bpp end if
   return VideoMode(type, width, height, 0, 1, type == MS_FULLDIB, bpp, halfscreen, frequency, description)
 end function
 
+// Create and initialize video state.
 function createVideoState()
   bad = makeMode(MS_UNINIT, 0, 0, 0, 0, 0)
   bad.description = "Bad mode"
@@ -221,6 +237,7 @@ function createVideoState()
   )
 end function
 
+// Apply the Quake-compatible vid window title for fps behavior.
 function inline VID_WindowTitleForFps(fps)
   safeFps = native.trunc(fps)
   if safeFps < 0 then safeFps = 0 end if
@@ -228,29 +245,75 @@ function inline VID_WindowTitleForFps(fps)
   return "MiniQuake - " + safeFps + " FPS"
 end function
 
+// Apply the Quake-compatible vid use state behavior.
 function VID_UseState(state)
   global currentVideoState
   currentVideoState = state
   return state
 end function
 
+// Apply the Quake-compatible vid state behavior.
 function VID_State()
   global currentVideoState
   if currentVideoState is void then currentVideoState = createVideoState() end if
   return currentVideoState
 end function
 
+// Apply the Quake-compatible vid set sound mixer behavior.
 function VID_SetSoundMixer(mixerState)
   state = VID_State()
   state.soundMixer = mixerState
   return mixerState
 end function
 
+// Reconcile focus only after the sound device has been attached.  The video
+// window is created before waveOut during Host_Init; if it loses focus during
+// that interval, AppActivate records soundBlocked but cannot yet increment the
+// mixer's block depth.  Attaching the mixer without this reconciliation leaves
+// the state flag and the actual depth out of sync until another focus edge.
+function VID_SynchronizeSoundFocus()
+  state = VID_State()
+  if state.soundMixer is void or not state.createNative then return false end if
+  focused = win.hasFocus()
+  minimized = win.minimized()
+  actualBlocked = sound.blockDepth(state.soundMixer) > 0
+  wantedBlocked = minimized or not focused
+  if wantedBlocked and not actualBlocked then sound.block(state.soundMixer) end if
+  if not wantedBlocked and actualBlocked then
+    while sound.blockDepth(state.soundMixer) > 0
+      sound.unblock(state.soundMixer)
+    end while
+  end if
+  state.activeApp = focused
+  state.minimized = minimized
+  state.soundBlocked = wantedBlocked
+  return true
+end function
+
+// Reconcile focus before every paint as well.  This deliberately compares the
+// desired focus state with the mixer's real nesting depth rather than trusting
+// soundBlocked: video starts before waveOut and renderer/display restarts also
+// replace VideoState, so the two pieces of state can otherwise diverge.
+function VID_SynchronizeSoundFocusIfNeeded()
+  state = VID_State()
+  if state.soundMixer is void or not state.createNative then return false end if
+  focused = win.hasFocus()
+  minimized = win.minimized()
+  wantedBlocked = minimized or not focused
+  actualBlocked = sound.blockDepth(state.soundMixer) > 0
+  if wantedBlocked != actualBlocked or state.activeApp != focused or state.minimized != minimized or state.soundBlocked != wantedBlocked then
+    return VID_SynchronizeSoundFocus()
+  end if
+  return false
+end function
+
+// Report whether text.
 function hasText(value, needle)
   if value == "" or needle == "" then return false end if
   return string.indexOf(value, needle, 0) >= 0
 end function
 
+// Initialize state for starts with ignore case.
 function startsWithIgnoreCase(value, prefix)
   source = bytes(value)
   wanted = bytes(prefix)
@@ -267,38 +330,46 @@ function startsWithIgnoreCase(value, prefix)
   return true
 end function
 
+// Apply the Quake-compatible vid handle pause behavior.
 function VID_HandlePause(pause)
   state = VID_State()
   state.paused = pause
   return true
 end function
 
+// Apply the Quake-compatible vid force lock state behavior.
 function VID_ForceLockState(lockState)
   state = VID_State()
   state.forceLock = lockState
   return true
 end function
 
+// Apply the Quake-compatible vid lock buffer behavior.
 function VID_LockBuffer()
   return true
 end function
 
+// Apply the Quake-compatible vid unlock buffer behavior.
 function VID_UnlockBuffer()
   return true
 end function
 
+// Apply the Quake-compatible vid force unlocked and return state behavior.
 function VID_ForceUnlockedAndReturnState()
   return 0
 end function
 
+// Mirror Quake's D_BeginDirectRect routine and its observable state changes.
 function D_BeginDirectRect(x, y, bitmap, width, height)
   return false
 end function
 
+// Mirror Quake's D_EndDirectRect routine and its observable state changes.
 function D_EndDirectRect(x, y, width, height)
   return false
 end function
 
+// Provide center window behavior for the active subsystem.
 function CenterWindow(width, height, screenWidth, screenHeight, leftTopJustify)
   centerX = native.trunc((screenWidth - width) / 2)
   centerY = native.trunc((screenHeight - height) / 2)
@@ -308,6 +379,7 @@ function CenterWindow(width, height, screenWidth, screenHeight, leftTopJustify)
   return [centerX, centerY]
 end function
 
+// Apply the Quake-compatible vid mode less behavior.
 function VID_ModeLess(left, right)
   if left.width != right.width then return left.width < right.width end if
   if left.height != right.height then return left.height < right.height end if
@@ -315,6 +387,7 @@ function VID_ModeLess(left, right)
   return left.frequency < right.frequency
 end function
 
+// Apply the Quake-compatible vid sort modes behavior.
 function VID_SortModes(modes)
   sorted = []
   for each candidate in modes
@@ -333,6 +406,7 @@ function VID_SortModes(modes)
   return sorted
 end function
 
+// Apply the Quake-compatible vid mode exists behavior.
 function VID_ModeExists(modes, candidate)
   for each existing in modes
     // MiniQuake's vmode_t has no refresh-rate field. EnumDisplaySettings can
@@ -343,6 +417,7 @@ function VID_ModeExists(modes, candidate)
   return false
 end function
 
+// Apply the Quake-compatible vid set windowed mode behavior.
 function VID_SetWindowedMode(modeNumber, createNative)
   state = VID_State()
   mode = VID_GetModePtr(modeNumber)
@@ -368,6 +443,7 @@ function VID_SetWindowedMode(modeNumber, createNative)
   return true
 end function
 
+// Apply the Quake-compatible vid set full dibmode behavior.
 function VID_SetFullDIBMode(modeNumber, createNative)
   state = VID_State()
   mode = VID_GetModePtr(modeNumber)
@@ -398,6 +474,7 @@ function VID_SetFullDIBMode(modeNumber, createNative)
   return true
 end function
 
+// Apply the Quake-compatible vid set mode behavior.
 function VID_SetMode(modeNumber, palette, createNative)
   state = VID_State()
   if modeNumber < 0 or modeNumber >= len(state.modes) then return error(3904, "Bad video mode") end if
@@ -434,6 +511,7 @@ function VID_SetMode(modeNumber, palette, createNative)
   return true
 end function
 
+// Apply the Quake-compatible vid update window status behavior.
 function VID_UpdateWindowStatus()
   state = VID_State()
   if state.createNative and win.contextReady() then
@@ -448,6 +526,7 @@ function VID_UpdateWindowStatus()
   return [state.windowX, state.windowY, state.windowWidth, state.windowHeight, state.windowCenterX, state.windowCenterY]
 end function
 
+// Validate texture extensions and report any incompatibility.
 function CheckTextureExtensions()
   state = VID_State()
   // OpenGL 1.1 exposes core texture objects even when the EXT spelling is not
@@ -456,6 +535,7 @@ function CheckTextureExtensions()
   return true
 end function
 
+// Validate array extensions and report any incompatibility.
 function CheckArrayExtensions()
   state = VID_State()
   state.arrayExtension = hasText(state.glExtensions, "GL_EXT_vertex_array")
@@ -463,6 +543,7 @@ function CheckArrayExtensions()
   return state.arrayExtension
 end function
 
+// Validate multi texture extensions and report any incompatibility.
 function CheckMultiTextureExtensions()
   state = VID_State()
   disabled = false
@@ -473,12 +554,14 @@ function CheckMultiTextureExtensions()
   return state.multitexture
 end function
 
+// Validate multi texture extensions non windows and report any incompatibility.
 function CheckMultiTextureExtensions_NonWindows()
   state = VID_State()
   state.multitexture = true
   return true
 end function
 
+// Mirror Quake's GL_Init routine and its observable state changes.
 function GL_Init()
   state = VID_State()
   if state.createNative and not win.contextReady() then return error(3907, "GL_Init: WGL context unavailable") end if
@@ -509,6 +592,7 @@ function GL_Init()
   return true
 end function
 
+// Mirror Quake's GL_BeginRendering routine and its observable state changes.
 function GL_BeginRendering()
   state = VID_State()
   width = state.windowWidth
@@ -517,6 +601,7 @@ function GL_BeginRendering()
   return [0, 0, width, height]
 end function
 
+// Mirror Quake's GL_EndRendering routine and its observable state changes.
 function GL_EndRendering()
   state = VID_State()
   if state.createNative and win.contextReady() then
@@ -540,6 +625,7 @@ function GL_EndRendering()
   return true
 end function
 
+// Apply the Quake-compatible vid build15 to8 behavior.
 function VID_Build15To8(state)
   value = 0
   while value < 32768
@@ -564,6 +650,7 @@ function VID_Build15To8(state)
   return state.table15
 end function
 
+// Apply the Quake-compatible vid set palette behavior.
 function VID_SetPalette(palette)
   state = VID_State()
   if palette is void or len(palette) < 768 then return error(3908, "VID_SetPalette: invalid palette") end if
@@ -587,16 +674,19 @@ function VID_SetPalette(palette)
   return true
 end function
 
+// Apply the Quake-compatible vid shift palette behavior.
 function VID_ShiftPalette(palette)
   // The MiniQuake source intentionally leaves SetDeviceGammaRamp commented out.
   return false
 end function
 
+// Apply the Quake-compatible vid set default mode behavior.
 function VID_SetDefaultMode()
   input.IN_DeactivateMouse()
   return true
 end function
 
+// Apply the Quake-compatible vid shutdown behavior.
 function VID_Shutdown()
   state = VID_State()
   if not state.initialized then return false end if
@@ -611,17 +701,20 @@ function VID_Shutdown()
   return true
 end function
 
+// Provide b setup pixel format behavior for the active subsystem.
 function bSetupPixelFormat()
   state = VID_State()
   if not state.createNative then return true end if
   return win.contextReady()
 end function
 
+// Provide map key behavior for the active subsystem.
 function MapKey(key)
   scan = (key >> 16) & 255
   return input.quakeKeyForScanCode(scan)
 end function
 
+// Update module state for all states.
 function ClearAllStates()
   // Queue the same synthetic key-up commands emitted by WinQuake before the
   // physical state tables are cleared. The host drains this queue into Cbuf.
@@ -630,17 +723,25 @@ function ClearAllStates()
   return true
 end function
 
+// Provide app activate behavior for the active subsystem.
 function AppActivate(active, minimized)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   state = VID_State()
   state.activeApp = active
   state.minimized = minimized
-  if not active and not state.soundBlocked then
+  wantedBlocked = minimized or not active
+  actualBlocked = false
+  if state.soundMixer is not void then actualBlocked = sound.blockDepth(state.soundMixer) > 0 end if
+  if wantedBlocked and not actualBlocked then
     if state.soundMixer is not void then sound.block(state.soundMixer) end if
-    state.soundBlocked = true
-  else if active and state.soundBlocked then
-    if state.soundMixer is not void then sound.unblock(state.soundMixer) end if
-    state.soundBlocked = false
+  else if not wantedBlocked and actualBlocked then
+    if state.soundMixer is not void then
+      while sound.blockDepth(state.soundMixer) > 0
+        sound.unblock(state.soundMixer)
+      end while
+    end if
   end if
+  state.soundBlocked = wantedBlocked
   if state.createNative then win.activate(active, minimized) end if
   windowedMouse = false
   if state.registry is not void then windowedMouse = cvar.variableValue(state.registry, "_windowed_mouse") != 0.0 end if
@@ -666,12 +767,14 @@ function AppActivate(active, minimized)
   return true
 end function
 
+// Provide signed word behavior for the active subsystem.
 function signedWord(value)
   result = value & 0xffff
   if result >= 0x8000 then result = result - 0x10000 end if
   return result
 end function
 
+// Provide main wnd proc behavior for the active subsystem.
 function MainWndProc(message, wParam, lParam)
   state = VID_State()
   if message == 0x0003 then
@@ -707,16 +810,19 @@ function MainWndProc(message, wParam, lParam)
   return ["default", message]
 end function
 
+// Apply the Quake-compatible vid num modes behavior.
 function VID_NumModes()
   return len(VID_State().modes)
 end function
 
+// Apply the Quake-compatible vid get mode ptr behavior.
 function VID_GetModePtr(modeNumber)
   state = VID_State()
   if modeNumber >= 0 and modeNumber < len(state.modes) then return state.modes[modeNumber] end if
   return state.badMode
 end function
 
+// Apply the Quake-compatible vid get mode description behavior.
 function VID_GetModeDescription(modeNumber)
   state = VID_State()
   if modeNumber < 0 or modeNumber >= len(state.modes) then return "" end if
@@ -727,6 +833,7 @@ function VID_GetModeDescription(modeNumber)
   return state.modes[modeNumber].description
 end function
 
+// Apply the Quake-compatible vid get ext mode description behavior.
 function VID_GetExtModeDescription(modeNumber)
   state = VID_State()
   if modeNumber < 0 or modeNumber >= len(state.modes) then return "" end if
@@ -739,17 +846,20 @@ function VID_GetExtModeDescription(modeNumber)
   return "windowed"
 end function
 
+// Apply the Quake-compatible vid describe current mode f behavior.
 function VID_DescribeCurrentMode_f()
   state = VID_State()
   return VID_GetExtModeDescription(state.currentMode)
 end function
 
+// Apply the Quake-compatible vid num modes f behavior.
 function VID_NumModes_f()
   count = VID_NumModes()
   if count == 1 then return "1 video mode is available" end if
   return "" + count + " video modes are available"
 end function
 
+// Apply the Quake-compatible vid describe mode f behavior.
 function VID_DescribeMode_f(arguments)
   if len(arguments) < 2 then return "" end if
   state = VID_State()
@@ -760,6 +870,7 @@ function VID_DescribeMode_f(arguments)
   return result
 end function
 
+// Apply the Quake-compatible vid describe modes f behavior.
 function VID_DescribeModes_f()
   state = VID_State()
   previous = state.leaveCurrentMode
@@ -776,6 +887,7 @@ function VID_DescribeModes_f()
   return result
 end function
 
+// Apply the Quake-compatible vid init dib behavior.
 function VID_InitDIB(arguments)
   state = VID_State()
   width = common.integerOption(arguments, "-width", 640)
@@ -789,6 +901,7 @@ function VID_InitDIB(arguments)
   return mode
 end function
 
+// Apply the Quake-compatible vid init full dib behavior.
 function VID_InitFullDIB(enumeratedModes, testNative, noAdjustAspect)
   state = VID_State()
   fullscreenModes = []
@@ -829,10 +942,12 @@ function VID_InitFullDIB(enumeratedModes, testNative, noAdjustAspect)
   return len(fullscreenModes)
 end function
 
+// Apply the Quake-compatible vid is8bit behavior.
 function VID_Is8bit()
   return VID_State().is8bit
 end function
 
+// Apply the Quake-compatible vid init8bit palette behavior.
 function VID_Init8bitPalette()
   state = VID_State()
   disabled = false
@@ -843,10 +958,15 @@ function VID_Init8bitPalette()
   return not disabled and state.is8bit
 end function
 
+// Validate gamma and report any incompatibility.
 function Check_Gamma(palette)
   state = VID_State()
-  gamma = 0.7
-  if hasText(state.glRenderer, "Voodoo") or hasText(state.glVendor, "3Dfx") then gamma = 1.0 end if
+  // The shipped Windows GLQUAKE.EXE is the visual oracle. Its captured output
+  // uses the unmodified palette unless -gamma is explicitly supplied; using
+  // the source comment's 0.7 fallback made MiniQuake's world textures about
+  // 50 percent brighter in matched retail frames. Keep -gamma available for
+  // users who prefer that historical source-tree fallback.
+  gamma = 1.0
   if state.arguments is not void and common.hasParm(state.arguments, "-gamma") then gamma = common.floatOption(state.arguments, "-gamma", gamma) end if
   state.gamma = gamma
   index = 0
@@ -861,6 +981,7 @@ function Check_Gamma(palette)
   return gamma
 end function
 
+// Apply the Quake-compatible vid build gamma ramp behavior.
 function VID_BuildGammaRamp(gamma)
   ramp = bytes(1536)
   channel = 0
@@ -881,18 +1002,21 @@ function VID_BuildGammaRamp(gamma)
   return ramp
 end function
 
+// Apply the Quake-compatible vid apply gamma ramp behavior.
 function VID_ApplyGammaRamp(gamma)
   state = VID_State()
   state.gammaWorks = win.setGammaRamp(VID_BuildGammaRamp(gamma))
   return state.gammaWorks
 end function
 
+// Apply the Quake-compatible vid windowed requested behavior.
 function VID_WindowedRequested(arguments)
   return common.hasParm(arguments, "-window") or
     common.hasParm(arguments, "-windowed") or
     common.hasParm(arguments, "-startwindowed")
 end function
 
+// Apply the Quake-compatible vid fullscreen requested behavior.
 function VID_FullscreenRequested(arguments)
   return common.hasParm(arguments, "-fullscreen") or
     common.hasParm(arguments, "-mode") or
@@ -901,7 +1025,9 @@ function VID_FullscreenRequested(arguments)
     common.hasParm(arguments, "-force")
 end function
 
+// Apply the Quake-compatible vid find requested mode behavior.
 function VID_FindRequestedMode(arguments)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   state = VID_State()
   if VID_WindowedRequested(arguments) or not VID_FullscreenRequested(arguments) then
     state.windowed = true
@@ -950,7 +1076,9 @@ function VID_FindRequestedMode(arguments)
   return NO_MODE
 end function
 
+// Apply the Quake-compatible vid init behavior.
 function VID_Init(arguments, registry, palette, createNative)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if createNative then
     selectedRenderer = try(VID_SelectConfiguredRenderer(arguments, registry))
     if selectedRenderer is error then return selectedRenderer end if
@@ -992,14 +1120,17 @@ function VID_Init(arguments, registry, palette, createNative)
   return state
 end function
 
+// Apply the Quake-compatible vid restart renderer behavior.
 function VID_RestartRenderer(backend)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global rendererSelectionOverride
   state = VID_State()
   if backend == win.renderer() then
+    if state.registry is not void and cvar.find(state.registry, "vid_renderer") is not void then cvar.set(state.registry, "vid_renderer", VID_RendererConfigName(backend)) end if
     state.lastModeMessage = VID_RendererName(backend) + " renderer active."
     return true
   end if
-  if backend != win.RENDER_OPENGL and backend != win.RENDER_DIRECT3D9 then return error(3918, "Unknown renderer") end if
+  if backend != win.RENDER_OPENGL and backend != win.RENDER_DIRECT3D9 and backend != win.RENDER_VULKAN then return error(3918, "Unknown renderer") end if
   if not win.rendererAvailable(backend) then return error(3919, VID_RendererName(backend) + " is not available") end if
   oldBackend = win.renderer()
   oldWidth = state.windowWidth
@@ -1036,12 +1167,13 @@ function VID_RestartRenderer(backend)
     applied = VID_ApplyDisplayMode(modeNumber, oldFullscreen)
     if applied is error then state.lastModeMessage = applied.message end if
   end if
-  if oldRegistry is not void and cvar.find(oldRegistry, "vid_renderer") is not void then cvar.set(oldRegistry, "vid_renderer", VID_RendererName(backend)) end if
+  if oldRegistry is not void and cvar.find(oldRegistry, "vid_renderer") is not void then cvar.set(oldRegistry, "vid_renderer", VID_RendererConfigName(backend)) end if
   AppActivate(true, false)
   state.lastModeMessage = VID_RendererName(backend) + " renderer active."
   return true
 end function
 
+// Apply the Quake-compatible vid apply configured renderer behavior.
 function VID_ApplyConfiguredRenderer()
   state = VID_State()
   if state.registry is void then return false end if
@@ -1053,6 +1185,7 @@ function VID_ApplyConfiguredRenderer()
   return true
 end function
 
+// Apply the Quake-compatible vid menu mode count behavior.
 function VID_MenuModeCount()
   count = len(VID_State().modes) - 1
   if count < 0 then count = 0 end if
@@ -1060,10 +1193,15 @@ function VID_MenuModeCount()
   return count
 end function
 
+// Apply the Quake-compatible vid menu reset behavior.
 function VID_MenuReset()
   global videoMenuSelection, videoMenuDisplayFocus, videoMenuRendererFocus
   state = VID_State()
-  videoMenuDisplayFocus = true
+  // The original video menu opens on the active resolution.  Display mode and
+  // renderer are separate entries above the grid and are reached with UP.
+  // Starting on DISPLAY made the first LEFT/RIGHT press toggle fullscreen even
+  // though the player had opened the menu to choose a resolution.
+  videoMenuDisplayFocus = false
   videoMenuRendererFocus = false
   count = VID_MenuModeCount()
   if count == 0 then videoMenuSelection = NO_MODE; return videoMenuSelection end if
@@ -1087,6 +1225,7 @@ function VID_MenuReset()
   return videoMenuSelection
 end function
 
+// Apply the Quake-compatible vid menu selection behavior.
 function VID_MenuSelection()
   global videoMenuSelection
   count = VID_MenuModeCount()
@@ -1095,6 +1234,7 @@ function VID_MenuSelection()
   return videoMenuSelection
 end function
 
+// Apply the Quake-compatible vid menu move behavior.
 function VID_MenuMove(delta)
   global videoMenuSelection
   count = VID_MenuModeCount()
@@ -1110,16 +1250,19 @@ function VID_MenuMove(delta)
   return videoMenuSelection
 end function
 
+// Apply the Quake-compatible vid menu display focused behavior.
 function VID_MenuDisplayFocused()
   global videoMenuDisplayFocus
   return videoMenuDisplayFocus
 end function
 
+// Apply the Quake-compatible vid menu renderer focused behavior.
 function VID_MenuRendererFocused()
   global videoMenuRendererFocus
   return videoMenuRendererFocus
 end function
 
+// Apply the Quake-compatible vid save resolution cvars behavior.
 function VID_SaveResolutionCvars(state, width, height, bpp)
   if state.registry is void then return false end if
   if cvar.find(state.registry, "vid_width") is not void then cvar.setValue(state.registry, "vid_width", width) end if
@@ -1134,6 +1277,23 @@ function VID_SaveResolutionCvars(state, width, height, bpp)
   return true
 end function
 
+// Synchronize the live window, fullscreen and renderer state into archived
+// cvars immediately before config.cfg is written.  This also captures a window
+// resized by dragging its frame rather than only changes made in the menu.
+function VID_SaveCurrentConfigurationCvars()
+  state = VID_State()
+  if state.registry is void or not state.initialized then return false end if
+  VID_UpdateWindowStatus()
+  bpp = native.trunc(cvar.variableValue(state.registry, "vid_bpp"))
+  if state.modeState == MS_FULLDIB and state.currentMode >= 1 and state.currentMode < len(state.modes) then
+    bpp = state.modes[state.currentMode].bpp
+  end if
+  VID_SaveResolutionCvars(state, state.windowWidth, state.windowHeight, bpp)
+  if cvar.find(state.registry, "vid_renderer") is not void then cvar.set(state.registry, "vid_renderer", VID_RendererConfigName(win.renderer())) end if
+  return true
+end function
+
+// Apply the Quake-compatible vid restore native mode behavior.
 function VID_RestoreNativeMode(state, wasFullscreen, previousWidth, previousHeight, previousBpp, previousFrequency, previousHalfscreen)
   if not state.createNative then return true end if
   if wasFullscreen then
@@ -1148,6 +1308,7 @@ end function
 // context.  Keeping the context alive is essential: all map textures, display
 // lists and renderer caches remain valid across the menu operation.
 function VID_ApplyDisplayMode(modeNumber, fullscreen)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   state = VID_State()
   if modeNumber < 1 or modeNumber >= len(state.modes) then return error(3912, "Video resolution is unavailable") end if
   mode = state.modes[modeNumber]
@@ -1209,10 +1370,12 @@ function VID_ApplyDisplayMode(modeNumber, fullscreen)
   return true
 end function
 
+// Apply the Quake-compatible vid apply resolution behavior.
 function VID_ApplyResolution(modeNumber)
   return VID_ApplyDisplayMode(modeNumber, VID_State().modeState == MS_FULLDIB)
 end function
 
+// Apply the Quake-compatible vid toggle fullscreen behavior.
 function VID_ToggleFullscreen()
   selected = VID_MenuSelection()
   if selected == NO_MODE then return error(3915, "No fullscreen resolution is available") end if
@@ -1272,6 +1435,7 @@ function VID_ApplyConfiguredResolution()
   return false
 end function
 
+// Apply the Quake-compatible vid menu draw behavior.
 function VID_MenuDraw()
   state = VID_State()
   selection = VID_MenuSelection()
@@ -1289,28 +1453,38 @@ function VID_MenuDraw()
     mode = state.modes[index]
     current = index == state.currentMode
     if state.modeState == MS_WINDOWED and mode.width == state.windowWidth and mode.height == state.windowHeight then current = true end if
-    commands = commands + [["mode", index, mode.description, current, count % VID_ROW_SIZE, native.trunc(count / VID_ROW_SIZE), index == selection and not VID_MenuDisplayFocused()]]
+    commands = commands + [["mode", index, mode.description, current, count % VID_ROW_SIZE, native.trunc(count / VID_ROW_SIZE), index == selection and not VID_MenuDisplayFocused() and not VID_MenuRendererFocused()]]
     count = count + 1
     index = index + 1
   end while
   commands = commands + [
-    ["help", "Arrow keys select a resolution"],
-    ["help", "ENTER applies it immediately"],
-    ["help", "Display mode changes without restart"],
+    ["help", "LEFT/RIGHT select a resolution"],
+    ["help", "UP reaches display and renderer"],
+    ["help", "ENTER applies the selected setting"],
   ]
   state.drawTrace = commands
   return commands
 end function
 
+// Apply the Quake-compatible vid menu key behavior.
 function VID_MenuKey(key)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global videoMenuDisplayFocus, videoMenuRendererFocus
   if key == keys.K_ESCAPE then return "options" end if
   if videoMenuRendererFocus then
     if key == keys.K_DOWNARROW then videoMenuRendererFocus = false; videoMenuDisplayFocus = true; return "move" end if
     if key == keys.K_UPARROW then videoMenuRendererFocus = false; videoMenuDisplayFocus = false; return "move" end if
     if key == keys.K_LEFTARROW or key == keys.K_RIGHTARROW or key == keys.K_ENTER then
-      target = win.RENDER_DIRECT3D9
-      if win.renderer() == win.RENDER_DIRECT3D9 then target = win.RENDER_OPENGL end if
+      direction = 1
+      if key == keys.K_LEFTARROW then direction = -1 end if
+      target = win.renderer()
+      attempts = 0
+      while attempts < 3
+        target = target + direction
+        if target < win.RENDER_OPENGL then target = win.RENDER_VULKAN end if
+        if target > win.RENDER_VULKAN then target = win.RENDER_OPENGL end if
+        if win.rendererAvailable(target) then attempts = 3 else attempts = attempts + 1 end if
+      end while
       return ["renderer_switch", target]
     end if
     return "none"
@@ -1347,10 +1521,12 @@ function VID_MenuKey(key)
   return "none"
 end function
 
+// Apply the Quake-compatible vid menu draw callback behavior.
 function VID_MenuDrawCallback()
   return VID_MenuDraw()
 end function
 
+// Apply the Quake-compatible vid menu key callback behavior.
 function VID_MenuKeyCallback(key)
   return VID_MenuKey(key)
 end function

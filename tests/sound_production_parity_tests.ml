@@ -1,26 +1,30 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Production-path sound parity tests.  These exercise sound/mixer.ml, the module
 used by host.ml, rather than only the canonical snd_dma/snd_mix pendants.
 */
-
 import miniquake.sound.mixer as mixer
 import miniquake.sound.snd_mem as sndmem
 import miniquake.types as t
 import miniquake.byteio as bio
+import miniquake.gl_vidnt as video
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9580, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9581, name + ": expected true") end if
   return true
 end function
 
+// Create and initialize effect.
 function makeEffect(name, values, loopStart)
   data = bytes(len(values) * 2)
   index = 0
@@ -31,6 +35,7 @@ function makeEffect(name, values, loopStart)
   return t.SoundEffect(name, data, 22050, 2, 1, loopStart)
 end function
 
+// Create and initialize channel.
 function makeChannel(entityNumber, channelNumber, effect, sample, volume)
   return t.MixerChannel(
     entityNumber,
@@ -46,6 +51,7 @@ function makeChannel(entityNumber, channelNumber, effect, sample, volume)
   )
 end function
 
+// Return dynamic count derived from the active module state.
 function dynamicCount(state)
   count = 0
   for each channel in state.channels
@@ -54,6 +60,7 @@ function dynamicCount(state)
   return count
 end function
 
+// Verify channel selection and duplicate offset against the expected Quake behavior.
 function testChannelSelectionAndDuplicateOffset()
   state = mixer.create(void, 22050)
   state.enabled = true
@@ -122,6 +129,7 @@ function testChannelSelectionAndDuplicateOffset()
   return true
 end function
 
+// Verify static combine and stop quirk against the expected Quake behavior.
 function testStaticCombineAndStopQuirk()
   state = mixer.create(void, 22050)
   state.enabled = true
@@ -149,6 +157,7 @@ function testStaticCombineAndStopQuirk()
   return true
 end function
 
+// Verify loop boundary pcm and queue timing against the expected Quake behavior.
 function testLoopBoundaryPcmAndQueueTiming()
   state = mixer.create(void, 22050)
   state.enabled = true
@@ -187,6 +196,7 @@ function testLoopBoundaryPcmAndQueueTiming()
   return true
 end function
 
+// Verify focus block nesting against the expected Quake behavior.
 function testFocusBlockNesting()
   state = mixer.create(void, 22050)
   state.enabled = true
@@ -198,6 +208,14 @@ function testFocusBlockNesting()
   assertEqual(mixer.update(state, 0.016, 0.1), 0, "blocked production update")
   assertEqual(mixer.unblock(state), 1, "nested production unblock")
   assertEqual(mixer.unblock(state), 0, "final production unblock")
+  assertEqual(mixer.unblock(state), 0, "unbalanced production unblock clamps at zero")
+  videoState = video.createVideoState()
+  video.VID_UseState(videoState)
+  video.VID_SetSoundMixer(state)
+  video.AppActivate(false, false)
+  assertEqual(mixer.blockDepth(state), 1, "focus loss blocks production mixer")
+  video.AppActivate(true, false)
+  assertEqual(mixer.blockDepth(state), 0, "focus restore unblocks production mixer")
   state.audioState.opened = false
 
   commands = mixer.create(void, 22050)
@@ -213,6 +231,7 @@ function testFocusBlockNesting()
   return true
 end function
 
+// Verify malformed wave boundaries against the expected Quake behavior.
 function testMalformedWaveBoundaries()
   truncated = bytes("RIFF")
   info = sndmem.GetWavinfo("truncated.wav", truncated, len(truncated))
@@ -250,17 +269,71 @@ function testMalformedWaveBoundaries()
   return true
 end function
 
+// Verify spatial vector reuse against the expected Quake behavior.
+function testSpatialVectorReuse()
+  state = mixer.create(void, 22050)
+  listenerOriginRaw = nativeRawValue(state.listenerOrigin)
+  listenerForwardRaw = nativeRawValue(state.listenerForward)
+  listenerRightRaw = nativeRawValue(state.listenerRight)
+  mixer.updateListener(
+    state,
+    t.Vec3(1.0, 2.0, 3.0),
+    t.Vec3(0.0, 1.0, 0.0),
+    t.Vec3(-1.0, 0.0, 0.0),
+  )
+  assertEqual(nativeRawValue(state.listenerOrigin), listenerOriginRaw, "listener origin storage reused")
+  assertEqual(nativeRawValue(state.listenerForward), listenerForwardRaw, "listener forward storage reused")
+  assertEqual(nativeRawValue(state.listenerRight), listenerRightRaw, "listener right storage reused")
+  assertEqual(state.listenerOrigin.z, 3.0, "listener origin updated")
+
+  effect = makeEffect("spatial.wav", [1, 2, 3], -1)
+  channel = makeChannel(1, 1, effect, 0, 1.0)
+  state.channels = [channel]
+  entity = t.ClientEntityState(1, 1, 0, 0, 0, 0, t.Vec3(7.0, 8.0, 9.0), t.Vec3(0.0, 0.0, 0.0), 0.0, t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), false, void, 0.0)
+  entities = [void, entity]
+  channelOriginRaw = nativeRawValue(channel.origin)
+  state.listenerEntity = 2
+  mixer.updateEntityOrigins(state, entities)
+  assertEqual(nativeRawValue(channel.origin), channelOriginRaw, "channel origin storage reused")
+  assertEqual(channel.origin.y, 8.0, "channel origin updated")
+  return true
+end function
+
+// Verify realtime paint storage reuse against the expected Quake behavior.
+function testRealtimePaintStorageReuse()
+  state = mixer.create(void, 22050)
+  state.enabled = true
+  state.masterVolume = 1.0
+  state.listenerEntity = 1
+  effect = makeEffect("resident-loop.wav", [100, 200, 300, 400], 0)
+  state.channels = [makeChannel(1, 1, effect, 0, 1.0)]
+  channelsRaw = nativeRawValue(state.channels)
+  first = mixer.mixForSubmit(state, mixer.MIX_FRAMES)
+  firstRaw = nativeRawValue(first)
+  assertEqual(nativeRawValue(state.channels), channelsRaw, "resident channel array reused")
+  second = mixer.mixForSubmit(state, mixer.MIX_FRAMES)
+  assertEqual(nativeRawValue(second), firstRaw, "backend paint output reused")
+  assertEqual(nativeRawValue(state.channels), channelsRaw, "resident channel array remains reused")
+  assertEqual(bio.i16(second, 0), bio.i16(first, 0), "reused output retains PCM parity")
+  return true
+end function
+
+// Parse command-line arguments and run the selected operation.
 function main(args)
-  print "[1/5] production channel selection/duplicate offset"
+  print "[1/7] production channel selection/duplicate offset"
   testChannelSelectionAndDuplicateOffset()
-  print "[2/5] production static combine/stop quirk"
+  print "[2/7] production static combine/stop quirk"
   testStaticCombineAndStopQuirk()
-  print "[3/5] production loop PCM/queue timing"
+  print "[3/7] production loop PCM/queue timing"
   testLoopBoundaryPcmAndQueueTiming()
-  print "[4/5] production focus block nesting"
+  print "[4/7] production focus block nesting"
   testFocusBlockNesting()
-  print "[5/5] malformed WAV boundaries"
+  print "[5/7] malformed WAV boundaries"
   testMalformedWaveBoundaries()
-  print "MiniQuake production sound parity tests passed: 5"
+  print "[6/7] spatial vector storage reuse"
+  testSpatialVectorReuse()
+  print "[7/7] real-time paint storage reuse"
+  testRealtimePaintStorageReuse()
+  print "MiniQuake production sound parity tests passed: 7"
   return 0
 end function

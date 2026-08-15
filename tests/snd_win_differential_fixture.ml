@@ -1,10 +1,18 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/snd_win_differential_fixture.ml.
+*/
 import miniquake.sound.snd_win as snd
 
+// Return bool number derived from the active module state.
 function boolNumber(value)
   if value then return 1 end if
   return 0
 end function
 
+// Return prepared count derived from the active module state.
 function preparedCount(state)
   count = 0
   for each header in state.headers
@@ -13,6 +21,7 @@ function preparedCount(state)
   return count
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   state = snd.create(true, 11025)
   result = snd.SNDDMA_InitDirect(state)

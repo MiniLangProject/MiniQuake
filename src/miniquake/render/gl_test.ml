@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 MiniLang counterpart of the optional GLTEST renderer in gl_test.c.
 */
-
 package miniquake.render.gl_test
 
 import miniquake.types as t
@@ -36,18 +36,22 @@ end struct
 
 testState = void
 
+// Create the zero-initialized state for vector.
 function zeroVector()
   return t.Vec3(0.0, 0.0, 0.0)
 end function
 
+// Provide empty plane behavior for the active subsystem.
 function emptyPlane()
   return t.Plane(zeroVector(), 0.0, 0, 0)
 end function
 
+// Provide empty puff behavior for the active subsystem.
 function emptyPuff()
   return TestPuff(emptyPlane(), zeroVector(), zeroVector(), zeroVector(), zeroVector(), zeroVector(), 0.0)
 end function
 
+// Create and initialize state.
 function createState()
   puffs = []
   index = 0
@@ -58,18 +62,21 @@ function createState()
   return GlTestState(puffs, void, zeroVector(), 0.0, false, void, [])
 end function
 
+// Verify use state against the expected Quake behavior.
 function Test_UseState(state)
   global testState
   testState = state
   return state
 end function
 
+// Verify state against the expected Quake behavior.
 function Test_State()
   global testState
   if testState is void then testState = createState() end if
   return testState
 end function
 
+// Verify configure against the expected Quake behavior.
 function Test_Configure(worldMap, viewOrigin, frameTime, drawNative)
   state = Test_State()
   state.worldMap = worldMap
@@ -79,6 +86,7 @@ function Test_Configure(worldMap, viewOrigin, frameTime, drawNative)
   return state
 end function
 
+// Verify init against the expected Quake behavior.
 function Test_Init()
   state = Test_State()
   index = 0
@@ -90,6 +98,7 @@ function Test_Init()
   return true
 end function
 
+// Provide hit plane behavior for the active subsystem.
 function HitPlane(start, finish)
   state = Test_State()
   if state.hitPlaneOverride is not void then return state.hitPlaneOverride end if
@@ -99,6 +108,7 @@ function HitPlane(start, finish)
   return t.Plane(math.VectorCopy(traced.plane.normal), traced.plane.dist, traced.plane.type, traced.plane.signBits)
 end function
 
+// Verify spawn against the expected Quake behavior.
 function Test_Spawn(origin)
   state = Test_State()
   index = 0
@@ -126,6 +136,7 @@ function Test_Spawn(origin)
   return index
 end function
 
+// Provide puff points behavior for the active subsystem.
 function puffPoints(puff)
   points = []
   layer = 0
@@ -142,11 +153,13 @@ function puffPoints(puff)
   return points
 end function
 
+// Add vertex to the destination state.
 function emitVertex(point, drawNative)
   if drawNative then gl.vertex3(point.x, point.y, point.z) end if
   return [point.x, point.y, point.z]
 end function
 
+// Render puff.
 function DrawPuff(puff)
   state = Test_State()
   points = puffPoints(puff)
@@ -175,6 +188,7 @@ function DrawPuff(puff)
   return trace
 end function
 
+// Verify draw against the expected Quake behavior.
 function Test_Draw()
   state = Test_State()
   commands = []
@@ -187,6 +201,7 @@ function Test_Draw()
   return commands
 end function
 
+// Verify command trace against the expected Quake behavior.
 function Test_CommandTrace()
   return Test_State().commandTrace
 end function

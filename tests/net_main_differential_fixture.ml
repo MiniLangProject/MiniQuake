@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/net_main_differential_fixture.ml.
+*/
 import miniquake.net_main as netmain
 import miniquake.net_loop as netloop
 import miniquake.sizebuf as sz
@@ -7,23 +13,27 @@ struct FixtureClient
   socket
 end struct
 
+// Exercise bool int as part of this deterministic regression fixture.
 function boolInt(value)
   if value then return 1 end if
   return 0
 end function
 
+// Add the requested value to the destination state.
 function emit(functionName, caseName, result, index, value, count)
   print "{\"function\":\"" + functionName + "\",\"case\":\"" + caseName +
     "\",\"result\":" + result + ",\"index\":" + index +
     ",\"value\":" + value + ",\"count\":" + count + "}"
 end function
 
+// Return initialized state derived from the active module state.
 function initializedState(maxClients, noLan)
   state = netloop.createState()
   netmain.NET_Init(state, maxClients, false, false, 26000, noLan)
   return state
 end function
 
+// Return fatal mode derived from the active module state.
 function fatalMode(mode)
   state = netloop.createState()
   result = void
@@ -37,7 +47,9 @@ function fatalMode(mode)
   return 0
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   if len(args) > 0 then return fatalMode(args[0]) end if
 
   clock = netmain.SetNetTime()

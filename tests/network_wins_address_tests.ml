@@ -1,16 +1,17 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-062: net_wins.c byte order, PartialIPAddress and landriver state parity.
 */
-
 import miniquake.net_wins as wins
 import miniquake.types as t
 
 testIndex = 0
 failures = 0
 
+// Assert that the condition holds and identify a failing test.
 function bp062Check(value, name)
   global testIndex, failures
   testIndex = testIndex + 1
@@ -19,6 +20,7 @@ function bp062Check(value, name)
   return true
 end function
 
+// Exercise address text as part of this deterministic regression fixture.
 function addressText(input)
   target = t.WinSockAddress(0, 0, 0)
   status = wins.PartialIPAddress(input, target)
@@ -26,6 +28,7 @@ function addressText(input)
   return [status, wins.WINS_AddrToString(target)]
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   wins.WINS_ResetState()
   wins.WINS_SetLocalAddress("10.20.30.40")

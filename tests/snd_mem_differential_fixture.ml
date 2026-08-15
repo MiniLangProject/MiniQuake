@@ -1,7 +1,14 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/snd_mem_differential_fixture.ml.
+*/
 import miniquake.byteio as bio
 import miniquake.filesystem as qfs
 import miniquake.sound.snd_mem as memoryPort
 
+// Create and initialize wave.
 function makeWave()
   data = bytes(48)
   bio.copyInto(data, 0, bytes("RIFF"), 0, 4)
@@ -24,6 +31,7 @@ function makeWave()
   return data
 end function
 
+// Exercise cache event as part of this deterministic regression fixture.
 function cacheEvent(functionName, caseName, cache, cached)
   print "{\"function\":\"" + functionName + "\",\"case\":\"" + caseName +
     "\",\"length\":" + cache.length + ",\"loopstart\":" + cache.loopStart +
@@ -34,6 +42,7 @@ function cacheEvent(functionName, caseName, cache, cached)
     cache.data[6] + "," + cache.data[7] + "],\"cached\":" + cached + "}"
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   wave = makeWave()
   cursor = memoryPort.createCursor(wave, len(wave))

@@ -1,25 +1,31 @@
 /*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
 Deterministic MiniLang side of the original gl_rmisc.c differential oracle.
 */
-
 import miniquake.render.gl_rmisc as rmisc
 import miniquake.native as native
 import std.string as string
 
+// Return json number derived from the active module state.
 function jsonNumber(value)
   integerValue = native.trunc(value)
   if value == integerValue then return "" + integerValue end if
   return string.replaceAll("" + value, ".e", "e")
 end function
 
+// Add the requested value to the destination state.
 function emit(scene, functionName, sequence, operation, arguments)
   print "{\"schema\":\"miniquake.renderer.gl.v1\",\"scene\":\"" + scene + "\",\"function\":\"" + functionName + "\",\"seq\":" + sequence + ",\"op\":\"" + operation + "\",\"args\":" + arguments + "}"
 end function
 
+// Return fnv byte derived from the active module state.
 function inline fnvByte(hash, value)
   return ((hash ^ (value & 255)) * 16777619) & 4294967295
 end function
 
+// Fold bytes into the deterministic rolling hash.
 function hashBytes(data)
   hash = 2166136261
   index = 0
@@ -30,6 +36,7 @@ function hashBytes(data)
   return hash
 end function
 
+// Trace init textures through the collision world.
 function traceInitTextures()
   rmisc.ResetCompatibility()
   rmisc.R_InitTextures()
@@ -38,6 +45,7 @@ function traceInitTextures()
   emit("rmisc_init_textures", "R_InitTextures", 0, "texture", "[16,16," + offsets[0] + "," + offsets[1] + "," + offsets[2] + "," + hashBytes(state[1]) + "]")
 end function
 
+// Trace init particle through the collision world.
 function traceInitParticle()
   rmisc.ResetCompatibility()
   rmisc.R_InitParticleTexture()
@@ -45,6 +53,7 @@ function traceInitParticle()
   emit("rmisc_init_particle", "R_InitParticleTexture", 0, "particle", "[" + state[0] + "," + state[1] + "," + state[2] + "," + (state[3] * state[4]) + "," + hashBytes(state[5]) + "]")
 end function
 
+// Trace envmap through the collision world.
 function traceEnvmap()
   rmisc.ResetCompatibility()
   directions = rmisc.R_Envmap_f()
@@ -58,6 +67,7 @@ function traceEnvmap()
   emit("rmisc_envmap", "R_Envmap_f", index, "state", "[0," + state[0] + "," + state[2] + "," + state[3] + "]")
 end function
 
+// Trace init through the collision world.
 function traceInit()
   rmisc.ResetCompatibility()
   textureSort = rmisc.R_Init(true)
@@ -65,6 +75,7 @@ function traceInit()
   emit("rmisc_init", "R_Init", 0, "state", "[" + state[0] + "," + state[1] + "," + state[2] + "," + state[3] + "," + state[4] + "," + textureSort + "]")
 end function
 
+// Trace translate skin through the collision world.
 function traceTranslateSkin()
   rmisc.ResetCompatibility()
   rmisc.SetPlayerTextureBase(2000)
@@ -80,6 +91,7 @@ function traceTranslateSkin()
   emit("rmisc_translate_skin", "R_TranslatePlayerSkin", 0, "skin", "[" + state[0] + "," + state[1] + "," + state[2] + "," + hashBytes(state[3]) + "]")
 end function
 
+// Trace new map through the collision world.
 function traceNewMap()
   rmisc.ResetCompatibility()
   rmisc.SetNewMapCompatibility(["skyfixture", "window02_1", "brick"], 2)
@@ -88,6 +100,7 @@ function traceNewMap()
   emit("rmisc_new_map", "R_NewMap", 0, "state", "[" + state[0][0] + "," + state[0][255] + ",1,1,1," + state[2] + "," + state[3] + "," + state[4] + "," + state[5] + "]")
 end function
 
+// Trace time refresh through the collision world.
 function traceTimeRefresh()
   rmisc.ResetCompatibility()
   rmisc.R_TimeRefresh_f()
@@ -95,12 +108,14 @@ function traceTimeRefresh()
   emit("rmisc_time_refresh", "R_TimeRefresh_f", 0, "state", "[" + state[0] + "," + jsonNumber(state[1]) + "," + state[2] + "," + state[3] + "]")
 end function
 
+// Trace flush through the collision world.
 function traceFlush()
   rmisc.ResetCompatibility()
   rmisc.D_FlushCaches()
   emit("rmisc_flush_caches", "D_FlushCaches", 0, "state", "[]")
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   traceInitTextures()
   traceInitParticle()

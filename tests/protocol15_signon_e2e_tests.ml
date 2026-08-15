@@ -1,13 +1,13 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-015 end-to-end Protocol-15 signon fixtures.  These tests bind the original
 CL_SignonReply / Host_PreSpawn_f / Host_Spawn_f / Host_Begin_f queue boundary:
 command handlers append reliable bytes; CL_SendCmd and SV_SendClientMessages
 perform transport on their regular host-frame phases.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.sizebuf as sz
@@ -20,25 +20,30 @@ import miniquake.net_loop as netloop
 import miniquake.net_main as netmain
 import miniquake.player_move as movement
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9500, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9501, name + ": expected true") end if
   return true
 end function
 
+// Exercise assert false as part of this deterministic regression fixture.
 function assertFalse(value, name)
   if value != false then return error(9502, name + ": expected false") end if
   return true
 end function
 
+// Exercise assert hex as part of this deterministic regression fixture.
 function assertHex(data, expected, name)
   return assertEqual(hex(data), expected, name)
 end function
 
+// Execute one named test case and record its pass/fail result.
 function runTest(number, name, fn)
   print "  [" + number + "/12] " + name
   result = try(fn())
@@ -49,10 +54,12 @@ function runTest(number, name, fn)
   return true
 end function
 
+// Create and initialize player.
 function makePlayer()
   return movement.createPlayer(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
 end function
 
+// Create and initialize connected pair.
 function makeConnectedPair()
   network = netloop.createState()
   netmain.NET_Init(network, 2, false, false, 26000, true)
@@ -73,6 +80,7 @@ function makeConnectedPair()
   return [network, player, localClient, gameServer, target, serverSocket]
 end function
 
+// Release or remove state for pair.
 function closePair(pair)
   localClient = pair[2]
   target = pair[4]
@@ -82,6 +90,7 @@ function closePair(pair)
   return true
 end function
 
+// Verify client reply queues only against the expected Quake behavior.
 function testClientReplyQueuesOnly()
   pair = makeConnectedPair()
   if pair is error then return pair end if
@@ -99,6 +108,7 @@ function testClientReplyQueuesOnly()
   return true
 end function
 
+// Verify color high nibble is not masked against the expected Quake behavior.
 function testColorHighNibbleIsNotMasked()
   buffer = sz.alloc(128)
   signon.writeClientReply(buffer, c.SIGNON_PRESPAWN, "R", 0x1fd, "")
@@ -110,6 +120,7 @@ function testColorHighNibbleIsNotMasked()
   return true
 end function
 
+// Verify stage four writes nothing against the expected Quake behavior.
 function testStageFourWritesNothing()
   buffer = sz.alloc(32)
   assertEqual(signon.writeClientReply(buffer, c.SIGNON_ACTIVE, "R", 0, ""), 0, "stage four byte count")
@@ -117,6 +128,7 @@ function testStageFourWritesNothing()
   return true
 end function
 
+// Verify prespawn queues on server against the expected Quake behavior.
 function testPrespawnQueuesOnServer()
   gameServer = server.create(1)
   target = gameServer.clients[0]
@@ -133,6 +145,7 @@ function testPrespawnQueuesOnServer()
   return true
 end function
 
+// Verify spawn clears and queues against the expected Quake behavior.
 function testSpawnClearsAndQueues()
   gameServer = server.create(1)
   target = gameServer.clients[0]
@@ -140,14 +153,24 @@ function testSpawnClearsAndQueues()
   target.name = "Ranger"
   msg.writeByte(target.message, c.SVC_PRINT)
   player = makePlayer()
+  // A teleporter immediately before changelevel may leave an absolute old-map
+  // teleport_time.  The replacement server starts near time 1, so retaining
+  // that value would suppress negative forwardmove for many seconds.
+  player.teleportTime = 123.0
+  player.flags = player.flags | c.FL_WATERJUMP
+  player.moveDir = t.Vec3(80.0, 0.0, 0.0)
   written = server.writeSpawn(gameServer, target, player)
   assertTrue(written > 2, "spawn payload queued")
   assertEqual(target.message.data[0], c.SVC_TIME, "old reliable bytes cleared")
   assertTrue(target.sendSignon, "spawn marks sendsignon")
   assertEqual(target.signonStage, c.SIGNON_SPAWN, "spawn stage")
+  assertEqual(player.teleportTime, 0.0, "new level clears old teleport gate")
+  assertEqual(player.flags & c.FL_WATERJUMP, 0, "new level clears old waterjump")
+  assertEqual(player.moveDir.x, 0.0, "new level clears old movement direction")
   return true
 end function
 
+// Verify blocked server retains signon against the expected Quake behavior.
 function testBlockedServerRetainsSignon()
   pair = makeConnectedPair()
   if pair is error then return pair end if
@@ -166,6 +189,7 @@ function testBlockedServerRetainsSignon()
   return true
 end function
 
+// Exercise deliver server as part of this deterministic regression fixture.
 function deliverServer(pair, realtime)
   gameServer = pair[3]
   localClient = pair[2]
@@ -176,6 +200,7 @@ function deliverServer(pair, realtime)
   return result
 end function
 
+// Exercise deliver client as part of this deterministic regression fixture.
 function deliverClient(pair)
   localClient = pair[2]
   gameServer = pair[3]
@@ -187,6 +212,7 @@ function deliverClient(pair)
   return sent
 end function
 
+// Advance to spawn by one processing step.
 function advanceToSpawn(pair)
   deliverServer(pair, 1.0)
   if pair[2].signon != c.SIGNON_SERVERINFO then return error(9506, "stage one not reached") end if
@@ -199,6 +225,7 @@ function advanceToSpawn(pair)
   return true
 end function
 
+// Verify full stages one to three against the expected Quake behavior.
 function testFullStagesOneToThree()
   pair = makeConnectedPair()
   if pair is error then return pair end if
@@ -212,6 +239,7 @@ function testFullStagesOneToThree()
   return true
 end function
 
+// Verify begin has no server wire against the expected Quake behavior.
 function testBeginHasNoServerWire()
   pair = makeConnectedPair()
   if pair is error then return pair end if
@@ -226,6 +254,7 @@ function testBeginHasNoServerWire()
   return true
 end function
 
+// Verify fast update completes signon against the expected Quake behavior.
 function testFastUpdateCompletesSignon()
   pair = makeConnectedPair()
   if pair is error then return pair end if
@@ -250,6 +279,7 @@ function testFastUpdateCompletesSignon()
   return true
 end function
 
+// Verify duplicate signon rejected against the expected Quake behavior.
 function testDuplicateSignonRejected()
   localClient = client.create(makePlayer())
   localClient.signon = c.SIGNON_PRESPAWN
@@ -260,6 +290,7 @@ function testDuplicateSignonRejected()
   return true
 end function
 
+// Verify server stage sequence against the expected Quake behavior.
 function testServerStageSequence()
   testNoSyntheticSignonFour()
   gameServer = server.create(1)
@@ -279,6 +310,7 @@ function testServerStageSequence()
   return true
 end function
 
+// Verify reply order within single buffer against the expected Quake behavior.
 function testReplyOrderWithinSingleBuffer()
   buffer = sz.alloc(256)
   signon.writeClientReply(buffer, c.SIGNON_PRESPAWN, "Ranger", 0x4d, "coop 1")
@@ -293,6 +325,7 @@ function testReplyOrderWithinSingleBuffer()
   return true
 end function
 
+// Verify no synthetic signon four against the expected Quake behavior.
 function testNoSyntheticSignonFour()
   markers = sz.alloc(16)
   msg.writeByte(markers, c.SVC_SIGNONNUM); msg.writeByte(markers, c.SIGNON_SERVERINFO)

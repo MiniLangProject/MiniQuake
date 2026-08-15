@@ -1,5 +1,7 @@
 /*
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Runtime synchronization for Quake version-5 savegames.
 
@@ -8,12 +10,12 @@ MiniQuake's derived server-edict view without losing the saved sv.num_edicts
 high-water mark.  WinQuake preserves that high-water mark even when the final
 saved edict blocks are free.
 */
-
 package miniquake.savegame_runtime
 
 import miniquake.server as serverRuntime
 import miniquake.server_collision as collision
 
+// Update module state for loaded server.
 function synchronizeLoadedServer(server)
   if server.machine is void or server.machine.context is void then
     return error(3790, "loadgame runtime synchronization requires a QuakeC server")

@@ -1,11 +1,11 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 MiniLang pendant for WinQuake/wad.c and wad.h.  The C globals are represented
 by the WadArchive returned from W_LoadWadFile and passed to lookup functions.
 */
-
 package miniquake.wad
 
 import miniquake.types as t
@@ -50,6 +50,7 @@ function W_CleanupName(input)
   return output
 end function
 
+// Provide cleanup name text behavior for the active subsystem.
 function cleanupNameText(input)
   cleaned = W_CleanupName(input)
   length = 0
@@ -114,11 +115,13 @@ function W_LoadWadData(data, filename)
   return t.WadArchive(filename, data, lumps, count)
 end function
 
+// Mirror Quake's W_LoadWadFile routine and its observable state changes.
 function W_LoadWadFile(filename)
   data = fs.readAllBytes(filename)
   return W_LoadWadData(data, filename)
 end function
 
+// Mirror Quake's W_GetLumpinfo routine and its observable state changes.
 function W_GetLumpinfo(archive, name)
   wanted = cleanupNameText(name)
   for each lump in archive.lumps
@@ -134,6 +137,7 @@ function W_GetLumpName(archive, name)
   return slice(archive.data, lump.filePosition, lump.diskSize)
 end function
 
+// Mirror Quake's W_GetLumpNum routine and its observable state changes.
 function W_GetLumpNum(archive, number)
   // wad.c accidentally accepts num == wad_numlumps and then dereferences one
   // directory entry past the table.  That undefined access cannot be a useful
@@ -150,10 +154,12 @@ function parse(data, filename)
   return W_LoadWadData(data, filename)
 end function
 
+// Read and validate the requested value.
 function load(filename)
   return W_LoadWadFile(filename)
 end function
 
+// Return the requested value.
 function find(archive, name)
   wanted = cleanupNameText(name)
   for each lump in archive.lumps
@@ -162,12 +168,14 @@ function find(archive, name)
   return void
 end function
 
+// Read and validate lump.
 function readLump(archive, name)
   lump = W_GetLumpinfo(archive, name)
   if lump.compression != CMP_NONE then return error(1555, "compressed WAD lumps are unsupported") end if
   return slice(archive.data, lump.filePosition, lump.diskSize)
 end function
 
+// Provide picture dimensions behavior for the active subsystem.
 function pictureDimensions(archive, name)
   lump = W_GetLumpinfo(archive, name)
   if lump.diskSize < 8 then return error(1557, "WAD picture header is truncated") end if

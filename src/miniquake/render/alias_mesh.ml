@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang implementation of miniquake.render.alias_mesh.
+*/
 package miniquake.render.alias_mesh
 
 import miniquake.types as compatAliasTypes
@@ -60,6 +67,7 @@ aliasBatchMeshKeys = array(ALIAS_BATCH_CACHE_SIZE, 0)
 aliasBatchValues = array(ALIAS_BATCH_CACHE_SIZE)
 aliasShadeDotRows = array(16, void)
 
+// Update module state for caches.
 function clearCaches()
   global meshCacheModelKeys, meshCacheValues, aliasBatchFrameKeys, aliasBatchMeshKeys, aliasBatchValues
   meshCacheModelKeys = array(ALIAS_MESH_CACHE_SIZE, 0)
@@ -70,12 +78,14 @@ function clearCaches()
   return true
 end function
 
+// Provide triangle vertex behavior for the active subsystem.
 function triangleVertex(triangle, index)
   if index == 0 then return triangle.vertex0 end if
   if index == 1 then return triangle.vertex1 end if
   return triangle.vertex2
 end function
 
+// Update subsystem configuration for configure alias model.
 function configureAliasModel(model)
   global aliasmodel, paliashdr, triangles, stverts, used, stripverts, striptris
   aliasmodel = model
@@ -88,10 +98,12 @@ function configureAliasModel(model)
   return model
 end function
 
+// Provide shade dot row behavior for the active subsystem.
 function shadeDotRow(yaw)
   return (compatAliasNative.trunc(yaw * (16.0 / 360.0))) & 15
 end function
 
+// Update subsystem configuration for configure alias lighting.
 function configureAliasLighting(lightValue, ambientValue, yaw, spot)
   global shadelight, ambientlight, shadevector, shadedots, shadeRow, lightspot
   shadelight = lightValue
@@ -100,13 +112,20 @@ function configureAliasLighting(lightValue, ambientValue, yaw, spot)
   shadeRow = row
   shadedots = compatAliasNormals.shadeDots[row]
   angle = yaw * compatAliasMath.DEG_TO_RAD
-  shadevector = compatAliasMath.normalize(
-    compatAliasTypes.Vec3(
-      compatAliasNative.cos(-angle),
-      compatAliasNative.sin(-angle),
-      1.0,
-    )
-  )
+  // This function runs once for every visible alias entity.  Mutate the
+  // persistent gl_rmain-style vector instead of allocating an input Vec3 and
+  // a normalized copy for every monster, pickup and view model.
+  shadeX = compatAliasNative.cos(-angle)
+  shadeY = compatAliasNative.sin(-angle)
+  magnitude = compatAliasNative.sqrt(shadeX * shadeX + shadeY * shadeY + 1.0)
+  if magnitude != 0.0 then
+    inverseMagnitude = 1.0 / magnitude
+    persistentShade = shadevector
+    persistentShade.x = shadeX * inverseMagnitude
+    persistentShade.y = shadeY * inverseMagnitude
+    persistentShade.z = inverseMagnitude
+    shadevector = persistentShade
+  end if
   if spot is not void then lightspot = spot end if
   return true
 end function
@@ -114,6 +133,7 @@ end function
 // Exact gl_mesh.c candidate-strip walk.  Temporary used==2 markers are
 // cleared after each candidate while the starting triangle remains selected.
 function StripLength(starttri, startv)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global stripcount
   if starttri < 0 or starttri >= len(triangles) then return 0 end if
   used[starttri] = 2
@@ -164,7 +184,9 @@ function StripLength(starttri, startv)
   return stripcount
 end function
 
+// Return fan length derived from the active module state.
 function FanLength(starttri, startv)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global stripcount
   if starttri < 0 or starttri >= len(triangles) then return 0 end if
   used[starttri] = 2
@@ -214,7 +236,9 @@ function FanLength(starttri, startv)
   return stripcount
 end function
 
+// Create and initialize tris.
 function BuildTris()
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global used, commands, numcommands, vertexorder, numorder, allverts, alltris
   if paliashdr is void then return error(3900, "BuildTris: no alias header") end if
   used = compatAliasArrays.makeFilledArray(len(triangles), 0)
@@ -293,6 +317,7 @@ function BuildTris()
   return AliasMesh(commands, vertexorder, numcommands, numorder)
 end function
 
+// Provide cached mesh behavior for the active subsystem.
 function cachedMesh(model)
   key = nativeRawValue(model)
   slot = ((key >> 3) ^ (key >> 13)) & (ALIAS_MESH_CACHE_SIZE - 1)
@@ -305,6 +330,7 @@ function cachedMesh(model)
   return void
 end function
 
+// Mirror Quake's GL_MakeAliasModelDisplayLists routine and its observable state changes.
 function GL_MakeAliasModelDisplayLists(model, header)
   global meshCacheModelKeys, meshCacheValues, paliashdr
   existing = cachedMesh(model)
@@ -325,6 +351,7 @@ function GL_MakeAliasModelDisplayLists(model, header)
   return result
 end function
 
+// Advance for number by one processing step.
 function frameForNumber(model, frameNumber, time)
   if len(model.frames) == 0 then return void end if
   index = frameNumber
@@ -337,6 +364,7 @@ function frameForNumber(model, frameNumber, time)
   return set.frames[pose]
 end function
 
+// Return a validated clamp byte value.
 function clampByte(value)
   result = compatAliasNative.trunc(value)
   if result < 0 then result = 0 end if
@@ -344,7 +372,9 @@ function clampByte(value)
   return result
 end function
 
+// Return alias batch data derived from the active module state.
 function aliasBatchData(frame, mesh)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global aliasBatchFrameKeys, aliasBatchMeshKeys, aliasBatchValues
   frameKey = nativeRawValue(frame)
   meshKey = nativeRawValue(mesh)
@@ -397,6 +427,7 @@ function aliasBatchData(frame, mesh)
   return data
 end function
 
+// Preload and register the alias model asset.
 function precacheAliasModel(model)
   if model is void then return 0 end if
   mesh = try(GL_MakeAliasModelDisplayLists(model, model))
@@ -411,6 +442,7 @@ function precacheAliasModel(model)
   return count
 end function
 
+// Return alias shade dot data derived from the active module state.
 function aliasShadeDotData(row)
   global aliasShadeDotRows
   existing = aliasShadeDotRows[row]
@@ -426,6 +458,17 @@ function aliasShadeDotData(row)
   return data
 end function
 
+// Build the sixteen yaw-dependent shadedot tables during level precaching.
+function precacheAliasLightingRows()
+  index = 0
+  while index < len(aliasShadeDotRows)
+    aliasShadeDotData(index)
+    index = index + 1
+  end while
+  return index
+end function
+
+// Render alias mesh.
 function drawAliasMesh(model, frame, mesh)
   if frame is void or mesh is void then return 0 end if
   if not compatAliasGl.traceEnabled() and compatAliasGl.nativeBatchAvailable() then
@@ -461,6 +504,7 @@ function drawAliasMesh(model, frame, mesh)
   return drawn
 end function
 
+// Render alias model batch.
 function drawAliasModelBatch(model, frame, mesh, origin, angles, doubleEyes, smooth)
   batch = aliasBatchData(frame, mesh)
   dots = aliasShadeDotData(shadeRow)
@@ -478,6 +522,7 @@ function drawAliasModelBatch(model, frame, mesh, origin, angles, doubleEyes, smo
   )
 end function
 
+// Mirror Quake's GL_DrawAliasFrame routine and its observable state changes.
 function GL_DrawAliasFrame(header, posenum)
   global lastposenum, currentAliasFrame
   model = header
@@ -492,6 +537,7 @@ function GL_DrawAliasFrame(header, posenum)
   return drawAliasMesh(model, frame, mesh)
 end function
 
+// Provide alias shadow projection behavior for the active subsystem.
 function aliasShadowProjection(entityOriginZ, lightSpotZ)
   lheight = entityOriginZ - lightSpotZ
   return [lheight, -lheight + 1.0]
@@ -501,6 +547,7 @@ end function
 // The vertex coordinates below are still model-local because the entity
 // transform is already active on the GL matrix stack.
 function GL_DrawAliasShadowAtOrigin(header, posenum, entityOriginZ)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   model = header
   if model is void then model = paliashdr end if
   if model is void then return 0 end if
@@ -546,6 +593,7 @@ function GL_DrawAliasShadow(header, posenum)
   return GL_DrawAliasShadowAtOrigin(header, posenum, 0.0)
 end function
 
+// Apply the Quake-compatible r setup alias frame behavior.
 function R_SetupAliasFrame(frame, header)
   global lastposenum, currentAliasFrame
   model = header
@@ -558,6 +606,7 @@ function R_SetupAliasFrame(frame, header)
   return GL_DrawAliasFrame(model, selected)
 end function
 
+// Update module state for up alias frame at time.
 function setupAliasFrameAtTime(frame, header, time)
   global lastposenum, currentAliasFrame
   model = header

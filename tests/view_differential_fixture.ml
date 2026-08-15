@@ -1,7 +1,9 @@
 /*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
 MiniLang side of the direct pinned WinQuake/view.c differential oracle.
 */
-
 import miniquake.view as view
 import miniquake.types as t
 import miniquake.constants as c
@@ -13,6 +15,7 @@ import miniquake.cvar as cvar
 import miniquake.native as native
 import std.string as string
 
+// Return json number derived from the active module state.
 function jsonNumber(value)
   integerValue = native.trunc(value)
   difference = value - integerValue
@@ -21,11 +24,13 @@ function jsonNumber(value)
   return string.replaceAll("" + value, ".e", "e")
 end function
 
+// Return bool number derived from the active module state.
 function boolNumber(value)
   if value then return 1 end if
   return 0
 end function
 
+// Return fnv bytes derived from the active module state.
 function fnvBytes(data)
   hash = 2166136261
   index = 0
@@ -36,6 +41,7 @@ function fnvBytes(data)
   return hash
 end function
 
+// Fold values into the deterministic rolling hash.
 function hashValues(values)
   data = bytes(len(values))
   index = 0
@@ -46,12 +52,14 @@ function hashValues(values)
   return fnvBytes(data)
 end function
 
+// Return empty state derived from the active module state.
 function emptyState()
   state = view.create()
   state.commandTrace = []
   return state
 end function
 
+// Add the requested value to the destination state.
 function emit(scene, functionName, state, counters, extras)
   values = counters + [
     state.origin.x, state.origin.y, state.origin.z,
@@ -72,10 +80,12 @@ function emit(scene, functionName, state, counters, extras)
   print "{\"schema\":\"miniquake.view.v1\",\"scene\":\"" + scene + "\",\"function\":\"" + functionName + "\",\"seq\":0,\"op\":\"state\",\"args\":" + arguments + "}"
 end function
 
+// Exercise no counters as part of this deterministic regression fixture.
 function inline noCounters()
   return [0, 0, 0, 0, 0, 0, 0]
 end function
 
+// Trace calc roll through the collision world.
 function traceCalcRoll()
   state = emptyState()
   result = view.V_CalcRoll(
@@ -84,6 +94,7 @@ function traceCalcRoll()
   emit("view_calc_roll", "V_CalcRoll", state, noCounters(), [result, 0, 0, 0, 0, 0])
 end function
 
+// Trace calc bob through the collision world.
 function traceCalcBob()
   state = emptyState()
   result = view.V_CalcBob(
@@ -92,6 +103,7 @@ function traceCalcBob()
   emit("view_calc_bob", "V_CalcBob", state, noCounters(), [result, 0, 0, 0, 0, 0])
 end function
 
+// Trace start drift through the collision world.
 function traceStartDrift()
   state = emptyState()
   state.lastStop = 1.0
@@ -103,6 +115,7 @@ function traceStartDrift()
   )
 end function
 
+// Trace stop drift through the collision world.
 function traceStopDrift()
   state = emptyState()
   state.pitchVelocity = 500.0
@@ -113,6 +126,7 @@ function traceStopDrift()
   )
 end function
 
+// Trace drift pitch through the collision world.
 function traceDriftPitch()
   state = emptyState()
   state.noDrift = false
@@ -128,6 +142,7 @@ function traceDriftPitch()
   )
 end function
 
+// Trace build gamma through the collision world.
 function traceBuildGamma()
   state = emptyState()
   view.BuildGammaTable(state, 0.5)
@@ -140,6 +155,7 @@ function traceBuildGamma()
   )
 end function
 
+// Trace check gamma through the collision world.
 function traceCheckGamma()
   state = emptyState()
   first = view.V_CheckGamma(state, 0.7)
@@ -153,6 +169,7 @@ function traceCheckGamma()
   )
 end function
 
+// Trace parse damage through the collision world.
 function traceParseDamage()
   state = emptyState()
   view.V_ParseDamage(
@@ -168,6 +185,7 @@ function traceParseDamage()
   )
 end function
 
+// Trace cshift through the collision world.
 function traceCshift()
   state = emptyState()
   view.V_cshift_f(state, ["v_cshift", "1", "2", "3", "4"])
@@ -177,6 +195,7 @@ function traceCshift()
   )
 end function
 
+// Trace bonus through the collision world.
 function traceBonus()
   state = emptyState()
   view.V_BonusFlash_f(state)
@@ -184,6 +203,7 @@ function traceBonus()
   emit("view_bonus", "V_BonusFlash_f", state, noCounters(), [shift[0], shift[1], shift[2], shift[3], 0, 0])
 end function
 
+// Trace contents through the collision world.
 function traceContents()
   state = emptyState()
   view.V_cshift_f(state, ["v_cshift", "1", "2", "3", "4"])
@@ -198,6 +218,7 @@ function traceContents()
   emit("view_contents", "V_SetContentsColor", state, noCounters(), [code, shift[0], shift[1], shift[2], shift[3], 0])
 end function
 
+// Trace powerup through the collision world.
 function tracePowerup()
   state = emptyState()
   code = 0
@@ -209,6 +230,7 @@ function tracePowerup()
   emit("view_powerup", "V_CalcPowerupCshift", state, noCounters(), [code, shift[3], 0, 0, 0, 0])
 end function
 
+// Update module state for blend shifts.
 function setBlendShifts(state)
   state.cshifts[0] = [130.0, 80.0, 50.0, 128.0]
   state.cshifts[1] = [200.0, 100.0, 100.0, 45.0]
@@ -216,6 +238,7 @@ function setBlendShifts(state)
   state.cshifts[3] = [0.0, 0.0, 255.0, 30.0]
 end function
 
+// Trace blend through the collision world.
 function traceBlend()
   state = emptyState()
   setBlendShifts(state)
@@ -223,6 +246,7 @@ function traceBlend()
   emit("view_blend", "V_CalcBlend", state, noCounters(), [0, 0, 0, 0, 0, 0])
 end function
 
+// Exercise palette hash as part of this deterministic regression fixture.
 function paletteHash(state)
   palette = bytes(768)
   index = 0
@@ -235,6 +259,7 @@ function paletteHash(state)
   return fnvBytes(palette)
 end function
 
+// Exercise ramps hash as part of this deterministic regression fixture.
 function rampsHash(state)
   data = bytes(768)
   channel = 0
@@ -249,6 +274,7 @@ function rampsHash(state)
   return fnvBytes(data)
 end function
 
+// Trace update palette through the collision world.
 function traceUpdatePalette()
   state = emptyState()
   setBlendShifts(state)
@@ -264,12 +290,14 @@ function traceUpdatePalette()
   )
 end function
 
+// Trace angle delta through the collision world.
 function traceAngleDelta()
   state = emptyState()
   result = view.angledelta(270.0)
   emit("view_angle_delta", "angledelta", state, noCounters(), [result, 0, 0, 0, 0, 0])
 end function
 
+// Trace gun angle through the collision world.
 function traceGunAngle()
   state = emptyState()
   state.angles = t.Vec3(10.0, 20.0, 3.0)
@@ -278,6 +306,7 @@ function traceGunAngle()
   emit("view_gun_angle", "CalcGunAngle", state, noCounters(), [0, 0, 0, 0, 0, 0])
 end function
 
+// Trace bound offsets through the collision world.
 function traceBoundOffsets()
   state = emptyState()
   state.origin = t.Vec3(-100.0, 100.0, 100.0)
@@ -285,6 +314,7 @@ function traceBoundOffsets()
   emit("view_bound_offsets", "V_BoundOffsets", state, noCounters(), [0, 0, 0, 0, 0, 0])
 end function
 
+// Trace add idle through the collision world.
 function traceAddIdle()
   state = emptyState()
   state.angles = t.Vec3(10.0, 20.0, 3.0)
@@ -292,6 +322,7 @@ function traceAddIdle()
   emit("view_add_idle", "V_AddIdle", state, noCounters(), [0, 0, 0, 0, 0, 0])
 end function
 
+// Trace view roll through the collision world.
 function traceViewRoll()
   state = emptyState()
   state.damageTime = 0.5
@@ -304,6 +335,7 @@ function traceViewRoll()
   emit("view_calc_view_roll", "V_CalcViewRoll", state, noCounters(), [0, 0, 0, 0, 0, 0])
 end function
 
+// Trace intermission through the collision world.
 function traceIntermission()
   state = emptyState()
   player = movement.create(t.Vec3(10.0, 20.0, 30.0), t.Vec3(5.0, 15.0, 2.0))
@@ -311,6 +343,7 @@ function traceIntermission()
   emit("view_intermission", "V_CalcIntermissionRefdef", state, noCounters(), [boolNumber(not state.viewModelVisible), 0, 0, 0, 0, 0])
 end function
 
+// Exercise prepare refdef as part of this deterministic regression fixture.
 function prepareRefdef()
   registry = host.createCvars(common.create([]), false)
   player = movement.create(t.Vec3(10.0, 20.0, 0.0), t.Vec3(0.0, 15.0, 0.0))
@@ -329,6 +362,7 @@ function prepareRefdef()
   return [registry, player, localClient]
 end function
 
+// Trace calc refdef through the collision world.
 function traceCalcRefdef()
   setup = prepareRefdef()
   registry = setup[0]; player = setup[1]; localClient = setup[2]
@@ -345,6 +379,7 @@ function traceCalcRefdef()
   )
 end function
 
+// Trace render view through the collision world.
 function traceRenderView()
   setup = prepareRefdef()
   registry = setup[0]; player = setup[1]; localClient = setup[2]
@@ -368,6 +403,7 @@ function traceRenderView()
   emit("view_render_view", "V_RenderView", state, counters, [640, 1, 960, 0, 0, 0])
 end function
 
+// Trace init through the collision world.
 function traceInit()
   state = emptyState()
   state.gammaTable = []
@@ -391,6 +427,7 @@ function traceInit()
   )
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   traceCalcRoll()
   traceCalcBob()

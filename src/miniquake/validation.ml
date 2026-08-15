@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang implementation of miniquake.validation.
+*/
 package miniquake.validation
 
 import miniquake.filesystem as qfs
@@ -7,6 +14,7 @@ import miniquake.render.world as renderer
 import miniquake.world_bsp as world
 import miniquake.constants as c
 
+// Validate map and report any incompatibility.
 function validateMap(filesystem, mapName, palette)
   path = "maps/" + mapName + ".bsp"
   data = qfs.readFile(filesystem, path)
@@ -23,6 +31,7 @@ function validateMap(filesystem, mapName, palette)
   return map
 end function
 
+// Execute one named test case and record its pass/fail result.
 function run(baseDirectory, preferredMap)
   filesystem = qfs.standard(baseDirectory, "id1")
   palette = qfs.readFile(filesystem, "gfx/palette.lmp")

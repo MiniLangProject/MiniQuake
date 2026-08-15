@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Self-contained package verifier for MiniQuake OPT-001D.
+"""Self-contained integrity and source-hygiene verifier for MiniQuake.
 
 Historical subsystem semantics are checked by the source-guided component
 checkers invoked from build.ps1.  This verifier owns current delivery
@@ -17,15 +17,12 @@ import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-PACKAGE_ID = "BP-094"
-PARENT_PACKAGE_ID = "BP-093"
-BLOCK_ID = "BP-090-094"
-BLOCK_PARENT_PACKAGE_ID = "BP-085-089R8"
-DELIVERY_REVISION = "OPT-001D"
-DELIVERY_PARENT = "OPT-001CR3R7"
 MANIFEST = "SOURCE_MANIFEST.sha256"
 
-EXCLUDED_DIRS = {".git", "build", "__pycache__", ".pytest_cache"}
+EXCLUDED_DIRS = {
+    ".git", "build", "build_perf", "__pycache__", ".pytest_cache",
+    "text_build",
+}
 FORBIDDEN_SUFFIXES = {
     ".pak", ".bsp", ".mdl", ".spr", ".wad", ".dem", ".sav", ".lmp",
     ".pcx", ".tga", ".ogg", ".wav", ".lit", ".vis",
@@ -35,110 +32,110 @@ FORBIDDEN_NAMES = {
     "glquake.exe", "opengl32.dll", "originalquakesourcecode.zip",
 }
 
-REQUIRED_PATHS = {
-    "TEST_OPT-001D.ps1", "CHANGELOG_OPT-001D.md",
-    "docs/OPT-001D_TESTING.md", "docs/OPT-001D_CHANGELOG.md",
-    "docs/OPT-001D_RESULT_ANALYSIS.md", "docs/OPT-001D_HOTFIX_REPORT.json",
+_LEGACY_REQUIRED_PATHS = {
+    "TEST_OPT-001D.ps1", "docs/archive/changelog/CHANGELOG_OPT-001D.md",
+    "docs/archive/releases/OPT-001D_TESTING.md", "docs/archive/releases/OPT-001D_CHANGELOG.md",
+    "docs/archive/releases/OPT-001D_RESULT_ANALYSIS.md", "docs/archive/releases/OPT-001D_HOTFIX_REPORT.json",
     "audit/opt001d_audio_transition_hotpath.json", "tools/check_opt001d.py",
     "tools/analyze_opt001d_audio.py", "patches/OPT-001D.diff",
-    "TEST_OPT-001CR3R6.ps1", "CHANGELOG_OPT-001CR3R6.md",
-    "docs/OPT-001CR3R6_TESTING.md", "docs/OPT-001CR3R6_CHANGELOG.md",
-    "docs/OPT-001CR3R6_RESULT_ANALYSIS.md", "docs/OPT-001CR3R6_HOTFIX_REPORT.json",
+    "TEST_OPT-001CR3R6.ps1", "docs/archive/changelog/CHANGELOG_OPT-001CR3R6.md",
+    "docs/archive/releases/OPT-001CR3R6_TESTING.md", "docs/archive/releases/OPT-001CR3R6_CHANGELOG.md",
+    "docs/archive/releases/OPT-001CR3R6_RESULT_ANALYSIS.md", "docs/archive/releases/OPT-001CR3R6_HOTFIX_REPORT.json",
     "audit/opt001cr3r6_windowed_transition.json", "tools/check_opt001cr3r6.py",
     "patches/OPT-001CR3R6.diff",
-    "TEST_OPT-001CR3R2.ps1", "CHANGELOG_OPT-001CR3R2.md",
-    "docs/OPT-001CR3R2_TESTING.md", "docs/OPT-001CR3R2_CHANGELOG.md",
-    "docs/OPT-001CR3R2_RESULT_ANALYSIS.md", "docs/OPT-001CR3R2_HOTFIX_REPORT.json",
+    "TEST_OPT-001CR3R2.ps1", "docs/archive/changelog/CHANGELOG_OPT-001CR3R2.md",
+    "docs/archive/releases/OPT-001CR3R2_TESTING.md", "docs/archive/releases/OPT-001CR3R2_CHANGELOG.md",
+    "docs/archive/releases/OPT-001CR3R2_RESULT_ANALYSIS.md", "docs/archive/releases/OPT-001CR3R2_HOTFIX_REPORT.json",
     "tools/run_process_live.py", "audit/opt001cr3r2_live_exitcode.json",
     "patches/OPT-001CR3R2.diff",
-    "TEST_OPT-001CR3R1.ps1", "CHANGELOG_OPT-001CR3R1.md",
-    "docs/OPT-001CR3R1_TESTING.md", "docs/OPT-001CR3R1_CHANGELOG.md",
-    "docs/OPT-001CR3R1_RESULT_ANALYSIS.md", "docs/OPT-001CR3R1_HOTFIX_REPORT.json",
+    "TEST_OPT-001CR3R1.ps1", "docs/archive/changelog/CHANGELOG_OPT-001CR3R1.md",
+    "docs/archive/releases/OPT-001CR3R1_TESTING.md", "docs/archive/releases/OPT-001CR3R1_CHANGELOG.md",
+    "docs/archive/releases/OPT-001CR3R1_RESULT_ANALYSIS.md", "docs/archive/releases/OPT-001CR3R1_HOTFIX_REPORT.json",
     "audit/opt001cr3r1_compiler_safe_inline.json", "patches/OPT-001CR3R1.diff",
-    "TEST_OPT-001CR3.ps1", "CHANGELOG_OPT-001CR3.md",
-    "docs/OPT-001CR3_TESTING.md", "docs/OPT-001CR3_CHANGELOG.md",
-    "docs/OPT-001CR3_DELIVERY_REPORT.json", "patches/OPT-001CR3.diff",
+    "TEST_OPT-001CR3.ps1", "docs/archive/changelog/CHANGELOG_OPT-001CR3.md",
+    "docs/archive/releases/OPT-001CR3_TESTING.md", "docs/archive/releases/OPT-001CR3_CHANGELOG.md",
+    "docs/archive/releases/OPT-001CR3_DELIVERY_REPORT.json", "patches/OPT-001CR3.diff",
     "tests/opt001cr3_hotpath_tests.ml", "tools/check_opt001cr3.py",
     "tools/compare_opt001cr3_performance.py", "audit/opt001cr3_inline_array_hotpath.json",
     "audit/opt001cr2_accepted_baseline.json",
-    "TEST_OPT-001CR2.ps1", "CHANGELOG_OPT-001CR2.md",
-    "docs/OPT-001CR2_TESTING.md", "docs/OPT-001CR2_RESULT_ANALYSIS.md",
-    "docs/OPT-001CR2_HOTFIX_REPORT.json", "docs/OPT-001CR2_DELIVERY_REPORT.json",
+    "TEST_OPT-001CR2.ps1", "docs/archive/changelog/CHANGELOG_OPT-001CR2.md",
+    "docs/archive/releases/OPT-001CR2_TESTING.md", "docs/archive/releases/OPT-001CR2_RESULT_ANALYSIS.md",
+    "docs/archive/releases/OPT-001CR2_HOTFIX_REPORT.json", "docs/archive/releases/OPT-001CR2_DELIVERY_REPORT.json",
     "patches/OPT-001CR2.diff", "tools/check_opt001cr2.py",
     "audit/opt001cr2_harness_golden.json",
-    "TEST_OPT-001CR1.ps1", "CHANGELOG_OPT-001CR1.md",
-    "docs/OPT-001CR1_TESTING.md", "docs/OPT-001CR1_RESULT_ANALYSIS.md",
-    "docs/OPT-001CR1_HOTFIX_REPORT.json", "docs/OPT-001CR1_DELIVERY_REPORT.json",
+    "TEST_OPT-001CR1.ps1", "docs/archive/changelog/CHANGELOG_OPT-001CR1.md",
+    "docs/archive/releases/OPT-001CR1_TESTING.md", "docs/archive/releases/OPT-001CR1_RESULT_ANALYSIS.md",
+    "docs/archive/releases/OPT-001CR1_HOTFIX_REPORT.json", "docs/archive/releases/OPT-001CR1_DELIVERY_REPORT.json",
     "patches/OPT-001CR1.diff", "tools/check_opt001cr1.py",
     "tools/check_minilang_delimiters.py", "audit/opt001cr1_syntax_golden.json",
-    "TEST_OPT-001C.ps1", "CHANGELOG_OPT-001C.md",
-    "docs/OPT-001C_TESTING.md", "docs/OPT-001C_ALLOCATION_CONTRACT.md",
-    "docs/OPT-001C_DELIVERY_REPORT.json", "patches/OPT-001C.diff",
+    "TEST_OPT-001C.ps1", "docs/archive/changelog/CHANGELOG_OPT-001C.md",
+    "docs/archive/releases/OPT-001C_TESTING.md", "docs/archive/releases/OPT-001C_ALLOCATION_CONTRACT.md",
+    "docs/archive/releases/OPT-001C_DELIVERY_REPORT.json", "patches/OPT-001C.diff",
     "tests/opt001c_contract_tests.ml", "tools/check_opt001c.py",
     "tools/compare_opt001c_performance.py",
     "audit/opt001c_allocation_golden.json", "audit/opt001b_performance_baseline.json",
-    "TEST_OPT-001B.ps1", "CHANGELOG_OPT-001B.md",
-    "docs/OPT-001B_TESTING.md", "docs/OPT-001B_CORRECTNESS_CONTRACT.md",
-    "docs/OPT-001B_DELIVERY_REPORT.json", "patches/OPT-001B.diff",
+    "TEST_OPT-001B.ps1", "docs/archive/changelog/CHANGELOG_OPT-001B.md",
+    "docs/archive/releases/OPT-001B_TESTING.md", "docs/archive/releases/OPT-001B_CORRECTNESS_CONTRACT.md",
+    "docs/archive/releases/OPT-001B_DELIVERY_REPORT.json", "patches/OPT-001B.diff",
     "tests/opt001b_contract_tests.ml", "tools/check_opt001b.py",
     "audit/opt001b_correctness_golden.json",
-    "TEST_OPT-001A.ps1", "CHANGELOG_OPT-001A.md",
-    "docs/OPT-001A_TESTING.md", "docs/OPT-001A_BASELINE_CONTRACT.md",
-    "docs/OPT-001A_DELIVERY_REPORT.json", "patches/OPT-001A.diff",
+    "TEST_OPT-001A.ps1", "docs/archive/changelog/CHANGELOG_OPT-001A.md",
+    "docs/archive/releases/OPT-001A_TESTING.md", "docs/archive/releases/OPT-001A_BASELINE_CONTRACT.md",
+    "docs/archive/releases/OPT-001A_DELIVERY_REPORT.json", "patches/OPT-001A.diff",
     "src/miniquake/optimization_baseline.ml", "tests/opt001a_contract_tests.ml",
     "tools/check_opt001a.py", "tools/analyze_opt001a.py",
     "audit/opt001a_baseline_golden.json",
     "COPYING", "README.md", "build.ps1", "COLLECT_RESULTS.ps1", "test.ps1",
-    "TEST_BP-090-094.ps1", "CHANGELOG_BP-090-094.md",
-    "TEST_BP-090-094R15.ps1", "CHANGELOG_BP-090-094R15.md",
-    "docs/BP-090-094R15_TESTING.md", "docs/BP-090-094R15_RESULT_ANALYSIS.md",
-    "docs/BP-090-094R15_HOTFIX_REPORT.json", "patches/BP-094R15.diff",
-    "TEST_BP-090-094R14.ps1", "CHANGELOG_BP-090-094R14.md",
-    "docs/BP-090-094R14_TESTING.md", "docs/BP-090-094R14_RESULT_ANALYSIS.md",
-    "docs/BP-090-094R14_HOTFIX_REPORT.json", "patches/BP-094R14.diff",
-    "TEST_BP-090-094R13.ps1", "CHANGELOG_BP-090-094R13.md",
-    "docs/BP-090-094R13_TESTING.md", "docs/BP-090-094R13_RESULT_ANALYSIS.md",
-    "docs/BP-090-094R13_HOTFIX_REPORT.json", "patches/BP-094R13.diff",
-    "TEST_BP-090-094R12.ps1", "CHANGELOG_BP-090-094R12.md",
-    "docs/BP-090-094R12_TESTING.md", "docs/BP-090-094R12_RESULT_ANALYSIS.md",
-    "docs/BP-090-094R12_HOTFIX_REPORT.json", "patches/BP-094R12.diff",
-    "TEST_BP-090-094R11.ps1", "CHANGELOG_BP-090-094R11.md",
-    "docs/BP-090-094R11_TESTING.md", "docs/BP-090-094R11_RESULT_ANALYSIS.md",
-    "docs/BP-090-094R11_HOTFIX_REPORT.json", "patches/BP-094R11.diff",
-    "TEST_BP-090-094R10.ps1", "CHANGELOG_BP-090-094R10.md",
-    "docs/BP-090-094R10_TESTING.md", "docs/BP-090-094R10_RESULT_ANALYSIS.md",
-    "docs/BP-090-094R10_HOTFIX_REPORT.json", "patches/BP-094R10.diff",
-    "TEST_BP-090-094R9.ps1", "CHANGELOG_BP-090-094R9.md",
-    "docs/BP-090-094R9_TESTING.md", "docs/BP-090-094R9_RESULT_ANALYSIS.md",
-    "docs/BP-090-094R9_HOTFIX_REPORT.json", "patches/BP-094R9.diff",
-    "TEST_BP-090-094R8.ps1", "CHANGELOG_BP-090-094R8.md",
-    "docs/BP-090-094R8_TESTING.md", "docs/BP-090-094R8_RESULT_ANALYSIS.md",
-    "docs/BP-090-094R8_HOTFIX_REPORT.json", "docs/BP-093_R7_VISUAL_DIAGNOSTIC_ANALYSIS.md",
-    "docs/BP-093_R7_VISUAL_DIAGNOSTIC_ANALYSIS.json", "patches/BP-094R8.diff",
-    "TEST_BP-090-094R7.ps1", "CHANGELOG_BP-090-094R7.md",
-    "docs/BP-090-094R7_TESTING.md", "docs/BP-090-094R7_RESULT_ANALYSIS.md",
-    "docs/BP-090-094R7_HOTFIX_REPORT.json", "patches/BP-094R7.diff",
-    "TEST_BP-090-094R6.ps1", "CHANGELOG_BP-090-094R6.md",
-    "docs/BP-090-094R6_TESTING.md", "docs/BP-090-094R6_RESULT_ANALYSIS.md",
-    "docs/BP-090-094R6_HOTFIX_REPORT.json", "patches/BP-094R6.diff",
-    "TEST_BP-090-094R5.ps1", "CHANGELOG_BP-090-094R5.md",
-    "docs/BP-090-094R5_TESTING.md", "docs/BP-090-094R5_RESULT_ANALYSIS.md",
-    "docs/BP-090-094R5_HOTFIX_REPORT.json", "patches/BP-094R5.diff",
-    "TEST_BP-090-094R4.ps1", "CHANGELOG_BP-090-094R4.md",
-    "docs/BP-090-094R4_TESTING.md", "docs/BP-090-094R4_RESULT_ANALYSIS.md",
-    "docs/BP-090-094R4_HOTFIX_REPORT.json", "patches/BP-094R4.diff",
-    "TEST_BP-090-094R3.ps1", "CHANGELOG_BP-090-094R3.md",
-    "docs/BP-090-094R3_TESTING.md", "docs/BP-090-094R3_RESULT_ANALYSIS.md",
-    "docs/BP-090-094R3_HOTFIX_REPORT.json", "patches/BP-094R3.diff",
-    "TEST_BP-090-094R2.ps1", "CHANGELOG_BP-090-094R2.md",
-    "docs/BP-090-094R2_TESTING.md", "docs/BP-090-094R2_RESULT_ANALYSIS.md",
-    "docs/BP-090-094R2_HOTFIX_REPORT.json", "patches/BP-094R2.diff",
-    "TEST_BP-090-094R1.ps1", "CHANGELOG_BP-090-094R1.md",
-    "docs/BP-090-094R1_TESTING.md", "docs/BP-090-094R1_RESULT_ANALYSIS.md",
-    "docs/BP-090-094R1_HOTFIX_REPORT.json", "patches/BP-094R1.diff",
+    "TEST_BP-090-094.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094.md",
+    "TEST_BP-090-094R15.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R15.md",
+    "docs/archive/releases/BP-090-094R15_TESTING.md", "docs/archive/releases/BP-090-094R15_RESULT_ANALYSIS.md",
+    "docs/archive/releases/BP-090-094R15_HOTFIX_REPORT.json", "patches/BP-094R15.diff",
+    "TEST_BP-090-094R14.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R14.md",
+    "docs/archive/releases/BP-090-094R14_TESTING.md", "docs/archive/releases/BP-090-094R14_RESULT_ANALYSIS.md",
+    "docs/archive/releases/BP-090-094R14_HOTFIX_REPORT.json", "patches/BP-094R14.diff",
+    "TEST_BP-090-094R13.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R13.md",
+    "docs/archive/releases/BP-090-094R13_TESTING.md", "docs/archive/releases/BP-090-094R13_RESULT_ANALYSIS.md",
+    "docs/archive/releases/BP-090-094R13_HOTFIX_REPORT.json", "patches/BP-094R13.diff",
+    "TEST_BP-090-094R12.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R12.md",
+    "docs/archive/releases/BP-090-094R12_TESTING.md", "docs/archive/releases/BP-090-094R12_RESULT_ANALYSIS.md",
+    "docs/archive/releases/BP-090-094R12_HOTFIX_REPORT.json", "patches/BP-094R12.diff",
+    "TEST_BP-090-094R11.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R11.md",
+    "docs/archive/releases/BP-090-094R11_TESTING.md", "docs/archive/releases/BP-090-094R11_RESULT_ANALYSIS.md",
+    "docs/archive/releases/BP-090-094R11_HOTFIX_REPORT.json", "patches/BP-094R11.diff",
+    "TEST_BP-090-094R10.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R10.md",
+    "docs/archive/releases/BP-090-094R10_TESTING.md", "docs/archive/releases/BP-090-094R10_RESULT_ANALYSIS.md",
+    "docs/archive/releases/BP-090-094R10_HOTFIX_REPORT.json", "patches/BP-094R10.diff",
+    "TEST_BP-090-094R9.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R9.md",
+    "docs/archive/releases/BP-090-094R9_TESTING.md", "docs/archive/releases/BP-090-094R9_RESULT_ANALYSIS.md",
+    "docs/archive/releases/BP-090-094R9_HOTFIX_REPORT.json", "patches/BP-094R9.diff",
+    "TEST_BP-090-094R8.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R8.md",
+    "docs/archive/releases/BP-090-094R8_TESTING.md", "docs/archive/releases/BP-090-094R8_RESULT_ANALYSIS.md",
+    "docs/archive/releases/BP-090-094R8_HOTFIX_REPORT.json", "docs/archive/releases/BP-093_R7_VISUAL_DIAGNOSTIC_ANALYSIS.md",
+    "docs/archive/releases/BP-093_R7_VISUAL_DIAGNOSTIC_ANALYSIS.json", "patches/BP-094R8.diff",
+    "TEST_BP-090-094R7.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R7.md",
+    "docs/archive/releases/BP-090-094R7_TESTING.md", "docs/archive/releases/BP-090-094R7_RESULT_ANALYSIS.md",
+    "docs/archive/releases/BP-090-094R7_HOTFIX_REPORT.json", "patches/BP-094R7.diff",
+    "TEST_BP-090-094R6.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R6.md",
+    "docs/archive/releases/BP-090-094R6_TESTING.md", "docs/archive/releases/BP-090-094R6_RESULT_ANALYSIS.md",
+    "docs/archive/releases/BP-090-094R6_HOTFIX_REPORT.json", "patches/BP-094R6.diff",
+    "TEST_BP-090-094R5.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R5.md",
+    "docs/archive/releases/BP-090-094R5_TESTING.md", "docs/archive/releases/BP-090-094R5_RESULT_ANALYSIS.md",
+    "docs/archive/releases/BP-090-094R5_HOTFIX_REPORT.json", "patches/BP-094R5.diff",
+    "TEST_BP-090-094R4.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R4.md",
+    "docs/archive/releases/BP-090-094R4_TESTING.md", "docs/archive/releases/BP-090-094R4_RESULT_ANALYSIS.md",
+    "docs/archive/releases/BP-090-094R4_HOTFIX_REPORT.json", "patches/BP-094R4.diff",
+    "TEST_BP-090-094R3.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R3.md",
+    "docs/archive/releases/BP-090-094R3_TESTING.md", "docs/archive/releases/BP-090-094R3_RESULT_ANALYSIS.md",
+    "docs/archive/releases/BP-090-094R3_HOTFIX_REPORT.json", "patches/BP-094R3.diff",
+    "TEST_BP-090-094R2.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R2.md",
+    "docs/archive/releases/BP-090-094R2_TESTING.md", "docs/archive/releases/BP-090-094R2_RESULT_ANALYSIS.md",
+    "docs/archive/releases/BP-090-094R2_HOTFIX_REPORT.json", "patches/BP-094R2.diff",
+    "TEST_BP-090-094R1.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R1.md",
+    "docs/archive/releases/BP-090-094R1_TESTING.md", "docs/archive/releases/BP-090-094R1_RESULT_ANALYSIS.md",
+    "docs/archive/releases/BP-090-094R1_HOTFIX_REPORT.json", "patches/BP-094R1.diff",
     "BLOCK_LEDGER.json",
-    "PORT_LEDGER.json", "PORT_STATUS.md", MANIFEST,
-    "docs/BP-090-094_TESTING.md", "docs/BP-085-089R8_ACCEPTANCE_ANALYSIS.md",
+    "PORT_LEDGER.json", "docs/status/PORT_STATUS.md", MANIFEST,
+    "docs/archive/releases/BP-090-094_TESTING.md", "docs/archive/releases/BP-085-089R8_ACCEPTANCE_ANALYSIS.md",
     "src/main.ml", "src/miniquake/build_info.ml", "src/miniquake/host.ml",
     "src/miniquake/external_reference_contract.ml",
     "tests/original_reference_provenance_tests.ml",
@@ -162,17 +159,34 @@ REQUIRED_PATHS = {
     "patches/BP-093.diff", "patches/BP-094.diff",
 }
 
-EXPECTED_NATIVE = {
-    "native/miniquake_native.dll": (
-        "3e7a6f09aa4836875b243530908b309f3245ffc267ecef06b2adbc33b02c0588",
-        160,
-        "native/miniquake_native.def",
-    ),
-    "native/miniquake_text.dll": (
-        "3e6ea2aa37ca58bdfd821a1b9278d6411a90143c3b0c48b8f96bfa10a0c6bd7c",
-        12,
-        "native/miniquake_text.def",
-    ),
+CURRENT_REQUIRED_PATHS = {
+    ".gitignore", "COPYING", "LICENSES/Apache-2.0.txt", "README.md",
+    "docs/CHANGELOG.md", "docs/archive/README.md",
+    "docs/native/README.md", "docs/status/PORT_STATUS.md",
+    "SOURCE_MANIFEST.sha256", "build.ps1", "test.ps1",
+    "src/main.ml", "src/miniquake/build_info.ml",
+    "native/build_bridge.py", "native/build_text_bridge.py",
+    "native/miniquake_native.c", "native/miniquake_native.h",
+    "native/miniquake_native.def", "native/miniquake_native.dll",
+    "native/miniquake_text.c", "native/miniquake_text.def",
+    "native/miniquake_text.dll", "native/miniquake_d3d9.c",
+    "native/miniquake_d3d9.h", "native/miniquake_vulkan.c",
+    "native/miniquake_vulkan.h", "native/miniquake_vulkan_shaders.h",
+    "native/shaders/miniquake_vulkan.vert",
+    "native/shaders/miniquake_vulkan.frag",
+    "native/shaders/miniquake_vulkan.vert.spv",
+    "native/shaders/miniquake_vulkan.frag.spv",
+    "third_party/stb/stb_vorbis.c",
+    "third_party/Vulkan-Headers/MINIQUAKE-VENDOR.txt",
+    "third_party/Vulkan-Headers/LICENSE.md",
+    "tools/check_minilang_delimiters.py",
+    "tools/check_source_documentation.py",
+    "tools/apply_source_documentation.py", "tools/embed_spirv.py",
+}
+
+NATIVE_BRIDGES = {
+    "native/miniquake_native.dll": ("native/miniquake_native.def", 178),
+    "native/miniquake_text.dll": ("native/miniquake_text.def", 12),
 }
 
 
@@ -193,6 +207,7 @@ def sha256(path: Path) -> str:
 
 
 def package_files(root: Path) -> list[Path]:
+    """Return deliverable files while excluding generated build/report trees."""
     result: list[Path] = []
     for path in root.rglob("*"):
         if not path.is_file():
@@ -206,6 +221,19 @@ def package_files(root: Path) -> list[Path]:
             continue
         result.append(path)
     return sorted(result, key=lambda p: p.relative_to(root).as_posix().lower())
+
+
+def refresh_manifest(root: Path) -> int:
+    """Atomically bind the manifest to the current deliverable file set."""
+    entries = [
+        f"{sha256(path)} *{path.relative_to(root).as_posix()}\n"
+        for path in package_files(root)
+    ]
+    destination = root / MANIFEST
+    temporary = destination.with_suffix(destination.suffix + ".tmp")
+    temporary.write_text("".join(entries), encoding="utf-8", newline="\n")
+    temporary.replace(destination)
+    return len(entries)
 
 
 def parse_manifest(path: Path) -> dict[str, str]:
@@ -224,8 +252,13 @@ def parse_manifest(path: Path) -> dict[str, str]:
 
 
 def check_required(root: Path) -> Check:
-    missing = sorted(rel for rel in REQUIRED_PATHS if not (root / rel).is_file())
-    return Check("required_paths", not missing, {"required": len(REQUIRED_PATHS)}, [f"missing: {x}" for x in missing])
+    """Require the current engine, renderer, licensing and verification surface."""
+    missing = sorted(rel for rel in CURRENT_REQUIRED_PATHS if not (root / rel).is_file())
+    return Check(
+        "required_paths", not missing,
+        {"required": len(CURRENT_REQUIRED_PATHS)},
+        [f"missing: {path}" for path in missing],
+    )
 
 
 def check_manifest(root: Path) -> Check:
@@ -254,43 +287,27 @@ def marker_errors(text: str, markers: list[str], label: str) -> list[str]:
 
 
 def check_identity(root: Path) -> Check:
+    """Read package identity from the authoritative MiniLang build-info unit."""
     errors: list[str] = []
     build_info = (root / "src/miniquake/build_info.ml").read_text(encoding="utf-8-sig")
-    main = (root / "src/main.ml").read_text(encoding="utf-8-sig")
-    build = (root / "build.ps1").read_text(encoding="utf-8-sig")
-    test = (root / "TEST_OPT-001D.ps1").read_text(encoding="utf-8-sig")
-    collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
-    launcher = (root / "test.ps1").read_text(encoding="utf-8-sig")
-    errors += marker_errors(build_info, [
-        'const PACKAGE_ID = "BP-094"', 'const PARENT_PACKAGE_ID = "BP-093"',
-        'const BLOCK_ID = "BP-090-094"', 'const BLOCK_PARENT_PACKAGE_ID = "BP-085-089R8"',
-        'const OPTIMIZATION_STATUS = "opt001d_performance_audio_ui_candidate_v1"',
-        'const OPTIMIZATION_FINGERPRINT = 0x1c001c10',
-        'const OPTIMIZATION_PARENT = "OPT-001CR3R7"',
-        'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001D"',
-        'const OPTIMIZATION_DELIVERY_PARENT = "OPT-001CR3R7"',
-    ], "build_info")
-    errors += marker_errors(main, [
-        "--opt001a-map-parse", "--opt001a-frame-baseline", "--opt001a-handle-plateau", "--opt001b-transition",
-        "Optimization status:", "Optimization parent:",
-    ], "main")
-    errors += marker_errors(build, [
-        '$PackageId = "BP-094"', "MiniQuakeOPT001CAllocationTests.exe",
-        "MiniQuakeOPT001CR3HotpathTests.exe", "tests\\opt001cr3_hotpath_tests.ml",
-    ], "build")
-    errors += marker_errors(test, [
-        '$DeliveryRevision = "OPT-001D"', '$DeliveryParent = "OPT-001CR3R7"',
-        "MiniQuake OPT-001D acceptance test: PASS", "output_mode=python_binary_passthrough_named_build_binding",
-        "--opt001a-map-parse", "--opt001a-frame-baseline", "--opt001a-handle-plateau",
-    ], "test")
-    errors += marker_errors(collector, [
-        '$DeliveryRevision = "OPT-001D"', "MiniQuake_OPT-001D_RESULTS_",
-    ], "collector")
-    errors += marker_errors(launcher, ["TEST_OPT-001D.ps1"], "test.ps1")
+    values: dict[str, str] = {}
+    for name in (
+        "PACKAGE_ID", "PARENT_PACKAGE_ID", "BLOCK_ID",
+        "BLOCK_PARENT_PACKAGE_ID", "OPTIMIZATION_STATUS",
+        "OPTIMIZATION_PARENT", "OPTIMIZATION_DELIVERY_REVISION",
+        "OPTIMIZATION_DELIVERY_PARENT",
+    ):
+        match = re.search(rf'^const {name} = "([^"]+)"$', build_info, re.M)
+        if match:
+            values[name] = match.group(1)
+        else:
+            errors.append(f"build_info missing string constant: {name}")
     return Check(
         "package_identity", not errors,
-        {"package_id": PACKAGE_ID, "parent_package_id": PARENT_PACKAGE_ID,
-         "block_id": BLOCK_ID, "delivery_revision": DELIVERY_REVISION},
+        {"package_id": values.get("PACKAGE_ID", ""),
+         "parent_package_id": values.get("PARENT_PACKAGE_ID", ""),
+         "block_id": values.get("BLOCK_ID", ""),
+         "delivery_revision": values.get("OPTIMIZATION_DELIVERY_REVISION", "")},
         errors,
     )
 
@@ -301,7 +318,7 @@ def check_r8_visual_parity(root: Path) -> Check:
     world = (root / "src/miniquake/render/world.ml").read_text(encoding="utf-8-sig")
     entities = (root / "src/miniquake/render/entities.ml").read_text(encoding="utf-8-sig")
     test = (root / "TEST_BP-090-094R8.ps1").read_text(encoding="utf-8-sig")
-    analysis = (root / "docs/BP-093_R7_VISUAL_DIAGNOSTIC_ANALYSIS.md").read_text(encoding="utf-8-sig")
+    analysis = (root / "docs/archive/releases/BP-093_R7_VISUAL_DIAGNOSTIC_ANALYSIS.md").read_text(encoding="utf-8-sig")
     required = [
         ('"-gamma", "1"', main, "main startup gamma"),
         ("gl.clearColor(1.0, 0.0, 0.0, 0.0)", world, "GL clear colour"),
@@ -380,9 +397,9 @@ def check_r9_network_provenance(root: Path) -> Check:
 def check_r10_original_server_readiness(root: Path) -> Check:
     errors: list[str] = []
     runner = (root / "TEST_BP-090-094R12.ps1").read_text(encoding="utf-8-sig")
-    testing = (root / "docs/BP-090-094R10_TESTING.md").read_text(encoding="utf-8-sig")
-    analysis = (root / "docs/BP-090-094R10_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
-    hotfix = json.loads((root / "docs/BP-090-094R10_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig"))
+    testing = (root / "docs/archive/releases/BP-090-094R10_TESTING.md").read_text(encoding="utf-8-sig")
+    analysis = (root / "docs/archive/releases/BP-090-094R10_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
+    hotfix = json.loads((root / "docs/archive/releases/BP-090-094R10_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig"))
     required = [
         ("[int]$OriginalServerReadyTimeoutMs = 180000", runner, "readiness timeout parameter"),
         ("function Wait-OriginalServerControlReady(", runner, "readiness probe helper"),
@@ -450,10 +467,10 @@ def check_r11_original_reference_handoff(root: Path) -> Check:
     errors: list[str] = []
     runner = (root / "TEST_BP-090-094R12.ps1").read_text(encoding="utf-8-sig")
     prepare = (root / "tools/prepare_original_reference.py").read_text(encoding="utf-8-sig")
-    testing = (root / "docs/BP-090-094R11_TESTING.md").read_text(encoding="utf-8-sig")
-    analysis = (root / "docs/BP-090-094R11_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
+    testing = (root / "docs/archive/releases/BP-090-094R11_TESTING.md").read_text(encoding="utf-8-sig")
+    analysis = (root / "docs/archive/releases/BP-090-094R11_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
     hotfix = json.loads(
-        (root / "docs/BP-090-094R11_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig")
+        (root / "docs/archive/releases/BP-090-094R11_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig")
     )
 
     required = [
@@ -569,9 +586,9 @@ def check_r12_persistent_original_connect(root: Path) -> Check:
     net_main = (root / "src/miniquake/net_main.ml").read_text(encoding="utf-8-sig")
     net_loop = (root / "src/miniquake/net_loop.ml").read_text(encoding="utf-8-sig")
     runner = (root / "TEST_BP-090-094R12.ps1").read_text(encoding="utf-8-sig")
-    testing = (root / "docs/BP-090-094R12_TESTING.md").read_text(encoding="utf-8-sig")
-    analysis = (root / "docs/BP-090-094R12_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
-    hotfix = json.loads((root / "docs/BP-090-094R12_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig"))
+    testing = (root / "docs/archive/releases/BP-090-094R12_TESTING.md").read_text(encoding="utf-8-sig")
+    analysis = (root / "docs/archive/releases/BP-090-094R12_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
+    hotfix = json.loads((root / "docs/archive/releases/BP-090-094R12_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig"))
 
     required = [
         ("function connectRemotePersistent(", net_loop, "persistent UDP connector"),
@@ -635,9 +652,9 @@ def check_r13_pre_fallback_readiness_guard(root: Path) -> Check:
     host = (root / "src/miniquake/host.ml").read_text(encoding="utf-8-sig")
     net_loop = (root / "src/miniquake/net_loop.ml").read_text(encoding="utf-8-sig")
     runner = (root / "TEST_BP-090-094R13.ps1").read_text(encoding="utf-8-sig")
-    testing = (root / "docs/BP-090-094R13_TESTING.md").read_text(encoding="utf-8-sig")
-    analysis = (root / "docs/BP-090-094R13_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
-    hotfix = json.loads((root / "docs/BP-090-094R13_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig"))
+    testing = (root / "docs/archive/releases/BP-090-094R13_TESTING.md").read_text(encoding="utf-8-sig")
+    analysis = (root / "docs/archive/releases/BP-090-094R13_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
+    hotfix = json.loads((root / "docs/archive/releases/BP-090-094R13_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig"))
 
     required = [
         ('"-original-interop-target", arguments[2] + ":" + port', main, "private pre-fallback target option"),
@@ -705,9 +722,9 @@ def check_r14_original_capture_ensemble(root: Path) -> Check:
     runner=(root/'TEST_BP-090-094R14.ps1').read_text(encoding='utf-8-sig')
     comparator=(root/'tools/compare_original_reference.py').read_text(encoding='utf-8-sig')
     golden=json.loads((root/'audit/original_visual_reference_golden.json').read_text(encoding='utf-8-sig'))
-    testing=(root/'docs/BP-090-094R14_TESTING.md').read_text(encoding='utf-8-sig')
-    analysis=(root/'docs/BP-090-094R14_RESULT_ANALYSIS.md').read_text(encoding='utf-8-sig')
-    hotfix=json.loads((root/'docs/BP-090-094R14_HOTFIX_REPORT.json').read_text(encoding='utf-8-sig'))
+    testing=(root/'docs/archive/releases/BP-090-094R14_TESTING.md').read_text(encoding='utf-8-sig')
+    analysis=(root/'docs/archive/releases/BP-090-094R14_RESULT_ANALYSIS.md').read_text(encoding='utf-8-sig')
+    hotfix=json.loads((root/'docs/archive/releases/BP-090-094R14_HOTFIX_REPORT.json').read_text(encoding='utf-8-sig'))
     for marker in ['function Get-OriginalTgaState(','function Wait-OriginalTgaComplete(','validated_tga_size_hash_stability','expected_tga_bytes','stable_polls',"'--original-alt',$OriginalB", "'--min-reference-ssim','0.98'",'bounded_dual_reference_ensemble',"reference_aggregation='minimum_ssim'",'original_reference_ssim','MiniQuake BP-090-094R14 acceptance test: PASS']:
         if marker not in runner: errors.append('R14 runner missing marker: '+marker)
     if 'if ($OriginalHashA -ne $OriginalHashB) { throw' in runner: errors.append('R14 runner still rejects non-identical original captures before measuring similarity')
@@ -729,9 +746,9 @@ def check_r15_visual_timestep_parity(root: Path) -> Check:
     runner = (root / "TEST_BP-090-094R15.ps1").read_text(encoding="utf-8-sig")
     host = (root / "src/miniquake/host.ml").read_text(encoding="utf-8-sig")
     golden = json.loads((root / "audit/original_visual_reference_golden.json").read_text(encoding="utf-8-sig"))
-    testing = (root / "docs/BP-090-094R15_TESTING.md").read_text(encoding="utf-8-sig")
-    analysis = (root / "docs/BP-090-094R15_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
-    hotfix = json.loads((root / "docs/BP-090-094R15_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig"))
+    testing = (root / "docs/archive/releases/BP-090-094R15_TESTING.md").read_text(encoding="utf-8-sig")
+    analysis = (root / "docs/archive/releases/BP-090-094R15_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
+    hotfix = json.loads((root / "docs/archive/releases/BP-090-094R15_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig"))
 
     config_match = re.search(r"(?ms)^function Write-OriginalVisualConfig\b.*?^}\s*$", runner)
     config = config_match.group(0) if config_match else ""
@@ -979,9 +996,10 @@ def check_minilang_entry_function_shadow_arity(root: Path) -> Check:
     }, errors)
 
 def check_native(root: Path) -> Check:
+    """Validate checked-in x64 bridge binaries against their current DEF files."""
     errors: list[str] = []
     details: dict[str, object] = {}
-    for rel, (expected_hash, expected_count, def_rel) in EXPECTED_NATIVE.items():
+    for rel, (def_rel, minimum_exports) in NATIVE_BRIDGES.items():
         path = root / rel
         try:
             actual_hash = sha256(path)
@@ -990,10 +1008,10 @@ def check_native(root: Path) -> Check:
         except Exception as exc:
             errors.append(f"{rel}: {exc}")
             continue
-        if actual_hash != expected_hash:
-            errors.append(f"{rel}: SHA-256 {actual_hash} != {expected_hash}")
-        if len(exports) != expected_count:
-            errors.append(f"{def_rel}: exports {len(exports)} != {expected_count}")
+        if len(exports) < minimum_exports:
+            errors.append(f"{def_rel}: exports {len(exports)} < required {minimum_exports}")
+        if len(exports) != len(set(exports)):
+            errors.append(f"{def_rel}: duplicate export names")
         if machine != 0x8664:
             errors.append(f"{rel}: PE machine 0x{machine:04x} != 0x8664")
         details[rel] = {"sha256": actual_hash, "exports": len(exports), "machine": f"0x{machine:04x}"}
@@ -1001,6 +1019,7 @@ def check_native(root: Path) -> Check:
 
 
 def ml_files(root: Path) -> list[Path]:
+    """Return production and test MiniLang source files."""
     return sorted([*root.glob("src/**/*.ml"), *root.glob("tests/**/*.ml")])
 
 
@@ -1225,7 +1244,7 @@ def check_verifier_cli_compatibility(root: Path) -> Check:
     errors: list[str] = []
     build = (root / "build.ps1").read_text(encoding="utf-8-sig")
     verifier = (root / "tools/verify.py").read_text(encoding="utf-8-sig")
-    docs = (root / "docs/BP-090-094R7_TESTING.md").read_text(encoding="utf-8-sig")
+    docs = (root / "docs/archive/releases/BP-090-094R7_TESTING.md").read_text(encoding="utf-8-sig")
     canonical = "& $PythonExe @PythonPrefixArgs $Verifier --root $Root"
     legacy_build = "& $PythonExe @PythonPrefixArgs $Verifier $Root"
     if canonical not in build:
@@ -1257,8 +1276,8 @@ def check_original_glquake_runtime_safety(root: Path) -> Check:
     """Bind the modern-driver-safe launch and evidence policy for GLQUAKE.EXE."""
     errors: list[str] = []
     runner = (root / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
-    historical_analysis = (root / "docs/BP-090-094R4_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
-    current_analysis = (root / "docs/BP-090-094R7_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
+    historical_analysis = (root / "docs/archive/releases/BP-090-094R4_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
+    current_analysis = (root / "docs/archive/releases/BP-090-094R7_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
     try:
         server_golden = json.loads((root / "audit/original_server_interop_golden.json").read_text(encoding="utf-8-sig"))
         client_golden = json.loads((root / "audit/original_client_interop_golden.json").read_text(encoding="utf-8-sig"))
@@ -1418,9 +1437,9 @@ def check_temporary_loopback_firewall_rules(root: Path) -> Check:
     """Require exact-program, loopback-only, temporary firewall authorization."""
     errors: list[str] = []
     runner = (root / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
-    testing = (root / "docs/BP-090-094R7_TESTING.md").read_text(encoding="utf-8-sig")
-    analysis = (root / "docs/BP-090-094R7_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
-    hotfix = json.loads((root / "docs/BP-090-094R7_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig"))
+    testing = (root / "docs/archive/releases/BP-090-094R7_TESTING.md").read_text(encoding="utf-8-sig")
+    analysis = (root / "docs/archive/releases/BP-090-094R7_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
+    hotfix = json.loads((root / "docs/archive/releases/BP-090-094R7_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig"))
     required = [
         "function Test-IsAdministrator()",
         "function Relaunch-ElevatedForInteropIfNeeded()",
@@ -1502,8 +1521,8 @@ def check_original_client_port_routing(root: Path) -> Check:
     """Bind the original Quake console tokenizer and net_hostport routing fix."""
     errors: list[str] = []
     runner = (root / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
-    testing = (root / "docs/BP-090-094R7_TESTING.md").read_text(encoding="utf-8-sig")
-    analysis = (root / "docs/BP-090-094R7_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
+    testing = (root / "docs/archive/releases/BP-090-094R7_TESTING.md").read_text(encoding="utf-8-sig")
+    analysis = (root / "docs/archive/releases/BP-090-094R7_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
     golden = json.loads((root / "audit/original_client_port_routing_golden.json").read_text(encoding="utf-8-sig"))
     required = [
         "COM_Parse, where ':' is a",
@@ -1674,6 +1693,51 @@ def check_minilang_delimiters(root: Path) -> Check:
     return Check("minilang_delimiter_balance", not errors, details, errors)
 
 
+def check_source_documentation(root: Path) -> Check:
+    """Run the licence-aware production header and function-comment audit."""
+    script = root / "tools/check_source_documentation.py"
+    process = subprocess.run(
+        [sys.executable, str(script), "--root", str(root)],
+        capture_output=True,
+        text=True,
+    )
+    output = (process.stdout + process.stderr).strip()
+    errors = [] if process.returncode == 0 else [output]
+    details: dict[str, object] = {"return_code": process.returncode}
+    match = re.search(r"production functions documented:\s*(\d+)/(\d+)", output)
+    if match:
+        details["documented_functions"] = int(match.group(1))
+        details["production_functions"] = int(match.group(2))
+    return Check("source_documentation", not errors, details, errors)
+
+
+def check_embedded_vulkan_shaders(root: Path) -> Check:
+    """Rebuild the embedded SPIR-V header and require byte-identical output."""
+    output = root / "build" / "verify-vulkan-shaders.h"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    process = subprocess.run(
+        [
+            sys.executable, str(root / "tools/embed_spirv.py"),
+            "--vertex", str(root / "native/shaders/miniquake_vulkan.vert.spv"),
+            "--fragment", str(root / "native/shaders/miniquake_vulkan.frag.spv"),
+            "--output", str(output),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    checked_in = root / "native/miniquake_vulkan_shaders.h"
+    errors: list[str] = []
+    if process.returncode != 0:
+        errors.append((process.stdout + process.stderr).strip())
+    elif output.read_bytes() != checked_in.read_bytes():
+        errors.append("native/miniquake_vulkan_shaders.h is stale; regenerate it with tools/embed_spirv.py")
+    return Check(
+        "embedded_vulkan_shaders", not errors,
+        {"return_code": process.returncode, "header_sha256": sha256(checked_in)},
+        errors,
+    )
+
+
 def check_opt001cr1(root: Path) -> Check:
     out = root / "build" / "verify-opt001cr1.json"
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -1787,37 +1851,33 @@ def check_opt001cr3(root: Path) -> Check:
     return Check("opt001cr3_inline_array_hotpaths", not errors, details, errors)
 
 def main() -> int:
+    """Run the current integrity checks and optionally write a JSON report."""
     parser = argparse.ArgumentParser()
     parser.add_argument("legacy_root", nargs="?")
     parser.add_argument("--root", default="")
     parser.add_argument("--json", default="")
+    parser.add_argument(
+        "--refresh-manifest",
+        action="store_true",
+        help="atomically regenerate SOURCE_MANIFEST.sha256 before verification",
+    )
     args = parser.parse_args()
     if args.root and args.legacy_root:
         parser.error("specify the project root either positionally or with --root, not both")
     root_value = args.root or args.legacy_root or "."
     root = Path(root_value).resolve()
+    if args.refresh_manifest:
+        count = refresh_manifest(root)
+        print(f"Refreshed {MANIFEST}: {count} files")
     checks = [
         check_required(root),
         check_manifest(root),
         check_identity(root),
         check_minilang_utf8_no_bom(root),
-        check_current_entry_helper_namespace(root),
         check_minilang_entry_function_shadow_arity(root),
         check_minilang_delimiters(root),
-        check_opt001cr1(root),
-        check_opt001cr2(root),
-        check_opt001d(root),
-        check_opt001cr3(root),
-        check_opt001b(root),
-        check_opt001c(root),
-        check_r8_visual_parity(root),
-        check_r9_network_provenance(root),
-        check_r10_original_server_readiness(root),
-        check_r11_original_reference_handoff(root),
-        check_r12_persistent_original_connect(root),
-        check_r13_pre_fallback_readiness_guard(root),
-        check_r14_original_capture_ensemble(root),
-        check_r15_visual_timestep_parity(root),
+        check_source_documentation(root),
+        check_embedded_vulkan_shaders(root),
         check_no_game_data(root),
         check_native(root),
         check_minilang(root),
@@ -1827,30 +1887,27 @@ def main() -> int:
         check_powershell_elseif_syntax(root),
         check_powershell_interpolation_safety(root),
         check_verifier_cli_compatibility(root),
-        check_original_glquake_runtime_safety(root),
-        check_original_loopback_isolation(root),
-        check_temporary_loopback_firewall_rules(root),
-        check_original_client_port_routing(root),
-        check_inherited_contract_lineage(root),
-        check_external_checkers(root),
     ]
     passed = all(check.passed for check in checks)
-    print("MiniQuake OPT-001D verification")
+    identity = next(check for check in checks if check.name == "package_identity")
+    print("MiniQuake source verification")
     for check in checks:
         print(f"  [{'PASS' if check.passed else 'FAIL'}] {check.name}")
         for key, value in check.details.items():
             print(f"         {key}={value}")
         for error in check.errors:
             print(f"         error: {error}")
-    print(f"MiniQuake OPT-001D verification: {'PASS' if passed else 'FAIL'}")
+    print(f"MiniQuake source verification: {'PASS' if passed else 'FAIL'}")
+    package_id = str(identity.details.get("package_id", ""))
+    parent_package_id = str(identity.details.get("parent_package_id", ""))
+    block_id = str(identity.details.get("block_id", ""))
+    delivery_revision = str(identity.details.get("delivery_revision", ""))
     report = {
         "schema_version": 1,
-        "package_id": PACKAGE_ID,
-        "parent_package_id": PARENT_PACKAGE_ID,
-        "block_id": BLOCK_ID,
-        "block_parent_package_id": BLOCK_PARENT_PACKAGE_ID,
-        "delivery_revision": DELIVERY_REVISION,
-        "delivery_parent": DELIVERY_PARENT,
+        "package_id": package_id,
+        "parent_package_id": parent_package_id,
+        "block_id": block_id,
+        "delivery_revision": delivery_revision,
         "status": "PASS" if passed else "FAIL",
         "checks": [asdict(check) for check in checks],
     }

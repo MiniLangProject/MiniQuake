@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.keys.
+*/
 package miniquake.keys
 
 import miniquake.input as input
@@ -61,10 +68,12 @@ teamMessage = false
 registeredCommandNames = []
 pendingReleaseCommands = ""
 
+// Create the zero-initialized state for values.
 function zeroValues(count)
   return array(count, 0)
 end function
 
+// Return identity values derived from the active module state.
 function identityValues(count)
   result = array(count, 0)
   index = 0
@@ -75,16 +84,19 @@ function identityValues(count)
   return result
 end function
 
+// Update module state for destination.
 function setDestination(destination)
   global keyDest
   keyDest = destination
   return keyDest
 end function
 
+// Provide destination behavior for the active subsystem.
 function inline destination()
   return keyDest
 end function
 
+// Initialize state for begin message.
 function beginMessage(team)
   global keyDest, teamMessage, chatBuffer
   keyDest = KEY_MESSAGE
@@ -93,6 +105,7 @@ function beginMessage(team)
   return true
 end function
 
+// Mirror Quake's Key_StringToKeynum routine and its observable state changes.
 function Key_StringToKeynum(text)
   if text is void or text == "" then return -1 end if
   source = bytes(text)
@@ -100,15 +113,18 @@ function Key_StringToKeynum(text)
   return input.keyCodeForName(text)
 end function
 
+// Mirror Quake's Key_KeynumToString routine and its observable state changes.
 function Key_KeynumToString(keynum)
   return input.keyNameForCode(keynum)
 end function
 
+// Mirror Quake's Key_SetBinding routine and its observable state changes.
 function Key_SetBinding(keynum, binding)
   if keynum < 0 or keynum > 255 then return false end if
   return input.setBindingCode(keynum, binding)
 end function
 
+// Mirror Quake's Key_Unbind_f routine and its observable state changes.
 function Key_Unbind_f(arguments)
   if len(arguments) != 2 then return "unbind <key> : remove commands from a key" end if
   keynum = Key_StringToKeynum(arguments[1])
@@ -117,6 +133,7 @@ function Key_Unbind_f(arguments)
   return ""
 end function
 
+// Mirror Quake's Key_Unbindall_f routine and its observable state changes.
 function Key_Unbindall_f()
   keynum = 0
   while keynum < 256
@@ -126,6 +143,7 @@ function Key_Unbindall_f()
   return true
 end function
 
+// Mirror Quake's Key_Bind_f routine and its observable state changes.
 function Key_Bind_f(arguments)
   count = len(arguments)
   if count != 2 and count != 3 then return "bind <key> [command] : attach a command to a key" end if
@@ -140,6 +158,7 @@ function Key_Bind_f(arguments)
   return ""
 end function
 
+// Mirror Quake's Key_Bindlist_f routine and its observable state changes.
 function Key_Bindlist_f()
   result = ""
   keynum = 0
@@ -153,10 +172,12 @@ function Key_Bindlist_f()
   return result
 end function
 
+// Mirror Quake's Key_WriteBindings routine and its observable state changes.
 function Key_WriteBindings()
   return input.bindingText()
 end function
 
+// Initialize state for initialize shift table.
 function initializeShiftTable()
   global keyShift
   keyShift = identityValues(256)
@@ -188,6 +209,7 @@ function initializeShiftTable()
   keyShift[92] = 124
 end function
 
+// Mirror Quake's Key_Init routine and its observable state changes.
 function Key_Init()
   global keyLines, keyLinePos, editLine, historyLine
   global keyDest, keyCount, keyLastPress, shiftDown
@@ -246,6 +268,7 @@ function Key_Init()
   return true
 end function
 
+// Mirror Quake's Key_Console routine and its observable state changes.
 function Key_Console(key, state, commandSystem, registry, visibleRows)
   global editLine, historyLine, keyLinePos, keyLines
   if key == K_ENTER then
@@ -326,6 +349,7 @@ function Key_Console(key, state, commandSystem, registry, visibleRows)
   return ""
 end function
 
+// Mirror Quake's Key_Message routine and its observable state changes.
 function Key_Message(key)
   global keyDest, chatBuffer
   if key == K_ENTER then
@@ -351,6 +375,7 @@ function Key_Message(key)
   return ""
 end function
 
+// Provide plus release behavior for the active subsystem.
 function plusRelease(binding, key)
   if binding is void or binding == "" then return "" end if
   source = bytes(binding)
@@ -362,6 +387,7 @@ end function
 // intentionally small: menu policy stays in menu/host while key routing and
 // binding semantics remain wholly owned here.
 function Key_Event(key, down, consoleState, commandSystem, registry, forcedConsole, demoPlayback)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global keyCount, keyLastPress, shiftDown, keyRepeats, keyDownStates
   if key < 0 or key > 255 then return ["", "", key] end if
   if len(keyDownStates) != 256 then Key_Init() end if
@@ -419,6 +445,7 @@ function Key_Event(key, down, consoleState, commandSystem, registry, forcedConso
   return [Key_Console(routedKey, consoleState, commandSystem, registry, visibleRows), "", routedKey]
 end function
 
+// Mirror Quake's Key_ClearStates routine and its observable state changes.
 function Key_ClearStates()
   global keyRepeats, keyDownStates
   if len(keyDownStates) != 256 then Key_Init() end if
@@ -453,12 +480,14 @@ function Key_ReleaseAllCommands()
   return queued
 end function
 
+// Mirror Quake's Key_QueueReleaseAllCommands routine and its observable state changes.
 function Key_QueueReleaseAllCommands()
   global pendingReleaseCommands
   pendingReleaseCommands = pendingReleaseCommands + Key_ReleaseAllCommands()
   return len(bytes(pendingReleaseCommands))
 end function
 
+// Mirror Quake's Key_TakePendingCommands routine and its observable state changes.
 function Key_TakePendingCommands()
   global pendingReleaseCommands
   queued = pendingReleaseCommands
@@ -466,6 +495,7 @@ function Key_TakePendingCommands()
   return queued
 end function
 
+// Provide hardware key codes behavior for the active subsystem.
 function hardwareKeyCodes()
   result = [K_TAB, K_ENTER, K_ESCAPE, K_SPACE, K_BACKSPACE]
   code = 97

@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse,hashlib,json,os,shutil,struct,subprocess,tempfile
 from pathlib import Path
 PACKAGE_ID='BP-021';PARENT_PACKAGE_ID='BP-020';SCHEMA='MiniQuakeQuakeCVMGolden/1';REPORT='MiniQuakeBP021QuakeCVMVerification/1';GOLDEN='audit/quakec_vm_golden.json';ORACLE='tools/oracle/quakec_vm_oracle.c'
+RUNTIME_FIXTURES=16
 def sha(p):return hashlib.sha256(Path(p).read_bytes()).hexdigest()
 def fbits(v):return struct.unpack('<I',struct.pack('<f',v))[0]
 def rows():return [
@@ -34,7 +35,7 @@ def contract(root):
   if m not in vm:errors.append('missing VM marker: '+m)
  if 'machine.builtins = [unexpectedBuiltinZero, enableTrace]' not in tests:errors.append('builtin #1 fixture does not retain the historical slot-zero entry')
  if 'firstStatement=-1 denotes builtin slot 1' not in tests:errors.append('builtin slot mapping regression comment is missing')
- if tests.count('if run(')!=16 or 'MiniQuake BP-021 QuakeC VM tests passed: 16' not in tests:errors.append('expected 16 BP-021 fixtures')
+ if tests.count('if run(')!=RUNTIME_FIXTURES or f'MiniQuake BP-021 QuakeC VM tests passed: {RUNTIME_FIXTURES}' not in tests:errors.append(f'expected {RUNTIME_FIXTURES} BP-021 fixtures')
  if vm.count('setWord(machine, op.OFS_RETURN')<3:errors.append('three-word return copy is not visible')
  return errors
 def main():
@@ -46,9 +47,9 @@ def main():
  ok,detail,actual=run_oracle(root)
  if not ok:errors.append('C oracle failed: '+detail)
  elif actual and actual!=doc['rows']:errors.append('C oracle differs from Python model')
- errors+=contract(root);report={'schema':REPORT,'package_id':PACKAGE_ID,'parent_package_id':PARENT_PACKAGE_ID,'ok':not errors,'oracle':detail,'rows':len(doc['rows']),'runtime_fixtures':16,'errors':errors}
+ errors+=contract(root);report={'schema':REPORT,'package_id':PACKAGE_ID,'parent_package_id':PARENT_PACKAGE_ID,'ok':not errors,'oracle':detail,'rows':len(doc['rows']),'runtime_fixtures':RUNTIME_FIXTURES,'errors':errors}
  if a.json_output:Path(a.json_output).write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
- print('MiniQuake BP-021 QuakeC VM verification: '+('PASS' if not errors else 'FAIL'));print(f'  rows={len(doc["rows"])} runtime_fixtures=16 oracle={detail}')
+ print('MiniQuake BP-021 QuakeC VM verification: '+('PASS' if not errors else 'FAIL'));print(f'  rows={len(doc["rows"])} runtime_fixtures={RUNTIME_FIXTURES} oracle={detail}')
  for e in errors:print('  ERROR: '+e)
  return 0 if not errors else 1
 if __name__=='__main__':raise SystemExit(main())

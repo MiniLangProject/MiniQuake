@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.player_move.
+*/
 package miniquake.player_move
 
 import miniquake.types as t
@@ -5,10 +12,12 @@ import miniquake.constants as c
 import miniquake.mathlib as math
 import miniquake.world_bsp as world
 
+// Create the zero-initialized state for vector.
 function zeroVector()
   return t.Vec3(0.0, 0.0, 0.0)
 end function
 
+// Create and initialize the module state.
 function create(origin, angles)
   return t.PlayerState(
     math.copy(origin),
@@ -35,7 +44,7 @@ function create(origin, angles)
     false,
     false,
     c.FL_CLIENT,
-    -1,
+    0,
     c.CONTENTS_EMPTY,
     zeroVector(),
     false,
@@ -46,6 +55,7 @@ function create(origin, angles)
   )
 end function
 
+// Trace velocity through the collision world.
 function clipVelocity(input, normal, overbounce)
   backoff = math.dot(input, normal) * overbounce
   output = t.Vec3(
@@ -59,10 +69,12 @@ function clipVelocity(input, normal, overbounce)
   return output
 end function
 
+// Provide horizontal speed behavior for the active subsystem.
 function horizontalSpeed(velocity)
   return math.length(t.Vec3(velocity.x, velocity.y, 0.0))
 end function
 
+// Validate water and report any incompatibility.
 function checkWater(player, map)
   point = t.Vec3(player.origin.x, player.origin.y, player.origin.z + player.mins.z + 1.0)
   player.waterLevel = 0
@@ -79,6 +91,7 @@ function checkWater(player, map)
   return player.waterLevel > 1
 end function
 
+// Validate ground and report any incompatibility.
 function checkGround(player, map)
   finish = t.Vec3(player.origin.x, player.origin.y, player.origin.z - 2.0)
   trace = world.trace(map, player.origin, player.mins, player.maxs, finish)
@@ -87,6 +100,7 @@ function checkGround(player, map)
   return player.onGround
 end function
 
+// Provide user friction behavior for the active subsystem.
 function userFriction(player, map, frameTime, friction, edgeFriction, stopSpeed)
   speed = horizontalSpeed(player.velocity)
   if speed == 0.0 then return player end if
@@ -112,6 +126,7 @@ function userFriction(player, map, frameTime, friction, edgeFriction, stopSpeed)
   return player
 end function
 
+// Provide accelerate behavior for the active subsystem.
 function accelerate(player, wishDirection, wishSpeed, frameTime, acceleration)
   currentSpeed = math.dot(player.velocity, wishDirection)
   addSpeed = wishSpeed - currentSpeed
@@ -122,6 +137,7 @@ function accelerate(player, wishDirection, wishSpeed, frameTime, acceleration)
   return player
 end function
 
+// Provide air accelerate behavior for the active subsystem.
 function airAccelerate(player, wishVelocity, wishSpeed, frameTime, acceleration)
   direction = math.normalize(wishVelocity)
   limitedSpeed = math.length(wishVelocity)
@@ -135,6 +151,7 @@ function airAccelerate(player, wishVelocity, wishSpeed, frameTime, acceleration)
   return player
 end function
 
+// Provide water move behavior for the active subsystem.
 function waterMove(player, command, frameTime)
   vectors = math.angleVectors(player.viewAngles)
   forward = vectors[0]
@@ -174,6 +191,7 @@ function waterMove(player, command, frameTime)
   return player
 end function
 
+// Provide wish move behavior for the active subsystem.
 function wishMove(player, command, frameTime, map)
   movementAngles = t.Vec3(0.0, player.viewAngles.y, 0.0)
   vectors = math.angleVectors(movementAngles)
@@ -203,7 +221,9 @@ function wishMove(player, command, frameTime, map)
   return player
 end function
 
+// Provide slide move behavior for the active subsystem.
 function slideMove(player, map, frameTime)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   originalVelocity = math.copy(player.velocity)
   primalVelocity = math.copy(player.velocity)
   planes = []
@@ -276,6 +296,7 @@ function slideMove(player, map, frameTime)
   return blocked
 end function
 
+// Provide walk move behavior for the active subsystem.
 function walkMove(player, map, frameTime)
   wasOnGround = player.onGround
   oldOrigin = math.copy(player.origin)
@@ -315,6 +336,7 @@ function walkMove(player, map, frameTime)
   return blocked
 end function
 
+// Apply command to the active subsystem state.
 function applyCommand(player, map, command, frameTime)
   player.viewAngles = math.copy(command.viewAngles)
   player.renderAngles.x = -player.viewAngles.x / 3.0
@@ -348,14 +370,17 @@ function applyCommand(player, map, command, frameTime)
   return player
 end function
 
+// Return camera origin derived from the active module state.
 function cameraOrigin(player)
   return t.Vec3(player.origin.x, player.origin.y, player.origin.z + player.viewHeight)
 end function
 
+// Create and initialize player.
 function createPlayer(origin, angles)
   return create(origin, angles)
 end function
 
+// Transfer data for move.
 function move(player, map, command, frameTime, registry)
   return applyCommand(player, map, command, frameTime)
 end function

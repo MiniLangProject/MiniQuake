@@ -1,7 +1,9 @@
 /*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
 MiniLang side of reference/harness/sv_move_oracle.c.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.native as native
@@ -17,6 +19,7 @@ struct MoveDifferentialMap
   leafs
 end struct
 
+// Exercise differential move map as part of this deterministic regression fixture.
 function differentialMoveMap(backContents, frontContents)
   plane = t.BspPlane(t.Vec3(0.0, 0.0, 1.0), 0.0, 2)
   node = t.BspNode(0, -2, -1, t.Vec3(-256.0, -256.0, -256.0), t.Vec3(256.0, 256.0, 256.0), 0, 0)
@@ -40,6 +43,7 @@ function differentialMoveMap(backContents, frontContents)
   )
 end function
 
+// Exercise differential move fields as part of this deterministic regression fixture.
 function differentialMoveFields()
   return [
     t.QuakeCDef(c.EV_VOID, 0, 0, ""),
@@ -59,6 +63,7 @@ function differentialMoveFields()
   ]
 end function
 
+// Exercise differential move fixture as part of this deterministic regression fixture.
 function differentialMoveFixture(map)
   dummy = t.QuakeCFunction(0, 0, 0, 0, "", "", 0, [])
   program = t.QuakeCProgram(
@@ -92,6 +97,7 @@ function differentialMoveFixture(map)
   return game
 end function
 
+// Exercise differential set move entity as part of this deterministic regression fixture.
 function differentialSetMoveEntity(machine, index, origin, flags)
   vm.setEntityVector(machine, index, 1, origin)
   vm.setEntityVector(machine, index, 4, t.Vec3(0.0, 0.0, 0.0))
@@ -107,15 +113,18 @@ function differentialSetMoveEntity(machine, index, origin, flags)
   vm.setEntityFloat(machine, index, 20, 360.0)
 end function
 
+// Return differential move number derived from the active module state.
 function differentialMoveNumber(value)
   return native.floatText(value)
 end function
 
+// Exercise differential move result as part of this deterministic regression fixture.
 function differentialMoveResult(value)
   if value then return 1 end if
   return 0
 end function
 
+// Add move to the destination state.
 function emitMove(machine, functionName, caseName, result, entityIndex)
   origin = vm.entityVector(machine, entityIndex, 1)
   angles = vm.entityVector(machine, entityIndex, 4)
@@ -128,6 +137,7 @@ function emitMove(machine, functionName, caseName, result, entityIndex)
     ",\"ground\":" + vm.entityField(machine, entityIndex, 16) + "}"
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   floorMap = differentialMoveMap(c.CONTENTS_SOLID, c.CONTENTS_EMPTY)
   emptyMap = differentialMoveMap(c.CONTENTS_EMPTY, c.CONTENTS_EMPTY)

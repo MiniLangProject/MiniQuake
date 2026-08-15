@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.render.gl_rmisc.
+*/
 package miniquake.render.gl_rmisc
 
 import miniquake.array_util as arrayutil
@@ -43,6 +50,7 @@ rmiscColors = 0
 rmiscMaxSize = 4
 rmiscPlayerMip = 0
 
+// Update module state for compatibility.
 function ResetCompatibility()
   global r_notexture_mip, r_notexture_mips, r_notexture_offsets
   global particletexture, texture_extension_number, playertextures, envmap
@@ -90,6 +98,7 @@ function ResetCompatibility()
   return true
 end function
 
+// Apply the Quake-compatible r init textures behavior.
 function R_InitTextures()
   global r_notexture_mip, r_notexture_mips, r_notexture_offsets
   sizes = [16, 8, 4, 2]
@@ -123,6 +132,7 @@ function R_InitTextures()
   return combined
 end function
 
+// Apply the Quake-compatible r init particle texture behavior.
 function R_InitParticleTexture()
   global particletexture, texture_extension_number, rmiscParticlePixels
   global rmiscBoundTexture, rmiscUploadWidth, rmiscUploadHeight
@@ -159,6 +169,7 @@ function R_InitParticleTexture()
   return particletexture
 end function
 
+// Apply the Quake-compatible r envmap f behavior.
 function R_Envmap_f()
   global envmap, rmiscEnvDirections, rmiscRenderViews
   global rmiscLastDrawBuffer, rmiscEndRendering
@@ -174,6 +185,7 @@ function R_Envmap_f()
   return rmiscEnvDirections
 end function
 
+// Apply the Quake-compatible r init behavior.
 function R_Init(multitexture)
   global rmiscCommands, rmiscCvars, rmiscInitParticles
   global playertextures, texture_extension_number
@@ -188,6 +200,7 @@ function R_Init(multitexture)
   return textureSort
 end function
 
+// Update module state for player skin compatibility.
 function SetPlayerSkinCompatibility(width, height, pixels, colors, maxSize, playerMip)
   global rmiscSkinWidth, rmiscSkinHeight, rmiscSkin, rmiscColors
   global rmiscMaxSize, rmiscPlayerMip
@@ -200,12 +213,14 @@ function SetPlayerSkinCompatibility(width, height, pixels, colors, maxSize, play
   return true
 end function
 
+// Update module state for player texture base.
 function SetPlayerTextureBase(value)
   global playertextures
   playertextures = value
   return playertextures
 end function
 
+// Return translated index derived from the active module state.
 function translatedIndex(value, top, bottom)
   if value >= c.TOP_RANGE and value < c.TOP_RANGE + 16 then
     offset = value - c.TOP_RANGE
@@ -220,7 +235,9 @@ function translatedIndex(value, top, bottom)
   return value
 end function
 
+// Apply the Quake-compatible r translate player skin behavior.
 function R_TranslatePlayerSkin(playernum)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global rmiscSkinPixels, rmiscBoundTexture, rmiscUploadWidth, rmiscUploadHeight
   if rmiscSkinWidth <= 0 or rmiscSkinHeight <= 0 or len(rmiscSkin) < rmiscSkinWidth * rmiscSkinHeight then return false end if
   top = rmiscColors & 0xf0
@@ -260,6 +277,7 @@ function R_TranslatePlayerSkin(playernum)
   return true
 end function
 
+// Update module state for new map compatibility.
 function SetNewMapCompatibility(textureNames, leafCount)
   global rmiscTextureNames, rmiscLeafCount
   rmiscTextureNames = textureNames
@@ -267,6 +285,7 @@ function SetNewMapCompatibility(textureNames, leafCount)
   return true
 end function
 
+// Initialize state for starts with.
 function startsWith(value, prefix)
   left = bytes(value)
   right = bytes(prefix)
@@ -279,6 +298,7 @@ function startsWith(value, prefix)
   return true
 end function
 
+// Apply the Quake-compatible r new map behavior.
 function R_NewMap()
   global rmiscLightStyles, rmiscSkyTexture, rmiscMirrorTexture
   global rmiscClearParticles, rmiscBuildLightmaps
@@ -297,6 +317,7 @@ function R_NewMap()
   return true
 end function
 
+// Apply the Quake-compatible r time refresh f behavior.
 function R_TimeRefresh_f()
   global rmiscRenderViews, rmiscLastYaw, rmiscLastDrawBuffer
   global rmiscEndRendering
@@ -307,30 +328,37 @@ function R_TimeRefresh_f()
   return [2.0, 64.0]
 end function
 
+// Mirror Quake's D_FlushCaches routine and its observable state changes.
 function D_FlushCaches()
   return void
 end function
 
+// Return texture state.
 function GetTextureState()
   return [r_notexture_offsets, r_notexture_mip]
 end function
 
+// Return particle state.
 function GetParticleState()
   return [particletexture, texture_extension_number, rmiscBoundTexture, rmiscUploadWidth, rmiscUploadHeight, rmiscParticlePixels]
 end function
 
+// Return init state.
 function GetInitState()
   return [rmiscCommands, rmiscCvars, rmiscInitParticles, playertextures, texture_extension_number]
 end function
 
+// Return skin state.
 function GetSkinState()
   return [rmiscBoundTexture, rmiscUploadWidth, rmiscUploadHeight, rmiscSkinPixels]
 end function
 
+// Return new map state.
 function GetNewMapState()
   return [rmiscLightStyles, rmiscLeafCount, rmiscSkyTexture, rmiscMirrorTexture, rmiscClearParticles, rmiscBuildLightmaps]
 end function
 
+// Return refresh state.
 function inline GetRefreshState()
   return [rmiscRenderViews, rmiscLastYaw, rmiscLastDrawBuffer, rmiscEndRendering]
 end function

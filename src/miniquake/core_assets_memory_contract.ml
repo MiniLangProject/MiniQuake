@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang implementation of miniquake.core_assets_memory_contract.
+*/
 package miniquake.core_assets_memory_contract
 
 const STATUS = "core_assets_memory_109_frozen_v1"
@@ -17,6 +24,7 @@ const CACHE_NAME_BYTES = 15
 const ZONE_DYNAMIC_SIZE = 0xc000
 const RETAIL_EVIDENCE_FILES = 4
 
+// Report whether canonical text.
 function canonicalText()
   return STATUS + "\n" +
     "common_q_atof_binary32=1\n" +
@@ -38,6 +46,7 @@ function canonicalText()
     "retail_evidence_files=4\n"
 end function
 
+// Provide fnv1a32 behavior for the active subsystem.
 function fnv1a32(text)
   data = bytes(text)
   value = 0x811c9dc5
@@ -49,6 +58,7 @@ function fnv1a32(text)
   return value
 end function
 
+// Validate the requested value and report any invalid state.
 function verify()
   if fnv1a32(canonicalText()) != FINGERPRINT then return error(10740, "core assets/memory fingerprint mismatch") end if
   if PAK_ENTRY_BYTES != 64 or PACK_NAME_BYTES != 56 or MAX_PACK_FILES != 2048 then return error(10741, "PACK contract mismatch") end if

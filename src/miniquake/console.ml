@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.console.
+*/
 package miniquake.console
 
 import miniquake.types as t
@@ -15,6 +22,7 @@ backscrollLines = 0
 notifyBoxWaiting = false
 notifyBoxSawDown = false
 
+// Return filled bytes derived from the active module state.
 function filledBytes(count, value)
   output = bytes(count)
   index = 0
@@ -25,10 +33,12 @@ function filledBytes(count, value)
   return output
 end function
 
+// Create the zero-initialized state for times.
 function zeroTimes()
   return [0.0, 0.0, 0.0, 0.0]
 end function
 
+// Create and initialize the module state.
 function create(maxLines)
   if maxLines < 32 then maxLines = 32 end if
   state = t.ConsoleState(
@@ -67,10 +77,12 @@ function create(maxLines)
   return state
 end function
 
+// Provide backscroll behavior for the active subsystem.
 function inline backscroll()
   return backscrollLines
 end function
 
+// Update module state for backscroll.
 function setBackscroll(value)
   global backscrollLines
   if value < 0 then value = 0 end if
@@ -78,6 +90,7 @@ function setBackscroll(value)
   return backscrollLines
 end function
 
+// Provide adjust backscroll behavior for the active subsystem.
 function adjustBackscroll(state, delta, visibleRows)
   maximum = state.lineCount - visibleRows
   if maximum < 0 then maximum = 0 end if
@@ -87,11 +100,13 @@ function adjustBackscroll(state, delta, visibleRows)
   return setBackscroll(value)
 end function
 
+// Mirror Quake's Con_ClearNotify routine and its observable state changes.
 function Con_ClearNotify(state)
   state.notifyTimes = zeroTimes()
   return true
 end function
 
+// Mirror Quake's Con_CheckResize routine and its observable state changes.
 function Con_CheckResize(state, pixelWidth)
   // con_x is deliberately not reset by MiniQuake's Con_CheckResize.  A resize
   // reformats the circular backing store but the next printed byte continues
@@ -142,6 +157,7 @@ function Con_CheckResize(state, pixelWidth)
   return true
 end function
 
+// Mirror Quake's Con_Init routine and its observable state changes.
 function Con_Init(state, filesystem, pixelWidth, debugLog)
   state.filesystem = filesystem
   state.debugLog = debugLog
@@ -159,6 +175,7 @@ function Con_Init(state, filesystem, pixelWidth, debugLog)
   return ["toggleconsole", "messagemode", "messagemode2", "clear"]
 end function
 
+// Mirror Quake's Con_Linefeed routine and its observable state changes.
 function Con_Linefeed(state)
   state.cursorX = 0
   state.currentLine = state.currentLine + 1
@@ -173,6 +190,7 @@ function Con_Linefeed(state)
   return state.currentLine
 end function
 
+// Return line bytes derived from the active module state.
 function lineBytes(state, logicalLine)
   output = bytes(state.lineWidth)
   sourceLine = logicalLine % state.totalLines
@@ -186,6 +204,7 @@ function lineBytes(state, logicalLine)
   return output
 end function
 
+// Provide printable line behavior for the active subsystem.
 function printableLine(raw)
   endIndex = len(raw)
   while endIndex > 0 and (raw[endIndex - 1] & 127) == 32
@@ -202,6 +221,7 @@ function printableLine(raw)
   return decode(output)
 end function
 
+// Update module state for lines.
 function syncLines(state)
   count = state.lineCount
   if state.maxLines < count then count = state.maxLines end if
@@ -217,7 +237,9 @@ function syncLines(state)
   return state.lines
 end function
 
+// Mirror Quake's Con_Print routine and its observable state changes.
 function Con_Print(state, text, realtime)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   state.realtime = realtime
   setBackscroll(0)
   source = bytes(text)
@@ -266,12 +288,14 @@ function Con_Print(state, text, realtime)
   return len(source)
 end function
 
+// Mirror Quake's Con_DebugLog routine and its observable state changes.
 function Con_DebugLog(state, filename, text)
   if state.filesystem is void then return false end if
   written = try(fs.appendAllText(qfs.gamePath(state.filesystem, filename), text))
   return written is not error
 end function
 
+// Mirror Quake's Con_Printf routine and its observable state changes.
 function Con_Printf(state, message, dedicated, loadingDisabled)
   // Sys_Printf's side effect remains visible in every mode.
   print message
@@ -282,11 +306,13 @@ function Con_Printf(state, message, dedicated, loadingDisabled)
   return true
 end function
 
+// Mirror Quake's Con_DPrintf routine and its observable state changes.
 function Con_DPrintf(state, message, developer, dedicated, loadingDisabled)
   if not developer then return false end if
   return Con_Printf(state, message, dedicated, loadingDisabled)
 end function
 
+// Mirror Quake's Con_SafePrintf routine and its observable state changes.
 function Con_SafePrintf(state, message, dedicated)
   state.safePrintDepth = state.safePrintDepth + 1
   result = Con_Printf(state, message, dedicated, true)
@@ -294,6 +320,7 @@ function Con_SafePrintf(state, message, dedicated)
   return result
 end function
 
+// Mirror Quake's Con_Clear_f routine and its observable state changes.
 function Con_Clear_f(state)
   // console.c only blanks con_text.  Cursor position, carriage-return state,
   // notify history and scroll position remain untouched.
@@ -302,10 +329,12 @@ function Con_Clear_f(state)
   return true
 end function
 
+// Update module state for the requested operation.
 function clear(state)
   return Con_Clear_f(state)
 end function
 
+// Mirror Quake's Con_ToggleConsole_f routine and its observable state changes.
 function Con_ToggleConsole_f(state, connected)
   Con_ClearNotify(state)
   state.notifyUntil = 0.0
@@ -322,27 +351,32 @@ function Con_ToggleConsole_f(state, connected)
   return "console"
 end function
 
+// Update subsystem configuration for toggle.
 function toggle(state)
   state.active = not state.active
   Con_ClearNotify(state)
   return state.active
 end function
 
+// Update module state for active.
 function setActive(state, active)
   state.active = active
   return state.active
 end function
 
+// Mirror Quake's Con_MessageMode_f routine and its observable state changes.
 function Con_MessageMode_f(state)
   state.active = false
   return false
 end function
 
+// Mirror Quake's Con_MessageMode2_f routine and its observable state changes.
 function Con_MessageMode2_f(state)
   state.active = false
   return true
 end function
 
+// Mirror Quake's Con_DrawInput routine and its observable state changes.
 function Con_DrawInput(state, realtime)
   if not state.active and not state.forcedUp then return [] end if
   cursor = 10 + (native.trunc(realtime * 4.0) & 1)
@@ -360,6 +394,7 @@ function Con_DrawInput(state, realtime)
   return output
 end function
 
+// Mirror Quake's Con_NotifyRows routine and its observable state changes.
 function Con_NotifyRows(state, realtime, notifyTime)
   rows = []
   first = state.currentLine - NUM_CON_TIMES + 1
@@ -374,6 +409,7 @@ function Con_NotifyRows(state, realtime, notifyTime)
   return rows
 end function
 
+// Mirror Quake's Con_DrawNotify routine and its observable state changes.
 function Con_DrawNotify(state, realtime, notifyTime, messageMode, chatText)
   rows = Con_NotifyRows(state, realtime, notifyTime)
   commands = []
@@ -392,6 +428,7 @@ function Con_DrawNotify(state, realtime, notifyTime, messageMode, chatText)
   return commands
 end function
 
+// Mirror Quake's Con_ConsoleRows routine and its observable state changes.
 function Con_ConsoleRows(state, pixelLines)
   rows = native.trunc((pixelLines - 16) / 8)
   if rows < 0 then rows = 0 end if
@@ -406,6 +443,7 @@ function Con_ConsoleRows(state, pixelLines)
   return output
 end function
 
+// Mirror Quake's Con_DrawConsole routine and its observable state changes.
 function Con_DrawConsole(state, pixelLines, drawInput, realtime)
   if pixelLines <= 0 then return [] end if
   state.visiblePixelLines = pixelLines
@@ -421,6 +459,7 @@ function Con_DrawConsole(state, pixelLines, drawInput, realtime)
   return commands
 end function
 
+// Mirror Quake's Con_NotifyBox routine and its observable state changes.
 function Con_NotifyBox(state, text)
   global notifyBoxWaiting, notifyBoxSawDown
   border = decode(bytes([29, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 31]))
@@ -436,10 +475,12 @@ function Con_NotifyBox(state, text)
   return true
 end function
 
+// Mirror Quake's Con_NotifyBoxPending routine and its observable state changes.
 function inline Con_NotifyBoxPending()
   return notifyBoxWaiting
 end function
 
+// Mirror Quake's Con_NotifyBoxKey routine and its observable state changes.
 function Con_NotifyBoxKey(state, down)
   global notifyBoxWaiting, notifyBoxSawDown
   if not notifyBoxWaiting then return false end if
@@ -457,6 +498,7 @@ function Con_NotifyBoxKey(state, down)
   return true
 end function
 
+// Mirror Quake's Con_CancelNotifyBox routine and its observable state changes.
 function Con_CancelNotifyBox(state)
   global notifyBoxWaiting, notifyBoxSawDown
   notifyBoxWaiting = false
@@ -465,6 +507,7 @@ function Con_CancelNotifyBox(state)
   return true
 end function
 
+// Mirror Quake's Con_Print_f routine and its observable state changes.
 function Con_Print_f(state, arguments)
   text = ""
   index = 1
@@ -476,26 +519,31 @@ function Con_Print_f(state, arguments)
   return Con_Printf(state, text + "\n", state.dedicated, false)
 end function
 
+// Mirror Quake's Con_LogCenterPrint routine and its observable state changes.
 function Con_LogCenterPrint(state, text, realtime)
   Con_Print(state, "\n\n" + text + "\n\n", realtime)
   state.centerText = text
   return true
 end function
 
+// Mirror Quake's Con_Notify routine and its observable state changes.
 function Con_Notify(state, text)
   return Con_NotifyBox(state, text)
 end function
 
+// Add state for append line.
 function appendLine(state, text)
   Con_Print(state, text + "\n", state.realtime)
   return len(state.lines)
 end function
 
+// Add state for append.
 function append(state, text)
   Con_Print(state, text, state.realtime)
   return len(state.lines)
 end function
 
+// Provide trim oldest behavior for the active subsystem.
 function trimOldest(lines, maximum)
   if len(lines) <= maximum then return lines end if
   result = arrays.makeEmptyArray(maximum)
@@ -509,6 +557,7 @@ function trimOldest(lines, maximum)
   return result
 end function
 
+// Report whether visible lines holds for the active state.
 function visibleLines(state, count)
   if count <= 0 then return [] end if
   start = len(state.lines) - count - backscrollLines
@@ -524,11 +573,13 @@ function visibleLines(state, count)
   return result
 end function
 
+// Update module state for input.
 function setInput(state, text)
   state.inputText = text
   return text
 end function
 
+// Add state for append character.
 function appendCharacter(state, code)
   if code < 32 or code > 126 then return false end if
   if len(bytes(state.inputText)) >= MAXCMDLINE - 2 then return false end if
@@ -536,6 +587,7 @@ function appendCharacter(state, code)
   return true
 end function
 
+// Provide backspace behavior for the active subsystem.
 function backspace(state)
   data = bytes(state.inputText)
   if len(data) == 0 then return false end if
@@ -543,12 +595,14 @@ function backspace(state)
   return true
 end function
 
+// Consume pending state for take input.
 function takeInput(state)
   text = state.inputText
   state.inputText = ""
   return text
 end function
 
+// Provide center print behavior for the active subsystem.
 function centerPrint(state, text, currentTime, duration)
   state.centerText = text
   state.centerUntil = currentTime + duration
@@ -556,6 +610,7 @@ function centerPrint(state, text, currentTime, duration)
   return true
 end function
 
+// Update module state for expired center.
 function clearExpiredCenter(state, currentTime)
   if state.centerUntil > 0.0 and currentTime >= state.centerUntil then
     state.centerText = ""
@@ -564,11 +619,13 @@ function clearExpiredCenter(state, currentTime)
   return state.centerText
 end function
 
+// Mirror Quake's Con_SetRealtime routine and its observable state changes.
 function Con_SetRealtime(state, realtime)
   state.realtime = realtime
   return realtime
 end function
 
+// Mirror Quake's Con_CommandTrace routine and its observable state changes.
 function Con_CommandTrace(state)
   return state.drawTrace
 end function

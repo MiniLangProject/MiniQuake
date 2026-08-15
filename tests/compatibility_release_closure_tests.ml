@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/compatibility_release_closure_tests.ml.
+*/
 import miniquake.compatibility_matrix as matrix
 import miniquake.game_profile as profile
 import miniquake.mod_compat as modcompat
@@ -7,6 +13,7 @@ import miniquake.stability_contract as stability
 passed = 0
 failed = 0
 
+// Assert that the condition holds and identify a failing test.
 function bp089Check(condition, label)
   global passed, failed
   if condition then passed = passed + 1; return true end if
@@ -15,10 +22,12 @@ function bp089Check(condition, label)
   return false
 end function
 
+// Assert exact equality and report both values on failure.
 function bp089Equal(actual, expected, label)
   return bp089Check(actual == expected, label + ": expected " + expected + ", got " + actual)
 end function
 
+// Exercise the contains test scenario and verify its expected result.
 function bp089Contains(values, wanted)
   for each value in values
     if value == wanted then return true end if
@@ -26,6 +35,7 @@ function bp089Contains(values, wanted)
   return false
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   global passed, failed
   print "[1/24] status"

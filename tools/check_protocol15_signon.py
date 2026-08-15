@@ -77,7 +77,7 @@ def source_contract(root: Path) -> list[str]:
     tests = (root / "tests/protocol15_signon_e2e_tests.ml").read_text(encoding="utf-8")
     required = {
         "unmasked high color argument": "(colorValue >> 4)",
-        "queued client reply": "return true\nend function\n\nfunction applyEvent",
+        "queued client reply": "return true\nend function\n\n// Process apply event.\nfunction applyEvent",
         "queued prespawn": "client.sendSignon = true",
         "spawn embedded message": "buffer = client.message",
         "success marker": "MiniQuake BP-015 Protocol 15 signon tests passed: 12",

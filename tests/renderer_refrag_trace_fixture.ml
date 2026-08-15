@@ -1,16 +1,20 @@
 /*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
 Deterministic MiniLang side of the original gl_refrag.c differential oracle.
 */
-
 import miniquake.render.gl_refrag as refrag
 import miniquake.render.entities as entities
 import miniquake.types as t
 import miniquake.constants as c
 
+// Add the requested value to the destination state.
 function emit(scene, functionName, operation, arguments)
   print "{\"schema\":\"miniquake.renderer.gl.v1\",\"scene\":\"" + scene + "\",\"function\":\"" + functionName + "\",\"seq\":0,\"op\":\"" + operation + "\",\"args\":" + arguments + "}"
 end function
 
+// Create and initialize entity.
 function makeEntity(number)
   zero = t.Vec3(0.0, 0.0, 0.0)
   return t.ClientEntityState(
@@ -19,6 +23,7 @@ function makeEntity(number)
   )
 end function
 
+// Create and initialize setup.
 function makeSetup()
   zero = t.Vec3(0.0, 0.0, 0.0)
   minimum = t.Vec3(-1.0, -1.0, -1.0)
@@ -37,8 +42,8 @@ function makeSetup()
   renderer = t.WorldRenderer(
     map, bytes(), [], [], [], true, 0, false, false, 0, bytes(), 0, 1.0
   )
-  noneModel = t.ClientRenderModel("", entities.MODEL_NONE, void, void, [], false)
-  brushModel = t.ClientRenderModel("*1", entities.MODEL_BRUSH, void, void, [], false)
+  noneModel = t.ClientRenderModel("", entities.MODEL_NONE, void, void, void, [], false)
+  brushModel = t.ClientRenderModel("*1", entities.MODEL_BRUSH, void, void, void, [], false)
   entityRenderer = t.EntityRenderer(void, bytes(), [noneModel, brushModel], 0)
   first = makeEntity(0)
   second = makeEntity(1)
@@ -46,6 +51,7 @@ function makeSetup()
   return [first, second]
 end function
 
+// Trace remove through the collision world.
 function traceRemove()
   setup = makeSetup()
   refrag.R_AddEfrags(setup[0])
@@ -54,6 +60,7 @@ function traceRemove()
   emit("refrag_remove", "R_RemoveEfrags", "state", "[" + state[0] + "," + state[2][0] + "," + state[2][1] + ",1]")
 end function
 
+// Trace split through the collision world.
 function traceSplit()
   setup = makeSetup()
   refrag.SetSplitState(
@@ -66,6 +73,7 @@ function traceSplit()
   emit("refrag_split", "R_SplitEntityOnNode", "state", "[" + state[0] + "," + topIsRoot + "," + state[2][0] + "," + state[2][1] + "]")
 end function
 
+// Trace add through the collision world.
 function traceAdd()
   setup = makeSetup()
   refrag.R_AddEfrags(setup[0])
@@ -75,6 +83,7 @@ function traceAdd()
   emit("refrag_add", "R_AddEfrags", "state", "[" + state[0] + "," + topIsRoot + "," + state[2][0] + "," + state[2][1] + "]")
 end function
 
+// Trace store through the collision world.
 function traceStore()
   setup = makeSetup()
   refrag.R_AddEfrags(setup[0])
@@ -83,6 +92,7 @@ function traceStore()
   emit("refrag_store", "R_StoreEfrags", "state", "[" + len(visible) + "]")
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   traceRemove()
   traceSplit()

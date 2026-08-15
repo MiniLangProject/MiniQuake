@@ -1,17 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See COPYING.
+Quake-compatible MiniLang implementation of src/main.ml.
 */
-
 import miniquake.constants as c
 import miniquake.build_info as buildInfo
 import miniquake.external_reference_contract as externalReference
@@ -41,12 +34,13 @@ import miniquake.filesystem as qfs
 import miniquake.sound.mixer as mixer
 import std.fs as fs
 
+// Format and emit usage.
 function printUsage()
   print "MiniQuake " + c.QUAKE_VERSION + " / protocol " + c.PROTOCOL_VERSION
   print "package " + buildInfo.PACKAGE_ID + " / profile " + buildInfo.COMPATIBILITY_PROFILE
   print "usage: MiniQuake.exe [-basedir PATH] [-game DIR] [+map MAP] [options]"
   print "       MiniQuake.exe COMMAND [arguments]"
-  print "renderer: -renderer opengl|direct3d9 (aliases: -opengl, -directx, -d3d9)"
+  print "renderer: -renderer opengl|direct3d9|vulkan (aliases: -opengl, -directx, -d3d9, -vulkan)"
   print ""
   print "Inspection and validation commands:"
   print "  --pak FILE                 inspect a Quake PACK archive"
@@ -97,26 +91,30 @@ function printUsage()
   print "                             100k-frame listen/dedicated/demo resource soak"
   print "  --opt001a-map-parse BASE MAP PREFIX [-game DIR]"
   print "                             parse a retail map and write start metrics"
-  print "  --opt001a-frame-baseline BASE MAP MODE WARMUP MEASURE PREFIX [-game DIR]"
-  print "                             record headless/render frame-time and stage baseline"
-  print "  --opt001a-handle-plateau BASE MAP WARMUP WINDOW WINDOWS PREFIX [-game DIR] [-port N]"
+  print "  --opt001a-frame-baseline BASE MAP MODE WARMUP MEASURE PREFIX [-game DIR] [-width N] [-height N]"
+  print "                             record headless/render/render-audio/demo/demo-audio frame-time"
+  print "  --opt001a-handle-plateau BASE MAP WARMUP WINDOW WINDOWS PREFIX [-game DIR] [-port N] [-renderer NAME]"
   print "                             classify process handles as STABLE, PLATEAU or LEAK"
-  print "  --opt001b-transition BASE FRAMES PREFIX [-game DIR]"
+  print "  --opt001b-transition BASE FRAMES PREFIX [-game DIR] [-renderer NAME]"
   print "                             render start -> e1m1 -> e1m2 -> e1m1 via changelevel"
+  print "  --renderer-switch-smoke BASE MAP FRAMES PREFIX [-game DIR]"
+  print "                             rebuild one live scene through OpenGL, D3D9 and Vulkan"
   print "  --udp-smoke [TIMEOUT_MS]   exchange a datagram through Winsock loopback"
   print "  --music-smoke BASE GAME TRACK"
   print "                             decode and mix an OGG replacement track"
-  print "  --play BASEDIR MAP         shorthand for -basedir BASEDIR +map MAP"
+  print "  --play BASEDIR [MAP]       start the original demo loop, or an optional map"
   print ""
   print "  --version                  print version information"
   print "  --help                     print this help"
 end function
 
+// Report the requested value and return the corresponding failure status.
 function fail(result)
   print "MiniQuake: " + result.message
   return 2
 end function
 
+// Inspect ogg and emit its decoded metadata.
 function inspectOgg(filename)
   data = fs.readAllBytes(filename)
   if native.oggOpen(data, len(data)) == 0 then return error(2414, "invalid Ogg Vorbis file " + filename) end if
@@ -135,6 +133,7 @@ function inspectOgg(filename)
   return 0
 end function
 
+// Provide music smoke behavior for the active subsystem.
 function musicSmoke(baseDirectory, gameDirectory, trackText)
   track = toNumber(trackText)
   if track is void then return error(2416, "invalid music track " + trackText) end if
@@ -143,17 +142,35 @@ function musicSmoke(baseDirectory, gameDirectory, trackText)
   soundMixer.enabled = true
   played = try(mixer.playMusic(soundMixer, native.trunc(track), true))
   if played is error then qfs.release(filesystem); return played end if
-  mixed = mixer.mix(soundMixer, 512)
   music = soundMixer.music
+  peak = 0
+  nonZero = 0
+  mixedFrames = 0
+  block = 0
+  while block < 24
+    mixed = mixer.mix(soundMixer, 512)
+    mixedFrames = mixedFrames + len(mixed) / 4
+    sampleOffset = 0
+    while sampleOffset < len(mixed)
+      sample = bio.i16(mixed, sampleOffset)
+      magnitude = sample
+      if magnitude < 0 then magnitude = -magnitude end if
+      if magnitude > peak then peak = magnitude end if
+      if sample != 0 then nonZero = nonZero + 1 end if
+      sampleOffset = sampleOffset + 2
+    end while
+    block = block + 1
+  end while
   print "MiniQuake OGG music smoke"
   print "  game=" + gameDirectory + " track=" + music.number
   print "  source=" + music.rate + "Hz channels=" + music.channels + " frames=" + music.frames
-  print "  mixed=" + (len(mixed) / 4) + " stereo frames first-pcm=" + bio.i16(mixed, 0)
+  print "  mixed=" + mixedFrames + " stereo frames peak=" + peak + " nonzero=" + nonZero
   mixer.stopMusic(soundMixer)
   qfs.release(filesystem)
   return 0
 end function
 
+// Inspect pack and emit its decoded metadata.
 function inspectPack(filename)
   archive = try(pak.load(filename))
   if archive is error then return fail(archive) end if
@@ -161,6 +178,7 @@ function inspectPack(filename)
   return 0
 end function
 
+// Inspect wad and emit its decoded metadata.
 function inspectWad(filename)
   archive = try(wad.load(filename))
   if archive is error then return fail(archive) end if
@@ -168,6 +186,7 @@ function inspectWad(filename)
   return 0
 end function
 
+// Inspect bsp and emit its decoded metadata.
 function inspectBsp(filename)
   map = try(bsp.load(filename))
   if map is error then return fail(map) end if
@@ -178,6 +197,7 @@ function inspectBsp(filename)
   return 0
 end function
 
+// Inspect mdl and emit its decoded metadata.
 function inspectMdl(filename)
   model = try(mdl.load(filename))
   if model is error then return fail(model) end if
@@ -187,6 +207,7 @@ function inspectMdl(filename)
   return 0
 end function
 
+// Inspect sprite and emit its decoded metadata.
 function inspectSprite(filename)
   model = try(sprite.load(filename))
   if model is error then return fail(model) end if
@@ -195,6 +216,7 @@ function inspectSprite(filename)
   return 0
 end function
 
+// Inspect progs and emit its decoded metadata.
 function inspectProgs(filename)
   program = try(progs.load(filename))
   if program is error then return fail(program) end if
@@ -204,6 +226,7 @@ function inspectProgs(filename)
   return 0
 end function
 
+// Inspect wav and emit its decoded metadata.
 function inspectWav(filename)
   loaded = try(wav.load(filename))
   if loaded is error then return fail(loaded) end if
@@ -213,6 +236,7 @@ function inspectWav(filename)
   return 0
 end function
 
+// Inspect demo and emit its decoded metadata.
 function inspectDemo(filename)
   recording = try(demo.load(filename))
   if recording is error then return fail(recording) end if
@@ -225,6 +249,7 @@ function inspectDemo(filename)
   return 0
 end function
 
+// Validate demo and report any invalid state.
 function verifyDemo(filename)
   recording = try(demo.load(filename))
   if recording is error then return fail(recording) end if
@@ -234,6 +259,7 @@ function verifyDemo(filename)
   return 2
 end function
 
+// Inspect message and emit its decoded metadata.
 function inspectMessage(filename)
   data = try(fs.readAllBytes(filename))
   if data is error then return fail(data) end if
@@ -246,6 +272,7 @@ function inspectMessage(filename)
   return 0
 end function
 
+// Validate game and report any incompatibility.
 function validateGame(arguments)
   options = launch.parse(arguments)
   report = try(gameValidation.validate(options))
@@ -254,6 +281,7 @@ function validateGame(arguments)
   return 2
 end function
 
+// Return a validated bounded integer value.
 function boundedInteger(text, fallback, minimum, maximum)
   value = toNumber(text)
   if value is void or value is not int then return fallback end if
@@ -262,6 +290,7 @@ function boundedInteger(text, fallback, minimum, maximum)
   return value
 end function
 
+// Provide game option behavior for the active subsystem.
 function gameOption(arguments)
   gameDirectory = "id1"
   index = 1
@@ -276,6 +305,7 @@ function gameOption(arguments)
   return gameDirectory
 end function
 
+// Provide integer named option behavior for the active subsystem.
 function integerNamedOption(arguments, name, fallback, minimum, maximum)
   index = 1
   while index + 1 < len(arguments)
@@ -287,6 +317,7 @@ function integerNamedOption(arguments, name, fallback, minimum, maximum)
   return fallback
 end function
 
+// Report whether named option.
 function hasNamedOption(arguments, name)
   wanted = bio.lower(name)
   for each argument in arguments
@@ -295,6 +326,7 @@ function hasNamedOption(arguments, name)
   return false
 end function
 
+// Provide named option behavior for the active subsystem.
 function namedOption(arguments, name, fallback)
   wanted = bio.lower(name)
   index = 1
@@ -305,6 +337,7 @@ function namedOption(arguments, name, fallback)
   return fallback
 end function
 
+// Return optional frame count derived from the active module state.
 function optionalFrameCount(arguments, index, fallback, maximum)
   if index >= len(arguments) then return fallback end if
   value = toNumber(arguments[index])
@@ -312,15 +345,18 @@ function optionalFrameCount(arguments, index, fallback, maximum)
   return boundedInteger(arguments[index], fallback, 1, maximum)
 end function
 
+// Provide headless arguments behavior for the active subsystem.
 function headlessArguments(baseDirectory, mapName, gameDirectory)
   return ["-basedir", baseDirectory, "-game", gameDirectory, "-headless", "-nosound", "+map", mapName]
 end function
 
+// Provide runtime smoke behavior for the active subsystem.
 function runtimeSmoke(arguments)
   frames = optionalFrameCount(arguments, 3, 120, 1000000)
   return host.runHeadlessFrames(headlessArguments(arguments[1], arguments[2], gameOption(arguments)), frames)
 end function
 
+// Execute runtime validation command.
 function runRuntimeValidationCommand(arguments)
   frames = optionalFrameCount(arguments, 3, 300, 1000000)
   report = runtimeValidation.validate(arguments[1], gameOption(arguments), arguments[2], frames)
@@ -328,6 +364,7 @@ function runRuntimeValidationCommand(arguments)
   return 2
 end function
 
+// Execute compatibility trace command.
 function runCompatibilityTraceCommand(arguments)
   frames = boundedInteger(arguments[3], 120, 1, 1000000)
   result = try(compatTrace.run(arguments[1], gameOption(arguments), arguments[2], frames, arguments[4]))
@@ -336,6 +373,7 @@ function runCompatibilityTraceCommand(arguments)
   return 3
 end function
 
+// Execute compatibility snapshot command.
 function runCompatibilitySnapshotCommand(arguments)
   frames = boundedInteger(arguments[3], 1, 1, 1000000)
   result = try(compatTrace.run(arguments[1], gameOption(arguments), arguments[2], frames, arguments[4]))
@@ -344,16 +382,19 @@ function runCompatibilitySnapshotCommand(arguments)
   return 3
 end function
 
+// Execute compatibility report command.
 function runCompatibilityReportCommand(path)
   if compatTrace.inspect(path) then return 0 end if
   return 2
 end function
 
+// Execute soak command.
 function runSoakCommand(arguments)
   frames = optionalFrameCount(arguments, 3, 10000, 2000000000)
   return host.runSoak(headlessArguments(arguments[1], arguments[2], gameOption(arguments)), frames)
 end function
 
+// Execute long soak command.
 function runLongSoakCommand(arguments)
   mode = bio.lower(arguments[1])
   frames = optionalFrameCount(arguments, 4, 100000, 2000000000)
@@ -366,6 +407,7 @@ function runLongSoakCommand(arguments)
   return 0
 end function
 
+// Render smoke.
 function renderSmoke(arguments)
   frames = optionalFrameCount(arguments, 3, 300, 1000000)
   return host.run([
@@ -378,6 +420,7 @@ function renderSmoke(arguments)
   ])
 end function
 
+// Execute render evidence command.
 function runRenderEvidenceCommand(arguments)
   frames = boundedInteger(arguments[3], 128, 1, 1000000)
   width = integerNamedOption(arguments, "-width", 640, 320, 8192)
@@ -403,6 +446,7 @@ function runRenderEvidenceCommand(arguments)
   return host.runRenderEvidence(renderArguments, frames, arguments[4])
 end function
 
+// Execute endscreen evidence command.
 function runEndscreenEvidenceCommand(arguments)
   width = integerNamedOption(arguments, "-width", 2048, 320, 8192)
   height = integerNamedOption(arguments, "-height", 1152, 200, 8192)
@@ -411,12 +455,14 @@ function runEndscreenEvidenceCommand(arguments)
   return 0
 end function
 
+// Execute ui resolution matrix command.
 function runUiResolutionMatrixCommand(arguments)
   result = try(host.runUiResolutionMatrix(arguments[1], gameOption(arguments), arguments[2]))
   if result is error then print "MiniQuake UI resolution matrix: " + result.message; return 3 end if
   return 0
 end function
 
+// Execute render demo evidence command.
 function runRenderDemoEvidenceCommand(arguments)
   frames = boundedInteger(arguments[3], 256, 1, 1000000)
   return host.runRenderEvidence([
@@ -447,6 +493,7 @@ function runRenderDemoEvidenceCommand(arguments)
   ], frames, arguments[4])
 end function
 
+// Execute original interop server command.
 function runOriginalInteropServerCommand(arguments)
   port = boundedInteger(arguments[3], 26000, 1, 65534)
   frames = boundedInteger(arguments[4], externalReference.ORIGINAL_INTEROP_MAX_FRAMES, 1, 1000000)
@@ -461,6 +508,7 @@ function runOriginalInteropServerCommand(arguments)
   ], frames, arguments[5])
 end function
 
+// Execute original interop client command.
 function runOriginalInteropClientCommand(arguments)
   port = boundedInteger(arguments[3], 26000, 1, 65534)
   frames = boundedInteger(arguments[4], externalReference.ORIGINAL_INTEROP_MAX_FRAMES, 1, 1000000)
@@ -481,23 +529,28 @@ function runOriginalInteropClientCommand(arguments)
 end function
 
 
+// Execute opt001 amap parse command.
 function runOpt001AMapParseCommand(arguments)
   result = try(host.opt001aMapParse(arguments[1], gameOption(arguments), arguments[2], arguments[3]))
   if result is error then print "MiniQuake OPT-001A map parse: " + result.message; return 3 end if
   return 0
 end function
 
+// Execute opt001 aframe baseline command.
 function runOpt001AFrameBaselineCommand(arguments)
   warmup = boundedInteger(arguments[4], 300, 0, 1000000)
   measure = boundedInteger(arguments[5], 3000, 1, 1000000)
   result = try(host.runOpt001AFrameBaseline(
     arguments[1], gameOption(arguments), arguments[2], bio.lower(arguments[3]),
-    warmup, measure, arguments[6],
+    warmup, measure, arguments[6], namedOption(arguments, "-renderer", ""),
+    integerNamedOption(arguments, "-width", 640, 320, 8192),
+    integerNamedOption(arguments, "-height", 480, 200, 8192),
   ))
   if result is error then print "MiniQuake OPT-001A frame baseline: " + result.message; return 3 end if
   return 0
 end function
 
+// Execute opt001 ahandle plateau command.
 function runOpt001AHandlePlateauCommand(arguments)
   warmup = boundedInteger(arguments[3], 1200, 1, 1000000)
   windowFrames = boundedInteger(arguments[4], 5000, 1, 100000000)
@@ -505,19 +558,29 @@ function runOpt001AHandlePlateauCommand(arguments)
   port = integerNamedOption(arguments, "-port", 26000, 1, 65534)
   result = try(host.runOpt001AHandlePlateau(
     arguments[1], gameOption(arguments), arguments[2],
-    warmup, windowFrames, windows, port, arguments[6],
+    warmup, windowFrames, windows, port, arguments[6], namedOption(arguments, "-renderer", ""),
   ))
   if result is error then print "MiniQuake OPT-001A handle plateau: " + result.message; return 3 end if
   return 0
 end function
 
+// Execute opt001 btransition command.
 function runOpt001BTransitionCommand(arguments)
   frames = boundedInteger(arguments[2], 64, 1, 1000000)
-  result = try(host.runOpt001BTransition(arguments[1], gameOption(arguments), frames, arguments[3]))
+  result = try(host.runOpt001BTransition(arguments[1], gameOption(arguments), frames, arguments[3], namedOption(arguments, "-renderer", "")))
   if result is error then print "MiniQuake OPT-001B transition: " + result.message; return 3 end if
   return 0
 end function
 
+// Execute renderer switch smoke command.
+function runRendererSwitchSmokeCommand(arguments)
+  frames = boundedInteger(arguments[3], 8, 1, 10000)
+  result = try(host.runRendererSwitchSmoke(arguments[1], gameOption(arguments), arguments[2], frames, arguments[4]))
+  if result is error then print "MiniQuake renderer switch smoke: " + result.message; return 3 end if
+  return 0
+end function
+
+// Execute udp smoke.
 function runUdpSmoke(arguments)
   timeout = 1000
   if len(arguments) >= 2 then timeout = boundedInteger(arguments[1], timeout, 1, 60000) end if
@@ -536,6 +599,7 @@ function runUdpSmoke(arguments)
   return 2
 end function
 
+// Assert that the condition holds and identify a failing test.
 function runSelfCheck()
   check = crc.block(bytes("123456789"), 0, 9)
   print "MiniQuake " + c.QUAKE_VERSION + " / protocol " + c.PROTOCOL_VERSION
@@ -597,7 +661,9 @@ function runSelfCheck()
 end function
 
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if len(args) == 0 then
     runSelfCheck()
     print ""
@@ -642,9 +708,10 @@ function main(args)
   if command == "--opt001a-frame-baseline" and len(args) >= 7 then return runOpt001AFrameBaselineCommand(args) end if
   if command == "--opt001a-handle-plateau" and len(args) >= 7 then return runOpt001AHandlePlateauCommand(args) end if
   if command == "--opt001b-transition" and len(args) >= 4 then return runOpt001BTransitionCommand(args) end if
+  if command == "--renderer-switch-smoke" and len(args) >= 5 then return runRendererSwitchSmokeCommand(args) end if
   if command == "--udp-smoke" and len(args) <= 2 then return runUdpSmoke(args) end if
   if command == "--music-smoke" and len(args) == 4 then return musicSmoke(args[1], args[2], args[3]) end if
-  if command == "--play" and len(args) == 3 then return sysWin.WinMain(args, host.run) end if
+  if command == "--play" and len(args) >= 2 then return sysWin.WinMain(args, host.run) end if
   if len(bytes(command)) > 1 and decode(slice(bytes(command), 0, 2)) == "--" then
     print "MiniQuake: invalid command or argument count"
     printUsage()

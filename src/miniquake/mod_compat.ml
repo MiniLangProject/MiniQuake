@@ -1,12 +1,12 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Runtime-facing compatibility inspection for id1, mission packs and custom
 -game directories.  This intentionally accepts arbitrary QuakeC programs that
 satisfy the version-6 ABI rather than imposing stock id1 counts on mods.
 */
-
 package miniquake.mod_compat
 
 import miniquake.filesystem as qfs
@@ -20,10 +20,12 @@ const STATUS = "mod_runtime_109_frozen_v1"
 const FINGERPRINT = 0x4649813d
 const CONTRACT_TEXT = "mod-runtime|progs-v6|bsp-v29|id1-required|rogue-optional|hipnotic-optional|integrated-host"
 
+// Provide directory present behavior for the active subsystem.
 function directoryPresent(baseDirectory, gameDirectory)
   return fs.isDir(fs.joinPath(baseDirectory, gameDirectory))
 end function
 
+// Report whether candidate directories.
 function candidateDirectories(baseDirectory)
   result = ["id1"]
   if directoryPresent(baseDirectory, "rogue") then result = result + ["rogue"] end if
@@ -31,6 +33,7 @@ function candidateDirectories(baseDirectory)
   return result
 end function
 
+// Provide profile arguments behavior for the active subsystem.
 function profileArguments(baseDirectory, gameDirectory)
   if gameDirectory == "rogue" then return ["-basedir", baseDirectory, "-rogue"] end if
   if gameDirectory == "hipnotic" then return ["-basedir", baseDirectory, "-hipnotic"] end if
@@ -38,6 +41,7 @@ function profileArguments(baseDirectory, gameDirectory)
   return ["-basedir", baseDirectory, "-game", gameDirectory]
 end function
 
+// Inspect the requested value and emit its decoded metadata.
 function inspect(baseDirectory, gameDirectory, mapName)
   args = profileArguments(baseDirectory, gameDirectory)
   commandLine = common.create(args)
@@ -70,11 +74,13 @@ function inspect(baseDirectory, gameDirectory, mapName)
   return result
 end function
 
+// Report whether valid summary.
 function validSummary(summary)
   if summary is not array or len(summary) != 13 then return false end if
   return summary[2] > 0 and summary[3] == 6 and summary[8] == 29 and summary[5] > 0 and summary[9] > 0
 end function
 
+// Return contract vector derived from the active module state.
 function inline contractVector()
   return [STATUS, FINGERPRINT, 6, 29, ["id1", "rogue", "hipnotic"]]
 end function

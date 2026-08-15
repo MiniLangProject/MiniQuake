@@ -1,12 +1,20 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/in_win_differential_fixture.ml.
+*/
 import miniquake.input as input
 import miniquake.cvar as cvar
 import miniquake.native as native
 
+// Return bool number derived from the active module state.
 function boolNumber(value)
   if value then return 1 end if
   return 0
 end function
 
+// Exercise registry as part of this deterministic regression fixture.
 function registry()
   result = cvar.createRegistry()
   result.variables = [
@@ -40,7 +48,9 @@ function registry()
   return result
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   variables = registry()
   input.configurePlatform(variables, false, false, false)
 

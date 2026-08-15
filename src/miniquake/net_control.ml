@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.net_control.
+*/
 package miniquake.net_control
 
 import miniquake.net_datagram as datagram
@@ -18,10 +25,12 @@ const CCREP_SERVER_INFO = 0x83
 const CCREP_PLAYER_INFO = 0x84
 const CCREP_RULE_INFO = 0x85
 
+// Provide wrap behavior for the active subsystem.
 function wrap(buffer)
   return datagram.control(sz.dataSlice(buffer))
 end function
 
+// Provide request connect behavior for the active subsystem.
 function requestConnect()
   buffer = sz.alloc(64)
   msg.writeByte(buffer, CCREQ_CONNECT)
@@ -30,6 +39,7 @@ function requestConnect()
   return wrap(buffer)
 end function
 
+// Provide request server info behavior for the active subsystem.
 function requestServerInfo()
   buffer = sz.alloc(64)
   msg.writeByte(buffer, CCREQ_SERVER_INFO)
@@ -38,6 +48,7 @@ function requestServerInfo()
   return wrap(buffer)
 end function
 
+// Provide request player info behavior for the active subsystem.
 function requestPlayerInfo(playerNumber)
   buffer = sz.alloc(16)
   msg.writeByte(buffer, CCREQ_PLAYER_INFO)
@@ -45,6 +56,7 @@ function requestPlayerInfo(playerNumber)
   return wrap(buffer)
 end function
 
+// Provide request rule info behavior for the active subsystem.
 function requestRuleInfo(previousRule)
   buffer = sz.alloc(256)
   msg.writeByte(buffer, CCREQ_RULE_INFO)
@@ -52,6 +64,7 @@ function requestRuleInfo(previousRule)
   return wrap(buffer)
 end function
 
+// Provide reply accept behavior for the active subsystem.
 function replyAccept(port)
   buffer = sz.alloc(16)
   msg.writeByte(buffer, CCREP_ACCEPT)
@@ -59,6 +72,7 @@ function replyAccept(port)
   return wrap(buffer)
 end function
 
+// Provide reply reject behavior for the active subsystem.
 function replyReject(reason)
   buffer = sz.alloc(512)
   msg.writeByte(buffer, CCREP_REJECT)
@@ -66,6 +80,7 @@ function replyReject(reason)
   return wrap(buffer)
 end function
 
+// Provide reply server info behavior for the active subsystem.
 function replyServerInfo(address, hostName, levelName, currentPlayers, maxPlayers)
   buffer = sz.alloc(512)
   msg.writeByte(buffer, CCREP_SERVER_INFO)
@@ -78,6 +93,7 @@ function replyServerInfo(address, hostName, levelName, currentPlayers, maxPlayer
   return wrap(buffer)
 end function
 
+// Provide reply player info behavior for the active subsystem.
 function replyPlayerInfo(playerNumber, name, colors, frags, connectTime, address)
   buffer = sz.alloc(512)
   msg.writeByte(buffer, CCREP_PLAYER_INFO)
@@ -90,6 +106,7 @@ function replyPlayerInfo(playerNumber, name, colors, frags, connectTime, address
   return wrap(buffer)
 end function
 
+// Provide reply rule info behavior for the active subsystem.
 function replyRuleInfo(rule, value)
   buffer = sz.alloc(512)
   msg.writeByte(buffer, CCREP_RULE_INFO)
@@ -103,6 +120,7 @@ end function
 
 // Returns [command, fields].  The field order is the exact net.h wire order.
 function parse(wirePacket)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   packet = datagram.decodePacket(wirePacket)
   if packet is error then return packet end if
   if packet.flags != datagram.NETFLAG_CTL then return error(3420, "not a connectionless control packet") end if
@@ -147,6 +165,7 @@ function parse(wirePacket)
   return [command, fields]
 end function
 
+// Report whether valid quake request.
 function validQuakeRequest(parsed)
   if parsed[0] != CCREQ_CONNECT and parsed[0] != CCREQ_SERVER_INFO then return false end if
   if parsed[1][0] != GAME_NAME then return false end if
@@ -156,10 +175,12 @@ function validQuakeRequest(parsed)
   return true
 end function
 
+// Report whether valid connect request.
 function inline validConnectRequest(parsed)
   return parsed[0] == CCREQ_CONNECT and parsed[1][0] == GAME_NAME and parsed[1][1] == NET_PROTOCOL_VERSION
 end function
 
+// Report whether valid server info request.
 function inline validServerInfoRequest(parsed)
   return parsed[0] == CCREQ_SERVER_INFO and parsed[1][0] == GAME_NAME
 end function

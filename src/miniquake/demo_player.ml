@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang implementation of miniquake.demo_player.
+*/
 package miniquake.demo_player
 
 import miniquake.types as t
@@ -7,6 +14,7 @@ import miniquake.player_move as movement
 import miniquake.mathlib as math
 import miniquake.native as native
 
+// Create and initialize the module state.
 function create(recording)
   player = movement.create(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
   state = client.create(player)
@@ -28,6 +36,7 @@ function create(recording)
   )
 end function
 
+// Apply the Quake-compatible cl finish time demo behavior.
 function CL_FinishTimeDemo(playback, hostFrameCount, realtime)
   playback.timedemo = false
   playback.client.timedemo = false
@@ -41,6 +50,7 @@ function CL_FinishTimeDemo(playback, hostFrameCount, realtime)
   return playback.finishResult
 end function
 
+// Apply the Quake-compatible cl stop playback behavior.
 function CL_StopPlayback(playback, hostFrameCount, realtime)
   if playback is void or playback.stopped then return false end if
   playback.client.demoPlayback = false
@@ -52,6 +62,7 @@ function CL_StopPlayback(playback, hostFrameCount, realtime)
   return true
 end function
 
+// Apply the Quake-compatible cl time demo f behavior.
 function CL_TimeDemo_f(playback, hostFrameCount)
   if playback is void then return error(2020, "timedemo has no playback") end if
   playback.timedemo = true
@@ -62,6 +73,7 @@ function CL_TimeDemo_f(playback, hostFrameCount)
   return true
 end function
 
+// Apply the Quake-compatible cl get message behavior.
 function CL_GetMessage(playback, hostFrameCount, realtime)
   if playback is void or playback.stopped then return void end if
   if playback.client.signon == c.SIGNONS then
@@ -90,6 +102,7 @@ function CL_GetMessage(playback, hostFrameCount, realtime)
   return item
 end function
 
+// Execute message.
 function processMessage(playback, item)
   parsed = try(client.parseMessage(playback.client, item.payload))
   if parsed is error then
@@ -102,6 +115,7 @@ function processMessage(playback, item)
   return parsed
 end function
 
+// Advance frame by one processing step.
 function stepFrame(playback, hostFrameCount, realtime, frameTime)
   if playback is void or playback.stopped then return 0 end if
   playback.client.oldTime = playback.client.time
@@ -124,6 +138,7 @@ function stepFrame(playback, hostFrameCount, realtime, frameTime)
   return parsedEvents
 end function
 
+// Advance the requested value by one processing step.
 function step(playback)
   if playback.complete then return 0 end if
   if playback.index < 0 or playback.index >= len(playback.recording.messages) then
@@ -143,6 +158,7 @@ function step(playback)
   return parsed
 end function
 
+// Play all through the active media subsystem.
 function playAll(playback)
   while not playback.complete
     result = step(playback)
@@ -151,6 +167,7 @@ function playAll(playback)
   return playback.eventCount
 end function
 
+// Validate the requested value and report any invalid state.
 function verify(recording)
   playback = create(recording)
   result = try(playAll(playback))
@@ -179,6 +196,7 @@ function verify(recording)
   )
 end function
 
+// Format and emit report.
 function printReport(report)
   for each line in report.messages
     print line

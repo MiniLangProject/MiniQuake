@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.format.bsp.
+*/
 package miniquake.format.bsp
 
 import miniquake.types as t
@@ -9,6 +16,15 @@ import miniquake.native as native
 import miniquake.common as common
 import std.fs as fs
 
+// BSP texture arrays are immutable after loading.  Cache their linked
+// animation tables so a render-frame lookup does not rebuild hundreds of
+// short arrays for every visible animated texture.
+const TEXTURE_ANIMATION_CACHE_SIZE = 16
+textureAnimationCacheKeys = array(TEXTURE_ANIMATION_CACHE_SIZE, 0)
+textureAnimationCacheSources = array(TEXTURE_ANIMATION_CACHE_SIZE)
+textureAnimationCacheTables = array(TEXTURE_ANIMATION_CACHE_SIZE)
+
+// Read and validate lumps.
 function parseLumps(data)
   if len(data) < 4 + c.HEADER_LUMPS * 8 then return error(1700, "BSP header is truncated") end if
   lumps = arrayutil.makeEmptyArray(c.HEADER_LUMPS)
@@ -23,6 +39,7 @@ function parseLumps(data)
   return lumps
 end function
 
+// Read and validate planes.
 function parsePlanes(data, lump)
   if lump.length % 20 != 0 then return error(1702, "invalid BSP plane lump") end if
   count = lump.length / 20
@@ -37,6 +54,7 @@ function parsePlanes(data, lump)
   return result
 end function
 
+// Read and validate vertices.
 function parseVertices(data, lump)
   if lump.length % 12 != 0 then return error(1703, "invalid BSP vertex lump") end if
   count = lump.length / 12
@@ -50,6 +68,7 @@ function parseVertices(data, lump)
   return result
 end function
 
+// Read and validate edges.
 function parseEdges(data, lump)
   if lump.length % 4 != 0 then return error(1704, "invalid BSP edge lump") end if
   count = lump.length / 4
@@ -63,6 +82,7 @@ function parseEdges(data, lump)
   return result
 end function
 
+// Read and validate surf edges.
 function parseSurfEdges(data, lump)
   if lump.length % 4 != 0 then return error(1705, "invalid BSP surfedge lump") end if
   count = lump.length / 4
@@ -75,6 +95,7 @@ function parseSurfEdges(data, lump)
   return result
 end function
 
+// Read and validate nodes.
 function parseNodes(data, lump)
   if lump.length % 24 != 0 then return error(1706, "invalid BSP node lump") end if
   count = lump.length / 24
@@ -98,6 +119,7 @@ function parseNodes(data, lump)
   return result
 end function
 
+// Read and validate clip nodes.
 function parseClipNodes(data, lump)
   if lump.length % 8 != 0 then return error(1707, "invalid BSP clipnode lump") end if
   count = lump.length / 8
@@ -111,6 +133,7 @@ function parseClipNodes(data, lump)
   return result
 end function
 
+// Read and validate tex info.
 function parseTexInfo(data, lump)
   if lump.length % 40 != 0 then return error(1708, "invalid BSP texinfo lump") end if
   count = lump.length / 40
@@ -126,6 +149,7 @@ function parseTexInfo(data, lump)
   return result
 end function
 
+// Read and validate faces.
 function parseFaces(data, lump)
   if lump.length % 20 != 0 then return error(1709, "invalid BSP face lump") end if
   count = lump.length / 20
@@ -148,6 +172,7 @@ function parseFaces(data, lump)
   return result
 end function
 
+// Read and validate leafs.
 function parseLeafs(data, lump)
   if lump.length % 28 != 0 then return error(1710, "invalid BSP leaf lump") end if
   count = lump.length / 28
@@ -171,6 +196,7 @@ function parseLeafs(data, lump)
   return result
 end function
 
+// Read and validate mark surfaces.
 function parseMarkSurfaces(data, lump)
   if lump.length % 2 != 0 then return error(1711, "invalid BSP marksurface lump") end if
   count = lump.length / 2
@@ -183,6 +209,7 @@ function parseMarkSurfaces(data, lump)
   return result
 end function
 
+// Read and validate models.
 function parseModels(data, lump)
   if lump.length % 64 != 0 then return error(1712, "invalid BSP model lump") end if
   count = lump.length / 64
@@ -201,6 +228,7 @@ function parseModels(data, lump)
   return result
 end function
 
+// Read and validate textures.
 function parseTextures(data, lump)
   if lump.length == 0 then return [] end if
   if lump.length < 4 then return error(1713, "invalid BSP texture lump") end if
@@ -244,6 +272,7 @@ function parseTextures(data, lump)
   return result
 end function
 
+// Convert entities into its canonical representation.
 function tokenizeEntities(text)
   source = protocolText.encodeBytes(text)
   tokenBuilder = arrayutil.createArrayBuilder(64)
@@ -303,6 +332,7 @@ function tokenizeEntities(text)
   return arrayutil.finishArrayBuilder(tokenBuilder)
 end function
 
+// Read and validate entities.
 function parseEntities(text)
   tokens = tokenizeEntities(text)
   entityBuilder = arrayutil.createArrayBuilder(64)
@@ -323,6 +353,7 @@ function parseEntities(text)
   return arrayutil.finishArrayBuilder(entityBuilder)
 end function
 
+// Return entity value derived from the active module state.
 function entityValue(entity, key)
   for each pair in entity.pairs
     if pair.key == key then return pair.value end if
@@ -330,6 +361,7 @@ function entityValue(entity, key)
   return ""
 end function
 
+// Read and validate vector.
 function parseVector(text)
   source = bytes(text)
   values = [0.0, 0.0, 0.0]
@@ -351,10 +383,12 @@ function parseVector(text)
   return t.Vec3(values[0], values[1], values[2])
 end function
 
+// Return entity vector derived from the active module state.
 function entityVector(entity, key)
   return parseVector(entityValue(entity, key))
 end function
 
+// Provide decompress visibility behavior for the active subsystem.
 function decompressVisibility(data, offset, rowBytes)
   if rowBytes is not int then return error(1719, "PVS row size must be an integer, got " + typeof(rowBytes)) end if
   if rowBytes < 0 then return error(1719, "negative PVS row size") end if
@@ -382,12 +416,14 @@ function decompressVisibility(data, offset, rowBytes)
   return output
 end function
 
+// Mirror Quake's Mod_DecompressVis routine and its observable state changes.
 function Mod_DecompressVis(data, offset, numLeafs)
   rowBytes = (numLeafs + 7) >> 3
   if offset < 0 then return bytes(rowBytes, 255) end if
   return decompressVisibility(data, offset, rowBytes)
 end function
 
+// Provide exact prefix behavior for the active subsystem.
 function exactPrefix(text, prefix)
   source = bytes(text)
   wanted = bytes(prefix)
@@ -400,6 +436,7 @@ function exactPrefix(text, prefix)
   return true
 end function
 
+// Return same animation name derived from the active module state.
 function sameAnimationName(left, right)
   leftBytes = bytes(left)
   rightBytes = bytes(right)
@@ -412,6 +449,7 @@ function sameAnimationName(left, right)
   return true
 end function
 
+// Provide animation slot behavior for the active subsystem.
 function animationSlot(name)
   source = bytes(name)
   if len(source) < 2 or source[0] != 43 then return error(1727, "Bad animating texture " + name) end if
@@ -422,6 +460,7 @@ function animationSlot(name)
   return error(1727, "Bad animating texture " + name)
 end function
 
+// Provide empty animation table behavior for the active subsystem.
 function emptyAnimationTable(count)
   result = arrayutil.makeEmptyArray(count)
   index = 0
@@ -435,6 +474,15 @@ end function
 
 // The pointer links of texture_t are represented as stable texture indices.
 function sequenceTextureAnimations(textures)
+  global textureAnimationCacheKeys, textureAnimationCacheSources, textureAnimationCacheTables
+  sourceKey = nativeRawValue(textures)
+  cacheSlot = ((sourceKey >> 3) ^ (sourceKey >> 17)) & (TEXTURE_ANIMATION_CACHE_SIZE - 1)
+  cacheStart = cacheSlot
+  while textureAnimationCacheSources[cacheSlot] is not void
+    if textureAnimationCacheKeys[cacheSlot] == sourceKey then return textureAnimationCacheTables[cacheSlot] end if
+    cacheSlot = (cacheSlot + 1) & (TEXTURE_ANIMATION_CACHE_SIZE - 1)
+    if cacheSlot == cacheStart then break end if
+  end while
   table = emptyAnimationTable(len(textures))
   index = 0
   while index < len(textures)
@@ -480,9 +528,15 @@ function sequenceTextureAnimations(textures)
     end while
     index = index + 1
   end while
+  // Root the source next to its raw identity key.  This prevents an address
+  // from being recycled while the cached table is still reachable.
+  textureAnimationCacheKeys[cacheSlot] = sourceKey
+  textureAnimationCacheSources[cacheSlot] = textures
+  textureAnimationCacheTables[cacheSlot] = table
   return table
 end function
 
+// Return texture animation index derived from the active module state.
 function textureAnimationIndex(textures, baseIndex, time, alternate)
   if baseIndex < 0 or baseIndex >= len(textures) or textures[baseIndex] is void then return baseIndex end if
   table = sequenceTextureAnimations(textures)
@@ -501,18 +555,21 @@ function textureAnimationIndex(textures, baseIndex, time, alternate)
   return current
 end function
 
+// Return floor value derived from the active module state.
 function floorValue(value)
   result = native.trunc(value)
   if result > value then result = result - 1 end if
   return result
 end function
 
+// Return ceil value derived from the active module state.
 function ceilValue(value)
   result = native.trunc(value)
   if result < value then result = result + 1 end if
   return result
 end function
 
+// Provide surface vertex behavior for the active subsystem.
 function surfaceVertex(map, face, edgeNumber)
   surfEdgeIndex = face.firstEdge + edgeNumber
   if surfEdgeIndex < 0 or surfEdgeIndex >= len(map.surfEdges) then return error(1731, "CalcSurfaceExtents: bad surfedge") end if
@@ -527,6 +584,7 @@ function surfaceVertex(map, face, edgeNumber)
   return map.vertices[vertexIndex].position
 end function
 
+// Provide calc surface extents behavior for the active subsystem.
 function CalcSurfaceExtents(map, faceIndex)
   if faceIndex < 0 or faceIndex >= len(map.faces) then return error(1734, "CalcSurfaceExtents: bad surface") end if
   face = map.faces[faceIndex]
@@ -560,6 +618,7 @@ function CalcSurfaceExtents(map, faceIndex)
   return [textureMins, extents]
 end function
 
+// Provide tex info mip adjust behavior for the active subsystem.
 function texInfoMipAdjust(info)
   lengthS = native.sqrt(info.s[0] * info.s[0] + info.s[1] * info.s[1] + info.s[2] * info.s[2])
   lengthT = native.sqrt(info.t[0] * info.t[0] + info.t[1] * info.t[1] + info.t[2] * info.t[2])
@@ -570,6 +629,7 @@ function texInfoMipAdjust(info)
   return 1
 end function
 
+// Return plane sign bits derived from the active module state.
 function planeSignBits(plane)
   bits = 0
   if plane.normal.x < 0.0 then bits = bits | 1 end if
@@ -578,6 +638,7 @@ function planeSignBits(plane)
   return bits
 end function
 
+// Mirror Quake's Mod_SetParent routine and its observable state changes.
 function Mod_SetParent(map)
   nodeParents = arrayutil.makeFilledArray(len(map.nodes), -1)
   leafParents = arrayutil.makeFilledArray(len(map.leafs), -1)
@@ -612,6 +673,7 @@ function Mod_SetParent(map)
   return [nodeParents, leafParents]
 end function
 
+// Provide face underwater behavior for the active subsystem.
 function faceUnderwater(map, faceIndex)
   leafIndex = 0
   while leafIndex < len(map.leafs)
@@ -629,7 +691,21 @@ function faceUnderwater(map, faceIndex)
   return false
 end function
 
+// External BSP29 models (ammo and health boxes in the retail data) have no
+// visibility lump and store visofs 0 in their leaves.  GLQuake accepts this:
+// Mod_LoadVisibility leaves loadmodel->visdata NULL and NULL + 0 remains the
+// no-PVS case.  World BSPs additionally use -1 as the explicit no-PVS
+// sentinel.  Preserve both original encodings while still rejecting offsets
+// outside a non-empty visibility lump.
+function validLeafVisibilityOffset(offset, visibilitySize)
+  if offset == -1 then return true end if
+  if visibilitySize == 0 then return offset == 0 end if
+  return offset >= 0 and offset < visibilitySize
+end function
+
+// Validate brush model and report any incompatibility.
 function validateBrushModel(map)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if len(map.models) == 0 then return error(1748, "Mod_LoadBrushModel: no submodels") end if
   animations = sequenceTextureAnimations(map.textures)
   if animations is error then return animations end if
@@ -686,7 +762,13 @@ function validateBrushModel(map)
     if leaf.firstMarkSurface < 0 or leaf.numMarkSurfaces < 0 or leaf.firstMarkSurface + leaf.numMarkSurfaces > len(map.markSurfaces) then
       return error(1749, "Mod_LoadLeafs: bad marksurface range")
     end if
-    if leaf.visibilityOffset >= len(map.visibility) then return error(1750, "Mod_LoadLeafs: bad visibility offset") end if
+    if not validLeafVisibilityOffset(leaf.visibilityOffset, len(map.visibility)) then
+      return error(
+        1750,
+        "Mod_LoadLeafs: bad visibility offset " + leaf.visibilityOffset +
+          " for visibility size " + len(map.visibility),
+      )
+    end if
     index = index + 1
   end while
   index = 0
@@ -718,64 +800,80 @@ function Mod_LoadTextures(data, lump)
   return textures
 end function
 
+// Mirror Quake's Mod_LoadLighting routine and its observable state changes.
 function Mod_LoadLighting(data, lump)
   return slice(data, lump.offset, lump.length)
 end function
 
+// Mirror Quake's Mod_LoadVisibility routine and its observable state changes.
 function Mod_LoadVisibility(data, lump)
   return slice(data, lump.offset, lump.length)
 end function
 
+// Mirror Quake's Mod_LoadEntities routine and its observable state changes.
 function Mod_LoadEntities(data, lump)
   if lump.length == 0 then return "" end if
   return protocolText.decodeBytes(slice(data, lump.offset, lump.length))
 end function
 
+// Mirror Quake's Mod_LoadVertexes routine and its observable state changes.
 function Mod_LoadVertexes(data, lump)
   return parseVertices(data, lump)
 end function
 
+// Mirror Quake's Mod_LoadSubmodels routine and its observable state changes.
 function Mod_LoadSubmodels(data, lump)
   return parseModels(data, lump)
 end function
 
+// Mirror Quake's Mod_LoadEdges routine and its observable state changes.
 function Mod_LoadEdges(data, lump)
   return parseEdges(data, lump)
 end function
 
+// Mirror Quake's Mod_LoadTexinfo routine and its observable state changes.
 function Mod_LoadTexinfo(data, lump)
   return parseTexInfo(data, lump)
 end function
 
+// Mirror Quake's Mod_LoadFaces routine and its observable state changes.
 function Mod_LoadFaces(data, lump)
   return parseFaces(data, lump)
 end function
 
+// Mirror Quake's Mod_LoadNodes routine and its observable state changes.
 function Mod_LoadNodes(data, lump)
   return parseNodes(data, lump)
 end function
 
+// Mirror Quake's Mod_LoadLeafs routine and its observable state changes.
 function Mod_LoadLeafs(data, lump)
   return parseLeafs(data, lump)
 end function
 
+// Mirror Quake's Mod_LoadClipnodes routine and its observable state changes.
 function Mod_LoadClipnodes(data, lump)
   return parseClipNodes(data, lump)
 end function
 
+// Mirror Quake's Mod_LoadMarksurfaces routine and its observable state changes.
 function Mod_LoadMarksurfaces(data, lump)
   return parseMarkSurfaces(data, lump)
 end function
 
+// Mirror Quake's Mod_LoadSurfedges routine and its observable state changes.
 function Mod_LoadSurfedges(data, lump)
   return parseSurfEdges(data, lump)
 end function
 
+// Mirror Quake's Mod_LoadPlanes routine and its observable state changes.
 function Mod_LoadPlanes(data, lump)
   return parsePlanes(data, lump)
 end function
 
+// Read and validate the requested value.
 function parse(data, filename)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if len(data) < 4 then return error(1722, filename + ": BSP file is truncated") end if
   version = bio.i32(data, 0)
   if version != c.BSP_VERSION then return error(1723, filename + ": unsupported BSP version " + version) end if
@@ -820,10 +918,12 @@ function parse(data, filename)
   return map
 end function
 
+// Mirror Quake's Mod_LoadBrushModel routine and its observable state changes.
 function Mod_LoadBrushModel(data, filename)
   return parse(data, filename)
 end function
 
+// Read and validate the requested value.
 function load(filename)
   data = fs.readAllBytes(filename)
   return parse(data, filename)

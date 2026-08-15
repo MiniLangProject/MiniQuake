@@ -1,0 +1,9 @@
+MiniQuake Vulkan-Headers subset
+
+Upstream: https://github.com/KhronosGroup/Vulkan-Headers
+Commit: f9973cd97e6f3584707e7ef1c425e336f1b92a5b
+
+Only the C headers needed by MiniQuake's dynamically loaded Vulkan 1.3
+backend and the upstream license files are vendored. MiniQuake does not link
+against the Vulkan loader import library and requires no Vulkan SDK at build
+or run time.

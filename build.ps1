@@ -408,6 +408,7 @@ $PackageBuildArtifacts = @(
   "MiniQuakeServerMoveTests.exe",
   "MiniQuakeServerPhysicsTests.exe",
   "MiniQuakeSvUserMovementTests.exe",
+  "MiniQuakeBackwardMovementRetailTests.exe",
   "MiniQuakeServerUserTests.exe",
   "MiniQuakeWorldPhysicsClosureTests.exe",
   "MiniQuakeHostTimingTests.exe",
@@ -962,11 +963,18 @@ $CommonArgs = @(
   # Retail maps keep the BSP, alias frames and renderer command caches live at
   # once.  A 32 MiB initial commit left only ~10 MiB free after e1m1 startup,
   # forcing a full mark/sweep every rendered frame.  Reserve virtual space and
-  # commit enough physical backing for several seconds of frame temporaries;
-  # this removes GC cadence from the 60 Hz server/render loop on x64 Windows.
-  "--heap-reserve", "1g",
-  "--heap-commit", "512m",
-  "--heap-grow", "64m"
+  # commit enough physical backing for sustained frame temporaries. The native
+  # allocator performs a full collection before it grows a committed arena;
+  # e1m2 reaches roughly 480 MiB during startup and can generate almost 800 MiB
+  # of frame temporaries before the next safe point. A 1 GiB commit therefore
+  # still forced an emergency full collection after roughly twenty seconds.
+  # Reserved address space is cheap on x64 and committed pages remain
+  # demand-paged by Windows; commit the complete 2 GiB arena up front so the
+  # allocator never inserts an unpredictable GC into an interactive frame.
+  "--heap-reserve", "2g",
+  "--heap-commit", "2g",
+  "--heap-grow", "256m",
+  "--no-gc-periodic"
 )
 
 if ($Configuration -ieq "Debug") {
@@ -1165,6 +1173,7 @@ $WorldLinkTestStatus = "SKIPPED"
 $ServerMoveTestStatus = "SKIPPED"
 $ServerPhysicsTestStatus = "SKIPPED"
 $SvUserMovementTestStatus = "SKIPPED"
+$BackwardMovementRetailTestStatus = "SKIPPED"
 $ServerUserTestStatus = "SKIPPED"
 $WorldPhysicsClosureTestStatus = "SKIPPED"
 $HostTimingTestStatus = "SKIPPED"
@@ -1366,6 +1375,13 @@ if (-not $SkipTests) {
   Write-Host "[MiniQuake] compiling $SvUserMovementTestExe"
   Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\sv_user_movement_parity_tests.ml") -OutputFile $SvUserMovementTestExe -CompilerArguments $CommonArgs -Label "sv-user-movement-tests"
   $SvUserMovementTestStatus = "COMPILED"
+
+  # This retail-data executable is compiled by every test build and can be run
+  # against a local Quake installation to exercise a real e1m1 -> e1m2 change.
+  $BackwardMovementRetailTestExe = Join-Path $Output "MiniQuakeBackwardMovementRetailTests.exe"
+  Write-Host "[MiniQuake] compiling $BackwardMovementRetailTestExe"
+  Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\backward_movement_retail_tests.ml") -OutputFile $BackwardMovementRetailTestExe -CompilerArguments $CommonArgs -Label "backward-movement-retail-tests"
+  $BackwardMovementRetailTestStatus = "COMPILED"
 
   $ServerUserTestExe = Join-Path $Output "MiniQuakeServerUserTests.exe"
   Write-Host "[MiniQuake] compiling $ServerUserTestExe"
@@ -2297,6 +2313,6 @@ if ($NetworkTests -and -not $NoRunTests) {
   $NetworkTestStatus = "COMPILED-NOT-RUN"
 }
 
-Write-Host "[MiniQuake] test summary: core=$CoreTestStatus milestone=$MilestoneTestStatus diagnostics=$DiagnosticsTestStatus protocol15=$ProtocolTestStatus protocol15_commands=$ProtocolCommandTestStatus protocol15_serverdata=$ProtocolServerDataTestStatus protocol15_events=$ProtocolEventTestStatus protocol15_runtime_events=$ProtocolRuntimeEventTestStatus protocol15_signon=$ProtocolSignonTestStatus protocol15_delivery=$ProtocolDeliveryTestStatus protocol15_datagram=$ProtocolDatagramTestStatus protocol15_demo=$ProtocolDemoTestStatus protocol15_closure=$ProtocolClosureTestStatus quakec_progs=$QuakeCProgsTestStatus quakec_vm=$QuakeCVMTestStatus quakec_edicts=$QuakeCEdictTestStatus quakec_builtins=$QuakeCBuiltinTestStatus quakec_closure=$QuakeCClosureTestStatus quakec_stock=$QuakeCStockTestStatus world_hull=$WorldHullTestStatus world_trace=$WorldTraceTestStatus world_link=$WorldLinkTestStatus server_move=$ServerMoveTestStatus server_physics=$ServerPhysicsTestStatus sv_user_movement=$SvUserMovementTestStatus server_user=$ServerUserTestStatus world_physics_closure=$WorldPhysicsClosureTestStatus host_timing=$HostTimingTestStatus command_cvar=$CommandCvarTestStatus demo_lifecycle=$DemoLifecycleTestStatus savegame_v5=$SavegameV5TestStatus host_lifecycle_closure=$HostLifecycleClosureTestStatus client_state_render=$ClientStateRenderTestStatus view_state=$ViewStateTestStatus temporary_beams=$TemporaryBeamTestStatus particle_runtime=$ParticleRuntimeTestStatus client_render_closure=$ClientRenderClosureTestStatus world_surfaces=$WorldSurfaceRenderTestStatus lightmap_atlas=$LightmapAtlasTestStatus dynamic_light_render=$DynamicLightRenderTestStatus sky_water=$SkyWaterRenderTestStatus world_render_closure=$WorldRenderClosureTestStatus alias_model=$AliasModelTestStatus sprite_sync=$SpriteSyncTestStatus render_ui_hud=$RenderUiHudTestStatus render_evidence=$RenderEvidenceTestStatus model_ui_render_closure=$ModelUiRenderClosureTestStatus mirror_special=$MirrorSpecialTestStatus render_clear_special=$RenderClearSpecialTestStatus envmap_timerefresh=$EnvmapTimeRefreshTestStatus render_evidence_corpus=$RenderEvidenceCorpusTestStatus render_special_closure=$RenderSpecialClosureTestStatus audio_memory=$AudioMemoryTestStatus audio_dma=$AudioDmaTestStatus audio_mixer=$AudioMixerTestStatus audio_win=$AudioWinTestStatus audio_closure=$AudioClosureTestStatus audio_retail_evidence=$AudioRetailEvidenceStatus network_main=$NetworkMainTestStatus network_control=$NetworkControlTestStatus network_wins=$NetworkWinsAddressTestStatus system_platform=$SystemPlatformTestStatus network_platform_closure=$NetworkPlatformClosureTestStatus network_platform_evidence=$NetworkPlatformEvidenceStatus key_focus=$KeyFocusTestStatus input_device=$InputDeviceTestStatus console_screen=$ConsoleScreenTestStatus menu_lifecycle=$MenuLifecycleTestStatus frontend_closure=$FrontendClosureTestStatus common_core=$CommonCoreTestStatus filesystem_pack=$FilesystemPackTestStatus wad_graphics=$WadGraphicsTestStatus model_assets=$ModelAssetTestStatus core_assets_memory=$CoreAssetsMemoryTestStatus core_asset_retail_evidence=$CoreAssetRetailEvidenceStatus gameplay_math_chase=$GameplayMathChaseTestStatus gameplay_view=$GameplayViewTestStatus gameplay_screen=$GameplayScreenTestStatus gameplay_statusbar=$GameplayStatusbarTestStatus gameplay_presentation_closure=$GameplayPresentationClosureTestStatus cvar_source_surface=$CvarSourceSurfaceTestStatus cd_audio_source_surface=$CdAudioSourceSurfaceTestStatus source_inventory=$SourceFunctionInventoryTestStatus black_port_corpus=$BlackPortCorpusTestStatus black_port_source_closure=$BlackPortSourceClosureTestStatus game_profile=$GameProfileTestStatus mod_runtime=$ModRuntimeTestStatus artifact_compat=$ArtifactCompatTestStatus stability=$StabilityTestStatus compat_release=$CompatibilityReleaseTestStatus original_reference=$OriginalReferenceTestStatus original_server_interop=$OriginalServerInteropTestStatus original_client_interop=$OriginalClientInteropTestStatus original_visual_reference=$OriginalVisualReferenceTestStatus external_compat_closure=$ExternalCompatibilityClosureTestStatus artifact_retail_evidence=$ArtifactRetailEvidenceStatus network=$NetworkTestStatus"
+Write-Host "[MiniQuake] test summary: core=$CoreTestStatus milestone=$MilestoneTestStatus diagnostics=$DiagnosticsTestStatus protocol15=$ProtocolTestStatus protocol15_commands=$ProtocolCommandTestStatus protocol15_serverdata=$ProtocolServerDataTestStatus protocol15_events=$ProtocolEventTestStatus protocol15_runtime_events=$ProtocolRuntimeEventTestStatus protocol15_signon=$ProtocolSignonTestStatus protocol15_delivery=$ProtocolDeliveryTestStatus protocol15_datagram=$ProtocolDatagramTestStatus protocol15_demo=$ProtocolDemoTestStatus protocol15_closure=$ProtocolClosureTestStatus quakec_progs=$QuakeCProgsTestStatus quakec_vm=$QuakeCVMTestStatus quakec_edicts=$QuakeCEdictTestStatus quakec_builtins=$QuakeCBuiltinTestStatus quakec_closure=$QuakeCClosureTestStatus quakec_stock=$QuakeCStockTestStatus world_hull=$WorldHullTestStatus world_trace=$WorldTraceTestStatus world_link=$WorldLinkTestStatus server_move=$ServerMoveTestStatus server_physics=$ServerPhysicsTestStatus sv_user_movement=$SvUserMovementTestStatus backward_movement_retail=$BackwardMovementRetailTestStatus server_user=$ServerUserTestStatus world_physics_closure=$WorldPhysicsClosureTestStatus host_timing=$HostTimingTestStatus command_cvar=$CommandCvarTestStatus demo_lifecycle=$DemoLifecycleTestStatus savegame_v5=$SavegameV5TestStatus host_lifecycle_closure=$HostLifecycleClosureTestStatus client_state_render=$ClientStateRenderTestStatus view_state=$ViewStateTestStatus temporary_beams=$TemporaryBeamTestStatus particle_runtime=$ParticleRuntimeTestStatus client_render_closure=$ClientRenderClosureTestStatus world_surfaces=$WorldSurfaceRenderTestStatus lightmap_atlas=$LightmapAtlasTestStatus dynamic_light_render=$DynamicLightRenderTestStatus sky_water=$SkyWaterRenderTestStatus world_render_closure=$WorldRenderClosureTestStatus alias_model=$AliasModelTestStatus sprite_sync=$SpriteSyncTestStatus render_ui_hud=$RenderUiHudTestStatus render_evidence=$RenderEvidenceTestStatus model_ui_render_closure=$ModelUiRenderClosureTestStatus mirror_special=$MirrorSpecialTestStatus render_clear_special=$RenderClearSpecialTestStatus envmap_timerefresh=$EnvmapTimeRefreshTestStatus render_evidence_corpus=$RenderEvidenceCorpusTestStatus render_special_closure=$RenderSpecialClosureTestStatus audio_memory=$AudioMemoryTestStatus audio_dma=$AudioDmaTestStatus audio_mixer=$AudioMixerTestStatus audio_win=$AudioWinTestStatus audio_closure=$AudioClosureTestStatus audio_retail_evidence=$AudioRetailEvidenceStatus network_main=$NetworkMainTestStatus network_control=$NetworkControlTestStatus network_wins=$NetworkWinsAddressTestStatus system_platform=$SystemPlatformTestStatus network_platform_closure=$NetworkPlatformClosureTestStatus network_platform_evidence=$NetworkPlatformEvidenceStatus key_focus=$KeyFocusTestStatus input_device=$InputDeviceTestStatus console_screen=$ConsoleScreenTestStatus menu_lifecycle=$MenuLifecycleTestStatus frontend_closure=$FrontendClosureTestStatus common_core=$CommonCoreTestStatus filesystem_pack=$FilesystemPackTestStatus wad_graphics=$WadGraphicsTestStatus model_assets=$ModelAssetTestStatus core_assets_memory=$CoreAssetsMemoryTestStatus core_asset_retail_evidence=$CoreAssetRetailEvidenceStatus gameplay_math_chase=$GameplayMathChaseTestStatus gameplay_view=$GameplayViewTestStatus gameplay_screen=$GameplayScreenTestStatus gameplay_statusbar=$GameplayStatusbarTestStatus gameplay_presentation_closure=$GameplayPresentationClosureTestStatus cvar_source_surface=$CvarSourceSurfaceTestStatus cd_audio_source_surface=$CdAudioSourceSurfaceTestStatus source_inventory=$SourceFunctionInventoryTestStatus black_port_corpus=$BlackPortCorpusTestStatus black_port_source_closure=$BlackPortSourceClosureTestStatus game_profile=$GameProfileTestStatus mod_runtime=$ModRuntimeTestStatus artifact_compat=$ArtifactCompatTestStatus stability=$StabilityTestStatus compat_release=$CompatibilityReleaseTestStatus original_reference=$OriginalReferenceTestStatus original_server_interop=$OriginalServerInteropTestStatus original_client_interop=$OriginalClientInteropTestStatus original_visual_reference=$OriginalVisualReferenceTestStatus external_compat_closure=$ExternalCompatibilityClosureTestStatus artifact_retail_evidence=$ArtifactRetailEvidenceStatus network=$NetworkTestStatus"
 Write-Host "[MiniQuake] build completed: $GameExe"
 exit 0

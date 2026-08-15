@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Frozen source-guided QuakeC 1.09 compatibility contract.
 */
-
 package miniquake.quakec.contract
 
 import miniquake.constants as c
@@ -23,10 +23,12 @@ const EXPECTED_LOCALSTACK_SIZE = 2048
 const FNV_OFFSET = 2166136261
 const FNV_PRIME = 16777619
 
+// Fold byte into the deterministic rolling hash.
 function inline hashByte(hash, value)
   return ((hash ^ (value & 255)) * FNV_PRIME) & 0xffffffff
 end function
 
+// Fold word into the deterministic rolling hash.
 function hashWord(hash, value)
   result = hash
   shift = 0
@@ -37,6 +39,7 @@ function hashWord(hash, value)
   return result
 end function
 
+// Fold text into the deterministic rolling hash.
 function hashText(hash, text)
   result = hash
   data = bytes(text)
@@ -48,6 +51,7 @@ function hashText(hash, text)
   return hashByte(result, 0)
 end function
 
+// Provide contract fingerprint behavior for the active subsystem.
 function contractFingerprint()
   hash = FNV_OFFSET
   hash = hashWord(hash, EXPECTED_VERSION)
@@ -62,6 +66,7 @@ function contractFingerprint()
   return hash
 end function
 
+// Provide required globals behavior for the active subsystem.
 function requiredGlobals()
   return [
     "self", "other", "world", "time", "frametime", "force_retouch", "mapname", "deathmatch", "coop", "teamplay",
@@ -74,6 +79,7 @@ function requiredGlobals()
   ]
 end function
 
+// Provide required fields behavior for the active subsystem.
 function requiredFields()
   return [
     "modelindex", "absmin", "absmax", "ltime", "movetype", "solid", "origin", "oldorigin", "velocity", "angles",
@@ -87,6 +93,7 @@ function requiredFields()
   ]
 end function
 
+// Provide required functions behavior for the active subsystem.
 function requiredFunctions()
   return [
     "main", "StartFrame", "PlayerPreThink", "PlayerPostThink", "ClientKill", "ClientConnect", "PutClientInServer",
@@ -94,6 +101,7 @@ function requiredFunctions()
   ]
 end function
 
+// Report whether definition.
 function hasDefinition(definitions, name)
   for each definition in definitions
     if definition.name == name then return true end if
@@ -101,6 +109,7 @@ function hasDefinition(definitions, name)
   return false
 end function
 
+// Report whether function.
 function hasFunction(program, name)
   for each functionValue in program.functions
     if functionValue.name == name then return true end if
@@ -108,6 +117,7 @@ function hasFunction(program, name)
   return false
 end function
 
+// Return builtin reference count derived from the active module state.
 function builtinReferenceCount(program)
   count = 0
   for each functionValue in program.functions
@@ -116,6 +126,7 @@ function builtinReferenceCount(program)
   return count
 end function
 
+// Provide maximum builtin reference behavior for the active subsystem.
 function maximumBuiltinReference(program)
   maximum = 0
   for each functionValue in program.functions
@@ -127,6 +138,7 @@ function maximumBuiltinReference(program)
   return maximum
 end function
 
+// Validate the requested value and report any incompatibility.
 function validate(program)
   if program.version != EXPECTED_VERSION then return error(3380, "QuakeC contract: expected version 6") end if
   if program.crc != EXPECTED_HEADER_CRC then return error(3381, "QuakeC contract: expected system CRC 5927") end if
@@ -159,6 +171,7 @@ function validate(program)
   return true
 end function
 
+// Provide program fingerprint behavior for the active subsystem.
 function programFingerprint(program)
   hash = FNV_OFFSET
   hash = hashWord(hash, program.version)
@@ -189,6 +202,7 @@ function programFingerprint(program)
   return hash
 end function
 
+// Return summary derived from the active module state.
 function summary(program)
   return [
     STATUS,

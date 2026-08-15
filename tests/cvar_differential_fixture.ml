@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/cvar_differential_fixture.ml.
+*/
 import miniquake.types as t
 import miniquake.native as native
 import miniquake.cvar as cvarPort
@@ -7,14 +13,17 @@ struct CvarCommandSession
   cvars
 end struct
 
+// Report whether differential command never exists holds for the active state.
 function differentialCommandNeverExists(name)
   return false
 end function
 
+// Return number derived from the active module state.
 function number(value)
   return native.floatText(value)
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   registry = cvarPort.createRegistry()
   cvarPort.register(registry, cvarPort.create("foo", "1.25", true, false), differentialCommandNeverExists)

@@ -1,11 +1,19 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/cd_audio_differential_fixture.ml.
+*/
 import miniquake.sound.cd_audio as cd
 import miniquake.native as native
 
+// Return bool number derived from the active module state.
 function boolNumber(value)
   if value then return 1 end if
   return 0
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   state = cd.create(void, 12)
   result = cd.CDAudio_Init(state)

@@ -1,11 +1,19 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/net_loop_differential_fixture.ml.
+*/
 import miniquake.sizebuf as sz
 import miniquake.net_loop as loopPort
 
+// Return bool value derived from the active module state.
 function boolValue(value)
   if value then return 1 end if
   return 0
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "{\"function\":\"Loop_Init\",\"case\":\"modes\",\"values\":[" +
     loopPort.Loop_Init(false) + "," + loopPort.Loop_Init(true) + "]}"

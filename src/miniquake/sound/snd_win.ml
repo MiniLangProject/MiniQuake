@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.sound.snd_win.
+*/
 package miniquake.sound.snd_win
 
 import miniquake.native as native
@@ -53,6 +60,7 @@ struct WindowsSoundState
   resetCount
 end struct
 
+// Create and initialize headers.
 function createHeaders()
   builder = arrays.createArrayBuilder(WAV_BUFFERS)
   index = 0
@@ -63,6 +71,7 @@ function createHeaders()
   return arrays.finishArrayBuilder(builder)
 end function
 
+// Create and initialize the module state.
 function create(simulated, sampleRate)
   if sampleRate <= 0 then sampleRate = 11025 end if
   return WindowsSoundState(
@@ -97,6 +106,7 @@ function create(simulated, sampleRate)
   )
 end function
 
+// Report whether argument.
 function hasArgument(arguments, wanted)
   if arguments is void then return false end if
   for each argument in arguments
@@ -105,6 +115,7 @@ function hasArgument(arguments, wanted)
   return false
 end function
 
+// Provide prepare headers behavior for the active subsystem.
 function prepareHeaders(state)
   index = 0
   while index < len(state.headers)
@@ -118,6 +129,7 @@ function prepareHeaders(state)
   end while
 end function
 
+// Provide unprepare headers behavior for the active subsystem.
 function unprepareHeaders(state)
   index = 0
   while index < len(state.headers)
@@ -129,6 +141,7 @@ function unprepareHeaders(state)
   end while
 end function
 
+// Handle one header and update the associated state.
 function completeOneHeader(state)
   if state.completed >= state.sent then return false end if
   header = state.headers[state.completed & WAV_MASK]
@@ -141,6 +154,7 @@ function completeOneHeader(state)
   return true
 end function
 
+// Handle headers and update the associated state.
 function completeHeaders(state, count)
   completedNow = 0
   while completedNow < count and completeOneHeader(state)
@@ -149,6 +163,7 @@ function completeHeaders(state, count)
   return completedNow
 end function
 
+// Provide refresh native headers behavior for the active subsystem.
 function refreshNativeHeaders(state)
   if state.simulated or not state.waveInitialized then return 0 end if
   nativeCompleted = native.audioCompleted()
@@ -158,6 +173,7 @@ function refreshNativeHeaders(state)
   return completeHeaders(state, delta)
 end function
 
+// Add state for queued headers.
 function queuedHeaders(state)
   refreshNativeHeaders(state)
   queued = state.sent - state.completed
@@ -165,6 +181,7 @@ function queuedHeaders(state)
   return queued
 end function
 
+// Apply the Quake-compatible s block sound behavior.
 function S_BlockSound(state)
   if not state.waveInitialized then return state.blocked end if
   state.blocked = state.blocked + 1
@@ -180,11 +197,13 @@ function S_BlockSound(state)
   return state.blocked
 end function
 
+// Apply the Quake-compatible s unblock sound behavior.
 function S_UnblockSound(state)
   if state.waveInitialized then state.blocked = state.blocked - 1 end if
   return state.blocked
 end function
 
+// Release state for free sound.
 function FreeSound(state)
   if state.waveInitialized and not state.simulated then
     refreshNativeHeaders(state)
@@ -198,6 +217,7 @@ function FreeSound(state)
   return true
 end function
 
+// Mirror Quake's SNDDMA_InitDirect routine and its observable state changes.
 function SNDDMA_InitDirect(state)
   state.directAttempted = true
   state.directInitialized = false
@@ -207,6 +227,7 @@ function SNDDMA_InitDirect(state)
   return SIS_FAILURE
 end function
 
+// Mirror Quake's SNDDMA_InitWav routine and its observable state changes.
 function SNDDMA_InitWav(state)
   state.waveAttempted = true
   opened = true
@@ -234,6 +255,7 @@ function SNDDMA_InitWav(state)
   return true
 end function
 
+// Mirror Quake's SNDDMA_Init routine and its observable state changes.
 function SNDDMA_Init(state, arguments)
   if hasArgument(arguments, "-nosound") then return 0 end if
   if hasArgument(arguments, "-wavonly") then state.wavOnly = true end if
@@ -263,6 +285,7 @@ function SNDDMA_Init(state, arguments)
   return 1
 end function
 
+// Mirror Quake's SNDDMA_GetDMAPos routine and its observable state changes.
 function SNDDMA_GetDMAPos(state)
   if not state.waveInitialized and not state.directInitialized then return 0 end if
   if state.simulated then
@@ -274,10 +297,12 @@ function SNDDMA_GetDMAPos(state)
   return state.dmaPosition
 end function
 
+// Return next header for the active module state.
 function nextHeader(state)
   return state.headers[state.sent & WAV_MASK]
 end function
 
+// Transfer data for copy submission.
 function copySubmission(state, data, header)
   sourceOffset = 0
   // The original waveOut headers point at distinct 1024-byte regions of the
@@ -298,6 +323,7 @@ function copySubmission(state, data, header)
   return count
 end function
 
+// Mirror Quake's SNDDMA_Submit routine and its observable state changes.
 function SNDDMA_Submit(state, data)
   if not state.waveInitialized or state.blocked > 0 then return false end if
   refreshNativeHeaders(state)
@@ -331,6 +357,7 @@ function SNDDMA_Submit(state, data)
   return submitted
 end function
 
+// Mirror Quake's SNDDMA_Shutdown routine and its observable state changes.
 function SNDDMA_Shutdown(state)
   FreeSound(state)
   state.shutdownCount = state.shutdownCount + 1

@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-025 source-guided world.c trace-coordinate and box-hull boundary fixtures.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.world_hull as hull
@@ -21,16 +21,19 @@ struct TraceTestMap
   leafs
 end struct
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9250, name + ": expected true") end if
   return true
 end function
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9251, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function assertNear(actual, expected, name)
   delta = actual - expected
   if delta < 0.0 then delta = -delta end if
@@ -38,12 +41,14 @@ function assertNear(actual, expected, name)
   return true
 end function
 
+// Exercise assert vec as part of this deterministic regression fixture.
 function assertVec(actual, expected, name)
   assertNear(actual.x, expected.x, name + ".x")
   assertNear(actual.y, expected.y, name + ".y")
   assertNear(actual.z, expected.z, name + ".z")
 end function
 
+// Create and initialize trace map.
 function makeTraceMap()
   plane = t.BspPlane(t.Vec3(1.0, 0.0, 0.0), 0.0, 0)
   worldNode = t.BspNode(0, -1, -2, t.Vec3(-256.0, -256.0, -256.0), t.Vec3(256.0, 256.0, 256.0), 0, 0)
@@ -63,6 +68,7 @@ function makeTraceMap()
   return TraceTestMap([worldModel, brushModel], [worldNode, brushNode], clips, [plane], [emptyLeaf, solidLeaf])
 end function
 
+// Create and initialize entity.
 function makeEntity(number, origin, solid, model)
   item = edict.create(number)
   item.origin = origin
@@ -75,18 +81,21 @@ function makeEntity(number, origin, solid, model)
   return item
 end function
 
+// Verify max plane is empty against the expected Quake behavior.
 function testMaxPlaneIsEmpty()
   box = hull.createBoxHull(t.Vec3(-1.0, -1.0, -1.0), t.Vec3(1.0, 1.0, 1.0))
   assertEqual(hull.truePointContents(box, t.Vec3(1.0, 0.0, 0.0)), c.CONTENTS_EMPTY, "max plane contents")
   return true
 end function
 
+// Verify min plane is solid against the expected Quake behavior.
 function testMinPlaneIsSolid()
   box = hull.createBoxHull(t.Vec3(-1.0, -1.0, -1.0), t.Vec3(1.0, 1.0, 1.0))
   assertEqual(hull.truePointContents(box, t.Vec3(-1.0, 0.0, 0.0)), c.CONTENTS_SOLID, "min plane contents")
   return true
 end function
 
+// Verify parallel max plane clear against the expected Quake behavior.
 function testParallelMaxPlaneClear()
   box = hull.createBoxHull(t.Vec3(-1.0, -1.0, -1.0), t.Vec3(1.0, 1.0, 1.0))
   finish = t.Vec3(1.0, -3.0, 0.0)
@@ -96,6 +105,7 @@ function testParallelMaxPlaneClear()
   return true
 end function
 
+// Verify start solid escape against the expected Quake behavior.
 function testStartSolidEscape()
   box = hull.createBoxHull(t.Vec3(-1.0, -1.0, -1.0), t.Vec3(1.0, 1.0, 1.0))
   finish = t.Vec3(2.0, 0.0, 0.0)
@@ -106,6 +116,7 @@ function testStartSolidEscape()
   return true
 end function
 
+// Verify translated brush clear end against the expected Quake behavior.
 function testTranslatedBrushClearEnd()
   map = makeTraceMap()
   finish = t.Vec3(70.0, 4.0, 3.0)
@@ -115,6 +126,7 @@ function testTranslatedBrushClearEnd()
   return true
 end function
 
+// Verify translated brush hit end against the expected Quake behavior.
 function testTranslatedBrushHitEnd()
   map = makeTraceMap()
   trace = bspworld.traceBrushModel(map, 1, t.Vec3(100.0, 0.0, 0.0), t.Vec3(80.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), t.Vec3(120.0, 0.0, 0.0))
@@ -123,6 +135,7 @@ function testTranslatedBrushHitEnd()
   return true
 end function
 
+// Verify public clip clear end against the expected Quake behavior.
 function testPublicClipClearEnd()
   map = makeTraceMap()
   game = server.create(1)
@@ -140,6 +153,7 @@ function testPublicClipClearEnd()
   return true
 end function
 
+// Verify move bounds expansion against the expected Quake behavior.
 function testMoveBoundsExpansion()
   value = worldPort.SV_MoveBounds(t.Vec3(4.0, 5.0, 6.0), t.Vec3(-1.0, -2.0, -3.0), t.Vec3(1.0, 2.0, 3.0), t.Vec3(-4.0, 8.0, 2.0))
   assertVec(value[0], t.Vec3(-6.0, 2.0, -2.0), "move bounds mins")
@@ -147,6 +161,7 @@ function testMoveBoundsExpansion()
   return true
 end function
 
+// Verify clear trace keeps finish object values against the expected Quake behavior.
 function testClearTraceKeepsFinishObjectValues()
   box = hull.createBoxHull(t.Vec3(-1.0, -1.0, -1.0), t.Vec3(1.0, 1.0, 1.0))
   finish = t.Vec3(4.0, 5.0, 6.0)
@@ -155,6 +170,7 @@ function testClearTraceKeepsFinishObjectValues()
   return true
 end function
 
+// Verify impact plane distance against the expected Quake behavior.
 function testImpactPlaneDistance()
   box = hull.createBoxHull(t.Vec3(-1.0, -1.0, -1.0), t.Vec3(1.0, 1.0, 1.0))
   trace = hull.traceLine(box, t.Vec3(-3.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
@@ -164,12 +180,14 @@ function testImpactPlaneDistance()
   return true
 end function
 
+// Execute one named test case and record its pass/fail result.
 function run(name, fn)
   result = try(fn())
   if result is error then print "FAIL: " + name + ": " + result.message; return false end if
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   passed = 0
   if run("max plane empty", testMaxPlaneIsEmpty) then passed = passed + 1 else return 1 end if

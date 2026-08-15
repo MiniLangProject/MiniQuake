@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang implementation of miniquake.temp_entities.
+*/
 package miniquake.temp_entities
 
 import miniquake.types as t
@@ -40,6 +47,7 @@ struct TempEntityState
   colormap
 end struct
 
+// Read and validate position.
 function readPosition(reader)
   return t.Vec3(msg.readCoord(reader), msg.readCoord(reader), msg.readCoord(reader))
 end function
@@ -70,18 +78,22 @@ function parseType(reader, type)
   return t.TemporaryEntity(type, origin, endPosition, entity)
 end function
 
+// Read and validate the requested value.
 function parse(reader)
   return parseType(reader, msg.readByte(reader))
 end function
 
+// Provide empty beam behavior for the active subsystem.
 function emptyBeam()
   return TempBeam(0, "", 0.0, t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
 end function
 
+// Provide empty dynamic light behavior for the active subsystem.
 function emptyDynamicLight()
   return t.DynamicLight(t.Vec3(0.0, 0.0, 0.0), 0.0, 0.0, 0.0, 0.0, 0)
 end function
 
+// Apply the Quake-compatible cl init tents behavior.
 function CL_InitTEnts(mixer)
   sounds = [
     "wizard/hit.wav",
@@ -108,16 +120,19 @@ function CL_InitTEnts(mixer)
   return TempEntityState(beams, 0, [], [], sounds, [], [], [], lights, [], 1, void)
 end function
 
+// Apply the Quake-compatible cl set random seed behavior.
 function CL_SetRandomSeed(state, seed)
   state.randomSeed = seed & 0xffffffff
   return state.randomSeed
 end function
 
+// Apply the Quake-compatible cl rand behavior.
 function CL_Rand(state)
   state.randomSeed = (state.randomSeed * 214013 + 2531011) & 0xffffffff
   return (state.randomSeed >> 16) & 0x7fff
 end function
 
+// Add state for append unique.
 function appendUnique(values, value)
   for each current in values
     if current == value then return values end if
@@ -125,6 +140,7 @@ function appendUnique(values, value)
   return values + [value]
 end function
 
+// Provide beam type for model behavior for the active subsystem.
 function beamTypeForModel(model)
   if model == "progs/bolt.mdl" then return c.TE_LIGHTNING1 end if
   if model == "progs/bolt2.mdl" then return c.TE_LIGHTNING2 end if
@@ -132,6 +148,7 @@ function beamTypeForModel(model)
   return c.TE_BEAM
 end function
 
+// Return beam model for type derived from the active module state.
 function beamModelForType(type)
   if type == c.TE_LIGHTNING1 then return "progs/bolt.mdl" end if
   if type == c.TE_LIGHTNING2 then return "progs/bolt2.mdl" end if
@@ -140,6 +157,7 @@ function beamModelForType(type)
   return ""
 end function
 
+// Update module state for beam.
 function setBeam(beam, entity, model, start, finish, currentTime)
   beam.entity = entity
   beam.model = model
@@ -149,6 +167,7 @@ function setBeam(beam, entity, model, start, finish, currentTime)
   return beam
 end function
 
+// Apply the Quake-compatible cl parse beam behavior.
 function CL_ParseBeam(state, reader, model, currentTime)
   entity = msg.readShort(reader)
   start = readPosition(reader)
@@ -179,14 +198,17 @@ function CL_ParseBeam(state, reader, model, currentTime)
   return event
 end function
 
+// Add state for append sound event.
 function appendSoundEvent(state, name, origin)
   state.soundEvents = state.soundEvents + [[-1, 0, name, math.copy(origin), 1.0, 1.0]]
 end function
 
+// Add state for append particle event.
 function appendParticleEvent(state, name, origin, color, count, extra)
   state.particleEvents = state.particleEvents + [[name, math.copy(origin), color, count, extra]]
 end function
 
+// Allocate and initialize temp dlight.
 function allocateTempDlight(state, currentTime)
   index = 0
   while index < len(state.dynamicLights)
@@ -205,6 +227,7 @@ function allocateTempDlight(state, currentTime)
   return state.dynamicLights[0]
 end function
 
+// Add state for append explosion light.
 function appendExplosionLight(state, origin, currentTime)
   light = allocateTempDlight(state, currentTime)
   light.origin = math.copy(origin)
@@ -214,6 +237,7 @@ function appendExplosionLight(state, origin, currentTime)
   return light
 end function
 
+// Add state for append spike sound.
 function appendSpikeSound(state, origin)
   if CL_Rand(state) % 5 != 0 then
     appendSoundEvent(state, "weapons/tink1.wav", origin)
@@ -226,7 +250,9 @@ function appendSpikeSound(state, origin)
   return name
 end function
 
+// Apply the Quake-compatible cl parse tent behavior.
 function CL_ParseTEnt(state, reader, currentTime)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   type = msg.readByte(reader)
   model = beamModelForType(type)
   if model != "" then return CL_ParseBeam(state, reader, model, currentTime) end if
@@ -269,6 +295,7 @@ function CL_ParseTEnt(state, reader, currentTime)
   return value
 end function
 
+// Apply the Quake-compatible cl new temp entity behavior.
 function CL_NewTempEntity(state)
   if len(state.visibleEntities) >= c.MAX_VISEDICTS then return void end if
   if state.numTempEntities >= c.MAX_TEMP_ENTITIES then return void end if
@@ -284,7 +311,9 @@ function CL_NewTempEntity(state)
   return entity
 end function
 
+// Apply the Quake-compatible cl update tents behavior.
 function CL_UpdateTEnts(state, currentTime, viewEntity, viewOrigin)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   state.numTempEntities = 0
   state.tempEntities = []
   state.visibleEntities = []

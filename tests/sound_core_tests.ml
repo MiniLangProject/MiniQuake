@@ -1,26 +1,29 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Focused snd_dma.c, snd_mem.c, snd_mix.c, and sound.h parity fixtures.
 */
-
 import miniquake.sound.snd_mem as sndmem
 import miniquake.sound.snd_mix as sndmix
 import miniquake.sound.snd_dma as snddma
 import miniquake.byteio as bio
 import miniquake.types as t
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9400, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9401, name + ": expected true") end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function assertNear(actual, expected, epsilon, name)
   delta = actual - expected
   if delta < 0.0 then delta = -delta end if
@@ -28,6 +31,7 @@ function assertNear(actual, expected, epsilon, name)
   return true
 end function
 
+// Create and initialize looped wave.
 function makeLoopedWave()
   data = bytes(122)
   bio.copyInto(data, 0, bytes("RIFF"), 0, 4)
@@ -58,6 +62,7 @@ function makeLoopedWave()
   return data
 end function
 
+// Create and initialize cache16.
 function makeCache16(values, loopStart)
   data = bytes(len(values) * 2)
   index = 0
@@ -68,12 +73,14 @@ function makeCache16(values, loopStart)
   return sndmem.SoundCache(len(values), loopStart, 22050, 2, 0, data)
 end function
 
+// Exercise descriptor with cache as part of this deterministic regression fixture.
 function descriptorWithCache(name, cache)
   descriptor = sndmem.createDescriptor(name)
   descriptor.cache = cache
   return descriptor
 end function
 
+// Verify wave chunks and resample against the expected Quake behavior.
 function testWaveChunksAndResample()
   wave = makeLoopedWave()
   cursor = sndmem.createCursor(wave, len(wave))
@@ -107,6 +114,7 @@ function testWaveChunksAndResample()
   return true
 end function
 
+// Verify sixteen bit paint and loop against the expected Quake behavior.
 function testSixteenBitPaintAndLoop()
   dma = sndmix.createDma(22050, 16, 2, 2048)
   state = sndmix.createState(dma)
@@ -149,6 +157,7 @@ function testSixteenBitPaintAndLoop()
   return true
 end function
 
+// Verify paint blocks and formats against the expected Quake behavior.
 function testPaintBlocksAndFormats()
   values = []
   index = 0
@@ -193,6 +202,7 @@ function testPaintBlocksAndFormats()
   return true
 end function
 
+// Verify channel control and spatialization against the expected Quake behavior.
 function testChannelControlAndSpatialization()
   system = snddma.create(void, 22050)
   assertEqual(snddma.S_Init(system, ["-simsound"], 0x1000000), true, "S_Init")
@@ -248,6 +258,7 @@ function testChannelControlAndSpatialization()
   return true
 end function
 
+// Verify ambient timing and commands against the expected Quake behavior.
 function testAmbientTimingAndCommands()
   system = snddma.create(void, 22050)
   snddma.S_Init(system, ["-simsound"], 0x1000000)
@@ -314,6 +325,7 @@ function testAmbientTimingAndCommands()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "[1/5] WAVE chunks/resampling"
   testWaveChunksAndResample()

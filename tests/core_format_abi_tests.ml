@@ -1,12 +1,12 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Branch and binary-layout checks for the header-only MiniQuake logical units:
 bspfile.h, modelgen.h, spritegn.h, protocol.h, pr_comp.h, progdefs.h,
 progs.h, and the shared quakedef.h constants consumed by those formats.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.byteio as bio
@@ -19,11 +19,13 @@ import miniquake.format.sprite as sprite
 import miniquake.format.progs as progs
 import miniquake.quakec.opcodes as op
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9940, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function assertNear(actual, expected, name)
   difference = actual - expected
   if difference < 0.0 then difference = -difference end if
@@ -31,11 +33,13 @@ function assertNear(actual, expected, name)
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9942, name + ": expected true") end if
   return true
 end function
 
+// Verify bsp header abi against the expected Quake behavior.
 function testBspHeaderAbi()
   assertEqual(c.BSP_VERSION, 29, "BSPVERSION")
   assertEqual(c.BSP_TOOL_VERSION, 2, "TOOLVERSION")
@@ -107,6 +111,7 @@ function testBspHeaderAbi()
   return true
 end function
 
+// Verify model header abi against the expected Quake behavior.
 function testModelHeaderAbi()
   assertEqual(c.ALIAS_VERSION, 6, "ALIAS_VERSION")
   assertEqual(c.ALIAS_ONSEAM, 0x20, "ALIAS_ONSEAM")
@@ -148,6 +153,7 @@ function testModelHeaderAbi()
   return true
 end function
 
+// Verify sprite header abi against the expected Quake behavior.
 function testSpriteHeaderAbi()
   assertEqual(c.SPRITE_VERSION, 1, "SPRITE_VERSION")
   assertEqual(c.IDSPRITEHEADER, 0x50534449, "IDSPRITEHEADER")
@@ -176,6 +182,7 @@ function testSpriteHeaderAbi()
   return true
 end function
 
+// Verify quake cheader abi against the expected Quake behavior.
 function testQuakeCHeaderAbi()
   assertEqual(c.PROG_VERSION, 6, "PROG_VERSION")
   assertEqual(c.DEF_SAVEGLOBAL, 0x8000, "DEF_SAVEGLOBAL")
@@ -260,6 +267,7 @@ function testQuakeCHeaderAbi()
   return true
 end function
 
+// Verify protocol header abi against the expected Quake behavior.
 function testProtocolHeaderAbi()
   assertNear(c.VERSION, 1.09, "VERSION")
   assertNear(c.GLQUAKE_VERSION, 1.0, "GLQUAKE_VERSION")
@@ -325,6 +333,7 @@ function testProtocolHeaderAbi()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "[1/5] BSP29 header/layout ABI"
   testBspHeaderAbi()

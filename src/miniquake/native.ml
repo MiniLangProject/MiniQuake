@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang implementation of miniquake.native.
+*/
 package miniquake.native
 
 extern function f32FromText(text as cstr) from "miniquake_native.dll" symbol "mq_f32_from_text" returns u32
@@ -24,6 +31,7 @@ extern function winPoll() from "miniquake_native.dll" symbol "mq_win_poll" retur
 extern function winSwap() from "miniquake_native.dll" symbol "mq_win_swap" returns void
 extern function winKeyDown(virtualKey as i32) from "miniquake_native.dll" symbol "mq_win_key_down" returns i32
 extern function winKeyPressed(virtualKey as i32) from "miniquake_native.dll" symbol "mq_win_key_pressed" returns i32
+extern function winKeySnapshot(downStates as bytes, pressedStates as bytes, queryMask as bytes, stateCount as u32) from "miniquake_native.dll" symbol "mq_win_key_snapshot" returns i32
 extern function winTextPop() from "miniquake_native.dll" symbol "mq_win_text_pop" returns i32
 extern function winHasFocus() from "miniquake_native.dll" symbol "mq_win_has_focus" returns i32
 extern function winClientWidth() from "miniquake_native.dll" symbol "mq_win_client_width" returns i32
@@ -108,10 +116,12 @@ extern function audioHeaderState(index as u32) from "miniquake_native.dll" symbo
 extern function audioCapacity() from "miniquake_native.dll" symbol "mq_audio_capacity" returns u32
 extern function audioIsOpen() from "miniquake_native.dll" symbol "mq_audio_is_open" returns i32
 extern function oggOpen(data as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_ogg_open" returns u32
+extern function oggOpenFile(filename as wstr) from "miniquake_native.dll" symbol "mq_ogg_open_file" returns u32
 extern function oggRate() from "miniquake_native.dll" symbol "mq_ogg_rate" returns u32
 extern function oggChannels() from "miniquake_native.dll" symbol "mq_ogg_channels" returns u32
 extern function oggFrames() from "miniquake_native.dll" symbol "mq_ogg_frames" returns u32
 extern function oggDecode(output as bytes, frameCapacity as u32) from "miniquake_native.dll" symbol "mq_ogg_decode" returns u32
+extern function oggSeekStart() from "miniquake_native.dll" symbol "mq_ogg_seek_start" returns i32
 extern function oggClose() from "miniquake_native.dll" symbol "mq_ogg_close"
 
 extern function udpOpen(port as u32) from "miniquake_native.dll" symbol "mq_udp_open" returns u64
@@ -173,6 +183,7 @@ extern function glFinish() from "miniquake_native.dll" symbol "mq_gl_finish" ret
 extern function glFlush() from "miniquake_native.dll" symbol "mq_gl_flush" returns void
 extern function glDrawBuffer(mode as u32) from "miniquake_native.dll" symbol "mq_gl_draw_buffer" returns void
 extern function glDrawAliasBatch(data as bytes, byteCount as u32, shadeDots as bytes, shadeDotCount as u32, shadeLightBits as u32) from "miniquake_native.dll" symbol "mq_gl_draw_alias_batch" returns i32
+extern function glDrawParticleBatch(data as bytes, byteCount as u32, viewOriginX as u32, viewOriginY as u32, viewOriginZ as u32, viewForwardX as u32, viewForwardY as u32, viewForwardZ as u32, viewUpX as u32, viewUpY as u32, viewUpZ as u32, viewRightX as u32, viewRightY as u32, viewRightZ as u32) from "miniquake_native.dll" symbol "mq_gl_draw_particle_batch" returns i32
 extern function glDrawAliasModel(data as bytes, byteCount as u32, shadeDots as bytes, shadeDotCount as u32, shadeLightBits as u32, originX as u32, originY as u32, originZ as u32, angleX as u32, angleY as u32, angleZ as u32, scaleOriginX as u32, scaleOriginY as u32, scaleOriginZ as u32, scaleX as u32, scaleY as u32, scaleZ as u32, doubleEyes as i32, smooth as i32) from "miniquake_native.dll" symbol "mq_gl_draw_alias_model" returns i32
 
 // Win64-safe native text bridge.
@@ -189,6 +200,7 @@ function nativeTextResult(buffer, count)
   return decoded
 end function
 
+// Provide f32 to text behavior for the active subsystem.
 function f32ToText(bits)
   output = bytes(64)
   return nativeTextResult(output, f32ToTextRaw(bits, output, len(output)))
@@ -202,16 +214,19 @@ function f32ToFixed6(bits)
   return nativeTextResult(output, f32ToFixed6Raw(bits, output, len(output)))
 end function
 
+// Provide ascii char behavior for the active subsystem.
 function asciiChar(value)
   output = bytes(2)
   return nativeTextResult(output, asciiCharRaw(value, output, len(output)))
 end function
 
+// Provide conproc read text behavior for the active subsystem.
 function conprocReadText(mapped, byteOffset)
   output = bytes(65532)
   return nativeTextResult(output, conprocReadTextRaw(mapped, byteOffset, output, len(output)))
 end function
 
+// Provide conproc read console text behavior for the active subsystem.
 function conprocReadConsoleText(beginLine, endLine)
   if endLine < beginLine then return "" end if
   capacity = 80 * (endLine - beginLine + 1)
@@ -221,41 +236,49 @@ function conprocReadConsoleText(beginLine, endLine)
   return nativeTextResult(output, conprocReadConsoleTextRaw(beginLine, endLine, output, capacity))
 end function
 
+// Provide udp bound address behavior for the active subsystem.
 function udpBoundAddress(handle)
   output = bytes(64)
   return nativeTextResult(output, udpBoundAddressRaw(handle, output, len(output)))
 end function
 
+// Provide udp last address behavior for the active subsystem.
 function udpLastAddress()
   output = bytes(64)
   return nativeTextResult(output, udpLastAddressRaw(output, len(output)))
 end function
 
+// Provide udp local address behavior for the active subsystem.
 function udpLocalAddress()
   output = bytes(64)
   return nativeTextResult(output, udpLocalAddressRaw(output, len(output)))
 end function
 
+// Return udp host name derived from the active module state.
 function udpHostName()
   output = bytes(256)
   return nativeTextResult(output, udpHostNameRaw(output, len(output)))
 end function
 
+// Return udp resolve name derived from the active module state.
 function udpResolveName(name)
   output = bytes(256)
   return nativeTextResult(output, udpResolveNameRaw(name, output, len(output)))
 end function
 
+// Return udp reverse name derived from the active module state.
 function udpReverseName(address)
   output = bytes(256)
   return nativeTextResult(output, udpReverseNameRaw(address, output, len(output)))
 end function
 
+// Provide gl get string behavior for the active subsystem.
 function glGetString(name)
   output = bytes(4096)
   return nativeTextResult(output, glGetStringRaw(name, output, len(output)))
 end function
 
+// Return float bits derived from the active module state.
 function floatBits(value)
   // Avoid number -> text -> strtod.  MiniLang exposes the exact tagged word via
   // nativeRawValue(), and the bridge understands both immediate f32 and boxed
@@ -263,12 +286,14 @@ function floatBits(value)
   return f32FromRaw(nativeRawValue(value))
 end function
 
+// Provide bits float behavior for the active subsystem.
 function bitsFloat(bits)
   // Every IEEE-754 binary32 value has MiniLang's compact immediate-float form.
   // Return that raw word and let nativeValueFromRaw() restore the real value.
   return nativeValueFromRaw(f32ToRaw(bits))
 end function
 
+// Provide trunc behavior for the active subsystem.
 function trunc(value)
   // MiniLang integers are already exact integral values.  Sending them through
   // IEEE-754 binary32 first would round masks and counters above 2^24 (for
@@ -278,26 +303,32 @@ function trunc(value)
   return f32ToI32Trunc(floatBits(value))
 end function
 
+// Provide float text behavior for the active subsystem.
 function floatText(value)
   return f32ToText(floatBits(value))
 end function
 
+// Provide fixed six text behavior for the active subsystem.
 function fixedSixText(value)
   return f32ToFixed6(floatBits(value))
 end function
 
+// Provide sin behavior for the active subsystem.
 function sin(value)
   return bitsFloat(f32Sin(floatBits(value)))
 end function
 
+// Provide cos behavior for the active subsystem.
 function cos(value)
   return bitsFloat(f32Cos(floatBits(value)))
 end function
 
+// Provide sqrt behavior for the active subsystem.
 function sqrt(value)
   return bitsFloat(f32Sqrt(floatBits(value)))
 end function
 
+// Provide atan2 behavior for the active subsystem.
 function atan2(y, x)
   return bitsFloat(f32Atan2(floatBits(y), floatBits(x)))
 end function

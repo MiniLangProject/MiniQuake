@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.render.gl_rmain.
+*/
 package miniquake.render.gl_rmain
 
 import miniquake.native as native
@@ -69,6 +76,7 @@ zTrick = false
 trickFrame = 0
 blendColor = [0.0, 0.0, 0.0, 0.0]
 
+// Update module state for sink.
 function ResetSink()
   global sinkHash, sinkCalls, sinkScalar, sinkVertices, sinkBinds
   global sinkLastTexture, sinkClearMask, sinkDepthFunc
@@ -86,6 +94,7 @@ function ResetSink()
   return true
 end function
 
+// Update module state for compatibility.
 function ResetCompatibility()
   global frustum, vpn, vright, vup, r_origin
   global r_vieworg, r_viewangles, r_fov_x, r_fov_y
@@ -126,6 +135,7 @@ function ResetCompatibility()
   return true
 end function
 
+// Provide note behavior for the active subsystem.
 function Note(operation, a, b, c, d)
   global sinkHash, sinkCalls, sinkScalar
   sinkHash = (sinkHash * 131 + operation) % 1000000007
@@ -134,6 +144,7 @@ function Note(operation, a, b, c, d)
   return true
 end function
 
+// Provide bind behavior for the active subsystem.
 function Bind(texture)
   global sinkBinds, sinkLastTexture
   sinkBinds = sinkBinds + 1
@@ -141,12 +152,14 @@ function Bind(texture)
   Note(104, texture, 0, 0, 0)
 end function
 
+// Provide vertex behavior for the active subsystem.
 function Vertex(operation, point)
   global sinkVertices
   sinkVertices = sinkVertices + 1
   Note(operation, point[0], point[1], point[2], 0)
 end function
 
+// Provide depth range behavior for the active subsystem.
 function DepthRange(minimum, maximum)
   global sinkDepthMin, sinkDepthMax
   sinkDepthMin = minimum
@@ -154,18 +167,21 @@ function DepthRange(minimum, maximum)
   Note(19, minimum, maximum, 0, 0)
 end function
 
+// Provide depth func behavior for the active subsystem.
 function DepthFunc(value)
   global sinkDepthFunc
   sinkDepthFunc = value
   Note(27, value, 0, 0, 0)
 end function
 
+// Update module state for the requested operation.
 function Clear(mask)
   global sinkClearMask
   sinkClearMask = mask
   Note(26, mask, 0, 0, 0)
 end function
 
+// Return sink state.
 function GetSinkState()
   return [
     sinkCalls, sinkHash, sinkScalar, sinkVertices, sinkBinds,
@@ -173,22 +189,27 @@ function GetSinkState()
   ]
 end function
 
+// Provide dot behavior for the active subsystem.
 function inline Dot(left, right)
   return left[0] * right[0] + left[1] * right[1] + left[2] * right[2]
 end function
 
+// Provide f32 behavior for the active subsystem.
 function F32(value)
   return native.bitsFloat(native.floatBits(value))
 end function
 
+// Add state for add.
 function Add(left, right)
   return [left[0] + right[0], left[1] + right[1], left[2] + right[2]]
 end function
 
+// Provide subtract behavior for the active subsystem.
 function Subtract(left, right)
   return [left[0] - right[0], left[1] - right[1], left[2] - right[2]]
 end function
 
+// Provide multiply add behavior for the active subsystem.
 function MultiplyAdd(origin, scale, direction)
   return [
     origin[0] + scale * direction[0],
@@ -197,6 +218,7 @@ function MultiplyAdd(origin, scale, direction)
   ]
 end function
 
+// Provide box on plane side behavior for the active subsystem.
 function BoxOnPlaneSide(mins, maxs, plane)
   distance1 = Dot(maxs, plane[0]) - plane[1]
   distance2 = Dot(mins, plane[0]) - plane[1]
@@ -206,6 +228,7 @@ function BoxOnPlaneSide(mins, maxs, plane)
   return sides
 end function
 
+// Apply the Quake-compatible r cull box behavior.
 function R_CullBox(mins, maxs)
   index = 0
   while index < 4
@@ -215,6 +238,7 @@ function R_CullBox(mins, maxs)
   return false
 end function
 
+// Apply the Quake-compatible r rotate for entity behavior.
 function R_RotateForEntity(entity)
   origin = entity[0]
   angles = entity[1]
@@ -225,6 +249,7 @@ function R_RotateForEntity(entity)
   return true
 end function
 
+// Apply the Quake-compatible r get sprite frame behavior.
 function R_GetSpriteFrame(frameType, textures, intervals, time, syncbase)
   if frameType == 0 then return textures[0] end if
   fullinterval = intervals[len(intervals) - 1]
@@ -238,6 +263,7 @@ function R_GetSpriteFrame(frameType, textures, intervals, time, syncbase)
   return textures[len(textures) - 1]
 end function
 
+// Apply the Quake-compatible r draw sprite model behavior.
 function R_DrawSpriteModel(entity, frame)
   origin = entity[0]
   up = vup
@@ -260,6 +286,7 @@ function R_DrawSpriteModel(entity, frame)
   return 4
 end function
 
+// Create and initialize alias header.
 function MakeAliasHeader()
   pose0 = [[1, 2, 3], [2, 3, 4], [3, 4, 5]]
   pose1 = [[4, 5, 6], [5, 6, 7], [6, 7, 8]]
@@ -269,6 +296,7 @@ function MakeAliasHeader()
   ]
 end function
 
+// Mirror Quake's GL_DrawAliasFrame routine and its observable state changes.
 function GL_DrawAliasFrame(header, posenum, light)
   global lastposenum
   lastposenum = posenum
@@ -287,6 +315,7 @@ function GL_DrawAliasFrame(header, posenum, light)
   return posenum
 end function
 
+// Mirror Quake's GL_DrawAliasShadow routine and its observable state changes.
 function GL_DrawAliasShadow(header, posenum, entityOrigin, lightSpot, vector)
   vertices = header[2][posenum]
   scale = header[0]
@@ -312,6 +341,7 @@ function GL_DrawAliasShadow(header, posenum, entityOrigin, lightSpot, vector)
   return true
 end function
 
+// Apply the Quake-compatible r setup alias frame behavior.
 function R_SetupAliasFrame(frame, header, time, light)
   pose = 0
   numposes = header[5]
@@ -320,6 +350,7 @@ function R_SetupAliasFrame(frame, header, time, light)
   return pose
 end function
 
+// Apply the Quake-compatible r draw alias model behavior.
 function R_DrawAliasModel(entity, header, time, shadows)
   global c_alias_polys
   // Fixture platform edge: R_LightPoint.
@@ -362,6 +393,7 @@ function R_DrawAliasModel(entity, header, time, shadows)
   return header[4]
 end function
 
+// Apply the Quake-compatible r draw entities on list behavior.
 function R_DrawEntitiesOnList(brushCount, sprites)
   if not r_drawentities then return 0 end if
   index = 0
@@ -375,6 +407,7 @@ function R_DrawEntitiesOnList(brushCount, sprites)
   return brushCount + len(sprites)
 end function
 
+// Apply the Quake-compatible r draw view model behavior.
 function R_DrawViewModel(entity, header, time, shadows)
   if not r_drawviewmodel or not r_drawentities or mirror then return 0 end if
   Note(107, 0, 0, 0, 0)
@@ -384,6 +417,7 @@ function R_DrawViewModel(entity, header, time, shadows)
   return result
 end function
 
+// Apply the Quake-compatible r poly blend behavior.
 function R_PolyBlend()
   if blendColor[3] == 0.0 then return false end if
   Note(105, 0, 0, 0, 0)
@@ -407,6 +441,7 @@ function R_PolyBlend()
   return true
 end function
 
+// Provide signbits for plane behavior for the active subsystem.
 function SignbitsForPlane(plane)
   bits = 0
   if plane[0][0] < 0.0 then bits = bits | 1 end if
@@ -415,6 +450,7 @@ function SignbitsForPlane(plane)
   return bits
 end function
 
+// Apply the Quake-compatible r set frustum behavior.
 function R_SetFrustum()
   global frustum
   if r_fov_x == 90.0 then
@@ -440,6 +476,7 @@ function R_SetFrustum()
   return true
 end function
 
+// Apply the Quake-compatible r setup frame behavior.
 function R_SetupFrame()
   global r_framecount, r_origin, vpn, vright, vup
   global c_brush_polys, c_alias_polys
@@ -457,6 +494,7 @@ function R_SetupFrame()
   return true
 end function
 
+// Provide myglu perspective behavior for the active subsystem.
 function MYgluPerspective(fovy, aspect, zNear, zFar)
   angle = fovy * 3.141592653589793 / 360.0
   ymax = zNear * native.sin(angle) / native.cos(angle)
@@ -467,6 +505,7 @@ function MYgluPerspective(fovy, aspect, zNear, zFar)
   return [xmin, xmax, ymin, ymax]
 end function
 
+// Apply the Quake-compatible r setup gl behavior.
 function R_SetupGL()
   Note(22, GL_PROJECTION, 0, 0, 0)
   Note(20, 0, 0, 0, 0)
@@ -494,6 +533,7 @@ function R_SetupGL()
   return true
 end function
 
+// Apply the Quake-compatible r render scene behavior.
 function R_RenderScene()
   R_SetupFrame()
   R_SetFrustum()
@@ -508,6 +548,7 @@ function R_RenderScene()
   return true
 end function
 
+// Apply the Quake-compatible r clear behavior.
 function R_Clear()
   global gldepthmin, gldepthmax, trickFrame
   if mirrorAlpha != 1.0 then
@@ -537,6 +578,7 @@ function R_Clear()
   return true
 end function
 
+// Apply the Quake-compatible r mirror behavior.
 function R_Mirror()
   global r_vieworg, r_viewangles, vpn, gldepthmin, gldepthmax
   if not mirror then return false end if
@@ -575,6 +617,7 @@ function R_Mirror()
   return true
 end function
 
+// Apply the Quake-compatible r render view behavior.
 function R_RenderView()
   global mirror
   mirror = false
@@ -586,22 +629,26 @@ function R_RenderView()
   return true
 end function
 
+// Update module state for cull planes.
 function SetCullPlanes(planes)
   global frustum
   frustum = planes
 end function
 
+// Update module state for blend.
 function SetBlend(value)
   global blendColor
   blendColor = value
 end function
 
+// Update module state for draw flags.
 function SetDrawFlags(entities, viewModel)
   global r_drawentities, r_drawviewmodel
   r_drawentities = entities
   r_drawviewmodel = viewModel
 end function
 
+// Update module state for clear flags.
 function SetClearFlags(alpha, clearValue, zValue)
   global mirrorAlpha, clearColor, zTrick
   mirrorAlpha = alpha
@@ -609,12 +656,14 @@ function SetClearFlags(alpha, clearValue, zValue)
   zTrick = zValue
 end function
 
+// Update module state for mirror.
 function SetMirror(value, plane)
   global mirror, mirrorPlane
   mirror = value
   mirrorPlane = plane
 end function
 
+// Update module state for view basis.
 function SetViewBasis(origin, forward, right, up)
   global r_origin, vpn, vright, vup
   r_origin = origin
@@ -624,6 +673,7 @@ function SetViewBasis(origin, forward, right, up)
   return true
 end function
 
+// Update module state for frame state.
 function SetFrameState(frame, brushPolys, aliasPolys)
   global r_framecount, c_brush_polys, c_alias_polys
   r_framecount = frame
@@ -631,6 +681,7 @@ function SetFrameState(frame, brushPolys, aliasPolys)
   c_alias_polys = aliasPolys
 end function
 
+// Update module state for depth compatibility.
 function SetDepthCompatibility(minimum, maximum)
   global gldepthmin, gldepthmax
   gldepthmin = minimum
@@ -638,6 +689,7 @@ function SetDepthCompatibility(minimum, maximum)
   return true
 end function
 
+// Provide prepare world behavior for the active subsystem.
 function PrepareWorld()
   global r_vieworg, r_viewangles, r_fov_x, r_fov_y
   global r_drawentities, r_drawviewmodel
@@ -650,6 +702,7 @@ function PrepareWorld()
   return true
 end function
 
+// Return frame state.
 function GetFrameState()
   return [
     r_framecount, c_brush_polys, c_alias_polys, lastposenum,

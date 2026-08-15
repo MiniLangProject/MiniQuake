@@ -1,24 +1,27 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-025: exact WinQuake box-hull traversal and trace boundaries.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.world_hull as hull
 
+// Assert that the condition holds and identify a failing test.
 function require(value, text)
   if not value then return error(2500, text) end if
   return true
 end function
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, text)
   if actual != expected then return error(2501, text + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function near(actual, expected, tolerance, text)
   delta = actual - expected
   if delta < 0.0 then delta = -delta end if
@@ -26,6 +29,7 @@ function near(actual, expected, tolerance, text)
   return true
 end function
 
+// Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
   print "[" + number + "/14] " + name
   result = try(fn())
@@ -33,48 +37,56 @@ function run(number, name, fn)
   return true
 end function
 
+// Verify inside against the expected Quake behavior.
 function testInside()
   box = hull.createBoxHull(t.Vec3(-2.0, -3.0, -4.0), t.Vec3(2.0, 3.0, 4.0))
   equal(hull.pointContentsFromNode(box, 0, t.Vec3(0.0, 0.0, 0.0)), c.CONTENTS_SOLID, "inside")
   return true
 end function
 
+// Verify max xboundary against the expected Quake behavior.
 function testMaxXBoundary()
   box = hull.createBoxHull(t.Vec3(-2.0, -3.0, -4.0), t.Vec3(2.0, 3.0, 4.0))
   equal(hull.pointContentsFromNode(box, 0, t.Vec3(2.0, 0.0, 0.0)), c.CONTENTS_EMPTY, "max x is empty")
   return true
 end function
 
+// Verify min xboundary against the expected Quake behavior.
 function testMinXBoundary()
   box = hull.createBoxHull(t.Vec3(-2.0, -3.0, -4.0), t.Vec3(2.0, 3.0, 4.0))
   equal(hull.pointContentsFromNode(box, 0, t.Vec3(-2.0, 0.0, 0.0)), c.CONTENTS_SOLID, "min x is solid")
   return true
 end function
 
+// Verify max yboundary against the expected Quake behavior.
 function testMaxYBoundary()
   box = hull.createBoxHull(t.Vec3(-2.0, -3.0, -4.0), t.Vec3(2.0, 3.0, 4.0))
   equal(hull.pointContentsFromNode(box, 0, t.Vec3(0.0, 3.0, 0.0)), c.CONTENTS_EMPTY, "max y is empty")
   return true
 end function
 
+// Verify min yboundary against the expected Quake behavior.
 function testMinYBoundary()
   box = hull.createBoxHull(t.Vec3(-2.0, -3.0, -4.0), t.Vec3(2.0, 3.0, 4.0))
   equal(hull.pointContentsFromNode(box, 0, t.Vec3(0.0, -3.0, 0.0)), c.CONTENTS_SOLID, "min y is solid")
   return true
 end function
 
+// Verify max zboundary against the expected Quake behavior.
 function testMaxZBoundary()
   box = hull.createBoxHull(t.Vec3(-2.0, -3.0, -4.0), t.Vec3(2.0, 3.0, 4.0))
   equal(hull.pointContentsFromNode(box, 0, t.Vec3(0.0, 0.0, 4.0)), c.CONTENTS_EMPTY, "max z is empty")
   return true
 end function
 
+// Verify min zboundary against the expected Quake behavior.
 function testMinZBoundary()
   box = hull.createBoxHull(t.Vec3(-2.0, -3.0, -4.0), t.Vec3(2.0, 3.0, 4.0))
   equal(hull.pointContentsFromNode(box, 0, t.Vec3(0.0, 0.0, -4.0)), c.CONTENTS_SOLID, "min z is solid")
   return true
 end function
 
+// Verify start node honored against the expected Quake behavior.
 function testStartNodeHonored()
   box = hull.createBoxHull(t.Vec3(-2.0, -3.0, -4.0), t.Vec3(2.0, 3.0, 4.0))
   // Starting at clipnode 1 deliberately bypasses the x maximum plane.
@@ -82,12 +94,14 @@ function testStartNodeHonored()
   return true
 end function
 
+// Verify negative leaf against the expected Quake behavior.
 function testNegativeLeaf()
   box = hull.createBoxHull(t.Vec3(-2.0, -3.0, -4.0), t.Vec3(2.0, 3.0, 4.0))
   equal(hull.pointContentsFromNode(box, c.CONTENTS_WATER, t.Vec3(0.0, 0.0, 0.0)), c.CONTENTS_WATER, "negative leaf passthrough")
   return true
 end function
 
+// Verify bad node against the expected Quake behavior.
 function testBadNode()
   box = hull.createBoxHull(t.Vec3(-2.0, -3.0, -4.0), t.Vec3(2.0, 3.0, 4.0))
   value = try(hull.pointContentsFromNode(box, 6, t.Vec3(0.0, 0.0, 0.0)))
@@ -95,6 +109,7 @@ function testBadNode()
   return true
 end function
 
+// Verify clear trace against the expected Quake behavior.
 function testClearTrace()
   box = hull.createBoxHull(t.Vec3(-2.0, -2.0, -2.0), t.Vec3(2.0, 2.0, 2.0))
   trace = hull.traceLine(box, t.Vec3(4.0, 4.0, 0.0), t.Vec3(4.0, -4.0, 0.0))
@@ -103,6 +118,7 @@ function testClearTrace()
   return true
 end function
 
+// Verify cross trace against the expected Quake behavior.
 function testCrossTrace()
   box = hull.createBoxHull(t.Vec3(-2.0, -2.0, -2.0), t.Vec3(2.0, 2.0, 2.0))
   trace = hull.traceLine(box, t.Vec3(4.0, 0.0, 0.0), t.Vec3(-4.0, 0.0, 0.0))
@@ -113,6 +129,7 @@ function testCrossTrace()
   return true
 end function
 
+// Verify start solid exit against the expected Quake behavior.
 function testStartSolidExit()
   box = hull.createBoxHull(t.Vec3(-2.0, -2.0, -2.0), t.Vec3(2.0, 2.0, 2.0))
   trace = hull.traceLine(box, t.Vec3(0.0, 0.0, 0.0), t.Vec3(4.0, 0.0, 0.0))
@@ -121,6 +138,7 @@ function testStartSolidExit()
   return true
 end function
 
+// Verify all solid against the expected Quake behavior.
 function testAllSolid()
   box = hull.createBoxHull(t.Vec3(-2.0, -2.0, -2.0), t.Vec3(2.0, 2.0, 2.0))
   trace = hull.traceLine(box, t.Vec3(0.0, 0.0, 0.0), t.Vec3(1.0, 0.0, 0.0))
@@ -128,6 +146,7 @@ function testAllSolid()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   passed = 0
   if run(1, "inside box hull", testInside) then passed = passed + 1 end if

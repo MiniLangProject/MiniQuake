@@ -1,8 +1,16 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang implementation of miniquake.graphics_data.
+*/
 package miniquake.graphics_data
 
 import miniquake.filesystem as qfs
 import miniquake.wad as wad
 
+// Read and validate console characters from wad.
 function readConsoleCharactersFromWad(filesystem)
   wadData = qfs.readFile(filesystem, "gfx.wad")
   archive = wad.parse(wadData, "gfx.wad")

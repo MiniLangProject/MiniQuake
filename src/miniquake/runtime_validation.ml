@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang implementation of miniquake.runtime_validation.
+*/
 package miniquake.runtime_validation
 
 import miniquake.types as t
@@ -5,6 +12,7 @@ import miniquake.host as host
 import miniquake.world_bsp as world
 import miniquake.mathlib as math
 
+// Add state for append.
 function inline append(messages, level, text)
   return messages + [level + " " + text]
 end function
@@ -17,11 +25,13 @@ function worldFaceCount(worldModel)
   return len(worldModel.faces)
 end function
 
+// Render surface count.
 function renderSurfaceCount(renderer)
   if renderer is void then return 0 end if
   return len(renderer.surfaces)
 end function
 
+// Provide failed report behavior for the active subsystem.
 function failedReport(messages, mapName, cleanShutdown)
   return t.RuntimeValidation(
     false,
@@ -44,6 +54,7 @@ function failedReport(messages, mapName, cleanShutdown)
   )
 end function
 
+// Validate the requested value and report any incompatibility.
 function validate(baseDirectory, gameDirectory, mapName, frameCount)
   if mapName == "" then mapName = "start" end if
   if gameDirectory == "" then gameDirectory = "id1" end if
@@ -164,6 +175,7 @@ function validate(baseDirectory, gameDirectory, mapName, frameCount)
   )
 end function
 
+// Format and emit report.
 function printReport(report)
   print "MiniQuake runtime validation: " + report.mapName
   for each line in report.messages

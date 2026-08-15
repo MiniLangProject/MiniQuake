@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Focused sv_move.c monster-step, chase-direction and MoveToGoal fixtures.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.native as native
@@ -20,16 +20,19 @@ struct MoveTestMap
   leafs
 end struct
 
+// Assert exact equality and report both values on failure.
 function moveAssertEqual(actual, expected, name)
   if actual != expected then return error(9960, name) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function moveAssertTrue(value, name)
   if value != true then return error(9961, name) end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function moveAssertNear(actual, expected, name)
   delta = actual - expected
   if delta < 0.0 then delta = -delta end if
@@ -37,6 +40,7 @@ function moveAssertNear(actual, expected, name)
   return true
 end function
 
+// Create and initialize move map.
 function makeMoveMap(backContents, frontContents)
   plane = t.BspPlane(t.Vec3(0.0, 0.0, 1.0), 0.0, 2)
   node = t.BspNode(0, -2, -1, t.Vec3(-256.0, -256.0, -256.0), t.Vec3(256.0, 256.0, 256.0), 0, 0)
@@ -55,6 +59,7 @@ function makeMoveMap(backContents, frontContents)
   return MoveTestMap([model], [node], [clipNode], [plane], [backLeaf, frontLeaf])
 end function
 
+// Transfer data for field definitions.
 function moveFieldDefinitions()
   return [
     t.QuakeCDef(c.EV_VOID, 0, 0, ""),
@@ -74,6 +79,7 @@ function moveFieldDefinitions()
   ]
 end function
 
+// Create and initialize move fixture.
 function makeMoveFixture(entityCount, map)
   dummy = t.QuakeCFunction(0, 0, 0, 0, "", "", 0, [])
   program = t.QuakeCProgram(
@@ -107,6 +113,7 @@ function makeMoveFixture(entityCount, map)
   return game
 end function
 
+// Update module state for move entity.
 function setMoveEntity(machine, index, origin, flags)
   vm.setEntityVector(machine, index, 1, origin)
   vm.setEntityVector(machine, index, 4, t.Vec3(0.0, 0.0, 0.0))
@@ -118,6 +125,7 @@ function setMoveEntity(machine, index, origin, flags)
   vm.setEntityFloat(machine, index, 20, 360.0)
 end function
 
+// Verify bottom and monster step against the expected Quake behavior.
 function testBottomAndMonsterStep()
   game = makeMoveFixture(4, makeMoveMap(c.CONTENTS_SOLID, c.CONTENTS_EMPTY))
   machine = game.machine
@@ -142,6 +150,7 @@ function testBottomAndMonsterStep()
   return true
 end function
 
+// Verify fly swim and yaw gate against the expected Quake behavior.
 function testFlySwimAndYawGate()
   game = makeMoveFixture(4, makeMoveMap(c.CONTENTS_SOLID, c.CONTENTS_EMPTY))
   machine = game.machine
@@ -170,6 +179,7 @@ function testFlySwimAndYawGate()
   return true
 end function
 
+// Verify chase close and move to goal against the expected Quake behavior.
 function testChaseCloseAndMoveToGoal()
   game = makeMoveFixture(4, makeMoveMap(c.CONTENTS_SOLID, c.CONTENTS_EMPTY))
   machine = game.machine
@@ -199,6 +209,7 @@ function testChaseCloseAndMoveToGoal()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "[1/3] bottom and monster step"
   result = try(testBottomAndMonsterStep())

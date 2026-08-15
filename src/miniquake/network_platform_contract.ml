@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Frozen observable WinQuake 1.09 network and Windows-platform contract.
 */
-
 package miniquake.network_platform_contract
 
 const STATUS = "network_platform_109_frozen_v1"
@@ -22,6 +22,7 @@ const MAX_HOST_NAME = 256
 const NET_NAME_LENGTH = 64
 const QHOST_COMMANDS = 4
 
+// Return values derived from the active module state.
 function values()
   return [
     DEFAULT_HOST_PORT,
@@ -39,6 +40,7 @@ function values()
   ]
 end function
 
+// Validate the requested value and report any invalid state.
 function verify()
   return STATUS == "network_platform_109_frozen_v1" and
     FINGERPRINT == 0xb3ec7589 and

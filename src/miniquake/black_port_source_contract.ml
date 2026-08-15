@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang implementation of miniquake.black_port_source_contract.
+*/
 package miniquake.black_port_source_contract
 
 import miniquake.source_profile_contract as profile
@@ -13,6 +20,7 @@ const UNCLASSIFIED_FUNCTION_COUNT = 0
 const CORPUS_SCENARIO_COUNT = 4
 const CORPUS_FRAMES_PER_SCENARIO = 64
 
+// Return contract vector derived from the active module state.
 function contractVector()
   return [
     SCHEMA_VERSION,
@@ -28,6 +36,7 @@ function contractVector()
   ]
 end function
 
+// Validate the requested value and report any incompatibility.
 function validate()
   if STATUS != "black_port_source_109_frozen_v1" then return false end if
   if FINGERPRINT != 0x309b0737 then return false end if

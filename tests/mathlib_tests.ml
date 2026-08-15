@@ -1,24 +1,27 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Focused mathlib.c/mathlib.h behavioral fixtures.
 */
-
 import miniquake.mathlib as math
 import miniquake.types as t
 import miniquake.native as native
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9600, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9601, name + ": expected true") end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function assertNear(actual, expected, name)
   difference = actual - expected
   if difference < 0.0 then difference = -difference end if
@@ -26,12 +29,14 @@ function assertNear(actual, expected, name)
   return true
 end function
 
+// Exercise assert vec as part of this deterministic regression fixture.
 function assertVec(value, x, y, z, name)
   assertNear(value.x, x, name + ".x")
   assertNear(value.y, y, name + ".y")
   assertNear(value.z, z, name + ".z")
 end function
 
+// Verify vector macros and functions against the expected Quake behavior.
 function testVectorMacrosAndFunctions()
   first = t.Vec3(1.0, 2.0, 3.0)
   second = t.Vec3(4.0, 5.0, 6.0)
@@ -66,6 +71,7 @@ function testVectorMacrosAndFunctions()
   return true
 end function
 
+// Verify projection and rotation against the expected Quake behavior.
 function testProjectionAndRotation()
   projected = math.ProjectPointOnPlane(t.Vec3(1.0, 2.0, 3.0), t.Vec3(0.0, 0.0, 1.0))
   assertVec(projected, 1.0, 2.0, 0.0, "ProjectPointOnPlane unit")
@@ -78,6 +84,7 @@ function testProjectionAndRotation()
   return true
 end function
 
+// Verify angles against the expected Quake behavior.
 function testAngles()
   assertNear(math.anglemod(450.0), 90.0, "anglemod positive")
   assertNear(math.anglemod(360.0), 0.0, "anglemod wrap")
@@ -89,6 +96,7 @@ function testAngles()
   return true
 end function
 
+// Verify box on plane side against the expected Quake behavior.
 function testBoxOnPlaneSide()
   minimums = t.Vec3(-3.0, -2.0, -1.0)
   maximums = t.Vec3(5.0, 7.0, 11.0)
@@ -120,6 +128,7 @@ function testBoxOnPlaneSide()
   return true
 end function
 
+// Verify matrices against the expected Quake behavior.
 function testMatrices()
   first = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
   identity = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
@@ -139,6 +148,7 @@ function testMatrices()
   return true
 end function
 
+// Verify integer helpers against the expected Quake behavior.
 function testIntegerHelpers()
   result = math.FloorDivMod(7.0, 3.0)
   assertEqual(result[0], 2, "FloorDivMod positive quotient")
@@ -167,6 +177,7 @@ function testIntegerHelpers()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "[1/6] vector functions/macros"
   testVectorMacrosAndFunctions()

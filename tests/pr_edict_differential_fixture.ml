@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/pr_edict_differential_fixture.ml.
+*/
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.native as native
@@ -8,6 +14,7 @@ import miniquake.quakec.opcodes as op
 import miniquake.quakec.vm as vm
 import miniquake.quakec.edict as edict
 
+// Create and initialize machine.
 function makeMachine()
   fields = [
     t.QuakeCDef(c.EV_VOID, 0, 0, ""),
@@ -85,6 +92,7 @@ function makeMachine()
   return machine
 end function
 
+// Encode and write ascii.
 function putAscii(data, offset, text)
   source = bytes(text)
   index = 0
@@ -95,6 +103,7 @@ function putAscii(data, offset, text)
   return offset + len(source)
 end function
 
+// Create and initialize synthetic progs.
 function makeSyntheticProgs()
   statementOffset = 60
   globalDefOffset = statementOffset + 8
@@ -141,6 +150,7 @@ function makeSyntheticProgs()
   return data
 end function
 
+// Return oracle stub crc derived from the active module state.
 function oracleStubCrc(data)
   value = 0xffff
   for each item in data
@@ -149,17 +159,20 @@ function oracleStubCrc(data)
   return value
 end function
 
+// Add edict to the destination state.
 function emitEdict(functionName, caseName, result, index, value, count)
   print "{\"function\":\"" + functionName + "\",\"case\":\"" + caseName +
     "\",\"result\":" + result + ",\"index\":" + index +
     ",\"value\":" + native.floatText(value) + ",\"count\":" + count + "}"
 end function
 
+// Exercise bool int as part of this deterministic regression fixture.
 function boolInt(value)
   if value then return 1 end if
   return 0
 end function
 
+// Return fatal mode derived from the active module state.
 function fatalMode(name)
   machine = makeMachine()
   result = void
@@ -172,6 +185,7 @@ function fatalMode(name)
   return 0
 end function
 
+// Exercise hidden semantic checks as part of this deterministic regression fixture.
 function hiddenSemanticChecks()
   machine = makeMachine()
   vm.setEntityFloat(machine, 1, 17, 99.0)
@@ -197,7 +211,9 @@ function hiddenSemanticChecks()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   if len(args) > 0 and (args[0] == "--error-edict-num" or args[0] == "--error-num-for-edict") then
     return fatalMode(args[0])
   end if

@@ -1,6 +1,9 @@
 /*
  * MiniQuake caller-owned text bridge.
  *
+ * Copyright (c) 2026 Nils Kopal
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * MiniLang compiler v1.0 can pass a bytes payload to extern functions, but a
  * direct `returns cstr` from a high-address Win64 DLL may be truncated before
  * the runtime copies it.  This shim calls the legacy string exports in
@@ -41,6 +44,7 @@ static const mq_u16 mq_crt_name[] = {
     'm','s','v','c','r','t','.','d','l','l',0
 };
 
+/* Resolve a text-conversion export from the native bridge. */
 static FARPROC mq_backend_proc(const char *name) {
     if (mq_backend_module == MQ_NULL) {
         mq_backend_module = GetModuleHandleW(mq_backend_name);
@@ -54,6 +58,7 @@ static FARPROC mq_backend_proc(const char *name) {
     return GetProcAddress(mq_backend_module, name);
 }
 
+/* Resolve a formatting routine from the process C runtime. */
 static FARPROC mq_crt_proc(const char *name) {
     if (mq_crt_module == MQ_NULL) {
         mq_crt_module = GetModuleHandleW(mq_crt_name);
@@ -67,6 +72,7 @@ static FARPROC mq_crt_proc(const char *name) {
     return GetProcAddress(mq_crt_module, name);
 }
 
+/* Reinterpret MiniLang's IEEE-754 bit pattern as a native float. */
 static float mq_bits_to_float(mq_u32 bits) {
     union {
         mq_u32 word;
@@ -76,6 +82,7 @@ static float mq_bits_to_float(mq_u32 bits) {
     return converted.value;
 }
 
+/* Copy text into caller-owned storage. */
 static mq_u32 mq_copy_text(void *destination_value, mq_u32 capacity, const char *source) {
     mq_u8 *destination = (mq_u8 *)destination_value;
     mq_u32 index = 0;
@@ -98,6 +105,7 @@ typedef const char *(*mq_text_void_fn)(void);
 typedef const char *(*mq_text_cstr_fn)(const char *);
 typedef int (MQ_CDECL *mq_sprintf_fn)(char *, const char *, ...);
 
+/* Format a MiniLang float into caller-owned UTF-8 storage. */
 MQ_EXPORT mq_u32 mqt_f32_to_text(mq_u32 bits, void *destination, mq_u32 capacity) {
     mq_text_u32_fn function_value = (mq_text_u32_fn)mq_backend_proc("mq_f32_to_text");
     return function_value != MQ_NULL ? mq_copy_text(destination, capacity, function_value(bits)) : 0;
@@ -133,6 +141,7 @@ MQ_EXPORT mq_u32 mqt_f32_to_fixed6(
     return mq_copy_text(destination, capacity, formatted);
 }
 
+/* Convert or transfer text across the MiniLang native boundary. */
 MQ_EXPORT mq_u32 mqt_ascii_char(mq_i32 value, void *destination_value, mq_u32 capacity) {
     mq_u8 *destination = (mq_u8 *)destination_value;
     mq_u32 code = (mq_u32)value & 255u;
@@ -155,6 +164,7 @@ MQ_EXPORT mq_u32 mqt_ascii_char(mq_i32 value, void *destination_value, mq_u32 ca
     return 2;
 }
 
+/* Bridge the dedicated-console operation to the Win32 host. */
 MQ_EXPORT mq_u32 mqt_conproc_read_text(
     mq_ptr mapped,
     mq_u32 byte_offset,
@@ -168,6 +178,7 @@ MQ_EXPORT mq_u32 mqt_conproc_read_text(
         : 0;
 }
 
+/* Bridge the dedicated-console operation to the Win32 host. */
 MQ_EXPORT mq_u32 mqt_conproc_read_console_text(
     mq_i32 begin_line,
     mq_i32 end_line,
@@ -181,6 +192,7 @@ MQ_EXPORT mq_u32 mqt_conproc_read_console_text(
         : 0;
 }
 
+/* Format the UDP socket's bound address for MiniLang. */
 MQ_EXPORT mq_u32 mqt_udp_bound_address(
     mq_u64 handle,
     void *destination,
@@ -193,6 +205,7 @@ MQ_EXPORT mq_u32 mqt_udp_bound_address(
         : 0;
 }
 
+/* Format the address of the last received UDP packet. */
 MQ_EXPORT mq_u32 mqt_udp_last_address(void *destination, mq_u32 capacity) {
     mq_text_void_fn function_value =
         (mq_text_void_fn)mq_backend_proc("mq_udp_last_address");
@@ -201,6 +214,7 @@ MQ_EXPORT mq_u32 mqt_udp_last_address(void *destination, mq_u32 capacity) {
         : 0;
 }
 
+/* Format the host's selected local UDP address. */
 MQ_EXPORT mq_u32 mqt_udp_local_address(void *destination, mq_u32 capacity) {
     mq_text_void_fn function_value =
         (mq_text_void_fn)mq_backend_proc("mq_udp_local_address");
@@ -209,6 +223,7 @@ MQ_EXPORT mq_u32 mqt_udp_local_address(void *destination, mq_u32 capacity) {
         : 0;
 }
 
+/* Copy the local host name into caller-owned storage. */
 MQ_EXPORT mq_u32 mqt_udp_host_name(void *destination, mq_u32 capacity) {
     mq_text_void_fn function_value =
         (mq_text_void_fn)mq_backend_proc("mq_udp_host_name");
@@ -217,6 +232,7 @@ MQ_EXPORT mq_u32 mqt_udp_host_name(void *destination, mq_u32 capacity) {
         : 0;
 }
 
+/* Resolve a host name and format its UDP address. */
 MQ_EXPORT mq_u32 mqt_udp_resolve_name(
     const char *name,
     void *destination,
@@ -229,6 +245,7 @@ MQ_EXPORT mq_u32 mqt_udp_resolve_name(
         : 0;
 }
 
+/* Resolve a UDP address back to a host name. */
 MQ_EXPORT mq_u32 mqt_udp_reverse_name(
     const char *address,
     void *destination,
@@ -241,6 +258,7 @@ MQ_EXPORT mq_u32 mqt_udp_reverse_name(
         : 0;
 }
 
+/* Return get string. */
 MQ_EXPORT mq_u32 mqt_gl_get_string(
     mq_u32 name,
     void *destination,

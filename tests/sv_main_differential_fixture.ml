@@ -1,7 +1,9 @@
 /*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
 MiniLang side of the pinned WinQuake/sv_main.c differential oracle.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.native as native
@@ -21,6 +23,7 @@ struct SvMainDifferentialMap
   visibility
 end struct
 
+// Exercise differential map as part of this deterministic regression fixture.
 function differentialMap()
   plane = t.BspPlane(t.Vec3(1.0, 0.0, 0.0), 0.0, 0)
   node = t.BspNode(
@@ -71,12 +74,14 @@ function differentialMap()
   )
 end function
 
+// Exercise differential entity as part of this deterministic regression fixture.
 function differentialEntity(number)
   item = edict.create(number)
   item.number = number
   return item
 end function
 
+// Return differential state derived from the active module state.
 function differentialState()
   state = svmain.SV_Init(1)
   state.server.worldModel = differentialMap()
@@ -87,20 +92,24 @@ function differentialState()
   return state
 end function
 
+// Exercise byte at as part of this deterministic regression fixture.
 function byteAt(buffer, index)
   if index < 0 or index >= buffer.curSize then return 0 end if
   return buffer.data[index]
 end function
 
+// Exercise number text as part of this deterministic regression fixture.
 function numberText(value)
   return native.floatText(value)
 end function
 
+// Return bool number derived from the active module state.
 function boolNumber(value)
   if value then return 1 end if
   return 0
 end function
 
+// Add sv main to the destination state.
 function emitSvMain(functionName, caseName, result, size, b0, b1, b2, value, count)
   print "{\"function\":\"" + functionName + "\",\"case\":\"" + caseName +
     "\",\"result\":" + result + ",\"size\":" + size +
@@ -108,6 +117,7 @@ function emitSvMain(functionName, caseName, result, size, b0, b1, b2, value, cou
     ",\"value\":" + numberText(value) + ",\"count\":" + count + "}"
 end function
 
+// Exercise setup server info as part of this deterministic regression fixture.
 function setupServerInfo(state)
   state.server.levelName = "Oracle"
   state.server.cdTrack = 3
@@ -116,6 +126,7 @@ function setupServerInfo(state)
   return true
 end function
 
+// Exercise loop pair as part of this deterministic regression fixture.
 function loopPair()
   network = netloop.createState()
   clientSocket = netloop.Loop_Connect(network, "local")
@@ -123,7 +134,9 @@ function loopPair()
   return [network, clientSocket, serverSocket]
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   state = svmain.SV_Init(1)
   emitSvMain(
     "SV_Init",

@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/cl_parse_port_tests.ml.
+*/
 import miniquake.client_protocol as protocol
 import miniquake.client as client
 import miniquake.types as t
@@ -9,16 +15,19 @@ import miniquake.protocol_write as writer
 import miniquake.net_loop as netloop
 import miniquake.net_main as netmain
 
+// Assert that the condition holds and identify a failing test.
 function require(value, name)
   if value != true then return error(9870, name) end if
   return true
 end function
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(9871, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function near(actual, expected, tolerance, name)
   delta = actual - expected
   if delta < 0.0 then delta = -delta end if
@@ -26,6 +35,7 @@ function near(actual, expected, tolerance, name)
   return true
 end function
 
+// Exercise byte fixture as part of this deterministic regression fixture.
 function byteFixture(values)
   result = bytes(len(values))
   index = 0
@@ -36,6 +46,7 @@ function byteFixture(values)
   return result
 end function
 
+// Create and initialize client.
 function newClient()
   player = movement.create(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
   result = client.create(player)
@@ -43,6 +54,7 @@ function newClient()
   return result
 end function
 
+// Exercise server info packet as part of this deterministic regression fixture.
 function serverInfoPacket(maxClients)
   buffer = sz.alloc(2048)
   msg.writeByte(buffer, c.SVC_SERVERINFO)
@@ -58,6 +70,7 @@ function serverInfoPacket(maxClients)
   return sz.dataSlice(buffer)
 end function
 
+// Verify server info against the expected Quake behavior.
 function testServerInfo()
   packet = serverInfoPacket(2)
   parsed = protocol.CL_ParseServerMessage(packet)
@@ -85,6 +98,7 @@ function testServerInfo()
   return true
 end function
 
+// Verify sound packets against the expected Quake behavior.
 function testSoundPackets()
   buffer = sz.alloc(128)
   msg.writeByte(buffer, c.SVC_SOUND)
@@ -122,6 +136,7 @@ function testSoundPackets()
   return true
 end function
 
+// Verify fast update against the expected Quake behavior.
 function testFastUpdate()
   // Every protocol-15 update bit is set. This hard-coded fixture verifies the
   // exact byte order rather than round-tripping through the same writer.
@@ -172,6 +187,7 @@ function testFastUpdate()
   return true
 end function
 
+// Verify client data and svc state against the expected Quake behavior.
 function testClientDataAndSvcState()
   buffer = sz.alloc(1024)
   bits = c.SU_VIEWHEIGHT | c.SU_IDEALPITCH |
@@ -242,6 +258,7 @@ function testClientDataAndSvcState()
   return true
 end function
 
+// Verify baselines and disconnect against the expected Quake behavior.
 function testBaselinesAndDisconnect()
   buffer = sz.alloc(256)
   baseline = [1, 2, 0, 3, t.Vec3(4.0, 5.0, 6.0), t.Vec3(0.0, 90.0, 0.0)]
@@ -254,9 +271,27 @@ function testBaselinesAndDisconnect()
   localClient.modelPrecache = ["", "progs/torch.mdl"]
   equal(client.parseMessage(localClient, sz.dataSlice(buffer)), 2, "baseline/static parse")
   equal(localClient.entities[5].baseline[1], 2, "stored baseline frame")
-  staticEntity = localClient.entities[len(localClient.entities) - 1]
+  equal(len(localClient.staticEntities), 1, "separate static entity table")
+  staticEntity = localClient.staticEntities[0]
   near(staticEntity.messageTime, -1.0, 0.000001, "static entity marker")
   near(staticEntity.origin.x, 4.0, 0.000001, "static entity origin")
+
+  // A future ED_Alloc uses dynamic slot 6, which used to alias the appended
+  // static entity. An omitted zero coordinate must come from the dynamic
+  // zero baseline, never from the torch's x=4 baseline.
+  localClient.messageTimes = [1.0, 0.0]
+  localClient.serverTime = 1.0
+  dynamic = client.applyFastUpdate(localClient, [
+    6, 0, 1, 0, 0, 0, 0,
+    [void, 20.0, 30.0], [void, void, void],
+  ])
+  require(dynamic is not error, "future dynamic update after spawnstatic")
+  near(dynamic.messageOrigin.x, 0.0, 0.000001, "dynamic zero coordinate uses dynamic baseline")
+  near(staticEntity.origin.x, 4.0, 0.000001, "static entity survives dynamic slot reuse")
+  client.CL_RelinkEntities(localClient)
+  equal(len(localClient.visibleEntities), 2, "static and reused dynamic slot both relink")
+  equal(localClient.visibleEntities[0].number, 6, "dynamic protocol entity has render priority")
+  equal(localClient.visibleEntities[1].number, c.MAX_EDICTS, "static renderer-local number")
 
   localClient.connected = true
   disconnected = try(client.parseMessage(localClient, byteFixture([c.SVC_DISCONNECT])))
@@ -269,6 +304,7 @@ function testBaselinesAndDisconnect()
   return true
 end function
 
+// Verify keepalive and malformed against the expected Quake behavior.
 function testKeepaliveAndMalformed()
   network = netloop.createState()
   localClient = newClient()
@@ -333,6 +369,7 @@ function testKeepaliveAndMalformed()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "MiniQuake cl_parse port tests starting: 7"
   result = try(testServerInfo())

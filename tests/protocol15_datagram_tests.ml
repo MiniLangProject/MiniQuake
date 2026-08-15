@@ -1,27 +1,31 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-017 byte-exact net_dgrm.c fragmentation, ACK, retransmit and loss tests.
 */
-
 import miniquake.net_datagram as datagram
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(9700, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function yes(value, name)
   if not value then return error(9701, name + ": expected true") end if
   return true
 end function
 
+// Exercise no as part of this deterministic regression fixture.
 function no(value, name)
   if value then return error(9702, name + ": expected false") end if
   return true
 end function
 
+// Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
   print "  [" + number + "/18] " + name
   result = try(fn())
@@ -29,6 +33,7 @@ function run(number, name, fn)
   return true
 end function
 
+// Exercise patterned as part of this deterministic regression fixture.
 function patterned(count)
   data = bytes(count)
   index = 0
@@ -39,6 +44,7 @@ function patterned(count)
   return data
 end function
 
+// Verify header encoding against the expected Quake behavior.
 function testHeaderEncoding()
   wire = datagram.encode(datagram.NETFLAG_DATA | datagram.NETFLAG_EOM, 0x12345678, bytes([1, 2, 3]))
   equal(hex(wire), "0009000b12345678010203", "wire header")
@@ -49,6 +55,7 @@ function testHeaderEncoding()
   return true
 end function
 
+// Verify fragment boundaries against the expected Quake behavior.
 function testFragmentBoundaries()
   exact = datagram.createChannel()
   exactPacket = datagram.Datagram_SendMessage(exact, bytes(datagram.MAX_DATAGRAM), 1.0)
@@ -64,6 +71,7 @@ function testFragmentBoundaries()
   return true
 end function
 
+// Verify ack defers next fragment against the expected Quake behavior.
 function testAckDefersNextFragment()
   sender = datagram.createChannel()
   datagram.Datagram_SendMessage(sender, bytes(1500), 2.0)
@@ -80,6 +88,7 @@ function testAckDefersNextFragment()
   return true
 end function
 
+// Verify reliable reassembly against the expected Quake behavior.
 function testReliableReassembly()
   payload = patterned(2500)
   sender = datagram.createChannel()
@@ -105,6 +114,7 @@ function testReliableReassembly()
   return true
 end function
 
+// Verify lost ack retransmit against the expected Quake behavior.
 function testLostAckRetransmit()
   sender = datagram.createChannel()
   receiver = datagram.createChannel()
@@ -123,6 +133,7 @@ function testLostAckRetransmit()
   return true
 end function
 
+// Verify lost data retransmit against the expected Quake behavior.
 function testLostDataRetransmit()
   sender = datagram.createChannel()
   first = datagram.Datagram_SendMessage(sender, bytes(1500), 20.0)
@@ -137,6 +148,7 @@ function testLostDataRetransmit()
   return true
 end function
 
+// Verify duplicate data against the expected Quake behavior.
 function testDuplicateData()
   receiver = datagram.createChannel()
   packet = datagram.encode(datagram.NETFLAG_DATA, 0, bytes([1, 2, 3]))
@@ -149,6 +161,7 @@ function testDuplicateData()
   return true
 end function
 
+// Verify stale and duplicate ack against the expected Quake behavior.
 function testStaleAndDuplicateAck()
   sender = datagram.createChannel()
   datagram.Datagram_SendMessage(sender, bytes(1500), 1.0)
@@ -163,6 +176,7 @@ function testStaleAndDuplicateAck()
   return true
 end function
 
+// Verify nak extension against the expected Quake behavior.
 function testNakExtension()
   sender = datagram.createChannel()
   original = datagram.Datagram_SendMessage(sender, bytes("retry"), 3.0)
@@ -173,6 +187,7 @@ function testNakExtension()
   return true
 end function
 
+// Verify unreliable gap and stale against the expected Quake behavior.
 function testUnreliableGapAndStale()
   receiver = datagram.createChannel()
   gap = datagram.Datagram_GetMessage(receiver, datagram.encode(datagram.NETFLAG_UNRELIABLE, 3, bytes("u3")), 1.0)
@@ -185,6 +200,7 @@ function testUnreliableGapAndStale()
   return true
 end function
 
+// Verify sequence wrap against the expected Quake behavior.
 function testSequenceWrap()
   sender = datagram.createChannel()
   sender.sendSequence = 0xffffffff
@@ -199,6 +215,7 @@ function testSequenceWrap()
   return true
 end function
 
+// Verify receive overflow against the expected Quake behavior.
 function testReceiveOverflow()
   receiver = datagram.createChannel()
   receiver.receiveMessage = bytes(datagram.NET_MAXMESSAGE)
@@ -208,6 +225,7 @@ function testReceiveOverflow()
   return true
 end function
 
+// Verify payload bounds against the expected Quake behavior.
 function testPayloadBounds()
   empty = try(datagram.Datagram_SendMessage(datagram.createChannel(), bytes(), 0.0))
   yes(empty is error, "empty reliable rejected")
@@ -220,6 +238,7 @@ function testPayloadBounds()
   return true
 end function
 
+// Verify can send query side effect free against the expected Quake behavior.
 function testCanSendQuerySideEffectFree()
   channel = datagram.createChannel()
   channel.canSend = false
@@ -232,6 +251,7 @@ function testCanSendQuerySideEffectFree()
   return true
 end function
 
+// Verify receive loop deferral against the expected Quake behavior.
 function testReceiveLoopDeferral()
   sender = datagram.createChannel()
   datagram.Datagram_SendMessage(sender, bytes(1500), 0.0)
@@ -245,6 +265,7 @@ function testReceiveLoopDeferral()
   return true
 end function
 
+// Verify control ignored against the expected Quake behavior.
 function testControlIgnored()
   channel = datagram.createChannel()
   packet = datagram.control(bytes([1, 2, 3, 4]))
@@ -254,6 +275,7 @@ function testControlIgnored()
   return true
 end function
 
+// Verify statistics against the expected Quake behavior.
 function testStatistics()
   datagram.resetStats()
   sender = datagram.createChannel()
@@ -268,6 +290,7 @@ function testStatistics()
   return true
 end function
 
+// Verify strict length decode against the expected Quake behavior.
 function testStrictLengthDecode()
   valid = datagram.encode(datagram.NETFLAG_UNRELIABLE, 0, bytes([1]))
   malformed = bytes(len(valid) + 1)
@@ -281,6 +304,7 @@ function testStrictLengthDecode()
   return true
 end function
 
+// Exercise fault scenario as part of this deterministic regression fixture.
 function faultScenario()
   sender = datagram.createChannel()
   receiver = datagram.createChannel()
@@ -300,6 +324,7 @@ function faultScenario()
   return hex(finalRx[1]) + ":" + sender.sendSequence + ":" + receiver.receiveSequence + ":" + sender.packetsReSent
 end function
 
+// Verify deterministic fault schedule against the expected Quake behavior.
 function testDeterministicFaultSchedule()
   first = faultScenario()
   second = faultScenario()

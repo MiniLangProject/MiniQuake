@@ -1,26 +1,29 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-024 asset-free closure fixtures for the frozen QuakeC 1.09 contract.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.quakec.vm as vm
 import miniquake.quakec.builtins as builtins
 import miniquake.quakec.contract as contract
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(10040, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function yes(value, name)
   if value != true then return error(10041, name + ": expected true") end if
   return true
 end function
 
+// Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
   print "  [" + number + "/20] " + name
   result = try(fn())
@@ -31,6 +34,7 @@ function run(number, name, fn)
   return true
 end function
 
+// Create and initialize definitions.
 function makeDefinitions(names, typeValue)
   result = []
   offset = 0
@@ -41,6 +45,7 @@ function makeDefinitions(names, typeValue)
   return result
 end function
 
+// Create and initialize functions.
 function makeFunctions(skipName, builtinIndex)
   result = [t.QuakeCFunction(0, 0, 0, 0, "", "", 0, [])]
   statement = 0
@@ -56,6 +61,7 @@ function makeFunctions(skipName, builtinIndex)
   return result
 end function
 
+// Create and initialize program.
 function makeProgram(skipGlobal, skipField, skipFunction, builtinIndex)
   globalNames = []
   for each name in contract.requiredGlobals()
@@ -87,15 +93,18 @@ function makeProgram(skipGlobal, skipField, skipFunction, builtinIndex)
   )
 end function
 
+// Report whether program.
 function validProgram()
   return makeProgram("", "", "", 78)
 end function
 
+// Verify status against the expected Quake behavior.
 function testStatus()
   equal(contract.STATUS, "quakec_109_frozen_v1", "status")
   return true
 end function
 
+// Verify constants against the expected Quake behavior.
 function testConstants()
   equal(contract.EXPECTED_VERSION, 6, "version")
   equal(contract.EXPECTED_HEADER_CRC, 5927, "header CRC")
@@ -106,6 +115,7 @@ function testConstants()
   return true
 end function
 
+// Verify builtin table against the expected Quake behavior.
 function testBuiltinTable()
   equal(len(builtins.builtinNames()), 79, "name count")
   equal(len(builtins.fixmeSlots()), 14, "fixme count")
@@ -113,16 +123,19 @@ function testBuiltinTable()
   return true
 end function
 
+// Verify contract fingerprint against the expected Quake behavior.
 function testContractFingerprint()
   equal(contract.contractFingerprint(), 0xbc89cbf1, "contract fingerprint")
   return true
 end function
 
+// Verify valid program against the expected Quake behavior.
 function testValidProgram()
   yes(contract.validate(validProgram()), "valid synthetic stock program")
   return true
 end function
 
+// Verify bad version against the expected Quake behavior.
 function testBadVersion()
   program = validProgram()
   program.version = 5
@@ -130,6 +143,7 @@ function testBadVersion()
   return true
 end function
 
+// Verify bad crc against the expected Quake behavior.
 function testBadCrc()
   program = validProgram()
   program.crc = 1
@@ -137,6 +151,7 @@ function testBadCrc()
   return true
 end function
 
+// Verify bad entity fields against the expected Quake behavior.
 function testBadEntityFields()
   program = validProgram()
   program.entityFields = 0
@@ -144,6 +159,7 @@ function testBadEntityFields()
   return true
 end function
 
+// Verify highest stock builtin against the expected Quake behavior.
 function testHighestStockBuiltin()
   program = makeProgram("", "", "", 78)
   yes(contract.validate(program), "builtin 78 accepted")
@@ -151,33 +167,39 @@ function testHighestStockBuiltin()
   return true
 end function
 
+// Verify out of range builtin against the expected Quake behavior.
 function testOutOfRangeBuiltin()
   program = makeProgram("", "", "", 79)
   yes(try(contract.validate(program)) is error, "builtin 79 rejected")
   return true
 end function
 
+// Verify missing global against the expected Quake behavior.
 function testMissingGlobal()
   yes(try(contract.validate(makeProgram("self", "", "", 78))) is error, "missing self rejected")
   return true
 end function
 
+// Verify missing field against the expected Quake behavior.
 function testMissingField()
   yes(try(contract.validate(makeProgram("", "classname", "", 78))) is error, "missing classname rejected")
   return true
 end function
 
+// Verify missing function against the expected Quake behavior.
 function testMissingFunction()
   yes(try(contract.validate(makeProgram("", "", "worldspawn", 78))) is error, "missing worldspawn rejected")
   return true
 end function
 
+// Verify builtin reference count against the expected Quake behavior.
 function testBuiltinReferenceCount()
   program = validProgram()
   equal(contract.builtinReferenceCount(program), 1, "builtin reference count")
   return true
 end function
 
+// Verify no builtin references against the expected Quake behavior.
 function testNoBuiltinReferences()
   program = makeProgram("", "", "", 0)
   equal(contract.builtinReferenceCount(program), 0, "no builtin references")
@@ -185,12 +207,14 @@ function testNoBuiltinReferences()
   return true
 end function
 
+// Verify program fingerprint stable against the expected Quake behavior.
 function testProgramFingerprintStable()
   program = validProgram()
   equal(contract.programFingerprint(program), contract.programFingerprint(program), "stable fingerprint")
   return true
 end function
 
+// Verify program fingerprint mutation against the expected Quake behavior.
 function testProgramFingerprintMutation()
   first = validProgram()
   second = validProgram()
@@ -199,6 +223,7 @@ function testProgramFingerprintMutation()
   return true
 end function
 
+// Verify summary against the expected Quake behavior.
 function testSummary()
   program = validProgram()
   summary = contract.summary(program)
@@ -210,6 +235,7 @@ function testSummary()
   return true
 end function
 
+// Verify required definition sets against the expected Quake behavior.
 function testRequiredDefinitionSets()
   yes(len(contract.requiredGlobals()) >= 50, "generated globals covered")
   yes(len(contract.requiredFields()) >= 70, "generated fields covered")
@@ -217,12 +243,14 @@ function testRequiredDefinitionSets()
   return true
 end function
 
+// Verify vm limits bound against the expected Quake behavior.
 function testVmLimitsBound()
   equal(vm.MAX_STACK_DEPTH, contract.EXPECTED_STACK_DEPTH, "VM stack bound")
   equal(vm.LOCALSTACK_SIZE, contract.EXPECTED_LOCALSTACK_SIZE, "VM local bound")
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "MiniQuake BP-024 QuakeC closure tests"
   passed = 0

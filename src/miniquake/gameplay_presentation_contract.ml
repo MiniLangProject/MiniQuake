@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang implementation of miniquake.gameplay_presentation_contract.
+*/
 package miniquake.gameplay_presentation_contract
 
 const STATUS = "gameplay_presentation_109_frozen_v1"
@@ -18,6 +25,7 @@ const LOADING_TIMEOUT_SECONDS = 60
 const STATUSBAR_HEIGHT = 24
 const MAX_SCOREBOARD = 16
 
+// Report whether canonical text.
 function canonicalText()
   return STATUS + "\n" +
     "angle_units=65536\n" +
@@ -44,6 +52,7 @@ function canonicalText()
     "screenshot_failure_text=PCX\n"
 end function
 
+// Provide fnv1a32 behavior for the active subsystem.
 function fnv1a32(text)
   data = bytes(text)
   value = 0x811c9dc5
@@ -55,6 +64,7 @@ function fnv1a32(text)
   return value
 end function
 
+// Validate the requested value and report any invalid state.
 function verify()
   if fnv1a32(canonicalText()) != FINGERPRINT then return error(10790, "gameplay/presentation fingerprint mismatch") end if
   if ANGLE_UNITS != 65536 or CHASE_TRACE_DISTANCE != 4096 then return error(10791, "math/chase contract mismatch") end if

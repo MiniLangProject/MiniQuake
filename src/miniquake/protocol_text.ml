@@ -1,6 +1,7 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Protocol-15 strings are byte-oriented C strings. MiniLang strings are UTF-8,
 so sending bytes(text) directly changes every Quake character >= 0x80. This
@@ -8,11 +9,11 @@ module defines a reversible one-byte bridge: Unicode U+0000..U+00FF maps to
 Quake byte 0x00..0xFF. Code points outside that range are rejected rather than
 silently changing the wire format.
 */
-
 package miniquake.protocol_text
 
 const TEXT_ABI = "quake_latin1_cstring_v1"
 
+// Encode and write bytes.
 function encodeBytes(text)
   if text is void then return bytes() end if
   if text is not string then return error(1310, "Quake C string requires string or void") end if
@@ -60,6 +61,7 @@ function encodeBytes(text)
   return slice(output, 0, outputCount)
 end function
 
+// Read and validate bytes.
 function decodeBytes(data)
   if data is not bytes then return error(1314, "Quake byte string requires bytes") end if
 
@@ -89,10 +91,12 @@ function decodeBytes(data)
   return decoded
 end function
 
+// Encode and write d length.
 function encodedLength(text)
   return len(encodeBytes(text))
 end function
 
+// Return round trip bytes derived from the active module state.
 function roundTripBytes(data)
   return encodeBytes(decodeBytes(data))
 end function

@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.client.
+*/
 package miniquake.client
 
 import miniquake.types as t
@@ -45,11 +52,13 @@ function clientFloat(value)
   return native.bitsFloat(native.floatBits(value))
 end function
 
+// Provide client lerp behavior for the active subsystem.
 function clientLerp(previous, current, fraction)
   delta = clientFloat(current - previous)
   return clientFloat(previous + clientFloat(fraction * delta))
 end function
 
+// Create and initialize dynamic light.
 function newDynamicLight()
   return t.DynamicLight(
     t.Vec3(0.0, 0.0, 0.0),
@@ -61,6 +70,7 @@ function newDynamicLight()
   )
 end function
 
+// Update module state for dynamic light.
 function resetDynamicLight(light, key)
   light.origin = t.Vec3(0.0, 0.0, 0.0)
   light.radius = 0.0
@@ -71,6 +81,7 @@ function resetDynamicLight(light, key)
   return light
 end function
 
+// Ensure sufficient storage or state for dynamic lights.
 function ensureDynamicLights()
   global clDlights
   if len(clDlights) == c.MAX_DLIGHTS then return clDlights end if
@@ -83,6 +94,7 @@ function ensureDynamicLights()
   return clDlights
 end function
 
+// Apply the Quake-compatible cl clear dlights behavior.
 function CL_ClearDlights()
   global clDlights
   ensureDynamicLights()
@@ -94,11 +106,13 @@ function CL_ClearDlights()
   return true
 end function
 
+// Apply the Quake-compatible cl dlights behavior.
 function CL_Dlights()
   ensureDynamicLights()
   return clDlights
 end function
 
+// Apply the Quake-compatible cl set dlight time behavior.
 function CL_SetDlightTime(oldTime, currentTime)
   global clDlightOldTime, clDlightTime
   clDlightOldTime = oldTime
@@ -134,12 +148,14 @@ function CL_AllocDlight(key)
   return resetDynamicLight(clDlights[0], key)
 end function
 
+// Apply the Quake-compatible cl alloc dlight at behavior.
 function CL_AllocDlightAt(key, currentTime)
   global clDlightTime
   clDlightTime = currentTime
   return CL_AllocDlight(key)
 end function
 
+// Apply the Quake-compatible cl dlight index for key behavior.
 function CL_DlightIndexForKey(key)
   global clDlights
   ensureDynamicLights()
@@ -151,6 +167,7 @@ function CL_DlightIndexForKey(key)
   return -1
 end function
 
+// Apply the Quake-compatible cl decay lights behavior.
 function CL_DecayLights()
   global clDlights, clDlightOldTime, clDlightTime
   ensureDynamicLights()
@@ -167,6 +184,7 @@ function CL_DecayLights()
   return true
 end function
 
+// Apply the Quake-compatible cl decay lights at behavior.
 function CL_DecayLightsAt(currentTime, elapsed)
   global clDlightOldTime, clDlightTime
   clDlightOldTime = currentTime - elapsed
@@ -174,6 +192,7 @@ function CL_DecayLightsAt(currentTime, elapsed)
   return CL_DecayLights()
 end function
 
+// Apply the Quake-compatible cl lerp point behavior.
 function CL_LerpPoint(client)
   // f and frac are float locals in cl_main.c; mtime/time remain double.
   interval = clientFloat(client.messageTimes[0] - client.messageTimes[1])
@@ -198,40 +217,47 @@ function CL_LerpPoint(client)
   return fraction
 end function
 
+// Provide interpolated angle behavior for the active subsystem.
 function interpolatedAngle(previous, current, fraction)
   delta = clientFloat(current - previous)
   if delta > 180.0 then delta = clientFloat(delta - 360.0) else if delta < -180.0 then delta = clientFloat(delta + 360.0) end if
   return clientLerp(previous, clientFloat(previous + delta), fraction)
 end function
 
+// Apply the Quake-compatible cl set model flags behavior.
 function CL_SetModelFlags(flags)
   global clModelFlags
   clModelFlags = flags
   return len(clModelFlags)
 end function
 
+// Apply the Quake-compatible cl model flags behavior.
 function CL_ModelFlags()
   global clModelFlags
   return clModelFlags
 end function
 
+// Apply the Quake-compatible cl set model sync types behavior.
 function CL_SetModelSyncTypes(syncTypes)
   global clModelSyncTypes
   clModelSyncTypes = syncTypes
   return len(clModelSyncTypes)
 end function
 
+// Apply the Quake-compatible cl model sync types behavior.
 function CL_ModelSyncTypes()
   global clModelSyncTypes
   return clModelSyncTypes
 end function
 
+// Return model sync type for index derived from the active module state.
 function modelSyncTypeForIndex(modelIndex)
   global clModelSyncTypes
   if modelIndex < 0 or modelIndex >= len(clModelSyncTypes) then return c.ST_SYNC end if
   return clModelSyncTypes[modelIndex]
 end function
 
+// Apply the Quake-compatible cl assign model sync base behavior.
 function CL_AssignModelSyncBase(entity, previousModelIndex)
   if entity.modelIndex == previousModelIndex then return entity.syncBase end if
   if entity.modelIndex <= 0 then entity.syncBase = 0.0; return entity.syncBase end if
@@ -243,18 +269,21 @@ function CL_AssignModelSyncBase(entity, previousModelIndex)
   return entity.syncBase
 end function
 
+// Apply the Quake-compatible cl set chase active behavior.
 function CL_SetChaseActive(active)
   global clChaseActive
   clChaseActive = active
   return active
 end function
 
+// Return model flags for index derived from the active module state.
 function modelFlagsForIndex(modelIndex)
   global clModelFlags
   if modelIndex < 0 or modelIndex >= len(clModelFlags) then return 0 end if
   return clModelFlags[modelIndex]
 end function
 
+// Add state for queue relink particle effect.
 function queueRelinkParticleEffect(command, payload)
   global clRelinkParticleEffects, clRelinkParticlePool, clRelinkParticlePoolActive, clRelinkParticleTime
   if clRelinkParticlePoolActive then
@@ -275,6 +304,7 @@ function queueRelinkParticleEffect(command, payload)
   return len(clRelinkParticleEffects)
 end function
 
+// Apply the Quake-compatible cl take relink particle effects behavior.
 function CL_TakeRelinkParticleEffects()
   global clRelinkParticleEffects
   result = clRelinkParticleEffects
@@ -282,6 +312,7 @@ function CL_TakeRelinkParticleEffects()
   return result
 end function
 
+// Apply the Quake-compatible cl begin relink particles behavior.
 function CL_BeginRelinkParticles(active)
   global clRelinkParticlePool, clRelinkParticlePoolActive
   clRelinkParticlePool = active
@@ -289,6 +320,7 @@ function CL_BeginRelinkParticles(active)
   return len(clRelinkParticlePool)
 end function
 
+// Apply the Quake-compatible cl end relink particles behavior.
 function CL_EndRelinkParticles()
   global clRelinkParticlePool, clRelinkParticlePoolActive
   result = clRelinkParticlePool
@@ -297,10 +329,12 @@ function CL_EndRelinkParticles()
   return result
 end function
 
+// Apply the Quake-compatible cl set random seed behavior.
 function CL_SetRandomSeed(seed)
   return particles.resetRandom(seed)
 end function
 
+// Add state for add entity effect dlights.
 function addEntityEffectDlights(entity, currentTime)
   effects = entity.effects
   if (effects & c.EF_MUZZLEFLASH) != 0 then
@@ -329,6 +363,7 @@ function addEntityEffectDlights(entity, currentTime)
   return true
 end function
 
+// Apply the Quake-compatible cl relink entities behavior.
 function CL_RelinkEntities(client)
   global clRelinkParticleEffects, clChaseActive, clDlightTime, clRelinkParticleTime
   fraction = CL_LerpPoint(client)
@@ -430,6 +465,17 @@ function CL_RelinkEntities(client)
     end if
     index = index + 1
   end while
+  // WinQuake owns makestatic objects in cl_static_entities, outside numbered
+  // cl_entities. Dynamic entities enter cl_visedicts in CL_RelinkEntities;
+  // static efrags are appended later while drawing the world. Preserve that
+  // ordering so a full MAX_VISEDICTS list never drops a rocket or grenade in
+  // favor of a signon-time torch. The separate table also prevents a future
+  // ED_Alloc from inheriting an unrelated static baseline.
+  for each staticEntity in client.staticEntities
+    if staticEntity is not void and staticEntity.modelIndex != 0 and visibleBuilder.count < c.MAX_VISEDICTS then
+      arrayutil.pushArrayBuilder(visibleBuilder, staticEntity)
+    end if
+  end for
   client.visibleEntities = arrayutil.finishArrayBuilder(visibleBuilder)
   return client.visibleEntities
 end function
@@ -439,6 +485,20 @@ end function
 // Keep this as a defensive view: invalid/cleared entries can never leak into a
 // modern backend even if a caller retained an older visibleEntities array.
 function CL_ActiveVisibleEntities(client)
+  // CL_RelinkEntities already builds this list with the same validation and
+  // MAX_VISEDICTS cap. Retain the defensive scan for external/test callers,
+  // but keep the normal frame handoff zero-copy.
+  valid = true
+  count = 0
+  while count < len(client.visibleEntities)
+    entity = client.visibleEntities[count]
+    if entity is void or entity.modelIndex == 0 or count >= c.MAX_VISEDICTS then
+      valid = false
+      break
+    end if
+    count = count + 1
+  end while
+  if valid then return client.visibleEntities end if
   builder = arrayutil.createArrayBuilder(len(client.visibleEntities))
   for each entity in client.visibleEntities
     if entity is not void and entity.modelIndex != 0 and builder.count < c.MAX_VISEDICTS then
@@ -446,6 +506,84 @@ function CL_ActiveVisibleEntities(client)
     end if
   end for
   return arrayutil.finishArrayBuilder(builder)
+end function
+
+// Filter an integrated listen client's render list against the authoritative
+// server-edict mirror. Protocol 15 normally removes an omitted entity during
+// CL_RelinkEntities. This final boundary also covers a retained list from an
+// earlier frame: a freed edict or an item hidden by `self.model = string_null`
+// must never reach any renderer backend. The common all-valid path is
+// deliberately zero-copy.
+function CL_FilterAuthoritativeVisibleEntities(visibleEntities, authoritativeEdicts)
+  valid = true
+  index = 0
+  while index < len(visibleEntities)
+    entity = visibleEntities[index]
+    if entity is void then
+      valid = false
+      break
+    end if
+    // svc_spawnstatic consumes and frees its server edict during signon. Its
+    // negative message time marks a permanent client-only render entity.
+    if entity.messageTime >= 0.0 then
+      if entity.number <= 0 or entity.number >= len(authoritativeEdicts) then
+        valid = false
+        break
+      end if
+      authoritative = authoritativeEdicts[entity.number]
+      if authoritative is void or authoritative.free or authoritative.modelIndex == 0 or authoritative.model == "" then
+        valid = false
+        break
+      end if
+    end if
+    index = index + 1
+  end while
+  if valid then return visibleEntities end if
+
+  builder = arrayutil.createArrayBuilder(len(visibleEntities))
+  for each entity in visibleEntities
+    if entity is not void and entity.messageTime < 0.0 then
+      arrayutil.pushArrayBuilder(builder, entity)
+    else if entity is not void and entity.number > 0 and entity.number < len(authoritativeEdicts) then
+      authoritative = authoritativeEdicts[entity.number]
+      if authoritative is not void and not authoritative.free and authoritative.modelIndex != 0 and authoritative.model != "" then
+        arrayutil.pushArrayBuilder(builder, entity)
+      end if
+    end if
+  end for
+  return arrayutil.finishArrayBuilder(builder)
+end function
+
+// Apply an integrated listen server's authoritative entity visibility before
+// CL_RelinkEntities constructs the frame list. Pickups commonly clear only
+// their QuakeC `model` string while retaining the precached modelindex for a
+// possible deathmatch respawn. Protocol omission clears the entity on the
+// following client message; the shared local process can safely clear it in
+// the same frame and must do so before any renderer or efrag consumer runs.
+function CL_ApplyAuthoritativeEntityVisibility(client, authoritativeEdicts)
+  if client is void or authoritativeEdicts is void then return 0 end if
+  cleared = 0
+  index = client.maxClients + 1
+  if index < 1 then index = 1 end if
+  while index < len(client.entities)
+    entity = client.entities[index]
+    if entity is not void and entity.modelIndex != 0 then
+      number = entity.number
+      hidden = number <= 0 or number >= len(authoritativeEdicts)
+      if not hidden then
+        authoritative = authoritativeEdicts[number]
+        hidden = authoritative is void or authoritative.free or
+          authoritative.modelIndex == 0 or authoritative.model == ""
+      end if
+      if hidden then
+        entity.modelIndex = 0
+        entity.forceLink = true
+        cleared = cleared + 1
+      end if
+    end if
+    index = index + 1
+  end while
+  return cleared
 end function
 
 // gl_refrag.c removes stale efrags when a force-linked entity no longer has a
@@ -461,6 +599,7 @@ function CL_ViewEntityOrigin(client)
   return t.Vec3(0.0, 0.0, 0.0)
 end function
 
+// Apply the Quake-compatible cl efrag removal candidates behavior.
 function CL_EfragRemovalCandidates(client)
   builder = arrayutil.createArrayBuilder(len(client.entities))
   for each entity in client.entities
@@ -471,6 +610,7 @@ function CL_EfragRemovalCandidates(client)
   return arrayutil.finishArrayBuilder(builder)
 end function
 
+// Return next dlight random for the active module state.
 function nextDlightRandom()
   return particles.compatRand()
 end function
@@ -489,6 +629,7 @@ function CL_UpdateEntityDlights(client, currentTime)
   return clDlights
 end function
 
+// Create and initialize entity.
 function createEntity(number)
   origin = t.Vec3(0.0, 0.0, 0.0)
   angles = t.Vec3(0.0, 0.0, 0.0)
@@ -521,6 +662,7 @@ function createEntity(number)
   )
 end function
 
+// Create and initialize the module state.
 function create(player)
   CL_ClearDlights()
   scores = arrayutil.makeEmptyArray(1)
@@ -540,6 +682,7 @@ function create(player)
     [""],
     0,
     0.0,
+    [],
     [],
     [],
     [],
@@ -578,6 +721,7 @@ function create(player)
   )
 end function
 
+// Apply the Quake-compatible cl set standard quake behavior.
 function CL_SetStandardQuake(client, value)
   global clStandardQuake
   clStandardQuake = value
@@ -613,6 +757,7 @@ function CL_ClearState(client)
   client.messages = []
   client.printLog = []
   client.entities = []
+  client.staticEntities = []
   client.visibleEntities = []
   resetScores(client, 1)
   client.stats = arrayutil.makeFilledArray(c.MAX_CL_STATS, 0)
@@ -635,6 +780,7 @@ function CL_ClearState(client)
   return true
 end function
 
+// Update module state for state.
 function clearState(client)
   return CL_ClearState(client)
 end function
@@ -656,6 +802,7 @@ function CL_NextDemo(commands, demos, demoNumber)
   return [true, demoNumber + 1]
 end function
 
+// Apply the Quake-compatible cl print entities f behavior.
 function CL_PrintEntities_f(client)
   lines = []
   index = 0
@@ -682,6 +829,7 @@ function inline SetPal(index)
   return false
 end function
 
+// Update module state for scores.
 function resetScores(client, count)
   if count < 1 then count = 1 end if
   client.scores = arrayutil.makeEmptyArray(count)
@@ -693,10 +841,12 @@ function resetScores(client, count)
   return client.scores
 end function
 
+// Report whether score index.
 function validScoreIndex(client, index)
   return index >= 0 and index < len(client.scores)
 end function
 
+// Ensure sufficient storage or state for entity.
 function ensureEntity(client, number)
   while len(client.entities) <= number
     client.entities = client.entities + [void]
@@ -705,11 +855,13 @@ function ensureEntity(client, number)
   return client.entities[number]
 end function
 
+// Apply the Quake-compatible cl entity num behavior.
 function CL_EntityNum(client, number)
   if number < 0 or number >= c.MAX_EDICTS then return error(2910, "CL_EntityNum: " + number + " is an invalid number") end if
   return ensureEntity(client, number)
 end function
 
+// Apply the Quake-compatible cl new translation behavior.
 function CL_NewTranslation(client, slot)
   global clTranslations
   if slot < 0 or slot >= client.maxClients or slot >= len(client.scores) then
@@ -744,10 +896,12 @@ function CL_NewTranslation(client, slot)
   return translation
 end function
 
+// Establish the requested value using the active network transport.
 function connect(client, network)
   return CL_EstablishConnection(client, network, "local")
 end function
 
+// Apply the Quake-compatible cl establish connection behavior.
 function CL_EstablishConnection(client, network, host)
   global clMoveMessages
   if client.demoPlayback then return false end if
@@ -771,10 +925,12 @@ function CL_EstablishConnection(client, network, host)
   return client
 end function
 
+// Establish host using the active network transport.
 function connectHost(client, network, host)
   return CL_EstablishConnection(client, network, host)
 end function
 
+// Apply the Quake-compatible cl establish interop connection behavior.
 function CL_EstablishInteropConnection(client, network, host, timeoutMilliseconds, resendMilliseconds)
   global clMoveMessages
   if client.demoPlayback then return error(2950, "interop connect cannot start during demo playback") end if
@@ -795,10 +951,12 @@ function CL_EstablishInteropConnection(client, network, host, timeoutMillisecond
   return client
 end function
 
+// Establish host interop using the active network transport.
 function connectHostInterop(client, network, host, timeoutMilliseconds, resendMilliseconds)
   return CL_EstablishInteropConnection(client, network, host, timeoutMilliseconds, resendMilliseconds)
 end function
 
+// Apply the Quake-compatible cl keepalive message behavior.
 function CL_KeepaliveMessage(client, localServerActive, realtime)
   global clKeepaliveLastMessage
   if localServerActive or client.demoPlayback or not client.connected or client.socket is void then return false end if
@@ -825,6 +983,7 @@ function CL_KeepaliveMessage(client, localServerActive, realtime)
   return sent == 1
 end function
 
+// Establish the requested value using the active network transport.
 function reconnect(client)
   global clMoveMessages
   if not client.connected or client.socket is void or client.socket.disconnected then return false end if
@@ -836,6 +995,7 @@ function reconnect(client)
   return true
 end function
 
+// Apply the Quake-compatible cl disconnect behavior.
 function CL_Disconnect(client)
   global clMoveMessages
   if client.demoPlayback then
@@ -857,21 +1017,25 @@ function CL_Disconnect(client)
   return true
 end function
 
+// Terminate the requested value and release its transport state.
 function disconnect(client)
   return CL_Disconnect(client)
 end function
 
+// Apply the Quake-compatible cl disconnect f behavior.
 function CL_Disconnect_f(client)
   global clDisconnectRequestedServerShutdown
   clDisconnectRequestedServerShutdown = true
   return CL_Disconnect(client)
 end function
 
+// Apply the Quake-compatible cl server shutdown requested behavior.
 function CL_ServerShutdownRequested()
   global clDisconnectRequestedServerShutdown
   return clDisconnectRequestedServerShutdown
 end function
 
+// Release state for drop connection.
 function dropConnection(client)
   global clMoveMessages
   if client.socket is not void then netmain.NET_Close(client.socket) end if
@@ -883,12 +1047,14 @@ function dropConnection(client)
   return true
 end function
 
+// Add state for queue string.
 function queueString(client, text)
   if not client.connected or client.socket is void then return -1 end if
   writer.writeStringCommand(client.outgoing, text)
   return client.outgoing.curSize
 end function
 
+// Send reliable through the active connection.
 function sendReliable(client)
   if not client.connected or client.socket is void then return -1 end if
   if client.outgoing.curSize == 0 then return 0 end if
@@ -898,12 +1064,14 @@ function sendReliable(client)
   return result
 end function
 
+// Send string through the active connection.
 function sendString(client, text)
   queued = queueString(client, text)
   if queued < 0 then return queued end if
   return sendReliable(client)
 end function
 
+// Send move through the active connection.
 function sendMove(client, command)
   global clMoveMessages
   if not client.spawned then return 0 end if
@@ -936,13 +1104,13 @@ function sendMove(client, command)
   return result
 end function
 
+// Apply the Quake-compatible cl send move behavior.
 function CL_SendMove(client, command)
   return sendMove(client, command)
 end function
 
-function applyBaseline(client, number, baseline)
-  entity = CL_EntityNum(client, number)
-  if entity is error then return entity end if
+// Apply baseline values to an existing dynamic or static client entity.
+function assignBaseline(entity, baseline)
   previousModelIndex = entity.modelIndex
   entity.baseline = [
     baseline[0],
@@ -968,6 +1136,14 @@ function applyBaseline(client, number, baseline)
   return entity
 end function
 
+// Apply baseline to the active subsystem state.
+function applyBaseline(client, number, baseline)
+  entity = CL_EntityNum(client, number)
+  if entity is error then return entity end if
+  return assignBaseline(entity, baseline)
+end function
+
+// Apply fast update to the active subsystem state.
 function applyFastUpdate(client, payload)
   number = payload[0]
   entity = CL_EntityNum(client, number)
@@ -1025,6 +1201,7 @@ function applyFastUpdate(client, payload)
   return entity
 end function
 
+// Advance signon by one processing step.
 function advanceSignon(client, stage)
   if stage < c.SIGNON_SERVERINFO or stage > c.SIGNONS then
     return error(2903, "CL_ParseServerMessage: invalid signon " + stage)
@@ -1036,6 +1213,7 @@ function advanceSignon(client, stage)
   return CL_SignonReply(client)
 end function
 
+// Apply the Quake-compatible cl signon reply behavior.
 function CL_SignonReply(client)
   if client.signon == c.SIGNON_ACTIVE then
     client.spawned = true
@@ -1056,6 +1234,7 @@ function CL_SignonReply(client)
   return true
 end function
 
+// Apply event to the active subsystem state.
 function applyEvent(client, item)
   name = item.command
   payload = item.payload
@@ -1154,16 +1333,15 @@ function applyEvent(client, item)
     baselineEntity = applyBaseline(client, payload[0], payload[1])
     if baselineEntity is error then return baselineEntity end if
   else if name == "svc_spawnstatic" then
-    number = len(client.entities)
-    staticCount = 0
-    for each candidate in client.entities
-      if candidate is not void and candidate.messageTime < 0.0 then staticCount = staticCount + 1 end if
-    end for
+    staticCount = len(client.staticEntities)
     if staticCount >= c.MAX_STATIC_ENTITIES then return error(2926, "Too many static entities") end if
-    staticEntity = applyBaseline(client, number, payload)
-    if staticEntity is error then return staticEntity end if
+    // The number is renderer-local and deliberately outside Protocol 15's
+    // 0..MAX_EDICTS-1 domain. It may never alias a future fast update.
+    staticEntity = createEntity(c.MAX_EDICTS + staticCount)
+    assignBaseline(staticEntity, payload)
     staticEntity.messageTime = -1.0
     staticEntity.forceLink = false
+    client.staticEntities = client.staticEntities + [staticEntity]
   else if name == "fast_update" then
     // MiniQuake promotes signon 3 to 4 on the first entity update. The server
     // never emits svc_signonnum 4 on the original demo/network path.
@@ -1287,6 +1465,7 @@ function applyEvent(client, item)
   return true
 end function
 
+// Read and validate message.
 function parseMessage(client, data)
   result = try(protocol.CL_ParseServerMessage(data))
   if result is error then return result end if
@@ -1297,6 +1476,7 @@ function parseMessage(client, data)
   return len(result.events)
 end function
 
+// Read and validate network messages.
 function readNetworkMessages(client, realtime)
   if not client.connected or client.socket is void then return 0 end if
   processed = 0
@@ -1323,10 +1503,12 @@ function readNetworkMessages(client, realtime)
   return processed
 end function
 
+// Advance the requested value by one processing step.
 function pump(client)
   return readNetworkMessages(client, -1.0)
 end function
 
+// Advance recording by one processing step.
 function pumpRecording(client, recording)
   if not client.connected or client.socket is void then return 0 end if
   processed = 0
@@ -1350,6 +1532,7 @@ function pumpRecording(client, recording)
   return processed
 end function
 
+// Apply the Quake-compatible cl read from server behavior.
 function CL_ReadFromServer(client, frameTime, realtime)
   client.oldTime = client.time
   client.time = client.time + frameTime
@@ -1359,6 +1542,7 @@ function CL_ReadFromServer(client, frameTime, realtime)
   return 0
 end function
 
+// Apply the Quake-compatible cl send cmd behavior.
 function CL_SendCmd(client, command)
   if not client.connected and not client.demoPlayback then return 0 end if
   moveResult = 0
@@ -1372,16 +1556,19 @@ function CL_SendCmd(client, command)
   return reliableResult
 end function
 
+// Report whether client command exists holds for the active state.
 function clientCommandExists(name)
   return false
 end function
 
+// Ensure sufficient storage or state for client cvar.
 function ensureClientCvar(registry, name, value, archive)
   existing = cvar.find(registry, name)
   if existing is not void then return existing end if
   return cvar.register(registry, cvar.create(name, value, archive, false), clientCommandExists)
 end function
 
+// Apply the Quake-compatible cl init behavior.
 function CL_Init(client, registry)
   global clMoveMessages, clRegisteredCommands
   client.outgoing = sz.alloc(1024)
@@ -1411,34 +1598,40 @@ function CL_Init(client, registry)
   return true
 end function
 
+// Apply the Quake-compatible cl registered commands behavior.
 function CL_RegisteredCommands()
   global clRegisteredCommands
   return clRegisteredCommands
 end function
 
+// Apply the Quake-compatible cl move message count behavior.
 function CL_MoveMessageCount()
   global clMoveMessages
   return clMoveMessages
 end function
 
+// Apply the Quake-compatible cl set move message count behavior.
 function CL_SetMoveMessageCount(value)
   global clMoveMessages
   clMoveMessages = value
   return clMoveMessages
 end function
 
+// Consume pending state for consume messages.
 function consumeMessages(client)
   result = client.messages
   client.messages = []
   return result
 end function
 
+// Consume pending state for consume print log.
 function consumePrintLog(client)
   result = client.printLog
   client.printLog = []
   return result
 end function
 
+// Consume pending state for drain messages.
 function drainMessages(client)
   pending = client.messages
   client.messages = []

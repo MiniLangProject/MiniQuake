@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.zone.
+*/
 package miniquake.zone
 
 const DYNAMIC_SIZE = 0xc000
@@ -29,10 +36,12 @@ struct ZoneState
   nextAllocationId
 end struct
 
+// Provide align8 behavior for the active subsystem.
 function align8(value)
   return (value + 7) & ~7
 end function
 
+// Update module state for the requested operation.
 function clear(state, size)
   if size < ZONE_ADMIN_SIZE + BLOCK_HEADER_SIZE + TRASH_SIZE then
     return error(1610, "Z_ClearZone: zone is too small")
@@ -58,11 +67,13 @@ function clear(state, size)
   return state
 end function
 
+// Create and initialize the module state.
 function create(size)
   state = ZoneState(size, [], 0, 1)
   return clear(state, size)
 end function
 
+// Return index of for the active module state.
 function indexOf(state, block)
   index = 0
   while index < len(state.blocks)
@@ -74,6 +85,7 @@ function indexOf(state, block)
   return -1
 end function
 
+// Add state for insert after.
 function insertAfter(state, index, block)
   result = array(len(state.blocks) + 1)
   sourceIndex = 0
@@ -90,6 +102,7 @@ function insertAfter(state, index, block)
   state.blocks = result
 end function
 
+// Release state for remove at.
 function removeAt(state, index)
   result = array(len(state.blocks) - 1)
   sourceIndex = 0
@@ -104,6 +117,7 @@ function removeAt(state, index)
   state.blocks = result
 end function
 
+// Validate the requested value and report any incompatibility.
 function check(state)
   if state is void then return error(1611, "Z_CheckHeap: NULL zone") end if
   expectedStart = ZONE_ADMIN_SIZE
@@ -130,7 +144,9 @@ function check(state)
   return true
 end function
 
+// Provide tag malloc behavior for the active subsystem.
 function tagMalloc(state, size, tag)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if tag == 0 then return error(1619, "Z_TagMalloc: tried to use a 0 tag") end if
   if size < 0 then return error(1620, "Z_TagMalloc: negative size") end if
   required = align8(size + BLOCK_HEADER_SIZE + TRASH_SIZE)
@@ -182,6 +198,7 @@ function tagMalloc(state, size, tag)
   return void
 end function
 
+// Provide malloc behavior for the active subsystem.
 function malloc(state, size)
   check(state)
   block = tagMalloc(state, size, 1)
@@ -189,6 +206,7 @@ function malloc(state, size)
   return block
 end function
 
+// Release state for free.
 function free(block)
   if block is void then return error(1622, "Z_Free: NULL pointer") end if
   if block.id != ZONEID then return error(1623, "Z_Free: freed a pointer without ZONEID") end if
@@ -222,6 +240,7 @@ function free(block)
   return true
 end function
 
+// Release state for free memory.
 function freeMemory(state)
   total = 0
   for each block in state.blocks
@@ -230,6 +249,7 @@ function freeMemory(state)
   return total
 end function
 
+// Format and emit heap.
 function printHeap(state)
   text = "zone size: " + state.capacity
   for each block in state.blocks
@@ -238,6 +258,7 @@ function printHeap(state)
   return text
 end function
 
+// Provide dump heap behavior for the active subsystem.
 function dumpHeap(state)
   return printHeap(state)
 end function
@@ -248,30 +269,37 @@ function Z_ClearZone(state, size)
   return clear(state, size)
 end function
 
+// Mirror Quake's Z_Free routine and its observable state changes.
 function Z_Free(block)
   return free(block)
 end function
 
+// Mirror Quake's Z_Malloc routine and its observable state changes.
 function Z_Malloc(state, size)
   return malloc(state, size)
 end function
 
+// Mirror Quake's Z_TagMalloc routine and its observable state changes.
 function Z_TagMalloc(state, size, tag)
   return tagMalloc(state, size, tag)
 end function
 
+// Mirror Quake's Z_Print routine and its observable state changes.
 function Z_Print(state)
   return printHeap(state)
 end function
 
+// Mirror Quake's Z_DumpHeap routine and its observable state changes.
 function Z_DumpHeap(state)
   return dumpHeap(state)
 end function
 
+// Mirror Quake's Z_CheckHeap routine and its observable state changes.
 function Z_CheckHeap(state)
   return check(state)
 end function
 
+// Mirror Quake's Z_FreeMemory routine and its observable state changes.
 function Z_FreeMemory(state)
   return freeMemory(state)
 end function

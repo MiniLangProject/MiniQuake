@@ -1,8 +1,15 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/stability_contract_tests.ml.
+*/
 import miniquake.stability_contract as stability
 
 passed = 0
 failed = 0
 
+// Assert that the condition holds and identify a failing test.
 function bp088Check(condition, label)
   global passed, failed
   if condition then passed = passed + 1; return true end if
@@ -11,14 +18,17 @@ function bp088Check(condition, label)
   return false
 end function
 
+// Assert exact equality and report both values on failure.
 function bp088Equal(actual, expected, label)
   return bp088Check(actual == expected, label + ": expected " + expected + ", got " + actual)
 end function
 
+// Exercise the snapshot test scenario and verify its expected result.
 function inline bp088Snapshot()
   return [100, 100000, 50000, 10000, 90, 85, 1, 1, 7, 0, 0, 0, 1, 0, 4, 50]
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   global passed, failed
   print "[1/20] status"

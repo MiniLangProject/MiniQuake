@@ -1,11 +1,11 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 MiniLang pendant for WinQuake/r_part.c.  The C free/active linked lists are
 represented by a bounded ParticleSystem whose active array retains list order.
 */
-
 package miniquake.particles
 
 import miniquake.types as t
@@ -29,6 +29,7 @@ const MAX_PARTICLES = 2048
 const ABSOLUTE_MIN_PARTICLES = 512
 const NUM_VERTEX_NORMALS = 162
 
+// Provide particle float behavior for the active subsystem.
 function particleFloat(value)
   return native.bitsFloat(native.floatBits(value))
 end function
@@ -50,21 +51,25 @@ compatTracerCount = 0
 compatAngularVelocities = []
 canonicalVertexNormals = []
 
+// Allocate and initialize the requested value.
 function spawn(origin, velocity, dieTime, color, type)
   originCopy = t.Vec3(origin.x, origin.y, origin.z)
   velocityCopy = t.Vec3(velocity.x, velocity.y, velocity.z)
   return t.Particle(originCopy, velocityCopy, dieTime, color, 0.0, type)
 end function
 
+// Create the zero-initialized state for vector.
 function zeroVector()
   return t.Vec3(0.0, 0.0, 0.0)
 end function
 
+// Create and initialize system.
 function createSystem(capacity)
   if capacity < ABSOLUTE_MIN_PARTICLES then capacity = ABSOLUTE_MIN_PARTICLES end if
   return ParticleSystem(capacity, [], 1, 0, [])
 end function
 
+// Apply the Quake-compatible r init particles behavior.
 function R_InitParticles(arguments)
   capacity = MAX_PARTICLES
   index = 0
@@ -80,11 +85,13 @@ function R_InitParticles(arguments)
   return createSystem(capacity)
 end function
 
+// Apply the Quake-compatible r clear particles behavior.
 function R_ClearParticles(system)
   system.active = []
   return system
 end function
 
+// Apply the Quake-compatible r set random seed behavior.
 function R_SetRandomSeed(system, seed)
   system.randomSeed = seed & 0xffffffff
   return system.randomSeed
@@ -96,6 +103,7 @@ function R_Rand(system)
   return (system.randomSeed >> 16) & 0x7fff
 end function
 
+// Apply the Quake-compatible r alloc particle behavior.
 function R_AllocParticle(system)
   if len(system.active) >= system.capacity then return void end if
   origin = zeroVector()
@@ -107,6 +115,7 @@ function R_AllocParticle(system)
   return particle
 end function
 
+// Provide ramp color behavior for the active subsystem.
 function rampColor(values, ramp)
   index = native.trunc(ramp)
   if index < 0 then index = 0 end if
@@ -114,6 +123,7 @@ function rampColor(values, ramp)
   return values[index]
 end function
 
+// Apply the Quake-compatible r dark field particles behavior.
 function R_DarkFieldParticles(system, entityOrigin, currentTime)
   i = -16
   while i < 16
@@ -143,6 +153,7 @@ function R_DarkFieldParticles(system, entityOrigin, currentTime)
   return system.active
 end function
 
+// Initialize state for initialize angular velocities.
 function initializeAngularVelocities(system, count)
   if len(system.angularVelocities) != 0 then return true end if
   system.angularVelocities = []
@@ -198,6 +209,7 @@ function R_EntityParticles(system, entityOrigin, currentTime, vertexNormals)
   return system.active
 end function
 
+// Apply the Quake-compatible r read point file f behavior.
 function R_ReadPointFile_f(system, text)
   offset = 0
   pointCount = 0
@@ -222,6 +234,7 @@ function R_ReadPointFile_f(system, text)
   return pointCount
 end function
 
+// Apply the Quake-compatible r parse particle effect behavior.
 function R_ParseParticleEffect(system, reader, currentTime)
   origin = t.Vec3(msg.readCoord(reader), msg.readCoord(reader), msg.readCoord(reader))
   direction = t.Vec3(
@@ -236,6 +249,7 @@ function R_ParseParticleEffect(system, reader, currentTime)
   return R_RunParticleEffect(system, origin, direction, color, count, currentTime)
 end function
 
+// Return random explosion vector derived from the active module state.
 function randomExplosionVector(system, origin, particle)
   // The C body assigns org[j] and vel[j] in the same loop.  The interleaved
   // rand() order is observable in demos/effects and must not be regrouped.
@@ -247,6 +261,7 @@ function randomExplosionVector(system, origin, particle)
   particle.velocity.z = (R_Rand(system) % 512) - 256
 end function
 
+// Apply the Quake-compatible r particle explosion behavior.
 function R_ParticleExplosion(system, origin, currentTime)
   index = 0
   while index < 1024
@@ -263,6 +278,7 @@ function R_ParticleExplosion(system, origin, currentTime)
   return system.active
 end function
 
+// Apply the Quake-compatible r particle explosion2 behavior.
 function R_ParticleExplosion2(system, origin, colorStart, colorLength, currentTime)
   if colorLength <= 0 then return error(3701, "R_ParticleExplosion2 colorLength must be positive") end if
   colorMod = 0
@@ -280,6 +296,7 @@ function R_ParticleExplosion2(system, origin, colorStart, colorLength, currentTi
   return system.active
 end function
 
+// Apply the Quake-compatible r blob explosion behavior.
 function R_BlobExplosion(system, origin, currentTime)
   index = 0
   while index < 1024
@@ -299,6 +316,7 @@ function R_BlobExplosion(system, origin, currentTime)
   return system.active
 end function
 
+// Apply the Quake-compatible r run particle effect behavior.
 function R_RunParticleEffect(system, origin, direction, color, count, currentTime)
   index = 0
   while index < count
@@ -327,6 +345,7 @@ function R_RunParticleEffect(system, origin, direction, color, count, currentTim
   return system.active
 end function
 
+// Apply the Quake-compatible r lava splash behavior.
 function R_LavaSplash(system, origin, currentTime)
   i = -16
   while i < 16
@@ -353,6 +372,7 @@ function R_LavaSplash(system, origin, currentTime)
   return system.active
 end function
 
+// Apply the Quake-compatible r teleport splash behavior.
 function R_TeleportSplash(system, origin, currentTime)
   i = -16
   while i < 16
@@ -383,6 +403,7 @@ function R_TeleportSplash(system, origin, currentTime)
   return system.active
 end function
 
+// Apply the Quake-compatible r rocket trail behavior.
 function R_RocketTrail(system, start, finish, trailType, currentTime)
   direction = math.VectorSubtract(finish, start)
   length = math.VectorNormalize(direction)
@@ -462,6 +483,7 @@ function R_RocketTrail(system, start, finish, trailType, currentTime)
   return system.active
 end function
 
+// Provide particle draw command behavior for the active subsystem.
 function particleDrawCommand(particle, viewOrigin, viewForward, scaledUp, scaledRight)
   distance = math.DotProduct(math.VectorSubtract(particle.origin, viewOrigin), viewForward)
   scale = 1.0
@@ -471,6 +493,7 @@ function particleDrawCommand(particle, viewOrigin, viewForward, scaledUp, scaled
   return ["particle", particle.color, math.VectorCopy(particle.origin), upVertex, rightVertex, scale]
 end function
 
+// Update module state for particle physics.
 function updateParticlePhysics(particle, frameTime, gravity)
   // r_part.c stores frametime and all particle fields as float.
   frameTime = particleFloat(frameTime)
@@ -566,16 +589,19 @@ function R_DrawParticles(system, currentTime, oldTime, gravity, viewOrigin, view
   return arrays.copyArrayPrefix(commandBuffer, commandCount)
 end function
 
+// Provide compatibility system behavior for the active subsystem.
 function compatibilitySystem()
   global compatRandomSeed, compatTracerCount, compatAngularVelocities
   return ParticleSystem(MAX_PARTICLES, [], compatRandomSeed, compatTracerCount, compatAngularVelocities)
 end function
 
+// Report whether compatibility system with active holds for the active state.
 function compatibilitySystemWithActive(active)
   global compatRandomSeed, compatTracerCount, compatAngularVelocities
   return ParticleSystem(MAX_PARTICLES, active, compatRandomSeed, compatTracerCount, compatAngularVelocities)
 end function
 
+// Provide canonical entity normals behavior for the active subsystem.
 function canonicalEntityNormals()
   global canonicalVertexNormals
   if len(canonicalVertexNormals) == NUM_VERTEX_NORMALS then return canonicalVertexNormals end if
@@ -589,6 +615,7 @@ function canonicalEntityNormals()
   return canonicalVertexNormals
 end function
 
+// Finalize state for finish compatibility.
 function finishCompatibility(system)
   global compatRandomSeed, compatTracerCount, compatAngularVelocities
   compatRandomSeed = system.randomSeed
@@ -597,6 +624,7 @@ function finishCompatibility(system)
   return system.active
 end function
 
+// Update module state for random.
 function resetRandom(seed)
   global compatRandomSeed, compatTracerCount, compatAngularVelocities
   compatRandomSeed = seed & 0xffffffff
@@ -605,12 +633,14 @@ function resetRandom(seed)
   return compatRandomSeed
 end function
 
+// Provide compat rand behavior for the active subsystem.
 function compatRand()
   global compatRandomSeed
   compatRandomSeed = (compatRandomSeed * 214013 + 2531011) & 0xffffffff
   return (compatRandomSeed >> 16) & 0x7fff
 end function
 
+// Add state for append limited.
 function appendLimited(target, source)
   appendCount = len(source)
   available = MAX_PARTICLES - len(target)
@@ -634,13 +664,8 @@ function appendLimited(target, source)
   return result
 end function
 
+// Update module state for with gravity.
 function updateWithGravity(particles, currentTime, deltaTime, gravity)
-  capacity = MAX_PARTICLES
-  if len(particles) > capacity then capacity = len(particles) end if
-  randomSeed = compatRandomSeed
-  tracerCount = compatTracerCount
-  angularVelocities = compatAngularVelocities
-  system = ParticleSystem(capacity, particles, randomSeed, tracerCount, angularVelocities)
   // Host_Frame advances effects even in a headless client/demo.  Building the
   // complete GL command trace here used to allocate several copied Vec3s and
   // an ever-growing nested array for every one of up to 2048 particles even
@@ -648,19 +673,30 @@ function updateWithGravity(particles, currentTime, deltaTime, gravity)
   // that could force a collection while the command array was only partially
   // rooted.  Advance in the same draw-before-simulate order without producing
   // renderer commands; R_DrawParticles remains the trace/render oracle.
-  activeCount = len(system.active)
+  activeCount = len(particles)
   survivorCount = 0
   readIndex = 0
   while readIndex < activeCount
-    particle = system.active[readIndex]
+    particle = particles[readIndex]
     if particle.die >= currentTime then survivorCount = survivorCount + 1 end if
     readIndex = readIndex + 1
   end while
+  // Most frames have no particle crossing its die time. The particle structs
+  // are intentionally advanced in place, so preserve the already-rooted active
+  // array instead of allocating and filling an identical replacement.
+  if survivorCount == activeCount then
+    readIndex = 0
+    while readIndex < activeCount
+      updateParticlePhysics(particles[readIndex], deltaTime, gravity)
+      readIndex = readIndex + 1
+    end while
+    return particles
+  end if
   alive = arrays.makeEmptyArray(survivorCount)
   readIndex = 0
   writeIndex = 0
   while readIndex < activeCount
-    particle = system.active[readIndex]
+    particle = particles[readIndex]
     if particle.die >= currentTime then
       updateParticlePhysics(particle, deltaTime, gravity)
       if writeIndex >= len(alive) then return error(3702, "particle survivor count changed during update") end if
@@ -669,8 +705,7 @@ function updateWithGravity(particles, currentTime, deltaTime, gravity)
     end if
     readIndex = readIndex + 1
   end while
-  system.active = alive
-  return system.active
+  return alive
 end function
 
 // Compatibility wrapper for callers that do not own the server cvar table.
@@ -680,22 +715,26 @@ function update(particles, currentTime, deltaTime)
   return updateWithGravity(particles, currentTime, deltaTime, 800.0)
 end function
 
+// Execute effect.
 function runEffect(origin, direction, count, color, currentTime)
   system = compatibilitySystem()
   R_RunParticleEffect(system, origin, direction, color, count, currentTime)
   return finishCompatibility(system)
 end function
 
+// Provide point effect behavior for the active subsystem.
 function pointEffect(origin, count, color, currentTime)
   return runEffect(origin, zeroVector(), count, color, currentTime)
 end function
 
+// Provide explosion behavior for the active subsystem.
 function explosion(origin, currentTime)
   system = compatibilitySystem()
   R_ParticleExplosion(system, origin, currentTime)
   return finishCompatibility(system)
 end function
 
+// Provide explosion2 behavior for the active subsystem.
 function explosion2(origin, colorStart, colorLength, currentTime)
   system = compatibilitySystem()
   result = R_ParticleExplosion2(system, origin, colorStart, colorLength, currentTime)
@@ -703,24 +742,28 @@ function explosion2(origin, colorStart, colorLength, currentTime)
   return finishCompatibility(system)
 end function
 
+// Provide blob explosion behavior for the active subsystem.
 function blobExplosion(origin, currentTime)
   system = compatibilitySystem()
   R_BlobExplosion(system, origin, currentTime)
   return finishCompatibility(system)
 end function
 
+// Provide lava splash behavior for the active subsystem.
 function lavaSplash(origin, currentTime)
   system = compatibilitySystem()
   R_LavaSplash(system, origin, currentTime)
   return finishCompatibility(system)
 end function
 
+// Provide teleport splash behavior for the active subsystem.
 function teleportSplash(origin, currentTime)
   system = compatibilitySystem()
   R_TeleportSplash(system, origin, currentTime)
   return finishCompatibility(system)
 end function
 
+// Provide rocket trail behavior for the active subsystem.
 function rocketTrail(start, finish, trailType, currentTime)
   system = compatibilitySystem()
   R_RocketTrail(system, start, finish, trailType, currentTime)
@@ -737,6 +780,7 @@ function entityParticlesInto(active, entityOrigin, currentTime)
   return finishCompatibility(system)
 end function
 
+// Provide rocket trail into behavior for the active subsystem.
 function rocketTrailInto(active, start, finish, trailType, currentTime)
   system = compatibilitySystemWithActive(active)
   R_RocketTrail(system, start, finish, trailType, currentTime)

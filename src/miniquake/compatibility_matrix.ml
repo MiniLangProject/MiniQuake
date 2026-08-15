@@ -1,11 +1,12 @@
 /*
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Cumulative compatibility release-candidate matrix.  The status deliberately
 remains a release candidate: original executable interoperability and an
 external MiniQuake visual reference corpus remain separate final gates.
 */
-
 package miniquake.compatibility_matrix
 
 const STATUS = "compat_109_release_candidate_v1"
@@ -17,6 +18,7 @@ const BLACK_PORT_MAP_COUNT = 4
 const RETAIL_DEMO_COUNT = 3
 const SOAK_MODE_COUNT = 2
 
+// Provide accepted contracts behavior for the active subsystem.
 function acceptedContracts()
   return [
     "protocol15_frozen_v1",
@@ -40,14 +42,17 @@ function acceptedContracts()
   ]
 end function
 
+// Provide pending external gates behavior for the active subsystem.
 function pendingExternalGates()
   return ["original_binary_interop", "external_glquake_visual_reference"]
 end function
 
+// Validate the requested value and report any incompatibility.
 function validate()
   return len(acceptedContracts()) == CONTRACT_COUNT and len(pendingExternalGates()) == 2 and SOURCE_FUNCTION_COUNT == 1094 and BLACK_PORT_MAP_COUNT == 4 and RETAIL_DEMO_COUNT == 3 and SOAK_MODE_COUNT == 2
 end function
 
+// Return contract vector derived from the active module state.
 function contractVector()
   return [STATUS, FINGERPRINT, CONTRACT_COUNT, SOURCE_FUNCTION_COUNT, BLACK_PORT_MAP_COUNT, RETAIL_DEMO_COUNT, SOAK_MODE_COUNT, acceptedContracts(), pendingExternalGates()]
 end function

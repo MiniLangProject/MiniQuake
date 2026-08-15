@@ -1,12 +1,12 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Protocol-15 server-to-client payload writers shared by the integrated server
 and the source-guided parity fixtures.  The field order, optional-bit rules
 and strict datagram boundary match WinQuake/sv_main.c.
 */
-
 package miniquake.protocol_serverdata
 
 import miniquake.types as t
@@ -27,10 +27,12 @@ const RELIABLE_WAIT = 2
 const RELIABLE_DROP_ASAP = 3
 const RELIABLE_SEND = 4
 
+// Provide progs crc text behavior for the active subsystem.
 function progsCrcText(crc)
   return "\u0002\nVERSION 1.09 SERVER (" + native.trunc(crc) + " CRC)"
 end function
 
+// Encode and write precache list.
 function writePrecacheList(buffer, values)
   index = 1
   while index < len(values)
@@ -76,6 +78,7 @@ function writeServerInfo(
   return buffer.curSize - start
 end function
 
+// Provide sound field mask behavior for the active subsystem.
 function soundFieldMask(volume, attenuation)
   return transients.soundFieldMask(volume, attenuation)
 end function
@@ -106,6 +109,7 @@ function writeSound(buffer, entityNumber, channel, soundNumber, volume, attenuat
   return buffer.curSize - start
 end function
 
+// Encode and write baseline.
 function writeBaseline(buffer, entityNumber, baseline)
   start = buffer.curSize
   msg.writeByte(buffer, c.SVC_SPAWNBASELINE)
@@ -123,6 +127,7 @@ function writeBaseline(buffer, entityNumber, baseline)
   return buffer.curSize - start
 end function
 
+// Return client data bits derived from the active module state.
 function clientDataBits(data)
   bits = c.SU_ITEMS | c.SU_WEAPON
   if data.viewHeight != c.DEFAULT_VIEWHEIGHT then bits = bits | c.SU_VIEWHEIGHT end if
@@ -130,14 +135,12 @@ function clientDataBits(data)
   if (native.trunc(data.flags) & c.FL_ONGROUND) != 0 then bits = bits | c.SU_ONGROUND end if
   if native.trunc(data.waterLevel) >= 2 then bits = bits | c.SU_INWATER end if
 
-  punches = [data.punch.x, data.punch.y, data.punch.z]
-  velocities = [data.velocity.x, data.velocity.y, data.velocity.z]
-  axis = 0
-  while axis < 3
-    if punches[axis] != 0.0 then bits = bits | (c.SU_PUNCH1 << axis) end if
-    if velocities[axis] != 0.0 then bits = bits | (c.SU_VELOCITY1 << axis) end if
-    axis = axis + 1
-  end while
+  if data.punch.x != 0.0 then bits = bits | c.SU_PUNCH1 end if
+  if data.punch.y != 0.0 then bits = bits | c.SU_PUNCH2 end if
+  if data.punch.z != 0.0 then bits = bits | c.SU_PUNCH3 end if
+  if data.velocity.x != 0.0 then bits = bits | c.SU_VELOCITY1 end if
+  if data.velocity.y != 0.0 then bits = bits | c.SU_VELOCITY2 end if
+  if data.velocity.z != 0.0 then bits = bits | c.SU_VELOCITY3 end if
   if data.weaponFrame != 0.0 then bits = bits | c.SU_WEAPONFRAME end if
   if data.armor != 0.0 then bits = bits | c.SU_ARMOR end if
   return bits
@@ -147,6 +150,7 @@ end function
 // In mission-pack mode a zero bitfield emits no byte, matching the original C
 // loop's fall-through behavior.
 function writeClientData(buffer, data)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   start = buffer.curSize
   bits = clientDataBits(data)
   msg.writeByte(buffer, c.SVC_CLIENTDATA)
@@ -154,14 +158,12 @@ function writeClientData(buffer, data)
   if (bits & c.SU_VIEWHEIGHT) != 0 then msg.writeChar(buffer, data.viewHeight) end if
   if (bits & c.SU_IDEALPITCH) != 0 then msg.writeChar(buffer, data.idealPitch) end if
 
-  punches = [data.punch.x, data.punch.y, data.punch.z]
-  velocities = [data.velocity.x, data.velocity.y, data.velocity.z]
-  axis = 0
-  while axis < 3
-    if (bits & (c.SU_PUNCH1 << axis)) != 0 then msg.writeChar(buffer, punches[axis]) end if
-    if (bits & (c.SU_VELOCITY1 << axis)) != 0 then msg.writeChar(buffer, velocities[axis] / 16.0) end if
-    axis = axis + 1
-  end while
+  if (bits & c.SU_PUNCH1) != 0 then msg.writeChar(buffer, data.punch.x) end if
+  if (bits & c.SU_VELOCITY1) != 0 then msg.writeChar(buffer, data.velocity.x / 16.0) end if
+  if (bits & c.SU_PUNCH2) != 0 then msg.writeChar(buffer, data.punch.y) end if
+  if (bits & c.SU_VELOCITY2) != 0 then msg.writeChar(buffer, data.velocity.y / 16.0) end if
+  if (bits & c.SU_PUNCH3) != 0 then msg.writeChar(buffer, data.punch.z) end if
+  if (bits & c.SU_VELOCITY3) != 0 then msg.writeChar(buffer, data.velocity.z / 16.0) end if
 
   msg.writeLong(buffer, data.items)
   if (bits & c.SU_WEAPONFRAME) != 0 then msg.writeByte(buffer, data.weaponFrame) end if
@@ -210,6 +212,7 @@ function initialDeliveryPlan(spawned, sendSignon, elapsed)
   return PLAN_RELIABLE_PHASE
 end function
 
+// Provide reliable delivery plan behavior for the active subsystem.
 function reliableDeliveryPlan(overflowed, messageSize, dropAsap, canSend)
   if overflowed then return RELIABLE_DROP_OVERFLOW end if
   if messageSize <= 0 and not dropAsap then return RELIABLE_NONE end if

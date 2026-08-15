@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.sound.snd_dma.
+*/
 package miniquake.sound.snd_dma
 
 import miniquake.sound.snd_mem as sndmem
@@ -58,6 +65,7 @@ struct SoundSystem
   registeredCvars
 end struct
 
+// Create and initialize the module state.
 function create(filesystem, sampleRate)
   dma = sndmix.createDma(sampleRate, 16, 2, 32768)
   return SoundSystem(
@@ -113,10 +121,12 @@ function SNDDMA_Init(system)
   return system.dmaOpened
 end function
 
+// Mirror Quake's SNDDMA_GetDMAPos routine and its observable state changes.
 function inline SNDDMA_GetDMAPos(system)
   return system.mixState.dma.samplePosition
 end function
 
+// Mirror Quake's SNDDMA_Submit routine and its observable state changes.
 function SNDDMA_Submit(system)
   system.submitCalls = system.submitCalls + 1
   if system.fakeDma then return true end if
@@ -125,17 +135,20 @@ function SNDDMA_Submit(system)
   return native.audioSubmit(dma.buffer, len(dma.buffer)) != 0
 end function
 
+// Mirror Quake's SNDDMA_Shutdown routine and its observable state changes.
 function SNDDMA_Shutdown(system)
   if system.dmaOpened and not system.fakeDma then native.audioClose() end if
   system.dmaOpened = false
   return true
 end function
 
+// Apply the Quake-compatible s init paint channels behavior.
 function S_InitPaintChannels(system)
   sndmix.clearPaintBuffer(system.mixState, sndmix.PAINTBUFFER_SIZE)
   return sndmix.SND_InitScaletable(system.mixState)
 end function
 
+// Report whether argument.
 function hasArgument(arguments, wanted)
   if arguments is void then return false end if
   for each argument in arguments
@@ -144,16 +157,19 @@ function hasArgument(arguments, wanted)
   return false
 end function
 
+// Apply the Quake-compatible s ambient off behavior.
 function S_AmbientOff(system)
   system.ambientEnabled = false
   return false
 end function
 
+// Apply the Quake-compatible s ambient on behavior.
 function S_AmbientOn(system)
   system.ambientEnabled = true
   return true
 end function
 
+// Apply the Quake-compatible s sound info f behavior.
 function S_SoundInfo_f(system)
   if not system.started or system.mixState.dma is void then return ["sound system not started"] end if
   dma = system.mixState.dma
@@ -169,6 +185,7 @@ function S_SoundInfo_f(system)
   ]
 end function
 
+// Apply the Quake-compatible s startup behavior.
 function S_Startup(system)
   if not system.initialized then return false end if
   if not SNDDMA_Init(system) then
@@ -181,6 +198,7 @@ function S_Startup(system)
   return true
 end function
 
+// Apply the Quake-compatible s init behavior.
 function S_Init(system, arguments, memorySize)
   if hasArgument(arguments, "-nosound") then
     system.noSound = true
@@ -224,6 +242,7 @@ function S_Init(system, arguments, memorySize)
   return true
 end function
 
+// Apply the Quake-compatible s shutdown behavior.
 function S_Shutdown(system)
   if not system.started then return false end if
   system.mixState.dma.gameAlive = false
@@ -232,6 +251,7 @@ function S_Shutdown(system)
   return true
 end function
 
+// Apply the Quake-compatible s find name behavior.
 function S_FindName(system, name)
   if name is void then return error(2480, "S_FindName: NULL") end if
   if len(bytes(name)) >= 64 then return error(2481, "Sound name too long: " + name) end if
@@ -244,6 +264,7 @@ function S_FindName(system, name)
   return descriptor
 end function
 
+// Apply the Quake-compatible s touch sound behavior.
 function S_TouchSound(system, name)
   if not system.started then return false end if
   descriptor = S_FindName(system, name)
@@ -251,6 +272,7 @@ function S_TouchSound(system, name)
   return descriptor.cache is not void
 end function
 
+// Apply the Quake-compatible s precache sound behavior.
 function S_PrecacheSound(system, name)
   if not system.started or system.noSound then return void end if
   descriptor = S_FindName(system, name)
@@ -262,6 +284,7 @@ function S_PrecacheSound(system, name)
   return descriptor
 end function
 
+// Mirror Quake's SND_PickChannel routine and its observable state changes.
 function SND_PickChannel(system, entityNumber, entityChannel)
   firstToDie = -1
   lifeLeft = 0x7fffffff
@@ -287,10 +310,12 @@ function SND_PickChannel(system, entityNumber, entityChannel)
   return target
 end function
 
+// Provide sound f32 behavior for the active subsystem.
 function soundF32(value)
   return native.bitsFloat(native.floatBits(value))
 end function
 
+// Mirror Quake's SND_Spatialize routine and its observable state changes.
 function SND_Spatialize(system, channel)
   if channel.entityNumber == system.listenerEntity then
     channel.leftVolume = channel.masterVolume
@@ -322,13 +347,16 @@ function SND_Spatialize(system, channel)
   return [channel.leftVolume, channel.rightVolume]
 end function
 
+// Return next random for the active module state.
 function nextRandom(system)
   // WinQuake/MiniQuake uses the Microsoft C runtime rand() sequence.
   system.randomSeed = (system.randomSeed * 214013 + 2531011) & 0xffffffff
   return (system.randomSeed >> 16) & 0x7fff
 end function
 
+// Apply the Quake-compatible s start sound behavior.
 function S_StartSound(system, entityNumber, entityChannel, descriptor, origin, volume, attenuation)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if not system.started or descriptor is void or system.noSound then return false end if
   target = SND_PickChannel(system, entityNumber, entityChannel)
   if target is void then return false end if
@@ -370,6 +398,7 @@ function S_StartSound(system, entityNumber, entityChannel, descriptor, origin, v
   return true
 end function
 
+// Apply the Quake-compatible s stop sound behavior.
 function S_StopSound(system, entityNumber, entityChannel)
   // Preserve the original 1.09 loop bounds, including its first-eight-slots
   // quirk rather than silently widening this to every channel.
@@ -386,6 +415,7 @@ function S_StopSound(system, entityNumber, entityChannel)
   return false
 end function
 
+// Apply the Quake-compatible s clear buffer behavior.
 function S_ClearBuffer(system)
   if not system.started or system.mixState.dma is void then return false end if
   clearValue = 0
@@ -400,6 +430,7 @@ function S_ClearBuffer(system)
   return true
 end function
 
+// Apply the Quake-compatible s stop all sounds behavior.
 function S_StopAllSounds(system, clear)
   if not system.started then return false end if
   system.mixState.totalChannels = STATIC_FIRST
@@ -412,10 +443,12 @@ function S_StopAllSounds(system, clear)
   return true
 end function
 
+// Apply the Quake-compatible s stop all sounds c behavior.
 function S_StopAllSoundsC(system)
   return S_StopAllSounds(system, true)
 end function
 
+// Apply the Quake-compatible s static sound behavior.
 function S_StaticSound(system, descriptor, origin, volume, attenuation)
   if descriptor is void then return false end if
   if system.mixState.totalChannels >= MAX_CHANNELS then return false end if
@@ -437,6 +470,7 @@ function S_StaticSound(system, descriptor, origin, volume, attenuation)
   return true
 end function
 
+// Apply the Quake-compatible s update ambient sounds behavior.
 function S_UpdateAmbientSounds(system, ambientLevels, frameTime)
   if not system.ambientEnabled then return false end if
   // With no world model the original returns without disturbing the
@@ -474,6 +508,7 @@ function S_UpdateAmbientSounds(system, ambientLevels, frameTime)
   return true
 end function
 
+// Provide combine static channels behavior for the active subsystem.
 function combineStaticChannels(system)
   index = STATIC_FIRST
   while index < system.mixState.totalChannels
@@ -496,6 +531,7 @@ function combineStaticChannels(system)
   end while
 end function
 
+// Return soundtime.
 function GetSoundtime(system, samplePosition)
   dma = system.mixState.dma
   fullSamples = dma.samples / dma.channels
@@ -513,6 +549,7 @@ function GetSoundtime(system, samplePosition)
   return system.mixState.soundTime
 end function
 
+// Apply the Quake-compatible s update behavior.
 function S_Update_(system, samplePosition)
   if not system.started or system.blocked > 0 then return 0 end if
   GetSoundtime(system, samplePosition)
@@ -529,6 +566,7 @@ function S_Update_(system, samplePosition)
   return endTime
 end function
 
+// Apply the Quake-compatible s update behavior.
 function S_Update(system, origin, forward, right, up, ambientLevels, frameTime, samplePosition)
   if not system.started or system.blocked > 0 then return false end if
   system.listenerOrigin = math.copy(origin)
@@ -547,6 +585,7 @@ function S_Update(system, origin, forward, right, up, ambientLevels, frameTime, 
   return true
 end function
 
+// Apply the Quake-compatible s extra update behavior.
 function S_ExtraUpdate(system, samplePosition)
   // WinQuake accumulates pending mouse input before honoring
   // snd_noextraupdate.
@@ -555,6 +594,7 @@ function S_ExtraUpdate(system, samplePosition)
   return S_Update_(system, samplePosition)
 end function
 
+// Report whether extension.
 function hasExtension(name)
   data = bytes(name)
   index = 0
@@ -565,6 +605,7 @@ function hasExtension(name)
   return false
 end function
 
+// Apply the Quake-compatible s play behavior.
 function S_Play(system, arguments)
   played = 0
   for each argument in arguments
@@ -581,6 +622,7 @@ function S_Play(system, arguments)
   return played
 end function
 
+// Apply the Quake-compatible s play vol behavior.
 function S_PlayVol(system, arguments)
   played = 0
   index = 0
@@ -600,6 +642,7 @@ function S_PlayVol(system, arguments)
   return played
 end function
 
+// Apply the Quake-compatible s sound list behavior.
 function S_SoundList(system)
   entries = arrays.createArrayBuilder(len(system.knownSfx))
   total = 0
@@ -614,6 +657,7 @@ function S_SoundList(system)
   return [arrays.finishArrayBuilder(entries), total]
 end function
 
+// Apply the Quake-compatible s local sound behavior.
 function S_LocalSound(system, sound)
   if system.noSound or not system.started then return false end if
   descriptor = S_PrecacheSound(system, sound)
@@ -621,14 +665,17 @@ function S_LocalSound(system, sound)
   return S_StartSound(system, system.listenerEntity, -1, descriptor, t.Vec3(0.0, 0.0, 0.0), 1.0, 1.0)
 end function
 
+// Apply the Quake-compatible s clear precache behavior.
 function S_ClearPrecache(system)
   return true
 end function
 
+// Apply the Quake-compatible s begin precaching behavior.
 function S_BeginPrecaching(system)
   return true
 end function
 
+// Apply the Quake-compatible s end precaching behavior.
 function S_EndPrecaching(system)
   return true
 end function

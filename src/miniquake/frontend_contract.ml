@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Frozen WinQuake 1.09 keyboard, input, console, menu and Win32-video contract.
 */
-
 package miniquake.frontend_contract
 
 import miniquake.keys as frontendKeys
@@ -29,6 +29,7 @@ const MAX_VIDEO_MODES = 30
 const MAX_VIDEO_DESCRIPTIONS = 27
 const NOTIFY_ACK_EDGES = 2
 
+// Return values derived from the active module state.
 function values()
   return [
     KEY_COUNT,
@@ -47,6 +48,7 @@ function values()
   ]
 end function
 
+// Validate the requested value and report any invalid state.
 function verify()
   return frontendKeys.MAXCMDLINE == MAX_COMMAND_LINE and
     frontendConsole.CON_TEXTSIZE == CONSOLE_TEXT_BYTES and

@@ -90,7 +90,7 @@ def contract(root:Path):
         errors.append('missing BP-018 runtime success marker')
     if 'whitespace = demo.parse(bytes("  2\\n"))' not in tests:
         errors.append('BP-018 whitespace arithmetic fixture must use two leading spaces')
-    if 'equal(whitespace.forcedTrack, -1758, "GLQuake bytewise whitespace arithmetic")' not in tests:
+    if 'equal(whitespace.forcedTrack, -1758, "MiniQuake bytewise whitespace arithmetic")' not in tests:
         errors.append('BP-018 whitespace arithmetic expectation differs from GLQuake bytewise parsing')
     if tests.count('if run(')!=19:errors.append('expected 19 BP-018 runtime fixtures')
     return errors

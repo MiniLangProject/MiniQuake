@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/cl_main_differential_fixture.ml.
+*/
 import miniquake.client as client
 import miniquake.types as t
 import miniquake.constants as c
@@ -10,12 +16,14 @@ import miniquake.sizebuf as sz
 import miniquake.message as msg
 import miniquake.native as native
 
+// Create and initialize client.
 function newClient()
   result = client.create(movement.create(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0)))
   result.localAuthoritative = false
   return result
 end function
 
+// Return contains bytes derived from the active module state.
 function containsBytes(data, wanted)
   if len(wanted) == 0 then return true end if
   start = 0
@@ -32,6 +40,7 @@ function containsBytes(data, wanted)
   return false
 end function
 
+// Return count byte derived from the active module state.
 function countByte(data, value)
   count = 0
   for each item in data
@@ -40,12 +49,15 @@ function countByte(data, value)
   return count
 end function
 
+// Exercise bool text as part of this deterministic regression fixture.
 function boolText(value)
   if value then return "true" end if
   return "false"
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   clearClient = newClient()
   clearClient.levelName = "stale"
   clearClient.entities = [client.createEntity(0), client.createEntity(1)]

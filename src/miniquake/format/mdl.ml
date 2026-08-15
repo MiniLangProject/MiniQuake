@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang implementation of miniquake.format.mdl.
+*/
 package miniquake.format.mdl
 
 import miniquake.types as t
@@ -6,11 +13,13 @@ import miniquake.byteio as bio
 import miniquake.array_util as arrayutil
 import std.fs as fs
 
+// Read and validate vertex.
 function parseVertex(data, offset)
   if offset < 0 or offset + 4 > len(data) then return error(1800, "MDL vertex outside file") end if
   return t.MdlVertex(data[offset], data[offset + 1], data[offset + 2], data[offset + 3])
 end function
 
+// Read and validate single frame.
 function parseSingleFrame(data, offset, numVertices)
   size = 24 + numVertices * 4
   if offset < 0 or offset + size > len(data) then return error(1801, "MDL frame outside file") end if
@@ -26,7 +35,9 @@ function parseSingleFrame(data, offset, numVertices)
   return [t.MdlFrame(name, mins, maxs, vertices), offset + size]
 end function
 
+// Mirror Quake's Mod_FloodFillSkin routine and its observable state changes.
 function Mod_FloodFillSkin(skin, skinWidth, skinHeight)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if skinWidth <= 0 or skinHeight <= 0 or len(skin) < skinWidth * skinHeight then return skin end if
   fillColor = skin[0]
   filledColor = 0
@@ -93,6 +104,7 @@ function Mod_FloodFillSkin(skin, skinWidth, skinHeight)
   return skin
 end function
 
+// Read and validate skin.
 function parseSkin(data, offset, skinWidth, skinHeight)
   skinBytes = skinWidth * skinHeight
   if offset + 4 > len(data) then return error(1802, "MDL skin type outside file") end if
@@ -128,10 +140,12 @@ function parseSkin(data, offset, skinWidth, skinHeight)
   return [t.MdlSkin(true, intervals, images), offset]
 end function
 
+// Mirror Quake's Mod_LoadAliasFrame routine and its observable state changes.
 function Mod_LoadAliasFrame(data, offset, numVertices)
   return parseSingleFrame(data, offset, numVertices)
 end function
 
+// Mirror Quake's Mod_LoadAliasGroup routine and its observable state changes.
 function Mod_LoadAliasGroup(data, offset, numVertices)
   if offset + 12 > len(data) then return error(1818, "MDL frame group outside file") end if
   count = bio.i32(data, offset)
@@ -157,6 +171,7 @@ function Mod_LoadAliasGroup(data, offset, numVertices)
   return [t.MdlFrameSet(true, intervals, frames), cursor]
 end function
 
+// Read and validate frame set.
 function parseFrameSet(data, offset, numVertices)
   if offset + 4 > len(data) then return error(1808, "MDL frame type outside file") end if
   group = bio.i32(data, offset)
@@ -169,6 +184,7 @@ function parseFrameSet(data, offset, numVertices)
   return Mod_LoadAliasGroup(data, offset, numVertices)
 end function
 
+// Mirror Quake's Mod_LoadAllSkins routine and its observable state changes.
 function Mod_LoadAllSkins(data, offset, numSkins, skinWidth, skinHeight)
   skins = arrayutil.makeEmptyArray(numSkins)
   index = 0
@@ -182,7 +198,9 @@ function Mod_LoadAllSkins(data, offset, numSkins, skinWidth, skinHeight)
   return [skins, offset]
 end function
 
+// Read and validate the requested value.
 function parse(data, filename)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if len(data) < 84 then return error(1812, filename + ": MDL header is truncated") end if
   if bio.fourCC(data, 0) != "IDPO" then return error(1813, filename + ": not an IDPO model") end if
   version = bio.i32(data, 4)
@@ -254,10 +272,12 @@ function parse(data, filename)
   return t.MdlModel(filename, data, version, scale, scaleOrigin, boundingRadius, eyePosition, numSkins, skinWidth, skinHeight, numVertices, numTriangles, numFrames, syncType, flags, modelSize * c.ALIAS_BASE_SIZE_RATIO, skins, texCoords, triangles, frames)
 end function
 
+// Mirror Quake's Mod_LoadAliasModel routine and its observable state changes.
 function Mod_LoadAliasModel(data, filename)
   return parse(data, filename)
 end function
 
+// Read and validate the requested value.
 function load(filename)
   data = fs.readAllBytes(filename)
   return parse(data, filename)

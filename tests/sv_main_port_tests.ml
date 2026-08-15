@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Focused deterministic sv_main.c / server.h fixtures.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.sv_main as svmain
@@ -14,16 +14,19 @@ import miniquake.sizebuf as sz
 import miniquake.message as msg
 import miniquake.net_loop as netloop
 
+// Assert exact equality and report both values on failure.
 function svmTestEqual(actual, expected, name)
   if actual != expected then return error(9960, name + ": got " + actual + " expected " + expected) end if
   return true
 end function
 
+// Apply server-side test true semantics.
 function svmTestTrue(value, name)
   if value != true then return error(9961, name) end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function svmTestNear(actual, expected, name)
   difference = actual - expected
   if difference < 0.0 then difference = -difference end if
@@ -31,10 +34,12 @@ function svmTestNear(actual, expected, name)
   return true
 end function
 
+// Apply server-side baseline semantics.
 function svmBaseline(modelIndex, frame, colormap, skin, origin, angles)
   return t.EntityBaseline(modelIndex, frame, colormap, skin, 0, origin, angles)
 end function
 
+// Verify entity update packing against the expected Quake behavior.
 function testEntityUpdatePacking()
   state = svmain.SV_Init(1)
   item = edict.create(300)
@@ -70,6 +75,7 @@ function testEntityUpdatePacking()
   return true
 end function
 
+// Verify baseline and client data against the expected Quake behavior.
 function testBaselineAndClientData()
   state = svmain.SV_Init(1)
   server = state.server
@@ -155,6 +161,7 @@ function testBaselineAndClientData()
   return true
 end function
 
+// Verify reliable broadcast and overflow against the expected Quake behavior.
 function testReliableBroadcastAndOverflow()
   state = svmain.SV_Init(2)
   first = state.server.clients[0]
@@ -190,6 +197,7 @@ function testReliableBroadcastAndOverflow()
   return true
 end function
 
+// Verify connect and signon lifecycle against the expected Quake behavior.
 function testConnectAndSignonLifecycle()
   state = svmain.SV_Init(1)
   state.server.active = true
@@ -218,6 +226,7 @@ function testConnectAndSignonLifecycle()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "[1/4] Protocol-15 entity update packing"
   result = try(testEntityUpdatePacking())

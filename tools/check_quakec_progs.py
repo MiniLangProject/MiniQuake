@@ -70,7 +70,11 @@ def contract(root:Path):
     if 'program.crc != c.PROGHEADER_CRC' not in edict:errors.append('PR_LoadProgs does not use named ABI CRC')
     if 'progs.runtimeCrc(server.progs)' not in server or 'progs.runtimeCrc(server.progs)' not in svmain:errors.append('serverinfo does not use full-file progs CRC')
     if 'parameterWords > fn.locals' in progs:errors.append('strict audit still imposes the invalid parameterWords <= locals rule')
-    if 'fn.firstStatement >= 0 and fn.parmStart + parameterWords > len(program.globals)' not in progs:errors.append('strict audit does not check the actual parameter destination')
+    parameter_destination_guards = (
+        'fn.firstStatement >= 0 and fn.parmStart + parameterWords > len(program.globals)',
+        'executableBytecode and fn.parmStart + parameterWords > len(program.globals)',
+    )
+    if not any(marker in progs for marker in parameter_destination_guards):errors.append('strict audit does not check the actual executable-bytecode parameter destination')
     if 'validation = try(validateLoadableProgram(program))' not in progs:errors.append('normal parsing still invokes the strict audit')
     if 'bytecode-zero-locals.dat' not in tests or 'bytecode parameter storage accepted' not in tests:errors.append('missing qcc bytecode zero-locals regression fixture')
     if 'parameter-storage-outside-globals.dat' not in tests or 'parameter storage outside globals rejected' not in tests:errors.append('missing parameter destination bounds fixture')

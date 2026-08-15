@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/opt001cr3_hotpath_tests.ml.
+*/
 import miniquake.build_info as buildInfo
 import miniquake.array_util as arrays
 import miniquake.client_state as clientState
@@ -13,6 +19,7 @@ import miniquake.screen as screen
 opt001cr3r8Passed = 0
 opt001cr3r8Failed = 0
 
+// Assert that the condition holds and identify a failing test.
 function opt001cr3r8Check(condition, label)
   global opt001cr3r8Passed, opt001cr3r8Failed
   if condition then
@@ -24,6 +31,7 @@ function opt001cr3r8Check(condition, label)
   end if
 end function
 
+// Return opt001cr3r8 video state derived from the active module state.
 function opt001cr3r8VideoState()
   state = video.createVideoState()
   video.VID_UseState(state)
@@ -32,6 +40,7 @@ function opt001cr3r8VideoState()
   return state
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   opt001cr3r8Check(buildInfo.OPTIMIZATION_STATUS == "opt001d_performance_audio_ui_candidate_v1", "optimization status")
   opt001cr3r8Check(buildInfo.OPTIMIZATION_FINGERPRINT == 0x1c001c10, "optimization fingerprint")

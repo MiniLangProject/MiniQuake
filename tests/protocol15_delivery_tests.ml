@@ -1,5 +1,9 @@
-/* BP-016 Protocol-15 reliable/unreliable delivery and failure-order fixtures. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
+BP-016 Protocol-15 reliable/unreliable delivery and failure-order fixtures.
+*/
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.sizebuf as sz
@@ -13,18 +17,22 @@ import miniquake.net_loop as netloop
 import miniquake.net_main as netmain
 import miniquake.player_move as movement
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(9600, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
+// Assert that the condition holds and identify a failing test.
 function yes(value, name)
   if not value then return error(9601, name + ": expected true") end if
   return true
 end function
+// Exercise no as part of this deterministic regression fixture.
 function no(value, name)
   if value then return error(9602, name + ": expected false") end if
   return true
 end function
+// Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
   print "  [" + number + "/14] " + name
   result = try(fn())
@@ -32,10 +40,12 @@ function run(number, name, fn)
   return true
 end function
 
+// Exercise player as part of this deterministic regression fixture.
 function player()
   return movement.createPlayer(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
 end function
 
+// Exercise pair as part of this deterministic regression fixture.
 function pair()
   network = netloop.createState()
   netmain.NET_Init(network, 2, false, false, 26000, true)
@@ -45,6 +55,7 @@ function pair()
   return [network, a, b]
 end function
 
+// Release or remove state for pair.
 function closePair(value)
   if value[2] is not void then netmain.NET_Close(value[2]) end if
   if value[1] is not void then netmain.NET_Close(value[1]) end if
@@ -52,6 +63,7 @@ function closePair(value)
   return true
 end function
 
+// Verify outcome classification against the expected Quake behavior.
 function testOutcomeClassification()
   equal(delivery.reliableSendOutcome(-1), delivery.SEND_DROP, "negative result")
   equal(delivery.reliableSendOutcome(0), delivery.SEND_RETAIN, "zero result")
@@ -59,6 +71,7 @@ function testOutcomeClassification()
   return true
 end function
 
+// Verify client plans against the expected Quake behavior.
 function testClientPlans()
   equal(delivery.clientReliablePlan(false, 10, true), delivery.SEND_DROP, "disconnected")
   equal(delivery.clientReliablePlan(true, 0, true), 0, "empty")
@@ -67,12 +80,14 @@ function testClientPlans()
   return true
 end function
 
+// Verify keepalive strict boundary against the expected Quake behavior.
 function testKeepaliveStrictBoundary()
   no(delivery.keepaliveDue(5.0), "exactly five seconds")
   yes(delivery.keepaliveDue(5.000001), "strictly above five seconds")
   return true
 end function
 
+// Verify initial delivery plans against the expected Quake behavior.
 function testInitialDeliveryPlans()
   equal(planning.initialDeliveryPlan(true, false, 0.0), planning.PLAN_SEND_UNRELIABLE | planning.PLAN_RELIABLE_PHASE, "spawned plan")
   equal(planning.initialDeliveryPlan(false, false, 5.0), planning.PLAN_WAIT_SIGNON, "signon exact keepalive")
@@ -81,6 +96,7 @@ function testInitialDeliveryPlans()
   return true
 end function
 
+// Verify reliable ordering against the expected Quake behavior.
 function testReliableOrdering()
   equal(planning.reliableDeliveryPlan(true, 1, true, true), planning.RELIABLE_DROP_OVERFLOW, "overflow first")
   equal(planning.reliableDeliveryPlan(false, 0, true, false), planning.RELIABLE_WAIT, "drop waits blocked")
@@ -89,6 +105,7 @@ function testReliableOrdering()
   return true
 end function
 
+// Verify blocked client queue against the expected Quake behavior.
 function testBlockedClientQueue()
   value = pair()
   if value is error then return value end if
@@ -106,6 +123,7 @@ function testBlockedClientQueue()
   return true
 end function
 
+// Verify blocked server queue against the expected Quake behavior.
 function testBlockedServerQueue()
   value = pair()
   if value is error then return value end if
@@ -128,6 +146,7 @@ function testBlockedServerQueue()
   return true
 end function
 
+// Verify reliable broadcast accumulates during signon against the expected Quake behavior.
 function testReliableBroadcastAccumulatesDuringSignon()
   game = server.create(1)
   target = game.clients[0]
@@ -141,6 +160,7 @@ function testReliableBroadcastAccumulatesDuringSignon()
   return true
 end function
 
+// Verify reconnect payload against the expected Quake behavior.
 function testReconnectPayload()
   buffer = sz.alloc(32)
   transients.writeReconnect(buffer)
@@ -148,6 +168,7 @@ function testReconnectPayload()
   return true
 end function
 
+// Verify nop payload and timestamp against the expected Quake behavior.
 function testNopPayloadAndTimestamp()
   value = pair()
   if value is error then return value end if
@@ -164,6 +185,7 @@ function testNopPayloadAndTimestamp()
   return true
 end function
 
+// Verify drop asap waits then drops against the expected Quake behavior.
 function testDropAsapWaitsThenDrops()
   value = pair()
   if value is error then return value end if
@@ -182,6 +204,7 @@ function testDropAsapWaitsThenDrops()
   return true
 end function
 
+// Verify overflow precedes drop asap against the expected Quake behavior.
 function testOverflowPrecedesDropAsap()
   game = server.create(1)
   target = game.clients[0]
@@ -195,6 +218,7 @@ function testOverflowPrecedesDropAsap()
   return true
 end function
 
+// Verify empty reliable no work against the expected Quake behavior.
 function testEmptyReliableNoWork()
   no(delivery.reliableWorkPending(0, false), "empty no work")
   yes(delivery.reliableWorkPending(1, false), "bytes are work")
@@ -202,6 +226,7 @@ function testEmptyReliableNoWork()
   return true
 end function
 
+// Verify committed message round trip against the expected Quake behavior.
 function testCommittedMessageRoundTrip()
   value = pair()
   if value is error then return value end if
@@ -219,6 +244,7 @@ function testCommittedMessageRoundTrip()
   return true
 end function
 
+// Verify send outcome clear contract against the expected Quake behavior.
 function testSendOutcomeClearContract()
   no(delivery.clearAfterSend(-1), "failed send does not commit")
   no(delivery.clearAfterSend(0), "blocked send does not commit")

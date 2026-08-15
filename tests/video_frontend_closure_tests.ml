@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-069: WinQuake keyboard/input/console/menu/video closure contract.
 */
-
 import miniquake.frontend_contract as bp069Contract
 import miniquake.gl_vidnt as bp069Video
 import miniquake.keys as bp069Keys
@@ -15,6 +15,7 @@ import miniquake.cvar as bp069Cvar
 bp069Index = 0
 bp069Failures = 0
 
+// Assert that the condition holds and identify a failing test.
 function bp069Check(value, name)
   global bp069Index, bp069Failures
   bp069Index = bp069Index + 1
@@ -27,6 +28,7 @@ function bp069Check(value, name)
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   bp069Check(bp069Contract.STATUS == "frontend_109_frozen_v1", "contract status")
   bp069Check(bp069Contract.FINGERPRINT == 0x924251fa, "contract fingerprint")

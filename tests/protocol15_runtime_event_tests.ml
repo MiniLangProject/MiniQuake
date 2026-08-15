@@ -1,13 +1,13 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-014R1 byte-exact Protocol-15 temporary-entity, dynamic-sound, beam-pool,
 keepalive and reusable-client-message fixtures. The wire vectors are reproduced
 independently by tools/oracle/protocol15_runtime_events_oracle.c and
- tools/check_protocol15_runtime_events.py.
+tools/check_protocol15_runtime_events.py.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.sizebuf as sz
@@ -20,25 +20,30 @@ import miniquake.client_effects as clientEffects
 import miniquake.temp_entities as temporary
 import miniquake.server as server
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9700, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9701, name + ": expected true") end if
   return true
 end function
 
+// Exercise assert false as part of this deterministic regression fixture.
 function assertFalse(value, name)
   if value != false then return error(9702, name + ": expected false") end if
   return true
 end function
 
+// Exercise assert hex as part of this deterministic regression fixture.
 function assertHex(buffer, expected, name)
   return assertEqual(hex(sz.dataSlice(buffer)), expected, name)
 end function
 
+// Execute one named test case and record its pass/fail result.
 function runTest(number, name, fn)
   print "  [" + number + "/28] " + name
   result = try(fn())
@@ -49,18 +54,22 @@ function runTest(number, name, fn)
   return true
 end function
 
+// Exercise origin a as part of this deterministic regression fixture.
 function originA()
   return t.Vec3(10.0, -20.0, 30.0)
 end function
 
+// Exercise origin b as part of this deterministic regression fixture.
 function originB()
   return t.Vec3(-12.25, 0.125, 4095.875)
 end function
 
+// Return beam value derived from the active module state.
 function beamValue(type, entityNumber)
   return t.TemporaryEntity(type, originA(), originB(), entityNumber)
 end function
 
+// Verify temp point vector against the expected Quake behavior.
 function testTempPointVector()
   buffer = sz.alloc(64)
   assertEqual(transients.writePoint(buffer, c.TE_SPIKE, originA()), 8, "point length")
@@ -68,6 +77,7 @@ function testTempPointVector()
   return true
 end function
 
+// Verify temp beam vector against the expected Quake behavior.
 function testTempBeamVector()
   buffer = sz.alloc(64)
   assertEqual(transients.writeBeam(buffer, c.TE_LIGHTNING1, 300, originA(), originB()), 16, "beam length")
@@ -75,6 +85,7 @@ function testTempBeamVector()
   return true
 end function
 
+// Verify temp explosion2 vector against the expected Quake behavior.
 function testTempExplosion2Vector()
   buffer = sz.alloc(64)
   assertEqual(transients.writeExplosion2(buffer, originA(), 0x12, 0x34), 10, "explosion2 length")
@@ -82,6 +93,7 @@ function testTempExplosion2Vector()
   return true
 end function
 
+// Verify stop sound vector against the expected Quake behavior.
 function testStopSoundVector()
   buffer = sz.alloc(16)
   assertEqual(transients.writeStopSound(buffer, 300, 7), 3, "stop sound length")
@@ -89,6 +101,7 @@ function testStopSoundVector()
   return true
 end function
 
+// Verify dynamic sound default vector against the expected Quake behavior.
 function testDynamicSoundDefaultVector()
   buffer = sz.alloc(64)
   serverData.writeSound(buffer, 300, 2, 5, 255, 1.0, originA())
@@ -97,6 +110,7 @@ function testDynamicSoundDefaultVector()
   return true
 end function
 
+// Verify dynamic sound optional vector against the expected Quake behavior.
 function testDynamicSoundOptionalVector()
   buffer = sz.alloc(64)
   serverData.writeSound(buffer, 1, 7, 300, 128, 0.5, originB())
@@ -105,6 +119,7 @@ function testDynamicSoundOptionalVector()
   return true
 end function
 
+// Verify temp type matrix against the expected Quake behavior.
 function testTempTypeMatrix()
   types = [
     c.TE_SPIKE, c.TE_SUPERSPIKE, c.TE_GUNSHOT, c.TE_EXPLOSION,
@@ -132,6 +147,7 @@ function testTempTypeMatrix()
   return true
 end function
 
+// Verify point parser round trip against the expected Quake behavior.
 function testPointParserRoundTrip()
   buffer = sz.alloc(64)
   transients.writePoint(buffer, c.TE_TELEPORT, originB())
@@ -145,6 +161,7 @@ function testPointParserRoundTrip()
   return true
 end function
 
+// Verify beam parser round trip against the expected Quake behavior.
 function testBeamParserRoundTrip()
   buffer = sz.alloc(64)
   transients.writeBeam(buffer, c.TE_BEAM, 300, originA(), originB())
@@ -157,6 +174,7 @@ function testBeamParserRoundTrip()
   return true
 end function
 
+// Verify explosion2 parser round trip against the expected Quake behavior.
 function testExplosion2ParserRoundTrip()
   buffer = sz.alloc(64)
   transients.writeExplosion2(buffer, originA(), 0x12, 0x34)
@@ -167,6 +185,7 @@ function testExplosion2ParserRoundTrip()
   return true
 end function
 
+// Verify invalid and truncated temp entity against the expected Quake behavior.
 function testInvalidAndTruncatedTempEntity()
   invalid = try(transients.tempKind(14))
   assertTrue(invalid is error, "invalid type rejected")
@@ -179,6 +198,7 @@ function testInvalidAndTruncatedTempEntity()
   return true
 end function
 
+// Verify dynamic sound default parser against the expected Quake behavior.
 function testDynamicSoundDefaultParser()
   buffer = sz.alloc(64)
   serverData.writeSound(buffer, 3, 2, 5, 255, 1.0, originA())
@@ -192,6 +212,7 @@ function testDynamicSoundDefaultParser()
   return true
 end function
 
+// Verify dynamic sound optional parser against the expected Quake behavior.
 function testDynamicSoundOptionalParser()
   buffer = sz.alloc(64)
   serverData.writeSound(buffer, 1, 7, 9, 128, 0.5, originB())
@@ -204,6 +225,7 @@ function testDynamicSoundOptionalParser()
   return true
 end function
 
+// Verify dynamic sound entity boundary against the expected Quake behavior.
 function testDynamicSoundEntityBoundary()
   accepted = sz.alloc(64)
   serverData.writeSound(accepted, c.MAX_EDICTS, 0, 1, 255, 1.0, originA())
@@ -217,6 +239,7 @@ function testDynamicSoundEntityBoundary()
   return true
 end function
 
+// Verify stop sound parser against the expected Quake behavior.
 function testStopSoundParser()
   buffer = sz.alloc(16)
   transients.writeStopSound(buffer, 300, 7)
@@ -228,6 +251,7 @@ function testStopSoundParser()
   return true
 end function
 
+// Verify compact beam same entity slot against the expected Quake behavior.
 function testCompactBeamSameEntitySlot()
   first = beamValue(c.TE_LIGHTNING1, 42)
   initial = transients.updateCompactBeamListResult([], first, 0.0)
@@ -246,6 +270,7 @@ function testCompactBeamSameEntitySlot()
   return true
 end function
 
+// Verify compact beam pool limit against the expected Quake behavior.
 function testCompactBeamPoolLimit()
   beams = []
   index = 0
@@ -262,6 +287,7 @@ function testCompactBeamPoolLimit()
   return true
 end function
 
+// Verify compact beam free slot order against the expected Quake behavior.
 function testCompactBeamFreeSlotOrder()
   zero = [beamValue(c.TE_BEAM, 10), 2.0, 0]
   two = [beamValue(c.TE_BEAM, 12), 2.0, 2]
@@ -275,6 +301,7 @@ function testCompactBeamFreeSlotOrder()
   return true
 end function
 
+// Verify full beam pool diagnostic against the expected Quake behavior.
 function testFullBeamPoolDiagnostic()
   state = temporary.CL_InitTEnts(void)
   index = 0
@@ -291,12 +318,14 @@ function testFullBeamPoolDiagnostic()
   return true
 end function
 
+// Verify timing binary32 against the expected Quake behavior.
 function testTimingBinary32()
   assertEqual(native.floatBits(transients.beamEndTime(1.0)), 0x3f99999a, "beam endtime bits")
   assertEqual(native.floatBits(transients.dynamicLightDieTime(1.0)), 0x3fc00000, "dlight die bits")
   return true
 end function
 
+// Verify quake csound conversions against the expected Quake behavior.
 function testQuakeCSoundConversions()
   assertEqual(transients.quakeCSoundChannel(2.9), 2, "QuakeC channel truncation")
   assertEqual(transients.quakeCSoundVolumeByte(0.5), 127, "QuakeC volume binary32 product")
@@ -305,6 +334,7 @@ function testQuakeCSoundConversions()
   return true
 end function
 
+// Verify sound center binary32 against the expected Quake behavior.
 function testSoundCenterBinary32()
   center = transients.soundCenter(
     t.Vec3(-12.25, 20.0, 30.0),
@@ -317,6 +347,7 @@ function testSoundCenterBinary32()
   return true
 end function
 
+// Verify dynamic sound datagram boundary against the expected Quake behavior.
 function testDynamicSoundDatagramBoundary()
   buffer = sz.alloc(c.MAX_DATAGRAM)
   buffer.curSize = c.MAX_DATAGRAM - 16
@@ -326,6 +357,7 @@ function testDynamicSoundDatagramBoundary()
   return true
 end function
 
+// Verify reusable client message reset against the expected Quake behavior.
 function testReusableClientMessageReset()
   value = server.create(1)
   clientValue = value.clients[0]
@@ -339,6 +371,7 @@ function testReusableClientMessageReset()
   return true
 end function
 
+// Verify reliable overflow and drop priority against the expected Quake behavior.
 function testReliableOverflowAndDropPriority()
   assertEqual(
     serverData.reliableDeliveryPlan(true, 1, true, true),
@@ -358,6 +391,7 @@ function testReliableOverflowAndDropPriority()
   return true
 end function
 
+// Verify keepalive and reconnect boundaries against the expected Quake behavior.
 function testKeepaliveAndReconnectBoundaries()
   assertEqual(
     serverData.initialDeliveryPlan(false, false, 5.0),
@@ -375,6 +409,7 @@ function testKeepaliveAndReconnectBoundaries()
   return true
 end function
 
+// Verify static sound client scalars against the expected Quake behavior.
 function testStaticSoundClientScalars()
   normalizedVolume = transients.staticSoundVolume(127)
   assertEqual(native.floatBits(normalizedVolume), 0x3efefeff, "static volume mixer normalization")
@@ -385,6 +420,7 @@ function testStaticSoundClientScalars()
   return true
 end function
 
+// Verify compact beam state and active view against the expected Quake behavior.
 function testCompactBeamStateAndActiveView()
   firstValue = beamValue(c.TE_LIGHTNING1, 42)
   first = clientEffects.processTemporary(firstValue, void, [], [], 1.0)

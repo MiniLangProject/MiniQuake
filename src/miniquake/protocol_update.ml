@@ -1,8 +1,16 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.protocol_update.
+*/
 package miniquake.protocol_update
 
 import miniquake.constants as c
 import miniquake.message as msg
 
+// Provide absolute behavior for the active subsystem.
 function absolute(value)
   if value < 0.0 then return -value end if
   return value
@@ -64,12 +72,25 @@ function encodedSize(bits)
   return count
 end function
 
+// Report whether can write.
 function canWrite(buffer, bits)
   remaining = buffer.maxSize - buffer.curSize
   if remaining < 16 then return false end if
   return encodedSize(bits) <= remaining
 end function
 
+// The stock server appends sv.datagram after fast entity updates. Under a
+// dense PVS that can discard the complete transient tail, including gunshot
+// puffs and explosions. Reserve the already-known tail while scheduling
+// entity deltas; the strict '< maxSize' append boundary still applies.
+function canWriteWithReservedTail(buffer, bits, reservedBytes)
+  if reservedBytes <= 0 then return canWrite(buffer, bits) end if
+  remaining = buffer.maxSize - buffer.curSize - reservedBytes
+  if remaining < 16 then return false end if
+  return encodedSize(bits) < remaining
+end function
+
+// Encode and write fast update bits.
 function writeFastUpdateBits(
   buffer,
   bits,
@@ -103,6 +124,7 @@ function writeFastUpdateBits(
   return bits
 end function
 
+// Encode and write fast update.
 function writeFastUpdate(
   buffer,
   entityNumber,

@@ -1,13 +1,13 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Protocol-15 transient-event and scoreboard payloads shared by the integrated
 server, the direct sv_main pendant and QuakeC builtins.  These helpers retain
 the C function-parameter boundaries and byte order from sv_main.c, host.c,
 host_cmd.c, pr_cmds.c and r_part.c.
 */
-
 package miniquake.protocol_events
 
 import miniquake.types as t
@@ -18,10 +18,12 @@ import miniquake.protocol_text as protocolText
 
 const MAX_PLAYER_NAME_BYTES = 15
 
+// Provide c float behavior for the active subsystem.
 function cFloat(value)
   return native.bitsFloat(native.floatBits(value))
 end function
 
+// Provide c float product behavior for the active subsystem.
 function cFloatProduct(left, right)
   return cFloat(cFloat(left) * cFloat(right))
 end function
@@ -32,6 +34,7 @@ function canWriteTransient(buffer)
   return buffer.curSize <= c.MAX_DATAGRAM - 16
 end function
 
+// Encode and write spawn static.
 function writeSpawnStatic(buffer, modelIndex, frame, colormap, skin, origin, angles)
   start = buffer.curSize
   msg.writeByte(buffer, c.SVC_SPAWNSTATIC)
@@ -48,6 +51,7 @@ function writeSpawnStatic(buffer, modelIndex, frame, colormap, skin, origin, ang
   return buffer.curSize - start
 end function
 
+// Encode and write static entity.
 function writeStaticEntity(buffer, baseline)
   return writeSpawnStatic(
     buffer,
@@ -60,16 +64,19 @@ function writeStaticEntity(buffer, baseline)
   )
 end function
 
+// Return static sound volume byte derived from the active module state.
 function staticSoundVolumeByte(volume)
   // PF_ambientsound evaluates vol*255 as binary32 and then passes the result
   // to MSG_WriteByte's int parameter.  The original performs no clamping.
   return native.trunc(cFloatProduct(volume, 255.0))
 end function
 
+// Return static sound attenuation byte derived from the active module state.
 function staticSoundAttenuationByte(attenuation)
   return native.trunc(cFloatProduct(attenuation, 64.0))
 end function
 
+// Encode and write static sound.
 function writeStaticSound(buffer, origin, soundIndex, volume, attenuation)
   start = buffer.curSize
   msg.writeByte(buffer, c.SVC_SPAWNSTATICSOUND)
@@ -82,6 +89,7 @@ function writeStaticSound(buffer, origin, soundIndex, volume, attenuation)
   return buffer.curSize - start
 end function
 
+// Return particle direction byte derived from the active module state.
 function particleDirectionByte(value)
   result = native.trunc(cFloatProduct(value, 16.0))
   if result > 127 then result = 127 end if
@@ -89,6 +97,7 @@ function particleDirectionByte(value)
   return result
 end function
 
+// Encode and write particle.
 function writeParticle(buffer, origin, direction, count, color)
   start = buffer.curSize
   msg.writeByte(buffer, c.SVC_PARTICLE)
@@ -110,10 +119,12 @@ function particleCount(wireValue)
   return value
 end function
 
+// Return truncate player name derived from the active module state.
 function truncatePlayerName(text)
   return protocolText.truncate(text, MAX_PLAYER_NAME_BYTES)
 end function
 
+// Encode and write update name.
 function writeUpdateName(buffer, clientIndex, name)
   start = buffer.curSize
   msg.writeByte(buffer, c.SVC_UPDATENAME)
@@ -122,6 +133,7 @@ function writeUpdateName(buffer, clientIndex, name)
   return buffer.curSize - start
 end function
 
+// Encode and write update frags.
 function writeUpdateFrags(buffer, clientIndex, frags)
   start = buffer.curSize
   msg.writeByte(buffer, c.SVC_UPDATEFRAGS)
@@ -131,6 +143,7 @@ function writeUpdateFrags(buffer, clientIndex, frags)
   return buffer.curSize - start
 end function
 
+// Encode and write update colors.
 function writeUpdateColors(buffer, clientIndex, colors)
   start = buffer.curSize
   msg.writeByte(buffer, c.SVC_UPDATECOLORS)
@@ -139,6 +152,7 @@ function writeUpdateColors(buffer, clientIndex, colors)
   return buffer.curSize - start
 end function
 
+// Encode and write score state.
 function writeScoreState(buffer, clientIndex, name, oldFrags, colors)
   start = buffer.curSize
   writeUpdateName(buffer, clientIndex, name)
@@ -147,16 +161,19 @@ function writeScoreState(buffer, clientIndex, name, oldFrags, colors)
   return buffer.curSize - start
 end function
 
+// Encode and write score reset.
 function writeScoreReset(buffer, clientIndex)
   return writeScoreState(buffer, clientIndex, "", 0, 0)
 end function
 
+// Encode and write disconnect.
 function writeDisconnect(buffer)
   start = buffer.curSize
   msg.writeByte(buffer, c.SVC_DISCONNECT)
   return buffer.curSize - start
 end function
 
+// Provide frag changed behavior for the active subsystem.
 function fragChanged(oldFrags, currentFrags)
   // client_t.old_frags is int while edict->v.frags is float. C compares them
   // before converting the new float back to int. Fractional mod values thus
@@ -164,6 +181,7 @@ function fragChanged(oldFrags, currentFrags)
   return cFloat(oldFrags) != cFloat(currentFrags)
 end function
 
+// Provide stored frag behavior for the active subsystem.
 function storedFrag(currentFrags)
   return native.trunc(cFloat(currentFrags))
 end function

@@ -1,13 +1,21 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/pr_exec_differential_fixture.ml.
+*/
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.native as native
 import miniquake.quakec.vm as vm
 import miniquake.quakec.opcodes as op
 
+// Exercise dummy function as part of this deterministic regression fixture.
 function dummyFunction()
   return t.QuakeCFunction(0, 0, 0, 0, "", "", 0, [])
 end function
 
+// Create and initialize machine.
 function makeMachine(functionValue, statements)
   program = t.QuakeCProgram(
     "pr_exec_fixture.dat",
@@ -25,6 +33,7 @@ function makeMachine(functionValue, statements)
   return vm.create(program, 4)
 end function
 
+// Add exec to the destination state.
 function emitExec(functionName, caseName, result, depth, locals, value, count)
   print "{\"function\":\"" + functionName + "\",\"case\":\"" + caseName +
     "\",\"result\":" + result + ",\"depth\":" + depth +
@@ -32,6 +41,7 @@ function emitExec(functionName, caseName, result, depth, locals, value, count)
     ",\"count\":" + count + "}"
 end function
 
+// Report mode and return the corresponding failure status.
 function errorMode()
   functionValue = t.QuakeCFunction(0, 40, 0, 0, "error", "fixture.qc", 0, [])
   machine = makeMachine(functionValue, [t.QuakeCStatement(op.OP_DONE, 0, 0, 0)])
@@ -40,6 +50,7 @@ function errorMode()
   return 0
 end function
 
+// Exercise hidden semantic checks as part of this deterministic regression fixture.
 function hiddenSemanticChecks()
   functionValue = t.QuakeCFunction(0, 40, 0, 0, "stacked", "fixture.qc", 0, [])
   machine = makeMachine(functionValue, [t.QuakeCStatement(op.OP_DONE, 0, 0, 0)])
@@ -60,7 +71,9 @@ function hiddenSemanticChecks()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   if len(args) > 0 and args[0] == "--error" then return errorMode() end if
   hidden = try(hiddenSemanticChecks())
   if hidden is error then return 1 end if

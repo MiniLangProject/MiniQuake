@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-023 source-guided QuakeC builtin parity fixtures for pr_cmds.c.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.native as native
@@ -18,16 +18,19 @@ import miniquake.quakec.opcodes as op
 import miniquake.quakec.vm as vm
 import miniquake.quakec.builtins as qc
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(10030, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function yes(value, name)
   if value != true then return error(10031, name + ": expected true") end if
   return true
 end function
 
+// Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
   print "  [" + number + "/22] " + name
   result = try(fn())
@@ -38,10 +41,12 @@ function run(number, name, fn)
   return true
 end function
 
+// Exercise definition as part of this deterministic regression fixture.
 function definition(typeValue, offset, name)
   return t.QuakeCDef(typeValue, offset, 0, name)
 end function
 
+// Exercise fields as part of this deterministic regression fixture.
 function fields()
   return [
     definition(c.EV_VOID, 0, ""),
@@ -54,11 +59,13 @@ function fields()
   ]
 end function
 
+// Exercise globals as part of this deterministic regression fixture.
 function globals()
   result = [
     definition(c.EV_VOID, 0, ""),
     definition(c.EV_ENTITY, 80, "self"),
     definition(c.EV_ENTITY, 81, "msg_entity"),
+    definition(c.EV_ENTITY, 110, "trace_ent"),
   ]
   index = 1
   while index <= 16
@@ -68,10 +75,12 @@ function globals()
   return result
 end function
 
+// Exercise no command as part of this deterministic regression fixture.
 function noCommand(name)
   return false
 end function
 
+// Exercise fresh as part of this deterministic regression fixture.
 function fresh()
   dummy = t.QuakeCFunction(0, 0, 0, 0, "", "", 0, [])
   program = t.QuakeCProgram(
@@ -132,35 +141,47 @@ function fresh()
   return [machine, contextValue]
 end function
 
+// Update module state for parm word.
 function setParmWord(machine, index, value)
   qc.setWord(machine, op.OFS_PARM0 + index * 3, value)
 end function
 
+// Update module state for parm float.
 function setParmFloat(machine, index, value)
   qc.setFloat(machine, op.OFS_PARM0 + index * 3, value)
 end function
 
+// Update module state for parm vector.
 function setParmVector(machine, index, value)
   qc.setVectorValue(machine, op.OFS_PARM0 + index * 3, value)
 end function
 
+// Update module state for parm string.
 function setParmString(machine, index, value)
   setParmWord(machine, index, vm.internString(machine, value))
 end function
 
+// Return return string value derived from the active module state.
 function returnStringValue(machine)
   return qc.stringAt(machine, qc.word(machine, op.OFS_RETURN))
 end function
 
+// Verify builtin table against the expected Quake behavior.
 function testBuiltinTable()
   state = fresh()
   machine = state[0]
   equal(len(machine.builtins), 79, "stock builtin count")
   yes(try(machine.builtins[5](machine)) is error, "slot 5 is PF_Fixme")
   yes(try(machine.builtins[66](machine)) is error, "slot 66 is PF_Fixme")
+  plane = t.Plane(t.Vec3(0.0, 0.0, 1.0), 0.0, 2, 0)
+  qc.setTraceGlobals(machine, t.Trace(false, false, true, false, 1.0, t.Vec3(1.0, 2.0, 3.0), plane, -1))
+  equal(qc.globalWord(machine, "trace_ent"), 0, "no-hit trace publishes world entity")
+  qc.setTraceGlobals(machine, t.Trace(false, false, false, false, 0.5, t.Vec3(1.0, 2.0, 3.0), plane, 2))
+  equal(qc.globalWord(machine, "trace_ent"), 2, "hit trace preserves entity")
   return true
 end function
 
+// Verify ftos integer against the expected Quake behavior.
 function testFtosInteger()
   state = fresh(); machine = state[0]
   setParmFloat(machine, 0, -12.0)
@@ -169,6 +190,7 @@ function testFtosInteger()
   return true
 end function
 
+// Verify ftos positive tie even against the expected Quake behavior.
 function testFtosPositiveTieEven()
   state = fresh(); machine = state[0]
   setParmFloat(machine, 0, 1.25)
@@ -177,6 +199,7 @@ function testFtosPositiveTieEven()
   return true
 end function
 
+// Verify ftos negative tie even against the expected Quake behavior.
 function testFtosNegativeTieEven()
   state = fresh(); machine = state[0]
   setParmFloat(machine, 0, -1.25)
@@ -185,6 +208,7 @@ function testFtosNegativeTieEven()
   return true
 end function
 
+// Verify ftos binary32 below tie against the expected Quake behavior.
 function testFtosBinary32BelowTie()
   state = fresh(); machine = state[0]
   setParmFloat(machine, 0, native.bitsFloat(0x40166666))
@@ -193,6 +217,7 @@ function testFtosBinary32BelowTie()
   return true
 end function
 
+// Verify ftos negative zero after rounding against the expected Quake behavior.
 function testFtosNegativeZeroAfterRounding()
   state = fresh(); machine = state[0]
   setParmFloat(machine, 0, -0.04)
@@ -201,6 +226,7 @@ function testFtosNegativeZeroAfterRounding()
   return true
 end function
 
+// Verify vtos formatting against the expected Quake behavior.
 function testVtosFormatting()
   state = fresh(); machine = state[0]
   setParmVector(machine, 0, t.Vec3(1.25, -1.25, -0.04))
@@ -210,6 +236,7 @@ function testVtosFormatting()
 end function
 
 
+// Verify temporary string handle stable against the expected Quake behavior.
 function testTemporaryStringHandleStable()
   state = fresh(); machine = state[0]
   setParmFloat(machine, 0, 3.5)
@@ -223,6 +250,7 @@ function testTemporaryStringHandleStable()
   return true
 end function
 
+// Verify temporary string overwrite against the expected Quake behavior.
 function testTemporaryStringOverwrite()
   state = fresh(); machine = state[0]
   setParmFloat(machine, 0, 3.5)
@@ -235,6 +263,7 @@ function testTemporaryStringOverwrite()
   return true
 end function
 
+// Verify find skips null string against the expected Quake behavior.
 function testFindSkipsNullString()
   state = fresh(); machine = state[0]
   setParmWord(machine, 0, 0)
@@ -245,6 +274,7 @@ function testFindSkipsNullString()
   return true
 end function
 
+// Verify find latin1 exact against the expected Quake behavior.
 function testFindLatin1Exact()
   state = fresh(); machine = state[0]
   value = decode(bytes([0xc3, 0xa9]))
@@ -257,6 +287,7 @@ function testFindLatin1Exact()
   return true
 end function
 
+// Verify find radius chain order against the expected Quake behavior.
 function testFindRadiusChainOrder()
   state = fresh(); machine = state[0]
   qc.setEntityFloat(machine, 1, "solid", 1)
@@ -272,6 +303,7 @@ function testFindRadiusChainOrder()
   return true
 end function
 
+// Verify precache sound identity and duplicate against the expected Quake behavior.
 function testPrecacheSoundIdentityAndDuplicate()
   state = fresh(); machine = state[0]; contextValue = state[1]
   setParmString(machine, 0, "sound/test.wav")
@@ -283,6 +315,7 @@ function testPrecacheSoundIdentityAndDuplicate()
   return true
 end function
 
+// Verify precache model identity and duplicate against the expected Quake behavior.
 function testPrecacheModelIdentityAndDuplicate()
   state = fresh(); machine = state[0]; contextValue = state[1]
   setParmString(machine, 0, "progs/test.mdl")
@@ -294,6 +327,7 @@ function testPrecacheModelIdentityAndDuplicate()
   return true
 end function
 
+// Verify precache requires loading against the expected Quake behavior.
 function testPrecacheRequiresLoading()
   state = fresh(); machine = state[0]; contextValue = state[1]
   contextValue.server = server.create(1)
@@ -303,6 +337,7 @@ function testPrecacheRequiresLoading()
   return true
 end function
 
+// Verify precache rejects leading space against the expected Quake behavior.
 function testPrecacheRejectsLeadingSpace()
   state = fresh(); machine = state[0]
   setParmString(machine, 0, " bad.wav")
@@ -310,6 +345,7 @@ function testPrecacheRejectsLeadingSpace()
   return true
 end function
 
+// Verify write destinations against the expected Quake behavior.
 function testWriteDestinations()
   state = fresh(); machine = state[0]; contextValue = state[1]
   setParmFloat(machine, 0, 0); yes(qc.WriteDest(machine) == contextValue.datagram, "MSG_BROADCAST")
@@ -320,6 +356,7 @@ function testWriteDestinations()
   return true
 end function
 
+// Verify write destination errors against the expected Quake behavior.
 function testWriteDestinationErrors()
   state = fresh(); machine = state[0]
   setParmFloat(machine, 0, 4)
@@ -330,6 +367,7 @@ function testWriteDestinationErrors()
   return true
 end function
 
+// Verify change level one shot against the expected Quake behavior.
 function testChangeLevelOneShot()
   state = fresh(); machine = state[0]; contextValue = state[1]
   setParmString(machine, 0, "e1m2")
@@ -354,6 +392,7 @@ function testChangeLevelOneShot()
   return true
 end function
 
+// Verify set spawn parms against the expected Quake behavior.
 function testSetSpawnParms()
   state = fresh(); machine = state[0]; contextValue = state[1]
   values = arrayutil.makeFilledArray(16, 0.0)
@@ -370,6 +409,7 @@ function testSetSpawnParms()
   return true
 end function
 
+// Verify next entity skips free against the expected Quake behavior.
 function testNextEntitySkipsFree()
   state = fresh(); machine = state[0]
   machine.edictFree[1] = true
@@ -380,6 +420,7 @@ function testNextEntitySkipsFree()
   return true
 end function
 
+// Verify random msvc sequence against the expected Quake behavior.
 function testRandomMsvcSequence()
   state = fresh(); machine = state[0]; contextValue = state[1]
   contextValue.randomSeed = 1
@@ -390,6 +431,7 @@ function testRandomMsvcSequence()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "MiniQuake BP-023 QuakeC builtin tests"
   passed = 0

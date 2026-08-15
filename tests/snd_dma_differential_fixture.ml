@@ -1,14 +1,22 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/snd_dma_differential_fixture.ml.
+*/
 import miniquake.sound.snd_dma as sound
 import miniquake.sound.snd_mem as sndmem
 import miniquake.sound.snd_mix as mix
 import miniquake.types as t
 import miniquake.native as native
 
+// Exercise int bool as part of this deterministic regression fixture.
 function intBool(value)
   if value then return 1 end if
   return 0
 end function
 
+// Return text checksum derived from the active module state.
 function textChecksum(text)
   data = bytes(text)
   result = 0
@@ -20,6 +28,7 @@ function textChecksum(text)
   return result
 end function
 
+// Return registration checksum derived from the active module state.
 function registrationChecksum(names)
   result = 0
   index = 0
@@ -30,6 +39,7 @@ function registrationChecksum(names)
   return result
 end function
 
+// Add the requested value to the destination state.
 function emit(name, caseName, i0, i1, i2, i3, f0, f1, f2, f3)
   print "{\"function\":\"" + name + "\",\"case\":\"" + caseName +
     "\",\"i0\":" + i0 + ",\"i1\":" + i1 +
@@ -38,6 +48,7 @@ function emit(name, caseName, i0, i1, i2, i3, f0, f1, f2, f3)
     ",\"f2\":" + native.floatText(f2) + ",\"f3\":" + native.floatText(f3) + "}"
 end function
 
+// Exercise descriptor as part of this deterministic regression fixture.
 function descriptor(name, length, loopStart, width)
   return sndmem.SoundDescriptor(
     name,
@@ -45,6 +56,7 @@ function descriptor(name, length, loopStart, width)
   )
 end function
 
+// Exercise base system as part of this deterministic regression fixture.
 function baseSystem()
   system = sound.create(void, 22050)
   system.initialized = true
@@ -56,6 +68,7 @@ function baseSystem()
   return system
 end function
 
+// Report whether active pair count holds for the active state.
 function activePairCount(system)
   result = 0
   if system.mixState.channels[4].sfx is not void then result = result + 1 end if
@@ -63,7 +76,9 @@ function activePairCount(system)
   return result
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   system = baseSystem()
   system.mixState.channels[0].masterVolume = 5
   sound.S_AmbientOff(system)

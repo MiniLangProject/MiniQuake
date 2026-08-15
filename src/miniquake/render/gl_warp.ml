@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.render.gl_warp.
+*/
 package miniquake.render.gl_warp
 
 // Functional MiniLang counterpart of WinQuake/gl_warp.c (Quake 1 path).
@@ -26,6 +33,7 @@ function warpFloat(value)
   return native.bitsFloat(native.floatBits(value))
 end function
 
+// Update module state for subdivide size.
 function SetSubdivideSize(value)
   global gl_subdivide_size
   if value <= 0.0 then value = DEFAULT_SUBDIVIDE_SIZE end if
@@ -33,6 +41,7 @@ function SetSubdivideSize(value)
   return gl_subdivide_size
 end function
 
+// Return subdivide size.
 function CurrentSubdivideSize()
   return gl_subdivide_size
 end function
@@ -74,12 +83,14 @@ turbsin = [
   -1.56072, -1.3677, -1.17384, -0.979285, -0.784137, -0.588517, -0.392541, -0.19633,
 ]
 
+// Return floor value derived from the active module state.
 function floorValue(value)
   result = native.trunc(value)
   if result > value then result = result - 1 end if
   return result
 end function
 
+// Provide bound poly behavior for the active subsystem.
 function BoundPoly(vertices)
   minimums = t.Vec3(9999.0, 9999.0, 9999.0)
   maximums = t.Vec3(-9999.0, -9999.0, -9999.0)
@@ -95,6 +106,7 @@ function BoundPoly(vertices)
   return [minimums, maximums]
 end function
 
+// Provide interpolate vertex behavior for the active subsystem.
 function interpolateVertex(first, second, fraction)
   fraction = warpFloat(fraction)
   position = t.Vec3(
@@ -111,7 +123,9 @@ function interpolateVertex(first, second, fraction)
   )
 end function
 
+// Provide subdivide recursive behavior for the active subsystem.
 function subdivideRecursive(vertices, output, subdivideSize)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if len(vertices) > 60 then return error(3800, "SubdividePolygon: numverts > 60") end if
   bounds = BoundPoly(vertices)
   minimums = bounds[0]
@@ -163,6 +177,7 @@ function subdivideRecursive(vertices, output, subdivideSize)
   return true
 end function
 
+// Provide subdivide polygon behavior for the active subsystem.
 function SubdividePolygon(vertices, subdivideSize)
   if subdivideSize <= 0.0 then subdivideSize = DEFAULT_SUBDIVIDE_SIZE end if
   output = arrayutil.createArrayBuilder(8)
@@ -179,6 +194,7 @@ function SubdividePolygon(vertices, subdivideSize)
   return polygons
 end function
 
+// Provide surface warp vertices behavior for the active subsystem.
 function SurfaceWarpVertices(vertices, sVector, tVector)
   result = arrayutil.makeEmptyArray(len(vertices))
   index = 0
@@ -193,10 +209,12 @@ function SurfaceWarpVertices(vertices, sVector, tVector)
   return result
 end function
 
+// Mirror Quake's GL_SubdivideSurface routine and its observable state changes.
 function GL_SubdivideSurface(vertices, sVector, tVector, subdivideSize)
   return SubdividePolygon(SurfaceWarpVertices(vertices, sVector, tVector), subdivideSize)
 end function
 
+// Provide water tex coords behavior for the active subsystem.
 function WaterTexCoords(originalS, originalT, realtime)
   originalS = warpFloat(originalS)
   originalT = warpFloat(originalT)
@@ -207,6 +225,7 @@ function WaterTexCoords(originalS, originalT, realtime)
   return [textureS, textureT]
 end function
 
+// Add water polys to the destination state.
 function EmitWaterPolys(polygons, realtime)
   result = arrayutil.makeEmptyArray(len(polygons))
   polygonIndex = 0
@@ -230,11 +249,13 @@ function EmitWaterPolys(polygons, realtime)
   return result
 end function
 
+// Provide wrapped speed scale behavior for the active subsystem.
 function WrappedSpeedScale(realtime, speed)
   value = warpFloat(realtime * speed)
   return warpFloat(value - (native.trunc(value) & -128))
 end function
 
+// Provide sky tex coords behavior for the active subsystem.
 function SkyTexCoords(position, viewOrigin, currentSpeedScale)
   direction = t.Vec3(
     warpFloat(position.x - viewOrigin.x),
@@ -252,6 +273,7 @@ function SkyTexCoords(position, viewOrigin, currentSpeedScale)
   return [textureS, textureT]
 end function
 
+// Add sky polys to the destination state.
 function EmitSkyPolys(polygons, viewOrigin, currentSpeedScale)
   result = arrayutil.makeEmptyArray(len(polygons))
   polygonIndex = 0
@@ -275,6 +297,7 @@ function EmitSkyPolys(polygons, viewOrigin, currentSpeedScale)
   return result
 end function
 
+// Add both sky layers to the destination state.
 function EmitBothSkyLayers(polygons, viewOrigin, realtime)
   solidSpeed = WrappedSpeedScale(realtime, 8.0)
   alphaSpeed = WrappedSpeedScale(realtime, 16.0)
@@ -286,6 +309,7 @@ function EmitBothSkyLayers(polygons, viewOrigin, realtime)
   ]
 end function
 
+// Apply the Quake-compatible r draw sky chain behavior.
 function R_DrawSkyChain(surfacePolygons, viewOrigin, realtime)
   solidSpeed = WrappedSpeedScale(realtime, 8.0)
   alphaSpeed = WrappedSpeedScale(realtime, 16.0)
@@ -300,7 +324,9 @@ function R_DrawSkyChain(surfacePolygons, viewOrigin, realtime)
   return [solidSpeed, solid, alphaSpeed, alpha]
 end function
 
+// Apply the Quake-compatible r init sky pixels behavior.
 function R_InitSkyPixels(texture, palette)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if texture is void or texture.width != 256 or texture.height != 128 or len(texture.pixels) < 256 * 128 then
     return error(3801, "R_InitSky: sky texture must be 256x128")
   end if
@@ -356,6 +382,7 @@ function R_InitSkyPixels(texture, palette)
   return [solid, alpha]
 end function
 
+// Apply the Quake-compatible r init sky behavior.
 function R_InitSky(texture, palette)
   return R_InitSkyPixels(texture, palette)
 end function

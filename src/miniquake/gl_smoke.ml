@@ -1,8 +1,16 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang implementation of miniquake.gl_smoke.
+*/
 package miniquake.gl_smoke
 
 import miniquake.platform.win32 as win
 import miniquake.render.gl11 as gl
 
+// Render the requested value.
 function draw(width, height)
   gl.viewport(0, 0, width, height)
   gl.clearColor(0.08, 0.08, 0.1, 1.0)
@@ -22,6 +30,7 @@ function draw(width, height)
   gl.finishPrimitive()
 end function
 
+// Validate readback and report any incompatibility.
 function validateReadback(width, height)
   gl.finish()
   center = gl.readPixelsRgba(width / 2, height / 2, 1, 1)
@@ -42,6 +51,7 @@ function validateReadback(width, height)
   return true
 end function
 
+// Execute frames.
 function runFrames(maxFrames)
   if maxFrames < 0 then maxFrames = 0 end if
   win.create("MiniQuake OpenGL smoke test", 960, 540, 0)
@@ -75,6 +85,7 @@ function runFrames(maxFrames)
   return resultCode
 end function
 
+// Execute one named test case and record its pass/fail result.
 function run()
   return runFrames(0)
 end function

@@ -1,8 +1,15 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/opt001a_contract_tests.ml.
+*/
 import miniquake.optimization_baseline as opt
 
 opt001aPassed = 0
 opt001aFailed = 0
 
+// Assert that the condition holds and identify a failing test.
 function optCheck(condition, label)
   global opt001aPassed, opt001aFailed
   if condition then
@@ -14,6 +21,7 @@ function optCheck(condition, label)
   end if
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   optCheck(opt.classifyHandles([264, 264, 264, 264], true) == "STABLE", "stable handles")
   optCheck(opt.classifyHandles([264, 265, 265, 265], true) == "PLATEAU", "one-time plateau")

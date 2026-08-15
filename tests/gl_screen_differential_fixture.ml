@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/gl_screen_differential_fixture.ml.
+*/
 import miniquake.screen as screen
 import miniquake.render.draw2d as draw
 import miniquake.render.gl11 as gl
@@ -7,11 +13,13 @@ import miniquake.console as console
 import miniquake.keys as keys
 import miniquake.native as native
 
+// Return bool number derived from the active module state.
 function boolNumber(value)
   if value then return 1 end if
   return 0
 end function
 
+// Exercise registry as part of this deterministic regression fixture.
 function registry()
   result = cvar.createRegistry()
   result.variables = [
@@ -28,7 +36,9 @@ function registry()
   return result
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   variables = registry()
   consoleState = console.create(64)
   consoleState.textureId = 1
@@ -106,7 +116,7 @@ function main(args)
     boolNumber(turtle) + "}"
 
   print "{\"function\":\"SCR_DrawNet\",\"case\":\"stalled\",\"pictures\":" +
-    boolNumber(screen.SCR_DrawNet(1.0, 0.0, false)) + "}"
+    boolNumber(screen.SCR_DrawNet(1.0, 0.0, false, true, false)) + "}"
 
   print "{\"function\":\"SCR_DrawPause\",\"case\":\"paused\",\"pictures\":" +
     boolNumber(screen.SCR_DrawPause(true, 320, 200)) + "}"
@@ -174,7 +184,7 @@ function main(args)
   screen.SCR_DifferentialSetBlocked(true)
   update = screen.SCR_UpdateScreen(
     consoleState, void, void, void, 320, 200, "", false, 1.0, 0.05,
-    variables, true, 4, false, 0.0, false, false, true, false
+    variables, true, false, 4, false, 0.0, false, false, true, false
   )
   print "{\"function\":\"SCR_UpdateScreen\",\"case\":\"blocked\",\"begin\":0," +
     "\"view\":0,\"set2d\":0,\"sbar\":0,\"menu\":0,\"end\":0,\"pages\":3}"

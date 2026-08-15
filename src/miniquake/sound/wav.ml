@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.sound.wav.
+*/
 package miniquake.sound.wav
 
 import miniquake.types as t
@@ -5,6 +12,7 @@ import miniquake.byteio as bio
 import miniquake.native as native
 import std.fs as fs
 
+// Read and validate the requested value.
 function parse(data, filename)
   if len(data) < 12 or bio.fourCC(data, 0) != "RIFF" or bio.fourCC(data, 8) != "WAVE" then
     return error(1950, filename + ": not a RIFF/WAVE file")
@@ -59,17 +67,20 @@ function parse(data, filename)
   return t.WaveInfo(rate, width, channels, samples, loopStart, dataOffset, dataLength)
 end function
 
+// Read and validate the requested value.
 function load(filename)
   data = fs.readAllBytes(filename)
   return [parse(data, filename), data]
 end function
 
+// Build deterministic test data for at.
 function sampleAt(info, data, sampleIndex, channel)
   frameOffset = info.dataOffset + sampleIndex * info.width * info.channels + channel * info.width
   if info.width == 1 then return data[frameOffset] - 128 end if
   return bio.i16(data, frameOffset)
 end function
 
+// Provide resample behavior for the active subsystem.
 function resample(info, data, targetRate, force8Bit)
   if targetRate <= 0 then return error(1957, "invalid resample rate") end if
   outSamples = native.trunc(info.samples * targetRate / info.rate)

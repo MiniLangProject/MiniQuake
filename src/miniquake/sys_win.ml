@@ -1,12 +1,12 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 MiniLang port of sys_win.c, sys.h and the applicable winquake.h hooks.
 The Win32 bridge contains only primitives; handle policy, timing quirks,
 console editing, command-line parsing and lifecycle remain here.
 */
-
 package miniquake.sys_win
 
 import miniquake.conproc as conproc
@@ -74,10 +74,12 @@ end struct
 
 sysWinState = void
 
+// Provide empty handles behavior for the active subsystem.
 function emptyHandles()
   return array(MAX_HANDLES, 0)
 end function
 
+// Mirror Quake's Sys_CreateState routine and its observable state changes.
 function Sys_CreateState(useNative)
   return SysWinState(
     useNative,
@@ -117,33 +119,39 @@ function Sys_CreateState(useNative)
   )
 end function
 
+// Mirror Quake's Sys_UseState routine and its observable state changes.
 function Sys_UseState(state)
   global sysWinState
   sysWinState = state
   return state
 end function
 
+// Mirror Quake's Sys_State routine and its observable state changes.
 function Sys_State()
   global sysWinState
   if sysWinState is void then sysWinState = Sys_CreateState(true) end if
   return sysWinState
 end function
 
+// Provide signed32 behavior for the active subsystem.
 function signed32(value)
   value = value & 0xffffffff
   if value >= 0x80000000 then return value - 0x100000000 end if
   return value
 end function
 
+// Read and validate i32.
 function readI32(data, offset)
   value = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24)
   return signed32(value)
 end function
 
+// Read and validate u32.
 function inline readU32(data)
   return data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24)
 end function
 
+// Mirror Quake's Sys_PageIn routine and its observable state changes.
 function Sys_PageIn(memory, size)
   state = Sys_State()
   if memory is void or typeof(memory) != "bytes" then return Sys_Error("Sys_PageIn: invalid memory") end if
@@ -163,6 +171,7 @@ function Sys_PageIn(memory, size)
   return state.checksum
 end function
 
+// Provide findhandle behavior for the active subsystem.
 function findhandle()
   state = Sys_State()
   index = 1
@@ -173,11 +182,13 @@ function findhandle()
   return Sys_Error("out of handles")
 end function
 
+// Report whether valid handle.
 function validHandle(index)
   state = Sys_State()
   return index > 0 and index < MAX_HANDLES and state.handles[index] != 0
 end function
 
+// Provide filelength behavior for the active subsystem.
 function filelength(handle)
   state = Sys_State()
   if not validHandle(handle) then return -1 end if
@@ -189,6 +200,7 @@ function filelength(handle)
   return low
 end function
 
+// Mirror Quake's Sys_FileOpenRead routine and its observable state changes.
 function Sys_FileOpenRead(path)
   state = Sys_State()
   index = findhandle()
@@ -207,6 +219,7 @@ function Sys_FileOpenRead(path)
   return [filelength(index), index]
 end function
 
+// Mirror Quake's Sys_FileOpenWrite routine and its observable state changes.
 function Sys_FileOpenWrite(path)
   state = Sys_State()
   index = findhandle()
@@ -225,6 +238,7 @@ function Sys_FileOpenWrite(path)
   return index
 end function
 
+// Mirror Quake's Sys_FileClose routine and its observable state changes.
 function Sys_FileClose(handle)
   state = Sys_State()
   if not validHandle(handle) then return false end if
@@ -233,6 +247,7 @@ function Sys_FileClose(handle)
   return result
 end function
 
+// Mirror Quake's Sys_FileSeek routine and its observable state changes.
 function Sys_FileSeek(handle, position)
   state = Sys_State()
   if not validHandle(handle) then return false end if
@@ -240,6 +255,7 @@ function Sys_FileSeek(handle, position)
   return result != INVALID_SET_FILE_POINTER
 end function
 
+// Mirror Quake's Sys_FileRead routine and its observable state changes.
 function Sys_FileRead(handle, destination, count)
   state = Sys_State()
   if not validHandle(handle) or typeof(destination) != "bytes" then return -1 end if
@@ -250,6 +266,7 @@ function Sys_FileRead(handle, destination, count)
   return readU32(readCount)
 end function
 
+// Mirror Quake's Sys_FileWrite routine and its observable state changes.
 function Sys_FileWrite(handle, data, count)
   state = Sys_State()
   if not validHandle(handle) or typeof(data) != "bytes" then return -1 end if
@@ -260,16 +277,19 @@ function Sys_FileWrite(handle, data, count)
   return readU32(written)
 end function
 
+// Mirror Quake's Sys_FileTime routine and its observable state changes.
 function Sys_FileTime(path)
   if fs.isFile(path) then return 1 end if
   return -1
 end function
 
+// Mirror Quake's Sys_mkdir routine and its observable state changes.
 function Sys_mkdir(path)
   if fs.isDir(path) then return true end if
   return CreateDirectoryW(path, 0)
 end function
 
+// Mirror Quake's Sys_MakeCodeWriteable routine and its observable state changes.
 function Sys_MakeCodeWriteable(startAddress, length)
   state = Sys_State()
   state.codeWriteRequests = state.codeWriteRequests + [[startAddress, length]]
@@ -281,22 +301,27 @@ function Sys_MakeCodeWriteable(startAddress, length)
   return true
 end function
 
+// Mirror Quake's Sys_SetFPCW routine and its observable state changes.
 function Sys_SetFPCW()
   return true
 end function
 
+// Mirror Quake's Sys_PushFPCW_SetHigh routine and its observable state changes.
 function inline Sys_PushFPCW_SetHigh()
   return true
 end function
 
+// Mirror Quake's Sys_PopFPCW routine and its observable state changes.
 function inline Sys_PopFPCW()
   return true
 end function
 
+// Provide mask exceptions behavior for the active subsystem.
 function MaskExceptions()
   return true
 end function
 
+// Provide list tail behavior for the active subsystem.
 function listTail(values)
   result = []
   index = 1
@@ -307,6 +332,7 @@ function listTail(values)
   return result
 end function
 
+// Return next counter for the active module state.
 function nextCounter()
   state = Sys_State()
   if state.counterQueue is not void and len(state.counterQueue) > 0 then
@@ -322,6 +348,7 @@ function nextCounter()
   return native.sysCounter()
 end function
 
+// Mirror Quake's Sys_SetCounterFixture routine and its observable state changes.
 function Sys_SetCounterFixture(frequency, counters)
   state = Sys_State()
   state.testFrequency = frequency
@@ -331,6 +358,7 @@ function Sys_SetCounterFixture(frequency, counters)
   return true
 end function
 
+// Return argument index derived from the active module state.
 function argumentIndex(arguments, name)
   index = 0
   while index < len(arguments)
@@ -340,6 +368,7 @@ function argumentIndex(arguments, name)
   return -1
 end function
 
+// Mirror Quake's Sys_Init routine and its observable state changes.
 function Sys_Init()
   state = Sys_State()
   MaskExceptions()
@@ -362,6 +391,7 @@ function Sys_Init()
   return true
 end function
 
+// Mirror Quake's Sys_Error routine and its observable state changes.
 function Sys_Error(text)
   state = Sys_State()
   state.errorText = text
@@ -374,6 +404,7 @@ function Sys_Error(text)
   return error(2500, text)
 end function
 
+// Mirror Quake's Sys_Printf routine and its observable state changes.
 function Sys_Printf(text)
   state = Sys_State()
   state.outputLog = state.outputLog + text
@@ -381,6 +412,7 @@ function Sys_Printf(text)
   return true
 end function
 
+// Mirror Quake's Sys_Quit routine and its observable state changes.
 function Sys_Quit()
   state = Sys_State()
   state.quitRequested = true
@@ -389,6 +421,7 @@ function Sys_Quit()
   return true
 end function
 
+// Mirror Quake's Sys_FloatTime routine and its observable state changes.
 function Sys_FloatTime()
   state = Sys_State()
   Sys_PushFPCW_SetHigh()
@@ -420,6 +453,7 @@ function Sys_FloatTime()
   return state.curtime
 end function
 
+// Mirror Quake's Sys_InitFloatTime routine and its observable state changes.
 function Sys_InitFloatTime()
   state = Sys_State()
   Sys_FloatTime()
@@ -435,12 +469,14 @@ function Sys_InitFloatTime()
   return state.curtime
 end function
 
+// Mirror Quake's Sys_ConsoleInject routine and its observable state changes.
 function Sys_ConsoleInject(character, keyDown)
   state = Sys_State()
   state.consoleEvents = state.consoleEvents + [[keyDown, character]]
   return true
 end function
 
+// Consume pending state for pop console event.
 function popConsoleEvent()
   state = Sys_State()
   if len(state.consoleEvents) > 0 then
@@ -458,6 +494,7 @@ function popConsoleEvent()
   return [(encoded & 0x00010000) != 0, encoded & 255]
 end function
 
+// Mirror Quake's Sys_ConsoleInput routine and its observable state changes.
 function Sys_ConsoleInput()
   state = Sys_State()
   if not state.isDedicated then return void end if
@@ -496,6 +533,7 @@ function Sys_ConsoleInput()
   return void
 end function
 
+// Mirror Quake's Sys_Sleep routine and its observable state changes.
 function Sys_Sleep()
   state = Sys_State()
   state.sleptMilliseconds = state.sleptMilliseconds + 1
@@ -503,6 +541,7 @@ function Sys_Sleep()
   return true
 end function
 
+// Mirror Quake's Sys_SendKeyEvents routine and its observable state changes.
 function Sys_SendKeyEvents()
   state = Sys_State()
   state.sentKeyEvents = state.sentKeyEvents + 1
@@ -515,6 +554,7 @@ function Sys_SendKeyEvents()
   return not state.quitRequested
 end function
 
+// Provide sleep until input behavior for the active subsystem.
 function SleepUntilInput(time)
   state = Sys_State()
   if time < 0 then time = 0 end if
@@ -523,6 +563,7 @@ function SleepUntilInput(time)
   return true
 end function
 
+// Mirror Quake's Sys_ParseCommandLine routine and its observable state changes.
 function Sys_ParseCommandLine(commandLine)
   source = bytes(commandLine)
   arguments = [""]
@@ -541,6 +582,7 @@ function Sys_ParseCommandLine(commandLine)
   return arguments
 end function
 
+// Mirror Quake's Sys_SelectMemorySize routine and its observable state changes.
 function Sys_SelectMemorySize(available, total, arguments)
   size = available
   if size < MINIMUM_WIN_MEMORY then size = MINIMUM_WIN_MEMORY end if
@@ -555,6 +597,7 @@ function Sys_SelectMemorySize(available, total, arguments)
   return size
 end function
 
+// Handle argument and update the associated state.
 function handleArgument(arguments, name)
   index = argumentIndex(arguments, name)
   if index < 0 or index + 1 >= len(arguments) then return 0 end if
@@ -563,6 +606,7 @@ function handleArgument(arguments, name)
   return native.trunc(value)
 end function
 
+// Provide win main behavior for the active subsystem.
 function WinMain(arguments, runner)
   state = Sys_State()
   if typeof(arguments) == "string" then arguments = Sys_ParseCommandLine(arguments) end if
@@ -585,10 +629,12 @@ function WinMain(arguments, runner)
   return result
 end function
 
+// Mirror Quake's Sys_LowFPPrecision routine and its observable state changes.
 function Sys_LowFPPrecision()
   return Sys_PopFPCW()
 end function
 
+// Mirror Quake's Sys_HighFPPrecision routine and its observable state changes.
 function Sys_HighFPPrecision()
   return Sys_PushFPCW_SetHigh()
 end function

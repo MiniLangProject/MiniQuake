@@ -1,27 +1,30 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Focused cl_tent.c protocol, beam and effect fixtures.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.temp_entities as tent
 import miniquake.sizebuf as sz
 import miniquake.message as msg
 
+// Assert that the condition holds and identify a failing test.
 function tentRequire(value, message)
   if not value then return error(9980, message) end if
   return true
 end function
 
+// Encode and write position.
 function writePosition(buffer, value)
   msg.writeCoord(buffer, value.x)
   msg.writeCoord(buffer, value.y)
   msg.writeCoord(buffer, value.z)
 end function
 
+// Exercise point message as part of this deterministic regression fixture.
 function pointMessage(type, position)
   buffer = sz.alloc(64)
   msg.writeByte(buffer, type)
@@ -29,6 +32,7 @@ function pointMessage(type, position)
   return buffer
 end function
 
+// Exercise beam message as part of this deterministic regression fixture.
 function beamMessage(type, entity, start, finish)
   buffer = sz.alloc(64)
   msg.writeByte(buffer, type)
@@ -38,10 +42,12 @@ function beamMessage(type, entity, start, finish)
   return buffer
 end function
 
+// Read and validate buffer.
 function parseBuffer(state, buffer, currentTime)
   return tent.CL_ParseTEnt(state, msg.beginReading(buffer), currentTime)
 end function
 
+// Report whether active beam count holds for the active state.
 function activeBeamCount(state)
   count = 0
   for each beam in state.beams
@@ -50,6 +56,7 @@ function activeBeamCount(state)
   return count
 end function
 
+// Verify precache parse and effects against the expected Quake behavior.
 function testPrecacheParseAndEffects()
   state = tent.CL_InitTEnts(void)
   tentRequire(len(state.precachedSounds) == 7, "seven stock sounds")
@@ -95,6 +102,7 @@ function testPrecacheParseAndEffects()
   return true
 end function
 
+// Verify beam allocation override and overflow against the expected Quake behavior.
 function testBeamAllocationOverrideAndOverflow()
   state = tent.CL_InitTEnts(void)
   first = beamMessage(c.TE_LIGHTNING1, 7, t.Vec3(1.0, 2.0, 3.0), t.Vec3(61.0, 2.0, 3.0))
@@ -131,6 +139,7 @@ function testBeamAllocationOverrideAndOverflow()
   return true
 end function
 
+// Verify beam update segments and limits against the expected Quake behavior.
 function testBeamUpdateSegmentsAndLimits()
   state = tent.CL_InitTEnts(void)
   parseBuffer(
@@ -158,6 +167,7 @@ function testBeamUpdateSegmentsAndLimits()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "[1/3] precache, parse and effects"
   result = try(testPrecacheParseAndEffects())

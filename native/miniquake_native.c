@@ -1,9 +1,9 @@
 /*
  * MiniQuake native platform bridge.
  *
- * Copyright (C) 2026 MiniQuake contributors
- * Quake-derived integration work is distributed under GPL-2.0-or-later.
- * See COPYING.
+ * Copyright (c) 1996-1997 Id Software, Inc.
+ * Copyright (c) 2026 Nils Kopal
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * The bridge intentionally has a narrow C ABI consisting only of integer,
  * pointer and C/W-string values supported by MiniLang's extern mechanism.
@@ -11,25 +11,32 @@
  */
 #include "miniquake_native.h"
 #include "miniquake_d3d9.h"
+#include "miniquake_vulkan.h"
 #define MQ_DLLIMPORT __declspec(dllimport)
 #define MQ_WINAPI __stdcall
 #define MQ_CDECL __cdecl
 
 #define MQ_RENDER_OPENGL 0
 #define MQ_RENDER_DIRECT3D9 1
+#define MQ_RENDER_VULKAN 2
 static mq_i32 mq_render_backend_value = MQ_RENDER_OPENGL;
 
+/* Wait for readiness on the requested socket set. */
 MQ_EXPORT mq_i32 mq_render_select(mq_i32 backend) {
-    if (backend != MQ_RENDER_OPENGL && backend != MQ_RENDER_DIRECT3D9) return 0;
+    if (backend != MQ_RENDER_OPENGL && backend != MQ_RENDER_DIRECT3D9 && backend != MQ_RENDER_VULKAN) return 0;
     if (backend == MQ_RENDER_DIRECT3D9 && !mq_d3d9_available()) return 0;
+    if (backend == MQ_RENDER_VULKAN && !mq_vulkan_available()) return 0;
     mq_render_backend_value = backend;
     return 1;
 }
 
+/* Return the current backend value. */
 MQ_EXPORT mq_i32 mq_render_backend(void) { return mq_render_backend_value; }
+/* Report whether available is available. */
 MQ_EXPORT mq_i32 mq_render_available(mq_i32 backend) {
     if (backend == MQ_RENDER_OPENGL) return 1;
     if (backend == MQ_RENDER_DIRECT3D9) return mq_d3d9_available();
+    if (backend == MQ_RENDER_VULKAN) return mq_vulkan_available();
     return 0;
 }
 
@@ -480,11 +487,13 @@ static mq_gl_delete_buffers_proc mq_gl_delete_buffers_value = (mq_gl_delete_buff
 static mq_u32 mq_gl_world_program = 0u;
 static mq_i32 mq_gl_world_program_attempted = 0;
 
+/* Report whether valid wgl proc is available. */
 static mq_i32 mq_valid_wgl_proc(const void *value) {
     return value != (const void *)0 && value != (const void *)1 && value != (const void *)2 &&
         value != (const void *)3 && value != (const void *)-1;
 }
 
+/* Create and initialize create world program. */
 static mq_i32 mq_gl_create_world_program(void) {
     static const char *vertex_source =
         "#version 120\n"
@@ -703,6 +712,7 @@ static float mq_static_geometry_t = 0.0f;
 static float mq_static_geometry_multi_s[2] = {0.0f, 0.0f};
 static float mq_static_geometry_multi_t[2] = {0.0f, 0.0f};
 
+/* Manage cached native geometry for the renderer fast path. */
 static void mq_static_geometry_finish_capture(void) {
     mq_u32 triangle_vertices;
     mq_u32 triangle;
@@ -750,6 +760,7 @@ static void mq_static_geometry_finish_capture(void) {
     }
 }
 
+/* Manage cached native geometry for the renderer fast path. */
 static mq_i32 mq_static_geometry_find(mq_u64 key, mq_i32 pass, mq_u32 *slot_out) {
     mq_u64 mixed = key ^ (key >> 33) ^ ((mq_u64)(mq_u32)pass * 0x9E3779B185EBCA87ull);
     mq_u32 slot;
@@ -768,6 +779,7 @@ static mq_i32 mq_static_geometry_find(mq_u64 key, mq_i32 pass, mq_u32 *slot_out)
     return -1;
 }
 
+/* Manage cached native geometry for the renderer fast path. */
 MQ_EXPORT mq_i32 mq_gl_static_geometry_call(mq_u64 key_value, mq_i32 pass_value) {
     mq_u64 key = key_value;
     mq_i32 pass = pass_value;
@@ -776,17 +788,22 @@ MQ_EXPORT mq_i32 mq_gl_static_geometry_call(mq_u64 key_value, mq_i32 pass_value)
     if (mq_static_geometry_pending || mq_static_geometry_recording) return 0;
     found = mq_static_geometry_find(key, pass, &slot);
     if (found >= 0) {
-        if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+        if (mq_render_backend_value == MQ_RENDER_DIRECT3D9 || mq_render_backend_value == MQ_RENDER_VULKAN) {
             const mq_static_geometry_entry_t *entry = &mq_static_geometry_cache[found];
             if (entry->vertex_count == 0u) return 0;
-            return mq_d3d9_draw_interleaved_t2f_v3f(
+            if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+                return mq_d3d9_draw_interleaved_t2f_v3f(
+                    &mq_static_geometry_vertices[entry->vertex_offset * MQ_STATIC_GEOMETRY_VERTEX_FLOATS],
+                    entry->vertex_count) > 0;
+            }
+            return mq_vulkan_draw_interleaved_t2f_v3f(
                 &mq_static_geometry_vertices[entry->vertex_offset * MQ_STATIC_GEOMETRY_VERTEX_FLOATS],
                 entry->vertex_count) > 0;
         }
         glCallList(mq_static_geometry_cache[found].list_id);
         return 1;
     }
-    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return 0;
+    if (mq_render_backend_value != MQ_RENDER_OPENGL) return 0;
     if (mq_static_geometry_count >= MQ_STATIC_GEOMETRY_CACHE_MAX) return 0;
     {
         mq_u32 list_id = glGenLists(1);
@@ -819,7 +836,7 @@ MQ_EXPORT mq_i32 mq_gl_static_geometry_prepare(mq_u64 key_value, mq_i32 pass_val
     found = mq_static_geometry_find(key, pass, &slot);
     if (found >= 0) return 1;
     if (mq_static_geometry_count >= MQ_STATIC_GEOMETRY_CACHE_MAX) return -1;
-    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+    if (mq_render_backend_value != MQ_RENDER_OPENGL) {
         mq_static_geometry_cache[mq_static_geometry_count].key = key;
         mq_static_geometry_cache[mq_static_geometry_count].pass = pass;
         mq_static_geometry_cache[mq_static_geometry_count].list_id = 0u;
@@ -855,6 +872,7 @@ MQ_EXPORT mq_i32 mq_gl_static_geometry_prepare(mq_u64 key_value, mq_i32 pass_val
     return 0;
 }
 
+/* Manage cached native geometry for the renderer fast path. */
 MQ_EXPORT mq_i32 mq_gl_static_geometry_call_batch(
     const mq_u8 *keys,
     mq_u32 byte_count,
@@ -904,13 +922,15 @@ MQ_EXPORT mq_i32 mq_gl_static_geometry_call_batch(
         }
         if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
             if (mq_d3d9_draw_interleaved_t2f_v3f(mq_static_geometry_batch, batch_vertex_count) <= 0) return 0;
+        } else if (mq_render_backend_value == MQ_RENDER_VULKAN) {
+            if (mq_vulkan_draw_interleaved_t2f_v3f(mq_static_geometry_batch, batch_vertex_count) <= 0) return 0;
         } else {
             glInterleavedArrays(0x2A27u /* GL_T2F_V3F */, 0, mq_static_geometry_batch);
             glDrawArrays(0x0004u /* GL_TRIANGLES */, 0, (mq_i32)batch_vertex_count);
         }
         return (mq_i32)count;
     }
-    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return 0;
+    if (mq_render_backend_value != MQ_RENDER_OPENGL) return 0;
     glCallLists((mq_i32)count, 0x1405u /* GL_UNSIGNED_INT */, list_ids);
     return (mq_i32)count;
 }
@@ -975,6 +995,9 @@ typedef struct mq_alias_vertex_s {
 #define MQ_ALIAS_TRIANGLE_VERTICES 16384u
 static mq_alias_vertex_t mq_alias_command_vertices[MQ_ALIAS_COMMAND_VERTICES];
 static mq_alias_vertex_t mq_alias_triangle_vertices[MQ_ALIAS_TRIANGLE_VERTICES];
+#define MQ_PARTICLE_BATCH_MAX 8192u
+#define MQ_PARTICLE_RECORD_BYTES 16u
+static mq_alias_vertex_t mq_particle_vertices[MQ_PARTICLE_BATCH_MAX * 3u];
 static mq_u64 mq_alias_vbo_hash[MQ_ALIAS_VBO_CACHE_MAX];
 static mq_u64 mq_alias_vbo_signature[MQ_ALIAS_VBO_CACHE_MAX];
 static mq_u32 mq_alias_vbo_bytes[MQ_ALIAS_VBO_CACHE_MAX];
@@ -984,7 +1007,11 @@ static mq_u32 mq_alias_vbo_id[MQ_ALIAS_VBO_CACHE_MAX];
 static mq_u32 mq_alias_vbo_vertices[MQ_ALIAS_VBO_CACHE_MAX];
 static mq_i32 mq_alias_vbo_triangles[MQ_ALIAS_VBO_CACHE_MAX];
 static mq_u32 mq_alias_vbo_count = 0u;
+/* One orphaned streaming buffer replaces both synchronous client-array
+ * uploads and the former unbounded per-lighting-result VBO cache. */
+static mq_u32 mq_alias_stream_vbo = 0u;
 
+/* Draw cached multitextured geometry through the native fast path. */
 static void mq_static_multitexture_draw_vbo(mq_u32 scene) {
     mq_u32 group;
     mq_gl_bind_buffer_value(0x8892u /* GL_ARRAY_BUFFER */, mq_static_multitexture_vbo_id[scene]);
@@ -1017,6 +1044,7 @@ static void mq_static_multitexture_draw_vbo(mq_u32 scene) {
     mq_gl_bind_buffer_value(0x8892u /* GL_ARRAY_BUFFER */, 0u);
 }
 
+/* Manage cached native geometry for the renderer fast path. */
 MQ_EXPORT mq_i32 mq_gl_static_geometry_call_multitexture_batch(
     const mq_u8 *records,
     mq_u32 byte_count
@@ -1025,7 +1053,7 @@ MQ_EXPORT mq_i32 mq_gl_static_geometry_call_multitexture_batch(
     mq_u32 index;
     mq_u32 group_count = 0u;
     mq_u32 total_vertices = 0u;
-    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return 0;
+    if (mq_render_backend_value != MQ_RENDER_OPENGL) return 0;
     if (records == (const mq_u8 *)0 || (byte_count & 15u) != 0u ||
         !mq_valid_wgl_proc((const void *)mq_gl_active_texture_value) ||
         !mq_valid_wgl_proc((const void *)mq_gl_client_active_texture_value) ||
@@ -1302,9 +1330,10 @@ MQ_EXPORT mq_i32 mq_gl_static_geometry_call_multitexture_batch(
     return (mq_i32)count;
 }
 
+/* Manage cached native geometry for the renderer fast path. */
 MQ_EXPORT void mq_gl_static_geometry_clear(void) {
     mq_i32 i;
-    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+    if (mq_render_backend_value != MQ_RENDER_OPENGL) {
         for (i = 0; i < MQ_STATIC_GEOMETRY_HASH_SIZE; ++i) mq_static_geometry_hash[i] = 0u;
         mq_static_geometry_count = 0;
         mq_static_geometry_pending = 0;
@@ -1318,6 +1347,7 @@ MQ_EXPORT void mq_gl_static_geometry_clear(void) {
         mq_static_multitexture_vbo_count = 0u;
         mq_alias_list_count = 0u;
         mq_alias_vbo_count = 0u;
+        mq_alias_stream_vbo = 0u;
         return;
     }
     if (mq_static_geometry_recording) {
@@ -1340,6 +1370,7 @@ MQ_EXPORT void mq_gl_static_geometry_clear(void) {
         for (i = 0; i < (mq_i32)mq_alias_vbo_count; ++i) {
             if (mq_alias_vbo_id[i] != 0u) mq_gl_delete_buffers_value(1, &mq_alias_vbo_id[i]);
         }
+        if (mq_alias_stream_vbo != 0u) mq_gl_delete_buffers_value(1, &mq_alias_stream_vbo);
     }
     for (i = 0; i < MQ_STATIC_GEOMETRY_HASH_SIZE; ++i) mq_static_geometry_hash[i] = 0u;
     mq_static_geometry_count = 0;
@@ -1353,6 +1384,7 @@ MQ_EXPORT void mq_gl_static_geometry_clear(void) {
     mq_static_multitexture_vbo_count = 0u;
     mq_alias_list_count = 0u;
     mq_alias_vbo_count = 0u;
+    mq_alias_stream_vbo = 0u;
 }
 
 #define MQ_FALSE 0
@@ -1479,6 +1511,15 @@ static HGLRC mq_gl_context = MQ_NULL;
 static HINSTANCE mq_instance = MQ_NULL;
 static mq_i32 mq_class_registered = 0;
 static mq_i32 mq_running = 0;
+/*
+ * VID_RestartRenderer deliberately destroys the current HWND before creating
+ * the replacement for the other rendering API.  WM_DESTROY normally posts a
+ * thread-wide WM_QUIT, which survives that replacement and made the next
+ * mq_win_poll() terminate the otherwise successful renderer switch.  Suppress
+ * the quit notification only around our own synchronous teardown; a real
+ * WM_CLOSE still follows the normal WM_DESTROY/PostQuitMessage path.
+ */
+static mq_i32 mq_programmatic_window_destroy = 0;
 static mq_i32 mq_active_app = 0;
 static mq_i32 mq_minimized = 0;
 static mq_i32 mq_window_x_value = 0;
@@ -1511,6 +1552,7 @@ static mq_u16 mq_text_queue[MQ_TEXT_QUEUE_CAPACITY];
 static mq_u32 mq_text_head = 0;
 static mq_u32 mq_text_tail = 0;
 static mq_u8 mq_key_pressed[256];
+static mq_u8 mq_key_physical_latched[256];
 static mq_i32 mq_joy_available = 0;
 static UINT mq_joy_id = 0;
 static mq_u32 mq_joy_button_count_value = 0;
@@ -1522,6 +1564,7 @@ static HWAVEOUT mq_wave_output = MQ_NULL;
 #define MQ_AUDIO_BUFFER_BYTES 16384
 static mq_u8 mq_audio_data[MQ_AUDIO_BUFFER_COUNT][MQ_AUDIO_BUFFER_BYTES];
 static MQ_WAVEHDR mq_audio_headers[MQ_AUDIO_BUFFER_COUNT];
+static mq_u8 mq_audio_header_queued[MQ_AUDIO_BUFFER_COUNT];
 static mq_u32 mq_audio_next_buffer = 0;
 static mq_u32 mq_audio_buffer_count = 0;
 static mq_u32 mq_audio_bytes_per_sample = 2;
@@ -1542,18 +1585,21 @@ static mq_u32 mq_udp_last_port_value = 0;
 static mq_i32 mq_udp_last_error_value = 0;
 static mq_u8 mq_wsa_data[512];
 
+/* Reinterpret MiniLang's IEEE-754 bit pattern as a native float. */
 static float mq_bits_to_float(mq_u32 bits) {
     union { mq_u32 u; float f; } value;
     value.u = bits;
     return value.f;
 }
 
+/* Convert the scalar between MiniLang and native representations. */
 static mq_u32 mq_float_to_bits(float number) {
     union { mq_u32 u; float f; } value;
     value.f = number;
     return value.u;
 }
 
+/* Return the absolute value of a signed integer. */
 static mq_i32 mq_abs_i32(mq_i32 value) {
     return value < 0 ? -value : value;
 }
@@ -1575,6 +1621,7 @@ static mq_i32 mq_center_mouse_cursor(void) {
     return SetCursorPos(center.x, center.y) != 0;
 }
 
+/* Refresh the mouse confinement rectangle for the active window. */
 static mq_i32 mq_update_clip_cursor(void) {
     MQ_RECT rectangle;
     MQ_POINT upper_left;
@@ -1596,6 +1643,7 @@ static mq_i32 mq_update_clip_cursor(void) {
     return ClipCursor(&rectangle) != 0;
 }
 
+/* Submit input event to the native queue. */
 static void mq_push_input_event(mq_u32 type, mq_u32 code, mq_i32 value) {
     mq_u32 next = (mq_input_head + 1u) % MQ_INPUT_QUEUE_CAPACITY;
     mq_u32 packed = ((type & 0xFFu) << 24) | ((code & 0xFFFFu) << 8) | ((mq_u32)value & 0xFFu);
@@ -1606,6 +1654,7 @@ static void mq_push_input_event(mq_u32 type, mq_u32 code, mq_i32 value) {
     mq_input_head = next;
 }
 
+/* Release all input keys. */
 static void mq_release_all_input_keys(void) {
     mq_u32 index;
     for (index = 0; index < 256u; ++index) {
@@ -1623,6 +1672,7 @@ static void mq_release_all_input_keys(void) {
     }
 }
 
+/* Copy bytes into caller-owned storage. */
 static void mq_copy_bytes(mq_u8 *destination, const mq_u8 *source, mq_u32 count) {
     mq_u32 i = 0;
     while (i < count) {
@@ -1631,6 +1681,7 @@ static void mq_copy_bytes(mq_u8 *destination, const mq_u8 *source, mq_u32 count)
     }
 }
 
+/* Clear a caller-provided byte range. */
 static void mq_zero_bytes(mq_u8 *destination, mq_u32 count) {
     mq_u32 i = 0;
     while (i < count) {
@@ -1639,6 +1690,7 @@ static void mq_zero_bytes(mq_u8 *destination, mq_u32 count) {
     }
 }
 
+/* Copy c string into caller-owned storage. */
 static void mq_copy_c_string(char *destination, mq_u32 capacity, const char *source) {
     mq_u32 index = 0;
     if (capacity == 0) {
@@ -1653,6 +1705,7 @@ static void mq_copy_c_string(char *destination, mq_u32 capacity, const char *sou
     destination[index] = 0;
 }
 
+/* Initialize WinSock once for UDP networking. */
 static mq_i32 mq_winsock_start(void) {
     mq_i32 startup_result;
     if (mq_winsock_started) {
@@ -1670,6 +1723,7 @@ static mq_i32 mq_winsock_start(void) {
     return 1;
 }
 
+/* Format address for MiniLang. */
 static void mq_udp_format_address(char *destination, mq_u32 address) {
     const mq_u8 *octets = (const mq_u8 *)&address;
     sprintf(
@@ -1682,11 +1736,13 @@ static void mq_udp_format_address(char *destination, mq_u32 address) {
     );
 }
 
+/* Cache the most recently observed UDP peer address. */
 static void mq_udp_remember_address(const MQ_SOCKADDR_IN *address) {
     mq_udp_format_address(mq_udp_last_address_text, address->sin_addr);
     mq_udp_last_port_value = (mq_u32)ntohs(address->sin_port);
 }
 
+/* Clear the selected buffers or pending native state. */
 static void mq_clear_input_events(void) {
     mq_u32 i;
     mq_mouse_delta_x = 0;
@@ -1698,6 +1754,7 @@ static void mq_clear_input_events(void) {
     mq_input_tail = 0;
     for (i = 0; i < 256u; ++i) {
         mq_key_pressed[i] = 0;
+        mq_key_physical_latched[i] = 0;
         mq_virtual_key_down[i] = 0;
         mq_virtual_key_scan[i] = 0;
     }
@@ -1706,6 +1763,7 @@ static void mq_clear_input_events(void) {
     }
 }
 
+/* Submit text to the native queue. */
 static void mq_push_text(mq_u16 character) {
     mq_u32 next = (mq_text_head + 1u) % MQ_TEXT_QUEUE_CAPACITY;
     if (next == mq_text_tail) {
@@ -1715,6 +1773,7 @@ static void mq_push_text(mq_u16 character) {
     mq_text_head = next;
 }
 
+/* Build a Win32 display-mode request from video settings. */
 static void mq_prepare_display_mode(
     MQ_DEVMODEW *mode,
     mq_i32 width,
@@ -1737,6 +1796,7 @@ static void mq_prepare_display_mode(
     }
 }
 
+/* Apply requested display mode to the active backend state. */
 static mq_i32 mq_apply_requested_display_mode(void) {
     if (!mq_display_fullscreen || mq_display_use_current) {
         return 1;
@@ -1749,6 +1809,7 @@ static mq_i32 mq_apply_requested_display_mode(void) {
     return 1;
 }
 
+/* Restore requested display mode to its default state. */
 static void mq_restore_requested_display_mode(void) {
     if (mq_display_changed || mq_display_suspended) {
         ChangeDisplaySettingsW(MQ_NULL, 0);
@@ -1757,6 +1818,7 @@ static void mq_restore_requested_display_mode(void) {
     mq_display_suspended = 0;
 }
 
+/* Resolve a procedure from the dynamically loaded backend module. */
 static LRESULT MQ_WINAPI mq_window_proc(HWND window, UINT message, WPARAM w_param, LPARAM l_param) {
     if (message == MQ_WM_MOVE) {
         mq_window_x_value = (mq_i16)(l_param & 0xFFFF);
@@ -1818,8 +1880,10 @@ static LRESULT MQ_WINAPI mq_window_proc(HWND window, UINT message, WPARAM w_para
         return 0;
     }
     if (message == MQ_WM_DESTROY) {
-        mq_running = 0;
-        PostQuitMessage(0);
+        if (!mq_programmatic_window_destroy) {
+            mq_running = 0;
+            PostQuitMessage(0);
+        }
         return 0;
     }
     if (message == MQ_WM_MOUSEWHEEL) {
@@ -1869,6 +1933,7 @@ static LRESULT MQ_WINAPI mq_window_proc(HWND window, UINT message, WPARAM w_para
     return DefWindowProcW(window, message, w_param, l_param);
 }
 
+/* Convert the scalar between MiniLang and native representations. */
 MQ_EXPORT mq_u32 mq_f32_from_text(const char *text) {
     double parsed;
     if (text == MQ_NULL) {
@@ -1878,6 +1943,7 @@ MQ_EXPORT mq_u32 mq_f32_from_text(const char *text) {
     return mq_float_to_bits((float)parsed);
 }
 
+/* Decode MiniLang's raw float representation. */
 MQ_EXPORT mq_u32 mq_f32_from_ml_raw(mq_u64 raw_value) {
     mq_u32 tag = (mq_u32)(raw_value & MQ_ML_TAG_MASK);
 
@@ -1900,6 +1966,7 @@ MQ_EXPORT mq_u32 mq_f32_from_ml_raw(mq_u64 raw_value) {
     return 0;
 }
 
+/* Encode a native float in MiniLang's raw representation. */
 MQ_EXPORT mq_u64 mq_f32_to_ml_raw(mq_u32 bits) {
     return ((mq_u64)bits << 3) | MQ_ML_TAG_FLOAT;
 }
@@ -1914,30 +1981,37 @@ MQ_EXPORT const char *mq_f32_to_text(mq_u32 bits) {
     return output;
 }
 
+/* Evaluate the requested scalar math operation for MiniLang. */
 MQ_EXPORT mq_u32 mq_f32_sin(mq_u32 bits) {
     return mq_float_to_bits((float)sin((double)mq_bits_to_float(bits)));
 }
 
+/* Evaluate the requested scalar math operation for MiniLang. */
 MQ_EXPORT mq_u32 mq_f32_cos(mq_u32 bits) {
     return mq_float_to_bits((float)cos((double)mq_bits_to_float(bits)));
 }
 
+/* Evaluate the requested scalar math operation for MiniLang. */
 MQ_EXPORT mq_u32 mq_f32_sqrt(mq_u32 bits) {
     return mq_float_to_bits((float)sqrt((double)mq_bits_to_float(bits)));
 }
 
+/* Evaluate the requested scalar math operation for MiniLang. */
 MQ_EXPORT mq_u32 mq_f32_atan2(mq_u32 y_bits, mq_u32 x_bits) {
     return mq_float_to_bits((float)atan2((double)mq_bits_to_float(y_bits), (double)mq_bits_to_float(x_bits)));
 }
 
+/* Convert the scalar between MiniLang and native representations. */
 MQ_EXPORT mq_i32 mq_f32_to_i32_trunc(mq_u32 bits) {
     return (mq_i32)mq_bits_to_float(bits);
 }
 
+/* Convert the scalar between MiniLang and native representations. */
 MQ_EXPORT mq_u32 mq_i32_to_f32(mq_i32 value) {
     return mq_float_to_bits((float)value);
 }
 
+/* Convert or transfer text across the MiniLang native boundary. */
 MQ_EXPORT mq_i32 mq_ascii_code(const char *text) {
     if (text == MQ_NULL || text[0] == 0) {
         return -1;
@@ -1952,6 +2026,7 @@ MQ_EXPORT const char *mq_ascii_char(mq_i32 value) {
     return output;
 }
 
+/* Return display mode count. */
 MQ_EXPORT mq_u32 mq_win_display_mode_count(void) {
     MQ_DEVMODEW mode;
     DWORD index = 0;
@@ -1970,22 +2045,27 @@ MQ_EXPORT mq_u32 mq_win_display_mode_count(void) {
     return mq_display_mode_count_value;
 }
 
+/* Return display mode width. */
 MQ_EXPORT mq_i32 mq_win_display_mode_width(mq_u32 index) {
     return index < mq_display_mode_count_value ? (mq_i32)mq_display_modes[index].dmPelsWidth : 0;
 }
 
+/* Return display mode height. */
 MQ_EXPORT mq_i32 mq_win_display_mode_height(mq_u32 index) {
     return index < mq_display_mode_count_value ? (mq_i32)mq_display_modes[index].dmPelsHeight : 0;
 }
 
+/* Return the current display mode bpp. */
 MQ_EXPORT mq_i32 mq_win_display_mode_bpp(mq_u32 index) {
     return index < mq_display_mode_count_value ? (mq_i32)mq_display_modes[index].dmBitsPerPel : 0;
 }
 
+/* Return the current display mode frequency. */
 MQ_EXPORT mq_i32 mq_win_display_mode_frequency(mq_u32 index) {
     return index < mq_display_mode_count_value ? (mq_i32)mq_display_modes[index].dmDisplayFrequency : 0;
 }
 
+/* Validate a requested fullscreen display mode with Win32. */
 MQ_EXPORT mq_i32 mq_win_test_display_mode(mq_i32 width, mq_i32 height, mq_i32 bpp, mq_i32 frequency) {
     MQ_DEVMODEW mode;
     if (width < 1 || height < 1) {
@@ -1995,6 +2075,7 @@ MQ_EXPORT mq_i32 mq_win_test_display_mode(mq_i32 width, mq_i32 height, mq_i32 bp
     return ChangeDisplaySettingsW(&mode, MQ_CDS_TEST | MQ_CDS_FULLSCREEN) == MQ_DISP_CHANGE_SUCCESSFUL;
 }
 
+/* Configure display mode from the requested settings. */
 MQ_EXPORT mq_i32 mq_win_configure_display_mode(
     mq_i32 width,
     mq_i32 height,
@@ -2018,12 +2099,14 @@ MQ_EXPORT mq_i32 mq_win_configure_display_mode(
     return 1;
 }
 
+/* Restore display mode to its default state. */
 MQ_EXPORT void mq_win_restore_display_mode(void) {
     mq_restore_requested_display_mode();
     mq_display_fullscreen = 0;
     mq_display_use_current = 0;
 }
 
+/* Return get gamma ramp. */
 MQ_EXPORT mq_i32 mq_win_get_gamma_ramp(mq_u8 *ramp, mq_u32 byte_count) {
     HDC dc;
     BOOL result;
@@ -2041,6 +2124,7 @@ MQ_EXPORT mq_i32 mq_win_get_gamma_ramp(mq_u8 *ramp, mq_u32 byte_count) {
     return result != 0;
 }
 
+/* Update backend state for gamma ramp. */
 MQ_EXPORT mq_i32 mq_win_set_gamma_ramp(const mq_u8 *ramp, mq_u32 byte_count) {
     HDC dc;
     BOOL result;
@@ -2061,22 +2145,32 @@ MQ_EXPORT mq_i32 mq_win_set_gamma_ramp(const mq_u8 *ramp, mq_u32 byte_count) {
     return result != 0;
 }
 
+/* Report whether context ready is available. */
 MQ_EXPORT mq_i32 mq_win_context_ready(void) {
     if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return mq_d3d9_ready();
+    if (mq_render_backend_value == MQ_RENDER_VULKAN) return mq_vulkan_ready();
     return mq_window_dc != MQ_NULL && mq_gl_context != MQ_NULL;
 }
 
+/* Make the OpenGL rendering context current on this thread. */
 MQ_EXPORT mq_i32 mq_win_make_current(void) {
     if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return mq_d3d9_ready();
+    if (mq_render_backend_value == MQ_RENDER_VULKAN) return mq_vulkan_ready();
     return mq_window_dc != MQ_NULL && mq_gl_context != MQ_NULL && wglMakeCurrent(mq_window_dc, mq_gl_context);
 }
 
+/* Return the current window x. */
 MQ_EXPORT mq_i32 mq_win_window_x(void) { return mq_window_x_value; }
+/* Return the current window y. */
 MQ_EXPORT mq_i32 mq_win_window_y(void) { return mq_window_y_value; }
+/* Report whether the game window is currently minimized. */
 MQ_EXPORT mq_i32 mq_win_is_minimized(void) { return mq_minimized; }
+/* Return desktop width. */
 MQ_EXPORT mq_i32 mq_win_desktop_width(void) { return GetSystemMetrics(MQ_SM_CXSCREEN); }
+/* Return desktop height. */
 MQ_EXPORT mq_i32 mq_win_desktop_height(void) { return GetSystemMetrics(MQ_SM_CYSCREEN); }
 
+/* Apply focus-dependent input and display state. */
 MQ_EXPORT void mq_win_activate(mq_i32 active, mq_i32 minimized) {
     mq_active_app = active != 0;
     mq_minimized = minimized != 0;
@@ -2093,6 +2187,7 @@ MQ_EXPORT void mq_win_activate(mq_i32 active, mq_i32 minimized) {
     }
 }
 
+/* Create and initialize create. */
 MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32 height, mq_i32 fullscreen) {
     MQ_WNDCLASSEXW window_class;
     MQ_PIXELFORMATDESCRIPTOR pixel_format;
@@ -2198,6 +2293,11 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
             mq_win_destroy();
             return MQ_NULL;
         }
+    } else if (mq_render_backend_value == MQ_RENDER_VULKAN) {
+        if (!mq_vulkan_initialize(mq_window, width, height)) {
+            mq_win_destroy();
+            return MQ_NULL;
+        }
     } else {
     pixel_format.nSize = (WORD)sizeof(pixel_format);
     pixel_format.nVersion = 1;
@@ -2297,6 +2397,11 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
         mq_d3d9_clear(0x00004000u | 0x00000100u);
         mq_d3d9_present();
         mq_d3d9_clear(0x00004000u | 0x00000100u);
+    } else if (mq_render_backend_value == MQ_RENDER_VULKAN) {
+        mq_vulkan_clear_color(0u, 0u, 0u, 0x3f800000u);
+        mq_vulkan_clear(0x00004000u | 0x00000100u);
+        mq_vulkan_present();
+        mq_vulkan_clear(0x00004000u | 0x00000100u);
     } else {
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(0x00004000u | 0x00000100u); /* GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT */
@@ -2324,6 +2429,7 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
     return mq_window;
 }
 
+/* Release resources owned by destroy. */
 MQ_EXPORT void mq_win_destroy(void) {
     HDC gamma_dc;
     mq_win_set_cursor_capture(0);
@@ -2339,6 +2445,8 @@ MQ_EXPORT void mq_win_destroy(void) {
     }
     if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
         mq_d3d9_shutdown();
+    } else if (mq_render_backend_value == MQ_RENDER_VULKAN) {
+        mq_vulkan_shutdown();
     }
     if (mq_gl_context != MQ_NULL) {
         if (mq_gl_world_program != 0u && mq_valid_wgl_proc((const void *)mq_gl_delete_program_value)) {
@@ -2355,7 +2463,9 @@ MQ_EXPORT void mq_win_destroy(void) {
         mq_window_dc = MQ_NULL;
     }
     if (mq_window != MQ_NULL) {
+        mq_programmatic_window_destroy = 1;
         DestroyWindow(mq_window);
+        mq_programmatic_window_destroy = 0;
         mq_window = MQ_NULL;
     }
     mq_restore_requested_display_mode();
@@ -2367,6 +2477,7 @@ MQ_EXPORT void mq_win_destroy(void) {
     mq_minimized = 0;
 }
 
+/* Poll the native queue without blocking the game loop. */
 MQ_EXPORT mq_i32 mq_win_poll(void) {
     MQ_MSG message;
     MQ_POINT center;
@@ -2408,9 +2519,14 @@ MQ_EXPORT mq_i32 mq_win_poll(void) {
     return mq_running;
 }
 
+/* Present the OpenGL back buffer to the game window. */
 MQ_EXPORT void mq_win_swap(void) {
     if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
         mq_d3d9_present();
+        return;
+    }
+    if (mq_render_backend_value == MQ_RENDER_VULKAN) {
+        mq_vulkan_present();
         return;
     }
     if (mq_window_dc != MQ_NULL) {
@@ -2418,10 +2534,12 @@ MQ_EXPORT void mq_win_swap(void) {
     }
 }
 
+/* Read or update the requested native input state. */
 MQ_EXPORT mq_i32 mq_win_key_down(mq_i32 virtual_key) {
     return (GetAsyncKeyState(virtual_key) & 0x8000) != 0;
 }
 
+/* Read or update the requested native input state. */
 MQ_EXPORT mq_i32 mq_win_key_pressed(mq_i32 virtual_key) {
     mq_i32 result;
     if (virtual_key < 0 || virtual_key >= 256) {
@@ -2432,6 +2550,55 @@ MQ_EXPORT mq_i32 mq_win_key_pressed(mq_i32 virtual_key) {
     return result;
 }
 
+/* Capture all Win32 key levels and pending press edges in one bridge call.
+ *
+ * The ordered window-message table remains the source for press edges, but an
+ * active interactive window samples the physical high bit authoritatively.
+ * This prevents an occasionally delayed/missed message-level transition from
+ * turning a continuously held movement key into a one-frame release.  Keeping
+ * requested GetAsyncKeyState calls inside this one ABI crossing retains the
+ * allocation and call-overhead improvement of the bulk snapshot. */
+MQ_EXPORT mq_i32 mq_win_key_snapshot(
+    mq_u8 *down_states,
+    mq_u8 *pressed_states,
+    const mq_u8 *query_mask,
+    mq_u32 state_count
+) {
+    mq_u32 index;
+    if (down_states == MQ_NULL || pressed_states == MQ_NULL || query_mask == MQ_NULL) return 0;
+    if (state_count > 256u) state_count = 256u;
+    for (index = 0u; index < state_count; ++index) {
+        if (query_mask[index] == 0u) {
+            down_states[index] = 0u;
+            mq_key_physical_latched[index] = 0u;
+        } else if (mq_window != MQ_NULL) {
+            /* Once a real down edge has been observed, keep sampling that
+             * physical key until it is genuinely released. This repairs a
+             * stray message-level up without paying GetAsyncKeyState for every
+             * possible binding on every frame. */
+            if (!mq_active_app) {
+                down_states[index] = 0u;
+                mq_key_physical_latched[index] = 0u;
+            } else if (mq_virtual_key_down[index] || mq_key_pressed[index] || mq_key_physical_latched[index]) {
+                mq_u8 physical_down =
+                    (GetAsyncKeyState((mq_i32)index) & 0x8000) != 0 ? 1u : 0u;
+                down_states[index] = physical_down;
+                mq_key_physical_latched[index] = physical_down;
+            } else {
+                down_states[index] = 0u;
+            }
+        } else {
+            /* Headless bridge tests have no physical target window and use
+             * the same synthetic level table the message path maintains. */
+            down_states[index] = mq_virtual_key_down[index] != 0 ? 1u : 0u;
+        }
+        pressed_states[index] = mq_key_pressed[index] != 0 ? 1u : 0u;
+        mq_key_pressed[index] = 0;
+    }
+    return (mq_i32)state_count;
+}
+
+/* Convert or transfer text across the MiniLang native boundary. */
 MQ_EXPORT mq_i32 mq_win_text_pop(void) {
     mq_u16 character;
     if (mq_text_tail == mq_text_head) {
@@ -2442,10 +2609,12 @@ MQ_EXPORT mq_i32 mq_win_text_pop(void) {
     return (mq_i32)character;
 }
 
+/* Report whether the game window owns keyboard focus. */
 MQ_EXPORT mq_i32 mq_win_has_focus(void) {
     return mq_window != MQ_NULL && GetForegroundWindow() == mq_window;
 }
 
+/* Return client width. */
 MQ_EXPORT mq_i32 mq_win_client_width(void) {
     MQ_RECT rectangle;
     if (mq_window == MQ_NULL || !GetClientRect(mq_window, &rectangle)) {
@@ -2454,6 +2623,7 @@ MQ_EXPORT mq_i32 mq_win_client_width(void) {
     return rectangle.right - rectangle.left;
 }
 
+/* Return client height. */
 MQ_EXPORT mq_i32 mq_win_client_height(void) {
     MQ_RECT rectangle;
     if (mq_window == MQ_NULL || !GetClientRect(mq_window, &rectangle)) {
@@ -2533,15 +2703,18 @@ MQ_EXPORT mq_i32 mq_win_resize_client(mq_i32 width, mq_i32 height) {
     }
     if (rectangle.right - rectangle.left != width || rectangle.bottom - rectangle.top != height) return 0;
     if (mq_render_backend_value == MQ_RENDER_DIRECT3D9 && !mq_d3d9_resize(width, height)) return 0;
+    if (mq_render_backend_value == MQ_RENDER_VULKAN && !mq_vulkan_resize(width, height)) return 0;
     return 1;
 }
 
+/* Update backend state for title. */
 MQ_EXPORT void mq_win_set_title(const unsigned short *title) {
     if (mq_window != MQ_NULL && title != MQ_NULL) {
         SetWindowTextW(mq_window, title);
     }
 }
 
+/* Update backend state for cursor capture. */
 MQ_EXPORT void mq_win_set_cursor_capture(mq_i32 enabled) {
     if (enabled && !mq_cursor_captured) {
         while (ShowCursor(MQ_FALSE) >= 0) { }
@@ -2563,18 +2736,21 @@ MQ_EXPORT void mq_win_set_cursor_capture(mq_i32 enabled) {
     }
 }
 
+/* Read or update the requested native input state. */
 MQ_EXPORT mq_i32 mq_win_mouse_dx(void) {
     mq_i32 value = mq_mouse_delta_x;
     mq_mouse_delta_x = 0;
     return value;
 }
 
+/* Read or update the requested native input state. */
 MQ_EXPORT mq_i32 mq_win_mouse_dy(void) {
     mq_i32 value = mq_mouse_delta_y;
     mq_mouse_delta_y = 0;
     return value;
 }
 
+/* Read or update the requested native input state. */
 MQ_EXPORT mq_i32 mq_win_mouse_buttons(void) {
     mq_i32 buttons = 0;
     if (GetAsyncKeyState(MQ_VK_LBUTTON) & 0x8000) buttons |= 1;
@@ -2583,12 +2759,14 @@ MQ_EXPORT mq_i32 mq_win_mouse_buttons(void) {
     return buttons;
 }
 
+/* Read or update the requested native input state. */
 MQ_EXPORT mq_i32 mq_win_mouse_wheel(void) {
     mq_i32 value = mq_mouse_wheel_delta;
     mq_mouse_wheel_delta = 0;
     return value;
 }
 
+/* Remove the oldest event from the native input queue. */
 MQ_EXPORT mq_u32 mq_win_input_event_pop(void) {
     mq_u32 value;
     if (mq_input_tail == mq_input_head) {
@@ -2599,10 +2777,16 @@ MQ_EXPORT mq_u32 mq_win_input_event_pop(void) {
     return value;
 }
 
+/* Inject one event into the input queue for tests. */
 MQ_EXPORT void mq_win_input_test_push(mq_u32 type, mq_u32 code, mq_i32 value) {
+    if (type == MQ_INPUT_EVENT_KEY && code < 256u) {
+        mq_virtual_key_down[code] = value != 0 ? 1u : 0u;
+        if (value != 0) mq_key_pressed[code] = 1u;
+    }
     mq_push_input_event(type, code, value);
 }
 
+/* Show or hide the Win32 cursor with balanced calls. */
 MQ_EXPORT void mq_win_cursor_show(mq_i32 show) {
     if (show) {
         while (ShowCursor(MQ_TRUE) < 0) { }
@@ -2611,10 +2795,12 @@ MQ_EXPORT void mq_win_cursor_show(mq_i32 show) {
     }
 }
 
+/* Move the cursor to the center of the client area. */
 MQ_EXPORT mq_i32 mq_win_cursor_center(void) {
     return mq_center_mouse_cursor();
 }
 
+/* Refresh the mouse confinement rectangle for the active window. */
 MQ_EXPORT mq_i32 mq_win_update_clip_cursor(void) {
     if (!mq_cursor_captured) {
         return 0;
@@ -2622,6 +2808,7 @@ MQ_EXPORT mq_i32 mq_win_update_clip_cursor(void) {
     return mq_update_clip_cursor();
 }
 
+/* Read or update the requested native input state. */
 MQ_EXPORT mq_i32 mq_win_joy_startup(void) {
     UINT device_count = joyGetNumDevs();
     UINT index;
@@ -2657,6 +2844,7 @@ MQ_EXPORT mq_i32 mq_win_joy_startup(void) {
     return 1;
 }
 
+/* Read or update the requested native input state. */
 MQ_EXPORT mq_i32 mq_win_joy_read(void) {
     if (!mq_joy_available) {
         return 0;
@@ -2667,6 +2855,7 @@ MQ_EXPORT mq_i32 mq_win_joy_read(void) {
     return joyGetPosEx(mq_joy_id, &mq_joy_info) == MQ_JOYERR_NOERROR;
 }
 
+/* Read or update the requested native input state. */
 MQ_EXPORT mq_u32 mq_win_joy_axis(mq_u32 axis) {
     if (axis == 0u) return mq_joy_info.dwXpos;
     if (axis == 1u) return mq_joy_info.dwYpos;
@@ -2677,10 +2866,15 @@ MQ_EXPORT mq_u32 mq_win_joy_axis(mq_u32 axis) {
     return 32768u;
 }
 
+/* Read or update the requested native input state. */
 MQ_EXPORT mq_u32 mq_win_joy_buttons(void) { return mq_joy_info.dwButtons; }
+/* Read or update the requested native input state. */
 MQ_EXPORT mq_u32 mq_win_joy_pov(void) { return mq_joy_info.dwPOV; }
+/* Return joy button count. */
 MQ_EXPORT mq_u32 mq_win_joy_button_count(void) { return mq_joy_button_count_value; }
+/* Read or update the requested native input state. */
 MQ_EXPORT mq_i32 mq_win_joy_has_pov(void) { return mq_joy_has_pov_value; }
+/* Read or update the requested native input state. */
 MQ_EXPORT mq_i32 mq_win_joy_warrior_curve(mq_i32 raw_value) {
     double magnitude = (double)(raw_value < 0 ? -raw_value : raw_value);
     double curved = 300.0 * pow(magnitude / 800.0, 1.3);
@@ -2688,6 +2882,7 @@ MQ_EXPORT mq_i32 mq_win_joy_warrior_curve(mq_i32 raw_value) {
     return raw_value > 0 ? (mq_i32)curved : -(mq_i32)curved;
 }
 
+/* Read or update the requested native input state. */
 MQ_EXPORT mq_u32 mq_win_joy_warrior_curve_f32(mq_i32 raw_value) {
     float magnitude = (float)(raw_value < 0 ? -raw_value : raw_value);
     float curved = (float)(300.0 * pow((double)magnitude / 800.0, 1.3));
@@ -2696,6 +2891,7 @@ MQ_EXPORT mq_u32 mq_win_joy_warrior_curve_f32(mq_i32 raw_value) {
     return mq_float_to_bits(curved);
 }
 
+/* Return the monotonic high-resolution timer value. */
 MQ_EXPORT mq_u32 mq_win_ticks(void) {
     static mq_i64 frequency = 0;
     mq_i64 counter = 0;
@@ -2710,28 +2906,33 @@ MQ_EXPORT mq_u32 mq_win_ticks(void) {
     return GetTickCount();
 }
 
+/* Yield the current thread for the requested duration. */
 MQ_EXPORT void mq_win_sleep(mq_u32 milliseconds) {
     Sleep(milliseconds);
 }
 
+/* Read the Win32 performance counter. */
 MQ_EXPORT mq_u64 mq_sys_counter(void) {
     mq_i64 counter = 0;
     if (!QueryPerformanceCounter(&counter)) return 0;
     return (mq_u64)counter;
 }
 
+/* Return the Win32 performance-counter frequency. */
 MQ_EXPORT mq_u64 mq_sys_frequency(void) {
     mq_i64 frequency = 0;
     if (!QueryPerformanceFrequency(&frequency)) return 0;
     return (mq_u64)frequency;
 }
 
+/* Return mq process handle count. */
 MQ_EXPORT mq_u32 mq_process_handle_count(void) {
     DWORD handle_count = 0;
     if (!GetProcessHandleCount(GetCurrentProcess(), &handle_count)) return 0;
     return handle_count;
 }
 
+/* Change protection on a generated-code memory range. */
 MQ_EXPORT mq_i32 mq_sys_make_code_writeable(mq_u64 address, mq_u64 length) {
     DWORD old_protection = 0;
     if (address == 0 || length == 0) return 0;
@@ -2740,6 +2941,7 @@ MQ_EXPORT mq_i32 mq_sys_make_code_writeable(mq_u64 address, mq_u64 length) {
 
 static mq_i32 mq_sys_owns_console = 0;
 
+/* Bridge the dedicated-console operation to the Win32 host. */
 MQ_EXPORT mq_i32 mq_sys_console_alloc(void) {
     HANDLE output;
     if (AllocConsole() != 0) {
@@ -2752,12 +2954,14 @@ MQ_EXPORT mq_i32 mq_sys_console_alloc(void) {
     return output != MQ_NULL && (ULONG_PTR)output != ~(mq_u64)0;
 }
 
+/* Bridge the dedicated-console operation to the Win32 host. */
 MQ_EXPORT mq_i32 mq_sys_console_free(void) {
     if (!mq_sys_owns_console) return 1;
     mq_sys_owns_console = 0;
     return FreeConsole() != 0;
 }
 
+/* Bridge the dedicated-console operation to the Win32 host. */
 MQ_EXPORT mq_u32 mq_sys_console_event_pop(void) {
     HANDLE input = GetStdHandle(MQ_STD_INPUT_HANDLE);
     MQ_INPUT_RECORD record;
@@ -2789,6 +2993,7 @@ MQ_EXPORT mq_u32 mq_sys_console_event_pop(void) {
     return result;
 }
 
+/* Bridge the dedicated-console operation to the Win32 host. */
 MQ_EXPORT mq_i32 mq_sys_console_write(const char *text) {
     HANDLE output = GetStdHandle(MQ_STD_OUTPUT_HANDLE);
     DWORD length = 0;
@@ -2798,23 +3003,28 @@ MQ_EXPORT mq_i32 mq_sys_console_write(const char *text) {
     return WriteFile(output, text, length, &written, MQ_NULL) != 0 && written == length;
 }
 
+/* Wait until input arrives or the timeout expires. */
 MQ_EXPORT void mq_sys_sleep_until_input(mq_u32 milliseconds) {
     MsgWaitForMultipleObjects(0, MQ_NULL, MQ_FALSE, milliseconds, 0x04FFu);
 }
 
+/* Bridge the dedicated-console operation to the Win32 host. */
 MQ_EXPORT mq_u64 mq_conproc_create_event(void) {
     return (mq_u64)(ULONG_PTR)CreateEventW(MQ_NULL, MQ_FALSE, MQ_FALSE, MQ_NULL);
 }
 
+/* Bridge the dedicated-console operation to the Win32 host. */
 MQ_EXPORT mq_i32 mq_conproc_set_event(mq_u64 handle) {
     if (handle == 0) return 0;
     return SetEvent((HANDLE)(ULONG_PTR)handle) != 0;
 }
 
+/* Bridge the dedicated-console operation to the Win32 host. */
 MQ_EXPORT void mq_conproc_close_handle(mq_u64 handle) {
     if (handle != 0) CloseHandle((HANDLE)(ULONG_PTR)handle);
 }
 
+/* Bridge the dedicated-console operation to the Win32 host. */
 MQ_EXPORT mq_i32 mq_conproc_wait_any(mq_u64 first, mq_u64 second, mq_u32 milliseconds) {
     HANDLE handles[2];
     DWORD result;
@@ -2827,20 +3037,24 @@ MQ_EXPORT mq_i32 mq_conproc_wait_any(mq_u64 first, mq_u64 second, mq_u32 millise
     return -1;
 }
 
+/* Bridge the dedicated-console operation to the Win32 host. */
 MQ_EXPORT mq_ptr mq_conproc_map(mq_u64 handle) {
     if (handle == 0) return MQ_NULL;
     return MapViewOfFile((HANDLE)(ULONG_PTR)handle, MQ_FILE_MAP_READ | MQ_FILE_MAP_WRITE, 0, 0, 0);
 }
 
+/* Bridge the dedicated-console operation to the Win32 host. */
 MQ_EXPORT mq_i32 mq_conproc_unmap(mq_ptr mapped) {
     return mapped != MQ_NULL && UnmapViewOfFile(mapped) != 0;
 }
 
+/* Bridge the dedicated-console operation to the Win32 host. */
 MQ_EXPORT mq_i32 mq_conproc_read_i32(mq_ptr mapped, mq_u32 index) {
     const mq_i32 *values = (const mq_i32 *)mapped;
     return values != MQ_NULL ? values[index] : 0;
 }
 
+/* Bridge the dedicated-console operation to the Win32 host. */
 MQ_EXPORT void mq_conproc_write_i32(mq_ptr mapped, mq_u32 index, mq_i32 value) {
     mq_i32 *values = (mq_i32 *)mapped;
     if (values != MQ_NULL) values[index] = value;
@@ -2851,6 +3065,7 @@ MQ_EXPORT const char *mq_conproc_read_text(mq_ptr mapped, mq_u32 byte_offset) {
     return (const char *)((const mq_u8 *)mapped + byte_offset);
 }
 
+/* Bridge the dedicated-console operation to the Win32 host. */
 MQ_EXPORT mq_i32 mq_conproc_write_text(mq_ptr mapped, mq_u32 byte_offset, const char *text, mq_u32 capacity) {
     char *destination;
     mq_u32 index = 0;
@@ -2864,6 +3079,7 @@ MQ_EXPORT mq_i32 mq_conproc_write_text(mq_ptr mapped, mq_u32 byte_offset, const 
     return 1;
 }
 
+/* Bridge the dedicated-console operation to the Win32 host. */
 MQ_EXPORT mq_i32 mq_conproc_screen_lines(void) {
     MQ_CONSOLE_SCREEN_BUFFER_INFO info;
     HANDLE output = GetStdHandle(MQ_STD_OUTPUT_HANDLE);
@@ -2871,6 +3087,7 @@ MQ_EXPORT mq_i32 mq_conproc_screen_lines(void) {
     return (mq_i32)info.dwSize.Y;
 }
 
+/* Bridge the dedicated-console operation to the Win32 host. */
 MQ_EXPORT mq_i32 mq_conproc_set_screen_size(mq_i32 cx, mq_i32 cy) {
     HANDLE output = GetStdHandle(MQ_STD_OUTPUT_HANDLE);
     MQ_CONSOLE_SCREEN_BUFFER_INFO info;
@@ -2929,6 +3146,7 @@ MQ_EXPORT const char *mq_conproc_read_console_text(mq_i32 begin_line, mq_i32 end
     return output;
 }
 
+/* Bridge the dedicated-console operation to the Win32 host. */
 MQ_EXPORT mq_i32 mq_conproc_write_key(mq_i32 character, mq_i32 virtual_key, mq_i32 scan_code, mq_i32 shift, mq_i32 down) {
     HANDLE stdin_handle = GetStdHandle(MQ_STD_INPUT_HANDLE);
     MQ_INPUT_RECORD record;
@@ -2945,6 +3163,7 @@ MQ_EXPORT mq_i32 mq_conproc_write_key(mq_i32 character, mq_i32 virtual_key, mq_i
     return WriteConsoleInputA(stdin_handle, &record, 1, &written) != 0 && written == 1u;
 }
 
+/* Recycle audio buffers completed by the output device. */
 static void mq_audio_reap_completed(void) {
     mq_u32 i;
     if (mq_wave_output == MQ_NULL) {
@@ -2952,14 +3171,10 @@ static void mq_audio_reap_completed(void) {
     }
     for (i = 0; i < MQ_AUDIO_BUFFER_COUNT; ++i) {
         MQ_WAVEHDR *header = &mq_audio_headers[i];
-        if ((header->dwFlags & MQ_WHDR_PREPARED) && (header->dwFlags & MQ_WHDR_DONE)) {
+        if (mq_audio_header_queued[i] && (header->dwFlags & MQ_WHDR_DONE)) {
             mq_audio_completed_bytes += (mq_u64)header->dwBufferLength;
             ++mq_audio_completed_count;
-            waveOutUnprepareHeader(mq_wave_output, header, (UINT)sizeof(*header));
-            header->dwBufferLength = 0;
-            header->dwBytesRecorded = 0;
-            header->dwUser = 0;
-            header->dwFlags = 0;
+            mq_audio_header_queued[i] = 0;
             if (mq_audio_buffer_count > 0) {
                 --mq_audio_buffer_count;
             }
@@ -2967,6 +3182,7 @@ static void mq_audio_reap_completed(void) {
     }
 }
 
+/* Open and validate the requested resource. */
 MQ_EXPORT mq_i32 mq_audio_open(mq_u32 sample_rate, mq_u32 channels, mq_u32 bits_per_sample) {
     MQ_WAVEFORMATEX format;
     mq_u32 i;
@@ -2996,6 +3212,7 @@ MQ_EXPORT mq_i32 mq_audio_open(mq_u32 sample_rate, mq_u32 channels, mq_u32 bits_
         mq_audio_headers[i].dwLoops = 0;
         mq_audio_headers[i].lpNext = MQ_NULL;
         mq_audio_headers[i].reserved = 0;
+        mq_audio_header_queued[i] = 0;
     }
     mq_audio_next_buffer = 0;
     mq_audio_buffer_count = 0;
@@ -3007,6 +3224,7 @@ MQ_EXPORT mq_i32 mq_audio_open(mq_u32 sample_rate, mq_u32 channels, mq_u32 bits_
     return 1;
 }
 
+/* Submit submit to the native queue. */
 MQ_EXPORT mq_i32 mq_audio_submit(const void *data, mq_u32 byte_count) {
     MQ_WAVEHDR *header = MQ_NULL;
     mq_u32 attempt;
@@ -3020,13 +3238,13 @@ MQ_EXPORT mq_i32 mq_audio_submit(const void *data, mq_u32 byte_count) {
         ++mq_audio_underrun_count;
     }
 
-    /* Do not stall merely because the next ring slot is still active.  Windows
+    /* Do not stall merely because the next ring slot is still active. Windows
      * can complete waveOut headers out of phase with our submit cadence, so
-     * scan the complete ring for an unused or completed buffer. */
+     * scan the complete ring for a slot reaped from the device queue. */
     for (attempt = 0; attempt < MQ_AUDIO_BUFFER_COUNT; ++attempt) {
         mq_u32 index = (mq_audio_next_buffer + attempt) % MQ_AUDIO_BUFFER_COUNT;
         MQ_WAVEHDR *candidate = &mq_audio_headers[index];
-        if ((candidate->dwFlags & MQ_WHDR_PREPARED) == 0 || (candidate->dwFlags & MQ_WHDR_DONE) != 0) {
+        if (!mq_audio_header_queued[index]) {
             header = candidate;
             selected = index;
             break;
@@ -3035,25 +3253,31 @@ MQ_EXPORT mq_i32 mq_audio_submit(const void *data, mq_u32 byte_count) {
     if (header == MQ_NULL) {
         return 0;
     }
-    if ((header->dwFlags & MQ_WHDR_PREPARED) != 0) {
+
+    /* A prepared waveOut header can be submitted repeatedly after WHDR_DONE.
+     * Keep the normal fixed-size 512-frame blocks registered with the driver;
+     * unprepare only if a diagnostic caller changes the block size. */
+    if ((header->dwFlags & MQ_WHDR_PREPARED) != 0 && header->dwBufferLength != byte_count) {
         waveOutUnprepareHeader(mq_wave_output, header, (UINT)sizeof(*header));
-        if (mq_audio_buffer_count > 0) {
-            --mq_audio_buffer_count;
-        }
+        header->dwFlags = 0;
     }
     mq_copy_bytes((mq_u8 *)header->lpData, (const mq_u8 *)data, byte_count);
     header->dwBufferLength = byte_count;
     header->dwBytesRecorded = 0;
     header->dwUser = byte_count;
-    header->dwFlags = 0;
     header->dwLoops = 0;
-    if (waveOutPrepareHeader(mq_wave_output, header, (UINT)sizeof(*header)) != 0) {
-        return 0;
+    if ((header->dwFlags & MQ_WHDR_PREPARED) == 0) {
+        header->dwFlags = 0;
+        if (waveOutPrepareHeader(mq_wave_output, header, (UINT)sizeof(*header)) != 0) {
+            return 0;
+        }
+    } else {
+        header->dwFlags &= MQ_WHDR_PREPARED;
     }
     if (waveOutWrite(mq_wave_output, header, (UINT)sizeof(*header)) != 0) {
-        waveOutUnprepareHeader(mq_wave_output, header, (UINT)sizeof(*header));
         return 0;
     }
+    mq_audio_header_queued[selected] = 1;
     mq_audio_next_buffer = (selected + 1u) % MQ_AUDIO_BUFFER_COUNT;
     if (mq_audio_buffer_count < MQ_AUDIO_BUFFER_COUNT) {
         ++mq_audio_buffer_count;
@@ -3062,6 +3286,7 @@ MQ_EXPORT mq_i32 mq_audio_submit(const void *data, mq_u32 byte_count) {
     return 1;
 }
 
+/* Close the active resource and release its storage. */
 MQ_EXPORT void mq_audio_close(void) {
     mq_u32 i;
     if (mq_wave_output == MQ_NULL) {
@@ -3074,12 +3299,14 @@ MQ_EXPORT void mq_audio_close(void) {
             waveOutUnprepareHeader(mq_wave_output, &mq_audio_headers[i], (UINT)sizeof(MQ_WAVEHDR));
             mq_audio_headers[i].dwFlags = 0;
         }
+        mq_audio_header_queued[i] = 0;
     }
     waveOutClose(mq_wave_output);
     mq_wave_output = MQ_NULL;
     mq_audio_buffer_count = 0;
 }
 
+/* Return the number of queued audio frames. */
 MQ_EXPORT mq_u32 mq_audio_queued(void) {
     if (mq_wave_output == MQ_NULL) {
         return 0;
@@ -3088,6 +3315,7 @@ MQ_EXPORT mq_u32 mq_audio_queued(void) {
     return mq_audio_buffer_count;
 }
 
+/* Restore reset to its default state. */
 MQ_EXPORT mq_i32 mq_audio_reset(void) {
     if (mq_wave_output == MQ_NULL) {
         return 0;
@@ -3099,6 +3327,7 @@ MQ_EXPORT mq_i32 mq_audio_reset(void) {
     return 1;
 }
 
+/* Return the audio device's playback position. */
 MQ_EXPORT mq_u32 mq_audio_position(mq_u32 sample_mask) {
     MQ_MMTIME time_value;
     mq_u64 byte_position = mq_audio_completed_bytes;
@@ -3116,19 +3345,23 @@ MQ_EXPORT mq_u32 mq_audio_position(mq_u32 sample_mask) {
     return (mq_u32)(byte_position / mq_audio_bytes_per_sample) & sample_mask;
 }
 
+/* Submit submitted to the native queue. */
 MQ_EXPORT mq_u32 mq_audio_submitted(void) {
     return mq_audio_submitted_count;
 }
 
+/* Return the number of audio frames completed by the device. */
 MQ_EXPORT mq_u32 mq_audio_completed(void) {
     mq_audio_reap_completed();
     return mq_audio_completed_count;
 }
 
+/* Return the accumulated audio underrun count. */
 MQ_EXPORT mq_u32 mq_audio_underruns(void) {
     return mq_audio_underrun_count;
 }
 
+/* Return the state of the selected audio buffer header. */
 MQ_EXPORT mq_u32 mq_audio_header_state(mq_u32 index) {
     MQ_WAVEHDR *header;
     if (index >= MQ_AUDIO_BUFFER_COUNT) {
@@ -3136,23 +3369,21 @@ MQ_EXPORT mq_u32 mq_audio_header_state(mq_u32 index) {
     }
     mq_audio_reap_completed();
     header = &mq_audio_headers[index];
-    if ((header->dwFlags & MQ_WHDR_PREPARED) == 0) {
-        return 0;
-    }
-    if (header->dwFlags & MQ_WHDR_DONE) {
-        return 2;
-    }
-    return 1;
+    if (mq_audio_header_queued[index] && (header->dwFlags & MQ_WHDR_PREPARED) != 0) return 1;
+    return 0;
 }
 
+/* Return the audio queue's frame capacity. */
 MQ_EXPORT mq_u32 mq_audio_capacity(void) {
     return MQ_AUDIO_BUFFER_COUNT;
 }
 
+/* Report whether the requested native device is open. */
 MQ_EXPORT mq_i32 mq_audio_is_open(void) {
     return mq_wave_output != MQ_NULL;
 }
 
+/* Open and validate bound. */
 MQ_EXPORT mq_u64 mq_udp_open_bound(mq_u32 port, const char *bind_address) {
     SOCKET socket_value;
     MQ_SOCKADDR_IN address;
@@ -3196,10 +3427,12 @@ MQ_EXPORT mq_u64 mq_udp_open_bound(mq_u32 port, const char *bind_address) {
     return (mq_u64)socket_value;
 }
 
+/* Open and validate the requested resource. */
 MQ_EXPORT mq_u64 mq_udp_open(mq_u32 port) {
     return mq_udp_open_bound(port, "0.0.0.0");
 }
 
+/* Close the active resource and release its storage. */
 MQ_EXPORT void mq_udp_close(mq_u64 handle) {
     SOCKET socket_value = (SOCKET)handle;
     if (handle == 0 || socket_value == MQ_INVALID_SOCKET) {
@@ -3215,6 +3448,7 @@ MQ_EXPORT void mq_udp_close(mq_u64 handle) {
     }
 }
 
+/* Return the UDP port assigned to a socket. */
 MQ_EXPORT mq_u32 mq_udp_bound_port(mq_u64 handle) {
     MQ_SOCKADDR_IN address;
     mq_i32 address_length = (mq_i32)sizeof(address);
@@ -3246,6 +3480,7 @@ MQ_EXPORT const char *mq_udp_bound_address(mq_u64 handle) {
     return mq_udp_bound_address_text;
 }
 
+/* Update the enabled state of broadcast. */
 MQ_EXPORT mq_i32 mq_udp_enable_broadcast(mq_u64 handle) {
     mq_i32 enabled = 1;
     if (handle == 0) {
@@ -3260,6 +3495,7 @@ MQ_EXPORT mq_i32 mq_udp_enable_broadcast(mq_u64 handle) {
     return 0;
 }
 
+/* Poll the native queue without blocking the game loop. */
 MQ_EXPORT mq_i32 mq_udp_peek(mq_u64 handle) {
     char value;
     mq_i32 result;
@@ -3285,6 +3521,7 @@ MQ_EXPORT mq_i32 mq_udp_peek(mq_u64 handle) {
     return result;
 }
 
+/* Submit the immediate-mode vertices collected for the draw. */
 MQ_EXPORT mq_i32 mq_udp_send(mq_u64 handle, const char *address_text, mq_u32 port, const void *data, mq_u32 byte_count) {
     MQ_SOCKADDR_IN address;
     MQ_HOSTENT *host_entry;
@@ -3327,6 +3564,7 @@ MQ_EXPORT mq_i32 mq_udp_send(mq_u64 handle, const char *address_text, mq_u32 por
     return result;
 }
 
+/* Remove receive from the native queue. */
 MQ_EXPORT mq_i32 mq_udp_receive(mq_u64 handle, void *data, mq_u32 capacity) {
     MQ_SOCKADDR_IN address;
     mq_i32 address_length = (mq_i32)sizeof(address);
@@ -3352,7 +3590,9 @@ MQ_EXPORT mq_i32 mq_udp_receive(mq_u64 handle, void *data, mq_u32 capacity) {
 }
 
 MQ_EXPORT const char *mq_udp_last_address(void) { return mq_udp_last_address_text; }
+/* Return the source port of the last UDP packet. */
 MQ_EXPORT mq_u32 mq_udp_last_port(void) { return mq_udp_last_port_value; }
+/* Return the last native networking error code. */
 MQ_EXPORT mq_i32 mq_udp_last_error(void) { return mq_udp_last_error_value; }
 MQ_EXPORT const char *mq_udp_local_address(void) {
     char host_name[256];
@@ -3435,9 +3675,10 @@ MQ_EXPORT const char *mq_udp_reverse_name(const char *address_text) {
     return mq_udp_reverse_name_text;
 }
 
+/* Begin collecting immediate-mode vertices for one draw. */
 MQ_EXPORT void mq_gl_begin(mq_u32 mode) {
     if (mq_static_geometry_pending && !mq_static_geometry_recording) {
-        if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+        if (mq_render_backend_value != MQ_RENDER_OPENGL) {
             mq_static_geometry_pending = 0;
             mq_static_geometry_recording = 1;
             mq_static_geometry_capture_count = 0u;
@@ -3456,9 +3697,11 @@ MQ_EXPORT void mq_gl_begin(mq_u32 mode) {
         mq_static_geometry_capture_valid = 1;
     }
     if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_begin(mode); return; }
+    if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_begin(mode); return; }
  glBegin(mode); }
+/* Submit the immediate-mode vertices collected for the draw. */
 MQ_EXPORT void mq_gl_end(void) {
-    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+    if (mq_render_backend_value != MQ_RENDER_OPENGL) {
         if (mq_static_geometry_recording) {
             mq_static_geometry_finish_capture();
             mq_static_geometry_recording = 0;
@@ -3467,7 +3710,8 @@ MQ_EXPORT void mq_gl_end(void) {
             mq_static_geometry_pending_entry = -1;
             mq_static_geometry_capture_valid = 0;
         } else {
-            mq_d3d9_end();
+            if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) mq_d3d9_end();
+            else mq_vulkan_end();
         }
         return;
     }
@@ -3482,7 +3726,9 @@ MQ_EXPORT void mq_gl_end(void) {
         mq_static_geometry_capture_valid = 0;
     }
 }
-MQ_EXPORT void mq_gl_vertex2(mq_u32 x_bits, mq_u32 y_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_vertex2(x_bits, y_bits); return; } glVertex2f(mq_bits_to_float(x_bits), mq_bits_to_float(y_bits)); }
+/* Update the current immediate-mode vertex attributes. */
+MQ_EXPORT void mq_gl_vertex2(mq_u32 x_bits, mq_u32 y_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_vertex2(x_bits, y_bits); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_vertex2(x_bits, y_bits); return; } glVertex2f(mq_bits_to_float(x_bits), mq_bits_to_float(y_bits)); }
+/* Update the current immediate-mode vertex attributes. */
 MQ_EXPORT void mq_gl_vertex3(mq_u32 x_bits, mq_u32 y_bits, mq_u32 z_bits) {
     float x = mq_bits_to_float(x_bits);
     float y = mq_bits_to_float(y_bits);
@@ -3512,8 +3758,13 @@ MQ_EXPORT void mq_gl_vertex3(mq_u32 x_bits, mq_u32 y_bits, mq_u32 z_bits) {
         if (!mq_static_geometry_recording) mq_d3d9_vertex3(x_bits, y_bits, z_bits);
         return;
     }
+    if (mq_render_backend_value == MQ_RENDER_VULKAN) {
+        if (!mq_static_geometry_recording) mq_vulkan_vertex3(x_bits, y_bits, z_bits);
+        return;
+    }
     glVertex3f(x, y, z);
 }
+/* Update the current immediate-mode texture coordinates. */
 MQ_EXPORT void mq_gl_texcoord2(mq_u32 s_bits, mq_u32 t_bits) {
     mq_static_geometry_s = mq_bits_to_float(s_bits);
     mq_static_geometry_t = mq_bits_to_float(t_bits);
@@ -3523,73 +3774,118 @@ MQ_EXPORT void mq_gl_texcoord2(mq_u32 s_bits, mq_u32 t_bits) {
         if (!mq_static_geometry_recording) mq_d3d9_texcoord2(s_bits, t_bits);
         return;
     }
+    if (mq_render_backend_value == MQ_RENDER_VULKAN) {
+        if (!mq_static_geometry_recording) mq_vulkan_texcoord2(s_bits, t_bits);
+        return;
+    }
     glTexCoord2f(mq_static_geometry_s, mq_static_geometry_t);
 }
-MQ_EXPORT void mq_gl_color4ub(mq_u32 r, mq_u32 g, mq_u32 b, mq_u32 a) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_color4ub(r, g, b, a); return; } glColor4ub((mq_u8)r, (mq_u8)g, (mq_u8)b, (mq_u8)a); }
-MQ_EXPORT void mq_gl_clear_color(mq_u32 r_bits, mq_u32 g_bits, mq_u32 b_bits, mq_u32 a_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_clear_color(r_bits, g_bits, b_bits, a_bits); return; } glClearColor(mq_bits_to_float(r_bits), mq_bits_to_float(g_bits), mq_bits_to_float(b_bits), mq_bits_to_float(a_bits)); }
-MQ_EXPORT void mq_gl_clear(mq_u32 mask) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_clear(mask); return; } glClear(mask); }
-MQ_EXPORT void mq_gl_enable(mq_u32 capability) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_enable(capability); return; } glEnable(capability); }
-MQ_EXPORT void mq_gl_disable(mq_u32 capability) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_disable(capability); return; } glDisable(capability); }
-MQ_EXPORT void mq_gl_blend_func(mq_u32 source, mq_u32 destination) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_blend_func(source, destination); return; } glBlendFunc(source, destination); }
-MQ_EXPORT void mq_gl_depth_func(mq_u32 function_name) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_depth_func(function_name); return; } glDepthFunc(function_name); }
-MQ_EXPORT void mq_gl_depth_mask(mq_i32 enabled) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_depth_mask(enabled); return; } glDepthMask((mq_u8)(enabled != 0)); }
-MQ_EXPORT void mq_gl_depth_range(mq_u32 near_bits, mq_u32 far_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_depth_range(near_bits, far_bits); return; } glDepthRange((double)mq_bits_to_float(near_bits), (double)mq_bits_to_float(far_bits)); }
-MQ_EXPORT void mq_gl_alpha_func(mq_u32 function_name, mq_u32 reference_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_alpha_func(function_name, reference_bits); return; } glAlphaFunc(function_name, mq_bits_to_float(reference_bits)); }
-MQ_EXPORT void mq_gl_cull_face(mq_u32 mode) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_cull_face(mode); return; } glCullFace(mode); }
-MQ_EXPORT void mq_gl_shade_model(mq_u32 mode) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_shade_model(mode); return; } glShadeModel(mode); }
-MQ_EXPORT void mq_gl_polygon_mode(mq_u32 face, mq_u32 mode) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_polygon_mode(face, mode); return; } glPolygonMode(face, mode); }
-MQ_EXPORT void mq_gl_viewport(mq_i32 x, mq_i32 y, mq_i32 width, mq_i32 height) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_viewport(x, y, width, height); return; } glViewport(x, y, width, height); }
-MQ_EXPORT void mq_gl_matrix_mode(mq_u32 mode) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_matrix_mode(mode); return; } glMatrixMode(mode); }
-MQ_EXPORT void mq_gl_load_identity(void) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_load_identity(); return; } glLoadIdentity(); }
-MQ_EXPORT void mq_gl_push_matrix(void) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_push_matrix(); return; } glPushMatrix(); }
-MQ_EXPORT void mq_gl_pop_matrix(void) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_pop_matrix(); return; } glPopMatrix(); }
-MQ_EXPORT void mq_gl_translate(mq_u32 x_bits, mq_u32 y_bits, mq_u32 z_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_translate(x_bits, y_bits, z_bits); return; } glTranslatef(mq_bits_to_float(x_bits), mq_bits_to_float(y_bits), mq_bits_to_float(z_bits)); }
-MQ_EXPORT void mq_gl_rotate(mq_u32 angle_bits, mq_u32 x_bits, mq_u32 y_bits, mq_u32 z_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_rotate(angle_bits, x_bits, y_bits, z_bits); return; } glRotatef(mq_bits_to_float(angle_bits), mq_bits_to_float(x_bits), mq_bits_to_float(y_bits), mq_bits_to_float(z_bits)); }
-MQ_EXPORT void mq_gl_scale(mq_u32 x_bits, mq_u32 y_bits, mq_u32 z_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_scale(x_bits, y_bits, z_bits); return; } glScalef(mq_bits_to_float(x_bits), mq_bits_to_float(y_bits), mq_bits_to_float(z_bits)); }
-MQ_EXPORT void mq_gl_ortho(mq_u32 left_bits, mq_u32 right_bits, mq_u32 bottom_bits, mq_u32 top_bits, mq_u32 near_bits, mq_u32 far_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_ortho(left_bits, right_bits, bottom_bits, top_bits, near_bits, far_bits); return; } glOrtho((double)mq_bits_to_float(left_bits), (double)mq_bits_to_float(right_bits), (double)mq_bits_to_float(bottom_bits), (double)mq_bits_to_float(top_bits), (double)mq_bits_to_float(near_bits), (double)mq_bits_to_float(far_bits)); }
-MQ_EXPORT void mq_gl_frustum(mq_u32 left_bits, mq_u32 right_bits, mq_u32 bottom_bits, mq_u32 top_bits, mq_u32 near_bits, mq_u32 far_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_frustum(left_bits, right_bits, bottom_bits, top_bits, near_bits, far_bits); return; } glFrustum((double)mq_bits_to_float(left_bits), (double)mq_bits_to_float(right_bits), (double)mq_bits_to_float(bottom_bits), (double)mq_bits_to_float(top_bits), (double)mq_bits_to_float(near_bits), (double)mq_bits_to_float(far_bits)); }
-MQ_EXPORT void mq_gl_bind_texture(mq_u32 target, mq_u32 texture) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_bind_texture(target, texture); return; } glBindTexture(target, texture); }
-MQ_EXPORT void mq_gl_gen_textures(mq_i32 count, void *texture_ids) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_gen_textures(count, texture_ids); return; } glGenTextures(count, (mq_u32 *)texture_ids); }
-MQ_EXPORT void mq_gl_delete_textures(mq_i32 count, const void *texture_ids) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_delete_textures(count, texture_ids); return; } glDeleteTextures(count, (const mq_u32 *)texture_ids); }
-MQ_EXPORT void mq_gl_tex_parameter_i(mq_u32 target, mq_u32 name, mq_i32 value) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_tex_parameter_i(target, name, value); return; } glTexParameteri(target, name, value); }
-MQ_EXPORT void mq_gl_tex_env_i(mq_u32 target, mq_u32 name, mq_i32 value) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_tex_env_i(target, name, value); return; } glTexEnvi(target, name, value); }
-MQ_EXPORT void mq_gl_tex_image_2d(mq_u32 target, mq_i32 level, mq_i32 internal_format, mq_i32 width, mq_i32 height, mq_i32 border, mq_u32 format, mq_u32 type, const void *pixels) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_tex_image_2d(target, level, internal_format, width, height, border, format, type, pixels); return; } glTexImage2D(target, level, internal_format, width, height, border, format, type, pixels); }
+/* Update the current immediate-mode vertex attributes. */
+MQ_EXPORT void mq_gl_color4ub(mq_u32 r, mq_u32 g, mq_u32 b, mq_u32 a) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_color4ub(r, g, b, a); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_color4ub(r, g, b, a); return; } glColor4ub((mq_u8)r, (mq_u8)g, (mq_u8)b, (mq_u8)a); }
+/* Update the current immediate-mode vertex attributes. */
+MQ_EXPORT void mq_gl_clear_color(mq_u32 r_bits, mq_u32 g_bits, mq_u32 b_bits, mq_u32 a_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_clear_color(r_bits, g_bits, b_bits, a_bits); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_clear_color(r_bits, g_bits, b_bits, a_bits); return; } glClearColor(mq_bits_to_float(r_bits), mq_bits_to_float(g_bits), mq_bits_to_float(b_bits), mq_bits_to_float(a_bits)); }
+/* Clear the selected buffers or pending native state. */
+MQ_EXPORT void mq_gl_clear(mq_u32 mask) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_clear(mask); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_clear(mask); return; } glClear(mask); }
+/* Update the enabled state of enable. */
+MQ_EXPORT void mq_gl_enable(mq_u32 capability) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_enable(capability); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_enable(capability); return; } glEnable(capability); }
+/* Update the enabled state of disable. */
+MQ_EXPORT void mq_gl_disable(mq_u32 capability) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_disable(capability); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_disable(capability); return; } glDisable(capability); }
+/* Update the source and destination blend factors. */
+MQ_EXPORT void mq_gl_blend_func(mq_u32 source, mq_u32 destination) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_blend_func(source, destination); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_blend_func(source, destination); return; } glBlendFunc(source, destination); }
+/* Update the depth comparison function. */
+MQ_EXPORT void mq_gl_depth_func(mq_u32 function_name) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_depth_func(function_name); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_depth_func(function_name); return; } glDepthFunc(function_name); }
+/* Enable or disable depth-buffer writes. */
+MQ_EXPORT void mq_gl_depth_mask(mq_i32 enabled) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_depth_mask(enabled); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_depth_mask(enabled); return; } glDepthMask((mq_u8)(enabled != 0)); }
+/* Clamp and update the viewport depth range. */
+MQ_EXPORT void mq_gl_depth_range(mq_u32 near_bits, mq_u32 far_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_depth_range(near_bits, far_bits); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_depth_range(near_bits, far_bits); return; } glDepthRange((double)mq_bits_to_float(near_bits), (double)mq_bits_to_float(far_bits)); }
+/* Update the alpha-test reference value. */
+MQ_EXPORT void mq_gl_alpha_func(mq_u32 function_name, mq_u32 reference_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_alpha_func(function_name, reference_bits); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_alpha_func(function_name, reference_bits); return; } glAlphaFunc(function_name, mq_bits_to_float(reference_bits)); }
+/* Select which polygon face is culled. */
+MQ_EXPORT void mq_gl_cull_face(mq_u32 mode) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_cull_face(mode); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_cull_face(mode); return; } glCullFace(mode); }
+/* Accept the fixed-function shade-model state. */
+MQ_EXPORT void mq_gl_shade_model(mq_u32 mode) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_shade_model(mode); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_shade_model(mode); return; } glShadeModel(mode); }
+/* Select the polygon rasterization mode. */
+MQ_EXPORT void mq_gl_polygon_mode(mq_u32 face, mq_u32 mode) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_polygon_mode(face, mode); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_polygon_mode(face, mode); return; } glPolygonMode(face, mode); }
+/* Update the backend viewport rectangle. */
+MQ_EXPORT void mq_gl_viewport(mq_i32 x, mq_i32 y, mq_i32 width, mq_i32 height) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_viewport(x, y, width, height); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_viewport(x, y, width, height); return; } glViewport(x, y, width, height); }
+/* Select the active fixed-function matrix stack. */
+MQ_EXPORT void mq_gl_matrix_mode(mq_u32 mode) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_matrix_mode(mode); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_matrix_mode(mode); return; } glMatrixMode(mode); }
+/* Initialize a column-major identity matrix. */
+MQ_EXPORT void mq_gl_load_identity(void) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_load_identity(); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_load_identity(); return; } glLoadIdentity(); }
+/* Submit matrix to the native queue. */
+MQ_EXPORT void mq_gl_push_matrix(void) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_push_matrix(); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_push_matrix(); return; } glPushMatrix(); }
+/* Remove matrix from the native queue. */
+MQ_EXPORT void mq_gl_pop_matrix(void) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_pop_matrix(); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_pop_matrix(); return; } glPopMatrix(); }
+/* Postmultiply the current matrix with a translate transform. */
+MQ_EXPORT void mq_gl_translate(mq_u32 x_bits, mq_u32 y_bits, mq_u32 z_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_translate(x_bits, y_bits, z_bits); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_translate(x_bits, y_bits, z_bits); return; } glTranslatef(mq_bits_to_float(x_bits), mq_bits_to_float(y_bits), mq_bits_to_float(z_bits)); }
+/* Postmultiply the current matrix with a rotate transform. */
+MQ_EXPORT void mq_gl_rotate(mq_u32 angle_bits, mq_u32 x_bits, mq_u32 y_bits, mq_u32 z_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_rotate(angle_bits, x_bits, y_bits, z_bits); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_rotate(angle_bits, x_bits, y_bits, z_bits); return; } glRotatef(mq_bits_to_float(angle_bits), mq_bits_to_float(x_bits), mq_bits_to_float(y_bits), mq_bits_to_float(z_bits)); }
+/* Postmultiply the current matrix with a scale transform. */
+MQ_EXPORT void mq_gl_scale(mq_u32 x_bits, mq_u32 y_bits, mq_u32 z_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_scale(x_bits, y_bits, z_bits); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_scale(x_bits, y_bits, z_bits); return; } glScalef(mq_bits_to_float(x_bits), mq_bits_to_float(y_bits), mq_bits_to_float(z_bits)); }
+/* Postmultiply the current matrix with the requested ortho projection. */
+MQ_EXPORT void mq_gl_ortho(mq_u32 left_bits, mq_u32 right_bits, mq_u32 bottom_bits, mq_u32 top_bits, mq_u32 near_bits, mq_u32 far_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_ortho(left_bits, right_bits, bottom_bits, top_bits, near_bits, far_bits); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_ortho(left_bits, right_bits, bottom_bits, top_bits, near_bits, far_bits); return; } glOrtho((double)mq_bits_to_float(left_bits), (double)mq_bits_to_float(right_bits), (double)mq_bits_to_float(bottom_bits), (double)mq_bits_to_float(top_bits), (double)mq_bits_to_float(near_bits), (double)mq_bits_to_float(far_bits)); }
+/* Postmultiply the current matrix with the requested frustum projection. */
+MQ_EXPORT void mq_gl_frustum(mq_u32 left_bits, mq_u32 right_bits, mq_u32 bottom_bits, mq_u32 top_bits, mq_u32 near_bits, mq_u32 far_bits) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_frustum(left_bits, right_bits, bottom_bits, top_bits, near_bits, far_bits); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_frustum(left_bits, right_bits, bottom_bits, top_bits, near_bits, far_bits); return; } glFrustum((double)mq_bits_to_float(left_bits), (double)mq_bits_to_float(right_bits), (double)mq_bits_to_float(bottom_bits), (double)mq_bits_to_float(top_bits), (double)mq_bits_to_float(near_bits), (double)mq_bits_to_float(far_bits)); }
+/* Bind the selected texture for subsequent draws. */
+MQ_EXPORT void mq_gl_bind_texture(mq_u32 target, mq_u32 texture) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_bind_texture(target, texture); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_bind_texture(target, texture); return; } glBindTexture(target, texture); }
+/* Allocate caller-visible texture identifiers. */
+MQ_EXPORT void mq_gl_gen_textures(mq_i32 count, void *texture_ids) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_gen_textures(count, texture_ids); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_gen_textures(count, texture_ids); return; } glGenTextures(count, (mq_u32 *)texture_ids); }
+/* Release resources owned by delete textures. */
+MQ_EXPORT void mq_gl_delete_textures(mq_i32 count, const void *texture_ids) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_delete_textures(count, texture_ids); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_delete_textures(count, texture_ids); return; } glDeleteTextures(count, (const mq_u32 *)texture_ids); }
+/* Update fixed-function texture sampling state. */
+MQ_EXPORT void mq_gl_tex_parameter_i(mq_u32 target, mq_u32 name, mq_i32 value) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_tex_parameter_i(target, name, value); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_tex_parameter_i(target, name, value); return; } glTexParameteri(target, name, value); }
+/* Update fixed-function texture sampling state. */
+MQ_EXPORT void mq_gl_tex_env_i(mq_u32 target, mq_u32 name, mq_i32 value) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_tex_env_i(target, name, value); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_tex_env_i(target, name, value); return; } glTexEnvi(target, name, value); }
+/* Allocate and upload a complete texture image. */
+MQ_EXPORT void mq_gl_tex_image_2d(mq_u32 target, mq_i32 level, mq_i32 internal_format, mq_i32 width, mq_i32 height, mq_i32 border, mq_u32 format, mq_u32 type, const void *pixels) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_tex_image_2d(target, level, internal_format, width, height, border, format, type, pixels); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_tex_image_2d(target, level, internal_format, width, height, border, format, type, pixels); return; } glTexImage2D(target, level, internal_format, width, height, border, format, type, pixels); }
+/* Upload a rectangular update into an existing texture image. */
 MQ_EXPORT void mq_gl_tex_sub_image_2d(mq_u32 target, mq_i32 level, mq_i32 x_offset, mq_i32 y_offset, mq_i32 width, mq_i32 height, mq_u32 format, mq_u32 type, const void *pixels) {
     if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_tex_sub_image_2d(target, level, x_offset, y_offset, width, height, format, type, pixels); return; }
+    if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_tex_sub_image_2d(target, level, x_offset, y_offset, width, height, format, type, pixels); return; }
     glTexSubImage2D(target, level, x_offset, y_offset, width, height, format, type, pixels);
 }
-MQ_EXPORT void mq_gl_read_pixels(mq_i32 x, mq_i32 y, mq_i32 width, mq_i32 height, mq_u32 format, mq_u32 type, void *pixels) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_read_pixels(x, y, width, height, format, type, pixels); return; } glReadPixels(x, y, width, height, format, type, pixels); }
-MQ_EXPORT const char *mq_gl_get_string(mq_u32 name) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return mq_d3d9_get_string(name); return (const char *)glGetString(name); }
-MQ_EXPORT mq_u32 mq_gl_get_error(void) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return mq_d3d9_get_error(); return glGetError(); }
-MQ_EXPORT void mq_gl_finish(void) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_finish(); return; } glFinish(); }
-MQ_EXPORT void mq_gl_flush(void) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_flush(); return; } glFlush(); }
-MQ_EXPORT void mq_gl_draw_buffer(mq_u32 mode) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_draw_buffer(mode); return; } glDrawBuffer(mode); }
+/* Read pixels into caller-owned storage. */
+MQ_EXPORT void mq_gl_read_pixels(mq_i32 x, mq_i32 y, mq_i32 width, mq_i32 height, mq_u32 format, mq_u32 type, void *pixels) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_read_pixels(x, y, width, height, format, type, pixels); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_read_pixels(x, y, width, height, format, type, pixels); return; } glReadPixels(x, y, width, height, format, type, pixels); }
+MQ_EXPORT const char *mq_gl_get_string(mq_u32 name) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return mq_d3d9_get_string(name); if (mq_render_backend_value == MQ_RENDER_VULKAN) return mq_vulkan_get_string(name); return (const char *)glGetString(name); }
+/* Return the current get error value. */
+MQ_EXPORT mq_u32 mq_gl_get_error(void) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return mq_d3d9_get_error(); if (mq_render_backend_value == MQ_RENDER_VULKAN) return mq_vulkan_get_error(); return glGetError(); }
+/* Synchronize queued rendering work with the native backend. */
+MQ_EXPORT void mq_gl_finish(void) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_finish(); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_finish(); return; } glFinish(); }
+/* Synchronize queued rendering work with the native backend. */
+MQ_EXPORT void mq_gl_flush(void) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_flush(); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_flush(); return; } glFlush(); }
+/* Submit draw buffer geometry to the active backend command buffer. */
+MQ_EXPORT void mq_gl_draw_buffer(mq_u32 mode) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_draw_buffer(mode); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_draw_buffer(mode); return; } glDrawBuffer(mode); }
+/* Report whether multitexture available is available. */
 MQ_EXPORT mq_i32 mq_gl_multitexture_available(void) {
-    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return 0;
+    if (mq_render_backend_value != MQ_RENDER_OPENGL) return 0;
     return mq_valid_wgl_proc((const void *)mq_gl_active_texture_value) &&
         mq_valid_wgl_proc((const void *)mq_gl_client_active_texture_value) &&
         mq_valid_wgl_proc((const void *)mq_gl_multi_tex_coord2f_value);
 }
+/* Report whether world program available is available. */
 MQ_EXPORT mq_i32 mq_gl_world_program_available(void) {
     /* The release renderer intentionally stays on GLQuake's fixed-function
      * texture-combine path. The shader bridge remains private fallback
      * infrastructure, but must not silently replace the compatibility path. */
     return 0;
 }
+/* Enable or disable the OpenGL world shader program. */
 MQ_EXPORT void mq_gl_world_program_enable(mq_i32 enabled) {
-    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return;
+    if (mq_render_backend_value != MQ_RENDER_OPENGL) return;
     if (!mq_valid_wgl_proc((const void *)mq_gl_use_program_value)) return;
     if (enabled && mq_gl_create_world_program()) mq_gl_use_program_value(mq_gl_world_program);
     else mq_gl_use_program_value(0u);
 }
+/* Select the active OpenGL texture unit. */
 MQ_EXPORT void mq_gl_active_texture(mq_i32 unit) {
-    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return;
+    if (mq_render_backend_value != MQ_RENDER_OPENGL) return;
     if (!mq_valid_wgl_proc((const void *)mq_gl_active_texture_value)) return;
     mq_gl_active_texture_value(0x84C0u /* GL_TEXTURE0 */ + (mq_u32)(unit > 0 ? 1 : 0));
 }
+/* Update the current immediate-mode vertex attributes. */
 MQ_EXPORT void mq_gl_multi_tex_coord2(mq_i32 unit, mq_u32 s_bits, mq_u32 t_bits) {
     mq_i32 index = unit > 0 ? 1 : 0;
-    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return;
+    if (mq_render_backend_value != MQ_RENDER_OPENGL) return;
     if (!mq_valid_wgl_proc((const void *)mq_gl_multi_tex_coord2f_value)) return;
     mq_static_geometry_multi_s[index] = mq_bits_to_float(s_bits);
     mq_static_geometry_multi_t[index] = mq_bits_to_float(t_bits);
@@ -3628,11 +3924,13 @@ static mq_i32 mq_alias_stream_valid(const mq_u8 *data, mq_u32 byte_count) {
     return 0;
 }
 
+/* Manage cached native geometry for the renderer fast path. */
 static void mq_alias_hash_byte(mq_u8 value, mq_u64 *hash, mq_u64 *signature) {
     *hash = (*hash ^ value) * 1099511628211ull;
     *signature ^= (mq_u64)value + 0x9e3779b97f4a7c15ull + (*signature << 6) + (*signature >> 2);
 }
 
+/* Manage cached native geometry for the renderer fast path. */
 static mq_i32 mq_alias_build_triangles(
     const mq_u8 *data,
     mq_u32 byte_count,
@@ -3729,6 +4027,7 @@ static mq_i32 mq_alias_build_triangles(
     return 0;
 }
 
+/* Manage cached native geometry for the renderer fast path. */
 static void mq_alias_draw_vbo(mq_u32 cache_index) {
     if (mq_valid_wgl_proc((const void *)mq_gl_client_active_texture_value)) {
         mq_gl_client_active_texture_value(0x84C0u /* GL_TEXTURE0 */);
@@ -3742,6 +4041,105 @@ static void mq_alias_draw_vbo(mq_u32 cache_index) {
     mq_gl_bind_buffer_value(0x8892u /* GL_ARRAY_BUFFER */, 0u);
 }
 
+/* Decode and draw all GLQuake particles through one MiniLang/native crossing. */
+MQ_EXPORT mq_i32 mq_gl_draw_particle_batch(
+    const mq_u8 *data,
+    mq_u32 byte_count,
+    mq_u32 view_origin_x_bits,
+    mq_u32 view_origin_y_bits,
+    mq_u32 view_origin_z_bits,
+    mq_u32 view_forward_x_bits,
+    mq_u32 view_forward_y_bits,
+    mq_u32 view_forward_z_bits,
+    mq_u32 view_up_x_bits,
+    mq_u32 view_up_y_bits,
+    mq_u32 view_up_z_bits,
+    mq_u32 view_right_x_bits,
+    mq_u32 view_right_y_bits,
+    mq_u32 view_right_z_bits
+) {
+    mq_u32 particle_count;
+    mq_u32 particle;
+    float view_origin_x = mq_bits_to_float(view_origin_x_bits);
+    float view_origin_y = mq_bits_to_float(view_origin_y_bits);
+    float view_origin_z = mq_bits_to_float(view_origin_z_bits);
+    float view_forward_x = mq_bits_to_float(view_forward_x_bits);
+    float view_forward_y = mq_bits_to_float(view_forward_y_bits);
+    float view_forward_z = mq_bits_to_float(view_forward_z_bits);
+    float scaled_up_x = mq_bits_to_float(view_up_x_bits) * 1.5f;
+    float scaled_up_y = mq_bits_to_float(view_up_y_bits) * 1.5f;
+    float scaled_up_z = mq_bits_to_float(view_up_z_bits) * 1.5f;
+    float scaled_right_x = mq_bits_to_float(view_right_x_bits) * 1.5f;
+    float scaled_right_y = mq_bits_to_float(view_right_y_bits) * 1.5f;
+    float scaled_right_z = mq_bits_to_float(view_right_z_bits) * 1.5f;
+    if (data == MQ_NULL || byte_count == 0u || byte_count % MQ_PARTICLE_RECORD_BYTES != 0u) return 0;
+    particle_count = byte_count / MQ_PARTICLE_RECORD_BYTES;
+    if (particle_count > MQ_PARTICLE_BATCH_MAX) return 0;
+    for (particle = 0u; particle < particle_count; ++particle) {
+        const mq_u8 *record = data + particle * MQ_PARTICLE_RECORD_BYTES;
+        mq_u32 x_bits = (mq_u32)record[4] |
+            ((mq_u32)record[5] << 8) |
+            ((mq_u32)record[6] << 16) |
+            ((mq_u32)record[7] << 24);
+        mq_u32 y_bits = (mq_u32)record[8] |
+            ((mq_u32)record[9] << 8) |
+            ((mq_u32)record[10] << 16) |
+            ((mq_u32)record[11] << 24);
+        mq_u32 z_bits = (mq_u32)record[12] |
+            ((mq_u32)record[13] << 8) |
+            ((mq_u32)record[14] << 16) |
+            ((mq_u32)record[15] << 24);
+        float origin_x = mq_bits_to_float(x_bits);
+        float origin_y = mq_bits_to_float(y_bits);
+        float origin_z = mq_bits_to_float(z_bits);
+        float distance = (origin_x - view_origin_x) * view_forward_x +
+            (origin_y - view_origin_y) * view_forward_y +
+            (origin_z - view_origin_z) * view_forward_z;
+        float scale = distance >= 20.0f ? 1.0f + distance * 0.004f : 1.0f;
+        mq_u32 vertex;
+        for (vertex = 0u; vertex < 3u; ++vertex) {
+            mq_alias_vertex_t *output = &mq_particle_vertices[particle * 3u + vertex];
+            output->s = vertex == 1u ? 1.0f : 0.0f;
+            output->t = vertex == 2u ? 1.0f : 0.0f;
+            output->r = record[0];
+            output->g = record[1];
+            output->b = record[2];
+            output->a = record[3];
+            output->x = origin_x;
+            output->y = origin_y;
+            output->z = origin_z;
+            if (vertex == 1u) {
+                output->x += scale * scaled_up_x;
+                output->y += scale * scaled_up_y;
+                output->z += scale * scaled_up_z;
+            } else if (vertex == 2u) {
+                output->x += scale * scaled_right_x;
+                output->y += scale * scaled_right_y;
+                output->z += scale * scaled_right_z;
+            }
+        }
+    }
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+        if (mq_d3d9_draw_interleaved_t2f_c4ub_v3f(mq_particle_vertices, particle_count * 3u) <= 0) return 0;
+    } else if (mq_render_backend_value == MQ_RENDER_VULKAN) {
+        if (mq_vulkan_draw_interleaved_t2f_c4ub_v3f(mq_particle_vertices, particle_count * 3u) <= 0) return 0;
+    } else {
+        if (mq_valid_wgl_proc((const void *)mq_gl_client_active_texture_value)) {
+            mq_gl_client_active_texture_value(0x84C0u /* GL_TEXTURE0 */);
+        }
+        if (mq_valid_wgl_proc((const void *)mq_gl_bind_buffer_value)) {
+            mq_gl_bind_buffer_value(0x8892u /* GL_ARRAY_BUFFER */, 0u);
+        }
+        glInterleavedArrays(0x2A29u /* GL_T2F_C4UB_V3F */, (mq_i32)sizeof(mq_alias_vertex_t), mq_particle_vertices);
+        glDrawArrays(0x0004u /* GL_TRIANGLES */, 0, (mq_i32)(particle_count * 3u));
+        glDisableClientState(0x8078u /* GL_TEXTURE_COORD_ARRAY */);
+        glDisableClientState(0x8076u /* GL_COLOR_ARRAY */);
+        glDisableClientState(0x8074u /* GL_VERTEX_ARRAY */);
+    }
+    return (mq_i32)particle_count;
+}
+
+/* Submit draw alias batch geometry to the active backend command buffer. */
 MQ_EXPORT mq_i32 mq_gl_draw_alias_batch(
     const mq_u8 *data,
     mq_u32 byte_count,
@@ -3758,12 +4156,64 @@ MQ_EXPORT mq_i32 mq_gl_draw_alias_batch(
     mq_u32 cache_index;
     mq_u32 list_id = 0u;
     if (data == MQ_NULL || shade_dots == MQ_NULL) return 0;
-    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9 || mq_render_backend_value == MQ_RENDER_VULKAN) {
         mq_u32 vertex_count = 0u;
         mq_i32 triangle_count = 0;
         if (!mq_alias_build_triangles(data, byte_count, shade_dots, shade_dot_count, shade_light, &vertex_count, &triangle_count)) return 0;
-        if (mq_d3d9_draw_interleaved_t2f_c4ub_v3f(mq_alias_triangle_vertices, vertex_count) <= 0) return 0;
+        if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+            if (mq_d3d9_draw_interleaved_t2f_c4ub_v3f(mq_alias_triangle_vertices, vertex_count) <= 0) return 0;
+        } else if (mq_vulkan_draw_interleaved_t2f_c4ub_v3f(mq_alias_triangle_vertices, vertex_count) <= 0) return 0;
         return triangle_count;
+    }
+    /* Lighting varies per entity and frame.  Caching that baked vertex colour
+     * in immutable VBOs/display lists created thousands of one-use driver
+     * objects and stalled the first frame of newly visible monsters.  Rebuild
+     * into the persistent CPU scratch array and submit it in one draw instead;
+     * geometry, colour and ordering are identical to the cached path. */
+    {
+        mq_u32 vertex_count = 0u;
+        mq_i32 triangle_count = 0;
+        if (mq_alias_build_triangles(
+                data, byte_count, shade_dots, shade_dot_count, shade_light,
+                &vertex_count, &triangle_count)) {
+            if (mq_valid_wgl_proc((const void *)mq_gl_client_active_texture_value)) {
+                mq_gl_client_active_texture_value(0x84C0u /* GL_TEXTURE0 */);
+            }
+            if (mq_valid_wgl_proc((const void *)mq_gl_gen_buffers_value) &&
+                mq_valid_wgl_proc((const void *)mq_gl_bind_buffer_value) &&
+                mq_valid_wgl_proc((const void *)mq_gl_buffer_data_value)) {
+                if (mq_alias_stream_vbo == 0u) mq_gl_gen_buffers_value(1, &mq_alias_stream_vbo);
+                mq_gl_bind_buffer_value(0x8892u /* GL_ARRAY_BUFFER */, mq_alias_stream_vbo);
+                mq_gl_buffer_data_value(
+                    0x8892u /* GL_ARRAY_BUFFER */,
+                    (mq_i64)(vertex_count * sizeof(mq_alias_vertex_t)),
+                    mq_alias_triangle_vertices,
+                    0x88E0u /* GL_STREAM_DRAW */
+                );
+                glInterleavedArrays(
+                    0x2A29u /* GL_T2F_C4UB_V3F */,
+                    (mq_i32)sizeof(mq_alias_vertex_t),
+                    (const void *)0
+                );
+            } else {
+                if (mq_valid_wgl_proc((const void *)mq_gl_bind_buffer_value)) {
+                    mq_gl_bind_buffer_value(0x8892u /* GL_ARRAY_BUFFER */, 0u);
+                }
+                glInterleavedArrays(
+                    0x2A29u /* GL_T2F_C4UB_V3F */,
+                    (mq_i32)sizeof(mq_alias_vertex_t),
+                    mq_alias_triangle_vertices
+                );
+            }
+            glDrawArrays(0x0004u /* GL_TRIANGLES */, 0, (mq_i32)vertex_count);
+            glDisableClientState(0x8078u /* GL_TEXTURE_COORD_ARRAY */);
+            glDisableClientState(0x8076u /* GL_COLOR_ARRAY */);
+            glDisableClientState(0x8074u /* GL_VERTEX_ARRAY */);
+            if (mq_valid_wgl_proc((const void *)mq_gl_bind_buffer_value)) {
+                mq_gl_bind_buffer_value(0x8892u /* GL_ARRAY_BUFFER */, 0u);
+            }
+            return triangle_count;
+        }
     }
     shade_key_count = shade_dot_count > 256u ? 256u : shade_dot_count;
     for (cache_index = 0u; cache_index < byte_count; ++cache_index) {
@@ -3904,6 +4354,7 @@ MQ_EXPORT mq_i32 mq_gl_draw_alias_batch(
     return triangles;
 }
 
+/* Submit draw alias model geometry to the active backend command buffer. */
 MQ_EXPORT mq_i32 mq_gl_draw_alias_model(
     const mq_u8 *data, mq_u32 byte_count,
     const mq_u8 *shade_dots, mq_u32 shade_dot_count, mq_u32 shade_light_bits,
@@ -3920,29 +4371,40 @@ MQ_EXPORT mq_i32 mq_gl_draw_alias_model(
     float sy = mq_bits_to_float(scale_y);
     float sz = mq_bits_to_float(scale_z);
     mq_i32 triangles;
-    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
-        mq_d3d9_push_matrix();
-        mq_d3d9_translate(origin_x, origin_y, origin_z);
-        mq_d3d9_rotate(angle_y, mq_float_to_bits(0.0f), mq_float_to_bits(0.0f), mq_float_to_bits(1.0f));
-        mq_d3d9_rotate(mq_float_to_bits(-mq_bits_to_float(angle_x)), mq_float_to_bits(0.0f), mq_float_to_bits(1.0f), mq_float_to_bits(0.0f));
-        mq_d3d9_rotate(angle_z, mq_float_to_bits(1.0f), mq_float_to_bits(0.0f), mq_float_to_bits(0.0f));
+    if (mq_render_backend_value != MQ_RENDER_OPENGL) {
+        void (*push_matrix)(void) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_push_matrix : mq_vulkan_push_matrix;
+        void (*pop_matrix)(void) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_pop_matrix : mq_vulkan_pop_matrix;
+        void (*translate)(mq_u32,mq_u32,mq_u32) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_translate : mq_vulkan_translate;
+        void (*rotate)(mq_u32,mq_u32,mq_u32,mq_u32) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_rotate : mq_vulkan_rotate;
+        void (*scale)(mq_u32,mq_u32,mq_u32) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_scale : mq_vulkan_scale;
+        void (*cull_face)(mq_u32) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_cull_face : mq_vulkan_cull_face;
+        void (*enable)(mq_u32) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_enable : mq_vulkan_enable;
+        void (*disable)(mq_u32) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_disable : mq_vulkan_disable;
+        void (*shade_model)(mq_u32) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_shade_model : mq_vulkan_shade_model;
+        void (*tex_env)(mq_u32,mq_u32,mq_i32) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_tex_env_i : mq_vulkan_tex_env_i;
+        void (*color)(mq_u32,mq_u32,mq_u32,mq_u32) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_color4ub : mq_vulkan_color4ub;
+        push_matrix();
+        translate(origin_x, origin_y, origin_z);
+        rotate(angle_y, mq_float_to_bits(0.0f), mq_float_to_bits(0.0f), mq_float_to_bits(1.0f));
+        rotate(mq_float_to_bits(-mq_bits_to_float(angle_x)), mq_float_to_bits(0.0f), mq_float_to_bits(1.0f), mq_float_to_bits(0.0f));
+        rotate(angle_z, mq_float_to_bits(1.0f), mq_float_to_bits(0.0f), mq_float_to_bits(0.0f));
         if (double_eyes) {
-            mq_d3d9_translate(scale_origin_x, scale_origin_y, mq_float_to_bits(soz - 30.0f));
-            mq_d3d9_scale(mq_float_to_bits(sx * 2.0f), mq_float_to_bits(sy * 2.0f), mq_float_to_bits(sz * 2.0f));
+            translate(scale_origin_x, scale_origin_y, mq_float_to_bits(soz - 30.0f));
+            scale(mq_float_to_bits(sx * 2.0f), mq_float_to_bits(sy * 2.0f), mq_float_to_bits(sz * 2.0f));
         } else {
-            mq_d3d9_translate(scale_origin_x, scale_origin_y, scale_origin_z);
-            mq_d3d9_scale(scale_x, scale_y, scale_z);
+            translate(scale_origin_x, scale_origin_y, scale_origin_z);
+            scale(scale_x, scale_y, scale_z);
         }
-        mq_d3d9_cull_face(0x0404u);
-        mq_d3d9_enable(0x0B44u);
-        if (smooth) mq_d3d9_shade_model(0x1D01u);
-        mq_d3d9_tex_env_i(0x2300u, 0x2200u, 0x2100u);
+        cull_face(0x0404u);
+        enable(0x0B44u);
+        if (smooth) shade_model(0x1D01u);
+        tex_env(0x2300u, 0x2200u, 0x2100u);
         triangles = mq_gl_draw_alias_batch(data, byte_count, shade_dots, shade_dot_count, shade_light_bits);
-        mq_d3d9_tex_env_i(0x2300u, 0x2200u, 0x1E01u);
-        mq_d3d9_shade_model(0x1D00u);
-        mq_d3d9_color4ub(255u, 255u, 255u, 255u);
-        mq_d3d9_disable(0x0B44u);
-        mq_d3d9_pop_matrix();
+        tex_env(0x2300u, 0x2200u, 0x1E01u);
+        shade_model(0x1D00u);
+        color(255u, 255u, 255u, 255u);
+        disable(0x0B44u);
+        pop_matrix();
         return triangles;
     }
     glPushMatrix();

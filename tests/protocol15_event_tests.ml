@@ -1,13 +1,13 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-013 byte-exact Protocol-15 static-entity, static-sound, particle,
 scoreboard and graceful-disconnect fixtures. The wire streams are reproduced
 independently by tools/oracle/protocol15_events_oracle.c and
- tools/check_protocol15_events.py.
+tools/check_protocol15_events.py.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.sizebuf as sz
@@ -21,25 +21,30 @@ import miniquake.net_loop as netloop
 import miniquake.net_main as netmain
 import miniquake.player_move as movement
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9600, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9601, name + ": expected true") end if
   return true
 end function
 
+// Exercise assert false as part of this deterministic regression fixture.
 function assertFalse(value, name)
   if value != false then return error(9602, name + ": expected false") end if
   return true
 end function
 
+// Exercise assert hex as part of this deterministic regression fixture.
 function assertHex(buffer, expected, name)
   return assertEqual(hex(sz.dataSlice(buffer)), expected, name)
 end function
 
+// Execute one named test case and record its pass/fail result.
 function runTest(number, name, fn)
   print "  [" + number + "/22] " + name
   result = try(fn())
@@ -50,6 +55,7 @@ function runTest(number, name, fn)
   return true
 end function
 
+// Exercise basic baseline as part of this deterministic regression fixture.
 function basicBaseline()
   return t.EntityBaseline(
     1,
@@ -62,6 +68,7 @@ function basicBaseline()
   )
 end function
 
+// Verify static entity basic against the expected Quake behavior.
 function testStaticEntityBasic()
   buffer = sz.alloc(64)
   assertEqual(events.writeStaticEntity(buffer, basicBaseline()), 14, "static length")
@@ -69,6 +76,7 @@ function testStaticEntityBasic()
   return true
 end function
 
+// Verify static entity wrapped against the expected Quake behavior.
 function testStaticEntityWrapped()
   buffer = sz.alloc(64)
   value = t.EntityBaseline(
@@ -85,6 +93,7 @@ function testStaticEntityWrapped()
   return true
 end function
 
+// Verify static entity round trip against the expected Quake behavior.
 function testStaticEntityRoundTrip()
   buffer = sz.alloc(64)
   events.writeStaticEntity(buffer, basicBaseline())
@@ -101,6 +110,7 @@ function testStaticEntityRoundTrip()
   return true
 end function
 
+// Verify static sound vectors against the expected Quake behavior.
 function testStaticSoundVectors()
   basic = sz.alloc(64)
   events.writeStaticSound(basic, t.Vec3(10.0, -20.0, 30.0), 5, 0.5, 1.25)
@@ -112,6 +122,7 @@ function testStaticSoundVectors()
   return true
 end function
 
+// Verify static sound round trip against the expected Quake behavior.
 function testStaticSoundRoundTrip()
   buffer = sz.alloc(64)
   events.writeStaticSound(buffer, t.Vec3(10.0, -20.0, 30.0), 5, 0.5, 1.25)
@@ -126,6 +137,7 @@ function testStaticSoundRoundTrip()
   return true
 end function
 
+// Verify particle basic against the expected Quake behavior.
 function testParticleBasic()
   buffer = sz.alloc(64)
   events.writeParticle(
@@ -139,6 +151,7 @@ function testParticleBasic()
   return true
 end function
 
+// Verify particle clamp against the expected Quake behavior.
 function testParticleClamp()
   buffer = sz.alloc(64)
   events.writeParticle(
@@ -154,6 +167,7 @@ function testParticleClamp()
   return true
 end function
 
+// Verify particle explosion count against the expected Quake behavior.
 function testParticleExplosionCount()
   buffer = sz.alloc(64)
   events.writeParticle(
@@ -170,6 +184,7 @@ function testParticleExplosionCount()
   return true
 end function
 
+// Verify production particle against the expected Quake behavior.
 function testProductionParticle()
   state = svmain.SV_Init(1)
   sz.clear(state.server.datagram)
@@ -185,6 +200,7 @@ function testProductionParticle()
   return true
 end function
 
+// Verify particle datagram boundary against the expected Quake behavior.
 function testParticleDatagramBoundary()
   state = svmain.SV_Init(1)
   state.server.datagram.curSize = c.MAX_DATAGRAM - 16
@@ -212,6 +228,7 @@ function testParticleDatagramBoundary()
   return true
 end function
 
+// Verify integrated queued particle against the expected Quake behavior.
 function testIntegratedQueuedParticle()
   value = server.create(1)
   sz.clear(value.datagram)
@@ -224,6 +241,7 @@ function testIntegratedQueuedParticle()
   return true
 end function
 
+// Verify score vectors against the expected Quake behavior.
 function testScoreVectors()
   buffer = sz.alloc(128)
   events.writeUpdateName(buffer, 2, "Ranger")
@@ -247,6 +265,7 @@ function testScoreVectors()
   return true
 end function
 
+// Verify latin1 name and truncation against the expected Quake behavior.
 function testLatin1NameAndTruncation()
   buffer = sz.alloc(64)
   events.writeUpdateName(buffer, 1, "José")
@@ -255,6 +274,7 @@ function testLatin1NameAndTruncation()
   return true
 end function
 
+// Verify integrated name and color against the expected Quake behavior.
 function testIntegratedNameAndColor()
   value = server.create(1)
   clientValue = value.clients[0]
@@ -266,6 +286,7 @@ function testIntegratedNameAndColor()
   return true
 end function
 
+// Verify integrated frag fanout against the expected Quake behavior.
 function testIntegratedFragFanout()
   value = server.create(2)
   value.clients[0].active = true
@@ -280,6 +301,7 @@ function testIntegratedFragFanout()
   return true
 end function
 
+// Verify direct fractional frag fanout against the expected Quake behavior.
 function testDirectFractionalFragFanout()
   state = svmain.SV_Init(2)
   state.server.clients[0].active = true
@@ -303,6 +325,7 @@ function testDirectFractionalFragFanout()
   return true
 end function
 
+// Verify spawn uses old frags against the expected Quake behavior.
 function testSpawnUsesOldFrags()
   network = netloop.createState()
   netmain.NET_Init(network, 2, false, false, 26000, true)
@@ -357,6 +380,7 @@ function testSpawnUsesOldFrags()
   return true
 end function
 
+// Verify reliable distribution and overflow against the expected Quake behavior.
 function testReliableDistributionAndOverflow()
   value = server.create(2)
   value.clients[0].active = true
@@ -381,6 +405,7 @@ function testReliableDistributionAndOverflow()
   return true
 end function
 
+// Verify integrated graceful drop against the expected Quake behavior.
 function testIntegratedGracefulDrop()
   network = netloop.createState()
   netmain.NET_Init(network, 2, false, false, 26000, true)
@@ -419,6 +444,7 @@ function testIntegratedGracefulDrop()
   return true
 end function
 
+// Verify direct graceful drop against the expected Quake behavior.
 function testDirectGracefulDrop()
   network = netloop.createState()
   netmain.NET_Init(network, 2, false, false, 26000, true)
@@ -456,6 +482,7 @@ function testDirectGracefulDrop()
   return true
 end function
 
+// Verify blocked and crash drop against the expected Quake behavior.
 function testBlockedAndCrashDrop()
   network = netloop.createState()
   netmain.NET_Init(network, 2, false, false, 26000, true)
@@ -489,6 +516,7 @@ function testBlockedAndCrashDrop()
   return true
 end function
 
+// Verify reliable delivery boundaries against the expected Quake behavior.
 function testReliableDeliveryBoundaries()
   assertEqual(
     serverData.reliableDeliveryPlan(true, 0, false, false),

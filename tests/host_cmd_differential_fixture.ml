@@ -1,18 +1,27 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/host_cmd_differential_fixture.ml.
+*/
 import miniquake.host as host
 import miniquake.server as server
 import miniquake.savegame as savegame
 import miniquake.cvar as cvar
 import miniquake.constants as c
 
+// Exercise bool text as part of this deterministic regression fixture.
 function boolText(value)
   if value then return "true" end if
   return "false"
 end function
 
+// Create and initialize session.
 function newSession()
   return host.create([])
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   findSession = newSession()
   found = host.FindViewthing(findSession)

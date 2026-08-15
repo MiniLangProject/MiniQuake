@@ -1,5 +1,9 @@
-/* BP-042: dynamic-light marking, frame order, and brush-model light roots. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
+BP-042: dynamic-light marking, frame order, and brush-model light roots.
+*/
 import miniquake.render.world as worldRender
 import miniquake.types as t
 import miniquake.constants as c
@@ -10,21 +14,25 @@ struct BrushEntity
   angles
 end struct
 
+// Assert that the condition holds and identify a failing test.
 function yes(value, name)
   if not value then return error(4200, name + ": expected true") end if
   return true
 end function
 
+// Exercise no as part of this deterministic regression fixture.
 function no(value, name)
   if value then return error(4201, name + ": expected false") end if
   return true
 end function
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(4202, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
   print "[" + number + "/20] " + name
   result = try(fn())
@@ -32,10 +40,12 @@ function run(number, name, fn)
   return true
 end function
 
+// Exercise light as part of this deterministic regression fixture.
 function light(radius, die)
   return t.DynamicLight(t.Vec3(0.0, 0.0, 8.0), radius, die, 0.0, 0.0, 0)
 end function
 
+// Exercise setup as part of this deterministic regression fixture.
 function setup(lights, flashBlend, dynamicEnabled, includeModels)
   zero = t.Vec3(0.0, 0.0, 0.0)
   minimum = t.Vec3(-32.0, -32.0, -32.0)
@@ -71,31 +81,37 @@ function setup(lights, flashBlend, dynamicEnabled, includeModels)
   return renderer
 end function
 
+// Verify active at deadline against the expected Quake behavior.
 function testActiveAtDeadline()
   yes(worldRender.R_DynamicLightIsActive(light(10.0, 1.0), 1.0), "deadline active")
   return true
 end function
 
+// Verify expired light against the expected Quake behavior.
 function testExpiredLight()
   no(worldRender.R_DynamicLightIsActive(light(10.0, 0.999), 1.0), "expired")
   return true
 end function
 
+// Verify zero radius against the expected Quake behavior.
 function testZeroRadius()
   no(worldRender.R_DynamicLightIsActive(light(0.0, 2.0), 1.0), "zero radius")
   return true
 end function
 
+// Verify negative radius against the expected Quake behavior.
 function testNegativeRadius()
   no(worldRender.R_DynamicLightIsActive(light(-1.0, 2.0), 1.0), "negative radius")
   return true
 end function
 
+// Verify void light against the expected Quake behavior.
 function testVoidLight()
   no(worldRender.R_DynamicLightIsActive(void, 1.0), "void light")
   return true
 end function
 
+// Verify push targets next frame against the expected Quake behavior.
 function testPushTargetsNextFrame()
   setup([light(64.0, 2.0)], false, true, true)
   equal(worldRender.R_PushDlights(), 2, "marked surfaces")
@@ -105,6 +121,7 @@ function testPushTargetsNextFrame()
   return true
 end function
 
+// Verify begin frame alignment against the expected Quake behavior.
 function testBeginFrameAlignment()
   setup([light(64.0, 2.0)], false, true, true)
   result = worldRender.R_BeginWorldFrame()
@@ -114,6 +131,7 @@ function testBeginFrameAlignment()
   return true
 end function
 
+// Verify second surface marked against the expected Quake behavior.
 function testSecondSurfaceMarked()
   setup([light(64.0, 2.0)], false, true, true)
   worldRender.R_BeginWorldFrame()
@@ -121,6 +139,7 @@ function testSecondSurfaceMarked()
   return true
 end function
 
+// Verify multiple light bits against the expected Quake behavior.
 function testMultipleLightBits()
   setup([light(64.0, 2.0), light(64.0, 2.0)], false, true, true)
   worldRender.R_BeginWorldFrame()
@@ -128,6 +147,7 @@ function testMultipleLightBits()
   return true
 end function
 
+// Verify stale bits reset against the expected Quake behavior.
 function testStaleBitsReset()
   setup([light(64.0, 2.0)], false, true, true)
   worldRender.R_SetSurfaceCompatibilityState(0, 7, 7, [256, 0, 0, 0], false, 0, 0, 0)
@@ -136,30 +156,35 @@ function testStaleBitsReset()
   return true
 end function
 
+// Verify flash blend skips marks against the expected Quake behavior.
 function testFlashBlendSkipsMarks()
   setup([light(64.0, 2.0)], true, true, true)
   equal(worldRender.R_PushDlights(), 0, "flashblend skip")
   return true
 end function
 
+// Verify dynamic disabled skips marks against the expected Quake behavior.
 function testDynamicDisabledSkipsMarks()
   setup([light(64.0, 2.0)], false, false, true)
   equal(worldRender.R_PushDlights(), 0, "dynamic skip")
   return true
 end function
 
+// Verify no world model against the expected Quake behavior.
 function testNoWorldModel()
   setup([light(64.0, 2.0)], false, true, false)
   equal(worldRender.R_PushDlights(), 0, "no model")
   return true
 end function
 
+// Verify expired skipped against the expected Quake behavior.
 function testExpiredSkipped()
   setup([light(64.0, 0.5)], false, true, true)
   equal(worldRender.R_PushDlights(), 0, "expired push")
   return true
 end function
 
+// Verify brush model marks against the expected Quake behavior.
 function testBrushModelMarks()
   setup([light(64.0, 2.0)], false, true, true)
   entity = BrushEntity(1, t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
@@ -167,6 +192,7 @@ function testBrushModelMarks()
   return true
 end function
 
+// Verify world like brush skips against the expected Quake behavior.
 function testWorldLikeBrushSkips()
   setup([light(64.0, 2.0)], false, true, true)
   entity = BrushEntity(2, t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
@@ -174,6 +200,7 @@ function testWorldLikeBrushSkips()
   return true
 end function
 
+// Verify invalid brush model against the expected Quake behavior.
 function testInvalidBrushModel()
   setup([light(64.0, 2.0)], false, true, true)
   entity = BrushEntity(99, t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
@@ -181,6 +208,7 @@ function testInvalidBrushModel()
   return true
 end function
 
+// Verify brush flash blend skip against the expected Quake behavior.
 function testBrushFlashBlendSkip()
   setup([light(64.0, 2.0)], true, true, true)
   entity = BrushEntity(1, t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
@@ -188,6 +216,7 @@ function testBrushFlashBlendSkip()
   return true
 end function
 
+// Verify frame getter against the expected Quake behavior.
 function testFrameGetter()
   setup([], false, true, true)
   worldRender.R_BeginWorldFrame()
@@ -196,6 +225,7 @@ function testFrameGetter()
   return true
 end function
 
+// Verify invalid dlight state against the expected Quake behavior.
 function testInvalidDlightState()
   setup([], false, true, true)
   state = worldRender.R_GetDynamicLightCompatibilityState(99)

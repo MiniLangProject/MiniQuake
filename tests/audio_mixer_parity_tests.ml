@@ -1,22 +1,31 @@
-/* BP-057: snd_mix.c 32-bit paintbuffer and PCM transfer parity. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+BP-057: snd_mix.c 32-bit paintbuffer and PCM transfer parity.
+*/
 import miniquake.sound.snd_mix as bp057Mix
 import miniquake.sound.snd_mem as bp057Mem
 import miniquake.byteio as bp057Bio
 
+// Assert exact equality and report both values on failure.
 function bp057Equal(actual, expected, name)
   if actual != expected then return error(5700, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
+// Assert that the condition holds and identify a failing test.
 function bp057Yes(value, name)
   if not value then return error(5701, name + ": expected true") end if
   return true
 end function
+// Execute one named test case and record its pass/fail result.
 function bp057Run(number, name, fn)
   print "[" + number + "/22] " + name
   value = try(fn())
   if value is error then print "FAIL: " + value.message; return false end if
   return true
 end function
+// Exercise the cache16 test scenario and verify its expected result.
 function bp057Cache16(values, loopStart)
   data = bytes(len(values) * 2)
   index = 0
@@ -26,35 +35,41 @@ function bp057Cache16(values, loopStart)
   end while
   return bp057Mem.SoundCache(len(values), loopStart, 22050, 2, 0, data)
 end function
+// Exercise the descriptor test scenario and verify its expected result.
 function bp057Descriptor(values, loopStart)
   descriptor = bp057Mem.createDescriptor("fixture.wav")
   descriptor.cache = bp057Cache16(values, loopStart)
   return descriptor
 end function
 
+// Return constants for the active module state.
 function bp057Constants()
   bp057Equal(bp057Mix.PAINTBUFFER_SIZE, 512, "paintbuffer")
   bp057Equal(bp057Mix.MAX_CHANNELS, 128, "channels")
   return true
 end function
+// Exercise the signed byte test scenario and verify its expected result.
 function bp057SignedByte()
   bp057Equal(bp057Mix.signedByte(0), 0, "signed zero")
   bp057Equal(bp057Mix.signedByte(128), -128, "signed 128")
   bp057Equal(bp057Mix.signedByte(255), -1, "signed 255")
   return true
 end function
+// Exercise the i32 test scenario and verify its expected result.
 function bp057I32()
   bp057Equal(bp057Mix.soundI32(0xffffffff), -1, "i32 minus one")
   bp057Equal(bp057Mix.soundI32(0x80000000), -2147483648, "i32 minimum")
   bp057Equal(bp057Mix.soundI32(0x100000001), 1, "i32 wrap")
   return true
 end function
+// Return a validated clamp value.
 function bp057Clamp()
   bp057Equal(bp057Mix.clamp16(40000), 32767, "positive clamp")
   bp057Equal(bp057Mix.clamp16(-40000), -32768, "negative clamp")
   bp057Equal(bp057Mix.clamp16(123), 123, "inside clamp")
   return true
 end function
+// Exercise the scale table test scenario and verify its expected result.
 function bp057ScaleTable()
   state = bp057Mix.createState(bp057Mix.createDma(22050, 16, 2, 8))
   bp057Equal(state.scaleTable[31 * 256 + 255], -248, "scale -1")
@@ -62,6 +77,7 @@ function bp057ScaleTable()
   bp057Equal(state.scaleTable[1 * 256 + 1], 8, "scale one")
   return true
 end function
+// Exercise the linear clamp test scenario and verify its expected result.
 function bp057LinearClamp()
   state = bp057Mix.createState(bp057Mix.createDma(22050, 16, 2, 8))
   state.paintBuffer[0] = 40000; state.paintBuffer[1] = -40000
@@ -71,6 +87,7 @@ function bp057LinearClamp()
   bp057Equal(bp057Bio.i16(state.dma.buffer, 2), -32768, "linear negative")
   return true
 end function
+// Exercise the linear overflow test scenario and verify its expected result.
 function bp057LinearOverflow()
   state = bp057Mix.createState(bp057Mix.createDma(22050, 16, 2, 8))
   state.paintBuffer[0] = 0x7fffffff
@@ -79,6 +96,7 @@ function bp057LinearOverflow()
   bp057Equal(bp057Bio.i16(state.dma.buffer, 0), -1, "32-bit transfer wrap")
   return true
 end function
+// Exercise the stereo transfer test scenario and verify its expected result.
 function bp057StereoTransfer()
   state = bp057Mix.createState(bp057Mix.createDma(22050, 16, 2, 8))
   state.volume = 1.0
@@ -89,6 +107,7 @@ function bp057StereoTransfer()
   bp057Equal(bp057Bio.i16(state.dma.buffer, 6), -2000, "stereo right 1")
   return true
 end function
+// Exercise the stereo ring wrap test scenario and verify its expected result.
 function bp057StereoRingWrap()
   state = bp057Mix.createState(bp057Mix.createDma(22050, 16, 2, 8))
   state.volume = 1.0; state.paintedTime = 3
@@ -99,6 +118,7 @@ function bp057StereoRingWrap()
   bp057Equal(bp057Bio.i16(state.dma.buffer, 0), 30, "ring frame zero left")
   return true
 end function
+// Exercise the mono8 test scenario and verify its expected result.
 function bp057Mono8()
   state = bp057Mix.createState(bp057Mix.createDma(22050, 8, 1, 8))
   state.volume = 1.0; state.paintBuffer[0] = 256; state.paintBuffer[2] = -256
@@ -107,6 +127,7 @@ function bp057Mono8()
   bp057Equal(state.dma.buffer[1], 127, "mono negative")
   return true
 end function
+// Exercise the mono16 test scenario and verify its expected result.
 function bp057Mono16()
   state = bp057Mix.createState(bp057Mix.createDma(22050, 16, 1, 8))
   state.volume = 1.0; state.paintBuffer[0] = 1000; state.paintBuffer[2] = -1000
@@ -115,6 +136,7 @@ function bp057Mono16()
   bp057Equal(bp057Bio.i16(state.dma.buffer, 2), -1000, "mono16 second")
   return true
 end function
+// Exercise the paint8 test scenario and verify its expected result.
 function bp057Paint8()
   state = bp057Mix.createState(bp057Mix.createDma(22050, 16, 2, 8))
   channel = state.channels[0]; channel.leftVolume = 255; channel.rightVolume = 128
@@ -125,6 +147,7 @@ function bp057Paint8()
   bp057Equal(state.paintBuffer[5], -128, "paint8 right minus one")
   return true
 end function
+// Exercise the paint16 test scenario and verify its expected result.
 function bp057Paint16()
   state = bp057Mix.createState(bp057Mix.createDma(22050, 16, 2, 8))
   channel = state.channels[0]; channel.leftVolume = 128; channel.rightVolume = 64
@@ -135,6 +158,7 @@ function bp057Paint16()
   bp057Equal(state.paintBuffer[2], -1000, "paint16 left second")
   return true
 end function
+// Exercise the paint16 overflow test scenario and verify its expected result.
 function bp057Paint16Overflow()
   state = bp057Mix.createState(bp057Mix.createDma(22050, 16, 2, 8))
   channel = state.channels[0]; channel.leftVolume = 131072; channel.rightVolume = 0
@@ -143,6 +167,7 @@ function bp057Paint16Overflow()
   bp057Equal(state.paintBuffer[0], -512, "paint multiplication wraps")
   return true
 end function
+// Update module state for buffer.
 function bp057ClearBuffer()
   state = bp057Mix.createState(bp057Mix.createDma(22050, 16, 2, 8))
   state.paintBuffer[0] = 9; state.paintBuffer[3] = 7; state.paintBuffer[4] = 5
@@ -152,6 +177,7 @@ function bp057ClearBuffer()
   bp057Equal(state.paintBuffer[4], 5, "clear boundary")
   return true
 end function
+// Exercise the paint channels test scenario and verify its expected result.
 function bp057PaintChannels()
   state = bp057Mix.createState(bp057Mix.createDma(22050, 16, 2, 8))
   state.volume = 1.0; state.totalChannels = 1
@@ -162,6 +188,7 @@ function bp057PaintChannels()
   bp057Equal(bp057Bio.i16(state.dma.buffer, 0), 996, "paint output")
   return true
 end function
+// Exercise the loop restart test scenario and verify its expected result.
 function bp057LoopRestart()
   state = bp057Mix.createState(bp057Mix.createDma(22050, 16, 2, 16))
   state.volume = 1.0; state.totalChannels = 1
@@ -172,17 +199,20 @@ function bp057LoopRestart()
   bp057Yes(channel.sfx is not void, "loop remains active")
   return true
 end function
+// Finalize state for before painted.
 function bp057EndBeforePainted()
   state = bp057Mix.createState(bp057Mix.createDma(22050, 16, 2, 8)); state.paintedTime = 5
   result = try(bp057Mix.S_PaintChannels(state, 4))
   bp057Yes(result is error, "end before painted")
   return true
 end function
+// Exercise the chunk boundary test scenario and verify its expected result.
 function bp057ChunkBoundary()
   state = bp057Mix.createState(bp057Mix.createDma(22050, 16, 2, 2048)); state.volume = 1.0
   bp057Equal(bp057Mix.S_PaintChannels(state, 513), 513, "two paint blocks")
   return true
 end function
+// Exercise the dma defaults test scenario and verify its expected result.
 function bp057DmaDefaults()
   dma = bp057Mix.createDma(0, 7, 3, 0)
   bp057Equal(dma.speed, 22050, "default rate")
@@ -190,6 +220,7 @@ function bp057DmaDefaults()
   bp057Equal(dma.channels, 2, "default channels")
   return true
 end function
+// Exercise the channel reset test scenario and verify its expected result.
 function bp057ChannelReset()
   channel = bp057Mix.createChannel(); channel.leftVolume = 10; channel.sfx = bp057Descriptor([1], -1)
   bp057Mix.resetChannel(channel)
@@ -197,6 +228,7 @@ function bp057ChannelReset()
   bp057Yes(channel.sfx is void, "reset source")
   return true
 end function
+// Exercise the scale clamp and volume test scenario and verify its expected result.
 function bp057ScaleClampAndVolume()
   state = bp057Mix.createState(bp057Mix.createDma(22050, 16, 2, 8))
   channel = state.channels[0]; channel.leftVolume = 999; channel.rightVolume = 999

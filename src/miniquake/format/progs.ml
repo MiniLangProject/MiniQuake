@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang implementation of miniquake.format.progs.
+*/
 package miniquake.format.progs
 
 import miniquake.types as t
@@ -8,6 +15,7 @@ import miniquake.protocol_text as protocolText
 import miniquake.crc as crc16
 import std.fs as fs
 
+// Provide string at behavior for the active subsystem.
 function stringAt(strings, offset)
   if offset < 0 or offset >= len(strings) then return "" end if
   endOffset = offset
@@ -17,17 +25,20 @@ function stringAt(strings, offset)
   return protocolText.decodeBytes(slice(strings, offset, endOffset - offset))
 end function
 
+// Return type size derived from the active module state.
 function typeSize(valueType)
   baseType = valueType & 0x7fff
   if baseType == c.EV_VECTOR then return 3 end if
   return 1
 end function
 
+// Report whether valid type.
 function validType(valueType)
   baseType = valueType & 0x7fff
   return baseType >= c.EV_VOID and baseType <= c.EV_POINTER
 end function
 
+// Validate definition and report any incompatibility.
 function validateDefinition(definition, limit, sectionName)
   if not validType(definition.type) then
     return error(1910, "progs.dat " + sectionName + " has invalid type " + (definition.type & 0x7fff))
@@ -38,6 +49,7 @@ function validateDefinition(definition, limit, sectionName)
   return true
 end function
 
+// Validate loadable program and report any incompatibility.
 function validateLoadableProgram(program)
   // PR_LoadProgs performs only the loader-level checks that protect the
   // on-disk layout consumed by the engine.  Keep deeper diagnostics in the
@@ -57,6 +69,7 @@ function validateLoadableProgram(program)
   return true
 end function
 
+// Validate program and report any incompatibility.
 function validateProgram(program)
   loadable = try(validateLoadableProgram(program))
   if loadable is error then return loadable end if
@@ -91,14 +104,21 @@ function validateProgram(program)
     if fn.firstStatement >= len(program.statements) then
       return error(1918, program.filename + ": first statement outside program in function " + fn.name)
     end if
+    executableBytecode = fn.firstStatement > 0 or (fn.firstStatement == 0 and (fn.parmStart != 0 or fn.locals != 0))
     parameterWords = 0
     parameter = 0
     while parameter < fn.numParms
       size = fn.parmSize[parameter]
-      if size != 1 and size != 3 then
+      // dfunction_t carries one uniform parm_size array for bytecode and
+      // builtin/import declarations. Stock qcc leaves sizes zero for both
+      // negative builtin entries and zero-statement extension stubs (for
+      // example makevectors/ex_bprint in rerelease progs.dat). Neither enters
+      // PR_EnterFunction. Validate 1/3-word destinations only when the record
+      // has a bytecode entry point or owns local/parameter storage.
+      if executableBytecode and size != 1 and size != 3 then
         return error(1919, program.filename + ": invalid parameter size in function " + fn.name)
       end if
-      parameterWords = parameterWords + size
+      if executableBytecode then parameterWords = parameterWords + size end if
       parameter = parameter + 1
     end while
 
@@ -107,7 +127,7 @@ function validateProgram(program)
     // bytecode function may legitimately declare parameters while locals is
     // zero (for example stock SUB_AttackFinished).  Audit the actual parameter
     // destination rather than imposing the false parameterWords <= locals rule.
-    if fn.firstStatement >= 0 and fn.parmStart + parameterWords > len(program.globals) then
+    if executableBytecode and fn.parmStart + parameterWords > len(program.globals) then
       return error(1920, program.filename + ": parameter storage outside globals in function " + fn.name)
     end if
     index = index + 1
@@ -115,18 +135,22 @@ function validateProgram(program)
   return true
 end function
 
+// Return runtime crc derived from the active module state.
 function runtimeCrc(program)
   if program is void then return 0 end if
   if typeof(program.data) != "bytes" or len(program.data) == 0 then return program.crc end if
   return crc16.CRC_Block(program.data, 0, len(program.data))
 end function
 
+// Validate section and report any incompatibility.
 function checkSection(data, offset, count, stride, name)
   if offset < 0 or count < 0 or offset + count * stride > len(data) then return error(1900, "progs.dat section outside file: " + name) end if
   return true
 end function
 
+// Read and validate the requested value.
 function parse(data, filename)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if len(data) < 60 then return error(1901, filename + ": progs.dat header is truncated") end if
   version = bio.i32(data, 0)
   crc = bio.i32(data, 4)
@@ -223,6 +247,7 @@ function parse(data, filename)
   return program
 end function
 
+// Read and validate the requested value.
 function load(filename)
   data = fs.readAllBytes(filename)
   return parse(data, filename)

@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.net_wins.
+*/
 package miniquake.net_wins
 
 // WinQuake/net_wins.c pendant.  Address parsing, byte order, landriver state
@@ -27,6 +34,7 @@ net_hostport = 26000
 blocktime = 0.0
 lastError = 0
 
+// Mirror Quake's WINS_ResetState routine and its observable state changes.
 function WINS_ResetState()
   global net_acceptsocket, net_controlsocket, net_broadcastsocket, broadcastaddr
   global myAddr, my_tcpip_address, configuredHostname, winsock_lib_initialized
@@ -48,6 +56,7 @@ function WINS_ResetState()
   return true
 end function
 
+// Mirror Quake's WINS_SetLocalAddress routine and its observable state changes.
 function WINS_SetLocalAddress(addressText)
   global myAddr, my_tcpip_address
   numeric = parseIpv4(addressText)
@@ -57,12 +66,14 @@ function WINS_SetLocalAddress(addressText)
   return my_tcpip_address
 end function
 
+// Mirror Quake's WINS_SetBlockTime routine and its observable state changes.
 function WINS_SetBlockTime(value)
   global blocktime
   blocktime = value
   return blocktime
 end function
 
+// Mirror Quake's WINS_StateSnapshot routine and its observable state changes.
 function WINS_StateSnapshot()
   return [
     winsock_lib_initialized,
@@ -76,27 +87,32 @@ function WINS_StateSnapshot()
   ]
 end function
 
+// Mirror Quake's WINS_SetAcceptSocket routine and its observable state changes.
 function WINS_SetAcceptSocket(socketValue)
   global net_acceptsocket
   net_acceptsocket = socketValue
   return net_acceptsocket
 end function
 
+// Mirror Quake's WINS_SetBroadcastSocket routine and its observable state changes.
 function WINS_SetBroadcastSocket(socketValue)
   global net_broadcastsocket
   net_broadcastsocket = socketValue
   return net_broadcastsocket
 end function
 
+// Provide htons behavior for the active subsystem.
 function htons(value)
   number = value & 0xffff
   return ((number & 255) << 8) | ((number >> 8) & 255)
 end function
 
+// Provide ntohs behavior for the active subsystem.
 function ntohs(value)
   return htons(value)
 end function
 
+// Provide htonl behavior for the active subsystem.
 function htonl(value)
   return ((value & 255) << 24) |
     ((value & 0xff00) << 8) |
@@ -104,16 +120,19 @@ function htonl(value)
     ((value >> 24) & 255)
 end function
 
+// Provide ntohl behavior for the active subsystem.
 function ntohl(value)
   return htonl(value)
 end function
 
+// Provide short text behavior for the active subsystem.
 function shortText(text, maximum)
   data = bytes(text)
   if len(data) <= maximum then return text end if
   return decode(slice(data, 0, maximum))
 end function
 
+// Convert text into its canonical representation.
 function splitText(text, separator)
   source = bytes(text)
   values = []
@@ -129,6 +148,7 @@ function splitText(text, separator)
   return values
 end function
 
+// Read and validate decimal.
 function parseDecimal(text, maximumDigits, maximumValue)
   source = bytes(text)
   if len(source) == 0 or len(source) > maximumDigits then return void end if
@@ -141,6 +161,7 @@ function parseDecimal(text, maximumDigits, maximumValue)
   return value
 end function
 
+// Read and validate ipv4.
 function parseIpv4(text)
   parts = splitText(text, 46)
   if len(parts) != 4 then return void end if
@@ -153,6 +174,7 @@ function parseIpv4(text)
   return ((values[0] & 255) << 24) | ((values[1] & 255) << 16) | ((values[2] & 255) << 8) | (values[3] & 255)
 end function
 
+// Provide ipv4 text behavior for the active subsystem.
 function ipv4Text(hostOrderAddress)
   return ((hostOrderAddress >> 24) & 255) + "." +
     ((hostOrderAddress >> 16) & 255) + "." +
@@ -160,12 +182,14 @@ function ipv4Text(hostOrderAddress)
     (hostOrderAddress & 255)
 end function
 
+// Create and initialize address.
 function newAddress(addressText, port)
   numeric = parseIpv4(addressText)
   if numeric is void then return error(3450, "invalid IPv4 address " + addressText) end if
   return t.WinSockAddress(AF_INET, htonl(numeric), htons(port))
 end function
 
+// Update module state for address.
 function setAddress(target, source)
   target.family = source.family
   target.address = source.address
@@ -173,11 +197,13 @@ function setAddress(target, source)
   return target
 end function
 
+// Provide blocking hook behavior for the active subsystem.
 function BlockingHook()
   if win.ticks() / 1000.0 - blocktime > 2.0 then return false end if
   return win.poll()
 end function
 
+// Mirror Quake's WINS_GetLocalAddress routine and its observable state changes.
 function WINS_GetLocalAddress()
   global myAddr, my_tcpip_address
   if myAddr != 0 then return my_tcpip_address end if
@@ -189,6 +215,7 @@ function WINS_GetLocalAddress()
   return my_tcpip_address
 end function
 
+// Return numeric host name derived from the active module state.
 function numericHostName(text)
   source = bytes(text)
   if len(source) == 0 then return false end if
@@ -198,6 +225,7 @@ function numericHostName(text)
   return true
 end function
 
+// Return short host name derived from the active module state.
 function shortHostName(text)
   if numericHostName(text) then return text end if
   source = bytes(text)
@@ -211,6 +239,7 @@ function shortHostName(text)
   return decode(slice(source, 0, count))
 end function
 
+// Mirror Quake's WINS_Init routine and its observable state changes.
 function WINS_Init(hostName, noUdp, configuredIp, hostPort)
   global winsock_lib_initialized, winsock_initialized, configuredHostname
   global myAddr, my_tcpip_address, net_hostport, net_controlsocket, broadcastaddr, tcpipAvailable
@@ -246,6 +275,7 @@ function WINS_Init(hostName, noUdp, configuredIp, hostPort)
   return net_controlsocket
 end function
 
+// Mirror Quake's WINS_Shutdown routine and its observable state changes.
 function WINS_Shutdown()
   global winsock_initialized, winsock_lib_initialized, net_controlsocket, tcpipAvailable
   WINS_Listen(false)
@@ -258,6 +288,7 @@ function WINS_Shutdown()
   return true
 end function
 
+// Mirror Quake's WINS_Listen routine and its observable state changes.
 function WINS_Listen(state)
   global net_acceptsocket
   if state then
@@ -272,6 +303,7 @@ function WINS_Listen(state)
   return true
 end function
 
+// Mirror Quake's WINS_OpenSocket routine and its observable state changes.
 function WINS_OpenSocket(port)
   global lastError
   bindAddress = "0.0.0.0"
@@ -282,6 +314,7 @@ function WINS_OpenSocket(port)
   return opened
 end function
 
+// Mirror Quake's WINS_CloseSocket routine and its observable state changes.
 function WINS_CloseSocket(socketValue)
   global net_broadcastsocket
   if socketValue is void or socketValue == -1 then return -1 end if
@@ -290,6 +323,7 @@ function WINS_CloseSocket(socketValue)
   return -1
 end function
 
+// Provide partial ipaddress behavior for the active subsystem.
 function PartialIPAddress(input, hostaddr)
   text = input
   source = bytes(text)
@@ -348,10 +382,12 @@ function PartialIPAddress(input, hostaddr)
   return 0
 end function
 
+// Mirror Quake's WINS_Connect routine and its observable state changes.
 function WINS_Connect(socketValue, addr)
   return 0
 end function
 
+// Mirror Quake's WINS_CheckNewConnections routine and its observable state changes.
 function WINS_CheckNewConnections()
   if net_acceptsocket is void then return -1 end if
   available = try(udp.peek(net_acceptsocket))
@@ -359,6 +395,7 @@ function WINS_CheckNewConnections()
   return net_acceptsocket
 end function
 
+// Mirror Quake's WINS_Read routine and its observable state changes.
 function WINS_Read(socketValue, buffer, length, addr)
   global lastError
   received = try(udp.receive(socketValue, length))
@@ -376,6 +413,7 @@ function WINS_Read(socketValue, buffer, length, addr)
   return count
 end function
 
+// Mirror Quake's WINS_MakeSocketBroadcastCapable routine and its observable state changes.
 function WINS_MakeSocketBroadcastCapable(socketValue)
   global net_broadcastsocket, lastError
   result = try(udp.makeBroadcastCapable(socketValue))
@@ -385,6 +423,7 @@ function WINS_MakeSocketBroadcastCapable(socketValue)
   return 0
 end function
 
+// Mirror Quake's WINS_Broadcast routine and its observable state changes.
 function WINS_Broadcast(socketValue, buffer, length)
   if net_broadcastsocket is void or socketValue != net_broadcastsocket then
     if net_broadcastsocket is not void then return error(3452, "Attempted to use multiple broadcasts sockets") end if
@@ -395,6 +434,7 @@ function WINS_Broadcast(socketValue, buffer, length)
   return WINS_Write(socketValue, buffer, length, broadcastaddr)
 end function
 
+// Mirror Quake's WINS_Write routine and its observable state changes.
 function WINS_Write(socketValue, buffer, length, addr)
   global lastError
   if length < 0 or length > len(buffer) then return -1 end if
@@ -405,10 +445,12 @@ function WINS_Write(socketValue, buffer, length, addr)
   return result
 end function
 
+// Mirror Quake's WINS_AddrToString routine and its observable state changes.
 function WINS_AddrToString(addr)
   return ipv4Text(ntohl(addr.address)) + ":" + ntohs(addr.port)
 end function
 
+// Mirror Quake's WINS_StringToAddr routine and its observable state changes.
 function WINS_StringToAddr(text, addr)
   source = bytes(text)
   colon = -1
@@ -429,6 +471,7 @@ function WINS_StringToAddr(text, addr)
   return 0
 end function
 
+// Mirror Quake's WINS_GetSocketAddr routine and its observable state changes.
 function WINS_GetSocketAddr(socketValue, addr)
   addressText = socketValue.bindAddress
   if addressText == "0.0.0.0" or addressText == "127.0.0.1" then
@@ -441,6 +484,7 @@ function WINS_GetSocketAddr(socketValue, addr)
   return 0
 end function
 
+// Mirror Quake's WINS_GetNameFromAddr routine and its observable state changes.
 function WINS_GetNameFromAddr(addr)
   addressText = ipv4Text(ntohl(addr.address))
   resolved = try(udp.reverseName(addressText))
@@ -448,6 +492,7 @@ function WINS_GetNameFromAddr(addr)
   return shortText(resolved, NET_NAMELEN - 1)
 end function
 
+// Mirror Quake's WINS_GetAddrFromName routine and its observable state changes.
 function WINS_GetAddrFromName(name, addr)
   source = bytes(name)
   if len(source) == 0 then return -1 end if
@@ -460,6 +505,7 @@ function WINS_GetAddrFromName(name, addr)
   return 0
 end function
 
+// Mirror Quake's WINS_AddrCompare routine and its observable state changes.
 function WINS_AddrCompare(addr1, addr2)
   if addr1.family != addr2.family then return -1 end if
   if addr1.address != addr2.address then return -1 end if
@@ -467,10 +513,12 @@ function WINS_AddrCompare(addr1, addr2)
   return 0
 end function
 
+// Mirror Quake's WINS_GetSocketPort routine and its observable state changes.
 function WINS_GetSocketPort(addr)
   return ntohs(addr.port)
 end function
 
+// Mirror Quake's WINS_SetSocketPort routine and its observable state changes.
 function WINS_SetSocketPort(addr, port)
   addr.port = htons(port)
   return 0

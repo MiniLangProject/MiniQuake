@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.types.
+*/
 package miniquake.types
 
 struct Vec3
@@ -52,6 +59,7 @@ end struct
 struct CvarRegistry
   variables
   serverChanges
+  lookup
 end struct
 
 struct CommandAlias
@@ -434,6 +442,14 @@ struct QuakeCMachine
   temporaryString
   randomSeed
   trace
+  fastStatements
+  fastFunctions
+  fastLocalBases
+  fastLocalCounts
+  fastSavedLocals
+  fastDepth
+  fastLocalDepth
+  fastExecutionDepth
 end struct
 
 struct WaveInfo
@@ -647,6 +663,7 @@ struct QuakeEdict
   onGround
   groundEntity
   baseline
+  leafNums
 end struct
 
 struct ServerClient
@@ -667,6 +684,8 @@ struct ServerClient
   oldFrags
   lastMessage
   dropAsap
+  playerState
+  datagramBuffer
 end struct
 
 struct GameServer
@@ -723,6 +742,7 @@ struct LocalClient
   messages
   printLog
   entities
+  staticEntities
   player
   lastMessageTime
   command
@@ -1045,6 +1065,7 @@ end struct
 
 struct MusicTrack
   number
+  source
   samples
   rate
   channels
@@ -1053,6 +1074,8 @@ struct MusicTrack
   looping
   playing
   paused
+  sampleBase
+  sampleFrames
 end struct
 
 struct SoundMixer
@@ -1218,6 +1241,7 @@ struct ClientRenderModel
   kind
   aliasModel
   spriteModel
+  brushRenderer
   textureIds
   uploaded
 end struct
@@ -1359,10 +1383,12 @@ function concreteTypeNameMatches(value, shortName, qualifiedName)
   return kind == shortName or kind == qualifiedName
 end function
 
+// Report whether is vec3 value.
 function isVec3Value(value)
   return concreteTypeNameMatches(value, "Vec3", "miniquake.types.Vec3")
 end function
 
+// Report whether is entity baseline value.
 function isEntityBaselineValue(value)
   return concreteTypeNameMatches(
     value,
@@ -1371,6 +1397,7 @@ function isEntityBaselineValue(value)
   )
 end function
 
+// Report whether is quake edict value.
 function isQuakeEdictValue(value)
   return concreteTypeNameMatches(
     value,

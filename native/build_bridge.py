@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
 """Build the self-contained MiniQuake Win64 platform/OpenGL bridge.
 
 The source deliberately avoids Windows SDK headers.  This script also creates
@@ -27,6 +30,8 @@ IMPORTS: dict[str, list[str]] = {
         "QueryPerformanceCounter", "QueryPerformanceFrequency", "VirtualProtect",
         "GetNumberOfConsoleInputEvents", "ReadConsoleInputA",
         "GetFileType", "PeekNamedPipe", "ReadFile", "WriteFile",
+        "CreateFileW", "GetFileSizeEx", "VirtualAlloc", "VirtualFree",
+        "LoadLibraryA", "GetProcAddress", "FreeLibrary",
         "AllocConsole", "FreeConsole",
     ],
     "user32.dll": [
@@ -73,16 +78,19 @@ IMPORTS: dict[str, list[str]] = {
     ],
     "d3d9.dll": [
         "Direct3DCreate9",
+        "Direct3DCreate9Ex",
     ],
 }
 
 
 def run(command: list[str], cwd: Path) -> None:
+    """Run one build command and fail immediately if the tool reports an error."""
     print("+", " ".join(command))
     subprocess.run(command, cwd=cwd, check=True)
 
 
 def find_tool(explicit: str | None, name: str) -> str:
+    """Resolve an explicitly configured tool or locate it on PATH."""
     if explicit:
         path = shutil.which(explicit) or explicit
     else:
@@ -93,6 +101,7 @@ def find_tool(explicit: str | None, name: str) -> str:
 
 
 def write_import_library(librarian: str, build: Path, dll: str, symbols: list[str], msvc: bool) -> Path:
+    """Generate a minimal x64 COFF import library for the requested DLL exports."""
     stem = dll.rsplit(".", 1)[0]
     definition = build / f"{stem}.def"
     library = build / f"{stem}.lib"
@@ -108,6 +117,7 @@ def write_import_library(librarian: str, build: Path, dll: str, symbols: list[st
 
 
 def find_msvc_tools() -> tuple[str, str, str] | None:
+    """Locate a complete x64 MSVC compiler, linker and librarian toolchain."""
     roots = []
     for variable in ("ProgramFiles", "ProgramFiles(x86)"):
         value = os.environ.get(variable)
@@ -129,6 +139,7 @@ def find_msvc_tools() -> tuple[str, str, str] | None:
 
 
 def main() -> int:
+    """Parse build options and compile the complete native MiniQuake bridge."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--clean", action="store_true")
     parser.add_argument("--clang-cl")
@@ -173,6 +184,8 @@ def main() -> int:
     ogg_obj = build / "miniquake_ogg.obj"
     d3d_source = root / "miniquake_d3d9.c"
     d3d_obj = build / "miniquake_d3d9.obj"
+    vulkan_source = root / "miniquake_vulkan.c"
+    vulkan_obj = build / "miniquake_vulkan.obj"
     output = root / "miniquake_native.dll"
     import_library = build / "miniquake_native.lib"
 
@@ -192,12 +205,19 @@ def main() -> int:
         "/Od" if args.debug else "/O2", f"/Fo{d3d_obj}", str(d3d_source),
     ]
     run(d3d_flags, root)
+    vulkan_flags = [
+        compiler, "/nologo", "/c", "/W4", "/GS-", "/Zl", "/fp:precise",
+        "/Od" if args.debug else "/O2",
+        f"/I{root.parent / 'third_party' / 'Vulkan-Headers' / 'include'}",
+        f"/Fo{vulkan_obj}", str(vulkan_source),
+    ]
+    run(vulkan_flags, root)
 
     link_flags = [
         linker, "/dll", "/noentry", "/machine:x64", "/subsystem:windows,6.0",
-        "/nodefaultlib", "/dynamicbase", "/nxcompat", "/opt:ref", "/opt:icf",
+        "/nodefaultlib", "/dynamicbase", "/nxcompat", "/Brepro", "/opt:ref", "/opt:icf",
         f"/def:{root / 'miniquake_native.def'}", f"/out:{output}",
-        f"/implib:{import_library}", str(obj), str(ogg_obj), str(d3d_obj), *(str(path) for path in libraries),
+        f"/implib:{import_library}", str(obj), str(ogg_obj), str(d3d_obj), str(vulkan_obj), *(str(path) for path in libraries),
     ]
     run(link_flags, root)
     print(f"built {output} ({output.stat().st_size} bytes)")

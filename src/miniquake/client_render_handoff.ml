@@ -1,12 +1,12 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Builds the temporary alias-model entities that CL_UpdateTEnts appends to
 cl_visedicts.  Retained beam slots remain protocol state; this is the frame
 view consumed by the modern renderer.
 */
-
 package miniquake.client_render_handoff
 
 import miniquake.types as t
@@ -24,10 +24,12 @@ const BEAM_STEP = 30.0
 
 currentTemporary = []
 
+// Render float.
 function renderFloat(value)
   return native.bitsFloat(native.floatBits(value))
 end function
 
+// Return beam angles derived from the active module state.
 function beamAngles(startPosition, endPosition)
   distance = math.subtract(endPosition, startPosition)
   yaw = 0.0
@@ -44,6 +46,7 @@ function beamAngles(startPosition, endPosition)
   return t.Vec3(renderFloat(pitch), renderFloat(yaw), 0.0)
 end function
 
+// Return beam segment origins derived from the active module state.
 function beamSegmentOrigins(startPosition, endPosition, limit)
   builder = arrays.createArrayBuilder(limit)
   distance = math.subtract(endPosition, startPosition)
@@ -63,11 +66,13 @@ function beamSegmentOrigins(startPosition, endPosition, limit)
   return arrays.finishArrayBuilder(builder)
 end function
 
+// Provide compact beam start behavior for the active subsystem.
 function compactBeamStart(value, viewEntity, viewOrigin)
   if value.entity == viewEntity then return math.copy(viewOrigin) end if
   return math.copy(value.origin)
 end function
 
+// Return beam model name derived from the active module state.
 function beamModelName(type)
   if type == c.TE_LIGHTNING1 then return "progs/bolt.mdl" end if
   if type == c.TE_LIGHTNING2 then return "progs/bolt2.mdl" end if
@@ -76,6 +81,7 @@ function beamModelName(type)
   return ""
 end function
 
+// Return model index for name derived from the active module state.
 function modelIndexForName(client, name)
   if len(client.modelPrecache) == 0 then client.modelPrecache = [""] end if
   index = 1
@@ -87,6 +93,18 @@ function modelIndexForName(client, name)
   return len(client.modelPrecache) - 1
 end function
 
+// CL_InitTEnts owns the lightning models rather than receiving them in the
+// server model list. Register them during signon so the first beam does not
+// parse and upload a model while gameplay is already visible.
+function precacheBeamModels(client)
+  names = ["progs/bolt.mdl", "progs/bolt2.mdl", "progs/bolt3.mdl", "progs/beam.mdl"]
+  for each name in names
+    modelIndexForName(client, name)
+  end for
+  return names
+end function
+
+// Create and initialize beam entity.
 function makeBeamEntity(number, modelIndex, origin, angles, currentTime)
   entityOrigin = math.copy(origin)
   entityAngles = math.copy(angles)
@@ -150,17 +168,20 @@ function buildTemporaryEntities(compactBeams, client, currentTime, visibleCount)
   return currentTemporary
 end function
 
+// Return temporary entities.
 function currentTemporaryEntities()
   global currentTemporary
   return currentTemporary
 end function
 
+// Update module state for temporary entities.
 function clearTemporaryEntities()
   global currentTemporary
   currentTemporary = []
   return true
 end function
 
+// Submit state for submit mirror entities.
 function submitMirrorEntities(visibleEntities, temporaryEntities, viewEntity)
   result = submitEntities(visibleEntities, temporaryEntities)
   if viewEntity is void or viewEntity.modelIndex == 0 then return result end if
@@ -171,7 +192,12 @@ function submitMirrorEntities(visibleEntities, temporaryEntities, viewEntity)
   return result + [viewEntity]
 end function
 
+// Submit state for submit entities.
 function submitEntities(visibleEntities, temporaryEntities)
+  // The overwhelmingly common frame has no active beam segments. The visible
+  // list is already capped by CL_RelinkEntities, so it can be consumed directly
+  // instead of being copied into a third frame-local array.
+  if len(temporaryEntities) == 0 and len(visibleEntities) <= c.MAX_VISEDICTS then return visibleEntities end if
   capacity = len(visibleEntities) + len(temporaryEntities)
   if capacity > c.MAX_VISEDICTS then capacity = c.MAX_VISEDICTS end if
   builder = arrays.createArrayBuilder(capacity)

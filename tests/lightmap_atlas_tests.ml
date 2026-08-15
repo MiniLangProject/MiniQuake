@@ -1,25 +1,33 @@
-/* BP-041: lightmap formats, atlas row strides, and shared texture ownership. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
+BP-041: lightmap formats, atlas row strides, and shared texture ownership.
+*/
 import miniquake.render.world as worldRender
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.array_util as arrayutil
 
+// Assert that the condition holds and identify a failing test.
 function yes(value, name)
   if not value then return error(4100, name + ": expected true") end if
   return true
 end function
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(4101, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert exact equality and report both values on failure.
 function byteEqual(data, offset, expected, name)
   equal(data[offset], expected, name)
   return true
 end function
 
+// Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
   print "[" + number + "/23] " + name
   result = try(fn())
@@ -27,6 +35,7 @@ function run(number, name, fn)
   return true
 end function
 
+// Exercise setup as part of this deterministic regression fixture.
 function setup(lighting, lightOffset, fullbright)
   zero = t.Vec3(0.0, 0.0, 0.0)
   plane = t.BspPlane(t.Vec3(0.0, 0.0, 1.0), 0.0, 2)
@@ -48,31 +57,37 @@ function setup(lighting, lightOffset, fullbright)
   return [renderer, surface]
 end function
 
+// Exercise standard fixture as part of this deterministic regression fixture.
 function standardFixture()
   return setup(bytes([0, 10, 20, 30]), 0, false)
 end function
 
+// Verify required luminance against the expected Quake behavior.
 function testRequiredLuminance()
   equal(worldRender.R_LightmapRequiredBytes(2, 2, 2, 1), 4, "luminance required")
   return true
 end function
 
+// Verify required stride clamp against the expected Quake behavior.
 function testRequiredStrideClamp()
   equal(worldRender.R_LightmapRequiredBytes(2, 2, 1, 1), 4, "stride clamp")
   return true
 end function
 
+// Verify required rgba against the expected Quake behavior.
 function testRequiredRgba()
   equal(worldRender.R_LightmapRequiredBytes(2, 2, 10, 4), 18, "rgba required")
   return true
 end function
 
+// Verify bad format against the expected Quake behavior.
 function testBadFormat()
   result = try(worldRender.R_LightmapRequiredBytes(2, 2, 2, 2))
   yes(result is error, "bad lightmap format")
   return true
 end function
 
+// Verify luminance exact against the expected Quake behavior.
 function testLuminanceExact()
   setupValue = standardFixture()
   worldRender.R_SetLightmapCompatibility(500, 1)
@@ -84,6 +99,7 @@ function testLuminanceExact()
   return true
 end function
 
+// Verify luminance padded against the expected Quake behavior.
 function testLuminancePadded()
   setupValue = standardFixture()
   worldRender.R_SetLightmapCompatibility(500, 1)
@@ -96,6 +112,7 @@ function testLuminancePadded()
   return true
 end function
 
+// Verify rgba alpha exact against the expected Quake behavior.
 function testRgbaAlphaExact()
   setupValue = standardFixture()
   worldRender.R_SetLightmapCompatibility(500, 4)
@@ -107,6 +124,7 @@ function testRgbaAlphaExact()
   return true
 end function
 
+// Verify rgba padded against the expected Quake behavior.
 function testRgbaPadded()
   setupValue = standardFixture()
   worldRender.R_SetLightmapCompatibility(500, 4)
@@ -118,6 +136,7 @@ function testRgbaPadded()
   return true
 end function
 
+// Verify rgba rgb untouched against the expected Quake behavior.
 function testRgbaRgbUntouched()
   setupValue = standardFixture()
   worldRender.R_SetLightmapCompatibility(500, 4)
@@ -128,6 +147,7 @@ function testRgbaRgbUntouched()
   return true
 end function
 
+// Verify destination too small against the expected Quake behavior.
 function testDestinationTooSmall()
   setupValue = standardFixture()
   worldRender.R_SetLightmapCompatibility(500, 4)
@@ -136,6 +156,7 @@ function testDestinationTooSmall()
   return true
 end function
 
+// Verify destination type against the expected Quake behavior.
 function testDestinationType()
   setupValue = standardFixture()
   worldRender.R_SetLightmapCompatibility(500, 1)
@@ -144,6 +165,7 @@ function testDestinationType()
   return true
 end function
 
+// Verify fullbright against the expected Quake behavior.
 function testFullbright()
   setupValue = setup(bytes([0, 10, 20, 30]), 0, true)
   worldRender.R_SetLightmapCompatibility(500, 1)
@@ -152,6 +174,7 @@ function testFullbright()
   return true
 end function
 
+// Verify missing light data against the expected Quake behavior.
 function testMissingLightData()
   setupValue = setup(bytes(), 0, false)
   worldRender.R_SetLightmapCompatibility(500, 1)
@@ -160,6 +183,7 @@ function testMissingLightData()
   return true
 end function
 
+// Verify negative light offset against the expected Quake behavior.
 function testNegativeLightOffset()
   setupValue = setup(bytes([1, 2, 3, 4]), -1, false)
   worldRender.R_SetLightmapCompatibility(500, 1)
@@ -168,6 +192,7 @@ function testNegativeLightOffset()
   return true
 end function
 
+// Verify cached style against the expected Quake behavior.
 function testCachedStyle()
   setupValue = standardFixture()
   worldRender.R_SetLightmapCompatibility(500, 1)
@@ -176,6 +201,7 @@ function testCachedStyle()
   return true
 end function
 
+// Verify build preserves chain against the expected Quake behavior.
 function testBuildPreservesChain()
   setupValue = standardFixture()
   worldRender.R_SetLightmapCompatibility(500, 1)
@@ -185,6 +211,7 @@ function testBuildPreservesChain()
   return true
 end function
 
+// Exercise collector renderer as part of this deterministic regression fixture.
 function collectorRenderer(pageIds, surfaceIds)
   renderer = setup(bytes(), -1, true)[0]
   renderer.lightmaps = pageIds
@@ -197,6 +224,7 @@ function collectorRenderer(pageIds, surfaceIds)
   return renderer
 end function
 
+// Verify collector pages against the expected Quake behavior.
 function testCollectorPages()
   ids = worldRender.R_CollectLightmapTextureIds(collectorRenderer([500, 501], []))
   equal(len(ids), 2, "page ids")
@@ -204,6 +232,7 @@ function testCollectorPages()
   return true
 end function
 
+// Verify collector surfaces against the expected Quake behavior.
 function testCollectorSurfaces()
   ids = worldRender.R_CollectLightmapTextureIds(collectorRenderer([], [600, 601]))
   equal(len(ids), 2, "surface ids")
@@ -211,12 +240,14 @@ function testCollectorSurfaces()
   return true
 end function
 
+// Verify collector deduplicates against the expected Quake behavior.
 function testCollectorDeduplicates()
   ids = worldRender.R_CollectLightmapTextureIds(collectorRenderer([500], [500, 500]))
   equal(len(ids), 1, "deduplicated ids")
   return true
 end function
 
+// Verify collector ignores zero against the expected Quake behavior.
 function testCollectorIgnoresZero()
   ids = worldRender.R_CollectLightmapTextureIds(collectorRenderer([0, 500], [0]))
   equal(len(ids), 1, "ignore zero")
@@ -224,6 +255,7 @@ function testCollectorIgnoresZero()
   return true
 end function
 
+// Verify collector order against the expected Quake behavior.
 function testCollectorOrder()
   ids = worldRender.R_CollectLightmapTextureIds(collectorRenderer([502, 500], [501]))
   equal(ids[0], 502, "order page0")
@@ -232,11 +264,13 @@ function testCollectorOrder()
   return true
 end function
 
+// Verify collector void against the expected Quake behavior.
 function testCollectorVoid()
   equal(len(worldRender.R_CollectLightmapTextureIds(void)), 0, "void collector")
   return true
 end function
 
+// Verify required empty against the expected Quake behavior.
 function testRequiredEmpty()
   equal(worldRender.R_LightmapRequiredBytes(0, 2, 8, 4), 0, "empty width")
   equal(worldRender.R_LightmapRequiredBytes(2, 0, 8, 4), 0, "empty height")

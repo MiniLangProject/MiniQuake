@@ -1,27 +1,31 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Focused conproc.c QHOST protocol and console fixtures.
 */
-
 import miniquake.conproc as conproc
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9800, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9801, name + ": expected true") end if
   return true
 end function
 
+// Return initialized state derived from the active module state.
 function initializedState()
   assertTrue(conproc.InitConProc(1, 2, 3, false), "test conproc init")
   return conproc.ConProc_State()
 end function
 
+// Verify lifecycle against the expected Quake behavior.
 function testLifecycle()
   assertEqual(conproc.InitConProc(0, 2, 3, false), false, "missing mapping ignored")
   state = initializedState()
@@ -33,6 +37,7 @@ function testLifecycle()
   return true
 end function
 
+// Verify character codes against the expected Quake behavior.
 function testCharacterCodes()
   assertEqual(conproc.CharToCode(13), 28, "return scan code")
   assertEqual(conproc.CharToCode(97), 30, "lowercase A scan code")
@@ -43,6 +48,7 @@ function testCharacterCodes()
   return true
 end function
 
+// Verify screen buffer against the expected Quake behavior.
 function testScreenBuffer()
   state = initializedState()
   state.maximumWidth = 100
@@ -60,6 +66,7 @@ function testScreenBuffer()
   return true
 end function
 
+// Verify write text against the expected Quake behavior.
 function testWriteText()
   state = initializedState()
   assertTrue(conproc.WriteText("aB\n"), "write text")
@@ -73,6 +80,7 @@ function testWriteText()
   return true
 end function
 
+// Verify requests against the expected Quake behavior.
 function testRequests()
   state = initializedState()
   conproc.ConProc_SetTestBuffer([conproc.CCOM_WRITE_TEXT, "go\n"])
@@ -95,6 +103,7 @@ function testRequests()
   return true
 end function
 
+// Verify mapped buffer hooks against the expected Quake behavior.
 function testMappedBufferHooks()
   state = initializedState()
   buffer = [conproc.CCOM_GET_SCR_LINES]
@@ -105,6 +114,7 @@ function testMappedBufferHooks()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   testLifecycle()
   testCharacterCodes()

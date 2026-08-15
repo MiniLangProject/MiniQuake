@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang implementation of miniquake.format.sprite.
+*/
 package miniquake.format.sprite
 
 import miniquake.types as t
@@ -6,6 +13,7 @@ import miniquake.byteio as bio
 import miniquake.array_util as arrayutil
 import std.fs as fs
 
+// Read and validate single frame.
 function parseSingleFrame(data, offset)
   if offset + 16 > len(data) then return error(1850, "sprite frame header outside file") end if
   originX = bio.i32(data, offset)
@@ -17,10 +25,12 @@ function parseSingleFrame(data, offset)
   return [frame, offset + 16 + width * height]
 end function
 
+// Mirror Quake's Mod_LoadSpriteFrame routine and its observable state changes.
 function Mod_LoadSpriteFrame(data, offset)
   return parseSingleFrame(data, offset)
 end function
 
+// Mirror Quake's Mod_LoadSpriteGroup routine and its observable state changes.
 function Mod_LoadSpriteGroup(data, offset)
   if offset + 4 > len(data) then return error(1853, "sprite group outside file") end if
   count = bio.i32(data, offset)
@@ -47,6 +57,7 @@ function Mod_LoadSpriteGroup(data, offset)
   return [t.SpriteFrameSet(true, intervals, frames), offset]
 end function
 
+// Read and validate frame set.
 function parseFrameSet(data, offset)
   if offset + 4 > len(data) then return error(1852, "sprite frame type outside file") end if
   group = bio.i32(data, offset)
@@ -59,6 +70,7 @@ function parseFrameSet(data, offset)
   return Mod_LoadSpriteGroup(data, offset)
 end function
 
+// Read and validate the requested value.
 function parse(data, filename)
   if len(data) < 36 then return error(1856, filename + ": sprite header is truncated") end if
   if bio.fourCC(data, 0) != "IDSP" then return error(1857, filename + ": not an IDSP sprite") end if
@@ -86,20 +98,24 @@ function parse(data, filename)
   return t.SpriteModel(filename, data, version, type, boundingRadius, width, height, numFrames, beamLength, syncType, frames)
 end function
 
+// Mirror Quake's Mod_LoadSpriteModel routine and its observable state changes.
 function Mod_LoadSpriteModel(data, filename)
   return parse(data, filename)
 end function
 
+// Provide sprite frame bounds behavior for the active subsystem.
 function spriteFrameBounds(frame)
   return [frame.originY, frame.originY - frame.height, frame.originX, frame.originX + frame.width]
 end function
 
+// Provide sprite model bounds behavior for the active subsystem.
 function spriteModelBounds(model)
   halfWidth = model.width / 2.0
   halfHeight = model.height / 2.0
   return [t.Vec3(-halfWidth, -halfWidth, -halfHeight), t.Vec3(halfWidth, halfWidth, halfHeight)]
 end function
 
+// Read and validate the requested value.
 function load(filename)
   data = fs.readAllBytes(filename)
   return parse(data, filename)

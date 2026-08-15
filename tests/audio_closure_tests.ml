@@ -1,85 +1,108 @@
-/* BP-059: frozen WinQuake 1.09 audio compatibility contract. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+BP-059: frozen WinQuake 1.09 audio compatibility contract.
+*/
 import miniquake.audio_contract as bp059Contract
 import miniquake.render_special_contract as bp059Parent
 import miniquake.sound.cd_audio as bp059Cd
 import miniquake.sound.mixer as bp059Mixer
 import miniquake.types as bp059Types
 
+// Assert exact equality and report both values on failure.
 function bp059Equal(actual, expected, name)
   if actual != expected then return error(5900, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
+// Assert that the condition holds and identify a failing test.
 function bp059Yes(value, name)
   if not value then return error(5901, name + ": expected true") end if
   return true
 end function
+// Execute one named test case and record its pass/fail result.
 function bp059Run(number, name, fn)
   print "[" + number + "/24] " + name
   result = try(fn())
   if result is error then print "FAIL: " + result.message; return false end if
   return true
 end function
+// Exercise the state test scenario and verify its expected result.
 function bp059State()
   state = bp059Cd.create(void, 99)
   bp059Cd.CDAudio_Init(state)
   state.volume = 1.0
   return state
 end function
+// Return status derived from the active module state.
 function bp059Status()
   bp059Equal(bp059Contract.status(), "audio_109_frozen_v1", "status")
   return true
 end function
+// Return fingerprint for the active module state.
 function bp059Fingerprint()
   bp059Equal(bp059Contract.fingerprint(), 3707215874, "fingerprint")
   return true
 end function
+// Validate the requested value and report any incompatibility.
 function bp059Verify()
   bp059Yes(bp059Contract.verify(), "contract verification")
   return true
 end function
+// Exercise the parent contract test scenario and verify its expected result.
 function bp059ParentContract()
   bp059Equal(bp059Parent.status(), "render_special_109_frozen_v1", "parent status")
   return true
 end function
+// Return max sfx for the active module state.
 function bp059MaxSfx()
   bp059Equal(bp059Contract.MAX_SFX, 512, "max sfx")
   return true
 end function
+// Return max channels for the active module state.
 function bp059MaxChannels()
   bp059Equal(bp059Contract.MAX_CHANNELS, 128, "max channels")
   return true
 end function
+// Exercise the ambient channels test scenario and verify its expected result.
 function bp059AmbientChannels()
   bp059Equal(bp059Contract.AMBIENT_CHANNELS, 4, "ambient channels")
   return true
 end function
+// Exercise the dynamic channels test scenario and verify its expected result.
 function bp059DynamicChannels()
   bp059Equal(bp059Contract.DYNAMIC_CHANNELS, 8, "dynamic channels")
   return true
 end function
+// Exercise the paint buffer test scenario and verify its expected result.
 function bp059PaintBuffer()
   bp059Equal(bp059Contract.PAINTBUFFER_FRAMES, 512, "paintbuffer frames")
   return true
 end function
+// Exercise the wave ring test scenario and verify its expected result.
 function bp059WaveRing()
   bp059Equal(bp059Contract.WAV_BUFFERS, 64, "wave buffers")
   bp059Equal(bp059Contract.WAV_BUFFER_SIZE, 1024, "wave buffer size")
   bp059Equal(bp059Contract.SECONDARY_BUFFER_SIZE, 65536, "secondary buffer")
   return true
 end function
+// Trace distance through the collision world.
 function bp059ClipDistance()
   bp059Equal(bp059Contract.NOMINAL_CLIP_DISTANCE, 1000, "clip distance")
   return true
 end function
+// Exercise the defaults test scenario and verify its expected result.
 function bp059Defaults()
   bp059Equal(bp059Contract.DEFAULT_SAMPLE_BITS, 16, "sample bits")
   bp059Equal(bp059Contract.DEFAULT_CHANNELS, 2, "output channels")
   return true
 end function
+// Exercise the cd slots test scenario and verify its expected result.
 function bp059CdSlots()
   bp059Equal(bp059Contract.CD_REMAP_SLOTS, 100, "CD remap slots")
   return true
 end function
+// Exercise the semantic flags test scenario and verify its expected result.
 function bp059SemanticFlags()
   bp059Equal(bp059Contract.BINARY32_SPATIAL, 1, "Binary32 spatial")
   bp059Equal(bp059Contract.I32_MIXER, 1, "i32 mixer")
@@ -87,10 +110,12 @@ function bp059SemanticFlags()
   bp059Equal(bp059Contract.QUAKE_ATOI_CD, 1, "Quake atoi CD")
   return true
 end function
+// Exercise the retail evidence count test scenario and verify its expected result.
 function bp059RetailEvidenceCount()
   bp059Equal(bp059Contract.RETAIL_EVIDENCE_SOUNDS, 2, "retail evidence sounds")
   return true
 end function
+// Exercise the identity remap test scenario and verify its expected result.
 function bp059IdentityRemap()
   values = bp059Cd.identityRemap()
   bp059Equal(len(values), 100, "identity length")
@@ -98,6 +123,7 @@ function bp059IdentityRemap()
   bp059Equal(values[99], 99, "identity final")
   return true
 end function
+// Exercise the track clamp test scenario and verify its expected result.
 function bp059TrackClamp()
   low = bp059Cd.create(void, 0)
   high = bp059Cd.create(void, 120)
@@ -105,6 +131,7 @@ function bp059TrackClamp()
   bp059Equal(high.maxTrack, 99, "high max track")
   return true
 end function
+// Exercise the cd play atoi test scenario and verify its expected result.
 function bp059CdPlayAtoi()
   state = bp059State()
   bp059Cd.CD_f(state, ["cd", "play", "5x"])
@@ -116,6 +143,7 @@ function bp059CdPlayAtoi()
   bp059Yes(invalid == "CDAudio: Bad track number 0.", "bad track message")
   return true
 end function
+// Exercise the cd remap atoi test scenario and verify its expected result.
 function bp059CdRemapAtoi()
   state = bp059State()
   bp059Cd.CD_f(state, ["cd", "remap", "7x", "2.9", "-1rest"])
@@ -124,6 +152,7 @@ function bp059CdRemapAtoi()
   bp059Equal(state.remap[3], 255, "remap wrapped negative")
   return true
 end function
+// Exercise the cd reset test scenario and verify its expected result.
 function bp059CdReset()
   state = bp059State()
   state.remap[1] = 8
@@ -135,6 +164,7 @@ function bp059CdReset()
   bp059Equal(state.enabled, true, "reset enabled")
   return true
 end function
+// Exercise the cd lifecycle test scenario and verify its expected result.
 function bp059CdLifecycle()
   state = bp059State()
   bp059Yes(bp059Cd.CDAudio_Play(state, 3, true), "play")
@@ -146,6 +176,7 @@ function bp059CdLifecycle()
   bp059Equal(state.playing, false, "stopped")
   return true
 end function
+// Exercise the cd info test scenario and verify its expected result.
 function bp059CdInfo()
   state = bp059State()
   bp059Cd.CDAudio_Play(state, 4, false)
@@ -153,6 +184,7 @@ function bp059CdInfo()
   bp059Yes(text == "99 tracks\nCurrently playing track 4\nVolume is 1.000000\n", "info text")
   return true
 end function
+// Exercise the cd volume toggle test scenario and verify its expected result.
 function bp059CdVolumeToggle()
   state = bp059State()
   bp059Cd.CDAudio_Play(state, 6, false)
@@ -162,6 +194,7 @@ function bp059CdVolumeToggle()
   bp059Equal(state.playing, true, "volume resume")
   return true
 end function
+// Exercise the production replacement and vector test scenario and verify its expected result.
 function bp059ProductionReplacementAndVector()
   state = bp059Mixer.create(void, 22050)
   state.enabled = true

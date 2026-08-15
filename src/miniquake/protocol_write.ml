@@ -1,18 +1,28 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.protocol_write.
+*/
 package miniquake.protocol_write
 
 import miniquake.constants as c
 import miniquake.message as msg
 import miniquake.native as native
 
+// Encode and write string command.
 function writeStringCommand(buffer, text)
   msg.writeByte(buffer, c.CLC_STRINGCMD)
   msg.writeString(buffer, text)
 end function
 
+// Encode and write disconnect.
 function writeDisconnect(buffer)
   msg.writeByte(buffer, c.CLC_DISCONNECT)
 end function
 
+// Encode and write move.
 function writeMove(buffer, command, clientTime)
   msg.writeByte(buffer, c.CLC_MOVE)
   msg.writeFloat(buffer, clientTime)
@@ -30,6 +40,7 @@ function writeMove(buffer, command, clientTime)
   return buffer
 end function
 
+// Encode and write baseline.
 function writeBaseline(buffer, baseline)
   msg.writeByte(buffer, baseline[0])
   msg.writeByte(buffer, baseline[1])

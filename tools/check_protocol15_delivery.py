@@ -41,7 +41,7 @@ def oracle(root:Path):
       return (r.returncode==0,cc,[json.loads(x) for x in r.stdout.splitlines() if x.strip()])
 def contract(root:Path):
     e=[]; delivery=(root/'src/miniquake/protocol_delivery.ml').read_text(); server=(root/'src/miniquake/server.ml').read_text(); client=(root/'src/miniquake/client.ml').read_text(); tests=(root/'tests/protocol15_delivery_tests.ml').read_text()
-    for marker in ('SEND_DROP','SEND_RETAIN','SEND_COMMIT','function keepaliveDue'):
+    for marker in ('SEND_DROP','SEND_RETAIN','SEND_COMMIT','function inline keepaliveDue'):
       if marker not in delivery:e.append('missing delivery marker '+marker)
     if 'if outcome == delivery.SEND_RETAIN then return 0 end if' not in server:e.append('server does not retain zero-result send')
     if 'delivery.clearAfterSend(result)' not in client:e.append('client not bound to shared send outcome')

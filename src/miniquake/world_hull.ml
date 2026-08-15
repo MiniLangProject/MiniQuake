@@ -1,13 +1,22 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.world_hull.
+*/
 package miniquake.world_hull
 
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.mathlib as math
 
+// Create and initialize box hull.
 function createBoxHull(mins, maxs)
   return t.Hull(mins, maxs)
 end function
 
+// Provide inside behavior for the active subsystem.
 function inside(box, point)
   // world.c's six-node box hull sends points exactly on a maximum plane to
   // CONTENTS_EMPTY, while minimum planes remain part of the solid half-space.
@@ -16,11 +25,13 @@ function inside(box, point)
     point.z >= box.mins.z and point.z < box.maxs.z
 end function
 
+// Provide true point contents behavior for the active subsystem.
 function truePointContents(box, point)
   if inside(box, point) then return c.CONTENTS_SOLID end if
   return c.CONTENTS_EMPTY
 end function
 
+// Provide point contents from node behavior for the active subsystem.
 function pointContentsFromNode(box, number, point)
   // Exact six-node traversal created by WinQuake SV_InitBoxHull.  Callers may
   // start at any clipnode, which matters for the public SV_HullPointContents
@@ -51,10 +62,12 @@ function pointContentsFromNode(box, number, point)
   return node
 end function
 
+// Provide empty plane behavior for the active subsystem.
 function emptyPlane()
   return t.Plane(t.Vec3(0.0, 0.0, 0.0), 0.0, 0, 0)
 end function
 
+// Trace line through the collision world.
 function traceLine(box, start, finish)
   if inside(box, start) then
     // SV_RecursiveHullCheck permits a move that starts solid to escape into

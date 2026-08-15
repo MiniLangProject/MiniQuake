@@ -1,27 +1,30 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Deterministic black-port diagnostics.  This module deliberately depends only
 on stable engine state and std.fs; it does not import the host module, so the
 host can call checkpoint() without creating an import cycle.
 */
-
 package miniquake.compat_diagnostics
 
 import miniquake.build_info as buildInfo
 import miniquake.types as t
 import miniquake.native as native
 import miniquake.optimization_baseline as optBaseline
+import miniquake.quakec.vm as vm
 import std.fs as fs
 
 const CONTEXT_SCHEMA = 1
 
+// Provide bool text behavior for the active subsystem.
 function boolText(value)
   if value then return "true" end if
   return "false"
 end function
 
+// Provide u32 hex behavior for the active subsystem.
 function u32Hex(value)
   masked = value & 0xffffffff
   return hex(bytes([
@@ -32,10 +35,12 @@ function u32Hex(value)
   ]))
 end function
 
+// Provide f32 hex behavior for the active subsystem.
 function f32Hex(value)
   return u32Hex(native.floatBits(value))
 end function
 
+// Provide json escape behavior for the active subsystem.
 function jsonEscape(text)
   source = bytes(text)
   result = ""
@@ -66,10 +71,12 @@ function jsonEscape(text)
   return result
 end function
 
+// Provide json string behavior for the active subsystem.
 function jsonString(text)
   return "\"" + jsonEscape(text) + "\""
 end function
 
+// Provide vec json behavior for the active subsystem.
 function vecJson(value)
   kind = typeName(value)
   if not t.isVec3Value(value) then return error(9300, "diagnostic vector expected Vec3, got " + kind) end if
@@ -86,6 +93,7 @@ function vecJson(value)
   return result
 end function
 
+// Provide stage text behavior for the active subsystem.
 function stageText(stages)
   result = ""
   index = 0
@@ -97,6 +105,7 @@ function stageText(stages)
   return result
 end function
 
+// Provide stage json behavior for the active subsystem.
 function stageJson(stages)
   result = "["
   index = 0
@@ -108,6 +117,7 @@ function stageJson(stages)
   return result + "]"
 end function
 
+// Report whether active server clients holds for the active state.
 function activeServerClients(session)
   count = 0
   for each item in session.server.clients
@@ -116,6 +126,7 @@ function activeServerClients(session)
   return count
 end function
 
+// Report whether active edicts holds for the active state.
 function activeEdicts(session)
   count = 0
   limit = session.server.numEdicts
@@ -128,6 +139,7 @@ function activeEdicts(session)
   return count
 end function
 
+// Return qc function name derived from the active module state.
 function qcFunctionName(session)
   machine = session.server.machine
   if machine is void then return "" end if
@@ -137,18 +149,21 @@ function qcFunctionName(session)
   return machine.program.functions[index].name
 end function
 
+// Provide qc statement behavior for the active subsystem.
 function qcStatement(session)
   machine = session.server.machine
   if machine is void then return -1 end if
   return machine.statement
 end function
 
+// Provide qc call depth behavior for the active subsystem.
 function qcCallDepth(session)
   machine = session.server.machine
   if machine is void then return 0 end if
-  return len(machine.callStack)
+  return vm.callDepth(machine)
 end function
 
+// Return last stage for the active module state.
 function lastStage(session)
   if session.diagnosticLastStage != "" then return session.diagnosticLastStage end if
   if len(session.frameTrace) == 0 then return "before_filter" end if
@@ -168,6 +183,7 @@ function hostContextJson(session)
   return result + "}"
 end function
 
+// Provide server context json behavior for the active subsystem.
 function serverContextJson(session)
   result = "{"
   result = result + "\"active\":" + boolText(session.server.active) + ","
@@ -180,6 +196,7 @@ function serverContextJson(session)
   return result + "}"
 end function
 
+// Provide client context json behavior for the active subsystem.
 function clientContextJson(session)
   result = "{"
   result = result + "\"connected\":" + boolText(session.client.connected) + ","
@@ -192,6 +209,7 @@ function clientContextJson(session)
   return result + "}"
 end function
 
+// Provide player context json behavior for the active subsystem.
 function playerContextJson(session)
   result = "{"
   result = result + "\"origin\":" + vecJson(session.player.origin) + ","
@@ -205,6 +223,7 @@ function playerContextJson(session)
   return result + "}"
 end function
 
+// Provide quake ccontext json behavior for the active subsystem.
 function quakeCContextJson(session)
   result = "{"
   result = result + "\"function\":" + jsonString(qcFunctionName(session)) + ","
@@ -213,6 +232,7 @@ function quakeCContextJson(session)
   return result + "}"
 end function
 
+// Provide context json behavior for the active subsystem.
 function contextJson(session, phase, errorText)
   result = "{"
   result = result + "\"schema\":\"MiniQuakeCrashContext/" + CONTEXT_SCHEMA + "\","
@@ -233,6 +253,7 @@ function contextJson(session, phase, errorText)
   return result + "}\n"
 end function
 
+// Provide persist behavior for the active subsystem.
 function persist(session, phase, errorText)
   if session.diagnosticContextPath == "" then return true end if
   written = try(fs.writeAllText(session.diagnosticContextPath, contextJson(session, phase, errorText)))
@@ -244,6 +265,7 @@ function persist(session, phase, errorText)
   return true
 end function
 
+// Report whether stage trace enabled holds for the active state.
 function inline stageTraceEnabled(session)
   // Headless sessions are also the deterministic diagnostics/test path.  Keep
   // their historical frame-stage contract, while the interactive renderer
@@ -251,6 +273,7 @@ function inline stageTraceEnabled(session)
   return session.diagnosticContextPath != "" or session.headless
 end function
 
+// Initialize state for begin frame.
 function beginFrame(session)
   optBaseline.beginFrame()
   if not stageTraceEnabled(session) then return true end if
@@ -260,6 +283,7 @@ function beginFrame(session)
   return persist(session, "before_frame", "")
 end function
 
+// Provide checkpoint behavior for the active subsystem.
 function checkpoint(session, stage)
   optBaseline.checkpoint(stage)
   session.diagnosticLastStage = stage
@@ -272,6 +296,7 @@ function checkpoint(session, stage)
   return true
 end function
 
+// Provide filtered frame behavior for the active subsystem.
 function filteredFrame(session)
   optBaseline.filteredFrame()
   session.diagnosticLastStage = "filtered"
@@ -279,6 +304,7 @@ function filteredFrame(session)
   return true
 end function
 
+// Handle frame and update the associated state.
 function completeFrame(session)
   optBaseline.completeFrame()
   session.diagnosticLastStage = "complete"
@@ -286,12 +312,14 @@ function completeFrame(session)
   return true
 end function
 
+// Provide post frame stage behavior for the active subsystem.
 function postFrameStage(session, stage)
   session.diagnosticLastStage = stage
   if session.diagnosticContextPath != "" then persist(session, "post_frame", "") end if
   return true
 end function
 
+// Report frame and return the corresponding failure status.
 function failFrame(session, message)
   if session.diagnosticContextPath != "" then persist(session, "frame_error", message) end if
   return true

@@ -1,18 +1,20 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Focused gl_test.c reflection, puff geometry and lifetime fixtures.
 */
-
 import miniquake.types as t
 import miniquake.render.gl_test as testRenderer
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9750, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function assertNear(actual, expected, name)
   difference = actual - expected
   if difference < 0.0 then difference = -difference end if
@@ -20,6 +22,7 @@ function assertNear(actual, expected, name)
   return true
 end function
 
+// Verify init and hit plane against the expected Quake behavior.
 function testInitAndHitPlane()
   state = testRenderer.createState()
   testRenderer.Test_UseState(state)
@@ -33,6 +36,7 @@ function testInitAndHitPlane()
   return true
 end function
 
+// Verify spawn reflection against the expected Quake behavior.
 function testSpawnReflection()
   state = testRenderer.createState()
   testRenderer.Test_UseState(state)
@@ -49,6 +53,7 @@ function testSpawnReflection()
   return true
 end function
 
+// Verify draw geometry and decay against the expected Quake behavior.
 function testDrawGeometryAndDecay()
   state = testRenderer.createState()
   testRenderer.Test_UseState(state)
@@ -71,6 +76,7 @@ function testDrawGeometryAndDecay()
   return true
 end function
 
+// Verify draw active only against the expected Quake behavior.
 function testDrawActiveOnly()
   state = testRenderer.createState()
   testRenderer.Test_UseState(state)
@@ -87,6 +93,7 @@ function testDrawActiveOnly()
   return true
 end function
 
+// Verify capacity against the expected Quake behavior.
 function testCapacity()
   state = testRenderer.createState()
   testRenderer.Test_UseState(state)
@@ -101,6 +108,7 @@ function testCapacity()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   testInitAndHitPlane()
   testSpawnReflection()

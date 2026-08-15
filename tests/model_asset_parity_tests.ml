@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/model_asset_parity_tests.ml.
+*/
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.byteio as bio
@@ -9,20 +15,24 @@ import miniquake.format.sprite as spriteFormat
 import miniquake.model_registry as modelRegistry
 import miniquake.world_bsp as world
 
+// Exercise json float as part of this deterministic regression fixture.
 function jsonFloat(value)
   return native.floatText(value)
 end function
 
+// Exercise bool int as part of this deterministic regression fixture.
 function boolInt(value)
   if value then return 1 end if
   return 0
 end function
 
+// Encode and write lump.
 function putLump(data, index, offset, length)
   bio.putI32(data, 4 + index * 8, offset)
   bio.putI32(data, 8 + index * 8, length)
 end function
 
+// Encode and write fixed.
 function putFixed(data, offset, text, count)
   source = bytes(text)
   copied = len(source)
@@ -30,6 +40,7 @@ function putFixed(data, offset, text, count)
   bio.copyInto(data, offset, source, 0, copied)
 end function
 
+// Encode and write textures.
 function writeTextures(data, base)
   bio.putI32(data, base, 4)
   names = ["+0fixture", "+1fixture", "+Afixture", "+Bfixture"]
@@ -55,7 +66,9 @@ function writeTextures(data, base)
   return cursor - base
 end function
 
+// Create and initialize bsp.
 function makeBsp()
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   data = bytes(4096)
   bio.putI32(data, 0, c.BSP_VERSION)
   cursor = 124
@@ -178,6 +191,7 @@ function makeBsp()
   return slice(data, 0, cursor)
 end function
 
+// Encode and write alias frame.
 function writeAliasFrame(data, offset, name, base, numVertices)
   data[offset] = base
   data[offset + 4] = base + 10
@@ -193,6 +207,7 @@ function writeAliasFrame(data, offset, name, base, numVertices)
   return offset + 24 + numVertices * 4
 end function
 
+// Create and initialize mdl.
 function makeMdl()
   data = bytes(512)
   putFixed(data, 0, "IDPO", 4)
@@ -249,6 +264,7 @@ function makeMdl()
   return slice(data, 0, cursor)
 end function
 
+// Encode and write sprite frame.
 function writeSpriteFrame(data, offset, x, y, base)
   bio.putI32(data, offset, x)
   bio.putI32(data, offset + 4, y)
@@ -261,6 +277,7 @@ function writeSpriteFrame(data, offset, x, y, base)
   return offset + 20
 end function
 
+// Create and initialize sprite.
 function makeSprite()
   data = bytes(128)
   putFixed(data, 0, "IDSP", 4)
@@ -281,6 +298,7 @@ function makeSprite()
   return slice(data, 0, cursor)
 end function
 
+// Create and initialize filesystem.
 function makeFilesystem(bspData, mdlData, spriteData)
   total = bytes(len(bspData) + len(mdlData) + len(spriteData))
   bio.copyInto(total, 0, bspData, 0, len(bspData))
@@ -296,16 +314,19 @@ function makeFilesystem(bspData, mdlData, spriteData)
 end function
 
 
+// Assert exact equality and report both values on failure.
 function bp073Equal(actual, expected, name)
   if actual != expected then return error(10730, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Exercise the true test scenario and verify its expected result.
 function bp073True(value, name)
   if value != true then return error(10731, name + ": expected true") end if
   return true
 end function
 
+// Build deterministic test data for the requested value.
 function bp073Fixture()
   bspData = makeBsp()
   mdlData = makeMdl()
@@ -314,6 +335,7 @@ function bp073Fixture()
   return [bspData, mdlData, spriteData, filesystem]
 end function
 
+// Read and validate all.
 function bp073LoadAll()
   fixture = bp073Fixture()
   brush = bsp.Mod_LoadBrushModel(fixture[0], "maps/fixture.bsp")
@@ -322,6 +344,7 @@ function bp073LoadAll()
   return [brush, alias, spriteModel, fixture[3]]
 end function
 
+// Exercise the case01 test scenario and verify its expected result.
 function bp073Case01()
   values = bp073LoadAll(); brush = values[0]
   bp073Equal(brush.version, c.BSP_VERSION, "BSP version")
@@ -330,6 +353,7 @@ function bp073Case01()
   return true
 end function
 
+// Exercise the case02 test scenario and verify its expected result.
 function bp073Case02()
   brush = bp073LoadAll()[0]
   bp073Equal(len(brush.entities), 1, "entity count")
@@ -338,6 +362,7 @@ function bp073Case02()
   return true
 end function
 
+// Exercise the case03 test scenario and verify its expected result.
 function bp073Case03()
   brush = bp073LoadAll()[0]
   animations = bsp.sequenceTextureAnimations(brush.textures)
@@ -349,6 +374,7 @@ function bp073Case03()
   return true
 end function
 
+// Exercise the case04 test scenario and verify its expected result.
 function bp073Case04()
   brush = bp073LoadAll()[0]
   bp073Equal(len(brush.vertices), 2, "vertex count")
@@ -358,6 +384,7 @@ function bp073Case04()
   return true
 end function
 
+// Exercise the case05 test scenario and verify its expected result.
 function bp073Case05()
   brush = bp073LoadAll()[0]
   bp073Equal(len(brush.visibility), 2, "visibility length")
@@ -367,6 +394,7 @@ function bp073Case05()
   return true
 end function
 
+// Exercise the case06 test scenario and verify its expected result.
 function bp073Case06()
   brush = bp073LoadAll()[0]
   model = brush.models[0]
@@ -380,6 +408,7 @@ function bp073Case06()
   return true
 end function
 
+// Exercise the case07 test scenario and verify its expected result.
 function bp073Case07()
   alias = bp073LoadAll()[1]
   bp073Equal(alias.version, c.MDL_VERSION, "MDL version")
@@ -389,6 +418,7 @@ function bp073Case07()
   return true
 end function
 
+// Exercise the case08 test scenario and verify its expected result.
 function bp073Case08()
   alias = bp073LoadAll()[1]
   skin = alias.skins[0]
@@ -399,6 +429,7 @@ function bp073Case08()
   return true
 end function
 
+// Exercise the case09 test scenario and verify its expected result.
 function bp073Case09()
   alias = bp073LoadAll()[1]
   frameSet = alias.frames[0]
@@ -409,6 +440,7 @@ function bp073Case09()
   return true
 end function
 
+// Exercise the case10 test scenario and verify its expected result.
 function bp073Case10()
   alias = bp073LoadAll()[1]
   bp073Equal(len(alias.texCoords), 3, "texture coords")
@@ -417,6 +449,7 @@ function bp073Case10()
   return true
 end function
 
+// Exercise the case11 test scenario and verify its expected result.
 function bp073Case11()
   skin = bytes([1, 1, 2, 1])
   mdl.Mod_FloodFillSkin(skin, 2, 2)
@@ -425,6 +458,7 @@ function bp073Case11()
   return true
 end function
 
+// Exercise the case12 test scenario and verify its expected result.
 function bp073Case12()
   spriteModel = bp073LoadAll()[2]
   bp073Equal(spriteModel.version, c.SPRITE_VERSION, "sprite version")
@@ -434,6 +468,7 @@ function bp073Case12()
   return true
 end function
 
+// Exercise the case13 test scenario and verify its expected result.
 function bp073Case13()
   spriteModel = bp073LoadAll()[2]
   frame = spriteModel.frames[0].frames[0]
@@ -446,6 +481,7 @@ function bp073Case13()
   return true
 end function
 
+// Exercise the case14 test scenario and verify its expected result.
 function bp073Case14()
   fixture = bp073Fixture(); filesystem = fixture[3]
   registry = modelRegistry.create()
@@ -458,6 +494,7 @@ function bp073Case14()
   return true
 end function
 
+// Exercise the case15 test scenario and verify its expected result.
 function bp073Case15()
   registry = modelRegistry.create()
   upper = modelRegistry.Mod_FindName(registry, "PROGS/PLAYER.MDL")
@@ -466,6 +503,7 @@ function bp073Case15()
   return true
 end function
 
+// Exercise the case16 test scenario and verify its expected result.
 function bp073Case16()
   values = bp073LoadAll(); filesystem = values[3]
   registry = modelRegistry.create()
@@ -477,6 +515,7 @@ function bp073Case16()
   return true
 end function
 
+// Exercise the case17 test scenario and verify its expected result.
 function bp073Case17()
   values = bp073LoadAll(); filesystem = values[3]
   registry = modelRegistry.create()
@@ -487,6 +526,7 @@ function bp073Case17()
   return true
 end function
 
+// Exercise the case18 test scenario and verify its expected result.
 function bp073Case18()
   fixture = bp073Fixture(); filesystem = fixture[3]
   registry = modelRegistry.create()
@@ -500,6 +540,7 @@ function bp073Case18()
   return true
 end function
 
+// Exercise the case19 test scenario and verify its expected result.
 function bp073Case19()
   fixture = bp073Fixture(); filesystem = fixture[3]
   registry = modelRegistry.create()
@@ -508,6 +549,7 @@ function bp073Case19()
   return true
 end function
 
+// Exercise the case20 test scenario and verify its expected result.
 function bp073Case20()
   brush = bp073LoadAll()[0]
   brush.models = brush.models + [brush.models[0]]
@@ -518,12 +560,14 @@ function bp073Case20()
   return true
 end function
 
+// Exercise the case21 test scenario and verify its expected result.
 function bp073Case21()
   data = makeBsp(); bio.putI32(data, 0, c.BSP_VERSION + 1)
   bp073True(try(bsp.Mod_LoadBrushModel(data, "bad.bsp")) is error, "BSP version rejection")
   return true
 end function
 
+// Exercise the case22 test scenario and verify its expected result.
 function bp073Case22()
   data = makeMdl(); bio.putI32(data, 4, c.MDL_VERSION + 1)
   bp073True(try(mdl.Mod_LoadAliasModel(data, "bad.mdl")) is error, "MDL version rejection")
@@ -532,6 +576,7 @@ function bp073Case22()
   return true
 end function
 
+// Exercise the case23 test scenario and verify its expected result.
 function bp073Case23()
   data = makeSprite(); bio.putF32(data, 44, 0.0)
   bp073True(try(spriteFormat.Mod_LoadSpriteModel(data, "bad.spr")) is error, "sprite interval rejection")
@@ -540,6 +585,7 @@ function bp073Case23()
   return true
 end function
 
+// Exercise the case24 test scenario and verify its expected result.
 function bp073Case24()
   fixture = bp073Fixture(); filesystem = fixture[3]
   registry = modelRegistry.create()
@@ -556,6 +602,7 @@ function bp073Case24()
   return true
 end function
 
+// Execute one named test case and record its pass/fail result.
 function bp073Run(index, name, callback)
   print "[" + index + "/24] " + name
   result = try(callback())
@@ -563,6 +610,7 @@ function bp073Run(index, name, callback)
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   callbacks=[bp073Case01,bp073Case02,bp073Case03,bp073Case04,bp073Case05,bp073Case06,bp073Case07,bp073Case08,bp073Case09,bp073Case10,bp073Case11,bp073Case12,bp073Case13,bp073Case14,bp073Case15,bp073Case16,bp073Case17,bp073Case18,bp073Case19,bp073Case20,bp073Case21,bp073Case22,bp073Case23,bp073Case24]
   names=["BSP header","BSP entities","BSP textures","BSP geometry","BSP visibility/light","BSP submodel","MDL header","MDL grouped skin","MDL grouped frames","MDL mesh","MDL flood fill","sprite header","sprite bounds","registry dispatch","registry case","registry touch","registry extradata","registry clear","registry missing","brush submodels","invalid BSP","invalid MDL","invalid sprite","registry bounds"]

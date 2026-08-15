@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-021 source-guided QuakeC VM parity fixtures for pr_exec.c.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.native as native
@@ -12,16 +12,19 @@ import miniquake.protocol_text as protocolText
 import miniquake.quakec.vm as vm
 import miniquake.quakec.opcodes as op
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(9920, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function yes(value, name)
   if value != true then return error(9921, name + ": expected true") end if
   return true
 end function
 
+// Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
   print "  [" + number + "/16] " + name
   result = try(fn())
@@ -32,10 +35,12 @@ function run(number, name, fn)
   return true
 end function
 
+// Exercise dummy function as part of this deterministic regression fixture.
 function dummyFunction()
   return t.QuakeCFunction(0, 0, 0, 0, "", "", 0, [])
 end function
 
+// Create and initialize machine.
 function makeMachine(statements, functions, globalDefs, fieldDefs, entityFields)
   program = t.QuakeCProgram(
     "bp021-vm.dat",
@@ -53,11 +58,13 @@ function makeMachine(statements, functions, globalDefs, fieldDefs, entityFields)
   return vm.create(program, 4)
 end function
 
+// Exercise simple machine as part of this deterministic regression fixture.
 function simpleMachine(statements)
   fn = t.QuakeCFunction(0, 40, 0, 0, "fixture", "bp021.qc", 0, [])
   return makeMachine(statements, [dummyFunction(), fn], [], [], 8)
 end function
 
+// Verify trace reset against the expected Quake behavior.
 function testTraceReset()
   machine = simpleMachine([t.QuakeCStatement(op.OP_DONE, 0, 0, 0)])
   machine.trace = true
@@ -66,15 +73,18 @@ function testTraceReset()
   return true
 end function
 
+// Exercise unexpected builtin zero as part of this deterministic regression fixture.
 function unexpectedBuiltinZero(machine)
   return error(9922, "builtin slot zero was invoked")
 end function
 
+// Exercise enable trace as part of this deterministic regression fixture.
 function enableTrace(machine)
   machine.trace = true
   return true
 end function
 
+// Verify trace on current invocation only against the expected Quake behavior.
 function testTraceOnCurrentInvocationOnly()
   functions = [
     dummyFunction(),
@@ -99,6 +109,7 @@ function testTraceOnCurrentInvocationOnly()
   return true
 end function
 
+// Exercise state machine as part of this deterministic regression fixture.
 function stateMachine(frameWord)
   globals = [
     t.QuakeCDef(c.EV_ENTITY, 40, 0, "self"),
@@ -122,6 +133,7 @@ function stateMachine(frameWord)
   return machine
 end function
 
+// Verify state signed zero preserved against the expected Quake behavior.
 function testStateSignedZeroPreserved()
   machine = stateMachine(0)
   vm.setEntityField(machine, 1, 1, 0x80000000)
@@ -130,6 +142,7 @@ function testStateSignedZeroPreserved()
   return true
 end function
 
+// Verify state changed frame stored against the expected Quake behavior.
 function testStateChangedFrameStored()
   machine = stateMachine(native.floatBits(3.5))
   vm.setEntityFloat(machine, 1, 1, 2.0)
@@ -139,6 +152,7 @@ function testStateChangedFrameStored()
   return true
 end function
 
+// Verify state nan stored against the expected Quake behavior.
 function testStateNanStored()
   machine = stateMachine(0x7fc00001)
   vm.setEntityField(machine, 1, 1, 0x7fc00002)
@@ -147,6 +161,7 @@ function testStateNanStored()
   return true
 end function
 
+// Verify state next think float against the expected Quake behavior.
 function testStateNextThinkFloat()
   machine = stateMachine(0)
   vm.PR_ExecuteProgram(machine, 1)
@@ -154,6 +169,7 @@ function testStateNextThinkFloat()
   return true
 end function
 
+// Exercise expect program error as part of this deterministic regression fixture.
 function expectProgramError(machine, name)
   result = try(vm.PR_ExecuteProgram(machine, 1))
   yes(result is error, name + " returns error")
@@ -163,6 +179,7 @@ function expectProgramError(machine, name)
   return true
 end function
 
+// Verify invalid load uses run error against the expected Quake behavior.
 function testInvalidLoadUsesRunError()
   machine = simpleMachine([t.QuakeCStatement(op.OP_LOAD_F, 50, 51, 52)])
   vm.setWord(machine, 50, 9)
@@ -170,6 +187,7 @@ function testInvalidLoadUsesRunError()
   return expectProgramError(machine, "invalid LOAD")
 end function
 
+// Verify invalid vector load uses run error against the expected Quake behavior.
 function testInvalidVectorLoadUsesRunError()
   machine = simpleMachine([t.QuakeCStatement(op.OP_LOAD_V, 50, 51, 52)])
   vm.setWord(machine, 50, 1)
@@ -177,6 +195,7 @@ function testInvalidVectorLoadUsesRunError()
   return expectProgramError(machine, "cross-boundary LOAD_V")
 end function
 
+// Verify invalid address entity uses run error against the expected Quake behavior.
 function testInvalidAddressEntityUsesRunError()
   machine = simpleMachine([t.QuakeCStatement(op.OP_ADDRESS, 50, 51, 52)])
   vm.setWord(machine, 50, 8)
@@ -184,6 +203,7 @@ function testInvalidAddressEntityUsesRunError()
   return expectProgramError(machine, "invalid ADDRESS entity")
 end function
 
+// Verify invalid address field uses run error against the expected Quake behavior.
 function testInvalidAddressFieldUsesRunError()
   machine = simpleMachine([t.QuakeCStatement(op.OP_ADDRESS, 50, 51, 52)])
   vm.setWord(machine, 50, 1)
@@ -191,12 +211,14 @@ function testInvalidAddressFieldUsesRunError()
   return expectProgramError(machine, "invalid ADDRESS field")
 end function
 
+// Verify pointer boundary rejected against the expected Quake behavior.
 function testPointerBoundaryRejected()
   machine = simpleMachine([t.QuakeCStatement(op.OP_STOREP_V, 50, 51, 0)])
   vm.setWord(machine, 51, 1 * 8 + 7)
   return expectProgramError(machine, "cross-boundary STOREP_V")
 end function
 
+// Verify pointer scalar accepted against the expected Quake behavior.
 function testPointerScalarAccepted()
   machine = simpleMachine([
     t.QuakeCStatement(op.OP_STOREP_F, 50, 51, 0),
@@ -209,6 +231,7 @@ function testPointerScalarAccepted()
   return true
 end function
 
+// Verify program string latin1 against the expected Quake behavior.
 function testProgramStringLatin1()
   machine = simpleMachine([t.QuakeCStatement(op.OP_DONE, 0, 0, 0)])
   text = vm.stringValue(machine, 1)
@@ -216,6 +239,7 @@ function testProgramStringLatin1()
   return true
 end function
 
+// Verify dynamic string latin1 against the expected Quake behavior.
 function testDynamicStringLatin1()
   machine = simpleMachine([t.QuakeCStatement(op.OP_DONE, 0, 0, 0)])
   handle = vm.internString(machine, decode(bytes([0xc3, 0xa9])))
@@ -223,6 +247,7 @@ function testDynamicStringLatin1()
   return true
 end function
 
+// Verify string compare unsigned bytes against the expected Quake behavior.
 function testStringCompareUnsignedBytes()
   machine = simpleMachine([t.QuakeCStatement(op.OP_DONE, 0, 0, 0)])
   high = vm.stringValue(machine, 1)
@@ -230,12 +255,30 @@ function testStringCompareUnsignedBytes()
   return true
 end function
 
+// Verify stack and local constants against the expected Quake behavior.
 function testStackAndLocalConstants()
   equal(vm.MAX_STACK_DEPTH, 32, "stack depth")
   equal(vm.LOCALSTACK_SIZE, 2048, "local stack size")
+  // Vector destinations may overlap their sources, as in pr_exec.c.  Reading
+  // every source component before writing the result preserves that contract.
+  machine = simpleMachine([
+    t.QuakeCStatement(op.OP_ADD_V, 50, 53, 51),
+    t.QuakeCStatement(op.OP_DONE, 0, 0, 0),
+  ])
+  vm.setGlobalFloat(machine, 50, 1.0)
+  vm.setGlobalFloat(machine, 51, 2.0)
+  vm.setGlobalFloat(machine, 52, 3.0)
+  vm.setGlobalFloat(machine, 53, 4.0)
+  vm.setGlobalFloat(machine, 54, 5.0)
+  vm.setGlobalFloat(machine, 55, 6.0)
+  vm.PR_ExecuteProgram(machine, 1)
+  equal(vm.word(machine, 51), native.floatBits(5.0), "overlapping vector x")
+  equal(vm.word(machine, 52), native.floatBits(7.0), "overlapping vector y")
+  equal(vm.word(machine, 53), native.floatBits(9.0), "overlapping vector z")
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "MiniQuake BP-021 QuakeC VM tests"
   passed = 0

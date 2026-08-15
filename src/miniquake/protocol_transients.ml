@@ -1,13 +1,13 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Protocol-15 temporary-entity and dynamic-sound helpers shared by client,
 server/QuakeC adapters and differential fixtures.  The conversion order is
 kept at the same C int/float boundaries as WinQuake cl_tent.c, cl_parse.c,
 sv_main.c and pr_cmds.c.
 */
-
 package miniquake.protocol_transients
 
 import miniquake.types as t
@@ -20,14 +20,17 @@ const TEMP_KIND_BEAM = 2
 const TEMP_KIND_EXPLOSION2 = 3
 const MAX_BEAMS = 24
 
+// Provide c float behavior for the active subsystem.
 function cFloat(value)
   return native.bitsFloat(native.floatBits(value))
 end function
 
+// Provide c float product behavior for the active subsystem.
 function cFloatProduct(left, right)
   return cFloat(cFloat(left) * cFloat(right))
 end function
 
+// Return sound attenuation byte derived from the active module state.
 function soundAttenuationByte(attenuation)
   return native.trunc(cFloatProduct(attenuation, 64.0))
 end function
@@ -41,6 +44,7 @@ function soundCenterComponent(origin, minimum, maximum)
   return cFloat(cFloat(origin) + 0.5 * bounds)
 end function
 
+// Provide sound center behavior for the active subsystem.
 function soundCenter(origin, minimum, maximum)
   return t.Vec3(
     soundCenterComponent(origin.x, minimum.x, maximum.x),
@@ -49,6 +53,7 @@ function soundCenter(origin, minimum, maximum)
   )
 end function
 
+// Provide sound field mask behavior for the active subsystem.
 function soundFieldMask(volume, attenuation)
   mask = 0
   if native.trunc(volume) != 255 then mask = mask | c.SND_VOLUME end if
@@ -56,6 +61,7 @@ function soundFieldMask(volume, attenuation)
   return mask
 end function
 
+// Return dynamic sound wire size derived from the active module state.
 function dynamicSoundWireSize(volume, attenuation)
   mask = soundFieldMask(volume, attenuation)
   size = 11
@@ -70,10 +76,12 @@ function inline canWriteDynamicSound(buffer)
   return buffer.curSize <= c.MAX_DATAGRAM - 16
 end function
 
+// Provide pack sound channel behavior for the active subsystem.
 function packSoundChannel(entityNumber, channel)
   return (native.trunc(entityNumber) << 3) | (native.trunc(channel) & 7)
 end function
 
+// Report whether is point type.
 function isPointType(type)
   value = native.trunc(type)
   return value == c.TE_SPIKE or
@@ -87,6 +95,7 @@ function isPointType(type)
     value == c.TE_TELEPORT
 end function
 
+// Report whether is beam type.
 function isBeamType(type)
   value = native.trunc(type)
   return value == c.TE_LIGHTNING1 or
@@ -95,6 +104,7 @@ function isBeamType(type)
     value == c.TE_BEAM
 end function
 
+// Provide temp kind behavior for the active subsystem.
 function tempKind(type)
   if isPointType(type) then return TEMP_KIND_POINT end if
   if isBeamType(type) then return TEMP_KIND_BEAM end if
@@ -102,6 +112,7 @@ function tempKind(type)
   return error(2880, "CL_ParseTEnt: bad type " + native.trunc(type))
 end function
 
+// Return temp wire size derived from the active module state.
 function tempWireSize(type)
   kind = tempKind(type)
   if kind == TEMP_KIND_POINT then return 8 end if
@@ -109,6 +120,7 @@ function tempWireSize(type)
   return 10
 end function
 
+// Encode and write point.
 function writePoint(buffer, type, origin)
   if not isPointType(type) then return error(2881, "temporary point type required") end if
   start = buffer.curSize
@@ -120,6 +132,7 @@ function writePoint(buffer, type, origin)
   return buffer.curSize - start
 end function
 
+// Encode and write beam.
 function writeBeam(buffer, type, entityNumber, startPosition, endPosition)
   if not isBeamType(type) then return error(2882, "temporary beam type required") end if
   start = buffer.curSize
@@ -135,6 +148,7 @@ function writeBeam(buffer, type, entityNumber, startPosition, endPosition)
   return buffer.curSize - start
 end function
 
+// Encode and write explosion2.
 function writeExplosion2(buffer, origin, colorStart, colorLength)
   start = buffer.curSize
   msg.writeByte(buffer, c.SVC_TEMP_ENTITY)
@@ -147,6 +161,7 @@ function writeExplosion2(buffer, origin, colorStart, colorLength)
   return buffer.curSize - start
 end function
 
+// Encode and write stop sound.
 function writeStopSound(buffer, entityNumber, channel)
   start = buffer.curSize
   msg.writeByte(buffer, c.SVC_STOPSOUND)
@@ -154,10 +169,12 @@ function writeStopSound(buffer, entityNumber, channel)
   return buffer.curSize - start
 end function
 
+// Provide sound entity behavior for the active subsystem.
 function soundEntity(packedChannel)
   return native.trunc(packedChannel) >> 3
 end function
 
+// Provide sound channel behavior for the active subsystem.
 function soundChannel(packedChannel)
   return native.trunc(packedChannel) & 7
 end function
@@ -168,10 +185,12 @@ function quakeCSoundChannel(value)
   return native.trunc(cFloat(value))
 end function
 
+// Return quake csound volume byte derived from the active module state.
 function quakeCSoundVolumeByte(value)
   return native.trunc(cFloatProduct(value, 255.0))
 end function
 
+// Provide quake csound attenuation behavior for the active subsystem.
 function quakeCSoundAttenuation(value)
   return cFloat(value)
 end function
@@ -183,10 +202,12 @@ function clientSoundVolume(volumeByte)
   return cFloat(native.trunc(volumeByte) / 255.0)
 end function
 
+// Provide client sound attenuation behavior for the active subsystem.
 function clientSoundAttenuation(attenuationByte)
   return cFloat(native.trunc(attenuationByte) / 64.0)
 end function
 
+// Provide static sound volume behavior for the active subsystem.
 function staticSoundVolume(volumeByte)
   // The original S_StaticSound receives the raw byte as its master volume.
   // MiniQuake stores MixerChannel.volume normalized and multiplies by 255 in
@@ -195,6 +216,7 @@ function staticSoundVolume(volumeByte)
   return cFloat(native.trunc(volumeByte) / 255.0)
 end function
 
+// Provide static sound attenuation behavior for the active subsystem.
 function staticSoundAttenuation(attenuationByte)
   return cFloat(native.trunc(attenuationByte))
 end function
@@ -204,10 +226,12 @@ function beamEndTime(currentTime)
   return cFloat(currentTime + 0.2)
 end function
 
+// Provide dynamic light die time behavior for the active subsystem.
 function dynamicLightDieTime(currentTime)
   return cFloat(currentTime + 0.5)
 end function
 
+// Provide beam alive behavior for the active subsystem.
 function beamAlive(endTime, currentTime)
   return cFloat(endTime) >= currentTime
 end function
@@ -237,6 +261,7 @@ function compactBeamSlot(record, fallback)
   return fallback
 end function
 
+// Provide compact beam slot taken behavior for the active subsystem.
 function compactBeamSlotTaken(beams, slot)
   for each item in beams
     if len(item) >= 3 and native.trunc(item[2]) == slot then return true end if
@@ -244,6 +269,7 @@ function compactBeamSlotTaken(beams, slot)
   return false
 end function
 
+// Return first unused compact beam slot for the active module state.
 function firstUnusedCompactBeamSlot(beams)
   slot = 0
   while slot < MAX_BEAMS
@@ -253,6 +279,7 @@ function firstUnusedCompactBeamSlot(beams)
   return -1
 end function
 
+// Add state for insert compact beam by slot.
 function insertCompactBeamBySlot(beams, record)
   result = []
   inserted = false
@@ -268,6 +295,7 @@ function insertCompactBeamBySlot(beams, record)
   return result
 end function
 
+// Convert compact beam list into its canonical representation.
 function normalizeCompactBeamList(beams)
   normalized = []
   fallback = 0
@@ -286,6 +314,7 @@ function normalizeCompactBeamList(beams)
   return normalized
 end function
 
+// Provide compact beam index for slot behavior for the active subsystem.
 function compactBeamIndexForSlot(beams, slot)
   index = 0
   while index < len(beams)
@@ -295,6 +324,7 @@ function compactBeamIndexForSlot(beams, slot)
   return -1
 end function
 
+// Update module state for compact beam list result.
 function updateCompactBeamListResult(beams, value, currentTime)
   normalized = normalizeCompactBeamList(beams)
   expiry = beamEndTime(currentTime)
@@ -333,10 +363,12 @@ function updateCompactBeamListResult(beams, value, currentTime)
   return [normalized, false, -1]
 end function
 
+// Update module state for compact beam list.
 function updateCompactBeamList(beams, value, currentTime)
   return updateCompactBeamListResult(beams, value, currentTime)[0]
 end function
 
+// Encode and write reconnect.
 function writeReconnect(buffer)
   start = buffer.curSize
   msg.writeChar(buffer, c.SVC_STUFFTEXT)

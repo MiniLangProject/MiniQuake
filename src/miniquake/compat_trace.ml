@@ -1,12 +1,12 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Deterministic compatibility traces and state snapshots for the source-guided
 black-port workflow.  The .mqtrace stream intentionally excludes heap addresses,
 wall-clock timestamps and output paths so two identical runs are byte-identical.
 */
-
 package miniquake.compat_trace
 
 import miniquake.types as t
@@ -20,25 +20,30 @@ const TRACE_SCHEMA = 1
 const FNV_OFFSET = 2166136261
 const FNV_PRIME = 16777619
 
+// Return bool number derived from the active module state.
 function boolNumber(value)
   if value then return 1 end if
   return 0
 end function
 
+// Return a validated safe text value.
 function safeText(value)
   if value is string then return value end if
   return ""
 end function
 
+// Return qc function index derived from the active module state.
 function qcFunctionIndex(session)
   if session.server.machine is void then return -1 end if
   return session.server.machine.currentFunction
 end function
 
+// Fold byte into the deterministic rolling hash.
 function inline hashByte(state, value)
   return (((state & 0xffffffff) ^ (value & 255)) * FNV_PRIME) & 0xffffffff
 end function
 
+// Fold word into the deterministic rolling hash.
 function hashWord(state, value)
   word = value & 0xffffffff
   result = hashByte(state, word)
@@ -48,10 +53,12 @@ function hashWord(state, value)
   return result
 end function
 
+// Fold float into the deterministic rolling hash.
 function hashFloat(state, value)
   return hashWord(state, native.floatBits(value))
 end function
 
+// Provide vec3 error behavior for the active subsystem.
 function vec3Error(label, value)
   return error(9301, label + " expected Vec3, got " + typeName(value))
 end function
@@ -69,6 +76,7 @@ function hashVec3(state, value, label)
   return result
 end function
 
+// Provide vec3 hex behavior for the active subsystem.
 function vec3Hex(value, label)
   if not t.isVec3Value(value) then return vec3Error(label, value) end if
   x = value.x
@@ -80,6 +88,7 @@ function vec3Hex(value, label)
   return result
 end function
 
+// Fold text seed into the deterministic rolling hash.
 function hashTextSeed(state, text)
   source = bytes(text)
   result = state & 0xffffffff
@@ -91,10 +100,12 @@ function hashTextSeed(state, text)
   return result
 end function
 
+// Fold text into the deterministic rolling hash.
 function hashText(text)
   return hashTextSeed(FNV_OFFSET, text)
 end function
 
+// Fold word array into the deterministic rolling hash.
 function hashWordArray(words)
   result = FNV_OFFSET
   index = 0
@@ -105,6 +116,7 @@ function hashWordArray(words)
   return result
 end function
 
+// Fold size buffer into the deterministic rolling hash.
 function hashSizeBuffer(state, buffer)
   result = hashWord(state, buffer.curSize)
   limit = buffer.curSize
@@ -118,12 +130,14 @@ function hashSizeBuffer(state, buffer)
   return result
 end function
 
+// Provide globals hash behavior for the active subsystem.
 function globalsHash(session)
   machine = session.server.machine
   if machine is void then return 0 end if
   return hashWordArray(machine.globals)
 end function
 
+// Provide qc edicts hash behavior for the active subsystem.
 function qcEdictsHash(session)
   machine = session.server.machine
   if machine is void then return 0 end if
@@ -149,6 +163,7 @@ function qcEdictsHash(session)
   return result
 end function
 
+// Provide server edicts hash behavior for the active subsystem.
 function serverEdictsHash(session)
   limit = session.server.numEdicts
   if limit > len(session.server.edicts) then limit = len(session.server.edicts) end if
@@ -218,6 +233,7 @@ function clientEntitiesHash(session)
   return result
 end function
 
+// Provide protocol hash behavior for the active subsystem.
 function protocolHash(session)
   result = FNV_OFFSET
   result = hashSizeBuffer(result, session.server.datagram)
@@ -231,6 +247,7 @@ function protocolHash(session)
   return result
 end function
 
+// Provide stages hash behavior for the active subsystem.
 function stagesHash(session)
   result = FNV_OFFSET
   for each stage in session.frameTrace
@@ -302,17 +319,20 @@ function canonicalFrame(session, frameIndex, accepted)
   return result
 end function
 
+// Trace line through the collision world.
 function traceLine(session, frameIndex, accepted)
   canonical = canonicalFrame(session, frameIndex, accepted)
   return canonical + "|state_hash=" + diagnostics.u32Hex(hashText(canonical)) + "\n"
 end function
 
+// Provide raw edict hash behavior for the active subsystem.
 function rawEdictHash(session, index)
   machine = session.server.machine
   if machine is void or index < 0 or index >= len(machine.edicts) then return 0 end if
   return hashWordArray(machine.edicts[index])
 end function
 
+// Provide edict json behavior for the active subsystem.
 function edictJson(session, index, item)
   result = "{"
   result = result + "\"number\":" + item.number + ","
@@ -335,6 +355,7 @@ function edictJson(session, index, item)
   return result + "}"
 end function
 
+// Provide edicts json behavior for the active subsystem.
 function edictsJson(session)
   limit = session.server.numEdicts
   if limit > len(session.server.edicts) then limit = len(session.server.edicts) end if
@@ -349,6 +370,7 @@ function edictsJson(session)
   return result + "]"
 end function
 
+// Provide client entity json behavior for the active subsystem.
 function clientEntityJson(item)
   result = "{"
   result = result + "\"number\":" + item.number + ","
@@ -362,6 +384,7 @@ function clientEntityJson(item)
   return result + "}"
 end function
 
+// Provide client entities json behavior for the active subsystem.
 function clientEntitiesJson(session)
   result = "["
   index = 0
@@ -379,6 +402,7 @@ function clientEntitiesJson(session)
   return result + "]"
 end function
 
+// Provide resource json behavior for the active subsystem.
 function resourceJson(session)
   values = host.resourceSnapshot(session)
   result = "{"
@@ -403,6 +427,7 @@ function resourceJson(session)
   return result + "}"
 end function
 
+// Provide snapshot host json behavior for the active subsystem.
 function snapshotHostJson(session)
   result = "{"
   result = result + "\"frame_count\":" + session.timing.frameCount + ","
@@ -413,6 +438,7 @@ function snapshotHostJson(session)
   return result + "}"
 end function
 
+// Provide snapshot server json behavior for the active subsystem.
 function snapshotServerJson(session)
   result = "{"
   result = result + "\"active\":" + diagnostics.boolText(session.server.active) + ","
@@ -425,6 +451,7 @@ function snapshotServerJson(session)
   return result + "}"
 end function
 
+// Provide snapshot client json behavior for the active subsystem.
 function snapshotClientJson(session)
   result = "{"
   result = result + "\"connected\":" + diagnostics.boolText(session.client.connected) + ","
@@ -436,6 +463,7 @@ function snapshotClientJson(session)
   return result + "}"
 end function
 
+// Provide snapshot player json behavior for the active subsystem.
 function snapshotPlayerJson(session)
   result = "{"
   result = result + "\"origin\":" + diagnostics.vecJson(session.player.origin) + ","
@@ -453,6 +481,7 @@ function snapshotPlayerJson(session)
   return result + "}"
 end function
 
+// Provide snapshot quake cjson behavior for the active subsystem.
 function snapshotQuakeCJson(session)
   result = "{"
   result = result + "\"function\":" + diagnostics.jsonString(diagnostics.qcFunctionName(session)) + ","
@@ -464,6 +493,7 @@ function snapshotQuakeCJson(session)
   return result + "}"
 end function
 
+// Provide snapshot digests json behavior for the active subsystem.
 function snapshotDigestsJson(session)
   result = "{"
   result = result + "\"server_edicts\":\"" + diagnostics.u32Hex(serverEdictsHash(session)) + "\","
@@ -472,6 +502,7 @@ function snapshotDigestsJson(session)
   return result + "}"
 end function
 
+// Provide snapshot json behavior for the active subsystem.
 function snapshotJson(session, frameIndex, phase, errorText)
   canonical = canonicalFrame(session, frameIndex, true)
   result = "{"
@@ -496,18 +527,21 @@ function snapshotJson(session, frameIndex, phase, errorText)
   return result + "}\n"
 end function
 
+// Encode and write file.
 function writeFile(path, text)
   result = try(fs.writeAllText(path, text))
   if result is error then return result end if
   return true
 end function
 
+// Add state for append file.
 function appendFile(path, text)
   result = try(fs.appendAllText(path, text))
   if result is error then return result end if
   return true
 end function
 
+// Trace error line through the collision world.
 function traceErrorLine(frameIndex, lastStage, message)
   result = "error_frame=" + frameIndex
   result = result + "|last_stage=" + lastStage
@@ -515,6 +549,7 @@ function traceErrorLine(frameIndex, lastStage, message)
   return result + "\n"
 end function
 
+// Update subsystem state for attempt shutdown.
 function attemptShutdown(session)
   result = try(host.shutdown(session))
   if result is error then return [false, result.message] end if
@@ -522,6 +557,7 @@ function attemptShutdown(session)
   return [true, ""]
 end function
 
+// Provide summary json behavior for the active subsystem.
 function summaryJson(ok, requested, written, accepted, rollingHash, tracePath, snapshotPath, contextPath, lastStage, errorText, cleanShutdown, diagnosticWriteError)
   result = "{"
   result = result + "\"schema\":\"MiniQuakeTraceSummary/" + TRACE_SCHEMA + "\","
@@ -542,6 +578,7 @@ function summaryJson(ok, requested, written, accepted, rollingHash, tracePath, s
   return result + "}\n"
 end function
 
+// Create and initialize result.
 function makeResult(ok, requested, written, accepted, rollingHash, prefix, lastStage, errorText, cleanShutdown)
   return t.CompatibilityTraceResult(
     ok,
@@ -559,7 +596,9 @@ function makeResult(ok, requested, written, accepted, rollingHash, prefix, lastS
   )
 end function
 
+// Execute internal.
 function runInternal(baseDirectory, gameDirectory, mapName, frameCount, outputPrefix)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if gameDirectory == "" then gameDirectory = "id1" end if
   if mapName == "" then mapName = "start" end if
   if frameCount < 1 then frameCount = 1 end if
@@ -739,6 +778,7 @@ function run(baseDirectory, gameDirectory, mapName, frameCount, outputPrefix)
   return makeResult(false, requested, 0, 0, FNV_OFFSET, prefix, "unhandled", failure, false)
 end function
 
+// Format and emit result.
 function printResult(result)
   print "MiniQuake deterministic compatibility trace"
   print "  trace=" + result.tracePath
@@ -753,6 +793,7 @@ function printResult(result)
   return result.ok
 end function
 
+// Provide contains text behavior for the active subsystem.
 function containsText(text, needle)
   source = bytes(text)
   wanted = bytes(needle)
@@ -772,6 +813,7 @@ function containsText(text, needle)
   return false
 end function
 
+// Return line count derived from the active module state.
 function lineCount(text)
   source = bytes(text)
   count = 0
@@ -783,6 +825,7 @@ function lineCount(text)
   return count
 end function
 
+// Inspect the requested value and emit its decoded metadata.
 function inspect(path)
   loaded = try(fs.readAllText(path))
   if loaded is error then print "MiniQuake compatibility report: " + loaded.message; return false end if

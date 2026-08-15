@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.sound.mixer.
+*/
 package miniquake.sound.mixer
 
 import miniquake.types as t
@@ -15,6 +22,7 @@ import miniquake.common as common
 // WinQuake reserves 128 software channels.  The former 32-channel limit could
 // evict looping/static sounds very quickly on a populated retail map.
 const MIX_FRAMES = 512
+const MUSIC_DECODE_FRAMES = 4096
 const MIN_QUEUED_BUFFERS = 3
 const MAX_QUEUED_BUFFERS = 7
 const MAX_CHANNELS = 128
@@ -26,6 +34,16 @@ const STATIC_FIRST = 12
 
 randomSeed = 1
 
+// S_PaintChannels owns fixed paint/volume buffers in the original engine.
+// Keep equivalent reusable storage so a real-time 44.1-kHz stream does not
+// allocate several large arrays for every 512-sample block.
+paintAccumulatorScratch = array(MIX_FRAMES * 2, 0)
+paintLeftVolumeScratch = array(MAX_CHANNELS, 0)
+paintRightVolumeScratch = array(MAX_CHANNELS, 0)
+paintSurvivorScratch = array(MAX_CHANNELS, void)
+paintOutputScratch = bytes(MIX_FRAMES * 4)
+
+// Create and initialize the module state.
 function create(filesystem, sampleRate)
   if sampleRate <= 0 then sampleRate = 22050 end if
   return t.SoundMixer(
@@ -52,6 +70,7 @@ function create(filesystem, sampleRate)
   )
 end function
 
+// Initialize state for open.
 function open(mixer)
   opened = audio.open(mixer.audioState, mixer.sampleRate, 2, 2)
   if opened is error then
@@ -64,6 +83,7 @@ function open(mixer)
   return opened
 end function
 
+// Finalize state for stop all.
 function stopAll(mixer)
   if mixer is void then return false end if
   mixer.channels = []
@@ -87,35 +107,42 @@ function block(mixer)
   return mixer.blockDepth
 end function
 
+// Provide unblock behavior for the active subsystem.
 function unblock(mixer)
   if mixer is void or not mixer.audioState.opened then return 0 end if
-  mixer.blockDepth = mixer.blockDepth - 1
+  if mixer.blockDepth > 0 then mixer.blockDepth = mixer.blockDepth - 1 end if
   return mixer.blockDepth
 end function
 
+// Provide block depth behavior for the active subsystem.
 function blockDepth(mixer)
   if mixer is void then return 0 end if
   return mixer.blockDepth
 end function
 
+// Finalize state for stop music.
 function stopMusic(mixer)
   if mixer is void then return false end if
+  if mixer.music is not void then native.oggClose() end if
   mixer.music = void
   return true
 end function
 
+// Provide pause music behavior for the active subsystem.
 function pauseMusic(mixer)
   if mixer.music is void or not mixer.music.playing then return false end if
   mixer.music.paused = true
   return true
 end function
 
+// Provide resume music behavior for the active subsystem.
 function resumeMusic(mixer)
   if mixer.music is void or not mixer.music.playing then return false end if
   mixer.music.paused = false
   return true
 end function
 
+// Play music through the active media subsystem.
 function playMusic(mixer, track, looping)
   if mixer is void or not mixer.enabled then return false end if
   if track < 1 or track > 99 then return error(2410, "invalid music track " + track) end if
@@ -124,9 +151,17 @@ function playMusic(mixer, track, looping)
     mixer.music.paused = false
     return true
   end if
-  source = qfs.readMusicTrack(mixer.filesystem, track)
-  if source is error then return source end if
-  if native.oggOpen(source, len(source)) == 0 then return error(2411, "invalid Ogg Vorbis track " + track) end if
+  stopMusic(mixer)
+  source = bytes()
+  sourcePath = qfs.musicTrackPath(mixer.filesystem, track)
+  opened = 0
+  if sourcePath != "" then opened = native.oggOpenFile(sourcePath)
+  else
+    source = qfs.readMusicTrack(mixer.filesystem, track)
+    if source is error then return source end if
+    opened = native.oggOpen(source, len(source))
+  end if
+  if opened == 0 then return error(2411, "invalid Ogg Vorbis track " + track) end if
   rate = native.oggRate()
   channels = native.oggChannels()
   frames = native.oggFrames()
@@ -134,15 +169,43 @@ function playMusic(mixer, track, looping)
     native.oggClose()
     return error(2412, "unsupported Ogg Vorbis track " + track)
   end if
-  pcm = bytes(frames * channels * 2)
-  decoded = native.oggDecode(pcm, frames)
-  native.oggClose()
-  if decoded < 1 then return error(2413, "Ogg Vorbis decode failed for track " + track) end if
-  if decoded < frames then pcm = slice(pcm, 0, decoded * channels * 2) end if
-  mixer.music = t.MusicTrack(track, pcm, rate, channels, decoded, 0, looping, true, false)
+  probe = bytes(MUSIC_DECODE_FRAMES * channels * 2)
+  decoded = native.oggDecode(probe, MUSIC_DECODE_FRAMES)
+  if decoded < 1 or native.oggSeekStart() == 0 then
+    native.oggClose()
+    return error(2413, "Ogg Vorbis decode failed for track " + track)
+  end if
+  // A packed fallback keeps its compressed source alive while stb_vorbis owns
+  // the memory view. Loose Steam/rerelease tracks are owned by the native OGG
+  // bridge so they do not become another long-lived MiniLang heap object. PCM
+  // is decoded in small blocks by mixMusic; decoding an entire retail track
+  // here allocated 50-100 MiB and stalled the signon/map change.
+  mixer.music = t.MusicTrack(track, source, bytes(), rate, channels, frames, 0, looping, true, false, 0, 0)
   return true
 end function
 
+// Read and validate music chunk.
+function decodeMusicChunk(track, restart)
+  if restart then
+    if native.oggSeekStart() == 0 then return false end if
+    track.sampleBase = 0
+  else
+    track.sampleBase = track.sampleBase + track.sampleFrames
+  end if
+  pcmSize = MUSIC_DECODE_FRAMES * track.channels * 2
+  pcm = track.samples
+  if len(pcm) != pcmSize then pcm = bytes(pcmSize) end if
+  decoded = native.oggDecode(pcm, MUSIC_DECODE_FRAMES)
+  if decoded < 1 then
+    track.sampleFrames = 0
+    return false
+  end if
+  track.samples = pcm
+  track.sampleFrames = decoded
+  return true
+end function
+
+// Release state for close.
 function close(mixer)
   stopMusic(mixer)
   stopAll(mixer)
@@ -154,6 +217,7 @@ function close(mixer)
   return true
 end function
 
+// Return effect index derived from the active module state.
 function effectIndex(mixer, name)
   index = 0
   while index < len(mixer.effects)
@@ -163,6 +227,7 @@ function effectIndex(mixer, name)
   return -1
 end function
 
+// Convert data for convert to mono16.
 function convertToMono16(info, source, targetRate)
   outputSamples = native.trunc(info.samples * targetRate / info.rate)
   if outputSamples < 1 then outputSamples = 1 end if
@@ -181,6 +246,7 @@ function convertToMono16(info, source, targetRate)
   return result
 end function
 
+// Read and validate effect.
 function loadEffect(mixer, name)
   existing = effectIndex(mixer, name)
   if existing >= 0 then return mixer.effects[existing] end if
@@ -196,6 +262,7 @@ function loadEffect(mixer, name)
   return effect
 end function
 
+// Preload and register the the requested value asset.
 function precache(mixer, names)
   if mixer is void or not mixer.enabled then return [0, 0] end if
   loaded = 0
@@ -213,6 +280,7 @@ function precache(mixer, names)
   return [loaded, failed]
 end function
 
+// Return channel.
 function findChannel(mixer, entityNumber, channelNumber)
   for each channel in mixer.channels
     if channel.entityNumber == entityNumber and channel.channelNumber == channelNumber then return channel end if
@@ -220,12 +288,14 @@ function findChannel(mixer, entityNumber, channelNumber)
   return void
 end function
 
+// Report whether is dynamic channel.
 function isDynamicChannel(channel)
   if channel.entityNumber == AMBIENT_WATER_ENTITY or channel.entityNumber == AMBIENT_WIND_ENTITY then return false end if
   if channel.channelNumber == STATIC_CHANNEL then return false end if
   return true
 end function
 
+// Return dynamic channel count derived from the active module state.
 function dynamicChannelCount(mixer)
   count = 0
   for each channel in mixer.channels
@@ -234,6 +304,7 @@ function dynamicChannelCount(mixer)
   return count
 end function
 
+// Release state for remove channel at.
 function removeChannelAt(mixer, victim)
   if victim < 0 or victim >= len(mixer.channels) then return false end if
   builder = arrays.createArrayBuilder(len(mixer.channels) - 1)
@@ -280,12 +351,14 @@ function pickDynamicChannel(mixer, newEntityNumber, newChannelNumber)
   return victim
 end function
 
+// Release or consume state for discard oldest channel.
 function discardOldestChannel(mixer, newEntityNumber)
   victim = pickDynamicChannel(mixer, newEntityNumber, 0)
   if victim < 0 then return false end if
   return removeChannelAt(mixer, victim)
 end function
 
+// Return next random for the active module state.
 function nextRandom()
   global randomSeed
   // MiniQuake's Win32 build uses the Microsoft C runtime rand sequence.
@@ -293,16 +366,19 @@ function nextRandom()
   return (randomSeed >> 16) & 0x7fff
 end function
 
+// Update module state for random seed.
 function setRandomSeed(seed)
   global randomSeed
   randomSeed = seed & 0xffffffff
   return randomSeed
 end function
 
+// Provide mixer f32 behavior for the active subsystem.
 function mixerF32(value)
   return native.bitsFloat(native.floatBits(value))
 end function
 
+// Initialize state for start sound.
 function startSound(mixer, entityNumber, channelNumber, name, origin, volume, attenuation)
   if not mixer.enabled then return false end if
   dynamicBefore = dynamicChannelCount(mixer)
@@ -357,6 +433,7 @@ function startSound(mixer, entityNumber, channelNumber, name, origin, volume, at
   return true
 end function
 
+// Provide static sound behavior for the active subsystem.
 function staticSound(mixer, name, origin, volume, attenuation)
   if mixer is void or not mixer.enabled or STATIC_FIRST + mixer.staticAllocations >= MAX_CHANNELS then return false end if
   // S_StaticSound consumes its fixed slot before loading/checking loopability.
@@ -379,6 +456,7 @@ function staticSound(mixer, name, origin, volume, attenuation)
   return true
 end function
 
+// Provide local sound behavior for the active subsystem.
 function localSound(mixer, name)
   if mixer is void or not mixer.enabled then return false end if
   entityNumber = mixer.listenerEntity
@@ -386,6 +464,7 @@ function localSound(mixer, name)
   return startSound(mixer, entityNumber, -1, name, mixer.listenerOrigin, 1.0, 0.0)
 end function
 
+// Report whether extension.
 function hasExtension(name)
   source = bytes(name)
   for each value in source
@@ -394,6 +473,7 @@ function hasExtension(name)
   return false
 end function
 
+// Play the requested value through the active media subsystem.
 function play(mixer, arguments)
   if mixer is void or not mixer.enabled then return 0 end if
   played = 0
@@ -408,6 +488,7 @@ function play(mixer, arguments)
   return played
 end function
 
+// Play vol through the active media subsystem.
 function playVol(mixer, arguments)
   if mixer is void or not mixer.enabled then return 0 end if
   played = 0
@@ -425,6 +506,7 @@ function playVol(mixer, arguments)
   return played
 end function
 
+// Provide sound list behavior for the active subsystem.
 function soundList(mixer)
   entries = arrays.createArrayBuilder(len(mixer.effects))
   total = 0
@@ -436,10 +518,11 @@ function soundList(mixer)
   return [arrays.finishArrayBuilder(entries), total]
 end function
 
+// Provide sound info behavior for the active subsystem.
 function soundInfo(mixer)
   if mixer is void or not mixer.enabled or not mixer.audioState.opened then return [["status", "sound system not started"]] end if
   sampleMask = audio.capacity(mixer.audioState) * MIX_FRAMES * mixer.audioState.channels - 1
-  return [
+  result = [
     ["stereo", mixer.audioState.channels - 1],
     ["samples", audio.capacity(mixer.audioState) * MIX_FRAMES * mixer.audioState.channels],
     ["samplepos", audio.position(mixer.audioState, sampleMask)],
@@ -447,10 +530,42 @@ function soundInfo(mixer)
     ["submission_chunk", 1],
     ["speed", mixer.audioState.rate],
     ["queued", audio.queued(mixer.audioState)],
+    ["submitted", audio.submitted(mixer.audioState)],
+    ["completed", audio.completed(mixer.audioState)],
+    ["underruns", audio.underruns(mixer.audioState)],
+    ["block_depth", mixer.blockDepth],
     ["total_channels", len(mixer.channels)],
+  ]
+  if mixer.music is not void then
+    result = result + [
+      ["music_track", mixer.music.number],
+      ["music_position", mixer.music.position],
+      ["music_playing", mixer.music.playing],
+      ["music_paused", mixer.music.paused],
+      ["music_volume", mixer.musicVolume],
+    ]
+  end if
+  return result
+end function
+
+// Provide music info behavior for the active subsystem.
+function musicInfo(mixer)
+  if mixer is void or not mixer.enabled then return [["status", "sound system not started"]] end if
+  if mixer.music is void then return [["status", "no music track loaded"]] end if
+  return [
+    ["track", mixer.music.number],
+    ["source_rate", mixer.music.rate],
+    ["source_channels", mixer.music.channels],
+    ["source_frames", mixer.music.frames],
+    ["position", mixer.music.position],
+    ["playing", mixer.music.playing],
+    ["paused", mixer.music.paused],
+    ["volume", mixer.musicVolume],
+    ["decoded_block_frames", mixer.music.sampleFrames],
   ]
 end function
 
+// Finalize state for stop sound.
 function stopSound(mixer, entityNumber, channelNumber)
   builder = arrays.createArrayBuilder(len(mixer.channels))
   stopped = 0
@@ -470,18 +585,29 @@ function stopSound(mixer, entityNumber, channelNumber)
   return stopped
 end function
 
+// Update module state for listener entity.
 function setListenerEntity(mixer, entityNumber)
   mixer.listenerEntity = entityNumber
   return entityNumber
 end function
 
+// Update module state for listener.
 function updateListener(mixer, origin, forward, right)
-  mixer.listenerOrigin = math.copy(origin)
-  mixer.listenerForward = math.copy(forward)
-  mixer.listenerRight = math.copy(right)
+  // snd_dma.c stores these in three persistent vec3_t arrays. Updating their
+  // components avoids replacing three heap-backed Vec3 objects every frame.
+  mixer.listenerOrigin.x = origin.x
+  mixer.listenerOrigin.y = origin.y
+  mixer.listenerOrigin.z = origin.z
+  mixer.listenerForward.x = forward.x
+  mixer.listenerForward.y = forward.y
+  mixer.listenerForward.z = forward.z
+  mixer.listenerRight.x = right.x
+  mixer.listenerRight.y = right.y
+  mixer.listenerRight.z = right.z
   return true
 end function
 
+// Update module state for entity origins.
 function updateEntityOrigins(mixer, entities)
   if mixer is void then return 0 end if
   updated = 0
@@ -490,7 +616,9 @@ function updateEntityOrigins(mixer, entities)
     if entityNumber > 0 and entityNumber != mixer.listenerEntity and entityNumber < len(entities) then
       entity = entities[entityNumber]
       if entity is not void then
-        channel.origin = math.copy(entity.origin)
+        channel.origin.x = entity.origin.x
+        channel.origin.y = entity.origin.y
+        channel.origin.z = entity.origin.z
         updated = updated + 1
       end if
     end if
@@ -498,6 +626,7 @@ function updateEntityOrigins(mixer, entities)
   return updated
 end function
 
+// Ensure sufficient storage or state for ambient channel.
 function ensureAmbientChannel(mixer, entityNumber, channelNumber, name)
   channel = findChannel(mixer, entityNumber, channelNumber)
   if channel is not void then return channel end if
@@ -520,9 +649,12 @@ function ensureAmbientChannel(mixer, entityNumber, channelNumber, name)
   return channel
 end function
 
+// Provide fade ambient channel behavior for the active subsystem.
 function fadeAmbientChannel(channel, target, step, origin)
   if channel is void then return false end if
-  channel.origin = math.copy(origin)
+  channel.origin.x = origin.x
+  channel.origin.y = origin.y
+  channel.origin.z = origin.z
   channel.active = true
   if channel.volume < target then
     channel.volume = channel.volume + step
@@ -534,6 +666,7 @@ function fadeAmbientChannel(channel, target, step, origin)
   return true
 end function
 
+// Provide ambient target behavior for the active subsystem.
 function ambientTarget(levelByte, ambientLevel)
   scaled = levelByte * ambientLevel
   if scaled < 8.0 then return 0.0 end if
@@ -566,38 +699,63 @@ function updateAmbient(mixer, map, origin, frameTime, ambientLevel, ambientFade)
   return true
 end function
 
+// Return a validated clamp sample value.
 function clampSample(value)
   if value > 32767 then return 32767 end if
   if value < -32768 then return -32768 end if
   return native.trunc(value)
 end function
 
-function channelVolumes(mixer, channel)
+// Calculate one channel's stereo volumes into reusable parallel arrays.
+function channelVolumesInto(mixer, channel, leftValues, rightValues, index)
   master = native.trunc(mixerF32(mixerF32(channel.volume) * 255.0))
   // Sounds emitted by the view entity (weapon and menu sounds) are never
   // spatialized in WinQuake; they play equally in both speakers.
   if channel.entityNumber == mixer.listenerEntity then
-    return [master, master]
+    leftValues[index] = master
+    rightValues[index] = master
+    return true
   end if
 
-  delta = math.subtract(channel.origin, mixer.listenerOrigin)
-  distance = mixerF32(math.length(delta))
+  // Scalar math preserves the SND_Spatialize formula without allocating the
+  // old delta and normalized-direction Vec3 pair for every active channel.
+  deltaX = channel.origin.x - mixer.listenerOrigin.x
+  deltaY = channel.origin.y - mixer.listenerOrigin.y
+  deltaZ = channel.origin.z - mixer.listenerOrigin.z
+  distance = mixerF32(native.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ))
   spatial = mixerF32(1.0 - mixerF32(mixerF32(distance * channel.attenuation) / 1000.0))
   if channel.attenuation <= 0.0 then spatial = 1.0 end if
   spatial = mixerF32(math.clamp(spatial, 0.0, 1.0))
   pan = 0.0
   if distance > 0.0 then
-    direction = math.scale(delta, mixerF32(1.0 / distance))
-    pan = mixerF32(math.clamp(math.dot(direction, mixer.listenerRight), -1.0, 1.0))
+    inverseDistance = mixerF32(1.0 / distance)
+    directionX = deltaX * inverseDistance
+    directionY = deltaY * inverseDistance
+    directionZ = deltaZ * inverseDistance
+    pan = mixerF32(math.clamp(
+      directionX * mixer.listenerRight.x + directionY * mixer.listenerRight.y + directionZ * mixer.listenerRight.z,
+      -1.0,
+      1.0,
+    ))
   end if
   left = native.trunc(mixerF32(mixerF32(master * spatial) * mixerF32(1.0 - pan)))
   right = native.trunc(mixerF32(mixerF32(master * spatial) * mixerF32(1.0 + pan)))
   if left < 0 then left = 0 end if
   if right < 0 then right = 0 end if
-  return [left, right]
+  leftValues[index] = left
+  rightValues[index] = right
+  return true
 end function
 
-function mixChannelWithVolumes(mixer, channel, accumulator, frameCount, volumes)
+// Provide channel volumes behavior for the active subsystem.
+function channelVolumes(mixer, channel)
+  global paintLeftVolumeScratch, paintRightVolumeScratch
+  channelVolumesInto(mixer, channel, paintLeftVolumeScratch, paintRightVolumeScratch, 0)
+  return [paintLeftVolumeScratch[0], paintRightVolumeScratch[0]]
+end function
+
+// Mix a channel using scalar stereo volumes.
+function mixChannelWithStereoVolumes(mixer, channel, accumulator, frameCount, leftVolumeValue, rightVolumeValue)
   if not channel.active or channel.effect is void then return false end if
   totalSamples = len(channel.effect.samples) / channel.effect.width
   if totalSamples <= 0 then channel.active = false; return false end if
@@ -618,16 +776,16 @@ function mixChannelWithVolumes(mixer, channel, accumulator, frameCount, volumes)
       if channel.effect.width == 1 then
         sample8 = channel.effect.samples[channel.sample + frame]
         if sample8 >= 128 then sample8 = sample8 - 256 end if
-        leftVolume = volumes[0]
-        rightVolume = volumes[1]
+        leftVolume = leftVolumeValue
+        rightVolume = rightVolumeValue
         if leftVolume > 255 then leftVolume = 255 end if
         if rightVolume > 255 then rightVolume = 255 end if
         accumulator[frame * 2] = accumulator[frame * 2] + sample8 * (leftVolume >> 3) * 8
         accumulator[frame * 2 + 1] = accumulator[frame * 2 + 1] + sample8 * (rightVolume >> 3) * 8
       else
         sample = bio.i16(channel.effect.samples, (channel.sample + frame) * 2)
-        accumulator[frame * 2] = accumulator[frame * 2] + ((sample * volumes[0]) >> 8)
-        accumulator[frame * 2 + 1] = accumulator[frame * 2 + 1] + ((sample * volumes[1]) >> 8)
+        accumulator[frame * 2] = accumulator[frame * 2] + ((sample * leftVolumeValue) >> 8)
+        accumulator[frame * 2 + 1] = accumulator[frame * 2 + 1] + ((sample * rightVolumeValue) >> 8)
       end if
       frame = frame + 1
     end while
@@ -649,55 +807,90 @@ function mixChannelWithVolumes(mixer, channel, accumulator, frameCount, volumes)
   return channel.active
 end function
 
+// Mix channel with volumes into the active audio buffer.
+function mixChannelWithVolumes(mixer, channel, accumulator, frameCount, volumes)
+  return mixChannelWithStereoVolumes(mixer, channel, accumulator, frameCount, volumes[0], volumes[1])
+end function
+
+// Mix channel into the active audio buffer.
 function mixChannel(mixer, channel, accumulator, frameCount)
   return mixChannelWithVolumes(mixer, channel, accumulator, frameCount, channelVolumes(mixer, channel))
 end function
 
-function mix(mixer, frameCount)
-  if frameCount <= 0 then return bytes() end if
-
+// Mix into a caller-owned PCM buffer using persistent paint scratch storage.
+function mixIntoOutput(mixer, frameCount, output)
+  global paintAccumulatorScratch, paintLeftVolumeScratch, paintRightVolumeScratch, paintSurvivorScratch
+  if frameCount <= 0 then return output end if
   // Accumulate all channels at full precision and clamp only once.  Clamping
   // the output buffer after every channel made the result depend on channel
   // order and could crush effects when several torches/doors overlapped.
   accumulatorCount = frameCount * 2
-  accumulator = arrays.makeFilledArray(accumulatorCount, 0)
+  if len(paintAccumulatorScratch) < accumulatorCount then paintAccumulatorScratch = array(accumulatorCount, 0) end if
+  accumulator = paintAccumulatorScratch
+  sampleIndex = 0
+  while sampleIndex < accumulatorCount
+    accumulator[sampleIndex] = 0
+    sampleIndex = sampleIndex + 1
+  end while
   channelCount = len(mixer.channels)
-  volumeOverrides = arrays.makeFilledArray(channelCount, void)
+  if len(paintLeftVolumeScratch) < channelCount then
+    paintLeftVolumeScratch = array(channelCount, 0)
+    paintRightVolumeScratch = array(channelCount, 0)
+    paintSurvivorScratch = array(channelCount, void)
+  end if
   channelIndex = 0
   while channelIndex < channelCount
     channel = mixer.channels[channelIndex]
-    volumes = channelVolumes(mixer, channel)
+    channelVolumesInto(mixer, channel, paintLeftVolumeScratch, paintRightVolumeScratch, channelIndex)
     if channel.channelNumber == STATIC_CHANNEL and channel.effect is not void then
       prior = 0
       combined = false
       while prior < channelIndex and not combined
         priorChannel = mixer.channels[prior]
         if priorChannel.channelNumber == STATIC_CHANNEL and priorChannel.effect == channel.effect and priorChannel.active then
-          volumeOverrides[prior][0] = volumeOverrides[prior][0] + volumes[0]
-          volumeOverrides[prior][1] = volumeOverrides[prior][1] + volumes[1]
-          volumes = [0, 0]
+          paintLeftVolumeScratch[prior] = paintLeftVolumeScratch[prior] + paintLeftVolumeScratch[channelIndex]
+          paintRightVolumeScratch[prior] = paintRightVolumeScratch[prior] + paintRightVolumeScratch[channelIndex]
+          paintLeftVolumeScratch[channelIndex] = 0
+          paintRightVolumeScratch[channelIndex] = 0
           combined = true
         end if
         prior = prior + 1
       end while
     end if
-    volumeOverrides[channelIndex] = volumes
     channelIndex = channelIndex + 1
   end while
 
-  alive = arrays.createArrayBuilder(channelCount)
+  survivorCount = 0
+  removed = false
   channelIndex = 0
   while channelIndex < channelCount
     channel = mixer.channels[channelIndex]
-    volumes = volumeOverrides[channelIndex]
-    if channel.active and volumes[0] == 0 and volumes[1] == 0 then
-      arrays.pushArrayBuilder(alive, channel)
-    else if mixChannelWithVolumes(mixer, channel, accumulator, frameCount, volumes) then
-      arrays.pushArrayBuilder(alive, channel)
+    leftVolume = paintLeftVolumeScratch[channelIndex]
+    rightVolume = paintRightVolumeScratch[channelIndex]
+    survives = channel.active and leftVolume == 0 and rightVolume == 0
+    if not survives then
+      survives = mixChannelWithStereoVolumes(mixer, channel, accumulator, frameCount, leftVolume, rightVolume)
+    end if
+    if survives then
+      paintSurvivorScratch[survivorCount] = channel
+      survivorCount = survivorCount + 1
+    else
+      removed = true
     end if
     channelIndex = channelIndex + 1
   end while
-  mixer.channels = arrays.finishArrayBuilder(alive)
+  // Most paint blocks do not end a channel. Keep the existing channel array
+  // in that common case and allocate a compact replacement only on an actual
+  // sound completion, matching the fixed-slot behavior of snd_mix.c.
+  if removed then
+    survivors = arrays.makeEmptyArray(survivorCount)
+    survivorIndex = 0
+    while survivorIndex < survivorCount
+      survivors[survivorIndex] = paintSurvivorScratch[survivorIndex]
+      survivorIndex = survivorIndex + 1
+    end while
+    mixer.channels = survivors
+  end if
   mixer.paintedTime = mixer.paintedTime + frameCount
 
   // S_TransferPaintBuffer applies the archived volume cvar once after all
@@ -710,7 +903,7 @@ function mix(mixer, frameCount)
   end while
   mixMusic(mixer, accumulator, frameCount)
 
-  output = bytes(frameCount * 4)
+  if len(output) < frameCount * 4 then output = bytes(frameCount * 4) end if
   frame = 0
   while frame < frameCount
     bio.putI16(output, frame * 4, clampSample(accumulator[frame * 2]))
@@ -720,7 +913,24 @@ function mix(mixer, frameCount)
   return output
 end function
 
+// Mix the requested value into the active audio buffer.
+function mix(mixer, frameCount)
+  if frameCount <= 0 then return bytes() end if
+  return mixIntoOutput(mixer, frameCount, bytes(frameCount * 4))
+end function
+
+// Paint one backend block into the reusable submission buffer. audioSubmit
+// copies the samples synchronously into its fixed waveOut header ring.
+function mixForSubmit(mixer, frameCount)
+  global paintOutputScratch
+  required = frameCount * 4
+  if len(paintOutputScratch) != required then paintOutputScratch = bytes(required) end if
+  return mixIntoOutput(mixer, frameCount, paintOutputScratch)
+end function
+
+// Mix music into the active audio buffer.
 function mixMusic(mixer, accumulator, frameCount)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   track = mixer.music
   if track is void or not track.playing or track.paused or mixer.musicVolume <= 0.0 then return false end if
   frame = 0
@@ -730,19 +940,36 @@ function mixMusic(mixer, accumulator, frameCount)
       if track.looping then
         track.position = 0
         sourceFrame = 0
+        if not decodeMusicChunk(track, true) then track.playing = false; break end if
       else
         track.playing = false
         break
       end if
     end if
+    if track.sampleFrames == 0 then
+      if not decodeMusicChunk(track, track.sampleBase != 0) then track.playing = false; break end if
+    end if
+    while sourceFrame >= track.sampleBase + track.sampleFrames and track.playing
+      if not decodeMusicChunk(track, false) then
+        if track.looping then
+          track.position = 0
+          sourceFrame = 0
+          if not decodeMusicChunk(track, true) then track.playing = false end if
+        else
+          track.playing = false
+        end if
+      end if
+    end while
+    if not track.playing then break end if
+    chunkFrame = sourceFrame - track.sampleBase
     left = 0
     right = 0
     if track.channels == 1 then
-      left = bio.i16(track.samples, sourceFrame * 2)
+      left = bio.i16(track.samples, chunkFrame * 2)
       right = left
     else
-      left = bio.i16(track.samples, sourceFrame * 4)
-      right = bio.i16(track.samples, sourceFrame * 4 + 2)
+      left = bio.i16(track.samples, chunkFrame * 4)
+      right = bio.i16(track.samples, chunkFrame * 4 + 2)
     end if
     accumulator[frame * 2] = accumulator[frame * 2] + left * mixer.musicVolume
     accumulator[frame * 2 + 1] = accumulator[frame * 2 + 1] + right * mixer.musicVolume
@@ -752,6 +979,7 @@ function mixMusic(mixer, accumulator, frameCount)
   return track.playing
 end function
 
+// Provide desired queued buffers behavior for the active subsystem.
 function desiredQueuedBuffers(mixer, frameTime, mixAhead)
   if mixAhead < 0.0 then mixAhead = 0.0 end if
   if frameTime < 0.0 then frameTime = 0.0 end if
@@ -766,6 +994,7 @@ function desiredQueuedBuffers(mixer, frameTime, mixAhead)
   return target
 end function
 
+// Update module state for the requested operation.
 function update(mixer, frameTime, mixAhead)
   if not mixer.enabled or blockDepth(mixer) > 0 then return 0 end if
   queuedBefore = audio.queued(mixer.audioState)
@@ -776,7 +1005,7 @@ function update(mixer, frameTime, mixAhead)
   target = desiredQueuedBuffers(mixer, frameTime, mixAhead)
   submitted = 0
   while audio.queued(mixer.audioState) < target
-    data = mix(mixer, MIX_FRAMES)
+    data = mixForSubmit(mixer, MIX_FRAMES)
     if not audio.submit(mixer.audioState, data) then break end if
     submitted = submitted + 1
     mixer.submittedBuffers = mixer.submittedBuffers + 1

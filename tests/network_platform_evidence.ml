@@ -1,14 +1,21 @@
-/* BP-064: independent-process UDP control handshake evidence. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+BP-064: independent-process UDP control handshake evidence.
+*/
 import miniquake.net_udp as udp
 import miniquake.net_control as control
 import miniquake.platform.win32 as win
 
+// Report the requested value and return the corresponding failure status.
 function fail(message)
   print "MiniQuake BP-064 network platform evidence: FAIL"
   print "  " + message
   return 1
 end function
 
+// Exercise wait packet as part of this deterministic regression fixture.
 function waitPacket(socketValue, wanted, timeoutMilliseconds)
   elapsed = 0
   while elapsed < timeoutMilliseconds
@@ -24,6 +31,7 @@ function waitPacket(socketValue, wanted, timeoutMilliseconds)
   return error(3680, "network evidence receive timeout")
 end function
 
+// Execute server.
 function runServer(port)
   opened = try(udp.openBound(port, "127.0.0.1"))
   if opened is error then return fail(opened.message) end if
@@ -60,6 +68,7 @@ function runServer(port)
   return 0
 end function
 
+// Execute client.
 function runClient(port)
   opened = try(udp.open(0))
   if opened is error then return fail(opened.message) end if
@@ -88,6 +97,7 @@ function runClient(port)
   return 0
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   if len(args) < 2 then print "usage: evidence server|client PORT"; return 2 end if
   port = toNumber(args[1])

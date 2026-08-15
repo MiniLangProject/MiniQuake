@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/cl_demo_port_tests.ml.
+*/
 import miniquake.demo as demo
 import miniquake.demo_player as player
 import miniquake.client as client
@@ -8,16 +14,19 @@ import miniquake.sizebuf as sz
 import miniquake.message as msg
 import miniquake.byteio as bio
 
+// Assert that the condition holds and identify a failing test.
 function require(value, name)
   if value != true then return error(9880, name) end if
   return true
 end function
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(9881, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function near(actual, expected, tolerance, name)
   delta = actual - expected
   if delta < 0.0 then delta = -delta end if
@@ -25,6 +34,7 @@ function near(actual, expected, tolerance, name)
   return true
 end function
 
+// Exercise byte fixture as part of this deterministic regression fixture.
 function byteFixture(values)
   result = bytes(len(values))
   index = 0
@@ -35,6 +45,7 @@ function byteFixture(values)
   return result
 end function
 
+// Assert exact equality and report both values on failure.
 function bytesEqual(actual, expected, name)
   equal(len(actual), len(expected), name + " length")
   index = 0
@@ -45,6 +56,7 @@ function bytesEqual(actual, expected, name)
   return true
 end function
 
+// Exercise time payload as part of this deterministic regression fixture.
 function timePayload(value)
   buffer = sz.alloc(16)
   msg.writeByte(buffer, c.SVC_TIME)
@@ -52,6 +64,7 @@ function timePayload(value)
   return sz.dataSlice(buffer)
 end function
 
+// Exercise playback fixture as part of this deterministic regression fixture.
 function playbackFixture()
   recording = t.Demo(-1, [
     t.DemoMessage(t.Vec3(10.0, 20.0, 30.0), timePayload(1.1)),
@@ -66,6 +79,7 @@ function playbackFixture()
   return playback
 end function
 
+// Verify glquake framing against the expected Quake behavior.
 function testGlquakeFraming()
   fixture = byteFixture([
     45, 49, 10,
@@ -86,6 +100,7 @@ function testGlquakeFraming()
   return true
 end function
 
+// Verify record write stop against the expected Quake behavior.
 function testRecordWriteStop()
   plan = demo.CL_Record_f(["record", "fixture", "e1m1", "4"], false)
   equal(plan[0], "fixture.dem", "record filename")
@@ -116,6 +131,7 @@ function testRecordWriteStop()
   return true
 end function
 
+// Verify playback pacing against the expected Quake behavior.
 function testPlaybackPacing()
   playback = playbackFixture()
   equal(player.stepFrame(playback, 1, 1.0, 0.05), 0, "mtime blocks early message")
@@ -132,6 +148,7 @@ function testPlaybackPacing()
   return true
 end function
 
+// Verify timedemo against the expected Quake behavior.
 function testTimedemo()
   playback = playbackFixture()
   require(player.CL_TimeDemo_f(playback, 10), "start timedemo")
@@ -150,6 +167,7 @@ function testTimedemo()
   return true
 end function
 
+// Verify get message and stop against the expected Quake behavior.
 function testGetMessageAndStop()
   playback = playbackFixture()
   playback.client.time = 1.1
@@ -169,6 +187,7 @@ function testGetMessageAndStop()
   return true
 end function
 
+// Verify malformed against the expected Quake behavior.
 function testMalformed()
   missingHeader = try(demo.parse(byteFixture([45, 49])))
   require(missingHeader is error, "missing track newline")
@@ -191,6 +210,7 @@ function testMalformed()
   return true
 end function
 
+// Verify verifier path against the expected Quake behavior.
 function testVerifierPath()
   recording = t.Demo(0, [
     t.DemoMessage(t.Vec3(0.0, 90.0, 0.0), byteFixture([c.SVC_NOP])),
@@ -207,6 +227,7 @@ function testVerifierPath()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "MiniQuake cl_demo port tests starting: 7"
   result = try(testGlquakeFraming())

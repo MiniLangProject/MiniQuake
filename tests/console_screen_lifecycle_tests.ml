@@ -1,16 +1,17 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-067: console notify-box and screen modal lifecycle parity.
 */
-
 import miniquake.console as bp067Console
 import miniquake.screen as bp067Screen
 
 bp067Index = 0
 bp067Failures = 0
 
+// Assert that the condition holds and identify a failing test.
 function bp067Check(value, name)
   global bp067Index, bp067Failures
   bp067Index = bp067Index + 1
@@ -23,6 +24,7 @@ function bp067Check(value, name)
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   state = bp067Console.create(64)
   bp067Console.Con_Init(state, void, 320, false)

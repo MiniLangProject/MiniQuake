@@ -1,4 +1,10 @@
-/* Frozen MiniQuake 1.09 special-render and evidence-corpus contract. */
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Frozen MiniQuake 1.09 special-render and evidence-corpus contract.
+*/
 package miniquake.render_special_contract
 
 import miniquake.render.special_paths as special
@@ -20,14 +26,17 @@ const SPECIAL_RENDER_STAGE_COUNT = 12
 const ORIGINAL_REFERENCE_EXTERNAL = 1
 const PARENT_STATUS = "model_ui_render_109_frozen_v1"
 
+// Return the stable compatibility-contract status string.
 function inline status()
   return STATUS
 end function
 
+// Return the stable compatibility-contract fingerprint.
 function inline fingerprint()
   return FINGERPRINT
 end function
 
+// Return constants for the active module state.
 function constants()
   return [
     MIRROR_PREFIX_BYTES,
@@ -44,6 +53,7 @@ function constants()
   ]
 end function
 
+// Validate the requested value and report any invalid state.
 function verify()
   if parent.status() != PARENT_STATUS then return false end if
   if special.ENVMAP_SIZE != ENVMAP_SIZE then return false end if

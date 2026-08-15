@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.server_move.
+*/
 package miniquake.server_move
 
 import miniquake.types as t
@@ -10,15 +17,18 @@ import miniquake.server_collision as collision
 const STEP_SIZE = 18.0
 const DI_NODIR = -1.0
 
+// Create the zero-initialized state for vector.
 function zeroVector()
   return t.Vec3(0.0, 0.0, 0.0)
 end function
 
+// Provide absolute behavior for the active subsystem.
 function absolute(value)
   if value < 0.0 then return -value end if
   return value
 end function
 
+// Provide random word behavior for the active subsystem.
 function randomWord(server)
   if server is void or server.machine is void or server.machine.context is void then return 0 end if
   ctx = server.machine.context
@@ -28,7 +38,7 @@ end function
 
 // PF_changeyaw / SV_StepDirection share this exact angle update.
 function changeYaw(server, entityIndex)
-  angles = collision.entityVector(server, entityIndex, "angles", zeroVector())
+  angles = collision.entityVectorZero(server, entityIndex, "angles")
   current = math.angleMod(angles.y)
   ideal = math.angleMod(collision.entityFloat(server, entityIndex, "ideal_yaw", current))
   speed = collision.entityFloat(server, entityIndex, "yaw_speed", 0.0)
@@ -49,8 +59,9 @@ end function
 // SV_movestep: QuakeC monster movement, including stair/drop checks and
 // flying/swimming pursuit height adjustment.
 function moveStep(server, entityIndex, movement, relink)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if not collision.entityValid(server, entityIndex) then return false end if
-  oldOrigin = collision.entityVector(server, entityIndex, "origin", zeroVector())
+  oldOrigin = collision.entityVectorZero(server, entityIndex, "origin")
   flags = native.trunc(collision.entityFloat(server, entityIndex, "flags", 0.0))
 
   if (flags & (c.FL_SWIM | c.FL_FLY)) != 0 then
@@ -59,13 +70,13 @@ function moveStep(server, entityIndex, movement, relink)
       target = math.add(oldOrigin, movement)
       enemy = collision.entityWord(server, entityIndex, "enemy", 0)
       if attempt == 0 and enemy != 0 and collision.entityValid(server, enemy) then
-        enemyOrigin = collision.entityVector(server, enemy, "origin", zeroVector())
+        enemyOrigin = collision.entityVectorZero(server, enemy, "origin")
         dz = oldOrigin.z - enemyOrigin.z
         if dz > 40.0 then target.z = target.z - 8.0 end if
         if dz < 30.0 then target.z = target.z + 8.0 end if
       end if
-      mins = collision.entityVector(server, entityIndex, "mins", zeroVector())
-      maxs = collision.entityVector(server, entityIndex, "maxs", zeroVector())
+      mins = collision.entityVectorZero(server, entityIndex, "mins")
+      maxs = collision.entityVectorZero(server, entityIndex, "maxs")
       trace = collision.move(server, oldOrigin, mins, maxs, target, c.MOVE_NORMAL, entityIndex)
       if trace.fraction == 1.0 then
         if (flags & c.FL_SWIM) != 0 and world.pointContentsWorld(server.worldModel, trace.endPosition) == c.CONTENTS_EMPTY then return false end if
@@ -82,8 +93,8 @@ function moveStep(server, entityIndex, movement, relink)
   target = math.add(oldOrigin, movement)
   target.z = target.z + STEP_SIZE
   finish = t.Vec3(target.x, target.y, target.z - STEP_SIZE * 2.0)
-  mins = collision.entityVector(server, entityIndex, "mins", zeroVector())
-  maxs = collision.entityVector(server, entityIndex, "maxs", zeroVector())
+  mins = collision.entityVectorZero(server, entityIndex, "mins")
+  maxs = collision.entityVectorZero(server, entityIndex, "maxs")
   trace = collision.move(server, target, mins, maxs, finish, c.MOVE_NORMAL, entityIndex)
   if trace.allSolid then return false end if
 
@@ -123,14 +134,15 @@ function moveStep(server, entityIndex, movement, relink)
   return true
 end function
 
+// Advance direction by one processing step.
 function stepDirection(server, entityIndex, yaw, distance)
   collision.setEntityFloat(server, entityIndex, "ideal_yaw", yaw)
   changeYaw(server, entityIndex)
   radians = yaw * math.DEG_TO_RAD
   movement = t.Vec3(native.cos(radians) * distance, native.sin(radians) * distance, 0.0)
-  oldOrigin = collision.entityVector(server, entityIndex, "origin", zeroVector())
+  oldOrigin = collision.entityVectorZero(server, entityIndex, "origin")
   if moveStep(server, entityIndex, movement, false) then
-    angles = collision.entityVector(server, entityIndex, "angles", zeroVector())
+    angles = collision.entityVectorZero(server, entityIndex, "angles")
     ideal = collision.entityFloat(server, entityIndex, "ideal_yaw", yaw)
     delta = angles.y - ideal
     if delta > 45.0 and delta < 315.0 then collision.setEntityVector(server, entityIndex, "origin", oldOrigin) end if
@@ -141,14 +153,17 @@ function stepDirection(server, entityIndex, yaw, distance)
   return false
 end function
 
+// Provide fix check bottom behavior for the active subsystem.
 function fixCheckBottom(server, entityIndex)
   flags = native.trunc(collision.entityFloat(server, entityIndex, "flags", 0.0))
   collision.setEntityFloat(server, entityIndex, "flags", flags | c.FL_PARTIALGROUND)
 end function
 
+// Create and initialize chase direction.
 function newChaseDirection(server, actor, enemy, distance)
-  actorOrigin = collision.entityVector(server, actor, "origin", zeroVector())
-  enemyOrigin = collision.entityVector(server, enemy, "origin", zeroVector())
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
+  actorOrigin = collision.entityVectorZero(server, actor, "origin")
+  enemyOrigin = collision.entityVectorZero(server, enemy, "origin")
   oldDirection = math.angleMod(native.trunc(collision.entityFloat(server, actor, "ideal_yaw", 0.0) / 45.0) * 45.0)
   turnaround = math.angleMod(oldDirection - 180.0)
   deltaX = enemyOrigin.x - actorOrigin.x
@@ -197,6 +212,7 @@ function newChaseDirection(server, actor, enemy, distance)
   return false
 end function
 
+// Release state for close enough.
 function closeEnough(server, entityIndex, goalIndex, distance)
   entityMins = collision.entityAbsMin(server, entityIndex)
   entityMaxs = collision.entityAbsMax(server, entityIndex)
@@ -208,6 +224,7 @@ function closeEnough(server, entityIndex, goalIndex, distance)
   return true
 end function
 
+// Transfer data for move to goal.
 function moveToGoal(server, entityIndex, distance)
   flags = native.trunc(collision.entityFloat(server, entityIndex, "flags", 0.0))
   if (flags & (c.FL_ONGROUND | c.FL_FLY | c.FL_SWIM)) == 0 then return false end if
@@ -231,27 +248,33 @@ function SV_CheckBottom(server, entityIndex)
   return collision.checkBottom(server, entityIndex)
 end function
 
+// Apply the Quake-compatible sv movestep behavior.
 function SV_movestep(server, entityIndex, movement, relink)
   return moveStep(server, entityIndex, movement, relink)
 end function
 
+// Apply the Quake-compatible sv step direction behavior.
 function SV_StepDirection(server, entityIndex, yaw, distance)
   return stepDirection(server, entityIndex, yaw, distance)
 end function
 
+// Apply the Quake-compatible sv fix check bottom behavior.
 function SV_FixCheckBottom(server, entityIndex)
   fixCheckBottom(server, entityIndex)
   return true
 end function
 
+// Apply the Quake-compatible sv new chase dir behavior.
 function SV_NewChaseDir(server, actor, enemy, distance)
   return newChaseDirection(server, actor, enemy, distance)
 end function
 
+// Apply the Quake-compatible sv close enough behavior.
 function SV_CloseEnough(server, entityIndex, goalIndex, distance)
   return closeEnough(server, entityIndex, goalIndex, distance)
 end function
 
+// Apply the Quake-compatible sv move to goal behavior.
 function SV_MoveToGoal(server, entityIndex, distance)
   return moveToGoal(server, entityIndex, distance)
 end function

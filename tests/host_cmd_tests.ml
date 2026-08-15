@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/host_cmd_tests.ml.
+*/
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.server as server
@@ -12,24 +18,29 @@ import miniquake.sizebuf as sz
 import miniquake.native as native
 import miniquake.byteio as bio
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9800, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9801, name + ": expected true") end if
   return true
 end function
 
+// Exercise never command as part of this deterministic regression fixture.
 function neverCommand(name)
   return false
 end function
 
+// Update subsystem configuration for register variable.
 function registerVariable(registry, name, value)
   return cvar.register(registry, cvar.create(name, value, false, true), neverCommand)
 end function
 
+// Exercise contains as part of this deterministic regression fixture.
 function contains(values, wanted)
   for each value in values
     if value == wanted then return true end if
@@ -37,6 +48,7 @@ function contains(values, wanted)
   return false
 end function
 
+// Exercise contains text as part of this deterministic regression fixture.
 function containsText(text, wanted)
   source = bytes(text)
   needle = bytes(wanted)
@@ -55,6 +67,7 @@ function containsText(text, wanted)
   return false
 end function
 
+// Create and initialize server.
 function makeServer()
   fieldDefs = [
     t.QuakeCDef(c.EV_VOID, 0, 0, ""),
@@ -118,6 +131,7 @@ function makeServer()
   return gameServer
 end function
 
+// Verify client commands against the expected Quake behavior.
 function testClientCommands()
   gameServer = makeServer()
   first = gameServer.clients[0]
@@ -174,6 +188,7 @@ function testClientCommands()
   return true
 end function
 
+// Verify save format against the expected Quake behavior.
 function testSaveFormat()
   comment = savegame.Host_SavegameComment("Entrance", 1, 12)
   assertEqual(len(bytes(comment)), 39, "save comment length")
@@ -202,6 +217,7 @@ function testSaveFormat()
   return true
 end function
 
+// Verify registration against the expected Quake behavior.
 function testRegistration()
   commands = host.Host_InitCommands()
   assertTrue(contains(commands, "status"), "host status registered")
@@ -214,6 +230,7 @@ function testRegistration()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "MiniQuake host_cmd tests starting: 3"
   result = try(testClientCommands())

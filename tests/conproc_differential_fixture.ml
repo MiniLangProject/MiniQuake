@@ -1,10 +1,18 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/conproc_differential_fixture.ml.
+*/
 import miniquake.conproc as conproc
 
+// Return bool number derived from the active module state.
 function boolNumber(value)
   if value then return 1 end if
   return 0
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   conproc.InitConProc(10, 20, 30, false)
   state = conproc.ConProc_State()

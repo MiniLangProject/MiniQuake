@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Focused MiniQuake common.c/common.h compatibility tests.
 */
-
 import miniquake.types as t
 import miniquake.common as common
 import miniquake.byteio as bio
@@ -15,16 +15,19 @@ import miniquake.filesystem as qfs
 import miniquake.memory as memory
 import std.fs as fs
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9200, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9201, name + ": expected true") end if
   return true
 end function
 
+// Return registered bytes derived from the active module state.
 function registeredBytes()
   words = qfs.registeredWords()
   data = bytes(len(words) * 2)
@@ -37,11 +40,13 @@ function registeredBytes()
   return data
 end function
 
+// Exercise pack system as part of this deterministic regression fixture.
 function packSystem(files, data)
   archive = t.PackArchive("fixture.pak", data, files, len(files))
   return t.FileSystem("", "id1", [t.SearchPath("", archive)], "", true, false, true, false)
 end function
 
+// Return registered pack bytes derived from the active module state.
 function registeredPackBytes()
   pop = registeredBytes()
   progs = bytes("base")
@@ -69,6 +74,7 @@ function registeredPackBytes()
   return data
 end function
 
+// Verify links and formatting against the expected Quake behavior.
 function testLinksAndFormatting()
   head = t.Link(void, void)
   common.clearLink(head)
@@ -96,6 +102,7 @@ function testLinksAndFormatting()
   return true
 end function
 
+// Verify registered and search against the expected Quake behavior.
 function testRegisteredAndSearch()
   pop = registeredBytes()
   system = packSystem([t.PackFile("gfx/pop.lmp", 0, len(pop))], pop)
@@ -135,6 +142,7 @@ function testRegisteredAndSearch()
   return true
 end function
 
+// Verify handles and lifetimes against the expected Quake behavior.
 function testHandlesAndLifetimes()
   source = bytes("hello")
   system = packSystem([t.PackFile("test.bin", 0, len(source))], source)
@@ -173,6 +181,7 @@ function testHandlesAndLifetimes()
   return true
 end function
 
+// Verify filesystem initialization against the expected Quake behavior.
 function testFilesystemInitialization()
   packPath = "build\\common_path_test.pak"
   fs.writeAllBytes(packPath, registeredPackBytes())
@@ -204,6 +213,7 @@ function testFilesystemInitialization()
   return true
 end function
 
+// Verify message and size buffer against the expected Quake behavior.
 function testMessageAndSizeBuffer()
   buffer = sz.alloc(16)
   msg.writeAngle(buffer, 1.9)
@@ -223,6 +233,7 @@ function testMessageAndSizeBuffer()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   result = try(testLinksAndFormatting())
   if result is error then print "FAIL: " + result.message; return 1 end if

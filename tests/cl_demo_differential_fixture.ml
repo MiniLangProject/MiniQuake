@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/cl_demo_differential_fixture.ml.
+*/
 import miniquake.demo as demo
 import miniquake.demo_player as player
 import miniquake.client as client
@@ -7,6 +13,7 @@ import miniquake.player_move as movement
 import miniquake.net_loop as netloop
 import miniquake.native as native
 
+// Exercise payload as part of this deterministic regression fixture.
 function payload(values)
   result = bytes(len(values))
   index = 0
@@ -17,11 +24,13 @@ function payload(values)
   return result
 end function
 
+// Exercise bool text as part of this deterministic regression fixture.
 function boolText(value)
   if value then return "true" end if
   return "false"
 end function
 
+// Exercise playback fixture as part of this deterministic regression fixture.
 function playbackFixture(messages)
   recording = t.Demo(-1, messages, "-1\n")
   result = player.create(recording)
@@ -29,7 +38,9 @@ function playbackFixture(messages)
   return result
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   recording = t.Demo(-1, [], "-1\n")
   demo.CL_WriteDemoMessage(recording, payload([c.SVC_NOP, c.SVC_DISCONNECT]), t.Vec3(1.0, -2.5, 90.0))
   print "{\"function\":\"CL_WriteDemoMessage\",\"case\":\"framing\",\"file_length\":18,\"length_prefix\":2,\"payload\":[1,2],\"viewangles\":[1,-2.5,90]}"

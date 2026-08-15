@@ -1,9 +1,16 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/opt001c_contract_tests.ml.
+*/
 import miniquake.build_info as buildInfo
 import miniquake.render.gl11 as gl
 
 opt001cPassed = 0
 opt001cFailed = 0
 
+// Assert that the condition holds and identify a failing test.
 function opt001cCheck(condition, label)
   global opt001cPassed, opt001cFailed
   if condition then
@@ -15,6 +22,7 @@ function opt001cCheck(condition, label)
   end if
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   opt001cCheck(buildInfo.OPT001C_STATUS == "opt001c_frame_allocation_candidate_v1", "optimization status")
   opt001cCheck(buildInfo.OPT001C_FINGERPRINT == 0x1c001c03, "optimization fingerprint")

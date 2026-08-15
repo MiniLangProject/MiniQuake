@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-029 source-guided sv_user.c command, movement and gate fixtures.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.sv_user as svuser
@@ -23,16 +23,19 @@ struct SvUserTestMap
   leafs
 end struct
 
+// Assert exact equality and report both values on failure.
 function svuTestEqual(actual, expected, name)
   if actual != expected then return error(9970, name + ": got " + actual + " expected " + expected) end if
   return true
 end function
 
+// Exercise svu test true as part of this deterministic regression fixture.
 function svuTestTrue(value, name)
   if value != true then return error(9971, name) end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function svuTestNear(actual, expected, tolerance, name)
   difference = actual - expected
   if difference < 0.0 then difference = -difference end if
@@ -40,6 +43,7 @@ function svuTestNear(actual, expected, tolerance, name)
   return true
 end function
 
+// Create and initialize user floor map.
 function makeUserFloorMap(slope, solidBack)
   planeType = 3
   if slope == 0.0 then planeType = 2 end if
@@ -62,6 +66,7 @@ function makeUserFloorMap(slope, solidBack)
   return SvUserTestMap([model], [node], [clipNode], [plane], [backLeaf, frontLeaf])
 end function
 
+// Verify edge friction against the expected Quake behavior.
 function testEdgeFriction()
   game = server.create(1)
   state = svuser.SV_UserInit(game)
@@ -83,6 +88,7 @@ function testEdgeFriction()
   return true
 end function
 
+// Verify air water and waterjump against the expected Quake behavior.
 function testAirWaterAndWaterjump()
   game = server.create(1)
   state = svuser.SV_UserInit(game)
@@ -117,6 +123,7 @@ function testAirWaterAndWaterjump()
   return true
 end function
 
+// Verify angles ideal pitch and gates against the expected Quake behavior.
 function testAnglesIdealPitchAndGates()
   game = server.create(1)
   state = svuser.SV_UserInit(game)
@@ -171,6 +178,7 @@ function testAnglesIdealPitchAndGates()
   return true
 end function
 
+// Verify client command parsing against the expected Quake behavior.
 function testClientCommandParsing()
   game = server.create(1)
   state = svuser.SV_UserInit(game)
@@ -217,6 +225,7 @@ function testClientCommandParsing()
   return true
 end function
 
+// Execute one named test case and record its pass/fail result.
 function parityRun(number, name, fn)
   print "[" + number + "/18] " + name
   result = try(fn())
@@ -224,6 +233,7 @@ function parityRun(number, name, fn)
   return true
 end function
 
+// Verify privileged allowed uses client context against the expected Quake behavior.
 function testPrivilegedAllowedUsesClientContext()
   game=server.create(1);state=svuser.SV_UserInit(game);clientValue=game.clients[0];clientValue.name="before";clientValue.privileged=true
   player=movement.create(t.Vec3(0.0,0.0,0.0),t.Vec3(0.0,0.0,0.0))
@@ -231,6 +241,7 @@ function testPrivilegedAllowedUsesClientContext()
   svuTestEqual(state.commandEvents[0][0],"client","allowed command source");svuTestEqual(clientValue.name,"Ranger","allowed command effect")
   return true
 end function
+// Verify privileged arbitrary uses insert against the expected Quake behavior.
 function testPrivilegedArbitraryUsesInsert()
   game=server.create(1);state=svuser.SV_UserInit(game);clientValue=game.clients[0];clientValue.name="admin";clientValue.privileged=true
   player=movement.create(t.Vec3(0.0,0.0,0.0),t.Vec3(0.0,0.0,0.0))
@@ -238,16 +249,19 @@ function testPrivilegedArbitraryUsesInsert()
   svuTestEqual(state.commandEvents[0][0],"insert","insert source");svuTestEqual(len(state.diagnostics),0,"no privileged diagnostic")
   return true
 end function
+// Verify case insensitive whitelist against the expected Quake behavior.
 function testCaseInsensitiveWhitelist()
   svuTestTrue(svuser.svuAllowedCommand("StAtUs"),"case-insensitive status")
   svuTestTrue(svuser.svuAllowedCommand("NaMe Ranger"),"case-insensitive name")
   return true
 end function
+// Verify prefix whitelist matches original against the expected Quake behavior.
 function testPrefixWhitelistMatchesOriginal()
   svuTestTrue(svuser.svuAllowedCommand("status_extra"),"status prefix")
   svuTestTrue(svuser.svuAllowedCommand("say_teamhello"),"say_team prefix")
   return true
 end function
+// Verify unprivileged blocked diagnostic against the expected Quake behavior.
 function testUnprivilegedBlockedDiagnostic()
   game=server.create(1);state=svuser.SV_UserInit(game);clientValue=game.clients[0];clientValue.name="guest";clientValue.privileged=false
   player=movement.create(t.Vec3(0.0,0.0,0.0),t.Vec3(0.0,0.0,0.0))
@@ -255,11 +269,13 @@ function testUnprivilegedBlockedDiagnostic()
   svuTestEqual(len(state.diagnostics),1,"blocked diagnostic")
   return true
 end function
+// Create and initialize move packet.
 function makeMovePacket(clientTime, impulse)
   packet=sz.alloc(64);msg.writeFloat(packet,clientTime);msg.writeAngle(packet,45.0);msg.writeAngle(packet,90.0);msg.writeAngle(packet,0.0)
   msg.writeShort(packet,120);msg.writeShort(packet,-30);msg.writeShort(packet,10);msg.writeByte(packet,3);msg.writeByte(packet,impulse)
   return sz.dataSlice(packet)
 end function
+// Verify ping stored as binary32 against the expected Quake behavior.
 function testPingStoredAsBinary32()
   game=server.create(1);state=svuser.SV_UserInit(game);game.time=5.0;clientValue=game.clients[0];player=movement.create(t.Vec3(0.0,0.0,0.0),t.Vec3(0.0,0.0,0.0))
   reader=msg.beginReadingBytes(makeMovePacket(4.9,0));svuser.SV_ReadClientMove(state,reader,clientValue,player)
@@ -268,48 +284,57 @@ function testPingStoredAsBinary32()
   svuTestEqual(native.floatBits(clientValue.pingTimes[0]),expectedPingBits,"ping double-minus-float then float store")
   return true
 end function
+// Verify zero impulse preserves previous against the expected Quake behavior.
 function testZeroImpulsePreservesPrevious()
   game=server.create(1);state=svuser.SV_UserInit(game);clientValue=game.clients[0];clientValue.command.impulse=7;player=movement.create(t.Vec3(0.0,0.0,0.0),t.Vec3(0.0,0.0,0.0))
   reader=msg.beginReadingBytes(makeMovePacket(0.0,0));svuser.SV_ReadClientMove(state,reader,clientValue,player)
   svuTestEqual(clientValue.command.impulse,7,"zero impulse preserves old")
   return true
 end function
+// Verify water jump equal time retained against the expected Quake behavior.
 function testWaterJumpEqualTimeRetained()
   game=server.create(1);state=svuser.SV_UserInit(game);player=movement.create(t.Vec3(0.0,0.0,0.0),t.Vec3(0.0,0.0,0.0));player.flags=player.flags|c.FL_WATERJUMP;player.waterLevel=2;player.teleportTime=5.0;game.time=5.0
   svuser.SV_WaterJump(state,player);svuTestTrue((player.flags&c.FL_WATERJUMP)!=0,"equal time retains waterjump")
   return true
 end function
+// Verify water jump no water clears against the expected Quake behavior.
 function testWaterJumpNoWaterClears()
   game=server.create(1);state=svuser.SV_UserInit(game);player=movement.create(t.Vec3(0.0,0.0,0.0),t.Vec3(0.0,0.0,0.0));player.flags=player.flags|c.FL_WATERJUMP;player.waterLevel=0;player.teleportTime=10.0;game.time=5.0
   svuser.SV_WaterJump(state,player);svuTestEqual(player.flags&c.FL_WATERJUMP,0,"no water clears jump");svuTestNear(player.teleportTime,0.0,0.0,"timer cleared")
   return true
 end function
+// Verify frame time lower clamp against the expected Quake behavior.
 function testFrameTimeLowerClamp()
   state=svuser.SV_UserInit(server.create(1));svuTestNear(svuser.SV_UserSetFrameTime(state,-1.0),0.0,0.0,"negative frame time")
   return true
 end function
+// Verify frame time upper clamp against the expected Quake behavior.
 function testFrameTimeUpperClamp()
   state=svuser.SV_UserInit(server.create(1));svuTestNear(svuser.SV_UserSetFrameTime(state,1.0),0.1,0.0,"large frame time")
   return true
 end function
+// Verify mixed ideal pitch retains previous against the expected Quake behavior.
 function testMixedIdealPitchRetainsPrevious()
   state=svuser.SV_UserInit(server.create(1));state.idealPitches[0]=2.5
   value=svuser.SV_IdealPitchFromHeights(state,[0.0,1.0,3.0,4.0],0)
   svuTestNear(value,2.5,0.0,"mixed slope retains ideal pitch")
   return true
 end function
+// Verify unspawned client command cleared against the expected Quake behavior.
 function testUnspawnedClientCommandCleared()
   game=server.create(1);state=svuser.SV_UserInit(game);clientValue=game.clients[0];clientValue.active=true;clientValue.spawned=false;clientValue.command.forwardMove=123
   player=movement.create(t.Vec3(0.0,0.0,0.0),t.Vec3(0.0,0.0,0.0));svuser.SV_RunClients(state,player)
   svuTestEqual(clientValue.command.forwardMove,0,"unspawned movement cleared")
   return true
 end function
+// Verify unknown command rejects against the expected Quake behavior.
 function testUnknownCommandRejects()
   game=server.create(1);state=svuser.SV_UserInit(game);clientValue=game.clients[0];clientValue.active=true;player=movement.create(t.Vec3(0.0,0.0,0.0),t.Vec3(0.0,0.0,0.0));packet=sz.alloc(4);msg.writeByte(packet,99)
   svuTestEqual(svuser.SV_ReadClientMessage(state,clientValue,sz.dataSlice(packet),player),false,"unknown clc")
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   passed=0
   if parityRun(1,"edge friction",testEdgeFriction) then passed=passed+1 end if

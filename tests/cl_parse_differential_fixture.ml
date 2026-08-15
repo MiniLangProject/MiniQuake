@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/cl_parse_differential_fixture.ml.
+*/
 import miniquake.client_protocol as protocol
 import miniquake.client as client
 import miniquake.types as t
@@ -9,6 +15,7 @@ import miniquake.net_loop as netloop
 import miniquake.net_main as netmain
 import miniquake.native as native
 
+// Build deterministic test data for the requested value.
 function fixture(values)
   result = bytes(len(values))
   index = 0
@@ -19,16 +26,19 @@ function fixture(values)
   return result
 end function
 
+// Create and initialize client.
 function newClient()
   result = client.create(movement.create(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0)))
   result.localAuthoritative = false
   return result
 end function
 
+// Exercise reader as part of this deterministic regression fixture.
 function reader(data)
   return msg.beginReadingBytes(data)
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   entityClient = newClient()
   client.CL_EntityNum(entityClient, 5)

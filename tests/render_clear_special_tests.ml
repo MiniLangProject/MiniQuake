@@ -1,22 +1,31 @@
-/* BP-051: MiniQuake R_Clear, z-trick, finish and no-refresh contract. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+BP-051: MiniQuake R_Clear, z-trick, finish and no-refresh contract.
+*/
 import miniquake.render.special_paths as bp051Special
 import miniquake.render.world as bp051World
 import miniquake.render.gl11 as bp051Gl
 
+// Assert exact equality and report both values on failure.
 function bp051Equal(actual, expected, name)
   if actual != expected then return error(5100, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
+// Assert that the condition holds and identify a failing test.
 function bp051Yes(value, name)
   if not value then return error(5101, name + ": expected true") end if
   return true
 end function
+// Execute one named test case and record its pass/fail result.
 function bp051Run(number, name, fn)
   print "[" + number + "/20] " + name
   value = try(fn())
   if value is error then print "FAIL: " + value.message; return false end if
   return true
 end function
+// Exercise the mirror depth test scenario and verify its expected result.
 function bp051MirrorDepth()
   plan = bp051Special.clearPlan(0.5, false, true, 7)
   bp051Equal(plan[0], bp051Gl.GL_DEPTH_BUFFER_BIT, "mirror mask")
@@ -26,11 +35,13 @@ function bp051MirrorDepth()
   bp051Equal(plan[4], 7, "mirror trick frame")
   return true
 end function
+// Exercise the mirror color test scenario and verify its expected result.
 function bp051MirrorColor()
   plan = bp051Special.clearPlan(0.25, true, true, 2)
   bp051Equal(plan[0], bp051Gl.GL_DEPTH_BUFFER_BIT | bp051Gl.GL_COLOR_BUFFER_BIT, "mirror color mask")
   return true
 end function
+// Exercise the ztrick odd test scenario and verify its expected result.
 function bp051ZTrickOdd()
   plan = bp051Special.clearPlan(1.0, false, true, 0)
   bp051Equal(plan[0], 0, "odd mask")
@@ -39,11 +50,13 @@ function bp051ZTrickOdd()
   bp051Equal(plan[4], 1, "odd frame")
   return true
 end function
+// Exercise the ztrick odd far test scenario and verify its expected result.
 function bp051ZTrickOddFar()
   plan = bp051Special.clearPlan(1.0, false, true, 0)
   bp051Yes(plan[2] > 0.4999 and plan[2] < 0.5, "odd far")
   return true
 end function
+// Exercise the ztrick even test scenario and verify its expected result.
 function bp051ZTrickEven()
   plan = bp051Special.clearPlan(1.0, false, true, 1)
   bp051Equal(plan[0], 0, "even mask")
@@ -53,11 +66,13 @@ function bp051ZTrickEven()
   bp051Equal(plan[4], 2, "even frame")
   return true
 end function
+// Exercise the ztrick color test scenario and verify its expected result.
 function bp051ZTrickColor()
   plan = bp051Special.clearPlan(1.0, true, true, 0)
   bp051Equal(plan[0], bp051Gl.GL_COLOR_BUFFER_BIT, "ztrick color mask")
   return true
 end function
+// Exercise the normal depth test scenario and verify its expected result.
 function bp051NormalDepth()
   plan = bp051Special.clearPlan(1.0, false, false, 4)
   bp051Equal(plan[0], bp051Gl.GL_DEPTH_BUFFER_BIT, "normal mask")
@@ -67,11 +82,13 @@ function bp051NormalDepth()
   bp051Equal(plan[4], 4, "normal frame")
   return true
 end function
+// Exercise the normal color test scenario and verify its expected result.
 function bp051NormalColor()
   plan = bp051Special.clearPlan(1.0, true, false, 4)
   bp051Equal(plan[0], bp051Gl.GL_DEPTH_BUFFER_BIT | bp051Gl.GL_COLOR_BUFFER_BIT, "normal color mask")
   return true
 end function
+// Exercise the configure state test scenario and verify its expected result.
 function bp051ConfigureState()
   state = bp051World.R_ConfigureSpecialCompatibility(0.75, true, false, true, true)
   bp051Equal(state[0], 0.75, "state alpha")
@@ -81,6 +98,7 @@ function bp051ConfigureState()
   bp051Equal(state[4], true, "state norefresh")
   return true
 end function
+// Exercise the state vector test scenario and verify its expected result.
 function bp051StateVector()
   bp051World.R_ConfigureSpecialCompatibility(0.625, false, true, false, false)
   state = bp051World.R_SpecialCompatibilityState()
@@ -88,6 +106,7 @@ function bp051StateVector()
   bp051Equal(state[0], 0.625, "state vector alpha")
   return true
 end function
+// Exercise the world mirror trace test scenario and verify its expected result.
 function bp051WorldMirrorTrace()
   bp051World.R_ConfigureSpecialCompatibility(0.5, false, true, false, false)
   bp051Gl.Trace_Begin()
@@ -100,6 +119,7 @@ function bp051WorldMirrorTrace()
   bp051Equal(trace[2][0], "depth_range", "world mirror depth range")
   return true
 end function
+// Exercise the world normal trace test scenario and verify its expected result.
 function bp051WorldNormalTrace()
   bp051World.R_ConfigureSpecialCompatibility(1.0, false, false, false, false)
   bp051Gl.Trace_Begin()
@@ -109,6 +129,7 @@ function bp051WorldNormalTrace()
   bp051Equal(len(trace), 3, "world normal trace count")
   return true
 end function
+// Exercise the world ztrick trace test scenario and verify its expected result.
 function bp051WorldZTrickTrace()
   bp051World.R_ConfigureSpecialCompatibility(1.0, false, true, false, false)
   bp051Gl.Trace_Begin()
@@ -118,39 +139,46 @@ function bp051WorldZTrickTrace()
   bp051Equal(len(trace), 2, "world ztrick trace count")
   return true
 end function
+// Exercise the no refresh state test scenario and verify its expected result.
 function bp051NoRefreshState()
   bp051World.R_ConfigureSpecialCompatibility(1.0, false, true, false, true)
   state = bp051World.R_SpecialCompatibilityState()
   bp051Equal(state[4], true, "no refresh state")
   return true
 end function
+// Finalize state for state.
 function bp051FinishState()
   bp051World.R_ConfigureSpecialCompatibility(1.0, false, true, true, false)
   state = bp051World.R_SpecialCompatibilityState()
   bp051Equal(state[3], true, "finish state")
   return true
 end function
+// Exercise the mirror dominates ztrick test scenario and verify its expected result.
 function bp051MirrorDominatesZTrick()
   plan = bp051Special.clearPlan(0.999, false, true, 11)
   bp051Equal(plan[4], 11, "mirror does not advance ztrick")
   bp051Equal(plan[2], 0.5, "mirror split")
   return true
 end function
+// Exercise the exact alpha one test scenario and verify its expected result.
 function bp051ExactAlphaOne()
   plan = bp051Special.clearPlan(1.0, false, true, 0)
   bp051Equal(plan[4], 1, "exact one activates ztrick")
   return true
 end function
+// Exercise the alpha above one test scenario and verify its expected result.
 function bp051AlphaAboveOne()
   plan = bp051Special.clearPlan(1.001, false, true, 0)
   bp051Equal(plan[2], 0.5, "non-one mirror alpha")
   return true
 end function
+// Exercise the depth constants test scenario and verify its expected result.
 function bp051DepthConstants()
   bp051Equal(bp051Gl.GL_LEQUAL, 0x0203, "LEQUAL")
   bp051Equal(bp051Gl.GL_GEQUAL, 0x0206, "GEQUAL")
   return true
 end function
+// Update module state for constants.
 function bp051ClearConstants()
   bp051Equal(bp051Gl.GL_DEPTH_BUFFER_BIT, 0x00000100, "depth bit")
   bp051Equal(bp051Gl.GL_COLOR_BUFFER_BIT, 0x00004000, "color bit")

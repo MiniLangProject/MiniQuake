@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Focused sv_phys.c differential fixtures.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.native as native
@@ -21,16 +21,19 @@ struct PhysicsTestMap
   leafs
 end struct
 
+// Assert exact equality and report both values on failure.
 function physAssertEqual(actual, expected, name)
   if actual != expected then return error(9950, name) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function physAssertTrue(value, name)
   if value != true then return error(9951, name + ": expected true") end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function physAssertNear(actual, expected, name)
   difference = actual - expected
   if difference < 0.0 then difference = -difference end if
@@ -38,6 +41,7 @@ function physAssertNear(actual, expected, name)
   return true
 end function
 
+// Create and initialize physics map.
 function makePhysicsMap(backContents)
   plane = t.BspPlane(t.Vec3(1.0, 0.0, 0.0), 0.0, 0)
   node = t.BspNode(0, -2, -1, t.Vec3(-128.0, -128.0, -128.0), t.Vec3(128.0, 128.0, 128.0), 0, 0)
@@ -56,6 +60,7 @@ function makePhysicsMap(backContents)
   return PhysicsTestMap([model], [node], [clipNode], [plane], [backLeaf, frontLeaf])
 end function
 
+// Apply server-physics field definitions semantics.
 function physicsFieldDefinitions()
   return [
     t.QuakeCDef(c.EV_VOID, 0, 0, ""),
@@ -92,6 +97,7 @@ function physicsFieldDefinitions()
   ]
 end function
 
+// Create and initialize physics fixture.
 function makePhysicsFixture(entityCount)
   statements = [
     // blocked(): capture entity 2's origin before SV_PushMove rolls it back.
@@ -142,6 +148,7 @@ function makePhysicsFixture(entityCount)
   return game
 end function
 
+// Update module state for physics box.
 function setPhysicsBox(machine, entityIndex, origin, mins, maxs, moveType, solid)
   vm.setEntityVector(machine, entityIndex, 1, origin)
   vm.setEntityVector(machine, entityIndex, 4, t.Vec3(0.0, 0.0, 0.0))
@@ -151,6 +158,7 @@ function setPhysicsBox(machine, entityIndex, origin, mins, maxs, moveType, solid
   vm.setEntityFloat(machine, entityIndex, 20, solid)
 end function
 
+// Verify velocity gravity and think against the expected Quake behavior.
 function testVelocityGravityAndThink()
   game = makePhysicsFixture(3)
   machine = game.machine
@@ -184,6 +192,7 @@ function testVelocityGravityAndThink()
   return true
 end function
 
+// Verify clip and pusher rollback order against the expected Quake behavior.
 function testClipAndPusherRollbackOrder()
   clipped = physics.ClipVelocity(t.Vec3(100.0, -25.0, -50.0), t.Vec3(0.0, 0.0, 1.0), 1.0)
   physAssertEqual(clipped[1], 1, "floor blocked bit")
@@ -213,6 +222,7 @@ function testClipAndPusherRollbackOrder()
   return true
 end function
 
+// Verify water and toss against the expected Quake behavior.
 function testWaterAndToss()
   game = makePhysicsFixture(3)
   machine = game.machine
@@ -234,6 +244,7 @@ function testWaterAndToss()
   return true
 end function
 
+// Verify strict quake one dispatch against the expected Quake behavior.
 function testStrictQuakeOneDispatch()
   // The pinned WinQuake/MiniQuake 1.09 build is compiled without QUAKE2.
   // Merely exposing extended fields must not activate currents, conveyors,
@@ -271,6 +282,7 @@ function testStrictQuakeOneDispatch()
   return true
 end function
 
+// Verify force retouch against the expected Quake behavior.
 function testForceRetouch()
   game = makePhysicsFixture(4)
   machine = game.machine
@@ -285,6 +297,7 @@ function testForceRetouch()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "[1/5] velocity, gravity and think"
   result = try(testVelocityGravityAndThink())

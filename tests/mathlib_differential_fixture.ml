@@ -1,22 +1,32 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/mathlib_differential_fixture.ml.
+*/
 import miniquake.types as t
 import miniquake.native as native
 import miniquake.mathlib as mathPort
 
+// Return number derived from the active module state.
 function number(value)
   return native.floatText(value)
 end function
 
+// Exercise vec event as part of this deterministic regression fixture.
 function vecEvent(functionName, caseName, value)
   print "{\"function\":\"" + functionName + "\",\"case\":\"" + caseName +
     "\",\"x\":" + number(value.x) + ",\"y\":" + number(value.y) +
     ",\"z\":" + number(value.z) + "}"
 end function
 
+// Exercise scalar event as part of this deterministic regression fixture.
 function scalarEvent(functionName, caseName, value)
   print "{\"function\":\"" + functionName + "\",\"case\":\"" + caseName +
     "\",\"value\":" + number(value) + "}"
 end function
 
+// Exercise matrix3 event as part of this deterministic regression fixture.
 function matrix3Event(functionName, caseName, value)
   print "{\"function\":\"" + functionName + "\",\"case\":\"" + caseName +
     "\",\"values\":[" +
@@ -25,6 +35,7 @@ function matrix3Event(functionName, caseName, value)
     number(value[2][0]) + "," + number(value[2][1]) + "," + number(value[2][2]) + "]}"
 end function
 
+// Exercise matrix34 event as part of this deterministic regression fixture.
 function matrix34Event(functionName, caseName, value)
   print "{\"function\":\"" + functionName + "\",\"case\":\"" + caseName +
     "\",\"values\":[" +
@@ -33,6 +44,7 @@ function matrix34Event(functionName, caseName, value)
     number(value[2][0]) + "," + number(value[2][1]) + "," + number(value[2][2]) + "," + number(value[2][3]) + "]}"
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   point = t.Vec3(3.0, 4.0, 5.0)
   normal = t.Vec3(0.0, 0.0, 2.0)

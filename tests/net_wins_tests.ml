@@ -1,17 +1,21 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
-*/
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
+MiniLang parity and regression tests for tests/net_wins_tests.ml.
+*/
 import miniquake.types as t
 import miniquake.net_wins as wins
 import miniquake.platform.win32 as win
 
+// Assert that the condition holds and identify a failing test.
 function require(value, message)
   if not value then return error(9360, message) end if
   return true
 end function
 
+// Exercise wait for connection as part of this deterministic regression fixture.
 function waitForConnection(attempts)
   index = 0
   while index < attempts
@@ -23,6 +27,7 @@ function waitForConnection(attempts)
   return error(9361, "WINS_CheckNewConnections timed out")
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   require(wins.htons(0x1234) == 0x3412, "htons")
   require(wins.ntohs(0x3412) == 0x1234, "ntohs")

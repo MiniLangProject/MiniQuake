@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/cl_input_differential_fixture.ml.
+*/
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.input as input
@@ -6,6 +12,7 @@ import miniquake.net_loop as netloop
 import miniquake.net_main as netmain
 import miniquake.native as native
 
+// Add the requested value to the destination state.
 function emit(name, caseName, i0, i1, f0, f1, f2, f3)
   print "{\"function\":\"" + name + "\",\"case\":\"" + caseName +
     "\",\"i0\":" + i0 + ",\"i1\":" + i1 +
@@ -13,11 +20,13 @@ function emit(name, caseName, i0, i1, f0, f1, f2, f3)
     ",\"f2\":" + native.floatText(f2) + ",\"f3\":" + native.floatText(f3) + "}"
 end function
 
+// Exercise int bool as part of this deterministic regression fixture.
 function intBool(value)
   if value then return 1 end if
   return 0
 end function
 
+// Return data checksum derived from the active module state.
 function dataChecksum(data)
   result = 0
   index = 0
@@ -28,12 +37,14 @@ function dataChecksum(data)
   return result
 end function
 
+// Update module state for input.
 function resetInput()
   input.IN_ClearStates()
   input.setLookSpring(false)
   input.consumePitchDriftRequests()
 end function
 
+// Exercise wrapper event as part of this deterministic regression fixture.
 function wrapperEvent(name, downFunction, upFunction, button, release)
   resetInput()
   if release then
@@ -47,6 +58,7 @@ function wrapperEvent(name, downFunction, upFunction, button, release)
   emit(name, caseName, button[0], button[2], 0, 0, 0, 0)
 end function
 
+// Return registered checksum derived from the active module state.
 function registeredChecksum(names)
   result = 0
   commandIndex = 0
@@ -62,6 +74,7 @@ function registeredChecksum(names)
   return result
 end function
 
+// Exercise connected client as part of this deterministic regression fixture.
 function connectedClient()
   state = netloop.createState()
   socket = netloop.connect(state, "local")
@@ -74,6 +87,7 @@ function connectedClient()
   return [localClient, state]
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   // The production client receives its qsocket from NET_Connect after
   // NET_Init has sized the pool.  This fixture creates several isolated loop

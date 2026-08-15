@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/gl_model_differential_fixture.ml.
+*/
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.byteio as bio
@@ -9,20 +15,24 @@ import miniquake.format.sprite as spriteFormat
 import miniquake.model_registry as registryModule
 import miniquake.world_bsp as world
 
+// Exercise json float as part of this deterministic regression fixture.
 function jsonFloat(value)
   return native.floatText(value)
 end function
 
+// Exercise bool int as part of this deterministic regression fixture.
 function boolInt(value)
   if value then return 1 end if
   return 0
 end function
 
+// Encode and write lump.
 function putLump(data, index, offset, length)
   bio.putI32(data, 4 + index * 8, offset)
   bio.putI32(data, 8 + index * 8, length)
 end function
 
+// Encode and write fixed.
 function putFixed(data, offset, text, count)
   source = bytes(text)
   copied = len(source)
@@ -30,6 +40,7 @@ function putFixed(data, offset, text, count)
   bio.copyInto(data, offset, source, 0, copied)
 end function
 
+// Encode and write textures.
 function writeTextures(data, base)
   bio.putI32(data, base, 4)
   names = ["+0fixture", "+1fixture", "+Afixture", "+Bfixture"]
@@ -55,7 +66,9 @@ function writeTextures(data, base)
   return cursor - base
 end function
 
+// Create and initialize bsp.
 function makeBsp()
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   data = bytes(4096)
   bio.putI32(data, 0, c.BSP_VERSION)
   cursor = 124
@@ -178,6 +191,7 @@ function makeBsp()
   return slice(data, 0, cursor)
 end function
 
+// Encode and write alias frame.
 function writeAliasFrame(data, offset, name, base, numVertices)
   data[offset] = base
   data[offset + 4] = base + 10
@@ -193,6 +207,7 @@ function writeAliasFrame(data, offset, name, base, numVertices)
   return offset + 24 + numVertices * 4
 end function
 
+// Create and initialize mdl.
 function makeMdl()
   data = bytes(512)
   putFixed(data, 0, "IDPO", 4)
@@ -249,6 +264,7 @@ function makeMdl()
   return slice(data, 0, cursor)
 end function
 
+// Encode and write sprite frame.
 function writeSpriteFrame(data, offset, x, y, base)
   bio.putI32(data, offset, x)
   bio.putI32(data, offset + 4, y)
@@ -261,6 +277,7 @@ function writeSpriteFrame(data, offset, x, y, base)
   return offset + 20
 end function
 
+// Create and initialize sprite.
 function makeSprite()
   data = bytes(128)
   putFixed(data, 0, "IDSP", 4)
@@ -281,6 +298,7 @@ function makeSprite()
   return slice(data, 0, cursor)
 end function
 
+// Create and initialize filesystem.
 function makeFilesystem(bspData, mdlData, spriteData)
   total = bytes(len(bspData) + len(mdlData) + len(spriteData))
   bio.copyInto(total, 0, bspData, 0, len(bspData))
@@ -295,6 +313,7 @@ function makeFilesystem(bspData, mdlData, spriteData)
   return t.FileSystem("", "id1", [t.SearchPath("", archive)], "", false, true, true, false)
 end function
 
+// Return fatal mode derived from the active module state.
 function fatalMode(mode)
   if mode == "bsp-version" then
     data = makeBsp()
@@ -325,6 +344,7 @@ function fatalMode(mode)
   return 2
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   if len(args) == 2 and args[0] == "--fatal" then return fatalMode(args[1]) end if
 

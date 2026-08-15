@@ -1,13 +1,22 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/console_differential_fixture.ml.
+*/
 import miniquake.console as con
 import miniquake.filesystem as qfs
 import miniquake.native as native
 
+// Return bool number derived from the active module state.
 function boolNumber(value)
   if value then return 1 end if
   return 0
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   state = con.create(512)
   commands = con.Con_Init(state, void, 320, false)
   print "{\"function\":\"Con_Init\",\"case\":\"startup\",\"width\":" +

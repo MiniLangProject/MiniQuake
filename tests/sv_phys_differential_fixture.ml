@@ -1,4 +1,7 @@
 /*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
 MiniLang side of the pinned sv_phys.c differential fixture.
 */
 import miniquake.types as t
@@ -17,6 +20,7 @@ struct PhysicsDiffMap
   leafs
 end struct
 
+// Create and initialize physics map.
 function makePhysicsMap(backContents)
   plane = t.BspPlane(t.Vec3(1.0, 0.0, 0.0), 0.0, 0)
   node = t.BspNode(0, -2, -1, t.Vec3(-128.0, -128.0, -128.0), t.Vec3(128.0, 128.0, 128.0), 0, 0)
@@ -26,6 +30,7 @@ function makePhysicsMap(backContents)
   return PhysicsDiffMap([model], [node], [t.BspClipNode(0, c.CONTENTS_EMPTY, backContents)], [plane], [backLeaf, frontLeaf])
 end function
 
+// Apply server-physics fields semantics.
 function physicsFields()
   return [
     t.QuakeCDef(c.EV_VOID, 0, 0, ""),
@@ -59,6 +64,7 @@ function physicsFields()
   ]
 end function
 
+// Create and initialize physics fixture.
 function makePhysicsFixture(entityCount)
   statements = [
     t.QuakeCStatement(op.OP_LOAD_V, 50, 51, 60),
@@ -92,6 +98,7 @@ function makePhysicsFixture(entityCount)
   return game
 end function
 
+// Update module state for physics box.
 function setPhysicsBox(machine, entityIndex, origin, mins, maxs, moveType, solid)
   vm.setEntityVector(machine, entityIndex, 1, origin)
   vm.setEntityVector(machine, entityIndex, 4, t.Vec3(0.0, 0.0, 0.0))
@@ -101,6 +108,7 @@ function setPhysicsBox(machine, entityIndex, origin, mins, maxs, moveType, solid
   vm.setEntityFloat(machine, entityIndex, 20, solid)
 end function
 
+// Add values to the destination state.
 function emitValues(name, caseName, result, origin, velocity, flags, water, waterType, localTime, think, touch, sound, blocked)
   print "{" +
     "\"function\":\"" + name + "\",\"case\":\"" + caseName + "\"," +
@@ -119,6 +127,7 @@ function emitValues(name, caseName, result, origin, velocity, flags, water, wate
     "\"sound\":" + sound + ",\"blocked\":" + blocked + "}"
 end function
 
+// Add entity to the destination state.
 function emitEntity(name, caseName, result, game, index, think, touch, blocked)
   machine = game.machine
   emitValues(
@@ -133,11 +142,14 @@ function emitEntity(name, caseName, result, game, index, think, touch, blocked)
   )
 end function
 
+// Exercise fresh as part of this deterministic regression fixture.
 function fresh()
   return makePhysicsFixture(8)
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   game = fresh()
   physics.SV_CheckAllEnts(game)
   emitEntity("SV_CheckAllEnts", "valid", 1, game, 1, 0, 0, 0)

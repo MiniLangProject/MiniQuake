@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.render.original.
+*/
 package miniquake.render.original
 
 import miniquake.types as compatRmainTypes
@@ -91,6 +98,7 @@ rCompatEntityMaxs = compatRmainTypes.Vec3(0.0, 0.0, 0.0)
 cl_visedicts = []
 cl_numvisedicts = 0
 
+// Return compat cvar value derived from the active module state.
 function compatCvarValue(name, fallback)
   if rCompatCvars is void then return fallback end if
   variable = compatRmainCvar.find(rCompatCvars, name)
@@ -98,15 +106,18 @@ function compatCvarValue(name, fallback)
   return variable.value
 end function
 
+// Provide compat bool cvar behavior for the active subsystem.
 function compatBoolCvar(name, fallback)
   return compatCvarValue(name, fallback) != 0.0
 end function
 
+// Return compat vector derived from the active module state.
 function compatVector(value)
   if value is void then return compatRmainTypes.Vec3(0.0, 0.0, 0.0) end if
   return compatRmainMath.copy(value)
 end function
 
+// Apply the Quake-compatible r configure compatibility behavior.
 function R_ConfigureCompatibility(
   renderer,
   entityRenderer,
@@ -187,6 +198,7 @@ end function
 // -----------------------------------------------------------------------------
 
 function compatEnsureEfragState()
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global rCompatLeafEfrags, rCompatEntityEfrags
   global rCompatEfragValid, rCompatEfragModel
   global rCompatEfragOriginX, rCompatEfragOriginY, rCompatEfragOriginZ
@@ -227,6 +239,7 @@ function compatEnsureEfragState()
   return true
 end function
 
+// Apply the Quake-compatible r remove efrags behavior.
 function R_RemoveEfrags(ent)
   global rCompatLeafEfrags, rCompatEntityEfrags
   if ent is void then return false end if
@@ -248,6 +261,7 @@ function R_RemoveEfrags(ent)
   return true
 end function
 
+// Provide compat append efrag behavior for the active subsystem.
 function compatAppendEfrag(leafIndex)
   global rCompatLeafEfrags, rCompatEntityEfrags, rCompatEfragTopNode
   if rCompatAddEntity is void then return false end if
@@ -262,6 +276,7 @@ function compatAppendEfrag(leafIndex)
   return true
 end function
 
+// Apply the Quake-compatible r split entity on node behavior.
 function R_SplitEntityOnNode(node)
   global rCompatEfragTopNode
   if rCompatRenderer is void or rCompatAddEntity is void then return 0 end if
@@ -284,6 +299,7 @@ function R_SplitEntityOnNode(node)
   return count
 end function
 
+// Provide compat model bounds behavior for the active subsystem.
 function compatModelBounds(ent)
   if rCompatEntityRenderer is void or ent.modelIndex <= 0 or ent.modelIndex >= len(rCompatEntityRenderer.models) then return void end if
   model = rCompatEntityRenderer.models[ent.modelIndex]
@@ -301,6 +317,7 @@ function compatModelBounds(ent)
   return [compatRmainMath.subtract(ent.origin, extent), compatRmainMath.add(ent.origin, extent)]
 end function
 
+// Apply the Quake-compatible r add efrags behavior.
 function R_AddEfrags(ent)
   global rCompatAddEntity, rCompatEntityMins, rCompatEntityMaxs, rCompatEfragTopNode
   if ent is void or rCompatRenderer is void or len(rCompatRenderer.map.models) == 0 then return 0 end if
@@ -317,6 +334,7 @@ function R_AddEfrags(ent)
   return result
 end function
 
+// Provide compat store reference behavior for the active subsystem.
 function compatStoreReference(reference, output)
   global cl_numvisedicts
   if reference is void or reference.entity is void then return false end if
@@ -332,6 +350,7 @@ function compatStoreReference(reference, output)
   return true
 end function
 
+// Apply the Quake-compatible r store efrags behavior.
 function R_StoreEfrags(ppefrag)
   global cl_visedicts, cl_numvisedicts
   builder = compatRmainArrays.createArrayBuilder(compatRmainConstants.MAX_VISEDICTS)
@@ -354,7 +373,9 @@ function R_StoreEfrags(ppefrag)
   return cl_visedicts
 end function
 
+// Report whether compat collect visible efrags holds for the active state.
 function compatCollectVisibleEfrags()
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global cl_visedicts, cl_numvisedicts
   global rCompatEfragValid, rCompatEfragModel
   global rCompatEfragOriginX, rCompatEfragOriginY, rCompatEfragOriginZ
@@ -423,6 +444,7 @@ function R_CullBox(mins, maxs)
   return false
 end function
 
+// Apply the Quake-compatible r rotate for entity behavior.
 function R_RotateForEntity(entity)
   if entity is void then return false end if
   compatRmainGl.translate(entity.origin.x, entity.origin.y, entity.origin.z)
@@ -432,6 +454,7 @@ function R_RotateForEntity(entity)
   return true
 end function
 
+// Apply the Quake-compatible r get sprite frame behavior.
 function R_GetSpriteFrame(entity)
   if entity is void or rCompatEntityRenderer is void then return void end if
   if entity.modelIndex <= 0 or entity.modelIndex >= len(rCompatEntityRenderer.models) then return void end if
@@ -442,6 +465,7 @@ function R_GetSpriteFrame(entity)
   return selected[0]
 end function
 
+// Apply the Quake-compatible r draw sprite model behavior.
 function R_DrawSpriteModel(entity)
   global currententity
   if entity is void or rCompatEntityRenderer is void or rCompatView is void then return 0 end if
@@ -452,6 +476,7 @@ function R_DrawSpriteModel(entity)
   return compatRmainEntities.drawSprite(rCompatEntityRenderer, model, entity, rCompatView.right, rCompatView.up, rCompatTime)
 end function
 
+// Apply the Quake-compatible r draw alias model behavior.
 function R_DrawAliasModel(entity)
   global currententity, c_alias_polys, r_entorigin, modelorg
   if entity is void or rCompatEntityRenderer is void or rCompatRenderer is void then return 0 end if
@@ -471,6 +496,7 @@ function R_DrawAliasModel(entity)
   return result
 end function
 
+// Apply the Quake-compatible r draw entities on list behavior.
 function R_DrawEntitiesOnList()
   if not rCompatDrawEntities or rCompatEntityRenderer is void or rCompatClient is void then return 0 end if
   visible = compatCollectVisibleEfrags()
@@ -493,6 +519,7 @@ function R_DrawEntitiesOnList()
   return count
 end function
 
+// Apply the Quake-compatible r draw view model behavior.
 function R_DrawViewModel()
   if not rCompatDrawViewModel or not rCompatDrawEntities then return 0 end if
   if envmap or rCompatPlayer is void or rCompatView is void or rCompatEntityRenderer is void then return 0 end if
@@ -500,6 +527,7 @@ function R_DrawViewModel()
   return compatRmainEntities.renderViewModel(rCompatEntityRenderer, rCompatPlayer, rCompatView, rCompatTime)
 end function
 
+// Apply the Quake-compatible r poly blend behavior.
 function R_PolyBlend()
   if not compatBoolCvar("gl_polyblend", 1.0) or rCompatView is void then return false end if
   blend = rCompatView.blend
@@ -532,6 +560,7 @@ function R_PolyBlend()
   return true
 end function
 
+// Provide signbits for plane behavior for the active subsystem.
 function SignbitsForPlane(plane)
   bitsValue = 0
   if plane.normal.x < 0.0 then bitsValue = bitsValue | 1 end if
@@ -540,6 +569,7 @@ function SignbitsForPlane(plane)
   return bitsValue
 end function
 
+// Apply the Quake-compatible r set frustum behavior.
 function R_SetFrustum()
   global frustum
   if rCompatView is void then return false end if
@@ -571,6 +601,7 @@ function R_SetFrustum()
   return true
 end function
 
+// Apply the Quake-compatible r setup frame behavior.
 function R_SetupFrame()
   global r_origin, vpn, vright, vup, r_oldviewleaf, r_viewleaf
   global r_cache_thrash, c_brush_polys, c_alias_polys
@@ -592,6 +623,7 @@ function R_SetupFrame()
   return true
 end function
 
+// Provide myglu perspective behavior for the active subsystem.
 function MYgluPerspective(fovy, aspect, zNear, zFar)
   angle = fovy * compatRmainMath.PI / 360.0
   cosine = compatRmainNative.cos(angle)
@@ -604,6 +636,7 @@ function MYgluPerspective(fovy, aspect, zNear, zFar)
   return true
 end function
 
+// Apply the Quake-compatible r setup gl behavior.
 function R_SetupGL()
   if rCompatView is void then return false end if
   width = rCompatWidth
@@ -635,6 +668,7 @@ function R_SetupGL()
   return true
 end function
 
+// Apply the Quake-compatible r render scene behavior.
 function R_RenderScene()
   global c_brush_polys
   if rCompatRenderer is void then return 0 end if
@@ -653,6 +687,7 @@ function R_RenderScene()
   return worldPolys + entityPolys
 end function
 
+// Apply the Quake-compatible r clear behavior.
 function R_Clear()
   global rCompatDepthMin, rCompatDepthMax, rCompatTrickFrame
   clearColor = compatBoolCvar("gl_clear", 0.0)
@@ -685,6 +720,7 @@ function R_Clear()
   return true
 end function
 
+// Apply the Quake-compatible r mirror behavior.
 function R_Mirror()
   global mirror
   if not mirror or mirror_plane is void or rCompatView is void then return false end if
@@ -710,6 +746,7 @@ function R_Mirror()
   return true
 end function
 
+// Apply the Quake-compatible r render view behavior.
 function R_RenderView()
   global mirror
   if compatBoolCvar("r_norefresh", 0.0) then return 0 end if
@@ -760,6 +797,7 @@ function R_InitTextures()
   return r_notexture_mip
 end function
 
+// Apply the Quake-compatible r init particle texture behavior.
 function R_InitParticleTexture()
   global particletexture, rCompatParticleTexture
   dot = [
@@ -796,12 +834,14 @@ function R_InitParticleTexture()
   return particletexture
 end function
 
+// Return compat envmap path derived from the active module state.
 function compatEnvmapPath(index)
   name = "env" + index + ".rgb"
   if rCompatGameDirectory == "" then return name end if
   return compatRmainFs.joinPath(rCompatGameDirectory, name)
 end function
 
+// Apply the Quake-compatible r envmap f behavior.
 function R_Envmap_f()
   global envmap
   if rCompatRenderer is void or rCompatView is void then return error(3801, "R_Envmap_f: renderer is not initialized") end if
@@ -839,12 +879,14 @@ function R_Envmap_f()
   return true
 end function
 
+// Apply the Quake-compatible r init behavior.
 function R_Init()
   R_InitTextures()
   if rCompatRenderer is not void then R_InitParticleTexture() end if
   return true
 end function
 
+// Provide compat translate range behavior for the active subsystem.
 function compatTranslateRange(table, destination, source)
   index = 0
   while index < 16
@@ -856,7 +898,9 @@ function compatTranslateRange(table, destination, source)
   return table
 end function
 
+// Apply the Quake-compatible r translate player skin behavior.
 function R_TranslatePlayerSkin(playernum)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global playertextures
   if rCompatEntityRenderer is void or rCompatClient is void then return false end if
   entityNumber = 1 + playernum
@@ -895,6 +939,7 @@ function R_TranslatePlayerSkin(playernum)
   return texture
 end function
 
+// Apply the Quake-compatible r new map behavior.
 function R_NewMap()
   global r_worldentity, r_viewleaf, r_oldviewleaf, mirrortexturenum, mirror, mirror_plane
   global rCompatEntityEfrags, rCompatEfragValid, rCompatEfragModel
@@ -932,6 +977,7 @@ function R_NewMap()
   return true
 end function
 
+// Apply the Quake-compatible r time refresh f behavior.
 function R_TimeRefresh_f()
   if rCompatView is void then return error(3802, "R_TimeRefresh_f: no view") end if
   view = rCompatView
@@ -953,6 +999,7 @@ function R_TimeRefresh_f()
   return [seconds, fps]
 end function
 
+// Mirror Quake's D_FlushCaches routine and its observable state changes.
 function D_FlushCaches()
   return void
 end function

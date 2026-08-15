@@ -55,8 +55,8 @@ CONFIG = {
     '039': {
         'package':'BP-039','parent':'BP-038','schema':'MiniQuakeClientRenderClosureGolden/1',
         'golden':'audit/client_render_closure_golden.json','oracle':'tools/oracle/client_render_closure_oracle.c',
-        'test':'tests/client_render_closure_tests.ml','fixtures':24,
-        'success':'MiniQuake BP-039 client/render closure tests passed: 24',
+        'test':'tests/client_render_closure_tests.ml','fixtures':27,
+        'success':'MiniQuake BP-039 client/render closure tests passed: 27',
         'markers':{
             'src/miniquake/client_render_contract.ml':['client_render_109_frozen_v1','0x95e2b295','const BEAM_MODEL_HANDOFF = 1','const CHASE_REFDEF_PRESERVATION = 1','const EFRAG_FRAME_ACCUMULATION = 1','const PARTICLE_FLOAT_STORAGE = 1'],
             'src/miniquake/render/entities.ml':['function renderSubmitted(renderer, worldRendererValue, entities, hiddenEntityNumber, viewRight, viewUp, time)'],

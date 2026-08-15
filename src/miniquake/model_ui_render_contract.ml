@@ -1,4 +1,10 @@
-/* BP-049: frozen MiniQuake 1.09 model/UI/render-evidence contract. */
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+BP-049: frozen MiniQuake 1.09 model/UI/render-evidence contract.
+*/
 package miniquake.model_ui_render_contract
 
 const STATUS = "model_ui_render_109_frozen_v1"
@@ -22,14 +28,17 @@ const CAPTURE_AFTER_UI_BEFORE_SWAP = 1
 const CLIENT_RENDER_PARENT = "client_render_109_frozen_v1"
 const WORLD_RENDER_PARENT = "world_render_109_frozen_v1"
 
+// Return the stable compatibility-contract status string.
 function inline status()
   return STATUS
 end function
 
+// Return the stable compatibility-contract fingerprint.
 function inline fingerprint()
   return FINGERPRINT
 end function
 
+// Report whether canonical text.
 function canonicalText()
   result = "status=model_ui_render_109_frozen_v1\n"
   result = result + "alias=shade_quant16,shadow_origin,multitexture_zero\n"
@@ -41,6 +50,7 @@ function canonicalText()
   return result
 end function
 
+// Compute fingerprint.
 function calculateFingerprint()
   hash = FNV_OFFSET
   source = bytes(canonicalText())
@@ -52,10 +62,12 @@ function calculateFingerprint()
   return hash
 end function
 
+// Validate the requested value and report any invalid state.
 function verify()
   return calculateFingerprint() == FINGERPRINT
 end function
 
+// Return constants for the active module state.
 function constants()
   return [
     ALIAS_SHADEDOT_QUANT,

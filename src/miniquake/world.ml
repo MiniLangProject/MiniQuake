@@ -1,12 +1,12 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Logical MiniLang pendant for WinQuake/world.c and world.h.  BSP traversal stays
 in world_bsp, temporary AABB hulls stay in world_hull, and this unit owns the
 original server-facing AreaNode/link/clip orchestration.
 */
-
 package miniquake.world
 
 import miniquake.types as t
@@ -59,32 +59,38 @@ struct MoveClip
   passedEntity
 end struct
 
+// Create the zero-initialized state for vector.
 function zeroVector()
   return t.Vec3(0.0, 0.0, 0.0)
 end function
 
+// Provide absolute behavior for the active subsystem.
 function absolute(value)
   if value < 0.0 then return -value end if
   return value
 end function
 
+// Provide fallback edict behavior for the active subsystem.
 function fallbackEdict(state, entityIndex)
   if state.server is void or entityIndex < 0 or entityIndex >= len(state.server.edicts) then return void end if
   return state.server.edicts[entityIndex]
 end function
 
+// Report whether runtime.
 function inline hasRuntime(state)
   return state.server is not void and state.server.machine is not void and state.server.machine.context is not void
 end function
 
+// Report whether entity valid holds for the active state.
 function entityValid(state, entityIndex)
   if hasRuntime(state) then return collision.entityValid(state.server, entityIndex) end if
   item = fallbackEdict(state, entityIndex)
   return item is not void and not item.free
 end function
 
+// Return entity vector derived from the active module state.
 function entityVector(state, entityIndex, name)
-  if hasRuntime(state) then return collision.entityVector(state.server, entityIndex, name, zeroVector()) end if
+  if hasRuntime(state) then return collision.entityVectorZero(state.server, entityIndex, name) end if
   item = fallbackEdict(state, entityIndex)
   if item is void then return zeroVector() end if
   if name == "origin" then return math.VectorCopy(item.origin) end if
@@ -94,6 +100,7 @@ function entityVector(state, entityIndex, name)
   return zeroVector()
 end function
 
+// Return entity number derived from the active module state.
 function entityNumber(state, entityIndex, name, fallback)
   if hasRuntime(state) then
     if name == "owner" or name == "modelindex" or name == "touch" then
@@ -118,6 +125,7 @@ function entityNumber(state, entityIndex, name, fallback)
   return fallback
 end function
 
+// Provide entity model behavior for the active subsystem.
 function entityModel(state, entityIndex)
   if hasRuntime(state) then return collision.entityString(state.server, entityIndex, "model", "") end if
   item = fallbackEdict(state, entityIndex)
@@ -125,6 +133,7 @@ function entityModel(state, entityIndex)
   return item.model
 end function
 
+// Create and initialize state.
 function makeState(server, map)
   capacity = c.MAX_EDICTS
   if server is not void and server.maxEdicts > capacity then capacity = server.maxEdicts end if
@@ -144,18 +153,22 @@ function makeState(server, map)
   return WorldAreaState(server, map, [], -1, linkedNode, linkedTrigger, absMins, absMaxs, leafNums, touchEnabled, [])
 end function
 
+// Apply the Quake-compatible sv init box hull behavior.
 function SV_InitBoxHull()
   return boxworld.createBoxHull(zeroVector(), zeroVector())
 end function
 
+// Apply the Quake-compatible sv hull for box behavior.
 function SV_HullForBox(mins, maxs)
   return boxworld.createBoxHull(math.VectorCopy(mins), math.VectorCopy(maxs))
 end function
 
+// Apply the Quake-compatible sv box on plane side behavior.
 function SV_BoxOnPlaneSide(mins, maxs, plane)
   return math.BOX_ON_PLANE_SIDE(mins, maxs, plane)
 end function
 
+// Apply the Quake-compatible sv create area node behavior.
 function SV_CreateAreaNode(state, depth, mins, maxs)
   if len(state.nodes) >= AREA_NODES then return error(3800, "SV_CreateAreaNode: AREA_NODES exhausted") end if
   node = AreaNode(-1, 0.0, -1, -1, [], [])
@@ -184,6 +197,7 @@ function SV_CreateAreaNode(state, depth, mins, maxs)
   return nodeIndex
 end function
 
+// Apply the Quake-compatible sv clear world behavior.
 function SV_ClearWorld(server, map)
   if map is void or len(map.models) == 0 then return error(3801, "SV_ClearWorld: world model is missing") end if
   state = makeState(server, map)
@@ -192,6 +206,7 @@ function SV_ClearWorld(server, map)
   return state
 end function
 
+// Release state for remove entity.
 function removeEntity(values, entityIndex)
   result = []
   for each value in values
@@ -200,6 +215,7 @@ function removeEntity(values, entityIndex)
   return result
 end function
 
+// Apply the Quake-compatible sv unlink edict behavior.
 function SV_UnlinkEdict(state, entityIndex)
   if entityIndex < 0 or entityIndex >= len(state.linkedNode) then return false end if
   nodeIndex = state.linkedNode[entityIndex]
@@ -215,6 +231,7 @@ function SV_UnlinkEdict(state, entityIndex)
   return true
 end function
 
+// Provide box plane behavior for the active subsystem.
 function boxPlane(state, planeIndex)
   source = state.map.planes[planeIndex]
   signBits = 0
@@ -224,6 +241,7 @@ function boxPlane(state, planeIndex)
   return t.Plane(math.VectorCopy(source.normal), source.dist, source.type, signBits)
 end function
 
+// Apply the Quake-compatible sv find touched leafs behavior.
 function SV_FindTouchedLeafs(state, entityIndex, nodeNumber)
   if len(state.leafNums[entityIndex]) >= MAX_ENT_LEAFS then return false end if
   if nodeNumber < 0 then
@@ -242,27 +260,32 @@ function SV_FindTouchedLeafs(state, entityIndex, nodeNumber)
   return true
 end function
 
+// Report whether world set touch enabled holds for the active state.
 function World_SetTouchEnabled(state, entityIndex, enabled)
   if entityIndex < 0 or entityIndex >= len(state.touchEnabled) then return false end if
   state.touchEnabled[entityIndex] = enabled
   return true
 end function
 
+// Provide entity has touch behavior for the active subsystem.
 function entityHasTouch(state, entityIndex)
   if hasRuntime(state) then return entityNumber(state, entityIndex, "touch", 0) != 0 end if
   return state.touchEnabled[entityIndex]
 end function
 
+// Execute trigger.
 function executeTrigger(state, triggerIndex, entityIndex)
   if hasRuntime(state) then return collision.executeTouch(state.server, triggerIndex, entityIndex) end if
   state.touchEvents = state.touchEvents + [[triggerIndex, entityIndex, state.server.time]]
   return true
 end function
 
+// Provide boxes overlap behavior for the active subsystem.
 function boxesOverlap(minsA, maxsA, minsB, maxsB)
   return collision.boxesOverlap(minsA, maxsA, minsB, maxsB)
 end function
 
+// Apply the Quake-compatible sv touch links behavior.
 function SV_TouchLinks(state, entityIndex, nodeIndex)
   node = state.nodes[nodeIndex]
   // Iterate a snapshot: QuakeC may unlink/free the current trigger during touch.
@@ -288,6 +311,7 @@ function SV_TouchLinks(state, entityIndex, nodeIndex)
   return true
 end function
 
+// Provide rotated bounds behavior for the active subsystem.
 function rotatedBounds(origin, mins, maxs)
   maximum = 0.0
   values = [mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z]
@@ -301,6 +325,7 @@ function rotatedBounds(origin, mins, maxs)
   ]
 end function
 
+// Apply the Quake-compatible sv link edict behavior.
 function SV_LinkEdict(state, entityIndex, touchTriggers)
   SV_UnlinkEdict(state, entityIndex)
   if entityIndex == 0 or not entityValid(state, entityIndex) then return false end if
@@ -372,24 +397,29 @@ function SV_LinkEdict(state, entityIndex, touchTriggers)
   return true
 end function
 
+// Apply the Quake-compatible sv hull point contents behavior.
 function SV_HullPointContents(hull, number, point)
   return boxworld.pointContentsFromNode(hull, number, point)
 end function
 
+// Apply the Quake-compatible sv bsp hull point contents behavior.
 function SV_BspHullPointContents(hull, number, point)
   return bspworld.pointContentsFromNode(hull, number, point)
 end function
 
+// Apply the Quake-compatible sv point contents behavior.
 function SV_PointContents(state, point)
   contents = SV_TruePointContents(state, point)
   if contents <= -9 and contents >= -14 then return c.CONTENTS_WATER end if
   return contents
 end function
 
+// Apply the Quake-compatible sv true point contents behavior.
 function SV_TruePointContents(state, point)
   return bspworld.truePointContents(state.map, point)
 end function
 
+// Return hull index derived from the active module state.
 function hullIndex(mins, maxs)
   sizeX = maxs.x - mins.x
   if sizeX < 3.0 then return 0 end if
@@ -397,6 +427,7 @@ function hullIndex(mins, maxs)
   return 2
 end function
 
+// Apply the Quake-compatible sv hull for entity behavior.
 function SV_HullForEntity(state, entityIndex, mins, maxs)
   solid = entityNumber(state, entityIndex, "solid", c.SOLID_NOT)
   origin = entityVector(state, entityIndex, "origin")
@@ -418,6 +449,7 @@ function SV_HullForEntity(state, entityIndex, mins, maxs)
   return [SV_HullForBox(hullMins, hullMaxs), origin, false]
 end function
 
+// Provide rotate into model behavior for the active subsystem.
 function rotateIntoModel(value, angles)
   vectors = math.AngleVectors(angles)
   return t.Vec3(
@@ -427,15 +459,18 @@ function rotateIntoModel(value, angles)
   )
 end function
 
+// Provide rotate from model behavior for the active subsystem.
 function rotateFromModel(value, angles)
   inverse = t.Vec3(-angles.x, -angles.y, -angles.z)
   return rotateIntoModel(value, inverse)
 end function
 
+// Apply the Quake-compatible sv recursive hull check behavior.
 function SV_RecursiveHullCheck(hull, number, p1Fraction, p2Fraction, p1, p2, trace)
   return bspworld.recursiveHullCheck(hull, number, p1Fraction, p2Fraction, p1, p2, trace)
 end function
 
+// Apply the Quake-compatible sv clip move to entity behavior.
 function SV_ClipMoveToEntity(state, entityIndex, start, mins, maxs, finish)
   selected = SV_HullForEntity(state, entityIndex, mins, maxs)
   hull = selected[0]
@@ -471,15 +506,19 @@ function SV_ClipMoveToEntity(state, entityIndex, start, mins, maxs, finish)
   return trace
 end function
 
+// Apply the Quake-compatible sv move bounds behavior.
 function SV_MoveBounds(start, mins, maxs, finish)
   return collision.moveBounds(start, mins, maxs, finish)
 end function
 
+// Provide choose trace behavior for the active subsystem.
 function chooseTrace(best, candidate)
   return collision.chooseTrace(best, candidate)
 end function
 
+// Apply the Quake-compatible sv clip to links behavior.
 function SV_ClipToLinks(state, nodeIndex, clip)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   node = state.nodes[nodeIndex]
   solids = node.solidEdicts
   for each touchIndex in solids
@@ -524,6 +563,7 @@ function SV_ClipToLinks(state, nodeIndex, clip)
   return true
 end function
 
+// Apply the Quake-compatible sv move behavior.
 function SV_Move(state, start, mins, maxs, finish, moveType, passedEntity)
   trace = bspworld.trace(state.map, start, mins, maxs, finish)
   if trace.fraction < 1.0 or trace.startSolid then trace.entity = 0 else trace.entity = -1 end if
@@ -539,6 +579,7 @@ function SV_Move(state, start, mins, maxs, finish, moveType, passedEntity)
   return clip.trace
 end function
 
+// Apply the Quake-compatible sv test entity position behavior.
 function SV_TestEntityPosition(state, entityIndex)
   if not entityValid(state, entityIndex) then return -1 end if
   origin = entityVector(state, entityIndex, "origin")

@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/game_profile_compat_tests.ml.
+*/
 import miniquake.game_profile as profile
 import miniquake.common as common
 import miniquake.launch as launch
@@ -6,6 +12,7 @@ import miniquake.game_validation as validation
 passed = 0
 failed = 0
 
+// Assert that the condition holds and identify a failing test.
 function bp085Check(condition, label)
   global passed, failed
   if condition then passed = passed + 1; return true end if
@@ -14,10 +21,12 @@ function bp085Check(condition, label)
   return false
 end function
 
+// Assert exact equality and report both values on failure.
 function bp085Equal(actual, expected, label)
   return bp085Check(actual == expected, label + ": expected " + expected + ", got " + actual)
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   global passed, failed
   print "[1/22] status"

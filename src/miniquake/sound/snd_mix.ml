@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.sound.snd_mix.
+*/
 package miniquake.sound.snd_mix
 
 import miniquake.sound.snd_mem as sndmem
@@ -51,6 +58,7 @@ struct MixState
   transferVolume
 end struct
 
+// Create and initialize dma.
 function createDma(speed, sampleBits, channels, samples)
   if speed <= 0 then speed = 22050 end if
   if sampleBits != 8 and sampleBits != 16 then sampleBits = 16 end if
@@ -70,6 +78,7 @@ function createDma(speed, sampleBits, channels, samples)
   )
 end function
 
+// Create and initialize channel.
 function createChannel()
   return SoundChannel(
     void,
@@ -86,6 +95,7 @@ function createChannel()
   )
 end function
 
+// Update module state for channel.
 function resetChannel(channel)
   channel.sfx = void
   channel.leftVolume = 0
@@ -101,6 +111,7 @@ function resetChannel(channel)
   return channel
 end function
 
+// Create and initialize state.
 function createState(dma)
   channelBuilder = arrays.createArrayBuilder(MAX_CHANNELS)
   index = 0
@@ -126,24 +137,28 @@ function createState(dma)
   return state
 end function
 
+// Return signed byte derived from the active module state.
 function signedByte(value)
   value = value & 255
   if value >= 128 then return value - 256 end if
   return value
 end function
 
+// Provide sound i32 behavior for the active subsystem.
 function soundI32(value)
   result = value & 0xffffffff
   if result >= 0x80000000 then result = result - 0x100000000 end if
   return result
 end function
 
+// Provide clamp16 behavior for the active subsystem.
 function clamp16(value)
   if value > 32767 then return 32767 end if
   if value < -32768 then return -32768 end if
   return native.trunc(value)
 end function
 
+// Mirror Quake's SND_InitScaletable routine and its observable state changes.
 function SND_InitScaletable(state)
   row = 0
   while row < 32
@@ -157,6 +172,7 @@ function SND_InitScaletable(state)
   return state.scaleTable
 end function
 
+// Mirror Quake's Snd_WriteLinearBlastStereo16 routine and its observable state changes.
 function Snd_WriteLinearBlastStereo16(state)
   index = 0
   while index < state.linearCount
@@ -168,6 +184,7 @@ function Snd_WriteLinearBlastStereo16(state)
   return state.linearCount
 end function
 
+// Apply the Quake-compatible s transfer stereo16 behavior.
 function S_TransferStereo16(state, endTime)
   state.transferVolume = native.trunc(state.volume * 256.0)
   state.linearSource = 0
@@ -189,6 +206,7 @@ function S_TransferStereo16(state, endTime)
   return writtenFrames
 end function
 
+// Apply the Quake-compatible s transfer paint buffer behavior.
 function S_TransferPaintBuffer(state, endTime)
   if state.dma.sampleBits == 16 and state.dma.channels == 2 then
     return S_TransferStereo16(state, endTime)
@@ -216,6 +234,7 @@ function S_TransferPaintBuffer(state, endTime)
   return written
 end function
 
+// Mirror Quake's SND_PaintChannelFrom8 routine and its observable state changes.
 function SND_PaintChannelFrom8(state, channel, cache, count)
   if channel.leftVolume > 255 then channel.leftVolume = 255 end if
   if channel.rightVolume > 255 then channel.rightVolume = 255 end if
@@ -232,6 +251,7 @@ function SND_PaintChannelFrom8(state, channel, cache, count)
   return count
 end function
 
+// Mirror Quake's SND_PaintChannelFrom16 routine and its observable state changes.
 function SND_PaintChannelFrom16(state, channel, cache, count)
   index = 0
   while index < count
@@ -246,6 +266,7 @@ function SND_PaintChannelFrom16(state, channel, cache, count)
   return count
 end function
 
+// Update module state for paint buffer.
 function clearPaintBuffer(state, frameCount)
   index = 0
   while index < frameCount * 2
@@ -254,7 +275,9 @@ function clearPaintBuffer(state, frameCount)
   end while
 end function
 
+// Apply the Quake-compatible s paint channels behavior.
 function S_PaintChannels(state, endTime)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if endTime < state.paintedTime then return error(2470, "S_PaintChannels: end before painted time") end if
   while state.paintedTime < endTime
     blockEnd = endTime

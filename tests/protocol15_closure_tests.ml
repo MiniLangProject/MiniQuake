@@ -1,13 +1,13 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-019 closure fixtures stitch the source-guided Protocol-15 layers together:
 wire primitives, command catalogs, signon, reliable scheduling, datagram
 fragmentation, demo framing and client parsing.  Component suites remain the
 fine-grained oracle; this file is the final cross-layer freeze gate.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.sizebuf as sz
@@ -20,21 +20,25 @@ import miniquake.client_protocol as protocol
 import miniquake.net_datagram as datagram
 import miniquake.demo as demo
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(9900, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function yes(value, name)
   if value != true then return error(9901, name + ": expected true") end if
   return true
 end function
 
+// Exercise no as part of this deterministic regression fixture.
 function no(value, name)
   if value != false then return error(9902, name + ": expected false") end if
   return true
 end function
 
+// Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
   print "  [" + number + "/15] " + name
   result = try(fn())
@@ -45,6 +49,7 @@ function run(number, name, fn)
   return true
 end function
 
+// Exercise baseline as part of this deterministic regression fixture.
 function baseline()
   return t.EntityBaseline(
     1, 0, 0, 0, 0,
@@ -53,6 +58,7 @@ function baseline()
   )
 end function
 
+// Verify freeze identity against the expected Quake behavior.
 function testFreezeIdentity()
   equal(freeze.STATUS, "protocol15_frozen_v1", "freeze status")
   equal(freeze.PROTOCOL_VERSION, c.PROTOCOL_VERSION, "protocol version")
@@ -61,6 +67,7 @@ function testFreezeIdentity()
   return true
 end function
 
+// Verify svc catalog against the expected Quake behavior.
 function testSvcCatalog()
   values = freeze.validSvcCommands()
   equal(len(values), 33, "SVC count")
@@ -80,6 +87,7 @@ function testSvcCatalog()
   return true
 end function
 
+// Verify clc catalog against the expected Quake behavior.
 function testClcCatalog()
   values = freeze.validClcCommands()
   equal(len(values), 4, "CLC count")
@@ -94,6 +102,7 @@ function testClcCatalog()
   return true
 end function
 
+// Verify bit masks against the expected Quake behavior.
 function testBitMasks()
   equal(freeze.combineMask(freeze.fastUpdateBits()), 0x7fff, "fast update mask")
   equal(freeze.combineMask(freeze.clientDataBits()), 0x7eff, "client data mask")
@@ -104,6 +113,7 @@ function testBitMasks()
   return true
 end function
 
+// Verify temporary entity catalog against the expected Quake behavior.
 function testTemporaryEntityCatalog()
   values = freeze.temporaryEntityTypes()
   equal(len(values), 14, "temporary entity count")
@@ -116,6 +126,7 @@ function testTemporaryEntityCatalog()
   return true
 end function
 
+// Verify reserved server commands against the expected Quake behavior.
 function testReservedServerCommands()
   yes(try(protocol.parse(bytes([c.SVC_BAD]))) is error, "svc_bad rejected")
   yes(try(protocol.parse(bytes([c.SVC_SPAWNBINARY]))) is error, "spawnbinary rejected")
@@ -123,6 +134,7 @@ function testReservedServerCommands()
   return true
 end function
 
+// Verify signon wire sequence against the expected Quake behavior.
 function testSignonWireSequence()
   buffer = sz.alloc(1024)
   first = signon.writeClientReply(buffer, c.SIGNON_SERVERINFO, "player", 0x4f, "")
@@ -147,6 +159,7 @@ function testSignonWireSequence()
   return true
 end function
 
+// Verify delivery boundaries against the expected Quake behavior.
 function testDeliveryBoundaries()
   equal(delivery.clientReliablePlan(true, 1, false), delivery.SEND_RETAIN, "blocked client retains")
   equal(delivery.clientReliablePlan(true, 1, true), delivery.SEND_COMMIT, "sendable client commits")
@@ -158,6 +171,7 @@ function testDeliveryBoundaries()
   return true
 end function
 
+// Verify fast update signal against the expected Quake behavior.
 function testFastUpdateSignal()
   buffer = sz.alloc(64)
   item = baseline()
@@ -175,6 +189,7 @@ function testFastUpdateSignal()
   return true
 end function
 
+// Create and initialize closure message.
 function buildClosureMessage()
   buffer = sz.alloc(2048)
   msg.writeByte(buffer, c.SVC_TIME)
@@ -191,6 +206,7 @@ function buildClosureMessage()
   return sz.dataSlice(buffer)
 end function
 
+// Transfer data for reliable.
 function transferReliable(payload)
   sender = datagram.createChannel()
   receiver = datagram.createChannel()
@@ -211,6 +227,7 @@ function transferReliable(payload)
   return [complete, fragments, sender.canSend]
 end function
 
+// Verify datagram demo parser closure against the expected Quake behavior.
 function testDatagramDemoParserClosure()
   original = buildClosureMessage()
   yes(len(original) > datagram.MAX_DATAGRAM, "closure message fragments")
@@ -234,6 +251,7 @@ function testDatagramDemoParserClosure()
   return true
 end function
 
+// Verify demo keepalive and disconnect against the expected Quake behavior.
 function testDemoKeepaliveAndDisconnect()
   yes(demo.isKeepalivePayload(bytes([c.SVC_NOP])), "isolated keepalive")
   no(demo.isKeepalivePayload(bytes([c.SVC_NOP, c.SVC_NOP])), "compound payload retained")
@@ -244,6 +262,7 @@ function testDemoKeepaliveAndDisconnect()
   return true
 end function
 
+// Verify sequence wrap against the expected Quake behavior.
 function testSequenceWrap()
   channel = datagram.createChannel()
   channel.sendSequence = 0xffffffff
@@ -254,6 +273,7 @@ function testSequenceWrap()
   return true
 end function
 
+// Exercise closure scenario hex as part of this deterministic regression fixture.
 function closureScenarioHex()
   payload = buildClosureMessage()
   transferred = transferReliable(payload)
@@ -263,6 +283,7 @@ function closureScenarioHex()
   return hex(demo.serialize(recording))
 end function
 
+// Verify deterministic closure scenario against the expected Quake behavior.
 function testDeterministicClosureScenario()
   first = closureScenarioHex()
   if first is error then return first end if
@@ -272,6 +293,7 @@ function testDeterministicClosureScenario()
   return true
 end function
 
+// Verify coverage summary against the expected Quake behavior.
 function testCoverageSummary()
   summary = freeze.coverageSummary()
   equal(len(summary), 8, "summary fields")
@@ -286,6 +308,7 @@ function testCoverageSummary()
   return true
 end function
 
+// Verify protocol limits against the expected Quake behavior.
 function testProtocolLimits()
   equal(c.MAX_MSGLEN, 8000, "MAX_MSGLEN")
   equal(c.MAX_DATAGRAM, 1024, "MAX_DATAGRAM")
@@ -294,6 +317,7 @@ function testProtocolLimits()
   return true
 end function
 
+// Verify fingerprint mutation sensitivity against the expected Quake behavior.
 function testFingerprintMutationSensitivity()
   original = freeze.protocolFingerprint()
   changed = freeze.fingerprintValue(original, c.SVC_CUTSCENE + 1)
@@ -302,6 +326,7 @@ function testFingerprintMutationSensitivity()
   return true
 end function
 
+// Verify limits and fingerprint against the expected Quake behavior.
 function testLimitsAndFingerprint()
   testProtocolLimits()
   testFingerprintMutationSensitivity()

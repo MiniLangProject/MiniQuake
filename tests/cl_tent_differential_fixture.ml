@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/cl_tent_differential_fixture.ml.
+*/
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.temp_entities as tent
@@ -5,11 +11,13 @@ import miniquake.sizebuf as sz
 import miniquake.message as msg
 import miniquake.native as native
 
+// Exercise bool text as part of this deterministic regression fixture.
 function boolText(value)
   if value then return "true" end if
   return "false"
 end function
 
+// Exercise model marker as part of this deterministic regression fixture.
 function modelMarker(model)
   if model == "progs/bolt.mdl" then return 1 end if
   if model == "progs/bolt2.mdl" then return 2 end if
@@ -17,6 +25,7 @@ function modelMarker(model)
   return 4
 end function
 
+// Exercise sound marker as part of this deterministic regression fixture.
 function soundMarker(name)
   if name == "wizard/hit.wav" then return 1 end if
   if name == "hknight/hit.wav" then return 2 end if
@@ -28,6 +37,7 @@ function soundMarker(name)
   return 0
 end function
 
+// Exercise beam reader as part of this deterministic regression fixture.
 function beamReader(entity, start, finish)
   buffer = sz.alloc(64)
   msg.writeShort(buffer, entity)
@@ -40,6 +50,7 @@ function beamReader(entity, start, finish)
   return msg.beginReading(buffer)
 end function
 
+// Report whether active beam count holds for the active state.
 function activeBeamCount(state)
   count = 0
   for each beam in state.beams
@@ -48,6 +59,7 @@ function activeBeamCount(state)
   return count
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   initialized = tent.CL_InitTEnts(void)
   print "{\"function\":\"CL_InitTEnts\",\"case\":\"stock_precache\",\"sounds\":" + len(initialized.precachedSounds) + ",\"first_ok\":" + boolText(initialized.precachedSounds[0] == "wizard/hit.wav") + ",\"last_ok\":" + boolText(initialized.precachedSounds[6] == "weapons/r_exp3.wav") + "}"

@@ -1,21 +1,23 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Focused sys_win.c/sys.h/winquake.h parity fixtures.
 */
-
 import miniquake.sys_win as system
 import miniquake.conproc as conproc
 import std.fs as fs
 
 runnerArguments = []
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9900, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function assertNear(actual, expected, epsilon, name)
   if actual < expected - epsilon or actual > expected + epsilon then
     return error(9901, name + ": expected " + expected + ", got " + actual)
@@ -23,23 +25,27 @@ function assertNear(actual, expected, epsilon, name)
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9902, name + ": expected true") end if
   return true
 end function
 
+// Return use test state derived from the active module state.
 function useTestState()
   state = system.Sys_CreateState(false)
   system.Sys_UseState(state)
   return state
 end function
 
+// Build deterministic test data for runner.
 function fixtureRunner(arguments)
   global runnerArguments
   runnerArguments = arguments
   return 7
 end function
 
+// Verify command line and win main against the expected Quake behavior.
 function testCommandLineAndWinMain()
   state = useTestState()
   parsed = system.Sys_ParseCommandLine("  -dedicated\t-heapsize 4096  +map start")
@@ -56,6 +62,7 @@ function testCommandLineAndWinMain()
   return true
 end function
 
+// Verify page in against the expected Quake behavior.
 function testPageIn()
   state = useTestState()
   memory = bytes(65540)
@@ -66,6 +73,7 @@ function testPageIn()
   return true
 end function
 
+// Verify file io against the expected Quake behavior.
 function testFileIo()
   useTestState()
   path = "build\\sys_win_fixture.tmp"
@@ -90,6 +98,7 @@ function testFileIo()
   return true
 end function
 
+// Verify handle table against the expected Quake behavior.
 function testHandleTable()
   state = useTestState()
   index = 1
@@ -103,6 +112,7 @@ function testHandleTable()
   return true
 end function
 
+// Verify float time against the expected Quake behavior.
 function testFloatTime()
   state = useTestState()
   state.arguments = ["", "-starttime", "3.5"]
@@ -116,6 +126,7 @@ function testFloatTime()
   return true
 end function
 
+// Verify console input against the expected Quake behavior.
 function testConsoleInput()
   state = useTestState()
   state.isDedicated = true
@@ -133,6 +144,7 @@ function testConsoleInput()
   return true
 end function
 
+// Verify qhost polling against the expected Quake behavior.
 function testQHostPolling()
   state = useTestState()
   state.isDedicated = true
@@ -144,6 +156,7 @@ function testQHostPolling()
   return true
 end function
 
+// Verify system hooks against the expected Quake behavior.
 function testSystemHooks()
   state = useTestState()
   assertTrue(system.Sys_MakeCodeWriteable(4096, 128), "diagnostic writable request")
@@ -160,6 +173,7 @@ function testSystemHooks()
   return true
 end function
 
+// Verify error and quit against the expected Quake behavior.
 function testErrorAndQuit()
   state = useTestState()
   state.isDedicated = true
@@ -172,6 +186,7 @@ function testErrorAndQuit()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   testCommandLineAndWinMain()
   testPageIn()

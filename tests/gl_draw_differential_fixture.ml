@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/gl_draw_differential_fixture.ml.
+*/
 import miniquake.render.draw2d as draw
 import miniquake.render.gl11 as gl
 import miniquake.types as t
@@ -6,10 +12,12 @@ import miniquake.byteio as bio
 import miniquake.wad as wad
 import miniquake.cvar as cvar
 
+// Return fnv byte derived from the active module state.
 function inline fnvByte(hash, value)
   return ((hash ^ (value & 255)) * 16777619) & 4294967295
 end function
 
+// Fold bytes into the deterministic rolling hash.
 function hashBytes(data)
   hash = 2166136261
   index = 0
@@ -20,6 +28,7 @@ function hashBytes(data)
   return hash
 end function
 
+// Fold levels into the deterministic rolling hash.
 function hashLevels(levels)
   hash = 2166136261
   for each level in levels
@@ -30,6 +39,7 @@ function hashLevels(levels)
   return hash
 end function
 
+// Exercise level hashes as part of this deterministic regression fixture.
 function levelHashes(levels)
   result = "["
   index = 0
@@ -41,15 +51,18 @@ function levelHashes(levels)
   return result + "]"
 end function
 
+// Add the requested value to the destination state.
 function emit(functionName, scene, fields)
   print "{\"function\":\"" + functionName + "\",\"scene\":\"" + scene + "\"," + fields + "}"
 end function
 
+// Exercise bool int as part of this deterministic regression fixture.
 function boolInt(value)
   if value then return 1 end if
   return 0
 end function
 
+// Return count command for the active module state.
 function countCommand(commands, name)
   count = 0
   for each command in commands
@@ -58,6 +71,7 @@ function countCommand(commands, name)
   return count
 end function
 
+// Return last command for the active module state.
 function lastCommand(commands, name)
   result = void
   for each command in commands
@@ -66,6 +80,7 @@ function lastCommand(commands, name)
   return result
 end function
 
+// Exercise fill pic as part of this deterministic regression fixture.
 function fillPic(width, height, seed)
   data = bytes(8 + width * height)
   bio.putI32(data, 0, width)
@@ -78,6 +93,7 @@ function fillPic(width, height, seed)
   return data
 end function
 
+// Encode and write name.
 function putName(data, offset, name)
   source = bytes(name)
   copied = len(source)
@@ -85,6 +101,7 @@ function putName(data, offset, name)
   bio.copyInto(data, offset, source, 0, copied)
 end function
 
+// Encode and write lump directory.
 function putLumpDirectory(data, offset, filePosition, size, type, name)
   bio.putI32(data, offset, filePosition)
   bio.putI32(data, offset + 4, size)
@@ -94,6 +111,7 @@ function putLumpDirectory(data, offset, filePosition, size, type, name)
   putName(data, offset + 16, name)
 end function
 
+// Create and initialize assets.
 function makeAssets()
   characters = bytes(16384)
   index = 0
@@ -141,6 +159,7 @@ function makeAssets()
   return [filesystem, wad.parse(wadData, "gfx.wad"), characters, menu]
 end function
 
+// Exercise palette as part of this deterministic regression fixture.
 function palette()
   result = bytes(768)
   index = 0
@@ -153,12 +172,14 @@ function palette()
   return result
 end function
 
+// Exercise picture as part of this deterministic regression fixture.
 function picture(name, width, height, texture, pixels)
   result = t.MenuPicture(name, width, height, texture)
   draw.registerDrawPicture(result, [0.25, 0.125, 0.75, 0.875], pixels)
   return result
 end function
 
+// Exercise rgba source as part of this deterministic regression fixture.
 function rgbaSource()
   data = bytes(64)
   index = 0
@@ -170,6 +191,7 @@ function rgbaSource()
   return data
 end function
 
+// Return fatal mode derived from the active module state.
 function fatalMode(mode)
   pal = palette()
   draw.Draw_DifferentialReset(pal)
@@ -200,7 +222,9 @@ function fatalMode(mode)
   return 2
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   if len(args) == 2 and args[0] == "--fatal" then return fatalMode(args[1]) end if
   pal = palette()
   assets = makeAssets()

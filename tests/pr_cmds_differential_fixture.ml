@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/pr_cmds_differential_fixture.ml.
+*/
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.native as native
@@ -10,6 +16,7 @@ import miniquake.quakec.opcodes as op
 import miniquake.quakec.vm as vm
 import miniquake.quakec.builtins as qc
 
+// Add the requested value to the destination state.
 function emit(name, caseName, i0, i1, f0, f1, f2, f3)
   print "{\"function\":\"" + name + "\",\"case\":\"" + caseName +
     "\",\"i0\":" + i0 + ",\"i1\":" + i1 +
@@ -17,11 +24,13 @@ function emit(name, caseName, i0, i1, f0, f1, f2, f3)
     ",\"f2\":" + native.floatText(f2) + ",\"f3\":" + native.floatText(f3) + "}"
 end function
 
+// Exercise int bool as part of this deterministic regression fixture.
 function intBool(value)
   if value then return 1 end if
   return 0
 end function
 
+// Trace checksum through the collision world.
 function traceChecksum(value)
   data = value
   if value is string then data = bytes(value) end if
@@ -34,10 +43,12 @@ function traceChecksum(value)
   return result
 end function
 
+// Exercise field as part of this deterministic regression fixture.
 function field(typeValue, offset, name)
   return t.QuakeCDef(typeValue, offset, 0, name)
 end function
 
+// Create and initialize fields.
 function makeFields()
   return [
     field(c.EV_VOID, 0, ""),
@@ -68,6 +79,7 @@ function makeFields()
   ]
 end function
 
+// Create and initialize globals.
 function makeGlobals()
   result = [
     field(c.EV_VOID, 0, ""),
@@ -94,10 +106,12 @@ function makeGlobals()
   return result
 end function
 
+// Exercise no command as part of this deterministic regression fixture.
 function noCommand(name)
   return false
 end function
 
+// Exercise fresh as part of this deterministic regression fixture.
 function fresh()
   dummy = t.QuakeCFunction(0, 0, 0, 0, "", "", 0, [])
   program = t.QuakeCProgram(
@@ -160,31 +174,39 @@ function fresh()
   return [machine, contextValue]
 end function
 
+// Update module state for parm word.
 function setParmWord(machine, index, value)
   qc.setWord(machine, op.OFS_PARM0 + index * 3, value)
 end function
 
+// Update module state for parm float.
 function setParmFloat(machine, index, value)
   qc.setFloat(machine, op.OFS_PARM0 + index * 3, value)
 end function
 
+// Update module state for parm vector.
 function setParmVector(machine, index, x, y, z)
   qc.setVectorValue(machine, op.OFS_PARM0 + index * 3, t.Vec3(x, y, z))
 end function
 
+// Update module state for parm string.
 function setParmString(machine, index, text)
   setParmWord(machine, index, vm.internString(machine, text))
 end function
 
+// Return returned vector derived from the active module state.
 function returnedVector(machine)
   return qc.vectorValue(machine, op.OFS_RETURN)
 end function
 
+// Exercise returned float as part of this deterministic regression fixture.
 function returnedFloat(machine)
   return qc.floatValue(machine, op.OFS_RETURN)
 end function
 
+// Return fatal mode derived from the active module state.
 function fatalMode(caseNumber)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   state = fresh()
   machine = state[0]
   contextValue = state[1]
@@ -224,6 +246,7 @@ function fatalMode(caseNumber)
   return 0
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   if len(args) >= 2 and args[0] == "--fatal" then return fatalMode(toNumber(args[1])) end if
 

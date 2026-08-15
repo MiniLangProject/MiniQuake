@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.quakec.builtins.
+*/
 package miniquake.quakec.builtins
 
 import miniquake.types as t
@@ -24,37 +31,51 @@ const FNV_OFFSET = 2166136261
 const FNV_PRIME = 16777619
 
 activeContext = void
+brushBoundsNames = []
+brushBoundsValues = []
 
+// Provide bind behavior for the active subsystem.
 function bind(contextValue)
-  global activeContext
+  global activeContext, brushBoundsNames, brushBoundsValues
   activeContext = contextValue
+  // A new QuakeC server context may point at a different -game search path.
+  // Keep the Mod_ForName-style cache map-local so identically named mod BSPs
+  // never inherit bounds from the previous server.
+  brushBoundsNames = []
+  brushBoundsValues = []
   return contextValue
 end function
 
+// Provide context behavior for the active subsystem.
 function context()
   global activeContext
   return activeContext
 end function
 
+// Ensure sufficient storage or state for global.
 function ensureGlobal(machine, offset)
   return qvm.ensureGlobal(machine, offset)
 end function
 
+// Provide word behavior for the active subsystem.
 function word(machine, offset)
   ensureGlobal(machine, offset)
   return machine.globals[offset]
 end function
 
+// Update module state for word.
 function setWord(machine, offset, value)
   ensureGlobal(machine, offset)
   machine.globals[offset] = value & 0xffffffff
   return value
 end function
 
+// Return float value derived from the active module state.
 function floatValue(machine, offset)
   return native.bitsFloat(word(machine, offset))
 end function
 
+// Update module state for float.
 function setFloat(machine, offset, value)
   if value is bool then
     if value then value = 1.0 else value = 0.0 end if
@@ -62,40 +83,49 @@ function setFloat(machine, offset, value)
   return setWord(machine, offset, native.floatBits(value))
 end function
 
+// Return vector value derived from the active module state.
 function vectorValue(machine, offset)
   return t.Vec3(floatValue(machine, offset), floatValue(machine, offset + 1), floatValue(machine, offset + 2))
 end function
 
+// Update module state for vector value.
 function setVectorValue(machine, offset, value)
   setFloat(machine, offset, value.x)
   setFloat(machine, offset + 1, value.y)
   setFloat(machine, offset + 2, value.z)
 end function
 
+// Return parameter offset derived from the active module state.
 function inline parameterOffset(index)
   return op.OFS_PARM0 + index * 3
 end function
 
+// Provide parm word behavior for the active subsystem.
 function parmWord(machine, index)
   return word(machine, parameterOffset(index))
 end function
 
+// Provide parm float behavior for the active subsystem.
 function parmFloat(machine, index)
   return floatValue(machine, parameterOffset(index))
 end function
 
+// Return parm vector derived from the active module state.
 function parmVector(machine, index)
   return vectorValue(machine, parameterOffset(index))
 end function
 
+// Provide string at behavior for the active subsystem.
 function stringAt(machine, handle)
   return qvm.stringValue(machine, handle)
 end function
 
+// Provide parm string behavior for the active subsystem.
 function parmString(machine, index)
   return stringAt(machine, parmWord(machine, index))
 end function
 
+// Provide var string behavior for the active subsystem.
 function varString(machine, first)
   text = ""
   index = first
@@ -106,34 +136,41 @@ function varString(machine, first)
   return text
 end function
 
+// Provide intern string behavior for the active subsystem.
 function internString(machine, text)
   return qvm.internString(machine, text)
 end function
 
+// Provide return word behavior for the active subsystem.
 function returnWord(machine, value)
   setWord(machine, op.OFS_RETURN, value)
   setWord(machine, op.OFS_RETURN + 1, 0)
   setWord(machine, op.OFS_RETURN + 2, 0)
 end function
 
+// Provide return float behavior for the active subsystem.
 function returnFloat(machine, value)
   setFloat(machine, op.OFS_RETURN, value)
   setWord(machine, op.OFS_RETURN + 1, 0)
   setWord(machine, op.OFS_RETURN + 2, 0)
 end function
 
+// Return return vector derived from the active module state.
 function returnVector(machine, value)
   setVectorValue(machine, op.OFS_RETURN, value)
 end function
 
+// Provide return string behavior for the active subsystem.
 function returnString(machine, text)
   returnWord(machine, internString(machine, text))
 end function
 
+// Provide return temporary string behavior for the active subsystem.
 function returnTemporaryString(machine, text)
   returnWord(machine, qvm.setTemporaryString(machine, text))
 end function
 
+// Return definition offset derived from the active module state.
 function definitionOffset(definitions, name)
   for each definition in definitions
     if definition.name == name then return definition.offset end if
@@ -141,26 +178,31 @@ function definitionOffset(definitions, name)
   return -1
 end function
 
+// Return global offset derived from the active module state.
 function globalOffset(machine, name)
   return definitionOffset(machine.program.globalDefs, name)
 end function
 
+// Return field offset derived from the active module state.
 function fieldOffset(machine, name)
   return definitionOffset(machine.program.fieldDefs, name)
 end function
 
+// Provide global word behavior for the active subsystem.
 function globalWord(machine, name)
   offset = globalOffset(machine, name)
   if offset < 0 then return 0 end if
   return word(machine, offset)
 end function
 
+// Return global vector derived from the active module state.
 function globalVector(machine, name)
   offset = globalOffset(machine, name)
   if offset < 0 then return t.Vec3(0.0, 0.0, 0.0) end if
   return vectorValue(machine, offset)
 end function
 
+// Update module state for global word.
 function setGlobalWord(machine, name, value)
   offset = globalOffset(machine, name)
   if offset < 0 then return false end if
@@ -168,6 +210,7 @@ function setGlobalWord(machine, name, value)
   return true
 end function
 
+// Update module state for global float.
 function setGlobalFloat(machine, name, value)
   offset = globalOffset(machine, name)
   if offset < 0 then return false end if
@@ -175,6 +218,7 @@ function setGlobalFloat(machine, name, value)
   return true
 end function
 
+// Update module state for global vector.
 function setGlobalVector(machine, name, value)
   offset = globalOffset(machine, name)
   if offset < 0 then return false end if
@@ -182,12 +226,14 @@ function setGlobalVector(machine, name, value)
   return true
 end function
 
+// Provide entity word behavior for the active subsystem.
 function entityWord(machine, entityIndex, name)
   offset = fieldOffset(machine, name)
   if offset < 0 or entityIndex < 0 or entityIndex >= len(machine.edicts) then return 0 end if
   return machine.edicts[entityIndex][offset]
 end function
 
+// Update module state for entity word.
 function setEntityWord(machine, entityIndex, name, value)
   offset = fieldOffset(machine, name)
   if offset < 0 or entityIndex < 0 or entityIndex >= len(machine.edicts) then return false end if
@@ -195,20 +241,24 @@ function setEntityWord(machine, entityIndex, name, value)
   return true
 end function
 
+// Provide entity float behavior for the active subsystem.
 function entityFloat(machine, entityIndex, name)
   return native.bitsFloat(entityWord(machine, entityIndex, name))
 end function
 
+// Update module state for entity float.
 function setEntityFloat(machine, entityIndex, name, value)
   return setEntityWord(machine, entityIndex, name, native.floatBits(value))
 end function
 
+// Return entity vector derived from the active module state.
 function entityVector(machine, entityIndex, name)
   offset = fieldOffset(machine, name)
   if offset < 0 or entityIndex < 0 or entityIndex >= len(machine.edicts) then return t.Vec3(0.0, 0.0, 0.0) end if
   return t.Vec3(native.bitsFloat(machine.edicts[entityIndex][offset]), native.bitsFloat(machine.edicts[entityIndex][offset + 1]), native.bitsFloat(machine.edicts[entityIndex][offset + 2]))
 end function
 
+// Update module state for entity vector.
 function setEntityVector(machine, entityIndex, name, value)
   offset = fieldOffset(machine, name)
   if offset < 0 or entityIndex < 0 or entityIndex >= len(machine.edicts) then return false end if
@@ -218,10 +268,12 @@ function setEntityVector(machine, entityIndex, name, value)
   return true
 end function
 
+// Provide entity string behavior for the active subsystem.
 function entityString(machine, entityIndex, name)
   return stringAt(machine, entityWord(machine, entityIndex, name))
 end function
 
+// Update module state for bounds.
 function updateBounds(machine, entityIndex)
   origin = entityVector(machine, entityIndex, "origin")
   mins = entityVector(machine, entityIndex, "mins")
@@ -250,6 +302,7 @@ function updateBounds(machine, entityIndex)
   end if
 end function
 
+// Update module state for min max size.
 function setMinMaxSize(machine, entityIndex, mins, maxs, rotate)
   if mins.x > maxs.x or mins.y > maxs.y or mins.z > maxs.z then return error(2652, "PF_setsize: backwards mins/maxs") end if
   // MiniQuake's SetMinMaxSize forcibly disables rotation despite accepting the
@@ -260,6 +313,53 @@ function setMinMaxSize(machine, entityIndex, mins, maxs, rotate)
   return true
 end function
 
+// External brush entities (ammo/health boxes, explosive barrels, etc.) are
+// complete BSP29 files.  WinQuake's Mod_ForName loads their first dmodel and
+// PF_setmodel copies its expanded mins/maxs into the edict.  Parsing only the
+// model lump here keeps the server independent of renderer-owned model data
+// and avoids loading all render/lightmap lumps during QuakeC spawning.
+function brushModelBounds(data, modelName)
+  headerSize = 4 + c.HEADER_LUMPS * 8
+  if len(data) < headerSize then return error(2669, "PF_setmodel: truncated BSP " + modelName) end if
+  version = bio.i32(data, 0)
+  if version != c.BSP_VERSION then return error(2669, "PF_setmodel: unsupported BSP version " + version + " in " + modelName) end if
+  descriptor = 4 + c.LUMP_MODELS * 8
+  lumpOffset = bio.i32(data, descriptor)
+  lumpLength = bio.i32(data, descriptor + 4)
+  if lumpOffset < 0 or lumpLength < 64 or lumpLength % 64 != 0 or lumpOffset + lumpLength > len(data) then
+    return error(2669, "PF_setmodel: invalid BSP model lump in " + modelName)
+  end if
+  // Mod_LoadSubmodels spreads every side by one unit before setmodel uses it.
+  mins = t.Vec3(
+    bio.f32(data, lumpOffset) - 1.0,
+    bio.f32(data, lumpOffset + 4) - 1.0,
+    bio.f32(data, lumpOffset + 8) - 1.0,
+  )
+  maxs = t.Vec3(
+    bio.f32(data, lumpOffset + 12) + 1.0,
+    bio.f32(data, lumpOffset + 16) + 1.0,
+    bio.f32(data, lumpOffset + 20) + 1.0,
+  )
+  return [mins, maxs]
+end function
+
+// Provide cached brush model bounds behavior for the active subsystem.
+function cachedBrushModelBounds(ctx, modelName)
+  global brushBoundsNames, brushBoundsValues
+  index = 0
+  while index < len(brushBoundsNames)
+    if brushBoundsNames[index] == modelName then return brushBoundsValues[index] end if
+    index = index + 1
+  end while
+  if ctx.filesystem is void then return error(2668, "PF_setmodel: no filesystem for " + modelName) end if
+  data = try(filesystem.readFile(ctx.filesystem, modelName))
+  bounds = try(brushModelBounds(data, modelName))
+  brushBoundsNames = brushBoundsNames + [modelName]
+  brushBoundsValues = brushBoundsValues + [bounds]
+  return bounds
+end function
+
+// Provide model bounds behavior for the active subsystem.
 function modelBounds(machine, modelName)
   ctx = context()
   zero = t.Vec3(0.0, 0.0, 0.0)
@@ -280,6 +380,7 @@ function modelBounds(machine, modelName)
     if suffix == ".mdl" then
       return [t.Vec3(-16.0, -16.0, -16.0), t.Vec3(16.0, 16.0, 16.0)]
     end if
+    if suffix == ".bsp" then return cachedBrushModelBounds(ctx, modelName) end if
     if suffix == ".spr" then
       if ctx.filesystem is void then return error(2668, "PF_setmodel: no filesystem for " + modelName) end if
       data = filesystem.readFile(ctx.filesystem, modelName)
@@ -290,6 +391,7 @@ function modelBounds(machine, modelName)
   return [zero, zero]
 end function
 
+// Allocate and initialize edict.
 function allocateEdict(machine)
   ctx = context()
   first = 1
@@ -299,10 +401,12 @@ function allocateEdict(machine)
   return qcedict.allocate(machine, first)
 end function
 
+// Release or remove state for edict.
 function releaseEdict(machine, entityIndex)
   return qcedict.free(machine, entityIndex)
 end function
 
+// Preload and register the index asset.
 function precacheIndex(values, name)
   index = 0
   while index < len(values)
@@ -312,26 +416,31 @@ function precacheIndex(values, name)
   return -1
 end function
 
+// Report whether active edict limit holds for the active state.
 function activeEdictLimit(machine)
   ctx = context()
   if ctx is not void and ctx.edicts is not void then return ctx.edicts.numEdicts end if
   return len(machine.edicts)
 end function
 
+// Provide bad precache string behavior for the active subsystem.
 function badPrecacheString(name)
   data = bytes(name)
   return len(data) == 0 or data[0] <= 32
 end function
 
+// Add state for append console.
 function appendConsole(text)
   ctx = context()
   ctx.consoleLines = ctx.consoleLines + [text]
 end function
 
+// Provide fixme behavior for the active subsystem.
 function fixme(machine)
   return error(2650, "unimplemented bulitin")
 end function
 
+// Create and initialize vectors.
 function makeVectors(machine)
   vectors = math.angleVectors(parmVector(machine, 0))
   setGlobalVector(machine, "v_forward", vectors[0])
@@ -340,6 +449,7 @@ function makeVectors(machine)
   return true
 end function
 
+// Update module state for origin.
 function setOrigin(machine)
   entityIndex = parmWord(machine, 0)
   setEntityVector(machine, entityIndex, "origin", parmVector(machine, 1))
@@ -347,6 +457,7 @@ function setOrigin(machine)
   return true
 end function
 
+// Update module state for model.
 function setModel(machine)
   ctx = context()
   entityIndex = parmWord(machine, 0)
@@ -355,11 +466,12 @@ function setModel(machine)
   if modelIndex < 0 then return error(2651, "PF_setmodel: no precache for " + modelName) end if
   setEntityWord(machine, entityIndex, "model", parmWord(machine, 1))
   setEntityFloat(machine, entityIndex, "modelindex", modelIndex)
-  bounds = modelBounds(machine, modelName)
+  bounds = try(modelBounds(machine, modelName))
   setMinMaxSize(machine, entityIndex, bounds[0], bounds[1], true)
   return true
 end function
 
+// Update module state for size.
 function setSize(machine)
   entityIndex = parmWord(machine, 0)
   mins = parmVector(machine, 1)
@@ -367,6 +479,7 @@ function setSize(machine)
   return setMinMaxSize(machine, entityIndex, mins, maxs, false)
 end function
 
+// Provide break builtin behavior for the active subsystem.
 function breakBuiltin(machine)
   appendConsole("break statement")
   // The C builtin deliberately writes through address -4 to break into a
@@ -375,6 +488,7 @@ function breakBuiltin(machine)
   return error(2670, "break statement")
 end function
 
+// Provide random builtin behavior for the active subsystem.
 function randomBuiltin(machine)
   ctx = context()
   // WinQuake used the Microsoft C runtime rand() state.  Keep the state on
@@ -390,6 +504,7 @@ function randomBuiltin(machine)
   return true
 end function
 
+// Provide sound builtin behavior for the active subsystem.
 function soundBuiltin(machine)
   ctx = context()
   entityIndex = parmWord(machine, 0)
@@ -404,11 +519,13 @@ function soundBuiltin(machine)
   return true
 end function
 
+// Convert builtin into its canonical representation.
 function normalizeBuiltin(machine)
   returnVector(machine, math.normalize(parmVector(machine, 0)))
   return true
 end function
 
+// Report builtin and return the corresponding failure status.
 function errorBuiltin(machine)
   text = varString(machine, 0)
   appendConsole("======SERVER ERROR: " + text)
@@ -416,6 +533,7 @@ function errorBuiltin(machine)
   return error(2653, "QuakeC error: " + text)
 end function
 
+// Provide object error builtin behavior for the active subsystem.
 function objectErrorBuiltin(machine)
   selfIndex = globalWord(machine, "self")
   text = varString(machine, 0)
@@ -425,11 +543,13 @@ function objectErrorBuiltin(machine)
   return error(2654, "QuakeC object error: " + text)
 end function
 
+// Provide vector length builtin behavior for the active subsystem.
 function vectorLengthBuiltin(machine)
   returnFloat(machine, math.length(parmVector(machine, 0)))
   return true
 end function
 
+// Provide vector yaw builtin behavior for the active subsystem.
 function vectorYawBuiltin(machine)
   value = parmVector(machine, 0)
   yaw = 0.0
@@ -441,16 +561,19 @@ function vectorYawBuiltin(machine)
   return true
 end function
 
+// Allocate and initialize builtin.
 function spawnBuiltin(machine)
   entityIndex = allocateEdict(machine)
   returnWord(machine, entityIndex)
   return true
 end function
 
+// Release state for remove builtin.
 function removeBuiltin(machine)
   return releaseEdict(machine, parmWord(machine, 0))
 end function
 
+// Update module state for trace globals.
 function setTraceGlobals(machine, trace)
   setGlobalFloat(machine, "trace_allsolid", trace.allSolid)
   setGlobalFloat(machine, "trace_startsolid", trace.startSolid)
@@ -458,11 +581,18 @@ function setTraceGlobals(machine, trace)
   setGlobalVector(machine, "trace_endpos", trace.endPosition)
   setGlobalVector(machine, "trace_plane_normal", trace.plane.normal)
   setGlobalFloat(machine, "trace_plane_dist", trace.plane.dist)
-  setGlobalWord(machine, "trace_ent", trace.entity)
+  // PF_traceline publishes the world edict when SV_Move reports no entity.
+  // The collision layer uses -1 as its private no-hit sentinel; exposing that
+  // value as an unsigned QuakeC entity creates 0xffffffff and crashes on the
+  // next field access with "entity outside edict table".
+  traceEntity = trace.entity
+  if traceEntity < 0 then traceEntity = 0 end if
+  setGlobalWord(machine, "trace_ent", traceEntity)
   setGlobalFloat(machine, "trace_inopen", trace.inOpen)
   setGlobalFloat(machine, "trace_inwater", trace.inWater)
 end function
 
+// Trace line builtin through the collision world.
 function traceLineBuiltin(machine)
   ctx = context()
   moveType = c.MOVE_NORMAL
@@ -480,6 +610,7 @@ function traceLineBuiltin(machine)
   return true
 end function
 
+// Create and initialize check client.
 function newCheckClient(machine, current)
   ctx = context()
   if ctx.server is void or ctx.server.maxClients < 1 then return 0 end if
@@ -510,6 +641,7 @@ function newCheckClient(machine, current)
   return candidate
 end function
 
+// Validate client builtin and report any incompatibility.
 function checkClientBuiltin(machine)
   ctx = context()
   if ctx.server is void or ctx.server.maxClients < 1 then returnWord(machine, 0); return true end if
@@ -531,6 +663,7 @@ function checkClientBuiltin(machine)
   return true
 end function
 
+// Return builtin.
 function findBuiltin(machine)
   start = parmWord(machine, 0) + 1
   offset = parmWord(machine, 1)
@@ -549,6 +682,7 @@ function findBuiltin(machine)
   return true
 end function
 
+// Preload and register the sound builtin asset.
 function precacheSoundBuiltin(machine)
   ctx = context()
   if ctx.server is not void and not ctx.server.loading then return error(2654, "PF_Precache_*: Precache can only be done in spawn functions") end if
@@ -562,6 +696,7 @@ function precacheSoundBuiltin(machine)
   return true
 end function
 
+// Preload and register the model builtin asset.
 function precacheModelBuiltin(machine)
   ctx = context()
   if ctx.server is not void and not ctx.server.loading then return error(2654, "PF_Precache_*: Precache can only be done in spawn functions") end if
@@ -575,12 +710,14 @@ function precacheModelBuiltin(machine)
   return true
 end function
 
+// Provide client message buffer behavior for the active subsystem.
 function clientMessageBuffer(entityIndex)
   ctx = context()
   if entityIndex < 1 or entityIndex > len(ctx.clientMessages) then return void end if
   return ctx.clientMessages[entityIndex - 1]
 end function
 
+// Provide stuff command builtin behavior for the active subsystem.
 function stuffCommandBuiltin(machine)
   entityIndex = parmWord(machine, 0)
   buffer = clientMessageBuffer(entityIndex)
@@ -590,6 +727,7 @@ function stuffCommandBuiltin(machine)
   return true
 end function
 
+// Return radius builtin.
 function findRadiusBuiltin(machine)
   origin = parmVector(machine, 0)
   radius = parmFloat(machine, 1)
@@ -613,6 +751,7 @@ function findRadiusBuiltin(machine)
   return true
 end function
 
+// Provide broadcast print builtin behavior for the active subsystem.
 function broadcastPrintBuiltin(machine)
   ctx = context()
   text = varString(machine, 0)
@@ -636,6 +775,7 @@ function broadcastPrintBuiltin(machine)
   return true
 end function
 
+// Provide client print builtin behavior for the active subsystem.
 function clientPrintBuiltin(machine)
   entityIndex = parmWord(machine, 0)
   buffer = clientMessageBuffer(entityIndex)
@@ -645,23 +785,27 @@ function clientPrintBuiltin(machine)
   return true
 end function
 
+// Provide debug print builtin behavior for the active subsystem.
 function debugPrintBuiltin(machine)
   appendConsole(varString(machine, 0))
   return true
 end function
 
+// Return floor number derived from the active module state.
 function floorNumber(value)
   truncated = native.trunc(value)
   if value < truncated then return truncated - 1 end if
   return truncated
 end function
 
+// Return ceil number derived from the active module state.
 function ceilNumber(value)
   truncated = native.trunc(value)
   if value > truncated then return truncated + 1 end if
   return truncated
 end function
 
+// Provide float to string builtin behavior for the active subsystem.
 function floatToStringBuiltin(machine)
   value = parmFloat(machine, 0)
   rounded = native.trunc(value)
@@ -669,6 +813,7 @@ function floatToStringBuiltin(machine)
   return true
 end function
 
+// Provide round half even positive behavior for the active subsystem.
 function roundHalfEvenPositive(value)
   lower = floorNumber(value)
   fraction = value - lower
@@ -678,6 +823,7 @@ function roundHalfEvenPositive(value)
   return lower
 end function
 
+// Provide fixed one decimal behavior for the active subsystem.
 function fixedOneDecimal(value)
   value = native.bitsFloat(native.floatBits(value))
   negative = (native.floatBits(value) & 0x80000000) != 0
@@ -694,12 +840,14 @@ function fixedOneDecimal(value)
   return text
 end function
 
+// Provide vector to string builtin behavior for the active subsystem.
 function vectorToStringBuiltin(machine)
   value = parmVector(machine, 0)
   returnTemporaryString(machine, "'" + fixedOneDecimal(value.x) + " " + fixedOneDecimal(value.y) + " " + fixedOneDecimal(value.z) + "'")
   return true
 end function
 
+// Report whether active edict count holds for the active state.
 function activeEdictCount(machine)
   count = 0
   index = 0
@@ -711,27 +859,32 @@ function activeEdictCount(machine)
   return count
 end function
 
+// Provide core dump builtin behavior for the active subsystem.
 function coreDumpBuiltin(machine)
   appendConsole(qcedict.ED_PrintEdicts(machine))
   return true
 end function
 
+// Trace on builtin through the collision world.
 function traceOnBuiltin(machine)
   machine.trace = true
   return true
 end function
 
+// Trace off builtin through the collision world.
 function traceOffBuiltin(machine)
   machine.trace = false
   return true
 end function
 
+// Provide entity print builtin behavior for the active subsystem.
 function entityPrintBuiltin(machine)
   entityIndex = parmWord(machine, 0)
   appendConsole(qcedict.ED_Print(machine, entityIndex))
   return true
 end function
 
+// Trace entity move through the collision world.
 function traceEntityMove(machine, entityIndex, start, finish)
   mins = entityVector(machine, entityIndex, "mins")
   maxs = entityVector(machine, entityIndex, "maxs")
@@ -744,6 +897,7 @@ function traceEntityMove(machine, entityIndex, start, finish)
   return collision.move(ctx.server, start, mins, maxs, finish, c.MOVE_NORMAL, entityIndex)
 end function
 
+// Provide walk move builtin behavior for the active subsystem.
 function walkMoveBuiltin(machine)
   ctx = context()
   entityIndex = globalWord(machine, "self")
@@ -774,6 +928,7 @@ function walkMoveBuiltin(machine)
   return true
 end function
 
+// Release state for drop to floor builtin.
 function dropToFloorBuiltin(machine)
   ctx = context()
   entityIndex = globalWord(machine, "self")
@@ -790,6 +945,7 @@ function dropToFloorBuiltin(machine)
   return true
 end function
 
+// Provide light style builtin behavior for the active subsystem.
 function lightStyleBuiltin(machine)
   ctx = context()
   style = native.trunc(parmFloat(machine, 0))
@@ -811,6 +967,7 @@ function lightStyleBuiltin(machine)
   return true
 end function
 
+// Provide round builtin behavior for the active subsystem.
 function roundBuiltin(machine)
   value = parmFloat(machine, 0)
   if value > 0.0 then
@@ -821,16 +978,19 @@ function roundBuiltin(machine)
   return true
 end function
 
+// Provide floor builtin behavior for the active subsystem.
 function floorBuiltin(machine)
   returnFloat(machine, floorNumber(parmFloat(machine, 0)))
   return true
 end function
 
+// Provide ceil builtin behavior for the active subsystem.
 function ceilBuiltin(machine)
   returnFloat(machine, ceilNumber(parmFloat(machine, 0)))
   return true
 end function
 
+// Validate bottom builtin and report any incompatibility.
 function checkBottomBuiltin(machine)
   ctx = context()
   entityIndex = parmWord(machine, 0)
@@ -838,11 +998,13 @@ function checkBottomBuiltin(machine)
   return true
 end function
 
+// Provide point contents builtin behavior for the active subsystem.
 function pointContentsBuiltin(machine)
   if context().worldMap is void then returnFloat(machine, c.CONTENTS_EMPTY) else returnFloat(machine, world.pointContentsWorld(context().worldMap, parmVector(machine, 0))) end if
   return true
 end function
 
+// Provide absolute builtin behavior for the active subsystem.
 function absoluteBuiltin(machine)
   value = parmFloat(machine, 0)
   if value == 0.0 then value = 0.0 else if value < 0.0 then value = -value end if
@@ -850,7 +1012,9 @@ function absoluteBuiltin(machine)
   return true
 end function
 
+// Provide aim builtin behavior for the active subsystem.
 function aimBuiltin(machine)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   ctx = context()
   entityIndex = parmWord(machine, 0)
   forward = globalVector(machine, "v_forward")
@@ -905,16 +1069,19 @@ function aimBuiltin(machine)
   return true
 end function
 
+// Provide cvar builtin behavior for the active subsystem.
 function cvarBuiltin(machine)
   returnFloat(machine, cvar.variableValue(context().cvars, parmString(machine, 0)))
   return true
 end function
 
+// Provide local command builtin behavior for the active subsystem.
 function localCommandBuiltin(machine)
   cmd.addText(context().commands, parmString(machine, 0))
   return true
 end function
 
+// Return next entity builtin for the active module state.
 function nextEntityBuiltin(machine)
   index = parmWord(machine, 0) + 1
   limit = activeEdictLimit(machine)
@@ -926,6 +1093,7 @@ function nextEntityBuiltin(machine)
   return true
 end function
 
+// Provide particle builtin behavior for the active subsystem.
 function particleBuiltin(machine)
   ctx = context()
   ctx.particles = ctx.particles + [[
@@ -937,6 +1105,7 @@ function particleBuiltin(machine)
   return true
 end function
 
+// Update subsystem configuration for change yaw builtin.
 function changeYawBuiltin(machine)
   ctx = context()
   entityIndex = globalWord(machine, "self")
@@ -958,6 +1127,7 @@ function changeYawBuiltin(machine)
   return true
 end function
 
+// Provide vector angles builtin behavior for the active subsystem.
 function vectorAnglesBuiltin(machine)
   value = parmVector(machine, 0)
   yaw = 0.0
@@ -975,6 +1145,7 @@ function vectorAnglesBuiltin(machine)
   return true
 end function
 
+// Provide destination buffer behavior for the active subsystem.
 function destinationBuffer(machine, destination)
   ctx = context()
   if destination == 0 then return ctx.datagram end if
@@ -989,46 +1160,55 @@ function destinationBuffer(machine, destination)
   return error(2665, "WriteDest: bad destination " + destination)
 end function
 
+// Encode and write byte builtin.
 function writeByteBuiltin(machine)
   msg.writeByte(destinationBuffer(machine, native.trunc(parmFloat(machine, 0))), native.trunc(parmFloat(machine, 1)))
   return true
 end function
 
+// Encode and write char builtin.
 function writeCharBuiltin(machine)
   msg.writeChar(destinationBuffer(machine, native.trunc(parmFloat(machine, 0))), native.trunc(parmFloat(machine, 1)))
   return true
 end function
 
+// Encode and write short builtin.
 function writeShortBuiltin(machine)
   msg.writeShort(destinationBuffer(machine, native.trunc(parmFloat(machine, 0))), native.trunc(parmFloat(machine, 1)))
   return true
 end function
 
+// Encode and write long builtin.
 function writeLongBuiltin(machine)
   msg.writeLong(destinationBuffer(machine, native.trunc(parmFloat(machine, 0))), native.trunc(parmFloat(machine, 1)))
   return true
 end function
 
+// Encode and write coord builtin.
 function writeCoordBuiltin(machine)
   msg.writeCoord(destinationBuffer(machine, native.trunc(parmFloat(machine, 0))), parmFloat(machine, 1))
   return true
 end function
 
+// Encode and write angle builtin.
 function writeAngleBuiltin(machine)
   msg.writeAngle(destinationBuffer(machine, native.trunc(parmFloat(machine, 0))), parmFloat(machine, 1))
   return true
 end function
 
+// Encode and write string builtin.
 function writeStringBuiltin(machine)
   msg.writeString(destinationBuffer(machine, native.trunc(parmFloat(machine, 0))), parmString(machine, 1))
   return true
 end function
 
+// Encode and write entity builtin.
 function writeEntityBuiltin(machine)
   msg.writeShort(destinationBuffer(machine, native.trunc(parmFloat(machine, 0))), parmWord(machine, 1))
   return true
 end function
 
+// Transfer data for move to goal builtin.
 function moveToGoalBuiltin(machine)
   ctx = context()
   entityIndex = globalWord(machine, "self")
@@ -1044,11 +1224,13 @@ function moveToGoalBuiltin(machine)
   return walkMoveBuiltin(machine)
 end function
 
+// Preload and register the file builtin asset.
 function precacheFileBuiltin(machine)
   returnWord(machine, parmWord(machine, 0))
   return true
 end function
 
+// Encode and write static baseline.
 function writeStaticBaseline(buffer, machine, entityIndex)
   modelName = entityString(machine, entityIndex, "model")
   modelIndex = 0
@@ -1067,6 +1249,7 @@ function writeStaticBaseline(buffer, machine, entityIndex)
   )
 end function
 
+// Create and initialize static builtin.
 function makeStaticBuiltin(machine)
   ctx = context()
   entityIndex = parmWord(machine, 0)
@@ -1075,6 +1258,7 @@ function makeStaticBuiltin(machine)
   return true
 end function
 
+// Update subsystem configuration for change level builtin.
 function changeLevelBuiltin(machine)
   ctx = context()
   if ctx.changeLevel == "" then
@@ -1084,6 +1268,7 @@ function changeLevelBuiltin(machine)
   return true
 end function
 
+// Provide cvar set builtin behavior for the active subsystem.
 function cvarSetBuiltin(machine)
   ctx = context()
   name = parmString(machine, 0)
@@ -1096,6 +1281,7 @@ function cvarSetBuiltin(machine)
   return true
 end function
 
+// Provide center print builtin behavior for the active subsystem.
 function centerPrintBuiltin(machine)
   entityIndex = parmWord(machine, 0)
   buffer = clientMessageBuffer(entityIndex)
@@ -1105,6 +1291,7 @@ function centerPrintBuiltin(machine)
   return true
 end function
 
+// Provide ambient sound builtin behavior for the active subsystem.
 function ambientSoundBuiltin(machine)
   ctx = context()
   origin = parmVector(machine, 0)
@@ -1121,6 +1308,7 @@ function ambientSoundBuiltin(machine)
   return true
 end function
 
+// Update module state for spawn parms builtin.
 function setSpawnParmsBuiltin(machine)
   ctx = context()
   entityIndex = parmWord(machine, 0)
@@ -1138,6 +1326,7 @@ function setSpawnParmsBuiltin(machine)
   return true
 end function
 
+// Return builtin names derived from the active module state.
 function builtinNames()
   return [
     "PF_Fixme", "PF_makevectors", "PF_setorigin", "PF_setmodel", "PF_setsize", "PF_Fixme", "PF_break", "PF_random",
@@ -1153,10 +1342,12 @@ function builtinNames()
   ]
 end function
 
+// Provide fixme slots behavior for the active subsystem.
 function fixmeSlots()
   return [0, 5, 33, 39, 42, 50, 60, 61, 62, 63, 64, 65, 66, 71]
 end function
 
+// Provide builtin contract fingerprint behavior for the active subsystem.
 function builtinContractFingerprint()
   names = builtinNames()
   hash = FNV_OFFSET
@@ -1175,7 +1366,9 @@ function builtinContractFingerprint()
   return hash
 end function
 
+// Provide install behavior for the active subsystem.
 function install(machine, contextValue)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   bind(contextValue)
   table = [
     fixme,
@@ -1270,301 +1463,375 @@ function PF_VarString(machine, first)
   return varString(machine, first)
 end function
 
+// Mirror Quake's PF_error routine and its observable state changes.
 function PF_error(machine)
   return errorBuiltin(machine)
 end function
 
+// Mirror Quake's PF_objerror routine and its observable state changes.
 function PF_objerror(machine)
   return objectErrorBuiltin(machine)
 end function
 
+// Mirror Quake's PF_makevectors routine and its observable state changes.
 function PF_makevectors(machine)
   return makeVectors(machine)
 end function
 
+// Mirror Quake's PF_setorigin routine and its observable state changes.
 function PF_setorigin(machine)
   return setOrigin(machine)
 end function
 
+// Update module state for min max size.
 function SetMinMaxSize(machine, entityIndex, mins, maxs, rotate)
   return setMinMaxSize(machine, entityIndex, mins, maxs, rotate)
 end function
 
+// Mirror Quake's PF_setsize routine and its observable state changes.
 function PF_setsize(machine)
   return setSize(machine)
 end function
 
+// Mirror Quake's PF_setmodel routine and its observable state changes.
 function PF_setmodel(machine)
   return setModel(machine)
 end function
 
+// Mirror Quake's PF_bprint routine and its observable state changes.
 function PF_bprint(machine)
   return broadcastPrintBuiltin(machine)
 end function
 
+// Mirror Quake's PF_sprint routine and its observable state changes.
 function PF_sprint(machine)
   return clientPrintBuiltin(machine)
 end function
 
+// Mirror Quake's PF_centerprint routine and its observable state changes.
 function PF_centerprint(machine)
   return centerPrintBuiltin(machine)
 end function
 
+// Mirror Quake's PF_normalize routine and its observable state changes.
 function PF_normalize(machine)
   return normalizeBuiltin(machine)
 end function
 
+// Mirror Quake's PF_vlen routine and its observable state changes.
 function PF_vlen(machine)
   return vectorLengthBuiltin(machine)
 end function
 
+// Mirror Quake's PF_vectoyaw routine and its observable state changes.
 function PF_vectoyaw(machine)
   return vectorYawBuiltin(machine)
 end function
 
+// Mirror Quake's PF_vectoangles routine and its observable state changes.
 function PF_vectoangles(machine)
   return vectorAnglesBuiltin(machine)
 end function
 
+// Mirror Quake's PF_random routine and its observable state changes.
 function PF_random(machine)
   return randomBuiltin(machine)
 end function
 
+// Mirror Quake's PF_particle routine and its observable state changes.
 function PF_particle(machine)
   return particleBuiltin(machine)
 end function
 
+// Mirror Quake's PF_ambientsound routine and its observable state changes.
 function PF_ambientsound(machine)
   return ambientSoundBuiltin(machine)
 end function
 
+// Mirror Quake's PF_sound routine and its observable state changes.
 function PF_sound(machine)
   return soundBuiltin(machine)
 end function
 
+// Mirror Quake's PF_break routine and its observable state changes.
 function PF_break(machine)
   return breakBuiltin(machine)
 end function
 
+// Mirror Quake's PF_traceline routine and its observable state changes.
 function PF_traceline(machine)
   return traceLineBuiltin(machine)
 end function
 
+// Mirror Quake's PF_TraceToss routine and its observable state changes.
 function PF_TraceToss(machine)
   return fixme(machine)
 end function
 
+// Mirror Quake's PF_checkpos routine and its observable state changes.
 function PF_checkpos(machine)
   // The MiniQuake function body is intentionally empty and is not installed in
   // the stock builtin table (slot 5 remains PF_Fixme).
   return true
 end function
 
+// Mirror Quake's PF_newcheckclient routine and its observable state changes.
 function PF_newcheckclient(machine, check)
   return newCheckClient(machine, check)
 end function
 
+// Mirror Quake's PF_checkclient routine and its observable state changes.
 function PF_checkclient(machine)
   return checkClientBuiltin(machine)
 end function
 
+// Mirror Quake's PF_stuffcmd routine and its observable state changes.
 function PF_stuffcmd(machine)
   return stuffCommandBuiltin(machine)
 end function
 
+// Mirror Quake's PF_localcmd routine and its observable state changes.
 function PF_localcmd(machine)
   return localCommandBuiltin(machine)
 end function
 
+// Mirror Quake's PF_cvar routine and its observable state changes.
 function PF_cvar(machine)
   return cvarBuiltin(machine)
 end function
 
+// Mirror Quake's PF_cvar_set routine and its observable state changes.
 function PF_cvar_set(machine)
   return cvarSetBuiltin(machine)
 end function
 
+// Mirror Quake's PF_findradius routine and its observable state changes.
 function PF_findradius(machine)
   return findRadiusBuiltin(machine)
 end function
 
+// Mirror Quake's PF_dprint routine and its observable state changes.
 function PF_dprint(machine)
   return debugPrintBuiltin(machine)
 end function
 
+// Mirror Quake's PF_ftos routine and its observable state changes.
 function PF_ftos(machine)
   return floatToStringBuiltin(machine)
 end function
 
+// Mirror Quake's PF_fabs routine and its observable state changes.
 function PF_fabs(machine)
   return absoluteBuiltin(machine)
 end function
 
+// Mirror Quake's PF_vtos routine and its observable state changes.
 function PF_vtos(machine)
   return vectorToStringBuiltin(machine)
 end function
 
+// Mirror Quake's PF_etos routine and its observable state changes.
 function PF_etos(machine)
   return fixme(machine)
 end function
 
+// Mirror Quake's PF_Spawn routine and its observable state changes.
 function PF_Spawn(machine)
   return spawnBuiltin(machine)
 end function
 
+// Mirror Quake's PF_Remove routine and its observable state changes.
 function PF_Remove(machine)
   return removeBuiltin(machine)
 end function
 
+// Mirror Quake's PF_Find routine and its observable state changes.
 function PF_Find(machine)
   return findBuiltin(machine)
 end function
 
+// Mirror Quake's PR_CheckEmptyString routine and its observable state changes.
 function PR_CheckEmptyString(value)
   if badPrecacheString(value) then return error(2669, "Bad string") end if
   return true
 end function
 
+// Mirror Quake's PF_precache_file routine and its observable state changes.
 function PF_precache_file(machine)
   return precacheFileBuiltin(machine)
 end function
 
+// Mirror Quake's PF_precache_sound routine and its observable state changes.
 function PF_precache_sound(machine)
   return precacheSoundBuiltin(machine)
 end function
 
+// Mirror Quake's PF_precache_model routine and its observable state changes.
 function PF_precache_model(machine)
   return precacheModelBuiltin(machine)
 end function
 
+// Mirror Quake's PF_coredump routine and its observable state changes.
 function PF_coredump(machine)
   return coreDumpBuiltin(machine)
 end function
 
+// Mirror Quake's PF_traceon routine and its observable state changes.
 function PF_traceon(machine)
   return traceOnBuiltin(machine)
 end function
 
+// Mirror Quake's PF_traceoff routine and its observable state changes.
 function PF_traceoff(machine)
   return traceOffBuiltin(machine)
 end function
 
+// Mirror Quake's PF_eprint routine and its observable state changes.
 function PF_eprint(machine)
   return entityPrintBuiltin(machine)
 end function
 
+// Mirror Quake's PF_walkmove routine and its observable state changes.
 function PF_walkmove(machine)
   return walkMoveBuiltin(machine)
 end function
 
+// Mirror Quake's PF_droptofloor routine and its observable state changes.
 function PF_droptofloor(machine)
   return dropToFloorBuiltin(machine)
 end function
 
+// Mirror Quake's PF_lightstyle routine and its observable state changes.
 function PF_lightstyle(machine)
   return lightStyleBuiltin(machine)
 end function
 
+// Mirror Quake's PF_rint routine and its observable state changes.
 function PF_rint(machine)
   return roundBuiltin(machine)
 end function
 
+// Mirror Quake's PF_floor routine and its observable state changes.
 function PF_floor(machine)
   return floorBuiltin(machine)
 end function
 
+// Mirror Quake's PF_ceil routine and its observable state changes.
 function PF_ceil(machine)
   return ceilBuiltin(machine)
 end function
 
+// Mirror Quake's PF_checkbottom routine and its observable state changes.
 function PF_checkbottom(machine)
   return checkBottomBuiltin(machine)
 end function
 
+// Mirror Quake's PF_pointcontents routine and its observable state changes.
 function PF_pointcontents(machine)
   return pointContentsBuiltin(machine)
 end function
 
+// Mirror Quake's PF_nextent routine and its observable state changes.
 function PF_nextent(machine)
   return nextEntityBuiltin(machine)
 end function
 
+// Mirror Quake's PF_aim routine and its observable state changes.
 function PF_aim(machine)
   return aimBuiltin(machine)
 end function
 
+// Mirror Quake's PF_changeyaw routine and its observable state changes.
 function PF_changeyaw(machine)
   return changeYawBuiltin(machine)
 end function
 
+// Mirror Quake's PF_changepitch routine and its observable state changes.
 function PF_changepitch(machine)
   return fixme(machine)
 end function
 
+// Encode and write dest.
 function WriteDest(machine)
   return destinationBuffer(machine, native.trunc(parmFloat(machine, 0)))
 end function
 
+// Mirror Quake's PF_WriteByte routine and its observable state changes.
 function PF_WriteByte(machine)
   return writeByteBuiltin(machine)
 end function
 
+// Mirror Quake's PF_WriteChar routine and its observable state changes.
 function PF_WriteChar(machine)
   return writeCharBuiltin(machine)
 end function
 
+// Mirror Quake's PF_WriteShort routine and its observable state changes.
 function PF_WriteShort(machine)
   return writeShortBuiltin(machine)
 end function
 
+// Mirror Quake's PF_WriteLong routine and its observable state changes.
 function PF_WriteLong(machine)
   return writeLongBuiltin(machine)
 end function
 
+// Mirror Quake's PF_WriteAngle routine and its observable state changes.
 function PF_WriteAngle(machine)
   return writeAngleBuiltin(machine)
 end function
 
+// Mirror Quake's PF_WriteCoord routine and its observable state changes.
 function PF_WriteCoord(machine)
   return writeCoordBuiltin(machine)
 end function
 
+// Mirror Quake's PF_WriteString routine and its observable state changes.
 function PF_WriteString(machine)
   return writeStringBuiltin(machine)
 end function
 
+// Mirror Quake's PF_WriteEntity routine and its observable state changes.
 function PF_WriteEntity(machine)
   return writeEntityBuiltin(machine)
 end function
 
+// Mirror Quake's PF_makestatic routine and its observable state changes.
 function PF_makestatic(machine)
   return makeStaticBuiltin(machine)
 end function
 
+// Mirror Quake's PF_setspawnparms routine and its observable state changes.
 function PF_setspawnparms(machine)
   return setSpawnParmsBuiltin(machine)
 end function
 
+// Mirror Quake's PF_changelevel routine and its observable state changes.
 function PF_changelevel(machine)
   return changeLevelBuiltin(machine)
 end function
 
+// Mirror Quake's PF_WaterMove routine and its observable state changes.
 function PF_WaterMove(machine)
   return fixme(machine)
 end function
 
+// Mirror Quake's PF_sin routine and its observable state changes.
 function PF_sin(machine)
   return fixme(machine)
 end function
 
+// Mirror Quake's PF_cos routine and its observable state changes.
 function PF_cos(machine)
   return fixme(machine)
 end function
 
+// Mirror Quake's PF_sqrt routine and its observable state changes.
 function PF_sqrt(machine)
   return fixme(machine)
 end function
 
+// Mirror Quake's PF_Fixme routine and its observable state changes.
 function PF_Fixme(machine)
   return fixme(machine)
 end function

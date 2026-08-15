@@ -1,18 +1,25 @@
-/* BP-045: MiniQuake alias model, shadow-origin and texture-unit parity. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
+BP-045: MiniQuake alias model, shadow-origin and texture-unit parity.
+*/
 import miniquake.render.alias_mesh as aliasMesh
 import miniquake.render.world as worldRender
 
+// Assert that the condition holds and identify a failing test.
 function bp045Yes(value, name)
   if not value then return error(4500, name + ": expected true") end if
   return true
 end function
 
+// Assert exact equality and report both values on failure.
 function bp045Equal(actual, expected, name)
   if actual != expected then return error(4501, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function bp045Near(actual, expected, epsilon, name)
   difference = actual - expected
   if difference < 0.0 then difference = -difference end if
@@ -20,6 +27,7 @@ function bp045Near(actual, expected, epsilon, name)
   return true
 end function
 
+// Execute one named test case and record its pass/fail result.
 function bp045Run(number, name, fn)
   print "[" + number + "/22] " + name
   result = try(fn())
@@ -27,99 +35,121 @@ function bp045Run(number, name, fn)
   return true
 end function
 
+// Exercise the projection a test scenario and verify its expected result.
 function bp045ProjectionA()
   result = aliasMesh.aliasShadowProjection(13.0, 3.0)
   bp045Equal(result[0], 10.0, "positive lheight")
   return true
 end function
+// Exercise the projection b test scenario and verify its expected result.
 function bp045ProjectionB()
   result = aliasMesh.aliasShadowProjection(13.0, 3.0)
   bp045Equal(result[1], -9.0, "positive shadow height")
   return true
 end function
+// Exercise the projection c test scenario and verify its expected result.
 function bp045ProjectionC()
   result = aliasMesh.aliasShadowProjection(-2.0, 3.0)
   bp045Equal(result[0], -5.0, "negative lheight")
   return true
 end function
+// Exercise the projection d test scenario and verify its expected result.
 function bp045ProjectionD()
   result = aliasMesh.aliasShadowProjection(-2.0, 3.0)
   bp045Equal(result[1], 6.0, "negative shadow height")
   return true
 end function
+// Assert exact equality and report both values on failure.
 function bp045ProjectionEqual()
   result = aliasMesh.aliasShadowProjection(7.0, 7.0)
   bp045Equal(result[1], 1.0, "equal-height shadow")
   return true
 end function
+// Exercise the projection fraction test scenario and verify its expected result.
 function bp045ProjectionFraction()
   result = aliasMesh.aliasShadowProjection(1.25, -0.5)
   bp045Near(result[0], 1.75, 0.000001, "fractional lheight")
   return true
 end function
+// Exercise the row0 test scenario and verify its expected result.
 function bp045Row0()
   bp045Equal(aliasMesh.shadeDotRow(0.0), 0, "row zero")
   return true
 end function
+// Exercise the row90 test scenario and verify its expected result.
 function bp045Row90()
   bp045Equal(aliasMesh.shadeDotRow(90.0), 4, "row 90")
   return true
 end function
+// Exercise the row180 test scenario and verify its expected result.
 function bp045Row180()
   bp045Equal(aliasMesh.shadeDotRow(180.0), 8, "row 180")
   return true
 end function
+// Exercise the row270 test scenario and verify its expected result.
 function bp045Row270()
   bp045Equal(aliasMesh.shadeDotRow(270.0), 12, "row 270")
   return true
 end function
+// Exercise the row360 test scenario and verify its expected result.
 function bp045Row360()
   bp045Equal(aliasMesh.shadeDotRow(360.0), 0, "row wrap")
   return true
 end function
+// Exercise the row negative test scenario and verify its expected result.
 function bp045RowNegative()
   bp045Equal(aliasMesh.shadeDotRow(-90.0), 12, "negative row")
   return true
 end function
+// Return a validated clamp low value.
 function bp045ClampLow()
   bp045Equal(aliasMesh.clampByte(-4.0), 0, "clamp low")
   return true
 end function
+// Return a validated clamp zero value.
 function bp045ClampZero()
   bp045Equal(aliasMesh.clampByte(0.0), 0, "clamp zero")
   return true
 end function
+// Return a validated clamp trunc value.
 function bp045ClampTrunc()
   bp045Equal(aliasMesh.clampByte(12.9), 12, "clamp truncation")
   return true
 end function
+// Return a validated clamp high value.
 function bp045ClampHigh()
   bp045Equal(aliasMesh.clampByte(999.0), 255, "clamp high")
   return true
 end function
+// Exercise the lighting configure test scenario and verify its expected result.
 function bp045LightingConfigure()
   bp045Yes(aliasMesh.configureAliasLighting(0.75, 24.0, 90.0, void), "lighting configure")
   return true
 end function
+// Exercise the multitexture disabled a test scenario and verify its expected result.
 function bp045MultitextureDisabledA()
   worldRender.R_SetMultitextureCompatibility(true, true)
   bp045Yes(worldRender.GL_DisableMultitexture(), "disable multitexture")
   return true
 end function
+// Exercise the multitexture disabled b test scenario and verify its expected result.
 function bp045MultitextureDisabledB()
   bp045Yes(worldRender.GL_DisableMultitexture(), "idempotent disable")
   return true
 end function
+// Exercise the projection large test scenario and verify its expected result.
 function bp045ProjectionLarge()
   result = aliasMesh.aliasShadowProjection(1024.0, -256.0)
   bp045Equal(result[0], 1280.0, "large lheight")
   return true
 end function
+// Exercise the projection large height test scenario and verify its expected result.
 function bp045ProjectionLargeHeight()
   result = aliasMesh.aliasShadowProjection(1024.0, -256.0)
   bp045Equal(result[1], -1279.0, "large shadow height")
   return true
 end function
+// Exercise the quantization count test scenario and verify its expected result.
 function bp045QuantizationCount()
   index = 0
   while index < 16

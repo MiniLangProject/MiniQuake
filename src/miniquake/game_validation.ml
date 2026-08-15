@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.game_validation.
+*/
 package miniquake.game_validation
 
 import miniquake.types as t
@@ -14,10 +21,12 @@ import miniquake.world_bsp as world
 import miniquake.mathlib as math
 import miniquake.common as common
 
+// Add state for append.
 function inline append(messages, level, text)
   return messages + [level + " " + text]
 end function
 
+// Provide filesystem arguments behavior for the active subsystem.
 function filesystemArguments(options)
   // Preserve the full COM_InitFilesystem profile instead of reducing it to
   // only the final com_gamedir.  In particular, -rogue and -hipnotic may both
@@ -50,13 +59,16 @@ function filesystemArguments(options)
   return result
 end function
 
+// Provide runtime arguments behavior for the active subsystem.
 function runtimeArguments(options)
   result = filesystemArguments(options)
   result = result + ["-headless", "-nosound", "+map", options.startMap]
   return result
 end function
 
+// Validate integrated runtime and report any incompatibility.
 function validateIntegratedRuntime(options, messages)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   session = host.create(runtimeArguments(options))
   initialized = try(host.initialize(session))
   if initialized is error then
@@ -108,6 +120,7 @@ function validateIntegratedRuntime(options, messages)
   return [messages, ok]
 end function
 
+// Validate graphics data and report any incompatibility.
 function validateGraphicsData(system, messages)
   ok = true
   paletteData = try(qfs.readFile(system, "gfx/palette.lmp"))
@@ -142,6 +155,7 @@ function validateGraphicsData(system, messages)
   return [messages, ok]
 end function
 
+// Validate program data and report any incompatibility.
 function validateProgramData(system, messages)
   ok = true
   functionCount = 0
@@ -163,6 +177,7 @@ function validateProgramData(system, messages)
   return [messages, ok, functionCount]
 end function
 
+// Validate map data and report any incompatibility.
 function validateMapData(system, options, messages)
   ok = true
   faceCount = 0
@@ -200,6 +215,7 @@ function validateMapData(system, options, messages)
   return [messages, ok, faceCount, textureCount, entityCount]
 end function
 
+// Validate player model and report any incompatibility.
 function validatePlayerModel(system, messages)
   ok = true
   playerData = try(qfs.readFile(system, "progs/player.mdl"))
@@ -217,6 +233,7 @@ function validatePlayerModel(system, messages)
   return [messages, ok]
 end function
 
+// Validate menu sound and report any incompatibility.
 function validateMenuSound(system, messages)
   ok = true
   soundData = try(qfs.readFile(system, "sound/misc/menu1.wav"))
@@ -234,6 +251,7 @@ function validateMenuSound(system, messages)
   return [messages, ok]
 end function
 
+// Validate the requested value and report any incompatibility.
 function validate(options)
   print "[validate 1/7] mounting game search paths"
   system = qfs.initializeArguments(options.basedir, common.create(filesystemArguments(options)))
@@ -304,6 +322,7 @@ function validate(options)
   return t.GameValidation(ok, messages, packFiles, mapFaces, mapTextures, mapEntities, progsFunctions)
 end function
 
+// Format and emit report.
 function printReport(report)
   print "MiniQuake game-data validation"
   for each line in report.messages

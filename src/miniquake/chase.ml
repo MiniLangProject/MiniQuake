@@ -1,11 +1,11 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 MiniLang pendant for WinQuake/chase.c.  chase.h does not exist in the pinned
 MiniQuake tree; the four public routines and cvars are all defined in chase.c.
 */
-
 package miniquake.chase
 
 import miniquake.types as t
@@ -17,10 +17,12 @@ const CHASE_BACK_DEFAULT = 100.0
 const CHASE_UP_DEFAULT = 16.0
 const CHASE_RIGHT_DEFAULT = 0.0
 
+// Report whether command never exists holds for the active state.
 function commandNeverExists(name)
   return false
 end function
 
+// Create and initialize the module state.
 function create()
   return t.ChaseState(false, CHASE_BACK_DEFAULT, CHASE_UP_DEFAULT, CHASE_RIGHT_DEFAULT)
 end function
@@ -35,6 +37,7 @@ function Chase_Init(registry)
   return create()
 end function
 
+// Update module state for cvars.
 function syncCvars(state, registry)
   state.back = cvar.variableValue(registry, "chase_back")
   state.up = cvar.variableValue(registry, "chase_up")
@@ -48,6 +51,7 @@ function Chase_Reset(state)
   return state
 end function
 
+// Trace line through the collision world.
 function TraceLine(worldMap, start, finish)
   if worldMap is void then return math.VectorCopy(finish) end if
   trace = world.traceLine(worldMap, start, finish)
@@ -79,6 +83,7 @@ function Chase_UpdateRefdef(state, viewOrigin, clientViewAngles, renderViewAngle
   return [chaseDestination, adjustedAngles, math.VectorCopy(chaseDestination), stop]
 end function
 
+// Mirror Quake's Chase_Update routine and its observable state changes.
 function Chase_Update(state, viewOrigin, clientViewAngles, worldMap)
   return Chase_UpdateRefdef(state, viewOrigin, clientViewAngles, clientViewAngles, worldMap)
 end function

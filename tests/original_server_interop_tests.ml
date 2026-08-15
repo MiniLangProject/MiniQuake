@@ -1,9 +1,16 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/original_server_interop_tests.ml.
+*/
 import miniquake.external_reference_contract as reference
 import miniquake.constants as constants
 
 passed = 0
 failed = 0
 
+// Assert that the condition holds and identify a failing test.
 function bp091Check(condition, label)
   global passed, failed
   if condition then passed = passed + 1; print "[" + passed + "/20] " + label; return true end if
@@ -12,6 +19,7 @@ function bp091Check(condition, label)
   return false
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   global passed, failed
   bp091Check(constants.PROTOCOL_VERSION == 15, "Protocol 15")

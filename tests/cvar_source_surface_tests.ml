@@ -1,4 +1,9 @@
-/* BP-080 source-surface runtime entry. main(args) must remain in the global package. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+BP-080 source-surface runtime entry. main(args) must remain in the global package.
+*/
 import miniquake.cvar as cvars
 import miniquake.types as t
 import miniquake.native as native
@@ -6,6 +11,7 @@ import miniquake.native as native
 bp080Failures = 0
 bp080Checks = 0
 
+// Assert that the condition holds and identify a failing test.
 function bp080Check(condition, label)
   global bp080Failures, bp080Checks
   bp080Checks = bp080Checks + 1
@@ -15,14 +21,17 @@ function bp080Check(condition, label)
   end if
 end function
 
+// Assert exact equality and report both values on failure.
 function bp080Equal(actual, expected, label)
   bp080Check(actual == expected, label + ": expected " + expected + ", got " + actual)
 end function
 
+// Report whether command exists holds for the active state.
 function bp080CommandExists(name)
   return name == "echo"
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   global bp080Failures, bp080Checks
 

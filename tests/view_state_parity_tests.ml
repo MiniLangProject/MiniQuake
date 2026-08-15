@@ -1,26 +1,34 @@
-/* BP-036: WinQuake view.c state, cshift, damage and refdef helpers. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
+BP-036: WinQuake view.c state, cshift, damage and refdef helpers.
+*/
 import miniquake.view as view
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.player_move as playerMove
 import miniquake.chase as chase
 
+// Assert that the condition holds and identify a failing test.
 function yes(value, name)
   if not value then return error(3600, name + ": expected true") end if
   return true
 end function
 
+// Exercise no as part of this deterministic regression fixture.
 function no(value, name)
   if value then return error(3601, name + ": expected false") end if
   return true
 end function
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(3602, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function near(actual, expected, tolerance, name)
   delta = actual - expected
   if delta < 0.0 then delta = -delta end if
@@ -28,6 +36,7 @@ function near(actual, expected, tolerance, name)
   return true
 end function
 
+// Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
   print "[" + number + "/22] " + name
   result = try(fn())
@@ -35,29 +44,34 @@ function run(number, name, fn)
   return true
 end function
 
+// Verify roll cap against the expected Quake behavior.
 function testRollCap()
   value = view.V_CalcRoll(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, -400.0, 0.0), 2.0, 200.0)
   near(value, 2.0, 0.000001, "roll cap")
   return true
 end function
 
+// Verify roll scale against the expected Quake behavior.
 function testRollScale()
   value = view.V_CalcRoll(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, -100.0, 0.0), 2.0, 200.0)
   near(value, 1.0, 0.000001, "roll scale")
   return true
 end function
 
+// Verify bob zero cycle against the expected Quake behavior.
 function testBobZeroCycle()
   near(view.V_CalcBob(1.0, t.Vec3(100.0, 0.0, 0.0), 0.02, 0.0, 0.5), 0.0, 0.0, "zero bob cycle")
   return true
 end function
 
+// Verify bob upper clamp against the expected Quake behavior.
 function testBobUpperClamp()
   value = view.V_CalcBob(0.25, t.Vec3(10000.0, 0.0, 0.0), 1.0, 1.0, 0.5)
   yes(value <= 4.0, "bob upper clamp")
   return true
 end function
 
+// Verify start pitch drift against the expected Quake behavior.
 function testStartPitchDrift()
   state = view.create()
   state.noDrift = true
@@ -67,6 +81,7 @@ function testStartPitchDrift()
   return true
 end function
 
+// Verify stop pitch drift against the expected Quake behavior.
 function testStopPitchDrift()
   state = view.create()
   view.V_StopPitchDrift(state, 2.0)
@@ -75,6 +90,7 @@ function testStopPitchDrift()
   return true
 end function
 
+// Verify airborne cancels drift against the expected Quake behavior.
 function testAirborneCancelsDrift()
   state = view.create()
   state.noDrift = false
@@ -86,6 +102,7 @@ function testAirborneCancelsDrift()
   return true
 end function
 
+// Verify gamma identity against the expected Quake behavior.
 function testGammaIdentity()
   state = view.create()
   table = view.BuildGammaTable(state, 1.0)
@@ -95,6 +112,7 @@ function testGammaIdentity()
   return true
 end function
 
+// Verify gamma change gate against the expected Quake behavior.
 function testGammaChangeGate()
   state = view.create()
   yes(view.V_CheckGamma(state, 0.8), "first gamma change")
@@ -102,6 +120,7 @@ function testGammaChangeGate()
   return true
 end function
 
+// Verify damage minimum and armor color against the expected Quake behavior.
 function testDamageMinimumAndArmorColor()
   state = view.create()
   view.V_ParseDamage(state, 1, 0, t.Vec3(10.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), 0.6, 0.6, 0.5)
@@ -110,6 +129,7 @@ function testDamageMinimumAndArmorColor()
   return true
 end function
 
+// Verify damage blood color against the expected Quake behavior.
 function testDamageBloodColor()
   state = view.create()
   view.V_ParseDamage(state, 0, 20, t.Vec3(10.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), 0.6, 0.6, 0.5)
@@ -118,6 +138,7 @@ function testDamageBloodColor()
   return true
 end function
 
+// Verify cshift atoi against the expected Quake behavior.
 function testCshiftAtoi()
   state = view.create()
   view.V_cshift_f(state, ["v_cshift", "12.75", "-7junk", "0x20", "'A"])
@@ -128,6 +149,7 @@ function testCshiftAtoi()
   return true
 end function
 
+// Verify cshift missing arguments against the expected Quake behavior.
 function testCshiftMissingArguments()
   state = view.create()
   view.V_cshift_f(state, ["v_cshift", "9"])
@@ -136,6 +158,7 @@ function testCshiftMissingArguments()
   return true
 end function
 
+// Verify bonus flash against the expected Quake behavior.
 function testBonusFlash()
   state = view.create()
   view.V_BonusFlash_f(state)
@@ -144,6 +167,7 @@ function testBonusFlash()
   return true
 end function
 
+// Verify contents lava against the expected Quake behavior.
 function testContentsLava()
   state = view.create()
   shift = view.V_SetContentsColor(state, c.CONTENTS_LAVA)
@@ -152,6 +176,7 @@ function testContentsLava()
   return true
 end function
 
+// Verify contents empty uses configured shift against the expected Quake behavior.
 function testContentsEmptyUsesConfiguredShift()
   state = view.create()
   view.V_cshift_f(state, ["v_cshift", "1", "2", "3", "4"])
@@ -161,6 +186,7 @@ function testContentsEmptyUsesConfiguredShift()
   return true
 end function
 
+// Verify powerup priority against the expected Quake behavior.
 function testPowerupPriority()
   state = view.create()
   shift = view.V_CalcPowerupCshift(state, c.IT_QUAD | c.IT_INVULNERABILITY)
@@ -169,6 +195,7 @@ function testPowerupPriority()
   return true
 end function
 
+// Verify blend disabled against the expected Quake behavior.
 function testBlendDisabled()
   state = view.create()
   state.cshifts[view.CSHIFT_DAMAGE] = [255.0, 0.0, 0.0, 100.0]
@@ -177,6 +204,7 @@ function testBlendDisabled()
   return true
 end function
 
+// Verify palette decay order against the expected Quake behavior.
 function testPaletteDecayOrder()
   state = view.create()
   state.oldGamma = 1.0
@@ -186,6 +214,7 @@ function testPaletteDecayOrder()
   return true
 end function
 
+// Verify intermission hides weapon against the expected Quake behavior.
 function testIntermissionHidesWeapon()
   state = view.create()
   player = playerMove.create(t.Vec3(1.0, 2.0, 3.0), t.Vec3(0.0, 90.0, 0.0))
@@ -197,6 +226,7 @@ function testIntermissionHidesWeapon()
 end function
 
 
+// Verify chase preserves yaw roll against the expected Quake behavior.
 function testChasePreservesYawRoll()
   state = chase.create()
   state.active = true
@@ -212,6 +242,7 @@ function testChasePreservesYawRoll()
   return true
 end function
 
+// Verify chase destination against the expected Quake behavior.
 function testChaseDestination()
   state = chase.create()
   state.back = 100.0
@@ -229,6 +260,7 @@ function testChaseDestination()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   tests = [
     ["roll cap", testRollCap],

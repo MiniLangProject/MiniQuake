@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/artifact_retail_evidence.ml.
+*/
 import miniquake.artifact_compat as artifacts
 import miniquake.filesystem as qfs
 import miniquake.demo as demo
@@ -11,12 +17,14 @@ import miniquake.quakec.edict as qcedict
 import miniquake.common as common
 import miniquake.native as native
 
+// Report the requested value and return the corresponding failure status.
 function bp087Fail(message)
   print "error=" + message
   print "result=FAIL"
   return 1
 end function
 
+// Execute frames.
 function bp087RunFrames(session, count)
   index = 0
   while index < count
@@ -27,6 +35,7 @@ function bp087RunFrames(session, count)
   return true
 end function
 
+// Release or remove state for the requested value.
 function bp087Shutdown(session, label)
   result = try(host.shutdown(session))
   if result is error then return error(8790, label + " shutdown: " + result.message) end if
@@ -34,6 +43,7 @@ function bp087Shutdown(session, label)
   return true
 end function
 
+// Exercise the prepare loaded save test scenario and verify its expected result.
 function bp087PrepareLoadedSave(session, saved)
   applied = try(savegame.apply(session.server, saved))
   if applied is error then return applied end if
@@ -42,6 +52,7 @@ function bp087PrepareLoadedSave(session, saved)
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   if len(args) < 3 then
     print "usage: MiniQuakeArtifactRetailEvidence.exe BASE GAME MAP"

@@ -1,11 +1,18 @@
-/* BP-047: GL_Set2D, screen overlay, statusbar and TGA contract. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+BP-047: GL_Set2D, screen overlay, statusbar and TGA contract.
+*/
 import miniquake.render_ui_contract as ui
 import miniquake.constants as c
 
+// Assert exact equality and report both values on failure.
 function bp047Equal(actual, expected, name)
   if actual != expected then return error(4700, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
+// Exercise the array test scenario and verify its expected result.
 function bp047Array(actual, expected, name)
   bp047Equal(len(actual), len(expected), name + " length")
   index = 0
@@ -15,41 +22,50 @@ function bp047Array(actual, expected, name)
   end while
   return true
 end function
+// Execute one named test case and record its pass/fail result.
 function bp047Run(number, name, fn)
   print "[" + number + "/24] " + name
   result = try(fn())
   if result is error then print "FAIL: " + result.message; return false end if
   return true
 end function
+// Exercise the coop320 test scenario and verify its expected result.
 function bp047Coop320()
   bp047Equal(ui.statusbarXOffset(320, c.GAME_COOP), 0, "coop 320")
   return true
 end function
+// Exercise the coop640 test scenario and verify its expected result.
 function bp047Coop640()
   bp047Equal(ui.statusbarXOffset(640, c.GAME_COOP), 160, "coop 640")
   bp047Equal(ui.statusbarScaledXOffset(1920, c.GAME_COOP, 2.0), 640, "scaled coop 1920")
   return true
 end function
+// Exercise the coop800 test scenario and verify its expected result.
 function bp047Coop800()
   bp047Equal(ui.statusbarXOffset(800, c.GAME_COOP), 240, "coop 800")
   return true
 end function
+// Exercise the dm640 test scenario and verify its expected result.
 function bp047Dm640()
   bp047Equal(ui.statusbarXOffset(640, c.GAME_DEATHMATCH), 0, "deathmatch left")
   return true
 end function
+// Exercise the dialog test scenario and verify its expected result.
 function bp047Dialog()
   bp047Array(ui.overlayOrder(true, false, 0, true), ["set2d","tileclear","dialog","hud","fade","notify-string"], "dialog")
   return true
 end function
+// Exercise the loading test scenario and verify its expected result.
 function bp047Loading()
   bp047Array(ui.overlayOrder(false, true, 0, true), ["set2d","tileclear","loading","hud"], "loading")
   return true
 end function
+// Exercise the intermission test scenario and verify its expected result.
 function bp047Intermission()
   bp047Array(ui.overlayOrder(false, false, 1, true), ["set2d","tileclear","intermission"], "intermission")
   return true
 end function
+// Exercise the finale test scenario and verify its expected result.
 function bp047Finale()
   bp047Array(ui.overlayOrder(false, false, 2, true), ["set2d","tileclear","finale","center"], "finale")
   bp047Array(ui.overlayOrder(false, false, 3, true), ["set2d","tileclear","center"], "cutscene")
@@ -65,66 +81,82 @@ function bp047Finale()
   bp047Equal(ui.statusbarPhysicalLines(1920, 1080, 110.0, 0), 48, "scaled status lines")
   return true
 end function
+// Exercise the normal count test scenario and verify its expected result.
 function bp047NormalCount()
   bp047Equal(len(ui.overlayOrder(false, false, 0, true)), 11, "normal overlay count")
   return true
 end function
+// Exercise the normal first test scenario and verify its expected result.
 function bp047NormalFirst()
   bp047Equal(ui.overlayOrder(false, false, 0, true)[0], "set2d", "normal first")
   return true
 end function
+// Exercise the normal last test scenario and verify its expected result.
 function bp047NormalLast()
   bp047Equal(ui.overlayOrder(false, false, 0, true)[10], "menu", "normal last")
   return true
 end function
+// Exercise the set2d count test scenario and verify its expected result.
 function bp047Set2dCount()
   bp047Equal(len(ui.set2dStateOrder()), 11, "set2d count")
   return true
 end function
+// Exercise the set2d viewport test scenario and verify its expected result.
 function bp047Set2dViewport()
   bp047Equal(ui.set2dStateOrder()[0], "viewport", "set2d viewport")
   return true
 end function
+// Exercise the set2d depth test scenario and verify its expected result.
 function bp047Set2dDepth()
   bp047Equal(ui.set2dStateOrder()[6], "disable-depth", "set2d depth")
   return true
 end function
+// Exercise the set2d alpha test scenario and verify its expected result.
 function bp047Set2dAlpha()
   bp047Equal(ui.set2dStateOrder()[9], "enable-alpha", "set2d alpha")
   return true
 end function
+// Exercise the tga one test scenario and verify its expected result.
 function bp047TgaOne()
   bp047Equal(ui.tgaByteLength(1, 1), 21, "TGA 1x1")
   return true
 end function
+// Exercise the tga640 test scenario and verify its expected result.
 function bp047Tga640()
   bp047Equal(ui.tgaByteLength(640, 480), 921618, "TGA 640x480")
   return true
 end function
+// Exercise the tga invalid test scenario and verify its expected result.
 function bp047TgaInvalid()
   bp047Equal(ui.tgaByteLength(0, 480), 0, "TGA invalid")
   return true
 end function
+// Exercise the viewmodel depth test scenario and verify its expected result.
 function bp047ViewmodelDepth()
   bp047Equal(ui.viewModelDepthMaximum(), 0.3, "viewmodel depth")
   return true
 end function
+// Exercise the lines100 test scenario and verify its expected result.
 function bp047Lines100()
   bp047Equal(ui.statusbarLines(100.0, 0), 48, "viewsize 100")
   return true
 end function
+// Exercise the lines110 test scenario and verify its expected result.
 function bp047Lines110()
   bp047Equal(ui.statusbarLines(110.0, 0), 24, "viewsize 110")
   return true
 end function
+// Exercise the lines120 test scenario and verify its expected result.
 function bp047Lines120()
-  bp047Equal(ui.statusbarLines(120.0, 0), 0, "viewsize 120")
+  bp047Equal(ui.statusbarLines(120.0, 0), 24, "viewsize 120 keeps primary statusbar")
   return true
 end function
+// Exercise the lines intermission test scenario and verify its expected result.
 function bp047LinesIntermission()
   bp047Equal(ui.statusbarLines(100.0, 1), 0, "intermission lines")
   return true
 end function
+// Return constants for the active module state.
 function bp047Constants()
   bp047Equal(ui.STATUSBAR_WIDTH, 320, "statusbar width")
   bp047Equal(ui.TGA_BYTES_PER_PIXEL, 3, "TGA BPP")
@@ -153,7 +185,7 @@ if bp047Run(18,"TGA invalid size",bp047TgaInvalid) then passed=passed+1 end if
 if bp047Run(19,"viewmodel depth",bp047ViewmodelDepth) then passed=passed+1 end if
 if bp047Run(20,"statusbar 48 lines",bp047Lines100) then passed=passed+1 end if
 if bp047Run(21,"statusbar 24 lines",bp047Lines110) then passed=passed+1 end if
-if bp047Run(22,"statusbar hidden",bp047Lines120) then passed=passed+1 end if
+if bp047Run(22,"statusbar retained at maximum viewsize",bp047Lines120) then passed=passed+1 end if
 if bp047Run(23,"intermission statusbar",bp047LinesIntermission) then passed=passed+1 end if
 if bp047Run(24,"2D constants",bp047Constants) then passed=passed+1 end if
 if passed != 24 then print "MiniQuake BP-047 render UI/HUD tests failed: " + passed + "/24"; error(4799,"BP-047 render UI/HUD") end if

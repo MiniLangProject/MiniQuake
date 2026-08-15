@@ -1,19 +1,27 @@
-/* BP-082 inventory runtime entry. main(args) must remain in the global package. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+BP-082 inventory runtime entry. main(args) must remain in the global package.
+*/
 import miniquake.source_profile_contract as profile
 
 bp082Failures = 0
 bp082Checks = 0
 
+// Assert that the condition holds and identify a failing test.
 function bp082Check(condition, label)
   global bp082Failures, bp082Checks
   bp082Checks = bp082Checks + 1
   if not condition then bp082Failures = bp082Failures + 1; print "FAIL: " + label end if
 end function
 
+// Assert exact equality and report both values on failure.
 function bp082Equal(actual, expected, label)
   bp082Check(actual == expected, label + ": expected " + expected + ", got " + actual)
 end function
 
+// Exercise the contains test scenario and verify its expected result.
 function bp082Contains(values, wanted)
   for each value in values
     if value == wanted then return true end if
@@ -21,6 +29,7 @@ function bp082Contains(values, wanted)
   return false
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   global bp082Failures, bp082Checks
   adapters = profile.contextAdapterNames()

@@ -1,7 +1,9 @@
 /*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
 Deterministic MiniLang side of the original gl_rsurf.c differential oracle.
 */
-
 import miniquake.render.world as rsurf
 import miniquake.render.gl11 as gl
 import miniquake.types as t
@@ -10,12 +12,14 @@ import miniquake.native as native
 import miniquake.array_util as arrayutil
 import std.string as string
 
+// Return json number derived from the active module state.
 function jsonNumber(value)
   integerValue = native.trunc(value)
   if value == integerValue then return "" + integerValue end if
   return string.replaceAll("" + value, ".e", "e")
 end function
 
+// Exercise json arguments as part of this deterministic regression fixture.
 function jsonArguments(values)
   result = "["
   index = 0
@@ -27,10 +31,12 @@ function jsonArguments(values)
   return result + "]"
 end function
 
+// Add the requested value to the destination state.
 function emit(scene, functionName, sequence, operation, arguments)
   print "{\"schema\":\"miniquake.renderer.gl.v1\",\"scene\":\"" + scene + "\",\"function\":\"" + functionName + "\",\"seq\":" + sequence + ",\"op\":\"" + operation + "\",\"args\":" + arguments + "}"
 end function
 
+// Add commands to the destination state.
 function emitCommands(scene, functionName, commands)
   sequence = 0
   for each command in commands
@@ -40,10 +46,12 @@ function emitCommands(scene, functionName, commands)
   return sequence
 end function
 
+// Return fnv byte derived from the active module state.
 function inline fnvByte(hash, value)
   return ((hash ^ (value & 255)) * 16777619) & 4294967295
 end function
 
+// Fold bytes into the deterministic rolling hash.
 function hashBytes(data)
   hash = 2166136261
   index = 0
@@ -54,6 +62,7 @@ function hashBytes(data)
   return hash
 end function
 
+// Fold u32 into the deterministic rolling hash.
 function hashU32(values, count)
   hash = 2166136261
   index = 0
@@ -68,6 +77,7 @@ function hashU32(values, count)
   return hash
 end function
 
+// Exercise base vertices as part of this deterministic regression fixture.
 function baseVertices()
   return [
     t.RenderVertex(t.Vec3(0.0, 0.0, 0.0), 0.0, 0.0, 0.1, 0.2),
@@ -77,6 +87,7 @@ function baseVertices()
   ]
 end function
 
+// Create and initialize setup.
 function makeSetup(flags)
   zero = t.Vec3(0.0, 0.0, 0.0)
   plane = t.BspPlane(t.Vec3(0.0, 0.0, 1.0), 0.0, 2)
@@ -130,6 +141,7 @@ function makeSetup(flags)
   return [renderer, surface, plane]
 end function
 
+// Update subsystem configuration for configure world tree.
 function configureWorldTree(setup, textureSort)
   zero = t.Vec3(0.0, 0.0, 0.0)
   setup[0].map.nodes = [
@@ -149,6 +161,7 @@ function configureWorldTree(setup, textureSort)
   return setup
 end function
 
+// Trace add dynamic lights through the collision world.
 function traceAddDynamicLights()
   setup = makeSetup(0)
   rsurf.R_SetSurfaceCompatibilityState(0, 1, 0, [256, 128, 0, 0], false, 0, 2, 3)
@@ -156,6 +169,7 @@ function traceAddDynamicLights()
   emit("rsurf_add_dynamic_lights", "R_AddDynamicLights", 0, "blocklights_hash", "[" + hashU32(rsurf.R_GetBlocklights(), 4) + "]")
 end function
 
+// Trace build light map through the collision world.
 function traceBuildLightMap()
   setup = makeSetup(0)
   destination = bytes(12, 204)
@@ -165,6 +179,7 @@ function traceBuildLightMap()
   emit("rsurf_build_lightmap", "R_BuildLightMap", 1, "cached_styles", "[" + state[0][0] + "," + state[0][1] + ",0]")
 end function
 
+// Trace texture animation through the collision world.
 function traceTextureAnimation()
   setup = makeSetup(0)
   baseMap = t.BspTexture("+0fixture", 64, 64, [0, 0, 0, 0], bytes())
@@ -189,6 +204,7 @@ function traceTextureAnimation()
   emit("rsurf_texture_animation", "R_TextureAnimation", 1, "selected_texture", "[" + selected.glId + "]")
 end function
 
+// Trace multitexture through the collision world.
 function traceMultitexture()
   makeSetup(0)
   rsurf.R_SetMultitextureCompatibility(true, true)
@@ -206,6 +222,7 @@ function traceMultitexture()
   emit("rsurf_enable_multitexture", "GL_EnableMultitexture", sequence, "state", "[1]")
 end function
 
+// Trace call through the collision world.
 function traceCall(scene, functionName, setup, callback)
   gl.Trace_Begin()
   if callback == 0 then rsurf.DrawGLWaterPoly(setup[1]) end if
@@ -215,12 +232,14 @@ function traceCall(scene, functionName, setup, callback)
   emitCommands(scene, functionName, commands)
 end function
 
+// Trace draw polygons through the collision world.
 function traceDrawPolygons()
   traceCall("rsurf_draw_water_poly", "DrawGLWaterPoly", makeSetup(0), 0)
   traceCall("rsurf_draw_water_lightmap", "DrawGLWaterPolyLightmap", makeSetup(0), 1)
   traceCall("rsurf_draw_poly", "DrawGLPoly", makeSetup(0), 2)
 end function
 
+// Trace sequential through the collision world.
 function traceSequential(multitexture)
   setup = makeSetup(0)
   rsurf.R_SetMultitextureCompatibility(multitexture, false)
@@ -233,6 +252,7 @@ function traceSequential(multitexture)
   emitCommands(scene, "R_DrawSequentialPoly", commands)
 end function
 
+// Trace blend lightmaps through the collision world.
 function traceBlendLightmaps()
   setup = makeSetup(0)
   underwater = t.RenderSurface(
@@ -247,6 +267,7 @@ function traceBlendLightmaps()
   emitCommands("rsurf_blend_lightmaps", "R_BlendLightmaps", commands)
 end function
 
+// Trace render brush through the collision world.
 function traceRenderBrush(flags, scene)
   setup = makeSetup(flags)
   gl.Trace_Begin()
@@ -259,6 +280,7 @@ function traceRenderBrush(flags, scene)
   end if
 end function
 
+// Trace dynamic lightmaps through the collision world.
 function traceDynamicLightmaps()
   setup = makeSetup(0)
   rsurf.R_SetSurfaceCompatibilityState(0, 0, 0, [1, 128, 0, 0], false, 0, 2, 3)
@@ -272,6 +294,7 @@ function traceDynamicLightmaps()
   emit("rsurf_dynamic_lightmaps", "R_RenderDynamicLightmaps", 1, "atlas_hash", "[" + hashBytes(rsurf.R_GetLightmapBytes()) + "]")
 end function
 
+// Trace mirror through the collision world.
 function traceMirror()
   setup = makeSetup(0)
   rsurf.R_MirrorChain(setup[1])
@@ -281,6 +304,7 @@ function traceMirror()
   emit("rsurf_mirror_chain", "R_MirrorChain", 0, "mirror_state", "[1," + samePlane + "]")
 end function
 
+// Trace alloc through the collision world.
 function traceAlloc()
   makeSetup(0)
   x = [-1]
@@ -290,6 +314,7 @@ function traceAlloc()
   emit("rsurf_alloc_block", "AllocBlock", 0, "allocation", "[" + page + "," + x[0] + "," + y[0] + "," + allocation[x[0]] + "," + allocation[x[0] + 3] + "]")
 end function
 
+// Trace display list through the collision world.
 function traceDisplayList()
   setup = makeSetup(0)
   setup[1].vertices = [
@@ -307,6 +332,7 @@ function traceDisplayList()
   emit("rsurf_build_display_list", "BuildSurfaceDisplayList", 0, "display_list", arguments + "]")
 end function
 
+// Trace create lightmap through the collision world.
 function traceCreateLightmap()
   setup = makeSetup(0)
   rsurf.GL_CreateSurfaceLightmap(setup[1])
@@ -315,6 +341,7 @@ function traceCreateLightmap()
   emit("rsurf_create_surface_lightmap", "GL_CreateSurfaceLightmap", 1, "atlas_hash", "[" + hashBytes(rsurf.R_GetLightmapBytes()) + "]")
 end function
 
+// Trace build lightmaps through the collision world.
 function traceBuildLightmaps()
   setup = makeSetup(c.SURF_DRAWSKY)
   gl.Trace_Begin()
@@ -323,6 +350,7 @@ function traceBuildLightmaps()
   emit("rsurf_build_lightmaps", "GL_BuildLightmaps", 0, "build_state", "[1,500,1000]")
 end function
 
+// Trace draw texture chains through the collision world.
 function traceDrawTextureChains()
   setup = makeSetup(c.SURF_DRAWSKY)
   rsurf.R_SetSurfaceChainCompatibility(false, [setup[1]], [])
@@ -332,6 +360,7 @@ function traceDrawTextureChains()
   emitCommands("rsurf_draw_texture_chains", "DrawTextureChains", commands)
 end function
 
+// Trace draw water surfaces through the collision world.
 function traceDrawWaterSurfaces()
   setup = makeSetup(c.SURF_DRAWTURB)
   setup[0].waterAlpha = 0.5
@@ -342,6 +371,7 @@ function traceDrawWaterSurfaces()
   emitCommands("rsurf_draw_water_surfaces", "R_DrawWaterSurfaces", commands)
 end function
 
+// Trace draw brush model through the collision world.
 function traceDrawBrushModel()
   setup = configureWorldTree(makeSetup(0), true)
   baseModel = setup[0].map.models[0]
@@ -360,6 +390,7 @@ function traceDrawBrushModel()
   emitCommands("rsurf_draw_brush_model", "R_DrawBrushModel", commands)
 end function
 
+// Trace recursive world node through the collision world.
 function traceRecursiveWorldNode()
   setup = configureWorldTree(makeSetup(0), false)
   gl.Trace_Begin()
@@ -368,6 +399,7 @@ function traceRecursiveWorldNode()
   emitCommands("rsurf_recursive_world_node", "R_RecursiveWorldNode", commands)
 end function
 
+// Trace draw world through the collision world.
 function traceDrawWorld()
   setup = configureWorldTree(makeSetup(0), false)
   gl.Trace_Begin()
@@ -376,6 +408,7 @@ function traceDrawWorld()
   emitCommands("rsurf_draw_world", "R_DrawWorld", commands)
 end function
 
+// Trace mark leaves through the collision world.
 function traceMarkLeaves()
   setup = makeSetup(0)
   zero = t.Vec3(0.0, 0.0, 0.0)
@@ -391,6 +424,7 @@ function traceMarkLeaves()
   emit("rsurf_mark_leaves", "R_MarkLeaves", 0, "visframe", "[" + state[1] + "]")
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   traceAddDynamicLights()
   traceBuildLightMap()

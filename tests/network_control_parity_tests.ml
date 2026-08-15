@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-061: net_dgrm.c control queries, discovery cache and connect classification.
 */
-
 import miniquake.net_control as control
 import miniquake.net_datagram as datagram
 import miniquake.net_loop as netloop
@@ -13,6 +13,7 @@ import miniquake.types as t
 testIndex = 0
 failures = 0
 
+// Assert that the condition holds and identify a failing test.
 function bp061Check(value, name)
   global testIndex, failures
   testIndex = testIndex + 1
@@ -21,6 +22,7 @@ function bp061Check(value, name)
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   bp061Check(control.NET_PROTOCOL_VERSION == 3 and control.GAME_NAME == "QUAKE", "control protocol identity")
 

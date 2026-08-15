@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.world_render_contract.
+*/
 package miniquake.world_render_contract
 
 // BP-044: the authoritative MiniQuake 1.09 world-render contract.  Modern
@@ -20,14 +27,17 @@ const STAGE_VIEWMODEL = 5
 const STAGE_WATER = 6
 const STAGE_POLYBLEND = 7
 
+// Return the stable compatibility-contract status string.
 function inline status()
   return STATUS
 end function
 
+// Return the stable compatibility-contract fingerprint.
 function inline fingerprint()
   return FINGERPRINT
 end function
 
+// Provide stage order behavior for the active subsystem.
 function stageOrder()
   return [
     STAGE_WORLD,
@@ -40,6 +50,7 @@ function stageOrder()
   ]
 end function
 
+// Return constants for the active module state.
 function constants()
   return [
     NEAR_CLIP,

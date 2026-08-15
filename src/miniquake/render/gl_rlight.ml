@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.render.gl_rlight.
+*/
 package miniquake.render.gl_rlight
 
 // Functional MiniLang counterpart of WinQuake/gl_rlight.c.
@@ -12,6 +19,7 @@ import miniquake.mathlib as math
 import miniquake.native as native
 import miniquake.array_util as arrayutil
 
+// Apply the Quake-compatible r animate light into behavior.
 function R_AnimateLightInto(lightStyles, currentTime, values)
   if values is void or len(values) != c.MAX_LIGHTSTYLES then values = arrayutil.makeFilledArray(c.MAX_LIGHTSTYLES, 256) end if
   tick = native.trunc(currentTime * 10.0)
@@ -30,10 +38,12 @@ function R_AnimateLightInto(lightStyles, currentTime, values)
   return values
 end function
 
+// Apply the Quake-compatible r animate light behavior.
 function R_AnimateLight(lightStyles, currentTime)
   return R_AnimateLightInto(lightStyles, currentTime, arrayutil.makeFilledArray(c.MAX_LIGHTSTYLES, 256))
 end function
 
+// Add state for add light blend.
 function AddLightBlend(blend, red, green, blue, alpha2)
   if blend is void or len(blend) < 4 then blend = [0.0, 0.0, 0.0, 0.0] end if
   result = [blend[0], blend[1], blend[2], blend[3]]
@@ -48,6 +58,7 @@ function AddLightBlend(blend, red, green, blue, alpha2)
   return result
 end function
 
+// Apply the Quake-compatible r render dlight trace behavior.
 function R_RenderDlightTrace(light, currentTime, viewOrigin, viewForward, viewRight, viewUp, blend)
   if light is void or light.radius <= 0.0 or light.die < currentTime then return [false, blend, []] end if
   radius = light.radius * 0.35
@@ -73,10 +84,12 @@ function R_RenderDlightTrace(light, currentTime, viewOrigin, viewForward, viewRi
   return [true, blend, vertices]
 end function
 
+// Apply the Quake-compatible r render dlight behavior.
 function R_RenderDlight(light, currentTime, viewOrigin, viewForward, viewRight, viewUp, blend)
   return R_RenderDlightTrace(light, currentTime, viewOrigin, viewForward, viewRight, viewUp, blend)
 end function
 
+// Apply the Quake-compatible r render dlights behavior.
 function R_RenderDlights(dynamicLights, currentTime, viewOrigin, viewForward, viewRight, viewUp, blend)
   traces = arrayutil.createArrayBuilder(len(dynamicLights))
   currentBlend = blend
@@ -102,6 +115,7 @@ function R_RenderDlights(dynamicLights, currentTime, viewOrigin, viewForward, vi
   return [count, currentBlend, arrayutil.finishArrayBuilder(traces)]
 end function
 
+// Provide plane distance behavior for the active subsystem.
 function planeDistance(plane, point)
   if plane.type == 0 then return point.x - plane.dist end if
   if plane.type == 1 then return point.y - plane.dist end if
@@ -109,6 +123,7 @@ function planeDistance(plane, point)
   return math.dot(point, plane.normal) - plane.dist
 end function
 
+// Apply the Quake-compatible r mark lights behavior.
 function R_MarkLights(map, surfaceBits, surfaceFrames, frameCount, light, bit, nodeNumber)
   if light is void or nodeNumber < 0 or nodeNumber >= len(map.nodes) then return 0 end if
   node = map.nodes[nodeNumber]
@@ -139,6 +154,7 @@ function R_MarkLights(map, surfaceBits, surfaceFrames, frameCount, light, bit, n
   return marked
 end function
 
+// Apply the Quake-compatible r push dlights behavior.
 function R_PushDlights(map, surfaceBits, surfaceFrames, frameCount, dynamicLights, currentTime, rootNode)
   marked = 0
   index = 0
@@ -152,7 +168,9 @@ function R_PushDlights(map, surfaceBits, surfaceFrames, frameCount, dynamicLight
   return marked
 end function
 
+// Provide recursive light point behavior for the active subsystem.
 function RecursiveLightPoint(map, surfaces, lightStyleValues, nodeNumber, start, finish)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if nodeNumber < 0 or nodeNumber >= len(map.nodes) then return [-1, void, void] end if
   node = map.nodes[nodeNumber]
   if node.planeIndex < 0 or node.planeIndex >= len(map.planes) then return [-1, void, void] end if
@@ -221,6 +239,7 @@ function RecursiveLightPoint(map, surfaces, lightStyleValues, nodeNumber, start,
   return RecursiveLightPoint(map, surfaces, lightStyleValues, backChild, middle, finish)
 end function
 
+// Apply the Quake-compatible r light point behavior.
 function R_LightPoint(map, surfaces, lightStyleValues, rootNode, point)
   if len(map.lighting) == 0 then return [255, void, void] end if
   finish = t.Vec3(point.x, point.y, point.z - 2048.0)
@@ -237,6 +256,7 @@ fastLightSpotZ = 0.0
 fastLightPlane = void
 fastLightHit = false
 
+// Provide fast plane distance behavior for the active subsystem.
 function fastPlaneDistance(plane, x, y, z)
   if plane.type == 0 then return x - plane.dist end if
   if plane.type == 1 then return y - plane.dist end if
@@ -244,7 +264,9 @@ function fastPlaneDistance(plane, x, y, z)
   return x * plane.normal.x + y * plane.normal.y + z * plane.normal.z - plane.dist
 end function
 
+// Return recursive light point value derived from the active module state.
 function RecursiveLightPointValue(map, surfaces, lightStyleValues, nodeNumber, x, y, startZ, finishZ)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global fastLightSpotZ, fastLightPlane, fastLightHit
   if nodeNumber < 0 or nodeNumber >= len(map.nodes) then return -1 end if
   node = map.nodes[nodeNumber]
@@ -315,6 +337,7 @@ function RecursiveLightPointValue(map, surfaces, lightStyleValues, nodeNumber, x
   return RecursiveLightPointValue(map, surfaces, lightStyleValues, backChild, x, y, middleZ, finishZ)
 end function
 
+// Apply the Quake-compatible r light point value behavior.
 function R_LightPointValue(map, surfaces, lightStyleValues, rootNode, point)
   global fastLightHit, fastLightPlane
   if len(map.lighting) == 0 then fastLightHit = false; fastLightPlane = void; return 255 end if
@@ -325,14 +348,17 @@ function R_LightPointValue(map, surfaces, lightStyleValues, rootNode, point)
   return result
 end function
 
+// Provide fast light hit behavior for the active subsystem.
 function FastLightHit()
   return fastLightHit
 end function
 
+// Provide fast light spot z behavior for the active subsystem.
 function FastLightSpotZ()
   return fastLightSpotZ
 end function
 
+// Provide fast light plane behavior for the active subsystem.
 function FastLightPlane()
   return fastLightPlane
 end function

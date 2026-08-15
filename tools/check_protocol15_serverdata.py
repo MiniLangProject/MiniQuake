@@ -672,7 +672,7 @@ def check_source_contract(root: Path) -> Check:
             ),
             "types": (
                 "struct ProtocolClientData\n  viewHeight\n  idealPitch\n  punch\n  velocity",
-                "struct ServerClient", "  lastMessage\n  dropAsap\nend struct",
+                "struct ServerClient", "  lastMessage\n  dropAsap\n  playerState\n  datagramBuffer\nend struct",
                 "struct GameServer", "  standardQuake\n  randomSeed",
             ),
             "server": (
@@ -682,7 +682,7 @@ def check_source_contract(root: Path) -> Check:
                 "channel = native.trunc(event[1])",
                 "attenuation = transients.cFloat(event[4])",
                 "serverData.writeClientData(", "serverData.appendDatagramIfFits(",
-                "protocolUpdate.canWrite(buffer, bits)", "function sendClientMessagesAt(",
+                "protocolUpdate.canWriteWithReservedTail(buffer, bits, reservedBytes)", "function sendClientMessagesAt(",
                 'items2Offset = vm.fieldOffset(server.machine, "items2")',
                 "native.trunc(server.serverFlags) << 28",
                 "previous = server.edicts",
@@ -701,7 +701,7 @@ def check_source_contract(root: Path) -> Check:
                 "serverData.initialDeliveryPlan(", "serverData.reliableDeliveryPlan(",
                 'items2Offset = vm.fieldOffset(state.server.machine, "items2")',
                 "native.trunc(state.server.serverFlags) << 28",
-                "protocolUpdate.canWrite(buffer, bits)",
+                "protocolUpdate.canWriteWithReservedTail(buffer, bits, reservedBytes)",
                 "fallbackFlags = runtime.playerProtocolFlags(player)",
                 'svmQcFloat(state, entityIndex, "flags", fallbackFlags)',
             ),
@@ -792,11 +792,11 @@ def check_source_contract(root: Path) -> Check:
             errors.append("integrated baseline does not preserve zero-initialized baseline.effects")
 
         fixture_numbers = __import__("re").findall(r'runTest\("(\d\d)"', files["tests"])
-        if fixture_numbers != [f"{index:02d}" for index in range(1, 18)]:
+        if fixture_numbers != [f"{index:02d}" for index in range(1, 19)]:
             errors.append(f"BP-012R1 fixture numbering differs: {fixture_numbers!r}")
-        if 'print "  [" + number + "/17] " + name' not in files["tests"]:
-            errors.append("BP-012R1 MiniLang progress denominator is not 17")
-        if "MiniQuake BP-012R1 Protocol 15 server-data tests passed: 17" not in files["tests"]:
+        if 'print "  [" + number + "/18] " + name' not in files["tests"]:
+            errors.append("BP-012R1 MiniLang progress denominator is not 18")
+        if "MiniQuake BP-012R1 Protocol 15 server-data tests passed: 18" not in files["tests"]:
             errors.append("BP-012R1 MiniLang success marker is missing")
         expected = make_golden()
         missing_hex = [item["name"] for item in expected["vectors"] if item["bytes"] not in files["tests"]]

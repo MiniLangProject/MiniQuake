@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.model_registry.
+*/
 package miniquake.model_registry
 
 import miniquake.types as t
@@ -17,6 +24,7 @@ const MOD_BRUSH = 0
 const MOD_SPRITE = 1
 const MOD_ALIAS = 2
 
+// Report whether model command never exists holds for the active state.
 function modelCommandNeverExists(name)
   return false
 end function
@@ -35,6 +43,7 @@ function Mod_Init(registry, cvars)
   return registry
 end function
 
+// Create and initialize the module state.
 function create()
   return t.ModelRegistry([], [], [], [], [], bytes(1024, 255))
 end function
@@ -49,6 +58,7 @@ function findIndex(registry, name)
   return -1
 end function
 
+// Mirror Quake's Mod_FindName routine and its observable state changes.
 function Mod_FindName(registry, name)
   if name == "" then return error(1900, "Mod_ForName: NULL name") end if
   index = findIndex(registry, name)
@@ -62,6 +72,7 @@ function Mod_FindName(registry, name)
   return len(registry.names) - 1
 end function
 
+// Update subsystem configuration for register typed.
 function registerTyped(registry, name, model, type)
   index = Mod_FindName(registry, name)
   if index is error then return index end if
@@ -76,18 +87,21 @@ function register(registry, name, model)
   return registerTyped(registry, name, model, MOD_UNKNOWN)
 end function
 
+// Return the requested value.
 function get(registry, name)
   index = findIndex(registry, name)
   if index < 0 then return void end if
   return registry.models[index]
 end function
 
+// Return model type derived from the active module state.
 function modelType(registry, name)
   index = findIndex(registry, name)
   if index < 0 then return MOD_UNKNOWN end if
   return registry.types[index]
 end function
 
+// Update subsystem configuration for register brush submodels.
 function registerBrushSubmodels(registry, map)
   if len(map.models) <= 1 then return 0 end if
   index = 1
@@ -99,6 +113,7 @@ function registerBrushSubmodels(registry, map)
   return len(map.models) - 1
 end function
 
+// Read and validate bytes.
 function loadBytes(registry, name, data)
   if len(data) < 4 then return error(1902, name + ": model file is truncated") end if
   magic = bio.fourCC(data, 0)
@@ -133,12 +148,14 @@ function Mod_LoadModel(registry, filesystem, index, crash)
   return model
 end function
 
+// Mirror Quake's Mod_ForName routine and its observable state changes.
 function Mod_ForName(registry, filesystem, name, crash)
   index = Mod_FindName(registry, name)
   if index is error then return index end if
   return Mod_LoadModel(registry, filesystem, index, crash)
 end function
 
+// Mirror Quake's Mod_TouchModel routine and its observable state changes.
 function Mod_TouchModel(registry, name)
   index = Mod_FindName(registry, name)
   if index is error then return index end if
@@ -148,6 +165,7 @@ function Mod_TouchModel(registry, name)
   return index
 end function
 
+// Mirror Quake's Mod_Extradata routine and its observable state changes.
 function Mod_Extradata(registry, filesystem, index)
   if index < 0 or index >= len(registry.models) then return error(1905, "Mod_Extradata: bad model") end if
   value = registry.models[index]
@@ -158,6 +176,7 @@ function Mod_Extradata(registry, filesystem, index)
   return value
 end function
 
+// Mirror Quake's Mod_ClearAll routine and its observable state changes.
 function Mod_ClearAll(registry)
   index = 0
   while index < len(registry.names)
@@ -167,6 +186,7 @@ function Mod_ClearAll(registry)
   return len(registry.names)
 end function
 
+// Mirror Quake's Mod_Print routine and its observable state changes.
 function Mod_Print(registry)
   print "Cached models:"
   index = 0
@@ -179,6 +199,7 @@ function Mod_Print(registry)
   return len(registry.names)
 end function
 
+// Provide model bounds behavior for the active subsystem.
 function modelBounds(registry, name)
   index = findIndex(registry, name)
   if index < 0 or registry.models[index] is void then return void end if
@@ -199,6 +220,7 @@ function modelBounds(registry, name)
   return [model.mins, model.maxs]
 end function
 
+// Provide model radius behavior for the active subsystem.
 function modelRadius(registry, name)
   bounds = modelBounds(registry, name)
   if bounds is void then return 0.0 end if

@@ -1,10 +1,11 @@
 /*
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Release-candidate resource-stability contract layered on the existing host
 soak implementations.
 */
-
 package miniquake.stability_contract
 
 import miniquake.constants as c
@@ -18,14 +19,17 @@ const LISTEN_SOAK_FRAMES = 5000
 const LIVE_BLOCK_ALLOWANCE = 512
 const LIVE_BYTE_ALLOWANCE = 65536
 
+// Provide modes behavior for the active subsystem.
 function inline modes()
   return ["host", "listen"]
 end function
 
+// Provide delta stable behavior for the active subsystem.
 function inline deltaStable(before, after, allowance)
   return after <= before + allowance
 end function
 
+// Apply the Quake-compatible host stable behavior.
 function hostStable(liveBefore, liveAfter, bytesBefore, bytesAfter)
   return deltaStable(liveBefore, liveAfter, 64) and deltaStable(bytesBefore, bytesAfter, 1048576)
 end function
@@ -54,12 +58,14 @@ function clientEntityLimit(serverBefore, serverAfter, entitiesBefore)
   return limit
 end function
 
+// Provide client entity high water stable behavior for the active subsystem.
 function clientEntityHighWaterStable(serverBefore, serverAfter, entitiesBefore, entitiesAfter)
   limit = clientEntityLimit(serverBefore, serverAfter, entitiesBefore)
   if limit < 0 or entitiesAfter < 0 then return false end if
   return entitiesAfter <= limit
 end function
 
+// Provide long checks behavior for the active subsystem.
 function longChecks(before, after)
   if before is not array or after is not array or len(before) < 16 or len(after) < 16 then
     return [false, false, false, false, false, false, false, false, false]
@@ -90,6 +96,7 @@ function longChecks(before, after)
   ]
 end function
 
+// Provide long stable behavior for the active subsystem.
 function longStable(before, after)
   checks = longChecks(before, after)
   for each passed in checks
@@ -98,6 +105,7 @@ function longStable(before, after)
   return true
 end function
 
+// Return contract vector derived from the active module state.
 function contractVector()
   return [STATUS, FINGERPRINT, DEFAULT_SOAK_FRAMES, LISTEN_SOAK_FRAMES, LIVE_BLOCK_ALLOWANCE, LIVE_BYTE_ALLOWANCE, CLIENT_ENTITY_POLICY, modes()]
 end function

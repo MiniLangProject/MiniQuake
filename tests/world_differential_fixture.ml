@@ -1,7 +1,9 @@
 /*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
 MiniLang side of the pinned WinQuake/world.c differential oracle.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.native as native
@@ -17,6 +19,7 @@ struct WorldDifferentialMap
   leafs
 end struct
 
+// Exercise differential map as part of this deterministic regression fixture.
 function differentialMap(negativeContents)
   plane = t.BspPlane(t.Vec3(1.0, 0.0, 0.0), 0.0, 0)
   node = t.BspNode(
@@ -64,6 +67,7 @@ function differentialMap(negativeContents)
   )
 end function
 
+// Exercise differential entity as part of this deterministic regression fixture.
 function differentialEntity(number, origin, mins, maxs, solid)
   item = edict.create(number)
   item.origin = origin
@@ -73,6 +77,7 @@ function differentialEntity(number, origin, mins, maxs, solid)
   return item
 end function
 
+// Exercise differential fixture as part of this deterministic regression fixture.
 function differentialFixture(negativeContents)
   map = differentialMap(negativeContents)
   game = server.create(1)
@@ -113,15 +118,18 @@ function differentialFixture(negativeContents)
   return [game, map, worldPort.SV_ClearWorld(game, map)]
 end function
 
+// Return result number derived from the active module state.
 function resultNumber(value)
   if value then return 1 end if
   return 0
 end function
 
+// Exercise number text as part of this deterministic regression fixture.
 function numberText(value)
   return native.floatText(value)
 end function
 
+// Add world to the destination state.
 function emitWorld(functionName, caseName, result, a, b, cValue, d, e, f, count)
   print "{\"function\":\"" + functionName + "\",\"case\":\"" + caseName +
     "\",\"result\":" + result + ",\"a\":" + numberText(a) +
@@ -130,6 +138,7 @@ function emitWorld(functionName, caseName, result, a, b, cValue, d, e, f, count)
     ",\"f\":" + numberText(f) + ",\"count\":" + count + "}"
 end function
 
+// Add trace to the destination state.
 function emitTrace(functionName, caseName, result, trace)
   emitWorld(
     functionName,
@@ -145,7 +154,9 @@ function emitTrace(functionName, caseName, result, trace)
   )
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   fixture = differentialFixture(c.CONTENTS_EMPTY)
   state = fixture[2]
   hull = worldPort.SV_InitBoxHull()

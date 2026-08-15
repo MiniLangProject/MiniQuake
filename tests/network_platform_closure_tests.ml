@@ -1,4 +1,9 @@
-/* BP-064: frozen network/platform closure contract. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+BP-064: frozen network/platform closure contract.
+*/
 import miniquake.network_platform_contract as contract
 import miniquake.net_main as netmain
 import miniquake.net_loop as netloop
@@ -12,6 +17,7 @@ import miniquake.types as t
 
 testIndex = 0
 failures = 0
+// Assert that the condition holds and identify a failing test.
 function bp064Check(value, name)
   global testIndex, failures
   testIndex = testIndex + 1
@@ -20,6 +26,7 @@ function bp064Check(value, name)
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   bp064Check(contract.verify(), "frozen contract verification")
   bp064Check(contract.STATUS == "network_platform_109_frozen_v1", "contract status")

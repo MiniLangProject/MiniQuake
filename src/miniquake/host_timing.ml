@@ -1,13 +1,22 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.host_timing.
+*/
 package miniquake.host_timing
 
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.native as native
 
+// Create and initialize the module state.
 function create()
   return t.HostTiming(0.0, 0.0, 0.0, 0, 0)
 end function
 
+// Provide binary32 behavior for the active subsystem.
 function binary32(value)
   return native.bitsFloat(native.floatBits(value))
 end function
@@ -39,20 +48,22 @@ function filterAbsolute(timing, newRealtime, maxFps, forcedFrameRate, timedemo, 
   return true
 end function
 
-function filter(timing, elapsed, timedemo, forcedFrameRate, timeScale)
+// Provide filter behavior for the active subsystem.
+function filter(timing, elapsed, timedemo, forcedFrameRate, timeScale, maxFps)
   // _Host_Frame takes float time in WinQuake.  Preserve that boundary even
   // though MiniLang numeric expressions can otherwise retain more precision.
   inputDelta = binary32(elapsed)
   return filterAbsolute(
     timing,
     timing.realtime + inputDelta,
-    72.0,
+    maxFps,
     forcedFrameRate,
     timedemo,
     timeScale,
   )
 end function
 
+// Provide milliseconds behavior for the active subsystem.
 function milliseconds(timing)
   value = timing.frameTime * 1000.0
   if value < 1.0 then return 1 end if

@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang implementation of miniquake.map_viewer.
+*/
 package miniquake.map_viewer
 
 import miniquake.format.bsp as bsp
@@ -7,6 +14,7 @@ import miniquake.render.gl11 as gl
 import miniquake.native as native
 import std.fs as fs
 
+// Provide face vertex behavior for the active subsystem.
 function faceVertex(map, surfEdgeIndex)
   if surfEdgeIndex < 0 or surfEdgeIndex >= len(map.surfEdges) then return void end if
   signedEdge = map.surfEdges[surfEdgeIndex]
@@ -20,6 +28,7 @@ function faceVertex(map, surfEdgeIndex)
   return map.vertices[vertexIndex].position
 end function
 
+// Render map.
 function drawMap(map)
   gl.color(220, 220, 220, 255)
   for each face in map.faces
@@ -36,6 +45,7 @@ function drawMap(map)
   end for
 end function
 
+// Render the requested value.
 function render(map, angle, width, height)
   if height <= 0 then height = 1 end if
   aspect = width / height
@@ -57,6 +67,7 @@ function render(map, angle, width, height)
   drawMap(map)
 end function
 
+// Execute map.
 function runMap(map, title)
   win.create(title, 1280, 720, 0)
   win.captureMouse(false)
@@ -75,6 +86,7 @@ function runMap(map, title)
   return 0
 end function
 
+// Execute direct.
 function runDirect(bspFilename, paletteFilename)
   palette = fs.readAllBytes(paletteFilename)
   if len(palette) < 768 then return error(2350, "palette.lmp must contain 768 bytes") end if
@@ -82,6 +94,7 @@ function runDirect(bspFilename, paletteFilename)
   return runMap(map, "MiniQuake BSP viewer - " + bspFilename)
 end function
 
+// Execute from game.
 function runFromGame(baseDirectory, mapName)
   system = qfs.standard(baseDirectory, "id1")
   filename = mapName

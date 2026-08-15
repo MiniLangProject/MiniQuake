@@ -1,9 +1,17 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang implementation of miniquake.black_port_corpus.
+*/
 package miniquake.black_port_corpus
 
 const SCHEMA_VERSION = 1
 const FRAMES_PER_SCENARIO = 64
 const SCENARIO_COUNT = 4
 
+// Provide scenarios behavior for the active subsystem.
 function scenarios()
   return [
     ["start-064", "start", 64],
@@ -13,12 +21,14 @@ function scenarios()
   ]
 end function
 
+// Provide scenario at behavior for the active subsystem.
 function scenarioAt(index)
   values = scenarios()
   if index < 0 or index >= len(values) then return error(8400, "black-port corpus scenario index out of range") end if
   return values[index]
 end function
 
+// Validate the requested value and report any incompatibility.
 function validate()
   values = scenarios()
   if SCHEMA_VERSION != 1 or len(values) != SCENARIO_COUNT then return false end if

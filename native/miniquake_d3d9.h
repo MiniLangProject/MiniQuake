@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 1996-1997 Id Software, Inc.
+ * Copyright (c) 2026 Nils Kopal
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * Direct3D 9 implementation of MiniQuake's renderer bridge vocabulary.
+ */
 #ifndef MINIQUAKE_D3D9_H
 #define MINIQUAKE_D3D9_H
 

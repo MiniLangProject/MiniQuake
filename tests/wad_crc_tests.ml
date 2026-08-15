@@ -1,26 +1,29 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Focused WinQuake/wad.c+wad.h and crc.c+crc.h behavioral fixtures.
 */
-
 import miniquake.wad as wad
 import miniquake.crc as crc
 import miniquake.byteio as bio
 import miniquake.filesystem as qfs
 import std.fs as fs
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9700, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9701, name + ": expected true") end if
   return true
 end function
 
+// Return assert bytes derived from the active module state.
 function assertBytes(actual, expected, name)
   assertEqual(len(actual), len(expected), name + " length")
   index = 0
@@ -31,6 +34,7 @@ function assertBytes(actual, expected, name)
   return true
 end function
 
+// Encode and write name.
 function putName(data, offset, name)
   source = bytes(name)
   count = len(source)
@@ -38,6 +42,7 @@ function putName(data, offset, name)
   bio.copyInto(data, offset, source, 0, count)
 end function
 
+// Create and initialize synthetic wad.
 function makeSyntheticWad()
   // Header (12), qpic (8), compressed raw lump (3), directory (2 * 32).
   data = bytes(87)
@@ -67,6 +72,7 @@ function makeSyntheticWad()
   return data
 end function
 
+// Verify cleanup name against the expected Quake behavior.
 function testCleanupName()
   clean = wad.W_CleanupName("ABCdef")
   assertEqual(len(clean), 16, "W_CleanupName fixed length")
@@ -90,6 +96,7 @@ function testCleanupName()
   return true
 end function
 
+// Verify wad lookup and pictures against the expected Quake behavior.
 function testWadLookupAndPictures()
   data = makeSyntheticWad()
   archive = wad.W_LoadWadData(data, "synthetic.wad")
@@ -123,6 +130,7 @@ function testWadLookupAndPictures()
   return true
 end function
 
+// Verify wad bounds against the expected Quake behavior.
 function testWadBounds()
   badMagic = makeSyntheticWad()
   badMagic[0] = 88
@@ -144,6 +152,7 @@ function testWadBounds()
   return true
 end function
 
+// Verify crc against the expected Quake behavior.
 function testCrc()
   assertEqual(crc.CRC_Init(), 0xffff, "CRC_Init")
   value = crc.CRC_Init()
@@ -160,6 +169,7 @@ function testCrc()
   return true
 end function
 
+// Verify retail gfx wad against the expected Quake behavior.
 function testRetailGfxWad(baseDirectory)
   system = qfs.create(baseDirectory, "id1")
   qfs.addGameDirectory(system, qfs.join(baseDirectory, "id1"))
@@ -175,6 +185,7 @@ function testRetailGfxWad(baseDirectory)
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "[1/5] W_CleanupName"
   result = try(testCleanupName())

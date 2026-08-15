@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.mathlib.
+*/
 package miniquake.mathlib
 
 import miniquake.types as t
@@ -9,10 +16,12 @@ const RAD_TO_DEG = 57.29577951308232
 const DEG_TO_RAD = 0.017453292519943295
 const NAN_MASK = 0x7f800000
 
+// Provide vec3 behavior for the active subsystem.
 function vec3(x, y, z)
   return t.Vec3(x, y, z)
 end function
 
+// Return vec3 origin derived from the active module state.
 function vec3Origin()
   return t.Vec3(0.0, 0.0, 0.0)
 end function
@@ -22,18 +31,22 @@ function inline DotProduct(a, b)
   return a.x * b.x + a.y * b.y + a.z * b.z
 end function
 
+// Provide vector subtract behavior for the active subsystem.
 function VectorSubtract(a, b)
   return t.Vec3(a.x - b.x, a.y - b.y, a.z - b.z)
 end function
 
+// Provide vector add behavior for the active subsystem.
 function VectorAdd(a, b)
   return t.Vec3(a.x + b.x, a.y + b.y, a.z + b.z)
 end function
 
+// Provide vector copy behavior for the active subsystem.
 function VectorCopy(value)
   return t.Vec3(value.x, value.y, value.z)
 end function
 
+// Report whether is nan.
 function IS_NAN(value)
   return (native.floatBits(value) & NAN_MASK) == NAN_MASK
 end function
@@ -43,66 +56,81 @@ function copy(value)
   return VectorCopy(value)
 end function
 
+// Add state for add.
 function add(a, b)
   return VectorAdd(a, b)
 end function
 
+// Provide subtract behavior for the active subsystem.
 function subtract(a, b)
   return VectorSubtract(a, b)
 end function
 
+// Provide scale behavior for the active subsystem.
 function scale(value, scalar)
   return VectorScale(value, scalar)
 end function
 
+// Provide multiply add behavior for the active subsystem.
 function multiplyAdd(a, scalar, b)
   return VectorMA(a, scalar, b)
 end function
 
+// Provide dot behavior for the active subsystem.
 function dot(a, b)
   return DotProduct(a, b)
 end function
 
+// Provide cross behavior for the active subsystem.
 function cross(a, b)
   return CrossProduct(a, b)
 end function
 
+// Return length squared for the active module state.
 function lengthSquared(value)
   return DotProduct(value, value)
 end function
 
+// Return length derived from the active module state.
 function length(value)
   return Length(value)
 end function
 
+// Convert the requested value into its canonical representation.
 function normalize(value)
   result = VectorCopy(value)
   VectorNormalize(result)
   return result
 end function
 
+// Return a validated clamp value.
 function clamp(value, minimum, maximum)
   if value < minimum then return minimum end if
   if value > maximum then return maximum end if
   return value
 end function
 
+// Provide sqrt behavior for the active subsystem.
 function sqrt(value)
   return native.sqrt(value)
 end function
 
+// Provide atan2 behavior for the active subsystem.
 function atan2(y, x)
   return native.atan2(y, x)
 end function
 
+// Provide sin behavior for the active subsystem.
 function sin(value)
   return native.sin(value)
 end function
 
+// Provide cos behavior for the active subsystem.
 function cos(value)
   return native.cos(value)
 end function
 
+// Provide project point on plane behavior for the active subsystem.
 function ProjectPointOnPlane(point, normal)
   inverseDenominator = 1.0 / DotProduct(normal, normal)
   distance = DotProduct(normal, point) * inverseDenominator
@@ -118,10 +146,12 @@ function ProjectPointOnPlane(point, normal)
   )
 end function
 
+// Provide project point on plane behavior for the active subsystem.
 function projectPointOnPlane(point, normal)
   return ProjectPointOnPlane(point, normal)
 end function
 
+// Return perpendicular vector derived from the active module state.
 function PerpendicularVector(source)
   position = 0
   minimumElement = 1.0
@@ -145,10 +175,12 @@ function PerpendicularVector(source)
   return result
 end function
 
+// Return perpendicular vector derived from the active module state.
 function perpendicularVector(source)
   return PerpendicularVector(source)
 end function
 
+// Apply the Quake-compatible r concat rotations behavior.
 function R_ConcatRotations(first, second)
   return [
     [
@@ -169,6 +201,7 @@ function R_ConcatRotations(first, second)
   ]
 end function
 
+// Return rotate point around vector derived from the active module state.
 function RotatePointAroundVector(direction, point, degrees)
   forward = VectorCopy(direction)
   right = PerpendicularVector(direction)
@@ -200,23 +233,28 @@ function RotatePointAroundVector(direction, point, degrees)
   )
 end function
 
+// Return rotate point around vector derived from the active module state.
 function rotatePointAroundVector(direction, point, degrees)
   return RotatePointAroundVector(direction, point, degrees)
 end function
 
+// Provide anglemod behavior for the active subsystem.
 function anglemod(angle)
   quantized = native.trunc(angle * (65536.0 / 360.0)) & 65535
   return (360.0 / 65536.0) * quantized
 end function
 
+// Provide angle mod behavior for the active subsystem.
 function angleMod(angle)
   return anglemod(angle)
 end function
 
+// Mirror Quake's BOPS_Error routine and its observable state changes.
 function BOPS_Error()
   return error(2500, "BoxOnPlaneSide: Bad signbits")
 end function
 
+// Provide box on plane side behavior for the active subsystem.
 function BoxOnPlaneSide(emins, emaxs, plane)
   distance1 = 0.0
   distance2 = 0.0
@@ -255,6 +293,7 @@ function BoxOnPlaneSide(emins, emaxs, plane)
   return sides
 end function
 
+// Mirror Quake's BOX_ON_PLANE_SIDE routine and its observable state changes.
 function BOX_ON_PLANE_SIDE(emins, emaxs, plane)
   if plane.type == 0 then
     if plane.dist <= emins.x then return 1 end if
@@ -274,10 +313,12 @@ function BOX_ON_PLANE_SIDE(emins, emaxs, plane)
   return BoxOnPlaneSide(emins, emaxs, plane)
 end function
 
+// Provide box on plane side behavior for the active subsystem.
 function boxOnPlaneSide(emins, emaxs, plane)
   return BOX_ON_PLANE_SIDE(emins, emaxs, plane)
 end function
 
+// Provide angle vectors behavior for the active subsystem.
 function AngleVectors(angles)
   yawAngle = angles.y * (PI * 2.0 / 360.0)
   yawSine = native.sin(yawAngle)
@@ -308,10 +349,12 @@ function AngleVectors(angles)
   return vectors
 end function
 
+// Provide angle vectors behavior for the active subsystem.
 function angleVectors(angles)
   return AngleVectors(angles)
 end function
 
+// Provide vector compare behavior for the active subsystem.
 function VectorCompare(first, second)
   if first.x != second.x then return 0 end if
   if first.y != second.y then return 0 end if
@@ -319,6 +362,7 @@ function VectorCompare(first, second)
   return 1
 end function
 
+// Provide vector ma behavior for the active subsystem.
 function VectorMA(first, scalar, second)
   // MiniLang struct construction allocates.  Read both source vectors before
   // that allocation so a GC triggered while building the Vec3 cannot leave a
@@ -329,22 +373,27 @@ function VectorMA(first, scalar, second)
   return t.Vec3(x, y, z)
 end function
 
+// Provide dot product behavior for the active subsystem.
 function _DotProduct(first, second)
   return DotProduct(first, second)
 end function
 
+// Provide vector subtract behavior for the active subsystem.
 function _VectorSubtract(first, second)
   return VectorSubtract(first, second)
 end function
 
+// Provide vector add behavior for the active subsystem.
 function _VectorAdd(first, second)
   return VectorAdd(first, second)
 end function
 
+// Provide vector copy behavior for the active subsystem.
 function _VectorCopy(value)
   return VectorCopy(value)
 end function
 
+// Provide cross product behavior for the active subsystem.
 function CrossProduct(first, second)
   return t.Vec3(
     first.y * second.z - first.z * second.y,
@@ -353,11 +402,13 @@ function CrossProduct(first, second)
   )
 end function
 
+// Return length derived from the active module state.
 function Length(value)
   magnitude = value.x * value.x + value.y * value.y + value.z * value.z
   return native.sqrt(magnitude)
 end function
 
+// Provide vector normalize behavior for the active subsystem.
 function VectorNormalize(value)
   magnitude = native.sqrt(value.x * value.x + value.y * value.y + value.z * value.z)
   if magnitude != 0.0 then
@@ -369,6 +420,7 @@ function VectorNormalize(value)
   return magnitude
 end function
 
+// Provide vector inverse behavior for the active subsystem.
 function VectorInverse(value)
   value.x = -value.x
   value.y = -value.y
@@ -376,10 +428,12 @@ function VectorInverse(value)
   return value
 end function
 
+// Provide vector scale behavior for the active subsystem.
 function VectorScale(value, scalar)
   return t.Vec3(value.x * scalar, value.y * scalar, value.z * scalar)
 end function
 
+// Provide the Quake-compatible log2 entry point.
 function Q_log2(value)
   if value < 0 then return error(2501, "Q_log2: negative value") end if
   answer = 0
@@ -391,6 +445,7 @@ function Q_log2(value)
   return answer
 end function
 
+// Apply the Quake-compatible r concat transforms behavior.
 function R_ConcatTransforms(first, second)
   return [
     [
@@ -414,6 +469,7 @@ function R_ConcatTransforms(first, second)
   ]
 end function
 
+// Provide floor div mod behavior for the active subsystem.
 function FloorDivMod(numerator, denominator)
   if denominator <= 0.0 then return error(2502, "FloorDivMod: bad denominator " + denominator) end if
   quotient = 0
@@ -434,6 +490,7 @@ function FloorDivMod(numerator, denominator)
   return [quotient, remainder]
 end function
 
+// Provide greatest common divisor behavior for the active subsystem.
 function GreatestCommonDivisor(first, second)
   if first > second then
     if second == 0 then return first end if
@@ -443,10 +500,12 @@ function GreatestCommonDivisor(first, second)
   return GreatestCommonDivisor(first, second % first)
 end function
 
+// Provide greatest common divisor behavior for the active subsystem.
 function greatestCommonDivisor(first, second)
   return GreatestCommonDivisor(first, second)
 end function
 
+// Provide invert24 to16 behavior for the active subsystem.
 function Invert24To16(value)
   if value < 256 then return -1 end if
   return native.trunc((65536.0 * 16777216.0 / value) + 0.5)

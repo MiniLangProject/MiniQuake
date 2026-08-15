@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.view.
+*/
 package miniquake.view
 
 import miniquake.types as t
@@ -15,6 +22,7 @@ const CSHIFT_BONUS = 2
 const CSHIFT_POWERUP = 3
 const NUM_CSHIFTS = 4
 
+// Provide empty gamma behavior for the active subsystem.
 function emptyGamma()
   table = []
   index = 0
@@ -25,10 +33,12 @@ function emptyGamma()
   return table
 end function
 
+// Provide empty ramps behavior for the active subsystem.
 function emptyRamps()
   return [emptyGamma(), emptyGamma(), emptyGamma()]
 end function
 
+// Create and initialize the module state.
 function create()
   state = t.ViewState(
     t.Vec3(0.0, 0.0, 0.0),
@@ -78,6 +88,7 @@ function create()
   return V_Init(state)
 end function
 
+// Update module state for the requested operation.
 function reset(state, playerOrigin)
   state.oldZ = playerOrigin.z
   state.oldZValid = true
@@ -123,6 +134,7 @@ function V_ClearClientState(state)
   return state
 end function
 
+// Provide absolute behavior for the active subsystem.
 function absolute(value)
   if value < 0.0 then return -value end if
   return value
@@ -141,10 +153,12 @@ function V_CalcRoll(angles, velocity, rollAngle, rollSpeed)
   return side * sign
 end function
 
+// Provide calc roll behavior for the active subsystem.
 function calcRoll(angles, velocity, rollAngle, rollSpeed)
   return V_CalcRoll(angles, velocity, rollAngle, rollSpeed)
 end function
 
+// Mirror Quake's V_CalcBob routine and its observable state changes.
 function V_CalcBob(time, velocity, bobAmount, bobCycle, bobUp)
   if bobCycle <= 0.0 then return 0.0 end if
   if bobUp <= 0.0 then bobUp = 0.01 end if
@@ -164,10 +178,12 @@ function V_CalcBob(time, velocity, bobAmount, bobCycle, bobUp)
   return bob
 end function
 
+// Provide calc bob behavior for the active subsystem.
 function calcBob(time, velocity, bobAmount, bobCycle, bobUp)
   return V_CalcBob(time, velocity, bobAmount, bobCycle, bobUp)
 end function
 
+// Mirror Quake's V_StartPitchDrift routine and its observable state changes.
 function V_StartPitchDrift(state, clientTime, centerSpeed)
   if state.lastStop == clientTime then return state end if
   if state.noDrift or state.pitchVelocity == 0.0 then
@@ -178,6 +194,7 @@ function V_StartPitchDrift(state, clientTime, centerSpeed)
   return state
 end function
 
+// Mirror Quake's V_StopPitchDrift routine and its observable state changes.
 function V_StopPitchDrift(state, clientTime)
   state.lastStop = clientTime
   state.noDrift = true
@@ -185,6 +202,7 @@ function V_StopPitchDrift(state, clientTime)
   return state
 end function
 
+// Mirror Quake's V_DriftPitch routine and its observable state changes.
 function V_DriftPitch(state, viewAngles, idealPitch, forwardMove, forwardSpeed, frameTime, clientTime, centerMove, centerSpeed, noclipAngleHack, onGround, demoPlayback)
   if noclipAngleHack or not onGround or demoPlayback then
     state.driftMove = 0.0
@@ -216,6 +234,7 @@ function V_DriftPitch(state, viewAngles, idealPitch, forwardMove, forwardSpeed, 
   return viewAngles
 end function
 
+// Create and initialize gamma table.
 function BuildGammaTable(state, gamma)
   index = 0
   if gamma == 1.0 then
@@ -235,6 +254,7 @@ function BuildGammaTable(state, gamma)
   return state.gammaTable
 end function
 
+// Mirror Quake's V_CheckGamma routine and its observable state changes.
 function V_CheckGamma(state, gamma)
   if gamma == state.oldGamma then return false end if
   state.oldGamma = gamma
@@ -242,6 +262,7 @@ function V_CheckGamma(state, gamma)
   return true
 end function
 
+// Mirror Quake's V_ParseDamage routine and its observable state changes.
 function V_ParseDamage(state, armor, blood, source, entityOrigin, entityAngles, kickRoll, kickPitch, kickTime)
   count = blood * 0.5 + armor * 0.5
   if count < 10.0 then count = 10.0 end if
@@ -276,6 +297,7 @@ function V_ParseDamage(state, armor, blood, source, entityOrigin, entityAngles, 
   return state
 end function
 
+// Mirror Quake's V_cshift_f routine and its observable state changes.
 function V_cshift_f(state, arguments)
   // view.c uses atoi(Cmd_Argv(...)) for every component.  In particular,
   // decimal suffixes are truncated and malformed/empty values become zero;
@@ -293,11 +315,13 @@ function V_cshift_f(state, arguments)
   return state
 end function
 
+// Mirror Quake's V_BonusFlash_f routine and its observable state changes.
 function V_BonusFlash_f(state)
   state.cshifts[CSHIFT_BONUS] = [215.0, 186.0, 69.0, 50.0]
   return state
 end function
 
+// Mirror Quake's V_SetContentsColor routine and its observable state changes.
 function V_SetContentsColor(state, contents)
   if contents == c.CONTENTS_EMPTY or contents == c.CONTENTS_SOLID then
     state.cshifts[CSHIFT_CONTENTS] = [state.emptyCshift[0], state.emptyCshift[1], state.emptyCshift[2], state.emptyCshift[3]]
@@ -311,6 +335,7 @@ function V_SetContentsColor(state, contents)
   return state.cshifts[CSHIFT_CONTENTS]
 end function
 
+// Mirror Quake's V_CalcPowerupCshift routine and its observable state changes.
 function V_CalcPowerupCshift(state, items)
   if (items & c.IT_QUAD) != 0 then
     state.cshifts[CSHIFT_POWERUP] = [0.0, 0.0, 255.0, 30.0]
@@ -326,6 +351,7 @@ function V_CalcPowerupCshift(state, items)
   return state.cshifts[CSHIFT_POWERUP]
 end function
 
+// Mirror Quake's V_CalcBlend routine and its observable state changes.
 function V_CalcBlend(state, cshiftPercent)
   red = 0.0
   green = 0.0
@@ -354,6 +380,7 @@ end function
 // three gamma ramps so a diagnostic build can compare the software-palette
 // result without asking the platform bridge to own game policy.
 function V_UpdatePalette(state, items, frameTime, cshiftPercent, gamma)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   V_CalcPowerupCshift(state, items)
   changed = false
   shiftIndex = 0
@@ -399,12 +426,14 @@ function V_UpdatePalette(state, items, frameTime, cshiftPercent, gamma)
   return true
 end function
 
+// Provide angledelta behavior for the active subsystem.
 function angledelta(angle)
   angle = math.anglemod(angle)
   if angle > 180.0 then angle = angle - 360.0 end if
   return angle
 end function
 
+// Provide calc gun angle behavior for the active subsystem.
 function CalcGunAngle(state, clientTime, frameTime, idleScale, yawCycle, rollCycle, pitchCycle, yawLevel, rollLevel, pitchLevel)
   // view.c computes both deltas from the same r_refdef angles; retaining that
   // historical quirk makes the target angles zero and only eases old values.
@@ -432,6 +461,7 @@ function CalcGunAngle(state, clientTime, frameTime, idleScale, yawCycle, rollCyc
   return state.gunAngles
 end function
 
+// Mirror Quake's V_BoundOffsets routine and its observable state changes.
 function V_BoundOffsets(state, entityOrigin)
   if state.origin.x < entityOrigin.x - 14.0 then state.origin.x = entityOrigin.x - 14.0 end if
   if state.origin.x > entityOrigin.x + 14.0 then state.origin.x = entityOrigin.x + 14.0 end if
@@ -442,6 +472,7 @@ function V_BoundOffsets(state, entityOrigin)
   return state.origin
 end function
 
+// Mirror Quake's V_AddIdle routine and its observable state changes.
 function V_AddIdle(state, clientTime, idleScale, yawCycle, rollCycle, pitchCycle, yawLevel, rollLevel, pitchLevel)
   state.angles.z = state.angles.z + idleScale * math.sin(clientTime * rollCycle) * rollLevel
   state.angles.x = state.angles.x + idleScale * math.sin(clientTime * pitchCycle) * pitchLevel
@@ -449,6 +480,7 @@ function V_AddIdle(state, clientTime, idleScale, yawCycle, rollCycle, pitchCycle
   return state.angles
 end function
 
+// Mirror Quake's V_CalcViewRoll routine and its observable state changes.
 function V_CalcViewRoll(state, entityAngles, velocity, health, frameTime, rollAngle, rollSpeed, kickTime)
   side = V_CalcRoll(entityAngles, velocity, rollAngle, rollSpeed)
   state.roll = side
@@ -465,6 +497,7 @@ function V_CalcViewRoll(state, entityAngles, velocity, health, frameTime, rollAn
   return state.angles
 end function
 
+// Mirror Quake's V_CalcIntermissionRefdef routine and its observable state changes.
 function V_CalcIntermissionRefdef(state, player, clientTime, yawCycle, rollCycle, pitchCycle, yawLevel, rollLevel, pitchLevel)
   state.origin = math.copy(player.origin)
   state.angles = math.copy(player.renderAngles)
@@ -478,6 +511,7 @@ function V_CalcIntermissionRefdef(state, player, clientTime, yawCycle, rollCycle
   return state
 end function
 
+// Provide smooth stair step behavior for the active subsystem.
 function smoothStairStep(state, player, frameTime)
   if not state.oldZValid then
     state.oldZ = player.origin.z
@@ -496,6 +530,7 @@ function smoothStairStep(state, player, frameTime)
   return 0.0
 end function
 
+// Mirror Quake's V_CalcRefdef routine and its observable state changes.
 function V_CalcRefdef(state, player, viewAngles, idealPitch, forwardMove, forwardSpeed, clientTime, frameTime, stepFrameTime, demoPlayback, registry)
   opt001dCvarVIpitchLevel = cvar.variableValue(registry, "v_ipitch_level")
   opt001dCvarVIrollLevel = cvar.variableValue(registry, "v_iroll_level")
@@ -610,6 +645,7 @@ function V_CalcRefdef(state, player, viewAngles, idealPitch, forwardMove, forwar
   return state
 end function
 
+// Mirror Quake's V_RenderView routine and its observable state changes.
 function V_RenderView(state, player, client, registry, frameTime, paused, demoPlayback, intermission, forcedConsole)
   state.commandTrace = []
   if forcedConsole then return state end if
@@ -671,10 +707,12 @@ function V_RenderView(state, player, client, registry, frameTime, paused, demoPl
   return state
 end function
 
+// Mirror Quake's V_CommandTrace routine and its observable state changes.
 function V_CommandTrace(state)
   return state.commandTrace
 end function
 
+// Mirror Quake's V_Init routine and its observable state changes.
 function V_Init(state)
   state.commandTrace = [
     ["Cmd_AddCommand", "v_cshift"],
@@ -719,6 +757,7 @@ function addDamage(state, count, fromDirection, viewAngles, kickRoll, kickPitch,
   return state
 end function
 
+// Provide decay damage behavior for the active subsystem.
 function decayDamage(state, frameTime, kickTime)
   state.damageTime = state.damageTime - frameTime
   if state.damageTime < 0.0 then state.damageTime = 0.0 end if
@@ -730,6 +769,7 @@ function decayDamage(state, frameTime, kickTime)
   return state
 end function
 
+// Compute the requested value.
 function calculate(state, player, cameraAngles, clientTime, frameTime, bobAmount, bobCycle, bobUp, rollAngle, rollSpeed, kickTime)
   state.bob = V_CalcBob(clientTime, player.velocity, bobAmount, bobCycle, bobUp)
   state.roll = V_CalcRoll(cameraAngles, player.velocity, rollAngle, rollSpeed)

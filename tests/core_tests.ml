@@ -1,17 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See COPYING.
+MiniLang parity and regression tests for tests/core_tests.ml.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.crc as crc
@@ -48,16 +41,19 @@ import miniquake.render.gl_rlight as glRlight
 import miniquake.render.draw2d as draw2d
 import miniquake.screen as screenCompat
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9000, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9001, name + ": expected true") end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function assertNear(actual, expected, tolerance, name)
   difference = actual - expected
   if difference < 0 then difference = -difference end if
@@ -67,19 +63,23 @@ function assertNear(actual, expected, tolerance, name)
   return true
 end function
 
+// Report whether command never exists holds for the active state.
 function commandNeverExists(name)
   return false
 end function
 
+// Return command argument count derived from the active module state.
 function commandArgumentCount(arguments)
   return len(arguments)
 end function
 
+// Verify crc against the expected Quake behavior.
 function testCrc()
   assertEqual(crc.block(bytes("123456789"), 0, 9), 0x29b1, "CRC-CCITT")
   return true
 end function
 
+// Verify byte io against the expected Quake behavior.
 function testByteIo()
   print "  [02.01] allocate bytes"
   data = bytes(16)
@@ -158,6 +158,7 @@ function testByteIo()
   return true
 end function
 
+// Verify message against the expected Quake behavior.
 function testMessage()
   buffer = sz.alloc(256)
   msg.writeByte(buffer, 200)
@@ -213,6 +214,7 @@ function testMessage()
   return true
 end function
 
+// Verify math against the expected Quake behavior.
 function testMath()
   a = t.Vec3(1.0, 2.0, 3.0)
   b = t.Vec3(4.0, 5.0, 6.0)
@@ -226,7 +228,9 @@ function testMath()
   return true
 end function
 
+// Verify cvar against the expected Quake behavior.
 function testCvar()
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   assertEqual(common.atoi("0x10"), 16, "Q_atoi hexadecimal")
   assertEqual(common.atoi("-'A"), -65, "Q_atoi character literal")
   assertEqual(common.atoi("12tail"), 12, "Q_atoi stops at suffix")
@@ -325,6 +329,7 @@ function testCvar()
   return true
 end function
 
+// Create and initialize synthetic pack.
 function makeSyntheticPack()
   data = bytes(12 + 5 + 64)
   data[0] = 80; data[1] = 65; data[2] = 67; data[3] = 75
@@ -339,6 +344,7 @@ function makeSyntheticPack()
   return data
 end function
 
+// Verify pack against the expected Quake behavior.
 function testPack()
   archive = pak.parse(makeSyntheticPack(), "synthetic.pak")
   assertEqual(archive.numFiles, 1, "pack count")
@@ -358,6 +364,7 @@ function testPack()
   return true
 end function
 
+// Create and initialize synthetic wad.
 function makeSyntheticWad()
   data = bytes(12 + 8 + 32)
   data[0] = 87; data[1] = 65; data[2] = 68; data[3] = 50
@@ -374,6 +381,7 @@ function makeSyntheticWad()
   return data
 end function
 
+// Verify wad against the expected Quake behavior.
 function testWad()
   wadData = makeSyntheticWad()
   archive = wad.parse(wadData, "synthetic.wad")
@@ -397,6 +405,7 @@ function testWad()
   return true
 end function
 
+// Verify loopback against the expected Quake behavior.
 function testLoopback()
   state = netloop.createState()
   client = netloop.connect(state, "local")
@@ -412,6 +421,7 @@ function testLoopback()
   return true
 end function
 
+// Verify memory lifetimes against the expected Quake behavior.
 function testMemoryLifetimes()
   state = memory.create(256)
   mark = memory.lowMark(state)
@@ -441,6 +451,7 @@ function testMemoryLifetimes()
   return true
 end function
 
+// Verify box hull against the expected Quake behavior.
 function testBoxHull()
   box = hull.createBoxHull(t.Vec3(-1.0, -2.0, -3.0), t.Vec3(1.0, 2.0, 3.0))
   assertEqual(hull.truePointContents(box, t.Vec3(0.0, 0.0, 0.0)), c.CONTENTS_SOLID, "box interior")
@@ -452,6 +463,7 @@ function testBoxHull()
   return true
 end function
 
+// Verify bsp entity and pvs against the expected Quake behavior.
 function testBspEntityAndPvs()
   entities = bsp.parseEntities("{\n\"classname\" \"worldspawn\"\n\"origin\" \"1 2 3\"\n}\n")
   assertEqual(len(entities), 1, "entity count")
@@ -479,6 +491,7 @@ function testBspEntityAndPvs()
     t.BspTexture("+Bfixture", 16, 16, [40, 296, 360, 376], bytes(256)),
   ]
   animation = bsp.sequenceTextureAnimations(textures)
+  assertEqual(nativeRawValue(bsp.sequenceTextureAnimations(textures)), nativeRawValue(animation), "texture animation table cache")
   assertEqual(animation[0][0], 4, "texture animation total")
   assertEqual(animation[0][3], 1, "texture animation next link")
   assertEqual(animation[0][4], 2, "texture animation alternate link")
@@ -570,9 +583,15 @@ function testBspEntityAndPvs()
   assertEqual(len(leafPvs), 2, "PVS row ceiling bytes")
   assertEqual(leafPvs[0], 0, "PVS row zero byte 0")
   assertEqual(leafPvs[1], 0, "PVS row zero byte 1")
+  assertTrue(bsp.validLeafVisibilityOffset(-1, 0), "BSP29 no-PVS sentinel")
+  assertTrue(bsp.validLeafVisibilityOffset(0, 0), "external BSP accepts empty VIS at offset zero")
+  assertTrue(not bsp.validLeafVisibilityOffset(1, 0), "empty VIS rejects non-zero offset")
+  assertTrue(bsp.validLeafVisibilityOffset(1, 2), "non-empty VIS accepts in-range offset")
+  assertTrue(not bsp.validLeafVisibilityOffset(2, 2), "non-empty VIS rejects end offset")
   return true
 end function
 
+// Create and initialize synthetic wav.
 function makeSyntheticWav()
   data = bytes(48)
   bio.copyInto(data, 0, bytes("RIFF"), 0, 4)
@@ -596,6 +615,7 @@ function makeSyntheticWav()
 end function
 
 
+// Create and initialize looped synthetic wav.
 function makeLoopedSyntheticWav()
   data = bytes(122)
   bio.copyInto(data, 0, bytes("RIFF"), 0, 4)
@@ -630,6 +650,7 @@ function makeLoopedSyntheticWav()
   return data
 end function
 
+// Verify wave against the expected Quake behavior.
 function testWave()
   data = makeSyntheticWav()
   info = wav.parse(data, "synthetic.wav")
@@ -652,6 +673,7 @@ function testWave()
   return true
 end function
 
+// Verify demo roundtrip against the expected Quake behavior.
 function testDemoRoundtrip()
   recording = t.Demo(-1, [
     t.DemoMessage(t.Vec3(10.0, 20.0, 30.0), bytes("abc")),
@@ -667,6 +689,7 @@ function testDemoRoundtrip()
   return true
 end function
 
+// Verify server protocol against the expected Quake behavior.
 function testServerProtocol()
   buffer = sz.alloc(256)
   msg.writeByte(buffer, c.SVC_VERSION)
@@ -689,6 +712,7 @@ function testServerProtocol()
 end function
 
 
+// Create and initialize large synthetic progs.
 function makeLargeSyntheticProgs(statementCount)
   sectionEnd = 60 + statementCount * 8
   // dprograms_t requires the first string-table byte to be the empty string.
@@ -714,11 +738,13 @@ function makeLargeSyntheticProgs(statementCount)
   return data
 end function
 
+// Exercise reentrant execute builtin as part of this deterministic regression fixture.
 function reentrantExecuteBuiltin(machine)
   vm.execute(machine, 2)
   return true
 end function
 
+// Verify quake carithmetic against the expected Quake behavior.
 function testQuakeCArithmetic()
   statements = [
     t.QuakeCStatement(op.OP_ADD_F, 30, 31, 32),
@@ -891,6 +917,22 @@ function testQuakeCArithmetic()
   aliasBounds = qcb.modelBounds(semanticMachine, "progs/player.mdl")
   assertEqual(aliasBounds[0].x, -16.0, "MiniQuake alias model minimum bound")
   assertEqual(aliasBounds[1].z, 16.0, "MiniQuake alias model maximum bound")
+  brushHeaderSize = 4 + c.HEADER_LUMPS * 8
+  brushData = bytes(brushHeaderSize + 64)
+  bio.putI32(brushData, 0, c.BSP_VERSION)
+  bio.putI32(brushData, 4 + c.LUMP_MODELS * 8, brushHeaderSize)
+  bio.putI32(brushData, 8 + c.LUMP_MODELS * 8, 64)
+  bio.putF32(brushData, brushHeaderSize, 0.0)
+  bio.putF32(brushData, brushHeaderSize + 4, -16.0)
+  bio.putF32(brushData, brushHeaderSize + 8, -24.0)
+  bio.putF32(brushData, brushHeaderSize + 12, 32.0)
+  bio.putF32(brushData, brushHeaderSize + 16, 16.0)
+  bio.putF32(brushData, brushHeaderSize + 20, 40.0)
+  brushBounds = qcb.brushModelBounds(brushData, "maps/fixture.bsp")
+  assertEqual(brushBounds[0].x, -1.0, "QuakeC external BSP expanded minimum x")
+  assertEqual(brushBounds[0].z, -25.0, "QuakeC external BSP expanded minimum z")
+  assertEqual(brushBounds[1].x, 33.0, "QuakeC external BSP expanded maximum x")
+  assertEqual(brushBounds[1].z, 41.0, "QuakeC external BSP expanded maximum z")
   assertEqual(vm.PR_PrintStatement(branchMachine, branchStatements[0]), "IF         40(???)              branch 2", "PR_PrintStatement branch fixture")
   assertEqual(vm.PR_StackTrace(branchMachine)[0], "<NO STACK>", "PR_StackTrace empty fixture")
   profileLines = vm.PR_Profile_f(reentrantMachine)
@@ -921,6 +963,7 @@ function testQuakeCArithmetic()
   return true
 end function
 
+// Verify gl warp and rlight parity against the expected Quake behavior.
 function testGlWarpAndRlightParity()
   drawPalette = bytes(768)
   paletteIndex = 0
@@ -1119,7 +1162,9 @@ function testGlWarpAndRlightParity()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   passed = 0
   print "MiniQuake core tests starting: 16"
 

@@ -1,21 +1,30 @@
-/* BP-048: deterministic framebuffer evidence and TGA contract. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+BP-048: deterministic framebuffer evidence and TGA contract.
+*/
 import miniquake.render_evidence as evidence
 import miniquake.screen as screen
 
+// Assert exact equality and report both values on failure.
 function bp048Equal(actual, expected, name)
   if actual != expected then return error(4800, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
+// Assert that the condition holds and identify a failing test.
 function bp048Yes(value, name)
   if not value then return error(4801, name + ": expected true") end if
   return true
 end function
+// Execute one named test case and record its pass/fail result.
 function bp048Run(number, name, fn)
   print "[" + number + "/18] " + name
   result = try(fn())
   if result is error then print "FAIL: " + result.message; return false end if
   return true
 end function
+// Build deterministic test data for pixels.
 function fixturePixels()
   return bytes([
     0, 0, 0, 255,
@@ -24,18 +33,22 @@ function fixturePixels()
     0, 0, 255, 255,
   ])
 end function
+// Exercise the empty hash test scenario and verify its expected result.
 function bp048EmptyHash()
   bp048Equal(evidence.hashBytes(bytes()), 2166136261, "empty FNV")
   return true
 end function
+// Exercise the known hash test scenario and verify its expected result.
 function bp048KnownHash()
   bp048Equal(evidence.hashBytes(bytes("123456789")), 3146166556, "known FNV")
   return true
 end function
+// Exercise the pixel hash test scenario and verify its expected result.
 function bp048PixelHash()
   bp048Equal(evidence.hashBytes(fixturePixels()), evidence.hashBytes(fixturePixels()), "pixel hash stable")
   return true
 end function
+// Exercise the pixel mutation test scenario and verify its expected result.
 function bp048PixelMutation()
   first = fixturePixels()
   second = fixturePixels()
@@ -43,10 +56,12 @@ function bp048PixelMutation()
   bp048Yes(evidence.hashBytes(first) != evidence.hashBytes(second), "pixel mutation")
   return true
 end function
+// Build deterministic test data for stable.
 function bp048SampleStable()
   bp048Equal(evidence.samplePixelHash(fixturePixels(), 2, 2, 2), evidence.samplePixelHash(fixturePixels(), 2, 2, 2), "sample stable")
   return true
 end function
+// Build deterministic test data for mutation.
 function bp048SampleMutation()
   first = fixturePixels()
   second = fixturePixels()
@@ -54,22 +69,27 @@ function bp048SampleMutation()
   bp048Yes(evidence.samplePixelHash(first, 2, 2, 2) != evidence.samplePixelHash(second, 2, 2, 2), "sample mutation")
   return true
 end function
+// Exercise the black count test scenario and verify its expected result.
 function bp048BlackCount()
   bp048Equal(evidence.nonBlackPixels(bytes([0,0,0,255,0,0,0,0])), 0, "black count")
   return true
 end function
+// Exercise the color count test scenario and verify its expected result.
 function bp048ColorCount()
   bp048Equal(evidence.nonBlackPixels(fixturePixels()), 3, "color count")
   return true
 end function
+// Exercise the tga path test scenario and verify its expected result.
 function bp048TgaPath()
   bp048Equal(evidence.tgaPath("build/frame"), "build/frame.tga", "TGA path")
   return true
 end function
+// Exercise the summary path test scenario and verify its expected result.
 function bp048SummaryPath()
   bp048Equal(evidence.summaryPath("build/frame"), "build/frame-summary.json", "summary path")
   return true
 end function
+// Exercise the configure test scenario and verify its expected result.
 function bp048Configure()
   evidence.reset()
   configured = try(evidence.configure("build/frame", 7))
@@ -77,6 +97,7 @@ function bp048Configure()
   bp048Yes(evidence.shouldCapture(7), "capture target")
   return true
 end function
+// Exercise the before target test scenario and verify its expected result.
 function bp048BeforeTarget()
   evidence.reset()
   configured = try(evidence.configure("build/frame", 7))
@@ -84,16 +105,19 @@ function bp048BeforeTarget()
   bp048Equal(evidence.shouldCapture(6), false, "before target")
   return true
 end function
+// Update module state for the requested value.
 function bp048Reset()
   evidence.reset()
   bp048Equal(evidence.shouldCapture(999), false, "reset")
   return true
 end function
+// Exercise the invalid frame test scenario and verify its expected result.
 function bp048InvalidFrame()
   result = try(evidence.configure("build/frame", 0))
   bp048Equal(typeof(result), "error", "invalid frame")
   return true
 end function
+// Exercise the summary schema test scenario and verify its expected result.
 function bp048SummarySchema()
   text = evidence.summaryJson(7, 2, 2, 16, 30, 1, 2, 3, 3, "frame.tga")
   encoded = bytes(text)
@@ -104,12 +128,14 @@ function bp048SummarySchema()
   bp048Equal(encoded[len(encoded) - 1], 10, "summary newline")
   return true
 end function
+// Exercise the tga length test scenario and verify its expected result.
 function bp048TgaLength()
   tga = try(screen.BuildTga(2, 2, fixturePixels()))
   if tga is error then return tga end if
   bp048Equal(len(tga), 30, "TGA byte length")
   return true
 end function
+// Exercise the tga header test scenario and verify its expected result.
 function bp048TgaHeader()
   tga = try(screen.BuildTga(2, 2, fixturePixels()))
   if tga is error then return tga end if
@@ -117,6 +143,7 @@ function bp048TgaHeader()
   bp048Equal(tga[16], 24, "TGA depth")
   return true
 end function
+// Exercise the grid constant test scenario and verify its expected result.
 function bp048GridConstant()
   bp048Equal(evidence.SAMPLE_GRID, 16, "sample grid")
   return true

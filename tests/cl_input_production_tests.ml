@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/cl_input_production_tests.ml.
+*/
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.input as input
@@ -7,16 +13,19 @@ import miniquake.net_main as netmain
 import miniquake.sizebuf as sz
 import miniquake.message as msg
 
+// Assert that the condition holds and identify a failing test.
 function require(value, name)
   if not value then return error(9880, name) end if
   return true
 end function
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(9881, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Create and initialize without devices.
 function buildWithoutDevices(command, signon, noclip)
   return input.buildOriginalMove(
     command, signon, 20.0,
@@ -26,6 +35,7 @@ function buildWithoutDevices(command, signon, noclip)
   )
 end function
 
+// Verify demo consumes without network against the expected Quake behavior.
 function testDemoConsumesWithoutNetwork()
   input.IN_ClearStates()
   demoClient = client.create(void)
@@ -53,6 +63,7 @@ function testDemoConsumesWithoutNetwork()
   return true
 end function
 
+// Verify ui destination still builds move against the expected Quake behavior.
 function testUiDestinationStillBuildsMove()
   input.IN_ClearStates()
   network = netloop.createState()
@@ -85,6 +96,7 @@ function testUiDestinationStillBuildsMove()
   return true
 end function
 
+// Verify noclip strafe vertical mouse against the expected Quake behavior.
 function testNoclipStrafeVerticalMouse()
   input.IN_ClearStates()
   input.inStrafe[2] = 1
@@ -95,16 +107,98 @@ function testNoclipStrafeVerticalMouse()
   return true
 end function
 
+// Verify backward move keeps signed wire value against the expected Quake behavior.
+function testBackwardMoveKeepsSignedWireValue()
+  input.IN_ClearStates()
+  input.inBack[2] = 1
+  command = input.createCommand()
+  buildWithoutDevices(command, c.SIGNONS, false)
+  equal(command.forwardMove, -200.0, "held back command")
+
+  network = netloop.createState()
+  wireClient = netloop.Loop_Connect(network, "local")
+  wireServer = netloop.Loop_CheckNewConnections(network)
+  localClient = client.create(void)
+  localClient.connected = true
+  localClient.spawned = true
+  localClient.signon = c.SIGNONS
+  localClient.socket = wireClient
+  client.CL_SetMoveMessageCount(2)
+  equal(client.CL_SendMove(localClient, command), 1, "backward move sent")
+
+  incoming = sz.alloc(c.MAX_MSGLEN)
+  equal(netmain.NET_GetMessage(wireServer, incoming, 300.0), 2, "backward wire type")
+  reader = msg.beginReading(incoming)
+  equal(msg.readByte(reader), c.CLC_MOVE, "backward move opcode")
+  msg.readFloat(reader)
+  msg.readAngle(reader); msg.readAngle(reader); msg.readAngle(reader)
+  equal(msg.readShort(reader), -200, "backward signed wire value")
+  netloop.Loop_Close(wireClient)
+  input.IN_ClearStates()
+  return true
+end function
+
+// Verify gameplay transition consumes queued actions against the expected Quake behavior.
+function testGameplayTransitionConsumesQueuedActions()
+  input.IN_ClearStates()
+  input.IN_AttackDown(200)
+  input.IN_JumpDown(32)
+  input.IN_Impulse(7)
+  input.IN_BlockGameplayTransition()
+  require(input.IN_GameplayTransitionBlocked(), "transition latch armed")
+  equal(input.inAttack[2], 0, "transition clears attack")
+  equal(input.inJump[2], 0, "transition clears jump")
+  equal(input.inImpulse, 0, "transition clears impulse")
+  require(input.IN_ReleaseGameplayTransitionIfNeutral(), "neutral transition release")
+  require(not input.IN_GameplayTransitionBlocked(), "transition latch released")
+  return true
+end function
+
+// Verify gameplay transition ignores new movement against the expected Quake behavior.
+function testGameplayTransitionIgnoresNewMovement()
+  input.IN_ClearStates()
+  input.setBindingCode(203, "+forward")
+  input.setBindingCode(204, "+back")
+  axes = [32768, 32768, 32768, 32768, 32768, 32768]
+  input.setJoystickSnapshot(axes, 1, 65535, 2, false)
+  input.IN_Commands()
+  input.IN_BlockGameplayTransition()
+  require(input.IN_GameplayTransitionControlHeld(), "captured forward control holds transition")
+
+  // Back is pressed only after the transition began. Once the originally held
+  // forward control is released, this new movement must not keep input blocked.
+  input.updateJoystickSnapshot(axes, 3, 65535)
+  input.IN_Commands()
+  require(input.IN_GameplayTransitionControlHeld(), "original control remains held")
+  input.updateJoystickSnapshot(axes, 2, 65535)
+  input.IN_Commands()
+  require(not input.IN_GameplayTransitionControlHeld(), "new back input does not extend transition")
+  require(input.IN_ReleaseGameplayTransitionIfNeutral(), "transition releases with new movement held")
+  input.clearJoystickSnapshot()
+  input.IN_ClearStates()
+  return true
+end function
+
+// Parse command-line arguments and run the selected operation.
 function main(args)
   result = try(testDemoConsumesWithoutNetwork())
   if result is error then print "FAIL demo input consumption: " + result.message; return 1 end if
-  print "[1/3] demo command snapshot / edge consumption"
+  print "[1/6] demo command snapshot / edge consumption"
   result = try(testUiDestinationStillBuildsMove())
   if result is error then print "FAIL UI input consumption: " + result.message; return 1 end if
-  print "[2/3] console/menu held move / edge consumption"
+  print "[2/6] console/menu held move / edge consumption"
   result = try(testNoclipStrafeVerticalMouse())
   if result is error then print "FAIL noclip mouse branch: " + result.message; return 1 end if
-  print "[3/3] noclip strafe vertical mouse"
-  print "CL_INPUT PRODUCTION TESTS PASSED (3/3)"
+  print "[3/6] noclip strafe vertical mouse"
+  result = try(testBackwardMoveKeepsSignedWireValue())
+  if result is error then print "FAIL backward input/wire path: " + result.message; return 1 end if
+  print "[4/6] backward input / signed Protocol 15 move"
+  result = try(testGameplayTransitionConsumesQueuedActions())
+  if result is error then print "FAIL gameplay-transition input gate: " + result.message; return 1 end if
+  print "[5/6] menu/map transition input gate"
+  result = try(testGameplayTransitionIgnoresNewMovement())
+  if result is error then print "FAIL gameplay-transition movement snapshot: " + result.message; return 1 end if
+  print "[6/6] post-transition movement cannot extend input gate"
+  print "CL_INPUT PRODUCTION TESTS PASSED (6/6)"
   return 0
 end function

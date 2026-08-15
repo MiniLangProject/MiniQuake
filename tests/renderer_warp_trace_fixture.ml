@@ -1,26 +1,32 @@
 /*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
 Deterministic MiniLang side of the original gl_warp.c differential oracle.
 */
-
 import miniquake.render.gl_warp as warp
 import miniquake.types as t
 import miniquake.native as native
 import std.string as string
 
+// Add the requested value to the destination state.
 function emit(scene, functionName, sequence, operation, arguments)
   print "{\"schema\":\"miniquake.renderer.gl.v1\",\"scene\":\"" + scene + "\",\"function\":\"" + functionName + "\",\"seq\":" + sequence + ",\"op\":\"" + operation + "\",\"args\":" + arguments + "}"
 end function
 
+// Return json number derived from the active module state.
 function jsonNumber(value)
   integerValue = native.trunc(value)
   if value == integerValue then return "" + integerValue end if
   return string.replaceAll("" + value, ".e", "e")
 end function
 
+// Exercise vec arguments as part of this deterministic regression fixture.
 function vecArguments(vector)
   return jsonNumber(vector.x) + "," + jsonNumber(vector.y) + "," + jsonNumber(vector.z)
 end function
 
+// Trace polygons through the collision world.
 function tracePolygons(scene, functionName, polygons)
   polygonIndex = 0
   while polygonIndex < len(polygons)
@@ -37,6 +43,7 @@ function tracePolygons(scene, functionName, polygons)
   end while
 end function
 
+// Exercise quad as part of this deterministic regression fixture.
 function quad(z)
   return [
     t.RenderVertex(t.Vec3(-64.0, -32.0, z), 0.0, 0.0, 0.0, 0.0),
@@ -46,6 +53,7 @@ function quad(z)
   ]
 end function
 
+// Trace warp commands through the collision world.
 function traceWarpCommands(scene, functionName, polygons)
   sequence = 0
   for each polygon in polygons
@@ -63,6 +71,7 @@ function traceWarpCommands(scene, functionName, polygons)
   return sequence
 end function
 
+// Trace bound poly through the collision world.
 function traceBoundPoly()
   vertices = [
     t.RenderVertex(t.Vec3(-7.0, 4.0, 11.0), 0.0, 0.0, 0.0, 0.0),
@@ -74,6 +83,7 @@ function traceBoundPoly()
   emit("warp_bound_poly", "BoundPoly", 0, "bounds", "[" + vecArguments(bounds[0]) + "," + vecArguments(bounds[1]) + "]")
 end function
 
+// Trace subdivide polygon through the collision world.
 function traceSubdividePolygon()
   vertices = [
     t.RenderVertex(t.Vec3(-64.0, -64.0, 0.0), -64.0, -64.0, 0.0, 0.0),
@@ -84,6 +94,7 @@ function traceSubdividePolygon()
   tracePolygons("warp_subdivide_polygon", "SubdividePolygon", warp.SubdividePolygon(vertices, 128.0))
 end function
 
+// Trace subdivide surface through the collision world.
 function traceSubdivideSurface()
   vertices = [
     t.RenderVertex(t.Vec3(-64.0, -64.0, 0.0), 0.0, 0.0, 0.0, 0.0),
@@ -95,16 +106,19 @@ function traceSubdivideSurface()
   tracePolygons("warp_gl_subdivide_surface", "GL_SubdivideSurface", polygons)
 end function
 
+// Trace water through the collision world.
 function traceWater()
   commands = warp.EmitWaterPolys([quad(16.0)], 0.25)
   traceWarpCommands("warp_emit_water", "EmitWaterPolys", commands)
 end function
 
+// Trace sky through the collision world.
 function traceSky()
   commands = warp.EmitSkyPolys([quad(16.0)], t.Vec3(3.0, -2.0, 1.0), 17.0)
   traceWarpCommands("warp_emit_sky", "EmitSkyPolys", commands)
 end function
 
+// Trace both sky layers through the collision world.
 function traceBothSkyLayers()
   scene = "warp_both_sky_layers"
   functionName = "EmitBothSkyLayers"
@@ -123,6 +137,7 @@ function traceBothSkyLayers()
   emit(scene, functionName, sequence, "disable", "[3042]")
 end function
 
+// Trace warp commands offset through the collision world.
 function traceWarpCommandsOffset(scene, functionName, polygonGroups, firstSequence)
   sequence = firstSequence
   for each polygons in polygonGroups
@@ -142,6 +157,7 @@ function traceWarpCommandsOffset(scene, functionName, polygonGroups, firstSequen
   return sequence - firstSequence
 end function
 
+// Trace sky chain through the collision world.
 function traceSkyChain()
   scene = "warp_draw_sky_chain"
   functionName = "R_DrawSkyChain"
@@ -160,6 +176,7 @@ function traceSkyChain()
   emit(scene, functionName, sequence, "disable", "[3042]")
 end function
 
+// Exercise fnv1a as part of this deterministic regression fixture.
 function fnv1a(data)
   hash = 2166136261
   index = 0
@@ -170,6 +187,7 @@ function fnv1a(data)
   return hash
 end function
 
+// Trace init sky through the collision world.
 function traceInitSky()
   palette = bytes(768)
   index = 0
@@ -205,6 +223,7 @@ function traceInitSky()
   emit(scene, functionName, 7, "texture_parameter", "[3553,10240,9729]")
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   traceBoundPoly()
   traceSubdividePolygon()

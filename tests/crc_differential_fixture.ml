@@ -1,5 +1,12 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/crc_differential_fixture.ml.
+*/
 import miniquake.crc as crcPort
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   value = crcPort.CRC_Init()
   print "{\"function\":\"CRC_Init\",\"case\":\"initial\",\"value\":" + value + "}"

@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/sbar_differential_fixture.ml.
+*/
 import miniquake.statusbar as sbar
 import miniquake.render.draw2d as draw
 import miniquake.render.gl11 as gl
@@ -8,10 +14,12 @@ import miniquake.player_move as player_move
 import miniquake.array_util as arrayutil
 import miniquake.native as native
 
+// Return fnv byte derived from the active module state.
 function inline fnvByte(hash, value)
   return ((hash ^ (value & 255)) * 16777619) & 4294967295
 end function
 
+// Fold int into the deterministic rolling hash.
 function hashInt(hash, value)
   number = native.trunc(value)
   index = 0
@@ -22,6 +30,7 @@ function hashInt(hash, value)
   return hash
 end function
 
+// Fold string into the deterministic rolling hash.
 function hashString(hash, value)
   data = bytes(value)
   for each item in data
@@ -30,7 +39,9 @@ function hashString(hash, value)
   return fnvByte(hash, 0)
 end function
 
+// Fold commands into the deterministic rolling hash.
 function hashCommands(commands)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   hash = 2166136261
   calls = 0
   for each command in commands
@@ -74,6 +85,7 @@ function hashCommands(commands)
   return [calls, hash]
 end function
 
+// Fold names into the deterministic rolling hash.
 function hashNames(names)
   hash = 2166136261
   for each name in names
@@ -82,11 +94,13 @@ function hashNames(names)
   return hash
 end function
 
+// Add ops to the destination state.
 function emitOps(functionName, scene)
   result = hashCommands(sbar.Sbar_CommandTrace())
   print "{\"function\":\"" + functionName + "\",\"scene\":\"" + scene + "\",\"calls\":" + result[0] + ",\"hash\":" + result[1] + "}"
 end function
 
+// Exercise palette as part of this deterministic regression fixture.
 function palette()
   result = bytes(768)
   index = 0
@@ -97,12 +111,14 @@ function palette()
   return result
 end function
 
+// Build deterministic test data for picture.
 function fixturePicture(name, width)
   value = t.MenuPicture(name, width, 24, 10 + width)
   draw.registerDrawPicture(value, [0.0, 0.0, 1.0, 1.0], bytes(width * 24))
   return value
 end function
 
+// Add picture to the destination state.
 function addPicture(pictures, name)
   width = 24
   if name == "gfx/ranking.lmp" then width = 160 end if
@@ -112,7 +128,9 @@ function addPicture(pictures, name)
   return pictures + [fixturePicture(name, width)]
 end function
 
+// Create and initialize pictures.
 function makePictures()
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   names = []
   index = 0
   while index < 10
@@ -173,6 +191,7 @@ function makePictures()
   return pictures
 end function
 
+// Create and initialize player.
 function makePlayer()
   player = player_move.create(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
   player.health = 75
@@ -187,6 +206,7 @@ function makePlayer()
   return player
 end function
 
+// Create and initialize client.
 function makeClient(player)
   state = client.create(player)
   state.maxClients = 5
@@ -224,6 +244,7 @@ function makeClient(player)
   return state
 end function
 
+// Update subsystem configuration for configure.
 function configure(pictures, player, state)
   sbar.Sbar_Configure(void, 1, player, state, 640, 480, 48, 0.0)
   sbar.Sbar_SetFrameState(0.0, 3)
@@ -231,16 +252,19 @@ function configure(pictures, player, state)
   return true
 end function
 
+// Update module state for trace.
 function resetTrace()
   gl.Trace_Begin()
   sbar.Sbar_DifferentialClearTrace()
 end function
 
+// Finalize state for trace.
 function finishTrace()
   gl.Trace_End()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   pal = palette()
   draw.Draw_DifferentialReset(pal)

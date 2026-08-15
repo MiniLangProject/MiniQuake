@@ -1,32 +1,43 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/sys_win_differential_fixture.ml.
+*/
 import miniquake.sys_win as system
 import miniquake.native as native
 import std.fs as fs
 
 runnerCalls = 0
 
+// Exercise bool int as part of this deterministic regression fixture.
 function boolInt(value)
   if value then return 1 end if
   return 0
 end function
 
+// Add the requested value to the destination state.
 function emit(functionName, caseName, result, index, value, count)
   print "{\"function\":\"" + functionName + "\",\"case\":\"" + caseName +
     "\",\"result\":" + result + ",\"index\":" + index +
     ",\"value\":" + value + ",\"count\":" + count + "}"
 end function
 
+// Return use state derived from the active module state.
 function useState()
   state = system.Sys_CreateState(false)
   system.Sys_UseState(state)
   return state
 end function
 
+// Exercise runner as part of this deterministic regression fixture.
 function runner(arguments)
   global runnerCalls
   runnerCalls = runnerCalls + 1
   return 1
 end function
 
+// Report mode and return the corresponding failure status.
 function errorMode(mode)
   state = useState()
   result = void
@@ -49,7 +60,9 @@ function errorMode(mode)
   return 0
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   if len(args) > 0 then return errorMode(args[0]) end if
 
   state = useState()

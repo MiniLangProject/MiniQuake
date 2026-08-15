@@ -1,19 +1,27 @@
-/* BP-083 corpus runtime entry. main(args) must remain in the global package. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+BP-083 corpus runtime entry. main(args) must remain in the global package.
+*/
 import miniquake.black_port_corpus as corpus
 
 bp083Failures = 0
 bp083Checks = 0
 
+// Assert that the condition holds and identify a failing test.
 function bp083Check(condition, label)
   global bp083Failures, bp083Checks
   bp083Checks = bp083Checks + 1
   if not condition then bp083Failures = bp083Failures + 1; print "FAIL: " + label end if
 end function
 
+// Assert exact equality and report both values on failure.
 function bp083Equal(actual, expected, label)
   bp083Check(actual == expected, label + ": expected " + expected + ", got " + actual)
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   global bp083Failures, bp083Checks
   scenarios = corpus.scenarios()

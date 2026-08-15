@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.sound.snd_mem.
+*/
 package miniquake.sound.snd_mem
 
 import miniquake.types as t
@@ -33,19 +40,23 @@ struct ChunkCursor
   chunkLength
 end struct
 
+// Provide empty wave info behavior for the active subsystem.
 function emptyWaveInfo()
   return t.WaveInfo(0, 0, 0, 0, 0, 0, 0)
 end function
 
+// Apply the Quake-compatible s alloc behavior.
 function S_Alloc(size)
   if size < 0 then return error(2450, "S_Alloc: negative size") end if
   return bytes(size)
 end function
 
+// Create and initialize descriptor.
 function createDescriptor(name)
   return SoundDescriptor(name, void)
 end function
 
+// Create and initialize cursor.
 function createCursor(data, length)
   if data is void then data = bytes() end if
   if length < 0 then length = 0 end if
@@ -53,6 +64,7 @@ function createCursor(data, length)
   return ChunkCursor(data, length, 0, 0, 0, 0)
 end function
 
+// Return little short.
 function GetLittleShort(cursor)
   if cursor.position < 0 or cursor.position + 2 > cursor.endOffset then
     return error(2451, "GetLittleShort: read past WAVE data")
@@ -63,6 +75,7 @@ function GetLittleShort(cursor)
   return value
 end function
 
+// Return little long.
 function GetLittleLong(cursor)
   if cursor.position < 0 or cursor.position + 4 > cursor.endOffset then
     return error(2452, "GetLittleLong: read past WAVE data")
@@ -73,11 +86,13 @@ function GetLittleLong(cursor)
   return value
 end function
 
+// Provide chunk name at behavior for the active subsystem.
 function chunkNameAt(cursor, offset)
   if offset < 0 or offset + 4 > cursor.endOffset then return "" end if
   return bio.fourCC(cursor.data, offset)
 end function
 
+// Return next chunk.
 function FindNextChunk(cursor, name)
   while true
     cursor.position = cursor.lastChunk
@@ -109,11 +124,13 @@ function FindNextChunk(cursor, name)
   end while
 end function
 
+// Return chunk.
 function FindChunk(cursor, name)
   cursor.lastChunk = cursor.iffData
   return FindNextChunk(cursor, name)
 end function
 
+// Provide dump chunks behavior for the active subsystem.
 function DumpChunks(cursor)
   result = arrays.createArrayBuilder(8)
   cursor.position = cursor.iffData
@@ -129,7 +146,9 @@ function DumpChunks(cursor)
   return arrays.finishArrayBuilder(result)
 end function
 
+// Return wavinfo.
 function GetWavinfo(name, wav, wavLength)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   info = emptyWaveInfo()
   if wav is void then return info end if
   cursor = createCursor(wav, wavLength)
@@ -185,10 +204,12 @@ function GetWavinfo(name, wav, wavLength)
   return t.WaveInfo(rate, width, channels, samples, loopStart, dataOffset, dataLength)
 end function
 
+// Provide sound f32 behavior for the active subsystem.
 function soundF32(value)
   return native.bitsFloat(native.floatBits(value))
 end function
 
+// Provide resample sfx behavior for the active subsystem.
 function ResampleSfx(cache, inRate, inWidth, source, targetRate, loadAs8Bit)
   if cache is void then return error(2454, "ResampleSfx: null cache") end if
   if inRate <= 0 or targetRate <= 0 then return error(2455, "ResampleSfx: invalid sample rate") end if
@@ -247,6 +268,7 @@ function ResampleSfx(cache, inRate, inWidth, source, targetRate, loadAs8Bit)
   return cache
 end function
 
+// Apply the Quake-compatible s load sound data behavior.
 function S_LoadSoundData(name, data, targetRate, loadAs8Bit)
   info = GetWavinfo(name, data, len(data))
   if info is error then return info end if
@@ -263,12 +285,14 @@ function S_LoadSoundData(name, data, targetRate, loadAs8Bit)
   return ResampleSfx(cache, cache.speed, cache.width, source, targetRate, loadAs8Bit)
 end function
 
+// Return sound path derived from the active module state.
 function soundPath(name)
   nameBytes = bytes(name)
   if len(nameBytes) >= 6 and decode(slice(nameBytes, 0, 6)) == "sound/" then return name end if
   return "sound/" + name
 end function
 
+// Apply the Quake-compatible s load sound behavior.
 function S_LoadSound(filesystem, descriptor, targetRate, loadAs8Bit)
   if descriptor is void then return error(2460, "S_LoadSound: null sfx") end if
   if descriptor.cache is not void then return descriptor.cache end if
@@ -280,6 +304,7 @@ function S_LoadSound(filesystem, descriptor, targetRate, loadAs8Bit)
   return cache
 end function
 
+// Provide to sound effect behavior for the active subsystem.
 function toSoundEffect(descriptor)
   if descriptor is void or descriptor.cache is void then return void end if
   cache = descriptor.cache

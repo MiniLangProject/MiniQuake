@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse,hashlib,json,os,shutil,struct,subprocess,tempfile
 from pathlib import Path
 PACKAGE='BP-028';PARENT='BP-027';GOLDEN='audit/server_physics_golden.json';ORACLE='tools/oracle/server_physics_oracle.c'
+RUNTIME_FIXTURES=22
 def sha(p):return hashlib.sha256(Path(p).read_bytes()).hexdigest()
 def fbits(v):return struct.unpack('<I',struct.pack('<f',v))[0]
 def rows():
@@ -30,7 +31,7 @@ def contract(root):
   if forbidden in dispatch:e.append('strict dispatch still references '+forbidden)
  pusher=s[s.index('function SV_PushMove'):s.index('// QUAKE2 kept',s.index('function SV_PushMove'))]
  if 'collision.entityAbsMin(server, pusherIndex)' not in pusher or 'collapsePusherCorpseBounds' not in pusher:e.append('pusher bounds/corpse contract missing')
- if t.count('if parityRun(')!=18 or 'server physics tests passed: 18' not in t:e.append('expected 18 BP-028 fixtures')
+ if t.count('if parityRun(')!=RUNTIME_FIXTURES or f'server physics tests passed: {RUNTIME_FIXTURES}' not in t:e.append(f'expected {RUNTIME_FIXTURES} BP-028 fixtures')
  if 'testStrictQuakeOneDispatch' not in old:e.append('legacy sv_phys regression still expects QUAKE2 auto-dispatch')
  return e
 def main():
@@ -43,9 +44,9 @@ def main():
  if not ok:errors.append('C oracle failed: '+detail)
  elif actual and actual!=d['rows']:errors.append('C oracle differs from Python model')
  errors+=contract(root)
- report={'schema':'MiniQuakeBP028ServerPhysicsVerification/1','package_id':PACKAGE,'parent_package_id':PARENT,'ok':not errors,'oracle':detail,'rows':len(d['rows']),'runtime_fixtures':18,'errors':errors}
+ report={'schema':'MiniQuakeBP028ServerPhysicsVerification/1','package_id':PACKAGE,'parent_package_id':PARENT,'ok':not errors,'oracle':detail,'rows':len(d['rows']),'runtime_fixtures':RUNTIME_FIXTURES,'errors':errors}
  if a.json_output:Path(a.json_output).write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
- print('MiniQuake BP-028 server physics verification: '+('PASS' if not errors else 'FAIL'));print(f'  rows={len(d["rows"])} runtime_fixtures=18 oracle={detail}')
+ print('MiniQuake BP-028 server physics verification: '+('PASS' if not errors else 'FAIL'));print(f'  rows={len(d["rows"])} runtime_fixtures={RUNTIME_FIXTURES} oracle={detail}')
  for x in errors:print('  ERROR: '+x)
  return 0 if not errors else 1
 if __name__=='__main__':raise SystemExit(main())

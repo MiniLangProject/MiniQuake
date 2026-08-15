@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.source_profile_contract.
+*/
 package miniquake.source_profile_contract
 
 // Deterministic inventory of the WinQuake/MiniQuake 1.09 source profile used by
@@ -16,6 +23,7 @@ const MISSING = 0
 const COVERAGE_PERCENT = 100
 const INVENTORY_SHA256 = "31f437bb54a84fa690ff96011c50f8ca3e7dfabde05b4f450e58049eae5d8837"
 
+// Return context adapter names derived from the active module state.
 function contextAdapterNames()
   return [
     "Cvar_Command",
@@ -30,6 +38,7 @@ function contextAdapterNames()
   ]
 end function
 
+// Return technical equivalent names derived from the active module state.
 function technicalEquivalentNames()
   return [
     "CDAudio_CloseDoor",
@@ -39,10 +48,12 @@ function technicalEquivalentNames()
   ]
 end function
 
+// Provide accounted definitions behavior for the active subsystem.
 function accountedDefinitions()
   return EXACT_NAME + CONTEXT_ADAPTER + TECHNICAL_EQUIVALENT
 end function
 
+// Validate the requested value and report any incompatibility.
 function validate()
   if SOURCE_UNIT_COUNT != 53 then return false end if
   if HEADER_UNIT_COUNT != 10 then return false end if

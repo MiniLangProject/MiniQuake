@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/host_lifecycle_tests.ml.
+*/
 import miniquake.host as host
 import miniquake.common as common
 import miniquake.cvar as cvar
@@ -8,17 +14,21 @@ import miniquake.message as msg
 import miniquake.net_loop as netloop
 import miniquake.net_main as netmain
 import miniquake.client as clientRuntime
+import miniquake.input as input
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9850, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9851, name + ": expected true") end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function assertNear(actual, expected, tolerance, name)
   delta = actual - expected
   if delta < 0.0 then delta = -delta end if
@@ -26,6 +36,7 @@ function assertNear(actual, expected, tolerance, name)
   return true
 end function
 
+// Exercise assert trace as part of this deterministic regression fixture.
 function assertTrace(actual, expected)
   assertEqual(len(actual), len(expected), "frame trace length")
   index = 0
@@ -36,10 +47,12 @@ function assertTrace(actual, expected)
   return true
 end function
 
+// Create and initialize session.
 function newSession(extra)
   return host.create(["-headless", "-nosound", "-nolan"] + extra)
 end function
 
+// Verify find max clients against the expected Quake behavior.
 function testFindMaxClients()
   single = host.Host_FindMaxClients(common.create([]))
   assertEqual(single[0], 1, "default one client")
@@ -55,8 +68,17 @@ function testFindMaxClients()
   return true
 end function
 
+// Verify filter time against the expected Quake behavior.
 function testFilterTime()
+  modern = newSession([])
+  assertNear(cvar.variableValue(modern.cvars, "host_maxfps"), 250.0, 0.000001, "modern default frame limit")
+  assertTrue(host.Host_FilterTime(modern, 0.005), "default accepts a 200Hz frame")
+  unlimited = newSession([])
+  cvar.set(unlimited.cvars, "host_maxfps", "0")
+  assertTrue(host.Host_FilterTime(unlimited, 0.0001), "zero frame limit disables filtering")
+
   session = newSession([])
+  cvar.set(session.cvars, "host_maxfps", "72")
   assertEqual(host.Host_FilterTime(session, 0.005), false, "sub-72Hz frame filtered")
   assertEqual(session.timing.frameCount, 0, "filtered frame not counted")
   assertTrue(host.Host_FilterTime(session, 0.010), "accumulated 15ms frame accepted")
@@ -75,6 +97,25 @@ function testFilterTime()
   return true
 end function
 
+// Closing an action-driven main menu must still neutralize gameplay controls.
+function testMenuCloseInputHandoff()
+  session = newSession([])
+  keys.Key_Init()
+  input.IN_Init()
+  session.windowCreated = true
+  session.menu.active = false
+  keys.setDestination(keys.KEY_MENU)
+  input.IN_JumpDown(32)
+  host.setMenuActive(session, false)
+  assertTrue(input.IN_GameplayTransitionBlocked(), "menu close transition latch")
+  assertEqual(input.inJump[2], 0, "menu close clears jump")
+  assertEqual(keys.destination(), keys.KEY_GAME, "menu close restores game destination")
+  input.IN_Shutdown()
+  keys.Key_Init()
+  return true
+end function
+
+// Verify frame order against the expected Quake behavior.
 function testFrameOrder()
   session = newSession([])
   keys.Key_Init()
@@ -101,6 +142,7 @@ function testFrameOrder()
   return true
 end function
 
+// Verify errors drop and shutdown against the expected Quake behavior.
 function testErrorsDropAndShutdown()
   session = newSession(["-listen", "2"])
   session.server.active = true
@@ -146,6 +188,7 @@ function testErrorsDropAndShutdown()
   return true
 end function
 
+// Verify vcr exclusion against the expected Quake behavior.
 function testVcrExclusion()
   normal = newSession([])
   assertTrue(host.Host_InitVCR(normal), "normal host skips VCR")
@@ -155,6 +198,7 @@ function testVcrExclusion()
   return true
 end function
 
+// Verify production client send and loop slist against the expected Quake behavior.
 function testProductionClientSendAndLoopSlist()
   network = netloop.createState()
   wireClient = netloop.Loop_Connect(network, "local")
@@ -189,6 +233,7 @@ function testProductionClientSendAndLoopSlist()
   return true
 end function
 
+// Verify shutdown reliable flush against the expected Quake behavior.
 function testShutdownReliableFlush()
   // A queued incoming reliable record makes Loop_GetMessage mark this
   // self-peered test socket sendable, deterministically exercising the
@@ -246,29 +291,33 @@ function testShutdownReliableFlush()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
-  print "MiniQuake host lifecycle tests starting: 7"
+  print "MiniQuake host lifecycle tests starting: 8"
   result = try(testFindMaxClients())
   if result is error then print "FAIL maxclients: " + result.message; return 1 end if
-  print "[1/5] dedicated/listen maxclients"
+  print "[1/8] dedicated/listen maxclients"
   result = try(testFilterTime())
   if result is error then print "FAIL filter: " + result.message; return 1 end if
-  print "[2/5] filter/timedemo/host_framerate"
+  print "[2/8] filter/timedemo/host_framerate"
+  result = try(testMenuCloseInputHandoff())
+  if result is error then print "FAIL menu input handoff: " + result.message; return 1 end if
+  print "[3/8] menu close input handoff"
   result = try(testFrameOrder())
   if result is error then print "FAIL frame order: " + result.message; return 1 end if
-  print "[3/5] deterministic host frame order"
+  print "[4/8] deterministic host frame order"
   result = try(testErrorsDropAndShutdown())
   if result is error then print "FAIL lifecycle: " + result.message; return 1 end if
-  print "[4/5] error/drop/shutdown"
+  print "[5/8] error/drop/shutdown"
   result = try(testVcrExclusion())
   if result is error then print "FAIL VCR exclusion: " + result.message; return 1 end if
-  print "[5/6] VCR exclusion"
+  print "[6/8] VCR exclusion"
   result = try(testProductionClientSendAndLoopSlist())
   if result is error then print "FAIL production client/slist: " + result.message; return 1 end if
-  print "[6/7] production CL_SendCmd order / loop slist"
+  print "[7/8] production CL_SendCmd order / loop slist"
   result = try(testShutdownReliableFlush())
   if result is error then print "FAIL shutdown reliable flush: " + result.message; return 1 end if
-  print "[7/7] shutdown pending reliable / disconnect order"
-  print "MiniQuake host lifecycle tests passed: 7"
+  print "[8/8] shutdown pending reliable / disconnect order"
+  print "MiniQuake host lifecycle tests passed: 8"
   return 0
 end function

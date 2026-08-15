@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-018 demo framing, recording, keepalive filtering and timedemo fixtures.
 */
-
 import miniquake.demo as demo
 import miniquake.demo_player as player
 import miniquake.client as client
@@ -17,21 +17,25 @@ import miniquake.sizebuf as sz
 import miniquake.message as msg
 import miniquake.byteio as bio
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(9800, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function yes(value, name)
   if not value then return error(9801, name + ": expected true") end if
   return true
 end function
 
+// Exercise no as part of this deterministic regression fixture.
 function no(value, name)
   if value then return error(9802, name + ": expected false") end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function near(actual, expected, tolerance, name)
   delta = actual - expected
   if delta < 0.0 then delta = -delta end if
@@ -39,6 +43,7 @@ function near(actual, expected, tolerance, name)
   return true
 end function
 
+// Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
   print "  [" + number + "/19] " + name
   result = try(fn())
@@ -46,10 +51,12 @@ function run(number, name, fn)
   return true
 end function
 
+// Return player state derived from the active module state.
 function playerState()
   return movement.createPlayer(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
 end function
 
+// Exercise pair as part of this deterministic regression fixture.
 function pair()
   network = netloop.createState()
   netmain.NET_Init(network, 2, false, false, 26100, true)
@@ -59,6 +66,7 @@ function pair()
   return [network, clientSocket, serverSocket]
 end function
 
+// Release or remove state for pair.
 function closePair(value)
   if value[2] is not void then netmain.NET_Close(value[2]) end if
   if value[1] is not void then netmain.NET_Close(value[1]) end if
@@ -66,6 +74,7 @@ function closePair(value)
   return true
 end function
 
+// Exercise time message as part of this deterministic regression fixture.
 function timeMessage(value)
   buffer = sz.alloc(16)
   msg.writeByte(buffer, c.SVC_TIME)
@@ -73,6 +82,7 @@ function timeMessage(value)
   return buffer
 end function
 
+// Exercise playback fixture as part of this deterministic regression fixture.
 function playbackFixture()
   recording = t.Demo(-1, [
     t.DemoMessage(t.Vec3(10.0, 20.0, 30.0), sz.dataSlice(timeMessage(1.1))),
@@ -87,6 +97,7 @@ function playbackFixture()
   return playback
 end function
 
+// Verify record atoi against the expected Quake behavior.
 function testRecordAtoi()
   equal(demo.recordTrackNumber("1.5"), 1, "decimal suffix")
   equal(demo.recordTrackNumber("soundtrack"), 0, "no digits")
@@ -96,6 +107,7 @@ function testRecordAtoi()
   return true
 end function
 
+// Verify filename rules against the expected Quake behavior.
 function testFilenameRules()
   equal(demo.filename("route"), "route.dem", "default extension")
   equal(demo.filename("ROUTE.DEM"), "ROUTE.DEM", "case-insensitive extension")
@@ -104,6 +116,7 @@ function testFilenameRules()
   return true
 end function
 
+// Verify record plan against the expected Quake behavior.
 function testRecordPlan()
   plan = demo.CL_Record_f(["record", "fixture", "e1m1", "4"], false)
   equal(plan[0], "fixture.dem", "record name")
@@ -114,6 +127,7 @@ function testRecordPlan()
   return true
 end function
 
+// Verify exact frame bytes against the expected Quake behavior.
 function testExactFrameBytes()
   recording = t.Demo(4, [], "4\n")
   demo.CL_WriteDemoMessage(recording, bytes([1, 2, 3]), t.Vec3(1.0, -2.5, 90.0))
@@ -121,6 +135,7 @@ function testExactFrameBytes()
   return true
 end function
 
+// Verify round trip against the expected Quake behavior.
 function testRoundTrip()
   recording = t.Demo(-1, [], "-1\n")
   demo.CL_WriteDemoMessage(recording, bytes("alpha"), t.Vec3(1.25, 2.5, 5.0))
@@ -134,6 +149,7 @@ function testRoundTrip()
   return true
 end function
 
+// Verify keepalive predicate against the expected Quake behavior.
 function testKeepalivePredicate()
   yes(demo.isKeepalivePayload(bytes([c.SVC_NOP])), "isolated NOP")
   no(demo.isKeepalivePayload(bytes([c.SVC_NOP, c.SVC_NOP])), "two-byte payload")
@@ -142,6 +158,7 @@ function testKeepalivePredicate()
   return true
 end function
 
+// Verify recording pump filters keepalive against the expected Quake behavior.
 function testRecordingPumpFiltersKeepalive()
   value = pair()
   if value is error then return value end if
@@ -160,6 +177,7 @@ function testRecordingPumpFiltersKeepalive()
   return true
 end function
 
+// Verify normal pump filters keepalive against the expected Quake behavior.
 function testNormalPumpFiltersKeepalive()
   value = pair()
   if value is error then return value end if
@@ -174,6 +192,7 @@ function testNormalPumpFiltersKeepalive()
   return true
 end function
 
+// Verify stop writes disconnect against the expected Quake behavior.
 function testStopWritesDisconnect()
   recording = t.Demo(-1, [], "-1\n")
   demo.CL_WriteDemoMessage(recording, bytes([c.SVC_NOP, c.SVC_PRINT, 0]), t.Vec3(0.0, 0.0, 0.0))
@@ -184,6 +203,7 @@ function testStopWritesDisconnect()
   return true
 end function
 
+// Verify max message boundary against the expected Quake behavior.
 function testMaxMessageBoundary()
   recording = t.Demo(-1, [], "-1\n")
   equal(demo.CL_WriteDemoMessage(recording, bytes(c.MAX_MSGLEN), t.Vec3(0.0, 0.0, 0.0)), 1, "MAX_MSGLEN accepted")
@@ -192,6 +212,7 @@ function testMaxMessageBoundary()
   return true
 end function
 
+// Verify malformed framing against the expected Quake behavior.
 function testMalformedFraming()
   yes(try(demo.parse(bytes("-1"))) is error, "missing track newline")
   yes(try(demo.parse(bytes("-1\nx"))) is error, "truncated message header")
@@ -206,6 +227,7 @@ function testMalformedFraming()
   return true
 end function
 
+// Verify playback pacing against the expected Quake behavior.
 function testPlaybackPacing()
   playback = playbackFixture()
   equal(player.stepFrame(playback, 1, 1.0, 0.05), 0, "early frame blocked")
@@ -217,6 +239,7 @@ function testPlaybackPacing()
   return true
 end function
 
+// Verify timedemo same frame gate against the expected Quake behavior.
 function testTimedemoSameFrameGate()
   playback = playbackFixture()
   player.CL_TimeDemo_f(playback, 10)
@@ -228,6 +251,7 @@ function testTimedemoSameFrameGate()
   return true
 end function
 
+// Verify timedemo finish against the expected Quake behavior.
 function testTimedemoFinish()
   playback = playbackFixture()
   playback.timedemo = true
@@ -243,6 +267,7 @@ function testTimedemoFinish()
   return true
 end function
 
+// Verify eof stops playback against the expected Quake behavior.
 function testEofStopsPlayback()
   recording = t.Demo(0, [t.DemoMessage(t.Vec3(0.0, 0.0, 0.0), bytes([c.SVC_NOP]))], "0\n")
   playback = player.create(recording)
@@ -256,6 +281,7 @@ function testEofStopsPlayback()
   return true
 end function
 
+// Verify view angles applied against the expected Quake behavior.
 function testViewAnglesApplied()
   recording = t.Demo(0, [
     t.DemoMessage(t.Vec3(1.0, 2.0, 3.0), bytes([c.SVC_NOP])),
@@ -272,6 +298,7 @@ function testViewAnglesApplied()
   return true
 end function
 
+// Verify offline verifier against the expected Quake behavior.
 function testOfflineVerifier()
   recording = t.Demo(0, [
     t.DemoMessage(t.Vec3(0.0, 90.0, 0.0), bytes([c.SVC_NOP])),
@@ -284,6 +311,7 @@ function testOfflineVerifier()
   return true
 end function
 
+// Exercise deterministic corpus as part of this deterministic regression fixture.
 function deterministicCorpus()
   messages = []
   index = 0
@@ -300,6 +328,7 @@ function deterministicCorpus()
   return t.Demo(-1, messages, "-1\n")
 end function
 
+// Verify deterministic corpus against the expected Quake behavior.
 function testDeterministicCorpus()
   first = demo.serialize(deterministicCorpus())
   second = demo.serialize(deterministicCorpus())
@@ -310,6 +339,7 @@ function testDeterministicCorpus()
   return true
 end function
 
+// Verify track header playback arithmetic against the expected Quake behavior.
 function testTrackHeaderPlaybackArithmetic()
   whitespace = demo.parse(bytes("  2\n"))
   equal(whitespace.forcedTrack, -1758, "MiniQuake bytewise whitespace arithmetic")

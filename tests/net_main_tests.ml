@@ -1,8 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
-*/
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
+MiniLang parity and regression tests for tests/net_main_tests.ml.
+*/
 import miniquake.constants as c
 import miniquake.net_loop as netloop
 import miniquake.net_main as netmain
@@ -10,11 +12,13 @@ import miniquake.server as server
 import miniquake.sizebuf as sz
 import miniquake.message as msg
 
+// Assert that the condition holds and identify a failing test.
 function require(value, message)
   if not value then return error(9350, message) end if
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   state = netloop.createState()
   require(netmain.NET_Init(state, 2, false, false, 26000, true) == -1, "-nolan init")

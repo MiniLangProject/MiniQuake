@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.render.gl_refrag.
+*/
 package miniquake.render.gl_refrag
 
 import miniquake.constants as c
@@ -31,6 +38,7 @@ r_emaxs = void
 cl_visedicts = []
 cl_numvisedicts = 0
 
+// Update subsystem configuration for configure.
 function Configure(renderer, entityRenderer, entityStates)
   global refragLeafs, refragNodes, refragPlanes, refragBspModels
   global refragModels, refragEntities, refragLeafEfrags, refragEntityEfrags
@@ -60,6 +68,7 @@ function Configure(renderer, entityRenderer, entityStates)
   return true
 end function
 
+// Apply the Quake-compatible r remove efrags behavior.
 function R_RemoveEfrags(ent)
   global refragLeafEfrags, refragEntityEfrags
   if ent is void or ent.number < 0 or ent.number >= len(refragEntityEfrags) then return false end if
@@ -78,6 +87,7 @@ function R_RemoveEfrags(ent)
   return true
 end function
 
+// Add state for append efrag.
 function appendEfrag(leafIndex)
   global refragLeafEfrags, refragEntityEfrags, r_pefragtopnode
   if r_addent is void or leafIndex < 0 or leafIndex >= len(refragLeafEfrags) then return false end if
@@ -92,6 +102,7 @@ function appendEfrag(leafIndex)
   return true
 end function
 
+// Apply the Quake-compatible r split entity on node behavior.
 function R_SplitEntityOnNode(nodeNumber)
   global r_pefragtopnode
   if r_addent is void then return 0 end if
@@ -113,6 +124,7 @@ function R_SplitEntityOnNode(nodeNumber)
   return count
 end function
 
+// Provide model bounds behavior for the active subsystem.
 function modelBounds(ent)
   if ent.modelIndex <= 0 or ent.modelIndex >= len(refragModels) then return void end if
   model = refragModels[ent.modelIndex]
@@ -130,6 +142,7 @@ function modelBounds(ent)
   return [math.subtract(ent.origin, extent), math.add(ent.origin, extent)]
 end function
 
+// Apply the Quake-compatible r add efrags behavior.
 function R_AddEfrags(ent)
   global r_addent, r_emins, r_emaxs, r_pefragtopnode
   if ent is void or len(refragBspModels) == 0 then return 0 end if
@@ -145,6 +158,7 @@ function R_AddEfrags(ent)
   return count
 end function
 
+// Apply the Quake-compatible r begin visible frame behavior.
 function R_BeginVisibleFrame()
   global cl_visedicts, cl_numvisedicts
   cl_visedicts = []
@@ -152,6 +166,7 @@ function R_BeginVisibleFrame()
   return true
 end function
 
+// Apply the Quake-compatible r store efrags behavior.
 function R_StoreEfrags(leafIndex)
   global cl_visedicts, cl_numvisedicts
   // World traversal calls R_StoreEfrags once for every visible leaf.  The C
@@ -182,10 +197,12 @@ function R_StoreEfrags(leafIndex)
   return cl_visedicts
 end function
 
+// Apply the Quake-compatible r visible entities behavior.
 function R_VisibleEntities()
   return cl_visedicts
 end function
 
+// Update module state for split state.
 function SetSplitState(entity, mins, maxs)
   global r_addent, r_emins, r_emaxs, r_pefragtopnode
   r_addent = entity
@@ -195,6 +212,7 @@ function SetSplitState(entity, mins, maxs)
   return true
 end function
 
+// Return state.
 function GetState(entityNumber)
   entityCount = 0
   if entityNumber >= 0 and entityNumber < len(refragEntityEfrags) then entityCount = len(refragEntityEfrags[entityNumber]) end if

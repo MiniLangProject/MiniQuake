@@ -1,13 +1,21 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/gl_vidnt_differential_fixture.ml.
+*/
 import miniquake.gl_vidnt as video
 import miniquake.common as common
 import miniquake.cvar as cvar
 import miniquake.keys as keys
 
+// Return bool number derived from the active module state.
 function boolNumber(value)
   if value then return 1 end if
   return 0
 end function
 
+// Exercise gray palette as part of this deterministic regression fixture.
 function grayPalette()
   palette = bytes(768)
   index = 0
@@ -20,6 +28,7 @@ function grayPalette()
   return palette
 end function
 
+// Exercise install three modes as part of this deterministic regression fixture.
 function installThreeModes()
   state = video.createVideoState()
   state.arguments = common.create(["glquake"])
@@ -37,7 +46,9 @@ function installThreeModes()
   return state
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   palette = grayPalette()
   shifted = grayPalette()
   state = installThreeModes()

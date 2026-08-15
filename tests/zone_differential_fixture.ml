@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/zone_differential_fixture.ml.
+*/
 import miniquake.native as native
 import miniquake.zone as zone
 import miniquake.memory as memory
@@ -6,15 +12,18 @@ struct ZoneFixtureCommandLine
   args
 end struct
 
+// Return state derived from the active module state.
 function state()
   return memory.Memory_Init(32768, 1024)
 end function
 
+// Exercise bool int as part of this deterministic regression fixture.
 function boolInt(value)
   if value then return 1 end if
   return 0
 end function
 
+// Release or remove state for zone blocks.
 function freeZoneBlocks(zoneState)
   count = 0
   for each block in zoneState.blocks
@@ -23,12 +32,14 @@ function freeZoneBlocks(zoneState)
   return count
 end function
 
+// Add zone to the destination state.
 function emitZone(functionName, caseName, result, index, value, count)
   print "{\"function\":\"" + functionName + "\",\"case\":\"" + caseName +
     "\",\"result\":" + result + ",\"index\":" + index +
     ",\"value\":" + native.floatText(value) + ",\"count\":" + count + "}"
 end function
 
+// Return line count derived from the active module state.
 function lineCount(text)
   data = bytes(text)
   if len(data) == 0 then return 0 end if
@@ -39,7 +50,9 @@ function lineCount(text)
   return count
 end function
 
+// Return fatal mode derived from the active module state.
 function fatalMode(mode)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   manager = state()
   result = void
   if mode == "--error-z-free" then
@@ -95,7 +108,9 @@ function fatalMode(mode)
   return 0
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   if len(args) > 0 then return fatalMode(args[0]) end if
 
   manager = state()

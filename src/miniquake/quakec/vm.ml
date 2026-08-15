@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.quakec.vm.
+*/
 package miniquake.quakec.vm
 
 import miniquake.types as t
@@ -16,12 +23,17 @@ lookupMachine = void
 fieldLookupKeys = array(LOOKUP_CACHE_SIZE)
 fieldLookupRawKeys = array(LOOKUP_CACHE_SIZE, 0)
 fieldLookupValues = array(LOOKUP_CACHE_SIZE, -2)
+globalLookupKeys = array(LOOKUP_CACHE_SIZE)
+globalLookupRawKeys = array(LOOKUP_CACHE_SIZE, 0)
+globalLookupValues = array(LOOKUP_CACHE_SIZE, -2)
 functionLookupKeys = array(LOOKUP_CACHE_SIZE)
 functionLookupRawKeys = array(LOOKUP_CACHE_SIZE, 0)
 functionLookupValues = array(LOOKUP_CACHE_SIZE, -2)
 
+// Ensure sufficient storage or state for lookup machine.
 function ensureLookupMachine(machine)
   global lookupMachine, fieldLookupKeys, fieldLookupRawKeys, fieldLookupValues
+  global globalLookupKeys, globalLookupRawKeys, globalLookupValues
   global functionLookupKeys, functionLookupRawKeys, functionLookupValues
   if lookupMachine is not void and nativeRawValue(lookupMachine) == nativeRawValue(machine) then return true end if
   lookupMachine = machine
@@ -30,24 +42,31 @@ function ensureLookupMachine(machine)
   fieldLookupKeys = array(LOOKUP_CACHE_SIZE)
   fieldLookupRawKeys = array(LOOKUP_CACHE_SIZE, 0)
   fieldLookupValues = array(LOOKUP_CACHE_SIZE, -2)
+  globalLookupKeys = array(LOOKUP_CACHE_SIZE)
+  globalLookupRawKeys = array(LOOKUP_CACHE_SIZE, 0)
+  globalLookupValues = array(LOOKUP_CACHE_SIZE, -2)
   functionLookupKeys = array(LOOKUP_CACHE_SIZE)
   functionLookupRawKeys = array(LOOKUP_CACHE_SIZE, 0)
   functionLookupValues = array(LOOKUP_CACHE_SIZE, -2)
   return true
 end function
 
+// Return slot.
 function inline lookupSlot(key)
   return ((key >> 3) ^ (key >> 13) ^ (key >> 23)) & (LOOKUP_CACHE_SIZE - 1)
 end function
 
+// Create the zero-initialized state for array.
 function zeroArray(count)
   return arrayutil.makeFilledArray(count, 0)
 end function
 
+// Transfer data for copy program words.
 function copyProgramWords(source)
   return arrayutil.copyArrayLinear(source)
 end function
 
+// Create and initialize the module state.
 function create(program, maxEdicts)
   globals = copyProgramWords(program.globals)
   edicts = arrayutil.makeEmptyArray(maxEdicts)
@@ -58,9 +77,17 @@ function create(program, maxEdicts)
   end while
   edictFree = arrayutil.makeFilledArray(maxEdicts, true)
   if maxEdicts > 0 then edictFree[0] = false end if
-  return t.QuakeCMachine(program, globals, [], 0, 0, 0, 0, edicts, [], 100000, void, edictFree, [], "", 1, false)
+  // pr_exec.c uses fixed pr_stack[MAX_STACK_DEPTH] and localstack arrays.
+  // Retain the public dynamic callStack for direct PR_EnterFunction fixtures,
+  // while normal PR_ExecuteProgram runs on these allocation-free equivalents.
+  return t.QuakeCMachine(
+    program, globals, [], 0, 0, 0, 0, edicts, [], 100000, void, edictFree, [], "", 1, false,
+    zeroArray(MAX_STACK_DEPTH), zeroArray(MAX_STACK_DEPTH), zeroArray(MAX_STACK_DEPTH),
+    zeroArray(MAX_STACK_DEPTH), zeroArray(LOCALSTACK_SIZE), 0, 0, 0,
+  )
 end function
 
+// Ensure sufficient storage or state for global.
 function ensureGlobal(machine, offset)
   if offset < 0 then return error(2212, "negative QuakeC global offset") end if
   if len(machine.globals) <= offset then
@@ -68,21 +95,25 @@ function ensureGlobal(machine, offset)
   end if
 end function
 
+// Provide word behavior for the active subsystem.
 function word(machine, offset)
   ensureGlobal(machine, offset)
   return machine.globals[offset]
 end function
 
+// Update module state for word.
 function setWord(machine, offset, value)
   ensureGlobal(machine, offset)
   machine.globals[offset] = value & 0xffffffff
   return value
 end function
 
+// Provide global float behavior for the active subsystem.
 function globalFloat(machine, offset)
   return native.bitsFloat(word(machine, offset))
 end function
 
+// Update module state for global float.
 function setGlobalFloat(machine, offset, value)
   if value is bool then
     if value then value = 1.0 else value = 0.0 end if
@@ -90,10 +121,12 @@ function setGlobalFloat(machine, offset, value)
   setWord(machine, offset, native.floatBits(value))
 end function
 
+// Provide return float behavior for the active subsystem.
 function returnFloat(machine)
   return globalFloat(machine, op.OFS_RETURN)
 end function
 
+// Return string value derived from the active module state.
 function stringValue(machine, rawValue)
   if rawValue == TEMP_STRING_HANDLE then return machine.temporaryString end if
   if rawValue >= 0x80000000 then
@@ -109,15 +142,18 @@ function stringValue(machine, rawValue)
   return protocolText.decodeBytes(slice(machine.program.strings, rawValue, endOffset - rawValue))
 end function
 
+// Report whether canonical string.
 function canonicalString(text)
   encoded = protocolText.encodeBytes(text)
   return protocolText.decodeBytes(encoded)
 end function
 
+// Provide string at behavior for the active subsystem.
 function stringAt(machine, globalOffset)
   return stringValue(machine, word(machine, globalOffset))
 end function
 
+// Provide intern string behavior for the active subsystem.
 function internString(machine, text)
   text = canonicalString(text)
   index = 0
@@ -129,25 +165,30 @@ function internString(machine, text)
   return 0x80000000 + len(machine.dynamicStrings) - 1
 end function
 
+// Update module state for temporary string.
 function setTemporaryString(machine, text)
   machine.temporaryString = canonicalString(text)
   return TEMP_STRING_HANDLE
 end function
 
+// Update module state for global string.
 function setGlobalString(machine, offset, text)
   return setWord(machine, offset, internString(machine, text))
 end function
 
+// Return vector derived from the active module state.
 function vector(machine, offset)
   return t.Vec3(globalFloat(machine, offset), globalFloat(machine, offset + 1), globalFloat(machine, offset + 2))
 end function
 
+// Update module state for vector.
 function setVector(machine, offset, value)
   setGlobalFloat(machine, offset, value.x)
   setGlobalFloat(machine, offset + 1, value.y)
   setGlobalFloat(machine, offset + 2, value.z)
 end function
 
+// Provide entity field behavior for the active subsystem.
 function entityField(machine, entityIndex, fieldOffset)
   if entityIndex < 0 or entityIndex >= len(machine.edicts) then return error(2200, "QuakeC entity outside edict table") end if
   fields = machine.edicts[entityIndex]
@@ -155,22 +196,26 @@ function entityField(machine, entityIndex, fieldOffset)
   return fields[fieldOffset]
 end function
 
+// Update module state for entity field.
 function setEntityField(machine, entityIndex, fieldOffset, value)
   if entityIndex < 0 or entityIndex >= len(machine.edicts) then return error(2202, "QuakeC entity outside edict table") end if
   if fieldOffset < 0 or fieldOffset >= len(machine.edicts[entityIndex]) then return error(2203, "QuakeC field outside edict") end if
   machine.edicts[entityIndex][fieldOffset] = value
 end function
 
+// Provide pointer entity behavior for the active subsystem.
 function pointerEntity(machine, pointer)
   if machine.program.entityFields <= 0 then return 0 end if
   return native.trunc(pointer / machine.program.entityFields)
 end function
 
+// Provide pointer field behavior for the active subsystem.
 function pointerField(machine, pointer)
   if machine.program.entityFields <= 0 then return 0 end if
   return pointer % machine.program.entityFields
 end function
 
+// Validate pointer and report any incompatibility.
 function validatePointer(machine, pointer, wordCount)
   if machine.program.entityFields <= 0 then return error(2218, "QuakeC pointer uses an empty edict layout") end if
   totalWords = len(machine.edicts) * machine.program.entityFields
@@ -184,6 +229,7 @@ function validatePointer(machine, pointer, wordCount)
   return true
 end function
 
+// Encode and write locals.
 function saveLocals(machine, functionValue)
   saved = arrayutil.makeEmptyArray(functionValue.locals)
   i = 0
@@ -194,7 +240,9 @@ function saveLocals(machine, functionValue)
   return saved
 end function
 
+// Encode and write d local count.
 function savedLocalCount(machine)
+  if machine.fastExecutionDepth > 0 then return machine.fastLocalDepth end if
   count = 0
   for each frame in machine.callStack
     count = count + len(frame.savedLocals)
@@ -202,7 +250,47 @@ function savedLocalCount(machine)
   return count
 end function
 
+// Enter a QuakeC function using the original fixed execution and locals
+// stacks. Sources are saved before parameters overwrite a callee's locals.
+function fastEnterFunction(machine, functionIndex)
+  if functionIndex <= 0 or functionIndex >= len(machine.program.functions) then return error(2204, "bad QuakeC function index " + functionIndex) end if
+  functionValue = machine.program.functions[functionIndex]
+  if machine.fastDepth + 1 >= MAX_STACK_DEPTH then return error(2214, "QuakeC stack overflow") end if
+  if machine.fastLocalDepth + functionValue.locals > LOCALSTACK_SIZE then return error(2215, "QuakeC locals stack overflow") end if
+
+  slot = machine.fastDepth
+  machine.fastStatements[slot] = machine.statement
+  machine.fastFunctions[slot] = machine.currentFunction
+  machine.fastLocalBases[slot] = machine.fastLocalDepth
+  machine.fastLocalCounts[slot] = functionValue.locals
+  i = 0
+  while i < functionValue.locals
+    machine.fastSavedLocals[machine.fastLocalDepth + i] = word(machine, functionValue.parmStart + i)
+    i = i + 1
+  end while
+  machine.fastLocalDepth = machine.fastLocalDepth + functionValue.locals
+  machine.fastDepth = slot + 1
+
+  destination = functionValue.parmStart
+  parameter = 0
+  while parameter < functionValue.numParms
+    size = functionValue.parmSize[parameter]
+    component = 0
+    while component < size
+      setWord(machine, destination, word(machine, op.OFS_PARM0 + parameter * 3 + component))
+      destination = destination + 1
+      component = component + 1
+    end while
+    parameter = parameter + 1
+  end while
+  machine.currentFunction = functionIndex
+  machine.statement = functionValue.firstStatement
+  return true
+end function
+
+// Provide enter function behavior for the active subsystem.
 function enterFunction(machine, functionIndex)
+  if machine.fastExecutionDepth > 0 then return fastEnterFunction(machine, functionIndex) end if
   if functionIndex <= 0 or functionIndex >= len(machine.program.functions) then return error(2204, "bad QuakeC function index " + functionIndex) end if
   functionValue = machine.program.functions[functionIndex]
   // PR_EnterFunction increments pr_depth before checking MAX_STACK_DEPTH, so
@@ -229,12 +317,31 @@ function enterFunction(machine, functionIndex)
   machine.statement = functionValue.firstStatement
 end function
 
+// Consume pending state for pop array.
 function popArray(values)
   if len(values) <= 1 then return [] end if
   return arrayutil.copyArrayPrefix(values, len(values) - 1)
 end function
 
+// Provide leave function behavior for the active subsystem.
 function leaveFunction(machine)
+  if machine.fastExecutionDepth > 0 then
+    if machine.fastDepth == 0 then return error(2217, "prog stack underflow") end if
+    slot = machine.fastDepth - 1
+    functionValue = machine.program.functions[machine.currentFunction]
+    base = machine.fastLocalBases[slot]
+    count = machine.fastLocalCounts[slot]
+    i = 0
+    while i < functionValue.locals and i < count
+      setWord(machine, functionValue.parmStart + i, machine.fastSavedLocals[base + i])
+      i = i + 1
+    end while
+    machine.fastLocalDepth = base
+    machine.fastDepth = slot
+    machine.statement = machine.fastStatements[slot]
+    machine.currentFunction = machine.fastFunctions[slot]
+    return true
+  end if
   if len(machine.callStack) == 0 then return error(2217, "prog stack underflow") end if
   frame = machine.callStack[len(machine.callStack) - 1]
   functionValue = machine.program.functions[machine.currentFunction]
@@ -249,12 +356,14 @@ function leaveFunction(machine)
   return true
 end function
 
+// Provide call builtin behavior for the active subsystem.
 function callBuiltin(machine, builtinIndex)
   index = -builtinIndex
   if index < 0 or index >= len(machine.builtins) then return error(2205, "missing QuakeC builtin " + index) end if
   return machine.builtins[index](machine)
 end function
 
+// Return opcode name derived from the active module state.
 function opcodeName(code)
   names = [
     "DONE", "MUL_F", "MUL_V", "MUL_FV", "MUL_VF", "DIV_F",
@@ -273,18 +382,21 @@ function opcodeName(code)
   return names[code]
 end function
 
+// Provide debug floor behavior for the active subsystem.
 function debugFloor(value)
   truncated = native.trunc(value)
   if value < truncated then return truncated - 1 end if
   return truncated
 end function
 
+// Provide debug ceil behavior for the active subsystem.
 function debugCeil(value)
   truncated = native.trunc(value)
   if value > truncated then return truncated + 1 end if
   return truncated
 end function
 
+// Provide debug one decimal behavior for the active subsystem.
 function debugOneDecimal(value)
   scaled = 0
   if value >= 0.0 then scaled = debugFloor(value * 10.0 + 0.5) else scaled = debugCeil(value * 10.0 - 0.5) end if
@@ -298,6 +410,7 @@ function debugOneDecimal(value)
   return text
 end function
 
+// Return definition at offset derived from the active module state.
 function definitionAtOffset(definitions, offset)
   for each definition in definitions
     if definition.offset == offset then return definition end if
@@ -305,6 +418,7 @@ function definitionAtOffset(definitions, offset)
   return void
 end function
 
+// Provide debug value string behavior for the active subsystem.
 function debugValueString(machine, definition, offset)
   valueType = definition.type & 0x7fff
   if valueType == c.EV_STRING then return stringAt(machine, offset) end if
@@ -329,6 +443,7 @@ function debugValueString(machine, definition, offset)
   return "bad type " + valueType
 end function
 
+// Provide debug global string behavior for the active subsystem.
 function debugGlobalString(machine, offset, includeContents)
   definition = definitionAtOffset(machine.program.globalDefs, offset)
   text = ""
@@ -344,6 +459,7 @@ function debugGlobalString(machine, offset, includeContents)
   return text + " "
 end function
 
+// Format and emit statement.
 function printStatement(machine, statementValue)
   text = ""
   codeName = opcodeName(statementValue.op)
@@ -369,6 +485,7 @@ function printStatement(machine, statementValue)
   return text
 end function
 
+// Provide stack line behavior for the active subsystem.
 function stackLine(functionValue)
   fileName = functionValue.file
   while len(bytes(fileName)) < 12
@@ -377,8 +494,29 @@ function stackLine(functionValue)
   return fileName + " : " + functionValue.name
 end function
 
+// Provide stack trace behavior for the active subsystem.
 function stackTrace(machine)
   lines = []
+  if machine.fastExecutionDepth > 0 then
+    if machine.fastDepth == 0 then return ["<NO STACK>"] end if
+    index = machine.fastDepth - 1
+    current = machine.currentFunction
+    while index >= 0
+      if current <= 0 or current >= len(machine.program.functions) then
+        lines = lines + ["<NO FUNCTION>"]
+      else
+        lines = lines + [stackLine(machine.program.functions[current])]
+      end if
+      current = machine.fastFunctions[index]
+      index = index - 1
+    end while
+    if current <= 0 or current >= len(machine.program.functions) then
+      lines = lines + ["<NO FUNCTION>"]
+    else
+      lines = lines + [stackLine(machine.program.functions[current])]
+    end if
+    return lines
+  end if
   if len(machine.callStack) == 0 then return ["<NO STACK>"] end if
   index = len(machine.callStack) - 1
   current = machine.currentFunction
@@ -402,6 +540,7 @@ function stackTrace(machine)
   return lines
 end function
 
+// Provide profile report behavior for the active subsystem.
 function profileReport(machine)
   lines = []
   emitted = 0
@@ -426,6 +565,7 @@ function profileReport(machine)
   return lines
 end function
 
+// Execute error.
 function runError(machine, message)
   if machine.context is not void then
     statementIndex = machine.statement - 1
@@ -439,14 +579,19 @@ function runError(machine, message)
     machine.context.consoleLines = machine.context.consoleLines + [message]
   end if
   machine.callStack = []
+  machine.fastDepth = 0
+  machine.fastLocalDepth = 0
+  machine.fastExecutionDepth = 0
   machine.currentFunction = 0
   return error(2216, "Program error: " + message)
 end function
 
+// Provide float truth behavior for the active subsystem.
 function inline floatTruth(value)
   return value != 0.0
 end function
 
+// Provide string compare behavior for the active subsystem.
 function stringCompare(left, right)
   leftBytes = protocolText.encodeBytes(left)
   rightBytes = protocolText.encodeBytes(right)
@@ -461,6 +606,7 @@ function stringCompare(left, right)
 end function
 
 
+// Return definition offset derived from the active module state.
 function definitionOffset(definitions, name)
   for each definition in definitions
     // ED_FindField/ED_FindGlobal use strcmp.  Treating generated names as
@@ -470,22 +616,26 @@ function definitionOffset(definitions, name)
   return -1
 end function
 
+// Provide named global word behavior for the active subsystem.
 function namedGlobalWord(machine, name)
-  offset = definitionOffset(machine.program.globalDefs, name)
+  offset = globalOffset(machine, name)
   if offset < 0 then return 0 end if
   return word(machine, offset)
 end function
 
+// Provide named global float behavior for the active subsystem.
 function namedGlobalFloat(machine, name)
-  offset = definitionOffset(machine.program.globalDefs, name)
+  offset = globalOffset(machine, name)
   if offset < 0 then return 0.0 end if
   return globalFloat(machine, offset)
 end function
 
+// Return named field offset derived from the active module state.
 function namedFieldOffset(machine, name)
-  return definitionOffset(machine.program.fieldDefs, name)
+  return fieldOffset(machine, name)
 end function
 
+// Execute state.
 function executeState(machine, frameOffset, thinkOffset)
   selfIndex = namedGlobalWord(machine, "self")
   if selfIndex < 0 or selfIndex >= len(machine.edicts) then return error(2210, "OP_STATE: self is outside edict table") end if
@@ -506,6 +656,7 @@ function executeState(machine, frameOffset, thinkOffset)
   return true
 end function
 
+// Execute the requested value.
 function execute(machine, functionIndex)
   // PR_ExecuteProgram resets the global pr_trace flag at the start of every
   // invocation, including recursive entries made by movement builtins.
@@ -517,7 +668,8 @@ function execute(machine, functionIndex)
   // unwound to that depth; it does not discard the caller's execution state.
   // Resetting the shared stack here made the suspended caller resume at the
   // statement following the nested function's DONE opcode.
-  exitDepth = len(machine.callStack)
+  machine.fastExecutionDepth = machine.fastExecutionDepth + 1
+  exitDepth = machine.fastDepth
   entered = try(enterFunction(machine, functionIndex))
   if entered is error then return runError(machine, entered.message) end if
   running = true
@@ -542,43 +694,71 @@ function execute(machine, functionIndex)
       setWord(machine, op.OFS_RETURN + 2, word(machine, statement.a + 2))
       machine.returnWord = word(machine, op.OFS_RETURN)
       leaveFunction(machine)
-      if len(machine.callStack) <= exitDepth then
+      if machine.fastDepth <= exitDepth then
         running = false
       end if
     else if code == op.OP_MUL_F then
       setGlobalFloat(machine, statement.c, globalFloat(machine, statement.a) * globalFloat(machine, statement.b))
     else if code == op.OP_MUL_V then
-      a = vector(machine, statement.a)
-      b = vector(machine, statement.b)
-      setGlobalFloat(machine, statement.c, a.x * b.x + a.y * b.y + a.z * b.z)
+      ax = globalFloat(machine, statement.a)
+      ay = globalFloat(machine, statement.a + 1)
+      az = globalFloat(machine, statement.a + 2)
+      bx = globalFloat(machine, statement.b)
+      by = globalFloat(machine, statement.b + 1)
+      bz = globalFloat(machine, statement.b + 2)
+      setGlobalFloat(machine, statement.c, ax * bx + ay * by + az * bz)
     else if code == op.OP_MUL_FV then
       scalar = globalFloat(machine, statement.a)
-      value = vector(machine, statement.b)
-      setVector(machine, statement.c, t.Vec3(scalar * value.x, scalar * value.y, scalar * value.z))
+      vx = globalFloat(machine, statement.b)
+      vy = globalFloat(machine, statement.b + 1)
+      vz = globalFloat(machine, statement.b + 2)
+      setGlobalFloat(machine, statement.c, scalar * vx)
+      setGlobalFloat(machine, statement.c + 1, scalar * vy)
+      setGlobalFloat(machine, statement.c + 2, scalar * vz)
     else if code == op.OP_MUL_VF then
-      value = vector(machine, statement.a)
+      vx = globalFloat(machine, statement.a)
+      vy = globalFloat(machine, statement.a + 1)
+      vz = globalFloat(machine, statement.a + 2)
       scalar = globalFloat(machine, statement.b)
-      setVector(machine, statement.c, t.Vec3(value.x * scalar, value.y * scalar, value.z * scalar))
+      setGlobalFloat(machine, statement.c, vx * scalar)
+      setGlobalFloat(machine, statement.c + 1, vy * scalar)
+      setGlobalFloat(machine, statement.c + 2, vz * scalar)
     else if code == op.OP_DIV_F then
       setGlobalFloat(machine, statement.c, globalFloat(machine, statement.a) / globalFloat(machine, statement.b))
     else if code == op.OP_ADD_F then
       setGlobalFloat(machine, statement.c, globalFloat(machine, statement.a) + globalFloat(machine, statement.b))
     else if code == op.OP_ADD_V then
-      a = vector(machine, statement.a)
-      b = vector(machine, statement.b)
-      setVector(machine, statement.c, t.Vec3(a.x + b.x, a.y + b.y, a.z + b.z))
+      ax = globalFloat(machine, statement.a)
+      ay = globalFloat(machine, statement.a + 1)
+      az = globalFloat(machine, statement.a + 2)
+      bx = globalFloat(machine, statement.b)
+      by = globalFloat(machine, statement.b + 1)
+      bz = globalFloat(machine, statement.b + 2)
+      setGlobalFloat(machine, statement.c, ax + bx)
+      setGlobalFloat(machine, statement.c + 1, ay + by)
+      setGlobalFloat(machine, statement.c + 2, az + bz)
     else if code == op.OP_SUB_F then
       setGlobalFloat(machine, statement.c, globalFloat(machine, statement.a) - globalFloat(machine, statement.b))
     else if code == op.OP_SUB_V then
-      a = vector(machine, statement.a)
-      b = vector(machine, statement.b)
-      setVector(machine, statement.c, t.Vec3(a.x - b.x, a.y - b.y, a.z - b.z))
+      ax = globalFloat(machine, statement.a)
+      ay = globalFloat(machine, statement.a + 1)
+      az = globalFloat(machine, statement.a + 2)
+      bx = globalFloat(machine, statement.b)
+      by = globalFloat(machine, statement.b + 1)
+      bz = globalFloat(machine, statement.b + 2)
+      setGlobalFloat(machine, statement.c, ax - bx)
+      setGlobalFloat(machine, statement.c + 1, ay - by)
+      setGlobalFloat(machine, statement.c + 2, az - bz)
     else if code == op.OP_EQ_F then
       setGlobalFloat(machine, statement.c, globalFloat(machine, statement.a) == globalFloat(machine, statement.b))
     else if code == op.OP_EQ_V then
-      a = vector(machine, statement.a)
-      b = vector(machine, statement.b)
-      setGlobalFloat(machine, statement.c, a.x == b.x and a.y == b.y and a.z == b.z)
+      ax = globalFloat(machine, statement.a)
+      ay = globalFloat(machine, statement.a + 1)
+      az = globalFloat(machine, statement.a + 2)
+      bx = globalFloat(machine, statement.b)
+      by = globalFloat(machine, statement.b + 1)
+      bz = globalFloat(machine, statement.b + 2)
+      setGlobalFloat(machine, statement.c, ax == bx and ay == by and az == bz)
     else if code == op.OP_EQ_S then
       setGlobalFloat(machine, statement.c, stringAt(machine, statement.a) == stringAt(machine, statement.b))
     else if code == op.OP_EQ_E or code == op.OP_EQ_FNC then
@@ -586,9 +766,13 @@ function execute(machine, functionIndex)
     else if code == op.OP_NE_F then
       setGlobalFloat(machine, statement.c, globalFloat(machine, statement.a) != globalFloat(machine, statement.b))
     else if code == op.OP_NE_V then
-      a = vector(machine, statement.a)
-      b = vector(machine, statement.b)
-      setGlobalFloat(machine, statement.c, a.x != b.x or a.y != b.y or a.z != b.z)
+      ax = globalFloat(machine, statement.a)
+      ay = globalFloat(machine, statement.a + 1)
+      az = globalFloat(machine, statement.a + 2)
+      bx = globalFloat(machine, statement.b)
+      by = globalFloat(machine, statement.b + 1)
+      bz = globalFloat(machine, statement.b + 2)
+      setGlobalFloat(machine, statement.c, ax != bx or ay != by or az != bz)
     else if code == op.OP_NE_S then
       setGlobalFloat(machine, statement.c, stringCompare(stringAt(machine, statement.a), stringAt(machine, statement.b)))
     else if code == op.OP_NE_E or code == op.OP_NE_FNC then
@@ -646,8 +830,10 @@ function execute(machine, functionIndex)
     else if code == op.OP_NOT_F then
       setGlobalFloat(machine, statement.c, globalFloat(machine, statement.a) == 0.0)
     else if code == op.OP_NOT_V then
-      value = vector(machine, statement.a)
-      setGlobalFloat(machine, statement.c, value.x == 0.0 and value.y == 0.0 and value.z == 0.0)
+      vx = globalFloat(machine, statement.a)
+      vy = globalFloat(machine, statement.a + 1)
+      vz = globalFloat(machine, statement.a + 2)
+      setGlobalFloat(machine, statement.c, vx == 0.0 and vy == 0.0 and vz == 0.0)
     else if code == op.OP_NOT_S then
       setGlobalFloat(machine, statement.c, word(machine, statement.a) == 0 or stringAt(machine, statement.a) == "")
     else if code == op.OP_NOT_ENT or code == op.OP_NOT_FNC then
@@ -685,14 +871,24 @@ function execute(machine, functionIndex)
       return runError(machine, "Bad opcode " + code)
     end if
   end while
+  machine.fastExecutionDepth = machine.fastExecutionDepth - 1
   return machine.returnWord
 end function
 
+// Resolve the active PR_ExecuteProgram depth for diagnostics without exposing
+// the fixed-stack representation to compatibility fixtures.
+function callDepth(machine)
+  if machine.fastExecutionDepth > 0 then return machine.fastDepth end if
+  return len(machine.callStack)
+end function
+
+// Update module state for context.
 function setContext(machine, context)
   machine.context = context
   return machine
 end function
 
+// Return field offset derived from the active module state.
 function fieldOffset(machine, name)
   global fieldLookupKeys, fieldLookupRawKeys, fieldLookupValues
   ensureLookupMachine(machine)
@@ -713,13 +909,28 @@ function fieldOffset(machine, name)
   return -1
 end function
 
+// Return global offset derived from the active module state.
 function globalOffset(machine, name)
+  global globalLookupKeys, globalLookupRawKeys, globalLookupValues
+  ensureLookupMachine(machine)
+  key = nativeRawValue(name)
+  slot = lookupSlot(key)
+  if globalLookupValues[slot] != -2 and globalLookupKeys[slot] is not void and globalLookupRawKeys[slot] == key then return globalLookupValues[slot] end if
   for each definition in machine.program.globalDefs
-    if definition.name == name then return definition.offset end if
+    if definition.name == name then
+      globalLookupKeys[slot] = name
+      globalLookupRawKeys[slot] = key
+      globalLookupValues[slot] = definition.offset
+      return definition.offset
+    end if
   end for
+  globalLookupKeys[slot] = name
+  globalLookupRawKeys[slot] = key
+  globalLookupValues[slot] = -1
   return -1
 end function
 
+// Return function index derived from the active module state.
 function functionIndex(machine, name)
   global functionLookupKeys, functionLookupRawKeys, functionLookupValues
   ensureLookupMachine(machine)
@@ -742,14 +953,17 @@ function functionIndex(machine, name)
   return 0
 end function
 
+// Provide entity float behavior for the active subsystem.
 function entityFloat(machine, entityIndex, fieldOffsetValue)
   return native.bitsFloat(entityField(machine, entityIndex, fieldOffsetValue))
 end function
 
+// Update module state for entity float.
 function setEntityFloat(machine, entityIndex, fieldOffsetValue, value)
   return setEntityField(machine, entityIndex, fieldOffsetValue, native.floatBits(value))
 end function
 
+// Return entity vector derived from the active module state.
 function entityVector(machine, entityIndex, fieldOffsetValue)
   return t.Vec3(
     entityFloat(machine, entityIndex, fieldOffsetValue),
@@ -758,6 +972,7 @@ function entityVector(machine, entityIndex, fieldOffsetValue)
   )
 end function
 
+// Update module state for entity vector.
 function setEntityVector(machine, entityIndex, fieldOffsetValue, value)
   setEntityFloat(machine, entityIndex, fieldOffsetValue, value.x)
   setEntityFloat(machine, entityIndex, fieldOffsetValue + 1, value.y)
@@ -765,14 +980,17 @@ function setEntityVector(machine, entityIndex, fieldOffsetValue, value)
   return value
 end function
 
+// Provide entity string behavior for the active subsystem.
 function entityString(machine, entityIndex, fieldOffsetValue)
   return stringValue(machine, entityField(machine, entityIndex, fieldOffsetValue))
 end function
 
+// Update module state for entity string.
 function setEntityString(machine, entityIndex, fieldOffsetValue, text)
   return setEntityField(machine, entityIndex, fieldOffsetValue, internString(machine, text))
 end function
 
+// Update module state for entity.
 function clearEntity(machine, entityIndex)
   if entityIndex < 0 or entityIndex >= len(machine.edicts) then return error(2210, "clearEntity outside edict table") end if
   index = 0
@@ -783,6 +1001,7 @@ function clearEntity(machine, entityIndex)
   return true
 end function
 
+// Provide random float behavior for the active subsystem.
 function randomFloat(machine)
   machine.randomSeed = (machine.randomSeed * 214013 + 2531011) & 0xffffffff
   return ((machine.randomSeed >> 16) & 0x7fff) / 32767.0
@@ -794,26 +1013,32 @@ function PR_PrintStatement(machine, statementValue)
   return printStatement(machine, statementValue)
 end function
 
+// Mirror Quake's PR_StackTrace routine and its observable state changes.
 function PR_StackTrace(machine)
   return stackTrace(machine)
 end function
 
+// Mirror Quake's PR_Profile_f routine and its observable state changes.
 function PR_Profile_f(machine)
   return profileReport(machine)
 end function
 
+// Mirror Quake's PR_RunError routine and its observable state changes.
 function PR_RunError(machine, message)
   return runError(machine, message)
 end function
 
+// Mirror Quake's PR_EnterFunction routine and its observable state changes.
 function PR_EnterFunction(machine, functionIndexValue)
   return enterFunction(machine, functionIndexValue)
 end function
 
+// Mirror Quake's PR_LeaveFunction routine and its observable state changes.
 function PR_LeaveFunction(machine)
   return leaveFunction(machine)
 end function
 
+// Mirror Quake's PR_ExecuteProgram routine and its observable state changes.
 function PR_ExecuteProgram(machine, functionIndexValue)
   return execute(machine, functionIndexValue)
 end function

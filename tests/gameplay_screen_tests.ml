@@ -1,26 +1,34 @@
-/* BP-077: gl_screen.c loading, modal and screenshot parity. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
+BP-077: gl_screen.c loading, modal and screenshot parity.
+*/
 import miniquake.screen as screen
 import miniquake.console as console
 import miniquake.cvar as cvar
 import miniquake.types as t
 import miniquake.constants as c
 
+// Assert that the condition holds and identify a failing test.
 function yes(value, name)
   if not value then return error(10770, name + ": expected true") end if
   return true
 end function
 
+// Exercise no as part of this deterministic regression fixture.
 function no(value, name)
   if value then return error(10771, name + ": expected false") end if
   return true
 end function
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(10772, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function near(actual, expected, tolerance, name)
   difference = actual - expected
   if difference < 0.0 then difference = -difference end if
@@ -28,13 +36,15 @@ function near(actual, expected, tolerance, name)
   return true
 end function
 
+// Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
-  print "[" + number + "/22] " + name
+  print "[" + number + "/23] " + name
   result = try(fn())
   if result is error then print "FAIL: " + result.message; return false end if
   return true
 end function
 
+// Create and initialize registry.
 function makeRegistry()
   registry = cvar.createRegistry()
   registry.variables = [
@@ -51,52 +61,62 @@ function makeRegistry()
   return registry
 end function
 
+// Verify center print lines against the expected Quake behavior.
 function testCenterPrintLines()
   lines = screen.SCR_CenterPrint(void, "one\ntwo", 4.0)
   equal(lines, 2, "center lines")
   return true
 end function
 
+// Verify center draw characters against the expected Quake behavior.
 function testCenterDrawCharacters()
   screen.SCR_CenterPrint(void, "one\ntwo", 4.0)
   equal(screen.SCR_DrawCenterString(320, 200, 4.0), 6, "center characters")
   return true
 end function
 
+// Verify center timeout against the expected Quake behavior.
 function testCenterTimeout()
   screen.SCR_CenterPrint(void, "text", 1.0)
   equal(screen.SCR_CheckDrawCenterString(320, 200, 4.0, 3.0, true), 0, "expired center")
   return true
 end function
 
+// Verify calc fov classic against the expected Quake behavior.
 function testCalcFovClassic()
   near(screen.CalcFov(90.0, 320.0, 200.0), 64.01076641616699, 0.0001, "classic fov")
   return true
 end function
 
+// Verify calc fov low error against the expected Quake behavior.
 function testCalcFovLowError()
   result = try(screen.CalcFov(0.5, 320.0, 200.0))
   yes(result is error, "low fov error")
   return true
 end function
 
+// Verify calc fov high error against the expected Quake behavior.
 function testCalcFovHighError()
   result = try(screen.CalcFov(180.0, 320.0, 200.0))
   yes(result is error, "high fov error")
   return true
 end function
 
+// Verify calc refdef against the expected Quake behavior.
 function testCalcRefdef()
   registry = makeRegistry()
   refdef = screen.SCR_CalcRefdef(320, 200, registry, 0)
   equal(refdef[0], 0, "refdef x")
   equal(refdef[2], 320, "refdef width")
   yes(refdef[3] < 200, "statusbar reserves height")
+  cachedRefdef = screen.SCR_CalcRefdef(320, 200, registry, 0)
+  equal(nativeRawValue(cachedRefdef), nativeRawValue(refdef), "unchanged refdef storage reused")
   near(screen.SCR_ConsoleSlidePixels(640, 480, 0.05, registry), 15.0, 0.0001, "classic console speed")
   near(screen.SCR_ConsoleSlidePixels(1920, 1080, 0.05, registry), 30.0, 0.0001, "scaled console speed")
   return true
 end function
 
+// Verify size up against the expected Quake behavior.
 function testSizeUp()
   registry = makeRegistry()
   screen.SCR_SizeUp_f(registry)
@@ -104,6 +124,7 @@ function testSizeUp()
   return true
 end function
 
+// Verify size down against the expected Quake behavior.
 function testSizeDown()
   registry = makeRegistry()
   screen.SCR_SizeDown_f(registry)
@@ -111,6 +132,7 @@ function testSizeDown()
   return true
 end function
 
+// Verify tga layout against the expected Quake behavior.
 function testTgaLayout()
   tga = screen.BuildTga(2, 1, bytes([1, 2, 3, 255, 4, 5, 6, 255]))
   equal(len(tga), 24, "tga bytes")
@@ -121,6 +143,7 @@ function testTgaLayout()
   return true
 end function
 
+// Verify tga bgr against the expected Quake behavior.
 function testTgaBgr()
   tga = screen.BuildTga(1, 1, bytes([1, 2, 3, 255]))
   equal(tga[18], 3, "blue")
@@ -129,6 +152,7 @@ function testTgaBgr()
   return true
 end function
 
+// Verify screenshot historical error against the expected Quake behavior.
 function testScreenshotHistoricalError()
   result = try(screen.SCR_ScreenshotFailure())
   yes(result is error, "screenshot error")
@@ -136,16 +160,19 @@ function testScreenshotHistoricalError()
   return true
 end function
 
+// Verify loading disconnected against the expected Quake behavior.
 function testLoadingDisconnected()
   no(screen.SCR_BeginLoadingPlaque(void, 1.0, false, c.SIGNONS), "disconnected plaque")
   return true
 end function
 
+// Verify loading unsignoned against the expected Quake behavior.
 function testLoadingUnsignoned()
   no(screen.SCR_BeginLoadingPlaque(void, 1.0, true, c.SIGNON_SPAWN), "unsignoned plaque")
   return true
 end function
 
+// Verify loading accepted against the expected Quake behavior.
 function testLoadingAccepted()
   yes(screen.SCR_BeginLoadingPlaque(void, 10.0, true, c.SIGNONS), "accepted plaque")
   state = screen.SCR_DifferentialState()
@@ -153,6 +180,7 @@ function testLoadingAccepted()
   return true
 end function
 
+// Verify loading end against the expected Quake behavior.
 function testLoadingEnd()
   screen.SCR_BeginLoadingPlaque(void, 10.0, true, c.SIGNONS)
   screen.SCR_EndLoadingPlaque(void)
@@ -161,21 +189,35 @@ function testLoadingEnd()
   return true
 end function
 
+// Verify loading warmup updates against the expected Quake behavior.
+function testLoadingWarmupUpdates()
+  screen.SCR_BeginLoadingPlaque(void, 10.0, true, c.SIGNONS)
+  equal(screen.SCR_FinishLoadingAfterUpdates(2), 2, "warmup updates")
+  state = screen.SCR_DifferentialState()
+  no(state[11], "warmup drawing is not blocked")
+  screen.SCR_EndLoadingPlaque(void)
+  return true
+end function
+
+// Verify modal dedicated against the expected Quake behavior.
 function testModalDedicated()
   yes(screen.SCR_ModalMessage("Continue?", void, true), "dedicated modal")
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function testModalYes()
   yes(screen.SCR_ModalMessage("Continue?", 121, false), "modal y")
   return true
 end function
 
+// Verify modal no against the expected Quake behavior.
 function testModalNo()
   no(screen.SCR_ModalMessage("Continue?", 110, false), "modal n")
   return true
 end function
 
+// Verify tile clear historical width against the expected Quake behavior.
 function testTileClearHistoricalWidth()
   screen.SCR_DifferentialSetTile([10, 5, 100, 80, 90.0, 60.0], 48)
   tiles = screen.SCR_TileClear(320, 200)
@@ -185,6 +227,7 @@ function testTileClearHistoricalWidth()
   return true
 end function
 
+// Verify overlay dialog against the expected Quake behavior.
 function testOverlayDialog()
   order = screen.ScreenOverlayOrder(true, false, 0, true)
   equal(len(order), 6, "dialog stages")
@@ -193,6 +236,7 @@ function testOverlayDialog()
   return true
 end function
 
+// Verify overlay normal against the expected Quake behavior.
 function testOverlayNormal()
   order = screen.ScreenOverlayOrder(false, false, 0, true)
   equal(len(order), 11, "normal stages")
@@ -207,6 +251,7 @@ function testOverlayNormal()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   passed = 0
   if run(1, "center print lines", testCenterPrintLines) then passed = passed + 1 end if
@@ -225,13 +270,14 @@ function main(args)
   if run(14, "loading unsignoned", testLoadingUnsignoned) then passed = passed + 1 end if
   if run(15, "loading accepted", testLoadingAccepted) then passed = passed + 1 end if
   if run(16, "loading end", testLoadingEnd) then passed = passed + 1 end if
-  if run(17, "modal dedicated", testModalDedicated) then passed = passed + 1 end if
-  if run(18, "modal yes", testModalYes) then passed = passed + 1 end if
-  if run(19, "modal no", testModalNo) then passed = passed + 1 end if
-  if run(20, "tile clear", testTileClearHistoricalWidth) then passed = passed + 1 end if
-  if run(21, "dialog overlay", testOverlayDialog) then passed = passed + 1 end if
-  if run(22, "normal overlay", testOverlayNormal) then passed = passed + 1 end if
-  if passed != 22 then print "MiniQuake BP-077 screen/loading tests failed: " + passed + "/22"; return 1 end if
-  print "MiniQuake BP-077 screen/loading tests passed: 22"
+  if run(17, "loading warmup", testLoadingWarmupUpdates) then passed = passed + 1 end if
+  if run(18, "modal dedicated", testModalDedicated) then passed = passed + 1 end if
+  if run(19, "modal yes", testModalYes) then passed = passed + 1 end if
+  if run(20, "modal no", testModalNo) then passed = passed + 1 end if
+  if run(21, "tile clear", testTileClearHistoricalWidth) then passed = passed + 1 end if
+  if run(22, "dialog overlay", testOverlayDialog) then passed = passed + 1 end if
+  if run(23, "normal overlay", testOverlayNormal) then passed = passed + 1 end if
+  if passed != 23 then print "MiniQuake BP-077 screen/loading tests failed: " + passed + "/23"; return 1 end if
+  print "MiniQuake BP-077 screen/loading tests passed: 23"
   return 0
 end function

@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.render.world.
+*/
 package miniquake.render.world
 
 import miniquake.types as t
@@ -5,6 +12,7 @@ import miniquake.constants as c
 import miniquake.mathlib as math
 import miniquake.native as native
 import miniquake.render.gl11 as gl
+import miniquake.optimization_baseline as optBaseline
 import miniquake.render.draw2d as draw2d
 import miniquake.render.gl_warp as glWarp
 import miniquake.render.gl_rlight as glRlight
@@ -19,7 +27,12 @@ import miniquake.byteio as byteio
 // GameSession -> WorldRenderer -> surfaces is not reliable across allocations
 // performed while the entity renderer is built.
 worldSurfaceRoots = []
+clearStaticCacheOnCreate = true
+visibleFaceCountRenderer = void
+visibleFaceCountLeaf = -2
+visibleFaceCountValue = 0
 
+// Initialize state for starts with.
 function startsWith(text, prefix)
   textBytes = bytes(text)
   prefixBytes = bytes(prefix)
@@ -32,18 +45,21 @@ function startsWith(text, prefix)
   return true
 end function
 
+// Return floor value derived from the active module state.
 function floorValue(value)
   truncated = native.trunc(value)
   if truncated > value then truncated = truncated - 1 end if
   return truncated
 end function
 
+// Return ceil value derived from the active module state.
 function ceilValue(value)
   truncated = native.trunc(value)
   if truncated < value then truncated = truncated + 1 end if
   return truncated
 end function
 
+// Provide face vertex behavior for the active subsystem.
 function faceVertex(map, face, edgeNumber)
   surfEdgeIndex = face.firstEdge + edgeNumber
   if surfEdgeIndex < 0 or surfEdgeIndex >= len(map.surfEdges) then return error(2700, "R_BuildSurface: bad surfedge") end if
@@ -58,6 +74,7 @@ function faceVertex(map, face, edgeNumber)
   return map.vertices[vertexIndex].position
 end function
 
+// Provide indexed to rgba behavior for the active subsystem.
 function indexedToRgba(indexed, palette, transparent)
   if len(palette) < 768 then return error(2703, "palette.lmp is truncated") end if
   output = bytes(len(indexed) * 4)
@@ -75,6 +92,7 @@ function indexedToRgba(indexed, palette, transparent)
   return output
 end function
 
+// Provide missing texture pixels behavior for the active subsystem.
 function missingTexturePixels()
   output = bytes(16 * 16 * 4)
   y = 0
@@ -100,6 +118,7 @@ function missingTexturePixels()
   return output
 end function
 
+// Upload pixels to the active renderer.
 function uploadPixels(width, height, rgba, nearest)
   textureId = gl.generateTexture()
   gl.bindTexture(textureId)
@@ -113,6 +132,7 @@ function uploadPixels(width, height, rgba, nearest)
   return textureId
 end function
 
+// Provide texture flags behavior for the active subsystem.
 function textureFlags(textureName, faceSide)
   flags = 0
   if faceSide != 0 then flags = flags | c.SURF_PLANEBACK end if
@@ -121,6 +141,7 @@ function textureFlags(textureName, faceSide)
   return flags
 end function
 
+// Create and initialize underwater flags.
 function buildUnderwaterFlags(map)
   flags = bytes(len(map.faces), 0)
   leafIndex = 0
@@ -142,6 +163,7 @@ function buildUnderwaterFlags(map)
   return flags
 end function
 
+// Create and initialize surface.
 function buildSurface(map, faceIndex, underwaterFlags)
   if faceIndex < 0 or faceIndex >= len(map.faces) then return error(2704, "R_BuildSurface: bad face") end if
   face = map.faces[faceIndex]
@@ -237,6 +259,7 @@ function buildSurface(map, faceIndex, underwaterFlags)
   return surface
 end function
 
+// Create and initialize lightmap.
 function buildLightmap(renderer, surface)
   if surface.lightOffset < 0 then return 0 end if
   if (surface.flags & c.SURF_DRAWTILED) != 0 then return 0 end if
@@ -264,10 +287,11 @@ function buildLightmap(renderer, surface)
   return textureId
 end function
 
+// Create and initialize the module state.
 function create(map, palette)
   global worldSurfaceRoots
   if len(palette) < 768 then return error(2706, "R_NewMap: invalid palette") end if
-  gl.clearStaticGeometryCache()
+  if clearStaticCacheOnCreate then gl.clearStaticGeometryCache() end if
   textures = arrayutil.makeEmptyArray(len(map.textures))
   textureIndex = 0
   while textureIndex < len(map.textures)
@@ -316,6 +340,22 @@ function create(map, palette)
   return renderer
 end function
 
+// Create and initialize external.
+function createExternal(map, palette)
+  global worldSurfaceRoots, clearStaticCacheOnCreate
+  // External BSP pickups use the same surface builder but do not replace the
+  // active world's collector root. EntityRenderer keeps their surface arrays
+  // in its own direct package root until the level is destroyed.
+  activeWorldRoots = worldSurfaceRoots
+  previousClear = clearStaticCacheOnCreate
+  clearStaticCacheOnCreate = false
+  renderer = create(map, palette)
+  clearStaticCacheOnCreate = previousClear
+  worldSurfaceRoots = activeWorldRoots
+  return renderer
+end function
+
+// Upload the requested value to the active renderer.
 function upload(renderer)
   if renderer.uploaded then return renderer end if
   draw2d.Draw_SetPalette(renderer.palette)
@@ -366,8 +406,240 @@ function upload(renderer)
   return renderer
 end function
 
+// External BSP models such as maps/b_bh25.bsp are independent brush models,
+// not *n submodels of the active world. GLQuake includes all of them in
+// GL_BuildLightmaps. Keep their uploads independent from the world's shared
+// atlas so loading one cannot replace the active world's compatibility state.
+function buildStandaloneLightmap(renderer, surface)
+  // Build dependent state in order so later fields reference fully initialized data.
+  if (surface.flags & (c.SURF_DRAWSKY | c.SURF_DRAWTURB | c.SURF_DRAWTILED)) != 0 then return 0 end if
+  count = surface.lightWidth * surface.lightHeight
+  if count <= 0 then return 0 end if
+  accumulated = arrayutil.makeFilledArray(count, 0)
+  fullbright = renderer.fullbright or len(renderer.map.lighting) == 0 or surface.lightOffset < 0
+  if fullbright then
+    index = 0
+    while index < count
+      accumulated[index] = 255 * 256
+      index = index + 1
+    end while
+  else
+    face = renderer.map.faces[surface.faceIndex]
+    mapNumber = 0
+    while mapNumber < len(face.styles) and mapNumber < 4 and face.styles[mapNumber] != 255
+      sourceOffset = surface.lightOffset + mapNumber * count
+      index = 0
+      while index < count and sourceOffset + index < len(renderer.map.lighting)
+        accumulated[index] = accumulated[index] + renderer.map.lighting[sourceOffset + index] * 256
+        index = index + 1
+      end while
+      mapNumber = mapNumber + 1
+    end while
+  end if
+  pixels = bytes(count)
+  index = 0
+  while index < count
+    lightValue = accumulated[index] >> 7
+    if lightValue > 255 then lightValue = 255 end if
+    pixels[index] = 255 - lightValue
+    index = index + 1
+  end while
+  textureId = gl.generateTexture()
+  gl.bindTexture(textureId)
+  gl.textureParameter(gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR)
+  gl.textureParameter(gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)
+  gl.textureParameter(gl.GL_TEXTURE_WRAP_S, gl.GL_CLAMP)
+  gl.textureParameter(gl.GL_TEXTURE_WRAP_T, gl.GL_CLAMP)
+  gl.uploadLuminance(surface.lightWidth, surface.lightHeight, pixels)
+  return textureId
+end function
+
+// Upload standalone brush to the active renderer.
+function uploadStandaloneBrush(renderer)
+  if renderer.uploaded then return renderer end if
+  draw2d.Draw_SetPalette(renderer.palette)
+  renderer.noTextureId = uploadPixels(16, 16, missingTexturePixels(), true)
+  index = 0
+  while index < len(renderer.textures)
+    texture = renderer.textures[index]
+    if texture is not void and texture.width > 0 and texture.height > 0 and len(texture.pixels) >= texture.width * texture.height then
+      uploaded = try(draw2d.GL_LoadTexture(
+        renderer.map.filename + ":" + texture.name,
+        texture.width,
+        texture.height,
+        texture.pixels,
+        true,
+        texture.transparent,
+      ))
+      if uploaded is error then return uploaded end if
+      texture.glId = uploaded
+    end if
+    index = index + 1
+  end while
+  renderer.lightmaps = []
+  index = 0
+  while index < len(renderer.surfaces)
+    textureId = try(buildStandaloneLightmap(renderer, renderer.surfaces[index]))
+    if textureId is error then return textureId end if
+    renderer.surfaces[index].lightmapId = textureId
+    if textureId != 0 then renderer.lightmaps = renderer.lightmaps + [textureId] end if
+    index = index + 1
+  end while
+  renderer.uploaded = true
+  return renderer
+end function
+
+// Provide standalone texture id behavior for the active subsystem.
+function standaloneTextureId(renderer, surface, currentTime, alternate)
+  if surface.textureIndex >= 0 and surface.textureIndex < len(renderer.textures) then
+    texture = renderer.textures[surface.textureIndex]
+    if texture is not void then
+      target = bsp.textureAnimationIndex(renderer.map.textures, surface.textureIndex, currentTime, alternate)
+      if not (target is error) and target >= 0 and target < len(renderer.textures) then
+        animated = renderer.textures[target]
+        if animated is not void and animated.glId != 0 then return animated.glId end if
+      end if
+      if texture.glId != 0 then return texture.glId end if
+    end if
+  end if
+  return renderer.noTextureId
+end function
+
+// Return standalone model origin derived from the active module state.
+function standaloneModelOrigin(viewOrigin, entity)
+  result = math.subtract(viewOrigin, entity.origin)
+  if entity.angles.x == 0.0 and entity.angles.y == 0.0 and entity.angles.z == 0.0 then return result end if
+  vectors = math.angleVectors(entity.angles)
+  return t.Vec3(
+    math.dot(result, vectors[0]),
+    -math.dot(result, vectors[1]),
+    math.dot(result, vectors[2]),
+  )
+end function
+
+// Provide standalone surface faces viewer behavior for the active subsystem.
+function standaloneSurfaceFacesViewer(surface, distance)
+  if (surface.flags & c.SURF_PLANEBACK) != 0 then return distance < -GLQUAKE_BACKFACE_EPSILON end if
+  return distance > GLQUAKE_BACKFACE_EPSILON
+end function
+
+// Render standalone base.
+function drawStandaloneBase(renderer, surface, currentTime, alternate)
+  if len(surface.vertices) < 3 then return false end if
+  gl.bindTexture(standaloneTextureId(renderer, surface, currentTime, alternate))
+  transparent = false
+  if surface.textureIndex >= 0 and surface.textureIndex < len(renderer.textures) and renderer.textures[surface.textureIndex] is not void then
+    transparent = renderer.textures[surface.textureIndex].transparent
+  end if
+  if transparent then gl.enable(gl.GL_ALPHA_TEST); gl.alphaFunc(gl.GL_GREATER, 0.5) end if
+  gl.color(255, 255, 255, 255)
+  gl.begin(gl.GL_POLYGON)
+  for each vertex in surface.vertices
+    gl.texcoord2(vertex.s, vertex.t)
+    gl.vertex3(vertex.position.x, vertex.position.y, vertex.position.z)
+  end for
+  gl.finishPrimitive()
+  if transparent then gl.disable(gl.GL_ALPHA_TEST) end if
+  return true
+end function
+
+// Render standalone light.
+function drawStandaloneLight(surface)
+  if surface.lightmapId == 0 or len(surface.vertices) < 3 then return false end if
+  gl.bindTexture(surface.lightmapId)
+  gl.begin(gl.GL_POLYGON)
+  for each vertex in surface.vertices
+    gl.texcoord2(vertex.lightS, vertex.lightT)
+    gl.vertex3(vertex.position.x, vertex.position.y, vertex.position.z)
+  end for
+  gl.finishPrimitive()
+  return true
+end function
+
+// Render standalone brush.
+function drawStandaloneBrush(renderer, entity, viewOrigin, currentTime)
+  if renderer is void or entity is void or viewOrigin is void or len(renderer.map.models) == 0 then return 0 end if
+  uploaded = try(uploadStandaloneBrush(renderer))
+  if uploaded is error then return uploaded end if
+  GL_DisableMultitexture()
+  model = renderer.map.models[0]
+  modelOrigin = standaloneModelOrigin(viewOrigin, entity)
+  visibleCount = 0
+  gl.colorFloat(1.0, 1.0, 1.0, 1.0)
+  gl.pushMatrix()
+  gl.translate(entity.origin.x, entity.origin.y, entity.origin.z)
+  gl.rotate(entity.angles.y, 0.0, 0.0, 1.0)
+  gl.rotate(entity.angles.x, 0.0, 1.0, 0.0)
+  gl.rotate(entity.angles.z, 1.0, 0.0, 0.0)
+  faceIndex = model.firstFace
+  lastFace = faceIndex + model.numFaces
+  while faceIndex < lastFace and faceIndex < len(renderer.surfaces)
+    if faceIndex >= 0 then
+      surface = renderer.surfaces[faceIndex]
+      face = renderer.map.faces[surface.faceIndex]
+      if face.planeIndex >= 0 and face.planeIndex < len(renderer.map.planes) then
+        plane = renderer.map.planes[face.planeIndex]
+        distance = math.dot(modelOrigin, plane.normal) - plane.dist
+        if standaloneSurfaceFacesViewer(surface, distance) then
+          drawStandaloneBase(renderer, surface, currentTime, entity.frame != 0)
+          visibleCount = visibleCount + 1
+        end if
+      end if
+    end if
+    faceIndex = faceIndex + 1
+  end while
+  if visibleCount > 0 and not renderer.fullbright then
+    gl.depthMask(false)
+    gl.enable(gl.GL_BLEND)
+    gl.blendFunc(gl.GL_ZERO, gl.GL_ONE_MINUS_SRC_COLOR)
+    // Repeat the cheap plane test instead of allocating a visible-surface
+    // array for every pickup on every frame.
+    faceIndex = model.firstFace
+    while faceIndex < lastFace and faceIndex < len(renderer.surfaces)
+      if faceIndex >= 0 then
+        surface = renderer.surfaces[faceIndex]
+        face = renderer.map.faces[surface.faceIndex]
+        if face.planeIndex >= 0 and face.planeIndex < len(renderer.map.planes) then
+          plane = renderer.map.planes[face.planeIndex]
+          distance = math.dot(modelOrigin, plane.normal) - plane.dist
+          if standaloneSurfaceFacesViewer(surface, distance) then drawStandaloneLight(surface) end if
+        end if
+      end if
+      faceIndex = faceIndex + 1
+    end while
+    gl.disable(gl.GL_BLEND)
+    // R_BlendLightmaps restores GLQuake's conventional alpha blend factors
+    // after its multiplicative lightmap pass. External BSP pickups use an
+    // independent lightmap path, but subsequent dlight/polyblend rendering
+    // shares the same fixed-function state and requires the same restoration.
+    gl.blendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
+    gl.depthMask(true)
+  end if
+  gl.popMatrix()
+  return visibleCount
+end function
+
+// Release resources owned by standalone brush.
+function destroyStandaloneBrush(renderer)
+  if renderer is void then return false end if
+  if renderer.noTextureId != 0 then gl.deleteTexture(renderer.noTextureId); renderer.noTextureId = 0 end if
+  for each texture in renderer.textures
+    if texture is not void and texture.glId != 0 then gl.deleteTexture(texture.glId); texture.glId = 0 end if
+  end for
+  for each textureId in renderer.lightmaps
+    if textureId != 0 then gl.deleteTexture(textureId) end if
+  end for
+  renderer.lightmaps = []
+  for each surface in renderer.surfaces
+    surface.lightmapId = 0
+  end for
+  renderer.uploaded = false
+  return true
+end function
+
+// Release resources owned by the requested value.
 function destroy(renderer)
-  global worldSurfaceRoots
+  global worldSurfaceRoots, visibleFaceCountRenderer, visibleFaceCountLeaf, visibleFaceCountValue
   if renderer is void then return false end if
   gl.clearStaticGeometryCache()
   if renderer.noTextureId != 0 then gl.deleteTexture(renderer.noTextureId); renderer.noTextureId = 0 end if
@@ -385,10 +657,16 @@ function destroy(renderer)
   end for
   renderer.uploaded = false
   worldSurfaceRoots = []
+  if visibleFaceCountRenderer == renderer then
+    visibleFaceCountRenderer = void
+    visibleFaceCountLeaf = -2
+    visibleFaceCountValue = 0
+  end if
   if rCompatRenderer == renderer then R_ResetWorldCompatibility() end if
   return true
 end function
 
+// Provide compat contains integer behavior for the active subsystem.
 function compatContainsInteger(values, wanted)
   for each value in values
     if value == wanted then return true end if
@@ -396,6 +674,7 @@ function compatContainsInteger(values, wanted)
   return false
 end function
 
+// Apply the Quake-compatible r collect lightmap texture ids behavior.
 function R_CollectLightmapTextureIds(renderer)
   if renderer is void then return [] end if
   result = []
@@ -408,13 +687,19 @@ function R_CollectLightmapTextureIds(renderer)
   return result
 end function
 
+// Report whether mark all visible holds for the active state.
 function markAllVisible(renderer)
+  global visibleFaceCountRenderer, visibleFaceCountLeaf, visibleFaceCountValue
   renderer.visibleFaces = bytes(len(renderer.map.faces), 1)
   // Invalidate the cached leaf so returning from r_novis recomputes the PVS.
   renderer.viewLeaf = -1
-  return len(renderer.map.faces)
+  visibleFaceCountRenderer = renderer
+  visibleFaceCountLeaf = -1
+  visibleFaceCountValue = len(renderer.map.faces)
+  return visibleFaceCountValue
 end function
 
+// Report whether count visible faces holds for the active state.
 function countVisibleFaces(visibleFaces)
   count = 0
   index = 0
@@ -426,21 +711,38 @@ function countVisibleFaces(visibleFaces)
   return count
 end function
 
+// Report whether mark visible holds for the active state.
 function markVisible(renderer, viewOrigin)
+  global visibleFaceCountRenderer, visibleFaceCountLeaf, visibleFaceCountValue
   map = renderer.map
   if len(map.leafs) <= 1 or len(map.models) == 0 then return markAllVisible(renderer) end if
   currentLeaf = world.leafForPoint(map, viewOrigin)
   if currentLeaf == renderer.viewLeaf and len(renderer.visibleFaces) == len(map.faces) then
-    return countVisibleFaces(renderer.visibleFaces)
+    if visibleFaceCountRenderer == renderer and visibleFaceCountLeaf == currentLeaf then return visibleFaceCountValue end if
+    visibleFaceCountRenderer = renderer
+    visibleFaceCountLeaf = currentLeaf
+    visibleFaceCountValue = countVisibleFaces(renderer.visibleFaces)
+    return visibleFaceCountValue
   end if
   renderer.viewLeaf = currentLeaf
-  visibleFaces = bytes(len(map.faces), 0)
-  rowBytes = (map.models[0].visibleLeafs + 7) >> 3
-  visibility = bytes(rowBytes, 255)
-  if currentLeaf >= 0 and currentLeaf < len(map.leafs) then
-    offset = map.leafs[currentLeaf].visibilityOffset
-    if offset >= 0 and rowBytes > 0 then visibility = bsp.decompressVisibility(map.visibility, offset, rowBytes) end if
+  // Entering a new BSP leaf used to allocate a complete face mask in a live
+  // gameplay frame.  Reuse and clear the existing fixed-size buffer so rapid
+  // movement through portals cannot create allocator/collector pressure.
+  visibleFaces = renderer.visibleFaces
+  if len(visibleFaces) != len(map.faces) then
+    visibleFaces = bytes(len(map.faces), 0)
+  else
+    faceIndex = 0
+    while faceIndex < len(visibleFaces)
+      visibleFaces[faceIndex] = 0
+      faceIndex = faceIndex + 1
+    end while
   end if
+  rowBytes = (map.models[0].visibleLeafs + 7) >> 3
+  // SV_SpawnServer expands every PVS row while the loading plaque is active.
+  // Reuse that immutable row instead of decompressing on the first frame in
+  // each newly entered leaf.
+  visibility = world.leafPvs(map, currentLeaf)
 
   count = 0
   leafIndex = 1
@@ -464,6 +766,9 @@ function markVisible(renderer, viewOrigin)
     leafIndex = leafIndex + 1
   end while
   renderer.visibleFaces = visibleFaces
+  visibleFaceCountRenderer = renderer
+  visibleFaceCountLeaf = currentLeaf
+  visibleFaceCountValue = count
   return count
 end function
 
@@ -476,6 +781,7 @@ function ViewContents(renderer, viewOrigin)
   return renderer.map.leafs[leafIndex].contents
 end function
 
+// Provide texture id for surface behavior for the active subsystem.
 function textureIdForSurface(renderer, surface)
   if surface.textureIndex >= 0 and surface.textureIndex < len(renderer.textures) then
     texture = renderer.textures[surface.textureIndex]
@@ -501,6 +807,7 @@ function textureIdForSurface(renderer, surface)
   return renderer.noTextureId
 end function
 
+// Render base surface.
 function drawBaseSurface(renderer, surface)
   if len(surface.vertices) < 3 then return end if
   gl.bindTexture(textureIdForSurface(renderer, surface))
@@ -517,6 +824,7 @@ function drawBaseSurface(renderer, surface)
   if transparent then gl.disable(gl.GL_ALPHA_TEST) end if
 end function
 
+// Render light surface.
 function drawLightSurface(surface)
   if surface.lightmapId == 0 or len(surface.vertices) < 3 then return end if
   gl.bindTexture(surface.lightmapId)
@@ -528,6 +836,7 @@ function drawLightSurface(surface)
   gl.finishPrimitive()
 end function
 
+// Update module state for up view.
 function setupView(width, height, origin, angles)
   if width <= 0 then width = 1 end if
   if height <= 0 then height = 1 end if
@@ -535,6 +844,7 @@ function setupView(width, height, origin, angles)
   return setupViewRect(0, 0, width, height, width, height, 90.0, fovY, origin, angles)
 end function
 
+// Apply the Quake-compatible r viewport rect behavior.
 function R_ViewportRect(viewX, viewY, width, height, screenWidth, screenHeight)
   if width <= 0 then width = 1 end if
   if height <= 0 then height = 1 end if
@@ -552,6 +862,7 @@ function R_ViewportRect(viewX, viewY, width, height, screenWidth, screenHeight)
   return [x, y2, x2 - x, y - y2]
 end function
 
+// Apply the Quake-compatible r set cull compatibility behavior.
 function R_SetCullCompatibility(enabled)
   global rCompatCull
   rCompatCull = enabled
@@ -571,6 +882,7 @@ function R_ConfigureSpecialCompatibility(mirrorAlpha, clearColor, zTrick, finish
   return [rCompatMirrorAlpha, rCompatClearColor, rCompatZTrick, rCompatFinish, rCompatNoRefresh]
 end function
 
+// Apply the Quake-compatible r special compatibility state behavior.
 function R_SpecialCompatibilityState()
   return [
     rCompatMirrorAlpha, rCompatClearColor, rCompatZTrick,
@@ -579,10 +891,27 @@ function R_SpecialCompatibilityState()
   ]
 end function
 
+// Apply the Quake-compatible r current depth range behavior.
 function R_CurrentDepthRange()
   return [rCompatDepthMin, rCompatDepthMax]
 end function
 
+// Mirror Quake's R_CurrentDepthMinimum routine and its observable state changes.
+function R_CurrentDepthMinimum()
+  return rCompatDepthMin
+end function
+
+// Mirror Quake's R_CurrentDepthMaximum routine and its observable state changes.
+function R_CurrentDepthMaximum()
+  return rCompatDepthMax
+end function
+
+// Apply the Quake-compatible r current view origin behavior.
+function R_CurrentViewOrigin()
+  return rCompatViewOrigin
+end function
+
+// Apply the Quake-compatible r clear production behavior.
 function R_ClearProduction()
   global rCompatTrickFrame, rCompatDepthMin, rCompatDepthMax, rCompatLastClearPlan
   plan = specialPaths.clearPlan(rCompatMirrorAlpha, rCompatClearColor, rCompatZTrick, rCompatTrickFrame)
@@ -596,6 +925,7 @@ function R_ClearProduction()
   return plan
 end function
 
+// Apply the Quake-compatible r reset mirror compatibility behavior.
 function R_ResetMirrorCompatibility()
   global mirror, mirror_plane, rCompatMirrorChain, rCompatMirrorTexture
   mirror = false
@@ -606,23 +936,28 @@ function R_ResetMirrorCompatibility()
   return rCompatMirrorTexture
 end function
 
+// Apply the Quake-compatible r mirror ready behavior.
 function inline R_MirrorReady()
   return mirror and mirror_plane is not void and len(rCompatMirrorChain) > 0 and rCompatMirrorAlpha != 1.0
 end function
 
+// Apply the Quake-compatible r mirror view behavior.
 function R_MirrorView(origin, angles)
   if not R_MirrorReady() then return void end if
   return specialPaths.reflectView(origin, angles, mirror_plane)
 end function
 
+// Apply the Quake-compatible r mirror projection scale behavior.
 function R_MirrorProjectionScale()
   return specialPaths.mirrorProjectionScale(mirror_plane)
 end function
 
+// Apply the Quake-compatible r mirror chain count behavior.
 function R_MirrorChainCount()
   return len(rCompatMirrorChain)
 end function
 
+// Apply the Quake-compatible r draw mirror overlay behavior.
 function R_DrawMirrorOverlay(width, height, viewRect, origin, angles)
   global mirror, rCompatMirrorChain
   if not R_MirrorReady() then return 0 end if
@@ -651,11 +986,13 @@ function R_DrawMirrorOverlay(width, height, viewRect, origin, angles)
   return count
 end function
 
+// Apply the Quake-compatible r main render stage order behavior.
 function R_MainRenderStageOrder()
   // R_RenderScene followed by R_RenderView's post-scene passes.
   return ["world", "entities", "dlights", "particles", "viewmodel", "water", "polyblend"]
 end function
 
+// Update module state for up view rect.
 function setupViewRect(viewX, viewY, width, height, screenWidth, screenHeight, fovX, fovY, origin, angles)
   if width <= 0 then width = 1 end if
   if height <= 0 then height = 1 end if
@@ -681,6 +1018,7 @@ function setupViewRect(viewX, viewY, width, height, screenWidth, screenHeight, f
   gl.translate(-origin.x, -origin.y, -origin.z)
 end function
 
+// Render the requested value.
 function render(renderer, width, height, origin, angles)
   fovY = math.atan2(height * 1.0, width * 1.0) * 2.0 * math.RAD_TO_DEG
   return renderViewport(
@@ -690,6 +1028,7 @@ function render(renderer, width, height, origin, angles)
   )
 end function
 
+// Render viewport.
 function renderViewport(renderer, width, height, viewRect, origin, angles, dynamicLights, lightStyles, currentTime, realtime, frameTime, blend)
   if not renderer.uploaded then
     uploadResult = try(upload(renderer))
@@ -820,6 +1159,7 @@ rCompatAlphaSkyTexture = 0
 rCompatSkyChain = []
 rCompatWaterChain = []
 rCompatTextureChains = []
+rCompatTextureChainBuilders = []
 rCompatMultiTextureEnabled = false
 rCompatMultiTextureAvailable = false
 rCompatUseMultitexture = false
@@ -860,8 +1200,11 @@ rCompatSequentialBuilder = void
 rCompatCollectSequential = false
 rCompatMtexRecordFaces = []
 rCompatMtexRecords = bytes()
+rCompatMtexRecordCount = 0
 rCompatMtexRecordStamp = -1
 rCompatMtexTextureIds = []
+rCompatMtexTextureChecked = []
+rCompatSurfaceBatchKeys = bytes()
 mtexenabled = false
 r_dlightframecount = 0
 d_lightstylevalue = []
@@ -877,6 +1220,7 @@ nColinElim = 0
 mirror = false
 mirror_plane = void
 
+// Apply the Quake-compatible r reset world compatibility behavior.
 function R_ResetWorldCompatibility()
   global rCompatRenderer, rCompatViewOrigin, rCompatViewAngles, rCompatViewForward
   global rCompatViewRight, rCompatViewUp, rCompatDlights, rCompatLightStyles
@@ -885,7 +1229,7 @@ function R_ResetWorldCompatibility()
   global rCompatSurfaceCachedDlight, rCompatSurfaceLightmapPage, rCompatSurfaceLightS, rCompatSurfaceLightT
   global rCompatLightmapAllocated, rCompatLightmapModified, rCompatLightmapRectChange
   global rCompatWarpPolys, rCompatSurfaceWarpPolys, rCompatSkyTexture, rCompatAlphaSkyTexture
-  global rCompatSkyChain, rCompatWaterChain, rCompatTextureChains
+  global rCompatSkyChain, rCompatWaterChain, rCompatTextureChains, rCompatTextureChainBuilders
   global rCompatMultiTextureEnabled, rCompatUseMultitexture
   global rCompatDepthMin, rCompatDepthMax, rCompatLightSpot, rCompatLightPlane
   global rCompatMirrorTexture, rCompatMirrorChain, rCompatLastClearPlan
@@ -895,7 +1239,7 @@ function R_ResetWorldCompatibility()
   global skychain, waterchain, mtexenabled, r_dlightframecount, d_lightstylevalue
   global lightspot, lightplane, speedscale, solidskytexture, alphaskytexture
   global r_framecount, r_visframecount, c_brush_polys, nColinElim, mirror, mirror_plane
-  global currentTextureFrame, rCompatMtexRecordFaces, rCompatMtexRecords, rCompatMtexRecordStamp, rCompatMtexTextureIds
+  global currentTextureFrame, rCompatMtexRecordFaces, rCompatMtexRecords, rCompatMtexRecordCount, rCompatMtexRecordStamp, rCompatMtexTextureIds, rCompatMtexTextureChecked, rCompatSurfaceBatchKeys
 
   rCompatRenderer = void
   rCompatViewOrigin = void
@@ -926,6 +1270,7 @@ function R_ResetWorldCompatibility()
   rCompatSkyChain = []
   rCompatWaterChain = []
   rCompatTextureChains = []
+  rCompatTextureChainBuilders = []
   rCompatMultiTextureEnabled = false
   rCompatUseMultitexture = false
   rCompatDepthMin = 0.0
@@ -951,8 +1296,11 @@ function R_ResetWorldCompatibility()
   waterchain = []
   rCompatMtexRecordFaces = []
   rCompatMtexRecords = bytes()
+  rCompatMtexRecordCount = 0
   rCompatMtexRecordStamp = -1
   rCompatMtexTextureIds = []
+  rCompatMtexTextureChecked = []
+  rCompatSurfaceBatchKeys = bytes()
   mtexenabled = false
   r_dlightframecount = 0
   d_lightstylevalue = []
@@ -971,24 +1319,29 @@ function R_ResetWorldCompatibility()
   return true
 end function
 
+// Return compat zero vector derived from the active module state.
 function compatZeroVector()
   return t.Vec3(0.0, 0.0, 0.0)
 end function
 
+// Provide compat empty plane behavior for the active subsystem.
 function compatEmptyPlane()
   return t.Plane(compatZeroVector(), 0.0, GLQUAKE_PLANE_ANYZ, 0)
 end function
 
+// Provide compat abs behavior for the active subsystem.
 function compatAbs(value)
   if value < 0.0 then return -value end if
   return value
 end function
 
+// Return compat ensure array size derived from the active module state.
 function compatEnsureArraySize(values, count, fillValue)
   if len(values) == count then return values end if
   return arrayutil.makeFilledArray(count, fillValue)
 end function
 
+// Provide compat fresh lightmap allocation behavior for the active subsystem.
 function compatFreshLightmapAllocation()
   pages = arrayutil.makeEmptyArray(GLQUAKE_MAX_LIGHTMAPS)
   index = 0
@@ -999,11 +1352,12 @@ function compatFreshLightmapAllocation()
   return pages
 end function
 
+// Return compat ensure world state derived from the active module state.
 function compatEnsureWorldState()
   global rCompatSurfaceDlightBits, rCompatSurfaceDlightFrame, rCompatSurfaceCachedLight
   global rCompatSurfaceCachedDlight, rCompatSurfaceLightmapPage
   global rCompatSurfaceLightS, rCompatSurfaceLightT
-  global rCompatSurfaceWarpPolys, rCompatTextureChains
+  global rCompatSurfaceWarpPolys, rCompatTextureChains, rCompatTextureChainBuilders
   global rCompatLightmapAllocated, rCompatLightmapModified, rCompatLightmapRectChange
   global blocklights, lightmap_polys, rCompatLightmapBuilders
   global lightmap_modified, lightmap_rectchange, allocated, lightmaps, rCompatLightmapScratch
@@ -1026,6 +1380,7 @@ function compatEnsureWorldState()
   end if
   if len(rCompatSurfaceWarpPolys) != count then rCompatSurfaceWarpPolys = arrayutil.makeEmptyArray(count) end if
   if len(rCompatTextureChains) != len(rCompatRenderer.textures) then rCompatTextureChains = arrayutil.makeFilledArray(len(rCompatRenderer.textures), []) end if
+  if len(rCompatTextureChainBuilders) != len(rCompatRenderer.textures) then rCompatTextureChainBuilders = arrayutil.makeFilledArray(len(rCompatRenderer.textures), false) end if
   if len(rCompatLightmapAllocated) != GLQUAKE_MAX_LIGHTMAPS then
     rCompatLightmapAllocated = compatFreshLightmapAllocation()
     rCompatLightmapModified = arrayutil.makeFilledArray(GLQUAKE_MAX_LIGHTMAPS, false)
@@ -1071,6 +1426,7 @@ function R_SetSurfaceCompatibilityState(index, bitsValue, dlightFrame, cachedVal
   return true
 end function
 
+// Apply the Quake-compatible r set multitexture compatibility behavior.
 function R_SetMultitextureCompatibility(available, enabled)
   global rCompatMultiTextureAvailable, rCompatMultiTextureEnabled, rCompatUseMultitexture, rCompatTextureSort, mtexenabled
   rCompatMultiTextureAvailable = available
@@ -1083,12 +1439,14 @@ function R_SetMultitextureCompatibility(available, enabled)
   return true
 end function
 
+// Apply the Quake-compatible r set texture animation frame behavior.
 function R_SetTextureAnimationFrame(frame)
   global currentTextureFrame
   currentTextureFrame = frame
   return currentTextureFrame
 end function
 
+// Apply the Quake-compatible r set frame compatibility behavior.
 function R_SetFrameCompatibility(frame, visFrame)
   global r_framecount, r_visframecount
   r_framecount = frame
@@ -1096,12 +1454,14 @@ function R_SetFrameCompatibility(frame, visFrame)
   return true
 end function
 
+// Apply the Quake-compatible r set light style compatibility behavior.
 function R_SetLightStyleCompatibility(values)
   global d_lightstylevalue
   d_lightstylevalue = values
   return d_lightstylevalue
 end function
 
+// Apply the Quake-compatible r set lightmap compatibility behavior.
 function R_SetLightmapCompatibility(textureBase, bytesPerSample)
   global lightmap_textures, lightmap_bytes
   lightmap_textures = textureBase
@@ -1109,18 +1469,32 @@ function R_SetLightmapCompatibility(textureBase, bytesPerSample)
   return true
 end function
 
+// Apply the Quake-compatible r set lightmap dirty compatibility behavior.
 function R_SetLightmapDirtyCompatibility(page, rectangle, modified)
   rCompatLightmapRectChange[page] = rectangle
   rCompatLightmapModified[page] = modified
   return true
 end function
 
+// Reset a dirty rectangle in place. Animated lightstyles hit this path often,
+// so retaining the four-slot record avoids one heap object per atlas upload.
+function compatResetLightmapRectangle(page)
+  rectangle = rCompatLightmapRectChange[page]
+  rectangle[0] = GLQUAKE_BLOCK_WIDTH
+  rectangle[1] = GLQUAKE_BLOCK_HEIGHT
+  rectangle[2] = 0
+  rectangle[3] = 0
+  return rectangle
+end function
+
+// Apply the Quake-compatible r set lightmap chain compatibility behavior.
 function R_SetLightmapChainCompatibility(page, surfaces)
   rCompatLightmapBuilders[page] = false
   lightmap_polys[page] = surfaces
   return true
 end function
 
+// Provide compat add lightmap poly behavior for the active subsystem.
 function compatAddLightmapPoly(page, value)
   global rCompatLightmapBuilders, lightmap_polys
   builder = rCompatLightmapBuilders[page]
@@ -1140,10 +1514,13 @@ function compatAddLightmapPoly(page, value)
   return true
 end function
 
+// Provide compat finish lightmap chain behavior for the active subsystem.
 function compatFinishLightmapChain(page)
   global rCompatLightmapBuilders, lightmap_polys
   builder = rCompatLightmapBuilders[page]
   if builder is bool then return lightmap_polys[page] end if
+  cached = lightmap_polys[page]
+  if len(cached) == builder.count then return cached end if
   result = arrayutil.makeEmptyArray(builder.count)
   index = 0
   while index < builder.count
@@ -1151,16 +1528,20 @@ function compatFinishLightmapChain(page)
     index = index + 1
   end while
   lightmap_polys[page] = result
-  rCompatLightmapBuilders[page] = false
+  // Keep the geometrically grown backing array. R_ClearLightmapChains resets
+  // only its logical count, so animated lightmaps no longer allocate a fresh
+  // builder on every rendered frame.
   return result
 end function
 
+// Apply the Quake-compatible r set abstract surface calls behavior.
 function R_SetAbstractSurfaceCalls(enabled)
   global rCompatAbstractSurfaceCalls
   rCompatAbstractSurfaceCalls = enabled
   return enabled
 end function
 
+// Apply the Quake-compatible r set surface chain compatibility behavior.
 function R_SetSurfaceChainCompatibility(textureSort, skySurfaces, waterSurfaces)
   global rCompatTextureSort, skychain, waterchain
   rCompatTextureSort = textureSort
@@ -1173,23 +1554,86 @@ end function
 // gl_rsurf.c stores one linked surface chain on every texture. Arrays preserve
 // the same head-insertion order without exposing C pointers.
 function R_ResetTextureChains()
-  global rCompatTextureChains
-  if rCompatRenderer is void then rCompatTextureChains = []; return 0 end if
-  rCompatTextureChains = arrayutil.makeFilledArray(len(rCompatRenderer.textures), [])
+  global rCompatTextureChains, rCompatTextureChainBuilders
+  if rCompatRenderer is void then rCompatTextureChains = []; rCompatTextureChainBuilders = []; return 0 end if
+  textureCount = len(rCompatRenderer.textures)
+  if len(rCompatTextureChains) != textureCount then rCompatTextureChains = arrayutil.makeFilledArray(textureCount, []) end if
+  if len(rCompatTextureChainBuilders) != textureCount then rCompatTextureChainBuilders = arrayutil.makeFilledArray(textureCount, false) end if
+  index = 0
+  while index < textureCount
+    rCompatTextureChains[index] = []
+    builder = rCompatTextureChainBuilders[index]
+    if builder is not bool then builder.count = 0 end if
+    index = index + 1
+  end while
   return len(rCompatTextureChains)
 end function
 
-function inline R_GetTextureChains()
+// Apply the Quake-compatible r get texture chains behavior.
+function R_GetTextureChains()
+  global rCompatTextureChains, rCompatTextureChainBuilders
+  index = 0
+  while index < len(rCompatTextureChains)
+    builder = rCompatTextureChainBuilders[index]
+    if builder is not bool then
+      count = builder.count
+      chain = arrayutil.makeEmptyArray(count)
+      chainIndex = 0
+      while chainIndex < count
+        chain[chainIndex] = builder.values[count - 1 - chainIndex]
+        chainIndex = chainIndex + 1
+      end while
+      rCompatTextureChains[index] = chain
+    end if
+    index = index + 1
+  end while
   return rCompatTextureChains
 end function
 
+// Apply the Quake-compatible r chain surface behavior.
 function R_ChainSurface(surface)
-  global rCompatTextureChains
+  global rCompatTextureChains, rCompatTextureChainBuilders
   value = compatSurface(surface)
   if value is void then return false end if
   index = value.textureIndex
   if index < 0 or index >= len(rCompatTextureChains) then return false end if
-  rCompatTextureChains[index] = [value] + rCompatTextureChains[index]
+  builder = rCompatTextureChainBuilders[index]
+  if builder is bool then
+    builder = arrayutil.createArrayBuilder(32)
+    rCompatTextureChainBuilders[index] = builder
+  end if
+  arrayutil.pushArrayBuilder(builder, value)
+  return true
+end function
+
+// Resolve one texture chain in GLQuake head-insertion order. Production keeps
+// a reusable tail-appending builder to avoid allocating/copying an array for
+// every visible world polygon; only the consumed chain is materialized.
+function compatFinishTextureChain(index)
+  global rCompatTextureChains, rCompatTextureChainBuilders
+  if index < 0 or index >= len(rCompatTextureChains) then return [] end if
+  builder = rCompatTextureChainBuilders[index]
+  if builder is bool then return rCompatTextureChains[index] end if
+  count = builder.count
+  cached = rCompatTextureChains[index]
+  if len(cached) == count then return cached end if
+  chain = arrayutil.makeEmptyArray(count)
+  chainIndex = 0
+  while chainIndex < count
+    chain[chainIndex] = builder.values[count - 1 - chainIndex]
+    chainIndex = chainIndex + 1
+  end while
+  rCompatTextureChains[index] = chain
+  return chain
+end function
+
+// Clear one consumed texture chain without discarding its reusable capacity.
+function compatClearTextureChain(index)
+  global rCompatTextureChains, rCompatTextureChainBuilders
+  if index < 0 or index >= len(rCompatTextureChains) then return false end if
+  rCompatTextureChains[index] = []
+  builder = rCompatTextureChainBuilders[index]
+  if builder is not bool then builder.count = 0 end if
   return true
 end function
 
@@ -1213,18 +1657,22 @@ function R_BrushSurfaceFacesViewer(surface, planeDistance)
   return planeDistance > GLQUAKE_BACKFACE_EPSILON
 end function
 
+// Apply the Quake-compatible r water pass deferred behavior.
 function inline R_WaterPassDeferred(textureSort, waterAlpha)
   return textureSort and waterAlpha != 1.0
 end function
 
+// Apply the Quake-compatible r get blocklights behavior.
 function R_GetBlocklights()
   return blocklights
 end function
 
+// Apply the Quake-compatible r get lightmap bytes behavior.
 function R_GetLightmapBytes()
   return lightmaps
 end function
 
+// Apply the Quake-compatible r get surface compatibility state behavior.
 function R_GetSurfaceCompatibilityState(index)
   return [
     rCompatSurfaceCachedLight[index],
@@ -1235,6 +1683,7 @@ function R_GetSurfaceCompatibilityState(index)
   ]
 end function
 
+// Apply the Quake-compatible r get lightmap compatibility state behavior.
 function R_GetLightmapCompatibilityState(page)
   surfaces = compatFinishLightmapChain(page)
   return [
@@ -1245,27 +1694,33 @@ function R_GetLightmapCompatibilityState(page)
   ]
 end function
 
+// Apply the Quake-compatible r get allocation compatibility state behavior.
 function R_GetAllocationCompatibilityState(page)
   return rCompatLightmapAllocated[page]
 end function
 
+// Apply the Quake-compatible r get mirror compatibility state behavior.
 function R_GetMirrorCompatibilityState()
   return [mirror, mirror_plane]
 end function
 
+// Apply the Quake-compatible r get frame compatibility behavior.
 function R_GetFrameCompatibility()
   return [r_framecount, r_visframecount]
 end function
 
+// Apply the Quake-compatible r get dynamic light compatibility state behavior.
 function R_GetDynamicLightCompatibilityState(index)
   if index < 0 or index >= len(rCompatSurfaceDlightBits) then return [0, 0] end if
   return [rCompatSurfaceDlightBits[index], rCompatSurfaceDlightFrame[index]]
 end function
 
+// Apply the Quake-compatible r dynamic light is active behavior.
 function inline R_DynamicLightIsActive(light, currentTime)
   return light is not void and light.die >= currentTime and light.radius > 0.0
 end function
 
+// Apply the Quake-compatible r reset lightmap compatibility behavior.
 function R_ResetLightmapCompatibility()
   global rCompatLightmapAllocated, rCompatLightmapModified, rCompatLightmapRectChange
   global allocated, lightmap_modified, lightmap_rectchange, lightmap_polys, lightmaps, rCompatLightmapBuilders
@@ -1291,6 +1746,7 @@ function R_ResetLightmapCompatibility()
   return true
 end function
 
+// Provide compat fnv1a behavior for the active subsystem.
 function compatFnv1a(data, offset, count)
   hash = 2166136261
   index = 0
@@ -1301,11 +1757,13 @@ function compatFnv1a(data, offset, count)
   return hash
 end function
 
+// Provide compat hash lightmap rows behavior for the active subsystem.
 function compatHashLightmapRows(page, firstRow, rowCount)
   offset = (page * GLQUAKE_BLOCK_HEIGHT + firstRow) * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
   return compatFnv1a(lightmaps, offset, rowCount * GLQUAKE_BLOCK_WIDTH * lightmap_bytes)
 end function
 
+// Provide compat copy surface lightmap to atlas behavior for the active subsystem.
 function compatCopySurfaceLightmapToAtlas(surface, pixels)
   index = compatSurfaceIndex(surface)
   if index < 0 then return false end if
@@ -1330,6 +1788,7 @@ function compatCopySurfaceLightmapToAtlas(surface, pixels)
   return true
 end function
 
+// Apply the Quake-compatible r configure world compatibility behavior.
 function R_ConfigureWorldCompatibility(
   renderer,
   viewOrigin,
@@ -1371,10 +1830,12 @@ function R_ConfigureWorldCompatibility(
   return true
 end function
 
+// Apply the Quake-compatible r set subdivide size behavior.
 function R_SetSubdivideSize(value)
   return glWarp.SetSubdivideSize(value)
 end function
 
+// Return compat surface index derived from the active module state.
 function compatSurfaceIndex(surface)
   if rCompatRenderer is void then return -1 end if
   if typeof(surface) == "int" and surface >= 0 and surface < len(rCompatRenderer.surfaces) then return surface end if
@@ -1388,6 +1849,7 @@ function compatSurfaceIndex(surface)
   return -1
 end function
 
+// Provide compat surface behavior for the active subsystem.
 function compatSurface(surface)
   if rCompatRenderer is void then return void end if
   if typeof(surface) == "int" then
@@ -1397,6 +1859,7 @@ function compatSurface(surface)
   return surface
 end function
 
+// Provide compat face behavior for the active subsystem.
 function compatFace(surface)
   value = compatSurface(surface)
   if value is void then return void end if
@@ -1404,6 +1867,7 @@ function compatFace(surface)
   return rCompatRenderer.map.faces[value.faceIndex]
 end function
 
+// Provide compat plane behavior for the active subsystem.
 function compatPlane(surface)
   face = compatFace(surface)
   if face is void then return void end if
@@ -1411,6 +1875,7 @@ function compatPlane(surface)
   return rCompatRenderer.map.planes[face.planeIndex]
 end function
 
+// Provide compat tex info behavior for the active subsystem.
 function compatTexInfo(surface)
   face = compatFace(surface)
   if face is void then return void end if
@@ -1418,6 +1883,7 @@ function compatTexInfo(surface)
   return rCompatRenderer.map.texInfo[face.texInfo]
 end function
 
+// Provide compat plane distance behavior for the active subsystem.
 function compatPlaneDistance(plane, point)
   if plane.type == 0 then return point.x - plane.dist end if
   if plane.type == 1 then return point.y - plane.dist end if
@@ -1441,6 +1907,7 @@ function R_AnimateLight()
   return d_lightstylevalue
 end function
 
+// Provide compat assign light blend behavior for the active subsystem.
 function compatAssignLightBlend(updated)
   global rCompatBlend
   if rCompatBlend is void or len(rCompatBlend) < 4 then rCompatBlend = [0.0, 0.0, 0.0, 0.0] end if
@@ -1452,10 +1919,12 @@ function compatAssignLightBlend(updated)
   return rCompatBlend
 end function
 
+// Add state for add light blend.
 function AddLightBlend(red, green, blue, alpha2)
   return compatAssignLightBlend(glRlight.AddLightBlend(rCompatBlend, red, green, blue, alpha2))
 end function
 
+// Apply the Quake-compatible r render dlight behavior.
 function R_RenderDlight(light)
   global rCompatBlend
   trace = glRlight.R_RenderDlight(
@@ -1486,6 +1955,7 @@ function R_RenderDlight(light)
   return true
 end function
 
+// Apply the Quake-compatible r render dlights behavior.
 function R_RenderDlights()
   global r_dlightframecount
   if not rCompatFlashBlend then return 0 end if
@@ -1542,6 +2012,7 @@ function R_PolyBlendProduction(blend, enabled)
   return true
 end function
 
+// Apply the Quake-compatible r mark lights behavior.
 function R_MarkLights(light, bit, nodeNumber)
   global rCompatSurfaceDlightBits, rCompatSurfaceDlightFrame
   if rCompatRenderer is void or light is void or nodeNumber < 0 then return 0 end if
@@ -1556,6 +2027,7 @@ function R_MarkLights(light, bit, nodeNumber)
   )
 end function
 
+// Apply the Quake-compatible r push dlights behavior.
 function R_PushDlights()
   global r_dlightframecount
   if rCompatFlashBlend or not rCompatDynamic or rCompatRenderer is void then return 0 end if
@@ -1574,6 +2046,7 @@ function R_PushDlights()
   )
 end function
 
+// Apply the Quake-compatible r begin world frame behavior.
 function R_BeginWorldFrame()
   marked = R_PushDlights()
   R_AnimateLight()
@@ -1581,6 +2054,7 @@ function R_BeginWorldFrame()
   return [frame, r_dlightframecount, marked]
 end function
 
+// Apply the Quake-compatible r mark brush model lights for submodel behavior.
 function R_MarkBrushModelLightsForSubmodel(entity, submodelIndex)
   if rCompatRenderer is void or entity is void or rCompatFlashBlend or not rCompatDynamic then return 0 end if
   if submodelIndex < 1 or submodelIndex >= len(rCompatRenderer.map.models) then return 0 end if
@@ -1598,12 +2072,15 @@ function R_MarkBrushModelLightsForSubmodel(entity, submodelIndex)
   return marked
 end function
 
+// Apply the Quake-compatible r mark brush model lights behavior.
 function R_MarkBrushModelLights(entity)
   if entity is void then return 0 end if
   return R_MarkBrushModelLightsForSubmodel(entity, entity.modelIndex)
 end function
 
+// Apply the Quake-compatible r add dynamic lights behavior.
 function R_AddDynamicLights(surface)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global blocklights
   value = compatSurface(surface)
   index = compatSurfaceIndex(value)
@@ -1652,6 +2129,7 @@ function R_AddDynamicLights(surface)
   return blocklights
 end function
 
+// Apply the Quake-compatible r lightmap required bytes behavior.
 function R_LightmapRequiredBytes(width, height, stride, bytesPerSample)
   if width < 1 or height < 1 then return 0 end if
   if bytesPerSample != 1 and bytesPerSample != 4 then return error(3771, "Bad lightmap format") end if
@@ -1660,6 +2138,7 @@ function R_LightmapRequiredBytes(width, height, stride, bytesPerSample)
   return (height - 1) * stride + rowBytes
 end function
 
+// Apply the Quake-compatible r build light map behavior.
 function R_BuildLightMap(surface, destination, stride)
   global blocklights, rCompatSurfaceCachedLight, rCompatSurfaceCachedDlight
   value = compatSurface(surface)
@@ -1732,6 +2211,7 @@ function R_BuildLightMap(surface, destination, stride)
   return destination
 end function
 
+// Provide recursive light point behavior for the active subsystem.
 function RecursiveLightPoint(nodeNumber, start, finish)
   global lightspot, lightplane, rCompatLightSpot, rCompatLightPlane
   if rCompatRenderer is void then return -1 end if
@@ -1752,6 +2232,7 @@ function RecursiveLightPoint(nodeNumber, start, finish)
   return result[0]
 end function
 
+// Apply the Quake-compatible r light point behavior.
 function R_LightPoint(point)
   global lightspot, lightplane, rCompatLightSpot, rCompatLightPlane
   if rCompatRenderer is void or len(rCompatRenderer.map.models) == 0 then return 255 end if
@@ -1776,6 +2257,7 @@ function R_LightPoint(point)
   return result
 end function
 
+// Apply the Quake-compatible r active dynamic lights behavior.
 function R_ActiveDynamicLights()
   return rCompatDlights
 end function
@@ -1806,6 +2288,7 @@ end function
 
 currentTextureFrame = 0
 
+// Mirror Quake's GL_DisableMultitexture routine and its observable state changes.
 function GL_DisableMultitexture()
   global rCompatMultiTextureEnabled, mtexenabled
   if rCompatMultiTextureEnabled then
@@ -1819,6 +2302,7 @@ function GL_DisableMultitexture()
   return true
 end function
 
+// Mirror Quake's GL_EnableMultitexture routine and its observable state changes.
 function GL_EnableMultitexture()
   global rCompatMultiTextureEnabled, mtexenabled
   if not rCompatMultiTextureAvailable then return false end if
@@ -1830,7 +2314,9 @@ function GL_EnableMultitexture()
   return true
 end function
 
+// Apply the Quake-compatible r draw sequential poly behavior.
 function R_DrawSequentialPoly(surface)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global rCompatSequentialSurfaces, rCompatSequentialBuilder
   value = compatSurface(surface)
   if value is void then return false end if
@@ -1866,7 +2352,7 @@ function R_DrawSequentialPoly(surface)
         gl.uploadLuminanceSubImage(0, rectangle[1], GLQUAKE_BLOCK_WIDTH, rectangle[3], slice(lightmaps, uploadOffset, uploadLength))
       end if
       rCompatLightmapModified[page] = false
-      rCompatLightmapRectChange[page] = [GLQUAKE_BLOCK_WIDTH, GLQUAKE_BLOCK_HEIGHT, 0, 0]
+      compatResetLightmapRectangle(page)
     end if
     gl.textureEnvironment(gl.GL_BLEND)
     gl.begin(gl.GL_POLYGON)
@@ -1899,6 +2385,7 @@ function R_DrawSequentialPoly(surface)
   return true
 end function
 
+// Render glwater poly.
 function DrawGLWaterPoly(poly)
   value = compatSurface(poly)
   if value is void or len(value.vertices) < 3 then return false end if
@@ -1914,6 +2401,7 @@ function DrawGLWaterPoly(poly)
   return true
 end function
 
+// Render glwater poly lightmap.
 function DrawGLWaterPolyLightmap(poly)
   value = compatSurface(poly)
   if value is void or len(value.vertices) < 3 then return false end if
@@ -1929,6 +2417,7 @@ function DrawGLWaterPolyLightmap(poly)
   return true
 end function
 
+// Render glpoly.
 function DrawGLPoly(poly)
   value = compatSurface(poly)
   if value is void or len(value.vertices) < 3 then return false end if
@@ -1942,6 +2431,7 @@ function DrawGLPoly(poly)
   return true
 end function
 
+// Preload and register the static geometry asset.
 function precacheStaticGeometry(renderer)
   if renderer is void or gl.traceEnabled() then return 0 end if
   count = 0
@@ -1994,8 +2484,12 @@ function precacheStaticGeometry(renderer)
   return count
 end function
 
+// Provide compat surface batch keys behavior for the active subsystem.
 function compatSurfaceBatchKeys(surfaces)
-  keys = bytes(len(surfaces) * 8)
+  global rCompatSurfaceBatchKeys
+  required = len(surfaces) * 8
+  if len(rCompatSurfaceBatchKeys) != required then rCompatSurfaceBatchKeys = bytes(required) end if
+  keys = rCompatSurfaceBatchKeys
   index = 0
   while index < len(surfaces)
     key = nativeRawValue(surfaces[index])
@@ -2006,23 +2500,38 @@ function compatSurfaceBatchKeys(surfaces)
   return keys
 end function
 
-function compatMultitextureRecords(surfaces)
-  global rCompatMtexRecordFaces, rCompatMtexRecords, rCompatMtexRecordStamp, rCompatMtexTextureIds
+// Provide compat multitexture records behavior for the active subsystem.
+function compatMultitextureRecords(surfaces, surfaceCount)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
+  global rCompatMtexRecordFaces, rCompatMtexRecords, rCompatMtexRecordCount, rCompatMtexRecordStamp, rCompatMtexTextureIds, rCompatMtexTextureChecked
+  capacity = len(rCompatRenderer.surfaces)
+  if capacity < surfaceCount then capacity = surfaceCount end if
+  if len(rCompatMtexRecordFaces) < capacity then rCompatMtexRecordFaces = arrayutil.makeFilledArray(capacity, -1) end if
+  if len(rCompatMtexRecords) < capacity * 16 then rCompatMtexRecords = bytes(capacity * 16) end if
   alternate = 0
   if currentTextureFrame != 0 then alternate = 1 end if
   stamp = floorValue(rCompatTime * 10.0) * 2 + alternate
-  sameSurfaces = not gl.traceEnabled() and len(rCompatMtexRecordFaces) == len(surfaces)
+  sameSurfaces = not gl.traceEnabled() and rCompatMtexRecordCount == surfaceCount
   index = 0
-  while sameSurfaces and index < len(surfaces)
+  while sameSurfaces and index < surfaceCount
     if rCompatMtexRecordFaces[index] != surfaces[index].faceIndex then sameSurfaces = false end if
     index = index + 1
   end while
   if sameSurfaces and stamp == rCompatMtexRecordStamp then return rCompatMtexRecords end if
 
   if sameSurfaces and len(rCompatMtexTextureIds) == len(rCompatRenderer.textures) then
-    checked = arrayutil.makeFilledArray(len(rCompatRenderer.textures), false)
+    textureCount = len(rCompatRenderer.textures)
+    if len(rCompatMtexTextureChecked) != textureCount then rCompatMtexTextureChecked = arrayutil.makeFilledArray(textureCount, false) end if
+    checked = rCompatMtexTextureChecked
+    textureIndex = 0
+    while textureIndex < textureCount
+      checked[textureIndex] = false
+      textureIndex = textureIndex + 1
+    end while
     changed = false
-    for each surface in surfaces
+    index = 0
+    while index < surfaceCount
+      surface = surfaces[index]
       textureIndex = surface.textureIndex
       if textureIndex >= 0 and textureIndex < len(checked) and not checked[textureIndex] then
         checked[textureIndex] = true
@@ -2032,10 +2541,11 @@ function compatMultitextureRecords(surfaces)
           changed = true
         end if
       end if
-    end for
+      index = index + 1
+    end while
     if changed then
       index = 0
-      while index < len(surfaces)
+      while index < surfaceCount
         textureIndex = surfaces[index].textureIndex
         textureId = rCompatRenderer.noTextureId
         if textureIndex >= 0 and textureIndex < len(rCompatMtexTextureIds) then textureId = rCompatMtexTextureIds[textureIndex] end if
@@ -2043,15 +2553,17 @@ function compatMultitextureRecords(surfaces)
         index = index + 1
       end while
     end if
+    rCompatMtexRecordCount = surfaceCount
     rCompatMtexRecordStamp = stamp
     return rCompatMtexRecords
   end if
 
-  records = bytes(len(surfaces) * 16)
-  faces = arrayutil.makeFilledArray(len(surfaces), -1)
-  textureIds = arrayutil.makeFilledArray(len(rCompatRenderer.textures), -1)
+  records = rCompatMtexRecords
+  faces = rCompatMtexRecordFaces
+  textureIds = rCompatMtexTextureIds
+  if len(textureIds) != len(rCompatRenderer.textures) then textureIds = arrayutil.makeFilledArray(len(rCompatRenderer.textures), -1) end if
   index = 0
-  while index < len(surfaces)
+  while index < surfaceCount
     surface = surfaces[index]
     faces[index] = surface.faceIndex
     key = nativeRawValue(surface)
@@ -2066,16 +2578,22 @@ function compatMultitextureRecords(surfaces)
   end while
   rCompatMtexRecordFaces = faces
   rCompatMtexRecords = records
+  rCompatMtexRecordCount = surfaceCount
   rCompatMtexRecordStamp = stamp
   rCompatMtexTextureIds = textureIds
   return records
 end function
 
-function R_DrawMultitextureBatch(surfaces)
-  if len(surfaces) == 0 then return 0 end if
-  for each surface in surfaces
+// Apply the Quake-compatible r draw multitexture batch behavior.
+function R_DrawMultitextureBatch(surfaces, surfaceCount)
+  if surfaceCount <= 0 then return 0 end if
+  surfaceIndex = 0
+  while surfaceIndex < surfaceCount
+    surface = surfaces[surfaceIndex]
     compatRenderDynamicLightmaps(surface, false)
-  end for
+    surfaceIndex = surfaceIndex + 1
+  end while
+  optBaseline.checkpoint("mtex_lightmaps")
 
   // Accumulate the complete dirty rectangle before uploading. Uploading as
   // soon as each surface changed caused the same atlas page to be sliced and
@@ -2092,10 +2610,11 @@ function R_DrawMultitextureBatch(surfaces)
         gl.uploadLuminanceSubImage(0, rectangle[1], GLQUAKE_BLOCK_WIDTH, rectangle[3], slice(lightmaps, uploadOffset, uploadLength))
       end if
       rCompatLightmapModified[page] = false
-      rCompatLightmapRectChange[page] = [GLQUAKE_BLOCK_WIDTH, GLQUAKE_BLOCK_HEIGHT, 0, 0]
+      compatResetLightmapRectangle(page)
     end if
     page = page + 1
   end while
+  optBaseline.checkpoint("mtex_uploads")
 
   if not gl.traceEnabled() then gl.activeTexture(0) end if
   gl.textureEnvironment(gl.GL_REPLACE)
@@ -2111,19 +2630,26 @@ function R_DrawMultitextureBatch(surfaces)
     gl.textureEnvironmentParameter(gl.GL_SOURCE1_RGB, gl.GL_TEXTURE)
     gl.textureEnvironmentParameter(gl.GL_OPERAND1_RGB, gl.GL_ONE_MINUS_SRC_COLOR)
   end if
+  optBaseline.checkpoint("mtex_setup")
 
-  records = compatMultitextureRecords(surfaces)
-  batched = gl.staticGeometryCallMultitextureBatch(records)
+  records = compatMultitextureRecords(surfaces, surfaceCount)
+  optBaseline.checkpoint("mtex_records")
+  batched = gl.staticGeometryCallMultitextureBatchCount(records, surfaceCount)
+  optBaseline.checkpoint("mtex_native")
   if useWorldProgram then gl.worldProgramEnable(false) end if
   GL_DisableMultitexture()
-  if batched then return len(surfaces) end if
-  for each surface in surfaces
-    R_DrawSequentialPoly(surface)
-  end for
-  return len(surfaces)
+  if batched then return surfaceCount end if
+  surfaceIndex = 0
+  while surfaceIndex < surfaceCount
+    R_DrawSequentialPoly(surfaces[surfaceIndex])
+    surfaceIndex = surfaceIndex + 1
+  end while
+  return surfaceCount
 end function
 
+// Apply the Quake-compatible r blend lightmaps behavior.
 function R_BlendLightmaps()
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if rCompatRenderer is void or rCompatRenderer.fullbright or not rCompatTextureSort or rCompatUseMultitexture then return 0 end if
   gl.depthMask(false)
   gl.blendFunc(gl.GL_ZERO, gl.GL_ONE_MINUS_SRC_COLOR)
@@ -2150,7 +2676,7 @@ function R_BlendLightmaps()
           gl.uploadLuminanceSubImage(0, rectangle[1], GLQUAKE_BLOCK_WIDTH, rectangle[3], slice(lightmaps, uploadOffset, uploadLength))
         end if
         rCompatLightmapModified[page] = false
-        rCompatLightmapRectChange[page] = [GLQUAKE_BLOCK_WIDTH, GLQUAKE_BLOCK_HEIGHT, 0, 0]
+        compatResetLightmapRectangle(page)
       end if
       batchable = len(surfaces) > 1
       if batchable then
@@ -2188,7 +2714,9 @@ function R_BlendLightmaps()
   return count
 end function
 
+// Provide compat render dynamic lightmaps behavior for the active subsystem.
 function compatRenderDynamicLightmaps(surface, addToChain)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global c_brush_polys
   value = compatSurface(surface)
   index = compatSurfaceIndex(value)
@@ -2229,10 +2757,12 @@ function compatRenderDynamicLightmaps(surface, addToChain)
   return true
 end function
 
+// Apply the Quake-compatible r render dynamic lightmaps behavior.
 function R_RenderDynamicLightmaps(surface)
   return compatRenderDynamicLightmaps(surface, true)
 end function
 
+// Apply the Quake-compatible r render brush poly behavior.
 function R_RenderBrushPoly(surface)
   global c_brush_polys
   value = compatSurface(surface)
@@ -2252,6 +2782,7 @@ function R_RenderBrushPoly(surface)
   return true
 end function
 
+// Provide compat prepare batched brush poly behavior for the active subsystem.
 function compatPrepareBatchedBrushPoly(surface)
   global c_brush_polys
   value = compatSurface(surface)
@@ -2264,6 +2795,7 @@ function compatPrepareBatchedBrushPoly(surface)
   return true
 end function
 
+// Apply the Quake-compatible r mirror chain behavior.
 function R_MirrorChain(surface)
   global mirror, mirror_plane
   if mirror then return false end if
@@ -2272,6 +2804,7 @@ function R_MirrorChain(surface)
   return mirror_plane is not void
 end function
 
+// Apply the Quake-compatible r draw water surfaces behavior.
 function R_DrawWaterSurfaces()
   global waterchain, rCompatTextureChains
   if rCompatRenderer is void then return 0 end if
@@ -2301,14 +2834,14 @@ function R_DrawWaterSurfaces()
   else
     textureIndex = 0
     while textureIndex < len(rCompatTextureChains)
-      chain = rCompatTextureChains[textureIndex]
+      chain = compatFinishTextureChain(textureIndex)
       if len(chain) > 0 and (chain[0].flags & c.SURF_DRAWTURB) != 0 then
         gl.bindTexture(textureIdForSurface(rCompatRenderer, chain[0]))
         for each surface in chain
           EmitWaterPolys(surface)
           count = count + 1
         end for
-        rCompatTextureChains[textureIndex] = []
+        compatClearTextureChain(textureIndex)
       end if
       textureIndex = textureIndex + 1
     end while
@@ -2322,6 +2855,7 @@ function R_DrawWaterSurfaces()
   return count
 end function
 
+// Render texture chains.
 function DrawTextureChains()
   global skychain, rCompatTextureChains
   if rCompatRenderer is void then return 0 end if
@@ -2339,13 +2873,13 @@ function DrawTextureChains()
   count = 0
   textureIndex = 0
   while textureIndex < len(rCompatTextureChains)
-    chain = rCompatTextureChains[textureIndex]
+    chain = compatFinishTextureChain(textureIndex)
     if len(chain) > 0 then
       first = chain[0]
       if (first.flags & c.SURF_DRAWSKY) != 0 then
         R_DrawSkyChain(chain)
         count = count + len(chain)
-        rCompatTextureChains[textureIndex] = []
+        compatClearTextureChain(textureIndex)
       else if textureIndex == rCompatMirrorTexture and rCompatMirrorAlpha != 1.0 then
         if not mirror then
           R_MirrorChain(first)
@@ -2353,7 +2887,7 @@ function DrawTextureChains()
         end if
         // Mirror surfaces are drawn only by R_DrawMirrorOverlay.  During the
         // reflected scene they are discarded to prevent recursive mirrors.
-        rCompatTextureChains[textureIndex] = []
+        compatClearTextureChain(textureIndex)
       else if (first.flags & c.SURF_DRAWTURB) != 0 and R_WaterPassDeferred(true, rCompatRenderer.waterAlpha) then
         // Keep this chain for R_DrawWaterSurfaces.
       else
@@ -2379,7 +2913,7 @@ function DrawTextureChains()
             count = count + 1
           end for
         end if
-        rCompatTextureChains[textureIndex] = []
+        compatClearTextureChain(textureIndex)
       end if
     end if
     textureIndex = textureIndex + 1
@@ -2387,6 +2921,7 @@ function DrawTextureChains()
   return count
 end function
 
+// Return compat brush model origin derived from the active module state.
 function compatBrushModelOrigin(entity)
   result = math.subtract(rCompatViewOrigin, entity.origin)
   if entity.angles.x == 0.0 and entity.angles.y == 0.0 and entity.angles.z == 0.0 then return result end if
@@ -2399,13 +2934,22 @@ function compatBrushModelOrigin(entity)
   )
 end function
 
+// Apply the Quake-compatible r clear lightmap chains behavior.
 function R_ClearLightmapChains()
   global lightmap_polys, rCompatLightmapBuilders
-  lightmap_polys = arrayutil.makeFilledArray(GLQUAKE_MAX_LIGHTMAPS, [])
-  rCompatLightmapBuilders = arrayutil.makeFilledArray(GLQUAKE_MAX_LIGHTMAPS, false)
+  if len(lightmap_polys) != GLQUAKE_MAX_LIGHTMAPS then lightmap_polys = arrayutil.makeFilledArray(GLQUAKE_MAX_LIGHTMAPS, []) end if
+  if len(rCompatLightmapBuilders) != GLQUAKE_MAX_LIGHTMAPS then rCompatLightmapBuilders = arrayutil.makeFilledArray(GLQUAKE_MAX_LIGHTMAPS, false) end if
+  page = 0
+  while page < GLQUAKE_MAX_LIGHTMAPS
+    lightmap_polys[page] = []
+    builder = rCompatLightmapBuilders[page]
+    if builder is not bool then builder.count = 0 end if
+    page = page + 1
+  end while
   return true
 end function
 
+// Apply the Quake-compatible r draw brush model for submodel behavior.
 function R_DrawBrushModelForSubmodel(entity, submodelIndex)
   global currentTextureFrame
   if rCompatRenderer is void or entity is void then return 0 end if
@@ -2452,11 +2996,13 @@ function R_DrawBrushModelForSubmodel(entity, submodelIndex)
   return count
 end function
 
+// Apply the Quake-compatible r draw brush model behavior.
 function R_DrawBrushModel(entity)
   if entity is void then return 0 end if
   return R_DrawBrushModelForSubmodel(entity, entity.modelIndex)
 end function
 
+// Apply the Quake-compatible r recursive world node behavior.
 function R_RecursiveWorldNode(nodeNumber)
   global skychain, waterchain
   if rCompatRenderer is void or nodeNumber < 0 then return 0 end if
@@ -2494,6 +3040,7 @@ function R_RecursiveWorldNode(nodeNumber)
   return count
 end function
 
+// Apply the Quake-compatible r draw world behavior.
 function R_DrawWorld()
   global lightmap_polys, skychain, waterchain, rCompatSequentialSurfaces, rCompatSequentialBuilder, rCompatCollectSequential
   if rCompatRenderer is void or len(rCompatRenderer.map.models) == 0 then return 0 end if
@@ -2503,19 +3050,34 @@ function R_DrawWorld()
   waterchain = []
   rCompatSequentialSurfaces = []
   rCompatCollectSequential = rCompatUseMultitexture and not rCompatTextureSort
-  if rCompatCollectSequential then rCompatSequentialBuilder = arrayutil.createArrayBuilder(512) end if
+  if rCompatCollectSequential then
+    sequentialBuilder = rCompatSequentialBuilder
+    if sequentialBuilder is void then
+      sequentialBuilder = arrayutil.createArrayBuilder(512)
+      rCompatSequentialBuilder = sequentialBuilder
+    end if
+    sequentialBuilder.count = 0
+  end if
   R_ResetTextureChains()
+  optBaseline.checkpoint("world_clear")
   root = rCompatRenderer.map.models[0].headNodes[0]
   count = R_RecursiveWorldNode(root)
+  optBaseline.checkpoint("world_recursive")
   collectedSequential = rCompatCollectSequential
   rCompatCollectSequential = false
-  if collectedSequential then rCompatSequentialSurfaces = arrayutil.finishArrayBuilder(rCompatSequentialBuilder) end if
-  if collectedSequential then R_DrawMultitextureBatch(rCompatSequentialSurfaces) end if
+  if collectedSequential then
+    rCompatSequentialSurfaces = rCompatSequentialBuilder.values
+    R_DrawMultitextureBatch(rCompatSequentialBuilder.values, rCompatSequentialBuilder.count)
+  end if
+  optBaseline.checkpoint("world_multitexture")
   count = count + DrawTextureChains()
+  optBaseline.checkpoint("world_chains")
   R_BlendLightmaps()
+  optBaseline.checkpoint("world_lightmaps")
   return count
 end function
 
+// Apply the Quake-compatible r mark leaves behavior.
 function R_MarkLeaves()
   global r_visframecount
   if rCompatRenderer is void then return 0 end if
@@ -2524,7 +3086,9 @@ function R_MarkLeaves()
   return markVisible(rCompatRenderer, rCompatViewOrigin)
 end function
 
+// Create and initialize block.
 function AllocBlock(width, height, xOut, yOut)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global rCompatLightmapAllocated, allocated, active_lightmaps
   compatEnsureWorldState()
   textureNumber = 0
@@ -2562,6 +3126,7 @@ function AllocBlock(width, height, xOut, yOut)
   return error(3763, "AllocBlock: full")
 end function
 
+// Create and initialize surface display list.
 function BuildSurfaceDisplayList(surface)
   global nColinElim
   value = compatSurface(surface)
@@ -2617,6 +3182,7 @@ function BuildSurfaceDisplayList(surface)
   return value
 end function
 
+// Mirror Quake's GL_CreateSurfaceLightmap routine and its observable state changes.
 function GL_CreateSurfaceLightmap(surface)
   value = compatSurface(surface)
   if value is void then return error(3765, "GL_CreateSurfaceLightmap: bad surface") end if
@@ -2675,6 +3241,7 @@ function GL_CreateSurfaceLightmap(surface)
   return page
 end function
 
+// Mirror Quake's GL_BuildLightmaps routine and its observable state changes.
 function GL_BuildLightmaps()
   global r_framecount, lightmap_bytes, active_lightmaps, lightmap_textures
   if rCompatRenderer is void then return 0 end if
@@ -2749,6 +3316,7 @@ function BoundPoly(numverts, vertices, minimums, maximums)
   return [minimums, maximums]
 end function
 
+// Provide subdivide polygon behavior for the active subsystem.
 function SubdividePolygon(numverts, vertices)
   global rCompatWarpPolys
   source = vertices
@@ -2757,6 +3325,7 @@ function SubdividePolygon(numverts, vertices)
   return rCompatWarpPolys
 end function
 
+// Mirror Quake's GL_SubdivideSurface routine and its observable state changes.
 function GL_SubdivideSurface(surface)
   global rCompatSurfaceWarpPolys
   value = compatSurface(surface)
@@ -2773,6 +3342,7 @@ function GL_SubdivideSurface(surface)
   return polygons
 end function
 
+// Add water polys to the destination state.
 function EmitWaterPolys(surface)
   value = compatSurface(surface)
   if value is void then return false end if
@@ -2782,12 +3352,17 @@ function EmitWaterPolys(surface)
   end if
   polygons = GL_SubdivideSurface(value)
   if polygons is error then return polygons end if
-  traces = glWarp.EmitWaterPolys(polygons, rCompatRealtime)
-  for each commands in traces
+  for each polygon in polygons
     gl.begin(gl.GL_POLYGON)
-    for each command in commands
-      point = command[2]
-      gl.texcoord2(command[0], command[1])
+    for each vertex in polygon
+      point = vertex.position
+      originalS = glWarp.warpFloat(vertex.s)
+      originalT = glWarp.warpFloat(vertex.t)
+      sIndex = native.trunc((originalT * 0.125 + rCompatRealtime) * GLQUAKE_TURBSCALE) & 255
+      tIndex = native.trunc((originalS * 0.125 + rCompatRealtime) * GLQUAKE_TURBSCALE) & 255
+      textureS = glWarp.warpFloat((originalS + glWarp.turbsin[sIndex]) / 64.0)
+      textureT = glWarp.warpFloat((originalT + glWarp.turbsin[tIndex]) / 64.0)
+      gl.texcoord2(textureS, textureT)
       gl.vertex3(point.x, point.y, point.z)
     end for
     gl.finishPrimitive()
@@ -2795,17 +3370,31 @@ function EmitWaterPolys(surface)
   return len(polygons)
 end function
 
+// Add sky polys to the destination state.
 function EmitSkyPolys(surface)
   value = compatSurface(surface)
   if value is void then return false end if
   polygons = GL_SubdivideSurface(value)
   if polygons is error then return polygons end if
-  traces = glWarp.EmitSkyPolys(polygons, rCompatViewOrigin, speedscale)
-  for each commands in traces
+  for each polygon in polygons
     gl.begin(gl.GL_POLYGON)
-    for each command in commands
-      point = command[2]
-      gl.texcoord2(command[0], command[1])
+    for each vertex in polygon
+      point = vertex.position
+      directionX = glWarp.warpFloat(point.x - rCompatViewOrigin.x)
+      directionY = glWarp.warpFloat(point.y - rCompatViewOrigin.y)
+      directionZ = glWarp.warpFloat(point.z - rCompatViewOrigin.z)
+      directionZ = glWarp.warpFloat(directionZ * 3.0)
+      directionLength = glWarp.warpFloat(native.sqrt(directionX * directionX + directionY * directionY + directionZ * directionZ))
+      textureS = 0.0
+      textureT = 0.0
+      if directionLength != 0.0 then
+        directionScale = glWarp.warpFloat(378.0 / directionLength)
+        directionX = glWarp.warpFloat(directionX * directionScale)
+        directionY = glWarp.warpFloat(directionY * directionScale)
+        textureS = glWarp.warpFloat((glWarp.warpFloat(speedscale) + directionX) / 128.0)
+        textureT = glWarp.warpFloat((glWarp.warpFloat(speedscale) + directionY) / 128.0)
+      end if
+      gl.texcoord2(textureS, textureT)
       gl.vertex3(point.x, point.y, point.z)
     end for
     gl.finishPrimitive()
@@ -2813,6 +3402,7 @@ function EmitSkyPolys(surface)
   return len(polygons)
 end function
 
+// Add both sky layers to the destination state.
 function EmitBothSkyLayers(surface)
   global speedscale
   value = compatSurface(surface)
@@ -2833,6 +3423,7 @@ function EmitBothSkyLayers(surface)
   return first + second
 end function
 
+// Apply the Quake-compatible r draw sky chain behavior.
 function R_DrawSkyChain(chain)
   global speedscale
   if chain is void then return 0 end if
@@ -2859,6 +3450,7 @@ function R_DrawSkyChain(chain)
   return count
 end function
 
+// Apply the Quake-compatible r init sky behavior.
 function R_InitSky(texture)
   global solidskytexture, alphaskytexture, rCompatSkyTexture, rCompatAlphaSkyTexture
   if rCompatRenderer is void or len(rCompatRenderer.palette) < 768 then
@@ -2895,6 +3487,7 @@ function R_AdvanceFrameCounters()
   return r_framecount
 end function
 
+// Apply the Quake-compatible r reset light styles behavior.
 function R_ResetLightStyles(value)
   global d_lightstylevalue
   if len(d_lightstylevalue) != c.MAX_LIGHTSTYLES then d_lightstylevalue = arrayutil.makeFilledArray(c.MAX_LIGHTSTYLES, value) end if

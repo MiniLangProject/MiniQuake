@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang implementation of miniquake.client_protocol.
+*/
 package miniquake.client_protocol
 
 import miniquake.types as t
@@ -8,10 +15,12 @@ import miniquake.protocol_events as protocolEvents
 import miniquake.protocol_transients as transients
 import miniquake.array_util as arrays
 
+// Provide event behavior for the active subsystem.
 function event(name, payload)
   return t.ProtocolEvent(name, payload)
 end function
 
+// Apply the Quake-compatible cl parse baseline behavior.
 function CL_ParseBaseline(reader)
   model = msg.readByte(reader)
   frame = msg.readByte(reader)
@@ -28,10 +37,12 @@ function CL_ParseBaseline(reader)
   return [model, frame, colormap, skin, origin, angles]
 end function
 
+// Read and validate baseline.
 function readBaseline(reader)
   return CL_ParseBaseline(reader)
 end function
 
+// Apply the Quake-compatible cl parse update behavior.
 function CL_ParseUpdate(reader, lowBits)
   bits = lowBits
   if (bits & c.U_MOREBITS) != 0 then bits = bits | (msg.readByte(reader) << 8) end if
@@ -66,10 +77,12 @@ function CL_ParseUpdate(reader, lowBits)
   return event("fast_update", [entityNumber, bits, model, frame, colormap, skin, effects, origin, angles])
 end function
 
+// Read and validate fast update.
 function readFastUpdate(reader, lowBits)
   return CL_ParseUpdate(reader, lowBits)
 end function
 
+// Apply the Quake-compatible cl parse clientdata behavior.
 function CL_ParseClientdata(reader, bits)
   viewHeight = void
   idealPitch = void
@@ -100,11 +113,13 @@ function CL_ParseClientdata(reader, bits)
   return event("svc_clientdata", [bits, viewHeight, idealPitch, punch, velocity, items, weaponFrame, armor, weapon, health, ammo, shells, nails, rockets, cells, activeWeapon])
 end function
 
+// Read and validate client data.
 function readClientData(reader)
   bits = msg.readUnsignedShort(reader)
   return CL_ParseClientdata(reader, bits)
 end function
 
+// Apply the Quake-compatible cl parse server info behavior.
 function CL_ParseServerInfo(reader)
   version = msg.readLong(reader)
   maxClients = msg.readByte(reader)
@@ -145,10 +160,12 @@ function CL_ParseServerInfo(reader)
   return event("svc_serverinfo", [version, maxClients, gameType, levelName, models, sounds])
 end function
 
+// Read and validate server info.
 function readServerInfo(reader)
   return CL_ParseServerInfo(reader)
 end function
 
+// Apply the Quake-compatible cl parse start sound packet behavior.
 function CL_ParseStartSoundPacket(reader)
   fieldMask = msg.readByte(reader)
   volume = 255
@@ -163,10 +180,12 @@ function CL_ParseStartSoundPacket(reader)
   return event("svc_sound", [fieldMask, volume, attenuation, channel, sound, position])
 end function
 
+// Read and validate sound.
 function readSound(reader)
   return CL_ParseStartSoundPacket(reader)
 end function
 
+// Read and validate particle.
 function readParticle(reader)
   origin = t.Vec3(msg.readCoord(reader), msg.readCoord(reader), msg.readCoord(reader))
   direction = t.Vec3(msg.readChar(reader) * 0.0625, msg.readChar(reader) * 0.0625, msg.readChar(reader) * 0.0625)
@@ -175,6 +194,7 @@ function readParticle(reader)
   return event("svc_particle", [origin, direction, count, color])
 end function
 
+// Apply the Quake-compatible cl parse static sound behavior.
 function CL_ParseStaticSound(reader)
   origin = t.Vec3(msg.readCoord(reader), msg.readCoord(reader), msg.readCoord(reader))
   sound = msg.readByte(reader)
@@ -183,14 +203,17 @@ function CL_ParseStaticSound(reader)
   return event("svc_spawnstaticsound", [origin, sound, volume, attenuation])
 end function
 
+// Read and validate static sound.
 function readStaticSound(reader)
   return CL_ParseStaticSound(reader)
 end function
 
+// Apply the Quake-compatible cl parse static behavior.
 function CL_ParseStatic(reader)
   return event("svc_spawnstatic", CL_ParseBaseline(reader))
 end function
 
+// Read and validate the requested value.
 function parse(data)
   reader = msg.beginReadingBytes(data)
 
@@ -301,6 +324,7 @@ function parse(data)
   return t.ProtocolResult(arrays.finishArrayBuilder(events), reader.readCount)
 end function
 
+// Apply the Quake-compatible cl parse server message behavior.
 function CL_ParseServerMessage(data)
   return parse(data)
 end function

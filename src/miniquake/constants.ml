@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.constants.
+*/
 package miniquake.constants
 
 // quakedef.h exposes numeric per-renderer versions. QUAKE_VERSION remains a

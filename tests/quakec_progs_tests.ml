@@ -1,11 +1,11 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-020 validates the on-disk dprograms_t ABI, source-guided semantic checks,
 Quake byte strings and the full-file runtime CRC used by SV_SendServerinfo.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.byteio as bio
@@ -14,16 +14,19 @@ import miniquake.protocol_text as protocolText
 import miniquake.format.progs as progs
 import miniquake.quakec.edict as edict
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(10000, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function yes(value, name)
   if value != true then return error(10001, name + ": expected true") end if
   return true
 end function
 
+// Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
   print "  [" + number + "/18] " + name
   result = try(fn())
@@ -34,12 +37,14 @@ function run(number, name, fn)
   return true
 end function
 
+// Encode and write def.
 function putDef(data, offset, typeValue, wordOffset, nameOffset)
   bio.putU16(data, offset, typeValue)
   bio.putU16(data, offset + 2, wordOffset)
   bio.putI32(data, offset + 4, nameOffset)
 end function
 
+// Encode and write function.
 function putFunction(data, offset, firstStatement, parmStart, locals, nameOffset, fileOffset, numParms)
   bio.putI32(data, offset, firstStatement)
   bio.putI32(data, offset + 4, parmStart)
@@ -55,6 +60,7 @@ function putFunction(data, offset, firstStatement, parmStart, locals, nameOffset
   end while
 end function
 
+// Build deterministic test data for the requested value.
 function fixture()
   statementOffset = 60
   globalDefOffset = 68
@@ -97,10 +103,12 @@ function fixture()
   return data
 end function
 
+// Exercise parsed fixture as part of this deterministic regression fixture.
 function parsedFixture()
   return progs.parse(fixture(), "fixture-progs.dat")
 end function
 
+// Verify header and sections against the expected Quake behavior.
 function testHeaderAndSections()
   program = parsedFixture()
   equal(program.version, c.PROG_VERSION, "version")
@@ -114,6 +122,7 @@ function testHeaderAndSections()
   return true
 end function
 
+// Verify names against the expected Quake behavior.
 function testNames()
   program = parsedFixture()
   equal(program.globalDefs[1].name, "time", "global name")
@@ -123,6 +132,7 @@ function testNames()
   return true
 end function
 
+// Verify runtime crc against the expected Quake behavior.
 function testRuntimeCrc()
   data = fixture()
   program = progs.parse(data, "fixture-progs.dat")
@@ -131,18 +141,21 @@ function testRuntimeCrc()
   return true
 end function
 
+// Verify synthetic crc fallback against the expected Quake behavior.
 function testSyntheticCrcFallback()
   program = t.QuakeCProgram("synthetic", bytes(), c.PROG_VERSION, 1234, [], [], [], [], bytes([0]), [], 1)
   equal(progs.runtimeCrc(program), 1234, "synthetic CRC fallback")
   return true
 end function
 
+// Verify quake byte strings against the expected Quake behavior.
 function testQuakeByteStrings()
   text = progs.stringAt(bytes([0xe9, 0]), 0)
   equal(hex(protocolText.encodeBytes(text)), "e9", "Latin-1 byte string")
   return true
 end function
 
+// Verify load progs header crc against the expected Quake behavior.
 function testLoadProgsHeaderCrc()
   loaded = edict.PR_LoadProgs(fixture(), "fixture-progs.dat")
   equal(loaded.crc, c.PROGHEADER_CRC, "PR_LoadProgs accepts stock header CRC")
@@ -152,6 +165,7 @@ function testLoadProgsHeaderCrc()
   return true
 end function
 
+// Verify bad version against the expected Quake behavior.
 function testBadVersion()
   data = fixture()
   bio.putI32(data, 0, 5)
@@ -159,6 +173,7 @@ function testBadVersion()
   return true
 end function
 
+// Verify truncated section against the expected Quake behavior.
 function testTruncatedSection()
   data = fixture()
   bio.putI32(data, 8, len(data) - 4)
@@ -166,6 +181,7 @@ function testTruncatedSection()
   return true
 end function
 
+// Verify string table nul against the expected Quake behavior.
 function testStringTableNul()
   data = fixture()
   stringOffset = bio.i32(data, 40)
@@ -174,6 +190,7 @@ function testStringTableNul()
   return true
 end function
 
+// Verify opcode range against the expected Quake behavior.
 function testOpcodeRange()
   data = fixture()
   bio.putU16(data, bio.i32(data, 8), 66)
@@ -182,6 +199,7 @@ function testOpcodeRange()
   return true
 end function
 
+// Verify global type against the expected Quake behavior.
 function testGlobalType()
   data = fixture()
   bio.putU16(data, bio.i32(data, 16) + 8, 12)
@@ -190,6 +208,7 @@ function testGlobalType()
   return true
 end function
 
+// Verify global offset against the expected Quake behavior.
 function testGlobalOffset()
   data = fixture()
   bio.putU16(data, bio.i32(data, 16) + 10, 32)
@@ -198,6 +217,7 @@ function testGlobalOffset()
   return true
 end function
 
+// Verify field save global against the expected Quake behavior.
 function testFieldSaveGlobal()
   data = fixture()
   bio.putU16(data, bio.i32(data, 24) + 8, c.EV_FLOAT | c.DEF_SAVEGLOBAL)
@@ -205,6 +225,7 @@ function testFieldSaveGlobal()
   return true
 end function
 
+// Verify field offset against the expected Quake behavior.
 function testFieldOffset()
   data = fixture()
   bio.putU16(data, bio.i32(data, 24) + 10, 4)
@@ -213,6 +234,7 @@ function testFieldOffset()
   return true
 end function
 
+// Verify parameter count against the expected Quake behavior.
 function testParameterCount()
   data = fixture()
   functionOffset = bio.i32(data, 32) + 36
@@ -222,6 +244,7 @@ function testParameterCount()
   return true
 end function
 
+// Verify parameter size against the expected Quake behavior.
 function testParameterSize()
   data = fixture()
   functionOffset = bio.i32(data, 32) + 36
@@ -232,6 +255,7 @@ function testParameterSize()
   return true
 end function
 
+// Verify parameter storage against the expected Quake behavior.
 function testParameterStorage()
   // qcc may emit a bytecode function whose declared parameters are copied to
   // parmStart while locals remains zero.  SUB_AttackFinished in stock
@@ -268,9 +292,32 @@ function testParameterStorage()
   equal(builtinProgram.functions[1].firstStatement, -1, "builtin statement")
   equal(builtinProgram.functions[1].locals, 0, "builtin zero locals")
   equal(progs.validateProgram(builtinProgram), true, "builtin signature accepted")
+
+  // Stock qcc emits zero parm_size entries for builtins such as
+  // makevectors. Builtins consume OFS_PARM words directly and never enter
+  // PR_EnterFunction, so these zero entries are valid original data.
+  stockBuiltinData = fixture()
+  stockBuiltinOffset = bio.i32(stockBuiltinData, 32) + 36
+  bio.putI32(stockBuiltinData, stockBuiltinOffset, -1)
+  bio.putI32(stockBuiltinData, stockBuiltinOffset + 8, 0)
+  bio.putI32(stockBuiltinData, stockBuiltinOffset + 24, 1)
+  stockBuiltinProgram = progs.parse(stockBuiltinData, "stock-builtin-zero-parm-size.dat")
+  equal(stockBuiltinProgram.functions[1].parmSize[0], 0, "stock builtin zero parameter size")
+  equal(progs.validateProgram(stockBuiltinProgram), true, "stock builtin zero parameter size accepted")
+
+  extensionStubData = fixture()
+  extensionStubOffset = bio.i32(extensionStubData, 32) + 36
+  bio.putI32(extensionStubData, extensionStubOffset, 0)
+  bio.putI32(extensionStubData, extensionStubOffset + 4, 0)
+  bio.putI32(extensionStubData, extensionStubOffset + 8, 0)
+  bio.putI32(extensionStubData, extensionStubOffset + 24, 1)
+  extensionStubProgram = progs.parse(extensionStubData, "extension-stub-zero-parm-size.dat")
+  equal(extensionStubProgram.functions[1].parmSize[0], 0, "extension stub zero parameter size")
+  equal(progs.validateProgram(extensionStubProgram), true, "extension stub zero parameter size accepted")
   return true
 end function
 
+// Verify function statement against the expected Quake behavior.
 function testFunctionStatement()
   data = fixture()
   functionOffset = bio.i32(data, 32) + 36
@@ -280,12 +327,14 @@ function testFunctionStatement()
   return true
 end function
 
+// Verify void word size against the expected Quake behavior.
 function testVoidWordSize()
   equal(progs.typeSize(c.EV_VOID), 1, "EV_VOID storage size")
   equal(progs.typeSize(c.EV_VECTOR), 3, "EV_VECTOR storage size")
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "MiniQuake BP-020 QuakeC progs.dat tests"
   passed = 0

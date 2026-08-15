@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.host.
+*/
 package miniquake.host
 
 import miniquake.types as t
@@ -60,15 +67,19 @@ import std.fs as fs
 titleFpsInitialized = false
 titleFpsLastFrame = 0
 titleFpsLastRealtime = 0.0
+titleFpsLastValue = -1
 
+// Report whether command never exists holds for the active state.
 function commandNeverExists(name)
   return false
 end function
 
+// Update subsystem configuration for register cvar.
 function registerCvar(registry, name, value, archive, serverFlag)
   return cvar.register(registry, cvar.create(name, value, archive, serverFlag), commandNeverExists)
 end function
 
+// Create and initialize cvars.
 function createCvars(commandLine, registered)
   registry = cvar.createRegistry()
   registeredValue = "0"
@@ -80,7 +91,10 @@ function createCvars(commandLine, registered)
   registerCvar(registry, "registered", registeredValue, false, false)
   registerCvar(registry, "cmdline", commandLineValue, false, true)
   registerCvar(registry, "host_framerate", "0", false, false)
-  registerCvar(registry, "host_maxfps", "72", false, false)
+  // GLQuake hard-coded 72 Hz in Host_FilterTime. Keep an explicit limiter for
+  // users who want steadier pacing, but let modern machines render well above
+  // that historical ceiling. A value of zero disables filtering entirely.
+  registerCvar(registry, "host_maxfps", "250", true, false)
   registerCvar(registry, "host_speeds", "0", false, false)
   registerCvar(registry, "sys_ticrate", "0.05", false, false)
   registerCvar(registry, "serverprofile", "0", false, false)
@@ -168,13 +182,13 @@ function createCvars(commandLine, registered)
   registerCvar(registry, "showpause", "1", false, false)
   registerCvar(registry, "scr_printspeed", "8", false, false)
   registerCvar(registry, "gl_triplebuffer", "1", true, false)
-  registerCvar(registry, "vid_mode", "0", false, false)
+  registerCvar(registry, "vid_mode", "0", true, false)
   registerCvar(registry, "vid_width", "0", true, false)
   registerCvar(registry, "vid_height", "0", true, false)
   registerCvar(registry, "vid_bpp", "0", true, false)
   registerCvar(registry, "vid_fullscreen", "0", true, false)
   registerCvar(registry, "vid_renderer", "OPENGL", true, false)
-  registerCvar(registry, "vid_wait", "0", false, false)
+  registerCvar(registry, "vid_wait", "0", true, false)
   registerCvar(registry, "vid_nopageflip", "0", true, false)
   registerCvar(registry, "_vid_wait_override", "0", true, false)
   registerCvar(registry, "_vid_default_mode", "0", true, false)
@@ -225,6 +239,7 @@ function createCvars(commandLine, registered)
   return registry
 end function
 
+// Apply the Quake-compatible host find max clients behavior.
 function Host_FindMaxClients(arguments)
   dedicated = common.hasParm(arguments, "-dedicated")
   listening = common.hasParm(arguments, "-listen")
@@ -237,7 +252,11 @@ function Host_FindMaxClients(arguments)
   return [maximum, dedicated, listening]
 end function
 
+// Create and initialize the module state.
 function create(args)
+  // Screen command arrays are a differential-test trace, not renderer input.
+  // Keep them disabled in the production host to avoid per-frame UI garbage.
+  screen.SCR_SetCommandTraceEnabled(false)
   options = launch.parse(args)
   arguments = common.create(args)
   filesystem = qfs.initializeArguments(options.basedir, arguments)
@@ -338,6 +357,7 @@ function create(args)
   )
 end function
 
+// Report whether gameplay mouse enabled holds for the active state.
 function gameplayMouseEnabled(session)
   // WinQuake always owns the mouse in fullscreen.  In a window the original
   // _windowed_mouse cvar controls capture and relative mouse-look.
@@ -345,6 +365,7 @@ function gameplayMouseEnabled(session)
   return cvar.variableValue(session.cvars, "_windowed_mouse") != 0.0
 end function
 
+// Update module state for mouse capture.
 function updateMouseCapture(session)
   desired = false
   if session.windowCreated and win.hasFocus() and not session.menu.active and not session.console.active then
@@ -353,10 +374,12 @@ function updateMouseCapture(session)
   return input.setMouseCapture(desired)
 end function
 
+// Provide filter time behavior for the active subsystem.
 function filterTime(timing, newRealtime, maxFps, forcedFrameRate, timedemo)
   return hostTiming.filterAbsolute(timing, newRealtime, maxFps, forcedFrameRate, timedemo, 1.0)
 end function
 
+// Provide cvar command behavior for the active subsystem.
 function cvarCommand(session, arguments)
   result = cvar.command(session.cvars, arguments)
   if not result[0] then return false end if
@@ -364,6 +387,7 @@ function cvarCommand(session, arguments)
   return true
 end function
 
+// Provide flush server cvar changes behavior for the active subsystem.
 function flushServerCvarChanges(session)
   changes = cvar.takeServerChanges(session.cvars)
   if not session.server.active then return 0 end if
@@ -375,6 +399,7 @@ function flushServerCvarChanges(session)
   return written
 end function
 
+// Return alias.
 function findAlias(system, name)
   wanted = bio.lower(name)
   for each alias in system.aliases
@@ -383,20 +408,133 @@ function findAlias(system, name)
   return void
 end function
 
+// Initialize state for start map.
 function startMap(session, mapName)
   return transitionMap(session, mapName, false, false, false)
 end function
 
+// Update subsystem configuration for change level.
 function changeLevel(session, mapName)
   return transitionMap(session, mapName, true, true, false)
 end function
 
+// Provide restart level behavior for the active subsystem.
 function restartLevel(session, mapName)
   // Host_Restart_f keeps the existing spawn_parms.  Only changelevel calls
   // SV_SaveSpawnparms/SetChangeParms before SV_SpawnServer.
   return transitionMap(session, mapName, true, false, false)
 end function
 
+// Complete every deterministic client-side first-use cache before gameplay is
+// exposed. This corresponds to the original CL_InitTEnts/S_BeginPrecaching and
+// renderer cache work, with the modern OGG/audio queue included as well.
+function precachePlayableLevel(session, developerValue)
+  server.precacheClientFrameLookups(session.server, session.player)
+  if session.entityRenderer is not void then
+    renderHandoff.precacheBeamModels(session.client)
+    entityRenderer.synchronize(session.entityRenderer, session.client.modelPrecache)
+    entities = try(entityRenderer.precache(session.entityRenderer))
+    if entities is error then return error(3932, "client entity precache: " + entities.message) end if
+    synchronizeClientRelinkModels(session)
+  end if
+  if session.windowCreated and session.renderer is not void then
+    particleRenderer.R_InitParticleTexture()
+    // Prime the player's initial PVS and visible-face set. This is a pure
+    // render cache calculation: unlike a hidden Host_Frame it advances no
+    // game time and executes no monster/player QuakeC.
+    initialViewOrigin = t.Vec3(
+      session.player.origin.x + 0.03125,
+      session.player.origin.y + 0.03125,
+      session.player.origin.z + session.player.viewHeight + 0.03125,
+    )
+    worldRenderer.markVisible(session.renderer, initialViewOrigin)
+  end if
+
+  if session.mixer.enabled then
+    mixer.setListenerEntity(session.mixer, session.client.viewEntity)
+    soundPrecache = mixer.precache(session.mixer, session.client.soundPrecache)
+    temporaryPrecache = clientEffects.precacheTemporarySounds(session.mixer)
+    ambientPrecache = mixer.precache(session.mixer, ["ambience/water1.wav", "ambience/wind2.wav"])
+    failedSounds = soundPrecache[1] + temporaryPrecache[1] + ambientPrecache[1]
+    if failedSounds > 0 and developerValue != 0.0 then
+      loadedSounds = soundPrecache[0] + temporaryPrecache[0] + ambientPrecache[0]
+      print "sound precache: " + loadedSounds + " loaded, " + failedSounds + " failed"
+    end if
+    session.mixer.masterVolume = cvar.variableValue(session.cvars, "volume")
+    requestedVolume = cvar.variableValue(session.cvars, "bgmvolume")
+    cdState = cdAudio.ensure(session.mixer)
+    actualVolume = cdAudio.CDAudio_Update(cdState, requestedVolume)
+    if cdState.enabled then
+      if actualVolume != requestedVolume then cvar.setValue(session.cvars, "bgmvolume", actualVolume) end if
+      session.mixer.musicVolume = actualVolume
+    else
+      session.mixer.musicVolume = 0.0
+    end if
+    mixer.updateListener(session.mixer, session.view.origin, session.view.forward, session.view.right)
+    mixer.updateEntityOrigins(session.mixer, session.client.entities)
+    if session.server.worldModel is not void then
+      mixer.updateAmbient(
+        session.mixer,
+        session.server.worldModel,
+        session.view.origin,
+        session.timing.frameTime,
+        cvar.variableValue(session.cvars, "ambient_level"),
+        cvar.variableValue(session.cvars, "ambient_fade"),
+      )
+    end if
+    // Fill the waveOut queue now so neither PCM painting nor the first OGG
+    // decode block is charged to the first visible gameplay frame.
+    mixer.update(
+      session.mixer,
+      session.timing.frameTime,
+      cvar.variableValue(session.cvars, "_snd_mixahead"),
+    )
+  end if
+  return true
+end function
+
+// Present one non-simulating loading frame after the new renderer and all
+// level assets exist.  This moves the driver's one-time first SwapBuffers cost
+// out of the first ordinary Host_Frame while retaining four stock-order warmup
+// updates under the loading plaque.
+function finishLoadingPresentation(session)
+  if not session.windowCreated or session.renderer is void then
+    screen.SCR_EndLoadingPlaque(session.console)
+    return true
+  end if
+  // The first scene presents can complete asynchronously in the driver. Keep
+  // four ordinary world frames under the plaque so a deferred third-present
+  // stall cannot become the first visible gameplay frame.
+  screen.SCR_FinishLoadingAfterUpdates(5)
+  updated = try(screen.SCR_UpdateScreen(
+    session.console,
+    session.menu,
+    session.view,
+    session.player,
+    win.width(),
+    win.height(),
+    session.server.mapName,
+    false,
+    session.timing.realtime,
+    session.timing.frameTime,
+    session.cvars,
+    session.client.connected,
+    session.server.active,
+    session.client.signon,
+    session.server.paused,
+    session.client.lastMessageTime,
+    session.demoPlayback is not void,
+    false,
+    true,
+    false,
+  ))
+  if updated is error then return updated end if
+  glvid.GL_EndRendering()
+  win.poll()
+  return true
+end function
+
+// Finalize state for finish local map connection.
 function finishLocalMapConnection(session, preserveClients)
   opt001dCvarDeveloper = cvar.variableValue(session.cvars, "developer")
   session.client.name = cvar.variableString(session.cvars, "_cl_name")
@@ -424,7 +562,11 @@ function finishLocalMapConnection(session, preserveClients)
     if session.client.signon == c.SIGNON_SPAWN then
       for each serverClient in session.server.clients
         if serverClient.active and serverClient.spawned then
-          server.sendClientFrame(session.server, serverClient, session.player)
+          server.sendClientFrame(
+            session.server,
+            serverClient,
+            server.playerStateForClient(session.server, serverClient, session.player),
+          )
         end if
       end for
     end if
@@ -432,14 +574,14 @@ function finishLocalMapConnection(session, preserveClients)
     attempts = attempts + 1
   end while
   if session.client.signon != c.SIGNONS then return error(3001, "Host_Map: local signon stopped at " + session.client.signon) end if
-  if session.entityRenderer is not void then entityRenderer.synchronize(session.entityRenderer, session.client.modelPrecache) end if
-  if session.mixer.enabled then
-    mixer.setListenerEntity(session.mixer, session.client.viewEntity)
-    soundPrecache = mixer.precache(session.mixer, session.client.soundPrecache)
-    if soundPrecache[1] > 0 and opt001dCvarDeveloper != 0.0 then
-      print "sound precache: " + soundPrecache[0] + " loaded, " + soundPrecache[1] + " failed"
-    end if
-  end if
+  // CL_ParseServerMessage handles prints, static sounds and CD tracks during
+  // signon in GLQuake. MiniQuake queues those presentation events, so drain
+  // them now: OGG opening/probing and static-channel creation then happen
+  // behind the loading plaque and before the audio queue is painted.
+  consumeClientEvents(session)
+  precached = try(precachePlayableLevel(session, opt001dCvarDeveloper))
+  if precached is error then return precached end if
+  statusbar.Sbar_Changed()
   session.statusMessage = "map " + session.server.mapName + ": " + session.server.levelName
   console.appendLine(session.console, session.statusMessage)
   print session.statusMessage
@@ -451,6 +593,7 @@ function finishLocalMapConnection(session, preserveClients)
   return true
 end function
 
+// Provide failed map transition behavior for the active subsystem.
 function failedMapTransition(session, result)
   // A failed create/upload may leave either the error value itself or a
   // partially initialized renderer in the session.  Never let the following
@@ -460,15 +603,37 @@ function failedMapTransition(session, result)
   if session.entityRenderer is not void and session.entityRenderer is not error then entityRenderer.destroy(session.entityRenderer) end if
   session.renderer = void
   session.entityRenderer = void
+  // Every map-loading failure must leave the host in ss_dead rather than the
+  // transient ss_loading state.  Otherwise later frames continue treating an
+  // already failed synchronous command as an in-progress level transition.
+  session.server.loading = false
+  if session.client.connected then client.disconnect(session.client) end if
+  if session.server.active then
+    Host_ShutdownServer(session, true)
+  else
+    server.shutdown(session.server)
+  end if
   screen.SCR_EndLoadingPlaque(session.console)
   session.statusMessage = result.message
   line = "Map transition failed: " + result.message
   console.appendLine(session.console, line)
   print line
+  // Host_Map_f switches to gameplay before spawning in the original engine.
+  // On failure, expose the diagnostic console so an interactive build remains
+  // visibly responsive and the player can immediately enter another command.
+  if not session.headless and not common.hasParm(session.arguments, "-dedicated") then
+    setConsoleActive(session, true)
+  end if
   return result
 end function
 
+// Provide transition map behavior for the active subsystem.
 function transitionMap(session, mapName, preserveClients, saveChangeParms, deferLocalConnection)
+  if session.windowCreated then
+    input.IN_BlockGameplayTransition()
+    input.clear(session.client.command)
+    keys.Key_ClearStates()
+  end if
   screen.SCR_SetIntermission(0, "", session.console, session.client.time)
   // gl_screen.c stops every active sound before it even checks whether the
   // loading plaque can be displayed. Preserve that ordering here.
@@ -564,23 +729,21 @@ function transitionMap(session, mapName, preserveClients, saveChangeParms, defer
     if palette is error then return failedMapTransition(session, palette) end if
     videoState = glvid.VID_State()
     if videoState.initialized then palette = videoState.palette end if
-    // Alias/sprite precaching performs the largest burst of heap allocation
-    // during map startup.  Complete it before constructing the deeply nested
-    // world-surface graph so no later model-load allocation can invalidate
-    // boxed vertex members.
-    session.entityRenderer = try(entityRenderer.create(session.filesystem, palette, session.server.modelPrecache))
-    if session.entityRenderer is error then return failedMapTransition(session, session.entityRenderer) end if
-    if session.windowCreated then
-      precachedEntities = try(entityRenderer.precache(session.entityRenderer))
-      if precachedEntities is error then return failedMapTransition(session, error(3931, "startup entity precache: " + precachedEntities.message)) end if
-      win.poll()
-    end if
+    // Build the world first so external BSP pickup models cannot replace the
+    // active world-surface root while they are parsed and uploaded.
     session.renderer = try(worldRenderer.create(session.server.worldModel, palette))
     if session.renderer is error then return failedMapTransition(session, session.renderer) end if
     worldRenderer.R_SetMultitextureCompatibility(videoState.multitexture, false)
     if session.windowCreated then
       uploadedWorld = try(worldRenderer.upload(session.renderer))
       if uploadedWorld is error then return failedMapTransition(session, error(3930, "startup world upload: " + uploadedWorld.message)) end if
+      win.poll()
+    end if
+    session.entityRenderer = try(entityRenderer.create(session.filesystem, palette, session.server.modelPrecache))
+    if session.entityRenderer is error then return failedMapTransition(session, session.entityRenderer) end if
+    if session.windowCreated then
+      precachedEntities = try(entityRenderer.precache(session.entityRenderer))
+      if precachedEntities is error then return failedMapTransition(session, error(3931, "startup entity precache: " + precachedEntities.message)) end if
       win.poll()
     end if
     if session.windowCreated then
@@ -594,24 +757,41 @@ function transitionMap(session, mapName, preserveClients, saveChangeParms, defer
       updateTitle(session)
     end if
   end if
-  screen.SCR_EndLoadingPlaque(session.console)
   session.startMap = session.server.mapName
 
   if common.hasParm(session.arguments, "-dedicated") then
     session.statusMessage = "map " + session.server.mapName + ": " + session.server.levelName
     console.appendLine(session.console, session.statusMessage)
     print session.statusMessage
+    screen.SCR_EndLoadingPlaque(session.console)
     return true
   end if
 
   if deferLocalConnection then return true end if
   connected = try(finishLocalMapConnection(session, preserveClients))
   if connected is error then return failedMapTransition(session, connected) end if
+  statusbar.Sbar_Changed()
+  // Reclaim parser, signon and renderer-upload temporaries while the loading
+  // plaque is still visible. Interactive gameplay otherwise reaches the heap
+  // boundary unpredictably and pays for a full collection in an ordinary
+  // movement/render frame, which is perceived as asset streaming stutter.
+  gc_collect()
+  // Prime presentation without advancing simulation, then retain the plaque
+  // for two ordinary Host_Frame updates. The third frame is the first visible
+  // gameplay frame and no longer pays the driver's first-swap initialization.
+  presented = try(finishLoadingPresentation(session))
+  if presented is error then return failedMapTransition(session, presented) end if
   return connected
 end function
 
+// Encode and write configuration.
 function writeConfiguration(session)
   if session.filesystem is void then return false end if
+  // Automated render/transition diagnostics deliberately force small windowed
+  // modes.  They share the production host, but must never replace the user's
+  // persistent interactive settings when their temporary session shuts down.
+  if common.hasParm(session.arguments, "-noautosaveconfig") then return false end if
+  if session.windowCreated then glvid.VID_SaveCurrentConfigurationCvars() end if
   text = keys.Key_WriteBindings() + cvar.archiveText(session.cvars)
   written = try(qfs.writeText(session.filesystem, "config.cfg", text))
   if written is error then
@@ -621,6 +801,7 @@ function writeConfiguration(session)
   return true
 end function
 
+// Apply the Quake-compatible host init local behavior.
 function Host_InitLocal(session)
   mode = Host_FindMaxClients(session.arguments)
   if mode is error then return mode end if
@@ -632,19 +813,23 @@ function Host_InitLocal(session)
   return true
 end function
 
+// Apply the Quake-compatible host write configuration behavior.
 function Host_WriteConfiguration(session)
   if not session.initialized or common.hasParm(session.arguments, "-dedicated") then return false end if
   return writeConfiguration(session)
 end function
 
+// Apply the Quake-compatible sv client printf behavior.
 function SV_ClientPrintf(clientValue, text)
   return server.clientPrint(clientValue, text)
 end function
 
+// Apply the Quake-compatible sv broadcast printf behavior.
 function SV_BroadcastPrintf(session, text)
   return server.broadcastPrint(session.server, text)
 end function
 
+// Apply the Quake-compatible host client commands behavior.
 function Host_ClientCommands(clientValue, text)
   if clientValue is void or not clientValue.active then return false end if
   msg.writeByte(clientValue.message, c.SVC_STUFFTEXT)
@@ -652,11 +837,13 @@ function Host_ClientCommands(clientValue, text)
   return true
 end function
 
+// Apply the Quake-compatible sv drop client behavior.
 function SV_DropClient(session, clientValue, crash)
   if clientValue is void then return false end if
   return server.dropClient(session.server, clientValue, crash)
 end function
 
+// Apply the Quake-compatible host flush pending client messages behavior.
 function Host_FlushPendingClientMessages(session, timeoutSeconds)
   start = win.ticks() / 1000.0
   count = 0
@@ -685,6 +872,7 @@ function Host_FlushPendingClientMessages(session, timeoutSeconds)
   return count
 end function
 
+// Apply the Quake-compatible host shutdown server behavior.
 function Host_ShutdownServer(session, crash)
   if not session.server.active then return false end if
   // Mark inactive before disconnecting the local client, matching host.c and
@@ -707,6 +895,7 @@ function Host_ShutdownServer(session, crash)
   return true
 end function
 
+// Apply the Quake-compatible host clear memory behavior.
 function Host_ClearMemory(session)
   if session.entityRenderer is not void or session.renderer is not void then destroyScene(session) end if
   if session.client.connected then client.dropConnection(session.client) end if
@@ -722,12 +911,16 @@ function Host_ClearMemory(session)
   return true
 end function
 
+// Apply the Quake-compatible host filter time behavior.
 function Host_FilterTime(session, elapsedSeconds)
   forced = cvar.variableValue(session.cvars, "host_framerate")
+  maximum = cvar.variableValue(session.cvars, "host_maxfps")
+  if maximum < 0.0 then maximum = 0.0 end if
   timedemo = session.timedemoActive or common.hasParm(session.arguments, "-timedemo")
-  return hostTiming.filter(session.timing, elapsedSeconds, timedemo, forced, 1.0)
+  return hostTiming.filter(session.timing, elapsedSeconds, timedemo, forced, 1.0, maximum)
 end function
 
+// Apply the Quake-compatible host get console commands behavior.
 function Host_GetConsoleCommands(session, inputLines)
   count = 0
   for each line in inputLines
@@ -739,6 +932,7 @@ function Host_GetConsoleCommands(session, inputLines)
   return count
 end function
 
+// Apply the Quake-compatible host init vcr behavior.
 function Host_InitVCR(session)
   // VCR network capture/playback is an explicit project exclusion.  Rejecting
   // the original switches at initialization is deterministic and avoids
@@ -749,6 +943,7 @@ function Host_InitVCR(session)
   return true
 end function
 
+// Apply the Quake-compatible host end game behavior.
 function Host_EndGame(session, message)
   if cvar.variableValue(session.cvars, "developer") != 0.0 then print "Host_EndGame: " + message end if
   if session.server.active then Host_ShutdownServer(session, false) end if
@@ -760,6 +955,7 @@ function Host_EndGame(session, message)
   return error(3013, "Host_EndGame: " + message)
 end function
 
+// Apply the Quake-compatible host error behavior.
 function Host_Error(session, message)
   if session.inError then
     session.running = false
@@ -776,6 +972,7 @@ function Host_Error(session, message)
   return error(3015, "Host_Error: " + message)
 end function
 
+// Provide refresh save slots behavior for the active subsystem.
 function refreshSaveSlots(session)
   items = []
   loadable = []
@@ -798,6 +995,7 @@ function refreshSaveSlots(session)
   return items
 end function
 
+// Encode and write game.
 function saveGame(session, requestedName)
   if not session.server.active then return error(3712, "Not playing a local game.") end if
   if screen.SCR_IntermissionMode() != 0 then return error(3715, "Can't save in intermission.") end if
@@ -823,6 +1021,7 @@ function saveGame(session, requestedName)
   return true
 end function
 
+// Read and validate game.
 function loadGame(session, requestedName)
   name = savegame.filename(requestedName)
   if name is error then return name end if
@@ -838,9 +1037,9 @@ function loadGame(session, requestedName)
   started = transitionMap(session, saved.mapName, false, false, true)
   if started is error then return started end if
   restored = savegame.apply(session.server, saved)
-  if restored is error then return restored end if
+  if restored is error then return failedMapTransition(session, restored) end if
   synchronized = saveRuntime.synchronizeLoadedServer(session.server)
-  if synchronized is error then return synchronized end if
+  if synchronized is error then return failedMapTransition(session, synchronized) end if
   if len(session.server.clients) > 0 then
     server.syncPlayerFromQuakeC(session.server, session.server.clients[0], session.player)
   end if
@@ -850,14 +1049,20 @@ function loadGame(session, requestedName)
   session.server.loadGame = true
   if not common.hasParm(session.arguments, "-dedicated") then
     connected = try(finishLocalMapConnection(session, false))
-    if connected is error then return connected end if
+    if connected is error then return failedMapTransition(session, connected) end if
   end if
+  // Saved edict/global parsing creates a large temporary graph. Reclaim it and
+  // prime the new presentation while the load plaque is still authoritative.
+  gc_collect()
+  presented = try(finishLoadingPresentation(session))
+  if presented is error then return failedMapTransition(session, presented) end if
   message = "Loaded " + name
   console.appendLine(session.console, message)
   print message
   return true
 end function
 
+// Update module state for player flag.
 function setPlayerFlag(session, flag, enabled)
   if enabled then session.player.flags = session.player.flags | flag else session.player.flags = session.player.flags & ~flag end if
   if session.server.machine is not void and len(session.server.clients) > 0 then
@@ -866,10 +1071,12 @@ function setPlayerFlag(session, flag, enabled)
   return enabled
 end function
 
+// Report whether player flag enabled holds for the active state.
 function playerFlagEnabled(session, flag)
   return (session.player.flags & flag) != 0
 end function
 
+// Advance client by one processing step.
 function pumpClient(session)
   if session.demoRecording is not void then
     return client.pumpRecording(session.client, session.demoRecording)
@@ -877,6 +1084,7 @@ function pumpClient(session)
   return client.pump(session.client)
 end function
 
+// Finalize state for stop demo recording.
 function stopDemoRecording(session)
   if session.demoRecording is void then return error(3722, "Not recording a demo.") end if
   stopped = try(demo.CL_Stop_f(session.demoRecording, session.client.command.viewAngles))
@@ -889,6 +1097,7 @@ function stopDemoRecording(session)
   return true
 end function
 
+// Initialize state for begin demo recording.
 function beginDemoRecording(session, arguments)
   if session.demoRecording is not void then return error(3724, "Already recording a demo.") end if
   plan = try(demo.CL_Record_f(arguments, session.client.connected))
@@ -910,6 +1119,7 @@ function beginDemoRecording(session, arguments)
   return true
 end function
 
+// Release resources owned by scene.
 function destroyScene(session)
   if session.entityRenderer is not void then entityRenderer.destroy(session.entityRenderer); session.entityRenderer = void end if
   if session.renderer is not void then worldRenderer.destroy(session.renderer) end if
@@ -917,6 +1127,7 @@ function destroyScene(session)
   return true
 end function
 
+// Provide rebuild renderer resources behavior for the active subsystem.
 function rebuildRendererResources(session)
   videoState = glvid.VID_State()
   palette = videoState.palette
@@ -937,12 +1148,18 @@ function rebuildRendererResources(session)
   session.height = win.height()
   initialized = try(screen.initialize(session.console, session.menu, session.filesystem, palette, session.width, session.height, session.cvars))
   if initialized is error then return initialized end if
+  // The particle texture belongs to the active graphics context.  Recreate it
+  // eagerly so the first gunshot after a renderer switch cannot use a stale
+  // texture name or introduce an upload hitch.
+  particleRenderer.R_InitParticleTexture()
   menu.M_SetVideoCallbacks(session.menu, glvid.VID_MenuDrawCallback, glvid.VID_MenuKeyCallback)
   screen.SCR_ConfigureClient(session.client)
   return true
 end function
 
+// Provide restart renderer behavior for the active subsystem.
 function restartRenderer(session, backend)
+  particleRenderer.R_ShutdownParticleTexture()
   destroyScene(session)
   screen.shutdown(session.console, session.menu)
   switched = glvid.VID_RestartRenderer(backend)
@@ -954,6 +1171,7 @@ function restartRenderer(session, backend)
   return true
 end function
 
+// Provide prepare demo scene behavior for the active subsystem.
 function prepareDemoScene(session)
   if len(session.client.modelPrecache) <= 1 then return error(3727, "demo has no world model") end if
   modelName = session.client.modelPrecache[1]
@@ -972,23 +1190,37 @@ function prepareDemoScene(session)
     if palette is error then return palette end if
     videoState = glvid.VID_State()
     if videoState.initialized then palette = videoState.palette end if
-    session.renderer = worldRenderer.create(worldModel, palette)
+    session.renderer = try(worldRenderer.create(worldModel, palette))
+    if session.renderer is error then return session.renderer end if
     worldRenderer.R_SetMultitextureCompatibility(videoState.multitexture, false)
-    session.entityRenderer = entityRenderer.create(session.filesystem, palette, session.client.modelPrecache)
+    session.entityRenderer = try(entityRenderer.create(session.filesystem, palette, session.client.modelPrecache))
+    if session.entityRenderer is error then return session.entityRenderer end if
     if session.windowCreated then
+      uploadedWorld = try(worldRenderer.upload(session.renderer))
+      if uploadedWorld is error then return error(3935, "demo world upload: " + uploadedWorld.message) end if
+      precachedEntities = try(entityRenderer.precache(session.entityRenderer))
+      if precachedEntities is error then return error(3936, "demo entity precache: " + precachedEntities.message) end if
       session.width = win.width()
       session.height = win.height()
-      screen.initialize(session.console, session.menu, session.filesystem, palette, session.width, session.height, session.cvars)
+      initialized = try(screen.initialize(session.console, session.menu, session.filesystem, palette, session.width, session.height, session.cvars))
+      if initialized is error then return initialized end if
     end if
   end if
   if session.mixer.enabled then
     mixer.stopAll(session.mixer)
     mixer.setListenerEntity(session.mixer, session.client.viewEntity)
-    mixer.precache(session.mixer, session.client.soundPrecache)
   end if
+  // Demo signon has the same complete model/sound precache tables as a live
+  // connection.  Warm every renderer, temporary-effect and audio cache before
+  // the first timed frame so a newly visible monster or projectile cannot
+  // trigger synchronous parsing/upload work during playback.
+  precached = try(precachePlayableLevel(session, cvar.variableValue(session.cvars, "developer")))
+  if precached is error then return precached end if
+  gc_collect()
   return true
 end function
 
+// Establish remote host using the active network transport.
 function connectRemoteHost(session, hostName)
   if session.demoRecording is not void then stopDemoRecording(session) end if
   if session.demoPlayback is not void then finishDemoPlayback(session) end if
@@ -1010,6 +1242,7 @@ function connectRemoteHost(session, hostName)
   return true
 end function
 
+// Establish remote host interop using the active network transport.
 function connectRemoteHostInterop(session, hostName, timeoutMilliseconds, resendMilliseconds)
   if session.demoRecording is not void then stopDemoRecording(session) end if
   if session.demoPlayback is not void then finishDemoPlayback(session) end if
@@ -1030,6 +1263,7 @@ function connectRemoteHostInterop(session, hostName, timeoutMilliseconds, resend
   return true
 end function
 
+// Report whether active server clients holds for the active state.
 function activeServerClients(session)
   count = 0
   for each serverClient in session.server.clients
@@ -1038,6 +1272,7 @@ function activeServerClients(session)
   return count
 end function
 
+// Update subsystem configuration for configure network queries.
 function configureNetworkQueries(session)
   players = []
   now = win.ticks() / 1000.0
@@ -1062,6 +1297,7 @@ function configureNetworkQueries(session)
   return netloop.configureQueryData(session.network, players, rules)
 end function
 
+// Advance new connections by one processing step.
 function pumpNewConnections(session)
   if session.network.listener is void or not session.server.active then return 0 end if
   netloop.configureServer(
@@ -1089,6 +1325,7 @@ function pumpNewConnections(session)
   return accepted
 end function
 
+// Finalize state for finish demo playback.
 function finishDemoPlayback(session)
   if session.demoPlayback is void then return false end if
   playback = session.demoPlayback
@@ -1106,6 +1343,7 @@ function finishDemoPlayback(session)
   return true
 end function
 
+// Advance demo playback by one processing step.
 function stepDemoPlayback(session)
   playback = session.demoPlayback
   if playback is void then return 0 end if
@@ -1116,6 +1354,7 @@ function stepDemoPlayback(session)
   return parsed
 end function
 
+// Play demo through the active media subsystem.
 function playDemo(session, requestedName, timed)
   name = demo.filename(requestedName)
   if name is error then return name end if
@@ -1154,17 +1393,20 @@ function playDemo(session, requestedName, timed)
   return true
 end function
 
+// Provide network command address behavior for the active subsystem.
 function networkCommandAddress(arguments)
   if len(arguments) == 2 then return arguments[1] end if
   if len(arguments) == 4 and arguments[2] == ":" then return arguments[1] + ":" + arguments[3] end if
   return ""
 end function
 
+// Apply the Quake-compatible host forward to server behavior.
 function Host_ForwardToServer(session, text)
   if not session.client.connected or session.client.socket is void then return false end if
   return client.sendString(session.client, text + "\n") >= 0
 end function
 
+// Apply the Quake-compatible host disconnect f behavior.
 function Host_Disconnect_f(session)
   // CL_Disconnect_f disconnects the client and explicitly shuts down a local
   // server as a second step.  Keep the explicit host shutdown even when the
@@ -1174,6 +1416,7 @@ function Host_Disconnect_f(session)
   return true
 end function
 
+// Apply the Quake-compatible host quit f behavior.
 function Host_Quit_f(session)
   dedicated = common.hasParm(session.arguments, "-dedicated")
   if not session.console.active and not dedicated then
@@ -1186,6 +1429,7 @@ function Host_Quit_f(session)
   return true
 end function
 
+// Apply the Quake-compatible host status f behavior.
 function Host_Status_f(session)
   if not session.server.active then return Host_ForwardToServer(session, "status") end if
   print "host:    " + cvar.variableString(session.cvars, "hostname")
@@ -1218,49 +1462,71 @@ function Host_Status_f(session)
   return true
 end function
 
+// Apply the Quake-compatible host god f behavior.
 function Host_God_f(session)
   return Host_ForwardToServer(session, "god")
 end function
 
+// Apply the Quake-compatible host notarget f behavior.
 function Host_Notarget_f(session)
   return Host_ForwardToServer(session, "notarget")
 end function
 
+// Apply the Quake-compatible host noclip f behavior.
 function Host_Noclip_f(session)
   return Host_ForwardToServer(session, "noclip")
 end function
 
+// Apply the Quake-compatible host fly f behavior.
 function Host_Fly_f(session)
   return Host_ForwardToServer(session, "fly")
 end function
 
+// Apply the Quake-compatible host ping f behavior.
 function Host_Ping_f(session)
   return Host_ForwardToServer(session, "ping")
 end function
 
+// Apply the Quake-compatible host map f behavior.
 function Host_Map_f(session, arguments)
   if len(arguments) < 2 then print "map <levelname> : start a new server"; return false end if
+  requestedMap = server.cleanMapName(arguments[1])
+  requestedPath = "maps/" + requestedMap + ".bsp"
+  // A mistyped console command must be non-destructive.  Probe the search
+  // path before stopping demos, disconnecting, drawing LOADING or destroying
+  // the current renderer/server; the player can correct the name immediately.
+  if session.filesystem is void or not qfs.fileExists(session.filesystem, requestedPath) then
+    line = "Map \"" + requestedMap + "\" does not exist."
+    console.appendLine(session.console, line)
+    print line
+    return false
+  end if
   if session.demoRecording is not void then stopDemoRecording(session) end if
-  if session.demoPlayback is not void then finishDemoPlayback(session) end if
+  // Host_Map_f sets cls.demonum to -1 before CL_Disconnect.  Doing this after
+  // finishing playback lets CL_StopPlayback enqueue the next attract demo.
   session.demoNumber = -1
+  if session.demoPlayback is not void then finishDemoPlayback(session) end if
   session.server.serverFlags = 0
   // host_cmd.c preserves every token following the map name in
   // cls.spawnparms and includes it in the subsequent "spawn" command.
   session.client.spawnParms = server.commandText(arguments, 2)
-  return startMap(session, arguments[1])
+  return startMap(session, requestedMap)
 end function
 
+// Apply the Quake-compatible host changelevel f behavior.
 function Host_Changelevel_f(session, arguments)
   if len(arguments) != 2 then print "changelevel <levelname> : continue game on a new level"; return false end if
   if session.demoPlayback is not void or not session.server.active then print "Only the server may changelevel"; return false end if
   return changeLevel(session, arguments[1])
 end function
 
+// Apply the Quake-compatible host restart f behavior.
 function Host_Restart_f(session)
   if session.demoPlayback is not void or not session.server.active then return false end if
   return restartLevel(session, session.server.mapName)
 end function
 
+// Apply the Quake-compatible host reconnect f behavior.
 function Host_Reconnect_f(session)
   // SCR_BeginLoadingPlaque begins with S_StopAllSounds(true) in WinQuake.
   if session.mixer is not void then mixer.stopAll(session.mixer) end if
@@ -1275,6 +1541,7 @@ function Host_Reconnect_f(session)
   return true
 end function
 
+// Apply the Quake-compatible host connect f behavior.
 function Host_Connect_f(session, arguments)
   remoteName = networkCommandAddress(arguments)
   if remoteName == "" then print "connect <server>"; return false end if
@@ -1285,6 +1552,7 @@ function Host_Connect_f(session, arguments)
   return true
 end function
 
+// Apply the Quake-compatible host savegame f behavior.
 function Host_Savegame_f(session, arguments)
   if len(arguments) != 2 then print "save <savename> : save a game"; return false end if
   saved = try(saveGame(session, arguments[1]))
@@ -1292,6 +1560,7 @@ function Host_Savegame_f(session, arguments)
   return true
 end function
 
+// Apply the Quake-compatible host loadgame f behavior.
 function Host_Loadgame_f(session, arguments)
   if len(arguments) != 2 then print "load <savename> : load a game"; return false end if
   session.demoNumber = -1
@@ -1300,12 +1569,14 @@ function Host_Loadgame_f(session, arguments)
   return true
 end function
 
+// Apply the Quake-compatible host changelevel2 f behavior.
 function Host_Changelevel2_f(session, arguments)
   // QUAKE2-only in MiniQuake 1.09.  Retain the transition entry point while the
   // target build deliberately omits .gip hub-state semantics.
   return Host_Changelevel_f(session, arguments)
 end function
 
+// Apply the Quake-compatible host name f behavior.
 function Host_Name_f(session, arguments)
   if len(arguments) == 1 then print "\"name\" is \"" + cvar.variableString(session.cvars, "_cl_name") + "\""; return true end if
   newName = server.commandText(arguments, 1)
@@ -1317,11 +1588,13 @@ function Host_Name_f(session, arguments)
   return true
 end function
 
+// Apply the Quake-compatible host version f behavior.
 function Host_Version_f()
   print "Version " + c.QUAKE_VERSION
   return true
 end function
 
+// Apply the Quake-compatible host please f behavior.
 function Host_Please_f(session, arguments)
   // IDGODS-only in the reference.  The state is retained for faithful
   // privilege checks without enabling it automatically for public clients.
@@ -1346,6 +1619,7 @@ function Host_Please_f(session, arguments)
   return true
 end function
 
+// Apply the Quake-compatible host say behavior.
 function Host_Say(session, arguments, teamOnly)
   if len(arguments) < 2 then return false end if
   commandName = "say"
@@ -1360,19 +1634,23 @@ function Host_Say(session, arguments, teamOnly)
   return Host_ForwardToServer(session, commandName + " \"" + server.commandText(arguments, 1) + "\"")
 end function
 
+// Apply the Quake-compatible host say f behavior.
 function Host_Say_f(session, arguments)
   return Host_Say(session, arguments, false)
 end function
 
+// Apply the Quake-compatible host say team f behavior.
 function Host_Say_Team_f(session, arguments)
   return Host_Say(session, arguments, true)
 end function
 
+// Apply the Quake-compatible host tell f behavior.
 function Host_Tell_f(session, arguments)
   if len(arguments) < 3 then return false end if
   return Host_ForwardToServer(session, "tell " + arguments[1] + " \"" + server.commandText(arguments, 2) + "\"")
 end function
 
+// Apply the Quake-compatible host color f behavior.
 function Host_Color_f(session, arguments)
   if len(arguments) == 1 then
     colors = native.trunc(cvar.variableValue(session.cvars, "_cl_color"))
@@ -1390,38 +1668,46 @@ function Host_Color_f(session, arguments)
   return true
 end function
 
+// Apply the Quake-compatible host kill f behavior.
 function Host_Kill_f(session)
   return Host_ForwardToServer(session, "kill")
 end function
 
+// Apply the Quake-compatible host pause f behavior.
 function Host_Pause_f(session)
   return Host_ForwardToServer(session, "pause")
 end function
 
+// Apply the Quake-compatible host pre spawn f behavior.
 function Host_PreSpawn_f()
   print "prespawn is not valid from the console"
   return false
 end function
 
+// Apply the Quake-compatible host spawn f behavior.
 function Host_Spawn_f()
   print "spawn is not valid from the console"
   return false
 end function
 
+// Apply the Quake-compatible host begin f behavior.
 function Host_Begin_f()
   print "begin is not valid from the console"
   return false
 end function
 
+// Apply the Quake-compatible host kick f behavior.
 function Host_Kick_f(session, arguments)
   if session.server.active then return server.Host_Kick_f(session.server, void, arguments) end if
   return Host_ForwardToServer(session, server.commandText(arguments, 0))
 end function
 
+// Apply the Quake-compatible host give f behavior.
 function Host_Give_f(session, arguments)
   return Host_ForwardToServer(session, server.commandText(arguments, 0))
 end function
 
+// Return viewthing.
 function FindViewthing(session)
   for each item in session.server.edicts
     // The original scans every edict without testing ent->free.  ED_Free
@@ -1432,6 +1718,7 @@ function FindViewthing(session)
   return void
 end function
 
+// Apply the Quake-compatible host viewmodel f behavior.
 function Host_Viewmodel_f(session, arguments)
   if len(arguments) < 2 or session.entityRenderer is void then return false end if
   item = FindViewthing(session)
@@ -1445,12 +1732,14 @@ function Host_Viewmodel_f(session, arguments)
   return true
 end function
 
+// Provide viewthing model behavior for the active subsystem.
 function viewthingModel(session, item)
   if session.entityRenderer is void then return void end if
   if item.modelIndex < 0 or item.modelIndex >= len(session.entityRenderer.models) then return void end if
   return session.entityRenderer.models[item.modelIndex]
 end function
 
+// Apply the Quake-compatible host viewframe f behavior.
 function Host_Viewframe_f(session, arguments)
   if len(arguments) < 2 then return false end if
   item = FindViewthing(session)
@@ -1464,6 +1753,7 @@ function Host_Viewframe_f(session, arguments)
   return true
 end function
 
+// Format and emit frame name.
 function PrintFrameName(model, frame)
   if model is void or model.aliasModel is void then return "" end if
   if frame < 0 or frame >= len(model.aliasModel.frames) then return "" end if
@@ -1474,6 +1764,7 @@ function PrintFrameName(model, frame)
   return text
 end function
 
+// Apply the Quake-compatible host viewnext f behavior.
 function Host_Viewnext_f(session)
   item = FindViewthing(session)
   if item is void then return false end if
@@ -1486,6 +1777,7 @@ function Host_Viewnext_f(session)
   return true
 end function
 
+// Apply the Quake-compatible host viewprev f behavior.
 function Host_Viewprev_f(session)
   item = FindViewthing(session)
   if item is void then return false end if
@@ -1498,6 +1790,7 @@ function Host_Viewprev_f(session)
   return true
 end function
 
+// Return next demo for the active module state.
 function nextDemo(session)
   if len(session.demoLoop) == 0 or session.demoNumber < 0 then return false end if
   if session.demoNumber >= len(session.demoLoop) then session.demoNumber = 0 end if
@@ -1506,6 +1799,16 @@ function nextDemo(session)
   return cmd.addText(session.commands, "playdemo " + name + "\n")
 end function
 
+// Stop attract playback before a user-selected game action. This also removes
+// a next-demo command queued at the end of the preceding host frame.
+function stopAttractMode(session)
+  session.demoNumber = -1
+  cmd.removeCommandsNamed(session.commands, "playdemo")
+  if session.demoPlayback is not void then finishDemoPlayback(session) end if
+  return true
+end function
+
+// Apply the Quake-compatible host startdemos f behavior.
 function Host_Startdemos_f(session, arguments)
   if common.hasParm(session.arguments, "-dedicated") then
     if not session.server.active then cmd.addText(session.commands, "map start\n") end if
@@ -1520,6 +1823,10 @@ function Host_Startdemos_f(session, arguments)
     index = index + 1
   end while
   print count + " demo(s) in loop"
+  // host_cmd.c arms cls.demonum at slot zero before deciding whether the
+  // first demo can start immediately. The previous -1 guard prevented a
+  // directory-only launch from ever entering the attract loop.
+  session.demoNumber = 0
   // +map / validation starts are authoritative.  quake.rc is executed before
   // initialize() performs that direct map start in MiniQuake, so queuing
   // playdemo here would otherwise run after the requested map and tear down
@@ -1528,14 +1835,15 @@ function Host_Startdemos_f(session, arguments)
     session.demoNumber = -1
     return true
   end if
-  if not session.server.active and session.demoNumber != -1 and session.demoPlayback is void then
-    session.demoNumber = 0
-    return nextDemo(session)
+  if not session.server.active and session.demoPlayback is void then
+    queued = nextDemo(session)
+    if queued then return true end if
   end if
   session.demoNumber = -1
   return true
 end function
 
+// Apply the Quake-compatible host demos f behavior.
 function Host_Demos_f(session)
   if common.hasParm(session.arguments, "-dedicated") then return false end if
   // MiniQuake resumes a stopped loop at slot one; CL_NextDemo wraps to zero if
@@ -1546,6 +1854,7 @@ function Host_Demos_f(session)
   return nextDemo(session)
 end function
 
+// Apply the Quake-compatible host stopdemo f behavior.
 function Host_Stopdemo_f(session)
   if common.hasParm(session.arguments, "-dedicated") or session.demoPlayback is void then return false end if
   session.demoNumber = -1
@@ -1554,6 +1863,7 @@ function Host_Stopdemo_f(session)
   return true
 end function
 
+// Apply the Quake-compatible host edict f behavior.
 function Host_Edict_f(session, arguments)
   if session.server.machine is void then print "No server running."; return false end if
   if len(arguments) != 2 then print "edict <number>"; return false end if
@@ -1564,6 +1874,7 @@ function Host_Edict_f(session, arguments)
   return true
 end function
 
+// Apply the Quake-compatible host edicts f behavior.
 function Host_Edicts_f(session)
   if session.server.machine is void then print "No server running."; return false end if
   index = 0
@@ -1574,6 +1885,7 @@ function Host_Edicts_f(session)
   return true
 end function
 
+// Apply the Quake-compatible host edict count f behavior.
 function Host_EdictCount_f(session)
   if session.server.machine is void then print "No server running."; return false end if
   counts = qcedict.ED_Count(session.server.machine)
@@ -1585,6 +1897,7 @@ function Host_EdictCount_f(session)
   return true
 end function
 
+// Apply the Quake-compatible host profile f behavior.
 function Host_Profile_f(session)
   if session.server.machine is void then print "No server running."; return false end if
   for each line in qcvm.PR_Profile_f(session.server.machine)
@@ -1593,6 +1906,7 @@ function Host_Profile_f(session)
   return true
 end function
 
+// Apply the Quake-compatible host mod print behavior.
 function Host_Mod_Print(session)
   count = 0
   index = 0
@@ -1607,6 +1921,7 @@ function Host_Mod_Print(session)
   return count
 end function
 
+// Apply the Quake-compatible host flush cache f behavior.
 function Host_FlushCache_f(session)
   // Cache_Flush makes purgeable alias/sprite data get loaded again on demand.
   // MiniQuake's GC-backed model cache has no hunk address to purge, so rebuild
@@ -1621,6 +1936,7 @@ function Host_FlushCache_f(session)
   return true
 end function
 
+// Apply the Quake-compatible host init commands behavior.
 function Host_InitCommands()
   return [
     "status", "quit", "god", "notarget", "fly", "map", "restart",
@@ -1632,7 +1948,9 @@ function Host_InitCommands()
   ]
 end function
 
+// Apply the Quake-compatible host dispatch command behavior.
 function Host_DispatchCommand(session, text, arguments)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   name = bio.lower(arguments[0])
   if name == "status" then return Host_Status_f(session) end if
   if name == "quit" or name == "exit" then return Host_Quit_f(session) end if
@@ -1680,6 +1998,7 @@ function Host_DispatchCommand(session, text, arguments)
   return void
 end function
 
+// Execute command.
 function executeCommand(session, text)
   arguments = cmd.tokenize(text)
   if len(arguments) == 0 then return false end if
@@ -1928,7 +2247,7 @@ function executeCommand(session, text)
     if response != "" then print response end if
     return true
   end if
-  if (name == "play" or name == "playvol" or name == "stopsound" or name == "soundlist" or name == "soundinfo") and (session.headless or common.hasParm(session.arguments, "-nosound")) then return false end if
+  if (name == "play" or name == "playvol" or name == "stopsound" or name == "soundlist" or name == "soundinfo" or name == "musicinfo") and (session.headless or common.hasParm(session.arguments, "-nosound")) then return false end if
   if name == "play" then
     played = try(mixer.play(session.mixer, arguments))
     if played is error then print played.message; return false end if
@@ -1953,6 +2272,12 @@ function executeCommand(session, text)
   if name == "soundinfo" then
     for each soundField in mixer.soundInfo(session.mixer)
       print soundField[0] + " " + soundField[1]
+    end for
+    return true
+  end if
+  if name == "musicinfo" then
+    for each musicField in mixer.musicInfo(session.mixer)
+      print musicField[0] + " " + musicField[1]
     end for
     return true
   end if
@@ -2110,6 +2435,7 @@ function executeCommand(session, text)
   return false
 end function
 
+// Execute command buffer.
 function executeCommandBuffer(session, maximumCommands)
   executed = 0
   session.commands.wait = false
@@ -2132,6 +2458,7 @@ function executeCommandBuffer(session, maximumCommands)
   return executed
 end function
 
+// Add state for queue startup commands.
 function queueStartupCommands(session)
   if qfs.fileExists(session.filesystem, "quake.rc") then
     cmd.addText(session.commands, "exec quake.rc\n")
@@ -2145,14 +2472,18 @@ function queueStartupCommands(session)
   return true
 end function
 
+// Apply the Quake-compatible host init behavior.
 function Host_Init(session)
   // MiniLang's default small-object threshold runs a complete mark/sweep
   // collection after 8 MiB of tiny allocations. Scanning Quake's live map,
   // VM and renderer graph in the middle of Host_Frame creates visible
-  // 50-200 ms pauses. MiniQuake owns a 1 GiB reserved heap and explicit safe
+  // 50-200 ms pauses. MiniQuake owns a 2 GiB reserved/committed heap and explicit safe
   // collection points in diagnostic/validation flows; allocation-failure GC
   // remains enabled by the runtime.
   gc_set_limit(0)
+  // An empty requested map is meaningful: --play BASEDIR asks quake.rc to
+  // start the retail attract demos and show the menu over their playback.
+  attractStartup = session.startMap == ""
   localInit = try(Host_InitLocal(session))
   if localInit is error then return localInit end if
   vcrInit = try(Host_InitVCR(session))
@@ -2185,8 +2516,7 @@ function Host_Init(session)
       print "sound disabled: " + opened.message
     else
       session.audioStarted = true
-      videoState = glvid.VID_State()
-      if videoState.soundBlocked and mixer.blockDepth(session.mixer) == 0 then mixer.block(session.mixer) end if
+      glvid.VID_SynchronizeSoundFocus()
       // Menu feedback must be available before the first game event.  These
       // effects remain cached when the current level sound list is precached.
       mixer.precache(session.mixer, ["misc/menu1.wav", "misc/menu2.wav", "misc/menu3.wav"])
@@ -2245,9 +2575,16 @@ function Host_Init(session)
     fallbackMap = session.startMap
     if fallbackMap == "" and qfs.fileExists(session.filesystem, "maps/start.bsp") then fallbackMap = "start" end if
     if fallbackMap != "" then
+      // A missing/corrupt demo must not leave a half-armed loop that can fire
+      // after the fallback level ends.
+      if attractStartup then session.demoNumber = -1 end if
       started = try(startMap(session, fallbackMap))
       if started is error then return started end if
     end if
+  end if
+  if attractStartup and not session.headless and (session.demoPlayback is not void or session.server.active) then
+    setMenuActive(session, true)
+    menu.M_Menu_Main_f(session.menu)
   end if
   session.lastTicks = win.ticks()
   session.timing.oldRealtime = 0.0
@@ -2255,10 +2592,12 @@ function Host_Init(session)
   return session
 end function
 
+// Initialize state for initialize.
 function initialize(session)
   return Host_Init(session)
 end function
 
+// Consume pending state for consume client events.
 function consumeClientEvents(session)
   pending = client.consumeMessages(session.client)
   processable = []
@@ -2283,7 +2622,16 @@ function consumeClientEvents(session)
       end if
       cdState = cdAudio.ensure(session.mixer)
       played = try(cdAudio.CDAudio_Play(cdState, track, true))
-      if played is error and cvar.variableValue(session.cvars, "developer") != 0.0 then print played.message end if
+      if played is error then
+        line = "CDAudio: " + played.message
+        console.appendLine(session.console, line)
+        print line
+      else if not played then
+        line = cdState.lastMessage
+        if line == "" then line = "CDAudio: could not play track " + track end if
+        console.appendLine(session.console, line)
+        print line
+      end if
     else if item.command == "svc_centerprint" then
       screen.SCR_CenterPrint(void, item.payload, session.client.time)
     else if item.command == "svc_intermission" then
@@ -2313,11 +2661,27 @@ function consumeClientEvents(session)
   return len(pending)
 end function
 
+// Update module state for client relink models.
 function synchronizeClientRelinkModels(session)
-  flags = arrayutil.makeFilledArray(len(session.client.modelPrecache), 0)
-  syncTypes = arrayutil.makeFilledArray(len(session.client.modelPrecache), c.ST_SYNC)
+  targetCount = len(session.client.modelPrecache)
+  modelsChanged = false
   if session.entityRenderer is not void then
+    oldModelCount = len(session.entityRenderer.models)
     entityRenderer.synchronize(session.entityRenderer, session.client.modelPrecache)
+    modelsChanged = oldModelCount < targetCount
+  end if
+  currentFlags = client.CL_ModelFlags()
+  currentSyncTypes = client.CL_ModelSyncTypes()
+  // Model precaches are immutable between serverinfo messages. Once the
+  // renderer and the two relink lookup tables cover the current precache,
+  // rebuilding both arrays every Host_Frame only creates garbage.
+  if not modelsChanged and len(currentFlags) == targetCount and len(currentSyncTypes) == targetCount then
+    client.CL_SetChaseActive(cvar.variableValue(session.cvars, "chase_active") != 0.0)
+    return targetCount
+  end if
+  flags = arrayutil.makeFilledArray(targetCount, 0)
+  syncTypes = arrayutil.makeFilledArray(targetCount, c.ST_SYNC)
+  if session.entityRenderer is not void then
     index = 0
     while index < len(flags) and index < len(session.entityRenderer.models)
       model = session.entityRenderer.models[index]
@@ -2336,6 +2700,7 @@ function synchronizeClientRelinkModels(session)
   return len(flags)
 end function
 
+// Consume pending state for consume relink particle effects.
 function consumeRelinkParticleEffects(session)
   effects = client.CL_TakeRelinkParticleEffects()
   for each item in effects
@@ -2354,6 +2719,7 @@ function consumeRelinkParticleEffects(session)
   return len(effects)
 end function
 
+// Consume pending state for consume quake ccontrol.
 function consumeQuakeCControl(session)
   opt001dCvarDeveloper = cvar.variableValue(session.cvars, "developer")
   count = 0
@@ -2386,6 +2752,7 @@ function consumeQuakeCControl(session)
   return count
 end function
 
+// Play local sound through the active media subsystem.
 function playLocalSound(session, name)
   if session.mixer is void or not session.mixer.enabled then return false end if
   played = try(mixer.localSound(session.mixer, name))
@@ -2393,6 +2760,7 @@ function playLocalSound(session, name)
   return played
 end function
 
+// Play menu sound through the active media subsystem.
 function playMenuSound(session, name)
   if session.mixer is void or not session.mixer.enabled then return false end if
   result = try(mixer.localSound(session.mixer, name))
@@ -2417,8 +2785,13 @@ function consumeConsoleSideEffects(session)
   return forceScreen
 end function
 
+// Update module state for menu active.
 function setMenuActive(session, active)
   wasActive = session.menu.active
+  // Some exact menu handlers clear MenuState.active before returning "close".
+  // KEY_MENU and pausedByMenu still prove that the menu owned input, so retain
+  // the gameplay-transition gate even on that action-driven close path.
+  menuOwnedInput = wasActive or keys.destination() == keys.KEY_MENU or session.menu.pausedByMenu
   if active then
     console.setActive(session.console, false)
     session.consoleVisible = false
@@ -2430,6 +2803,11 @@ function setMenuActive(session, active)
       menu.setActive(session.menu, true)
     end if
   else
+    if menuOwnedInput and session.windowCreated then
+      input.IN_BlockGameplayTransition()
+      input.clear(session.client.command)
+      keys.Key_ClearStates()
+    end if
     if session.menu.pausedByMenu then
       session.server.paused = false
       session.menu.pausedByMenu = false
@@ -2444,6 +2822,7 @@ function setMenuActive(session, active)
     keys.setDestination(keys.KEY_GAME)
   end if
   updateMouseCapture(session)
+  if menuOwnedInput and not active and session.initialized then writeConfiguration(session) end if
   return active
 end function
 
@@ -2459,6 +2838,7 @@ function toggleMenu(session)
   return setMenuActive(session, not session.menu.active)
 end function
 
+// Update module state for console active.
 function setConsoleActive(session, active)
   if active and session.menu.active then setMenuActive(session, false) end if
   console.setActive(session.console, active)
@@ -2474,6 +2854,7 @@ function setConsoleActive(session, active)
   return active
 end function
 
+// Provide adjust menu option behavior for the active subsystem.
 function adjustMenuOption(session, direction)
   selection = session.menu.selection
   changed = true
@@ -2519,10 +2900,13 @@ function adjustMenuOption(session, direction)
     changed = false
   end if
   if changed then playMenuSound(session, "misc/menu3.wav") end if
+  if changed and session.initialized then writeConfiguration(session) end if
   return changed
 end function
 
+// Execute menu selection.
 function executeMenuSelection(session)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   action = menu.selectedCommand(session.menu)
   if action == "menu_single" then
     menu.M_Menu_SinglePlayer_f(session.menu)
@@ -2540,6 +2924,7 @@ function executeMenuSelection(session)
     menu.M_Menu_Quit_f(session.menu)
     playMenuSound(session, "misc/menu2.wav")
   else if action == "new_game" then
+    stopAttractMode(session)
     setMenuActive(session, false)
     cmd.addText(session.commands, "disconnect\nmaxplayers 1\nmap start\n")
   else if action == "load_game" then
@@ -2611,7 +2996,9 @@ function executeMenuSelection(session)
   return action
 end function
 
+// Handle exact menu action and update the associated state.
 function handleExactMenuAction(session, result)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if result is array then
     if len(result) == 0 then return false end if
     if result[0] == "renderer_switch" then
@@ -2621,6 +3008,7 @@ function handleExactMenuAction(session, result)
         playMenuSound(session, "misc/menu3.wav")
       else
         menu.setStatus(session.menu, glvid.VID_State().lastModeMessage)
+        writeConfiguration(session)
         playMenuSound(session, "misc/menu2.wav")
       end if
       return true
@@ -2635,6 +3023,7 @@ function handleExactMenuAction(session, result)
         session.server.clients[0].name = result[2]
         session.server.clients[0].colors = session.client.colors
       end if
+      writeConfiguration(session)
       menu.M_Menu_MultiPlayer_f(session.menu)
       playMenuSound(session, "misc/menu2.wav")
       return true
@@ -2694,6 +3083,7 @@ function handleExactMenuAction(session, result)
     session.width = videoState.windowWidth
     session.height = videoState.windowHeight
     updateMouseCapture(session)
+    writeConfiguration(session)
     playMenuSound(session, "misc/menu2.wav")
     return true
   end if
@@ -2706,12 +3096,16 @@ function handleExactMenuAction(session, result)
     return true
   end if
   if result == "close" then setMenuActive(session, false); return true end if
-  if result == "adjust" and session.menu.page == menu.PAGE_OPTIONS and session.menu.selection == 13 then updateMouseCapture(session) end if
+  if result == "adjust" then
+    if session.menu.page == menu.PAGE_OPTIONS and session.menu.selection == 13 then updateMouseCapture(session) end if
+    writeConfiguration(session)
+  end if
   if result == "none" then return false end if
   playMenuSound(session, "misc/menu1.wav")
   return true
 end function
 
+// Release or consume state for discard text input.
 function discardTextInput()
   count = 0
   code = win.textPop()
@@ -2722,7 +3116,9 @@ function discardTextInput()
   return count
 end function
 
+// Handle menu key and update the associated state.
 function handleMenuKey(session, key)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if session.menu.page == menu.PAGE_QUIT then
     return handleExactMenuAction(session, menu.M_Quit_Key(session.menu, key))
   end if
@@ -2773,6 +3169,7 @@ function handleMenuKey(session, key)
   return false
 end function
 
+// Handle key result and update the associated state.
 function handleKeyResult(session, result)
   if result[0] != "" then cmd.addText(session.commands, result[0]) end if
   action = result[1]
@@ -2791,6 +3188,7 @@ function handleKeyResult(session, result)
   return result[0] != ""
 end function
 
+// Execute console input.
 function processConsoleInput(session)
   if not session.windowCreated then return 0 end if
   handled = 0
@@ -2849,8 +3247,9 @@ function processConsoleInput(session)
   return handled
 end function
 
+// Update module state for title.
 function updateTitle(session)
-  global titleFpsInitialized, titleFpsLastFrame, titleFpsLastRealtime
+  global titleFpsInitialized, titleFpsLastFrame, titleFpsLastRealtime, titleFpsLastValue
   if not session.windowCreated then return end if
 
   frameCount = session.timing.frameCount
@@ -2859,6 +3258,7 @@ function updateTitle(session)
     titleFpsInitialized = true
     titleFpsLastFrame = frameCount
     titleFpsLastRealtime = realtime
+    titleFpsLastValue = 0
     win.setTitle(glvid.VID_WindowTitleForFps(0))
     return
   end if
@@ -2866,9 +3266,15 @@ function updateTitle(session)
   frameDelta = frameCount - titleFpsLastFrame
   if frameDelta < 30 then return end if
   elapsed = realtime - titleFpsLastRealtime
+  // SetWindowTextW can synchronize with DWM. Sampling once per second and
+  // avoiding identical writes removes that periodic OS-side frame disturbance.
+  if elapsed < 1.0 then return end if
   fps = 0
   if elapsed > 0.000001 then fps = native.trunc(frameDelta / elapsed) end if
-  win.setTitle(glvid.VID_WindowTitleForFps(fps))
+  if fps != titleFpsLastValue then
+    win.setTitle(glvid.VID_WindowTitleForFps(fps))
+    titleFpsLastValue = fps
+  end if
   titleFpsLastFrame = frameCount
   titleFpsLastRealtime = realtime
 end function
@@ -2881,14 +3287,24 @@ function inline shouldPollLiveButtonBindings(headless, destinationIsGame, consol
   return not headless and destinationIsGame and not consoleActive and not menuActive
 end function
 
+// Provide deterministic input requested behavior for the active subsystem.
 function deterministicInputRequested(session)
   return common.hasParm(session.arguments, "-noinput")
 end function
 
+// Send client intentions through the active connection.
 function sendClientIntentions(session)
   if session.demoPlayback is void and not session.client.connected then return 0 end if
   command = session.client.command
   inputSuppressed = deterministicInputRequested(session)
+  transitionSuppressed = input.IN_GameplayTransitionBlocked()
+  if transitionSuppressed then
+    // A neutral sample only arms the following frame. This prevents the key-up
+    // event and a queued keyPressed edge from becoming a one-frame shot/jump.
+    input.IN_ReleaseGameplayTransitionIfNeutral()
+    input.IN_ClearStates()
+    input.clear(command)
+  end if
   if inputSuppressed then
     // Render evidence needs a real OpenGL window but must not inherit keyboard,
     // mouse or joystick state from the desktop.  Original WinQuake only sees
@@ -2898,13 +3314,13 @@ function sendClientIntentions(session)
     input.clear(command)
   end if
   if session.client.signon == c.SIGNONS then
-    pollButtonBindings = not inputSuppressed and shouldPollLiveButtonBindings(
+    pollButtonBindings = not inputSuppressed and not transitionSuppressed and shouldPollLiveButtonBindings(
       session.headless,
       keys.destination() == keys.KEY_GAME,
       session.console.active,
       session.menu.active,
     )
-    deviceActive = not inputSuppressed and not session.headless and session.windowCreated and win.hasFocus()
+    deviceActive = not inputSuppressed and not transitionSuppressed and not session.headless and session.windowCreated and win.hasFocus()
     minimized = session.windowCreated and win.minimized()
     input.buildOriginalMove(
       command,
@@ -2927,6 +3343,7 @@ function sendClientIntentions(session)
   return client.CL_SendCmd(session.client, command)
 end function
 
+// Apply the Quake-compatible host server frame behavior.
 function Host_ServerFrame(session)
   if not session.server.active then return false end if
   sz.clear(session.server.datagram)
@@ -2943,10 +3360,12 @@ function Host_ServerFrame(session)
   return result
 end function
 
+// Apply the Quake-compatible host server frame behavior.
 function _Host_ServerFrame(session)
   return Host_ServerFrame(session)
 end function
 
+// Apply the Quake-compatible host frame behavior.
 function _Host_Frame(session, elapsedSeconds)
   // BP-001 persists the last completed host stage only when a compatibility
   // trace explicitly provides a context path. Normal gameplay does no I/O.
@@ -3023,6 +3442,13 @@ function _Host_Frame(session, elapsedSeconds)
   end if
   compatDiagnostics.checkpoint(session, "demo_scene")
 
+  // A local pickup can clear its authoritative QuakeC model during the server
+  // phase above. Remove that numbered client entity before relinking and
+  // before the world/entity render phases; filtering only the final submitted
+  // list left older entity/efrag consumers with one retained model.
+  if session.server.active and session.client.localAuthoritative then
+    client.CL_ApplyAuthoritativeEntityVisibility(session.client, session.server.edicts)
+  end if
   synchronizeClientRelinkModels(session)
   client.CL_BeginRelinkParticles(session.particles)
   client.CL_RelinkEntities(session.client)
@@ -3063,9 +3489,13 @@ function _Host_Frame(session, elapsedSeconds)
     screen.SCR_IntermissionMode(),
       not session.client.connected and session.demoPlayback is void,
   )
-  chaseState = chase.syncCvars(chase.create(), session.cvars)
   forcedConsole = not session.client.connected and session.demoPlayback is void
-  if chaseState.active and not session.server.paused and screen.SCR_IntermissionMode() == 0 and not forcedConsole then
+  chaseActive = cvar.variableValue(session.cvars, "chase_active") != 0.0
+  if chaseActive and not session.server.paused and screen.SCR_IntermissionMode() == 0 and not forcedConsole then
+    // The chase state has no persistent frame-to-frame mutation. Construct it
+    // only when the optional camera is actually active; first-person gameplay
+    // otherwise allocated a state object and performed four extra cvar scans.
+    chaseState = chase.syncCvars(chase.create(), session.cvars)
     chaseWorld = session.server.worldModel
     if session.renderer is not void then chaseWorld = session.renderer.map end if
     chased = chase.Chase_UpdateRefdef(
@@ -3176,6 +3606,16 @@ function _Host_Frame(session, elapsedSeconds)
       compatDiagnostics.checkpoint(session, "screen_world")
       if session.entityRenderer is not void then
         visibleEntities = client.CL_ActiveVisibleEntities(session.client)
+        // A local server and client share one process, so use the authoritative
+        // mirror as the final render gate. This makes collected pickups vanish
+        // immediately even if a stale Protocol-15 visible list survived one
+        // frame; remote clients and demos retain the original network path.
+        if session.server.active and session.client.localAuthoritative then
+          visibleEntities = client.CL_FilterAuthoritativeVisibleEntities(
+            visibleEntities,
+            session.server.edicts,
+          )
+        end if
         temporaryModels = renderHandoff.currentTemporaryEntities()
         entityRenderer.synchronize(session.entityRenderer, session.client.modelPrecache)
         if rDrawEntities then
@@ -3295,6 +3735,7 @@ function _Host_Frame(session, elapsedSeconds)
   compatDiagnostics.checkpoint(session, "particles")
 
   if session.mixer.enabled then
+    glvid.VID_SynchronizeSoundFocusIfNeeded()
     session.mixer.masterVolume = cvar.variableValue(session.cvars, "volume")
     requestedMusicVolume = cvar.variableValue(session.cvars, "bgmvolume")
     cdState = cdAudio.ensure(session.mixer)
@@ -3327,6 +3768,7 @@ function _Host_Frame(session, elapsedSeconds)
   return true
 end function
 
+// Apply the Quake-compatible host frame behavior.
 function Host_Frame(session, elapsedSeconds)
   if cvar.variableValue(session.cvars, "serverprofile") == 0.0 then return _Host_Frame(session, elapsedSeconds) end if
   started = win.ticks()
@@ -3342,10 +3784,12 @@ function Host_Frame(session, elapsedSeconds)
   return result
 end function
 
+// Advance the requested value by one processing step.
 function frame(session, elapsedSeconds)
   return Host_Frame(session, elapsedSeconds)
 end function
 
+// Apply the Quake-compatible host shutdown behavior.
 function Host_Shutdown(session)
   if session.shutdownStarted then
     print "recursive shutdown"
@@ -3358,6 +3802,7 @@ function Host_Shutdown(session)
     if stopped is error then print stopped.message end if
   end if
   if session.demoPlayback is not void then finishDemoPlayback(session) end if
+  particleRenderer.R_ShutdownParticleTexture()
   if session.entityRenderer is not void then entityRenderer.destroy(session.entityRenderer); session.entityRenderer = void end if
   if session.renderer is not void then worldRenderer.destroy(session.renderer) end if
   session.renderer = void
@@ -3382,11 +3827,14 @@ function Host_Shutdown(session)
   return true
 end function
 
+// Release state for shutdown.
 function shutdown(session)
   return Host_Shutdown(session)
 end function
 
+// Execute one named test case and record its pass/fail result.
 function run(args)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   session = create(args)
   initialized = try(initialize(session))
   if initialized is error then print "Host_Init: " + initialized.message; shutdown(session); return 2 end if
@@ -3462,6 +3910,7 @@ function run(args)
   return 0
 end function
 
+// Provide protocol queue snapshot behavior for the active subsystem.
 function protocolQueueSnapshot(session)
   queuedMessages = 0
   queuedBytes = 0
@@ -3486,6 +3935,7 @@ function protocolQueueSnapshot(session)
   return [queuedMessages, queuedBytes]
 end function
 
+// Return udp endpoint count derived from the active module state.
 function udpEndpointCount(session)
   count = 0
   if session.network.listener is not void and session.network.listener.open then count = count + 1 end if
@@ -3495,6 +3945,7 @@ function udpEndpointCount(session)
   return count
 end function
 
+// Provide resource snapshot behavior for the active subsystem.
 function resourceSnapshot(session)
   network = netmain.NET_QueueSnapshot()
   protocol = protocolQueueSnapshot(session)
@@ -3526,6 +3977,7 @@ function resourceSnapshot(session)
   ]
 end function
 
+// Provide resource high water behavior for the active subsystem.
 function resourceHighWater(high, value)
   updated = []
   index = 0
@@ -3538,15 +3990,18 @@ function resourceHighWater(high, value)
   return updated
 end function
 
+// Provide resource stable behavior for the active subsystem.
 function resourceStable(before, after)
   return stability.longStable(before, after)
 end function
 
+// Format and emit resource delta.
 function printResourceDelta(label, before, after, high)
   print "  " + label + ": " + before + " -> " + after + " (max " + high + ")"
   return true
 end function
 
+// Format and emit resource soak.
 function printResourceSoak(mode, target, frameCount, before, after, high, cycles, demoMessages, stable)
   print "MiniQuake long soak"
   print "  mode=" + mode + " target=" + target + " frames=" + frameCount
@@ -3585,12 +4040,14 @@ function printResourceSoak(mode, target, frameCount, before, after, high, cycles
   return stable
 end function
 
+// Provide soak frame error behavior for the active subsystem.
 function soakFrameError(session, phase, frameIndex, frameError)
   stage = "before-filter"
   if len(session.frameTrace) > 0 then stage = session.frameTrace[len(session.frameTrace) - 1] end if
   return error(3736, phase + " frame " + frameIndex + " [" + stage + "]: " + frameError.message)
 end function
 
+// Execute measured frames.
 function runMeasuredFrames(session, frameCount)
   gc_collect()
   before = resourceSnapshot(session)
@@ -3613,6 +4070,7 @@ function runMeasuredFrames(session, frameCount)
   return [before, after, high]
 end function
 
+// Execute server mode soak.
 function runServerModeSoak(args, mode, target, frameCount)
   session = create(args)
   initialized = try(initialize(session))
@@ -3640,11 +4098,13 @@ function runServerModeSoak(args, mode, target, frameCount)
   return true
 end function
 
+// Provide restart soak demo behavior for the active subsystem.
 function restartSoakDemo(session, demoName)
   if session.demoPlayback is not void then finishDemoPlayback(session) end if
   return playDemo(session, demoName, false)
 end function
 
+// Execute demo mode soak.
 function runDemoModeSoak(args, demoName, frameCount)
   session = create(args)
   initialized = try(initialize(session))
@@ -3728,10 +4188,12 @@ function runDemoModeSoak(args, demoName, frameCount)
 end function
 
 
+// Provide opt001a resource header behavior for the active subsystem.
 function opt001aResourceHeader()
   return "sample,frame,heap_live,heap_high_water_bytes,heap_live_bytes,heap_free_bytes,edicts,client_entities,active_clients,active_qsockets,free_qsockets,queued_messages,queued_bytes,poll_procedures,udp_endpoints,audio_queued,audio_channels,process_handles,particles,temporary_entities\n"
 end function
 
+// Provide opt001a resource row behavior for the active subsystem.
 function opt001aResourceRow(sampleName, frameIndex, values)
   result = sampleName + "," + frameIndex
   index = 0
@@ -3742,6 +4204,7 @@ function opt001aResourceRow(sampleName, frameIndex, values)
   return result + "\n"
 end function
 
+// Provide opt001a resource json behavior for the active subsystem.
 function opt001aResourceJson(values)
   result = "["
   index = 0
@@ -3753,6 +4216,7 @@ function opt001aResourceJson(values)
   return result + "]"
 end function
 
+// Provide opt001a non handle stable behavior for the active subsystem.
 function opt001aNonHandleStable(before, after)
   checks = stability.longChecks(before, after)
   index = 0
@@ -3763,6 +4227,7 @@ function opt001aNonHandleStable(before, after)
   return true
 end function
 
+// Provide opt001a map parse behavior for the active subsystem.
 function opt001aMapParse(baseDirectory, gameDirectory, mapName, outputPrefix)
   commandLine = common.create(["-basedir", baseDirectory, "-game", gameDirectory])
   filesystem = qfs.initializeArguments(baseDirectory, commandLine)
@@ -3814,28 +4279,51 @@ function opt001aMapParse(baseDirectory, gameDirectory, mapName, outputPrefix)
   return true
 end function
 
-function opt001aSessionArguments(baseDirectory, gameDirectory, mapName, mode, port)
-  if mode == "render" then
-    return [
+// Provide opt001a session arguments behavior for the active subsystem.
+function opt001aSessionArguments(baseDirectory, gameDirectory, mapName, mode, port, width, height)
+  if mode == "demo" or mode == "demo-audio" then
+    arguments = [
       "-basedir", baseDirectory,
       "-game", gameDirectory,
+      "-noautosaveconfig",
       "-window",
-      "-nosound",
       "-nolan",
       "-nomouse",
       "-nojoy",
       "-noinput",
-      "-width", "640",
-      "-height", "480",
+      "-width", "" + width,
+      "-height", "" + height,
+      "+vid_wait", "0",
+      "+gl_finish", "0",
+      "+timedemo", mapName,
+    ]
+    if mode == "demo" then arguments = arguments + ["-nosound"] end if
+    return arguments
+  end if
+  if mode == "render" or mode == "render-audio" then
+    arguments = [
+      "-basedir", baseDirectory,
+      "-game", gameDirectory,
+      "-noautosaveconfig",
+      "-window",
+      "-nolan",
+      "-nomouse",
+      "-nojoy",
+      "-noinput",
+      "-width", "" + width,
+      "-height", "" + height,
       "+vid_wait", "0",
       "+gl_finish", "0",
       "+map", mapName,
     ]
+    if mode == "render" then arguments = arguments + ["-nosound"] end if
+    return arguments
   end if
   if mode == "listen" then
     return [
       "-basedir", baseDirectory,
       "-game", gameDirectory,
+      "-noautosaveconfig",
       "-headless",
       "-nosound",
       "-listen", "8",
@@ -3847,12 +4335,14 @@ function opt001aSessionArguments(baseDirectory, gameDirectory, mapName, mode, po
   return [
     "-basedir", baseDirectory,
     "-game", gameDirectory,
+    "-noautosaveconfig",
     "-headless",
     "-nosound",
     "+map", mapName,
   ]
 end function
 
+// Provide opt001a run frames behavior for the active subsystem.
 function opt001aRunFrames(session, frameCount, phase)
   index = 0
   checkpoint = 500
@@ -3868,13 +4358,22 @@ function opt001aRunFrames(session, frameCount, phase)
   return true
 end function
 
-function runOpt001AFrameBaseline(baseDirectory, gameDirectory, mapName, mode, warmupFrames, measureFrames, outputPrefix)
-  if mode != "headless" and mode != "render" then return error(3800, "OPT-001A baseline mode must be headless or render") end if
-  session = create(opt001aSessionArguments(baseDirectory, gameDirectory, mapName, mode, 26000))
+// Execute opt001 aframe baseline.
+function runOpt001AFrameBaseline(baseDirectory, gameDirectory, mapName, mode, warmupFrames, measureFrames, outputPrefix, rendererName, width, height)
+  demoMode = mode == "demo" or mode == "demo-audio"
+  renderMode = mode == "render" or mode == "render-audio" or demoMode
+  if mode != "headless" and not renderMode then return error(3800, "OPT-001A baseline mode must be headless, render, render-audio, demo or demo-audio") end if
+  sessionArguments = opt001aSessionArguments(baseDirectory, gameDirectory, mapName, mode, 26000, width, height)
+  if renderMode and rendererName != "" then sessionArguments = sessionArguments + ["-renderer", rendererName] end if
+  session = create(sessionArguments)
   initialized = try(initialize(session))
   if initialized is error then shutdown(session); return initialized end if
-  if not session.server.active then shutdown(session); return error(3801, "OPT-001A baseline did not start map " + mapName) end if
-  if mode == "render" and (not session.windowCreated or session.renderer is void) then
+  if demoMode then
+    if session.demoPlayback is void then shutdown(session); return error(3801, "OPT-001A baseline did not start demo " + mapName) end if
+  else if not session.server.active then
+    shutdown(session); return error(3801, "OPT-001A baseline did not start map " + mapName)
+  end if
+  if renderMode and not demoMode and (not session.windowCreated or session.renderer is void) then
     shutdown(session)
     return error(3802, "OPT-001A render baseline requires a window and renderer")
   end if
@@ -3883,6 +4382,10 @@ function runOpt001AFrameBaseline(baseDirectory, gameDirectory, mapName, mode, wa
   print "  mode=" + mode + " map=" + mapName + " frames=" + warmupFrames
   warmed = try(opt001aRunFrames(session, warmupFrames, "warmup"))
   if warmed is error then shutdown(session); return warmed end if
+  if renderMode and (not session.windowCreated or session.renderer is void) then
+    shutdown(session)
+    return error(3802, "OPT-001A render baseline requires a window and renderer")
+  end if
 
   // A zero-warmup run measures the real post-load first frame.  Do not insert
   // a synthetic full collection that the interactive engine never performs at
@@ -3910,6 +4413,7 @@ function runOpt001AFrameBaseline(baseDirectory, gameDirectory, mapName, mode, wa
   return error(3803, "OPT-001A frame baseline recorded an unexpected frame count")
 end function
 
+// Provide opt001b change level trigger behavior for the active subsystem.
 function opt001bChangeLevelTrigger(session, destination)
   if session.server.machine is void then return error(3823, "OPT-001B QuakeC VM is unavailable") end if
   triggerIndex = -1
@@ -3929,6 +4433,7 @@ function opt001bChangeLevelTrigger(session, destination)
   return triggerIndex
 end function
 
+// Execute opt001 bquake cexit.
 function runOpt001BQuakeCExit(session, destination, maximumFrames)
   triggerIndex = try(opt001bChangeLevelTrigger(session, destination))
   if triggerIndex is error then return triggerIndex end if
@@ -3969,11 +4474,13 @@ function runOpt001BQuakeCExit(session, destination, maximumFrames)
   return frames
 end function
 
-function runOpt001BTransition(baseDirectory, gameDirectory, frameCount, outputPrefix)
+// Execute opt001 btransition.
+function runOpt001BTransition(baseDirectory, gameDirectory, frameCount, outputPrefix, rendererName)
   transitionArguments = []
-  for each argument in opt001aSessionArguments(baseDirectory, gameDirectory, "start", "render", 26000)
+  for each argument in opt001aSessionArguments(baseDirectory, gameDirectory, "start", "render", 26000, 640, 480)
     if argument != "-nosound" then transitionArguments = transitionArguments + [argument] end if
   end for
+  if rendererName != "" then transitionArguments = transitionArguments + ["-renderer", rendererName] end if
   session = create(transitionArguments)
   initialized = try(initialize(session))
   if initialized is error then shutdown(session); return initialized end if
@@ -4032,6 +4539,42 @@ function runOpt001BTransition(baseDirectory, gameDirectory, frameCount, outputPr
   return true
 end function
 
+// Execute renderer switch smoke.
+function runRendererSwitchSmoke(baseDirectory, gameDirectory, mapName, frameCount, outputPrefix)
+  sessionArguments = opt001aSessionArguments(baseDirectory, gameDirectory, mapName, "render", 26000, 640, 480)
+  sessionArguments = sessionArguments + ["-renderer", "opengl"]
+  session = create(sessionArguments)
+  initialized = try(initialize(session))
+  if initialized is error then shutdown(session); return initialized end if
+
+  backends = [win.RENDER_OPENGL, win.RENDER_DIRECT3D9, win.RENDER_VULKAN, win.RENDER_OPENGL]
+  json = "{\"schema\":\"MiniQuakeRendererSwitch/1\",\"map\":\"" + mapName + "\",\"backends\":["
+  index = 0
+  while index < len(backends)
+    backend = backends[index]
+    if index > 0 then
+      switched = try(restartRenderer(session, backend))
+      if switched is error then shutdown(session); return switched end if
+    end if
+    if win.renderer() != backend or session.renderer is void or not session.windowCreated then
+      shutdown(session)
+      return error(3935, "renderer switch left an incomplete " + glvid.VID_RendererName(backend) + " scene")
+    end if
+    ran = try(opt001aRunFrames(session, frameCount, "renderer_" + glvid.VID_RendererName(backend)))
+    if ran is error then shutdown(session); return ran end if
+    if index > 0 then json = json + "," end if
+    json = json + "{\"name\":\"" + glvid.VID_RendererName(backend) + "\",\"frames\":" + frameCount + "}"
+    print "MiniQuake renderer switch " + glvid.VID_RendererName(backend) + ": PASS"
+    index = index + 1
+  end while
+  json = json + "],\"result\":\"PASS\"}\n"
+  written = try(fs.writeAllText(outputPrefix + "-summary.json", json))
+  shutdown(session)
+  if written is error then return written end if
+  return true
+end function
+
+// Execute endscreen evidence.
 function runEndscreenEvidence(baseDirectory, gameDirectory, width, height, outputPrefix)
   renderEvidence.reset()
   session = create([
@@ -4122,6 +4665,7 @@ function runEndscreenEvidence(baseDirectory, gameDirectory, width, height, outpu
   return true
 end function
 
+// Provide capture ui resolution scene behavior for the active subsystem.
 function captureUiResolutionScene(session, outputPrefix, expectedWidth, expectedHeight)
   renderEvidence.reset()
   targetFrame = session.timing.frameCount + 1
@@ -4147,6 +4691,7 @@ function captureUiResolutionScene(session, outputPrefix, expectedWidth, expected
   return result
 end function
 
+// Provide warm ui resolution scene behavior for the active subsystem.
 function warmUiResolutionScene(session)
   index = 0
   while index < 3
@@ -4157,6 +4702,7 @@ function warmUiResolutionScene(session)
   return true
 end function
 
+// Execute ui resolution matrix.
 function runUiResolutionMatrix(baseDirectory, gameDirectory, outputPrefix)
   session = create([
     "-basedir", baseDirectory,
@@ -4298,9 +4844,15 @@ function runUiResolutionMatrix(baseDirectory, gameDirectory, outputPrefix)
   return true
 end function
 
-function runOpt001AHandlePlateau(baseDirectory, gameDirectory, mapName, warmupFrames, windowFrames, windowCount, port, outputPrefix)
+// Execute opt001 ahandle plateau.
+function runOpt001AHandlePlateau(baseDirectory, gameDirectory, mapName, warmupFrames, windowFrames, windowCount, port, outputPrefix, rendererName)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if windowCount < 3 then windowCount = 3 end if
-  session = create(opt001aSessionArguments(baseDirectory, gameDirectory, mapName, "listen", port))
+  mode = "listen"
+  if rendererName != "" then mode = "render" end if
+  sessionArguments = opt001aSessionArguments(baseDirectory, gameDirectory, mapName, mode, port, 640, 480)
+  if rendererName != "" then sessionArguments = sessionArguments + ["-renderer", rendererName] end if
+  session = create(sessionArguments)
   initialized = try(initialize(session))
   if initialized is error then shutdown(session); return initialized end if
   if not session.server.active then shutdown(session); return error(3810, "OPT-001A plateau test did not start map " + mapName) end if
@@ -4385,6 +4937,7 @@ function runOpt001AHandlePlateau(baseDirectory, gameDirectory, mapName, warmupFr
 end function
 
 
+// Execute long soak.
 function runLongSoak(baseDirectory, gameDirectory, mode, target, frameCount, port)
   if mode == "listen" then
     return runServerModeSoak([
@@ -4419,6 +4972,7 @@ function runLongSoak(baseDirectory, gameDirectory, mode, target, frameCount, por
   return error(3735, "unknown long soak mode " + mode)
 end function
 
+// Provide soak behavior for the active subsystem.
 function soak(session, frameCount, frameTime)
   gc_collect()
   liveBefore = heap_count()
@@ -4435,6 +4989,7 @@ function soak(session, frameCount, frameTime)
   return t.HostSoakResult(frameCount, liveBefore, liveAfter, bytesBefore, bytesAfter, stable)
 end function
 
+// Execute soak.
 function runSoak(args, frameCount)
   session = create(args)
   initialized = try(initialize(session))
@@ -4466,6 +5021,7 @@ function runSoak(args, frameCount)
   if result.stable then return 0 end if
   return 3
 end function
+// Execute render evidence.
 function runRenderEvidence(args, frameCount, outputPrefix)
   renderEvidence.reset()
   configured = try(renderEvidence.configure(outputPrefix, frameCount))
@@ -4538,11 +5094,13 @@ end function
 
 
 
+// Provide interop bool behavior for the active subsystem.
 function interopBool(value)
   if value then return "true" end if
   return "false"
 end function
 
+// Return interop write summary derived from the active module state.
 function interopWriteSummary(
   outputPrefix,
   mode,
@@ -4587,6 +5145,7 @@ function interopWriteSummary(
   return path
 end function
 
+// Provide interop write ready behavior for the active subsystem.
 function interopWriteReady(outputPrefix, port, mapName)
   path = outputPrefix + "-ready.json"
   text = "{\n"
@@ -4600,6 +5159,7 @@ function interopWriteReady(outputPrefix, port, mapName)
   return path
 end function
 
+// Return first remote server client for the active module state.
 function firstRemoteServerClient(session)
   for each serverClient in session.server.clients
     if serverClient.active and serverClient.socket is not void and serverClient.socket.transport == "udp" then
@@ -4609,7 +5169,9 @@ function firstRemoteServerClient(session)
   return void
 end function
 
+// Execute original interop server.
 function runOriginalInteropServer(args, maximumFrames, outputPrefix)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   session = create(args)
   initialized = try(initialize(session))
   if initialized is error then
@@ -4728,6 +5290,7 @@ function runOriginalInteropServer(args, maximumFrames, outputPrefix)
   return 3
 end function
 
+// Provide original interop client network provenance behavior for the active subsystem.
 function originalInteropClientNetworkProvenance(session, controlAddress)
   transport = "none"
   remoteAddress = ""
@@ -4745,6 +5308,7 @@ function originalInteropClientNetworkProvenance(session, controlAddress)
   )
 end function
 
+// Execute original interop client.
 function runOriginalInteropClient(args, maximumFrames, outputPrefix, controlAddress, controlPort)
   session = create(args)
   initialized = try(initialize(session))
@@ -4882,6 +5446,7 @@ function runOriginalInteropClient(args, maximumFrames, outputPrefix, controlAddr
   return 3
 end function
 
+// Execute headless frames.
 function runHeadlessFrames(args, frameCount)
   session = create(args)
   initialized = try(initialize(session))

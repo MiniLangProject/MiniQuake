@@ -1,7 +1,14 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/snd_mix_differential_fixture.ml.
+*/
 import miniquake.byteio as bio
 import miniquake.sound.snd_mem as sndmem
 import miniquake.sound.snd_mix as mixPort
 
+// Create and initialize cache16.
 function makeCache16()
   data = bytes(8)
   bio.putI16(data, 0, 1000)
@@ -11,6 +18,7 @@ function makeCache16()
   return sndmem.SoundCache(4, -1, 22050, 2, 0, data)
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   state = mixPort.createState(mixPort.createDma(22050, 16, 2, 8))
   table = mixPort.SND_InitScaletable(state)

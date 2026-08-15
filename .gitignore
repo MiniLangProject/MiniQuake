@@ -2,6 +2,7 @@
 /build/
 /build_perf/
 /native/build/
+/native/text_build/
 
 # Quake game data must be supplied by a local installation.
 *.pak

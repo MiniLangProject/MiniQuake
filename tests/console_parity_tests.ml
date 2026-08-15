@@ -1,24 +1,27 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Focused console.c ring-buffer, notify, input and condebug fixtures.
 */
-
 import miniquake.console as console
 import miniquake.filesystem as qfs
 import std.fs as fs
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9600, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9601, name + ": expected true") end if
   return true
 end function
 
+// Verify ring and resize against the expected Quake behavior.
 function testRingAndResize()
   state = console.create(32)
   assertTrue(console.Con_CheckResize(state, 80), "initial resize")
@@ -33,6 +36,7 @@ function testRingAndResize()
   return true
 end function
 
+// Verify carriage return and word wrap against the expected Quake behavior.
 function testCarriageReturnAndWordWrap()
   state = console.create(32)
   console.Con_CheckResize(state, 160)
@@ -47,6 +51,7 @@ function testCarriageReturnAndWordWrap()
   return true
 end function
 
+// Verify mask and notify times against the expected Quake behavior.
 function testMaskAndNotifyTimes()
   state = console.create(32)
   console.Con_CheckResize(state, 320)
@@ -64,6 +69,7 @@ function testMaskAndNotifyTimes()
   return true
 end function
 
+// Verify backscroll and input trace against the expected Quake behavior.
 function testBackscrollAndInputTrace()
   state = console.create(32)
   console.Con_CheckResize(state, 80)
@@ -87,6 +93,7 @@ function testBackscrollAndInputTrace()
   return true
 end function
 
+// Verify printing modes and commands against the expected Quake behavior.
 function testPrintingModesAndCommands()
   state = console.create(32)
   state.initialized = true
@@ -108,6 +115,7 @@ function testPrintingModesAndCommands()
   return true
 end function
 
+// Verify original state preservation against the expected Quake behavior.
 function testOriginalStatePreservation()
   state = console.create(32)
   state.initialized = true
@@ -145,6 +153,7 @@ function testOriginalStatePreservation()
   return true
 end function
 
+// Verify debug log and notify trace against the expected Quake behavior.
 function testDebugLogAndNotifyTrace()
   system = qfs.create(".", "build")
   state = console.create(32)
@@ -164,6 +173,7 @@ function testDebugLogAndNotifyTrace()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   testRingAndResize()
   testCarriageReturnAndWordWrap()

@@ -1,14 +1,21 @@
-/* BP-059: deterministic retail id1 WAVE parsing evidence. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+BP-059: deterministic retail id1 WAVE parsing evidence.
+*/
 import miniquake.filesystem as bp059Fs
 import miniquake.sound.snd_mem as bp059Mem
 import miniquake.render_evidence as bp059Hash
 
+// Exercise the retail fail test scenario and verify its expected result.
 function bp059RetailFail(message)
   print "MiniQuake BP-059 retail audio evidence: FAIL"
   print "  " + message
   return 1
 end function
 
+// Exercise the cache line test scenario and verify its expected result.
 function bp059CacheLine(name, cache)
   return "sound=" + name +
     "|length=" + cache.length +
@@ -19,6 +26,7 @@ function bp059CacheLine(name, cache)
     "|sample_hash=" + bp059Hash.hashBytes(cache.data)
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   if len(args) < 1 then
     print "usage: MiniQuakeAudioRetailEvidence.exe BASEDIR [GAME]"

@@ -1,13 +1,13 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-012R1 byte-exact Protocol-15 server payload, baseline, packet-planning
 and PlayerState ground-adapter fixtures. The golden byte streams are independently reproduced by
- tools/oracle/protocol15_serverdata_oracle.c and
- tools/check_protocol15_serverdata.py.
+tools/oracle/protocol15_serverdata_oracle.c and
+tools/check_protocol15_serverdata.py.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.client as clientModule
@@ -19,28 +19,34 @@ import miniquake.server as server
 import miniquake.sv_main as svmain
 import miniquake.edict as edict
 import miniquake.player_move as movement
+import miniquake.world_bsp as worldBsp
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9500, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9501, name + ": expected true") end if
   return true
 end function
 
+// Exercise assert false as part of this deterministic regression fixture.
 function assertFalse(value, name)
   if value != false then return error(9502, name + ": expected false") end if
   return true
 end function
 
+// Exercise assert hex as part of this deterministic regression fixture.
 function assertHex(buffer, expected, name)
   return assertEqual(hex(sz.dataSlice(buffer)), expected, name)
 end function
 
+// Execute one named test case and record its pass/fail result.
 function runTest(number, name, fn)
-  print "  [" + number + "/17] " + name
+  print "  [" + number + "/18] " + name
   result = try(fn())
   if result is error then
     print "    FAIL: " + result.message
@@ -49,6 +55,7 @@ function runTest(number, name, fn)
   return true
 end function
 
+// Return minimal client data derived from the active module state.
 function minimalClientData(standardQuake, activeWeapon)
   return t.ProtocolClientData(
     22.0,
@@ -72,6 +79,7 @@ function minimalClientData(standardQuake, activeWeapon)
   )
 end function
 
+// Return full client data derived from the active module state.
 function fullClientData()
   return t.ProtocolClientData(
     30.0,
@@ -95,6 +103,7 @@ function fullClientData()
   )
 end function
 
+// Return mission client data derived from the active module state.
 function missionClientData(activeWeapon)
   return t.ProtocolClientData(
     22.0,
@@ -118,6 +127,7 @@ function missionClientData(activeWeapon)
   )
 end function
 
+// Verify server info coop against the expected Quake behavior.
 function testServerInfoCoop()
   buffer = sz.alloc(c.MAX_MSGLEN)
   written = serverData.writeServerInfo(
@@ -137,6 +147,7 @@ function testServerInfoCoop()
   return true
 end function
 
+// Verify production server info against the expected Quake behavior.
 function testProductionServerInfo()
   state = svmain.SV_Init(4)
   state.server.coop = false
@@ -171,6 +182,7 @@ function testProductionServerInfo()
   return true
 end function
 
+// Verify sound vectors against the expected Quake behavior.
 function testSoundVectors()
   defaultSound = sz.alloc(64)
   serverData.writeSound(defaultSound, 3, 2.9, 5, 255.9, 1.0000000298023224, t.Vec3(10.0, -20.0, 30.0))
@@ -189,6 +201,7 @@ function testSoundVectors()
   return true
 end function
 
+// Verify production sound against the expected Quake behavior.
 function testProductionSound()
   state = svmain.SV_Init(1)
   item = edict.create(0)
@@ -210,6 +223,7 @@ function testProductionSound()
   return true
 end function
 
+// Verify client data minimal against the expected Quake behavior.
 function testClientDataMinimal()
   buffer = sz.alloc(64)
   result = serverData.writeClientData(buffer, minimalClientData(true, 2))
@@ -219,6 +233,7 @@ function testClientDataMinimal()
   return true
 end function
 
+// Verify client data full standard against the expected Quake behavior.
 function testClientDataFullStandard()
   buffer = sz.alloc(64)
   result = serverData.writeClientData(buffer, fullClientData())
@@ -228,6 +243,7 @@ function testClientDataFullStandard()
   return true
 end function
 
+// Verify client data mission pack against the expected Quake behavior.
 function testClientDataMissionPack()
   buffer = sz.alloc(64)
   result = serverData.writeClientData(buffer, missionClientData(1 << 7))
@@ -241,6 +257,7 @@ function testClientDataMissionPack()
   return true
 end function
 
+// Verify baseline vectors against the expected Quake behavior.
 function testBaselineVectors()
   world = t.EntityBaseline(1, 2, 0, 4, 0, t.Vec3(-12.25, 0.125, 4095.875), t.Vec3(90.75, -90.9, 359.9))
   worldBuffer = sz.alloc(64)
@@ -254,6 +271,7 @@ function testBaselineVectors()
   return true
 end function
 
+// Verify production baseline selection against the expected Quake behavior.
 function testProductionBaselineSelection()
   state = svmain.SV_Init(1)
   world = edict.create(0)
@@ -293,12 +311,14 @@ function testProductionBaselineSelection()
   return true
 end function
 
+// Create and initialize buffer.
 function makeBuffer(size, count, value)
   buffer = sz.alloc(size)
   if count > 0 then sz.writeBytes(buffer, bytes(count, value)) end if
   return buffer
 end function
 
+// Verify strict datagram boundary against the expected Quake behavior.
 function testStrictDatagramBoundary()
   emptyDestination = makeBuffer(10, 4, 1)
   emptySource = sz.alloc(10)
@@ -324,6 +344,7 @@ function testStrictDatagramBoundary()
   return true
 end function
 
+// Return full update bits derived from the active module state.
 function fullUpdateBits(longEntity)
   bits = c.U_MOREBITS | c.U_ORIGIN1 | c.U_ORIGIN2 | c.U_ORIGIN3 | c.U_ANGLE2 |
     c.U_NOLERP | c.U_FRAME | c.U_ANGLE1 | c.U_ANGLE3 | c.U_MODEL |
@@ -332,6 +353,7 @@ function fullUpdateBits(longEntity)
   return bits
 end function
 
+// Verify fast update planner against the expected Quake behavior.
 function testFastUpdatePlanner()
   shortBits = fullUpdateBits(false)
   longBits = fullUpdateBits(true)
@@ -345,9 +367,44 @@ function testFastUpdatePlanner()
   assertTrue(update.canWrite(makeBuffer(17, 0, 0), shortBits), "17-byte full short accepted")
   assertFalse(update.canWrite(makeBuffer(17, 0, 0), longBits), "17-byte full long rejected")
   assertTrue(update.canWrite(makeBuffer(18, 0, 0), longBits), "18-byte full long accepted")
+
+  reservedFits = makeBuffer(64, 30, 0)
+  assertTrue(update.canWriteWithReservedTail(reservedFits, shortBits, 16), "transient tail remains strictly below max")
+  assertFalse(update.canWriteWithReservedTail(reservedFits, shortBits, 17), "transient tail rejects exact max boundary")
+  assertFalse(update.canWriteWithReservedTail(makeBuffer(64, 40, 0), 0, 9), "reserved tail preserves original 16-byte update gate")
+
+  // A large door can have its origin in an invisible leaf while its visible
+  // face crosses into the client's PVS. SV_LinkEdict/SV_WriteEntitiesToClient
+  // must test all touched leaves, not only Mod_PointInLeaf(origin).
+  minimum = t.Vec3(-64.0, -64.0, -64.0)
+  maximum = t.Vec3(64.0, 64.0, 64.0)
+  plane = t.BspPlane(t.Vec3(1.0, 0.0, 0.0), 0.0, 0)
+  node = t.BspNode(0, -2, -3, minimum, maximum, 0, 0)
+  leaf0 = t.BspLeaf(c.CONTENTS_SOLID, -1, minimum, maximum, 0, 0, bytes(4))
+  leaf1 = t.BspLeaf(c.CONTENTS_EMPTY, 0, minimum, maximum, 0, 0, bytes(4))
+  leaf2 = t.BspLeaf(c.CONTENTS_EMPTY, 1, minimum, maximum, 0, 0, bytes(4))
+  worldModel = t.BspModel(minimum, maximum, t.Vec3(0.0, 0.0, 0.0), [0, 0, 0, 0], 2, 0, 0)
+  map = t.BspMap(
+    "multi-leaf.bsp", bytes(), c.BSP_VERSION, [], "", [], [plane], [], [],
+    bytes([1, 2]), [node], [], [], bytes(), [], [leaf0, leaf1, leaf2], [], [], [], [worldModel],
+  )
+  gameServer = server.create(1)
+  gameServer.worldModel = map
+  door = edict.create(2)
+  door.model = "*1"
+  door.modelIndex = 2
+  door.origin = t.Vec3(16.0, 0.0, 0.0)
+  door.mins = t.Vec3(-32.0, -8.0, -8.0)
+  door.maxs = t.Vec3(1.0, 8.0, 8.0)
+  assertTrue(server.entityVisible(gameServer, bytes([2]), door, 1), "multi-leaf door visible from crossed PVS")
+  assertEqual(len(door.leafNums), 2, "multi-leaf door caches both touched leaves")
+  assertFalse(server.entityVisible(gameServer, bytes([0]), door, 1), "multi-leaf door hidden outside every touched PVS")
+  fat = worldBsp.fatPvs(map, t.Vec3(0.0, 0.0, 0.0))
+  assertEqual(fat[0], 3, "fat PVS merges both sides of portal boundary")
   return true
 end function
 
+// Verify delivery plans against the expected Quake behavior.
 function testDeliveryPlans()
   assertEqual(serverData.initialDeliveryPlan(true, false, 0.0), 9, "spawned initial plan")
   assertEqual(serverData.initialDeliveryPlan(false, false, 5.01), 2, "keepalive after five seconds")
@@ -362,6 +419,41 @@ function testDeliveryPlans()
   return true
 end function
 
+// Verify sv main bsp boundary parity against the expected Quake behavior.
+function testSvMainBspBoundaryParity()
+  minimum = t.Vec3(-64.0, -64.0, -64.0)
+  maximum = t.Vec3(64.0, 64.0, 64.0)
+  plane = t.BspPlane(t.Vec3(1.0, 0.0, 0.0), 0.0, 0)
+
+  // BOX_ON_PLANE_SIDE in WinQuake classifies a box whose maximum lies
+  // exactly on an axial plane as back-only, not as straddling the plane.
+  assertEqual(
+    svmain.svmBoxPlaneSides(t.Vec3(-8.0, -1.0, -1.0), t.Vec3(0.0, 1.0, 1.0), plane),
+    2,
+    "sv_main axial maximum-on-plane classification",
+  )
+
+  node = t.BspNode(0, -2, -3, minimum, maximum, 0, 0)
+  leaf0 = t.BspLeaf(c.CONTENTS_SOLID, -1, minimum, maximum, 0, 0, bytes(1))
+  leaf1 = t.BspLeaf(c.CONTENTS_SOLID, -1, minimum, maximum, 0, 0, bytes(1))
+  leaf2 = t.BspLeaf(c.CONTENTS_EMPTY, 0, minimum, maximum, 0, 0, bytes(1))
+  worldModel = t.BspModel(minimum, maximum, t.Vec3(0.0, 0.0, 0.0), [0, 0, 0, 0], 2, 0, 0)
+  map = t.BspMap(
+    "solid-leaf-fixture.bsp", bytes(), c.BSP_VERSION, [], "", [], [plane], [], [],
+    bytes([1]), [node], [], [], bytes(), [], [leaf0, leaf1, leaf2], [], [], [], [worldModel],
+  )
+  touched = svmain.svmTouchedLeaves(
+    map,
+    0,
+    t.Vec3(0.0, -1.0, -1.0),
+    t.Vec3(8.0, 1.0, 1.0),
+    [],
+  )
+  assertEqual(len(touched), 0, "sv_main excludes nonzero solid leaves")
+  return true
+end function
+
+// Verify integrated client data wrapper against the expected Quake behavior.
 function testIntegratedClientDataWrapper()
   player = movement.create(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
   player.viewHeight = 22.0
@@ -404,6 +496,7 @@ function testIntegratedClientDataWrapper()
   return true
 end function
 
+// Verify sv main client data wrapper against the expected Quake behavior.
 function testSvMainClientDataWrapper()
   state = svmain.SV_Init(1)
   state.server.serverFlags = 1
@@ -436,6 +529,7 @@ function testSvMainClientDataWrapper()
 end function
 
 
+// Verify player ground flag mirror against the expected Quake behavior.
 function testPlayerGroundFlagMirror()
   player = movement.create(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
   player.flags = c.FL_CLIENT | c.FL_ONGROUND
@@ -458,6 +552,7 @@ function testPlayerGroundFlagMirror()
   return true
 end function
 
+// Verify reliable distribution and cleanup against the expected Quake behavior.
 function testReliableDistributionAndCleanup()
   gameServer = server.create(2)
   first = gameServer.clients[0]
@@ -489,6 +584,7 @@ function testReliableDistributionAndCleanup()
   return true
 end function
 
+// Verify server buffer and sound cutoff against the expected Quake behavior.
 function testServerBufferAndSoundCutoff()
   gameServer = server.create(1)
   assertEqual(gameServer.datagram.maxSize, c.MAX_DATAGRAM, "server datagram size")
@@ -516,6 +612,7 @@ function testServerBufferAndSoundCutoff()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "MiniQuake BP-012R1 Protocol 15 server-data tests"
   passed = 0
@@ -536,11 +633,12 @@ function main(args)
   if runTest("15", "reliable distribution and muzzle cleanup", testReliableDistributionAndCleanup) then passed = passed + 1 end if
   if runTest("16", "server buffers and sound cutoff", testServerBufferAndSoundCutoff) then passed = passed + 1 end if
   if runTest("17", "PlayerState ground-flag adapters", testPlayerGroundFlagMirror) then passed = passed + 1 end if
+  if runTest("18", "sv_main BSP boundary parity", testSvMainBspBoundaryParity) then passed = passed + 1 end if
 
-  if passed != 17 then
-    print "MiniQuake BP-012R1 Protocol 15 server-data tests failed: " + passed + "/17"
+  if passed != 18 then
+    print "MiniQuake BP-012R1 Protocol 15 server-data tests failed: " + passed + "/18"
     return 1
   end if
-  print "MiniQuake BP-012R1 Protocol 15 server-data tests passed: 17"
+  print "MiniQuake BP-012R1 Protocol 15 server-data tests passed: 18"
   return 0
 end function

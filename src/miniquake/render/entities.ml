@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.render.entities.
+*/
 package miniquake.render.entities
 
 import miniquake.types as t
@@ -12,6 +19,7 @@ import miniquake.mathlib as math
 import miniquake.render.alias_mesh as aliasMesh
 import miniquake.render.draw2d as draw2d
 import miniquake.render_ui_contract as renderUiContract
+import miniquake.optimization_baseline as optBaseline
 
 const MODEL_NONE = 0
 const MODEL_BRUSH = 1
@@ -38,7 +46,15 @@ aliasShadeCacheOriginZ = []
 aliasShadeCacheShade = []
 aliasShadeCacheAmbient = []
 aliasShadeCacheSpot = []
+aliasLightingScratch = [0.0, 0.0, t.Vec3(0.0, 0.0, 0.0)]
+viewModelScratch = void
+// Root complete external renderers (map, textures, surfaces and lightmaps) for
+// the lifetime of the entity renderer.  These are independent BSP models and
+// therefore are not owned by the active WorldRenderer.
+externalBrushRendererRoots = []
+externalBrushRendererNames = []
 
+// Update module state for alias shade cache.
 function resetAliasShadeCache()
   global aliasShadeCacheValid, aliasShadeCacheStamp, aliasShadeCacheModel
   global aliasShadeCacheColormap, aliasShadeCacheViewModel
@@ -58,6 +74,7 @@ function resetAliasShadeCache()
   return true
 end function
 
+// Update subsystem configuration for configure alias rendering.
 function ConfigureAliasRendering(smoothModels, affineModels, shadows, noColors, doubleEyes)
   global aliasSmoothModels, aliasAffineModels, aliasShadows, aliasNoColors, aliasDoubleEyes
   aliasSmoothModels = smoothModels
@@ -71,6 +88,7 @@ function ConfigureAliasRendering(smoothModels, affineModels, shadows, noColors, 
   ]
 end function
 
+// Provide alias rendering configuration behavior for the active subsystem.
 function AliasRenderingConfiguration()
   return [
     aliasSmoothModels, aliasAffineModels, aliasShadows,
@@ -78,6 +96,7 @@ function AliasRenderingConfiguration()
   ]
 end function
 
+// Initialize state for starts with.
 function startsWith(text, prefix)
   left = bytes(text)
   right = bytes(prefix)
@@ -90,6 +109,7 @@ function startsWith(text, prefix)
   return true
 end function
 
+// Finalize state for ends with insensitive.
 function endsWithInsensitive(text, suffix)
   left = bytes(bio.lower(text))
   right = bytes(bio.lower(suffix))
@@ -103,35 +123,88 @@ function endsWithInsensitive(text, suffix)
   return true
 end function
 
+// Provide empty model behavior for the active subsystem.
 function emptyModel(name, kind)
-  return t.ClientRenderModel(name, kind, void, void, [], false)
+  return t.ClientRenderModel(name, kind, void, void, void, [], false)
 end function
 
+// Return external brush for name derived from the active module state.
+function externalBrushForName(name)
+  index = 0
+  while index < len(externalBrushRendererNames) and index < len(externalBrushRendererRoots)
+    if externalBrushRendererNames[index] == name then return externalBrushRendererRoots[index] end if
+    index = index + 1
+  end while
+  return void
+end function
+
+// Provide brush renderer for model behavior for the active subsystem.
+function brushRendererForModel(model)
+  if model is void then return void end if
+  if model.brushRenderer is not void then return model.brushRenderer end if
+  return externalBrushForName(model.name)
+end function
+
+// Read and validate model.
 function loadModel(renderer, name)
   global renderModelRegistry
   if name == "" then return emptyModel(name, MODEL_NONE) end if
   if startsWith(name, "*") then return emptyModel(name, MODEL_BRUSH) end if
   if renderModelRegistry is void then renderModelRegistry = modelRegistry.Mod_Init(modelRegistry.create(), void) end if
   parsed = try(modelRegistry.Mod_ForName(renderModelRegistry, renderer.filesystem, name, false))
-  if parsed is error or parsed is void then return emptyModel(name, MODEL_NONE) end if
+  if parsed is error then
+    // GLQuake's Mod_ForName(..., true) turns a failed precache into a host
+    // error. Preserve that behaviour for external BSPs instead of silently
+    // treating a broken ammo/health model as MODEL_NONE.
+    if endsWithInsensitive(name, ".bsp") then return emptyModel(name, MODEL_BRUSH) end if
+    return emptyModel(name, MODEL_NONE)
+  end if
+  if parsed is void then
+    if endsWithInsensitive(name, ".bsp") then return emptyModel(name, MODEL_BRUSH) end if
+    return emptyModel(name, MODEL_NONE)
+  end if
   kind = modelRegistry.modelType(renderModelRegistry, name)
-  if kind == modelRegistry.MOD_ALIAS then return t.ClientRenderModel(name, MODEL_ALIAS, parsed, void, [], false) end if
-  if kind == modelRegistry.MOD_SPRITE then return t.ClientRenderModel(name, MODEL_SPRITE, void, parsed, [], false) end if
-  if kind == modelRegistry.MOD_BRUSH then return emptyModel(name, MODEL_BRUSH) end if
+  if kind == modelRegistry.MOD_ALIAS then return t.ClientRenderModel(name, MODEL_ALIAS, parsed, void, void, [], false) end if
+  if kind == modelRegistry.MOD_SPRITE then return t.ClientRenderModel(name, MODEL_SPRITE, void, parsed, void, [], false) end if
+  if kind == modelRegistry.MOD_BRUSH then
+    global externalBrushRendererRoots, externalBrushRendererNames
+    brush = try(worldRenderer.createExternal(parsed, renderer.palette))
+    if brush is error then return emptyModel(name, MODEL_BRUSH) end if
+    externalBrushRendererRoots = externalBrushRendererRoots + [brush]
+    externalBrushRendererNames = externalBrushRendererNames + [name]
+    return t.ClientRenderModel(name, MODEL_BRUSH, void, void, brush, [], false)
+  end if
   return emptyModel(name, MODEL_NONE)
 end function
 
-function create(filesystem, palette, modelPrecache)
+// Read and validate world model.
+function loadWorldModel(renderer, name)
   global renderModelRegistry
+  if name == "" then return emptyModel(name, MODEL_NONE) end if
+  if renderModelRegistry is void then renderModelRegistry = modelRegistry.Mod_Init(modelRegistry.create(), void) end if
+  // Loading model_precache[1] is required because Mod_LoadModel registers all
+  // *n inline models. The active world already owns its WorldRenderer, so this
+  // slot deliberately carries no standalone brush renderer.
+  parsed = try(modelRegistry.Mod_ForName(renderModelRegistry, renderer.filesystem, name, false))
+  if parsed is error or parsed is void then return emptyModel(name, MODEL_NONE) end if
+  return emptyModel(name, MODEL_BRUSH)
+end function
+
+// Create and initialize the module state.
+function create(filesystem, palette, modelPrecache)
+  global renderModelRegistry, externalBrushRendererRoots, externalBrushRendererNames
   aliasMesh.clearCaches()
   resetAliasShadeCache()
   renderModelRegistry = modelRegistry.Mod_Init(modelRegistry.create(), void)
+  externalBrushRendererRoots = []
+  externalBrushRendererNames = []
   draw2d.Draw_SetPalette(palette)
   renderer = t.EntityRenderer(filesystem, palette, [], 0)
   synchronize(renderer, modelPrecache)
   return renderer
 end function
 
+// Upload indexed texture to the active renderer.
 function uploadIndexedTexture(width, height, pixels, palette, transparent)
   if width <= 0 or height <= 0 then return 0 end if
   if len(pixels) < width * height then return 0 end if
@@ -147,11 +220,13 @@ function uploadIndexedTexture(width, height, pixels, palette, transparent)
   return texture
 end function
 
+// Provide translated player texture behavior for the active subsystem.
 function translatedPlayerTexture(entityNumber)
   if entityNumber < 0 or entityNumber >= len(translatedPlayerTextures) then return 0 end if
   return translatedPlayerTextures[entityNumber]
 end function
 
+// Update module state for translated player texture.
 function setTranslatedPlayerTexture(entityNumber, texture)
   global translatedPlayerTextures
   if entityNumber < 0 then return false end if
@@ -164,6 +239,7 @@ function setTranslatedPlayerTexture(entityNumber, texture)
   return true
 end function
 
+// Update module state for the requested value.
 function synchronize(renderer, modelPrecache)
   oldCount = len(renderer.models)
   targetCount = len(modelPrecache)
@@ -175,13 +251,18 @@ function synchronize(renderer, modelPrecache)
     index = index + 1
   end while
   while index < targetCount
-    models[index] = loadModel(renderer, modelPrecache[index])
+    if index == 1 then
+      models[index] = loadWorldModel(renderer, modelPrecache[index])
+    else
+      models[index] = loadModel(renderer, modelPrecache[index])
+    end if
     index = index + 1
   end while
   renderer.models = models
   return targetCount
 end function
 
+// Upload alias to the active renderer.
 function uploadAlias(renderer, model)
   if model.uploaded then return true end if
   source = model.aliasModel
@@ -219,6 +300,7 @@ function uploadAlias(renderer, model)
   return true
 end function
 
+// Upload sprite to the active renderer.
 function uploadSprite(renderer, model)
   if model.uploaded then return true end if
   source = model.spriteModel
@@ -253,14 +335,27 @@ function uploadSprite(renderer, model)
   return true
 end function
 
+// Upload the requested value to the active renderer.
 function upload(renderer, model)
   if model.kind == MODEL_ALIAS then return uploadAlias(renderer, model) end if
   if model.kind == MODEL_SPRITE then return uploadSprite(renderer, model) end if
+  brush = brushRendererForModel(model)
+  if model.kind == MODEL_BRUSH and brush is not void then
+    result = try(worldRenderer.uploadStandaloneBrush(brush))
+    if result is error then return result end if
+    model.uploaded = true
+    return true
+  end if
   return false
 end function
 
+// Preload and register the the requested value asset.
 function precache(renderer)
   if renderer is void then return error(3940, "entity precache: renderer is void") end if
+  // Native alias batches select one of sixteen yaw lighting rows. Building all
+  // rows here prevents the first monster/player drawn at a new yaw from doing
+  // conversion work in a playable frame.
+  aliasMesh.precacheAliasLightingRows()
   count = 0
   index = 0
   while index < len(renderer.models)
@@ -275,12 +370,21 @@ function precache(renderer)
       uploaded = try(uploadSprite(renderer, model))
       if uploaded is error then return error(3943, "sprite upload " + model.name + ": " + uploaded.message) end if
       count = count + 1
+    else if model is not void and model.kind == MODEL_BRUSH and brushRendererForModel(model) is not void then
+      uploaded = try(upload(renderer, model))
+      if uploaded is error then return error(3944, "brush upload " + model.name + ": " + uploaded.message) end if
+      count = count + 1
+    else if model is not void and model.kind == MODEL_BRUSH and index != 1 and not startsWith(model.name, "*") then
+      // Never silently count an unloaded external BSP as rendered. Retail
+      // ammo/health boxes are exactly this model class.
+      return error(3945, "external brush renderer missing for " + model.name)
     end if
     index = index + 1
   end while
   return count
 end function
 
+// Return cycle index derived from the active module state.
 function cycleIndex(intervals, time, count)
   if count <= 1 or len(intervals) == 0 then return 0 end if
   full = intervals[len(intervals) - 1]
@@ -294,6 +398,7 @@ function cycleIndex(intervals, time, count)
   return count - 1
 end function
 
+// Provide alias frame behavior for the active subsystem.
 function aliasFrame(source, frameNumber, time)
   if len(source.frames) == 0 then return void end if
   index = frameNumber
@@ -310,6 +415,7 @@ function aliasFrame(source, frameNumber, time)
   return set.frames[0]
 end function
 
+// Provide sprite frame and texture behavior for the active subsystem.
 function spriteFrameAndTexture(model, entity, time)
   source = model.spriteModel
   if source is void or len(source.frames) == 0 then return void end if
@@ -333,6 +439,7 @@ function spriteFrameAndTexture(model, entity, time)
   return [frame, texture]
 end function
 
+// Provide alias vertex behavior for the active subsystem.
 function aliasVertex(source, packed)
   return t.Vec3(
     packed.x * source.scale.x + source.scaleOrigin.x,
@@ -341,11 +448,13 @@ function aliasVertex(source, packed)
   )
 end function
 
+// Provide alias shade behavior for the active subsystem.
 function aliasShade(model, entity, time, viewModel)
   global aliasShadeCacheValid, aliasShadeCacheStamp, aliasShadeCacheModel
   global aliasShadeCacheColormap, aliasShadeCacheViewModel
   global aliasShadeCacheOriginX, aliasShadeCacheOriginY, aliasShadeCacheOriginZ
   global aliasShadeCacheShade, aliasShadeCacheAmbient, aliasShadeCacheSpot
+  global aliasLightingScratch
   lights = worldRenderer.R_ActiveDynamicLights()
   hasActiveLight = false
   for each light in lights
@@ -362,7 +471,11 @@ function aliasShade(model, entity, time, viewModel)
     aliasShadeCacheOriginX[number] == entity.origin.x and
     aliasShadeCacheOriginY[number] == entity.origin.y and
     aliasShadeCacheOriginZ[number] == entity.origin.z then
-    return [aliasShadeCacheShade[number], aliasShadeCacheAmbient[number], aliasShadeCacheSpot[number]]
+    aliasLightingScratch[0] = aliasShadeCacheShade[number]
+    aliasLightingScratch[1] = aliasShadeCacheAmbient[number]
+    cachedSpot = aliasShadeCacheSpot[number]
+    if cachedSpot is not void then aliasLightingScratch[2] = cachedSpot end if
+    return aliasLightingScratch
   end if
   ambient = worldRenderer.R_LightPoint(entity.origin)
   shade = ambient
@@ -396,11 +509,18 @@ function aliasShade(model, entity, time, viewModel)
     aliasShadeCacheAmbient[number] = ambient
     if spot is not void then aliasShadeCacheSpot[number] = math.copy(spot) end if
   end if
-  return [shadeValue, ambient, spot]
+  // drawAlias consumes the values immediately. Reusing this three-slot
+  // record avoids one short-lived array for every alias entity every frame.
+  aliasLightingScratch[0] = shadeValue
+  aliasLightingScratch[1] = ambient
+  if spot is not void then aliasLightingScratch[2] = spot end if
+  return aliasLightingScratch
 end function
 
+// Render alias.
 function drawAlias(renderer, model, entity, time, viewModel)
   uploadAlias(renderer, model)
+  optBaseline.checkpoint("alias_upload")
   source = model.aliasModel
   frame = aliasFrame(source, entity.frame, time)
   if frame is void then return 0 end if
@@ -421,9 +541,12 @@ function drawAlias(renderer, model, entity, time, viewModel)
   translated = translatedPlayerTexture(entity.number)
   if not aliasNoColors and entity.colormap != 0 and translated != 0 then texture = translated end if
   if texture != 0 then gl.bindTexture(texture) end if
+  optBaseline.checkpoint("alias_frame")
   lighting = aliasShade(model, entity, time, viewModel)
   aliasMesh.configureAliasLighting(lighting[0], lighting[1], entity.angles.y, lighting[2])
+  optBaseline.checkpoint("alias_light")
   mesh = aliasMesh.GL_MakeAliasModelDisplayLists(source, source)
+  optBaseline.checkpoint("alias_mesh")
   doubleEyes = model.name == "progs/eyes.mdl" and aliasDoubleEyes
   drawn = 0
   if not gl.traceEnabled() and gl.nativeBatchAvailable() then
@@ -453,6 +576,7 @@ function drawAlias(renderer, model, entity, time, viewModel)
     gl.disable(gl.GL_CULL_FACE)
     gl.popMatrix()
   end if
+  optBaseline.checkpoint("alias_native")
   if aliasShadows then
     gl.pushMatrix()
     gl.translate(entity.origin.x, entity.origin.y, entity.origin.z)
@@ -471,6 +595,7 @@ function drawAlias(renderer, model, entity, time, viewModel)
   return drawn
 end function
 
+// Render sprite.
 function drawSprite(renderer, model, entity, viewRight, viewUp, time)
   uploadSprite(renderer, model)
   // R_DrawSpriteModel has the same texture-unit-zero precondition.
@@ -499,37 +624,33 @@ function drawSprite(renderer, model, entity, viewRight, viewUp, time)
   top = frame.originY
   bottom = frame.originY - frame.height
 
-  bottomLeft = t.Vec3(
-    entity.origin.x + upVector.x * bottom + rightVector.x * left,
-    entity.origin.y + upVector.y * bottom + rightVector.y * left,
-    entity.origin.z + upVector.z * bottom + rightVector.z * left,
-  )
-  topLeft = t.Vec3(
-    entity.origin.x + upVector.x * top + rightVector.x * left,
-    entity.origin.y + upVector.y * top + rightVector.y * left,
-    entity.origin.z + upVector.z * top + rightVector.z * left,
-  )
-  topRight = t.Vec3(
-    entity.origin.x + upVector.x * top + rightVector.x * rightValue,
-    entity.origin.y + upVector.y * top + rightVector.y * rightValue,
-    entity.origin.z + upVector.z * top + rightVector.z * rightValue,
-  )
-  bottomRight = t.Vec3(
-    entity.origin.x + upVector.x * bottom + rightVector.x * rightValue,
-    entity.origin.y + upVector.y * bottom + rightVector.y * rightValue,
-    entity.origin.z + upVector.z * bottom + rightVector.z * rightValue,
-  )
+  // Submit the four billboard corners as scalars. Sprite-heavy combat used
+  // to allocate four Vec3 objects per sprite and frame solely to read their
+  // components in the following four calls.
+  bottomLeftX = entity.origin.x + upVector.x * bottom + rightVector.x * left
+  bottomLeftY = entity.origin.y + upVector.y * bottom + rightVector.y * left
+  bottomLeftZ = entity.origin.z + upVector.z * bottom + rightVector.z * left
+  topLeftX = entity.origin.x + upVector.x * top + rightVector.x * left
+  topLeftY = entity.origin.y + upVector.y * top + rightVector.y * left
+  topLeftZ = entity.origin.z + upVector.z * top + rightVector.z * left
+  topRightX = entity.origin.x + upVector.x * top + rightVector.x * rightValue
+  topRightY = entity.origin.y + upVector.y * top + rightVector.y * rightValue
+  topRightZ = entity.origin.z + upVector.z * top + rightVector.z * rightValue
+  bottomRightX = entity.origin.x + upVector.x * bottom + rightVector.x * rightValue
+  bottomRightY = entity.origin.y + upVector.y * bottom + rightVector.y * rightValue
+  bottomRightZ = entity.origin.z + upVector.z * bottom + rightVector.z * rightValue
 
   gl.begin(gl.GL_QUADS)
-  gl.texcoord2(0.0, 1.0); gl.vertex3(bottomLeft.x, bottomLeft.y, bottomLeft.z)
-  gl.texcoord2(0.0, 0.0); gl.vertex3(topLeft.x, topLeft.y, topLeft.z)
-  gl.texcoord2(1.0, 0.0); gl.vertex3(topRight.x, topRight.y, topRight.z)
-  gl.texcoord2(1.0, 1.0); gl.vertex3(bottomRight.x, bottomRight.y, bottomRight.z)
+  gl.texcoord2(0.0, 1.0); gl.vertex3(bottomLeftX, bottomLeftY, bottomLeftZ)
+  gl.texcoord2(0.0, 0.0); gl.vertex3(topLeftX, topLeftY, topLeftZ)
+  gl.texcoord2(1.0, 0.0); gl.vertex3(topRightX, topRightY, topRightZ)
+  gl.texcoord2(1.0, 1.0); gl.vertex3(bottomRightX, bottomRightY, bottomRightZ)
   gl.finishPrimitive()
   gl.disable(gl.GL_ALPHA_TEST)
   return 1
 end function
 
+// Return brush model index derived from the active module state.
 function brushModelIndex(name)
   source = bytes(name)
   if len(source) < 2 or source[0] != 42 then return -1 end if
@@ -538,9 +659,21 @@ function brushModelIndex(name)
   return value
 end function
 
-function drawBrush(worldRendererValue, model, entity)
+// Render brush.
+function drawBrush(worldRendererValue, model, entity, time)
   submodelIndex = brushModelIndex(model.name)
-  if submodelIndex <= 0 or submodelIndex >= len(worldRendererValue.map.models) then return 0 end if
+  if submodelIndex <= 0 then
+    brush = brushRendererForModel(model)
+    if brush is void then return 0 end if
+    brush.fullbright = worldRendererValue.fullbright
+    return worldRenderer.drawStandaloneBrush(
+      brush,
+      entity,
+      worldRenderer.R_CurrentViewOrigin(),
+      time,
+    )
+  end if
+  if submodelIndex >= len(worldRendererValue.map.models) then return 0 end if
   // Use the canonical MiniQuake bmodel path.  The client model index is a
   // precache slot, while the leading *n name identifies the BSP submodel.
   // Passing that index explicitly preserves entity.frame texture animation,
@@ -548,6 +681,7 @@ function drawBrush(worldRendererValue, model, entity)
   return worldRenderer.R_DrawBrushModelForSubmodel(entity, submodelIndex)
 end function
 
+// Render submitted.
 function renderSubmitted(renderer, worldRendererValue, entities, hiddenEntityNumber, viewRight, viewUp, time)
   rendered = 0
   // R_DrawEntitiesOnList renders opaque alias/brush models first and performs
@@ -559,7 +693,7 @@ function renderSubmitted(renderer, worldRendererValue, entities, hiddenEntityNum
     if entity is not void and (hiddenEntityNumber is void or entity.number != hiddenEntityNumber) and entity.modelIndex > 0 and entity.modelIndex < len(renderer.models) then
       model = renderer.models[entity.modelIndex]
       if model.kind == MODEL_BRUSH then
-        drawResult = try(drawBrush(worldRendererValue, model, entity))
+        drawResult = try(drawBrush(worldRendererValue, model, entity, time))
         if drawResult is error then return error(3893, "brush " + model.name + " entity " + entity.number + ": " + drawResult.message) end if
         rendered = rendered + 1
       else if model.kind == MODEL_ALIAS then
@@ -587,6 +721,7 @@ function renderSubmitted(renderer, worldRendererValue, entities, hiddenEntityNum
   return rendered
 end function
 
+// Render the requested value.
 function render(renderer, worldRendererValue, entities, viewEntity, viewRight, viewUp, time)
   return renderSubmitted(renderer, worldRendererValue, entities, viewEntity, viewRight, viewUp, time)
 end function
@@ -599,7 +734,9 @@ function viewModelDepthRange(depthMin, depthMax)
   return [depthMin, weaponMax]
 end function
 
+// Render view model.
 function renderViewModel(renderer, player, view, time)
+  global viewModelScratch
   if player.weapon <= 0 or player.weapon >= len(renderer.models) then return 0 end if
   if player.health <= 0.0 then return 0 end if
   if (player.items & c.IT_INVISIBILITY) != 0 then return 0 end if
@@ -607,43 +744,55 @@ function renderViewModel(renderer, player, view, time)
   if model is void or model.kind != MODEL_ALIAS then return 0 end if
 
   if not view.viewModelVisible then return 0 end if
-  gunOrigin = math.copy(view.gunOrigin)
-  gunAngles = math.copy(view.gunAngles)
-  messageOrigin = math.copy(gunOrigin)
-  previousMessageOrigin = math.copy(gunOrigin)
-  messageAngles = math.copy(gunAngles)
-  previousMessageAngles = math.copy(gunAngles)
-  baselineOrigin = math.copy(gunOrigin)
-  baselineAngles = math.copy(gunAngles)
-  baseline = [player.weapon, player.weaponFrame, 0, 0, baselineOrigin, baselineAngles, 0]
-  entity = t.ClientEntityState(
-    0,
-    player.weapon,
-    player.weaponFrame,
-    0,
-    0,
-    0,
-    gunOrigin,
-    gunAngles,
-    time,
-    messageOrigin,
-    previousMessageOrigin,
-    messageAngles,
-    previousMessageAngles,
-    true,
-    baseline,
-    0.0,
-  )
-  activeDepth = worldRenderer.R_CurrentDepthRange()
-  weaponDepth = viewModelDepthRange(activeDepth[0], activeDepth[1])
-  gl.depthRange(weaponDepth[0], weaponDepth[1])
+  if viewModelScratch is void then
+    gunOrigin = t.Vec3(0.0, 0.0, 0.0)
+    gunAngles = t.Vec3(0.0, 0.0, 0.0)
+    messageOrigin = t.Vec3(0.0, 0.0, 0.0)
+    previousMessageOrigin = t.Vec3(0.0, 0.0, 0.0)
+    messageAngles = t.Vec3(0.0, 0.0, 0.0)
+    previousMessageAngles = t.Vec3(0.0, 0.0, 0.0)
+    baselineOrigin = t.Vec3(0.0, 0.0, 0.0)
+    baselineAngles = t.Vec3(0.0, 0.0, 0.0)
+    baseline = [0, 0, 0, 0, baselineOrigin, baselineAngles, 0]
+    viewModelScratch = t.ClientEntityState(
+      0, 0, 0, 0, 0, 0,
+      gunOrigin, gunAngles, 0.0,
+      messageOrigin, previousMessageOrigin, messageAngles, previousMessageAngles,
+      true, baseline, 0.0,
+    )
+  end if
+  // R_DrawViewModel owns one transient currententity in GLQuake. Keep the
+  // equivalent object and its vectors alive instead of rebuilding nine heap
+  // objects for the weapon on every rendered frame.
+  entity = viewModelScratch
+  entity.modelIndex = player.weapon
+  entity.frame = player.weaponFrame
+  entity.messageTime = time
+  entity.origin.x = view.gunOrigin.x; entity.origin.y = view.gunOrigin.y; entity.origin.z = view.gunOrigin.z
+  entity.angles.x = view.gunAngles.x; entity.angles.y = view.gunAngles.y; entity.angles.z = view.gunAngles.z
+  entity.messageOrigin.x = view.gunOrigin.x; entity.messageOrigin.y = view.gunOrigin.y; entity.messageOrigin.z = view.gunOrigin.z
+  entity.previousMessageOrigin.x = view.gunOrigin.x; entity.previousMessageOrigin.y = view.gunOrigin.y; entity.previousMessageOrigin.z = view.gunOrigin.z
+  entity.messageAngles.x = view.gunAngles.x; entity.messageAngles.y = view.gunAngles.y; entity.messageAngles.z = view.gunAngles.z
+  entity.previousMessageAngles.x = view.gunAngles.x; entity.previousMessageAngles.y = view.gunAngles.y; entity.previousMessageAngles.z = view.gunAngles.z
+  entity.baseline[0] = player.weapon
+  entity.baseline[1] = player.weaponFrame
+  entity.baseline[4].x = view.gunOrigin.x; entity.baseline[4].y = view.gunOrigin.y; entity.baseline[4].z = view.gunOrigin.z
+  entity.baseline[5].x = view.gunAngles.x; entity.baseline[5].y = view.gunAngles.y; entity.baseline[5].z = view.gunAngles.z
+  depthMin = worldRenderer.R_CurrentDepthMinimum()
+  depthMax = worldRenderer.R_CurrentDepthMaximum()
+  weaponDepthMax = depthMin + renderUiContract.viewModelDepthMaximum() * (depthMax - depthMin)
+  gl.depthRange(depthMin, weaponDepthMax)
   result = drawAlias(renderer, model, entity, time, true)
-  gl.depthRange(activeDepth[0], activeDepth[1])
+  gl.depthRange(depthMin, depthMax)
   return result
 end function
 
+// Release resources owned by the requested value.
 function destroy(renderer)
-  global translatedPlayerTextures
+  global translatedPlayerTextures, externalBrushRendererRoots, externalBrushRendererNames, viewModelScratch
+  for each brush in externalBrushRendererRoots
+    if brush is not void then worldRenderer.destroyStandaloneBrush(brush) end if
+  end for
   for each model in renderer.models
     for each entry in model.textureIds
       if entry is array then
@@ -661,5 +810,8 @@ function destroy(renderer)
     if texture != 0 then gl.deleteTexture(texture) end if
   end for
   translatedPlayerTextures = []
+  externalBrushRendererRoots = []
+  externalBrushRendererNames = []
+  viewModelScratch = void
   return true
 end function

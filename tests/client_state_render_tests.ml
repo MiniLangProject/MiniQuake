@@ -1,26 +1,34 @@
-/* BP-035: cl_main.c state, relink and renderer hand-off parity. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
+BP-035: cl_main.c state, relink and renderer hand-off parity.
+*/
 import miniquake.client as client
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.player_move as playerMove
 import miniquake.native as native
 
+// Assert that the condition holds and identify a failing test.
 function yes(value, name)
   if not value then return error(3500, name + ": expected true") end if
   return true
 end function
 
+// Exercise no as part of this deterministic regression fixture.
 function no(value, name)
   if value then return error(3501, name + ": expected false") end if
   return true
 end function
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(3502, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function near(actual, expected, tolerance, name)
   delta = actual - expected
   if delta < 0.0 then delta = -delta end if
@@ -28,6 +36,7 @@ function near(actual, expected, tolerance, name)
   return true
 end function
 
+// Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
   print "[" + number + "/20] " + name
   result = try(fn())
@@ -35,6 +44,7 @@ function run(number, name, fn)
   return true
 end function
 
+// Create and initialize client.
 function newClient()
   value = client.create(playerMove.create(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0)))
   value.localAuthoritative = false
@@ -44,6 +54,7 @@ function newClient()
   return value
 end function
 
+// Report whether active entity holds for the active state.
 function activeEntity(value, number, modelIndex)
   entity = client.ensureEntity(value, number)
   entity.modelIndex = modelIndex
@@ -54,6 +65,7 @@ function activeEntity(value, number, modelIndex)
   return entity
 end function
 
+// Verify dlight key reuse against the expected Quake behavior.
 function testDlightKeyReuse()
   client.CL_ClearDlights()
   first = client.CL_AllocDlightAt(17, 1.0)
@@ -65,6 +77,7 @@ function testDlightKeyReuse()
   return true
 end function
 
+// Verify dlight strict expiry against the expected Quake behavior.
 function testDlightStrictExpiry()
   client.CL_ClearDlights()
   first = client.CL_AllocDlightAt(1, 1.0)
@@ -77,6 +90,7 @@ function testDlightStrictExpiry()
   return true
 end function
 
+// Verify dlight overflow fallback against the expected Quake behavior.
 function testDlightOverflowFallback()
   client.CL_ClearDlights()
   index = 0
@@ -90,6 +104,7 @@ function testDlightOverflowFallback()
   return true
 end function
 
+// Verify dlight decay equality against the expected Quake behavior.
 function testDlightDecayEquality()
   client.CL_ClearDlights()
   light = client.CL_AllocDlightAt(5, 1.0)
@@ -101,6 +116,7 @@ function testDlightDecayEquality()
   return true
 end function
 
+// Verify lerp half against the expected Quake behavior.
 function testLerpHalf()
   value = newClient()
   value.noLerp = false
@@ -109,6 +125,7 @@ function testLerpHalf()
   return true
 end function
 
+// Verify lerp gap clamp against the expected Quake behavior.
 function testLerpGapClamp()
   value = newClient()
   value.noLerp = false
@@ -119,6 +136,7 @@ function testLerpGapClamp()
   return true
 end function
 
+// Verify no lerp pins time against the expected Quake behavior.
 function testNoLerpPinsTime()
   value = newClient()
   value.time = 1.5
@@ -127,6 +145,7 @@ function testNoLerpPinsTime()
   return true
 end function
 
+// Verify angle wrap against the expected Quake behavior.
 function testAngleWrap()
   value = newClient()
   entity = activeEntity(value, 1, 1)
@@ -140,6 +159,7 @@ function testAngleWrap()
   return true
 end function
 
+// Verify view entity hidden against the expected Quake behavior.
 function testViewEntityHidden()
   value = newClient()
   activeEntity(value, 1, 1)
@@ -150,6 +170,7 @@ function testViewEntityHidden()
   return true
 end function
 
+// Verify chase includes view entity against the expected Quake behavior.
 function testChaseIncludesViewEntity()
   value = newClient()
   activeEntity(value, 1, 1)
@@ -161,6 +182,7 @@ function testChaseIncludesViewEntity()
   return true
 end function
 
+// Verify static entity visible against the expected Quake behavior.
 function testStaticEntityVisible()
   value = newClient()
   entity = activeEntity(value, 1, 1)
@@ -170,6 +192,7 @@ function testStaticEntityVisible()
   return true
 end function
 
+// Verify stale entity clears model against the expected Quake behavior.
 function testStaleEntityClearsModel()
   value = newClient()
   entity = activeEntity(value, 1, 1)
@@ -180,6 +203,7 @@ function testStaleEntityClearsModel()
   return true
 end function
 
+// Verify force link snap against the expected Quake behavior.
 function testForceLinkSnap()
   value = newClient()
   entity = activeEntity(value, 1, 1)
@@ -194,6 +218,7 @@ function testForceLinkSnap()
   return true
 end function
 
+// Verify teleport snap against the expected Quake behavior.
 function testTeleportSnap()
   value = newClient()
   entity = activeEntity(value, 1, 1)
@@ -206,8 +231,13 @@ function testTeleportSnap()
   return true
 end function
 
+// Verify visible cap against the expected Quake behavior.
 function testVisibleCap()
   value = newClient()
+  staticEntity = client.createEntity(c.MAX_EDICTS)
+  staticEntity.modelIndex = 1
+  staticEntity.messageTime = -1.0
+  value.staticEntities = [staticEntity]
   index = 1
   while index <= c.MAX_VISEDICTS + 3
     entity = activeEntity(value, index, 1)
@@ -216,9 +246,11 @@ function testVisibleCap()
   end while
   client.CL_RelinkEntities(value)
   equal(len(value.visibleEntities), c.MAX_VISEDICTS, "MAX_VISEDICTS cap")
+  equal(value.visibleEntities[c.MAX_VISEDICTS - 1].number, c.MAX_VISEDICTS, "dynamic entity wins cap over static")
   return true
 end function
 
+// Verify active visible filter against the expected Quake behavior.
 function testActiveVisibleFilter()
   value = newClient()
   valid = client.createEntity(1)
@@ -232,6 +264,7 @@ function testActiveVisibleFilter()
   return true
 end function
 
+// Verify efrag removal candidates against the expected Quake behavior.
 function testEfragRemovalCandidates()
   value = newClient()
   removed = client.ensureEntity(value, 1)
@@ -249,6 +282,7 @@ function testEfragRemovalCandidates()
   return true
 end function
 
+// Verify rotate flag against the expected Quake behavior.
 function testRotateFlag()
   value = newClient()
   entity = activeEntity(value, 1, 1)
@@ -263,11 +297,13 @@ function testRotateFlag()
 end function
 
 
+// Verify client float boundary against the expected Quake behavior.
 function testClientFloatBoundary()
   equal(client.clientFloat(16777217), 16777216.0, "binary32 integer boundary")
   return true
 end function
 
+// Verify view entity origin against the expected Quake behavior.
 function testViewEntityOrigin()
   value = newClient()
   entity = activeEntity(value, 3, 1)
@@ -279,6 +315,7 @@ function testViewEntityOrigin()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   tests = [
     ["dlight key reuse", testDlightKeyReuse],

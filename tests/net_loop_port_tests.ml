@@ -1,27 +1,30 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Focused net_loop.c framing, flow-control and reconnect fixtures.
 */
-
 import miniquake.net_loop as loopPort
 import miniquake.net_datagram as datagram
 import miniquake.sizebuf as sz
 import miniquake.message as msg
 import miniquake.types as t
 
+// Assert that the condition holds and identify a failing test.
 function loopRequire(value, message)
   if not value then return error(9970, message) end if
   return true
 end function
 
+// Exercise message text as part of this deterministic regression fixture.
 function messageText(text)
   buffer = sz.alloc(256)
   msg.writeString(buffer, text)
   return buffer
 end function
 
+// Verify init search and alignment against the expected Quake behavior.
 function testInitSearchAndAlignment()
   loopRequire(loopPort.Loop_Init(false) == 0, "client loop init")
   loopRequire(loopPort.Loop_Init(true) == -1, "dedicated loop disabled")
@@ -57,6 +60,7 @@ function testInitSearchAndAlignment()
   return true
 end function
 
+// Verify connection and message order against the expected Quake behavior.
 function testConnectionAndMessageOrder()
   state = loopPort.createState()
   loopRequire(loopPort.Loop_Connect(state, "LOCAL") is void, "host comparison is exact")
@@ -95,6 +99,7 @@ function testConnectionAndMessageOrder()
   return true
 end function
 
+// Verify capacity close and reconnect against the expected Quake behavior.
 function testCapacityCloseAndReconnect()
   state = loopPort.createState()
   client = loopPort.Loop_Connect(state, "local")
@@ -130,6 +135,7 @@ function testCapacityCloseAndReconnect()
   return true
 end function
 
+// Verify datagram reconnect classification against the expected Quake behavior.
 function testDatagramReconnectClassification()
   now = 100.0
   loopRequire(loopPort.connectionRequestAction(void, 28000, now) == "new", "new address accepted")
@@ -142,6 +148,7 @@ function testDatagramReconnectClassification()
   return true
 end function
 
+// Verify parallel remote isolation against the expected Quake behavior.
 function testParallelRemoteIsolation()
   state = loopPort.createState()
   first = loopPort.createRemoteSocket(void, "127.0.0.2", 28000)
@@ -160,6 +167,7 @@ function testParallelRemoteIsolation()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "[1/5] init, search and IntAlign"
   result = try(testInitSearchAndAlignment())

@@ -1,3 +1,6 @@
+; Copyright (c) 2026 Nils Kopal
+; SPDX-License-Identifier: Apache-2.0
+;
 LIBRARY miniquake_native.dll
 EXPORTS
   mq_f32_from_text
@@ -21,6 +24,7 @@ EXPORTS
   mq_win_swap
   mq_win_key_down
   mq_win_key_pressed
+  mq_win_key_snapshot
   mq_win_text_pop
   mq_win_has_focus
   mq_win_client_width
@@ -102,10 +106,12 @@ EXPORTS
   mq_audio_capacity
   mq_audio_is_open
   mq_ogg_open
+  mq_ogg_open_file
   mq_ogg_rate
   mq_ogg_channels
   mq_ogg_frames
   mq_ogg_decode
+  mq_ogg_seek_start
   mq_ogg_close
   mq_udp_open
   mq_udp_open_bound
@@ -170,6 +176,7 @@ EXPORTS
   mq_gl_active_texture
   mq_gl_multi_tex_coord2
   mq_gl_draw_alias_batch
+  mq_gl_draw_particle_batch
   mq_gl_draw_alias_model
   mq_gl_static_geometry_call
   mq_gl_static_geometry_call_batch

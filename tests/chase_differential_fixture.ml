@@ -1,12 +1,20 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/chase_differential_fixture.ml.
+*/
 import miniquake.types as t
 import miniquake.native as native
 import miniquake.cvar as cvar
 import miniquake.chase as chasePort
 
+// Return number derived from the active module state.
 function number(value)
   return native.floatText(value)
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   registry = cvar.createRegistry()
   state = chasePort.Chase_Init(registry)

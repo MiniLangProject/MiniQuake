@@ -1,8 +1,10 @@
 /*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
 Deterministic MiniLang side of reference/harness/sv_user_oracle.c.
 Stdout is JSONL and is consumed by tools/sv_user_differential.py.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.sv_user as svuser
@@ -20,6 +22,7 @@ struct SvUserDifferentialMap
   leafs
 end struct
 
+// Exercise differential floor map as part of this deterministic regression fixture.
 function differentialFloorMap(solidBack)
   plane = t.BspPlane(t.Vec3(0.0, 0.0, 1.0), 0.0, 2)
   node = t.BspNode(0, -2, -1, t.Vec3(-4096.0, -4096.0, -4096.0), t.Vec3(4096.0, 4096.0, 4096.0), 0, 0)
@@ -45,17 +48,21 @@ function differentialFloorMap(solidBack)
   )
 end function
 
+// Return differential number derived from the active module state.
 function differentialNumber(value)
   return native.floatText(value)
 end function
 
+// Add vector to the destination state.
 function emitVector(functionName, caseName, value)
   print "{\"function\":\"" + functionName + "\",\"case\":\"" + caseName + "\",\"x\":" +
     differentialNumber(value.x) + ",\"y\":" + differentialNumber(value.y) +
     ",\"z\":" + differentialNumber(value.z) + "}"
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   game = server.create(1)
   state = svuser.SV_UserInit(game)
   svuser.SV_UserSetFrameTime(state, 0.1)

@@ -1,16 +1,24 @@
-/* BP-055: snd_mem.c WAVE parsing and Binary32 resampling parity. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+BP-055: snd_mem.c WAVE parsing and Binary32 resampling parity.
+*/
 import miniquake.sound.snd_mem as bp055Mem
 import miniquake.byteio as bp055Bio
 import miniquake.native as bp055Native
 
+// Assert exact equality and report both values on failure.
 function bp055Equal(actual, expected, name)
   if actual != expected then return error(5500, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
+// Assert that the condition holds and identify a failing test.
 function bp055Yes(value, name)
   if not value then return error(5501, name + ": expected true") end if
   return true
 end function
+// Execute one named test case and record its pass/fail result.
 function bp055Run(number, name, fn)
   print "[" + number + "/20] " + name
   result = try(fn())
@@ -18,6 +26,7 @@ function bp055Run(number, name, fn)
   return true
 end function
 
+// Exercise the wave8 test scenario and verify its expected result.
 function bp055Wave8(channels)
   data = bytes(48)
   bp055Bio.copyInto(data, 0, bytes("RIFF"), 0, 4)
@@ -40,6 +49,7 @@ function bp055Wave8(channels)
   return data
 end function
 
+// Exercise the source16 test scenario and verify its expected result.
 function bp055Source16(values)
   data = bytes(len(values) * 2)
   index = 0
@@ -50,6 +60,7 @@ function bp055Source16(values)
   return data
 end function
 
+// Exercise the riff test scenario and verify its expected result.
 function bp055Riff()
   info = bp055Mem.GetWavinfo("fixture.wav", bp055Wave8(1), 48)
   bp055Equal(info.rate, 11025, "rate")
@@ -59,18 +70,21 @@ function bp055Riff()
   bp055Equal(info.dataOffset, 44, "data offset")
   return true
 end function
+// Exercise the little short test scenario and verify its expected result.
 function bp055LittleShort()
   data = bytes(2); data[0] = 0x34; data[1] = 0x12
   cursor = bp055Mem.createCursor(data, 2)
   bp055Equal(bp055Mem.GetLittleShort(cursor), 0x1234, "little short")
   return true
 end function
+// Exercise the little long test scenario and verify its expected result.
 function bp055LittleLong()
   data = bytes(4); data[0] = 0x78; data[1] = 0x56; data[2] = 0x34; data[3] = 0x12
   cursor = bp055Mem.createCursor(data, 4)
   bp055Equal(bp055Mem.GetLittleLong(cursor), 0x12345678, "little long")
   return true
 end function
+// Return chunks.
 function bp055FindChunks()
   wave = bp055Wave8(1)
   cursor = bp055Mem.createCursor(wave, len(wave))
@@ -80,11 +94,13 @@ function bp055FindChunks()
   bp055Equal(bp055Mem.FindChunk(cursor, "data"), 36, "data offset")
   return true
 end function
+// Exercise the stereo rejected test scenario and verify its expected result.
 function bp055StereoRejected()
   result = try(bp055Mem.S_LoadSoundData("stereo.wav", bp055Wave8(2), 11025, false))
   bp055Yes(result is error, "stereo rejected")
   return true
 end function
+// Exercise the identity8 test scenario and verify its expected result.
 function bp055Identity8()
   cache = bp055Mem.SoundCache(4, -1, 11025, 1, 1, bytes())
   result = bp055Mem.ResampleSfx(cache, 11025, 1, bytes([128,129,130,131]), 11025, false)
@@ -93,6 +109,7 @@ function bp055Identity8()
   bp055Equal(result.data[3], 3, "identity 3")
   return true
 end function
+// Exercise the double rate test scenario and verify its expected result.
 function bp055DoubleRate()
   cache = bp055Mem.SoundCache(4, -1, 11025, 1, 1, bytes())
   result = bp055Mem.ResampleSfx(cache, 11025, 1, bytes([128,129,130,131]), 22050, false)
@@ -102,6 +119,7 @@ function bp055DoubleRate()
   bp055Equal(result.data[7], 3, "double final")
   return true
 end function
+// Exercise the half rate test scenario and verify its expected result.
 function bp055HalfRate()
   cache = bp055Mem.SoundCache(4, -1, 22050, 1, 1, bytes())
   result = bp055Mem.ResampleSfx(cache, 22050, 1, bytes([128,129,130,131]), 11025, false)
@@ -110,6 +128,7 @@ function bp055HalfRate()
   bp055Equal(result.data[1], 2, "half second")
   return true
 end function
+// Exercise the sixteen bit test scenario and verify its expected result.
 function bp055SixteenBit()
   cache = bp055Mem.SoundCache(5, -1, 48000, 2, 1, bytes())
   result = bp055Mem.ResampleSfx(cache, 48000, 2, bp055Source16([0,1000,-1000,32767,-32768]), 22050, false)
@@ -118,6 +137,7 @@ function bp055SixteenBit()
   bp055Equal(bp055Bio.i16(result.data, 2), -1000, "16-bit second")
   return true
 end function
+// Read and validate as8.
 function bp055LoadAs8()
   cache = bp055Mem.SoundCache(5, 2, 22050, 2, 1, bytes())
   result = bp055Mem.ResampleSfx(cache, 22050, 2, bp055Source16([0,1000,-1000,32767,-32768]), 44100, true)
@@ -127,17 +147,20 @@ function bp055LoadAs8()
   bp055Equal(result.data[6], 127, "8-bit positive clip word")
   return true
 end function
+// Exercise the loop scale test scenario and verify its expected result.
 function bp055LoopScale()
   cache = bp055Mem.SoundCache(8, 4, 11025, 1, 1, bytes())
   result = bp055Mem.ResampleSfx(cache, 11025, 1, bytes([128,129,130,131,132,133,134,135]), 22050, false)
   bp055Equal(result.loopStart, 8, "loop scale")
   return true
 end function
+// Exercise the binary32 step test scenario and verify its expected result.
 function bp055Binary32Step()
   value = bp055Mem.soundF32(48000.0 / 22050.0)
   bp055Equal(bp055Native.floatBits(value), 0x400b51da, "stepscale word")
   return true
 end function
+// Exercise the binary32 count test scenario and verify its expected result.
 function bp055Binary32Count()
   source = bytes(100, 128)
   cache = bp055Mem.SoundCache(100, -1, 48000, 1, 1, bytes())
@@ -145,41 +168,48 @@ function bp055Binary32Count()
   bp055Equal(result.length, 45, "binary32 count")
   return true
 end function
+// Exercise the truncated test scenario and verify its expected result.
 function bp055Truncated()
   cache = bp055Mem.SoundCache(4, -1, 11025, 2, 1, bytes())
   result = try(bp055Mem.ResampleSfx(cache, 11025, 2, bytes(6), 11025, false))
   bp055Yes(result is error, "truncated source")
   return true
 end function
+// Exercise the negative length test scenario and verify its expected result.
 function bp055NegativeLength()
   cache = bp055Mem.SoundCache(-1, -1, 11025, 1, 1, bytes())
   result = try(bp055Mem.ResampleSfx(cache, 11025, 1, bytes(), 11025, false))
   bp055Yes(result is error, "negative length")
   return true
 end function
+// Exercise the invalid rate test scenario and verify its expected result.
 function bp055InvalidRate()
   cache = bp055Mem.SoundCache(1, -1, 11025, 1, 1, bytes())
   result = try(bp055Mem.ResampleSfx(cache, 0, 1, bytes([128]), 11025, false))
   bp055Yes(result is error, "invalid rate")
   return true
 end function
+// Exercise the invalid width test scenario and verify its expected result.
 function bp055InvalidWidth()
   cache = bp055Mem.SoundCache(1, -1, 11025, 3, 1, bytes())
   result = try(bp055Mem.ResampleSfx(cache, 11025, 3, bytes(3), 11025, false))
   bp055Yes(result is error, "invalid width")
   return true
 end function
+// Exercise the descriptor cache test scenario and verify its expected result.
 function bp055DescriptorCache()
   descriptor = bp055Mem.createDescriptor("cached.wav")
   descriptor.cache = bp055Mem.SoundCache(1, -1, 11025, 1, 1, bytes([0]))
   bp055Yes(bp055Mem.S_LoadSound(void, descriptor, 11025, false) == descriptor.cache, "cache identity")
   return true
 end function
+// Exercise the sound path test scenario and verify its expected result.
 function bp055SoundPath()
   bp055Equal(bp055Mem.soundPath("misc/menu1.wav"), "sound/misc/menu1.wav", "sound prefix")
   bp055Equal(bp055Mem.soundPath("sound/misc/menu1.wav"), "sound/misc/menu1.wav", "existing prefix")
   return true
 end function
+// Exercise the effect conversion and malformed test scenario and verify its expected result.
 function bp055EffectConversionAndMalformed()
   descriptor = bp055Mem.createDescriptor("effect.wav")
   descriptor.cache = bp055Mem.SoundCache(2, 1, 22050, 2, 1, bp055Source16([123,-456]))

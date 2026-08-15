@@ -1,26 +1,29 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Deterministic snd_win.c lifecycle tests plus an opt-in real waveOut smoke.
 */
-
 import miniquake.sound.snd_win as sndwin
 import miniquake.sound.snd_mem as sndmem
 import miniquake.native as native
 import miniquake.filesystem as qfs
 import miniquake.byteio as bio
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9500, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9501, name + ": expected true") end if
   return true
 end function
 
+// Verify has argument against the expected Quake behavior.
 function testHasArgument(arguments, wanted)
   for each argument in arguments
     if argument == wanted then return true end if
@@ -28,6 +31,7 @@ function testHasArgument(arguments, wanted)
   return false
 end function
 
+// Exercise argument after as part of this deterministic regression fixture.
 function argumentAfter(arguments, wanted)
   index = 0
   while index + 1 < len(arguments)
@@ -37,6 +41,7 @@ function argumentAfter(arguments, wanted)
   return ""
 end function
 
+// Verify fallback selection against the expected Quake behavior.
 function testFallbackSelection()
   regular = sndwin.create(true, 11025)
   assertEqual(sndwin.SNDDMA_Init(regular, []), 1, "SNDDMA_Init fallback")
@@ -66,6 +71,7 @@ function testFallbackSelection()
   return true
 end function
 
+// Verify header lifecycle and position against the expected Quake behavior.
 function testHeaderLifecycleAndPosition()
   state = sndwin.create(true, 11025)
   sndwin.SNDDMA_Init(state, ["-wavonly"])
@@ -95,6 +101,7 @@ function testHeaderLifecycleAndPosition()
   return true
 end function
 
+// Execute one named test case and record its pass/fail result.
 function testRingOverrun()
   state = sndwin.create(true, 11025)
   sndwin.SNDDMA_Init(state, ["-wavonly"])
@@ -108,6 +115,7 @@ function testRingOverrun()
   return true
 end function
 
+// Verify block and shutdown against the expected Quake behavior.
 function testBlockAndShutdown()
   state = sndwin.create(true, 11025)
   sndwin.SNDDMA_Init(state, ["-wavonly"])
@@ -132,6 +140,7 @@ function testBlockAndShutdown()
   return true
 end function
 
+// Verify real wave out against the expected Quake behavior.
 function testRealWaveOut()
   state = sndwin.create(false, 22050)
   initialized = sndwin.SNDDMA_Init(state, ["-wavonly"])
@@ -147,6 +156,13 @@ function testRealWaveOut()
   assertEqual(sndwin.SNDDMA_Submit(state, block), true, "real waveOut submit")
   assertTrue(native.audioSubmitted() >= 1, "native submitted counter")
   assertTrue(native.audioQueued() <= native.audioCapacity(), "native queued bound")
+  // Let at least one short block complete, then submit through the same
+  // permanently prepared native header. This exercises the low-stutter reuse
+  // path rather than only the first prepare/write operation.
+  submittedBeforeReuse = native.audioSubmitted()
+  native.winSleep(100)
+  assertEqual(sndwin.SNDDMA_Submit(state, block), true, "real waveOut header reuse")
+  assertTrue(native.audioSubmitted() > submittedBeforeReuse, "native reused submit counter")
   position = sndwin.SNDDMA_GetDMAPos(state)
   assertTrue(position >= 0 and position < state.dmaSamples, "native DMA position bound")
   assertEqual(sndwin.S_BlockSound(state), 1, "real waveOut reset")
@@ -156,6 +172,7 @@ function testRealWaveOut()
   return true
 end function
 
+// Verify retail wave out against the expected Quake behavior.
 function testRetailWaveOut(baseDirectory)
   filesystem = qfs.initialize(baseDirectory, "id1")
   descriptor = sndmem.createDescriptor("misc/menu1.wav")
@@ -188,6 +205,7 @@ function testRetailWaveOut(baseDirectory)
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "[1/4] DirectSound/waveOut fallback"
   testFallbackSelection()

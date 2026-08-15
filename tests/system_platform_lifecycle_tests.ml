@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-063: sys_win.c, conproc.c and Win32 platform lifecycle parity.
 */
-
 import miniquake.sys_win as system
 import miniquake.conproc as conproc
 
@@ -12,6 +12,7 @@ fixtureArguments = []
 testIndex = 0
 failures = 0
 
+// Assert that the condition holds and identify a failing test.
 function bp063Check(value, name)
   global testIndex, failures
   testIndex = testIndex + 1
@@ -20,18 +21,21 @@ function bp063Check(value, name)
   return true
 end function
 
+// Exercise runner as part of this deterministic regression fixture.
 function runner(arguments)
   global fixtureArguments
   fixtureArguments = arguments
   return 17
 end function
 
+// Exercise state for test as part of this deterministic regression fixture.
 function stateForTest()
   state = system.Sys_CreateState(false)
   system.Sys_UseState(state)
   return state
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   bp063Check(system.MINIMUM_WIN_MEMORY == 0x0880000 and system.MAXIMUM_WIN_MEMORY == 0x1000000, "WinQuake memory bounds")
   parsed = system.Sys_ParseCommandLine("  -dedicated\t-heapsize 4096  +map start")

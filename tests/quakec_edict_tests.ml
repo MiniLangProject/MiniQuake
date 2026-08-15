@@ -1,11 +1,11 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-022 source-guided ED_* fixtures: allocation lifetime, epair parsing,
 Quake byte entity text, save serialization and debug formatting.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.native as native
@@ -18,16 +18,19 @@ import miniquake.savegame as savegame
 import miniquake.array_util as arrayutil
 import miniquake.sizebuf as sz
 
+// Assert exact equality and report both values on failure.
 function equal(actual, expected, name)
   if actual != expected then return error(10200, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function yes(value, name)
   if value != true then return error(10201, name + ": expected true") end if
   return true
 end function
 
+// Report whether text.
 function equalText(actual, expected, name)
   if typeof(actual) != "string" then return error(10202, name + ": expected string, got " + typeof(actual)) end if
   if typeof(expected) != "string" then return error(10203, name + ": fixture expected value is not a string") end if
@@ -35,6 +38,7 @@ function equalText(actual, expected, name)
   return true
 end function
 
+// Exercise contains as part of this deterministic regression fixture.
 function contains(text, wanted)
   source = bytes(text)
   needle = bytes(wanted)
@@ -51,6 +55,7 @@ function contains(text, wanted)
   return false
 end function
 
+// Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
   print "  [" + number + "/22] " + name
   result = try(fn())
@@ -61,10 +66,12 @@ function run(number, name, fn)
   return true
 end function
 
+// Exercise def as part of this deterministic regression fixture.
 function def(typeValue, offset, name)
   return t.QuakeCDef(typeValue, offset, 0, name)
 end function
 
+// Exercise field defs as part of this deterministic regression fixture.
 function fieldDefs()
   return [
     def(c.EV_VOID, 0, ""),
@@ -94,6 +101,7 @@ function fieldDefs()
   ]
 end function
 
+// Exercise global defs as part of this deterministic regression fixture.
 function globalDefs()
   return [
     def(c.EV_VOID, 0, ""),
@@ -104,6 +112,7 @@ function globalDefs()
   ]
 end function
 
+// Create and initialize machine.
 function makeMachine()
   dummy = t.QuakeCFunction(0, 0, 0, 0, "", "", 0, array(8, 0))
   spawnfn = t.QuakeCFunction(0, 0, 0, 0, "spawnfn", "fixture.qc", 0, array(8, 0))
@@ -123,14 +132,17 @@ function makeMachine()
   return machine
 end function
 
+// Exercise pair as part of this deterministic regression fixture.
 function pair(key, value)
   return t.EntityPair(key, value)
 end function
 
+// Exercise entity as part of this deterministic regression fixture.
 function entity(pairs)
   return t.Entity(pairs)
 end function
 
+// Verify type sizes against the expected Quake behavior.
 function testTypeSizes()
   equal(edict.typeSize(c.EV_VOID), 1, "edict void size")
   equal(edict.typeSize(c.EV_VECTOR), 3, "edict vector size")
@@ -138,6 +150,7 @@ function testTypeSizes()
   return true
 end function
 
+// Verify allocate append against the expected Quake behavior.
 function testAllocateAppend()
   machine = makeMachine()
   index = edict.ED_Alloc(machine, 1)
@@ -146,6 +159,7 @@ function testAllocateAppend()
   return true
 end function
 
+// Verify reuse delay against the expected Quake behavior.
 function testReuseDelay()
   machine = makeMachine()
   machine.context.serverTime = 3.0
@@ -157,6 +171,7 @@ function testReuseDelay()
   return true
 end function
 
+// Verify early free reuse against the expected Quake behavior.
 function testEarlyFreeReuse()
   machine = makeMachine()
   machine.edictFree[1] = true
@@ -166,6 +181,7 @@ function testEarlyFreeReuse()
   return true
 end function
 
+// Verify free clears fields against the expected Quake behavior.
 function testFreeClearsFields()
   machine = makeMachine()
   vm.setEntityString(machine, 1, 15, "progs/test.mdl")
@@ -182,6 +198,7 @@ function testFreeClearsFields()
   return true
 end function
 
+// Verify angle hack against the expected Quake behavior.
 function testAngleHack()
   machine = makeMachine()
   edict.setKeyValue(machine, 1, "angle", "90")
@@ -192,6 +209,7 @@ function testAngleHack()
   return true
 end function
 
+// Verify light hack against the expected Quake behavior.
 function testLightHack()
   machine = makeMachine()
   edict.setKeyValue(machine, 1, "light", "250")
@@ -199,12 +217,14 @@ function testLightHack()
   return true
 end function
 
+// Verify underscore ignored against the expected Quake behavior.
 function testUnderscoreIgnored()
   machine = makeMachine()
   yes(edict.setKeyValue(machine, 1, "_comment", "ignored"), "underscore pair accepted")
   return true
 end function
 
+// Verify unknown field diagnostic against the expected Quake behavior.
 function testUnknownFieldDiagnostic()
   machine = makeMachine()
   edict.ED_ParseEdict(machine, 1, entity([pair("missing", "1")]))
@@ -212,6 +232,7 @@ function testUnknownFieldDiagnostic()
   return true
 end function
 
+// Verify unknown global diagnostic against the expected Quake behavior.
 function testUnknownGlobalDiagnostic()
   machine = makeMachine()
   edict.ED_ParseGlobals(machine, entity([pair("missing", "1")]))
@@ -219,6 +240,7 @@ function testUnknownGlobalDiagnostic()
   return true
 end function
 
+// Verify field epair against the expected Quake behavior.
 function testFieldEpair()
   machine = makeMachine()
   vm.setWord(machine, 6, 0x1234)
@@ -227,6 +249,7 @@ function testFieldEpair()
   return true
 end function
 
+// Verify function epair against the expected Quake behavior.
 function testFunctionEpair()
   machine = makeMachine()
   edict.setKeyValue(machine, 1, "think", "spawnfn")
@@ -235,6 +258,7 @@ function testFunctionEpair()
   return true
 end function
 
+// Verify entity epair against the expected Quake behavior.
 function testEntityEpair()
   machine = makeMachine()
   edict.setKeyValue(machine, 1, "enemy", "3")
@@ -242,6 +266,7 @@ function testEntityEpair()
   return true
 end function
 
+// Verify new string against the expected Quake behavior.
 function testNewString()
   high = protocolText.decodeBytes(bytes([0xe9]))
   text = edict.ED_NewString(high + "\\n" + "x\\t")
@@ -249,6 +274,7 @@ function testNewString()
   return true
 end function
 
+// Verify negative zero format against the expected Quake behavior.
 function testNegativeZeroFormat()
   negativeZero = native.bitsFloat(0x80000000)
   equal(native.floatBits(negativeZero), 0x80000000, "negative zero word")
@@ -272,7 +298,9 @@ function testNegativeZeroFormat()
   return true
 end function
 
+// Verify write edict against the expected Quake behavior.
 function testWriteEdict()
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   machine = makeMachine()
   vm.setEntityFloat(machine, 1, 6, 12.5)
   vm.setEntityVector(machine, 1, 2, t.Vec3(1.0, 2.0, 3.0))
@@ -320,6 +348,7 @@ function testWriteEdict()
   return true
 end function
 
+// Verify write globals against the expected Quake behavior.
 function testWriteGlobals()
   machine = makeMachine()
   vm.setGlobalFloat(machine, 40, 2.5)
@@ -355,6 +384,7 @@ function testWriteGlobals()
   return true
 end function
 
+// Verify empty entity against the expected Quake behavior.
 function testEmptyEntity()
   machine = makeMachine()
   edict.ED_ParseEdict(machine, 1, entity([]))
@@ -362,12 +392,14 @@ function testEmptyEntity()
   return true
 end function
 
+// Verify bad edict command against the expected Quake behavior.
 function testBadEdictCommand()
   machine = makeMachine()
   equal(edict.ED_PrintEdict_f(machine, 2), "Bad edict number\n", "command bounds")
   return true
 end function
 
+// Verify num for edict against the expected Quake behavior.
 function testNumForEdict()
   machine = makeMachine()
   equal(edict.NUM_FOR_EDICT(machine, 1), 1, "valid high-water edict")
@@ -375,6 +407,7 @@ function testNumForEdict()
   return true
 end function
 
+// Verify bsp entity bytes against the expected Quake behavior.
 function testBspEntityBytes()
   raw = bytes([123,34,109,101,115,115,97,103,101,34,32,34,0xe9,34,125])
   entities = bsp.parseEntities(protocolText.decodeBytes(raw))
@@ -383,6 +416,7 @@ function testBspEntityBytes()
   return true
 end function
 
+// Verify global roundtrip against the expected Quake behavior.
 function testGlobalRoundtrip()
   machine = makeMachine()
   edict.ED_ParseGlobals(machine, entity([pair("globalx", "3.5"), pair("globalent", "2")]))
@@ -391,6 +425,7 @@ function testGlobalRoundtrip()
   return true
 end function
 
+// Verify print free against the expected Quake behavior.
 function testPrintFree()
   machine = makeMachine()
   machine.edictFree[1] = true
@@ -398,6 +433,7 @@ function testPrintFree()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "MiniQuake BP-022 QuakeC edict tests"
   passed = 0

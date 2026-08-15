@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.menu.
+*/
 package miniquake.menu
 
 import miniquake.types as t
@@ -39,18 +46,22 @@ const HELP_PAGES = 6
 const MNET_IPX = 1
 const MNET_TCP = 2
 
+// Provide main items behavior for the active subsystem.
 function mainItems()
   return ["Single Player", "Multiplayer", "Options", "Help", "Quit"]
 end function
 
+// Provide single player items behavior for the active subsystem.
 function singlePlayerItems()
   return ["New Game", "Load", "Save"]
 end function
 
+// Provide multiplayer items behavior for the active subsystem.
 function multiplayerItems()
   return ["Join a Game", "New Game", "Setup"]
 end function
 
+// Provide options items behavior for the active subsystem.
 function optionsItems()
   // OPTIONS_ITEMS is 14 in WinQuake on Windows.
   return [
@@ -71,6 +82,7 @@ function optionsItems()
   ]
 end function
 
+// Provide key commands behavior for the active subsystem.
 function keyCommands()
   // bindnames from WinQuake/menu.c, kept in the original order.
   return [
@@ -80,6 +92,7 @@ function keyCommands()
   ]
 end function
 
+// Provide key items behavior for the active subsystem.
 function keyItems()
   return [
     "attack", "change weapon", "jump / swim up", "walk forward", "backpedal",
@@ -89,6 +102,7 @@ function keyItems()
   ]
 end function
 
+// Encode and write slot items.
 function saveSlotItems()
   return [
     "--- UNUSED SLOT ---", "--- UNUSED SLOT ---", "--- UNUSED SLOT ---",
@@ -98,6 +112,7 @@ function saveSlotItems()
   ]
 end function
 
+// Provide items for page behavior for the active subsystem.
 function itemsForPage(page)
   if page == PAGE_MAIN then return mainItems() end if
   if page == PAGE_SINGLEPLAYER then return singlePlayerItems() end if
@@ -115,6 +130,7 @@ function itemsForPage(page)
   return []
 end function
 
+// Provide title for page behavior for the active subsystem.
 function titleForPage(page)
   if page == PAGE_SINGLEPLAYER then return "SINGLE PLAYER" end if
   if page == PAGE_MULTIPLAYER then return "MULTIPLAYER" end if
@@ -134,6 +150,7 @@ function titleForPage(page)
   return "QUAKE"
 end function
 
+// Create and initialize the module state.
 function create()
   return t.MenuState(
     false,
@@ -181,6 +198,7 @@ function create()
   )
 end function
 
+// Provide stored selection behavior for the active subsystem.
 function storedSelection(state, page, fallback)
   for each item in state.pageSelections
     if item[0] == page then return item[1] end if
@@ -188,6 +206,7 @@ function storedSelection(state, page, fallback)
   return fallback
 end function
 
+// Provide remember selection behavior for the active subsystem.
 function rememberSelection(state)
   if state.page == "" then return 0 end if
   updated = []
@@ -205,6 +224,7 @@ function rememberSelection(state)
   return state.selection
 end function
 
+// Initialize state for open page.
 function openPage(state, page)
   rememberSelection(state)
   if page == PAGE_QUIT then state.previousPage = state.page end if
@@ -229,23 +249,27 @@ function setPage(state, page)
   return openPage(state, page)
 end function
 
+// Initialize state for open main.
 function openMain(state)
   openPage(state, PAGE_MAIN)
   state.active = true
   return true
 end function
 
+// Update module state for status.
 function setStatus(state, text)
   state.statusText = text
   return text
 end function
 
+// Update module state for items.
 function setItems(state, items)
   state.items = items
   if state.selection < 0 or state.selection >= len(state.items) then state.selection = 0 end if
   return len(state.items)
 end function
 
+// Update module state for active.
 function setActive(state, active)
   state.active = active
   if active and state.page == "" then openPage(state, PAGE_MAIN) end if
@@ -253,11 +277,13 @@ function setActive(state, active)
   return state.active
 end function
 
+// Update subsystem configuration for toggle.
 function toggle(state)
   if state.active then return setActive(state, false) end if
   return openMain(state)
 end function
 
+// Transfer data for move.
 function move(state, delta)
   if state.page == PAGE_HELP then return moveHelp(state, delta) end if
   if len(state.items) == 0 then state.selection = 0; return 0 end if
@@ -272,6 +298,7 @@ function move(state, delta)
   return state.selection
 end function
 
+// Transfer data for move help.
 function moveHelp(state, delta)
   state.helpPage = state.helpPage + delta
   while state.helpPage < 0
@@ -283,6 +310,7 @@ function moveHelp(state, delta)
   return state.helpPage
 end function
 
+// Update subsystem configuration for change help page.
 function changeHelpPage(state, delta)
   return moveHelp(state, delta)
 end function
@@ -316,6 +344,7 @@ function back(state)
   return "page"
 end function
 
+// Provide selected command behavior for the active subsystem.
 function selectedCommand(state)
   if state.page == PAGE_MAIN then
     if state.selection == 0 then return "menu_single" end if
@@ -353,6 +382,7 @@ function selectedCommand(state)
   return "none"
 end function
 
+// Return picture.
 function findPicture(state, name)
   for each pictureValue in state.pictures
     if pictureValue.name == name then return pictureValue end if
@@ -360,6 +390,7 @@ function findPicture(state, name)
   return void
 end function
 
+// Read and validate picture.
 function loadPicture(state, filesystem, palette, path, transparent)
   if findPicture(state, path) is not void then return true end if
   menuDraw.configureDraw(filesystem, palette, void)
@@ -381,10 +412,12 @@ function loadWadPicture(state, archive, palette, lumpName, transparent)
   return true
 end function
 
+// Return wad picture.
 function findWadPicture(state, lumpName)
   return findPicture(state, "wad:" + lumpName)
 end function
 
+// Read and validate status bar pictures.
 function loadStatusBarPictures(state, filesystem, palette)
   wadData = try(menuFs.readFile(filesystem, "gfx.wad"))
   if wadData is error then return false end if
@@ -434,6 +467,7 @@ function loadStatusBarPictures(state, filesystem, palette)
   return true
 end function
 
+// Initialize state for initialize.
 function initialize(state, filesystem, palette)
   if state is void or state.initialized then return true end if
 
@@ -446,6 +480,7 @@ function initialize(state, filesystem, palette)
   loadPicture(state, filesystem, palette, "gfx/p_multi.lmp", false)
   loadPicture(state, filesystem, palette, "gfx/mp_menu.lmp", true)
   loadPicture(state, filesystem, palette, "gfx/p_option.lmp", false)
+  loadPicture(state, filesystem, palette, "gfx/vidmodes.lmp", false)
   loadPicture(state, filesystem, palette, "gfx/p_load.lmp", false)
   loadPicture(state, filesystem, palette, "gfx/p_save.lmp", false)
   loadPicture(state, filesystem, palette, "gfx/ttl_cstm.lmp", false)
@@ -493,6 +528,7 @@ function initialize(state, filesystem, palette)
   return true
 end function
 
+// Release state for shutdown.
 function shutdown(state)
   if state is void then return true end if
   deletedTextures = []
@@ -513,10 +549,12 @@ function shutdown(state)
   return true
 end function
 
+// Provide layout behavior for the active subsystem.
 function layout(width, height)
   return menuUiContract.virtualCanvasLayout(width, height)
 end function
 
+// Provide virtual picture behavior for the active subsystem.
 function virtualPicture(state, name, x, y, transform, alpha)
   pictureValue = findPicture(state, name)
   if pictureValue is void or pictureValue.textureId == 0 then return false end if
@@ -532,12 +570,14 @@ function virtualPicture(state, name, x, y, transform, alpha)
   return true
 end function
 
+// Provide virtual centered picture behavior for the active subsystem.
 function virtualCenteredPicture(state, name, y, transform, alpha)
   pictureValue = findPicture(state, name)
   if pictureValue is void then return false end if
   return virtualPicture(state, name, (320.0 - pictureValue.width) * 0.5, y, transform, alpha)
 end function
 
+// Provide virtual string behavior for the active subsystem.
 function virtualString(texture, x, y, text, transform, alpha)
   if texture == 0 then return false end if
   // M_Print uses the brown character bank in conchars (ASCII + 128).
@@ -566,6 +606,7 @@ function virtualString(texture, x, y, text, transform, alpha)
   return true
 end function
 
+// Provide virtual white string behavior for the active subsystem.
 function virtualWhiteString(texture, x, y, text, transform, alpha)
   if texture == 0 then return false end if
   // M_PrintWhite uses the normal ASCII bank unchanged.
@@ -580,12 +621,14 @@ function virtualWhiteString(texture, x, y, text, transform, alpha)
   return true
 end function
 
+// Provide virtual centered string behavior for the active subsystem.
 function virtualCenteredString(texture, y, text, transform, alpha)
   x = (320.0 - len(bytes(text)) * 8.0) * 0.5
   if x < 0.0 then x = 0.0 end if
   return virtualString(texture, x, y, text, transform, alpha)
 end function
 
+// Provide virtual solid behavior for the active subsystem.
 function virtualSolid(x, y, width, height, transform, red, green, blue, alpha)
   menuDraw.solidQuad(
     transform[0] + x * transform[2],
@@ -645,6 +688,7 @@ function drawTextBox(state, x, y, width, lines, transform)
   return true
 end function
 
+// Render fallback list.
 function drawFallbackList(state, texture, transform)
   virtualCenteredString(texture, 12.0, state.title, transform, 255)
   y = 48.0
@@ -658,11 +702,13 @@ function drawFallbackList(state, texture, transform)
   end while
 end function
 
+// Render dot.
 function drawDot(state, realtime, y, transform)
   frame = (menuNative.trunc(realtime * 10.0) % 6) + 1
   return virtualPicture(state, "gfx/menudot" + frame + ".lmp", 54.0, y, transform, 255)
 end function
 
+// Render main.
 function drawMain(state, texture, transform, realtime)
   plaque = virtualPicture(state, "gfx/qplaque.lmp", 16.0, 4.0, transform, 255)
   title = virtualCenteredPicture(state, "gfx/ttl_main.lmp", 4.0, transform, 255)
@@ -671,6 +717,7 @@ function drawMain(state, texture, transform, realtime)
   if not plaque or not title or not body then drawFallbackList(state, texture, transform) end if
 end function
 
+// Render single player.
 function drawSinglePlayer(state, texture, transform, realtime)
   plaque = virtualPicture(state, "gfx/qplaque.lmp", 16.0, 4.0, transform, 255)
   title = virtualCenteredPicture(state, "gfx/ttl_sgl.lmp", 4.0, transform, 255)
@@ -679,6 +726,7 @@ function drawSinglePlayer(state, texture, transform, realtime)
   if not plaque or not title or not body then drawFallbackList(state, texture, transform) end if
 end function
 
+// Render multiplayer.
 function drawMultiplayer(state, texture, transform, realtime)
   plaque = virtualPicture(state, "gfx/qplaque.lmp", 16.0, 4.0, transform, 255)
   title = virtualCenteredPicture(state, "gfx/p_multi.lmp", 4.0, transform, 255)
@@ -688,6 +736,7 @@ function drawMultiplayer(state, texture, transform, realtime)
   if not state.tcpAvailable then virtualCenteredString(texture, 148.0, "No Communications Available", transform, 255) end if
 end function
 
+// Render slider.
 function drawSlider(texture, x, y, range, transform)
   if range < 0.0 then range = 0.0 end if
   if range > 1.0 then range = 1.0 end if
@@ -702,6 +751,7 @@ function drawSlider(texture, x, y, range, transform)
   menuDraw.character(texture, transform[0] + (x + 72.0 * range) * scale, transform[1] + y * scale, 131, scale, 255)
 end function
 
+// Render checkbox.
 function drawCheckbox(texture, x, y, enabled, transform)
   if enabled then
     virtualString(texture, x, y, "on", transform, 255)
@@ -710,6 +760,7 @@ function drawCheckbox(texture, x, y, enabled, transform)
   end if
 end function
 
+// Render options.
 function drawOptions(state, texture, transform, realtime, registry)
   plaque = virtualPicture(state, "gfx/qplaque.lmp", 16.0, 4.0, transform, 255)
   title = virtualCenteredPicture(state, "gfx/p_option.lmp", 4.0, transform, 255)
@@ -764,12 +815,14 @@ function drawOptions(state, texture, transform, realtime, registry)
   )
 end function
 
+// Provide key command at behavior for the active subsystem.
 function keyCommandAt(state)
   commands = keyCommands()
   if state.selection < 0 or state.selection >= len(commands) then return "" end if
   return commands[state.selection]
 end function
 
+// Render keys.
 function drawKeys(state, texture, transform, realtime)
   virtualCenteredPicture(state, "gfx/ttl_cstm.lmp", 4.0, transform, 255)
   if state.waitingForKey then
@@ -803,6 +856,7 @@ function drawKeys(state, texture, transform, realtime)
   )
 end function
 
+// Render save slots.
 function drawSaveSlots(state, texture, transform, realtime, page)
   pictureName = "gfx/p_load.lmp"
   if page == PAGE_SAVE then pictureName = "gfx/p_save.lmp" end if
@@ -816,6 +870,7 @@ function drawSaveSlots(state, texture, transform, realtime, page)
   menuDraw.character(texture, transform[0] + 8.0 * transform[2], transform[1] + (32.0 + state.selection * 8.0) * transform[2], cursor, transform[2], 255)
 end function
 
+// Provide player translation behavior for the active subsystem.
 function playerTranslation(registry)
   colors = 0
   if registry is not void then colors = menuNative.trunc(menuCvar.variableValue(registry, "_cl_color")) end if
@@ -836,6 +891,7 @@ function playerTranslation(registry)
   return translation
 end function
 
+// Render setup.
 function drawSetup(state, texture, transform, realtime, registry)
   virtualCenteredPicture(state, "gfx/p_multi.lmp", 4.0, transform, 255)
   virtualString(texture, 64.0, 40.0, "Hostname", transform, 255)
@@ -870,6 +926,7 @@ function drawSetup(state, texture, transform, realtime, registry)
   end if
 end function
 
+// Provide base episodes behavior for the active subsystem.
 function baseEpisodes()
   return [
     ["Welcome to Quake", 0, 1],
@@ -882,6 +939,7 @@ function baseEpisodes()
   ]
 end function
 
+// Provide base levels behavior for the active subsystem.
 function baseLevels()
   return [
     ["start", "Entrance"],
@@ -899,6 +957,7 @@ function baseLevels()
   ]
 end function
 
+// Provide hipnotic episodes behavior for the active subsystem.
 function hipnoticEpisodes()
   return [
     ["Scourge of Armagon", 0, 1],
@@ -910,6 +969,7 @@ function hipnoticEpisodes()
   ]
 end function
 
+// Provide hipnotic levels behavior for the active subsystem.
 function hipnoticLevels()
   return [
     ["start", "Command HQ"],
@@ -922,6 +982,7 @@ function hipnoticLevels()
   ]
 end function
 
+// Provide rogue episodes behavior for the active subsystem.
 function rogueEpisodes()
   return [
     ["Introduction", 0, 1],
@@ -931,6 +992,7 @@ function rogueEpisodes()
   ]
 end function
 
+// Provide rogue levels behavior for the active subsystem.
 function rogueLevels()
   return [
     ["start", "Split Decision"],
@@ -942,18 +1004,21 @@ function rogueLevels()
   ]
 end function
 
+// Provide episode table behavior for the active subsystem.
 function episodeTable(state)
   if state.missionPack == "hipnotic" then return hipnoticEpisodes() end if
   if state.missionPack == "rogue" then return rogueEpisodes() end if
   return baseEpisodes()
 end function
 
+// Provide level table behavior for the active subsystem.
 function levelTable(state)
   if state.missionPack == "hipnotic" then return hipnoticLevels() end if
   if state.missionPack == "rogue" then return rogueLevels() end if
   return baseLevels()
 end function
 
+// Provide selected level behavior for the active subsystem.
 function selectedLevel(state)
   episodes = episodeTable(state)
   levels = levelTable(state)
@@ -961,6 +1026,7 @@ function selectedLevel(state)
   return levels[episode[1] + state.startLevel]
 end function
 
+// Render network.
 function drawNetwork(state, texture, transform, realtime)
   virtualPicture(state, "gfx/qplaque.lmp", 16.0, 4.0, transform, 255)
   virtualCenteredPicture(state, "gfx/p_multi.lmp", 4.0, transform, 255)
@@ -978,6 +1044,7 @@ function drawNetwork(state, texture, transform, realtime)
   drawDot(state, realtime, 32.0 + state.selection * 20.0, transform)
 end function
 
+// Render lan config.
 function drawLanConfig(state, texture, transform, realtime)
   virtualPicture(state, "gfx/qplaque.lmp", 16.0, 4.0, transform, 255)
   title = findPicture(state, "gfx/p_multi.lmp")
@@ -1007,11 +1074,13 @@ function drawLanConfig(state, texture, transform, realtime)
   if state.returnReason != "" then virtualWhiteString(texture, baseX, 148.0, state.returnReason, transform, 255) end if
 end function
 
+// Provide game type text behavior for the active subsystem.
 function gameTypeText(registry)
   if menuCvar.variableValue(registry, "coop") != 0.0 then return "Cooperative" end if
   return "Deathmatch"
 end function
 
+// Provide teamplay text behavior for the active subsystem.
 function teamplayText(state, registry)
   value = menuNative.trunc(menuCvar.variableValue(registry, "teamplay"))
   if value == 1 then return "No Friendly Fire" end if
@@ -1025,6 +1094,7 @@ function teamplayText(state, registry)
   return "Off"
 end function
 
+// Render game options.
 function drawGameOptions(state, texture, transform, realtime, registry)
   virtualPicture(state, "gfx/qplaque.lmp", 16.0, 4.0, transform, 255)
   virtualCenteredPicture(state, "gfx/p_multi.lmp", 4.0, transform, 255)
@@ -1063,6 +1133,7 @@ function drawGameOptions(state, texture, transform, realtime, registry)
   M_DrawCharacter(texture, 144.0, cursorY, 12 + (menuNative.trunc(realtime * 4.0) & 1), transform)
 end function
 
+// Render search.
 function drawSearch(state, texture, transform)
   virtualCenteredPicture(state, "gfx/p_multi.lmp", 4.0, transform, 255)
   drawTextBox(state, 104.0, 32.0, 12, 1, transform)
@@ -1072,6 +1143,7 @@ function drawSearch(state, texture, transform)
   end if
 end function
 
+// Provide sort servers behavior for the active subsystem.
 function sortServers(state)
   if state.serverListSorted then return state.servers end if
   i = 0
@@ -1091,6 +1163,7 @@ function sortServers(state)
   return state.servers
 end function
 
+// Provide menu string less behavior for the active subsystem.
 function menuStringLess(left, right)
   leftBytes = bytes(left)
   rightBytes = bytes(right)
@@ -1107,6 +1180,7 @@ function menuStringLess(left, right)
   return len(leftBytes) < len(rightBytes)
 end function
 
+// Provide fixed server field behavior for the active subsystem.
 function fixedServerField(text, width)
   source = bytes(text)
   result = ""
@@ -1118,11 +1192,13 @@ function fixedServerField(text, width)
   return result
 end function
 
+// Provide width two behavior for the active subsystem.
 function widthTwo(number)
   if number < 10 then return " " + number end if
   return "" + number
 end function
 
+// Render server list.
 function drawServerList(state, texture, transform, realtime)
   sortServers(state)
   virtualCenteredPicture(state, "gfx/p_multi.lmp", 4.0, transform, 255)
@@ -1140,20 +1216,21 @@ function drawServerList(state, texture, transform, realtime)
   if state.returnReason != "" then virtualWhiteString(texture, 16.0, 148.0, state.returnReason, transform, 255) end if
 end function
 
+// Render video.
 function drawVideo(state, texture, transform, realtime)
   virtualCenteredPicture(state, "gfx/vidmodes.lmp", 4.0, transform, 255)
   modes = glvid.VID_MenuDraw()
   for each command in modes
     if command[0] == "renderer" then
-      rendererText = "RENDERER: < " + command[1] + " >"
-      if command[2] then virtualCenteredString(texture, 28.0, rendererText, transform, 255)
-      else virtualCenteredString(texture, 28.0, rendererText, transform, 180)
-      end if
+      rendererText = "RENDERER      < " + command[1] + " >"
+      rendererX = (320.0 - len(bytes(rendererText)) * 8.0) * 0.5
+      if command[2] then M_DrawCharacter(texture, rendererX - 12.0, 32.0, 12 + (menuNative.trunc(realtime * 4.0) & 1), transform) end if
+      virtualCenteredString(texture, 32.0, rendererText, transform, 255)
     else if command[0] == "display" then
-      displayText = "DISPLAY: < " + command[1] + " >"
-      if command[2] then virtualCenteredString(texture, 40.0, displayText, transform, 255)
-      else virtualCenteredString(texture, 40.0, displayText, transform, 180)
-      end if
+      displayText = "DISPLAY MODE  < " + command[1] + " >"
+      displayX = (320.0 - len(bytes(displayText)) * 8.0) * 0.5
+      if command[2] then M_DrawCharacter(texture, displayX - 12.0, 44.0, 12 + (menuNative.trunc(realtime * 4.0) & 1), transform) end if
+      virtualCenteredString(texture, 44.0, displayText, transform, 255)
     else if command[0] == "mode" then
       x = 8.0 + command[4] * 104.0
       y = 68.0 + command[5] * 8.0
@@ -1163,12 +1240,13 @@ function drawVideo(state, texture, transform, realtime)
       end if
     end if
   end for
-  virtualString(texture, 8.0, 56.0, "WIDTHxHEIGHTxBPP", transform, 220)
-  virtualCenteredString(texture, 148.0, "UP/DOWN SELECT", transform, 255)
-  virtualCenteredString(texture, 156.0, "LEFT/RIGHT OR ENTER CHANGES", transform, 255)
+  virtualString(texture, 8.0, 56.0, "RESOLUTION (WIDTHxHEIGHTxBPP)", transform, 220)
+  virtualCenteredString(texture, 148.0, "ARROWS SELECT", transform, 255)
+  virtualCenteredString(texture, 156.0, "ENTER APPLIES", transform, 255)
   virtualCenteredString(texture, 172.0, "ESC RETURNS TO OPTIONS", transform, 220)
 end function
 
+// Render help.
 function drawHelp(state, texture, transform)
   name = "gfx/help" + state.helpPage + ".lmp"
   if not virtualPicture(state, name, 0.0, 0.0, transform, 255) then
@@ -1177,6 +1255,7 @@ function drawHelp(state, texture, transform)
   end if
 end function
 
+// Render quit.
 function drawQuit(state, texture, transform)
   drawTextBox(state, 0.0, 0.0, 38, 23, transform)
   virtualWhiteString(texture, 16.0, 12.0, "  Quake version 1.09 by id Software", transform, 255)
@@ -1202,6 +1281,7 @@ function drawQuit(state, texture, transform)
   virtualWhiteString(texture, 16.0, 180.0, "reserved. Press y to exit", transform, 255)
 end function
 
+// Render page.
 function drawPage(state, texture, transform, realtime, registry, page)
   if page == PAGE_MAIN then
     M_Main_Draw(state, texture, transform, realtime)
@@ -1234,6 +1314,7 @@ function drawPage(state, texture, transform, realtime, registry, page)
   end if
 end function
 
+// Apply the Quake-compatible m draw behavior.
 function M_Draw(state, texture, width, height, mapName, realtime, registry)
   if state is void or not state.active or texture == 0 then return false end if
   state.drawTrace = [["fade"]]
@@ -1263,6 +1344,7 @@ function M_Draw(state, texture, width, height, mapName, realtime, registry)
   return true
 end function
 
+// Render the requested value.
 function render(state, texture, width, height, mapName, realtime, registry)
   return M_Draw(state, texture, width, height, mapName, realtime, registry)
 end function
@@ -1275,28 +1357,34 @@ function traceDraw(state, name)
   return name
 end function
 
+// Apply the Quake-compatible m draw character behavior.
 function M_DrawCharacter(texture, x, y, number, transform)
   if texture == 0 then return false end if
   menuDraw.character(texture, transform[0] + x * transform[2], transform[1] + y * transform[2], number, transform[2], 255)
   return true
 end function
 
+// Apply the Quake-compatible m print behavior.
 function M_Print(texture, x, y, text, transform)
   return virtualString(texture, x, y, text, transform, 255)
 end function
 
+// Apply the Quake-compatible m print white behavior.
 function M_PrintWhite(texture, x, y, text, transform)
   return virtualWhiteString(texture, x, y, text, transform, 255)
 end function
 
+// Apply the Quake-compatible m draw trans pic behavior.
 function M_DrawTransPic(state, name, x, y, transform)
   return virtualPicture(state, name, x, y, transform, 255)
 end function
 
+// Apply the Quake-compatible m draw pic behavior.
 function M_DrawPic(state, name, x, y, transform)
   return virtualPicture(state, name, x, y, transform, 255)
 end function
 
+// Apply the Quake-compatible m build translation table behavior.
 function M_BuildTranslationTable(top, bottom)
   translation = bytes(256)
   index = 0
@@ -1313,6 +1401,7 @@ function M_BuildTranslationTable(top, bottom)
   return translation
 end function
 
+// Apply the Quake-compatible m draw trans pic translate behavior.
 function M_DrawTransPicTranslate(state, name, x, y, transform, top, bottom)
   pictureValue = findPicture(state, name)
   if pictureValue is void then return false end if
@@ -1327,10 +1416,12 @@ function M_DrawTransPicTranslate(state, name, x, y, transform, top, bottom)
   return true
 end function
 
+// Apply the Quake-compatible m draw text box behavior.
 function M_DrawTextBox(state, x, y, width, lines, transform)
   return drawTextBox(state, x, y, width, lines, transform)
 end function
 
+// Apply the Quake-compatible m toggle menu f behavior.
 function M_ToggleMenu_f(state)
   state.enterSound = true
   if state.active then
@@ -1341,6 +1432,7 @@ function M_ToggleMenu_f(state)
   return M_Menu_Main_f(state)
 end function
 
+// Apply the Quake-compatible m menu main f behavior.
 function M_Menu_Main_f(state)
   openPage(state, PAGE_MAIN)
   state.active = true
@@ -1348,6 +1440,7 @@ function M_Menu_Main_f(state)
   return true
 end function
 
+// Apply the Quake-compatible m menu single player f behavior.
 function M_Menu_SinglePlayer_f(state)
   openPage(state, PAGE_SINGLEPLAYER)
   state.active = true
@@ -1355,6 +1448,7 @@ function M_Menu_SinglePlayer_f(state)
   return true
 end function
 
+// Apply the Quake-compatible m menu load f behavior.
 function M_Menu_Load_f(state)
   openPage(state, PAGE_LOAD)
   state.active = true
@@ -1362,6 +1456,7 @@ function M_Menu_Load_f(state)
   return true
 end function
 
+// Apply the Quake-compatible m menu save f behavior.
 function M_Menu_Save_f(state, serverActive, intermission, maxClients)
   if not serverActive or intermission != 0 or maxClients != 1 then return false end if
   openPage(state, PAGE_SAVE)
@@ -1370,6 +1465,7 @@ function M_Menu_Save_f(state, serverActive, intermission, maxClients)
   return true
 end function
 
+// Apply the Quake-compatible m menu multi player f behavior.
 function M_Menu_MultiPlayer_f(state)
   openPage(state, PAGE_MULTIPLAYER)
   state.active = true
@@ -1377,6 +1473,7 @@ function M_Menu_MultiPlayer_f(state)
   return true
 end function
 
+// Apply the Quake-compatible m menu setup f behavior.
 function M_Menu_Setup_f(state, registry)
   openPage(state, PAGE_SETUP)
   state.active = true
@@ -1391,6 +1488,7 @@ function M_Menu_Setup_f(state, registry)
   return true
 end function
 
+// Apply the Quake-compatible m menu net f behavior.
 function M_Menu_Net_f(state)
   openPage(state, PAGE_NET)
   state.active = true
@@ -1401,6 +1499,7 @@ function M_Menu_Net_f(state)
   return true
 end function
 
+// Apply the Quake-compatible m menu options f behavior.
 function M_Menu_Options_f(state)
   openPage(state, PAGE_OPTIONS)
   state.active = true
@@ -1408,6 +1507,7 @@ function M_Menu_Options_f(state)
   return true
 end function
 
+// Apply the Quake-compatible m menu keys f behavior.
 function M_Menu_Keys_f(state)
   openPage(state, PAGE_KEYS)
   state.active = true
@@ -1415,6 +1515,7 @@ function M_Menu_Keys_f(state)
   return true
 end function
 
+// Apply the Quake-compatible m menu video f behavior.
 function M_Menu_Video_f(state)
   openPage(state, PAGE_VIDEO)
   glvid.VID_MenuReset()
@@ -1423,6 +1524,7 @@ function M_Menu_Video_f(state)
   return true
 end function
 
+// Apply the Quake-compatible m menu help f behavior.
 function M_Menu_Help_f(state)
   openPage(state, PAGE_HELP)
   state.helpPage = 0
@@ -1431,6 +1533,7 @@ function M_Menu_Help_f(state)
   return true
 end function
 
+// Apply the Quake-compatible m menu quit f behavior.
 function M_Menu_Quit_f(state)
   if state.page == PAGE_QUIT then return false end if
   state.previousPage = state.page
@@ -1440,20 +1543,24 @@ function M_Menu_Quit_f(state)
   return true
 end function
 
+// Return excluded menu path derived from the active module state.
 function excludedMenuPath(state, name)
   state.action = ["excluded", name]
   state.statusText = name + " networking is excluded from the Windows x64 MiniQuake target"
   return false
 end function
 
+// Apply the Quake-compatible m menu serial config f behavior.
 function M_Menu_SerialConfig_f(state)
   return excludedMenuPath(state, "serial/modem")
 end function
 
+// Apply the Quake-compatible m menu modem config f behavior.
 function M_Menu_ModemConfig_f(state)
   return excludedMenuPath(state, "physical modem")
 end function
 
+// Apply the Quake-compatible m menu lan config f behavior.
 function M_Menu_LanConfig_f(state)
   hadSelection = false
   for each item in state.pageSelections
@@ -1472,6 +1579,7 @@ function M_Menu_LanConfig_f(state)
   return true
 end function
 
+// Apply the Quake-compatible m menu game options f behavior.
 function M_Menu_GameOptions_f(state, maximumClients, missionPack)
   openPage(state, PAGE_GAME_OPTIONS)
   state.active = true
@@ -1484,6 +1592,7 @@ function M_Menu_GameOptions_f(state, maximumClients, missionPack)
   return true
 end function
 
+// Apply the Quake-compatible m menu search f behavior.
 function M_Menu_Search_f(state, network, port, realtime)
   openPage(state, PAGE_SEARCH)
   state.active = true
@@ -1495,6 +1604,7 @@ function M_Menu_Search_f(state, network, port, realtime)
   return true
 end function
 
+// Apply the Quake-compatible m menu server list f behavior.
 function M_Menu_ServerList_f(state, servers)
   openPage(state, PAGE_SERVER_LIST)
   state.active = true
@@ -1510,89 +1620,106 @@ function M_Menu_ServerList_f(state, servers)
   return true
 end function
 
+// Apply the Quake-compatible m main draw behavior.
 function M_Main_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_Main_Draw")
   return drawMain(state, texture, transform, realtime)
 end function
 
+// Apply the Quake-compatible m single player draw behavior.
 function M_SinglePlayer_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_SinglePlayer_Draw")
   return drawSinglePlayer(state, texture, transform, realtime)
 end function
 
+// Apply the Quake-compatible m load draw behavior.
 function M_Load_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_Load_Draw")
   return drawSaveSlots(state, texture, transform, realtime, PAGE_LOAD)
 end function
 
+// Apply the Quake-compatible m save draw behavior.
 function M_Save_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_Save_Draw")
   return drawSaveSlots(state, texture, transform, realtime, PAGE_SAVE)
 end function
 
+// Apply the Quake-compatible m multi player draw behavior.
 function M_MultiPlayer_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_MultiPlayer_Draw")
   return drawMultiplayer(state, texture, transform, realtime)
 end function
 
+// Apply the Quake-compatible m setup draw behavior.
 function M_Setup_Draw(state, texture, transform, realtime, registry)
   traceDraw(state, "M_Setup_Draw")
   return drawSetup(state, texture, transform, realtime, registry)
 end function
 
+// Apply the Quake-compatible m net draw behavior.
 function M_Net_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_Net_Draw")
   return drawNetwork(state, texture, transform, realtime)
 end function
 
+// Apply the Quake-compatible m options draw behavior.
 function M_Options_Draw(state, texture, transform, realtime, registry)
   traceDraw(state, "M_Options_Draw")
   return drawOptions(state, texture, transform, realtime, registry)
 end function
 
+// Apply the Quake-compatible m keys draw behavior.
 function M_Keys_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_Keys_Draw")
   return drawKeys(state, texture, transform, realtime)
 end function
 
+// Apply the Quake-compatible m video draw behavior.
 function M_Video_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_Video_Draw")
   if state.videoDrawCallback is not void then state.action = state.videoDrawCallback() end if
   return drawVideo(state, texture, transform, realtime)
 end function
 
+// Apply the Quake-compatible m help draw behavior.
 function M_Help_Draw(state, texture, transform)
   traceDraw(state, "M_Help_Draw")
   return drawHelp(state, texture, transform)
 end function
 
+// Apply the Quake-compatible m quit draw behavior.
 function M_Quit_Draw(state, texture, transform)
   traceDraw(state, "M_Quit_Draw")
   return drawQuit(state, texture, transform)
 end function
 
+// Apply the Quake-compatible m serial config draw behavior.
 function M_SerialConfig_Draw(state, texture, transform)
   traceDraw(state, "M_SerialConfig_Draw:excluded")
   virtualCenteredString(texture, 96.0, "SERIAL/MODEM EXCLUDED", transform, 255)
   return false
 end function
 
+// Apply the Quake-compatible m modem config draw behavior.
 function M_ModemConfig_Draw(state, texture, transform)
   traceDraw(state, "M_ModemConfig_Draw:excluded")
   virtualCenteredString(texture, 96.0, "PHYSICAL MODEM EXCLUDED", transform, 255)
   return false
 end function
 
+// Apply the Quake-compatible m lan config draw behavior.
 function M_LanConfig_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_LanConfig_Draw")
   return drawLanConfig(state, texture, transform, realtime)
 end function
 
+// Apply the Quake-compatible m game options draw behavior.
 function M_GameOptions_Draw(state, texture, transform, realtime, registry)
   traceDraw(state, "M_GameOptions_Draw")
   return drawGameOptions(state, texture, transform, realtime, registry)
 end function
 
+// Apply the Quake-compatible m search draw behavior.
 function M_Search_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_Search_Draw")
   drawSearch(state, texture, transform)
@@ -1613,17 +1740,20 @@ function M_Search_Draw(state, texture, transform, realtime)
   return true
 end function
 
+// Apply the Quake-compatible m server list draw behavior.
 function M_ServerList_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_ServerList_Draw")
   return drawServerList(state, texture, transform, realtime)
 end function
 
+// Apply the Quake-compatible m scan saves behavior.
 function M_ScanSaves(state, labels, loadable)
   state.items = labels
   state.loadable = loadable
   return len(labels)
 end function
 
+// Apply the Quake-compatible m adjust sliders behavior.
 function M_AdjustSliders(state, registry, direction)
   selection = state.selection
   if selection == 3 then
@@ -1662,16 +1792,19 @@ function M_AdjustSliders(state, registry, direction)
   return true
 end function
 
+// Apply the Quake-compatible m draw slider behavior.
 function M_DrawSlider(texture, x, y, range, transform)
   drawSlider(texture, x, y, range, transform)
   return true
 end function
 
+// Apply the Quake-compatible m draw checkbox behavior.
 function M_DrawCheckbox(texture, x, y, enabled, transform)
   drawCheckbox(texture, x, y, enabled, transform)
   return true
 end function
 
+// Apply the Quake-compatible m find keys for command behavior.
 function M_FindKeysForCommand(command)
   result = [-1, -1]
   commandBytes = bytes(command)
@@ -1695,6 +1828,7 @@ function M_FindKeysForCommand(command)
   return result
 end function
 
+// Apply the Quake-compatible m unbind command behavior.
 function M_UnbindCommand(command)
   commandBytes = bytes(command)
   keynum = 0
@@ -1716,6 +1850,7 @@ function M_UnbindCommand(command)
   return true
 end function
 
+// Update module state for up append.
 function setupAppend(state, key)
   character = menuNative.asciiChar(key)
   if state.selection == 0 and len(bytes(state.setupHostname)) < 15 then state.setupHostname = state.setupHostname + character end if
@@ -1723,12 +1858,14 @@ function setupAppend(state, key)
   return true
 end function
 
+// Update module state for up backspace.
 function setupBackspace(state)
   if state.selection == 0 and len(bytes(state.setupHostname)) > 0 then state.setupHostname = decode(slice(bytes(state.setupHostname), 0, len(bytes(state.setupHostname)) - 1)) end if
   if state.selection == 1 and len(bytes(state.setupName)) > 0 then state.setupName = decode(slice(bytes(state.setupName), 0, len(bytes(state.setupName)) - 1)) end if
   return true
 end function
 
+// Apply the Quake-compatible m main key behavior.
 function M_Main_Key(state, key)
   if key == menuKeys.K_ESCAPE then state.active = false; return "close" end if
   if key == menuKeys.K_DOWNARROW then move(state, 1); return "move" end if
@@ -1737,6 +1874,7 @@ function M_Main_Key(state, key)
   return "none"
 end function
 
+// Apply the Quake-compatible m single player key behavior.
 function M_SinglePlayer_Key(state, key)
   if key == menuKeys.K_ESCAPE then M_Menu_Main_f(state); return "back" end if
   if key == menuKeys.K_DOWNARROW then move(state, 1); return "move" end if
@@ -1745,6 +1883,7 @@ function M_SinglePlayer_Key(state, key)
   return "none"
 end function
 
+// Apply the Quake-compatible m load key behavior.
 function M_Load_Key(state, key)
   if key == menuKeys.K_ESCAPE then M_Menu_SinglePlayer_f(state); return "back" end if
   if key == menuKeys.K_UPARROW or key == menuKeys.K_LEFTARROW then move(state, -1); return "move" end if
@@ -1753,6 +1892,7 @@ function M_Load_Key(state, key)
   return "none"
 end function
 
+// Apply the Quake-compatible m save key behavior.
 function M_Save_Key(state, key)
   if key == menuKeys.K_ESCAPE then M_Menu_SinglePlayer_f(state); return "back" end if
   if key == menuKeys.K_UPARROW or key == menuKeys.K_LEFTARROW then move(state, -1); return "move" end if
@@ -1761,6 +1901,7 @@ function M_Save_Key(state, key)
   return "none"
 end function
 
+// Apply the Quake-compatible m multi player key behavior.
 function M_MultiPlayer_Key(state, key)
   if key == menuKeys.K_ESCAPE then M_Menu_Main_f(state); return "back" end if
   if key == menuKeys.K_DOWNARROW then move(state, 1); return "move" end if
@@ -1774,6 +1915,7 @@ function M_MultiPlayer_Key(state, key)
   return "none"
 end function
 
+// Apply the Quake-compatible m setup key behavior.
 function M_Setup_Key(state, key)
   if key == menuKeys.K_ESCAPE then M_Menu_MultiPlayer_f(state); return "back" end if
   if key == menuKeys.K_UPARROW then move(state, -1); return "move" end if
@@ -1804,6 +1946,7 @@ function M_Setup_Key(state, key)
   return "none"
 end function
 
+// Apply the Quake-compatible m net key behavior.
 function M_Net_Key(state, key)
   if key == menuKeys.K_ESCAPE then M_Menu_MultiPlayer_f(state); return "back" end if
   if key == menuKeys.K_UPARROW or key == menuKeys.K_DOWNARROW then state.selection = 3; return "move" end if
@@ -1811,6 +1954,7 @@ function M_Net_Key(state, key)
   return "none"
 end function
 
+// Apply the Quake-compatible m options key behavior.
 function M_Options_Key(state, key, registry)
   if key == menuKeys.K_ESCAPE then M_Menu_Main_f(state); return "back" end if
   if key == menuKeys.K_UPARROW or key == menuKeys.K_DOWNARROW then
@@ -1831,6 +1975,7 @@ function M_Options_Key(state, key, registry)
   return "none"
 end function
 
+// Apply the Quake-compatible m keys key behavior.
 function M_Keys_Key(state, key)
   if state.waitingForKey then
     if key == menuKeys.K_ESCAPE then state.waitingForKey = false; return "bind_cancel" end if
@@ -1851,6 +1996,7 @@ function M_Keys_Key(state, key)
   return "none"
 end function
 
+// Apply the Quake-compatible m video key behavior.
 function M_Video_Key(state, key)
   if state.videoKeyCallback is not void then
     action = state.videoKeyCallback(key)
@@ -1866,6 +2012,7 @@ function M_Video_Key(state, key)
   return "none"
 end function
 
+// Apply the Quake-compatible m help key behavior.
 function M_Help_Key(state, key)
   if key == menuKeys.K_ESCAPE then M_Menu_Main_f(state); return "back" end if
   if key == menuKeys.K_UPARROW or key == menuKeys.K_RIGHTARROW then moveHelp(state, 1); state.enterSound = true; return "page" end if
@@ -1873,22 +2020,26 @@ function M_Help_Key(state, key)
   return "none"
 end function
 
+// Apply the Quake-compatible m quit key behavior.
 function M_Quit_Key(state, key)
   if key == menuKeys.K_ESCAPE or key == 110 or key == 78 then back(state); state.enterSound = true; return "cancel_quit" end if
   if key == 121 or key == 89 then return "quit" end if
   return "none"
 end function
 
+// Apply the Quake-compatible m serial config key behavior.
 function M_SerialConfig_Key(state, key)
   excludedMenuPath(state, "serial/modem")
   return "excluded"
 end function
 
+// Apply the Quake-compatible m modem config key behavior.
 function M_ModemConfig_Key(state, key)
   excludedMenuPath(state, "physical modem")
   return "excluded"
 end function
 
+// Convert lan port into its canonical representation.
 function normalizeLanPort(state)
   parsed = toNumber(state.lanPortText)
   if parsed is void and state.lanPortText == "" then parsed = 0 end if
@@ -1901,6 +2052,7 @@ function normalizeLanPort(state)
   return state.lanPort
 end function
 
+// Apply the Quake-compatible m lan config key behavior.
 function M_LanConfig_Key(state, key)
   if key == menuKeys.K_ESCAPE then M_Menu_Net_f(state); return "back" end if
   if key == menuKeys.K_UPARROW then
@@ -1931,7 +2083,9 @@ function M_LanConfig_Key(state, key)
   return "edit"
 end function
 
+// Apply the Quake-compatible m net start change behavior.
 function M_NetStart_Change(state, registry, direction)
+  // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   selection = state.selection
   if selection == 1 then
     state.maxPlayers = state.maxPlayers + direction
@@ -1981,6 +2135,7 @@ function M_NetStart_Change(state, registry, direction)
   return true
 end function
 
+// Apply the Quake-compatible m game options key behavior.
 function M_GameOptions_Key(state, key, registry)
   if key == menuKeys.K_ESCAPE then M_Menu_Net_f(state); return "back" end if
   if key == menuKeys.K_UPARROW then move(state, -1); return "move" end if
@@ -1995,10 +2150,12 @@ function M_GameOptions_Key(state, key, registry)
   return "none"
 end function
 
+// Apply the Quake-compatible m search key behavior.
 function M_Search_Key(state, key)
   return "none"
 end function
 
+// Apply the Quake-compatible m server list key behavior.
 function M_ServerList_Key(state, key)
   if key == menuKeys.K_ESCAPE then M_Menu_LanConfig_f(state); return "back" end if
   if key == menuKeys.K_SPACE then return "search" end if
@@ -2011,6 +2168,7 @@ function M_ServerList_Key(state, key)
   return "none"
 end function
 
+// Apply the Quake-compatible m keydown behavior.
 function M_Keydown(state, key, registry)
   if state.page == PAGE_MAIN then return M_Main_Key(state, key) end if
   if state.page == PAGE_SINGLEPLAYER then return M_SinglePlayer_Key(state, key) end if
@@ -2033,24 +2191,29 @@ function M_Keydown(state, key, registry)
   return "none"
 end function
 
+// Apply the Quake-compatible m configure net subsystem behavior.
 function M_ConfigureNetSubsystem(state)
   return state.lanPort
 end function
 
+// Apply the Quake-compatible m set video callbacks behavior.
 function M_SetVideoCallbacks(state, drawCallback, keyCallback)
   state.videoDrawCallback = drawCallback
   state.videoKeyCallback = keyCallback
   return true
 end function
 
+// Apply the Quake-compatible m command trace behavior.
 function M_CommandTrace(state)
   return state.drawTrace
 end function
 
+// Apply the Quake-compatible m excluded paths behavior.
 function M_ExcludedPaths(state)
   return state.excludedPaths
 end function
 
+// Apply the Quake-compatible m init behavior.
 function M_Init(state)
   state.excludedPaths = ["serial", "modem", "ipx"]
   return [

@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-065: keys.c/gl_vidnt.c key routing and synthetic release parity.
 */
-
 import miniquake.keys as bp065Keys
 import miniquake.input as bp065Input
 import miniquake.console as bp065Console
@@ -15,6 +15,7 @@ import miniquake.gl_vidnt as bp065Video
 bp065Index = 0
 bp065Failures = 0
 
+// Assert that the condition holds and identify a failing test.
 function bp065Check(value, name)
   global bp065Index, bp065Failures
   bp065Index = bp065Index + 1
@@ -27,6 +28,7 @@ function bp065Check(value, name)
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   bp065Input.unbindAll()
   bp065Keys.Key_Init()

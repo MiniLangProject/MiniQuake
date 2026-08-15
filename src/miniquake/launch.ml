@@ -1,14 +1,23 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.launch.
+*/
 package miniquake.launch
 
 import miniquake.types as t
 import miniquake.byteio as bio
 
+// Return first byte for the active module state.
 function firstByte(text)
   data = bytes(text)
   if len(data) == 0 then return -1 end if
   return data[0]
 end function
 
+// Provide substring behavior for the active subsystem.
 function substring(text, offset, count)
   data = bytes(text)
   if offset < 0 then offset = 0 end if
@@ -18,6 +27,7 @@ function substring(text, offset, count)
   return decode(slice(data, offset, count))
 end function
 
+// Convert map name into its canonical representation.
 function stripMapName(name)
   value = name
   lower = bio.lower(value)
@@ -33,6 +43,7 @@ function stripMapName(name)
   return value
 end function
 
+// Provide integer option behavior for the active subsystem.
 function integerOption(text, fallback, minimum, maximum)
   value = toNumber(text)
   if value is void or value is not int then return fallback end if
@@ -41,12 +52,14 @@ function integerOption(text, fallback, minimum, maximum)
   return value
 end function
 
+// Return command name derived from the active module state.
 function commandName(text)
   data = bytes(text)
   if len(data) <= 1 then return "" end if
   return bio.lower(decode(slice(data, 1, len(data) - 1)))
 end function
 
+// Add state for append plus command.
 function appendPlusCommand(commands, args, startIndex)
   text = commandName(args[startIndex])
   index = startIndex + 1
@@ -59,6 +72,7 @@ function appendPlusCommand(commands, args, startIndex)
   return [commands + [text], index]
 end function
 
+// Provide words behavior for the active subsystem.
 function words(text)
   source = bytes(text)
   result = []
@@ -94,6 +108,7 @@ function words(text)
   return result
 end function
 
+// Read and validate the requested value.
 function parse(args)
   basedir = "."
   gameDirectory = "id1"
@@ -113,17 +128,25 @@ function parse(args)
   explicitGame = false
   rogue = false
   hipnotic = false
+  attractStart = false
 
   index = 0
   while index < len(args)
     argument = args[index]
     lower = bio.lower(argument)
 
-    if lower == "--play" and index + 2 < len(args) then
+    if lower == "--play" and index + 1 < len(args) then
       basedir = args[index + 1]
-      startMap = stripMapName(args[index + 2])
-      plusCommands = plusCommands + ["map \"" + startMap + "\""]
-      index = index + 3
+      attractStart = true
+      index = index + 2
+      // The map is intentionally optional. With only a basedir, quake.rc and
+      // startdemos retain ownership of startup just as in the original game.
+      if index < len(args) and firstByte(args[index]) != 45 and firstByte(args[index]) != 43 then
+        startMap = stripMapName(args[index])
+        plusCommands = plusCommands + ["map \"" + startMap + "\""]
+        attractStart = false
+        index = index + 1
+      end if
       continue
     else if lower == "--validate-game" and index + 1 < len(args) then
       basedir = args[index + 1]
@@ -189,6 +212,7 @@ function parse(args)
       latestWords = words(latest)
       if len(latestWords) >= 2 and bio.lower(latestWords[0]) == "map" then
         startMap = stripMapName(latestWords[1])
+        attractStart = false
       end if
       continue
     end if
@@ -201,7 +225,7 @@ function parse(args)
     if rogue then gameDirectory = "rogue" end if
     if hipnotic then gameDirectory = "hipnotic" end if
   end if
-  if startMap == "" then startMap = "start" end if
+  if startMap == "" and not attractStart then startMap = "start" end if
   return t.LaunchOptions(
     args,
     basedir,
@@ -222,6 +246,7 @@ function parse(args)
   )
 end function
 
+// Initialize state for startup text.
 function startupText(options)
   result = ""
   for each command in options.plusCommands
@@ -230,6 +255,7 @@ function startupText(options)
   return result
 end function
 
+// Report whether parm.
 function hasParm(options, name)
   wanted = bio.lower(name)
   for each value in options.originalArgs

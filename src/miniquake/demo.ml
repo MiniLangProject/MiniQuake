@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang implementation of miniquake.demo.
+*/
 package miniquake.demo
 
 import miniquake.types as t
@@ -7,12 +14,14 @@ import miniquake.array_util as arrays
 import miniquake.native as native
 import std.fs as fs
 
+// Report whether suffix insensitive.
 function hasSuffixInsensitive(text, suffix)
   if len(bytes(text)) < len(bytes(suffix)) then return false end if
   start = len(bytes(text)) - len(bytes(suffix))
   return bio.lower(decode(slice(bytes(text), start, len(bytes(suffix))))) == bio.lower(suffix)
 end function
 
+// Provide filename behavior for the active subsystem.
 function filename(name)
   if name == "" then return error(3720, "empty demo name") end if
   data = bytes(name)
@@ -49,10 +58,12 @@ function recordTrackNumber(text)
   return value * sign
 end function
 
+// Report whether is keepalive payload.
 function isKeepalivePayload(payload)
   return payload is bytes and len(payload) == 1 and payload[0] == c.SVC_NOP
 end function
 
+// Read and validate track.
 function parseTrack(data)
   i = 0
   while i < len(data) and data[i] != 10
@@ -74,6 +85,7 @@ function parseTrack(data)
   return [value, i + 1, decode(slice(data, 0, i + 1))]
 end function
 
+// Read and validate the requested value.
 function parse(data)
   track = parseTrack(data)
   forcedTrack = track[0]
@@ -111,10 +123,12 @@ function parse(data)
   return t.Demo(forcedTrack, messages, trackHeader)
 end function
 
+// Read and validate the requested value.
 function load(filename)
   return parse(fs.readAllBytes(filename))
 end function
 
+// Encode and write the requested data.
 function serialize(recording)
   headerText = recording.trackHeader
   if headerText is void or headerText == "" then headerText = "" + recording.forcedTrack + "\n" end if
@@ -137,10 +151,12 @@ function serialize(recording)
   return output
 end function
 
+// Encode and write the requested data.
 function save(filename, recording)
   return fs.writeAllBytes(filename, serialize(recording))
 end function
 
+// Apply the Quake-compatible cl write demo message behavior.
 function CL_WriteDemoMessage(recording, payload, viewAngles)
   if recording is void then return error(2010, "CL_WriteDemoMessage: not recording") end if
   if len(payload) > c.MAX_MSGLEN then return error(2011, "Demo message > MAX_MSGLEN") end if
@@ -154,6 +170,7 @@ function CL_WriteDemoMessage(recording, payload, viewAngles)
   return len(recording.messages)
 end function
 
+// Apply the Quake-compatible cl stop f behavior.
 function CL_Stop_f(recording, viewAngles)
   if recording is void then return error(2012, "Not recording a demo.") end if
   disconnect = bytes(1)
@@ -163,6 +180,7 @@ function CL_Stop_f(recording, viewAngles)
   return recording
 end function
 
+// Apply the Quake-compatible cl record f behavior.
 function CL_Record_f(arguments, connected)
   if len(arguments) != 2 and len(arguments) != 3 and len(arguments) != 4 then
     return error(2013, "record <demoname> [<map> [cd track]]")
@@ -179,6 +197,7 @@ function CL_Record_f(arguments, connected)
   return [name, t.Demo(track, [], "" + track + "\n"), mapName]
 end function
 
+// Apply the Quake-compatible cl play demo f behavior.
 function CL_PlayDemo_f(data)
   return parse(data)
 end function

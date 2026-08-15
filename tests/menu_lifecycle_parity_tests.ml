@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-068: menu.c toggle, options and save-entry lifecycle parity.
 */
-
 import miniquake.menu as bp068Menu
 import miniquake.cvar as bp068Cvar
 import miniquake.keys as bp068Keys
@@ -14,6 +14,7 @@ bp068Index = 0
 bp068Failures = 0
 const BP068_FIXTURES = 24
 
+// Assert that the condition holds and identify a failing test.
 function bp068Check(value, name)
   global bp068Index, bp068Failures
   bp068Index = bp068Index + 1
@@ -26,6 +27,7 @@ function bp068Check(value, name)
   return true
 end function
 
+// Exercise the registry test scenario and verify its expected result.
 function bp068Registry()
   registry = bp068Cvar.createRegistry()
   registry.variables = [
@@ -47,6 +49,7 @@ function bp068Registry()
   return registry
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   state = bp068Menu.create()
   registry = bp068Registry()

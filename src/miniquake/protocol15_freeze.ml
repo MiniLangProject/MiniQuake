@@ -1,13 +1,13 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Protocol-15 closure metadata.  BP-019 freezes the observable WinQuake 1.09
 wire contract after the source-guided BP-010..BP-018 audit.  This module does
 not replace the production writers/parsers; it gives tests and diagnostics one
 canonical catalog and fingerprint for the constants that define the protocol.
 */
-
 package miniquake.protocol15_freeze
 
 import miniquake.constants as c
@@ -22,6 +22,7 @@ const SOUND_MASK = 0x0007
 const TEMP_ENTITY_COUNT = 14
 const FINGERPRINT = 0x0cf1e12a
 
+// Report whether valid svc commands.
 function validSvcCommands()
   return [
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
@@ -31,10 +32,12 @@ function validSvcCommands()
   ]
 end function
 
+// Report whether valid clc commands.
 function inline validClcCommands()
   return [1, 2, 3, 4]
 end function
 
+// Return fast update bits derived from the active module state.
 function fastUpdateBits()
   return [
     c.U_MOREBITS, c.U_ORIGIN1, c.U_ORIGIN2, c.U_ORIGIN3,
@@ -44,6 +47,7 @@ function fastUpdateBits()
   ]
 end function
 
+// Return client data bits derived from the active module state.
 function clientDataBits()
   return [
     c.SU_VIEWHEIGHT, c.SU_IDEALPITCH,
@@ -54,10 +58,12 @@ function clientDataBits()
   ]
 end function
 
+// Return sound bits derived from the active module state.
 function soundBits()
   return [c.SND_VOLUME, c.SND_ATTENUATION, c.SND_LOOPING]
 end function
 
+// Provide temporary entity types behavior for the active subsystem.
 function temporaryEntityTypes()
   return [
     c.TE_SPIKE, c.TE_SUPERSPIKE, c.TE_GUNSHOT, c.TE_EXPLOSION,
@@ -67,6 +73,7 @@ function temporaryEntityTypes()
   ]
 end function
 
+// Provide contains behavior for the active subsystem.
 function contains(values, wanted)
   for each value in values
     if value == wanted then return true end if
@@ -74,18 +81,22 @@ function contains(values, wanted)
   return false
 end function
 
+// Report whether is valid svc.
 function isValidSvc(command)
   return contains(validSvcCommands(), command)
 end function
 
+// Report whether is reserved svc.
 function isReservedSvc(command)
   return command == c.SVC_BAD or command == c.SVC_SPAWNBINARY
 end function
 
+// Report whether is valid clc.
 function isValidClc(command)
   return contains(validClcCommands(), command)
 end function
 
+// Provide combine mask behavior for the active subsystem.
 function combineMask(values)
   result = 0
   for each value in values
@@ -94,10 +105,12 @@ function combineMask(values)
   return result
 end function
 
+// Return fingerprint value derived from the active module state.
 function inline fingerprintValue(current, value)
   return ((current ^ (value & 0xffffffff)) * 16777619) & 0xffffffff
 end function
 
+// Return fingerprint values derived from the active module state.
 function fingerprintValues(current, values)
   result = current
   for each value in values
@@ -106,6 +119,7 @@ function fingerprintValues(current, values)
   return result
 end function
 
+// Provide protocol fingerprint behavior for the active subsystem.
 function protocolFingerprint()
   result = 2166136261
   result = fingerprintValue(result, c.PROTOCOL_VERSION)
@@ -124,6 +138,7 @@ function protocolFingerprint()
   return result
 end function
 
+// Return coverage summary derived from the active module state.
 function coverageSummary()
   return [
     c.PROTOCOL_VERSION,

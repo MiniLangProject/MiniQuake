@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Focused world.c/world.h AreaNode, linking, trigger and collision fixtures.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.world as worldPort
@@ -19,16 +19,19 @@ struct TestMap
   leafs
 end struct
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9900, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9901, name + ": expected true") end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function assertNear(actual, expected, name)
   difference = actual - expected
   if difference < 0.0 then difference = -difference end if
@@ -36,12 +39,14 @@ function assertNear(actual, expected, name)
   return true
 end function
 
+// Exercise assert vec as part of this deterministic regression fixture.
 function assertVec(value, x, y, z, name)
   assertNear(value.x, x, name + ".x")
   assertNear(value.y, y, name + ".y")
   assertNear(value.z, z, name + ".z")
 end function
 
+// Create and initialize map.
 function makeMap()
   plane = t.BspPlane(t.Vec3(1.0, 0.0, 0.0), 0.0, 0)
   node = t.BspNode(0, -2, -1, t.Vec3(-100.0, -100.0, -100.0), t.Vec3(100.0, 100.0, 100.0), 0, 0)
@@ -74,6 +79,7 @@ function makeMap()
   return TestMap([worldModel, brushModel], [node, brushNode], clipNodes, [plane], [solidLeaf, emptyLeaf])
 end function
 
+// Create and initialize entity.
 function makeEntity(number, origin, mins, maxs, solid)
   item = edict.create(number)
   item.origin = origin
@@ -83,6 +89,7 @@ function makeEntity(number, origin, mins, maxs, solid)
   return item
 end function
 
+// Create and initialize fixture.
 function makeFixture()
   map = makeMap()
   game = server.create(1)
@@ -112,6 +119,7 @@ function makeFixture()
   return [game, map, state]
 end function
 
+// Verify box hull and contents against the expected Quake behavior.
 function testBoxHullAndContents()
   hull = worldPort.SV_InitBoxHull()
   assertEqual(worldPort.SV_HullPointContents(hull, 0, t.Vec3(0.0, 0.0, 0.0)), c.CONTENTS_EMPTY, "init zero box boundary")
@@ -130,6 +138,7 @@ function testBoxHullAndContents()
   return true
 end function
 
+// Verify area tree links and pvs against the expected Quake behavior.
 function testAreaTreeLinksAndPvs()
   fixture = makeFixture()
   game = fixture[0]
@@ -162,6 +171,7 @@ function testAreaTreeLinksAndPvs()
   return true
 end function
 
+// Verify entity hull and rotation against the expected Quake behavior.
 function testEntityHullAndRotation()
   fixture = makeFixture()
   game = fixture[0]
@@ -182,11 +192,13 @@ function testEntityHullAndRotation()
   return true
 end function
 
+// Exercise world absolute as part of this deterministic regression fixture.
 function worldAbsolute(value)
   if value < 0.0 then return -value end if
   return value
 end function
 
+// Exercise link move fixture as part of this deterministic regression fixture.
 function linkMoveFixture(state, game)
   worldPort.SV_LinkEdict(state, 1, false)
   worldPort.SV_LinkEdict(state, 3, false)
@@ -195,6 +207,7 @@ function linkMoveFixture(state, game)
   worldPort.SV_LinkEdict(state, 6, false)
 end function
 
+// Verify move and filters against the expected Quake behavior.
 function testMoveAndFilters()
   fixture = makeFixture()
   game = fixture[0]
@@ -225,6 +238,7 @@ function testMoveAndFilters()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "[1/4] box hull/point contents"
   result = try(testBoxHullAndContents())

@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/gl_mesh_differential_fixture.ml.
+*/
 import miniquake.types as t
 import miniquake.render.alias_mesh as mesh
 
@@ -9,6 +15,7 @@ struct MeshFixture
   skinHeight
 end struct
 
+// Exercise texture coordinates as part of this deterministic regression fixture.
 function textureCoordinates(count)
   result = []
   index = 0
@@ -19,6 +26,7 @@ function textureCoordinates(count)
   return result
 end function
 
+// Convert model into its canonical representation.
 function stripModel(filename)
   triangles = [
     t.MdlTriangle(0, 0, 1, 2),
@@ -29,6 +37,7 @@ function stripModel(filename)
   return MeshFixture(filename, triangles, textureCoordinates(6), 64, 32)
 end function
 
+// Exercise fan model as part of this deterministic regression fixture.
 function fanModel(filename)
   triangles = [
     t.MdlTriangle(0, 0, 1, 2),
@@ -38,6 +47,7 @@ function fanModel(filename)
   return MeshFixture(filename, triangles, textureCoordinates(6), 64, 32)
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   mesh.configureAliasModel(stripModel("strip"))
   stripCount = mesh.StripLength(0, 0)

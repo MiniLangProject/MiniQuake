@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+Quake-compatible MiniLang implementation of miniquake.net_datagram.
+*/
 package miniquake.net_datagram
 
 import miniquake.types as t
@@ -21,6 +28,7 @@ receivedDuplicateCount = 0
 shortPacketCount = 0
 droppedDatagrams = 0
 
+// Update module state for stats.
 function resetStats()
   global packetsSent, packetsReSent, packetsReceived
   global receivedDuplicateCount, shortPacketCount, droppedDatagrams
@@ -33,14 +41,17 @@ function resetStats()
   return true
 end function
 
+// Return next sequence for the active module state.
 function inline nextSequence(sequence)
   return (sequence + 1) & 0xffffffff
 end function
 
+// Provide previous sequence behavior for the active subsystem.
 function inline previousSequence(sequence)
   return (sequence - 1) & 0xffffffff
 end function
 
+// Encode and write big u32.
 function putBigU32(data, offset, value)
   data[offset] = (value >> 24) & 255
   data[offset + 1] = (value >> 16) & 255
@@ -49,15 +60,18 @@ function putBigU32(data, offset, value)
   return offset + 4
 end function
 
+// Provide big u32 behavior for the active subsystem.
 function bigU32(data, offset)
   if offset < 0 or offset + 4 > len(data) then return error(3400, "Datagram header is truncated") end if
   return ((data[offset] & 255) << 24) | ((data[offset + 1] & 255) << 16) | ((data[offset + 2] & 255) << 8) | (data[offset + 3] & 255)
 end function
 
+// Create and initialize channel.
 function createChannel()
   return t.DatagramChannel(0, 0, 0, 0, 0, 0, bytes(), bytes(), true, false, 0.0, 0)
 end function
 
+// Add state for append bytes.
 function appendBytes(a, b)
   output = bytes(len(a) + len(b))
   bio.copyInto(output, 0, a, 0, len(a))
@@ -65,12 +79,14 @@ function appendBytes(a, b)
   return output
 end function
 
+// Release state for drop prefix.
 function dropPrefix(data, count)
   if count >= len(data) then return bytes() end if
   if count <= 0 then return data end if
   return slice(data, count, len(data) - count)
 end function
 
+// Encode and write the requested data.
 function encode(flags, sequence, payload)
   if payload is not bytes then return error(3401, "Datagram payload must be bytes") end if
   control = (flags & NETFLAG_CTL) != 0
@@ -85,6 +101,7 @@ function encode(flags, sequence, payload)
   return output
 end function
 
+// Read and validate packet.
 function decodePacket(data)
   if data is not bytes or len(data) < 4 then return error(3403, "Datagram packet is shorter than its header") end if
   lengthAndFlags = bigU32(data, 0)
@@ -103,6 +120,7 @@ function decodePacket(data)
   return t.DatagramPacket(flags, sequence, slice(data, headerSize, len(data) - headerSize))
 end function
 
+// Provide reliable behavior for the active subsystem.
 function reliable(channel, payload, endOfMessage)
   global packetsSent
   flags = NETFLAG_DATA
@@ -113,6 +131,7 @@ function reliable(channel, payload, endOfMessage)
   return packet
 end function
 
+// Provide unreliable behavior for the active subsystem.
 function unreliable(channel, payload)
   global packetsSent
   packet = encode(NETFLAG_UNRELIABLE, channel.unreliableSendSequence, payload)
@@ -121,18 +140,22 @@ function unreliable(channel, payload)
   return packet
 end function
 
+// Provide acknowledgement behavior for the active subsystem.
 function acknowledgement(sequence)
   return encode(NETFLAG_ACK, sequence, bytes())
 end function
 
+// Provide negative acknowledgement behavior for the active subsystem.
 function negativeAcknowledgement(sequence)
   return encode(NETFLAG_NAK, sequence, bytes())
 end function
 
+// Provide control behavior for the active subsystem.
 function control(payload)
   return encode(NETFLAG_CTL, 0, payload)
 end function
 
+// Provide accept reliable behavior for the active subsystem.
 function acceptReliable(channel, packet)
   if (packet.flags & NETFLAG_DATA) == 0 then return false end if
   if packet.sequence != channel.receiveSequence then return false end if
@@ -140,6 +163,7 @@ function acceptReliable(channel, packet)
   return true
 end function
 
+// Provide accept unreliable behavior for the active subsystem.
 function acceptUnreliable(channel, packet)
   if (packet.flags & NETFLAG_UNRELIABLE) == 0 then return false end if
   if packet.sequence < channel.unreliableReceiveSequence then return false end if
@@ -150,6 +174,7 @@ function acceptUnreliable(channel, packet)
   return true
 end function
 
+// Return next reliable packet for the active module state.
 function nextReliablePacket(channel, now)
   global packetsSent
   if len(channel.sendMessage) == 0 then
@@ -169,6 +194,7 @@ function nextReliablePacket(channel, now)
   return packet
 end function
 
+// Initialize state for begin reliable.
 function beginReliable(channel, payload, now)
   if payload is not bytes then return error(3410, "reliable message must be bytes") end if
   if len(payload) == 0 then return error(3411, "reliable message is empty") end if
@@ -179,6 +205,7 @@ function beginReliable(channel, payload, now)
   return nextReliablePacket(channel, now)
 end function
 
+// Provide resend reliable behavior for the active subsystem.
 function resendReliable(channel, now)
   global packetsReSent
   if channel.canSend or len(channel.sendMessage) == 0 then return void end if
@@ -193,6 +220,7 @@ function resendReliable(channel, now)
   return encode(flags, previousSequence(channel.sendSequence), slice(channel.sendMessage, 0, dataLength))
 end function
 
+// Provide poll retransmit behavior for the active subsystem.
 function pollRetransmit(channel, now)
   if channel.canSend then return void end if
   if now - channel.lastSendTime <= 1.0 then return void end if
@@ -277,19 +305,23 @@ function Datagram_SendMessage(channel, payload, now)
   return beginReliable(channel, payload, now)
 end function
 
+// Send message next through the active connection.
 function SendMessageNext(channel, now)
   return nextReliablePacket(channel, now)
 end function
 
+// Provide re send message behavior for the active subsystem.
 function ReSendMessage(channel, now)
   return resendReliable(channel, now)
 end function
 
+// Mirror Quake's Datagram_FlushSendNext routine and its observable state changes.
 function Datagram_FlushSendNext(channel, now)
   if not channel.sendNext then return void end if
   return nextReliablePacket(channel, now)
 end function
 
+// Mirror Quake's Datagram_CanSendMessage routine and its observable state changes.
 function Datagram_CanSendMessage(channel)
   // The C driver flushes sendNext here because it owns the socket.  The pure
   // MiniLang channel cannot perform I/O; net_loop.pumpRemote performs the same
@@ -297,23 +329,28 @@ function Datagram_CanSendMessage(channel)
   return channel.canSend
 end function
 
+// Mirror Quake's Datagram_CanSendUnreliableMessage routine and its observable state changes.
 function Datagram_CanSendUnreliableMessage(channel)
   return true
 end function
 
+// Mirror Quake's Datagram_SendUnreliableMessage routine and its observable state changes.
 function Datagram_SendUnreliableMessage(channel, payload)
   if payload is not bytes or len(payload) == 0 or len(payload) > MAX_DATAGRAM then return error(3415, "unreliable datagram must contain 1..MAX_DATAGRAM bytes") end if
   return unreliable(channel, payload)
 end function
 
+// Mirror Quake's Datagram_GetMessage routine and its observable state changes.
 function Datagram_GetMessage(channel, packet, now)
   return processPacket(channel, packet, now)
 end function
 
+// Format and emit stats.
 function PrintStats(channel)
   return "canSend = " + channel.canSend + " sendSeq = " + channel.sendSequence + " recvSeq = " + channel.receiveSequence
 end function
 
+// Mirror Quake's NET_Stats_f routine and its observable state changes.
 function NET_Stats_f(channels, messagesSent, messagesReceived, unreliableSent, unreliableReceived)
   text = ""
   if channels is not void then

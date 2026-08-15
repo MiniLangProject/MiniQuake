@@ -1,3 +1,10 @@
+/*
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang implementation of miniquake.array_util.
+*/
 package miniquake.array_util
 
 /*
@@ -15,6 +22,7 @@ struct ArrayBuilder
   count
 end struct
 
+// Create an array prefilled with one value.
 function makeFilledArray(count, value)
   if count < 0 then return error(1180, "negative array size") end if
   // MiniLang now exposes exact-sized native array allocation.  Avoid the
@@ -22,10 +30,12 @@ function makeFilledArray(count, value)
   return array(count, value)
 end function
 
+// Create an exact-sized array initialized with void slots.
 function makeEmptyArray(count)
   return makeFilledArray(count, void)
 end function
 
+// Copy every source element into a new linear array.
 function copyArrayLinear(source)
   sourceCount = len(source)
   result = makeEmptyArray(sourceCount)
@@ -37,6 +47,7 @@ function copyArrayLinear(source)
   return result
 end function
 
+// Copy the requested source prefix into a new array.
 function copyArrayPrefix(source, count)
   if count < 0 or count > len(source) then return error(1181, "array prefix outside source") end if
   result = makeEmptyArray(count)
@@ -48,6 +59,7 @@ function copyArrayPrefix(source, count)
   return result
 end function
 
+// Ensure sufficient storage or state for array to.
 function growArrayTo(source, requiredCount, fillValue)
   if requiredCount < 0 then return error(1182, "negative required array size") end if
   if len(source) >= requiredCount then return source end if
@@ -68,12 +80,14 @@ function growArrayTo(source, requiredCount, fillValue)
   return result
 end function
 
+// Create and initialize array builder.
 function createArrayBuilder(initialCapacity)
   capacity = initialCapacity
   if capacity < 1 then capacity = 1 end if
   return ArrayBuilder(makeEmptyArray(capacity), 0)
 end function
 
+// Add state for push array builder.
 function pushArrayBuilder(builder, value)
   if builder.count >= len(builder.values) then
     builder.values = builder.values + builder.values
@@ -83,6 +97,7 @@ function pushArrayBuilder(builder, value)
   return builder.count
 end function
 
+// Finalize state for finish array builder.
 function finishArrayBuilder(builder)
   return copyArrayPrefix(builder.values, builder.count)
 end function

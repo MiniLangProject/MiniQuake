@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/host_differential_fixture.ml.
+*/
 import miniquake.host as host
 import miniquake.common as common
 import miniquake.constants as c
@@ -6,15 +12,18 @@ import miniquake.keys as keys
 import miniquake.sizebuf as sz
 import miniquake.native as native
 
+// Exercise bool text as part of this deterministic regression fixture.
 function boolText(value)
   if value then return "true" end if
   return "false"
 end function
 
+// Create and initialize session.
 function newSession(extra)
   return host.create(["-headless", "-nosound", "-nolan"] + extra)
 end function
 
+// Trace contains through the collision world.
 function traceContains(trace, value)
   for each item in trace
     if item == value then return true end if
@@ -22,6 +31,7 @@ function traceContains(trace, value)
   return false
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   endSession = newSession([])
   endResult = try(host.Host_EndGame(endSession, "done"))

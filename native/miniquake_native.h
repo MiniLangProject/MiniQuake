@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026 Nils Kopal
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Shared fixed-width types and exports for the MiniLang/Win64 bridge ABI.
+ */
 #ifndef MINIQUAKE_NATIVE_H
 #define MINIQUAKE_NATIVE_H
 

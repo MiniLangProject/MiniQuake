@@ -1,11 +1,12 @@
 /*
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Machine-readable identity for black-port delivery packages.  This module is
 intentionally tiny so binaries, logs and user test reports can always be tied
 back to an exact source baseline.
 */
-
 package miniquake.build_info
 
 const PACKAGE_ID = "BP-094"

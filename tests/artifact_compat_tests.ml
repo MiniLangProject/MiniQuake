@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/artifact_compat_tests.ml.
+*/
 import miniquake.artifact_compat as artifacts
 import miniquake.demo as demo
 import miniquake.demo_player as player
@@ -10,6 +16,7 @@ import miniquake.native as native
 passed = 0
 failed = 0
 
+// Assert that the condition holds and identify a failing test.
 function bp087Check(condition, label)
   global passed, failed
   if condition then passed = passed + 1; return true end if
@@ -18,10 +25,12 @@ function bp087Check(condition, label)
   return false
 end function
 
+// Assert exact equality and report both values on failure.
 function bp087Equal(actual, expected, label)
   return bp087Check(actual == expected, label + ": expected " + expected + ", got " + actual)
 end function
 
+// Build deterministic test data for demo.
 function bp087SyntheticDemo()
   payload = bytes(1)
   payload[0] = c.SVC_NOP
@@ -29,12 +38,14 @@ function bp087SyntheticDemo()
   return t.Demo(-1, [message], "-1\n")
 end function
 
+// Save fixture in its persistent format.
 function bp087SaveFixture(value)
   globalState = t.Entity([t.EntityPair("serverflags", "3")])
   world = t.Entity([t.EntityPair("classname", "worldspawn"), t.EntityPair("message", value)])
   return t.SaveGame(5, "comment", [1.0], 1, "start", 2.0, ["m"], globalState, [world])
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   global passed, failed
   print "[1/24] status"

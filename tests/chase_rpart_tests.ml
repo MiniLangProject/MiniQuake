@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Focused chase.c and r_part.c behavioral fixtures.
 */
-
 import miniquake.types as t
 import miniquake.chase as chase
 import miniquake.cvar as cvar
@@ -13,16 +13,19 @@ import miniquake.render.particles as particleRender
 import miniquake.sizebuf as sz
 import miniquake.message as msg
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9800, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9801, name + ": expected true") end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function assertNear(actual, expected, name)
   difference = actual - expected
   if difference < 0.0 then difference = -difference end if
@@ -30,16 +33,19 @@ function assertNear(actual, expected, name)
   return true
 end function
 
+// Exercise assert vec as part of this deterministic regression fixture.
 function assertVec(value, x, y, z, name)
   assertNear(value.x, x, name + ".x")
   assertNear(value.y, y, name + ".y")
   assertNear(value.z, z, name + ".z")
 end function
 
+// Return first generated for the active module state.
 function inline firstGenerated(system)
   return system.active[len(system.active) - 1]
 end function
 
+// Verify chase against the expected Quake behavior.
 function testChase()
   registry = cvar.createRegistry()
   state = chase.Chase_Init(registry)
@@ -61,6 +67,7 @@ function testChase()
   return true
 end function
 
+// Verify init pool and random against the expected Quake behavior.
 function testInitPoolAndRandom()
   minimum = particles.R_InitParticles(["-particles", "12"])
   assertEqual(minimum.capacity, particles.ABSOLUTE_MIN_PARTICLES, "absolute minimum particles")
@@ -82,6 +89,7 @@ function testInitPoolAndRandom()
   return true
 end function
 
+// Verify effects and random order against the expected Quake behavior.
 function testEffectsAndRandomOrder()
   system = particles.createSystem(2048)
   particles.R_SetRandomSeed(system, 1)
@@ -136,6 +144,7 @@ function testEffectsAndRandomOrder()
   return true
 end function
 
+// Verify splash entity and point file against the expected Quake behavior.
 function testSplashEntityAndPointFile()
   lava = particles.createSystem(2048)
   particles.R_LavaSplash(lava, t.Vec3(10.0, 20.0, 30.0), 1.0)
@@ -171,6 +180,7 @@ function testSplashEntityAndPointFile()
   return true
 end function
 
+// Verify parse and trails against the expected Quake behavior.
 function testParseAndTrails()
   buffer = sz.alloc(32)
   msg.writeCoord(buffer, 1.0)
@@ -226,6 +236,7 @@ function testParseAndTrails()
   return true
 end function
 
+// Verify draw physics and texture against the expected Quake behavior.
 function testDrawPhysicsAndTexture()
   texture = particleRender.particleTexturePixels()
   assertEqual(len(texture), 256, "particle texture byte count")
@@ -294,6 +305,7 @@ function testDrawPhysicsAndTexture()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "[1/6] chase.c"
   result = try(testChase())

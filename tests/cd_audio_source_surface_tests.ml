@@ -1,9 +1,15 @@
-/* BP-081 source-surface runtime entry. main(args) must remain in the global package. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+BP-081 source-surface runtime entry. main(args) must remain in the global package.
+*/
 import miniquake.sound.cd_audio as cd
 
 bp081Failures = 0
 bp081Checks = 0
 
+// Assert that the condition holds and identify a failing test.
 function bp081Check(condition, label)
   global bp081Failures, bp081Checks
   bp081Checks = bp081Checks + 1
@@ -13,10 +19,12 @@ function bp081Check(condition, label)
   end if
 end function
 
+// Assert exact equality and report both values on failure.
 function bp081Equal(actual, expected, label)
   bp081Check(actual == expected, label + ": expected " + expected + ", got " + actual)
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   global bp081Failures, bp081Checks
   state = cd.create(void, 12)

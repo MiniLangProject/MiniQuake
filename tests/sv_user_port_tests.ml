@@ -1,10 +1,10 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Focused deterministic sv_user.c fixtures.
 */
-
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.sv_user as svuser
@@ -22,16 +22,19 @@ struct SvUserTestMap
   leafs
 end struct
 
+// Assert exact equality and report both values on failure.
 function svuTestEqual(actual, expected, name)
   if actual != expected then return error(9970, name + ": got " + actual + " expected " + expected) end if
   return true
 end function
 
+// Exercise svu test true as part of this deterministic regression fixture.
 function svuTestTrue(value, name)
   if value != true then return error(9971, name) end if
   return true
 end function
 
+// Assert floating-point equality within the requested tolerance.
 function svuTestNear(actual, expected, tolerance, name)
   difference = actual - expected
   if difference < 0.0 then difference = -difference end if
@@ -39,6 +42,7 @@ function svuTestNear(actual, expected, tolerance, name)
   return true
 end function
 
+// Create and initialize user floor map.
 function makeUserFloorMap(slope, solidBack)
   planeType = 3
   if slope == 0.0 then planeType = 2 end if
@@ -61,6 +65,7 @@ function makeUserFloorMap(slope, solidBack)
   return SvUserTestMap([model], [node], [clipNode], [plane], [backLeaf, frontLeaf])
 end function
 
+// Verify edge friction against the expected Quake behavior.
 function testEdgeFriction()
   game = server.create(1)
   state = svuser.SV_UserInit(game)
@@ -82,6 +87,7 @@ function testEdgeFriction()
   return true
 end function
 
+// Verify air water and waterjump against the expected Quake behavior.
 function testAirWaterAndWaterjump()
   game = server.create(1)
   state = svuser.SV_UserInit(game)
@@ -116,6 +122,7 @@ function testAirWaterAndWaterjump()
   return true
 end function
 
+// Verify angles ideal pitch and gates against the expected Quake behavior.
 function testAnglesIdealPitchAndGates()
   game = server.create(1)
   state = svuser.SV_UserInit(game)
@@ -170,6 +177,7 @@ function testAnglesIdealPitchAndGates()
   return true
 end function
 
+// Verify client command parsing against the expected Quake behavior.
 function testClientCommandParsing()
   game = server.create(1)
   state = svuser.SV_UserInit(game)
@@ -216,6 +224,7 @@ function testClientCommandParsing()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   print "[1/4] edge friction"
   result = try(testEdgeFriction())

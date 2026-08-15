@@ -1,7 +1,9 @@
 /*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
 MiniLang side of the pinned WinQuake/r_part.c differential oracle.
 */
-
 import miniquake.particles as particles
 import miniquake.types as t
 import miniquake.sizebuf as sz
@@ -9,6 +11,7 @@ import miniquake.message as msg
 import miniquake.native as native
 import std.string as string
 
+// Return json number derived from the active module state.
 function jsonNumber(value)
   integerValue = native.trunc(value)
   difference = value - integerValue
@@ -17,6 +20,7 @@ function jsonNumber(value)
   return string.replaceAll("" + value, ".e", "e")
 end function
 
+// Add values to the destination state.
 function emitValues(scene, functionName, values)
   arguments = "["
   index = 0
@@ -29,6 +33,7 @@ function emitValues(scene, functionName, values)
   print "{\"schema\":\"miniquake.r_part.v1\",\"scene\":\"" + scene + "\",\"function\":\"" + functionName + "\",\"seq\":0,\"op\":\"state\",\"args\":" + arguments + "}"
 end function
 
+// Add the requested value to the destination state.
 function emit(scene, functionName, system, randomCalls, glCalls, vertices, a, b, freeOverride)
   activeCount = len(system.active)
   freeCount = system.capacity - activeCount
@@ -62,11 +67,13 @@ function emit(scene, functionName, system, randomCalls, glCalls, vertices, a, b,
   )
 end function
 
+// Trace init through the collision world.
 function traceInit()
   system = particles.R_InitParticles(["quake", "-particles", "128"])
   emit("rpart_init", "R_InitParticles", system, 0, 0, 0, system.capacity, 1, 0)
 end function
 
+// Trace entity through the collision world.
 function traceEntity()
   system = particles.createSystem(2048)
   particles.R_SetRandomSeed(system, 1)
@@ -83,6 +90,7 @@ function traceEntity()
   emit("rpart_entity", "R_EntityParticles", system, 486, 0, 0, 0, 0, -1)
 end function
 
+// Trace clear through the collision world.
 function traceClear()
   system = particles.createSystem(2048)
   particles.R_RunParticleEffect(
@@ -93,12 +101,14 @@ function traceClear()
   emit("rpart_clear", "R_ClearParticles", system, 0, 0, 0, 0, 0, -1)
 end function
 
+// Trace point file through the collision world.
 function tracePointFile()
   system = particles.createSystem(2048)
   particles.R_ReadPointFile_f(system, "1 2 3\n-4.5 6 7\n")
   emit("rpart_point_file", "R_ReadPointFile_f", system, 0, 0, 0, 0, 0, -1)
 end function
 
+// Trace parse through the collision world.
 function traceParse()
   buffer = sz.alloc(32)
   msg.writeCoord(buffer, 1.0)
@@ -116,6 +126,7 @@ function traceParse()
   emit("rpart_parse", "R_ParseParticleEffect", system, 20, 0, 0, 3, 2, -1)
 end function
 
+// Trace explosion through the collision world.
 function traceExplosion()
   system = particles.createSystem(2048)
   particles.R_SetRandomSeed(system, 1)
@@ -123,6 +134,7 @@ function traceExplosion()
   emit("rpart_explosion", "R_ParticleExplosion", system, 7168, 0, 0, 0, 0, -1)
 end function
 
+// Trace explosion2 through the collision world.
 function traceExplosion2()
   system = particles.createSystem(2048)
   particles.R_SetRandomSeed(system, 1)
@@ -130,6 +142,7 @@ function traceExplosion2()
   emit("rpart_explosion2", "R_ParticleExplosion2", system, 3072, 0, 0, 0, 0, -1)
 end function
 
+// Trace blob through the collision world.
 function traceBlob()
   system = particles.createSystem(2048)
   particles.R_SetRandomSeed(system, 1)
@@ -137,6 +150,7 @@ function traceBlob()
   emit("rpart_blob", "R_BlobExplosion", system, 8192, 0, 0, 0, 0, -1)
 end function
 
+// Trace run effect through the collision world.
 function traceRunEffect()
   system = particles.createSystem(2048)
   particles.R_SetRandomSeed(system, 1)
@@ -146,6 +160,7 @@ function traceRunEffect()
   emit("rpart_run_effect", "R_RunParticleEffect", system, 20, 0, 0, 0, 0, -1)
 end function
 
+// Trace lava through the collision world.
 function traceLava()
   system = particles.createSystem(2048)
   particles.R_SetRandomSeed(system, 1)
@@ -153,6 +168,7 @@ function traceLava()
   emit("rpart_lava", "R_LavaSplash", system, 6144, 0, 0, 0, 0, -1)
 end function
 
+// Trace teleport through the collision world.
 function traceTeleport()
   system = particles.createSystem(2048)
   particles.R_SetRandomSeed(system, 1)
@@ -160,6 +176,7 @@ function traceTeleport()
   emit("rpart_teleport", "R_TeleportSplash", system, 5376, 0, 0, 0, 0, -1)
 end function
 
+// Trace rocket through the collision world.
 function traceRocket()
   system = particles.createSystem(2048)
   particles.R_SetRandomSeed(system, 1)
@@ -168,6 +185,7 @@ function traceRocket()
   emit("rpart_rocket", "R_RocketTrail", system, 16, 0, 0, start.x, start.y, -1)
 end function
 
+// Trace draw through the collision world.
 function traceDraw()
   system = particles.createSystem(2048)
   alive = particles.R_AllocParticle(system)
@@ -188,6 +206,7 @@ function traceDraw()
   emit("rpart_draw", "R_DrawParticles", system, 0, glCalls, vertices, alive.origin.z, alive.velocity.z, -1)
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   traceInit()
   traceEntity()

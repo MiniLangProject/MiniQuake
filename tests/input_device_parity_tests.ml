@@ -1,19 +1,22 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 BP-066: in_win.c device clear and first-sample m_filter parity.
 */
-
 import miniquake.input as bp066Input
+import miniquake.constants as bp066Constants
+import miniquake.platform.win32 as bp066Win
 
 bp066Index = 0
 bp066Failures = 0
 
+// Assert that the condition holds and identify a failing test.
 function bp066Check(value, name)
   global bp066Index, bp066Failures
   bp066Index = bp066Index + 1
-  print "[" + bp066Index + "/22] " + name
+  print "[" + bp066Index + "/31] " + name
   if not value then
     bp066Failures = bp066Failures + 1
     print "FAIL: " + name
@@ -22,6 +25,7 @@ function bp066Check(value, name)
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   bp066Input.IN_ClearStates()
 
@@ -75,10 +79,64 @@ function main(args)
   bp066Check(bp066Input.JOY_MAX_AXES == 6, "joystick axis count")
   bp066Check(len(bp066Input.CL_InitInput()) == 35, "stock input command set")
 
+  // The live poll cache must follow every bind mutation while excluding
+  // commands already handled exclusively by Key_Event.
+  bp066Input.resetBindings()
+  cachedCount = len(bp066Input.polledBindings)
+  bp066Input.bindKey("F1", "echo fixture")
+  bp066Check(len(bp066Input.polledBindings) == cachedCount, "poll cache excludes unrelated command")
+  bp066Input.bindKey("F1", "impulse 255")
+  cached = bp066Input.polledBindings[len(bp066Input.polledBindings) - 1]
+  bp066Check(len(bp066Input.polledBindings) == cachedCount + 1 and cached[0] == 135 and cached[2] == 255, "poll cache accepts canonical impulse")
+  bp066Input.bindKey("F1", "impulse 0255")
+  bp066Check(len(bp066Input.polledBindings) == cachedCount, "poll cache rejects noncanonical impulse")
+  bp066Input.bindKey("F1", "+attack")
+  cached = bp066Input.polledBindings[len(bp066Input.polledBindings) - 1]
+  bp066Check(len(bp066Input.polledBindings) == cachedCount + 1 and cached[0] == 135 and cached[3] == "+attack", "poll cache tracks button rebind")
+  bp066Input.unbindKey("F1")
+  bp066Check(len(bp066Input.polledBindings) == cachedCount, "poll cache tracks unbind")
+  bp066Input.resetBindings()
+
+  // A continuously held physical movement key must never acquire a synthetic
+  // release between frames. The native test level follows the same bulk
+  // snapshot path as the interactive Win32 window without requiring a GUI.
+  bp066Input.IN_ClearStates()
+  bp066Win.inputTestPush(1, 87, 1)
+  heldCommand = bp066Input.createCommand()
+  bp066Input.buildOriginalMove(
+    heldCommand, bp066Constants.SIGNONS, 4.0,
+    3.0, 0.022, 0.022, false,
+    200.0, 200.0, 350.0, 200.0,
+    false, true, false, false,
+  )
+  bp066Check(heldCommand.forwardMove == 100.0, "held W preserves stock half-frame press edge")
+  continuous = true
+  heldFrame = 0
+  while heldFrame < 512
+    bp066Input.buildOriginalMove(
+      heldCommand, bp066Constants.SIGNONS, 4.0,
+      3.0, 0.022, 0.022, false,
+      200.0, 200.0, 350.0, 200.0,
+      false, true, false, false,
+    )
+    if heldCommand.forwardMove != 200.0 then continuous = false end if
+    heldFrame = heldFrame + 1
+  end while
+  bp066Check(continuous, "held W remains continuous for 512 input frames")
+  bp066Win.inputTestPush(1, 87, 0)
+  bp066Input.buildOriginalMove(
+    heldCommand, bp066Constants.SIGNONS, 4.0,
+    3.0, 0.022, 0.022, false,
+    200.0, 200.0, 350.0, 200.0,
+    false, true, false, false,
+  )
+  bp066Check(heldCommand.forwardMove == 0.0, "released W stops forward movement")
+  bp066Input.IN_ClearStates()
+
   if bp066Failures > 0 then
-    print "MiniQuake BP-066 input device tests failed: " + bp066Failures + "/22"
+    print "MiniQuake BP-066 input device tests failed: " + bp066Failures + "/31"
     return 1
   end if
-  print "MiniQuake BP-066 input device tests passed: 22"
+  print "MiniQuake BP-066 input device tests passed: 31"
   return 0
 end function

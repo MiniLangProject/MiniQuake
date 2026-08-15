@@ -1,15 +1,16 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Deterministic MiniQuake side of the MiniQuake Draw_TileClear renderer oracle.
 Tracing is explicitly enabled here and is inert in release rendering.
 */
-
 import miniquake.render.draw2d as draw2d
 import miniquake.render.gl11 as gl
 import miniquake.types as t
 
+// Exercise json arguments as part of this deterministic regression fixture.
 function jsonArguments(values)
   result = "["
   index = 0
@@ -21,6 +22,7 @@ function jsonArguments(values)
   return result + "]"
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   draw2d.Draw_TraceSetBacktile(t.MenuPicture("trace/backtile", 64, 64, 77))
   gl.Trace_Begin()

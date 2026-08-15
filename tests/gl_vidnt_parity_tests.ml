@@ -1,25 +1,28 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 Deterministic gl_vidnt.c mode, gamma, palette, focus and command fixtures.
 */
-
 import miniquake.gl_vidnt as video
 import miniquake.common as common
 import miniquake.keys as keys
 import miniquake.cvar as cvar
 
+// Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
   if actual != expected then return error(9700, name + ": expected " + expected + ", got " + actual) end if
   return true
 end function
 
+// Assert that the condition holds and identify a failing test.
 function assertTrue(value, name)
   if value != true then return error(9701, name + ": expected true") end if
   return true
 end function
 
+// Exercise mode fixture as part of this deterministic regression fixture.
 function modeFixture()
   arguments = common.create(["-fullscreen", "-width", "800", "-height", "600", "-bpp", "16"])
   state = video.createVideoState()
@@ -37,6 +40,7 @@ function modeFixture()
   return state
 end function
 
+// Verify mode enumeration against the expected Quake behavior.
 function testModeEnumeration()
   state = modeFixture()
   assertEqual(video.VID_NumModes(), 5, "window plus four unique fullscreen modes")
@@ -67,6 +71,7 @@ function testModeEnumeration()
   return true
 end function
 
+// Verify descriptions and menu against the expected Quake behavior.
 function testDescriptionsAndMenu()
   state = modeFixture()
   state.currentMode = 3
@@ -78,6 +83,7 @@ function testDescriptionsAndMenu()
     cvar.create("vid_height", "600", true, false),
     cvar.create("vid_bpp", "16", true, false),
     cvar.create("vid_fullscreen", "1", true, false),
+    cvar.create("vid_renderer", "opengl", true, false),
   ]
   assertEqual(video.VID_GetModeDescription(3), "800x600x16", "mode description")
   assertEqual(video.VID_GetExtModeDescription(3), "800x600x16 fullscreen", "extended fullscreen description")
@@ -87,28 +93,56 @@ function testDescriptionsAndMenu()
   assertEqual(len(video.VID_DescribeModes_f()), 4, "describe modes excludes windowed mode")
   trace = video.VID_MenuDraw()
   assertEqual(trace[0][0], "picture", "video menu picture")
-  assertEqual(trace[2][0], "display", "video menu display selector")
-  assertEqual(trace[5][3], true, "video menu current mode highlight")
+  assertEqual(trace[2][0], "renderer", "video menu renderer entry")
+  assertEqual(trace[3][0], "display", "video menu display entry")
+  assertEqual(trace[6][3], true, "video menu current mode highlight")
   assertEqual(video.VID_MenuReset(), 3, "video menu starts on current resolution")
-  assertEqual(video.VID_MenuDisplayFocused(), true, "video menu starts on display selector")
-  assertEqual(video.VID_MenuKey(keys.K_ENTER), "mode_applied", "display selector switches to windowed")
-  assertEqual(state.modeState, video.MS_WINDOWED, "windowed display mode committed")
-  assertEqual(cvar.variableValue(state.registry, "vid_fullscreen"), 0.0, "windowed display mode archived")
-  assertEqual(video.VID_MenuKey(keys.K_DOWNARROW), "move", "video menu enters resolution grid")
+  assertEqual(video.VID_MenuDisplayFocused(), false, "video menu starts in resolution grid")
+  assertEqual(video.VID_MenuRendererFocused(), false, "renderer entry is not initially focused")
   assertEqual(video.VID_MenuKey(keys.K_RIGHTARROW), "move", "video menu resolution navigation")
   assertEqual(video.VID_MenuSelection(), 4, "video menu selected resolution")
+  assertEqual(state.modeState, video.MS_FULLDIB, "resolution navigation does not toggle fullscreen")
   assertEqual(video.VID_MenuKey(keys.K_ENTER), "mode_applied", "video menu applies resolution")
   assertEqual(state.windowWidth, 2560, "video menu applied width")
   assertEqual(state.windowHeight, 1440, "video menu applied height")
   assertEqual(video.VID_MenuKey(keys.K_UPARROW), "move", "video menu moves to first resolution row")
-  assertEqual(video.VID_MenuKey(keys.K_UPARROW), "move", "video menu returns to display selector")
-  assertEqual(video.VID_MenuKey(keys.K_ENTER), "mode_applied", "display selector switches to fullscreen")
+  assertEqual(video.VID_MenuKey(keys.K_UPARROW), "move", "video menu reaches display entry")
+  assertEqual(video.VID_MenuDisplayFocused(), true, "display entry has explicit focus")
+  assertEqual(video.VID_MenuKey(keys.K_LEFTARROW), "mode_applied", "display entry switches to windowed")
+  assertEqual(state.modeState, video.MS_WINDOWED, "windowed display mode committed")
+  assertEqual(cvar.variableValue(state.registry, "vid_fullscreen"), 0.0, "windowed display mode archived")
+  assertEqual(video.VID_MenuKey(keys.K_UPARROW), "move", "video menu reaches renderer entry")
+  assertEqual(video.VID_MenuRendererFocused(), true, "renderer entry has explicit focus")
+  assertEqual(video.VID_MenuKey(keys.K_DOWNARROW), "move", "renderer entry returns to display entry")
+  assertEqual(video.VID_MenuKey(keys.K_ENTER), "mode_applied", "display entry switches to fullscreen")
   assertEqual(state.modeState, video.MS_FULLDIB, "fullscreen display mode committed")
   assertEqual(cvar.variableValue(state.registry, "vid_fullscreen"), 1.0, "fullscreen display mode archived")
   assertEqual(video.VID_MenuKey(keys.K_ESCAPE), "options", "video menu escape callback")
+  state.initialized = true
+  assertEqual(video.VID_SaveCurrentConfigurationCvars(), true, "current video configuration saved")
+  assertEqual(cvar.variableString(state.registry, "vid_width"), "1024.000000", "current width archived")
+  assertEqual(cvar.variableString(state.registry, "vid_height"), "768.000000", "current height archived")
+  assertEqual(cvar.variableString(state.registry, "vid_fullscreen"), "1.000000", "current fullscreen archived")
+  assertEqual(cvar.variableString(state.registry, "vid_renderer"), "opengl", "current renderer archived")
   return true
 end function
 
+// Verify renderer names against the expected Quake behavior.
+function testRendererNames()
+  assertEqual(video.VID_RendererFromName("opengl"), 0, "OpenGL renderer name")
+  assertEqual(video.VID_RendererFromName("direct3d9"), 1, "Direct3D renderer name")
+  assertEqual(video.VID_RendererFromName("DIRECT3D 9"), 1, "archived Direct3D display name")
+  assertEqual(video.VID_RendererFromName("vulkan"), 2, "Vulkan renderer name")
+  assertEqual(video.VID_RendererFromName("vk"), 2, "Vulkan renderer alias")
+  assertEqual(video.VID_RendererName(0), "OPENGL", "OpenGL display name")
+  assertEqual(video.VID_RendererName(1), "DIRECT3D 9", "Direct3D display name")
+  assertEqual(video.VID_RendererName(2), "VULKAN", "Vulkan display name")
+  assertEqual(video.VID_CommandLineRenderer(common.create(["-vulkan"])), 2, "Vulkan command-line alias")
+  assertEqual(video.VID_CommandLineRenderer(common.create(["-renderer", "vulkan"])), 2, "Vulkan named renderer")
+  return true
+end function
+
+// Verify window and messages against the expected Quake behavior.
 function testWindowAndMessages()
   state = modeFixture()
   centered = video.CenterWindow(640, 480, 1024, 768, false)
@@ -139,6 +173,7 @@ function testWindowAndMessages()
   return true
 end function
 
+// Verify gamma against the expected Quake behavior.
 function testGamma()
   state = video.createVideoState()
   video.VID_UseState(state)
@@ -153,6 +188,17 @@ function testGamma()
   assertEqual(palette[0], 1, "gamma maps black using pal+1 rule")
   assertEqual(palette[127], 128, "gamma midpoint rounding")
   assertEqual(palette[255], 255, "gamma white clamp")
+  defaultState = video.createVideoState()
+  video.VID_UseState(defaultState)
+  defaultState.arguments = common.create([])
+  defaultPalette = bytes(768)
+  index = 0
+  while index < len(defaultPalette)
+    defaultPalette[index] = index & 255
+    index = index + 1
+  end while
+  assertEqual(video.Check_Gamma(defaultPalette), 1.0, "shipped GLQuake palette default")
+  assertEqual(defaultPalette[127], 128, "default palette stays at gamma one")
   ramp = video.VID_BuildGammaRamp(1.0)
   assertEqual(len(ramp), 1536, "three-channel gamma ramp size")
   assertEqual(ramp[0], 0, "gamma ramp black low")
@@ -164,6 +210,7 @@ function testGamma()
   return true
 end function
 
+// Verify palette tables against the expected Quake behavior.
 function testPaletteTables()
   state = video.createVideoState()
   video.VID_UseState(state)
@@ -183,6 +230,7 @@ function testPaletteTables()
   return true
 end function
 
+// Verify compatibility stubs against the expected Quake behavior.
 function testCompatibilityStubs()
   assertTrue(video.VID_HandlePause(true), "pause compatibility")
   assertTrue(video.VID_ForceLockState(3), "lock-state compatibility")
@@ -200,13 +248,15 @@ function testCompatibilityStubs()
   return true
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   testModeEnumeration()
   testDescriptionsAndMenu()
+  testRendererNames()
   testWindowAndMessages()
   testGamma()
   testPaletteTables()
   testCompatibilityStubs()
-  print "gl_vidnt parity tests: 6/6 passed"
+  print "gl_vidnt parity tests: 7/7 passed"
   return 0
 end function

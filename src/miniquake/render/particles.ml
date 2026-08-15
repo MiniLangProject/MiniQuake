@@ -1,17 +1,23 @@
 /*
-Copyright (C) 1996-1997 Id Software, Inc.
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 MiniQuake fixed-function particle drawing and particle-texture bridge.
 */
-
 package miniquake.render.particles
 
 import miniquake.types as t
 import miniquake.mathlib as math
 import miniquake.render.gl11 as gl
+import miniquake.native as native
 
 particleTexture = 0
+const PARTICLE_BATCH_RECORD_BYTES = 16
+const PARTICLE_BATCH_CAPACITY = 8192
+// Allocate this sizeable scratch buffer on first use.  Keeping it out of the
+// module initializer also keeps command-line/file inspection tools lightweight.
+particleBatch = bytes(0)
 
 dotTexture = [
   [0, 1, 1, 0, 0, 0, 0, 0],
@@ -24,6 +30,7 @@ dotTexture = [
   [0, 0, 0, 0, 0, 0, 0, 0],
 ]
 
+// Provide particle texture pixels behavior for the active subsystem.
 function particleTexturePixels()
   pixels = bytes(8 * 8 * 4)
   x = 0
@@ -42,9 +49,27 @@ function particleTexturePixels()
   return pixels
 end function
 
+// Restore the single-texture state assumed by GLQuake's particle pass.
+function prepareParticleTextureState()
+  // Native world batches bind both texture units without updating MiniLang's
+  // compatibility cache.  Always select unit zero and invalidate that cache;
+  // otherwise an impact can sample the last world or lightmap texture instead
+  // of the 8x8 particle dot.
+  if gl.multitextureAvailable() then
+    gl.activeTexture(1)
+    gl.disable(gl.GL_TEXTURE_2D)
+    gl.activeTexture(0)
+  end if
+  gl.enable(gl.GL_TEXTURE_2D)
+  gl.setBoundTextureForCompatibility(-1)
+  return true
+end function
+
+// Apply the Quake-compatible r init particle texture behavior.
 function R_InitParticleTexture()
   global particleTexture
   if particleTexture != 0 then return particleTexture end if
+  prepareParticleTextureState()
   particleTexture = gl.generateTexture()
   gl.bindTexture(particleTexture)
   gl.uploadRgba(8, 8, particleTexturePixels())
@@ -53,6 +78,18 @@ function R_InitParticleTexture()
   return particleTexture
 end function
 
+// Release the particle texture before the active renderer context is replaced.
+function R_ShutdownParticleTexture()
+  global particleTexture
+  if particleTexture == 0 then return false end if
+  oldTexture = particleTexture
+  particleTexture = 0
+  gl.deleteTexture(oldTexture)
+  gl.setBoundTextureForCompatibility(-1)
+  return true
+end function
+
+// Provide palette color behavior for the active subsystem.
 function paletteColor(palette, index)
   value = index & 255
   offset = value * 3
@@ -60,6 +97,45 @@ function paletteColor(palette, index)
   return [palette[offset], palette[offset + 1], palette[offset + 2]]
 end function
 
+// Return particle batch float bits derived from the active module state.
+function inline particleBatchFloatBits(value)
+  raw = nativeRawValue(value)
+  if (raw & 7) == 5 then return raw >> 3 end if
+  return native.floatBits(value)
+end function
+
+// Encode and write particle batch word.
+function inline putParticleBatchWord(offset, value)
+  global particleBatch
+  particleBatch[offset] = value & 255
+  particleBatch[offset + 1] = (value >> 8) & 255
+  particleBatch[offset + 2] = (value >> 16) & 255
+  particleBatch[offset + 3] = (value >> 24) & 255
+end function
+
+// Allocate the reusable particle staging buffer before the first rendered effect.
+function ensureParticleBatch()
+  global particleBatch
+  required = PARTICLE_BATCH_RECORD_BYTES * PARTICLE_BATCH_CAPACITY
+  if len(particleBatch) != required then particleBatch = bytes(required) end if
+  return particleBatch
+end function
+
+// Submit the populated prefix of the reusable particle staging buffer.
+function drawParticleBatch(count, viewOrigin, viewForward, viewUp, viewRight)
+  global particleBatch
+  if count <= 0 then return 0 end if
+  return native.glDrawParticleBatch(
+    particleBatch,
+    count * PARTICLE_BATCH_RECORD_BYTES,
+    native.floatBits(viewOrigin.x), native.floatBits(viewOrigin.y), native.floatBits(viewOrigin.z),
+    native.floatBits(viewForward.x), native.floatBits(viewForward.y), native.floatBits(viewForward.z),
+    native.floatBits(viewUp.x), native.floatBits(viewUp.y), native.floatBits(viewUp.z),
+    native.floatBits(viewRight.x), native.floatBits(viewRight.y), native.floatBits(viewRight.z),
+  )
+end function
+
+// Provide particle geometry behavior for the active subsystem.
 function particleGeometry(particle, viewOrigin, viewForward, viewUp, viewRight)
   scaledUp = math.VectorScale(viewUp, 1.5)
   scaledRight = math.VectorScale(viewRight, 1.5)
@@ -75,6 +151,7 @@ function particleGeometry(particle, viewOrigin, viewForward, viewUp, viewRight)
   return [origin, upVertex, rightVertex, scale]
 end function
 
+// Apply the Quake-compatible r draw particles trace behavior.
 function R_DrawParticlesTrace(particles, viewOrigin, viewForward, viewUp, viewRight)
   trace = [
     ["GL_Bind", "particletexture"],
@@ -99,43 +176,47 @@ function R_DrawParticlesTrace(particles, viewOrigin, viewForward, viewUp, viewRi
   ]
 end function
 
+// Render view.
 function renderView(particles, palette, viewOrigin, viewForward, viewUp, viewRight)
+  global particleBatch
   if len(particles) == 0 then return 0 end if
+  ensureParticleBatch()
   texture = R_InitParticleTexture()
+  prepareParticleTextureState()
   gl.bindTexture(texture)
   gl.enable(gl.GL_BLEND)
+  gl.blendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
   gl.textureEnvironment(gl.GL_MODULATE)
-  gl.begin(gl.GL_TRIANGLES)
+  batchCount = 0
+  rendered = 0
   for each particle in particles
-    color = paletteColor(palette, particle.color)
-    geometry = particleGeometry(particle, viewOrigin, viewForward, viewUp, viewRight)
-    red = color[0]
-    green = color[1]
-    blue = color[2]
-    origin = geometry[0]
-    upVertex = geometry[1]
-    rightVertex = geometry[2]
-    originX = origin.x
-    originY = origin.y
-    originZ = origin.z
-    upX = upVertex.x
-    upY = upVertex.y
-    upZ = upVertex.z
-    rightX = rightVertex.x
-    rightY = rightVertex.y
-    rightZ = rightVertex.z
-    gl.color(red, green, blue, 255)
-    gl.texcoord2(0.0, 0.0)
-    gl.vertex3(originX, originY, originZ)
-    gl.texcoord2(1.0, 0.0)
-    gl.vertex3(upX, upY, upZ)
-    gl.texcoord2(0.0, 1.0)
-    gl.vertex3(rightX, rightY, rightZ)
+    colorOffset = (particle.color & 255) * 3
+    red = 255
+    green = 255
+    blue = 255
+    if colorOffset + 2 < len(palette) then
+      red = palette[colorOffset]
+      green = palette[colorOffset + 1]
+      blue = palette[colorOffset + 2]
+    end if
+    offset = batchCount * PARTICLE_BATCH_RECORD_BYTES
+    particleBatch[offset] = red
+    particleBatch[offset + 1] = green
+    particleBatch[offset + 2] = blue
+    particleBatch[offset + 3] = 255
+    putParticleBatchWord(offset + 4, particleBatchFloatBits(particle.origin.x))
+    putParticleBatchWord(offset + 8, particleBatchFloatBits(particle.origin.y))
+    putParticleBatchWord(offset + 12, particleBatchFloatBits(particle.origin.z))
+    batchCount = batchCount + 1
+    if batchCount == PARTICLE_BATCH_CAPACITY then
+      rendered = rendered + drawParticleBatch(batchCount, viewOrigin, viewForward, viewUp, viewRight)
+      batchCount = 0
+    end if
   end for
-  gl.finishPrimitive()
+  rendered = rendered + drawParticleBatch(batchCount, viewOrigin, viewForward, viewUp, viewRight)
   gl.disable(gl.GL_BLEND)
   gl.textureEnvironment(gl.GL_REPLACE)
-  return len(particles)
+  return rendered
 end function
 
 // Compatibility entry point used by the integrated renderer until its view
@@ -151,6 +232,7 @@ function render(particles, palette)
   )
 end function
 
+// Render temporary.
 function renderTemporary(effects, currentTime, palette)
   rendered = 0
   gl.disable(gl.GL_TEXTURE_2D)

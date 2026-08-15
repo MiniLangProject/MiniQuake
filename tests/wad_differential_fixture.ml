@@ -1,5 +1,12 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/wad_differential_fixture.ml.
+*/
 import miniquake.wad as wadPort
 
+// Exercise cleanup event as part of this deterministic regression fixture.
 function cleanupEvent()
   cleaned = wadPort.W_CleanupName(bytes("MiXeD_NAME_123456789"))
   print "{\"function\":\"W_CleanupName\",\"case\":\"mixed\",\"values\":[" +
@@ -9,6 +16,7 @@ function cleanupEvent()
     cleaned[12] + "," + cleaned[13] + "," + cleaned[14] + "," + cleaned[15] + "]}"
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   cleanupEvent()
   archive = wadPort.W_LoadWadFile(args[0])

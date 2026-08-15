@@ -1,17 +1,18 @@
 /*
-Copyright (C) 2026 MiniQuake contributors
+Copyright (c) 1996-1997 Id Software, Inc.
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
 
 OPT-001A diagnostics only.  The module is disabled during normal gameplay.
 When enabled explicitly by the OPT-001A commands it records frame durations
 and checkpoint-to-checkpoint stage times in fixed arrays.
 */
-
 package miniquake.optimization_baseline
 
 import miniquake.native as native
 import std.fs as fs
 
-const STAGE_COUNT = 31
+const STAGE_COUNT = 46
 const OTHER_STAGE_INDEX = 19
 
 stageNames = [
@@ -46,6 +47,21 @@ stageNames = [
   "screen_evidence",
   "screen_swap",
   "screen_title",
+  "world_clear",
+  "world_recursive",
+  "world_multitexture",
+  "world_chains",
+  "world_lightmaps",
+  "mtex_lightmaps",
+  "mtex_uploads",
+  "mtex_setup",
+  "mtex_records",
+  "mtex_native",
+  "alias_upload",
+  "alias_frame",
+  "alias_light",
+  "alias_mesh",
+  "alias_native",
 ]
 
 stageLookupKeys = array(64, 0)
@@ -60,16 +76,20 @@ profileFrameActive = false
 profileDurations = []
 profileStageTotals = array(STAGE_COUNT, 0)
 profileStageHits = array(STAGE_COUNT, 0)
+profileStageFrames = []
 
+// Provide bool text behavior for the active subsystem.
 function boolText(value)
   if value then return "true" end if
   return "false"
 end function
 
+// Report whether enabled holds for the active state.
 function enabled()
   return profileEnabled
 end function
 
+// Convert stage into its canonical representation.
 function normalizeStage(stage)
   if stage == "demo_send" or stage == "local_send" or stage == "remote_send" then
     return "send"
@@ -77,6 +97,7 @@ function normalizeStage(stage)
   return stage
 end function
 
+// Return stage index derived from the active module state.
 function stageIndex(stage)
   global stageLookupKeys, stageLookupValues
   key = nativeRawValue(stage)
@@ -97,10 +118,11 @@ function stageIndex(stage)
   return OTHER_STAGE_INDEX
 end function
 
+// Update subsystem configuration for configure.
 function configure(frameCapacity)
   global profileEnabled, profileCapacity, profileFrameCount
   global profileFrameStart, profileLastTick, profileFrameActive
-  global profileDurations, profileStageTotals, profileStageHits
+  global profileDurations, profileStageTotals, profileStageHits, profileStageFrames
 
   if frameCapacity < 1 then frameCapacity = 1 end if
   profileCapacity = frameCapacity
@@ -111,10 +133,12 @@ function configure(frameCapacity)
   profileDurations = array(frameCapacity, 0)
   profileStageTotals = array(STAGE_COUNT, 0)
   profileStageHits = array(STAGE_COUNT, 0)
+  profileStageFrames = array(frameCapacity * STAGE_COUNT, 0)
   profileEnabled = true
   return true
 end function
 
+// Provide disable behavior for the active subsystem.
 function disable()
   global profileEnabled, profileFrameActive
   profileEnabled = false
@@ -122,6 +146,7 @@ function disable()
   return true
 end function
 
+// Initialize state for begin frame.
 function beginFrame()
   global profileFrameStart, profileLastTick, profileFrameActive
   if not profileEnabled then return true end if
@@ -132,17 +157,23 @@ function beginFrame()
   return true
 end function
 
+// Provide checkpoint behavior for the active subsystem.
 function checkpoint(stage)
-  global profileLastTick, profileStageTotals, profileStageHits
+  global profileLastTick, profileStageTotals, profileStageHits, profileStageFrames
   if not profileEnabled or not profileFrameActive then return true end if
   now = native.winTicks()
   index = stageIndex(stage)
-  profileStageTotals[index] = profileStageTotals[index] + (now - profileLastTick)
+  elapsed = now - profileLastTick
+  profileStageTotals[index] = profileStageTotals[index] + elapsed
   profileStageHits[index] = profileStageHits[index] + 1
+  if profileFrameCount < profileCapacity then
+    profileStageFrames[profileFrameCount * STAGE_COUNT + index] = elapsed
+  end if
   profileLastTick = now
   return true
 end function
 
+// Provide filtered frame behavior for the active subsystem.
 function filteredFrame()
   global profileFrameActive
   if not profileEnabled then return true end if
@@ -150,6 +181,7 @@ function filteredFrame()
   return true
 end function
 
+// Handle frame and update the associated state.
 function completeFrame()
   global profileFrameCount, profileFrameActive, profileDurations
   global profileLastTick, profileStageTotals, profileStageHits
@@ -167,10 +199,12 @@ function completeFrame()
   return true
 end function
 
+// Provide recorded frames behavior for the active subsystem.
 function recordedFrames()
   return profileFrameCount
 end function
 
+// Provide sorted durations behavior for the active subsystem.
 function sortedDurations()
   count = profileFrameCount
   values = array(count, 0)
@@ -194,6 +228,7 @@ function sortedDurations()
   return values
 end function
 
+// Provide percentile from sorted behavior for the active subsystem.
 function percentileFromSorted(values, numerator, denominator)
   count = len(values)
   if count == 0 then return 0 end if
@@ -203,6 +238,7 @@ function percentileFromSorted(values, numerator, denominator)
   return values[index]
 end function
 
+// Return summary derived from the active module state.
 function summary()
   values = sortedDurations()
   count = len(values)
@@ -225,6 +261,7 @@ function summary()
   ]
 end function
 
+// Provide stage totals json behavior for the active subsystem.
 function stageTotalsJson()
   result = "["
   index = 0
@@ -238,6 +275,7 @@ function stageTotalsJson()
   return result + "]"
 end function
 
+// Provide resource json behavior for the active subsystem.
 function resourceJson(values)
   result = "["
   index = 0
@@ -249,13 +287,26 @@ function resourceJson(values)
   return result + "]"
 end function
 
+// Encode and write reports.
 function writeReports(prefix, mode, mapName, beforeResources, afterResources)
   stats = summary()
 
-  csv = "frame,duration_ms\n"
+  csv = "frame,duration_ms"
+  stageIndexValue = 0
+  while stageIndexValue < STAGE_COUNT
+    csv = csv + "," + stageNames[stageIndexValue] + "_ms"
+    stageIndexValue = stageIndexValue + 1
+  end while
+  csv = csv + "\n"
   index = 0
   while index < profileFrameCount
-    csv = csv + index + "," + profileDurations[index] + "\n"
+    csv = csv + index + "," + profileDurations[index]
+    stageIndexValue = 0
+    while stageIndexValue < STAGE_COUNT
+      csv = csv + "," + profileStageFrames[index * STAGE_COUNT + stageIndexValue]
+      stageIndexValue = stageIndexValue + 1
+    end while
+    csv = csv + "\n"
     index = index + 1
   end while
   csvResult = try(fs.writeAllText(prefix + "-frames.csv", csv))
@@ -280,6 +331,7 @@ function writeReports(prefix, mode, mapName, beforeResources, afterResources)
   return true
 end function
 
+// Format and emit summary.
 function printSummary(mode, mapName)
   stats = summary()
   print "MiniQuake OPT-001A frame baseline"
@@ -298,6 +350,29 @@ function printSummary(mode, mapName)
   return stats
 end function
 
+// Print the stage breakdown for frames at or above the requested duration.
+function printSlowFrames(minimumMilliseconds)
+  index = 0
+  while index < profileFrameCount
+    duration = profileDurations[index]
+    if duration >= minimumMilliseconds then
+      line = "  slow_frame=" + index + " total_ms=" + duration
+      stageIndexValue = 0
+      while stageIndexValue < STAGE_COUNT
+        elapsed = profileStageFrames[index * STAGE_COUNT + stageIndexValue]
+        if elapsed > 0 then
+          line = line + " " + stageNames[stageIndexValue] + "=" + elapsed
+        end if
+        stageIndexValue = stageIndexValue + 1
+      end while
+      print line
+    end if
+    index = index + 1
+  end while
+  return true
+end function
+
+// Handle sequence text and update the associated state.
 function handleSequenceText(values)
   result = ""
   index = 0
@@ -309,6 +384,7 @@ function handleSequenceText(values)
   return result
 end function
 
+// Provide classify handles behavior for the active subsystem.
 function classifyHandles(handles, nonHandleStable)
   if not nonHandleStable then return "RESOURCE_GROWTH" end if
   if len(handles) < 2 then return "INCONCLUSIVE" end if

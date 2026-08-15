@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+MiniLang parity and regression tests for tests/common_differential_fixture.ml.
+*/
 import miniquake.types as t
 import miniquake.common as common
 import miniquake.message as msg
@@ -6,11 +12,13 @@ import miniquake.filesystem as fsys
 import miniquake.byteio as bio
 import std.fs as fs
 
+// Exercise bool text as part of this deterministic regression fixture.
 function boolText(value)
   if value then return "true" end if
   return "false"
 end function
 
+// Exercise byte four as part of this deterministic regression fixture.
 function byteFour(data)
   values = bytes(4)
   index = 0
@@ -21,52 +29,64 @@ function byteFour(data)
   return "[" + values[0] + "," + values[1] + "," + values[2] + "," + values[3] + "]"
 end function
 
+// Encode and write event.
 function writeEvent(name, callbackValue)
   buffer = sz.alloc(512)
   callbackValue(buffer)
   print "{\"function\":\"" + name + "\",\"case\":\"encode\",\"size\":" + buffer.curSize + ",\"bytes\":" + byteFour(sz.dataSlice(buffer)) + "}"
 end function
 
+// Encode and write char event.
 function writeCharEvent(buffer)
   msg.MSG_WriteChar(buffer, -2)
 end function
 
+// Encode and write byte event.
 function writeByteEvent(buffer)
   msg.MSG_WriteByte(buffer, 254)
 end function
 
+// Encode and write short event.
 function writeShortEvent(buffer)
   msg.MSG_WriteShort(buffer, -1234)
 end function
 
+// Encode and write long event.
 function writeLongEvent(buffer)
   msg.MSG_WriteLong(buffer, 305419896)
 end function
 
+// Encode and write float event.
 function writeFloatEvent(buffer)
   msg.MSG_WriteFloat(buffer, 12.5)
 end function
 
+// Encode and write string event.
 function writeStringEvent(buffer)
   msg.MSG_WriteString(buffer, "quake")
 end function
 
+// Encode and write coord event.
 function writeCoordEvent(buffer)
   msg.MSG_WriteCoord(buffer, -12.25)
 end function
 
+// Encode and write angle event.
 function writeAngleEvent(buffer)
   msg.MSG_WriteAngle(buffer, 90.75)
 end function
 
+// Return base path derived from the active module state.
 function inline basePath()
   return "build/common_differential/mlfs"
 end function
 
+// Build deterministic test data for game path.
 function fixtureGamePath()
   return fsys.join(basePath(), "id1")
 end function
 
+// Exercise loose system as part of this deterministic regression fixture.
 function looseSystem()
   target = fsys.join(fixtureGamePath(), "test.bin")
   fsys.COM_CreatePath(target)
@@ -77,6 +97,7 @@ function looseSystem()
   return system
 end function
 
+// Exercise pack image as part of this deterministic regression fixture.
 function packImage()
   data = bytes(80)
   data[0] = 80
@@ -100,7 +121,9 @@ function packImage()
   return data
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
+  // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   head = t.Link(void, void)
   common.ClearLink(head)
   print "{\"function\":\"ClearLink\",\"case\":\"self\",\"self\":" + boolText(head.next == head and head.previous == head) + "}"

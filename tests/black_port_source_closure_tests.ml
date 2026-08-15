@@ -1,4 +1,9 @@
-/* BP-084 closure runtime entry. main(args) must remain in the global package. */
+/*
+Copyright (c) 2026 Nils Kopal
+SPDX-License-Identifier: GPL-2.0-or-later
+
+BP-084 closure runtime entry. main(args) must remain in the global package.
+*/
 import miniquake.black_port_source_contract as closure
 import miniquake.source_profile_contract as profile
 import miniquake.black_port_corpus as corpus
@@ -6,16 +11,19 @@ import miniquake.black_port_corpus as corpus
 bp084Failures = 0
 bp084Checks = 0
 
+// Assert that the condition holds and identify a failing test.
 function bp084Check(condition, label)
   global bp084Failures, bp084Checks
   bp084Checks = bp084Checks + 1
   if not condition then bp084Failures = bp084Failures + 1; print "FAIL: " + label end if
 end function
 
+// Assert exact equality and report both values on failure.
 function bp084Equal(actual, expected, label)
   bp084Check(actual == expected, label + ": expected " + expected + ", got " + actual)
 end function
 
+// Parse command-line arguments and run the selected operation.
 function main(args)
   global bp084Failures, bp084Checks
   vector = closure.contractVector()
