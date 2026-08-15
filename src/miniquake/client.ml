@@ -363,6 +363,36 @@ function addEntityEffectDlights(entity, currentTime)
   return true
 end function
 
+// Report whether alias-model flags identify a stock trail projectile whose
+// model is more time-sensitive than an ordinary visible entity.
+function projectileModelFlags(modelFlags)
+  return (modelFlags & (c.EF_ROCKET | c.EF_GRENADE)) != 0
+end function
+
+// Append one dynamic render entity while preserving projectile visibility at
+// the original MAX_VISEDICTS limit. A newly allocated rocket or grenade often
+// has a high edict number; when the list is already full, replace the newest
+// ordinary entry rather than rendering only the later explosion event.
+function appendPrioritizedVisibleEntity(builder, entity, modelFlags)
+  if builder.count < c.MAX_VISEDICTS then
+    arrayutil.pushArrayBuilder(builder, entity)
+    return true
+  end if
+  if not projectileModelFlags(modelFlags) then return false end if
+  replaceIndex = builder.count - 1
+  while replaceIndex >= 0
+    existing = builder.values[replaceIndex]
+    existingFlags = 0
+    if existing is not void then existingFlags = modelFlagsForIndex(existing.modelIndex) end if
+    if not projectileModelFlags(existingFlags) then
+      builder.values[replaceIndex] = entity
+      return true
+    end if
+    replaceIndex = replaceIndex - 1
+  end while
+  return false
+end function
+
 // Apply the Quake-compatible cl relink entities behavior.
 function CL_RelinkEntities(client)
   global clRelinkParticleEffects, clChaseActive, clDlightTime, clRelinkParticleTime
@@ -406,7 +436,11 @@ function CL_RelinkEntities(client)
     entity = client.entities[index]
     if entity is not void and entity.modelIndex != 0 then
       if entity.messageTime < 0.0 then
-        if visibleBuilder.count < c.MAX_VISEDICTS then arrayutil.pushArrayBuilder(visibleBuilder, entity) end if
+        appendPrioritizedVisibleEntity(
+          visibleBuilder,
+          entity,
+          modelFlagsForIndex(entity.modelIndex),
+        )
       else if entity.messageTime != client.messageTimes[0] then
         entity.modelIndex = 0
       else
@@ -458,8 +492,8 @@ function CL_RelinkEntities(client)
           queueRelinkParticleEffect("rocket_trail", [oldOrigin, math.copy(entity.origin), 6])
         end if
         entity.forceLink = false
-        if (index != client.viewEntity or clChaseActive) and visibleBuilder.count < c.MAX_VISEDICTS then
-          arrayutil.pushArrayBuilder(visibleBuilder, entity)
+        if index != client.viewEntity or clChaseActive then
+          appendPrioritizedVisibleEntity(visibleBuilder, entity, modelFlags)
         end if
       end if
     end if

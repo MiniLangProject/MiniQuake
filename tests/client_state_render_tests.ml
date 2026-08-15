@@ -247,6 +247,27 @@ function testVisibleCap()
   client.CL_RelinkEntities(value)
   equal(len(value.visibleEntities), c.MAX_VISEDICTS, "MAX_VISEDICTS cap")
   equal(value.visibleEntities[c.MAX_VISEDICTS - 1].number, c.MAX_VISEDICTS, "dynamic entity wins cap over static")
+
+  // The separately transmitted explosion must never be the only visible
+  // evidence of a shot. Fill every slot with ordinary dynamic entities, then
+  // place a newly allocated rocket behind the cap by edict number.
+  value = newClient()
+  client.CL_SetModelFlags([0, 0, c.EF_ROCKET])
+  index = 1
+  while index <= c.MAX_VISEDICTS + 3
+    modelIndex = 1
+    if index == c.MAX_VISEDICTS + 3 then modelIndex = 2 end if
+    activeEntity(value, index, modelIndex)
+    index = index + 1
+  end while
+  client.CL_RelinkEntities(value)
+  equal(len(value.visibleEntities), c.MAX_VISEDICTS, "projectile priority retains visible cap")
+  rocketVisible = false
+  for each visible in value.visibleEntities
+    if visible.number == c.MAX_VISEDICTS + 3 then rocketVisible = true end if
+  end for
+  yes(rocketVisible, "high-numbered rocket displaces ordinary visible entity")
+  client.CL_SetModelFlags([0])
   return true
 end function
 
