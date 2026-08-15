@@ -25,8 +25,8 @@ def main() -> int:
     build = read("src/miniquake/build_info.ml")
     test = read("tests/external_compat_closure_tests.ml")
     contract = read("src/miniquake/external_reference_contract.ml")
-    harness = read("TEST_BP-090-094R6.ps1")
-    collector = read("COLLECT_RESULTS.ps1")
+    harness = read("scripts/TEST_BP-090-094R6.ps1")
+    collector = read("scripts/COLLECT_RESULTS.ps1")
     for marker in [
         'const PACKAGE_ID = "BP-094"',
         'const PARENT_PACKAGE_ID = "BP-093"',

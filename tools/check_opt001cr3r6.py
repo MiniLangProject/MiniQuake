@@ -18,7 +18,7 @@ def main() -> int:
     def text(rel): return (root/rel).read_text(encoding='utf-8')
     main_src=text('src/main.ml'); vid=text('src/miniquake/gl_vidnt.ml'); world=text('src/miniquake/render/world.ml')
     bi=text('src/miniquake/build_info.ml'); allocation=text('tests/opt001c_contract_tests.ml')
-    hot=text('tests/opt001cr3_hotpath_tests.ml'); runner=text('TEST_'+REV+'.ps1')
+    hot=text('tests/opt001cr3_hotpath_tests.ml'); runner=text('scripts/TEST_'+REV+'.ps1')
     vid_test=text('tests/gl_vidnt_parity_tests.ml')
 
     for forbidden in ('function opt001cr3r5HasArgument', 'function opt001cr3r5ApplyDefaultWindow', 'args = opt001cr3r5ApplyDefaultWindow(args)'):

@@ -159,11 +159,20 @@ _LEGACY_REQUIRED_PATHS = {
     "patches/BP-093.diff", "patches/BP-094.diff",
 }
 
+# Historical root-level PowerShell entry points now live together in scripts/.
+# Keep the legacy inventory readable while resolving those entries canonically.
+_LEGACY_REQUIRED_PATHS = {
+    f"scripts/{path}"
+    if path.endswith(".ps1") and path != "build.ps1" and "/" not in path
+    else path
+    for path in _LEGACY_REQUIRED_PATHS
+}
+
 CURRENT_REQUIRED_PATHS = {
     ".gitignore", "COPYING", "LICENSES/Apache-2.0.txt", "README.md",
     "docs/CHANGELOG.md", "docs/archive/README.md",
     "docs/native/README.md", "docs/status/PORT_STATUS.md",
-    "SOURCE_MANIFEST.sha256", "build.ps1", "test.ps1",
+    "SOURCE_MANIFEST.sha256", "build.ps1", "scripts/test.ps1",
     "src/main.ml", "src/miniquake/build_info.ml",
     "native/build_bridge.py", "native/build_text_bridge.py",
     "native/miniquake_native.c", "native/miniquake_native.h",
@@ -317,7 +326,7 @@ def check_r8_visual_parity(root: Path) -> Check:
     main = (root / "src/main.ml").read_text(encoding="utf-8-sig")
     world = (root / "src/miniquake/render/world.ml").read_text(encoding="utf-8-sig")
     entities = (root / "src/miniquake/render/entities.ml").read_text(encoding="utf-8-sig")
-    test = (root / "TEST_BP-090-094R8.ps1").read_text(encoding="utf-8-sig")
+    test = (root / "scripts" / "TEST_BP-090-094R8.ps1").read_text(encoding="utf-8-sig")
     analysis = (root / "docs/archive/releases/BP-093_R7_VISUAL_DIAGNOSTIC_ANALYSIS.md").read_text(encoding="utf-8-sig")
     required = [
         ('"-gamma", "1"', main, "main startup gamma"),
@@ -357,7 +366,7 @@ def check_r9_network_provenance(root: Path) -> Check:
     host = (root / "src/miniquake/host.ml").read_text(encoding="utf-8-sig")
     contract = (root / "src/miniquake/external_reference_contract.ml").read_text(encoding="utf-8-sig")
     fixture = (root / "tests/original_server_interop_tests.ml").read_text(encoding="utf-8-sig")
-    runner = (root / "TEST_BP-090-094R12.ps1").read_text(encoding="utf-8-sig")
+    runner = (root / "scripts" / "TEST_BP-090-094R12.ps1").read_text(encoding="utf-8-sig")
     golden = json.loads((root / "audit/original_server_interop_golden.json").read_text(encoding="utf-8-sig"))
     required = [
         ("function originalInteropClientNetworkProvenance(", host, "host provenance helper"),
@@ -396,7 +405,7 @@ def check_r9_network_provenance(root: Path) -> Check:
 
 def check_r10_original_server_readiness(root: Path) -> Check:
     errors: list[str] = []
-    runner = (root / "TEST_BP-090-094R12.ps1").read_text(encoding="utf-8-sig")
+    runner = (root / "scripts" / "TEST_BP-090-094R12.ps1").read_text(encoding="utf-8-sig")
     testing = (root / "docs/archive/releases/BP-090-094R10_TESTING.md").read_text(encoding="utf-8-sig")
     analysis = (root / "docs/archive/releases/BP-090-094R10_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
     hotfix = json.loads((root / "docs/archive/releases/BP-090-094R10_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig"))
@@ -465,7 +474,7 @@ def check_r10_original_server_readiness(root: Path) -> Check:
 
 def check_r11_original_reference_handoff(root: Path) -> Check:
     errors: list[str] = []
-    runner = (root / "TEST_BP-090-094R12.ps1").read_text(encoding="utf-8-sig")
+    runner = (root / "scripts" / "TEST_BP-090-094R12.ps1").read_text(encoding="utf-8-sig")
     prepare = (root / "tools/prepare_original_reference.py").read_text(encoding="utf-8-sig")
     testing = (root / "docs/archive/releases/BP-090-094R11_TESTING.md").read_text(encoding="utf-8-sig")
     analysis = (root / "docs/archive/releases/BP-090-094R11_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
@@ -585,7 +594,7 @@ def check_r12_persistent_original_connect(root: Path) -> Check:
     client = (root / "src/miniquake/client.ml").read_text(encoding="utf-8-sig")
     net_main = (root / "src/miniquake/net_main.ml").read_text(encoding="utf-8-sig")
     net_loop = (root / "src/miniquake/net_loop.ml").read_text(encoding="utf-8-sig")
-    runner = (root / "TEST_BP-090-094R12.ps1").read_text(encoding="utf-8-sig")
+    runner = (root / "scripts" / "TEST_BP-090-094R12.ps1").read_text(encoding="utf-8-sig")
     testing = (root / "docs/archive/releases/BP-090-094R12_TESTING.md").read_text(encoding="utf-8-sig")
     analysis = (root / "docs/archive/releases/BP-090-094R12_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
     hotfix = json.loads((root / "docs/archive/releases/BP-090-094R12_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig"))
@@ -651,7 +660,7 @@ def check_r13_pre_fallback_readiness_guard(root: Path) -> Check:
     main = (root / "src/main.ml").read_text(encoding="utf-8-sig")
     host = (root / "src/miniquake/host.ml").read_text(encoding="utf-8-sig")
     net_loop = (root / "src/miniquake/net_loop.ml").read_text(encoding="utf-8-sig")
-    runner = (root / "TEST_BP-090-094R13.ps1").read_text(encoding="utf-8-sig")
+    runner = (root / "scripts" / "TEST_BP-090-094R13.ps1").read_text(encoding="utf-8-sig")
     testing = (root / "docs/archive/releases/BP-090-094R13_TESTING.md").read_text(encoding="utf-8-sig")
     analysis = (root / "docs/archive/releases/BP-090-094R13_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
     hotfix = json.loads((root / "docs/archive/releases/BP-090-094R13_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig"))
@@ -719,7 +728,7 @@ def check_r13_pre_fallback_readiness_guard(root: Path) -> Check:
 
 def check_r14_original_capture_ensemble(root: Path) -> Check:
     errors=[]
-    runner=(root/'TEST_BP-090-094R14.ps1').read_text(encoding='utf-8-sig')
+    runner=(root/'scripts'/'TEST_BP-090-094R14.ps1').read_text(encoding='utf-8-sig')
     comparator=(root/'tools/compare_original_reference.py').read_text(encoding='utf-8-sig')
     golden=json.loads((root/'audit/original_visual_reference_golden.json').read_text(encoding='utf-8-sig'))
     testing=(root/'docs/archive/releases/BP-090-094R14_TESTING.md').read_text(encoding='utf-8-sig')
@@ -743,7 +752,7 @@ def check_r14_original_capture_ensemble(root: Path) -> Check:
 
 def check_r15_visual_timestep_parity(root: Path) -> Check:
     errors: list[str] = []
-    runner = (root / "TEST_BP-090-094R15.ps1").read_text(encoding="utf-8-sig")
+    runner = (root / "scripts" / "TEST_BP-090-094R15.ps1").read_text(encoding="utf-8-sig")
     host = (root / "src/miniquake/host.ml").read_text(encoding="utf-8-sig")
     golden = json.loads((root / "audit/original_visual_reference_golden.json").read_text(encoding="utf-8-sig"))
     testing = (root / "docs/archive/releases/BP-090-094R15_TESTING.md").read_text(encoding="utf-8-sig")
@@ -1062,8 +1071,8 @@ def check_minilang(root: Path) -> Check:
 def check_external_contract(root: Path) -> Check:
     errors: list[str] = []
     contract = (root / "src/miniquake/external_reference_contract.ml").read_text(encoding="utf-8-sig")
-    test = (root / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
-    collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
+    test = (root / "scripts" / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
+    collector = (root / "scripts" / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
     prepare = (root / "tools/prepare_original_reference.py").read_text(encoding="utf-8-sig")
     comparator = (root / "tools/compare_original_reference.py").read_text(encoding="utf-8-sig")
     errors += marker_errors(contract, [
@@ -1094,7 +1103,7 @@ def check_external_contract(root: Path) -> Check:
 
 def check_named_build_parameter_binding(root: Path) -> Check:
     errors: list[str] = []
-    current = (root / "TEST_OPT-001D.ps1").read_text(encoding="utf-8-sig")
+    current = (root / "scripts" / "TEST_OPT-001D.ps1").read_text(encoding="utf-8-sig")
     errors += marker_errors(current, [
         'function Invoke-LiveBuild(', '"-File", $ScriptPath',
         '"-Compiler", $Compiler', '"-StdLib", $StdLib',
@@ -1124,8 +1133,8 @@ def check_named_build_parameter_binding(root: Path) -> Check:
 
 def check_live_output(root: Path) -> Check:
     errors: list[str] = []
-    historical_test = (root / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
-    current_test = (root / "TEST_OPT-001D.ps1").read_text(encoding="utf-8-sig")
+    historical_test = (root / "scripts" / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
+    current_test = (root / "scripts" / "TEST_OPT-001D.ps1").read_text(encoding="utf-8-sig")
     live_runner = (root / "tools/run_process_live.py").read_text(encoding="utf-8-sig")
     build = (root / "build.ps1").read_text(encoding="utf-8-sig")
     for label, script_text in (("historical test", historical_test), ("current test", current_test), ("build", build)):
@@ -1185,7 +1194,7 @@ def check_powershell_elseif_syntax(root: Path) -> Check:
                 errors.append(
                     f"{rel}:{line_number}: invalid PowerShell `else if`; use `elseif`"
                 )
-    current = root / "TEST_OPT-001D.ps1"
+    current = root / "scripts" / "TEST_OPT-001D.ps1"
     if current.is_file():
         source = current.read_text(encoding="utf-8-sig", errors="replace")
         if "} elseif ($AllowFailure) {" not in source:
@@ -1227,7 +1236,7 @@ def check_powershell_interpolation_safety(root: Path) -> Check:
                     f"{rel}:{line_number}: ambiguous ${name}: interpolation; "
                     f"use ${{{name}}}: before a literal colon"
                 )
-    runner = (root / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
+    runner = (root / "scripts" / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
     if '${Scenario}: $OriginalHashA vs $OriginalHashB' not in runner:
         errors.append("R7 runner does not contain the braced Scenario interpolation")
     if '$Scenario: $OriginalHashA vs $OriginalHashB' in runner:
@@ -1275,7 +1284,7 @@ def check_verifier_cli_compatibility(root: Path) -> Check:
 def check_original_glquake_runtime_safety(root: Path) -> Check:
     """Bind the modern-driver-safe launch and evidence policy for GLQUAKE.EXE."""
     errors: list[str] = []
-    runner = (root / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
+    runner = (root / "scripts" / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
     historical_analysis = (root / "docs/archive/releases/BP-090-094R4_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
     current_analysis = (root / "docs/archive/releases/BP-090-094R7_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
     try:
@@ -1392,7 +1401,7 @@ def check_original_glquake_runtime_safety(root: Path) -> Check:
 def check_original_loopback_isolation(root: Path) -> Check:
     """Require unattended original-binary tests to stay on loopback only."""
     errors: list[str] = []
-    runner = (root / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
+    runner = (root / "scripts" / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
     main = (root / "src/main.ml").read_text(encoding="utf-8-sig")
     required_runner = [
         "'-ip', '127.0.0.1', '-port'",
@@ -1436,7 +1445,7 @@ def check_original_loopback_isolation(root: Path) -> Check:
 def check_temporary_loopback_firewall_rules(root: Path) -> Check:
     """Require exact-program, loopback-only, temporary firewall authorization."""
     errors: list[str] = []
-    runner = (root / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
+    runner = (root / "scripts" / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
     testing = (root / "docs/archive/releases/BP-090-094R7_TESTING.md").read_text(encoding="utf-8-sig")
     analysis = (root / "docs/archive/releases/BP-090-094R7_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
     hotfix = json.loads((root / "docs/archive/releases/BP-090-094R7_HOTFIX_REPORT.json").read_text(encoding="utf-8-sig"))
@@ -1520,7 +1529,7 @@ def check_temporary_loopback_firewall_rules(root: Path) -> Check:
 def check_original_client_port_routing(root: Path) -> Check:
     """Bind the original Quake console tokenizer and net_hostport routing fix."""
     errors: list[str] = []
-    runner = (root / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
+    runner = (root / "scripts" / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
     testing = (root / "docs/archive/releases/BP-090-094R7_TESTING.md").read_text(encoding="utf-8-sig")
     analysis = (root / "docs/archive/releases/BP-090-094R7_RESULT_ANALYSIS.md").read_text(encoding="utf-8-sig")
     golden = json.loads((root / "audit/original_client_port_routing_golden.json").read_text(encoding="utf-8-sig"))
@@ -1577,7 +1586,7 @@ def check_original_client_port_routing(root: Path) -> Check:
 def check_inherited_contract_lineage(root: Path) -> Check:
     errors: list[str] = []
     build = (root / "build.ps1").read_text(encoding="utf-8-sig")
-    collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
+    collector = (root / "scripts" / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
     errors += marker_errors(collector, [
         "MiniQuakeProtocol15ServerDataTests.exe",
         "BP-012_PROTOCOL15_SERVERDATA_AUDIT.md",

@@ -113,7 +113,7 @@ def main() -> int:
     if args.self_test:
         return self_test()
     root = Path(args.root_opt or args.root_pos or ".").resolve()
-    path = root / "TEST_BP-060-064R6.ps1"
+    path = root / "scripts" / "TEST_BP-060-064R6.ps1"
     try:
         text = path.read_text(encoding="utf-8-sig")
     except OSError as exc:

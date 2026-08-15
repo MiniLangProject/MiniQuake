@@ -24,8 +24,8 @@ def main() -> int:
     diag_ml = (root / "src/miniquake/compat_diagnostics.ml").read_text(encoding="utf-8-sig")
     opt_ml = (root / "src/miniquake/optimization_baseline.ml").read_text(encoding="utf-8-sig")
     build_info = (root / "src/miniquake/build_info.ml").read_text(encoding="utf-8-sig")
-    test_ps1 = (root / "TEST_OPT-001A.ps1").read_text(encoding="utf-8-sig")
-    collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
+    test_ps1 = (root / "scripts" / "TEST_OPT-001A.ps1").read_text(encoding="utf-8-sig")
+    collector = (root / "scripts" / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
     contract = (root / "tests/opt001a_contract_tests.ml").read_text(encoding="utf-8-sig")
     golden = json.loads((root / "audit/opt001a_baseline_golden.json").read_text(encoding="utf-8-sig"))
     if golden.get("fingerprint") != "0x1a001a01":

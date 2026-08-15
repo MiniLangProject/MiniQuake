@@ -18,10 +18,10 @@ def main():
         if m not in keys: errors.append('keys.ml missing marker: '+m)
     if 'keys.Key_QueueReleaseAllCommands()' not in vid: errors.append('gl_vidnt ClearAllStates does not queue releases')
     if 'pendingReleases = keys.Key_TakePendingCommands()' not in host: errors.append('host does not drain queued releases')
-    if 'MiniQuake BP-065 key/focus tests passed: 20' not in test: errors.append('fixture count marker missing')
-    if golden.get('fixtures')!=20 or golden.get('key_count')!=256 or golden.get('release_bytes')!=34: errors.append('golden mismatch')
+    if 'MiniQuake BP-065 key/focus tests passed: 28' not in test: errors.append('fixture count marker missing')
+    if golden.get('fixtures')!=28 or golden.get('key_count')!=256 or golden.get('release_bytes')!=34: errors.append('golden mismatch')
     report={'schema_version':1,'package':'BP-065','status':'PASS' if not errors else 'FAIL','errors':errors,
-            'fixtures':20,'key_count':256,'release_bytes':34,'focus_release_queue':not errors}
+            'fixtures':28,'key_count':256,'release_bytes':34,'focus_release_queue':not errors}
     if ns.json: pathlib.Path(ns.json).write_text(json.dumps(report,indent=2)+'\n')
     print('MiniQuake BP-065 key/focus verification: '+report['status'])
     for e in errors: print('  [FAIL] '+e)

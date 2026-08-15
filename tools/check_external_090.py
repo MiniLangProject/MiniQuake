@@ -10,7 +10,7 @@ def main() -> int:
     required=[
         'src/miniquake/external_reference_contract.ml','tests/original_reference_provenance_tests.ml',
         'tools/prepare_original_reference.py','audit/original_reference_golden.json',
-        'TEST_BP-090-094R6.ps1'
+        'scripts/TEST_BP-090-094R6.ps1'
     ]
     for rel in required:
         if not (root/rel).is_file(): errors.append('missing file: '+rel)

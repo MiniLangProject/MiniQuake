@@ -15,10 +15,10 @@ def main():
     if 'if filterEnabled and mouseFilterReady then' in src: errors.append('first filtered sample still bypasses averaging')
     if 'input.IN_ClearDeviceStates()' not in host: errors.append('host focus path does not use device-only clear')
     if 'input.IN_ClearDeviceStates()' not in vid: errors.append('video clear path does not use device-only clear')
-    if 'MiniQuake BP-066 input device tests passed: 28' not in test: errors.append('fixture count marker missing')
-    if golden.get('fixtures')!=22 or golden.get('joystick_axes')!=6: errors.append('golden mismatch')
+    if 'MiniQuake BP-066 input device tests passed: 35' not in test: errors.append('fixture count marker missing')
+    if golden.get('fixtures')!=35 or golden.get('joystick_axes')!=6: errors.append('golden mismatch')
     report={'schema_version':1,'package':'BP-066','status':'PASS' if not errors else 'FAIL','errors':errors,
-            'fixtures':22,'first_filtered':golden.get('first_filtered'),'device_only_clear':not errors}
+            'fixtures':35,'first_filtered':golden.get('first_filtered'),'device_only_clear':not errors}
     if ns.json: pathlib.Path(ns.json).write_text(json.dumps(report,indent=2)+'\n')
     print('MiniQuake BP-066 input device verification: '+report['status'])
     for e in errors: print('  [FAIL] '+e)

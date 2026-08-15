@@ -284,7 +284,7 @@ def source_contract(root: Path) -> tuple[list[str], dict[str, Any]]:
         "builtins": "src/miniquake/quakec/builtins.ml",
         "tests": "tests/protocol15_runtime_event_tests.ml",
         "build": "build.ps1",
-        "acceptance": "TEST_BP-014R1.ps1",
+        "acceptance": "scripts/TEST_BP-014R1.ps1",
         "build_info": "src/miniquake/build_info.ml",
     }
     texts: dict[str, str] = {}

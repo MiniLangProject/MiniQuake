@@ -34,7 +34,7 @@ def main() -> int:
     entities = read("src/miniquake/render/entities.ml")
     tool = read("tools/compare_original_reference.py")
     test = read("tests/original_visual_reference_tests.ml")
-    harness = read("TEST_BP-090-094R15.ps1")
+    harness = read("scripts/TEST_BP-090-094R15.ps1")
     analysis = read("docs/archive/releases/BP-093_R7_VISUAL_DIAGNOSTIC_ANALYSIS.md")
     golden_path = root / "audit/original_visual_reference_golden.json"
     try:

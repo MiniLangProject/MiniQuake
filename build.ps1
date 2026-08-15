@@ -2120,13 +2120,13 @@ if (-not $SkipTests) {
     Invoke-MiniQuakeTestBinary `
       -Label "BP-065 key/focus tests" `
       -Executable $KeyFocusTestExe `
-      -ProgressHint "The last printed [NN/20] line identifies the active key, binding or focus-release fixture."
+      -ProgressHint "The last printed [NN/28] line identifies the active key, binding or focus-release fixture."
     $KeyFocusTestStatus = "PASS"
 
     Invoke-MiniQuakeTestBinary `
       -Label "BP-066 input device tests" `
       -Executable $InputDeviceTestExe `
-      -ProgressHint "The last printed [NN/23] line identifies the active mouse filtering or device-clear fixture."
+      -ProgressHint "The last printed [NN/35] line identifies the active mouse filtering or device-clear fixture."
     $InputDeviceTestStatus = "PASS"
 
     Invoke-MiniQuakeTestBinary `

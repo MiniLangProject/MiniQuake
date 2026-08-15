@@ -20,7 +20,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $Root = Split-Path -Parent $PSScriptRoot
-$TestScript = Join-Path $Root "TEST_BP-045-049.ps1"
+$TestScript = Join-Path $PSScriptRoot "TEST_BP-045-049.ps1"
 $PowerShellExecutable = (Get-Process -Id $PID).Path
 $Arguments = @(
   "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $TestScript,

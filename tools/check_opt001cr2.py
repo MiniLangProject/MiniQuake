@@ -34,10 +34,10 @@ def main() -> int:
     golden = json.loads(
         (root / "audit/opt001cr2_harness_golden.json").read_text(encoding="utf-8-sig")
     )
-    runner = (root / "TEST_OPT-001CR2.ps1").read_text(encoding="utf-8-sig")
-    collector_path = root / ("COLLECT_RESULTS_OPT001CR2.ps1" if args.allow_downstream_package else "COLLECT_RESULTS.ps1")
+    runner = (root / "scripts" / "TEST_OPT-001CR2.ps1").read_text(encoding="utf-8-sig")
+    collector_path = root / "scripts" / ("COLLECT_RESULTS_OPT001CR2.ps1" if args.allow_downstream_package else "COLLECT_RESULTS.ps1")
     collector = collector_path.read_text(encoding="utf-8-sig")
-    launcher = (root / "test.ps1").read_text(encoding="utf-8-sig")
+    launcher = (root / "scripts" / "test.ps1").read_text(encoding="utf-8-sig")
     aggregate = (root / "tools/analyze_opt001a.py").read_text(encoding="utf-8-sig")
     comparator = (root / "tools/compare_opt001c_performance.py").read_text(encoding="utf-8-sig")
     build_info = (root / "src/miniquake/build_info.ml").read_text(encoding="utf-8-sig")

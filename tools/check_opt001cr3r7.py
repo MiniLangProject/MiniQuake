@@ -9,7 +9,7 @@ def main():
     root=Path(a.root).resolve(); errors=[]
     def text(rel): return (root/rel).read_text(encoding='utf-8')
     bi=text('src/miniquake/build_info.ml'); host=text('src/miniquake/host.ml'); mixer=text('src/miniquake/sound/mixer.ml')
-    world=text('src/miniquake/render/world.ml'); hot=text('tests/opt001cr3_hotpath_tests.ml'); runner=text('TEST_OPT-001CR3R7.ps1')
+    world=text('src/miniquake/render/world.ml'); hot=text('tests/opt001cr3_hotpath_tests.ml'); runner=text('scripts/TEST_OPT-001CR3R7.ps1')
     markers=[f'const OPTIMIZATION_STATUS = "{STATUS}"',f'const OPTIMIZATION_FINGERPRINT = {FINGERPRINT}',
              f'const OPTIMIZATION_PARENT = "{PARENT}"',f'const OPTIMIZATION_DELIVERY_REVISION = "{REV}"']
     for m in markers:

@@ -95,9 +95,9 @@ def main() -> int:
         runner_name = "TEST_" + downstream_revision + ".ps1"
     else:
         runner_name = "TEST_OPT-001C.ps1"
-    runner = (root / runner_name).read_text(encoding="utf-8-sig")
-    collector = (root / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
-    launcher = (root / "test.ps1").read_text(encoding="utf-8-sig")
+    runner = (root / "scripts" / runner_name).read_text(encoding="utf-8-sig")
+    collector = (root / "scripts" / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
+    launcher = (root / "scripts" / "test.ps1").read_text(encoding="utf-8-sig")
     contract = (root / "tests/opt001c_contract_tests.ml").read_text(encoding="utf-8-sig")
     comparator = (root / "tools/compare_opt001c_performance.py").read_text(encoding="utf-8-sig")
     golden = json.loads((root / "audit/opt001c_allocation_golden.json").read_text(encoding="utf-8-sig"))

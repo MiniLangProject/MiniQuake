@@ -67,6 +67,7 @@ polledBindings = []
 polledKeyDownSnapshot = bytes(256)
 polledKeyPressedSnapshot = bytes(256)
 polledKeyQueryMask = bytes(256)
+eventKeyDownStates = bytes(256)
 gameplayTransitionBlocked = false
 gameplayTransitionHeldCodes = []
 
@@ -432,6 +433,7 @@ function resetBindings()
   bindKey("DOWNARROW", "+back")
   bindKey("LEFTARROW", "+left")
   bindKey("RIGHTARROW", "+right")
+  bindKey("ALT", "+strafe")
   bindKey("W", "+forward")
   bindKey("S", "+back")
   bindKey("A", "+moveleft")
@@ -530,6 +532,9 @@ function keyIsDown(code)
   if code >= 203 and code <= 206 then return (joyOldButtonState & (1 << (code - 203))) != 0 end if
   if code >= 211 and code <= 234 then return (joyOldButtonState & (1 << (code - 207))) != 0 end if
   if code >= 235 and code <= 238 then return (joyOldPovState & (1 << (code - 235))) != 0 end if
+  // Ordered WM_KEYDOWN/WM_KEYUP state is the WinQuake-compatible authority.
+  // The asynchronous query remains a fallback for a delayed window message.
+  if code >= 0 and code < len(eventKeyDownStates) and eventKeyDownStates[code] != 0 then return true end if
   virtualKey = virtualKeyForCode(code)
   if virtualKey < 0 then return false end if
   return win.keyDown(virtualKey)
@@ -544,6 +549,7 @@ function keyIsDownWithMouseSnapshot(code, mouseButtons)
   if code >= 203 and code <= 206 then return (joyOldButtonState & (1 << (code - 203))) != 0 end if
   if code >= 211 and code <= 234 then return (joyOldButtonState & (1 << (code - 207))) != 0 end if
   if code >= 235 and code <= 238 then return (joyOldPovState & (1 << (code - 235))) != 0 end if
+  if code >= 0 and code < len(eventKeyDownStates) and eventKeyDownStates[code] != 0 then return true end if
   virtualKey = virtualKeyForCode(code)
   if virtualKey < 0 then return false end if
   return win.keyDown(virtualKey)
@@ -754,9 +760,29 @@ function polledKeyDownAt(code, mouseButtons)
   if code >= 203 and code <= 206 then return (joyOldButtonState & (1 << (code - 203))) != 0 end if
   if code >= 211 and code <= 234 then return (joyOldButtonState & (1 << (code - 207))) != 0 end if
   if code >= 235 and code <= 238 then return (joyOldPovState & (1 << (code - 235))) != 0 end if
+  if code >= 0 and code < len(eventKeyDownStates) and eventKeyDownStates[code] != 0 then return true end if
   virtualKey = virtualKeyForCode(code)
   if virtualKey < 0 or virtualKey >= len(polledKeyDownSnapshot) then return false end if
   return polledKeyDownSnapshot[virtualKey] != 0
+end function
+
+// Record the ordered Quake key level delivered by the Win32 event queue.
+// Keeping this separate from kbutton ownership lets live polling repair a
+// consumed command without trusting a transient asynchronous key sample.
+function setEventKeyState(code, down)
+  if code < 0 or code >= len(eventKeyDownStates) then return false end if
+  if down then eventKeyDownStates[code] = 1 else eventKeyDownStates[code] = 0 end if
+  return true
+end function
+
+// Clear all ordered keyboard levels after focus loss or input shutdown.
+function clearEventKeyStates()
+  index = 0
+  while index < len(eventKeyDownStates)
+    eventKeyDownStates[index] = 0
+    index = index + 1
+  end while
+  return true
 end function
 
 // Resolve a binding press edge from the frame-local bulk keyboard snapshot.
@@ -1237,6 +1263,11 @@ end function
 function IN_BlockGameplayTransition()
   global gameplayTransitionBlocked, gameplayTransitionHeldCodes
   gameplayTransitionHeldCodes = captureGameplayTransitionHeldCodes()
+  // A synchronous map load can outlive the WM_KEYUP message for the menu key
+  // that initiated it.  Do not let that old ordered event level become the
+  // authority after the handoff; the captured list below is checked against
+  // the current physical device level until every initiating control is up.
+  clearEventKeyStates()
   IN_ClearStates()
   IN_DiscardPolledKeyEdges()
   gameplayTransitionBlocked = true
@@ -1266,10 +1297,26 @@ function captureGameplayTransitionHeldCodes()
   return result
 end function
 
+// Query only the current physical device level for a control captured at a
+// menu/map boundary.  eventKeyDownStates intentionally is not consulted here:
+// it describes the pre-transition message stream and can remain set when the
+// renderer or a synchronous map load clears/recreates the native input queue.
+function gameplayTransitionCodeDown(code)
+  if code == 200 then return (win.mouseButtons() & 1) != 0 end if
+  if code == 201 then return (win.mouseButtons() & 2) != 0 end if
+  if code == 202 then return (win.mouseButtons() & 4) != 0 end if
+  if code >= 203 and code <= 206 then return (joyOldButtonState & (1 << (code - 203))) != 0 end if
+  if code >= 211 and code <= 234 then return (joyOldButtonState & (1 << (code - 207))) != 0 end if
+  if code >= 235 and code <= 238 then return (joyOldPovState & (1 << (code - 235))) != 0 end if
+  virtualKey = virtualKeyForCode(code)
+  if virtualKey < 0 then return false end if
+  return win.keyDown(virtualKey)
+end function
+
 // Report whether a control captured at the transition boundary remains held.
 function IN_GameplayTransitionControlHeld()
   for each code in gameplayTransitionHeldCodes
-    if keyIsDown(code) then return true end if
+    if gameplayTransitionCodeDown(code) then return true end if
   end for
   return false
 end function
@@ -1295,6 +1342,7 @@ function IN_Init()
   global gameplayTransitionBlocked, gameplayTransitionHeldCodes
   gameplayTransitionBlocked = false
   gameplayTransitionHeldCodes = []
+  clearEventKeyStates()
   IN_ClearStates()
   IN_StartupMouse()
   IN_StartupJoystick()
@@ -1307,6 +1355,7 @@ function IN_Shutdown()
   IN_DeactivateMouse()
   IN_ShowMouse()
   IN_ClearStates()
+  clearEventKeyStates()
   gameplayTransitionBlocked = false
   gameplayTransitionHeldCodes = []
   return true

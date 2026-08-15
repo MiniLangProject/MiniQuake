@@ -539,17 +539,24 @@ function PollEvents()
     key = -1
     if eventType == 1 then
       key = input.quakeKeyForVirtualKey(code)
-      if key >= 0 then events = events + [[key, value != 0]] end if
+      if key >= 0 then
+        input.setEventKeyState(key, value != 0)
+        events = events + [[key, value != 0]]
+      end if
     else if eventType == 2 then
       if code < 3 then events = events + [[K_MOUSE1 + code, value != 0]] end if
     else if eventType == 3 then
       if value == 255 then key = K_MWHEELDOWN else key = K_MWHEELUP end if
       events = events + [[key, true], [key, false]]
     else if eventType == 4 then
+      if value == 0 then input.clearEventKeyStates() end if
       events = events + [[-1, value != 0]]
     else if eventType == 5 then
       key = input.quakeKeyForScanCode(code)
-      if key != 0 then events = events + [[key, value != 0]] end if
+      if key != 0 then
+        input.setEventKeyState(key, value != 0)
+        events = events + [[key, value != 0]]
+      end if
     end if
     packed = win.inputEventPop()
   end while

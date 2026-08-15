@@ -34,8 +34,8 @@ def main() -> int:
     mixer = text("src/miniquake/sound/mixer.ml")
     world = text("src/miniquake/render/world.ml")
     hotpath_test = text("tests/opt001cr3_hotpath_tests.ml")
-    runner = text("TEST_OPT-001D.ps1")
-    collector = text("COLLECT_RESULTS.ps1")
+    runner = text("scripts/TEST_OPT-001D.ps1")
+    collector = text("scripts/COLLECT_RESULTS.ps1")
 
     errors += marker_errors(build_info, (
         f'const OPTIMIZATION_STATUS = "{STATUS}"',

@@ -50,4 +50,4 @@ python tools/verify.py --root . --refresh-manifest
 
 Historical acceptance detail remains in `PORT_LEDGER.json`,
 `BLOCK_LEDGER.json`, `docs/archive/changelog/`, `docs/archive/releases/`,
-`TEST_*.ps1`, and `audit/`.
+`scripts/TEST_*.ps1`, and `audit/`.

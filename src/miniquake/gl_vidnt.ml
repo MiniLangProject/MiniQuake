@@ -719,6 +719,10 @@ function ClearAllStates()
   // Queue the same synthetic key-up commands emitted by WinQuake before the
   // physical state tables are cleared. The host drains this queue into Cbuf.
   keys.Key_QueueReleaseAllCommands()
+  // A focus or renderer-mode transition may discard the matching native
+  // WM_KEYUP.  Clear the ordered event mirror together with the device state
+  // so live polling cannot resurrect a movement/jump key after activation.
+  input.clearEventKeyStates()
   input.IN_ClearDeviceStates()
   return true
 end function

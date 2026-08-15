@@ -179,26 +179,48 @@ function testGameplayTransitionIgnoresNewMovement()
   return true
 end function
 
+// Verify that a menu key whose release is lost during synchronous loading
+// cannot leave every gameplay control behind the transition latch forever.
+function testGameplayTransitionDropsStaleMenuEvent()
+  input.IN_ClearStates()
+  previous = input.commandForKey("ENTER")
+  input.bindKey("ENTER", "+jump")
+  input.setEventKeyState(13, true)
+  input.IN_BlockGameplayTransition()
+  require(input.IN_GameplayTransitionBlocked(), "stale menu transition armed")
+  require(not input.IN_GameplayTransitionControlHeld(), "stale event is not a physical hold")
+  require(input.IN_ReleaseGameplayTransitionIfNeutral(), "stale menu transition releases")
+  command = input.createCommand()
+  buildWithoutDevices(command, c.SIGNONS, false)
+  equal(command.buttons & c.BUTTON_JUMP, 0, "stale menu jump does not enter game")
+  if previous == "" then input.unbindKey("ENTER") else input.bindKey("ENTER", previous) end if
+  input.IN_ClearStates()
+  return true
+end function
+
 // Parse command-line arguments and run the selected operation.
 function main(args)
   result = try(testDemoConsumesWithoutNetwork())
   if result is error then print "FAIL demo input consumption: " + result.message; return 1 end if
-  print "[1/6] demo command snapshot / edge consumption"
+  print "[1/7] demo command snapshot / edge consumption"
   result = try(testUiDestinationStillBuildsMove())
   if result is error then print "FAIL UI input consumption: " + result.message; return 1 end if
-  print "[2/6] console/menu held move / edge consumption"
+  print "[2/7] console/menu held move / edge consumption"
   result = try(testNoclipStrafeVerticalMouse())
   if result is error then print "FAIL noclip mouse branch: " + result.message; return 1 end if
-  print "[3/6] noclip strafe vertical mouse"
+  print "[3/7] noclip strafe vertical mouse"
   result = try(testBackwardMoveKeepsSignedWireValue())
   if result is error then print "FAIL backward input/wire path: " + result.message; return 1 end if
-  print "[4/6] backward input / signed Protocol 15 move"
+  print "[4/7] backward input / signed Protocol 15 move"
   result = try(testGameplayTransitionConsumesQueuedActions())
   if result is error then print "FAIL gameplay-transition input gate: " + result.message; return 1 end if
-  print "[5/6] menu/map transition input gate"
+  print "[5/7] menu/map transition input gate"
   result = try(testGameplayTransitionIgnoresNewMovement())
   if result is error then print "FAIL gameplay-transition movement snapshot: " + result.message; return 1 end if
-  print "[6/6] post-transition movement cannot extend input gate"
-  print "CL_INPUT PRODUCTION TESTS PASSED (6/6)"
+  print "[6/7] post-transition movement cannot extend input gate"
+  result = try(testGameplayTransitionDropsStaleMenuEvent())
+  if result is error then print "FAIL stale menu-transition event: " + result.message; return 1 end if
+  print "[7/7] stale menu key cannot retain transition gate"
+  print "CL_INPUT PRODUCTION TESTS PASSED (7/7)"
   return 0
 end function

@@ -16,7 +16,7 @@ bp066Failures = 0
 function bp066Check(value, name)
   global bp066Index, bp066Failures
   bp066Index = bp066Index + 1
-  print "[" + bp066Index + "/31] " + name
+  print "[" + bp066Index + "/35] " + name
   if not value then
     bp066Failures = bp066Failures + 1
     print "FAIL: " + name
@@ -133,10 +133,48 @@ function main(args)
   bp066Check(heldCommand.forwardMove == 0.0, "released W stops forward movement")
   bp066Input.IN_ClearStates()
 
+  // Exercise the original Quake arrow bindings through the same native VK
+  // level snapshot used by the interactive build. This prevents W/S-only
+  // coverage from hiding regressions in the navigation-key translation.
+  bp066Win.inputTestPush(1, 38, 1)
+  bp066Input.buildOriginalMove(
+    heldCommand, bp066Constants.SIGNONS, 4.0,
+    3.0, 0.022, 0.022, false,
+    200.0, 200.0, 350.0, 200.0,
+    false, true, false, false,
+  )
+  bp066Check(heldCommand.forwardMove == 100.0, "UPARROW starts stock forward movement")
+  bp066Win.inputTestPush(1, 38, 0)
+  bp066Input.buildOriginalMove(
+    heldCommand, bp066Constants.SIGNONS, 4.0,
+    3.0, 0.022, 0.022, false,
+    200.0, 200.0, 350.0, 200.0,
+    false, true, false, false,
+  )
+  bp066Check(heldCommand.forwardMove == 0.0, "released UPARROW stops forward movement")
+
+  bp066Win.inputTestPush(1, 40, 1)
+  bp066Input.buildOriginalMove(
+    heldCommand, bp066Constants.SIGNONS, 4.0,
+    3.0, 0.022, 0.022, false,
+    200.0, 200.0, 350.0, 200.0,
+    false, true, false, false,
+  )
+  bp066Check(heldCommand.forwardMove == -100.0, "DOWNARROW starts stock backward movement")
+  bp066Win.inputTestPush(1, 40, 0)
+  bp066Input.buildOriginalMove(
+    heldCommand, bp066Constants.SIGNONS, 4.0,
+    3.0, 0.022, 0.022, false,
+    200.0, 200.0, 350.0, 200.0,
+    false, true, false, false,
+  )
+  bp066Check(heldCommand.forwardMove == 0.0, "released DOWNARROW stops backward movement")
+  bp066Input.IN_ClearStates()
+
   if bp066Failures > 0 then
-    print "MiniQuake BP-066 input device tests failed: " + bp066Failures + "/31"
+    print "MiniQuake BP-066 input device tests failed: " + bp066Failures + "/35"
     return 1
   end if
-  print "MiniQuake BP-066 input device tests passed: 31"
+  print "MiniQuake BP-066 input device tests passed: 35"
   return 0
 end function

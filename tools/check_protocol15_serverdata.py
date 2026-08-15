@@ -651,8 +651,8 @@ def check_source_contract(root: Path) -> Check:
             "builtins": root / "src/miniquake/quakec/builtins.ml",
             "tests": root / "tests/protocol15_serverdata_tests.ml",
             "build": root / "build.ps1",
-            "acceptance": root / "TEST_BP-012R1.ps1",
-            "collector": root / "COLLECT_RESULTS.ps1",
+            "acceptance": root / "scripts" / "TEST_BP-012R1.ps1",
+            "collector": root / "scripts" / "COLLECT_RESULTS.ps1",
         }
         files = {key: path.read_text(encoding="utf-8-sig") for key, path in paths.items()}
 

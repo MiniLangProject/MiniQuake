@@ -60,7 +60,7 @@ def main() -> int:
     if has_legacy_window_title(source):
         errors.append("production source still contains GLQuake window title")
 
-    runner_path = root / "TEST_OPT-001D.ps1"
+    runner_path = root / "scripts" / "TEST_OPT-001D.ps1"
     if not runner_path.exists():
         errors.append("missing test runner")
     elif "Test-OPT001D60FpsGate" not in runner_path.read_text(encoding="utf-8"):

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "package": "BP-066",
-  "fixtures": 22,
+  "fixtures": 35,
   "first_filtered": [5.0, -3.0],
   "second_filtered": [8.0, -2.0],
   "joystick_axes": 6,

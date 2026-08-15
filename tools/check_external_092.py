@@ -25,7 +25,7 @@ def main() -> int:
     host = read("src/miniquake/host.ml")
     mainml = read("src/main.ml")
     test = read("tests/original_client_interop_tests.ml")
-    harness = read("TEST_BP-090-094R6.ps1")
+    harness = read("scripts/TEST_BP-090-094R6.ps1")
     golden_path = root / "audit/original_client_interop_golden.json"
     try:
         golden = json.loads(golden_path.read_text(encoding="utf-8-sig"))

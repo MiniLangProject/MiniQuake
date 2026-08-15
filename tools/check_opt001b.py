@@ -25,39 +25,39 @@ def main() -> int:
     bi=(root/'src/miniquake/build_info.ml').read_text(encoding='utf-8-sig')
     if args.allow_downstream_package:
         if 'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R8"' in bi:
-            runner_path = root / 'TEST_OPT-001CR3R8.ps1'
+            runner_path = root / 'scripts' / 'TEST_OPT-001CR3R8.ps1'
             downstream_revision = 'OPT-001CR3R8'
             downstream_parent = 'OPT-001CR3R7'
         elif 'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R6"' in bi:
-            runner_path = root / 'TEST_OPT-001CR3R6.ps1'
+            runner_path = root / 'scripts' / 'TEST_OPT-001CR3R6.ps1'
             downstream_revision = 'OPT-001CR3R6'
             downstream_parent = 'OPT-001CR3R5'
         elif 'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R4"' in bi:
-            runner_path = root / 'TEST_OPT-001CR3R4.ps1'
+            runner_path = root / 'scripts' / 'TEST_OPT-001CR3R4.ps1'
             downstream_revision = 'OPT-001CR3R4'
             downstream_parent = 'OPT-001CR3R3'
         elif 'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R3"' in bi:
-            runner_path = root / 'TEST_OPT-001CR3R3.ps1'
+            runner_path = root / 'scripts' / 'TEST_OPT-001CR3R3.ps1'
             downstream_revision = 'OPT-001CR3R3'
             downstream_parent = 'OPT-001CR3R2'
         elif 'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R2"' in bi:
-            runner_path = root / 'TEST_OPT-001CR3R2.ps1'
+            runner_path = root / 'scripts' / 'TEST_OPT-001CR3R2.ps1'
             downstream_revision = 'OPT-001CR3R2'
             downstream_parent = 'OPT-001CR3R1'
         elif 'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3R1"' in bi:
-            runner_path = root / 'TEST_OPT-001CR3R1.ps1'
+            runner_path = root / 'scripts' / 'TEST_OPT-001CR3R1.ps1'
             downstream_revision = 'OPT-001CR3R1'
             downstream_parent = 'OPT-001CR3'
         elif 'const OPTIMIZATION_DELIVERY_REVISION = "OPT-001CR3"' in bi:
-            runner_path = root / 'TEST_OPT-001CR3.ps1'
+            runner_path = root / 'scripts' / 'TEST_OPT-001CR3.ps1'
             downstream_revision = 'OPT-001CR3'
             downstream_parent = 'OPT-001CR2'
         else:
-            runner_path = root / 'TEST_OPT-001C.ps1'
+            runner_path = root / 'scripts' / 'TEST_OPT-001C.ps1'
             downstream_revision = 'OPT-001C'
             downstream_parent = 'OPT-001B'
     else:
-        runner_path = root / 'TEST_OPT-001B.ps1'
+        runner_path = root / 'scripts' / 'TEST_OPT-001B.ps1'
     runner=runner_path.read_text(encoding='utf-8-sig')
     contract=(root/'tests/opt001b_contract_tests.ml').read_text(encoding='utf-8-sig')
     golden=json.loads((root/'audit/opt001b_correctness_golden.json').read_text(encoding='utf-8-sig'))
