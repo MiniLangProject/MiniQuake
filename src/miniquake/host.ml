@@ -2850,7 +2850,20 @@ end function
 
 // Update module state for console active.
 function setConsoleActive(session, active)
+  // Con_ToggleConsole_f mutates ConsoleState.active before returning its next
+  // destination. consoleVisible and KEY_CONSOLE therefore preserve ownership
+  // of the old input context when this helper receives active=false.
+  consoleOwnedInput = session.console.active or session.consoleVisible or keys.destination() == keys.KEY_CONSOLE
   if active and session.menu.active then setMenuActive(session, false) end if
+  if not active and consoleOwnedInput and session.windowCreated then
+    // ENTER is both the console submit key and a stock +jump binding. Native
+    // press edges are intentionally retained while gameplay polling is off;
+    // discard those console-owned edges before the first gameplay frame so a
+    // previously submitted command cannot become a delayed jump.
+    input.IN_BlockGameplayTransition()
+    input.clear(session.client.command)
+    keys.Key_ClearStates()
+  end if
   console.setActive(session.console, active)
   session.consoleVisible = active
   if active then

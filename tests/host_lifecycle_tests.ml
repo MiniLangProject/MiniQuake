@@ -15,6 +15,7 @@ import miniquake.net_loop as netloop
 import miniquake.net_main as netmain
 import miniquake.client as clientRuntime
 import miniquake.input as input
+import miniquake.platform.win32 as win
 
 // Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
@@ -110,6 +111,37 @@ function testMenuCloseInputHandoff()
   assertTrue(input.IN_GameplayTransitionBlocked(), "menu close transition latch")
   assertEqual(input.inJump[2], 0, "menu close clears jump")
   assertEqual(keys.destination(), keys.KEY_GAME, "menu close restores game destination")
+  input.IN_Shutdown()
+  keys.Key_Init()
+  return true
+end function
+
+// Closing the console must consume an earlier ENTER press instead of turning
+// its retained native edge into the stock +jump binding in gameplay.
+function testConsoleCloseInputHandoff()
+  session = newSession([])
+  keys.Key_Init()
+  input.IN_Init()
+  previous = input.commandForKey("ENTER")
+  input.bindKey("ENTER", "+jump")
+  session.windowCreated = true
+  session.console.active = true
+  session.consoleVisible = true
+  keys.setDestination(keys.KEY_CONSOLE)
+
+  // A complete console ENTER press is consumed by Key_Console, while the
+  // native pressed edge remains pending until gameplay polling resumes.
+  win.inputTestPush(1, 13, 1)
+  win.inputTestPush(1, 13, 0)
+  host.processConsoleInput(session)
+  host.setConsoleActive(session, false)
+  assertTrue(input.IN_GameplayTransitionBlocked(), "console close transition latch")
+  assertEqual(keys.destination(), keys.KEY_GAME, "console close restores game destination")
+  assertTrue(input.IN_ReleaseGameplayTransitionIfNeutral(), "console close releases neutral latch")
+  input.IN_PollButtonCommands()
+  assertEqual(input.inJump[2], 0, "console ENTER edge does not become jump")
+
+  if previous == "" then input.unbindKey("ENTER") else input.bindKey("ENTER", previous) end if
   input.IN_Shutdown()
   keys.Key_Init()
   return true
@@ -293,31 +325,34 @@ end function
 
 // Parse command-line arguments and run the selected operation.
 function main(args)
-  print "MiniQuake host lifecycle tests starting: 8"
+  print "MiniQuake host lifecycle tests starting: 9"
   result = try(testFindMaxClients())
   if result is error then print "FAIL maxclients: " + result.message; return 1 end if
-  print "[1/8] dedicated/listen maxclients"
+  print "[1/9] dedicated/listen maxclients"
   result = try(testFilterTime())
   if result is error then print "FAIL filter: " + result.message; return 1 end if
-  print "[2/8] filter/timedemo/host_framerate"
+  print "[2/9] filter/timedemo/host_framerate"
   result = try(testMenuCloseInputHandoff())
   if result is error then print "FAIL menu input handoff: " + result.message; return 1 end if
-  print "[3/8] menu close input handoff"
+  print "[3/9] menu close input handoff"
+  result = try(testConsoleCloseInputHandoff())
+  if result is error then print "FAIL console input handoff: " + result.message; return 1 end if
+  print "[4/9] console close consumes ENTER edge"
   result = try(testFrameOrder())
   if result is error then print "FAIL frame order: " + result.message; return 1 end if
-  print "[4/8] deterministic host frame order"
+  print "[5/9] deterministic host frame order"
   result = try(testErrorsDropAndShutdown())
   if result is error then print "FAIL lifecycle: " + result.message; return 1 end if
-  print "[5/8] error/drop/shutdown"
+  print "[6/9] error/drop/shutdown"
   result = try(testVcrExclusion())
   if result is error then print "FAIL VCR exclusion: " + result.message; return 1 end if
-  print "[6/8] VCR exclusion"
+  print "[7/9] VCR exclusion"
   result = try(testProductionClientSendAndLoopSlist())
   if result is error then print "FAIL production client/slist: " + result.message; return 1 end if
-  print "[7/8] production CL_SendCmd order / loop slist"
+  print "[8/9] production CL_SendCmd order / loop slist"
   result = try(testShutdownReliableFlush())
   if result is error then print "FAIL shutdown reliable flush: " + result.message; return 1 end if
-  print "[8/8] shutdown pending reliable / disconnect order"
-  print "MiniQuake host lifecycle tests passed: 8"
+  print "[9/9] shutdown pending reliable / disconnect order"
+  print "MiniQuake host lifecycle tests passed: 9"
   return 0
 end function
