@@ -1552,7 +1552,6 @@ static mq_u16 mq_text_queue[MQ_TEXT_QUEUE_CAPACITY];
 static mq_u32 mq_text_head = 0;
 static mq_u32 mq_text_tail = 0;
 static mq_u8 mq_key_pressed[256];
-static mq_u8 mq_key_physical_latched[256];
 static mq_i32 mq_joy_available = 0;
 static UINT mq_joy_id = 0;
 static mq_u32 mq_joy_button_count_value = 0;
@@ -1754,7 +1753,6 @@ static void mq_clear_input_events(void) {
     mq_input_tail = 0;
     for (i = 0; i < 256u; ++i) {
         mq_key_pressed[i] = 0;
-        mq_key_physical_latched[i] = 0;
         mq_virtual_key_down[i] = 0;
         mq_virtual_key_scan[i] = 0;
     }
@@ -2552,12 +2550,13 @@ MQ_EXPORT mq_i32 mq_win_key_pressed(mq_i32 virtual_key) {
 
 /* Capture all Win32 key levels and pending press edges in one bridge call.
  *
- * The ordered window-message table remains the source for press edges, but an
- * active interactive window samples the physical high bit authoritatively.
- * This prevents an occasionally delayed/missed message-level transition from
- * turning a continuously held movement key into a one-frame release.  Keeping
- * requested GetAsyncKeyState calls inside this one ABI crossing retains the
- * allocation and call-overhead improvement of the bulk snapshot. */
+ * The ordered window-message table remains the source for press edges, while
+ * every requested binding samples the physical high bit authoritatively.  A
+ * previous optimization only sampled keys after observing a message-level
+ * down edge.  A delayed or discarded edge during synchronous level loading
+ * could therefore make arrows, Alt and Space invisible for the whole hold.
+ * Keeping all requested GetAsyncKeyState calls inside this one ABI crossing
+ * retains the allocation and call-overhead improvement of the bulk snapshot. */
 MQ_EXPORT mq_i32 mq_win_key_snapshot(
     mq_u8 *down_states,
     mq_u8 *pressed_states,
@@ -2570,22 +2569,15 @@ MQ_EXPORT mq_i32 mq_win_key_snapshot(
     for (index = 0u; index < state_count; ++index) {
         if (query_mask[index] == 0u) {
             down_states[index] = 0u;
-            mq_key_physical_latched[index] = 0u;
         } else if (mq_window != MQ_NULL) {
-            /* Once a real down edge has been observed, keep sampling that
-             * physical key until it is genuinely released. This repairs a
-             * stray message-level up without paying GetAsyncKeyState for every
-             * possible binding on every frame. */
-            if (!mq_active_app) {
+            /* Do not sample global keyboard state unless this window actually
+             * owns focus; WM_ACTIVATEAPP can lag a foreground switch by one
+             * message-pump pass. */
+            if (!mq_active_app || GetForegroundWindow() != mq_window) {
                 down_states[index] = 0u;
-                mq_key_physical_latched[index] = 0u;
-            } else if (mq_virtual_key_down[index] || mq_key_pressed[index] || mq_key_physical_latched[index]) {
-                mq_u8 physical_down =
-                    (GetAsyncKeyState((mq_i32)index) & 0x8000) != 0 ? 1u : 0u;
-                down_states[index] = physical_down;
-                mq_key_physical_latched[index] = physical_down;
             } else {
-                down_states[index] = 0u;
+                down_states[index] =
+                    (GetAsyncKeyState((mq_i32)index) & 0x8000) != 0 ? 1u : 0u;
             }
         } else {
             /* Headless bridge tests have no physical target window and use
