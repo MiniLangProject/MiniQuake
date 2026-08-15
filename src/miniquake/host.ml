@@ -537,6 +537,16 @@ end function
 // Finalize state for finish local map connection.
 function finishLocalMapConnection(session, preserveClients)
   opt001dCvarDeveloper = cvar.variableValue(session.cvars, "developer")
+  // Demo playback and remote connections deliberately use a non-authoritative
+  // LocalClient because protocol snapshots own their rendered PlayerState.
+  // A following local map reuses that client object, so restore the integrated
+  // loopback invariant before any signon packet can write quantized origin,
+  // velocity or FL_ONGROUND data back into the server's shared PlayerState.
+  // Direct +map starts already carry this flag from create(); the attract-demo
+  // -> New Game path is the transition that requires the explicit reset.
+  session.client.localAuthoritative = true
+  session.client.demoPlayback = false
+  session.client.player = session.player
   session.client.name = cvar.variableString(session.cvars, "_cl_name")
   session.client.colors = native.trunc(cvar.variableValue(session.cvars, "_cl_color"))
   if not preserveClients then

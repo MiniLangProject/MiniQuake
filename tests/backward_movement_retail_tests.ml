@@ -10,6 +10,7 @@ import miniquake.host as host
 import miniquake.input as input
 import miniquake.keys as keys
 import miniquake.mathlib as math
+import miniquake.menu as menu
 import miniquake.platform.win32 as win
 import miniquake.screen as screen
 import miniquake.server as server
@@ -47,6 +48,47 @@ function main(args)
   ])
   initialized = try(host.initialize(session))
   if initialized is error then return fail(session, initialized.message) end if
+
+  // Reproduce the directory-only launch path before testing ordinary map
+  // movement: the attract loop replaces the integrated client with a remote-
+  // style demo client. Starting New Game must restore local authority before
+  // Protocol 15 begins feeding snapshots into the shared server PlayerState.
+  playingDemo = try(host.playDemo(session, "demo1", false))
+  if playingDemo is error then return fail(session, "attract demo did not start: " + playingDemo.message) end if
+  if session.demoPlayback is void then return fail(session, "attract demo playback was not active") end if
+  if session.client.localAuthoritative then return fail(session, "demo client incorrectly retained local authority") end if
+  host.setMenuActive(session, true)
+  menu.M_Menu_SinglePlayer_f(session.menu)
+  if not host.executeMenuSelection(session) then return fail(session, "New Game menu selection was rejected") end if
+  newGameFrame = try(host.frame(session, 0.02))
+  if newGameFrame is error then return fail(session, "New Game after attract demo failed: " + newGameFrame.message) end if
+  if session.server.mapName != "start" then return fail(session, "New Game menu selection did not load start") end if
+  if not session.client.localAuthoritative then return fail(session, "New Game retained the non-authoritative demo client") end if
+
+  // Prove the user-visible symptom immediately on the first New Game map,
+  // before a second transition could accidentally repair the client state.
+  session.player.moveType = c.MOVETYPE_NOCLIP
+  session.player.noclip = true
+  session.client.command.viewAngles = math.copy(session.player.viewAngles)
+  attractForward = math.angleVectors(session.client.command.viewAngles)[0]
+  attractStart = math.copy(session.player.origin)
+  input.IN_ClearStates()
+  keys.setDestination(keys.KEY_GAME)
+  queueArrowEvent(session, 72, true)
+  attractFrame = 0
+  while attractFrame < 12
+    attractResult = try(host.frame(session, 0.02))
+    if attractResult is error then return fail(session, attractResult.message) end if
+    attractFrame = attractFrame + 1
+  end while
+  queueArrowEvent(session, 72, false)
+  attractDisplacement = math.subtract(session.player.origin, attractStart)
+  attractForwardDistance = math.dot(attractDisplacement, attractForward)
+  if session.server.clients[0].command.forwardMove <= 0.0 then return fail(session, "New Game after attract demo lost UPARROW forwardmove") end if
+  if attractForwardDistance <= 0.5 then return fail(session, "New Game after attract demo did not move forward") end if
+
+  restoredMap = try(host.Host_Map_f(session, ["map", "e1m1"]))
+  if restoredMap is error then return fail(session, restoredMap.message) end if
 
   // A mistyped in-game map command must not enter the destructive transition
   // path. Keep the real retail e1m1 server, loopback signon and screen state
