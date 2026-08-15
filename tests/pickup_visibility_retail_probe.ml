@@ -9,6 +9,7 @@ import miniquake.host as host
 import miniquake.server as server
 import miniquake.server_collision as collision
 import miniquake.client as client
+import miniquake.constants as c
 
 // Exercise contains entity as part of this deterministic regression fixture.
 function containsEntity(values, entityIndex)
@@ -16,6 +17,28 @@ function containsEntity(values, entityIndex)
     if value is not void and value.number == entityIndex then return true end if
   end for
   return false
+end function
+
+// Print every live model-bearing edict so retail maps can be audited for
+// overlapping skill/deathmatch variants without relying on visual inspection.
+function printModelEdicts(session)
+  machine = session.server.machine
+  index = session.server.maxClients + 1
+  while index < machine.context.edicts.numEdicts
+    if not machine.context.edicts.freeFlags[index] then
+      model = server.qcString(machine, index, "model", "")
+      if model != "" then
+        origin = server.qcVector(machine, index, "origin", session.player.origin)
+        print "edict=" + index +
+          " class=" + server.qcString(machine, index, "classname", "") +
+          " model=" + model +
+          " origin=" + origin.x + "," + origin.y + "," + origin.z +
+          " spawnflags=" + server.qcFloat(machine, index, "spawnflags", 0.0)
+      end if
+    end if
+    index = index + 1
+  end while
+  return true
 end function
 
 // Print authoritative and client-side visibility state for one pickup.
@@ -27,6 +50,7 @@ function printPickupState(session, entityIndex, label)
   filtered = client.CL_FilterAuthoritativeVisibleEntities(active, session.server.edicts)
   print label +
     " qc_model='" + server.qcString(machine, entityIndex, "model", "") + "'" +
+    " qc_modelhandle=" + server.qcWord(machine, entityIndex, "model", 0) +
     " qc_modelindex=" + server.qcFloat(machine, entityIndex, "modelindex", 0.0) +
     " qc_solid=" + server.qcFloat(machine, entityIndex, "solid", 0.0) +
     " qc_free=" + machine.context.edicts.freeFlags[entityIndex] +
@@ -37,6 +61,30 @@ function printPickupState(session, entityIndex, label)
     " client_message=" + clientEntity.messageTime +
     " visible=" + containsEntity(active, entityIndex) +
     " filtered=" + containsEntity(filtered, entityIndex)
+  return true
+end function
+
+// Make each stock pickup category eligible before invoking its real touch
+// function. This prevents a full-health or full-ammo no-op from masquerading
+// as a render-lifecycle result.
+function prepareEligiblePlayer(session)
+  player = session.player
+  player.health = 25.0
+  player.armor = 0.0
+  player.ammo = 0.0
+  player.shells = 0.0
+  player.nails = 0.0
+  player.rockets = 0.0
+  player.cells = 0.0
+  player.items = c.IT_SHOTGUN
+  server.setQcEntityFloat(session.server, 1, "health", player.health)
+  server.setQcEntityFloat(session.server, 1, "armorvalue", player.armor)
+  server.setQcEntityFloat(session.server, 1, "currentammo", player.ammo)
+  server.setQcEntityFloat(session.server, 1, "ammo_shells", player.shells)
+  server.setQcEntityFloat(session.server, 1, "ammo_nails", player.nails)
+  server.setQcEntityFloat(session.server, 1, "ammo_rockets", player.rockets)
+  server.setQcEntityFloat(session.server, 1, "ammo_cells", player.cells)
+  server.setQcEntityFloat(session.server, 1, "items", player.items)
   return true
 end function
 
@@ -53,6 +101,11 @@ function main(args)
   ])
   initialized = try(host.initialize(session))
   if initialized is error then print initialized.message; return 1 end if
+  if wanted == "list" then
+    printModelEdicts(session)
+    host.shutdown(session)
+    return 0
+  end if
   machine = session.server.machine
   entityIndex = -1
   index = session.server.maxClients + 1
@@ -78,12 +131,35 @@ function main(args)
   clientEntity.messageTime = session.client.messageTimes[0]
   session.client.visibleEntities = [clientEntity]
   printPickupState(session, entityIndex, "before")
+  prepareEligiblePlayer(session)
   session.player.origin.x = target.x
   session.player.origin.y = target.y
   session.player.origin.z = target.z
   server.setQcEntityVector(session.server, 1, "origin", target)
   collision.linkEntity(session.server, 1, true)
   printPickupState(session, entityIndex, "after_touch")
+  if server.qcString(machine, entityIndex, "model", "") != "" then
+    print "pickup touch did not hide " + wanted
+    host.shutdown(session)
+    return 7
+  end if
+
+  // Reproduce the stale demo/reconnect ownership flag that originally let a
+  // same-process pickup bypass the authoritative gate. Keep server time paused
+  // so Protocol-15 omission alone cannot accidentally make this test pass.
+  server.syncQuakeCSnapshotEdicts(session.server)
+  session.client.localAuthoritative = false
+  session.server.paused = true
+  guardedFrame = try(host.frame(session, 0.05))
+  if guardedFrame is error then print guardedFrame.message; host.shutdown(session); return 10 end if
+  printPickupState(session, entityIndex, "after_transition_guard")
+  if session.client.entities[entityIndex].modelIndex != 0 then
+    print "integrated transition retained pickup " + wanted
+    host.shutdown(session)
+    return 11
+  end if
+  session.client.localAuthoritative = true
+  session.server.paused = false
 
   frameIndex = 0
   while frameIndex < 4
@@ -95,7 +171,11 @@ function main(args)
   active = client.CL_ActiveVisibleEntities(session.client)
   filtered = client.CL_FilterAuthoritativeVisibleEntities(active, session.server.edicts)
   visibleAfter = containsEntity(filtered, entityIndex)
+  mirrorVisible = session.server.edicts[entityIndex].model != ""
+  clientVisible = session.client.entities[entityIndex].modelIndex != 0
   host.shutdown(session)
   if visibleAfter then return 6 end if
+  if mirrorVisible then return 8 end if
+  if clientVisible then return 9 end if
   return 0
 end function

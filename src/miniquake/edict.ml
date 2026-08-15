@@ -58,6 +58,7 @@ function create(number)
     0,
     0,
     0,
+    0,
     origin,
     angles,
     velocity,

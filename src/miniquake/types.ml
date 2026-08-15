@@ -645,6 +645,7 @@ struct QuakeEdict
   keyValues
   className
   model
+  modelHandle
   modelIndex
   frame
   skin

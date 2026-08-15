@@ -3469,7 +3469,11 @@ function _Host_Frame(session, elapsedSeconds)
   // phase above. Remove that numbered client entity before relinking and
   // before the world/entity render phases; filtering only the final submitted
   // list left older entity/efrag consumers with one retained model.
-  if session.server.active and session.client.localAuthoritative then
+  // The presence of the same-process server is the authoritative ownership
+  // test. A LocalClient can temporarily retain remote/demo interpolation flags
+  // across reconnect-style transitions; those flags must never allow an old
+  // numbered model to bypass the server edict that already hid or freed it.
+  if session.server.active then
     client.CL_ApplyAuthoritativeEntityVisibility(session.client, session.server.edicts)
   end if
   synchronizeClientRelinkModels(session)
@@ -3633,7 +3637,7 @@ function _Host_Frame(session, elapsedSeconds)
         // mirror as the final render gate. This makes collected pickups vanish
         // immediately even if a stale Protocol-15 visible list survived one
         // frame; remote clients and demos retain the original network path.
-        if session.server.active and session.client.localAuthoritative then
+        if session.server.active then
           visibleEntities = client.CL_FilterAuthoritativeVisibleEntities(
             visibleEntities,
             session.server.edicts,

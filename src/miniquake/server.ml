@@ -2762,6 +2762,7 @@ function syncQuakeCEdictAt(server, entityIndex, offsets)
   if item.free then return item end if
 
   item.className = qcStringAt(machine, entityIndex, offsets[0], "")
+  item.modelHandle = qcWordAt(machine, entityIndex, offsets[1], 0)
   item.model = qcStringAt(machine, entityIndex, offsets[1], "")
   item.modelIndex = native.trunc(qcFloatAt(machine, entityIndex, offsets[2], 0.0))
   item.frame = native.trunc(qcFloatAt(machine, entityIndex, offsets[3], 0.0))
@@ -2827,6 +2828,7 @@ function syncQuakeCSnapshotEdictAt(server, entityIndex, offsets)
   oldOriginX = item.origin.x
   oldOriginY = item.origin.y
   oldOriginZ = item.origin.z
+  oldModelHandle = item.modelHandle
   oldModelIndex = item.modelIndex
   // SV_WriteEntitiesToClient rejects entities whose entvars_t::model string
   // handle is zero, independently of modelindex. Stock pickup QuakeC uses
@@ -2836,10 +2838,12 @@ function syncQuakeCSnapshotEdictAt(server, entityIndex, offsets)
   // Resolve text only when the item becomes visible or changes model; the
   // normal visible-entity frame remains allocation-free.
   modelHandle = qcWordAt(machine, entityIndex, offsets[1], 0)
+  item.modelHandle = modelHandle
   item.modelIndex = native.trunc(qcFloatAt(machine, entityIndex, offsets[2], 0.0))
   if modelHandle == 0 then
     item.model = ""
-  else if item.model == "" or oldModelIndex != item.modelIndex then
+  else if modelHandle == vm.TEMP_STRING_HANDLE or oldModelHandle != modelHandle or
+    item.model == "" or oldModelIndex != item.modelIndex then
     item.model = vm.stringValue(machine, modelHandle)
   end if
   item.frame = native.trunc(qcFloatAt(machine, entityIndex, offsets[3], 0.0))

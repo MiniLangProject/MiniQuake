@@ -103,7 +103,7 @@ function bp001MakeSyncMachine(entityCount)
     [],
     bp001SyncFieldDefinitions(),
     [dummy],
-    bytes(1),
+    bytes(2),
     vm.zeroArray(64),
     30,
   )
@@ -237,10 +237,18 @@ function bp001TestSynchronizedEdictGcRoots()
   vm.setEntityField(machine, 77, 1, 0)
   serverRuntime.syncQuakeCSnapshotEdicts(game)
   assertEqual(game.edicts[77].model, "", "collected pickup model string clears")
+  assertEqual(game.edicts[77].modelHandle, 0, "collected pickup model handle clears")
   assertEqual(game.edicts[77].modelIndex, 5, "collected pickup retains modelindex")
   vm.setEntityString(machine, 77, 1, "progs/g_rock2.mdl")
   serverRuntime.syncQuakeCSnapshotEdicts(game)
   assertEqual(game.edicts[77].model, "progs/g_rock2.mdl", "respawned pickup model restores")
+  // QuakeC strings are offsets, not nullable host strings. A mod can assign
+  // an empty string at a non-zero program offset; retaining only modelindex
+  // and the previous decoded text would keep drawing the collected pickup.
+  vm.setEntityField(machine, 77, 1, 1)
+  serverRuntime.syncQuakeCSnapshotEdicts(game)
+  assertEqual(game.edicts[77].modelHandle, 1, "non-zero empty pickup handle enters snapshot")
+  assertEqual(game.edicts[77].model, "", "non-zero empty pickup string clears")
 
   gc_set_limit(1048576)
   serverRuntime.shutdown(game)
