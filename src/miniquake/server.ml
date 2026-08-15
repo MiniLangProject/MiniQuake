@@ -1652,6 +1652,64 @@ function writePlannedEntityUpdate(server, buffer, item)
   return writePlannedEntityUpdateReserved(server, buffer, item, 0)
 end function
 
+// Report whether an entity is a latency-sensitive projectile that must be
+// scheduled before ordinary snapshot entities. Rockets and expansion-pack
+// missiles use MOVETYPE_FLYMISSILE; the stock grenade is a bouncing entity
+// and therefore also needs its model-name discriminator.
+function entityIsPriorityProjectile(item)
+  if item is void then return false end if
+  if item.moveType == c.MOVETYPE_FLYMISSILE then return true end if
+  return item.moveType == c.MOVETYPE_BOUNCE and item.model == "progs/grenade.mdl"
+end function
+
+// Write one snapshot class while retaining the Protocol-15 packet budget.
+// The caller selects either priority projectiles or ordinary entities; the
+// client edict is handled separately so it can never be duplicated.
+function writeVisibleEntityClassReserved(
+  server,
+  buffer,
+  pvs,
+  clientEdict,
+  reservedBytes,
+  priorityProjectiles,
+)
+  written = 0
+  index = 1
+  while index < server.numEdicts and index < len(server.edicts)
+    item = server.edicts[index]
+    if item is not void and index != clientEdict and not item.free and
+      entityIsPriorityProjectile(item) == priorityProjectiles and
+      entityVisible(server, pvs, item, clientEdict) then
+      if not writePlannedEntityUpdateReserved(server, buffer, item, reservedBytes) then return written end if
+      written = written + 1
+    end if
+    index = index + 1
+  end while
+  return written
+end function
+
+// Write a complete visible-entity snapshot with the player and active
+// projectiles ahead of less time-sensitive entities. Protocol 15 accepts fast
+// updates in any entity order. Prioritization prevents a high-numbered rocket
+// or grenade from disappearing when a dense PVS reaches MAX_DATAGRAM.
+function writeVisibleEntityUpdatesReserved(server, buffer, pvs, clientEdict, reservedBytes)
+  written = 0
+  if clientEdict > 0 and clientEdict < server.numEdicts and clientEdict < len(server.edicts) then
+    playerItem = server.edicts[clientEdict]
+    if playerItem is not void and not playerItem.free then
+      if not writePlannedEntityUpdateReserved(server, buffer, playerItem, reservedBytes) then return written end if
+      written = written + 1
+    end if
+  end if
+  written = written + writeVisibleEntityClassReserved(
+    server, buffer, pvs, clientEdict, reservedBytes, true,
+  )
+  written = written + writeVisibleEntityClassReserved(
+    server, buffer, pvs, clientEdict, reservedBytes, false,
+  )
+  return written
+end function
+
 // Send client frame through the active connection.
 function sendClientFrame(server, client, player)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
@@ -1689,14 +1747,7 @@ function sendClientFrame(server, client, player)
   eye.z = player.origin.z + player.viewHeight
   pvs = world.fatPvs(server.worldModel, eye)
   reservedBytes = server.datagram.curSize
-  index = 1
-  while index < server.numEdicts and index < len(server.edicts)
-    item = server.edicts[index]
-    if item is not void and not item.free and entityVisible(server, pvs, item, client.edictIndex) then
-      if not writePlannedEntityUpdateReserved(server, buffer, item, reservedBytes) then break end if
-    end if
-    index = index + 1
-  end while
+  writeVisibleEntityUpdatesReserved(server, buffer, pvs, client.edictIndex, reservedBytes)
   appendDatagram(buffer, server.datagram)
   return netmain.NET_SendUnreliableMessage(client.socket, buffer)
 end function

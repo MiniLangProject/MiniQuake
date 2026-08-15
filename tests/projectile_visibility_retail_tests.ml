@@ -48,6 +48,8 @@ function main(args)
     print "usage: MiniQuakeProjectileVisibilityRetailTests.exe BASE [GAME]"
     return 2
   end if
+  // Fire repeated stock QuakeC projectiles and inspect each one only after it
+  // has crossed the server snapshot and client relink phases.
   game = "id1"
   if len(args) > 1 then game = args[1] end if
   session = host.create([
@@ -59,21 +61,25 @@ function main(args)
   playerIndex = session.server.clients[0].edictIndex
   names = ["W_FireRocket", "W_FireGrenade"]
   for each functionName in names
-    oldCount = server.recomputeEdictCount(session.server)
-    fired = try(server.executeQcFunction(session.server, functionName, playerIndex, 0))
-    if fired is error then return projectileFail(session, functionName + ": " + fired.message) end if
-    if not fired then return projectileFail(session, functionName + " is missing from retail progs.dat") end if
-    entityNumber = findProjectile(session, oldCount)
-    if entityNumber < 0 then entityNumber = findProjectile(session, session.server.maxClients + 1) end if
-    if entityNumber < 0 then return projectileFail(session, functionName + " did not allocate a projectile") end if
-    frameResult = try(host.frame(session, 0.02))
-    if frameResult is error then return projectileFail(session, functionName + " frame: " + frameResult.message) end if
-    if entityNumber >= len(session.server.edicts) then return projectileFail(session, functionName + " mirror was not synchronized") end if
-    mirror = session.server.edicts[entityNumber]
-    print functionName + " edict=" + entityNumber + " model=" + mirror.model + " modelindex=" + mirror.modelIndex + " packet=" + session.server.clients[0].datagramBuffer.curSize + " visible=" + clientSees(session, entityNumber)
-    if not clientSees(session, entityNumber) then
-      return projectileFail(session, functionName + " edict " + entityNumber + " did not reach the client")
-    end if
+    shot = 0
+    while shot < 8
+      oldCount = server.recomputeEdictCount(session.server)
+      fired = try(server.executeQcFunction(session.server, functionName, playerIndex, 0))
+      if fired is error then return projectileFail(session, functionName + ": " + fired.message) end if
+      if not fired then return projectileFail(session, functionName + " is missing from retail progs.dat") end if
+      entityNumber = findProjectile(session, oldCount)
+      if entityNumber < 0 then entityNumber = findProjectile(session, session.server.maxClients + 1) end if
+      if entityNumber < 0 then return projectileFail(session, functionName + " did not allocate a projectile") end if
+      frameResult = try(host.frame(session, 0.02))
+      if frameResult is error then return projectileFail(session, functionName + " frame: " + frameResult.message) end if
+      if entityNumber >= len(session.server.edicts) then return projectileFail(session, functionName + " mirror was not synchronized") end if
+      mirror = session.server.edicts[entityNumber]
+      print functionName + " shot=" + (shot + 1) + " edict=" + entityNumber + " model=" + mirror.model + " modelindex=" + mirror.modelIndex + " packet=" + session.server.clients[0].datagramBuffer.curSize + " visible=" + clientSees(session, entityNumber)
+      if not clientSees(session, entityNumber) then
+        return projectileFail(session, functionName + " edict " + entityNumber + " did not reach the client")
+      end if
+      shot = shot + 1
+    end while
   end for
 
   host.shutdown(session)

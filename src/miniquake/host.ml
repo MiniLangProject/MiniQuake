@@ -1039,6 +1039,13 @@ function loadGame(session, requestedName)
   if source is error then return source end if
   saved = savegame.parseBytes(source)
   if saved is error then return saved end if
+  // Host_Loadgame_f sets cls.demonum to -1 and disconnects the current
+  // client before spawning the saved map. In MiniQuake an attract demo also
+  // has a session-level DemoPlayback owner; merely disconnecting its
+  // LocalClient leaves that owner eligible for stepDemoPlayback on the next
+  // Host_Frame. Stop it only after the save has been validated, so a missing
+  // or corrupt save remains a non-destructive menu/console error.
+  stopAttractMode(session)
   cvar.setValue(session.cvars, "skill", saved.skill)
   // Host_Loadgame_f spawns the map, restores all globals/edicts, and only
   // then establishes the local connection.  Deferring signon is essential:
@@ -1815,6 +1822,14 @@ function stopAttractMode(session)
   session.demoNumber = -1
   cmd.removeCommandsNamed(session.commands, "playdemo")
   if session.demoPlayback is not void then finishDemoPlayback(session) end if
+  // Demo protocol side effects are deferred until the host presentation
+  // phase. A menu selection can occur between parsing and that drain; never
+  // carry those old sounds/prints/temporary effects into a new local game or
+  // a loaded save's serverinfo packet.
+  session.client.messages = []
+  session.client.printLog = []
+  session.particles = []
+  session.temporaryEntities = []
   return true
 end function
 

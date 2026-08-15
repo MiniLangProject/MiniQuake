@@ -11,6 +11,7 @@ tools/check_protocol15_serverdata.py.
 import miniquake.types as t
 import miniquake.constants as c
 import miniquake.client as clientModule
+import miniquake.client_protocol as clientProtocol
 import miniquake.sizebuf as sz
 import miniquake.message as msg
 import miniquake.protocol_serverdata as serverData
@@ -52,6 +53,43 @@ function runTest(number, name, fn)
     print "    FAIL: " + result.message
     return false
   end if
+  return true
+end function
+
+// Verify that dense snapshots retain high-numbered rockets and grenades.
+function testProjectileSnapshotPriority()
+  gameServer = server.create(1)
+  entities = [edict.create(0)]
+  player = edict.create(1)
+  entities = entities + [player]
+  index = 2
+  while index < 70
+    filler = edict.create(index)
+    filler.model = "progs/filler.mdl"
+    filler.modelIndex = 2
+    filler.origin = t.Vec3(index * 8.0, index * 4.0, index * 2.0)
+    filler.frame = index
+    entities = entities + [filler]
+    index = index + 1
+  end while
+  rocket = edict.create(70)
+  rocket.model = "progs/missile.mdl"
+  rocket.modelIndex = 3
+  rocket.moveType = c.MOVETYPE_FLYMISSILE
+  rocket.origin = t.Vec3(128.0, 64.0, 32.0)
+  entities = entities + [rocket]
+  gameServer.edicts = entities
+  gameServer.numEdicts = len(entities)
+
+  // A 64-byte fixture cannot contain every low-numbered filler. The planner
+  // must nevertheless emit the player followed by the high-numbered rocket.
+  buffer = sz.alloc(64)
+  written = server.writeVisibleEntityUpdatesReserved(gameServer, buffer, bytes(), 1, 0)
+  assertTrue(written >= 2, "dense snapshot writes player and projectile")
+  parsed = clientProtocol.CL_ParseServerMessage(sz.dataSlice(buffer))
+  assertTrue(len(parsed.events) >= 2, "dense snapshot has fast updates")
+  assertEqual(parsed.events[0].payload[0], 1, "player update is first")
+  assertEqual(parsed.events[1].payload[0], 70, "rocket update precedes filler saturation")
   return true
 end function
 
@@ -401,7 +439,7 @@ function testFastUpdatePlanner()
   assertFalse(server.entityVisible(gameServer, bytes([0]), door, 1), "multi-leaf door hidden outside every touched PVS")
   fat = worldBsp.fatPvs(map, t.Vec3(0.0, 0.0, 0.0))
   assertEqual(fat[0], 3, "fat PVS merges both sides of portal boundary")
-  return true
+  return testProjectileSnapshotPriority()
 end function
 
 // Verify delivery plans against the expected Quake behavior.

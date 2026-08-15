@@ -448,10 +448,53 @@ function SV_WriteEntitiesToClientReserved(state, clientEntity, buffer, reservedB
   eye = math.add(clientEntity.origin, clientEntity.viewOffset)
   pvs = SV_FatPVS(state, eye)
   written = 0
+  clientIndex = clientEntity.number
+  if clientIndex > 0 and clientIndex < state.server.numEdicts and clientIndex < len(state.server.edicts) then
+    playerItem = state.server.edicts[clientIndex]
+    if playerItem is not void and not playerItem.free then
+      playerBits = svmEntityBits(playerItem)
+      if not protocolUpdate.canWriteWithReservedTail(buffer, playerBits, reservedBytes) then
+        state.diagnostics = state.diagnostics + ["packet overflow before player update"]
+        return written
+      end if
+      protocolUpdate.writeFastUpdateBits(
+        buffer, playerBits, playerItem.number, playerItem.modelIndex, playerItem.frame,
+        playerItem.colormap, playerItem.skin, playerItem.effects, playerItem.origin,
+        playerItem.angles,
+      )
+      written = written + 1
+    end if
+  end if
+
+  // Protocol 15 permits arbitrary fast-update ordering. Send active missiles
+  // and the stock bouncing grenade before ordinary entities so the fixed
+  // datagram cannot intermittently omit a newly fired high-numbered edict.
   index = 1
   while index < state.server.numEdicts and index < len(state.server.edicts)
     item = state.server.edicts[index]
-    if item is not void and not item.free and svmEntityVisible(state, item, clientEntity.number, pvs) then
+    if index != clientIndex and item is not void and not item.free and
+      runtime.entityIsPriorityProjectile(item) and
+      svmEntityVisible(state, item, clientIndex, pvs) then
+      bits = svmEntityBits(item)
+      if not protocolUpdate.canWriteWithReservedTail(buffer, bits, reservedBytes) then
+        state.diagnostics = state.diagnostics + ["packet overflow during projectile updates"]
+        return written
+      end if
+      protocolUpdate.writeFastUpdateBits(
+        buffer, bits, item.number, item.modelIndex, item.frame, item.colormap, item.skin,
+        item.effects, item.origin, item.angles,
+      )
+      written = written + 1
+    end if
+    index = index + 1
+  end while
+
+  index = 1
+  while index < state.server.numEdicts and index < len(state.server.edicts)
+    item = state.server.edicts[index]
+    if index != clientIndex and item is not void and not item.free and
+      not runtime.entityIsPriorityProjectile(item) and
+      svmEntityVisible(state, item, clientIndex, pvs) then
       bits = svmEntityBits(item)
       if not protocolUpdate.canWriteWithReservedTail(buffer, bits, reservedBytes) then
         state.diagnostics = state.diagnostics + ["packet overflow"]
