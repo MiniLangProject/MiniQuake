@@ -12,6 +12,7 @@ import miniquake.mathlib as math
 import miniquake.render.entities as entities
 import miniquake.array_util as arrayutil
 import miniquake.types as t
+import miniquake.world_bsp as world
 
 // Direct MiniLang pendant of WinQuake/gl_refrag.c. Native pointer-linked
 // efrags are represented by shared EfragRef objects in per-entity/per-leaf
@@ -37,6 +38,10 @@ r_emins = void
 r_emaxs = void
 cl_visedicts = []
 cl_numvisedicts = 0
+staticRendererKey = 0
+staticModelRendererKey = 0
+staticEntityArrayKey = 0
+staticEntityCount = -1
 
 // Update subsystem configuration for configure.
 function Configure(renderer, entityRenderer, entityStates)
@@ -65,6 +70,29 @@ function Configure(renderer, entityRenderer, entityStates)
   r_addent = void
   cl_visedicts = []
   cl_numvisedicts = 0
+  return true
+end function
+
+// Rebuild the immutable signon-time static-entity efrag index only when its
+// map, model table or source array changes. Static renderer-local numbers sit
+// outside Protocol 15's edict range, but their shared EfragRef objects remain
+// fully linked from the BSP leaves used for frame visibility.
+function ConfigureStaticEntities(renderer, entityRenderer, entityStates)
+  global staticRendererKey, staticModelRendererKey, staticEntityArrayKey, staticEntityCount
+  if renderer is void or entityRenderer is void or entityStates is void then return false end if
+  rendererKey = nativeRawValue(renderer)
+  modelRendererKey = nativeRawValue(entityRenderer.models)
+  entityArrayKey = nativeRawValue(entityStates)
+  count = len(entityStates)
+  if rendererKey == staticRendererKey and modelRendererKey == staticModelRendererKey and entityArrayKey == staticEntityArrayKey and count == staticEntityCount then return false end if
+  Configure(renderer, entityRenderer, entityStates)
+  for each entity in entityStates
+    if entity is not void and entity.modelIndex > 0 then R_AddEfrags(entity) end if
+  end for
+  staticRendererKey = rendererKey
+  staticModelRendererKey = modelRendererKey
+  staticEntityArrayKey = entityArrayKey
+  staticEntityCount = count
   return true
 end function
 
@@ -116,7 +144,10 @@ function R_SplitEntityOnNode(nodeNumber)
   if nodeNumber >= len(refragNodes) then return 0 end if
   node = refragNodes[nodeNumber]
   if node.planeIndex < 0 or node.planeIndex >= len(refragPlanes) then return 0 end if
-  sides = math.boxOnPlaneSide(r_emins, r_emaxs, refragPlanes[node.planeIndex])
+  // BSP29 planes do not carry the renderer-only signBits field expected by
+  // math.boxOnPlaneSide. Use the canonical BSP helper, including its axial
+  // equality rules and non-axial positive/negative support corners.
+  sides = world.boxOnBspPlaneSide(r_emins, r_emaxs, refragPlanes[node.planeIndex])
   if sides == 3 and r_pefragtopnode is void then r_pefragtopnode = nodeNumber end if
   count = 0
   if (sides & 1) != 0 then count = count + R_SplitEntityOnNode(node.child0) end if
@@ -192,6 +223,38 @@ function R_StoreEfrags(leafIndex)
       end if
     end for
   end if
+  cl_visedicts = arrayutil.finishArrayBuilder(builder)
+  cl_numvisedicts = len(cl_visedicts)
+  return cl_visedicts
+end function
+
+// Append efrag-linked statics from exactly the leaves in the current view PVS.
+// Dynamic entities are supplied first, matching CL_RelinkEntities ordering and
+// preserving their priority at MAX_VISEDICTS. One builder replaces the old
+// per-leaf copy loop and avoids frame-time allocation bursts in large maps.
+function R_AppendVisiblePvs(dynamicEntities, pvs)
+  global cl_visedicts, cl_numvisedicts
+  builder = arrayutil.createArrayBuilder(c.MAX_VISEDICTS)
+  for each entity in dynamicEntities
+    if entity is not void and entity.modelIndex > 0 and builder.count < c.MAX_VISEDICTS then arrayutil.pushArrayBuilder(builder, entity) end if
+  end for
+  leafIndex = 0
+  while leafIndex < len(refragLeafEfrags) and builder.count < c.MAX_VISEDICTS
+    visible = pvs is void or world.leafVisible(pvs, leafIndex)
+    if visible then
+      for each reference in refragLeafEfrags[leafIndex]
+        entity = reference.entity
+        present = false
+        index = 0
+        while index < builder.count
+          if builder.values[index].number == entity.number then present = true; index = builder.count else index = index + 1 end if
+        end while
+        modelValid = entity.modelIndex > 0 and entity.modelIndex < len(refragModels)
+        if modelValid and not present and builder.count < c.MAX_VISEDICTS then arrayutil.pushArrayBuilder(builder, entity) end if
+      end for
+    end if
+    leafIndex = leafIndex + 1
+  end while
   cl_visedicts = arrayutil.finishArrayBuilder(builder)
   cl_numvisedicts = len(cl_visedicts)
   return cl_visedicts

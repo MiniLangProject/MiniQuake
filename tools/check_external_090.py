@@ -30,7 +30,8 @@ def main() -> int:
         if marker not in tool: errors.append('stager marker missing: '+marker)
     for marker in ['prepare_original_reference.py','-OriginalQuakeSourceArchive','-OriginalGLQuakeExe','verified original GLQuake reference']:
         if marker not in harness: errors.append('acceptance marker missing: '+marker)
-    forbidden=[p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file() and p.name.lower()=='glquake.exe']
+    ignored_outputs=('build/','build_perf/','native/build/','native/text_build/')
+    forbidden=[p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file() and p.name.lower()=='glquake.exe' and not p.relative_to(root).as_posix().startswith(ignored_outputs)]
     if forbidden: errors.append('original GLQUAKE.EXE must not be redistributed: '+', '.join(forbidden))
     report={'schema_version':1,'package':'BP-094','step':'BP-090','status':'PASS' if not errors else 'FAIL','errors':errors,'fixtures':20,'reference_sha256':EXPECTED_SHA,'redistributed':False}
     if ns.json: pathlib.Path(ns.json).write_text(json.dumps(report,indent=2,sort_keys=True)+'\n',encoding='utf-8')

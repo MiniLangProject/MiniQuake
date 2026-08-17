@@ -491,7 +491,7 @@ function R_DrawAliasModel(entity)
   currententity = entity
   r_entorigin = compatRmainMath.copy(entity.origin)
   modelorg = compatRmainMath.subtract(r_origin, r_entorigin)
-  result = compatRmainEntities.drawAlias(rCompatEntityRenderer, model, entity, rCompatTime, false)
+  result = compatRmainEntities.drawAlias(rCompatEntityRenderer, model, entity, rCompatTime, false, false)
   c_alias_polys = c_alias_polys + model.aliasModel.numTriangles
   return result
 end function

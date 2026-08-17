@@ -74,7 +74,7 @@ IMPORTS: dict[str, list[str]] = {
         "glInterleavedArrays", "glDrawArrays", "glVertexPointer", "glTexCoordPointer",
         "glEnableClientState", "glDisableClientState",
         "glTexParameteri", "glTexImage2D", "glTexSubImage2D",
-        "glTexEnvi", "glReadPixels", "glGetString", "glGetError", "glFinish", "glFlush", "glDrawBuffer",
+        "glTexEnvi", "glReadPixels", "glGetFloatv", "glGetString", "glGetError", "glFinish", "glFlush", "glDrawBuffer",
     ],
     "d3d9.dll": [
         "Direct3DCreate9",
@@ -212,7 +212,6 @@ def main() -> int:
         f"/Fo{vulkan_obj}", str(vulkan_source),
     ]
     run(vulkan_flags, root)
-
     link_flags = [
         linker, "/dll", "/noentry", "/machine:x64", "/subsystem:windows,6.0",
         "/nodefaultlib", "/dynamicbase", "/nxcompat", "/Brepro", "/opt:ref", "/opt:icf",

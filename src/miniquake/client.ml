@@ -499,17 +499,11 @@ function CL_RelinkEntities(client)
     end if
     index = index + 1
   end while
-  // WinQuake owns makestatic objects in cl_static_entities, outside numbered
-  // cl_entities. Dynamic entities enter cl_visedicts in CL_RelinkEntities;
-  // static efrags are appended later while drawing the world. Preserve that
-  // ordering so a full MAX_VISEDICTS list never drops a rocket or grenade in
-  // favor of a signon-time torch. The separate table also prevents a future
-  // ED_Alloc from inheriting an unrelated static baseline.
-  for each staticEntity in client.staticEntities
-    if staticEntity is not void and staticEntity.modelIndex != 0 and visibleBuilder.count < c.MAX_VISEDICTS then
-      arrayutil.pushArrayBuilder(visibleBuilder, staticEntity)
-    end if
-  end for
+  // WinQuake does not append every cl_static_entity here. R_AddEfrags links
+  // them into BSP leaves and R_StoreEfrags contributes only those reached by
+  // the current PVS during world traversal. The production host performs that
+  // step after R_MarkLeaves; appending the complete table here made torches,
+  // zombies and other statics visible through solid floors and walls.
   client.visibleEntities = arrayutil.finishArrayBuilder(visibleBuilder)
   return client.visibleEntities
 end function

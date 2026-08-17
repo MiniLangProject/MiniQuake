@@ -143,6 +143,28 @@ same renderer selection without editing the configuration file manually.
 OpenGL remains the compatibility fallback. Direct3D 9 uses the Windows runtime,
 and Vulkan is loaded dynamically from `vulkan-1.dll` when available.
 
+The **Lighting** entry in **Options > Video Mode** switches between the original
+GLQuake-compatible presentation and MiniQuake's optional enhanced lighting on
+all three backends. Enhanced lighting adds per-pixel Protocol-15 dynamic lights
+while retaining Quake's original lightmaps and art direction. **Shadows** are
+independent of that lighting choice: opaque enemies, pickups, crates, doors,
+platforms, and other modelled objects cast geometry-projected shadows whenever
+the option is enabled. **Shadow Quality** selects low, medium, or high filtering.
+Classic lighting remains the compatibility fallback; set Shadows to Off as well
+for the unextended GLQuake presentation.
+
+The corresponding archived console variables are:
+
+```text
+r_lighting 0       // 0 = classic, 1 = enhanced
+r_shadows 1        // 0 = disabled, 1 = enabled
+r_shadowquality 1  // 0 = low, 1 = medium, 2 = high
+```
+
+Changes made in the menu are stored in `config.cfg`. If a backend cannot create
+its enhanced shader pipeline, MiniQuake keeps rendering through its classic
+path instead of making the game unavailable.
+
 ## Music
 
 Physical CD playback is replaced by OGG streaming. MiniQuake maps Quake's

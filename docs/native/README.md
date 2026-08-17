@@ -11,7 +11,8 @@ directly through the current MiniLang runtime.
 The main bridge provides:
 
 - Win32 window, display, timing, input, controller, and gamma integration;
-- OpenGL 1.1, Direct3D 9, and Vulkan renderer entry points;
+- OpenGL 1.1, Direct3D 9, and Vulkan renderer entry points, including the
+  optional shared per-pixel dynamic-light shader bridge;
 - `waveOut` audio submission and device state;
 - Winsock UDP and address helpers;
 - OGG decoding through the vendored `stb_vorbis` implementation; and

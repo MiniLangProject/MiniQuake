@@ -114,6 +114,9 @@ currentVideoState = void
 videoMenuSelection = NO_MODE
 videoMenuDisplayFocus = false
 videoMenuRendererFocus = false
+videoMenuLightingFocus = false
+videoMenuShadowFocus = false
+videoMenuShadowQualityFocus = false
 rendererSelectionOverride = -1
 
 // Apply the Quake-compatible vid renderer from name behavior.
@@ -1199,7 +1202,7 @@ end function
 
 // Apply the Quake-compatible vid menu reset behavior.
 function VID_MenuReset()
-  global videoMenuSelection, videoMenuDisplayFocus, videoMenuRendererFocus
+  global videoMenuSelection, videoMenuDisplayFocus, videoMenuRendererFocus, videoMenuLightingFocus, videoMenuShadowFocus, videoMenuShadowQualityFocus
   state = VID_State()
   // The original video menu opens on the active resolution.  Display mode and
   // renderer are separate entries above the grid and are reached with UP.
@@ -1207,6 +1210,9 @@ function VID_MenuReset()
   // though the player had opened the menu to choose a resolution.
   videoMenuDisplayFocus = false
   videoMenuRendererFocus = false
+  videoMenuLightingFocus = false
+  videoMenuShadowFocus = false
+  videoMenuShadowQualityFocus = false
   count = VID_MenuModeCount()
   if count == 0 then videoMenuSelection = NO_MODE; return videoMenuSelection end if
   selected = state.currentMode
@@ -1264,6 +1270,68 @@ end function
 function VID_MenuRendererFocused()
   global videoMenuRendererFocus
   return videoMenuRendererFocus
+end function
+
+// Report whether the enhanced-lighting row owns keyboard focus.
+function VID_MenuLightingFocused()
+  global videoMenuLightingFocus
+  return videoMenuLightingFocus
+end function
+
+// Report whether the shadow row owns keyboard focus.
+function VID_MenuShadowFocused()
+  global videoMenuShadowFocus
+  return videoMenuShadowFocus
+end function
+
+// Report whether the shadow-quality row owns keyboard focus.
+function VID_MenuShadowQualityFocused()
+  global videoMenuShadowQualityFocus
+  return videoMenuShadowQualityFocus
+end function
+
+// Toggle the archived classic/enhanced renderer policy without changing maps.
+function VID_ToggleEnhancedLighting()
+  state = VID_State()
+  if state.registry is void or cvar.find(state.registry, "r_lighting") is void then return false end if
+  enable = cvar.variableValue(state.registry, "r_lighting") == 0.0
+  if enable and not gl.enhancedAvailable() then
+    state.lastModeMessage = "Enhanced lighting is unavailable on this renderer."
+    return false
+  end if
+  value = 0.0
+  name = "CLASSIC"
+  if enable then value = 1.0; name = "ENHANCED" end if
+  cvar.setValue(state.registry, "r_lighting", value)
+  state.lastModeMessage = "LIGHTING " + name + " applied."
+  return true
+end function
+
+// Toggle archived dynamic entity shadows used by enhanced rendering.
+function VID_ToggleEnhancedShadows()
+  state = VID_State()
+  if state.registry is void or cvar.find(state.registry, "r_shadows") is void then return false end if
+  enabled = cvar.variableValue(state.registry, "r_shadows") == 0.0
+  value = 0.0
+  name = "OFF"
+  if enabled then value = 1.0; name = "ON" end if
+  cvar.setValue(state.registry, "r_shadows", value)
+  state.lastModeMessage = "SHADOWS " + name + " applied."
+  return true
+end function
+
+// Cycle the archived soft-shadow sampling level in the requested direction.
+function VID_AdjustEnhancedShadowQuality(direction)
+  state = VID_State()
+  if state.registry is void or cvar.find(state.registry, "r_shadowquality") is void then return false end if
+  value = native.trunc(cvar.variableValue(state.registry, "r_shadowquality"))
+  if direction < 0 then value = value - 1 else value = value + 1 end if
+  if value < 0 then value = 2 end if
+  if value > 2 then value = 0 end if
+  cvar.setValue(state.registry, "r_shadowquality", value)
+  name = ["LOW", "MEDIUM", "HIGH"][value]
+  state.lastModeMessage = "SHADOW QUALITY " + name + " applied."
+  return true
 end function
 
 // Apply the Quake-compatible vid save resolution cvars behavior.
@@ -1442,12 +1510,28 @@ end function
 // Apply the Quake-compatible vid menu draw behavior.
 function VID_MenuDraw()
   state = VID_State()
+  // Assemble fixed renderer rows first, then append the independently
+  // navigable resolution grid and its help text.
   selection = VID_MenuSelection()
   modeName = "WINDOWED"
   if state.modeState == MS_FULLDIB then modeName = "FULLSCREEN" end if
+  lightingName = "CLASSIC"
+  shadowsName = "OFF"
+  shadowQualityName = "MEDIUM"
+  if state.registry is not void then
+    if cvar.variableValue(state.registry, "r_lighting") != 0.0 then lightingName = "ENHANCED" end if
+    if cvar.variableValue(state.registry, "r_shadows") != 0.0 then shadowsName = "ON" end if
+    shadowQuality = native.trunc(cvar.variableValue(state.registry, "r_shadowquality"))
+    if shadowQuality < 0 then shadowQuality = 0 end if
+    if shadowQuality > 2 then shadowQuality = 2 end if
+    shadowQualityName = ["LOW", "MEDIUM", "HIGH"][shadowQuality]
+  end if
   commands = [
     ["picture", "gfx/vidmodes.lmp"],
     ["heading", "Video Mode"],
+    ["lighting", lightingName, VID_MenuLightingFocused()],
+    ["shadows", shadowsName, VID_MenuShadowFocused()],
+    ["shadow_quality", shadowQualityName, VID_MenuShadowQualityFocused()],
     ["renderer", VID_RendererName(win.renderer()), VID_MenuRendererFocused()],
     ["display", modeName, VID_MenuDisplayFocused()],
   ]
@@ -1457,13 +1541,13 @@ function VID_MenuDraw()
     mode = state.modes[index]
     current = index == state.currentMode
     if state.modeState == MS_WINDOWED and mode.width == state.windowWidth and mode.height == state.windowHeight then current = true end if
-    commands = commands + [["mode", index, mode.description, current, count % VID_ROW_SIZE, native.trunc(count / VID_ROW_SIZE), index == selection and not VID_MenuDisplayFocused() and not VID_MenuRendererFocused()]]
+    commands = commands + [["mode", index, mode.description, current, count % VID_ROW_SIZE, native.trunc(count / VID_ROW_SIZE), index == selection and not VID_MenuDisplayFocused() and not VID_MenuRendererFocused() and not VID_MenuLightingFocused() and not VID_MenuShadowFocused() and not VID_MenuShadowQualityFocused()]]
     count = count + 1
     index = index + 1
   end while
   commands = commands + [
     ["help", "LEFT/RIGHT select a resolution"],
-    ["help", "UP reaches display and renderer"],
+    ["help", "UP reaches display and lighting"],
     ["help", "ENTER applies the selected setting"],
   ]
   state.drawTrace = commands
@@ -1473,11 +1557,40 @@ end function
 // Apply the Quake-compatible vid menu key behavior.
 function VID_MenuKey(key)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
-  global videoMenuDisplayFocus, videoMenuRendererFocus
+  global videoMenuDisplayFocus, videoMenuRendererFocus, videoMenuLightingFocus, videoMenuShadowFocus, videoMenuShadowQualityFocus
   if key == keys.K_ESCAPE then return "options" end if
+  if videoMenuLightingFocus then
+    if key == keys.K_DOWNARROW then videoMenuLightingFocus = false; videoMenuShadowFocus = true; return "move" end if
+    if key == keys.K_UPARROW then videoMenuLightingFocus = false; return "move" end if
+    if key == keys.K_LEFTARROW or key == keys.K_RIGHTARROW or key == keys.K_ENTER then
+      if VID_ToggleEnhancedLighting() then return "lighting_applied" end if
+      return "lighting_error"
+    end if
+    return "none"
+  end if
+  if videoMenuShadowFocus then
+    if key == keys.K_DOWNARROW then videoMenuShadowFocus = false; videoMenuShadowQualityFocus = true; return "move" end if
+    if key == keys.K_UPARROW then videoMenuShadowFocus = false; videoMenuLightingFocus = true; return "move" end if
+    if key == keys.K_LEFTARROW or key == keys.K_RIGHTARROW or key == keys.K_ENTER then
+      if VID_ToggleEnhancedShadows() then return "lighting_applied" end if
+      return "lighting_error"
+    end if
+    return "none"
+  end if
+  if videoMenuShadowQualityFocus then
+    if key == keys.K_DOWNARROW then videoMenuShadowQualityFocus = false; videoMenuRendererFocus = true; return "move" end if
+    if key == keys.K_UPARROW then videoMenuShadowQualityFocus = false; videoMenuShadowFocus = true; return "move" end if
+    if key == keys.K_LEFTARROW or key == keys.K_RIGHTARROW or key == keys.K_ENTER then
+      direction = 1
+      if key == keys.K_LEFTARROW then direction = -1 end if
+      if VID_AdjustEnhancedShadowQuality(direction) then return "lighting_applied" end if
+      return "lighting_error"
+    end if
+    return "none"
+  end if
   if videoMenuRendererFocus then
     if key == keys.K_DOWNARROW then videoMenuRendererFocus = false; videoMenuDisplayFocus = true; return "move" end if
-    if key == keys.K_UPARROW then videoMenuRendererFocus = false; videoMenuDisplayFocus = false; return "move" end if
+    if key == keys.K_UPARROW then videoMenuRendererFocus = false; videoMenuShadowQualityFocus = true; return "move" end if
     if key == keys.K_LEFTARROW or key == keys.K_RIGHTARROW or key == keys.K_ENTER then
       direction = 1
       if key == keys.K_LEFTARROW then direction = -1 end if

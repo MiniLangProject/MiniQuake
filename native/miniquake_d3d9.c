@@ -21,6 +21,7 @@ typedef mq_i32 MQ_BOOL;
 typedef mq_u32 MQ_DWORD;
 typedef mq_ptr MQ_HWND;
 typedef mq_ptr MQ_HANDLE;
+typedef mq_ptr MQ_HMODULE;
 
 typedef struct mq_d3d_present_parameters_s {
     mq_u32 BackBufferWidth;
@@ -108,6 +109,9 @@ MQ_DLLIMPORT void * __cdecl memset(void *destination, mq_i32 value, mq_u64 count
 MQ_DLLIMPORT double __cdecl sin(double value);
 MQ_DLLIMPORT double __cdecl cos(double value);
 MQ_DLLIMPORT double __cdecl sqrt(double value);
+MQ_DLLIMPORT MQ_HMODULE MQ_WINAPI LoadLibraryA(const char *name);
+MQ_DLLIMPORT void *MQ_WINAPI GetProcAddress(MQ_HMODULE module, const char *name);
+MQ_DLLIMPORT MQ_BOOL MQ_WINAPI FreeLibrary(MQ_HMODULE module);
 
 #define MQ_D3D_METHOD(object, index, type) ((type)(*(void ***)(object))[index])
 #define MQ_D3D_SUCCEEDED(value) ((MQ_HRESULT)(value) >= 0)
@@ -302,6 +306,13 @@ static mq_u32 mq_d3d_modelview_top = 0u;
 static mq_u32 mq_d3d_projection_top = 0u;
 static mq_i32 mq_d3d_matrices_dirty = 1;
 static mq_i32 mq_d3d_using_ex = 0;
+static void *mq_d3d_enhanced_vertex_shader = MQ_NULL;
+static void *mq_d3d_enhanced_pixel_shader = MQ_NULL;
+static mq_i32 mq_d3d_enhanced_enabled = 0;
+static mq_i32 mq_d3d_enhanced_draw_kind_value = 0;
+static mq_i32 mq_d3d_enhanced_light_count = 0;
+static float mq_d3d_enhanced_view[16];
+static float mq_d3d_enhanced_lights[16];
 
 typedef mq_u32 (MQ_WINAPI *mq_d3d_release_fn)(void *self);
 typedef MQ_HRESULT (MQ_WINAPI *mq_d3d_create_device_fn)(void *, mq_u32, mq_i32, MQ_HWND, mq_u32, mq_d3d_present_parameters_t *, void **);
@@ -331,6 +342,18 @@ typedef MQ_HRESULT (MQ_WINAPI *mq_d3d_create_offscreen_surface_fn)(void *, mq_u3
 typedef MQ_HRESULT (MQ_WINAPI *mq_d3d_surface_get_desc_fn)(void *, mq_d3d_surface_desc_t *);
 typedef MQ_HRESULT (MQ_WINAPI *mq_d3d_surface_lock_rect_fn)(void *, mq_d3d_locked_rect_t *, const mq_d3d_rect_t *, mq_u32);
 typedef MQ_HRESULT (MQ_WINAPI *mq_d3d_surface_unlock_rect_fn)(void *);
+typedef MQ_HRESULT (MQ_WINAPI *mq_d3d_create_vertex_shader_fn)(void *, const mq_u32 *, void **);
+typedef MQ_HRESULT (MQ_WINAPI *mq_d3d_set_vertex_shader_fn)(void *, void *);
+typedef MQ_HRESULT (MQ_WINAPI *mq_d3d_set_vertex_shader_constant_f_fn)(void *, mq_u32, const float *, mq_u32);
+typedef MQ_HRESULT (MQ_WINAPI *mq_d3d_create_pixel_shader_fn)(void *, const mq_u32 *, void **);
+typedef MQ_HRESULT (MQ_WINAPI *mq_d3d_set_pixel_shader_fn)(void *, void *);
+typedef MQ_HRESULT (MQ_WINAPI *mq_d3d_set_pixel_shader_constant_f_fn)(void *, mq_u32, const float *, mq_u32);
+typedef MQ_HRESULT (MQ_WINAPI *mq_d3d_compile_fn)(
+    const void *, mq_u64, const char *, const void *, void *, const char *,
+    const char *, mq_u32, mq_u32, void **, void **);
+typedef void * (MQ_WINAPI *mq_d3d_blob_pointer_fn)(void *);
+
+static void mq_d3d_release(void **object);
 
 /* Reinterpret MiniLang's IEEE-754 bit pattern as a native float. */
 static float mq_d3d_bits_to_float(mq_u32 bits) {
@@ -549,6 +572,118 @@ static mq_u32 mq_d3d_compare_value(mq_u32 value) {
     return MQ_D3DCMP_LESS;
 }
 
+/* Release the optional Direct3D shader pair before reset/shutdown. */
+static void mq_d3d_release_enhanced_shaders(void) {
+    mq_d3d_release(&mq_d3d_enhanced_vertex_shader);
+    mq_d3d_release(&mq_d3d_enhanced_pixel_shader);
+    mq_d3d_enhanced_draw_kind_value = 0;
+}
+
+/* Compile and create the shared per-pixel additive light program. */
+static mq_i32 mq_d3d_create_enhanced_shaders(void) {
+    static const char vertex_source[] =
+        "float4x4 mq_mvp:register(c0);float4x4 mq_mv:register(c4);"
+        "struct I{float3 p:POSITION0;float4 c:COLOR0;float2 uv:TEXCOORD0;};"
+        "struct O{float4 p:POSITION0;float2 uv:TEXCOORD0;float3 e:TEXCOORD1;};"
+        "O main(I i){O o;float4 p=float4(i.p,1);o.p=mul(p,mq_mvp);"
+        "o.e=mul(p,mq_mv).xyz;o.uv=i.uv;return o;}";
+    static const char pixel_source[] =
+        "sampler2D mq_base:register(s0);float4 mq_lights[4]:register(c0);"
+        "float4 mq_params:register(c4);"
+        "float one(float4 q,float3 e,float3 n){float3 d=q.xyz-e;float z=length(d);"
+        "if(z>=q.w||q.w<=0)return 0;float a=1-z/q.w;a*=a;"
+        "return a*max(dot(n,d/max(z,0.001)),0);}"
+        "float4 main(float2 uv:TEXCOORD0,float3 e:TEXCOORD1):COLOR0{"
+        "float3 n=normalize(cross(ddx(e),ddy(e)));if(dot(n,-e)<0)n=-n;float l=0;"
+        "if(mq_params.x>0)l+=one(mq_lights[0],e,n);"
+        "if(mq_params.x>1)l+=one(mq_lights[1],e,n);"
+        "if(mq_params.x>2)l+=one(mq_lights[2],e,n);"
+        "if(mq_params.x>3)l+=one(mq_lights[3],e,n);"
+        "float4 b=tex2D(mq_base,uv);return float4(b.rgb*float3(1,0.58,0.30)*min(l,1.5),b.a);}";
+    MQ_HMODULE compiler_module;
+    mq_d3d_compile_fn compile;
+    void *vertex_blob = MQ_NULL;
+    void *pixel_blob = MQ_NULL;
+    void *messages = MQ_NULL;
+    const mq_u32 *vertex_code;
+    const mq_u32 *pixel_code;
+    MQ_HRESULT result;
+    if (mq_d3d_enhanced_vertex_shader != MQ_NULL && mq_d3d_enhanced_pixel_shader != MQ_NULL) return 1;
+    if (mq_d3d_device == MQ_NULL) return 0;
+    compiler_module = LoadLibraryA("d3dcompiler_47.dll");
+    if (compiler_module == MQ_NULL) compiler_module = LoadLibraryA("d3dcompiler_43.dll");
+    if (compiler_module == MQ_NULL) return 0;
+    compile = (mq_d3d_compile_fn)GetProcAddress(compiler_module, "D3DCompile");
+    if (compile == (mq_d3d_compile_fn)0) { FreeLibrary(compiler_module); return 0; }
+    result = compile(vertex_source, sizeof(vertex_source) - 1u, "MiniQuake enhanced vertex", MQ_NULL, MQ_NULL,
+        "main", "vs_3_0", 0x00008000u /* D3DCOMPILE_OPTIMIZATION_LEVEL3 */, 0u, &vertex_blob, &messages);
+    if (messages != MQ_NULL) mq_d3d_release(&messages);
+    if (!MQ_D3D_SUCCEEDED(result) || vertex_blob == MQ_NULL) { FreeLibrary(compiler_module); return 0; }
+    result = compile(pixel_source, sizeof(pixel_source) - 1u, "MiniQuake enhanced pixel", MQ_NULL, MQ_NULL,
+        "main", "ps_3_0", 0x00008000u /* D3DCOMPILE_OPTIMIZATION_LEVEL3 */, 0u, &pixel_blob, &messages);
+    if (messages != MQ_NULL) mq_d3d_release(&messages);
+    if (!MQ_D3D_SUCCEEDED(result) || pixel_blob == MQ_NULL) {
+        mq_d3d_release(&vertex_blob); FreeLibrary(compiler_module); return 0;
+    }
+    vertex_code = (const mq_u32 *)MQ_D3D_METHOD(vertex_blob, 3, mq_d3d_blob_pointer_fn)(vertex_blob);
+    pixel_code = (const mq_u32 *)MQ_D3D_METHOD(pixel_blob, 3, mq_d3d_blob_pointer_fn)(pixel_blob);
+    result = MQ_D3D_METHOD(mq_d3d_device, 91, mq_d3d_create_vertex_shader_fn)(
+        mq_d3d_device, vertex_code, &mq_d3d_enhanced_vertex_shader);
+    if (MQ_D3D_SUCCEEDED(result)) {
+        result = MQ_D3D_METHOD(mq_d3d_device, 106, mq_d3d_create_pixel_shader_fn)(
+            mq_d3d_device, pixel_code, &mq_d3d_enhanced_pixel_shader);
+    }
+    mq_d3d_release(&vertex_blob);
+    mq_d3d_release(&pixel_blob);
+    FreeLibrary(compiler_module);
+    if (!MQ_D3D_SUCCEEDED(result) || mq_d3d_enhanced_vertex_shader == MQ_NULL ||
+        mq_d3d_enhanced_pixel_shader == MQ_NULL) {
+        mq_d3d_release_enhanced_shaders();
+        return 0;
+    }
+    return 1;
+}
+
+/* Bind shader constants for one enhanced draw using the current model matrix. */
+static mq_i32 mq_d3d_apply_enhanced_program(void) {
+    float depth_conversion[16];
+    float converted_projection[16];
+    float combined[16];
+    mq_d3d_matrix_t mvp;
+    mq_d3d_matrix_t modelview;
+    float parameters[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    if (!mq_d3d_enhanced_enabled || mq_d3d_enhanced_draw_kind_value == 0 ||
+        !mq_d3d_create_enhanced_shaders()) return 0;
+    mq_d3d_identity(depth_conversion);
+    depth_conversion[10] = mq_d3d_depth_min > mq_d3d_depth_max ? -0.5f : 0.5f;
+    depth_conversion[14] = 0.5f;
+    mq_d3d_multiply(converted_projection, depth_conversion, mq_d3d_projection_stack[mq_d3d_projection_top]);
+    mq_d3d_multiply(combined, converted_projection, mq_d3d_modelview_stack[mq_d3d_modelview_top]);
+    mq_d3d_transpose(&mvp, combined);
+    mq_d3d_transpose(&modelview, mq_d3d_modelview_stack[mq_d3d_modelview_top]);
+    parameters[0] = (float)mq_d3d_enhanced_light_count;
+    MQ_D3D_METHOD(mq_d3d_device, 92, mq_d3d_set_vertex_shader_fn)(
+        mq_d3d_device, mq_d3d_enhanced_vertex_shader);
+    MQ_D3D_METHOD(mq_d3d_device, 107, mq_d3d_set_pixel_shader_fn)(
+        mq_d3d_device, mq_d3d_enhanced_pixel_shader);
+    MQ_D3D_METHOD(mq_d3d_device, 94, mq_d3d_set_vertex_shader_constant_f_fn)(
+        mq_d3d_device, 0u, &mvp.m[0][0], 4u);
+    MQ_D3D_METHOD(mq_d3d_device, 94, mq_d3d_set_vertex_shader_constant_f_fn)(
+        mq_d3d_device, 4u, &modelview.m[0][0], 4u);
+    MQ_D3D_METHOD(mq_d3d_device, 109, mq_d3d_set_pixel_shader_constant_f_fn)(
+        mq_d3d_device, 0u, mq_d3d_enhanced_lights, 4u);
+    MQ_D3D_METHOD(mq_d3d_device, 109, mq_d3d_set_pixel_shader_constant_f_fn)(
+        mq_d3d_device, 4u, parameters, 1u);
+    return 1;
+}
+
+/* Restore fixed-function shaders after an enhanced DrawPrimitiveUP call. */
+static void mq_d3d_clear_enhanced_program(void) {
+    if (mq_d3d_device == MQ_NULL) return;
+    MQ_D3D_METHOD(mq_d3d_device, 92, mq_d3d_set_vertex_shader_fn)(mq_d3d_device, MQ_NULL);
+    MQ_D3D_METHOD(mq_d3d_device, 107, mq_d3d_set_pixel_shader_fn)(mq_d3d_device, MQ_NULL);
+}
+
 /* Restore the renderer's GLQuake-compatible default state. */
 static void mq_d3d_default_state(void) {
     if (mq_d3d_device == MQ_NULL) return;
@@ -687,12 +822,14 @@ mq_i32 mq_d3d9_initialize(mq_ptr window, mq_i32 width, mq_i32 height) {
     mq_d3d_identity(mq_d3d_modelview_stack[0]);
     mq_d3d_identity(mq_d3d_projection_stack[0]);
     mq_d3d_default_state();
+    mq_d3d_create_enhanced_shaders();
     mq_d3d_last_error = 0;
     return 1;
 }
 
 /* Release resources owned by 9 shutdown. */
 void mq_d3d9_shutdown(void) {
+    mq_d3d_release_enhanced_shaders();
     mq_d3d_release_textures();
     mq_d3d_release(&mq_d3d_device);
     mq_d3d_release(&mq_d3d_object);
@@ -712,6 +849,7 @@ mq_i32 mq_d3d9_ready(void) {
 mq_i32 mq_d3d9_resize(mq_i32 width, mq_i32 height) {
     MQ_HRESULT result;
     if (mq_d3d_device == MQ_NULL || width < 1 || height < 1) return 0;
+    mq_d3d_release_enhanced_shaders();
     mq_d3d_present.BackBufferWidth = (mq_u32)width;
     mq_d3d_present.BackBufferHeight = (mq_u32)height;
     result = MQ_D3D_METHOD(mq_d3d_device, 16, mq_d3d_reset_fn)(mq_d3d_device, &mq_d3d_present);
@@ -722,6 +860,7 @@ mq_i32 mq_d3d9_resize(mq_i32 width, mq_i32 height) {
     if (mq_d3d_viewport_width > width) mq_d3d_viewport_width = width;
     if (mq_d3d_viewport_height > height) mq_d3d_viewport_height = height;
     mq_d3d_default_state();
+    mq_d3d_create_enhanced_shaders();
     return 1;
 }
 
@@ -746,13 +885,20 @@ void mq_d3d9_begin(mq_u32 mode) {
 /* Submit draw vertices geometry to the active backend command buffer. */
 static void mq_d3d_draw_vertices(mq_i32 primitive_type, mq_u32 primitive_count, const mq_d3d_vertex_t *vertices) {
     MQ_HRESULT result;
+    mq_i32 enhanced_program;
     if (mq_d3d_device == MQ_NULL || primitive_count == 0u) return;
     mq_d3d_apply_matrices();
+    enhanced_program = mq_d3d_apply_enhanced_program();
     result = MQ_D3D_METHOD(mq_d3d_device, 41, mq_d3d_begin_scene_fn)(mq_d3d_device);
-    if (!MQ_D3D_SUCCEEDED(result)) { mq_d3d_last_error = result; return; }
+    if (!MQ_D3D_SUCCEEDED(result)) {
+        if (enhanced_program) mq_d3d_clear_enhanced_program();
+        mq_d3d_last_error = result;
+        return;
+    }
     result = MQ_D3D_METHOD(mq_d3d_device, 83, mq_d3d_draw_primitive_up_fn)(
         mq_d3d_device, primitive_type, primitive_count, vertices, (mq_u32)sizeof(mq_d3d_vertex_t));
     MQ_D3D_METHOD(mq_d3d_device, 42, mq_d3d_end_scene_fn)(mq_d3d_device);
+    if (enhanced_program) mq_d3d_clear_enhanced_program();
     mq_d3d_last_error = result;
 }
 
@@ -1242,3 +1388,53 @@ void mq_d3d9_finish(void) { }
 void mq_d3d9_flush(void) { }
 /* Submit draw buffer geometry to the active backend command buffer. */
 void mq_d3d9_draw_buffer(mq_u32 mode) { (void)mode; }
+
+/* Report whether Direct3D can create the enhanced shader pair. */
+mq_i32 mq_d3d9_enhanced_available(void) {
+    return mq_d3d_device != MQ_NULL && mq_d3d_create_enhanced_shaders();
+}
+
+/* Configure Direct3D enhanced rendering; shadow options are shared-policy
+ * inputs and are consumed by the shadow stage added above this light pass. */
+mq_i32 mq_d3d9_enhanced_configure(mq_i32 enabled, mq_i32 shadows, mq_i32 shadow_quality) {
+    (void)shadows;
+    (void)shadow_quality;
+    mq_d3d_enhanced_enabled = enabled != 0 && mq_d3d9_enhanced_available();
+    mq_d3d_enhanced_draw_kind_value = 0;
+    if (!mq_d3d_enhanced_enabled) mq_d3d_clear_enhanced_program();
+    return enabled == 0 || mq_d3d_enhanced_enabled;
+}
+
+/* Transform compact world-space dynamic lights through the captured view. */
+mq_i32 mq_d3d9_enhanced_begin_frame(const void *light_data, mq_u32 byte_count) {
+    const float *source = (const float *)light_data;
+    mq_u32 count;
+    mq_u32 index;
+    if (!mq_d3d_enhanced_enabled || source == (const float *)0 || (byte_count & 15u) != 0u) return 0;
+    count = byte_count >> 4;
+    if (count > 4u) count = 4u;
+    memcpy(mq_d3d_enhanced_view, mq_d3d_modelview_stack[mq_d3d_modelview_top], sizeof(mq_d3d_enhanced_view));
+    for (index = 0u; index < count; ++index) {
+        float x = source[index * 4u];
+        float y = source[index * 4u + 1u];
+        float z = source[index * 4u + 2u];
+        mq_d3d_enhanced_lights[index * 4u] = mq_d3d_enhanced_view[0] * x + mq_d3d_enhanced_view[4] * y + mq_d3d_enhanced_view[8] * z + mq_d3d_enhanced_view[12];
+        mq_d3d_enhanced_lights[index * 4u + 1u] = mq_d3d_enhanced_view[1] * x + mq_d3d_enhanced_view[5] * y + mq_d3d_enhanced_view[9] * z + mq_d3d_enhanced_view[13];
+        mq_d3d_enhanced_lights[index * 4u + 2u] = mq_d3d_enhanced_view[2] * x + mq_d3d_enhanced_view[6] * y + mq_d3d_enhanced_view[10] * z + mq_d3d_enhanced_view[14];
+        mq_d3d_enhanced_lights[index * 4u + 3u] = source[index * 4u + 3u];
+    }
+    mq_d3d_enhanced_light_count = (mq_i32)count;
+    return 1;
+}
+
+/* Select the optional per-pixel program for following geometry. */
+void mq_d3d9_enhanced_draw_kind(mq_i32 kind) {
+    mq_d3d_enhanced_draw_kind_value = kind;
+    if (kind == 0) mq_d3d_clear_enhanced_program();
+}
+
+/* Restore Direct3D fixed-function rendering before the 2-D pass. */
+void mq_d3d9_enhanced_end_frame(void) {
+    mq_d3d_enhanced_draw_kind_value = 0;
+    mq_d3d_clear_enhanced_program();
+}

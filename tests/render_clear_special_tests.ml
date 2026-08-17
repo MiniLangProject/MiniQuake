@@ -126,6 +126,7 @@ function bp051WorldNormalTrace()
   plan = bp051World.R_ClearProduction()
   trace = bp051Gl.Trace_End()
   bp051Equal(plan[2], 1.0, "world normal far")
+  bp051Equal(bp051World.R_CurrentDepthFunction(), plan[3], "world normal current depth function")
   bp051Equal(len(trace), 3, "world normal trace count")
   return true
 end function
@@ -136,6 +137,7 @@ function bp051WorldZTrickTrace()
   plan = bp051World.R_ClearProduction()
   trace = bp051Gl.Trace_End()
   bp051Equal(plan[0], 0, "world ztrick no clear")
+  bp051Equal(bp051World.R_CurrentDepthFunction(), plan[3], "world ztrick current depth function")
   bp051Equal(len(trace), 2, "world ztrick trace count")
   return true
 end function

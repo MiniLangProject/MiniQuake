@@ -84,6 +84,9 @@ function testDescriptionsAndMenu()
     cvar.create("vid_bpp", "16", true, false),
     cvar.create("vid_fullscreen", "1", true, false),
     cvar.create("vid_renderer", "opengl", true, false),
+    cvar.create("r_lighting", "0", true, false),
+    cvar.create("r_shadows", "1", true, false),
+    cvar.create("r_shadowquality", "1", true, false),
   ]
   assertEqual(video.VID_GetModeDescription(3), "800x600x16", "mode description")
   assertEqual(video.VID_GetExtModeDescription(3), "800x600x16 fullscreen", "extended fullscreen description")
@@ -93,9 +96,12 @@ function testDescriptionsAndMenu()
   assertEqual(len(video.VID_DescribeModes_f()), 4, "describe modes excludes windowed mode")
   trace = video.VID_MenuDraw()
   assertEqual(trace[0][0], "picture", "video menu picture")
-  assertEqual(trace[2][0], "renderer", "video menu renderer entry")
-  assertEqual(trace[3][0], "display", "video menu display entry")
-  assertEqual(trace[6][3], true, "video menu current mode highlight")
+  assertEqual(trace[2][0], "lighting", "video menu lighting entry")
+  assertEqual(trace[3][0], "shadows", "video menu shadow entry")
+  assertEqual(trace[4][0], "shadow_quality", "video menu shadow-quality entry")
+  assertEqual(trace[5][0], "renderer", "video menu renderer entry")
+  assertEqual(trace[6][0], "display", "video menu display entry")
+  assertEqual(trace[9][3], true, "video menu current mode highlight")
   assertEqual(video.VID_MenuReset(), 3, "video menu starts on current resolution")
   assertEqual(video.VID_MenuDisplayFocused(), false, "video menu starts in resolution grid")
   assertEqual(video.VID_MenuRendererFocused(), false, "renderer entry is not initially focused")
@@ -117,6 +123,17 @@ function testDescriptionsAndMenu()
   assertEqual(video.VID_MenuKey(keys.K_ENTER), "mode_applied", "display entry switches to fullscreen")
   assertEqual(state.modeState, video.MS_FULLDIB, "fullscreen display mode committed")
   assertEqual(cvar.variableValue(state.registry, "vid_fullscreen"), 1.0, "fullscreen display mode archived")
+  assertEqual(video.VID_MenuKey(keys.K_UPARROW), "move", "display entry reaches renderer")
+  assertEqual(video.VID_MenuKey(keys.K_UPARROW), "move", "renderer entry reaches shadow quality")
+  assertEqual(video.VID_MenuShadowQualityFocused(), true, "shadow quality has explicit focus")
+  assertEqual(video.VID_MenuKey(keys.K_LEFTARROW), "lighting_applied", "shadow quality cycles")
+  assertEqual(cvar.variableValue(state.registry, "r_shadowquality"), 0.0, "shadow quality setting archived")
+  assertEqual(video.VID_MenuKey(keys.K_UPARROW), "move", "shadow quality reaches shadows")
+  assertEqual(video.VID_MenuShadowFocused(), true, "shadow entry has explicit focus")
+  assertEqual(video.VID_MenuKey(keys.K_LEFTARROW), "lighting_applied", "shadow entry toggles")
+  assertEqual(cvar.variableValue(state.registry, "r_shadows"), 0.0, "shadow setting archived")
+  assertEqual(video.VID_MenuKey(keys.K_UPARROW), "move", "shadow entry reaches lighting")
+  assertEqual(video.VID_MenuLightingFocused(), true, "lighting entry has explicit focus")
   assertEqual(video.VID_MenuKey(keys.K_ESCAPE), "options", "video menu escape callback")
   state.initialized = true
   assertEqual(video.VID_SaveCurrentConfigurationCvars(), true, "current video configuration saved")

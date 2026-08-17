@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "package": "BP-078",
-  "fixtures": 22,
+  "fixtures": 23,
   "statusbar_height": 24,
   "statusbar_width": 320,
   "max_scoreboard": 16,

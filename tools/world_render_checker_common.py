@@ -7,21 +7,21 @@ from pathlib import Path
 CONFIG = {
   '040': dict(package='BP-040', parent='BP-039', schema='MiniQuakeWorldSurfaceGolden/1',
       golden='audit/world_surface_render_golden.json', oracle='tools/oracle/world_surface_render_oracle.c',
-      test='tests/world_surface_render_tests.ml', fixtures=20,
-      success='MiniQuake BP-040 world surface tests passed: 20',
+      test='tests/world_surface_render_tests.ml', fixtures=21,
+      success='MiniQuake BP-040 world surface tests passed: 21',
       markers={
         'src/miniquake/render/world.ml': [
           'function R_ResetTextureChains()', 'function R_ChainSurface(surface)',
           'function R_SurfaceFacesViewer(surface, planeDistance)',
           'function R_BrushSurfaceFacesViewer(surface, planeDistance)',
-          'function R_WaterPassDeferred(textureSort, waterAlpha)',
+          'function inline R_WaterPassDeferred(textureSort, waterAlpha)',
           'R_ChainSurface(surface)',
         ],
       }),
   '041': dict(package='BP-041', parent='BP-040', schema='MiniQuakeLightmapAtlasGolden/1',
       golden='audit/lightmap_atlas_render_golden.json', oracle='tools/oracle/lightmap_atlas_render_oracle.c',
-      test='tests/lightmap_atlas_tests.ml', fixtures=22,
-      success='MiniQuake BP-041 lightmap atlas tests passed: 22',
+      test='tests/lightmap_atlas_tests.ml', fixtures=23,
+      success='MiniQuake BP-041 lightmap atlas tests passed: 23',
       markers={
         'src/miniquake/render/world.ml': [
           'function R_LightmapRequiredBytes(width, height, stride, bytesPerSample)',
@@ -39,7 +39,7 @@ CONFIG = {
       success='MiniQuake BP-042 dynamic-light render tests passed: 20',
       markers={
         'src/miniquake/render/world.ml': [
-          'function R_DynamicLightIsActive(light, currentTime)',
+          'function inline R_DynamicLightIsActive(light, currentTime)',
           'function R_BeginWorldFrame()', 'function R_MarkBrushModelLights(entity)',
           'R_PushDlights()', 'R_AnimateLight()', 'R_AdvanceFrameCounters()',
         ],

@@ -11,12 +11,14 @@ import miniquake.types as t
 import miniquake.constants as c
 import miniquake.model_registry as modelRegistry
 import miniquake.render.gl11 as gl
+import miniquake.render.enhanced as enhanced
 import miniquake.render.world as worldRenderer
 import miniquake.byteio as bio
 import miniquake.native as native
 import miniquake.array_util as arrayutil
 import miniquake.mathlib as math
 import miniquake.render.alias_mesh as aliasMesh
+import miniquake.render.ray_shadow as rayShadow
 import miniquake.render.draw2d as draw2d
 import miniquake.render_ui_contract as renderUiContract
 import miniquake.optimization_baseline as optBaseline
@@ -33,6 +35,7 @@ renderModelRegistry = void
 aliasSmoothModels = true
 aliasAffineModels = false
 aliasShadows = false
+aliasShadowQuality = 1
 aliasNoColors = false
 aliasDoubleEyes = true
 aliasShadeCacheValid = []
@@ -46,7 +49,9 @@ aliasShadeCacheOriginZ = []
 aliasShadeCacheShade = []
 aliasShadeCacheAmbient = []
 aliasShadeCacheSpot = []
-aliasLightingScratch = [0.0, 0.0, t.Vec3(0.0, 0.0, 0.0)]
+aliasShadeCacheReceiverHit = []
+aliasLightingScratch = [0.0, 0.0, t.Vec3(0.0, 0.0, 0.0), false, 0.0, 0.0, 0.0, false]
+brushShadowSourceScratch = [false, 0.0, 0.0, 0.0]
 viewModelScratch = void
 // Root complete external renderers (map, textures, surfaces and lightmaps) for
 // the lifetime of the entity renderer.  These are independent BSP models and
@@ -60,6 +65,7 @@ function resetAliasShadeCache()
   global aliasShadeCacheColormap, aliasShadeCacheViewModel
   global aliasShadeCacheOriginX, aliasShadeCacheOriginY, aliasShadeCacheOriginZ
   global aliasShadeCacheShade, aliasShadeCacheAmbient, aliasShadeCacheSpot
+  global aliasShadeCacheReceiverHit
   aliasShadeCacheValid = arrayutil.makeFilledArray(c.MAX_EDICTS, false)
   aliasShadeCacheStamp = arrayutil.makeFilledArray(c.MAX_EDICTS, -1)
   aliasShadeCacheModel = arrayutil.makeFilledArray(c.MAX_EDICTS, "")
@@ -71,6 +77,7 @@ function resetAliasShadeCache()
   aliasShadeCacheShade = arrayutil.makeFilledArray(c.MAX_EDICTS, 0.0)
   aliasShadeCacheAmbient = arrayutil.makeFilledArray(c.MAX_EDICTS, 0.0)
   aliasShadeCacheSpot = arrayutil.makeEmptyArray(c.MAX_EDICTS)
+  aliasShadeCacheReceiverHit = arrayutil.makeFilledArray(c.MAX_EDICTS, false)
   return true
 end function
 
@@ -94,6 +101,15 @@ function AliasRenderingConfiguration()
     aliasSmoothModels, aliasAffineModels, aliasShadows,
     aliasNoColors, aliasDoubleEyes,
   ]
+end function
+
+// Configure the backend-neutral projected-shadow sampling level.
+function ConfigureEnhancedShadowQuality(value)
+  global aliasShadowQuality
+  aliasShadowQuality = native.trunc(value)
+  if aliasShadowQuality < 0 then aliasShadowQuality = 0 end if
+  if aliasShadowQuality > 2 then aliasShadowQuality = 2 end if
+  return aliasShadowQuality
 end function
 
 // Initialize state for starts with.
@@ -454,6 +470,7 @@ function aliasShade(model, entity, time, viewModel)
   global aliasShadeCacheColormap, aliasShadeCacheViewModel
   global aliasShadeCacheOriginX, aliasShadeCacheOriginY, aliasShadeCacheOriginZ
   global aliasShadeCacheShade, aliasShadeCacheAmbient, aliasShadeCacheSpot
+  global aliasShadeCacheReceiverHit
   global aliasLightingScratch
   lights = worldRenderer.R_ActiveDynamicLights()
   hasActiveLight = false
@@ -473,20 +490,38 @@ function aliasShade(model, entity, time, viewModel)
     aliasShadeCacheOriginZ[number] == entity.origin.z then
     aliasLightingScratch[0] = aliasShadeCacheShade[number]
     aliasLightingScratch[1] = aliasShadeCacheAmbient[number]
+    cachedReceiverHit = aliasShadeCacheReceiverHit[number]
     cachedSpot = aliasShadeCacheSpot[number]
-    if cachedSpot is not void then aliasLightingScratch[2] = cachedSpot end if
+    if cachedReceiverHit and cachedSpot is not void then aliasLightingScratch[2] = cachedSpot end if
+    aliasLightingScratch[3] = false
+    aliasLightingScratch[7] = cachedReceiverHit and cachedSpot is not void
     return aliasLightingScratch
   end if
   ambient = worldRenderer.R_LightPoint(entity.origin)
+  receiverHit = worldRenderer.R_LightPointHit()
+  receiverSpot = worldRenderer.lightspot
+  receiverPlane = worldRenderer.lightplane
+  if receiverHit and (receiverSpot is void or receiverPlane is void) then receiverHit = false end if
+  if receiverHit and receiverPlane.normal.z < 0.5 and receiverPlane.normal.z > -0.5 then receiverHit = false end if
+  if receiverHit then
+    receiverDistance = entity.origin.z - receiverSpot.z
+    if receiverDistance < -4.0 or receiverDistance > 256.0 then receiverHit = false end if
+  end if
   shade = ambient
+  strongestLight = void
+  strongestAddition = 0.0
   for each light in lights
-    if light.radius > 0.0 and light.die >= time then
+    if light is not void and light.radius > 0.0 and light.die >= time then
       deltaX = entity.origin.x - light.origin.x
       deltaY = entity.origin.y - light.origin.y
       deltaZ = entity.origin.z - light.origin.z
       distance = native.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ)
       addition = light.radius - distance
-      if addition > 0.0 then ambient = ambient + addition; shade = shade + addition end if
+      if addition > 0.0 then
+        ambient = ambient + addition
+        shade = shade + addition
+        if addition > strongestAddition then strongestAddition = addition; strongestLight = light end if
+      end if
     end if
   end for
   if viewModel and ambient < 24.0 then ambient = 24.0; shade = 24.0 end if
@@ -496,6 +531,7 @@ function aliasShade(model, entity, time, viewModel)
   if model.name == "progs/flame.mdl" or model.name == "progs/flame2.mdl" then ambient = 256.0; shade = 256.0 end if
   shadeValue = shade / 200.0
   spot = worldRenderer.lightspot
+  if not receiverHit then spot = void end if
   if cacheable then
     aliasShadeCacheValid[number] = true
     aliasShadeCacheStamp[number] = stamp
@@ -507,6 +543,7 @@ function aliasShade(model, entity, time, viewModel)
     aliasShadeCacheOriginZ[number] = entity.origin.z
     aliasShadeCacheShade[number] = shadeValue
     aliasShadeCacheAmbient[number] = ambient
+    aliasShadeCacheReceiverHit[number] = spot is not void
     if spot is not void then aliasShadeCacheSpot[number] = math.copy(spot) end if
   end if
   // drawAlias consumes the values immediately. Reusing this three-slot
@@ -514,11 +551,46 @@ function aliasShade(model, entity, time, viewModel)
   aliasLightingScratch[0] = shadeValue
   aliasLightingScratch[1] = ambient
   if spot is not void then aliasLightingScratch[2] = spot end if
+  aliasLightingScratch[3] = strongestLight is not void
+  if strongestLight is not void then
+    aliasLightingScratch[4] = strongestLight.origin.x
+    aliasLightingScratch[5] = strongestLight.origin.y
+    aliasLightingScratch[6] = strongestLight.origin.z
+  end if
+  aliasLightingScratch[7] = receiverHit
   return aliasLightingScratch
 end function
 
+// Transform the strongest world-space point light into the alias model's
+// yaw-local coordinates used by the projected silhouette routine.
+function configureAliasShadowSource(entity, enabled, lightX, lightY, lightZ)
+  if not enabled then return aliasMesh.configureAliasShadowPointLight(false, 0.0, 0.0, 0.0) end if
+  relativeX = lightX - entity.origin.x
+  relativeY = lightY - entity.origin.y
+  angle = entity.angles.y * math.DEG_TO_RAD
+  cosine = native.cos(angle)
+  sine = native.sin(angle)
+  localX = cosine * relativeX + sine * relativeY
+  localY = -sine * relativeX + cosine * relativeY
+  localZ = lightZ - entity.origin.z
+  return aliasMesh.configureAliasShadowPointLight(true, localX, localY, localZ)
+end function
+
+// Return whether an alias model represents opaque physical geometry. Flames
+// and beam/light effects are alias MDLs in retail Quake rather than sprites;
+// projecting them created bright duplicate torches and energy streaks on the
+// receiver floor on backends that defer fixed-function texture state.
+function aliasModelCastsShadow(model)
+  if model is void then return false end if
+  name = bio.lower(model.name)
+  if name == "progs/flame.mdl" or name == "progs/flame2.mdl" then return false end if
+  if name == "progs/bolt.mdl" or name == "progs/bolt2.mdl" or name == "progs/bolt3.mdl" or name == "progs/beam.mdl" then return false end if
+  if name == "progs/lavaball.mdl" or name == "progs/laser.mdl" or name == "progs/plasma.mdl" then return false end if
+  return true
+end function
+
 // Render alias.
-function drawAlias(renderer, model, entity, time, viewModel)
+function drawAlias(renderer, model, entity, time, viewModel, enhancedOverlay)
   uploadAlias(renderer, model)
   optBaseline.checkpoint("alias_upload")
   source = model.aliasModel
@@ -544,6 +616,7 @@ function drawAlias(renderer, model, entity, time, viewModel)
   optBaseline.checkpoint("alias_frame")
   lighting = aliasShade(model, entity, time, viewModel)
   aliasMesh.configureAliasLighting(lighting[0], lighting[1], entity.angles.y, lighting[2])
+  configureAliasShadowSource(entity, lighting[3], lighting[4], lighting[5], lighting[6])
   optBaseline.checkpoint("alias_light")
   mesh = aliasMesh.GL_MakeAliasModelDisplayLists(source, source)
   optBaseline.checkpoint("alias_mesh")
@@ -577,18 +650,54 @@ function drawAlias(renderer, model, entity, time, viewModel)
     gl.popMatrix()
   end if
   optBaseline.checkpoint("alias_native")
-  if aliasShadows then
+  rayShadowReady = false
+  if aliasShadows and not enhancedOverlay and not viewModel and aliasModelCastsShadow(model) then
+    rayShadowReady = rayShadow.configureAlias(
+      worldRenderer.R_CurrentWorldMap(), worldRenderer.R_CurrentWorldSurfaces(),
+      entity, source, doubleEyes,
+      lighting[3], lighting[4], lighting[5], lighting[6],
+    )
+  end if
+  if rayShadowReady then
     gl.pushMatrix()
-    gl.translate(entity.origin.x, entity.origin.y, entity.origin.z)
-    gl.rotate(entity.angles.y, 0.0, 0.0, 1.0)
-    gl.rotate(-entity.angles.x, 0.0, 1.0, 0.0)
-    gl.rotate(entity.angles.z, 1.0, 0.0, 0.0)
     gl.disable(gl.GL_TEXTURE_2D)
+    gl.disable(gl.GL_ALPHA_TEST)
+    gl.disable(gl.GL_CULL_FACE)
     gl.enable(gl.GL_BLEND)
-    gl.color(0, 0, 0, 128)
-    aliasMesh.GL_DrawAliasShadowAtOrigin(source, frame, entity.origin.z)
+    gl.blendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
+    gl.depthMask(false)
+    gl.depthFunc(worldRenderer.R_CurrentDepthFunction())
+    // MODULATE makes the pass solid black even if a translated backend defers
+    // GL_TEXTURE_2D disable until the next batch. Under REPLACE the previously
+    // bound flame/item skin appeared as a fully coloured copy on the floor.
+    gl.textureEnvironment(gl.GL_MODULATE)
+    if aliasShadowQuality == 0 then
+      gl.color(0, 0, 0, 118)
+      aliasMesh.GL_DrawAliasRayShadowSample(source, frame, entity, doubleEyes, lighting[3], lighting[4], lighting[5], lighting[6], 0.0, 0.0)
+    else if aliasShadowQuality == 1 then
+      // Three independently traced source positions approximate a compact
+      // area light without shifting finished geometry across BSP boundaries.
+      gl.color(0, 0, 0, 48)
+      aliasMesh.GL_DrawAliasRayShadowSample(source, frame, entity, doubleEyes, lighting[3], lighting[4], lighting[5], lighting[6], -4.0, 0.0)
+      aliasMesh.GL_DrawAliasRayShadowSample(source, frame, entity, doubleEyes, lighting[3], lighting[4], lighting[5], lighting[6], 0.0, 0.0)
+      aliasMesh.GL_DrawAliasRayShadowSample(source, frame, entity, doubleEyes, lighting[3], lighting[4], lighting[5], lighting[6], 4.0, 0.0)
+    else
+      // Five true BSP rays per model vertex form a soft cross-filtered area
+      // light while retaining occlusion and receiver-plane validation.
+      gl.color(0, 0, 0, 30)
+      aliasMesh.GL_DrawAliasRayShadowSample(source, frame, entity, doubleEyes, lighting[3], lighting[4], lighting[5], lighting[6], 0.0, 0.0)
+      aliasMesh.GL_DrawAliasRayShadowSample(source, frame, entity, doubleEyes, lighting[3], lighting[4], lighting[5], lighting[6], -6.0, 0.0)
+      aliasMesh.GL_DrawAliasRayShadowSample(source, frame, entity, doubleEyes, lighting[3], lighting[4], lighting[5], lighting[6], 6.0, 0.0)
+      aliasMesh.GL_DrawAliasRayShadowSample(source, frame, entity, doubleEyes, lighting[3], lighting[4], lighting[5], lighting[6], 0.0, -6.0)
+      aliasMesh.GL_DrawAliasRayShadowSample(source, frame, entity, doubleEyes, lighting[3], lighting[4], lighting[5], lighting[6], 0.0, 6.0)
+    end if
+    gl.depthMask(true)
+    gl.textureEnvironment(gl.GL_REPLACE)
     gl.enable(gl.GL_TEXTURE_2D)
+    gl.disable(gl.GL_ALPHA_TEST)
+    gl.disable(gl.GL_CULL_FACE)
     gl.disable(gl.GL_BLEND)
+    gl.depthFunc(worldRenderer.R_CurrentDepthFunction())
     gl.color(255, 255, 255, 255)
     gl.popMatrix()
   end if
@@ -681,6 +790,149 @@ function drawBrush(worldRendererValue, model, entity, time)
   return worldRenderer.R_DrawBrushModelForSubmodel(entity, submodelIndex)
 end function
 
+// Render one brush entity without its classic lightmap pass so the optional
+// additive GPU program can light the geometry exactly once.
+function drawBrushEnhanced(worldRendererValue, model, entity, time)
+  submodelIndex = brushModelIndex(model.name)
+  if submodelIndex <= 0 then
+    brush = brushRendererForModel(model)
+    if brush is void then return 0 end if
+    return worldRenderer.drawStandaloneBrushEnhanced(
+      brush,
+      entity,
+      worldRenderer.R_CurrentViewOrigin(),
+      time,
+    )
+  end if
+  if submodelIndex >= len(worldRendererValue.map.models) then return 0 end if
+  return worldRenderer.R_DrawBrushModelEnhancedForSubmodel(entity, submodelIndex)
+end function
+
+// Resolve a stable receiver height from the main BSP beneath an object.  A
+// production miss must suppress the shadow: lightspot retains reusable storage
+// and may still contain another entity's receiver from an earlier trace.
+function objectShadowFloorZ(worldRendererValue, entity)
+  if worldRendererValue is void or worldRendererValue.map is void or len(worldRendererValue.map.models) == 0 then
+    return entity.origin.z + 1.0
+  end if
+  worldRenderer.R_LightPoint(entity.origin)
+  if not worldRenderer.R_LightPointHit() then return void end if
+  spot = worldRenderer.lightspot
+  plane = worldRenderer.lightplane
+  if spot is void or plane is void then return void end if
+  // Very steep receivers cannot be represented by this horizontal projected
+  // pass.  Distant lower floors would create room-spanning silhouettes, so
+  // leave those objects unshadowed instead of leaking through the level.
+  if plane.normal.z < 0.5 and plane.normal.z > -0.5 then return void end if
+  receiverDistance = entity.origin.z - spot.z
+  if receiverDistance < -4.0 or receiverDistance > 256.0 then return void end if
+  return spot.z + 1.0
+end function
+
+// Select the dynamic light with the strongest local contribution and retain
+// its world-space source for BSP ray projection. When no live point light
+// reaches the object, the projector uses a stable directional fallback.
+function brushShadowSource(entity, time)
+  global brushShadowSourceScratch
+  strongest = void
+  strongestAddition = 0.0
+  for each light in worldRenderer.R_ActiveDynamicLights()
+    if light is not void and light.radius > 0.0 and light.die >= time then
+      deltaX = entity.origin.x - light.origin.x
+      deltaY = entity.origin.y - light.origin.y
+      deltaZ = entity.origin.z - light.origin.z
+      addition = light.radius - native.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ)
+      if addition > strongestAddition then strongestAddition = addition; strongest = light end if
+    end if
+  end for
+  brushShadowSourceScratch[0] = strongest is not void
+  if strongest is void then return brushShadowSourceScratch end if
+  brushShadowSourceScratch[1] = strongest.origin.x
+  brushShadowSourceScratch[2] = strongest.origin.y
+  brushShadowSourceScratch[3] = strongest.origin.z
+  return brushShadowSourceScratch
+end function
+
+// Draw one projected footprint sample for either an external pickup BSP or an
+// inline moving brush model.
+function drawBrushShadowSample(worldRendererValue, model, entity, floorWorldZ, source, offsetX, offsetY, contactOnly)
+  submodelIndex = brushModelIndex(model.name)
+  if submodelIndex <= 0 then
+    brush = brushRendererForModel(model)
+    if brush is void then return 0 end if
+    return worldRenderer.drawStandaloneBrushShadow(
+      brush, entity, floorWorldZ, offsetX, offsetY, contactOnly,
+      source[0], source[1], source[2], source[3],
+    )
+  end if
+  if submodelIndex >= len(worldRendererValue.map.models) then return 0 end if
+  return worldRenderer.R_DrawBrushModelShadowForSubmodel(
+    entity, submodelIndex, floorWorldZ, offsetX, offsetY, contactOnly,
+    source[0], source[1], source[2], source[3],
+  )
+end function
+
+// Render a backend-neutral soft footprint for BSP pickups, crates, doors and
+// platforms. Sprite effects stay emissive and intentionally cast no shadow.
+function drawBrushShadow(worldRendererValue, model, entity, time)
+  source = brushShadowSource(entity, time)
+  if not rayShadow.configureBrush(
+    worldRenderer.R_CurrentWorldMap(), worldRenderer.R_CurrentWorldSurfaces(),
+    entity, source[0], source[1], source[2], source[3],
+  ) then return 0 end if
+  floorWorldZ = 0.0
+  worldRenderer.GL_DisableMultitexture()
+  gl.disable(gl.GL_TEXTURE_2D)
+  gl.disable(gl.GL_ALPHA_TEST)
+  gl.disable(gl.GL_CULL_FACE)
+  gl.enable(gl.GL_BLEND)
+  gl.blendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
+  gl.depthMask(false)
+  gl.depthFunc(worldRenderer.R_CurrentDepthFunction())
+  // Keep projected BSP geometry black even on deferred fixed-function state
+  // backends; otherwise the last box/door texture can leak onto the receiver.
+  gl.textureEnvironment(gl.GL_MODULATE)
+  drawn = 0
+  if aliasShadowQuality == 0 then
+    gl.color(0, 0, 0, 112)
+    drawn = drawBrushShadowSample(worldRendererValue, model, entity, floorWorldZ, source, 0.0, 0.0, false)
+  else if aliasShadowQuality == 1 then
+    gl.color(0, 0, 0, 46)
+    drawn = drawBrushShadowSample(worldRendererValue, model, entity, floorWorldZ, source, -4.0, 0.0, false)
+    drawn = drawn + drawBrushShadowSample(worldRendererValue, model, entity, floorWorldZ, source, 0.0, 0.0, false)
+    drawn = drawn + drawBrushShadowSample(worldRendererValue, model, entity, floorWorldZ, source, 4.0, 0.0, false)
+  else
+    gl.color(0, 0, 0, 28)
+    drawn = drawBrushShadowSample(worldRendererValue, model, entity, floorWorldZ, source, 0.0, 0.0, false)
+    drawn = drawn + drawBrushShadowSample(worldRendererValue, model, entity, floorWorldZ, source, -6.0, 0.0, false)
+    drawn = drawn + drawBrushShadowSample(worldRendererValue, model, entity, floorWorldZ, source, 6.0, 0.0, false)
+    drawn = drawn + drawBrushShadowSample(worldRendererValue, model, entity, floorWorldZ, source, 0.0, -6.0, false)
+    drawn = drawn + drawBrushShadowSample(worldRendererValue, model, entity, floorWorldZ, source, 0.0, 6.0, false)
+  end if
+  gl.depthMask(true)
+  gl.textureEnvironment(gl.GL_REPLACE)
+  gl.enable(gl.GL_TEXTURE_2D)
+  gl.disable(gl.GL_ALPHA_TEST)
+  gl.disable(gl.GL_CULL_FACE)
+  gl.disable(gl.GL_BLEND)
+  gl.blendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
+  gl.depthFunc(worldRenderer.R_CurrentDepthFunction())
+  gl.color(255, 255, 255, 255)
+  return drawn
+end function
+
+// Restore compatibility blend/depth state after any enhanced entity replay,
+// including error exits from malformed external models.
+function finishEnhancedEntityOverlay()
+  enhanced.endOverlay()
+  gl.depthMask(true)
+  gl.depthFunc(worldRenderer.R_CurrentDepthFunction())
+  gl.disable(gl.GL_BLEND)
+  gl.blendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
+  gl.color(255, 255, 255, 255)
+  return true
+end function
+
 // Render submitted.
 function renderSubmitted(renderer, worldRendererValue, entities, hiddenEntityNumber, viewRight, viewUp, time)
   rendered = 0
@@ -695,9 +947,10 @@ function renderSubmitted(renderer, worldRendererValue, entities, hiddenEntityNum
       if model.kind == MODEL_BRUSH then
         drawResult = try(drawBrush(worldRendererValue, model, entity, time))
         if drawResult is error then return error(3893, "brush " + model.name + " entity " + entity.number + ": " + drawResult.message) end if
+        if aliasShadows then drawBrushShadow(worldRendererValue, model, entity, time) end if
         rendered = rendered + 1
       else if model.kind == MODEL_ALIAS then
-        drawResult = try(drawAlias(renderer, model, entity, time, false))
+        drawResult = try(drawAlias(renderer, model, entity, time, false, false))
         if drawResult is error then return error(3894, "alias " + model.name + " entity " + entity.number + ": " + drawResult.message) end if
         rendered = rendered + 1
       end if
@@ -718,6 +971,39 @@ function renderSubmitted(renderer, worldRendererValue, entities, hiddenEntityNum
     index = index + 1
   end while
   renderer.renderedEntities = rendered
+  return rendered
+end function
+
+// Draw the entity portion of the optional additive per-pixel light layer.
+// Sprites remain emissive/alpha-tested and intentionally do not receive it.
+function renderEnhancedSubmitted(renderer, worldRendererValue, entities, hiddenEntityNumber, time)
+  if not enhanced.hasActiveLights() then return 0 end if
+  worldRenderer.GL_DisableMultitexture()
+  gl.enable(gl.GL_TEXTURE_2D)
+  gl.enable(gl.GL_BLEND)
+  gl.blendFunc(gl.GL_ONE, gl.GL_ONE)
+  gl.depthMask(false)
+  gl.depthFunc(worldRenderer.R_CurrentDepthFunction())
+  enhanced.beginOverlay()
+  rendered = 0
+  index = 0
+  while index < len(entities)
+    entity = entities[index]
+    if entity is not void and (hiddenEntityNumber is void or entity.number != hiddenEntityNumber) and entity.modelIndex > 0 and entity.modelIndex < len(renderer.models) then
+      model = renderer.models[entity.modelIndex]
+      if model.kind == MODEL_BRUSH then
+        result = try(drawBrushEnhanced(worldRendererValue, model, entity, time))
+        if result is error then finishEnhancedEntityOverlay(); return result end if
+        rendered = rendered + 1
+      else if model.kind == MODEL_ALIAS then
+        result = try(drawAlias(renderer, model, entity, time, false, true))
+        if result is error then finishEnhancedEntityOverlay(); return result end if
+        rendered = rendered + 1
+      end if
+    end if
+    index = index + 1
+  end while
+  finishEnhancedEntityOverlay()
   return rendered
 end function
 
@@ -782,7 +1068,32 @@ function renderViewModel(renderer, player, view, time)
   depthMax = worldRenderer.R_CurrentDepthMaximum()
   weaponDepthMax = depthMin + renderUiContract.viewModelDepthMaximum() * (depthMax - depthMin)
   gl.depthRange(depthMin, weaponDepthMax)
-  result = drawAlias(renderer, model, entity, time, true)
+  result = drawAlias(renderer, model, entity, time, true, false)
+  gl.depthRange(depthMin, depthMax)
+  return result
+end function
+
+// Add per-pixel dynamic light to the first-person weapon using the same
+// compressed depth range as the classic viewmodel draw.
+function renderViewModelEnhanced(renderer, player, view, time)
+  if not enhanced.hasActiveLights() then return 0 end if
+  if player.weapon <= 0 or player.weapon >= len(renderer.models) then return 0 end if
+  if player.health <= 0.0 or (player.items & c.IT_INVISIBILITY) != 0 or not view.viewModelVisible then return 0 end if
+  model = renderer.models[player.weapon]
+  if model is void or model.kind != MODEL_ALIAS then return 0 end if
+  // Reuse the entity assembled by the immediately preceding classic
+  // renderViewModel call.  If that call was suppressed there is no overlay.
+  if viewModelScratch is void then return 0 end if
+  depthMin = worldRenderer.R_CurrentDepthMinimum()
+  depthMax = worldRenderer.R_CurrentDepthMaximum()
+  weaponDepthMax = depthMin + renderUiContract.viewModelDepthMaximum() * (depthMax - depthMin)
+  gl.depthRange(depthMin, weaponDepthMax)
+  gl.enable(gl.GL_BLEND)
+  gl.blendFunc(gl.GL_ONE, gl.GL_ONE)
+  gl.depthMask(false)
+  enhanced.beginOverlay()
+  result = drawAlias(renderer, model, viewModelScratch, time, true, true)
+  finishEnhancedEntityOverlay()
   gl.depthRange(depthMin, depthMax)
   return result
 end function

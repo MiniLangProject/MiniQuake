@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "package": "BP-077",
-  "fixtures": 22,
+  "fixtures": 23,
   "center_line_chars": 40,
   "screenshot_slots": 100,
   "loading_timeout_seconds": 60,

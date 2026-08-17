@@ -1219,31 +1219,48 @@ end function
 // Render video.
 function drawVideo(state, texture, transform, realtime)
   virtualCenteredPicture(state, "gfx/vidmodes.lmp", 4.0, transform, 255)
+  // Translate backend-neutral menu commands into the 320x200 Quake canvas;
+  // focus markers share the same row coordinates as their text.
   modes = glvid.VID_MenuDraw()
   for each command in modes
-    if command[0] == "renderer" then
+    if command[0] == "lighting" then
+      lightingText = "LIGHTING      < " + command[1] + " >"
+      lightingX = (320.0 - len(bytes(lightingText)) * 8.0) * 0.5
+      if command[2] then M_DrawCharacter(texture, lightingX - 12.0, 28.0, 12 + (menuNative.trunc(realtime * 4.0) & 1), transform) end if
+      virtualCenteredString(texture, 28.0, lightingText, transform, 255)
+    else if command[0] == "shadows" then
+      shadowText = "SHADOWS       < " + command[1] + " >"
+      shadowX = (320.0 - len(bytes(shadowText)) * 8.0) * 0.5
+      if command[2] then M_DrawCharacter(texture, shadowX - 12.0, 40.0, 12 + (menuNative.trunc(realtime * 4.0) & 1), transform) end if
+      virtualCenteredString(texture, 40.0, shadowText, transform, 255)
+    else if command[0] == "shadow_quality" then
+      qualityText = "SHADOW QUALITY < " + command[1] + " >"
+      qualityX = (320.0 - len(bytes(qualityText)) * 8.0) * 0.5
+      if command[2] then M_DrawCharacter(texture, qualityX - 12.0, 52.0, 12 + (menuNative.trunc(realtime * 4.0) & 1), transform) end if
+      virtualCenteredString(texture, 52.0, qualityText, transform, 255)
+    else if command[0] == "renderer" then
       rendererText = "RENDERER      < " + command[1] + " >"
       rendererX = (320.0 - len(bytes(rendererText)) * 8.0) * 0.5
-      if command[2] then M_DrawCharacter(texture, rendererX - 12.0, 32.0, 12 + (menuNative.trunc(realtime * 4.0) & 1), transform) end if
-      virtualCenteredString(texture, 32.0, rendererText, transform, 255)
+      if command[2] then M_DrawCharacter(texture, rendererX - 12.0, 64.0, 12 + (menuNative.trunc(realtime * 4.0) & 1), transform) end if
+      virtualCenteredString(texture, 64.0, rendererText, transform, 255)
     else if command[0] == "display" then
       displayText = "DISPLAY MODE  < " + command[1] + " >"
       displayX = (320.0 - len(bytes(displayText)) * 8.0) * 0.5
-      if command[2] then M_DrawCharacter(texture, displayX - 12.0, 44.0, 12 + (menuNative.trunc(realtime * 4.0) & 1), transform) end if
-      virtualCenteredString(texture, 44.0, displayText, transform, 255)
+      if command[2] then M_DrawCharacter(texture, displayX - 12.0, 76.0, 12 + (menuNative.trunc(realtime * 4.0) & 1), transform) end if
+      virtualCenteredString(texture, 76.0, displayText, transform, 255)
     else if command[0] == "mode" then
       x = 8.0 + command[4] * 104.0
-      y = 68.0 + command[5] * 8.0
+      y = 100.0 + command[5] * 8.0
       if len(command) > 6 and command[6] then virtualWhiteString(texture, x - 8.0, y, ">", transform, 255) end if
       if command[3] then virtualWhiteString(texture, x, y, command[2], transform, 255)
       else virtualString(texture, x, y, command[2], transform, 255)
       end if
     end if
   end for
-  virtualString(texture, 8.0, 56.0, "RESOLUTION (WIDTHxHEIGHTxBPP)", transform, 220)
-  virtualCenteredString(texture, 148.0, "ARROWS SELECT", transform, 255)
-  virtualCenteredString(texture, 156.0, "ENTER APPLIES", transform, 255)
-  virtualCenteredString(texture, 172.0, "ESC RETURNS TO OPTIONS", transform, 220)
+  virtualString(texture, 8.0, 88.0, "RESOLUTION (WIDTHxHEIGHTxBPP)", transform, 220)
+  virtualCenteredString(texture, 176.0, "ARROWS SELECT", transform, 255)
+  virtualCenteredString(texture, 184.0, "ENTER APPLIES", transform, 255)
+  virtualCenteredString(texture, 196.0, "ESC RETURNS TO OPTIONS", transform, 220)
 end function
 
 // Render help.
@@ -2001,9 +2018,9 @@ function M_Video_Key(state, key)
   if state.videoKeyCallback is not void then
     action = state.videoKeyCallback(key)
     if action == "options" then M_Menu_Options_f(state); return "back" end if
-    if action == "mode_applied" or action == "mode_error" then
+    if action == "mode_applied" or action == "mode_error" or action == "lighting_applied" or action == "lighting_error" then
       setStatus(state, glvid.VID_State().lastModeMessage)
-      state.enterSound = action == "mode_applied"
+      state.enterSound = action == "mode_applied" or action == "lighting_applied"
       return action
     end if
     if action != "none" then return action end if

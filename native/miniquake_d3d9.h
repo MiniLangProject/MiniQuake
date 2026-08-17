@@ -60,5 +60,10 @@ mq_u32 mq_d3d9_get_error(void);
 void mq_d3d9_finish(void);
 void mq_d3d9_flush(void);
 void mq_d3d9_draw_buffer(mq_u32 mode);
+mq_i32 mq_d3d9_enhanced_available(void);
+mq_i32 mq_d3d9_enhanced_configure(mq_i32 enabled, mq_i32 shadows, mq_i32 shadow_quality);
+mq_i32 mq_d3d9_enhanced_begin_frame(const void *light_data, mq_u32 byte_count);
+void mq_d3d9_enhanced_draw_kind(mq_i32 kind);
+void mq_d3d9_enhanced_end_frame(void);
 
 #endif

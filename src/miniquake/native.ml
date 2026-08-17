@@ -24,6 +24,9 @@ extern function asciiCharRaw(value as i32, output as bytes, capacity as u32) fro
 extern function renderSelect(backend as i32) from "miniquake_native.dll" symbol "mq_render_select" returns i32
 extern function renderBackend() from "miniquake_native.dll" symbol "mq_render_backend" returns i32
 extern function renderAvailable(backend as i32) from "miniquake_native.dll" symbol "mq_render_available" returns i32
+extern function shadowWorldClear() from "miniquake_native.dll" symbol "mq_shadow_world_clear" returns void
+extern function shadowWorldUpload(data as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_shadow_world_upload" returns i32
+extern function shadowTraceBatch(rays as bytes, rayBytes as u32, results as bytes, resultBytes as u32) from "miniquake_native.dll" symbol "mq_shadow_trace_batch" returns i32
 
 extern function winCreate(title as wstr, width as i32, height as i32, fullscreen as i32) from "miniquake_native.dll" symbol "mq_win_create" returns ptr
 extern function winDestroy() from "miniquake_native.dll" symbol "mq_win_destroy" returns void
@@ -183,6 +186,8 @@ extern function glFinish() from "miniquake_native.dll" symbol "mq_gl_finish" ret
 extern function glFlush() from "miniquake_native.dll" symbol "mq_gl_flush" returns void
 extern function glDrawBuffer(mode as u32) from "miniquake_native.dll" symbol "mq_gl_draw_buffer" returns void
 extern function glDrawAliasBatch(data as bytes, byteCount as u32, shadeDots as bytes, shadeDotCount as u32, shadeLightBits as u32) from "miniquake_native.dll" symbol "mq_gl_draw_alias_batch" returns i32
+extern function glDrawShadowBatch(data as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_gl_draw_shadow_batch" returns i32
+extern function glDrawAliasRayShadow(data as bytes, byteCount as u32, originX as u32, originY as u32, originZ as u32, angleX as u32, angleY as u32, angleZ as u32, scaleOriginX as u32, scaleOriginY as u32, scaleOriginZ as u32, scaleX as u32, scaleY as u32, scaleZ as u32, doubleEyes as i32, pointLightActive as i32, lightX as u32, lightY as u32, lightZ as u32, sampleX as u32, sampleY as u32) from "miniquake_native.dll" symbol "mq_gl_draw_alias_ray_shadow" returns i32
 extern function glDrawParticleBatch(data as bytes, byteCount as u32, viewOriginX as u32, viewOriginY as u32, viewOriginZ as u32, viewForwardX as u32, viewForwardY as u32, viewForwardZ as u32, viewUpX as u32, viewUpY as u32, viewUpZ as u32, viewRightX as u32, viewRightY as u32, viewRightZ as u32) from "miniquake_native.dll" symbol "mq_gl_draw_particle_batch" returns i32
 extern function glDrawAliasModel(data as bytes, byteCount as u32, shadeDots as bytes, shadeDotCount as u32, shadeLightBits as u32, originX as u32, originY as u32, originZ as u32, angleX as u32, angleY as u32, angleZ as u32, scaleOriginX as u32, scaleOriginY as u32, scaleOriginZ as u32, scaleX as u32, scaleY as u32, scaleZ as u32, doubleEyes as i32, smooth as i32) from "miniquake_native.dll" symbol "mq_gl_draw_alias_model" returns i32
 
@@ -340,5 +345,10 @@ extern function glStaticGeometryClear() from "miniquake_native.dll" symbol "mq_g
 extern function glMultitextureAvailable() from "miniquake_native.dll" symbol "mq_gl_multitexture_available" returns i32
 extern function glWorldProgramAvailable() from "miniquake_native.dll" symbol "mq_gl_world_program_available" returns i32
 extern function glWorldProgramEnable(enabled as i32) from "miniquake_native.dll" symbol "mq_gl_world_program_enable" returns void
+extern function glEnhancedAvailable() from "miniquake_native.dll" symbol "mq_gl_enhanced_available" returns i32
+extern function glEnhancedConfigure(enabled as i32, shadows as i32, shadowQuality as i32) from "miniquake_native.dll" symbol "mq_gl_enhanced_configure" returns i32
+extern function glEnhancedBeginFrame(lights as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_gl_enhanced_begin_frame" returns i32
+extern function glEnhancedDrawKind(kind as i32) from "miniquake_native.dll" symbol "mq_gl_enhanced_draw_kind" returns void
+extern function glEnhancedEndFrame() from "miniquake_native.dll" symbol "mq_gl_enhanced_end_frame" returns void
 extern function glActiveTexture(unit as i32) from "miniquake_native.dll" symbol "mq_gl_active_texture" returns void
 extern function glMultiTexCoord2(unit as i32, sBits as u32, tBits as u32) from "miniquake_native.dll" symbol "mq_gl_multi_tex_coord2" returns void

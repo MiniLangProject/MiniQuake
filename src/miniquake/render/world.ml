@@ -12,10 +12,12 @@ import miniquake.constants as c
 import miniquake.mathlib as math
 import miniquake.native as native
 import miniquake.render.gl11 as gl
+import miniquake.render.enhanced as enhanced
 import miniquake.optimization_baseline as optBaseline
 import miniquake.render.draw2d as draw2d
 import miniquake.render.gl_warp as glWarp
 import miniquake.render.gl_rlight as glRlight
+import miniquake.render.ray_shadow as rayShadow
 import miniquake.render.special_paths as specialPaths
 import miniquake.world_bsp as world
 import miniquake.format.bsp as bsp
@@ -619,6 +621,86 @@ function drawStandaloneBrush(renderer, entity, viewOrigin, currentTime)
   return visibleCount
 end function
 
+// Draw only the base polygons of an external BSP entity for the additive
+// per-pixel light pass.  The caller owns blend/depth/shader state.
+function drawStandaloneBrushEnhanced(renderer, entity, viewOrigin, currentTime)
+  if renderer is void or entity is void or viewOrigin is void or len(renderer.map.models) == 0 then return 0 end if
+  uploaded = try(uploadStandaloneBrush(renderer))
+  if uploaded is error then return uploaded end if
+  model = renderer.map.models[0]
+  modelOrigin = standaloneModelOrigin(viewOrigin, entity)
+  visibleCount = 0
+  gl.pushMatrix()
+  gl.translate(entity.origin.x, entity.origin.y, entity.origin.z)
+  gl.rotate(entity.angles.y, 0.0, 0.0, 1.0)
+  gl.rotate(entity.angles.x, 0.0, 1.0, 0.0)
+  gl.rotate(entity.angles.z, 1.0, 0.0, 0.0)
+  faceIndex = model.firstFace
+  lastFace = faceIndex + model.numFaces
+  while faceIndex < lastFace and faceIndex < len(renderer.surfaces)
+    if faceIndex >= 0 then
+      surface = renderer.surfaces[faceIndex]
+      face = renderer.map.faces[surface.faceIndex]
+      if face.planeIndex >= 0 and face.planeIndex < len(renderer.map.planes) then
+        plane = renderer.map.planes[face.planeIndex]
+        distance = math.dot(modelOrigin, plane.normal) - plane.dist
+        if standaloneSurfaceFacesViewer(surface, distance) and (surface.flags & (c.SURF_DRAWSKY | c.SURF_DRAWTURB)) == 0 then
+          drawStandaloneBase(renderer, surface, currentTime, entity.frame != 0)
+          visibleCount = visibleCount + 1
+        end if
+      end if
+    end if
+    faceIndex = faceIndex + 1
+  end while
+  gl.popMatrix()
+  return visibleCount
+end function
+
+// Ray-project every polygon of an external BSP object onto the first visible
+// main-world receiver. The legacy floor/contact parameters remain in the ABI;
+// receiver selection now comes exclusively from the configured BSP ray caster.
+function drawStandaloneBrushShadow(renderer, entity, floorWorldZ, offsetX, offsetY, contactOnly, pointLightActive, lightX, lightY, lightZ)
+  if renderer is void or entity is void or len(renderer.map.models) == 0 or not rayShadow.isReady() then return 0 end if
+  // Project each convex source face, then triangulate only receiver-compatible
+  // fans so one bad ray cannot pull the remaining polygon through a corner.
+  model = renderer.map.models[0]
+  rayShadow.beginProjectionSample(offsetX, offsetY)
+  drawn = 0
+  gl.pushMatrix()
+  faceIndex = model.firstFace
+  lastFace = faceIndex + model.numFaces
+  while faceIndex < lastFace and faceIndex < len(renderer.surfaces)
+    if faceIndex >= 0 then
+      surface = renderer.surfaces[faceIndex]
+      if surface is not void and len(surface.vertices) >= 3 then
+        rayShadow.beginPrimitive()
+        rayShadow.projectBrushVertices(surface.vertices)
+        valid = true
+        vertexIndex = 0
+        for each vertex in surface.vertices
+          if not rayShadow.projectedPointValid(vertexIndex) then valid = false end if
+          vertexIndex = vertexIndex + 1
+        end for
+        gl.begin(gl.GL_TRIANGLES)
+        triangleIndex = 1
+        while valid and triangleIndex + 1 < len(surface.vertices)
+          if rayShadow.receiverTriangleCompatible(0, triangleIndex, triangleIndex + 1) then
+            gl.vertex3(rayShadow.projectedPointX(0), rayShadow.projectedPointY(0), rayShadow.projectedPointZ(0))
+            gl.vertex3(rayShadow.projectedPointX(triangleIndex), rayShadow.projectedPointY(triangleIndex), rayShadow.projectedPointZ(triangleIndex))
+            gl.vertex3(rayShadow.projectedPointX(triangleIndex + 1), rayShadow.projectedPointY(triangleIndex + 1), rayShadow.projectedPointZ(triangleIndex + 1))
+            drawn = drawn + 1
+          end if
+          triangleIndex = triangleIndex + 1
+        end while
+        gl.finishPrimitive()
+      end if
+    end if
+    faceIndex = faceIndex + 1
+  end while
+  gl.popMatrix()
+  return drawn
+end function
+
 // Release resources owned by standalone brush.
 function destroyStandaloneBrush(renderer)
   if renderer is void then return false end if
@@ -906,18 +988,39 @@ function R_CurrentDepthMaximum()
   return rCompatDepthMax
 end function
 
+// Return the depth comparison selected by R_ClearProduction for this frame.
+// gl_ztrick reverses the depth range every other frame and therefore requires
+// every later overlay (lighting, shadows and the view model) to retain GEQUAL
+// on those frames instead of silently restoring the usual LEQUAL mode.
+function R_CurrentDepthFunction()
+  return rCompatDepthFunc
+end function
+
 // Apply the Quake-compatible r current view origin behavior.
 function R_CurrentViewOrigin()
   return rCompatViewOrigin
 end function
 
+// Return the active main BSP map used by entity shadow-ray projection.
+function R_CurrentWorldMap()
+  if rCompatRenderer is void then return void end if
+  return rCompatRenderer.map
+end function
+
+// Return the active render-surface graph used by arbitrary BSP shadow rays.
+function R_CurrentWorldSurfaces()
+  if rCompatRenderer is void then return [] end if
+  return rCompatRenderer.surfaces
+end function
+
 // Apply the Quake-compatible r clear production behavior.
 function R_ClearProduction()
-  global rCompatTrickFrame, rCompatDepthMin, rCompatDepthMax, rCompatLastClearPlan
+  global rCompatTrickFrame, rCompatDepthMin, rCompatDepthMax, rCompatDepthFunc, rCompatLastClearPlan
   plan = specialPaths.clearPlan(rCompatMirrorAlpha, rCompatClearColor, rCompatZTrick, rCompatTrickFrame)
   rCompatTrickFrame = plan[4]
   rCompatDepthMin = plan[1]
   rCompatDepthMax = plan[2]
+  rCompatDepthFunc = plan[3]
   rCompatLastClearPlan = plan
   if plan[0] != 0 then gl.clear(plan[0]) end if
   gl.depthFunc(plan[3])
@@ -1067,9 +1170,11 @@ function renderViewport(renderer, width, height, viewRect, origin, angles, dynam
   if renderer.wireframe then gl.polygonMode(gl.GL_FRONT_AND_BACK, gl.GL_LINE) end if
   setupResult = try(setupViewRect(viewRect[0], viewRect[1], viewRect[2], viewRect[3], width, height, viewRect[4], viewRect[5], origin, angles))
   if setupResult is error then return error(3900, "setup_view: " + setupResult.message) end if
+  enhanced.beginFrame(dynamicLights, currentTime, origin)
   count = try(R_DrawWorld())
   if count is error then return error(3901, "draw_world: " + count.message) end if
-  dlightResult = try(R_RenderDlights())
+  dlightResult = try(R_DrawEnhancedWorldLighting())
+  if not enhanced.isEnabled() then dlightResult = try(R_RenderDlights()) end if
   if dlightResult is error then return error(3902, "draw_dlights: " + dlightResult.message) end if
   gl.polygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
   renderer.frameCount = renderer.frameCount + 1
@@ -1079,6 +1184,7 @@ end function
 // Mirror R_RenderScene pass.  The caller submits reflected entities and
 // particles around this world pass, matching gl_rmain.c's host-owned order.
 function renderMirrorViewport(renderer, width, height, viewRect, origin, angles, dynamicLights, lightStyles, currentTime, realtime, frameTime, blend)
+  global rCompatDepthMin, rCompatDepthMax, rCompatDepthFunc
   if not R_MirrorReady() then return 0 end if
   vectors = math.angleVectors(angles)
   R_ConfigureWorldCompatibility(
@@ -1088,6 +1194,9 @@ function renderMirrorViewport(renderer, width, height, viewRect, origin, angles,
   )
   R_BeginWorldFrame()
   R_MarkLeaves()
+  rCompatDepthMin = 0.5
+  rCompatDepthMax = 1.0
+  rCompatDepthFunc = gl.GL_LEQUAL
   gl.depthRange(0.5, 1.0)
   gl.depthFunc(gl.GL_LEQUAL)
   gl.enable(gl.GL_DEPTH_TEST)
@@ -1103,7 +1212,8 @@ function renderMirrorViewport(renderer, width, height, viewRect, origin, angles,
   gl.cullFace(gl.GL_BACK)
   gl.matrixMode(gl.GL_MODELVIEW)
   count = R_DrawWorld()
-  R_RenderDlights()
+  enhanced.beginFrame(dynamicLights, currentTime, origin)
+  if enhanced.isEnabled() then R_DrawEnhancedWorldLighting() else R_RenderDlights() end if
   gl.polygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
   return count
 end function
@@ -1143,6 +1253,8 @@ rCompatFlashBlend = true
 rCompatDynamic = true
 rCompatNoVis = false
 rCompatSurfaceDlightBits = []
+rCompatEnhancedTextureBuilders = []
+rCompatEnhancedBatchKeys = bytes()
 rCompatSurfaceDlightFrame = []
 rCompatSurfaceCachedLight = []
 rCompatSurfaceCachedDlight = []
@@ -1165,6 +1277,7 @@ rCompatMultiTextureAvailable = false
 rCompatUseMultitexture = false
 rCompatDepthMin = 0.0
 rCompatDepthMax = 1.0
+rCompatDepthFunc = gl.GL_LEQUAL
 rCompatLightSpot = void
 rCompatLightPlane = void
 rCompatAbstractSurfaceCalls = false
@@ -1231,7 +1344,7 @@ function R_ResetWorldCompatibility()
   global rCompatWarpPolys, rCompatSurfaceWarpPolys, rCompatSkyTexture, rCompatAlphaSkyTexture
   global rCompatSkyChain, rCompatWaterChain, rCompatTextureChains, rCompatTextureChainBuilders
   global rCompatMultiTextureEnabled, rCompatUseMultitexture
-  global rCompatDepthMin, rCompatDepthMax, rCompatLightSpot, rCompatLightPlane
+  global rCompatDepthMin, rCompatDepthMax, rCompatDepthFunc, rCompatLightSpot, rCompatLightPlane
   global rCompatMirrorTexture, rCompatMirrorChain, rCompatLastClearPlan
   global skytexturenum, lightmap_textures, active_lightmaps, blocklights
   global lightmap_polys, rCompatLightmapBuilders
@@ -1275,6 +1388,7 @@ function R_ResetWorldCompatibility()
   rCompatUseMultitexture = false
   rCompatDepthMin = 0.0
   rCompatDepthMax = 1.0
+  rCompatDepthFunc = gl.GL_LEQUAL
   rCompatLightSpot = void
   rCompatLightPlane = void
   rCompatMirrorTexture = -1
@@ -1830,6 +1944,114 @@ function R_ConfigureWorldCompatibility(
   return true
 end function
 
+// Configure the optional renderer extension.  This never mutates Quake world
+// state: an unavailable backend simply leaves the exact Classic path active.
+function R_ConfigureEnhancedLighting(requestedEnabled, requestedShadows, shadowQuality)
+  return enhanced.configure(requestedEnabled, requestedShadows, shadowQuality)
+end function
+
+// Ensure one persistent surface builder per BSP texture for the enhanced
+// additive pass.  Reusing these builders avoids per-frame chain allocations.
+function compatEnsureEnhancedBuilders()
+  global rCompatEnhancedTextureBuilders, rCompatEnhancedBatchKeys
+  if rCompatRenderer is void then return false end if
+  textureCount = len(rCompatRenderer.textures)
+  if textureCount < 1 then textureCount = 1 end if
+  if len(rCompatEnhancedTextureBuilders) != textureCount then
+    rCompatEnhancedTextureBuilders = arrayutil.makeEmptyArray(textureCount)
+    index = 0
+    while index < textureCount
+      rCompatEnhancedTextureBuilders[index] = arrayutil.createArrayBuilder(32)
+      index = index + 1
+    end while
+  end if
+  requiredBytes = len(rCompatRenderer.surfaces) * 8
+  if len(rCompatEnhancedBatchKeys) < requiredBytes then rCompatEnhancedBatchKeys = bytes(requiredBytes) end if
+  return true
+end function
+
+// Pack the populated prefix of a surface builder into the reusable native-key
+// buffer used by the static geometry batch bridge.
+function compatEnhancedBatchKeys(values, count)
+  global rCompatEnhancedBatchKeys
+  index = 0
+  while index < count
+    key = nativeRawValue(values[index])
+    byteio.putU32(rCompatEnhancedBatchKeys, index * 8, key & 0xffffffff)
+    byteio.putU32(rCompatEnhancedBatchKeys, index * 8 + 4, (key >> 32) & 0xffffffff)
+    index = index + 1
+  end while
+  return rCompatEnhancedBatchKeys
+end function
+
+// Render an additive, per-pixel dynamic-light layer over the already complete
+// classic base/lightmap world.  Static lightmaps remain untouched; therefore
+// disabling this pass produces byte-for-byte Classic draw ordering again.
+function R_DrawEnhancedWorldLighting()
+  if rCompatRenderer is void or not enhanced.hasActiveLights() then return 0 end if
+  // Rebuild texture-local visible chains, then submit each chain through the
+  // existing static geometry cache under one additive shader state.
+  compatEnsureEnhancedBuilders()
+  builderIndex = 0
+  while builderIndex < len(rCompatEnhancedTextureBuilders)
+    rCompatEnhancedTextureBuilders[builderIndex].count = 0
+    builderIndex = builderIndex + 1
+  end while
+
+  faceIndex = 0
+  while faceIndex < len(rCompatRenderer.surfaces)
+    if faceIndex < len(rCompatRenderer.visibleFaces) and rCompatRenderer.visibleFaces[faceIndex] != 0 then
+      surface = rCompatRenderer.surfaces[faceIndex]
+      if surface is not void and (surface.flags & (c.SURF_DRAWSKY | c.SURF_DRAWTURB | GLQUAKE_SURF_UNDERWATER)) == 0 then
+        plane = compatPlane(surface)
+        if plane is not void then
+          distance = compatPlaneDistance(plane, rCompatViewOrigin)
+          if R_SurfaceFacesViewer(surface, distance) then
+            textureIndex = surface.textureIndex
+            if textureIndex < 0 or textureIndex >= len(rCompatEnhancedTextureBuilders) then textureIndex = 0 end if
+            arrayutil.pushArrayBuilder(rCompatEnhancedTextureBuilders[textureIndex], surface)
+          end if
+        end if
+      end if
+    end if
+    faceIndex = faceIndex + 1
+  end while
+
+  GL_DisableMultitexture()
+  gl.enable(gl.GL_TEXTURE_2D)
+  gl.enable(gl.GL_BLEND)
+  gl.blendFunc(gl.GL_ONE, gl.GL_ONE)
+  gl.depthMask(false)
+  gl.depthFunc(R_CurrentDepthFunction())
+  enhanced.beginOverlay()
+  drawn = 0
+  builderIndex = 0
+  while builderIndex < len(rCompatEnhancedTextureBuilders)
+    builder = rCompatEnhancedTextureBuilders[builderIndex]
+    if builder.count > 0 then
+      first = builder.values[0]
+      gl.bindTexture(textureIdForSurface(rCompatRenderer, first))
+      keys = compatEnhancedBatchKeys(builder.values, builder.count)
+      batched = gl.staticGeometryCallBatchCount(keys, builder.count, 0)
+      if not batched then
+        item = 0
+        while item < builder.count
+          DrawGLPoly(builder.values[item])
+          item = item + 1
+        end while
+      end if
+      drawn = drawn + builder.count
+    end if
+    builderIndex = builderIndex + 1
+  end while
+  enhanced.endOverlay()
+  gl.depthMask(true)
+  gl.disable(gl.GL_BLEND)
+  gl.blendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
+  gl.color(255, 255, 255, 255)
+  return drawn
+end function
+
 // Apply the Quake-compatible r set subdivide size behavior.
 function R_SetSubdivideSize(value)
   return glWarp.SetSubdivideSize(value)
@@ -2255,6 +2477,14 @@ function R_LightPoint(point)
     rCompatLightPlane = lightplane
   end if
   return result
+end function
+
+// Report whether the most recent vertical light/receiver trace actually hit
+// a world surface.  lightspot intentionally retains its storage object for
+// allocation-free alias lighting, so callers must not infer validity merely
+// from that object's non-void state.
+function R_LightPointHit()
+  return glRlight.FastLightHit()
 end function
 
 // Apply the Quake-compatible r active dynamic lights behavior.
@@ -2993,6 +3223,92 @@ function R_DrawBrushModelForSubmodel(entity, submodelIndex)
   R_BlendLightmaps()
   gl.popMatrix()
   currentTextureFrame = previousTextureFrame
+  return count
+end function
+
+// Draw only the textured faces of one inline BSP model for the enhanced
+// additive pass; classic lightmap chains and dynamic-light marks are not
+// touched by this second draw.
+function R_DrawBrushModelEnhancedForSubmodel(entity, submodelIndex)
+  global currentTextureFrame
+  if rCompatRenderer is void or entity is void then return 0 end if
+  if submodelIndex < 1 or submodelIndex >= len(rCompatRenderer.map.models) then return 0 end if
+  submodel = rCompatRenderer.map.models[submodelIndex]
+  modelOrigin = compatBrushModelOrigin(entity)
+  previousTextureFrame = currentTextureFrame
+  currentTextureFrame = entity.frame
+  gl.pushMatrix()
+  gl.translate(entity.origin.x, entity.origin.y, entity.origin.z)
+  gl.rotate(entity.angles.y, 0.0, 0.0, 1.0)
+  gl.rotate(entity.angles.x, 0.0, 1.0, 0.0)
+  gl.rotate(entity.angles.z, 1.0, 0.0, 0.0)
+  faceIndex = submodel.firstFace
+  lastFace = faceIndex + submodel.numFaces
+  count = 0
+  while faceIndex < lastFace and faceIndex < len(rCompatRenderer.surfaces)
+    if faceIndex >= 0 then
+      surface = rCompatRenderer.surfaces[faceIndex]
+      plane = compatPlane(surface)
+      if plane is not void then
+        distance = math.dot(modelOrigin, plane.normal) - plane.dist
+        if R_BrushSurfaceFacesViewer(surface, distance) and (surface.flags & (c.SURF_DRAWSKY | c.SURF_DRAWTURB | GLQUAKE_SURF_UNDERWATER)) == 0 then
+          gl.bindTexture(textureIdForSurface(rCompatRenderer, surface))
+          DrawGLPoly(surface)
+          count = count + 1
+        end if
+      end if
+    end if
+    faceIndex = faceIndex + 1
+  end while
+  gl.popMatrix()
+  currentTextureFrame = previousTextureFrame
+  return count
+end function
+
+// Ray-project an inline BSP object's complete silhouette onto arbitrary world
+// polygons. Each fan triangle is emitted only when all three rays reach a
+// compatible receiver, preventing interpolation through a BSP corner.
+function R_DrawBrushModelShadowForSubmodel(entity, submodelIndex, floorWorldZ, offsetX, offsetY, contactOnly, pointLightActive, lightX, lightY, lightZ)
+  if rCompatRenderer is void or entity is void then return 0 end if
+  if submodelIndex < 1 or submodelIndex >= len(rCompatRenderer.map.models) then return 0 end if
+  if not rayShadow.isReady() then return 0 end if
+  // Reuse the active world ray context but isolate vertex indexes per face;
+  // inline BSP polygons do not share the external model's vertex numbering.
+  submodel = rCompatRenderer.map.models[submodelIndex]
+  rayShadow.beginProjectionSample(offsetX, offsetY)
+  gl.pushMatrix()
+  faceIndex = submodel.firstFace
+  lastFace = faceIndex + submodel.numFaces
+  count = 0
+  while faceIndex < lastFace and faceIndex < len(rCompatRenderer.surfaces)
+    if faceIndex >= 0 then
+      surface = rCompatRenderer.surfaces[faceIndex]
+      if surface is not void and len(surface.vertices) >= 3 then
+        rayShadow.beginPrimitive()
+        rayShadow.projectBrushVertices(surface.vertices)
+        valid = true
+        vertexIndex = 0
+        for each vertex in surface.vertices
+          if not rayShadow.projectedPointValid(vertexIndex) then valid = false end if
+          vertexIndex = vertexIndex + 1
+        end for
+        gl.begin(gl.GL_TRIANGLES)
+        triangleIndex = 1
+        while valid and triangleIndex + 1 < len(surface.vertices)
+          if rayShadow.receiverTriangleCompatible(0, triangleIndex, triangleIndex + 1) then
+            gl.vertex3(rayShadow.projectedPointX(0), rayShadow.projectedPointY(0), rayShadow.projectedPointZ(0))
+            gl.vertex3(rayShadow.projectedPointX(triangleIndex), rayShadow.projectedPointY(triangleIndex), rayShadow.projectedPointZ(triangleIndex))
+            gl.vertex3(rayShadow.projectedPointX(triangleIndex + 1), rayShadow.projectedPointY(triangleIndex + 1), rayShadow.projectedPointZ(triangleIndex + 1))
+            count = count + 1
+          end if
+          triangleIndex = triangleIndex + 1
+        end while
+        gl.finishPrimitive()
+      end if
+    end if
+    faceIndex = faceIndex + 1
+  end while
+  gl.popMatrix()
   return count
 end function
 

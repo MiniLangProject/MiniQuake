@@ -12,10 +12,12 @@ layout(push_constant) uniform MiniQuakePush {
     mat4 transform;
     vec4 alphaReference;
     vec4 depthRange;
+    vec4 lights[2];
 } pushData;
 
 layout(location = 0) out vec2 texcoord;
 layout(location = 1) out vec4 color;
+layout(location = 2) out vec3 eyePosition;
 
 void main() {
     gl_Position = pushData.transform * vec4(inPosition, 1.0);
@@ -27,4 +29,7 @@ void main() {
     );
     texcoord = inTexcoord;
     color = inColor;
+    // Enhanced draws are transformed to eye space by the native bridge before
+    // upload; classic draws ignore this interpolant in the fragment shader.
+    eyePosition = inPosition;
 }

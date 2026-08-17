@@ -1,6 +1,6 @@
 # MiniQuake current port status
 
-Updated: 2026-08-15
+Updated: 2026-08-17
 
 MiniQuake targets GLQuake/WinQuake 1.09 behavior on Windows x64, Protocol 15
 and the original Quake data formats. Engine behavior is implemented in
@@ -14,6 +14,9 @@ rendering, audio, UDP, controller and codec facilities.
   runtime scenario is defect-free.
 - OpenGL, Direct3D 9 and Vulkan backends are present. Vulkan is loaded at
   runtime and preserves the OpenGL fallback path.
+- All three backends provide an optional enhanced path for per-pixel dynamic
+  lights and geometry-projected real-time shadows while retaining the original
+  BSP lightmaps.
 - The production documentation audit covers MiniLang and maintained native
   sources, including file provenance and function summaries.
 - Build products (`build`, `build_perf`, `native/build` and

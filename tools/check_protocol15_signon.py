@@ -77,14 +77,18 @@ def source_contract(root: Path) -> list[str]:
     tests = (root / "tests/protocol15_signon_e2e_tests.ml").read_text(encoding="utf-8")
     required = {
         "unmasked high color argument": "(colorValue >> 4)",
-        "queued client reply": "return true\nend function\n\n// Process apply event.\nfunction applyEvent",
         "queued prespawn": "client.sendSignon = true",
         "spawn embedded message": "buffer = client.message",
         "success marker": "MiniQuake BP-015 Protocol 15 signon tests passed: 12",
     }
-    texts = [signon, client, server, server, tests]
+    texts = [signon, server, server, tests]
     for (name, marker), text in zip(required.items(), texts):
         if marker not in text: errors.append(f"missing {name}: {marker}")
+    reply_start = client.find("function CL_SignonReply(client)")
+    reply_end = client.find("function applyEvent(client, item)", reply_start)
+    reply = client[reply_start:reply_end] if reply_start >= 0 and reply_end > reply_start else ""
+    if "protocolSignon.writeClientReply(" not in reply or "return true" not in reply:
+        errors.append("CL_SignonReply no longer queues the client reply")
     if 'entity.baseline = [0, 0, 0, 0, baselineOrigin, baselineAngles, 0]' not in tests:
         errors.append("BP-015 fast-update fixture must use the canonical ClientEntityState baseline array")
     if 'serverBaseline = t.EntityBaseline(' not in tests or 'update.writeFastUpdate(packet, 1, serverBaseline,' not in tests:

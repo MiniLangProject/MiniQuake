@@ -73,13 +73,13 @@ function printUsage()
   print "                             report signon, QuakeC, collision and heap checks"
   print "  --render-smoke BASE MAP [FRAMES] [-game DIR]"
   print "                             run the textured host and exit automatically"
-  print "  --render-evidence BASE MAP FRAME PREFIX [-game DIR] [-width N] [-height N] [-menu] [-console]"
+  print "  --render-evidence BASE MAP FRAME PREFIX [-game DIR] [-width N] [-height N] [-renderer NAME] [-lighting 0|1] [-shadows 0|1] [-shadowquality 0|1|2] [-menu] [-console]"
   print "                             capture deterministic TGA after UI and before swap"
   print "  --endscreen-evidence BASE PREFIX [-game DIR] [-width N] [-height N]"
   print "                             capture the real e1m1 QuakeC intermission overlay"
   print "  --ui-resolution-matrix BASE PREFIX [-game DIR]"
   print "                             capture every UI surface at every offered resolution"
-  print "  --render-demo-evidence BASE DEMO FRAME PREFIX [-game DIR]"
+  print "  --render-demo-evidence BASE DEMO FRAME PREFIX [-game DIR] [-width N] [-height N] [-renderer NAME] [-lighting 0|1] [-shadows 0|1] [-shadowquality 0|1|2]"
   print "                             capture a deterministic demo frame for external comparison"
   print "  --original-interop-server BASE MAP PORT FRAMES PREFIX [-game DIR]"
   print "                             run MiniQuake server for an original MiniQuake client"
@@ -437,8 +437,20 @@ function runRenderEvidenceCommand(arguments)
     "-width", "" + width,
     "-height", "" + height,
     "-maxframes", "" + frames,
-    "+map", arguments[2],
   ]
+  // Evidence-specific visual overrides must be copied into the nested engine
+  // command line.  Arbitrary trailing arguments belong to this diagnostic
+  // command itself and are otherwise intentionally not forwarded.
+  if hasNamedOption(arguments, "-lighting") then
+    renderArguments = renderArguments + ["+r_lighting", "" + integerNamedOption(arguments, "-lighting", 0, 0, 1)]
+  end if
+  if hasNamedOption(arguments, "-shadows") then
+    renderArguments = renderArguments + ["+r_shadows", "" + integerNamedOption(arguments, "-shadows", 0, 0, 1)]
+  end if
+  if hasNamedOption(arguments, "-shadowquality") then
+    renderArguments = renderArguments + ["+r_shadowquality", "" + integerNamedOption(arguments, "-shadowquality", 1, 0, 2)]
+  end if
+  renderArguments = renderArguments + ["+map", arguments[2]]
   if hasNamedOption(arguments, "-menu") then renderArguments = renderArguments + ["+menu_main"] end if
   if hasNamedOption(arguments, "-console") then renderArguments = renderArguments + ["+toggleconsole"] end if
   renderer = namedOption(arguments, "-renderer", "")
@@ -465,7 +477,9 @@ end function
 // Execute render demo evidence command.
 function runRenderDemoEvidenceCommand(arguments)
   frames = boundedInteger(arguments[3], 256, 1, 1000000)
-  return host.runRenderEvidence([
+  width = integerNamedOption(arguments, "-width", 640, 320, 8192)
+  height = integerNamedOption(arguments, "-height", 480, 200, 8192)
+  renderArguments = [
     "-basedir", arguments[1],
     "-game", gameOption(arguments),
     "-window",
@@ -477,8 +491,8 @@ function runRenderDemoEvidenceCommand(arguments)
     // Match MiniQuake's startup palette transform.  The runtime +gamma cvar is
     // separate from gl_vidnt::Check_Gamma and does not affect uploaded textures.
     "-gamma", "1",
-    "-width", "640",
-    "-height", "480",
+    "-width", "" + width,
+    "-height", "" + height,
     "-maxframes", "" + frames,
     "+viewsize", "100",
     "+fov", "90",
@@ -489,8 +503,20 @@ function runRenderDemoEvidenceCommand(arguments)
     "+gl_ztrick", "0",
     "+gl_clear", "1",
     "+gl_finish", "1",
-    "+timedemo", arguments[2],
-  ], frames, arguments[4])
+  ]
+  renderer = namedOption(arguments, "-renderer", "")
+  if renderer != "" then renderArguments = renderArguments + ["-renderer", renderer] end if
+  if hasNamedOption(arguments, "-lighting") then
+    renderArguments = renderArguments + ["+r_lighting", "" + integerNamedOption(arguments, "-lighting", 0, 0, 1)]
+  end if
+  if hasNamedOption(arguments, "-shadows") then
+    renderArguments = renderArguments + ["+r_shadows", "" + integerNamedOption(arguments, "-shadows", 0, 0, 1)]
+  end if
+  if hasNamedOption(arguments, "-shadowquality") then
+    renderArguments = renderArguments + ["+r_shadowquality", "" + integerNamedOption(arguments, "-shadowquality", 1, 0, 2)]
+  end if
+  renderArguments = renderArguments + ["+timedemo", arguments[2]]
+  return host.runRenderEvidence(renderArguments, frames, arguments[4])
 end function
 
 // Execute original interop server command.

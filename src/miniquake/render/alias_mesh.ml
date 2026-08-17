@@ -14,6 +14,7 @@ import miniquake.array_util as compatAliasArrays
 import miniquake.byteio as compatAliasBytes
 import miniquake.render.gl11 as compatAliasGl
 import miniquake.render.alias_normals as compatAliasNormals
+import miniquake.render.ray_shadow as rayShadow
 
 // gl_mesh.c / alias-draw state.  MiniLang arrays replace the fixed C work
 // buffers but the strip/fan selection and vertex ordering are unchanged.
@@ -59,6 +60,10 @@ shadevector = compatAliasTypes.Vec3(0.0, 0.0, 1.0)
 shadedots = compatAliasNormals.shadeDots[0]
 shadeRow = 0
 lightspot = compatAliasTypes.Vec3(0.0, 0.0, 0.0)
+shadowPointLightActive = false
+shadowPointLightX = 0.0
+shadowPointLightY = 0.0
+shadowPointLightZ = 0.0
 currentAliasFrame = void
 meshCacheModelKeys = array(ALIAS_MESH_CACHE_SIZE, 0)
 meshCacheValues = array(ALIAS_MESH_CACHE_SIZE)
@@ -128,6 +133,17 @@ function configureAliasLighting(lightValue, ambientValue, yaw, spot)
   end if
   if spot is not void then lightspot = spot end if
   return true
+end function
+
+// Select a model-local point light for physically directed projected shadows.
+// Disabling it retains GLQuake's stable directional fallback.
+function configureAliasShadowPointLight(enabled, x, y, z)
+  global shadowPointLightActive, shadowPointLightX, shadowPointLightY, shadowPointLightZ
+  shadowPointLightActive = enabled
+  shadowPointLightX = x
+  shadowPointLightY = y
+  shadowPointLightZ = z
+  return shadowPointLightActive
 end function
 
 // Exact gl_mesh.c candidate-strip walk.  Temporary used==2 markers are
@@ -546,7 +562,7 @@ end function
 // gl_rmain.c computes the projected height from currententity->origin[2].
 // The vertex coordinates below are still model-local because the entity
 // transform is already active on the GL matrix stack.
-function GL_DrawAliasShadowAtOrigin(header, posenum, entityOriginZ)
+function drawAliasShadowProjectionSampleAtOrigin(header, posenum, entityOriginZ, offsetX, offsetY, contactOnly)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   model = header
   if model is void then model = paliashdr end if
@@ -570,21 +586,113 @@ function GL_DrawAliasShadowAtOrigin(header, posenum, entityOriginZ)
       item = command.vertices[index]
       if item.vertexIndex >= 0 and item.vertexIndex < len(frame.vertices) then
         packed = frame.vertices[item.vertexIndex]
-        point = compatAliasTypes.Vec3(
-          packed.x * model.scale.x + model.scaleOrigin.x,
-          packed.y * model.scale.y + model.scaleOrigin.y,
-          packed.z * model.scale.z + model.scaleOrigin.z,
-        )
-        point.x = point.x - shadevector.x * (point.z + heightDifference)
-        point.y = point.y - shadevector.y * (point.z + heightDifference)
-        point.z = height
-        compatAliasGl.vertex3(point.x, point.y, point.z)
+        // Keep the soft-shadow replay allocation-free.  The former Vec3 per
+        // vertex became costly when the high-quality path emitted five taps.
+        pointX = packed.x * model.scale.x + model.scaleOrigin.x
+        pointY = packed.y * model.scale.y + model.scaleOrigin.y
+        pointZ = packed.z * model.scale.z + model.scaleOrigin.z
+        // The contact pass projects vertically and therefore remains visible
+        // around an actor's feet from the normal first-person viewpoint.  The
+        // following directional pass retains the light-driven silhouette.
+        projectedX = pointX
+        projectedY = pointY
+        if not contactOnly then
+          projectedX = pointX - shadevector.x * (pointZ + heightDifference)
+          projectedY = pointY - shadevector.y * (pointZ + heightDifference)
+          if shadowPointLightActive and shadowPointLightZ > height + 8.0 then
+            denominator = pointZ - shadowPointLightZ
+            if denominator < -0.001 or denominator > 0.001 then
+              fraction = (height - shadowPointLightZ) / denominator
+              // Reject grazing projections that would stretch across an entire
+              // room; the directional fallback is more stable in that case.
+              if fraction >= 0.0 and fraction <= 4.0 then
+                projectedX = shadowPointLightX + (pointX - shadowPointLightX) * fraction
+                projectedY = shadowPointLightY + (pointY - shadowPointLightY) * fraction
+              end if
+            end if
+          end if
+        end if
+        projectedX = projectedX + offsetX
+        projectedY = projectedY + offsetY
+        compatAliasGl.vertex3(projectedX, projectedY, height)
       end if
       index = index + 1
     end while
     compatAliasGl.finishPrimitive()
     drawn = drawn + count - 2
   end for
+  return drawn
+end function
+
+// Draw one vertically projected model footprint as the stable contact core of
+// the enhanced shadow.  This is still the model mesh, not a generic blob.
+function GL_DrawAliasContactShadowAtOrigin(header, posenum, entityOriginZ)
+  return drawAliasShadowProjectionSampleAtOrigin(header, posenum, entityOriginZ, 0.0, 0.0, true)
+end function
+
+// Draw one directional projected-shadow sample with the requested penumbra
+// offset while retaining the public GLQuake-compatible entry point.
+function GL_DrawAliasShadowSampleAtOrigin(header, posenum, entityOriginZ, offsetX, offsetY)
+  return drawAliasShadowProjectionSampleAtOrigin(header, posenum, entityOriginZ, offsetX, offsetY, false)
+end function
+
+// Draw the reference single-tap projected alias silhouette.
+function GL_DrawAliasShadowAtOrigin(header, posenum, entityOriginZ)
+  return GL_DrawAliasShadowSampleAtOrigin(header, posenum, entityOriginZ, 0.0, 0.0)
+end function
+
+// Project every MDL triangle along a real light ray onto the first compatible
+// render-BSP polygon. The caster transform and world context are configured by
+// the entity renderer immediately before this call.
+function GL_DrawAliasRayShadowSample(header, posenum, entity, doubleEyes, pointLightEnabled, lightX, lightY, lightZ, offsetX, offsetY)
+  model = header
+  if model is void then model = paliashdr end if
+  if model is void or not rayShadow.isReady() then return 0 end if
+  frame = posenum
+  if posenum is int then frame = frameForNumber(model, posenum, 0.0) end if
+  if frame is void then return 0 end if
+  mesh = GL_MakeAliasModelDisplayLists(model, model)
+  // The production path keeps the cached MDL command stream, transform,
+  // native BVH traversal and triangle submission within one bridge call.
+  // Scalar projection below intentionally remains available to trace tests.
+  if not compatAliasGl.traceEnabled() and compatAliasGl.nativeBatchAvailable() then
+    batch = aliasBatchData(frame, mesh)
+    eyesValue = 0
+    pointValue = 0
+    if doubleEyes then eyesValue = 1 end if
+    if pointLightEnabled then pointValue = 1 end if
+    return compatAliasNative.glDrawAliasRayShadow(
+      batch, len(batch),
+      compatAliasNative.floatBits(entity.origin.x), compatAliasNative.floatBits(entity.origin.y), compatAliasNative.floatBits(entity.origin.z),
+      compatAliasNative.floatBits(entity.angles.x), compatAliasNative.floatBits(entity.angles.y), compatAliasNative.floatBits(entity.angles.z),
+      compatAliasNative.floatBits(model.scaleOrigin.x), compatAliasNative.floatBits(model.scaleOrigin.y), compatAliasNative.floatBits(model.scaleOrigin.z),
+      compatAliasNative.floatBits(model.scale.x), compatAliasNative.floatBits(model.scale.y), compatAliasNative.floatBits(model.scale.z),
+      eyesValue, pointValue,
+      compatAliasNative.floatBits(lightX), compatAliasNative.floatBits(lightY), compatAliasNative.floatBits(lightZ),
+      compatAliasNative.floatBits(offsetX), compatAliasNative.floatBits(offsetY),
+    )
+  end if
+  rayShadow.beginProjectionSample(offsetX, offsetY)
+  rayShadow.projectAliasVertices(frame.vertices)
+  compatAliasGl.begin(compatAliasGl.GL_TRIANGLES)
+  drawn = 0
+  for each triangle in model.triangles
+    first = triangle.vertex0
+    second = triangle.vertex1
+    third = triangle.vertex2
+    if first >= 0 and first < len(frame.vertices) and second >= 0 and second < len(frame.vertices) and third >= 0 and third < len(frame.vertices) then
+      firstHit = rayShadow.projectedPointValid(first)
+      secondHit = rayShadow.projectedPointValid(second)
+      thirdHit = rayShadow.projectedPointValid(third)
+      if firstHit and secondHit and thirdHit and rayShadow.receiverTriangleCompatible(first, second, third) then
+        compatAliasGl.vertex3(rayShadow.projectedPointX(first), rayShadow.projectedPointY(first), rayShadow.projectedPointZ(first))
+        compatAliasGl.vertex3(rayShadow.projectedPointX(second), rayShadow.projectedPointY(second), rayShadow.projectedPointZ(second))
+        compatAliasGl.vertex3(rayShadow.projectedPointX(third), rayShadow.projectedPointY(third), rayShadow.projectedPointZ(third))
+        drawn = drawn + 1
+      end if
+    end if
+  end for
+  compatAliasGl.finishPrimitive()
   return drawn
 end function
 

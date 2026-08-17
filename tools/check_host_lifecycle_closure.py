@@ -79,7 +79,7 @@ def contract(root):
  dispatch=function(host,'Host_DispatchCommand')
  for marker in ('return Host_Quit_f(session)','return Host_Disconnect_f(session)','return Host_Map_f(session, arguments)','return Host_Restart_f(session)'):
   if marker not in dispatch: errors.append('missing host command route: '+marker)
- if 'host lifecycle closure tests passed: 24' not in test: errors.append('expected 24 BP-034 fixtures')
+ if 'host lifecycle closure tests passed: 25' not in test: errors.append('expected 25 BP-034 fixtures')
  return errors
 def main():
  parser=argparse.ArgumentParser();parser.add_argument('root',nargs='?',default='.');parser.add_argument('--root',dest='root_flag');parser.add_argument('--write-golden',action='store_true');parser.add_argument('--json-output')
@@ -92,10 +92,10 @@ def main():
  if not ok:errors.append('C oracle failed: '+detail)
  elif actual and actual!=expected['rows']:errors.append('C oracle differs from Python model')
  errors+=contract(root)
- result={'schema':'MiniQuakeBP034HostLifecycleClosureVerification/1','package_id':P,'parent_package_id':PAR,'ok':not errors,'oracle':detail,'contract_fingerprint':'0x%08x'%rows()[0]['value'],'rows':len(expected['rows']),'runtime_fixtures':24,'errors':errors}
+ result={'schema':'MiniQuakeBP034HostLifecycleClosureVerification/1','package_id':P,'parent_package_id':PAR,'ok':not errors,'oracle':detail,'contract_fingerprint':'0x%08x'%rows()[0]['value'],'rows':len(expected['rows']),'runtime_fixtures':25,'errors':errors}
  if args.json_output:Path(args.json_output).write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')
  print('MiniQuake BP-034 host lifecycle closure verification: '+('PASS' if not errors else 'FAIL'))
- print(f'  fingerprint=0x{rows()[0]["value"]:08x} rows={len(expected["rows"])} runtime_fixtures=24 oracle={detail}')
+ print(f'  fingerprint=0x{rows()[0]["value"]:08x} rows={len(expected["rows"])} runtime_fixtures=25 oracle={detail}')
  for error in errors:print('  ERROR: '+error)
  return 0 if not errors else 1
 if __name__=='__main__':raise SystemExit(main())

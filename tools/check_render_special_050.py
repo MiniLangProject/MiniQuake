@@ -19,7 +19,7 @@ def main() -> int:
     golden=json.loads((root/'audit/mirror_special_golden.json').read_text(encoding='utf-8'))
     for marker in ('const MIRROR_TEXTURE_PREFIX = "window02_1"','function reflectPoint(','function reflectVector(','function reflectView(','function mirrorProjectionScale('):
         if marker not in special: errors.append(f'special_paths missing {marker}')
-    for marker in ('function R_MirrorReady()','function renderMirrorViewport(','function R_DrawMirrorOverlay(','rCompatMirrorChain = chain'):
+    for marker in ('function inline R_MirrorReady()','function renderMirrorViewport(','function R_DrawMirrorOverlay(','rCompatMirrorChain = chain'):
         if marker not in world: errors.append(f'world renderer missing {marker}')
     for marker in ('r_mirroralpha','worldRenderer.renderMirrorViewport(','worldRenderer.R_DrawMirrorOverlay('):
         if marker not in host: errors.append(f'host integration missing {marker}')

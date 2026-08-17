@@ -362,3 +362,179 @@ end function
 function FastLightPlane()
   return fastLightPlane
 end function
+
+// Allocation-free state for arbitrary world-surface shadow rays.  Unlike the
+// vertical light sampler, this path records a complete 3-D receiver and the
+// normalized fraction along the submitted segment.
+shadowRayHit = false
+shadowRayX = 0.0
+shadowRayY = 0.0
+shadowRayZ = 0.0
+shadowRayNormalX = 0.0
+shadowRayNormalY = 0.0
+shadowRayNormalZ = 1.0
+shadowRayFraction = 1.0
+shadowRayStartX = 0.0
+shadowRayStartY = 0.0
+shadowRayStartZ = 0.0
+shadowRayFinishX = 0.0
+shadowRayFinishY = 0.0
+shadowRayFinishZ = 0.0
+
+// Test a BSP-plane intersection against the real convex render polygon rather
+// than only its lightmap rectangle.  The latter can extend beyond sloped or
+// clipped faces and would let a projected shadow jump through a nearby wall.
+function shadowPointInsideSurface(surface, plane, x, y, z)
+  if surface is void or len(surface.vertices) < 3 then return false end if
+  positive = false
+  negative = false
+  index = 0
+  while index < len(surface.vertices)
+    current = surface.vertices[index].position
+    nextIndex = index + 1
+    if nextIndex >= len(surface.vertices) then nextIndex = 0 end if
+    following = surface.vertices[nextIndex].position
+    edgeX = following.x - current.x
+    edgeY = following.y - current.y
+    edgeZ = following.z - current.z
+    pointX = x - current.x
+    pointY = y - current.y
+    pointZ = z - current.z
+    crossX = edgeY * pointZ - edgeZ * pointY
+    crossY = edgeZ * pointX - edgeX * pointZ
+    crossZ = edgeX * pointY - edgeY * pointX
+    side = crossX * plane.normal.x + crossY * plane.normal.y + crossZ * plane.normal.z
+    if side > 0.05 then positive = true end if
+    if side < -0.05 then negative = true end if
+    if positive and negative then return false end if
+    index = index + 1
+  end while
+  return true
+end function
+
+// Walk the render BSP from the ray origin toward its endpoint and retain the
+// first actual world polygon.  Scalar coordinates keep thousands of shadow
+// rays per frame free of temporary Vec3 and result-array allocations.
+function RecursiveShadowRay(map, surfaces, nodeNumber, startX, startY, startZ, finishX, finishY, finishZ, startFraction, finishFraction)
+  global shadowRayHit, shadowRayX, shadowRayY, shadowRayZ
+  global shadowRayNormalX, shadowRayNormalY, shadowRayNormalZ, shadowRayFraction
+  global shadowRayStartX, shadowRayStartY, shadowRayStartZ
+  global shadowRayFinishX, shadowRayFinishY, shadowRayFinishZ
+  // Traverse the near child first, test polygons on the separating plane, and
+  // visit the far child only if neither earlier stage produced a receiver.
+  if nodeNumber < 0 or nodeNumber >= len(map.nodes) then return false end if
+  node = map.nodes[nodeNumber]
+  if node.planeIndex < 0 or node.planeIndex >= len(map.planes) then return false end if
+  plane = map.planes[node.planeIndex]
+  front = fastPlaneDistance(plane, startX, startY, startZ)
+  back = fastPlaneDistance(plane, finishX, finishY, finishZ)
+  side = 0
+  if front < 0.0 then side = 1 end if
+  sameSide = (back < 0.0 and side == 1) or (back >= 0.0 and side == 0)
+  if sameSide then
+    child = node.child0
+    if side == 1 then child = node.child1 end if
+    return RecursiveShadowRay(map, surfaces, child, startX, startY, startZ, finishX, finishY, finishZ, startFraction, finishFraction)
+  end if
+
+  fraction = front / (front - back)
+  middleX = startX + (finishX - startX) * fraction
+  middleY = startY + (finishY - startY) * fraction
+  middleZ = startZ + (finishZ - startZ) * fraction
+  middleFraction = startFraction + (finishFraction - startFraction) * fraction
+  frontChild = node.child0
+  if side == 1 then frontChild = node.child1 end if
+  if RecursiveShadowRay(map, surfaces, frontChild, startX, startY, startZ, middleX, middleY, middleZ, startFraction, middleFraction) then return true end if
+
+  faceIndex = node.firstFace
+  lastFace = faceIndex + node.numFaces
+  while faceIndex < lastFace and faceIndex < len(surfaces)
+    if faceIndex >= 0 then
+      surface = surfaces[faceIndex]
+      if surface is not void and (surface.flags & c.SURF_DRAWSKY) == 0 and shadowPointInsideSurface(surface, plane, middleX, middleY, middleZ) then
+        shadowRayHit = true
+        shadowRayX = middleX
+        shadowRayY = middleY
+        shadowRayZ = middleZ
+        shadowRayFraction = middleFraction
+        normalX = plane.normal.x
+        normalY = plane.normal.y
+        normalZ = plane.normal.z
+        rayX = shadowRayFinishX - shadowRayStartX
+        rayY = shadowRayFinishY - shadowRayStartY
+        rayZ = shadowRayFinishZ - shadowRayStartZ
+        if normalX * rayX + normalY * rayY + normalZ * rayZ > 0.0 then
+          normalX = -normalX
+          normalY = -normalY
+          normalZ = -normalZ
+        end if
+        shadowRayNormalX = normalX
+        shadowRayNormalY = normalY
+        shadowRayNormalZ = normalZ
+        return true
+      end if
+    end if
+    faceIndex = faceIndex + 1
+  end while
+
+  backChild = node.child1
+  if side == 1 then backChild = node.child0 end if
+  return RecursiveShadowRay(map, surfaces, backChild, middleX, middleY, middleZ, finishX, finishY, finishZ, middleFraction, finishFraction)
+end function
+
+// Trace one arbitrary segment against the rendered BSP surfaces.
+function ShadowRay(map, surfaces, rootNode, startX, startY, startZ, finishX, finishY, finishZ)
+  global shadowRayHit, shadowRayFraction
+  global shadowRayStartX, shadowRayStartY, shadowRayStartZ
+  global shadowRayFinishX, shadowRayFinishY, shadowRayFinishZ
+  shadowRayHit = false
+  shadowRayFraction = 1.0
+  shadowRayStartX = startX
+  shadowRayStartY = startY
+  shadowRayStartZ = startZ
+  shadowRayFinishX = finishX
+  shadowRayFinishY = finishY
+  shadowRayFinishZ = finishZ
+  if map is void or len(map.nodes) == 0 or len(surfaces) == 0 then return false end if
+  return RecursiveShadowRay(map, surfaces, rootNode, startX, startY, startZ, finishX, finishY, finishZ, 0.0, 1.0)
+end function
+
+// Report whether the latest arbitrary shadow segment reached a world polygon.
+function ShadowRayHit()
+  return shadowRayHit
+end function
+
+// Return the latest shadow receiver x coordinate.
+function ShadowRayX()
+  return shadowRayX
+end function
+
+// Return the latest shadow receiver y coordinate.
+function ShadowRayY()
+  return shadowRayY
+end function
+
+// Return the latest shadow receiver z coordinate.
+function ShadowRayZ()
+  return shadowRayZ
+end function
+
+// Return the oriented latest receiver normal x coordinate.
+function ShadowRayNormalX()
+  return shadowRayNormalX
+end function
+
+// Return the oriented latest receiver normal y coordinate.
+function ShadowRayNormalY()
+  return shadowRayNormalY
+end function
+
+// Return the oriented latest receiver normal z coordinate.
+function ShadowRayNormalZ()
+  return shadowRayNormalZ
+end function
+
+// Return the normalized fraction of the latest world-surface hit.
+function ShadowRayFraction()
+  return shadowRayFraction
+end function

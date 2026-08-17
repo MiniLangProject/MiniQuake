@@ -124,6 +124,7 @@ typedef struct mq_vk_push_s {
     float transform[16];
     float alpha_reference[4];
     float depth_range[4];
+    float lights[8];
 } mq_vk_push_t;
 
 typedef struct mq_vk_texture_s {
@@ -286,6 +287,11 @@ static mq_i32 mq_vk_width = 0;
 static mq_i32 mq_vk_height = 0;
 static mq_i32 mq_vk_last_error = 0;
 static char mq_vk_device_name[VK_MAX_PHYSICAL_DEVICE_NAME_SIZE];
+static mq_i32 mq_vk_enhanced_enabled = 0;
+static mq_i32 mq_vk_enhanced_draw_kind_value = 0;
+static mq_i32 mq_vk_enhanced_light_count = 0;
+static float mq_vk_enhanced_view[16];
+static float mq_vk_enhanced_lights[12];
 
 static mq_u32 mq_vk_primitive_mode = MQ_GL_TRIANGLES;
 static mq_vk_vertex_t mq_vk_immediate[65536];
@@ -760,6 +766,9 @@ void mq_vulkan_shutdown(void) {
     if (mq_vk_instance != VK_NULL_HANDLE) mq_vkDestroyInstance(mq_vk_instance, MQ_NULL);
     memset(mq_vk_frames, 0, sizeof(mq_vk_frames)); memset(mq_vk_textures, 0, sizeof(mq_vk_textures)); memset(&mq_vk_white_texture, 0, sizeof(mq_vk_white_texture));
     mq_vk_instance = VK_NULL_HANDLE; mq_vk_device = VK_NULL_HANDLE; mq_vk_physical = VK_NULL_HANDLE; mq_vk_surface = VK_NULL_HANDLE; mq_vk_queue = VK_NULL_HANDLE; mq_vk_command_pool = VK_NULL_HANDLE; mq_vk_pipeline = VK_NULL_HANDLE; mq_vk_pipeline_layout = VK_NULL_HANDLE; mq_vk_descriptor_pool = VK_NULL_HANDLE; mq_vk_descriptor_layout = VK_NULL_HANDLE; mq_vk_staging = MQ_NULL; mq_vk_staging_buffer = VK_NULL_HANDLE; mq_vk_staging_memory = VK_NULL_HANDLE; mq_vk_staging_size = 0u; mq_vk_next_texture = 1u; mq_vk_bound_texture = 0u;
+    mq_vk_enhanced_enabled = 0; mq_vk_enhanced_draw_kind_value = 0; mq_vk_enhanced_light_count = 0;
+    memset(mq_vk_enhanced_view, 0, sizeof(mq_vk_enhanced_view));
+    memset(mq_vk_enhanced_lights, 0, sizeof(mq_vk_enhanced_lights));
 }
 
 /* Report whether ready is available. */
@@ -769,7 +778,8 @@ mq_i32 mq_vulkan_ready(void) { return mq_vk_device != VK_NULL_HANDLE && mq_vk_sw
 mq_i32 mq_vulkan_resize(mq_i32 width, mq_i32 height) {
     if (mq_vk_device == VK_NULL_HANDLE || width < 1 || height < 1) return 0;
     mq_vk_destroy_swapchain();
-    return mq_vk_create_swapchain(width, height);
+    if (!mq_vk_create_swapchain(width, height)) return 0;
+    return 1;
 }
 
 /* Acquire the next swap-chain image and begin recording its frame. */
@@ -829,11 +839,35 @@ static mq_i32 mq_vk_draw(const mq_vk_vertex_t *vertices, mq_u32 count, mq_u32 mo
     VkBool32 blend;
     VkColorBlendEquationEXT equation;
     mq_vk_texture_t *texture;
-    if (vertices == MQ_NULL || count == 0u || !mq_vk_frame_begin() || count > MQ_VK_MAX_VERTICES - frame->vertex_count) return 0;
-    memcpy(&frame->vertices[frame->vertex_count], vertices, count * sizeof(mq_vk_vertex_t));
+    mq_i32 enhanced_draw;
+    mq_u32 vertex_index;
+    if (vertices == MQ_NULL || count == 0u) return 0;
+    enhanced_draw = mq_vk_enhanced_enabled && mq_vk_enhanced_draw_kind_value != 0;
+    if (!mq_vk_frame_begin() || count > MQ_VK_MAX_VERTICES - frame->vertex_count) return 0;
+    if (enhanced_draw) {
+        const float *matrix = mq_vk_modelview[mq_vk_modelview_top];
+        for (vertex_index = 0u; vertex_index < count; ++vertex_index) {
+            const mq_vk_vertex_t *source = &vertices[vertex_index];
+            mq_vk_vertex_t *destination = &frame->vertices[frame->vertex_count + vertex_index];
+            *destination = *source;
+            destination->x = matrix[0] * source->x + matrix[4] * source->y + matrix[8] * source->z + matrix[12];
+            destination->y = matrix[1] * source->x + matrix[5] * source->y + matrix[9] * source->z + matrix[13];
+            destination->z = matrix[2] * source->x + matrix[6] * source->y + matrix[10] * source->z + matrix[14];
+        }
+    } else {
+        memcpy(&frame->vertices[frame->vertex_count], vertices, count * sizeof(mq_vk_vertex_t));
+    }
     offset = frame->vertex_count * sizeof(mq_vk_vertex_t);
     mq_vkCmdBindVertexBuffers(frame->command, 0u, 1u, &frame->vertex_buffer, &offset);
-    memset(&push, 0, sizeof(push)); mq_vk_multiply(push.transform, mq_vk_projection[mq_vk_projection_top], mq_vk_modelview[mq_vk_modelview_top]); push.alpha_reference[0] = mq_vk_alpha_reference; push.alpha_reference[1] = (float)mq_vk_alpha_test; push.alpha_reference[2] = (float)mq_vk_texture_enabled; push.alpha_reference[3] = mq_vk_texture_environment == MQ_GL_MODULATE ? 1.0f : 0.0f; push.depth_range[0] = mq_vk_depth_min; push.depth_range[1] = mq_vk_depth_max;
+    memset(&push, 0, sizeof(push));
+    if (enhanced_draw) memcpy(push.transform, mq_vk_projection[mq_vk_projection_top], sizeof(push.transform));
+    else mq_vk_multiply(push.transform, mq_vk_projection[mq_vk_projection_top], mq_vk_modelview[mq_vk_modelview_top]);
+    if (enhanced_draw && mq_vk_enhanced_light_count > 2) {
+        memcpy(push.alpha_reference, &mq_vk_enhanced_lights[8], 4u * sizeof(float));
+    } else {
+        push.alpha_reference[0] = mq_vk_alpha_reference; push.alpha_reference[1] = (float)mq_vk_alpha_test; push.alpha_reference[2] = (float)mq_vk_texture_enabled; push.alpha_reference[3] = mq_vk_texture_environment == MQ_GL_MODULATE ? 1.0f : 0.0f;
+    }
+    push.depth_range[0] = mq_vk_depth_min; push.depth_range[1] = mq_vk_depth_max; push.depth_range[2] = (float)enhanced_draw; push.depth_range[3] = (float)mq_vk_enhanced_light_count; memcpy(push.lights, mq_vk_enhanced_lights, sizeof(push.lights));
     mq_vkCmdPushConstants(frame->command, mq_vk_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0u, sizeof(push), &push);
     texture = mq_vk_bound_texture < MQ_VK_MAX_TEXTURES && mq_vk_textures[mq_vk_bound_texture].allocated && mq_vk_textures[mq_vk_bound_texture].image != VK_NULL_HANDLE ? &mq_vk_textures[mq_vk_bound_texture] : &mq_vk_white_texture;
     mq_vkCmdBindDescriptorSets(frame->command, VK_PIPELINE_BIND_POINT_GRAPHICS, mq_vk_pipeline_layout, 0u, 1u, &texture->descriptor, 0u, MQ_NULL);
@@ -956,3 +990,50 @@ void mq_vulkan_read_pixels(mq_i32 x,mq_i32 y,mq_i32 width,mq_i32 height,mq_u32 f
 const char*mq_vulkan_get_string(mq_u32 name){if(name==MQ_GL_VENDOR)return"Khronos Group";if(name==MQ_GL_RENDERER)return mq_vk_device_name;if(name==MQ_GL_VERSION)return"Vulkan 1.3";return"";}
 /* Return the current get error value. */
 mq_u32 mq_vulkan_get_error(void){mq_u32 value=(mq_u32)mq_vk_last_error;mq_vk_last_error=0;return value;}void mq_vulkan_finish(void){if(mq_vk_device!=VK_NULL_HANDLE)mq_vkDeviceWaitIdle(mq_vk_device);}void mq_vulkan_flush(void){}void mq_vulkan_draw_buffer(mq_u32 mode){(void)mode;}
+
+/* Report whether Vulkan can execute the enhanced per-pixel light pass. */
+mq_i32 mq_vulkan_enhanced_available(void) {
+    return mq_vk_device != VK_NULL_HANDLE && mq_vk_pipeline != VK_NULL_HANDLE;
+}
+
+/* Configure the optional Vulkan enhanced-lighting path. */
+mq_i32 mq_vulkan_enhanced_configure(mq_i32 enabled, mq_i32 shadows, mq_i32 shadow_quality) {
+    (void)shadows;
+    (void)shadow_quality;
+    mq_vk_enhanced_enabled = enabled != 0 && mq_vulkan_enhanced_available();
+    mq_vk_enhanced_draw_kind_value = 0;
+    if (!mq_vk_enhanced_enabled) mq_vk_enhanced_light_count = 0;
+    return enabled == 0 || mq_vk_enhanced_enabled;
+}
+
+/* Snapshot the view matrix and transform compact world lights to eye space. */
+mq_i32 mq_vulkan_enhanced_begin_frame(const void *light_data, mq_u32 byte_count) {
+    const float *source = (const float *)light_data;
+    mq_u32 index;
+    mq_u32 count;
+    if (!mq_vk_enhanced_enabled || source == MQ_NULL) return 0;
+    memcpy(mq_vk_enhanced_view, mq_vk_modelview[mq_vk_modelview_top], sizeof(mq_vk_enhanced_view));
+    count = byte_count / (4u * (mq_u32)sizeof(float));
+    if (count > 3u) count = 3u;
+    for (index = 0u; index < count; ++index) {
+        float x = source[index * 4u];
+        float y = source[index * 4u + 1u];
+        float z = source[index * 4u + 2u];
+        mq_vk_enhanced_lights[index * 4u] = mq_vk_enhanced_view[0] * x + mq_vk_enhanced_view[4] * y + mq_vk_enhanced_view[8] * z + mq_vk_enhanced_view[12];
+        mq_vk_enhanced_lights[index * 4u + 1u] = mq_vk_enhanced_view[1] * x + mq_vk_enhanced_view[5] * y + mq_vk_enhanced_view[9] * z + mq_vk_enhanced_view[13];
+        mq_vk_enhanced_lights[index * 4u + 2u] = mq_vk_enhanced_view[2] * x + mq_vk_enhanced_view[6] * y + mq_vk_enhanced_view[10] * z + mq_vk_enhanced_view[14];
+        mq_vk_enhanced_lights[index * 4u + 3u] = source[index * 4u + 3u];
+    }
+    mq_vk_enhanced_light_count = (mq_i32)count;
+    return 1;
+}
+
+/* Select whether subsequent Vulkan geometry belongs to the enhanced overlay. */
+void mq_vulkan_enhanced_draw_kind(mq_i32 kind) {
+    mq_vk_enhanced_draw_kind_value = mq_vk_enhanced_enabled ? kind : 0;
+}
+
+/* Restore classic Vulkan drawing state at the end of the 3-D frame. */
+void mq_vulkan_enhanced_end_frame(void) {
+    mq_vk_enhanced_draw_kind_value = 0;
+}

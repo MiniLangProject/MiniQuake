@@ -25,7 +25,7 @@ def contract(root):
  for m in ('function computedEntityBounds(server, entityIndex)','function updateEntityBounds(server, entityIndex)','function linkEntity(server, entityIndex, touchTriggerLinks)','if trace.startSolid then return 0 end if','linkEntity(server, entityIndex, true)'):
   if m not in s:e.append('missing collision marker: '+m)
  if 'best.entity = 0 else best.entity = -1' not in s or 'trace.entity = 0 else trace.entity = -1' not in w:e.append('clear traces still identify the world')
- if t.count('if run(')!=15 or 'world link/collision tests passed: 15' not in t:e.append('expected 15 BP-026 fixtures')
+ if t.count('if run(')!=16 or 'world link/collision tests passed: 16' not in t:e.append('expected 16 BP-026 fixtures')
  return e
 def main():
  a=argparse.ArgumentParser();a.add_argument('root',nargs='?',default='.');a.add_argument('--root',dest='rf');a.add_argument('--write-golden',action='store_true');a.add_argument('--json-output');x=a.parse_args();root=Path(x.rf or x.root).resolve();d=doc(root);g=root/GOLDEN
@@ -36,9 +36,9 @@ def main():
  ok,detail,actual=run_oracle(root)
  if not ok:errors.append('C oracle failed: '+detail)
  elif actual and actual!=d['rows']:errors.append('C oracle differs from model')
- errors+=contract(root);report={'schema':'MiniQuakeBP026WorldLinkVerification/1','package_id':PACKAGE,'parent_package_id':PARENT,'ok':not errors,'oracle':detail,'rows':len(d['rows']),'runtime_fixtures':15,'errors':errors}
+ errors+=contract(root);report={'schema':'MiniQuakeBP026WorldLinkVerification/1','package_id':PACKAGE,'parent_package_id':PARENT,'ok':not errors,'oracle':detail,'rows':len(d['rows']),'runtime_fixtures':16,'errors':errors}
  if x.json_output:Path(x.json_output).write_text(json.dumps(report,indent=2)+'\n')
- print('MiniQuake BP-026 world link/collision verification: '+('PASS' if not errors else 'FAIL'));print(f'  rows={len(d["rows"])} runtime_fixtures=15 oracle={detail}')
+ print('MiniQuake BP-026 world link/collision verification: '+('PASS' if not errors else 'FAIL'));print(f'  rows={len(d["rows"])} runtime_fixtures=16 oracle={detail}')
  for z in errors:print('  ERROR: '+z)
  return 0 if not errors else 1
 if __name__=='__main__':raise SystemExit(main())

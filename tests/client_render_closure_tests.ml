@@ -40,7 +40,7 @@ end function
 
 // Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
-  print "[" + number + "/28] " + name
+  print "[" + number + "/30] " + name
   result = try(fn())
   if result is error then print "FAIL: " + result.message; return false end if
   return true
@@ -301,6 +301,45 @@ function testFrameRestartAllowsEntityAgain()
   return true
 end function
 
+// Verify that the production single-pass PVS collector excludes statics in a
+// hidden BSP leaf while retaining dynamic entities and visible-leaf statics.
+function testStaticPvsCollection()
+  entities = setup()
+  split(entities[0], t.Vec3(1.0, 0.0, 0.0), t.Vec3(2.0, 1.0, 1.0))
+  split(entities[1], t.Vec3(-2.0, 0.0, 0.0), t.Vec3(-1.0, 1.0, 1.0))
+  dynamic = makeEntity(99, 1)
+  hiddenNegativeLeaf = refrag.R_AppendVisiblePvs([dynamic], bytes(1, 0))
+  equal(len(hiddenNegativeLeaf), 2, "hidden leaf static excluded")
+  equal(hiddenNegativeLeaf[0].number, 99, "dynamic entity retains priority")
+  equal(hiddenNegativeLeaf[1].number, 0, "visible positive-leaf static retained")
+  bothLeaves = refrag.R_AppendVisiblePvs([dynamic], bytes(1, 1))
+  equal(len(bothLeaves), 3, "visible negative leaf static restored")
+  return true
+end function
+
+// Verify non-axial BSP29 planes use computed support corners rather than the
+// renderer Plane.signBits representation, which BspPlane deliberately lacks.
+function testNonAxialEfragSplit()
+  entities = setup()
+  plane = t.BspPlane(t.Vec3(0.70710678, 0.70710678, 0.0), 0.0, 3)
+  node = t.BspNode(0, -1, -2, t.Vec3(-64.0, -64.0, -64.0), t.Vec3(64.0, 64.0, 64.0), 0, 0)
+  // Reconfigure a real two-leaf map whose root is the diagonal plane.
+  minimum = t.Vec3(-64.0, -64.0, -64.0)
+  maximum = t.Vec3(64.0, 64.0, 64.0)
+  leaf0 = t.BspLeaf(c.CONTENTS_EMPTY, -1, minimum, maximum, 0, 0, bytes(4))
+  leaf1 = t.BspLeaf(c.CONTENTS_EMPTY, -1, minimum, maximum, 0, 0, bytes(4))
+  model = t.BspModel(minimum, maximum, t.Vec3(0.0, 0.0, 0.0), [0, 0, 0, 0], 2, 0, 0)
+  map = t.BspMap("diagonal.bsp", bytes(), c.BSP_VERSION, [], "", [], [plane], [], [], bytes(), [node], [], [], bytes(), [], [leaf0, leaf1], [], [], [], [model])
+  renderer = t.WorldRenderer(map, bytes(), [], [], [], true, 0, false, false, 0, bytes(), 0, 1.0)
+  noneModel = t.ClientRenderModel("", entityRenderer.MODEL_NONE, void, void, void, [], false)
+  aliasModel = t.ClientRenderModel("progs/test.mdl", entityRenderer.MODEL_ALIAS, void, void, void, [], false)
+  modelRenderer = t.EntityRenderer(void, bytes(), [noneModel, aliasModel], 0)
+  refrag.Configure(renderer, modelRenderer, entities)
+  refrag.SetSplitState(entities[0], t.Vec3(-2.0, -2.0, -1.0), t.Vec3(2.0, 2.0, 1.0))
+  equal(refrag.R_SplitEntityOnNode(0), 2, "diagonal plane touches both leaves")
+  return true
+end function
+
 // Verify cap constant positive against the expected Quake behavior.
 function testCapConstantPositive()
   yes(contract.maxVisibleEntities() > 0 and contract.maxTemporaryEntities() > 0, "positive limits")
@@ -392,6 +431,8 @@ function main(args)
     ["view cshift", testViewCshiftContract],
     ["store order", testStoreOrder],
     ["frame restart", testFrameRestartAllowsEntityAgain],
+    ["static PVS collection", testStaticPvsCollection],
+    ["non-axial efrag split", testNonAxialEfragSplit],
     ["beam model names", testBeamModelNames],
     ["beam model preload", testBeamModelsPrecachedOnce],
     ["temporary submission cap", testTemporarySubmissionCap],
@@ -405,7 +446,7 @@ function main(args)
     if run(index + 1, tests[index][0], tests[index][1]) then passed = passed + 1 end if
     index = index + 1
   end while
-  if passed != 28 then return 1 end if
-  print "MiniQuake BP-039 client/render closure tests passed: 28"
+  if passed != 30 then return 1 end if
+  print "MiniQuake BP-039 client/render closure tests passed: 30"
   return 0
 end function

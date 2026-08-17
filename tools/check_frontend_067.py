@@ -8,7 +8,7 @@ def main():
     host=(root/'src/miniquake/host.ml').read_text(encoding='utf-8-sig')
     test=(root/'tests/console_screen_lifecycle_tests.ml').read_text(encoding='utf-8-sig')
     golden=json.loads((root/'audit/console_screen_golden.json').read_text())
-    for m in ['function Con_NotifyBoxPending()', 'function Con_NotifyBoxKey(state, down)',
+    for m in ['function inline Con_NotifyBoxPending()', 'function Con_NotifyBoxKey(state, down)',
               'notifyBoxSawDown = true', 'if not notifyBoxSawDown then return false end if']:
         if m not in console: errors.append('console.ml missing marker: '+m)
     if 'if console.Con_NotifyBoxPending() then' not in host: errors.append('host does not route notify-box key edges')

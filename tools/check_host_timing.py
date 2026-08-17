@@ -56,22 +56,22 @@ def contract(root):
     )
     for marker in markers:
         if marker not in timing: errors.append('missing timing marker: '+marker)
-    if 'return hostTiming.filter(session.timing, elapsedSeconds, timedemo, forced, 1.0)' not in host:
+    if 'return hostTiming.filter(session.timing, elapsedSeconds, timedemo, forced, 1.0, maximum)' not in host:
         errors.append('Host_FilterTime does not use shared exact filter')
     if test.count('if run(') not in (0,18) and 'while index < len(tests)' not in test:
         errors.append('unexpected BP-030 fixture structure')
     if 'host timing tests passed: 18' not in test: errors.append('expected 18 BP-030 runtime fixtures')
     accumulation_markers = (
-      'no(timing.filter(value, 0.001, false, 0.0, 1.0), "first filtered")',
-      'no(timing.filter(value, 0.007, false, 0.0, 1.0), "second filtered")',
-      'yes(timing.filter(value, 0.007, false, 0.0, 1.0), "accumulated frame")',
+      'no(timing.filter(value, 0.001, false, 0.0, 1.0, 72.0), "first filtered")',
+      'no(timing.filter(value, 0.007, false, 0.0, 1.0, 72.0), "second filtered")',
+      'yes(timing.filter(value, 0.007, false, 0.0, 1.0, 72.0), "accumulated frame")',
       'equal(value.filteredFrames, 2, "accumulated filtered count")',
       'equal(value.frameCount, 1, "accumulated accepted count")',
       'near(value.frameTime, 0.015, 0.000001, "accumulated frame time")',
     )
     for marker in accumulation_markers:
         if marker not in test: errors.append('missing accumulated-threshold fixture marker: '+marker)
-    stale = 'no(timing.filter(value, 0.007, false, 0.0, 1.0), "first filtered")'
+    stale = 'no(timing.filter(value, 0.007, false, 0.0, 1.0, 72.0), "first filtered")'
     if stale in test: errors.append('stale BP-030 accumulation order remains in runtime fixture')
     return errors
 def main():

@@ -382,6 +382,8 @@ MQ_DLLIMPORT BOOL MQ_WINAPI WriteConsoleInputA(HANDLE input, const MQ_INPUT_RECO
 MQ_DLLIMPORT BOOL MQ_WINAPI QueryPerformanceCounter(mq_i64 *counter);
 MQ_DLLIMPORT BOOL MQ_WINAPI QueryPerformanceFrequency(mq_i64 *frequency);
 MQ_DLLIMPORT BOOL MQ_WINAPI VirtualProtect(LPVOID address, mq_u64 length, DWORD protection, DWORD *old_protection);
+MQ_DLLIMPORT LPVOID MQ_WINAPI VirtualAlloc(LPVOID address, mq_u64 length, DWORD allocation_type, DWORD protection);
+MQ_DLLIMPORT BOOL MQ_WINAPI VirtualFree(LPVOID address, mq_u64 length, DWORD free_type);
 MQ_DLLIMPORT BOOL MQ_WINAPI GetNumberOfConsoleInputEvents(HANDLE input, DWORD *event_count);
 MQ_DLLIMPORT BOOL MQ_WINAPI ReadConsoleInputA(HANDLE input, MQ_INPUT_RECORD *records, DWORD length, DWORD *read_count);
 MQ_DLLIMPORT DWORD MQ_WINAPI GetFileType(HANDLE file);
@@ -442,6 +444,270 @@ MQ_DLLIMPORT BOOL MQ_WINAPI wglDeleteContext(HGLRC context);
 MQ_DLLIMPORT BOOL MQ_WINAPI wglMakeCurrent(HDC dc, HGLRC context);
 MQ_DLLIMPORT void *MQ_WINAPI wglGetProcAddress(const char *name);
 
+/* Compact CPU BVH used by the backend-neutral projected ray-shadow path. */
+typedef struct MQ_SHADOW_TRIANGLE {
+    float vertex[9];
+    float edge_a[3];
+    float edge_b[3];
+    float normal[3];
+    float minimum[3];
+    float maximum[3];
+    float centroid[3];
+} MQ_SHADOW_TRIANGLE;
+
+typedef struct MQ_SHADOW_NODE {
+    float minimum[3];
+    float maximum[3];
+    mq_i32 left;
+    mq_i32 right;
+    mq_u32 start;
+    mq_u32 count;
+} MQ_SHADOW_NODE;
+
+static MQ_SHADOW_TRIANGLE *mq_shadow_triangles = (MQ_SHADOW_TRIANGLE *)0;
+static mq_u32 *mq_shadow_indices = (mq_u32 *)0;
+static MQ_SHADOW_NODE *mq_shadow_nodes = (MQ_SHADOW_NODE *)0;
+static mq_u32 mq_shadow_triangle_count = 0u;
+static mq_u32 mq_shadow_node_count = 0u;
+
+/* Return the lesser scalar without depending on compiler runtime helpers. */
+static float mq_shadow_minimum(float left, float right) { return left < right ? left : right; }
+/* Return the greater scalar without depending on compiler runtime helpers. */
+static float mq_shadow_maximum(float left, float right) { return left > right ? left : right; }
+
+/* Release every allocation owned by the current world-shadow acceleration structure. */
+MQ_EXPORT void mq_shadow_world_clear(void) {
+    if (mq_shadow_triangles) VirtualFree(mq_shadow_triangles, 0u, 0x8000u /* MEM_RELEASE */);
+    if (mq_shadow_indices) VirtualFree(mq_shadow_indices, 0u, 0x8000u);
+    if (mq_shadow_nodes) VirtualFree(mq_shadow_nodes, 0u, 0x8000u);
+    mq_shadow_triangles = (MQ_SHADOW_TRIANGLE *)0;
+    mq_shadow_indices = (mq_u32 *)0;
+    mq_shadow_nodes = (MQ_SHADOW_NODE *)0;
+    mq_shadow_triangle_count = 0u;
+    mq_shadow_node_count = 0u;
+}
+
+/* Sort one index range in-place by triangle centroid for median BVH splitting. */
+static void mq_shadow_sort_indices(mq_i32 left, mq_i32 right, mq_u32 axis) {
+    mq_i32 first = left;
+    mq_i32 last = right;
+    float pivot = mq_shadow_triangles[mq_shadow_indices[(left + right) >> 1]].centroid[axis];
+    while (first <= last) {
+        while (mq_shadow_triangles[mq_shadow_indices[first]].centroid[axis] < pivot) ++first;
+        while (mq_shadow_triangles[mq_shadow_indices[last]].centroid[axis] > pivot) --last;
+        if (first <= last) {
+            mq_u32 temporary = mq_shadow_indices[first];
+            mq_shadow_indices[first] = mq_shadow_indices[last];
+            mq_shadow_indices[last] = temporary;
+            ++first;
+            --last;
+        }
+    }
+    if (left < last) mq_shadow_sort_indices(left, last, axis);
+    if (first < right) mq_shadow_sort_indices(first, right, axis);
+}
+
+/* Recursively build one median-split BVH node over a contiguous index range. */
+static mq_i32 mq_shadow_build_node(mq_u32 start, mq_u32 count) {
+    mq_u32 axis;
+    mq_u32 index;
+    mq_i32 node_index = (mq_i32)mq_shadow_node_count++;
+    MQ_SHADOW_NODE *node = &mq_shadow_nodes[node_index];
+    float centroid_minimum[3] = {3.402823466e+38f, 3.402823466e+38f, 3.402823466e+38f};
+    float centroid_maximum[3] = {-3.402823466e+38f, -3.402823466e+38f, -3.402823466e+38f};
+    node->left = -1;
+    node->right = -1;
+    node->start = start;
+    node->count = count;
+    for (axis = 0u; axis < 3u; ++axis) {
+        node->minimum[axis] = 3.402823466e+38f;
+        node->maximum[axis] = -3.402823466e+38f;
+    }
+    for (index = start; index < start + count; ++index) {
+        MQ_SHADOW_TRIANGLE *triangle = &mq_shadow_triangles[mq_shadow_indices[index]];
+        for (axis = 0u; axis < 3u; ++axis) {
+            node->minimum[axis] = mq_shadow_minimum(node->minimum[axis], triangle->minimum[axis]);
+            node->maximum[axis] = mq_shadow_maximum(node->maximum[axis], triangle->maximum[axis]);
+            centroid_minimum[axis] = mq_shadow_minimum(centroid_minimum[axis], triangle->centroid[axis]);
+            centroid_maximum[axis] = mq_shadow_maximum(centroid_maximum[axis], triangle->centroid[axis]);
+        }
+    }
+    if (count <= 8u) return node_index;
+    axis = 0u;
+    if (centroid_maximum[1] - centroid_minimum[1] > centroid_maximum[axis] - centroid_minimum[axis]) axis = 1u;
+    if (centroid_maximum[2] - centroid_minimum[2] > centroid_maximum[axis] - centroid_minimum[axis]) axis = 2u;
+    mq_shadow_sort_indices((mq_i32)start, (mq_i32)(start + count - 1u), axis);
+    {
+        mq_u32 left_count = count >> 1;
+        node->count = 0u;
+        node->left = mq_shadow_build_node(start, left_count);
+        node->right = mq_shadow_build_node(start + left_count, count - left_count);
+    }
+    return node_index;
+}
+
+/* Upload world-surface triangles and rebuild the native shadow-ray BVH. */
+MQ_EXPORT mq_i32 mq_shadow_world_upload(const mq_u8 *data, mq_u32 byte_count) {
+    mq_u32 triangle_count;
+    mq_u32 triangle_index;
+    mq_shadow_world_clear();
+    if (!data || byte_count == 0u || (byte_count % 36u) != 0u) return 0;
+    triangle_count = byte_count / 36u;
+    if (triangle_count == 0u || triangle_count > 1048576u) return 0;
+    mq_shadow_triangles = (MQ_SHADOW_TRIANGLE *)VirtualAlloc((LPVOID)0, (mq_u64)triangle_count * sizeof(MQ_SHADOW_TRIANGLE), 0x3000u /* COMMIT|RESERVE */, 0x04u /* READWRITE */);
+    mq_shadow_indices = (mq_u32 *)VirtualAlloc((LPVOID)0, (mq_u64)triangle_count * sizeof(mq_u32), 0x3000u, 0x04u);
+    mq_shadow_nodes = (MQ_SHADOW_NODE *)VirtualAlloc((LPVOID)0, (mq_u64)(triangle_count * 2u) * sizeof(MQ_SHADOW_NODE), 0x3000u, 0x04u);
+    if (!mq_shadow_triangles || !mq_shadow_indices || !mq_shadow_nodes) {
+        mq_shadow_world_clear();
+        return 0;
+    }
+    for (triangle_index = 0u; triangle_index < triangle_count; ++triangle_index) {
+        MQ_SHADOW_TRIANGLE *triangle = &mq_shadow_triangles[triangle_index];
+        mq_u32 component;
+        float edge_a[3];
+        float edge_b[3];
+        float length;
+        memcpy(triangle->vertex, data + triangle_index * 36u, 36u);
+        for (component = 0u; component < 3u; ++component) {
+            float first = triangle->vertex[component];
+            float second = triangle->vertex[3u + component];
+            float third = triangle->vertex[6u + component];
+            triangle->minimum[component] = mq_shadow_minimum(first, mq_shadow_minimum(second, third));
+            triangle->maximum[component] = mq_shadow_maximum(first, mq_shadow_maximum(second, third));
+            triangle->centroid[component] = (first + second + third) * (1.0f / 3.0f);
+            edge_a[component] = second - first;
+            edge_b[component] = third - first;
+            triangle->edge_a[component] = edge_a[component];
+            triangle->edge_b[component] = edge_b[component];
+        }
+        triangle->normal[0] = edge_a[1] * edge_b[2] - edge_a[2] * edge_b[1];
+        triangle->normal[1] = edge_a[2] * edge_b[0] - edge_a[0] * edge_b[2];
+        triangle->normal[2] = edge_a[0] * edge_b[1] - edge_a[1] * edge_b[0];
+        length = sqrtf(triangle->normal[0] * triangle->normal[0] + triangle->normal[1] * triangle->normal[1] + triangle->normal[2] * triangle->normal[2]);
+        if (length > 0.000001f) {
+            triangle->normal[0] /= length;
+            triangle->normal[1] /= length;
+            triangle->normal[2] /= length;
+        }
+        mq_shadow_indices[triangle_index] = triangle_index;
+    }
+    mq_shadow_triangle_count = triangle_count;
+    mq_shadow_node_count = 0u;
+    mq_shadow_build_node(0u, triangle_count);
+    return (mq_i32)triangle_count;
+}
+
+/* Test a finite ray against an AABB without allocating inverse-direction state. */
+static mq_i32 mq_shadow_ray_box(const float *origin, const float *direction, const MQ_SHADOW_NODE *node, float maximum_fraction) {
+    float minimum_fraction = 0.0f;
+    mq_u32 axis;
+    for (axis = 0u; axis < 3u; ++axis) {
+        if (direction[axis] > -0.0000001f && direction[axis] < 0.0000001f) {
+            if (origin[axis] < node->minimum[axis] || origin[axis] > node->maximum[axis]) return 0;
+        } else {
+            float inverse = 1.0f / direction[axis];
+            float first = (node->minimum[axis] - origin[axis]) * inverse;
+            float second = (node->maximum[axis] - origin[axis]) * inverse;
+            if (first > second) { float temporary = first; first = second; second = temporary; }
+            if (first > minimum_fraction) minimum_fraction = first;
+            if (second < maximum_fraction) maximum_fraction = second;
+            if (minimum_fraction > maximum_fraction) return 0;
+        }
+    }
+    return maximum_fraction >= 0.0f && minimum_fraction <= 1.0f;
+}
+
+/* Test a finite ray against one triangle with the two-sided Moller-Trumbore method. */
+static mq_i32 mq_shadow_ray_triangle(const float *origin, const float *direction, const MQ_SHADOW_TRIANGLE *triangle, float *fraction) {
+    float p[3];
+    float translated[3];
+    float q[3];
+    float determinant;
+    float inverse;
+    float u;
+    float v;
+    float candidate;
+    translated[0] = origin[0] - triangle->vertex[0];
+    translated[1] = origin[1] - triangle->vertex[1];
+    translated[2] = origin[2] - triangle->vertex[2];
+    p[0] = direction[1] * triangle->edge_b[2] - direction[2] * triangle->edge_b[1];
+    p[1] = direction[2] * triangle->edge_b[0] - direction[0] * triangle->edge_b[2];
+    p[2] = direction[0] * triangle->edge_b[1] - direction[1] * triangle->edge_b[0];
+    determinant = triangle->edge_a[0] * p[0] + triangle->edge_a[1] * p[1] + triangle->edge_a[2] * p[2];
+    if (determinant > -0.000001f && determinant < 0.000001f) return 0;
+    inverse = 1.0f / determinant;
+    u = (translated[0] * p[0] + translated[1] * p[1] + translated[2] * p[2]) * inverse;
+    if (u < 0.0f || u > 1.0f) return 0;
+    q[0] = translated[1] * triangle->edge_a[2] - translated[2] * triangle->edge_a[1];
+    q[1] = translated[2] * triangle->edge_a[0] - translated[0] * triangle->edge_a[2];
+    q[2] = translated[0] * triangle->edge_a[1] - translated[1] * triangle->edge_a[0];
+    v = (direction[0] * q[0] + direction[1] * q[1] + direction[2] * q[2]) * inverse;
+    if (v < 0.0f || u + v > 1.0f) return 0;
+    candidate = (triangle->edge_b[0] * q[0] + triangle->edge_b[1] * q[1] + triangle->edge_b[2] * q[2]) * inverse;
+    if (candidate <= 0.000001f || candidate >= *fraction || candidate > 1.0f) return 0;
+    *fraction = candidate;
+    return 1;
+}
+
+/* Trace one finite segment through the world BVH and return its closest triangle. */
+static mq_i32 mq_shadow_trace_one(const float *ray, float *result) {
+    mq_i32 stack[128];
+    mq_i32 stack_count = 0;
+    float origin[3] = {ray[0], ray[1], ray[2]};
+    float direction[3] = {ray[3] - ray[0], ray[4] - ray[1], ray[5] - ray[2]};
+    float best_fraction = 1.0f;
+    mq_i32 best_triangle = -1;
+    if (!mq_shadow_nodes || mq_shadow_node_count == 0u) return 0;
+    stack[stack_count++] = 0;
+    while (stack_count > 0) {
+        mq_i32 node_index = stack[--stack_count];
+        MQ_SHADOW_NODE *node = &mq_shadow_nodes[node_index];
+        if (!mq_shadow_ray_box(origin, direction, node, best_fraction)) continue;
+        if (node->count != 0u) {
+            mq_u32 item;
+            for (item = node->start; item < node->start + node->count; ++item) {
+                mq_u32 triangle_index = mq_shadow_indices[item];
+                if (mq_shadow_ray_triangle(origin, direction, &mq_shadow_triangles[triangle_index], &best_fraction)) best_triangle = (mq_i32)triangle_index;
+            }
+        } else if (stack_count + 2 <= 128) {
+            if (node->left >= 0) stack[stack_count++] = node->left;
+            if (node->right >= 0) stack[stack_count++] = node->right;
+        }
+    }
+    if (best_triangle < 0) return 0;
+    {
+        MQ_SHADOW_TRIANGLE *triangle = &mq_shadow_triangles[best_triangle];
+        float normal_dot = triangle->normal[0] * direction[0] + triangle->normal[1] * direction[1] + triangle->normal[2] * direction[2];
+        result[0] = 1.0f;
+        result[1] = best_fraction;
+        result[2] = origin[0] + direction[0] * best_fraction;
+        result[3] = origin[1] + direction[1] * best_fraction;
+        result[4] = origin[2] + direction[2] * best_fraction;
+        result[5] = triangle->normal[0];
+        result[6] = triangle->normal[1];
+        result[7] = triangle->normal[2];
+        if (normal_dot > 0.0f) { result[5] = -result[5]; result[6] = -result[6]; result[7] = -result[7]; }
+    }
+    return 1;
+}
+
+/* Trace a packed array of six-float segments into eight-float hit records. */
+MQ_EXPORT mq_i32 mq_shadow_trace_batch(const mq_u8 *rays, mq_u32 ray_bytes, mq_u8 *results, mq_u32 result_bytes) {
+    mq_u32 ray_count;
+    mq_u32 index;
+    if (!rays || !results || (ray_bytes % 24u) != 0u) return 0;
+    ray_count = ray_bytes / 24u;
+    if (result_bytes < ray_count * 32u) return 0;
+    for (index = 0u; index < ray_count; ++index) {
+        float ray[6];
+        float result[8] = {0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+        memcpy(ray, rays + index * 24u, 24u);
+        mq_shadow_trace_one(ray, result);
+        memcpy(results + index * 32u, result, 32u);
+    }
+    return (mq_i32)ray_count;
+}
+
 typedef BOOL (MQ_WINAPI *mq_wgl_swap_interval_proc)(mq_i32 interval);
 typedef void (MQ_WINAPI *mq_gl_active_texture_proc)(mq_u32 texture);
 typedef void (MQ_WINAPI *mq_gl_client_active_texture_proc)(mq_u32 texture);
@@ -459,6 +725,7 @@ typedef void (MQ_WINAPI *mq_gl_use_program_proc)(mq_u32 program);
 typedef void (MQ_WINAPI *mq_gl_delete_program_proc)(mq_u32 program);
 typedef mq_i32 (MQ_WINAPI *mq_gl_get_uniform_location_proc)(mq_u32 program, const char *name);
 typedef void (MQ_WINAPI *mq_gl_uniform_1i_proc)(mq_i32 location, mq_i32 value);
+typedef void (MQ_WINAPI *mq_gl_uniform_4fv_proc)(mq_i32 location, mq_i32 count, const float *value);
 typedef void (MQ_WINAPI *mq_gl_gen_buffers_proc)(mq_i32 count, mq_u32 *buffers);
 typedef void (MQ_WINAPI *mq_gl_bind_buffer_proc)(mq_u32 target, mq_u32 buffer);
 typedef void (MQ_WINAPI *mq_gl_buffer_data_proc)(mq_u32 target, mq_i64 size, const void *data, mq_u32 usage);
@@ -480,12 +747,21 @@ static mq_gl_use_program_proc mq_gl_use_program_value = (mq_gl_use_program_proc)
 static mq_gl_delete_program_proc mq_gl_delete_program_value = (mq_gl_delete_program_proc)0;
 static mq_gl_get_uniform_location_proc mq_gl_get_uniform_location_value = (mq_gl_get_uniform_location_proc)0;
 static mq_gl_uniform_1i_proc mq_gl_uniform_1i_value = (mq_gl_uniform_1i_proc)0;
+static mq_gl_uniform_4fv_proc mq_gl_uniform_4fv_value = (mq_gl_uniform_4fv_proc)0;
 static mq_gl_gen_buffers_proc mq_gl_gen_buffers_value = (mq_gl_gen_buffers_proc)0;
 static mq_gl_bind_buffer_proc mq_gl_bind_buffer_value = (mq_gl_bind_buffer_proc)0;
 static mq_gl_buffer_data_proc mq_gl_buffer_data_value = (mq_gl_buffer_data_proc)0;
 static mq_gl_delete_buffers_proc mq_gl_delete_buffers_value = (mq_gl_delete_buffers_proc)0;
 static mq_u32 mq_gl_world_program = 0u;
 static mq_i32 mq_gl_world_program_attempted = 0;
+static mq_u32 mq_gl_enhanced_program = 0u;
+static mq_i32 mq_gl_enhanced_program_attempted = 0;
+static mq_i32 mq_gl_enhanced_enabled = 0;
+static mq_i32 mq_gl_enhanced_shadows = 0;
+static mq_i32 mq_gl_enhanced_shadow_quality = 1;
+static mq_i32 mq_gl_enhanced_draw_kind_value = 0;
+static mq_i32 mq_gl_enhanced_light_count = 0;
+static float mq_gl_enhanced_lights[16];
 
 /* Report whether valid wgl proc is available. */
 static mq_i32 mq_valid_wgl_proc(const void *value) {
@@ -572,6 +848,95 @@ static mq_i32 mq_gl_create_world_program(void) {
     return 1;
 }
 
+/* Create the optional per-pixel additive dynamic-light program. */
+static mq_i32 mq_gl_create_enhanced_program(void) {
+    static const char *vertex_source =
+        "#version 120\n"
+        "varying vec3 mq_eye;varying vec2 mq_uv;"
+        "void main(){vec4 e=gl_ModelViewMatrix*gl_Vertex;mq_eye=e.xyz;"
+        "mq_uv=gl_MultiTexCoord0.st;gl_Position=gl_ProjectionMatrix*e;}\n";
+    static const char *fragment_source =
+        "#version 120\n"
+        "uniform sampler2D mq_base;uniform int mq_light_count;uniform vec4 mq_lights[4];"
+        "varying vec3 mq_eye;varying vec2 mq_uv;"
+        "float mq_one(vec4 q,vec3 n){vec3 d=q.xyz-mq_eye;float z=length(d);"
+        "if(z>=q.w||q.w<=0.0)return 0.0;float a=1.0-z/q.w;a*=a;"
+        "float lam=max(dot(n,d/max(z,0.001)),0.0);return a*lam;}"
+        "void main(){vec3 n=normalize(cross(dFdx(mq_eye),dFdy(mq_eye)));"
+        "if(dot(n,-mq_eye)<0.0)n=-n;float l=0.0;"
+        "if(mq_light_count>0)l+=mq_one(mq_lights[0],n);"
+        "if(mq_light_count>1)l+=mq_one(mq_lights[1],n);"
+        "if(mq_light_count>2)l+=mq_one(mq_lights[2],n);"
+        "if(mq_light_count>3)l+=mq_one(mq_lights[3],n);"
+        "vec4 b=texture2D(mq_base,mq_uv);"
+        "gl_FragColor=vec4(b.rgb*vec3(1.0,0.58,0.30)*min(l,1.5),b.a);}\n";
+    mq_u32 vertex_shader;
+    mq_u32 fragment_shader;
+    mq_u32 program;
+    mq_i32 compiled = 0;
+    mq_i32 linked = 0;
+    mq_i32 location;
+    if (mq_gl_enhanced_program != 0u) return 1;
+    if (mq_gl_enhanced_program_attempted) return 0;
+    mq_gl_enhanced_program_attempted = 1;
+    if (!mq_valid_wgl_proc((const void *)mq_gl_create_shader_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_shader_source_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_compile_shader_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_get_shader_iv_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_delete_shader_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_create_program_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_attach_shader_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_link_program_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_get_program_iv_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_use_program_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_delete_program_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_get_uniform_location_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_uniform_1i_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_uniform_4fv_value)) return 0;
+    vertex_shader = mq_gl_create_shader_value(0x8B31u /* GL_VERTEX_SHADER */);
+    fragment_shader = mq_gl_create_shader_value(0x8B30u /* GL_FRAGMENT_SHADER */);
+    if (vertex_shader == 0u || fragment_shader == 0u) return 0;
+    mq_gl_shader_source_value(vertex_shader, 1, &vertex_source, (const mq_i32 *)0);
+    mq_gl_compile_shader_value(vertex_shader);
+    mq_gl_get_shader_iv_value(vertex_shader, 0x8B81u /* GL_COMPILE_STATUS */, &compiled);
+    if (!compiled) {
+        mq_gl_delete_shader_value(vertex_shader);
+        mq_gl_delete_shader_value(fragment_shader);
+        return 0;
+    }
+    compiled = 0;
+    mq_gl_shader_source_value(fragment_shader, 1, &fragment_source, (const mq_i32 *)0);
+    mq_gl_compile_shader_value(fragment_shader);
+    mq_gl_get_shader_iv_value(fragment_shader, 0x8B81u /* GL_COMPILE_STATUS */, &compiled);
+    if (!compiled) {
+        mq_gl_delete_shader_value(vertex_shader);
+        mq_gl_delete_shader_value(fragment_shader);
+        return 0;
+    }
+    program = mq_gl_create_program_value();
+    if (program == 0u) {
+        mq_gl_delete_shader_value(vertex_shader);
+        mq_gl_delete_shader_value(fragment_shader);
+        return 0;
+    }
+    mq_gl_attach_shader_value(program, vertex_shader);
+    mq_gl_attach_shader_value(program, fragment_shader);
+    mq_gl_link_program_value(program);
+    mq_gl_get_program_iv_value(program, 0x8B82u /* GL_LINK_STATUS */, &linked);
+    mq_gl_delete_shader_value(vertex_shader);
+    mq_gl_delete_shader_value(fragment_shader);
+    if (!linked) {
+        mq_gl_delete_program_value(program);
+        return 0;
+    }
+    mq_gl_enhanced_program = program;
+    mq_gl_use_program_value(program);
+    location = mq_gl_get_uniform_location_value(program, "mq_base");
+    if (location >= 0) mq_gl_uniform_1i_value(location, 0);
+    mq_gl_use_program_value(0u);
+    return 1;
+}
+
 /* winmm */
 MQ_DLLIMPORT MMRESULT MQ_WINAPI waveOutOpen(HWAVEOUT *output, UINT device_id, const MQ_WAVEFORMATEX *format, ULONG_PTR callback, ULONG_PTR instance, DWORD flags);
 MQ_DLLIMPORT MMRESULT MQ_WINAPI waveOutPrepareHeader(HWAVEOUT output, MQ_WAVEHDR *header, UINT size);
@@ -641,6 +1006,7 @@ MQ_DLLIMPORT void MQ_WINAPI glTexImage2D(mq_u32 target, mq_i32 level, mq_i32 int
 MQ_DLLIMPORT void MQ_WINAPI glTexSubImage2D(mq_u32 target, mq_i32 level, mq_i32 x_offset, mq_i32 y_offset, mq_i32 width, mq_i32 height, mq_u32 format, mq_u32 type, const void *pixels);
 MQ_DLLIMPORT void MQ_WINAPI glDrawBuffer(mq_u32 mode);
 MQ_DLLIMPORT void MQ_WINAPI glReadPixels(mq_i32 x, mq_i32 y, mq_i32 width, mq_i32 height, mq_u32 format, mq_u32 type, void *pixels);
+MQ_DLLIMPORT void MQ_WINAPI glGetFloatv(mq_u32 name, float *value);
 MQ_DLLIMPORT const mq_u8 *MQ_WINAPI glGetString(mq_u32 name);
 MQ_DLLIMPORT mq_u32 MQ_WINAPI glGetError(void);
 MQ_DLLIMPORT void MQ_WINAPI glFinish(void);
@@ -2337,6 +2703,10 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
     }
     mq_gl_world_program = 0u;
     mq_gl_world_program_attempted = 0;
+    mq_gl_enhanced_program = 0u;
+    mq_gl_enhanced_program_attempted = 0;
+    mq_gl_enhanced_enabled = 0;
+    mq_gl_enhanced_draw_kind_value = 0;
 
     mq_gl_active_texture_value = (mq_gl_active_texture_proc)wglGetProcAddress("glActiveTexture");
     if (!mq_valid_wgl_proc((const void *)mq_gl_active_texture_value)) {
@@ -2363,11 +2733,13 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
     mq_gl_delete_program_value = (mq_gl_delete_program_proc)wglGetProcAddress("glDeleteProgram");
     mq_gl_get_uniform_location_value = (mq_gl_get_uniform_location_proc)wglGetProcAddress("glGetUniformLocation");
     mq_gl_uniform_1i_value = (mq_gl_uniform_1i_proc)wglGetProcAddress("glUniform1i");
+    mq_gl_uniform_4fv_value = (mq_gl_uniform_4fv_proc)wglGetProcAddress("glUniform4fv");
     mq_gl_gen_buffers_value = (mq_gl_gen_buffers_proc)wglGetProcAddress("glGenBuffers");
     mq_gl_bind_buffer_value = (mq_gl_bind_buffer_proc)wglGetProcAddress("glBindBuffer");
     mq_gl_buffer_data_value = (mq_gl_buffer_data_proc)wglGetProcAddress("glBufferData");
     mq_gl_delete_buffers_value = (mq_gl_delete_buffers_proc)wglGetProcAddress("glDeleteBuffers");
     mq_gl_create_world_program();
+    mq_gl_create_enhanced_program();
 
     /* GLQuake predates driver-controlled swap synchronization and never
      * requests it.  Explicitly select interval zero when WGL_EXT_swap_control
@@ -2452,6 +2824,13 @@ MQ_EXPORT void mq_win_destroy(void) {
             mq_gl_world_program = 0u;
         }
         mq_gl_world_program_attempted = 0;
+        if (mq_gl_enhanced_program != 0u && mq_valid_wgl_proc((const void *)mq_gl_delete_program_value)) {
+            mq_gl_delete_program_value(mq_gl_enhanced_program);
+            mq_gl_enhanced_program = 0u;
+        }
+        mq_gl_enhanced_program_attempted = 0;
+        mq_gl_enhanced_enabled = 0;
+        mq_gl_enhanced_draw_kind_value = 0;
         wglMakeCurrent(MQ_NULL, MQ_NULL);
         wglDeleteContext(mq_gl_context);
         mq_gl_context = MQ_NULL;
@@ -3756,6 +4135,232 @@ MQ_EXPORT void mq_gl_vertex3(mq_u32 x_bits, mq_u32 y_bits, mq_u32 z_bits) {
     }
     glVertex3f(x, y, z);
 }
+/* Draw packed world-space shadow triangles through one MiniLang/native crossing. */
+MQ_EXPORT mq_i32 mq_gl_draw_shadow_batch(const mq_u8 *data, mq_u32 byte_count) {
+    mq_u32 offset = 0u;
+    if (!data || byte_count == 0u || (byte_count % 36u) != 0u) return 0;
+    mq_gl_begin(0x0004u /* GL_TRIANGLES */);
+    while (offset < byte_count) {
+        mq_u32 x_bits;
+        mq_u32 y_bits;
+        mq_u32 z_bits;
+        memcpy(&x_bits, data + offset, 4u);
+        memcpy(&y_bits, data + offset + 4u, 4u);
+        memcpy(&z_bits, data + offset + 8u, 4u);
+        mq_gl_vertex3(x_bits, y_bits, z_bits);
+        offset += 12u;
+    }
+    mq_gl_end();
+    return (mq_i32)(byte_count / 36u);
+}
+
+#define MQ_SHADOW_ALIAS_COMMAND_MAX 1024u
+#define MQ_SHADOW_ALIAS_CACHE_SIZE 4096u
+static float mq_shadow_alias_projected[MQ_SHADOW_ALIAS_CACHE_SIZE][3];
+static float mq_shadow_alias_normal[MQ_SHADOW_ALIAS_CACHE_SIZE][3];
+static float mq_shadow_alias_source[MQ_SHADOW_ALIAS_CACHE_SIZE][3];
+static mq_u8 mq_shadow_alias_valid[MQ_SHADOW_ALIAS_CACHE_SIZE];
+static mq_u32 mq_shadow_alias_command_slot[MQ_SHADOW_ALIAS_COMMAND_MAX];
+static mq_u32 mq_shadow_alias_cache_key[MQ_SHADOW_ALIAS_CACHE_SIZE];
+static mq_u32 mq_shadow_alias_cache_generation[MQ_SHADOW_ALIAS_CACHE_SIZE];
+static mq_u32 mq_shadow_alias_generation = 1u;
+
+/* Resolve one compressed MDL position in the sample-local projection cache. */
+static mq_u32 mq_shadow_alias_cache_slot(mq_u8 x, mq_u8 y, mq_u8 z, mq_i32 *created) {
+    mq_u32 key = (mq_u32)x | ((mq_u32)y << 8u) | ((mq_u32)z << 16u);
+    mq_u32 slot = (key * 2654435761u) & (MQ_SHADOW_ALIAS_CACHE_SIZE - 1u);
+    mq_u32 probes = 0u;
+    while (probes < MQ_SHADOW_ALIAS_CACHE_SIZE) {
+        if (mq_shadow_alias_cache_generation[slot] != mq_shadow_alias_generation) {
+            mq_shadow_alias_cache_generation[slot] = mq_shadow_alias_generation;
+            mq_shadow_alias_cache_key[slot] = key;
+            *created = 1;
+            return slot;
+        }
+        if (mq_shadow_alias_cache_key[slot] == key) {
+            *created = 0;
+            return slot;
+        }
+        slot = (slot + 1u) & (MQ_SHADOW_ALIAS_CACHE_SIZE - 1u);
+        ++probes;
+    }
+    *created = 0;
+    return MQ_SHADOW_ALIAS_CACHE_SIZE;
+}
+
+/* Validate one projected alias edge against receiver orientation and stretch. */
+static mq_i32 mq_shadow_alias_edge_compatible(mq_u32 left, mq_u32 right) {
+    float normal_dot =
+        mq_shadow_alias_normal[left][0] * mq_shadow_alias_normal[right][0] +
+        mq_shadow_alias_normal[left][1] * mq_shadow_alias_normal[right][1] +
+        mq_shadow_alias_normal[left][2] * mq_shadow_alias_normal[right][2];
+    float source_x = mq_shadow_alias_source[left][0] - mq_shadow_alias_source[right][0];
+    float source_y = mq_shadow_alias_source[left][1] - mq_shadow_alias_source[right][1];
+    float source_z = mq_shadow_alias_source[left][2] - mq_shadow_alias_source[right][2];
+    float projected_x = mq_shadow_alias_projected[left][0] - mq_shadow_alias_projected[right][0];
+    float projected_y = mq_shadow_alias_projected[left][1] - mq_shadow_alias_projected[right][1];
+    float projected_z = mq_shadow_alias_projected[left][2] - mq_shadow_alias_projected[right][2];
+    float source_length;
+    float projected_length;
+    if (normal_dot < 0.65f) return 0;
+    source_length = sqrtf(source_x * source_x + source_y * source_y + source_z * source_z);
+    projected_length = sqrtf(projected_x * projected_x + projected_y * projected_y + projected_z * projected_z);
+    return projected_length <= source_length * 6.0f + 96.0f;
+}
+
+/* Project one transformed alias vertex through the native world BVH. */
+static mq_i32 mq_shadow_alias_project_vertex(
+    mq_u32 index, float packed_x, float packed_y, float packed_z,
+    const float *origin, const float *scale_origin, const float *scale,
+    float yaw_cosine, float yaw_sine, float pitch_cosine, float pitch_sine,
+    float roll_cosine, float roll_sine, mq_i32 point_light_active,
+    const float *point_light, float sample_x, float sample_y
+) {
+    float local_x = packed_x * scale[0] + scale_origin[0];
+    float local_y = packed_y * scale[1] + scale_origin[1];
+    float local_z = packed_z * scale[2] + scale_origin[2];
+    float rolled_y = roll_cosine * local_y - roll_sine * local_z;
+    float rolled_z = roll_sine * local_y + roll_cosine * local_z;
+    float pitched_x = pitch_cosine * local_x + pitch_sine * rolled_z;
+    float pitched_y = rolled_y;
+    float pitched_z = -pitch_sine * local_x + pitch_cosine * rolled_z;
+    float world[3];
+    float ray[6];
+    float result[8] = {0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+    float minimum_fraction = 0.0f;
+    world[0] = origin[0] + yaw_cosine * pitched_x - yaw_sine * pitched_y;
+    world[1] = origin[1] + yaw_sine * pitched_x + yaw_cosine * pitched_y;
+    world[2] = origin[2] + pitched_z;
+    mq_shadow_alias_source[index][0] = world[0];
+    mq_shadow_alias_source[index][1] = world[1];
+    mq_shadow_alias_source[index][2] = world[2];
+    if (point_light_active) {
+        float delta[3];
+        float distance;
+        float inverse;
+        ray[0] = point_light[0] + sample_x;
+        ray[1] = point_light[1] + sample_y;
+        ray[2] = point_light[2];
+        delta[0] = world[0] - ray[0];
+        delta[1] = world[1] - ray[1];
+        delta[2] = world[2] - ray[2];
+        distance = sqrtf(delta[0] * delta[0] + delta[1] * delta[1] + delta[2] * delta[2]);
+        if (distance < 0.5f) return 0;
+        inverse = 1.0f / distance;
+        ray[3] = world[0] + delta[0] * inverse * 768.0f;
+        ray[4] = world[1] + delta[1] * inverse * 768.0f;
+        ray[5] = world[2] + delta[2] * inverse * 768.0f;
+        minimum_fraction = (distance + 0.25f) / (distance + 768.0f);
+    } else {
+        float delta[3] = {0.45f + sample_x * 0.018f, 0.35f + sample_y * 0.018f, -1.0f};
+        float inverse = 1.0f / sqrtf(delta[0] * delta[0] + delta[1] * delta[1] + delta[2] * delta[2]);
+        delta[0] *= inverse;
+        delta[1] *= inverse;
+        delta[2] *= inverse;
+        ray[0] = world[0] + delta[0] * 0.25f;
+        ray[1] = world[1] + delta[1] * 0.25f;
+        ray[2] = world[2] + delta[2] * 0.25f;
+        ray[3] = world[0] + delta[0] * 768.0f;
+        ray[4] = world[1] + delta[1] * 768.0f;
+        ray[5] = world[2] + delta[2] * 768.0f;
+    }
+    if (!mq_shadow_trace_one(ray, result)) return 0;
+    if (result[1] <= minimum_fraction) return 0;
+    if (point_light_active && minimum_fraction > 0.0f && result[1] > minimum_fraction * 3.0f) return 0;
+    mq_shadow_alias_projected[index][0] = result[2] + result[5] * 0.65f;
+    mq_shadow_alias_projected[index][1] = result[3] + result[6] * 0.65f;
+    mq_shadow_alias_projected[index][2] = result[4] + result[7] * 0.65f;
+    mq_shadow_alias_normal[index][0] = result[5];
+    mq_shadow_alias_normal[index][1] = result[6];
+    mq_shadow_alias_normal[index][2] = result[7];
+    return 1;
+}
+
+/* Transform, ray-project and draw one cached alias frame entirely in native code. */
+MQ_EXPORT mq_i32 mq_gl_draw_alias_ray_shadow(
+    const mq_u8 *data, mq_u32 byte_count,
+    mq_u32 origin_x_bits, mq_u32 origin_y_bits, mq_u32 origin_z_bits,
+    mq_u32 angle_x_bits, mq_u32 angle_y_bits, mq_u32 angle_z_bits,
+    mq_u32 scale_origin_x_bits, mq_u32 scale_origin_y_bits, mq_u32 scale_origin_z_bits,
+    mq_u32 scale_x_bits, mq_u32 scale_y_bits, mq_u32 scale_z_bits,
+    mq_i32 double_eyes, mq_i32 point_light_active,
+    mq_u32 light_x_bits, mq_u32 light_y_bits, mq_u32 light_z_bits,
+    mq_u32 sample_x_bits, mq_u32 sample_y_bits
+) {
+    float origin[3] = {mq_bits_to_float(origin_x_bits), mq_bits_to_float(origin_y_bits), mq_bits_to_float(origin_z_bits)};
+    float scale_origin[3] = {mq_bits_to_float(scale_origin_x_bits), mq_bits_to_float(scale_origin_y_bits), mq_bits_to_float(scale_origin_z_bits)};
+    float scale[3] = {mq_bits_to_float(scale_x_bits), mq_bits_to_float(scale_y_bits), mq_bits_to_float(scale_z_bits)};
+    float point_light[3] = {mq_bits_to_float(light_x_bits), mq_bits_to_float(light_y_bits), mq_bits_to_float(light_z_bits)};
+    float sample_x = mq_bits_to_float(sample_x_bits);
+    float sample_y = mq_bits_to_float(sample_y_bits);
+    float yaw = mq_bits_to_float(angle_y_bits) * 0.01745329251994329577f;
+    float pitch = -mq_bits_to_float(angle_x_bits) * 0.01745329251994329577f;
+    float roll = mq_bits_to_float(angle_z_bits) * 0.01745329251994329577f;
+    float yaw_cosine = (float)cos((double)yaw);
+    float yaw_sine = (float)sin((double)yaw);
+    float pitch_cosine = (float)cos((double)pitch);
+    float pitch_sine = (float)sin((double)pitch);
+    float roll_cosine = (float)cos((double)roll);
+    float roll_sine = (float)sin((double)roll);
+    mq_u32 offset = 0u;
+    mq_i32 drawn = 0;
+    if (!data || byte_count < 4u || !mq_shadow_nodes) return 0;
+    ++mq_shadow_alias_generation;
+    if (mq_shadow_alias_generation == 0u) {
+        mq_u32 cache_index;
+        for (cache_index = 0u; cache_index < MQ_SHADOW_ALIAS_CACHE_SIZE; ++cache_index) mq_shadow_alias_cache_generation[cache_index] = 0u;
+        mq_shadow_alias_generation = 1u;
+    }
+    if (double_eyes) {
+        scale[0] *= 2.0f;
+        scale[1] *= 2.0f;
+        scale[2] *= 2.0f;
+        scale_origin[2] -= 30.0f;
+    }
+    mq_gl_begin(0x0004u /* GL_TRIANGLES */);
+    while (offset + 4u <= byte_count) {
+        mq_i32 signed_count;
+        mq_u32 count;
+        mq_u32 index;
+        memcpy(&signed_count, data + offset, 4u);
+        offset += 4u;
+        if (signed_count == 0) break;
+        count = signed_count < 0 ? (mq_u32)(-signed_count) : (mq_u32)signed_count;
+        if (count > MQ_SHADOW_ALIAS_COMMAND_MAX || offset + count * 12u > byte_count) break;
+        for (index = 0u; index < count; ++index) {
+            const mq_u8 *vertex = data + offset + index * 12u;
+            mq_i32 created;
+            mq_u32 slot = mq_shadow_alias_cache_slot(vertex[8], vertex[9], vertex[10], &created);
+            mq_shadow_alias_command_slot[index] = slot;
+            if (slot < MQ_SHADOW_ALIAS_CACHE_SIZE && created) {
+                mq_shadow_alias_valid[slot] = (mq_u8)mq_shadow_alias_project_vertex(
+                    slot, (float)vertex[8], (float)vertex[9], (float)vertex[10],
+                    origin, scale_origin, scale,
+                    yaw_cosine, yaw_sine, pitch_cosine, pitch_sine, roll_cosine, roll_sine,
+                    point_light_active, point_light, sample_x, sample_y
+                );
+            }
+        }
+        for (index = 2u; index < count; ++index) {
+            mq_u32 first = mq_shadow_alias_command_slot[signed_count < 0 ? 0u : index - 2u];
+            mq_u32 second = mq_shadow_alias_command_slot[index - 1u];
+            mq_u32 third = mq_shadow_alias_command_slot[index];
+            if (first >= MQ_SHADOW_ALIAS_CACHE_SIZE || second >= MQ_SHADOW_ALIAS_CACHE_SIZE || third >= MQ_SHADOW_ALIAS_CACHE_SIZE) continue;
+            if (mq_shadow_alias_valid[first] && mq_shadow_alias_valid[second] && mq_shadow_alias_valid[third] &&
+                mq_shadow_alias_edge_compatible(first, second) &&
+                mq_shadow_alias_edge_compatible(second, third) &&
+                mq_shadow_alias_edge_compatible(third, first)) {
+                mq_gl_vertex3(mq_float_to_bits(mq_shadow_alias_projected[first][0]), mq_float_to_bits(mq_shadow_alias_projected[first][1]), mq_float_to_bits(mq_shadow_alias_projected[first][2]));
+                mq_gl_vertex3(mq_float_to_bits(mq_shadow_alias_projected[second][0]), mq_float_to_bits(mq_shadow_alias_projected[second][1]), mq_float_to_bits(mq_shadow_alias_projected[second][2]));
+                mq_gl_vertex3(mq_float_to_bits(mq_shadow_alias_projected[third][0]), mq_float_to_bits(mq_shadow_alias_projected[third][1]), mq_float_to_bits(mq_shadow_alias_projected[third][2]));
+                ++drawn;
+            }
+        }
+        offset += count * 12u;
+    }
+    mq_gl_end();
+    return drawn;
+}
 /* Update the current immediate-mode texture coordinates. */
 MQ_EXPORT void mq_gl_texcoord2(mq_u32 s_bits, mq_u32 t_bits) {
     mq_static_geometry_s = mq_bits_to_float(s_bits);
@@ -3867,6 +4472,107 @@ MQ_EXPORT void mq_gl_world_program_enable(mq_i32 enabled) {
     if (!mq_valid_wgl_proc((const void *)mq_gl_use_program_value)) return;
     if (enabled && mq_gl_create_world_program()) mq_gl_use_program_value(mq_gl_world_program);
     else mq_gl_use_program_value(0u);
+}
+
+/* Report whether the active backend supports the enhanced GPU light pass. */
+MQ_EXPORT mq_i32 mq_gl_enhanced_available(void) {
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) return mq_d3d9_enhanced_available();
+    if (mq_render_backend_value == MQ_RENDER_VULKAN) return mq_vulkan_enhanced_available();
+    if (mq_render_backend_value != MQ_RENDER_OPENGL) return 0;
+    return mq_gl_create_enhanced_program();
+}
+
+/* Configure optional enhanced lighting and its projected-shadow policy. */
+MQ_EXPORT mq_i32 mq_gl_enhanced_configure(mq_i32 enabled, mq_i32 shadows, mq_i32 shadow_quality) {
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+        return mq_d3d9_enhanced_configure(enabled, shadows, shadow_quality);
+    }
+    if (mq_render_backend_value == MQ_RENDER_VULKAN) {
+        return mq_vulkan_enhanced_configure(enabled, shadows, shadow_quality);
+    }
+    mq_gl_enhanced_shadows = shadows != 0;
+    mq_gl_enhanced_shadow_quality = shadow_quality;
+    if (mq_gl_enhanced_shadow_quality < 0) mq_gl_enhanced_shadow_quality = 0;
+    if (mq_gl_enhanced_shadow_quality > 2) mq_gl_enhanced_shadow_quality = 2;
+    mq_gl_enhanced_enabled = enabled != 0 && mq_gl_enhanced_available();
+    if (!mq_gl_enhanced_enabled && mq_render_backend_value == MQ_RENDER_OPENGL &&
+        mq_valid_wgl_proc((const void *)mq_gl_use_program_value)) {
+        mq_gl_use_program_value(0u);
+    }
+    mq_gl_enhanced_draw_kind_value = 0;
+    return enabled == 0 || mq_gl_enhanced_enabled;
+}
+
+/* Capture the current view and transform compact world lights to eye space. */
+MQ_EXPORT mq_i32 mq_gl_enhanced_begin_frame(const void *light_data, mq_u32 byte_count) {
+    const float *source = (const float *)light_data;
+    float view[16];
+    mq_u32 index;
+    mq_u32 count;
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+        return mq_d3d9_enhanced_begin_frame(light_data, byte_count);
+    }
+    if (mq_render_backend_value == MQ_RENDER_VULKAN) {
+        return mq_vulkan_enhanced_begin_frame(light_data, byte_count);
+    }
+    if (!mq_gl_enhanced_enabled || mq_render_backend_value != MQ_RENDER_OPENGL ||
+        source == (const float *)0 || (byte_count & 15u) != 0u) return 0;
+    count = byte_count >> 4;
+    if (count > 4u) count = 4u;
+    glGetFloatv(0x0BA6u /* GL_MODELVIEW_MATRIX */, view);
+    for (index = 0u; index < count; ++index) {
+        float x = source[index * 4u];
+        float y = source[index * 4u + 1u];
+        float z = source[index * 4u + 2u];
+        mq_gl_enhanced_lights[index * 4u] = view[0] * x + view[4] * y + view[8] * z + view[12];
+        mq_gl_enhanced_lights[index * 4u + 1u] = view[1] * x + view[5] * y + view[9] * z + view[13];
+        mq_gl_enhanced_lights[index * 4u + 2u] = view[2] * x + view[6] * y + view[10] * z + view[14];
+        mq_gl_enhanced_lights[index * 4u + 3u] = source[index * 4u + 3u];
+    }
+    mq_gl_enhanced_light_count = (mq_i32)count;
+    return 1;
+}
+
+/* Select the enhanced shader for additive 3-D geometry only. */
+MQ_EXPORT void mq_gl_enhanced_draw_kind(mq_i32 kind) {
+    mq_i32 location;
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+        mq_d3d9_enhanced_draw_kind(kind);
+        return;
+    }
+    if (mq_render_backend_value == MQ_RENDER_VULKAN) {
+        mq_vulkan_enhanced_draw_kind(kind);
+        return;
+    }
+    mq_gl_enhanced_draw_kind_value = kind;
+    if (mq_render_backend_value != MQ_RENDER_OPENGL ||
+        !mq_valid_wgl_proc((const void *)mq_gl_use_program_value)) return;
+    if (!mq_gl_enhanced_enabled || kind == 0 || !mq_gl_create_enhanced_program()) {
+        mq_gl_use_program_value(0u);
+        return;
+    }
+    mq_gl_use_program_value(mq_gl_enhanced_program);
+    location = mq_gl_get_uniform_location_value(mq_gl_enhanced_program, "mq_light_count");
+    if (location >= 0) mq_gl_uniform_1i_value(location, mq_gl_enhanced_light_count);
+    location = mq_gl_get_uniform_location_value(mq_gl_enhanced_program, "mq_lights");
+    if (location >= 0 && mq_gl_enhanced_light_count > 0) {
+        mq_gl_uniform_4fv_value(location, mq_gl_enhanced_light_count, mq_gl_enhanced_lights);
+    }
+}
+
+/* Restore the compatibility program before any 2-D draw begins. */
+MQ_EXPORT void mq_gl_enhanced_end_frame(void) {
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+        mq_d3d9_enhanced_end_frame();
+        return;
+    }
+    if (mq_render_backend_value == MQ_RENDER_VULKAN) {
+        mq_vulkan_enhanced_end_frame();
+        return;
+    }
+    mq_gl_enhanced_draw_kind_value = 0;
+    if (mq_render_backend_value == MQ_RENDER_OPENGL &&
+        mq_valid_wgl_proc((const void *)mq_gl_use_program_value)) mq_gl_use_program_value(0u);
 }
 /* Select the active OpenGL texture unit. */
 MQ_EXPORT void mq_gl_active_texture(mq_i32 unit) {

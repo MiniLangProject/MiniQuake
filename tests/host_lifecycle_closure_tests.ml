@@ -10,6 +10,9 @@ import miniquake.server as server
 import miniquake.filesystem as qfs
 import miniquake.screen as screen
 import miniquake.constants as c
+import miniquake.cvar as cvar
+import miniquake.keys as keys
+import miniquake.input as gameInput
 
 // Assert that the condition holds and identify a failing test.
 function yes(value, name)
@@ -38,7 +41,7 @@ function equalList(actual, expected, name)
 end function
 // Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
-  print "[" + number + "/24] " + name
+  print "[" + number + "/25] " + name
   result = try(fn())
   if result is error then print "FAIL: " + result.message; return false end if
   return true
@@ -231,6 +234,39 @@ function testQuitPaths()
   return true
 end function
 
+// Persist representative input, gameplay, audio and video settings through the
+// exact config.cfg writer and command-buffer loader used by production startup.
+function testSettingsPersistence()
+  root = "build\\settings_persistence_fixture"
+  configPath = qfs.join(root, "id1\\config.cfg")
+  qfs.COM_CreatePath(configPath)
+  saved = host.create(["-basedir", root, "-headless", "-nosound", "-nolan"])
+  settings = [
+    ["vid_width", "1920"], ["vid_height", "1080"], ["vid_bpp", "32"],
+    ["vid_fullscreen", "1"], ["vid_renderer", "vulkan"],
+    ["r_lighting", "1"], ["r_shadows", "1"], ["r_shadowquality", "2"],
+    ["gamma", "0.750000"], ["viewsize", "110"], ["sensitivity", "4.500000"],
+    ["volume", "0.600000"], ["bgmvolume", "0.800000"],
+    ["host_maxfps", "240"], ["_windowed_mouse", "1"],
+  ]
+  for each setting in settings
+    cvar.set(saved.cvars, setting[0], setting[1])
+  end for
+  keys.Key_SetBinding(119, "+forward")
+  saved.initialized = true
+  yes(host.Host_WriteConfiguration(saved), "settings config write")
+  yes(qfs.fileExists(saved.filesystem, "config.cfg"), "settings config exists")
+
+  loaded = host.create(["-basedir", root, "-headless", "-nosound", "-nolan"])
+  host.queueStartupCommands(loaded)
+  yes(host.executeCommandBuffer(loaded, 4096) > 0, "settings config executed")
+  for each setting in settings
+    equal(cvar.variableString(loaded.cvars, setting[0]), setting[1], "roundtrip " + setting[0])
+  end for
+  equal(gameInput.bindingForCode(119), "+forward", "roundtrip key binding")
+  return true
+end function
+
 // Parse command-line arguments and run the selected operation.
 function main(args)
   tests = [
@@ -240,13 +276,14 @@ function main(args)
     ["changelevel count",testChangeLevelCount],["changelevel order",testChangeLevelSaveOrder],["restart count",testRestartCount],["restart parms",testRestartPreservesParms],
     ["save layout",testSaveLayoutCount],["save constants",testSaveLayoutVersion],["shutdown count",testShutdownCount],["shutdown timeouts",testShutdownTimeouts],
     ["error stages",testErrorStages],["inactive shutdown",testInactiveShutdown],["map usage",testMapUsage],["inactive transition",testChangelevelInactive],["quit paths",testQuitPaths],
+    ["settings persistence",testSettingsPersistence],
   ]
   passed=0; index=0
   while index < len(tests)
     if run(index+1, tests[index][0], tests[index][1]) then passed=passed+1 end if
     index=index+1
   end while
-  if passed != 24 then return 1 end if
-  print "MiniQuake BP-034 host lifecycle closure tests passed: 24"
+  if passed != 25 then return 1 end if
+  print "MiniQuake BP-034 host lifecycle closure tests passed: 25"
   return 0
 end function

@@ -26,7 +26,9 @@ import miniquake.input as input
 import miniquake.keys as keys
 import miniquake.render.world as worldRenderer
 import miniquake.render.gl11 as gl
+import miniquake.render.enhanced as enhancedRenderer
 import miniquake.render.entities as entityRenderer
+import miniquake.render.gl_refrag as glRefrag
 import miniquake.render.particles as particleRenderer
 import miniquake.client_render_handoff as renderHandoff
 import miniquake.render.draw2d as draw2d
@@ -49,6 +51,7 @@ import miniquake.platform.win32 as win
 import miniquake.sys_win as sysWin
 import miniquake.gl_vidnt as glvid
 import miniquake.mathlib as math
+import miniquake.world_bsp as worldBsp
 import miniquake.byteio as bio
 import miniquake.native as native
 import miniquake.message as msg
@@ -68,6 +71,17 @@ titleFpsInitialized = false
 titleFpsLastFrame = 0
 titleFpsLastRealtime = 0.0
 titleFpsLastValue = -1
+
+// Append only static entities linked into leaves visible from the current
+// world PVS. CL_RelinkEntities intentionally contains dynamic entities only;
+// this is the production counterpart of GLQuake's R_StoreEfrags calls made
+// while traversing visible world leaves.
+function appendVisibleStaticEntities(session, dynamicEntities)
+  if session.renderer is void or session.entityRenderer is void or len(session.client.staticEntities) == 0 then return dynamicEntities end if
+  glRefrag.ConfigureStaticEntities(session.renderer, session.entityRenderer, session.client.staticEntities)
+  pvs = worldBsp.leafPvs(session.renderer.map, session.renderer.viewLeaf)
+  return glRefrag.R_AppendVisiblePvs(dynamicEntities, pvs)
+end function
 
 // Report whether command never exists holds for the active state.
 function commandNeverExists(name)
@@ -158,6 +172,11 @@ function createCvars(commandLine, registered)
   registerCvar(registry, "r_wateralpha", "1", false, false)
   registerCvar(registry, "r_drawviewmodel", "1", false, false)
   registerCvar(registry, "r_drawentities", "1", false, false)
+  // Modern lighting is opt-in so the exact GLQuake-compatible renderer stays
+  // the default and remains available for differential/reference testing.
+  registerCvar(registry, "r_lighting", "0", true, false)
+  registerCvar(registry, "r_shadows", "1", true, false)
+  registerCvar(registry, "r_shadowquality", "1", true, false)
   registerCvar(registry, "gl_subdivide_size", "128", true, false)
   registerCvar(registry, "gl_nobind", "0", false, false)
   registerCvar(registry, "gl_max_size", "1024", false, false)
@@ -3129,6 +3148,15 @@ function handleExactMenuAction(session, result)
     playMenuSound(session, "misc/menu3.wav")
     return true
   end if
+  if result == "lighting_applied" then
+    writeConfiguration(session)
+    playMenuSound(session, "misc/menu2.wav")
+    return true
+  end if
+  if result == "lighting_error" then
+    playMenuSound(session, "misc/menu3.wav")
+    return true
+  end if
   if result == "menu_single" or result == "menu_multi" or result == "menu_options" or result == "menu_help" or result == "menu_quit" or result == "new_game" or result == "load_game" or result == "save_game" or result == "player_setup" or result == "customize_controls" or result == "open_console" or result == "reset_defaults" or result == "video_options" or result == "bind_selected" or result == "load_slot" or result == "save_slot" or result == "video_option" or result == "adjust_option" or result == "help_next" then
     executeMenuSelection(session)
     return true
@@ -3614,6 +3642,20 @@ function _Host_Frame(session, elapsedSeconds)
     rDrawViewModel = cvar.variableValue(session.cvars, "r_drawviewmodel") != 0.0
     glPolyBlend = cvar.variableValue(session.cvars, "gl_polyblend") != 0.0
     crosshairEnabled = cvar.variableValue(session.cvars, "crosshair") != 0.0
+    enhancedRequested = cvar.variableValue(session.cvars, "r_lighting") != 0.0
+    enhancedShadows = cvar.variableValue(session.cvars, "r_shadows") != 0.0
+    enhancedShadowQuality = native.trunc(cvar.variableValue(session.cvars, "r_shadowquality"))
+    enhancedActive = worldRenderer.R_ConfigureEnhancedLighting(
+      enhancedRequested,
+      enhancedShadows,
+      enhancedShadowQuality,
+    )
+    // Projected geometry shadows use the fixed-function entity pass and do not
+    // depend on the optional per-pixel lighting shader.  Keeping this tied to
+    // enhancedActive made an archived `r_lighting 0` silently disable the
+    // visibly enabled Shadows menu option during normal first-person starts.
+    entityRenderer.ConfigureAliasRendering(true, false, enhancedShadows, false, true)
+    entityRenderer.ConfigureEnhancedShadowQuality(enhancedRenderer.shadowQuality())
 
     session.renderer.fullbright = rFullbright != 0.0
     session.renderer.wireframe = rWireframe != 0.0
@@ -3658,13 +3700,20 @@ function _Host_Frame(session, elapsedSeconds)
             session.server.edicts,
           )
         end if
-        temporaryModels = renderHandoff.currentTemporaryEntities()
+        // Static efrag bounds need the fully synchronized model table before
+        // they can be split across BSP leaves.
         entityRenderer.synchronize(session.entityRenderer, session.client.modelPrecache)
+        visibleEntities = appendVisibleStaticEntities(session, visibleEntities)
+        temporaryModels = renderHandoff.currentTemporaryEntities()
         if rDrawEntities then
           renderEntities = renderHandoff.submitEntities(visibleEntities, temporaryModels)
           // CL_RelinkEntities already applies first-person/chase filtering.
           entityResult = try(entityRenderer.renderSubmitted(session.entityRenderer, session.renderer, renderEntities, void, session.view.right, session.view.up, session.client.time))
           if entityResult is error then return error(3891, "screen_entities: " + entityResult.message) end if
+          if enhancedActive then
+            enhancedEntityResult = try(entityRenderer.renderEnhancedSubmitted(session.entityRenderer, session.renderer, renderEntities, void, session.client.time))
+            if enhancedEntityResult is error then return error(3936, "screen_enhanced_entities: " + enhancedEntityResult.message) end if
+          end if
         end if
       end if
       compatDiagnostics.checkpoint(session, "screen_entities")
@@ -3676,6 +3725,10 @@ function _Host_Frame(session, elapsedSeconds)
       if session.entityRenderer is not void and rDrawViewModel then
         viewModelResult = try(entityRenderer.renderViewModel(session.entityRenderer, session.player, session.view, session.client.time))
         if viewModelResult is error then return error(3892, "screen_viewmodel: " + viewModelResult.message) end if
+        if enhancedActive then
+          enhancedViewModelResult = try(entityRenderer.renderViewModelEnhanced(session.entityRenderer, session.player, session.view, session.client.time))
+          if enhancedViewModelResult is error then return error(3937, "screen_enhanced_viewmodel: " + enhancedViewModelResult.message) end if
+        end if
       end if
       compatDiagnostics.checkpoint(session, "screen_viewmodel")
       // R_RenderView draws the deferred translucent/unsorted water pass after
@@ -3719,6 +3772,7 @@ function _Host_Frame(session, elapsedSeconds)
         glPolyBlend,
       )
       compatDiagnostics.checkpoint(session, "screen_polyblend")
+      enhancedRenderer.endFrame()
     else
       compatDiagnostics.checkpoint(session, "screen_world")
       compatDiagnostics.checkpoint(session, "screen_entities")

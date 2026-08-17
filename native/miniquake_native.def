@@ -18,6 +18,9 @@ EXPORTS
   mq_render_select
   mq_render_backend
   mq_render_available
+  mq_shadow_world_clear
+  mq_shadow_world_upload
+  mq_shadow_trace_batch
   mq_win_create
   mq_win_destroy
   mq_win_poll
@@ -173,9 +176,16 @@ EXPORTS
   mq_gl_multitexture_available
   mq_gl_world_program_available
   mq_gl_world_program_enable
+  mq_gl_enhanced_available
+  mq_gl_enhanced_configure
+  mq_gl_enhanced_begin_frame
+  mq_gl_enhanced_draw_kind
+  mq_gl_enhanced_end_frame
   mq_gl_active_texture
   mq_gl_multi_tex_coord2
   mq_gl_draw_alias_batch
+  mq_gl_draw_shadow_batch
+  mq_gl_draw_alias_ray_shadow
   mq_gl_draw_particle_batch
   mq_gl_draw_alias_model
   mq_gl_static_geometry_call

@@ -12,7 +12,7 @@ def main() -> int:
     markers=['function aliasShadowProjection(entityOriginZ, lightSpotZ)','function GL_DrawAliasShadowAtOrigin(header, posenum, entityOriginZ)','row = shadeDotRow(yaw)']
     for m in markers:
         if m not in alias: errors.append('alias mesh missing marker: '+m)
-    for m in ['worldRenderer.GL_DisableMultitexture()','aliasMesh.GL_DrawAliasShadowAtOrigin(source, frame, entity.origin.z)']:
+    for m in ['worldRenderer.GL_DisableMultitexture()','aliasMesh.GL_DrawAliasRayShadowSample(source, frame, entity']:
         if m not in entities: errors.append('entity renderer missing marker: '+m)
     if tests.count('if bp045Run(')!=22: errors.append('BP-045 fixture count differs from 22')
     rows=golden.get('rows',[])

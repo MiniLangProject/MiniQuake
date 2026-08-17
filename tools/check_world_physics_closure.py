@@ -74,12 +74,12 @@ DOWNSTREAM_SERVER_ALLOWED_FUNCTIONS = (
 # BP-079 host-command deltas and the separately section-bound R7 stable
 # QuakeC mirror functions above.
 DOWNSTREAM_SERVER_PROTECTED_SHA256 = (
-    "7bcb39161543f833db1e9c7d0ce0c297a44dfae3b9769eaa57c3d539f3889448"
+    "139ba6433f90b6f1bc831167cc2a06808070a22274819edeaf32ebfee6fb7129"
 )
 SERVER_SECTION_HASHES = {
     "runWorldPhysicsWithRetouch": "5b082bf6147659c213fe46e84679d44a73f11dcd2aac070ef51eaf66dd0ecc8b",
-    "runNonClientPhysicsWithRetouch": "24a05fed078529237192653250631835a9d22d6d6c9054abb0ea5121f13095a6",
-    "frameMode": "09549e467d9a73e0802fda2c71552348fe7470dd6a84766098d02c90cbf87921",
+    "runNonClientPhysicsWithRetouch": "66825dd6c657984ef061f25b3942dd6092640f459d59a75d39576b0423843beb",
+    "frameMode": "3b020b4e4e2ed693d3c2f628cc83f035ca15e951147cbee6d792daeb72622709",
 }
 SERVER_GC_ROOT_SECTION_HASHES = {
     "requireSynchronizedVector": "ec5668c4a4f343926434df4f9f256fcc4658ce668df851bc24248d98f57d5145",
@@ -89,9 +89,9 @@ SERVER_GC_ROOT_SECTION_HASHES = {
     "resizeSynchronizedEdictArray": "feffb4ecf5ae81d17ec447f5c2e0d8535e566406518c5ea91172aa05346dd795",
     "ensureSynchronizedBaseline": "4373f3023d269bd09c9e4af1461b8c3046aeb4a6da501f4b47c0f39d801bbe92",
     "ensureSynchronizedEdict": "021e99d057bb0d8065985edbc3135f94c32ef3cde31672dd0f96c5c96fdd2562",
-    "syncQuakeCEdict": "8102bed267d77a7cf818721f1ca49cebb66022cd6fb0ca433321890a01a7ebbc",
+    "syncQuakeCEdict": "e284ddf91cee35f98352528f9985a544ef55d56ec907fffff166de05736117e2",
     "recomputeEdictCount": "c76b03b6df1ad59e54b32dd623a71854c23b11cd85556d6f630401e71502ae7e",
-    "syncQuakeCEdictRange": "edb59719fe83a55f5151f0fa05d237280844dc2a5ca2b7947261d2fde7ca539c",
+    "syncQuakeCEdictRange": "68c2a956d1b1a40bb97a69b5b54896591cb034a8bca8ad552225caca755ebde8",
     "syncQuakeCEdicts": "20487d24c832a3806d321883ccaccf5f7a7a3a20a892777009d5c2abe8759edc",
     "syncLoadedQuakeCEdicts": "dd64b00262cbab549e47098747ad2e6af8e61bd1985b49b7d59f54af724b3de7",
     "syncPlayerToQuakeC": "4ef4bfc0a9023055caee8af2d8345c230d84764d34f06e15215c45a53f78dad0",

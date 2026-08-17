@@ -352,6 +352,12 @@ const GL_PREVIOUS = 0x8578
 const GL_REPLACE = 0x1E01
 const GL_MODULATE = 0x2100
 
+// Native enhanced-lighting draw classifications.  The classic path always
+// uses NONE; the optional renderer uses OVERLAY only for its additive 3-D
+// light pass, so console/HUD/menu rendering cannot inherit a shader.
+const ENHANCED_DRAW_NONE = 0
+const ENHANCED_DRAW_OVERLAY = 1
+
 // Provide alpha func behavior for the active subsystem.
 function alphaFunc(functionName, reference)
   native.glAlphaFunc(functionName, bits(reference))
@@ -476,6 +482,38 @@ function worldProgramEnable(enabled)
   native.glWorldProgramEnable(value)
 end function
 
+// Report whether the active backend can execute the optional per-pixel light
+// pass.  Availability is capability based and is deliberately independent of
+// the selected Classic/Enhanced user setting.
+function enhancedAvailable()
+  return native.glEnhancedAvailable() != 0
+end function
+
+// Configure optional enhanced rendering without changing the selected native
+// backend.  Classic remains a zero-cost path when enabled is false.
+function enhancedConfigure(enabled, shadows, shadowQuality)
+  enabledValue = 0
+  shadowsValue = 0
+  if enabled then enabledValue = 1 end if
+  if shadows then shadowsValue = 1 end if
+  return native.glEnhancedConfigure(enabledValue, shadowsValue, shadowQuality) != 0
+end function
+
+// Upload the compact world-space dynamic-light packet for the current view.
+function enhancedBeginFrame(lightPacket, byteCount)
+  return native.glEnhancedBeginFrame(lightPacket, byteCount) != 0
+end function
+
+// Select which following geometry is part of the enhanced additive pass.
+function enhancedDrawKind(kind)
+  native.glEnhancedDrawKind(kind)
+end function
+
+// End enhanced 3-D rendering and force the compatibility program/state back.
+function enhancedEndFrame()
+  native.glEnhancedEndFrame()
+end function
+
 // Report whether active texture holds for the active state.
 function activeTexture(unit)
   native.glActiveTexture(unit)
@@ -494,6 +532,12 @@ end function
 // Provide static geometry call batch behavior for the active subsystem.
 function staticGeometryCallBatch(keys, passId)
   return native.glStaticGeometryCallBatch(keys, len(keys), passId) > 0
+end function
+
+// Draw only the populated key prefix of a reusable static-geometry buffer.
+function staticGeometryCallBatchCount(keys, keyCount, passId)
+  if keyCount <= 0 then return false end if
+  return native.glStaticGeometryCallBatch(keys, keyCount * 8, passId) > 0
 end function
 
 // Provide static geometry call multitexture batch behavior for the active subsystem.

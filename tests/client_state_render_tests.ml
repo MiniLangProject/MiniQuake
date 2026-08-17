@@ -182,13 +182,15 @@ function testChaseIncludesViewEntity()
   return true
 end function
 
-// Verify static entity visible against the expected Quake behavior.
+// Verify static entities are deferred to the BSP efrag/PVS pass.
 function testStaticEntityVisible()
   value = newClient()
-  entity = activeEntity(value, 1, 1)
+  entity = client.createEntity(c.MAX_EDICTS)
+  entity.modelIndex = 1
   entity.messageTime = -1.0
+  value.staticEntities = [entity]
   client.CL_RelinkEntities(value)
-  equal(len(value.visibleEntities), 1, "static entity")
+  equal(len(value.visibleEntities), 0, "static entity deferred until R_StoreEfrags")
   return true
 end function
 

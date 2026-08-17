@@ -15,63 +15,63 @@
   "authoritative_files": [
     {
       "path": "src/miniquake/constants.ml",
-      "sha256": "213387c278552bdd82e5edcae96feaefd36a9a81b837b55c26bf1c0a73917fed"
+      "sha256": "99bb7d750accb6e87c6bc2d765b3d1ed7913f71997e30c43b8a20264c8764936"
     },
     {
       "path": "src/miniquake/sizebuf.ml",
-      "sha256": "0b41aa7512f64a947b2a16a5aff313c481230e07d4863911d3485a8a694cf080"
+      "sha256": "9b4ca4108005598ae7c519f9090e9f86e0380865fd5af14e812c5aac919fe849"
     },
     {
       "path": "src/miniquake/message.ml",
-      "sha256": "ecff5fdb03b182c7b454c54fd4348cf60402ab6e15c424a43b6bea128f8e6e75"
+      "sha256": "89c3c80d690c0c51b36779fe5532c53f6495f1dda9393d6a6d452989f6ef9f16"
     },
     {
       "path": "src/miniquake/protocol_text.ml",
-      "sha256": "83a7d475f2a15ded25f3fb35c4b6af6bd8cfac5e8ed77fd8d2201ba5b4851fba"
+      "sha256": "8ae280905eab04811fc9805da2b270aeb7e57a3b923916f4487eccc333c3c183"
     },
     {
       "path": "src/miniquake/protocol_write.ml",
-      "sha256": "448f2c8365bce1057ba43778d795f998586bcfc29eaf72be5e4a231109ce6cc9"
+      "sha256": "6876026ad7080caeb8a37f91d31769361518177a6e8ac22ea7c5392f4258ae54"
     },
     {
       "path": "src/miniquake/protocol_signon.ml",
-      "sha256": "46a398d78d7bb19b0051c0f82ee33d5db045a7488d1d28a9381cd2ded3ae2724"
+      "sha256": "bd84c3313b621065756d7e253f581a411a08cca67cba3ea0e3100b5240045b9b"
     },
     {
       "path": "src/miniquake/protocol_delivery.ml",
-      "sha256": "817dbe7646adcc8196d5093832f7cffe446cd923a4a3d48b513b5f4d7ca85df6"
+      "sha256": "75c4ed76744bbd5a60566fcc03aa66fc44015627634151fb0089df6713b7011f"
     },
     {
       "path": "src/miniquake/protocol_update.ml",
-      "sha256": "a741f7d1ab39381eb26306209c32b51d0369321e4fb537a6118228c084b49dbb"
+      "sha256": "4e46356c739d77166efe325e7c5cd0c1f301bbef0548ae15cfd0041b7d3733b0"
     },
     {
       "path": "src/miniquake/protocol_serverdata.ml",
-      "sha256": "5e0ee92f883a7ecb64517b548ba6619d5dc3ccbba2ee95590ed7806f89f68afd"
+      "sha256": "08d95ffd4a32a87c9238b4b317aa1d6da578197361939e3aeed900662eabda4d"
     },
     {
       "path": "src/miniquake/protocol_events.ml",
-      "sha256": "ccf55059d968765ece0a620770768c0c2c5ddee5bc533de16cff97a921753f43"
+      "sha256": "7927ba9d8e56e217dcf3b67b82cbbc8c0710127da5b78247290befce081f8ad0"
     },
     {
       "path": "src/miniquake/protocol_transients.ml",
-      "sha256": "af88006eb71d30d1a95ac44009bade3d9e430b745055631d371d9ab5ac0ece53"
+      "sha256": "2e92984f8dc76f45251065952d2dd1639527ac7292cedc584375dd9dd3b029ec"
     },
     {
       "path": "src/miniquake/protocol15_freeze.ml",
-      "sha256": "2d08eb161fc3347f6ca5f19d98bccbd1780425a2cc595c9a7a04eeb37c429dfc"
+      "sha256": "084b8c01e717e45da2d38a1d2731516b0457cd8b0bbe3de2033f170e4543b000"
     },
     {
       "path": "src/miniquake/client_protocol.ml",
-      "sha256": "e1bbb747078ba48fb9f547b9c59fa973967e86e363556cb637b0cf68ed9934d6"
+      "sha256": "3a97e2fc8675f68fada902fcfeb250c7318d5455b8595c24c0ffbf7b4d35c300"
     },
     {
       "path": "src/miniquake/net_datagram.ml",
-      "sha256": "642f08bbbedd10baba6b288a3ca9979d20943c054e08858e57cf63d80b5e8f61"
+      "sha256": "d08de3a6829fb84682eebb9ce2a49a9d4f1816f0e50b22feb4aba4e078cc899f"
     },
     {
       "path": "src/miniquake/demo.ml",
-      "sha256": "93d11fc57fc7cf08c3d3b9280825e5e31bd2daadffd1443019c26414542b41db"
+      "sha256": "fe70c1f12a774e49c5b4f0a6c0d84d83e83a99540c1ca95ba658fe4adc36526d"
     }
   ]
 }
