@@ -1,14 +1,23 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """Verify BP-030 WinQuake Host_FilterTime and host clock contracts."""
 from __future__ import annotations
 import argparse, hashlib, json, os, shutil, struct, subprocess, tempfile
 from pathlib import Path
 PACKAGE='BP-030';PARENT='BP-029R3';SCHEMA='MiniQuakeHostTimingGolden/1'
 GOLDEN='audit/host_timing_golden.json';ORACLE='tools/oracle/host_timing_oracle.c'
-def sha(p): return hashlib.sha256(Path(p).read_bytes()).hexdigest()
-def fbits(v): return struct.unpack('<I',struct.pack('<f',v))[0]
+def sha(p):
+    """Compute the SHA-256 digest of the requested file."""
+    return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+def fbits(v):
+    """Return the IEEE-754 binary32 bit pattern for a Python float."""
+    return struct.unpack('<I',struct.pack('<f',v))[0]
 def model_rows():
     # Bound values are intentionally simple and mirror the independent C oracle.
+    """Build the deterministic model rows fixture used by this verifier."""
     return [
       {'kind':'case','name':'below_threshold_accept','value':0},
       {'kind':'case','name':'below_threshold_filtered','value':1},
@@ -24,16 +33,19 @@ def model_rows():
       {'kind':'case','name':'fixture_count','value':18},
     ]
 def document(root):
+    """Render the canonical evidence document for this verifier."""
     return {'schema':SCHEMA,'package_id':PACKAGE,'parent_package_id':PARENT,
             'sources':['host.c','quakedef.h'],'rows':model_rows(),
             'reference':{'oracle':ORACLE,'oracle_sha256':sha(root/ORACLE)}}
 def compiler():
+    """Locate a supported C compiler for the reference oracle."""
     values=([os.environ['CC']] if os.environ.get('CC') else [])+['cc','gcc','clang']
     for value in values:
         parts=value.split()
         if shutil.which(parts[0]): return parts
     return None
 def run_oracle(root):
+    """Run oracle and capture its deterministic result."""
     cc=compiler()
     if not cc: return True,'not available',[]
     with tempfile.TemporaryDirectory(prefix='mq-bp030-') as td:
@@ -43,6 +55,7 @@ def run_oracle(root):
         run=subprocess.run([str(exe)],capture_output=True,text=True)
         return run.returncode==0,' '.join(cc),[json.loads(line) for line in run.stdout.splitlines() if line.strip()]
 def contract(root):
+    """Evaluate the source and runtime evidence for this contract."""
     errors=[]
     timing=(root/'src/miniquake/host_timing.ml').read_text(encoding='utf-8-sig')
     host=(root/'src/miniquake/host.ml').read_text(encoding='utf-8-sig')
@@ -75,6 +88,7 @@ def contract(root):
     if stale in test: errors.append('stale BP-030 accumulation order remains in runtime fixture')
     return errors
 def main():
+    """Run the command-line workflow and return its process exit status."""
     ap=argparse.ArgumentParser();ap.add_argument('root',nargs='?',default='.');ap.add_argument('--root',dest='rf');ap.add_argument('--write-golden',action='store_true');ap.add_argument('--json-output');a=ap.parse_args()
     root=Path(a.rf or a.root).resolve();doc=document(root);golden=root/GOLDEN
     if a.write_golden:

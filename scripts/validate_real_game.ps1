@@ -1,4 +1,8 @@
-﻿[CmdletBinding()]
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+# Run retail-data validation against a caller-supplied Quake installation.
+
+[CmdletBinding()]
 param(
   [Parameter(Mandatory = $true)]
   [string]$QuakeBase,

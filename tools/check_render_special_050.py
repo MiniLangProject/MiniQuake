@@ -1,14 +1,22 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+"""Verify the check render special 050 compatibility and regression contract."""
+
 from __future__ import annotations
 import argparse, json, pathlib, sys
 
 def emit_report(path, name, passed, details, errors):
+    """Emit one deterministic machine-readable verification report."""
     if not path:
         return
     payload = {"schema": 1, "check": name, "status": "PASS" if passed else "FAIL", "passed": passed, "details": details, "errors": errors}
     pathlib.Path(path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     ap=argparse.ArgumentParser(); ap.add_argument('--root', default=str(pathlib.Path(__file__).resolve().parents[1])); ap.add_argument('--json-output'); args=ap.parse_args()
     root=pathlib.Path(args.root).resolve(); errors=[]
     special=(root/'src/miniquake/render/special_paths.ml').read_text(encoding='utf-8')
@@ -26,6 +34,7 @@ def main() -> int:
     if 'function submitMirrorEntities(' not in handoff: errors.append('mirror entity handoff is missing')
 
     def function_body(text: str, name: str) -> str:
+        """Extract one complete MiniLang function body from source text."""
         start = text.find(f"function {name}(")
         if start < 0:
             return ""

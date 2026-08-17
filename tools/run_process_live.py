@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
 """Run one child process with immediate binary-safe console and log forwarding.
 
 The child stream is never decoded by this helper.  This avoids Windows code-page
@@ -27,6 +30,7 @@ def _status_payload(
     started: bool,
     error: str = "",
 ) -> dict[str, object]:
+    """Build the serializable status record for a supervised process."""
     return {
         "schema": "MiniQuakeLiveProcessStatus/2",
         "exit_code": int(exit_code),
@@ -44,6 +48,7 @@ def write_status(
     started: bool,
     error: str = "",
 ) -> None:
+    """Atomically persist the supervised process status as JSON."""
     if path is None:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -70,10 +75,12 @@ def emit_bytes(data: bytes, log: BinaryIO | None = None) -> None:
 
 
 def emit_ascii(text: str, log: BinaryIO | None = None) -> None:
+    """Forward one child-output chunk through the ASCII console stream."""
     emit_bytes(text.encode("ascii", errors="backslashreplace"), log)
 
 
 def terminate_process(process: subprocess.Popen[bytes] | None) -> None:
+    """Terminate a child process tree and preserve its final status."""
     if process is None or process.poll() is not None:
         return
     try:
@@ -88,6 +95,7 @@ def terminate_process(process: subprocess.Popen[bytes] | None) -> None:
 
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--log", required=True)
     parser.add_argument("--cwd", default="")

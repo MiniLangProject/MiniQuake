@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+"""Verify the check gameplay 077 compatibility and regression contract."""
+
 import argparse, json, pathlib, sys
 
 def function_slice(text,name):
+    """Extract one complete MiniLang function body from source text."""
     start=text.find('function '+name+'(')
     if start<0: return ''
     end=text.find('\nend function',start)
     return text[start:end+13] if end>=0 else text[start:]
 
 def main():
+    """Run the command-line workflow and return its process exit status."""
     ap=argparse.ArgumentParser(); ap.add_argument('--root',default='.'); ap.add_argument('--json',default='')
     ns=ap.parse_args(); root=pathlib.Path(ns.root).resolve(); errors=[]
     golden=json.loads((root/'audit/gameplay_screen_golden.json').read_text())

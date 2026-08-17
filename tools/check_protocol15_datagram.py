@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """Verify BP-017 net_dgrm.c fragmentation and deferred-ACK contracts."""
 from __future__ import annotations
 import argparse, hashlib, json, os, shutil, subprocess, tempfile
@@ -10,8 +14,11 @@ GOLDEN="audit/protocol15_datagram_golden.json"
 ORACLE="tools/oracle/protocol15_datagram_oracle.c"
 MAX_DATAGRAM=1024; NET_MAXMESSAGE=8192
 
-def sha(path:Path)->str:return hashlib.sha256(path.read_bytes()).hexdigest()
+def sha(path:Path)->str:
+    """Compute the SHA-256 digest of the requested file."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 def rows():
+    """Build the deterministic result rows for this verifier."""
     values=[
       ("sequence_next_wrap",0),("sequence_previous_wrap",0xffffffff),
       ("exact_fragment_eom",1),("split_fragment_eom",0),
@@ -26,11 +33,13 @@ def rows():
     return [{"kind":"case","name":name,"value":value} for name,value in values]
 
 def document(root:Path):
+    """Render the canonical evidence document for this verifier."""
     return {"schema":SCHEMA,"package_id":PACKAGE_ID,"parent_package_id":PARENT_PACKAGE_ID,
       "protocol_version":15,"sources":["net_dgrm.c","net.h","net_main.c"],"cases":rows(),
       "reference":{"oracle":ORACLE,"oracle_sha256":sha(root/ORACLE)}}
 
 def compiler():
+    """Locate a supported C compiler for the reference oracle."""
     candidates=[]
     if os.environ.get("CC"):candidates.append(os.environ["CC"])
     candidates += ["cc","gcc","clang"]
@@ -40,6 +49,7 @@ def compiler():
     return None
 
 def oracle(root:Path):
+    """Compile and run the reference oracle for this verifier."""
     cc=compiler()
     if not cc:return True,"not available",[]
     with tempfile.TemporaryDirectory(prefix="mq-bp017-") as td:
@@ -51,6 +61,7 @@ def oracle(root:Path):
         return run.returncode==0," ".join(cc),parsed
 
 def contract(root:Path):
+    """Evaluate the source and runtime evidence for this contract."""
     errors=[]
     datagram=(root/'src/miniquake/net_datagram.ml').read_text(encoding='utf-8-sig')
     loop=(root/'src/miniquake/net_loop.ml').read_text(encoding='utf-8-sig')
@@ -76,6 +87,7 @@ def contract(root:Path):
     return errors
 
 def main()->int:
+    """Run the command-line workflow and return its process exit status."""
     parser=argparse.ArgumentParser()
     parser.add_argument('root',nargs='?',default='.')
     parser.add_argument('--root',dest='root_flag')

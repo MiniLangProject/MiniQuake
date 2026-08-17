@@ -1,18 +1,26 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """Verify BP-020 dprograms_t ABI, semantic parser guards and runtime CRC."""
 from __future__ import annotations
 import argparse, hashlib, json, os, shutil, struct, subprocess, tempfile
 from pathlib import Path
 PACKAGE_ID="BP-020";PARENT_PACKAGE_ID="BP-019";SCHEMA="MiniQuakeQuakeCProgsGolden/1";REPORT="MiniQuakeBP020QuakeCProgsVerification/1"
 GOLDEN="audit/quakec_progs_golden.json";ORACLE="tools/oracle/quakec_progs_oracle.c"
-def sha(p:Path)->str:return hashlib.sha256(p.read_bytes()).hexdigest()
+def sha(p:Path)->str:
+    """Compute the SHA-256 digest of the requested file."""
+    return hashlib.sha256(p.read_bytes()).hexdigest()
 def crc_block(data:bytes)->int:
+    """Compute Quake's 16-bit CRC over one byte block."""
     value=0xffff
     for item in data:
         value ^= item<<8
         for _ in range(8):value=((value<<1)^0x1021)&0xffff if value&0x8000 else (value<<1)&0xffff
     return value
 def fixture()->bytes:
+    """Build one deterministic QuakeC program fixture."""
     strings=b'\0time\0health\0main\0fixture.qc\0';so,gdo,fdo,fo,stro=60,68,84,100,172;go=stro+len(strings);gc=32
     data=bytearray(go+gc*4)
     struct.pack_into('<15i',data,0,6,5927,so,1,gdo,2,fdo,2,fo,2,stro,len(strings),go,gc,4)
@@ -24,6 +32,7 @@ def fixture()->bytes:
     data[stro:stro+len(strings)]=strings
     return bytes(data)
 def rows():
+    """Build the deterministic result rows for this verifier."""
     data=fixture();return [
       {"kind":"case","name":"sizeof_dprograms","value":60},
       {"kind":"case","name":"sizeof_dstatement","value":8},
@@ -37,13 +46,17 @@ def rows():
       {"kind":"case","name":"fixture_bytes","value":len(data)},
       {"kind":"case","name":"fixture_runtime_crc","value":crc_block(data)},
     ]
-def document(root:Path):return {"schema":SCHEMA,"package_id":PACKAGE_ID,"parent_package_id":PARENT_PACKAGE_ID,"sources":["pr_comp.h","progs.h","pr_edict.c","sv_main.c"],"rows":rows(),"reference":{"oracle":ORACLE,"oracle_sha256":sha(root/ORACLE)}}
+def document(root:Path):
+    """Render the canonical evidence document for this verifier."""
+    return {"schema":SCHEMA,"package_id":PACKAGE_ID,"parent_package_id":PARENT_PACKAGE_ID,"sources":["pr_comp.h","progs.h","pr_edict.c","sv_main.c"],"rows":rows(),"reference":{"oracle":ORACLE,"oracle_sha256":sha(root/ORACLE)}}
 def compiler():
+    """Locate a supported C compiler for the reference oracle."""
     for value in ([os.environ['CC']] if os.environ.get('CC') else [])+['cc','gcc','clang']:
         parts=value.split()
         if shutil.which(parts[0]):return parts
     return None
 def run_oracle(root:Path):
+    """Run oracle and capture its deterministic result."""
     cc=compiler()
     if not cc:return True,'not available',[]
     with tempfile.TemporaryDirectory(prefix='mq-bp020-') as td:
@@ -53,6 +66,7 @@ def run_oracle(root:Path):
         run=subprocess.run([str(exe)],capture_output=True,text=True)
         return run.returncode==0,' '.join(cc),[json.loads(line) for line in run.stdout.splitlines() if line.strip()]
 def contract(root:Path):
+    """Evaluate the source and runtime evidence for this contract."""
     errors=[]
     progs=(root/'src/miniquake/format/progs.ml').read_text(encoding='utf-8-sig')
     edict=(root/'src/miniquake/quakec/edict.ml').read_text(encoding='utf-8-sig')
@@ -85,6 +99,7 @@ def contract(root:Path):
     if tests.count('if run(')!=18 or 'MiniQuake BP-020 QuakeC progs.dat tests passed: 18' not in tests:errors.append('expected 18 BP-020 fixtures')
     return errors
 def main()->int:
+    """Run the command-line workflow and return its process exit status."""
     ap=argparse.ArgumentParser();ap.add_argument('root',nargs='?',default='.');ap.add_argument('--root',dest='root_flag');ap.add_argument('--write-golden',action='store_true');ap.add_argument('--json-output');a=ap.parse_args();root=Path(a.root_flag or a.root).resolve();doc=document(root);golden=root/GOLDEN
     if a.write_golden:golden.parent.mkdir(parents=True,exist_ok=True);golden.write_text(json.dumps(doc,indent=2)+'\n',encoding='utf-8')
     errors=[]

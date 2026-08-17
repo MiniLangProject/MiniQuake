@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+"""Verify the check frontend 068 compatibility and regression contract."""
+
 import argparse, json, pathlib, re, sys
 
 EXPECTED_FIXTURES = 24
@@ -6,6 +12,7 @@ EXPECTED_VOLUME_BITS = "0x3f4ccccd"
 EXPECTED_PITCH_BITS = "0xbcb43958"
 
 def main():
+    """Run the command-line workflow and return its process exit status."""
     ap=argparse.ArgumentParser(); ap.add_argument('--root',default='.'); ap.add_argument('--json',default='')
     ns=ap.parse_args(); root=pathlib.Path(ns.root).resolve(); errors=[]
     host=(root/'src/miniquake/host.ml').read_text(encoding='utf-8-sig')

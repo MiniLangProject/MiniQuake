@@ -1,14 +1,22 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+"""Verify the check render special 053 compatibility and regression contract."""
+
 from __future__ import annotations
 import argparse, json, pathlib, subprocess, sys
 
 def emit_report(path, name, passed, details, errors):
+    """Emit one deterministic machine-readable verification report."""
     if not path:
         return
     payload = {"schema": 1, "check": name, "status": "PASS" if passed else "FAIL", "passed": passed, "details": details, "errors": errors}
     pathlib.Path(path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     ap=argparse.ArgumentParser(); ap.add_argument('--root', default=str(pathlib.Path(__file__).resolve().parents[1])); ap.add_argument('--json-output'); a=ap.parse_args(); root=pathlib.Path(a.root).resolve(); errors=[]
     corpus=(root/'src/miniquake/render_evidence_corpus.ml').read_text(encoding='utf-8')
     test=(root/'tests/render_evidence_corpus_tests.ml').read_text(encoding='utf-8')

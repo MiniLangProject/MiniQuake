@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+"""Verify the check external 094 compatibility and regression contract."""
+
 from __future__ import annotations
 
 import argparse
@@ -8,6 +14,7 @@ import sys
 
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=".")
     ap.add_argument("--json", default="")
@@ -16,6 +23,7 @@ def main() -> int:
     errors: list[str] = []
 
     def read(rel: str) -> str:
+        """Read read from its caller-supplied source."""
         p = root / rel
         if not p.is_file():
             errors.append("missing file: " + rel)

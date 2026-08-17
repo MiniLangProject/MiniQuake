@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+"""Verify the check frontend 069 compatibility and regression contract."""
+
 from __future__ import annotations
 
 import argparse
@@ -9,11 +15,13 @@ import sys
 
 
 def _const_string(source: str, name: str) -> str:
+    """Extract a named MiniLang string constant from source text."""
     match = re.search(rf'^const\s+{name}\s*=\s*"([^"]+)"\s*$', source, flags=re.M)
     return match.group(1) if match else ""
 
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', default='.')
     parser.add_argument('--json', default='')

@@ -1,12 +1,20 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """Verify BP-025 world.c trace coordinates and six-plane box boundaries."""
 from __future__ import annotations
 import argparse, hashlib, json, os, shutil, subprocess, tempfile
 from pathlib import Path
 PACKAGE_ID="BP-025";PARENT_PACKAGE_ID="BP-024R3";SCHEMA="MiniQuakeWorldTraceGolden/1";REPORT="MiniQuakeBP025WorldTraceVerification/1"
 GOLDEN="audit/world_trace_golden.json";ORACLE="tools/oracle/world_trace_oracle.c"
-def sha(p:Path)->str:return hashlib.sha256(p.read_bytes()).hexdigest()
-def rows():return [
+def sha(p:Path)->str:
+    """Compute the SHA-256 digest of the requested file."""
+    return hashlib.sha256(p.read_bytes()).hexdigest()
+def rows():
+    """Build the deterministic result rows for this verifier."""
+    return [
  {"kind":"case","name":"max_plane_empty","value":1},
  {"kind":"case","name":"min_plane_solid","value":1},
  {"kind":"case","name":"parallel_max_clear","value":1},
@@ -17,13 +25,17 @@ def rows():return [
  {"kind":"case","name":"translated_hit_world_x","value":99.96875},
  {"kind":"case","name":"dist_epsilon","value":0.03125},
 ]
-def document(root:Path):return {"schema":SCHEMA,"package_id":PACKAGE_ID,"parent_package_id":PARENT_PACKAGE_ID,"sources":["world.c","world.h"],"rows":rows(),"reference":{"oracle":ORACLE,"oracle_sha256":sha(root/ORACLE)}}
+def document(root:Path):
+    """Render the canonical evidence document for this verifier."""
+    return {"schema":SCHEMA,"package_id":PACKAGE_ID,"parent_package_id":PARENT_PACKAGE_ID,"sources":["world.c","world.h"],"rows":rows(),"reference":{"oracle":ORACLE,"oracle_sha256":sha(root/ORACLE)}}
 def compiler():
+ """Locate a supported C compiler for the reference oracle."""
  for value in ([os.environ['CC']] if os.environ.get('CC') else [])+['cc','gcc','clang']:
   parts=value.split()
   if shutil.which(parts[0]):return parts
  return None
 def run_oracle(root:Path):
+ """Run oracle and capture its deterministic result."""
  cc=compiler()
  if not cc:return True,'not available',[]
  with tempfile.TemporaryDirectory(prefix='mq-bp025-') as td:
@@ -33,6 +45,7 @@ def run_oracle(root:Path):
   run=subprocess.run([str(exe)],capture_output=True,text=True)
   return run.returncode==0,' '.join(cc),[json.loads(x) for x in run.stdout.splitlines() if x.strip()]
 def contract(root:Path):
+ """Evaluate the source and runtime evidence for this contract."""
  errors=[]
  bsp=(root/'src/miniquake/world_bsp.ml').read_text(encoding='utf-8-sig')
  world=(root/'src/miniquake/world.ml').read_text(encoding='utf-8-sig')
@@ -48,6 +61,7 @@ def contract(root:Path):
   if marker not in tests:errors.append('missing BP-025 fixture: '+marker)
  return errors
 def main()->int:
+ """Run the command-line workflow and return its process exit status."""
  ap=argparse.ArgumentParser();ap.add_argument('root',nargs='?',default='.');ap.add_argument('--root',dest='root_flag');ap.add_argument('--write-golden',action='store_true');ap.add_argument('--json-output');a=ap.parse_args();root=Path(a.root_flag or a.root).resolve();doc=document(root);golden=root/GOLDEN
  if a.write_golden:golden.parent.mkdir(parents=True,exist_ok=True);golden.write_text(json.dumps(doc,indent=2)+'\n',encoding='utf-8')
  errors=[]

@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+"""Verify the check core 073 compatibility and regression contract."""
+
 import argparse, json, pathlib, sys
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     ap=argparse.ArgumentParser(); ap.add_argument('--root',default='.'); ap.add_argument('--json',default='')
     ns=ap.parse_args(); root=pathlib.Path(ns.root).resolve(); errors=[]
     files={

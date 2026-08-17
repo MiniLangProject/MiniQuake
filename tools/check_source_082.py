@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+"""Verify the check source 082 compatibility and regression contract."""
+
 import argparse, json, pathlib, sys
 
 EXPECTED = {
@@ -12,6 +18,7 @@ EXPECTED = {
 }
 
 def main():
+    """Run the command-line workflow and return its process exit status."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=".")
     ap.add_argument("--json", default="")

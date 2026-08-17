@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
 """Aggregate MiniQuake optimization baseline artifacts for any delivery prefix."""
 from __future__ import annotations
 
@@ -13,10 +16,12 @@ MODES = ("headless", "render")
 
 
 def load_json(path: Path) -> dict[str, Any]:
+    """Load and decode one UTF-8 JSON document."""
     return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
 def sha256(path: Path) -> str:
+    """Compute the SHA-256 digest of the requested file."""
     h = hashlib.sha256()
     with path.open("rb") as fh:
         for block in iter(lambda: fh.read(1024 * 1024), b""):
@@ -25,10 +30,12 @@ def sha256(path: Path) -> str:
 
 
 def artifact(build: Path, prefix: str, suffix: str) -> Path:
+    """Return the expected build-artifact path for a prefix and suffix."""
     return build / f"{prefix}-{suffix}"
 
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--build", required=True)
     parser.add_argument("--json", required=True)

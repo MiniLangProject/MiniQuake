@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+"""Verify the bp045 alias model checker compatibility and regression contract."""
+
 from __future__ import annotations
 import argparse, json, pathlib, re
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     ap=argparse.ArgumentParser(); ap.add_argument('--root',default='.'); ap.add_argument('--json-out','--json-output',dest='json_out'); ns=ap.parse_args()
     root=pathlib.Path(ns.root).resolve(); errors=[]
     alias=(root/'src/miniquake/render/alias_mesh.ml').read_text(encoding='utf-8-sig')

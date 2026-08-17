@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+"""Verify the check network 063 compatibility and regression contract."""
+
 import argparse,json,pathlib,sys
 
 def main():
+ """Run the command-line workflow and return its process exit status."""
  p=argparse.ArgumentParser();p.add_argument('--root',default='.');p.add_argument('--json',default='');a=p.parse_args();r=pathlib.Path(a.root).resolve();e=[]
  sysml=(r/'src/miniquake/sys_win.ml').read_text(encoding='utf-8-sig');cp=(r/'src/miniquake/conproc.ml').read_text(encoding='utf-8-sig');t=(r/'tests/system_platform_lifecycle_tests.ml').read_text(encoding='utf-8-sig');g=json.loads((r/'audit/system_platform_golden.json').read_text())
  for m in ['const MINIMUM_WIN_MEMORY = 0x0880000','const MAXIMUM_WIN_MEMORY = 0x1000000','const MAX_HANDLES = 10','function Sys_ParseCommandLine','function Sys_ConsoleInput','function WinMain']:

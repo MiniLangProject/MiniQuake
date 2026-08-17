@@ -1,12 +1,21 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """Verify BP-025 WinQuake box-hull and strict Quake-1 brush contracts."""
 from __future__ import annotations
 import argparse, hashlib, json, os, shutil, struct, subprocess, tempfile
 from pathlib import Path
 PACKAGE='BP-025';PARENT='BP-024R3';SCHEMA='MiniQuakeWorldHullGolden/1';GOLDEN='audit/world_hull_golden.json';ORACLE='tools/oracle/world_hull_oracle.c'
-def sha(p):return hashlib.sha256(Path(p).read_bytes()).hexdigest()
-def fbits(v):return struct.unpack('<I',struct.pack('<f',v))[0]
+def sha(p):
+    """Compute the SHA-256 digest of the requested file."""
+    return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+def fbits(v):
+    """Return the IEEE-754 binary32 bit pattern for a Python float."""
+    return struct.unpack('<I',struct.pack('<f',v))[0]
 def rows():
+ """Build the deterministic result rows for this verifier."""
  f=(4.0-2.0-(1.0/32.0))/8.0
  return [
   {'kind':'case','name':'inside','value':-2},{'kind':'case','name':'max_x','value':-1},
@@ -18,13 +27,17 @@ def rows():
   {'kind':'case','name':'cross_endpoint_bits','value':fbits(4.0-8.0*f)},
   {'kind':'case','name':'quake1_rotated_brush_enabled','value':0},
   {'kind':'case','name':'fixture_count','value':14}]
-def doc(root):return {'schema':SCHEMA,'package_id':PACKAGE,'parent_package_id':PARENT,'sources':['world.c','world.h'],'rows':rows(),'reference':{'oracle':ORACLE,'oracle_sha256':sha(root/ORACLE)}}
+def doc(root):
+    """Render the canonical evidence document for this verifier."""
+    return {'schema':SCHEMA,'package_id':PACKAGE,'parent_package_id':PARENT,'sources':['world.c','world.h'],'rows':rows(),'reference':{'oracle':ORACLE,'oracle_sha256':sha(root/ORACLE)}}
 def compiler():
+ """Locate a supported C compiler for the reference oracle."""
  for v in ([os.environ['CC']] if os.environ.get('CC') else [])+['cc','gcc','clang']:
   p=v.split()
   if shutil.which(p[0]):return p
  return None
 def oracle(root):
+ """Compile and run the reference oracle for this verifier."""
  cc=compiler()
  if not cc:return True,'not available',[]
  with tempfile.TemporaryDirectory(prefix='mq-bp025-') as td:
@@ -34,6 +47,7 @@ def oracle(root):
   r=subprocess.run([str(exe)],capture_output=True,text=True)
   return r.returncode==0,' '.join(cc),[json.loads(x) for x in r.stdout.splitlines() if x.strip()]
 def contract(root):
+ """Evaluate the source and runtime evidence for this contract."""
  e=[]
  wh=(root/'src/miniquake/world_hull.ml').read_text(encoding='utf-8-sig')
  w=(root/'src/miniquake/world.ml').read_text(encoding='utf-8-sig')
@@ -46,6 +60,7 @@ def contract(root):
  if t.count('if run(')!=14 or 'world hull tests passed: 14' not in t:e.append('expected 14 BP-025 runtime fixtures')
  return e
 def main():
+ """Run the command-line workflow and return its process exit status."""
  ap=argparse.ArgumentParser();ap.add_argument('root',nargs='?',default='.');ap.add_argument('--root',dest='rf');ap.add_argument('--write-golden',action='store_true');ap.add_argument('--json-output');a=ap.parse_args();root=Path(a.rf or a.root).resolve();d=doc(root);g=root/GOLDEN
  if a.write_golden:g.parent.mkdir(parents=True,exist_ok=True);g.write_text(json.dumps(d,indent=2)+'\n',encoding='utf-8')
  errors=[]

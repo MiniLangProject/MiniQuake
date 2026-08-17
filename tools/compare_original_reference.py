@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
 """Raw full-frame Original GLQuake versus MiniQuake TGA comparator.
 
 Only temporal candidate selection is permitted. Pixels are never cropped,
@@ -19,12 +22,14 @@ WINDOW = 8
 # "schema_version": 3
 
 def sha256(path: Path) -> str:
+    """Compute the SHA-256 digest of the requested file."""
     h=hashlib.sha256()
     with path.open('rb') as f:
         for block in iter(lambda:f.read(1024*1024), b''): h.update(block)
     return h.hexdigest()
 
 def read_tga(path: Path):
+    """Read tga from its caller-supplied source."""
     data=path.read_bytes()
     if len(data)<18: raise ValueError(f"{path}: truncated TGA")
     ident, cmap, image_type = data[0], data[1], data[2]
@@ -50,12 +55,14 @@ def read_tga(path: Path):
     return width,height,decoded,{'file_bytes':len(data),'expected_file_bytes':expected,'id_length':ident,'descriptor':descriptor}
 
 def luminance_bgr(payload: bytes):
+    """Convert one BGR sample to relative luminance."""
     out=[0.0]*(len(payload)//3); j=0
     for i in range(0,len(payload),3):
         b,g,r=payload[i],payload[i+1],payload[i+2]; out[j]=0.114*b+0.587*g+0.299*r; j+=1
     return out
 
 def ssim_values(a,b):
+    """Compute structural-similarity statistics for paired samples."""
     n=len(a)
     if n==0 or len(b)!=n: raise ValueError('invalid SSIM sample window')
     ma=sum(a)/n; mb=sum(b)/n
@@ -66,6 +73,7 @@ def ssim_values(a,b):
     return ((2*ma*mb+c1)*(2*cov+c2))/den if den else 1.0
 
 def windowed_ssim(a,b,w,h):
+    """Compute windowed structural similarity for two framebuffers."""
     values=[]
     for y0 in range(0,h,WINDOW):
         y1=min(y0+WINDOW,h)
@@ -77,6 +85,7 @@ def windowed_ssim(a,b,w,h):
     return sum(values)/len(values)
 
 def metrics(a:bytes,b:bytes,w:int,h:int):
+    """Compute pixel-difference and SSIM metrics for two reference images."""
     if len(a)!=len(b): raise ValueError('pixel payload lengths differ')
     n=len(a); absolute=squared=changed=0
     for x,y in zip(a,b):
@@ -89,6 +98,7 @@ def metrics(a:bytes,b:bytes,w:int,h:int):
             'ssim_global':global_ssim,'changed_bytes':changed,'changed_pixels':changed_pixels,'total_pixels':w*h}
 
 def parse_candidate(text:str):
+    """Parse candidate into its normalized representation."""
     f,sep,p=text.partition(':')
     if not sep: raise argparse.ArgumentTypeError('candidate must be FRAME:PATH')
     try: frame=int(f)
@@ -96,6 +106,7 @@ def parse_candidate(text:str):
     return frame,Path(p)
 
 def main():
+    """Run the command-line workflow and return its process exit status."""
     ap=argparse.ArgumentParser(); ap.add_argument('original',type=Path)
     ap.add_argument('--original-alt',action='append',type=Path,default=[])
     ap.add_argument('--candidate',action='append',type=parse_candidate,required=True)

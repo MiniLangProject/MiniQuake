@@ -32,7 +32,10 @@ function main(args)
   ports = netmain.NET_PortState()
   bp060Check(ports[0] == 27500 and ports[1] == 27500, "configured host port")
   counts = netmain.NET_SocketCounts()
-  bp060Check(counts[2] == 3 and counts[0] == 0 and counts[1] == 3, "client qsocket pool size")
+  initialPoolValid = counts[2] == 3 and counts[0] == 0 and counts[1] == 3
+  netmain.NET_SetMaximumClients(4)
+  grownCounts = netmain.NET_SocketCounts()
+  bp060Check(initialPoolValid and grownCounts[2] == 5 and grownCounts[1] == 5, "client qsocket pool size")
 
   low = netmain.MaxPlayers_f(4, 8, false, 0)
   bp060Check(low[0] == 1 and not low[1] and not low[2], "maxplayers lower clamp")

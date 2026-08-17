@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """Verify BP-031 WinQuake command buffer, alias and cvar contracts.
 
 The strict mode reproduces the historical BP-031 source audit.  Later packages
@@ -26,14 +30,17 @@ REPORT_SCHEMA = "MiniQuakeBP031CommandCvarVerification/1"
 
 
 def sha(path: Path) -> str:
+    """Compute the SHA-256 digest of the requested file."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def fbits(value: float) -> int:
+    """Return the IEEE-754 binary32 bit pattern for a Python float."""
     return struct.unpack("<I", struct.pack("<f", value))[0]
 
 
 def rows() -> list[dict[str, object]]:
+    """Build the deterministic result rows for this verifier."""
     return [
         {"kind": "case", "name": "stored_value_bits", "value": fbits(0.100000001)},
         {"kind": "case", "name": "setvalue_1_25", "value": "1.250000"},
@@ -46,6 +53,7 @@ def rows() -> list[dict[str, object]]:
 
 
 def document(root: Path) -> dict[str, object]:
+    """Render the canonical evidence document for this verifier."""
     return {
         "schema": "MiniQuakeCommandCvarGolden/1",
         "package_id": PACKAGE,
@@ -57,6 +65,7 @@ def document(root: Path) -> dict[str, object]:
 
 
 def compiler() -> list[str] | None:
+    """Locate a supported C compiler for the reference oracle."""
     candidates = ([os.environ["CC"]] if os.environ.get("CC") else []) + ["cc", "gcc", "clang"]
     for value in candidates:
         parts = value.split()
@@ -66,6 +75,7 @@ def compiler() -> list[str] | None:
 
 
 def run_oracle(root: Path) -> tuple[bool, str, list[dict[str, object]]]:
+    """Run oracle and capture its deterministic result."""
     cc = compiler()
     if not cc:
         return True, "not available", []
@@ -87,6 +97,7 @@ def run_oracle(root: Path) -> tuple[bool, str, list[dict[str, object]]]:
 
 
 def contract(root: Path, allow_downstream_package: bool = False) -> list[str]:
+    """Evaluate the source and runtime evidence for this contract."""
     errors: list[str] = []
     cvar = (root / "src/miniquake/cvar.ml").read_text(encoding="utf-8-sig")
     command = (root / "src/miniquake/cmd.ml").read_text(encoding="utf-8-sig")
@@ -154,6 +165,7 @@ def contract(root: Path, allow_downstream_package: bool = False) -> list[str]:
 
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser()
     parser.add_argument("root", nargs="?", default=".")
     parser.add_argument("--root", dest="root_flag")

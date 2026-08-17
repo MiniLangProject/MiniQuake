@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+"""Verify the bp048 render evidence checker compatibility and regression contract."""
+
 from __future__ import annotations
 import json, pathlib, re, subprocess, sys
 

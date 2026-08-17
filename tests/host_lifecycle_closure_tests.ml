@@ -197,7 +197,7 @@ function testMapUsage()
   attractSession = session()
   attractSession.startMap = ""
   attractSession.headless = false
-  attractSession.demoNumber = -1
+  attractSession.demoNumber = 0
   yes(host.Host_Startdemos_f(attractSession, ["startdemos", "demo1", "demo2"]), "attract demos queue")
   equal(attractSession.demoNumber, 1, "attract loop advances to second slot")
   equal(attractSession.demoLoop[0], "demo1", "attract first demo")
@@ -213,6 +213,33 @@ function testMapUsage()
   yes(host.executeMenuSelection(attractSession), "new game selection")
   equal(attractSession.demoNumber, -1, "new game stops attract loop")
   equal(attractSession.commands.text, "echo keep\ndisconnect\nmaxplayers 1\nmap start\n", "new game removes queued attract demo")
+
+  // Joining from the multiplayer menu has the same race with a demo that
+  // completed earlier in the input frame. The queued successor must be gone
+  // before connect runs or it will disconnect the newly signed-on client.
+  joinSession = session()
+  joinSession.startMap = ""
+  joinSession.headless = false
+  joinSession.demoNumber = 2
+  joinSession.commands.text = "playdemo demo2\necho keep\n"
+  joinSession.menu.active = true
+  joinSession.menu.lanPort = 26000
+  yes(host.handleExactMenuAction(joinSession, ["connect", "127.0.0.1"]), "menu join selection")
+  equal(joinSession.demoNumber, -1, "menu join stops attract loop")
+  equal(joinSession.commands.text, "echo keep\nconnect \"127.0.0.1\"\n", "menu join removes queued attract demo")
+  no(joinSession.menu.active, "menu join closes menu")
+
+  // quake.rc executes stuffcmds before startdemos. A startup +connect can
+  // therefore finish first; startdemos must preserve the -1 sentinel written
+  // by Host_Connect_f instead of replacing the live network game with demo1.
+  connectedSession = session()
+  connectedSession.startMap = ""
+  connectedSession.headless = false
+  connectedSession.client.connected = true
+  connectedSession.demoNumber = -1
+  yes(host.Host_Startdemos_f(connectedSession, ["startdemos", "demo1", "demo2"]), "connected startdemos is harmless")
+  equal(connectedSession.demoNumber, -1, "connected startdemos preserves stopped attract loop")
+  equal(connectedSession.commands.text, "", "connected startdemos queues no playdemo")
   return true
 end function
 // Verify changelevel inactive against the expected Quake behavior.

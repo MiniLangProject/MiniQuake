@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """Verify the BP-024 frozen QuakeC 1.09 compatibility contract."""
 from __future__ import annotations
 import argparse, hashlib, json, os, re, shutil, subprocess, tempfile
@@ -9,19 +13,28 @@ SCHEMA='MiniQuakeQuakeCClosureGolden/1'; REPORT='MiniQuakeBP024QuakeCClosureVeri
 GOLDEN='audit/quakec_closure_golden.json'; ORACLE='tools/oracle/quakec_closure_oracle.c'
 FNV_OFFSET=2166136261; FNV_PRIME=16777619
 
-def sha(path: Path): return hashlib.sha256(path.read_bytes()).hexdigest()
-def hb(h,b): return ((h^(b&255))*FNV_PRIME)&0xffffffff
+def sha(path: Path):
+    """Compute the SHA-256 digest of the requested file."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+def hb(h,b):
+    """Fold one byte into the running FNV-1a contract hash."""
+    return ((h^(b&255))*FNV_PRIME)&0xffffffff
 def hw(h,v):
+    """Fold one 32-bit word into the running FNV-1a contract hash."""
     for shift in range(0,32,8): h=hb(h,(v>>shift)&255)
     return h
 def ht(h,text):
+    """Fold one NUL-terminated ASCII string into the contract hash."""
     for b in text.encode('ascii'): h=hb(h,b)
     return hb(h,0)
 def contract_fingerprint():
+    """Compute the QuakeC closure contract fingerprint."""
     h=FNV_OFFSET
     for value in (6,5927,66,79,14,32,2048,0xb86a0245): h=hw(h,value)
     return ht(h,STATUS)
-def rows(): return [
+def rows():
+    """Build the deterministic result rows for this verifier."""
+    return [
     {'kind':'case','name':'version','value':6},
     {'kind':'case','name':'header_crc','value':5927},
     {'kind':'case','name':'opcode_count','value':66},
@@ -36,13 +49,17 @@ def rows(): return [
     {'kind':'case','name':'required_functions','value':11},
     {'kind':'case','name':'highest_stock_builtin','value':78},
 ]
-def document(root): return {'schema':SCHEMA,'package_id':PACKAGE_ID,'parent_package_id':PARENT_PACKAGE_ID,'status':STATUS,'rows':rows(),'reference':{'oracle':ORACLE,'oracle_sha256':sha(root/ORACLE)}}
+def document(root):
+    """Render the canonical evidence document for this verifier."""
+    return {'schema':SCHEMA,'package_id':PACKAGE_ID,'parent_package_id':PARENT_PACKAGE_ID,'status':STATUS,'rows':rows(),'reference':{'oracle':ORACLE,'oracle_sha256':sha(root/ORACLE)}}
 def compiler():
+    """Locate a supported C compiler for the reference oracle."""
     for value in ([os.environ['CC']] if os.environ.get('CC') else [])+['cc','gcc','clang']:
         parts=value.split()
         if shutil.which(parts[0]): return parts
     return None
 def run_oracle(root):
+    """Run oracle and capture its deterministic result."""
     cc=compiler()
     if not cc: return True,'not available',[]
     with tempfile.TemporaryDirectory(prefix='mq-bp024-') as td:
@@ -52,9 +69,11 @@ def run_oracle(root):
         run=subprocess.run([str(exe)],capture_output=True,text=True)
         return run.returncode==0,' '.join(cc),[json.loads(line) for line in run.stdout.splitlines() if line.strip()]
 def quoted_count(source, function):
+    """Compute the reference quoted count value for a deterministic fixture."""
     block=source.split(f'function {function}()',1)[1].split('end function',1)[0]
     return len(re.findall(r'"([^"]+)"',block))
 def contract(root, allow_downstream_package=False):
+    """Evaluate the source and runtime evidence for this contract."""
     errors=[]
     source=(root/'src/miniquake/quakec/contract.ml').read_text(encoding='utf-8-sig')
     builtins=(root/'src/miniquake/quakec/builtins.ml').read_text(encoding='utf-8-sig')
@@ -86,6 +105,7 @@ def contract(root, allow_downstream_package=False):
     return errors
 
 def main():
+    """Run the command-line workflow and return its process exit status."""
     ap=argparse.ArgumentParser();ap.add_argument('root',nargs='?',default='.');ap.add_argument('--root',dest='root_flag');ap.add_argument('--write-golden',action='store_true');ap.add_argument('--json-output');ap.add_argument('--allow-downstream-package',action='store_true');a=ap.parse_args()
     root=Path(a.root_flag or a.root).resolve();doc=document(root);golden=root/GOLDEN
     if a.write_golden: golden.parent.mkdir(parents=True,exist_ok=True);golden.write_text(json.dumps(doc,indent=2)+'\n',encoding='utf-8')

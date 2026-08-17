@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """Verify the frozen BP-025..BP-029 WinQuake world/physics contract.
 
 The historical checker keeps an exact-source mode for the original BP-029
@@ -113,6 +117,7 @@ CANONICAL = (
 
 
 def fnv(text: str) -> int:
+    """Compute the fixture's FNV-1a fingerprint."""
     value = 2166136261
     for byte in text.encode("utf-8"):
         value = ((value ^ byte) * 16777619) & 0xFFFFFFFF
@@ -120,14 +125,17 @@ def fnv(text: str) -> int:
 
 
 def sha(path: Path) -> str:
+    """Compute the SHA-256 digest of the requested file."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _read(path: Path) -> str:
+    """Read read from its caller-supplied source."""
     return path.read_text(encoding="utf-8-sig").replace("\r\n", "\n")
 
 
 def _const_string(source: str, name: str) -> str:
+    """Extract a named MiniLang string constant from source text."""
     match = re.search(rf'^const\s+{re.escape(name)}\s*=\s*"([^"]*)"\s*$', source, re.M)
     return match.group(1) if match else ""
 
@@ -169,11 +177,13 @@ def _mask_downstream_server(source: str) -> tuple[str, list[str]]:
 
 
 def _protected_server_hash(root: Path) -> tuple[str, list[str]]:
+    """Compute the accepted hash over protected server functions."""
     normalized, errors = _mask_downstream_server(_read(root / MUTABLE_DOWNSTREAM_FILE))
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest(), errors
 
 
 def _function_hashes(source: str) -> tuple[dict[str, str], list[str]]:
+    """Compute normalized hashes for the selected MiniLang functions."""
     values: dict[str, str] = {}
     errors: list[str] = []
     for name in PROTECTED_SERVER_SECTION_HASHES:
@@ -189,6 +199,7 @@ def _function_hashes(source: str) -> tuple[dict[str, str], list[str]]:
 
 
 def doc(root: Path) -> dict[str, object]:
+    """Render the canonical evidence document for this verifier."""
     return {
         "schema": "MiniQuakeWorldPhysicsClosureGolden/1",
         "package_id": PACKAGE,
@@ -203,6 +214,7 @@ def doc(root: Path) -> dict[str, object]:
 
 
 def _verify_downstream_golden(root: Path, golden: dict[str, object]) -> tuple[list[str], dict[str, object]]:
+    """Validate downstream golden and return its contract findings."""
     errors: list[str] = []
     expected_metadata = {
         "schema": "MiniQuakeWorldPhysicsClosureGolden/1",
@@ -280,6 +292,7 @@ def _verify_downstream_golden(root: Path, golden: dict[str, object]) -> tuple[li
 
 
 def contract(root: Path) -> list[str]:
+    """Evaluate the source and runtime evidence for this contract."""
     errors: list[str] = []
     module = _read(root / "src/miniquake/world_physics_contract.ml")
     test = _read(root / "tests/world_physics_closure_tests.ml")
@@ -333,6 +346,7 @@ def contract(root: Path) -> list[str]:
 
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser()
     parser.add_argument("root", nargs="?", default=".")
     parser.add_argument("--root", dest="root_flag")

@@ -1,4 +1,8 @@
-﻿[CmdletBinding()]
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+# Build MiniQuake and run the selected source and runtime verification gates.
+
+[CmdletBinding()]
 param(
   [string]$Compiler = "",
 
@@ -57,6 +61,7 @@ $CompatReleaseStatus = "compat_109_release_candidate_v1"
 $OriginalReferenceStatus = "original_reference_109_candidate_v1"
 $CompatFinalStatus = "compat_109_final_candidate_v1"
 
+# Resolve a configured executable from a path or command name.
 function Resolve-CommandOrFile {
   param(
     [Parameter(Mandatory = $true)]
@@ -78,6 +83,7 @@ function Resolve-CommandOrFile {
   throw "$Label not found: $Value"
 }
 
+# Normalize a standard-library candidate to its import root.
 function Normalize-StdImportRoot {
   param(
     [Parameter(Mandatory = $true)]
@@ -119,6 +125,7 @@ function Normalize-StdImportRoot {
   return $null
 }
 
+# Locate a usable MiniLang standard-library import root.
 function Find-StdImportRoot {
   param(
     [Parameter(Mandatory = $true)]
@@ -248,6 +255,7 @@ if ($CompilerIsPython -or $RebuildNative -or -not [string]::IsNullOrWhiteSpace($
   }
 }
 
+# Run a process while streaming and retaining its diagnostic output.
 function Invoke-LiveCapturedProcess {
   param(
     [Parameter(Mandatory = $true)]
@@ -292,6 +300,7 @@ function Invoke-LiveCapturedProcess {
   }
 }
 
+# Compile one MiniLang target with the selected compiler interface.
 function Invoke-MiniLangCompile {
   param(
     [Parameter(Mandatory = $true)]
@@ -515,6 +524,17 @@ if (-not $SkipPreflight -and $null -ne $PythonExe) {
   & $PythonExe @PythonPrefixArgs $Verifier --root $Root
   if ($LASTEXITCODE -ne 0) {
     throw "$PackageId diagnostics preflight failed. The source tree or manifest is inconsistent."
+  }
+
+  # Guard the native renderer resource lifetimes and texture bounds that are
+  # difficult to exercise deterministically on every build host.
+  $NativeRendererSafetyChecker = Join-Path $Root "tools\check_native_renderer_safety.py"
+  if (-not (Test-Path -LiteralPath $NativeRendererSafetyChecker -PathType Leaf)) {
+    throw "Native renderer safety checker is missing: $NativeRendererSafetyChecker"
+  }
+  & $PythonExe @PythonPrefixArgs $NativeRendererSafetyChecker --root $Root
+  if ($LASTEXITCODE -ne 0) {
+    throw "$PackageId native renderer safety preflight failed."
   }
 
   $RuntimeTestLogChecker = Join-Path $Root "tools\check_runtime_test_log.py"
@@ -930,6 +950,7 @@ if ($RebuildNative) {
   }
 }
 
+# Copy a rebuilt native bridge only when its bytes changed.
 function Copy-NativeBridgeIfChanged {
   param(
     [Parameter(Mandatory = $true)]
@@ -961,20 +982,16 @@ $CommonArgs = @(
   "-I", $StdImportRoot,
   "--keep-going", "--max-errors", "50",
   # Retail maps keep the BSP, alias frames and renderer command caches live at
-  # once.  A 32 MiB initial commit left only ~10 MiB free after e1m1 startup,
-  # forcing a full mark/sweep every rendered frame.  Reserve virtual space and
-  # commit enough physical backing for sustained frame temporaries. The native
-  # allocator performs a full collection before it grows a committed arena;
-  # e1m2 reaches roughly 480 MiB during startup and can generate almost 800 MiB
-  # of frame temporaries before the next safe point. A 1 GiB commit therefore
-  # still forced an emergency full collection after roughly twenty seconds.
-  # Reserved address space is cheap on x64 and committed pages remain
-  # demand-paged by Windows; commit the complete 2 GiB arena up front so the
-  # allocator never inserts an unpredictable GC into an interactive frame.
+  # once, so reserve a 2 GiB address range while committing only the 512 MiB
+  # normally needed by one loaded game. The heap can grow in 64 MiB steps for
+  # unusually large mods. Host_Init's bounded periodic collection prevents
+  # per-frame temporaries from consuming the complete reservation; committing
+  # all 2 GiB up front made two multiplayer windows exhaust the machine's
+  # commit budget and appear frozen immediately after joining.
   "--heap-reserve", "2g",
-  "--heap-commit", "2g",
-  "--heap-grow", "256m",
-  "--no-gc-periodic"
+  "--heap-commit", "512m",
+  "--heap-grow", "64m",
+  "--gc-limit", "256m"
 )
 
 if ($Configuration -ieq "Debug") {
@@ -1096,6 +1113,7 @@ if (-not $NoRunTests) {
   }
 }
 
+# Extract the first actionable failure marker from a runtime log.
 function Get-RuntimeTestFailureMarker {
   param([string]$Text)
 
@@ -1112,6 +1130,7 @@ function Get-RuntimeTestFailureMarker {
   return ""
 }
 
+# Run a MiniQuake test binary and validate its process result.
 function Invoke-MiniQuakeTestBinary {
   param(
     [Parameter(Mandatory = $true)]

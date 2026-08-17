@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+"""Verify the check external 090 compatibility and regression contract."""
+
 from __future__ import annotations
 import argparse, json, pathlib, sys
 
 EXPECTED_SHA = "04862c835c399bc9184f62101ae0390c2a758c21656ec06dcc0384e0f373d588"
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     ap=argparse.ArgumentParser(); ap.add_argument('--root',default='.'); ap.add_argument('--json',default=''); ns=ap.parse_args()
     root=pathlib.Path(ns.root).resolve(); errors=[]
     required=[
@@ -14,7 +21,9 @@ def main() -> int:
     ]
     for rel in required:
         if not (root/rel).is_file(): errors.append('missing file: '+rel)
-    def read(rel): return (root/rel).read_text(encoding='utf-8-sig') if (root/rel).is_file() else ''
+    def read(rel):
+        """Read read from its caller-supplied source."""
+        return (root/rel).read_text(encoding='utf-8-sig') if (root/rel).is_file() else ''
     contract=read(required[0]); test=read(required[1]); tool=read(required[2]); harness=read(required[-1])
     markers=[
         f'const ORIGINAL_GLQUAKE_SHA256 = "{EXPECTED_SHA}"',

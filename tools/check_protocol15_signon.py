@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """Verify BP-015 Protocol-15 signon queue and byte contracts."""
 from __future__ import annotations
 import argparse, hashlib, json, os, shutil, subprocess, tempfile
@@ -12,12 +16,15 @@ SCHEMA = "MiniQuakeProtocol15SignonGolden/1"
 REPORT_SCHEMA = "MiniQuakeBP015Protocol15SignonVerification/1"
 
 def sha(path: Path) -> str:
+    """Compute the SHA-256 digest of the requested file."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 def cmd(text: bytes) -> bytes:
+    """Encode one client string command with its Protocol 15 opcode and terminator."""
     return bytes((4,)) + text + b"\0"
 
 def expected_vectors() -> list[dict[str, object]]:
+    """Build the deterministic expected vectors consumed by this verifier."""
     rows = [
         ("client_stage_1", cmd(b"prespawn")),
         ("client_stage_2_unmasked_high", cmd(b'name "Ranger"\n') + cmd(b"color 31 13\n") + cmd(b"spawn 1 2 3")),
@@ -29,6 +36,7 @@ def expected_vectors() -> list[dict[str, object]]:
     return [{"kind":"vector","name":name,"bytes":data.hex(),"length":len(data)} for name,data in rows]
 
 def expected_document(root: Path) -> dict[str, object]:
+    """Build the deterministic expected document fixture used by this verifier."""
     return {
         "schema": SCHEMA,
         "package_id": PACKAGE_ID,
@@ -48,9 +56,11 @@ def expected_document(root: Path) -> dict[str, object]:
     }
 
 def parse_oracle(text: str) -> list[dict[str, object]]:
+    """Parse oracle into its normalized representation."""
     return [json.loads(line) for line in text.splitlines() if line.strip()]
 
 def compiler() -> str | None:
+    """Locate a supported C compiler for the reference oracle."""
     for value in (os.environ.get("CC", ""), "cc", "gcc", "clang"):
         if not value: continue
         found = shutil.which(value.split()[0])
@@ -58,6 +68,7 @@ def compiler() -> str | None:
     return None
 
 def run_oracle(root: Path) -> tuple[bool, str, list[dict[str, object]]]:
+    """Run oracle and capture its deterministic result."""
     cc = compiler()
     if not cc: return True, "not available", []
     with tempfile.TemporaryDirectory(prefix="mq-bp015-") as td:
@@ -70,6 +81,7 @@ def run_oracle(root: Path) -> tuple[bool, str, list[dict[str, object]]]:
         return True, cc, parse_oracle(ran.stdout)
 
 def source_contract(root: Path) -> list[str]:
+    """Build the deterministic source contract fixture used by this verifier."""
     errors: list[str] = []
     signon = (root / "src/miniquake/protocol_signon.ml").read_text(encoding="utf-8")
     client = (root / "src/miniquake/client.ml").read_text(encoding="utf-8")
@@ -99,6 +111,7 @@ def source_contract(root: Path) -> list[str]:
     return errors
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser()
     parser.add_argument("root", nargs="?", default=".")
     parser.add_argument("--root", dest="root_flag")

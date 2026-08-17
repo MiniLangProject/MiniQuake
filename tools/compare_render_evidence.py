@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
 """Compare two uncompressed 24-bit TGA framebuffer captures.
 
 The default report is descriptive.  --require-exact makes any byte difference
@@ -17,6 +20,7 @@ class Image:
 
 
 def load_tga(path: pathlib.Path) -> Image:
+    """Load and validate one uncompressed TGA reference image."""
     data = path.read_bytes()
     if len(data) < 18 or data[2] != 2 or data[16] != 24:
         raise ValueError(f"{path}: expected uncompressed 24-bit TGA")
@@ -37,6 +41,7 @@ def load_tga(path: pathlib.Path) -> Image:
 
 
 def luminance(rgb: bytes) -> list[float]:
+    """Convert one RGB sample to relative luminance."""
     return [
         0.2126 * rgb[i] + 0.7152 * rgb[i + 1] + 0.0722 * rgb[i + 2]
         for i in range(0, len(rgb), 3)
@@ -44,6 +49,7 @@ def luminance(rgb: bytes) -> list[float]:
 
 
 def global_ssim(left: bytes, right: bytes) -> float:
+    """Compute the global structural-similarity score for two images."""
     a = luminance(left)
     b = luminance(right)
     n = len(a)
@@ -66,6 +72,7 @@ def global_ssim(left: bytes, right: bytes) -> float:
 
 
 def compare(left_path: pathlib.Path, right_path: pathlib.Path) -> dict[str, object]:
+    """Compare candidate evidence with its accepted reference and report differences."""
     left = load_tga(left_path)
     right = load_tga(right_path)
     if (left.width, left.height) != (right.width, right.height):
@@ -97,6 +104,7 @@ def compare(left_path: pathlib.Path, right_path: pathlib.Path) -> dict[str, obje
 
 
 def make_tga(path: pathlib.Path, rgb: bytes, width: int, height: int) -> None:
+    """Build tga for deterministic verification."""
     header = bytearray(18)
     header[2] = 2
     header[12] = width & 255
@@ -111,6 +119,7 @@ def make_tga(path: pathlib.Path, rgb: bytes, width: int, height: int) -> None:
 
 
 def self_test() -> None:
+    """Exercise the tool with synthetic fixtures and verify its invariants."""
     with tempfile.TemporaryDirectory() as directory:
         root = pathlib.Path(directory)
         a = root / "a.tga"; b = root / "b.tga"; c = root / "c.tga"
@@ -124,6 +133,7 @@ def self_test() -> None:
 
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser()
     parser.add_argument("left", nargs="?")
     parser.add_argument("right", nargs="?")

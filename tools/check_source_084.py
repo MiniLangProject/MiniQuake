@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+"""Verify the check source 084 compatibility and regression contract."""
+
 import argparse, json, pathlib, re, sys
 
 EXPECTED_FINGERPRINT = 0x309B0737
 
 def fnv1a32(data: bytes) -> int:
+    """Compute the fixture's 32-bit FNV-1a fingerprint."""
     value = 0x811C9DC5
     for byte in data:
         value ^= byte
@@ -11,11 +18,13 @@ def fnv1a32(data: bytes) -> int:
     return value
 
 def _const_string(source: str, name: str) -> str:
+    """Extract a named MiniLang string constant from source text."""
     match = re.search(rf'^const\s+{re.escape(name)}\s*=\s*"([^"]+)"\s*$', source, flags=re.M)
     return match.group(1) if match else ""
 
 
 def main():
+    """Run the command-line workflow and return its process exit status."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=".")
     ap.add_argument("--json", default="")

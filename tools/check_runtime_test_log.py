@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
 """Detect MiniQuake runtime-test failures even when an executable exits with 0.
 
 Several historical MiniLang test entrypoints printed ``FAIL:`` and a failed
@@ -41,6 +44,7 @@ def first_failure_marker(text: str) -> str:
 
 
 def self_test() -> None:
+    """Exercise the tool with synthetic fixtures and verify its invariants."""
     clean = "[1/2] alpha\n[2/2] beta\nMiniQuake tests passed: 2\n"
     assert first_failure_marker(clean) == ""
     assert first_failure_marker("  FAIL: boom\n") == "FAIL: boom"
@@ -59,6 +63,7 @@ def self_test() -> None:
 
 
 def read_text(path: Path) -> str:
+    """Read text from its caller-supplied source."""
     data = path.read_bytes()
     for encoding in ("utf-8-sig", "utf-16", "utf-8", "cp1252"):
         try:
@@ -69,6 +74,7 @@ def read_text(path: Path) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser()
     parser.add_argument("paths", nargs="*", type=Path)
     parser.add_argument("--self-test", action="store_true")

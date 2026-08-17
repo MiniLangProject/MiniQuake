@@ -1,22 +1,34 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """Verify BP-022 ED_* allocation, parsing and serialization contracts."""
 from __future__ import annotations
 import argparse,hashlib,json,os,shutil,subprocess,tempfile
 from pathlib import Path
 PACKAGE_ID='BP-022';PARENT_PACKAGE_ID='BP-021';SCHEMA='MiniQuakeQuakeCEdictGolden/1';REPORT='MiniQuakeBP022QuakeCEdictVerification/1';GOLDEN='audit/quakec_edict_golden.json';ORACLE='tools/oracle/quakec_edict_oracle.c'
-def sha(p):return hashlib.sha256(Path(p).read_bytes()).hexdigest()
-def rows():return [
+def sha(p):
+    """Compute the SHA-256 digest of the requested file."""
+    return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+def rows():
+    """Build the deterministic result rows for this verifier."""
+    return [
  {'kind':'case','name':'type_size_void','value':1},{'kind':'case','name':'type_size_vector','value':3},{'kind':'case','name':'type_size_pointer','value':1},
  {'kind':'case','name':'reuse_early_free_time','value':1},{'kind':'case','name':'reuse_recent_old_slot','value':1},{'kind':'case','name':'reuse_exact_half_second','value':0},
  {'kind':'case','name':'angle_hack_pitch','value':0},{'kind':'case','name':'angle_hack_yaw','value':90},{'kind':'case','name':'light_alias','value':1},
  {'kind':'case','name':'unknown_key_continues','value':1},{'kind':'case','name':'save_global_type_count','value':3},{'kind':'text','name':'negative_zero_fixed','value':'-0.000000'}]
-def document(root):return {'schema':SCHEMA,'package_id':PACKAGE_ID,'parent_package_id':PARENT_PACKAGE_ID,'sources':['pr_edict.c','progs.h','world.c'],'rows':rows(),'reference':{'oracle':ORACLE,'oracle_sha256':sha(root/ORACLE)}}
+def document(root):
+    """Render the canonical evidence document for this verifier."""
+    return {'schema':SCHEMA,'package_id':PACKAGE_ID,'parent_package_id':PARENT_PACKAGE_ID,'sources':['pr_edict.c','progs.h','world.c'],'rows':rows(),'reference':{'oracle':ORACLE,'oracle_sha256':sha(root/ORACLE)}}
 def compiler():
+ """Locate a supported C compiler for the reference oracle."""
  for v in ([os.environ['CC']] if os.environ.get('CC') else [])+['cc','gcc','clang']:
   p=v.split()
   if shutil.which(p[0]):return p
  return None
 def run_oracle(root):
+ """Run oracle and capture its deterministic result."""
  cc=compiler()
  if not cc:return True,'not available',[]
  with tempfile.TemporaryDirectory(prefix='mq-bp022-') as td:
@@ -24,6 +36,7 @@ def run_oracle(root):
   if b.returncode:return False,b.stdout+b.stderr,[]
   r=subprocess.run([str(exe)],capture_output=True,text=True);return r.returncode==0,' '.join(cc),[json.loads(x) for x in r.stdout.splitlines() if x.strip()]
 def contract(root, allow_downstream_package=False):
+ """Evaluate the source and runtime evidence for this contract."""
  errors=[]
  e=(root/'src/miniquake/quakec/edict.ml').read_text(encoding='utf-8-sig')
  b=(root/'src/miniquake/format/bsp.ml').read_text(encoding='utf-8-sig')
@@ -112,6 +125,7 @@ def contract(root, allow_downstream_package=False):
  return errors
 
 def main():
+ """Run the command-line workflow and return its process exit status."""
  ap=argparse.ArgumentParser()
  ap.add_argument('root',nargs='?',default='.')
  ap.add_argument('--root',dest='root_flag')

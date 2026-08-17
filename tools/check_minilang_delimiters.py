@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
 """Lexically validate MiniLang (), [] delimiter balance.
 
 This is intentionally lightweight and runs before the Windows compiler.  It
@@ -27,6 +30,7 @@ class Issue:
 
 
 def scan_text(path: Path, text: str, root: Path) -> list[Issue]:
+    """Scan MiniLang text for balanced delimiters outside strings and comments."""
     issues: list[Issue] = []
     stack: list[tuple[str, int, int]] = []
     state = "normal"
@@ -119,6 +123,7 @@ def scan_text(path: Path, text: str, root: Path) -> list[Issue]:
 
 
 def source_files(root: Path) -> list[Path]:
+    """Return the maintained source files in deterministic order."""
     files: list[Path] = []
     for path in root.rglob("*.ml"):
         rel = path.relative_to(root)
@@ -129,6 +134,7 @@ def source_files(root: Path) -> list[Path]:
 
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", default=".")
     parser.add_argument("--json", default="")

@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
 """Static OPT-001B error-freedom and delivery contract checks."""
 from __future__ import annotations
 import argparse, json, re
 from pathlib import Path
 
 def require(text: str, markers: list[str], label: str, errors: list[str]) -> None:
+    """Require require and record a clear failure otherwise."""
     for marker in markers:
         if marker not in text:
             errors.append(f"{label} missing marker: {marker}")
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     ap=argparse.ArgumentParser()
     ap.add_argument('--root',default='.')
     ap.add_argument('--json',default='')

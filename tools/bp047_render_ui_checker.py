@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+"""Verify the bp047 render ui checker compatibility and regression contract."""
+
 from __future__ import annotations
 import argparse,json,pathlib
 
 def main():
+ """Run the command-line workflow and return its process exit status."""
  ap=argparse.ArgumentParser(); ap.add_argument('--root',default='.'); ap.add_argument('--json-out','--json-output',dest='out'); ns=ap.parse_args(); root=pathlib.Path(ns.root).resolve(); errors=[]
  contract=(root/'src/miniquake/render_ui_contract.ml').read_text(encoding='utf-8-sig'); screen=(root/'src/miniquake/screen.ml').read_text(encoding='utf-8-sig'); status=(root/'src/miniquake/statusbar.ml').read_text(encoding='utf-8-sig'); entities=(root/'src/miniquake/render/entities.ml').read_text(encoding='utf-8-sig'); tests=(root/'tests/render_ui_hud_parity_tests.ml').read_text(encoding='utf-8-sig')
  for marker in ['function statusbarXOffset(width, gameType)','function statusbarScaledXOffset(width, gameType, scale)','function statusbarPhysicalLines(width, height, viewSize, intermission)','function overlayOrder(dialog, loading, intermission, gameInput)','function set2dStateOrder()','function tgaByteLength(width, height)','function viewModelDepthMaximum()']:

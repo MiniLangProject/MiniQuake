@@ -1,12 +1,20 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
+"""Verify the check opt001cr3 compatibility and regression contract."""
+
 from __future__ import annotations
 import argparse, json, re
 from pathlib import Path
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     ap=argparse.ArgumentParser(); ap.add_argument('--root',default='.'); ap.add_argument('--json',default=''); args=ap.parse_args()
     root=Path(args.root).resolve(); errors=[]
-    def read(rel): return (root/rel).read_text(encoding='utf-8')
+    def read(rel):
+        """Read read from its caller-supplied source."""
+        return (root/rel).read_text(encoding='utf-8')
     arrayutil=read('src/miniquake/array_util.ml'); client=read('src/miniquake/client.ml'); particles=read('src/miniquake/particles.ml')
     diag=read('src/miniquake/compat_diagnostics.ml'); host=read('src/miniquake/host.ml')
     required_inline={'src/miniquake/mathlib.ml':['DotProduct'], 'src/miniquake/protocol15_freeze.ml':['fingerprintValue'], 'src/miniquake/statusbar.ml':['Sbar_ColorForMap']}

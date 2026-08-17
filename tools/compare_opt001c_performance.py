@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
 """Compare OPT-001C frame baselines with the accepted OPT-001B baseline."""
 from __future__ import annotations
 
@@ -14,22 +17,26 @@ FIELDS = ("total_ms", "median_ms", "p95_ms", "p99_ms", "max_ms")
 
 
 def load_json(path: Path) -> dict[str, Any]:
+    """Load and decode one UTF-8 JSON document."""
     return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
 def percentage_improvement(old: float, new: float) -> float:
+    """Compute the percentage improvement from baseline to candidate."""
     if old <= 0:
         return 0.0
     return (old - new) * 100.0 / old
 
 
 def ratio(old: float, new: float) -> float:
+    """Compute a guarded candidate-to-baseline ratio."""
     if new <= 0:
         return 0.0
     return old / new
 
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--baseline", required=True)
     parser.add_argument("--build", required=True)

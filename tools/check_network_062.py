@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+"""Verify the check network 062 compatibility and regression contract."""
+
 import argparse,json,pathlib,sys
 
 def main():
+ """Run the command-line workflow and return its process exit status."""
  p=argparse.ArgumentParser();p.add_argument('--root',default='.');p.add_argument('--json',default='');a=p.parse_args();r=pathlib.Path(a.root).resolve();e=[]
  s=(r/'src/miniquake/net_wins.ml').read_text(encoding='utf-8-sig');t=(r/'tests/network_wins_address_tests.ml').read_text(encoding='utf-8-sig');g=json.loads((r/'audit/network_wins_golden.json').read_text())
  for m in ['import miniquake.common as common','port = common.atoi(portText)','hostaddr.port = htons(port)','const AF_INET = 2']:

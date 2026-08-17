@@ -22,6 +22,7 @@ net_hostport = 26000
 net_time = 0.0
 net_driverlevel = 0
 net_numsockets = 0
+net_socketReserve = 1
 net_activeconnections = 0
 net_activeSockets = []
 net_freeSockets = []
@@ -64,14 +65,62 @@ function arrayTail(values)
   return result
 end function
 
-// Report whether compact active sockets holds for the active state.
+// Report whether the requested socket identity is present in an array.
+function socketArrayContains(values, wanted)
+  for each socket in values
+    if socket == wanted then return true end if
+  end for
+  return false
+end function
+
+// Return a socket array with every occurrence of one identity removed.
+function socketArrayWithout(values, unwanted)
+  result = []
+  for each socket in values
+    if socket is not void and socket != unwanted and not socketArrayContains(result, socket) then
+      result = result + [socket]
+    end if
+  end for
+  return result
+end function
+
+// Add one socket identity at most once.
+function appendUniqueSocket(values, socket)
+  if socket is void or socketArrayContains(values, socket) then return values end if
+  return values + [socket]
+end function
+
+// Compact the active list and reclaim externally disconnected qsocket slots.
+// Driver code may mark a socket disconnected before NET_Close observes it.
+// The C engine still returns that fixed qsocket_t to net_freeSockets; dropping
+// the MiniLang object here permanently shrank the pool on every reconnect.
 function compactActiveSockets()
-  global net_activeSockets
+  global net_activeSockets, net_freeSockets
   active = []
+  reclaimed = []
   for each socket in net_activeSockets
-    if socket is not void and not socket.disconnected then active = active + [socket] end if
+    if socket is not void then
+      if socket.disconnected then
+        reclaimed = appendUniqueSocket(reclaimed, socket)
+      else
+        active = appendUniqueSocket(active, socket)
+      end if
+    end if
+  end for
+  free = []
+  for each socket in net_freeSockets
+    if socket is not void and not socketArrayContains(active, socket) then
+      // net_loop.connect reactivates its persistent loopback object before
+      // NET_TrackSocket moves that same identity out of this free list.
+      // Do not close such a temporarily reactivated pooled object here.
+      free = appendUniqueSocket(free, socket)
+    end if
+  end for
+  for each socket in reclaimed
+    if not socketArrayContains(active, socket) then free = appendUniqueSocket(free, socket) end if
   end for
   net_activeSockets = active
+  net_freeSockets = free
   return len(active)
 end function
 
@@ -113,7 +162,7 @@ end function
 function ensureSocketPool()
   global net_numsockets, net_freeSockets
   if net_numsockets > 0 then return net_numsockets end if
-  net_numsockets = maximumClients + 1
+  net_numsockets = maximumClients + net_socketReserve
   index = 0
   while index < net_numsockets
     socket = netloop.createSocket()
@@ -124,17 +173,44 @@ function ensureSocketPool()
   return net_numsockets
 end function
 
+// Grow the fixed qsocket arena when maxplayers is raised before a server
+// starts. Host_FindMaxClients reserves at least four client slots in Quake;
+// MiniQuake resizes its server dynamically, so the network arena must mirror
+// that growth instead of retaining the two sockets from a single-player boot.
+function ensureSocketPoolCapacity(clientCount)
+  global net_numsockets, net_freeSockets
+  wanted = clientCount + net_socketReserve
+  if wanted < net_socketReserve then wanted = net_socketReserve end if
+  while net_numsockets < wanted
+    socket = netloop.createSocket()
+    socket.disconnected = true
+    net_freeSockets = appendUniqueSocket(net_freeSockets, socket)
+    net_numsockets = net_numsockets + 1
+  end while
+  return net_numsockets
+end function
+
 // Mirror Quake's NET_TrackSocket routine and its observable state changes.
 function NET_TrackSocket(socket)
   global net_activeSockets, net_freeSockets
   if socket is void or socket is error then return socket end if
   ensureSocketPool()
   compactActiveSockets()
-  if len(net_activeSockets) >= net_numsockets or len(net_freeSockets) == 0 then
+  // net_loop deliberately reuses its client/server objects.  Once such an
+  // object has been returned to this pool, move that exact object back to the
+  // active list instead of consuming another free identity and leaving an
+  // active/free alias behind.
+  if socketArrayContains(net_activeSockets, socket) then return socket end if
+  alreadyPooled = socketArrayContains(net_freeSockets, socket)
+  if len(net_activeSockets) >= net_numsockets or (not alreadyPooled and len(net_freeSockets) == 0) then
     netloop.close(socket)
     return error(3441, "NET_NewQSocket: no qsocket available")
   end if
-  net_freeSockets = arrayTail(net_freeSockets)
+  if alreadyPooled then
+    net_freeSockets = socketArrayWithout(net_freeSockets, socket)
+  else
+    net_freeSockets = arrayTail(net_freeSockets)
+  end if
   net_activeSockets = [socket] + net_activeSockets
   return socket
 end function
@@ -145,17 +221,37 @@ function NET_FreeQSocket(socket)
   if socket is void then return false end if
   found = false
   active = []
+  reclaimed = []
   for each item in net_activeSockets
     if item == socket then
       found = true
-    else if item is not void and not item.disconnected then
-      active = active + [item]
+    else if item is not void and item.disconnected then
+      reclaimed = appendUniqueSocket(reclaimed, item)
+    else if item is not void then
+      active = appendUniqueSocket(active, item)
     end if
   end for
-  if not found then return error(3442, "NET_FreeQSocket: not active") end if
+  free = []
+  for each item in net_freeSockets
+    if item is not void and not socketArrayContains(active, item) then free = appendUniqueSocket(free, item) end if
+  end for
+  for each item in reclaimed
+    if not socketArrayContains(active, item) then free = appendUniqueSocket(free, item) end if
+  end for
+  if not found then
+    // A diagnostic/count query may already have compacted an externally
+    // closed socket into the free list.  Treat the subsequent NET_Close as an
+    // idempotent release without inserting a duplicate free-list entry.
+    if socketArrayContains(free, socket) then
+      net_activeSockets = active
+      net_freeSockets = free
+      return true
+    end if
+    return error(3442, "NET_FreeQSocket: not active")
+  end if
   if not socket.disconnected then netloop.close(socket) end if
   net_activeSockets = active
-  net_freeSockets = [socket] + net_freeSockets
+  net_freeSockets = [socket] + socketArrayWithout(free, socket)
   return true
 end function
 
@@ -178,6 +274,7 @@ function NET_SetMaximumClients(count)
   global maximumClients
   maximumClients = count
   if maximumClients < 1 then maximumClients = 1 end if
+  ensureSocketPoolCapacity(maximumClients)
   return maximumClients
 end function
 
@@ -655,7 +752,7 @@ end function
 
 // Mirror Quake's NET_Init routine and its observable state changes.
 function NET_Init(state, maxClients, dedicated, listenRequested, requestedPort, noLan)
-  global networkState, maximumClients, net_numsockets, net_activeSockets, net_freeSockets
+  global networkState, maximumClients, net_numsockets, net_socketReserve, net_activeSockets, net_freeSockets
   global net_activeconnections, listening, DEFAULTnet_hostport, net_hostport, pollProcedureList
   if requestedPort is void then return error(3443, "NET_Init: you must specify a number after -port") end if
   networkState = state
@@ -664,8 +761,9 @@ function NET_Init(state, maxClients, dedicated, listenRequested, requestedPort, 
   DEFAULTnet_hostport = requestedPort
   net_hostport = requestedPort
   listening = listenRequested or dedicated
-  net_numsockets = maximumClients
-  if not dedicated then net_numsockets = net_numsockets + 1 end if
+  net_socketReserve = 1
+  if dedicated then net_socketReserve = 0 end if
+  net_numsockets = maximumClients + net_socketReserve
   net_activeSockets = []
   net_freeSockets = []
   net_activeconnections = 0

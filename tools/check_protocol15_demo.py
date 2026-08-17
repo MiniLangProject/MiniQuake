@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """Verify BP-018 cl_demo.c framing, keepalive and timedemo contracts."""
 from __future__ import annotations
 import argparse, hashlib, json, os, shutil, struct, subprocess, tempfile
@@ -8,8 +12,11 @@ SCHEMA="MiniQuakeProtocol15DemoGolden/1"
 REPORT="MiniQuakeBP018Protocol15DemoVerification/1"
 GOLDEN="audit/protocol15_demo_golden.json"; ORACLE="tools/oracle/protocol15_demo_oracle.c"
 
-def sha(path:Path)->str:return hashlib.sha256(path.read_bytes()).hexdigest()
+def sha(path:Path)->str:
+    """Compute the SHA-256 digest of the requested file."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 def c_atoi(text:str)->int:
+    """Reproduce the reference c atoi operation for differential testing."""
     i=0
     while i<len(text) and text[i] in ' \t\n\r\v\f':i+=1
     sign=1
@@ -21,6 +28,7 @@ def c_atoi(text:str)->int:
     return sign*value
 
 def playback_track(text:str)->int:
+    """Compute the reference playback track value for a deterministic fixture."""
     value=0; negative=False
     for item in text.encode('latin1'):
         if item==10:break
@@ -29,6 +37,7 @@ def playback_track(text:str)->int:
     return -value if negative else value
 
 def rows():
+    """Build the deterministic result rows for this verifier."""
     frame=b'4\n'+struct.pack('<i3f',3,1.0,-2.5,90.0)+bytes([1,2,3])
     values=[
       {"kind":"case","name":"atoi_decimal_suffix","value":c_atoi('1.5')},
@@ -47,11 +56,13 @@ def rows():
     return values
 
 def document(root:Path):
+    """Render the canonical evidence document for this verifier."""
     return {"schema":SCHEMA,"package_id":PACKAGE_ID,"parent_package_id":PARENT_PACKAGE_ID,
       "protocol_version":15,"sources":["cl_demo.c","cl_main.c","host.c"],"rows":rows(),
       "reference":{"oracle":ORACLE,"oracle_sha256":sha(root/ORACLE)}}
 
 def compiler():
+    """Locate a supported C compiler for the reference oracle."""
     candidates=[]
     if os.environ.get('CC'):candidates.append(os.environ['CC'])
     candidates += ['cc','gcc','clang']
@@ -61,6 +72,7 @@ def compiler():
     return None
 
 def run_oracle(root:Path):
+    """Run oracle and capture its deterministic result."""
     cc=compiler()
     if not cc:return True,'not available',[]
     with tempfile.TemporaryDirectory(prefix='mq-bp018-') as td:
@@ -72,6 +84,7 @@ def run_oracle(root:Path):
         return run.returncode==0,' '.join(cc),parsed
 
 def contract(root:Path):
+    """Evaluate the source and runtime evidence for this contract."""
     errors=[]
     demo=(root/'src/miniquake/demo.ml').read_text(encoding='utf-8-sig')
     client=(root/'src/miniquake/client.ml').read_text(encoding='utf-8-sig')
@@ -96,6 +109,7 @@ def contract(root:Path):
     return errors
 
 def main()->int:
+    """Run the command-line workflow and return its process exit status."""
     parser=argparse.ArgumentParser();parser.add_argument('root',nargs='?',default='.')
     parser.add_argument('--root',dest='root_flag');parser.add_argument('--write-golden',action='store_true');parser.add_argument('--json-output')
     args=parser.parse_args();root=Path(args.root_flag or args.root).resolve();doc=document(root);golden=root/GOLDEN

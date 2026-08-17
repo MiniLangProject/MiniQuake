@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """Verify BP-061 Protocol-3 control and rule-enumeration parity."""
 from __future__ import annotations
 import argparse, json, pathlib, sys
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     ap=argparse.ArgumentParser(); ap.add_argument('--root',default='.'); ap.add_argument('--json',default=''); a=ap.parse_args()
     r=pathlib.Path(a.root).resolve(); errors=[]
     loop=(r/'src/miniquake/net_loop.ml').read_text(encoding='utf-8-sig')

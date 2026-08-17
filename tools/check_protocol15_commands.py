@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """Validate BP-011 Protocol-15 signon, command-stream and entity-update parity.
 
 The checked-in golden vectors are independently reproduced by a pure Python
@@ -72,43 +76,54 @@ class Report:
 
 class Writer:
     def __init__(self) -> None:
+        """Initialize the helper with its immutable verification inputs."""
         self.data = bytearray()
 
     def byte(self, value: int | float | bool) -> None:
+        """Compute the reference byte value for a deterministic fixture."""
         self.data.append(int(value) & 0xFF)
 
     char = byte
 
     def short(self, value: int | float) -> None:
+        """Compute the reference short value for a deterministic fixture."""
         self.data += struct.pack("<H", int(value) & 0xFFFF)
 
     def long(self, value: int) -> None:
+        """Compute the reference long value for a deterministic fixture."""
         self.data += struct.pack("<I", int(value) & 0xFFFFFFFF)
 
     def float(self, value: int | float) -> None:
+        """Decode the fixture's IEEE-754 binary32 scalar value."""
         self.data += struct.pack("<f", float(value))
 
     def string(self, value: str) -> None:
+        """Compute the reference string value for a deterministic fixture."""
         self.data += value.encode("latin-1") + b"\0"
 
     def coord(self, value: int | float) -> None:
+        """Compute the reference coord value for a deterministic fixture."""
         rounded = struct.unpack("<f", struct.pack("<f", float(value)))[0]
         self.short(int(rounded * 8.0))
 
     def angle(self, value: int | float) -> None:
+        """Compute the reference angle value for a deterministic fixture."""
         rounded = struct.unpack("<f", struct.pack("<f", float(value)))[0]
         encoded = int((int(rounded) * 256) / 360) & 255
         self.byte(encoded)
 
     def string_command(self, text: str) -> None:
+        """Compute the reference string command value for a deterministic fixture."""
         self.byte(CLC["stringcmd"])
         self.string(text)
 
     def vector(self, name: str) -> dict[str, object]:
+        """Package one encoded protocol message as a deterministic vector row."""
         return {"name": name, "bytes": self.data.hex(), "length": len(self.data)}
 
 
 def baseline_state() -> dict[str, object]:
+    """Build the deterministic baseline state fixture used by this verifier."""
     return {
         "model": 1, "frame": 2, "colormap": 3, "skin": 4, "effects": 5,
         "origin": (10.0, 20.0, 30.0), "angles": (0.0, 45.0, 90.0),
@@ -116,6 +131,7 @@ def baseline_state() -> dict[str, object]:
 
 
 def update_bits(entity: int, baseline: dict[str, object], current: dict[str, object], movetype: int) -> int:
+    """Encode bits using the Protocol 15 layout."""
     bits = 0
     origins = current["origin"]
     base_origins = baseline["origin"]
@@ -142,6 +158,7 @@ def update_bits(entity: int, baseline: dict[str, object], current: dict[str, obj
 
 
 def write_fast_update(w: Writer, entity: int, baseline: dict[str, object], current: dict[str, object], movetype: int) -> int:
+    """Encode and write fast update to the fixture buffer."""
     bits = update_bits(entity, baseline, current, movetype)
     w.byte(bits | U_SIGNAL)
     if bits & U_MOREBITS: w.byte(bits >> 8)
@@ -164,6 +181,7 @@ def write_fast_update(w: Writer, entity: int, baseline: dict[str, object], curre
 
 
 def write_baseline(w: Writer) -> None:
+    """Encode and write baseline to the fixture buffer."""
     w.byte(1); w.byte(2); w.byte(0); w.byte(0)
     w.coord(1.0); w.angle(0.0)
     w.coord(2.0); w.angle(90.0)
@@ -171,6 +189,7 @@ def write_baseline(w: Writer) -> None:
 
 
 def write_svc_catalog(w: Writer) -> None:
+    """Encode and write svc catalog to the fixture buffer."""
     w.byte(SVC["nop"])
     w.byte(SVC["disconnect"])
     w.byte(SVC["updatestat"]); w.byte(2); w.long(123456)
@@ -211,6 +230,7 @@ def write_svc_catalog(w: Writer) -> None:
 
 
 def python_vectors() -> list[dict[str, object]]:
+    """Build the deterministic python vectors fixture used by this verifier."""
     out: list[dict[str, object]] = []
     for stage in range(1, 5):
         w = Writer()
@@ -250,14 +270,17 @@ def python_vectors() -> list[dict[str, object]]:
 
 
 def parse_oracle(text: str) -> list[dict[str, object]]:
+    """Parse oracle into its normalized representation."""
     return [json.loads(line) for line in text.splitlines() if line.strip()]
 
 
 def sha256(path: Path) -> str:
+    """Compute the SHA-256 digest of the requested file."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def compilers() -> list[list[str]]:
+    """Return all supported C compiler commands available to the verifier."""
     result: list[list[str]] = []
     if os.environ.get("CC", "").strip(): result.append(os.environ["CC"].split())
     for name in ("cc", "gcc", "clang", "cl"):
@@ -272,6 +295,7 @@ def compilers() -> list[list[str]]:
 
 
 def check_document(root: Path) -> Check:
+    """Validate document and return its contract findings."""
     errors: list[str] = []
     path = root / GOLDEN
     if not path.is_file(): return Check("golden_document", False, errors=[f"missing {GOLDEN}"])
@@ -287,6 +311,7 @@ def check_document(root: Path) -> Check:
 
 
 def check_c_oracle(root: Path, required: bool) -> Check:
+    """Validate c oracle and return its contract findings."""
     source = root / ORACLE
     errors: list[str] = []; warnings: list[str] = []
     expected = python_vectors()
@@ -319,6 +344,7 @@ def check_c_oracle(root: Path, required: bool) -> Check:
 
 
 def parse_constants(path: Path) -> dict[str, int]:
+    """Parse constants into its normalized representation."""
     values: dict[str, int] = {}
     pattern = re.compile(r"^\s*const\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(-?(?:0x[0-9A-Fa-f]+|[0-9]+))\s*$")
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -328,6 +354,7 @@ def parse_constants(path: Path) -> dict[str, int]:
 
 
 def check_constants(root: Path) -> Check:
+    """Validate constants and return its contract findings."""
     expected: dict[str, int] = {"PROTOCOL_VERSION": 15, "SIGNON_SERVERINFO": 1, "SIGNON_PRESPAWN": 2, "SIGNON_SPAWN": 3, "SIGNON_ACTIVE": 4}
     expected.update({"CLC_" + name.upper(): value for name, value in CLC.items()})
     expected.update({"SVC_" + name.upper(): value for name, value in SVC.items()})
@@ -344,6 +371,7 @@ def check_constants(root: Path) -> Check:
 
 
 def check_source_contract(root: Path) -> Check:
+    """Validate source contract and return its contract findings."""
     errors: list[str] = []
     files = {
         "signon": (root / "src/miniquake/protocol_signon.ml").read_text(encoding="utf-8"),
@@ -385,11 +413,13 @@ def check_source_contract(root: Path) -> Check:
 
 
 def run(root: Path, require_c: bool) -> Report:
+    """Run run and capture its deterministic result."""
     checks = [check_document(root), check_c_oracle(root, require_c), check_constants(root), check_source_contract(root)]
     return Report(PACKAGE_ID, str(root), all(item.passed for item in checks), checks)
 
 
 def print_report(report: Report) -> None:
+    """Emit report in the requested report format."""
     print(f"MiniQuake {report.package_id} Protocol 15 command verification")
     for check in report.checks:
         print(f"  [{'PASS' if check.passed else 'FAIL'}] {check.name}")
@@ -400,6 +430,7 @@ def print_report(report: Report) -> None:
 
 
 def self_test() -> int:
+    """Exercise the tool with synthetic fixtures and verify its invariants."""
     vectors = python_vectors()
     assert len(vectors) == 14
     by_name = {item["name"]: item for item in vectors}
@@ -413,6 +444,7 @@ def self_test() -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", nargs="?", default=".")
     parser.add_argument("--json-output")

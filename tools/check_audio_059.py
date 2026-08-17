@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+"""Verify the check audio 059 compatibility and regression contract."""
+
 from __future__ import annotations
 import argparse, json, pathlib
 
 def emit(path, name, passed, details, errors):
+    """Emit one deterministic machine-readable verification report."""
     if path:
         payload = {"schema": 1, "check": name, "status": "PASS" if passed else "FAIL", "passed": passed, "details": details, "errors": errors}
         pathlib.Path(path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=str(pathlib.Path(__file__).resolve().parents[1]))
     ap.add_argument("--json-output")

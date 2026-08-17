@@ -35,6 +35,92 @@ function main(args)
   recycled = netmain.NET_NewQSocket()
   require(recycled is not void, "preclosed qsocket pool slot recycled")
   netmain.NET_FreeQSocket(recycled)
+
+  // A driver-side disconnect can precede the higher-level NET_Close call.
+  // Merely querying socket counts used to discard that active identity
+  // without returning it to the finite pool, eventually crashing reconnects
+  // with "NET_NewQSocket: no qsocket available".
+  externallyCompacted = netmain.NET_NewQSocket()
+  require(externallyCompacted is not void, "externally compacted allocation")
+  netloop.close(externallyCompacted)
+  compactedCounts = netmain.NET_SocketCounts()
+  require(compactedCounts[0] == 0 and compactedCounts[1] == compactedCounts[2], "compaction reclaims disconnected qsocket")
+  require(netmain.NET_Close(externallyCompacted), "close after compaction is idempotent")
+
+  // net_loop reuses the same two loopback socket objects.  Repeatedly move
+  // them through active/free state and force compaction between driver close
+  // and NET_Close; neither aliases nor duplicate free entries may accumulate.
+  cycle = 0
+  while cycle < 12
+    cycleClient = netmain.NET_Connect(state, "local", 1)
+    cycleServer = netmain.NET_CheckNewConnections(state)
+    require(cycleClient is not void and cycleClient is not error, "loop reconnect client " + cycle)
+    require(cycleServer is not void and cycleServer is not error, "loop reconnect server " + cycle)
+    netloop.close(cycleClient)
+    netloop.close(cycleServer)
+    netmain.NET_SocketCounts()
+    require(netmain.NET_Close(cycleClient), "loop reconnect client release " + cycle)
+    require(netmain.NET_Close(cycleServer), "loop reconnect server release " + cycle)
+    cycleCounts = netmain.NET_SocketCounts()
+    require(cycleCounts[0] == 0 and cycleCounts[1] == cycleCounts[2], "loop reconnect pool remains complete " + cycle)
+    cycle = cycle + 1
+  end while
+
+  // Reproduce the crash path itself: the driver closes both endpoints and a
+  // new connection arrives before either owner calls NET_Close.  Tracking the
+  // new endpoints must reclaim the old slots during its own compaction.
+  cycle = 0
+  while cycle < 12
+    earlyClient = netmain.NET_Connect(state, "local", 1)
+    earlyServer = netmain.NET_CheckNewConnections(state)
+    require(earlyClient is not void and earlyClient is not error, "early reconnect client " + cycle)
+    require(earlyServer is not void and earlyServer is not error, "early reconnect server " + cycle)
+    netloop.close(earlyClient)
+    netloop.close(earlyServer)
+    cycle = cycle + 1
+  end while
+  earlyCounts = netmain.NET_SocketCounts()
+  require(earlyCounts[0] == 0 and earlyCounts[1] == earlyCounts[2], "early reconnects reclaim complete pool")
+
+  // The ordinary executable boots with maxplayers 1 and therefore initially
+  // owns two qsockets. Hosting through the multiplayer menu later raises
+  // maxplayers without restarting NET. The arena must grow to four server
+  // clients plus the listen host's local client socket before the first join.
+  netmain.NET_Shutdown(state)
+  hostState = netloop.createState()
+  require(netmain.NET_Init(hostState, 1, false, false, 26000, true) == -1, "single-player boot network init")
+  bootCounts = netmain.NET_SocketCounts()
+  require(bootCounts[2] == 2, "single-player boot qsocket capacity")
+  require(netmain.NET_SetMaximumClients(4) == 4, "multiplayer menu raises maxplayers")
+  grownCounts = netmain.NET_SocketCounts()
+  require(grownCounts[0] == 0 and grownCounts[1] == 5 and grownCounts[2] == 5, "listen qsocket arena grows with maxplayers")
+  hostClient = netmain.NET_Connect(hostState, "local", 1)
+  hostServer = netmain.NET_CheckNewConnections(hostState)
+  require(hostClient is not void and hostClient is not error, "listen host local client")
+  require(hostServer is not void and hostServer is not error, "listen host local server socket")
+  remoteSockets = []
+  remoteIndex = 0
+  while remoteIndex < 3
+    remoteSocket = netloop.createSocket()
+    remoteSocket.transport = "udp"
+    remoteSocket.address = "192.0.2." + (remoteIndex + 1)
+    trackedRemote = netmain.NET_TrackSocket(remoteSocket)
+    require(trackedRemote is not error, "external multiplayer join " + remoteIndex)
+    remoteSockets = remoteSockets + [trackedRemote]
+    remoteIndex = remoteIndex + 1
+  end while
+  fullHostCounts = netmain.NET_SocketCounts()
+  require(fullHostCounts[0] == 5 and fullHostCounts[1] == 0 and fullHostCounts[2] == 5, "listen host supports local plus three remote clients")
+  for each remoteSocket in remoteSockets
+    require(netmain.NET_Close(remoteSocket), "external multiplayer release")
+  end for
+  require(netmain.NET_Close(hostClient), "listen host client release")
+  require(netmain.NET_Close(hostServer), "listen host server release")
+  releasedHostCounts = netmain.NET_SocketCounts()
+  require(releasedHostCounts[0] == 0 and releasedHostCounts[1] == releasedHostCounts[2], "grown listen pool fully recyclable")
+  netmain.NET_Shutdown(hostState)
+  state = netloop.createState()
+  require(netmain.NET_Init(state, 2, false, false, 26000, true) == -1, "restore loop-only test network")
   require(netmain.IsID("192.246.40.17", true), "IsID positive")
   require(not netmain.IsID("192.246.41.17", true), "IsID mask")
 

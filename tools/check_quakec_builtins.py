@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """Verify BP-023 QuakeC builtin-table and formatting contracts."""
 from __future__ import annotations
 import argparse, hashlib, json, os, re, shutil, struct, subprocess, tempfile
@@ -8,15 +12,23 @@ PACKAGE_ID='BP-023'; PARENT_PACKAGE_ID='BP-022'
 SCHEMA='MiniQuakeQuakeCBuiltinGolden/1'; REPORT='MiniQuakeBP023QuakeCBuiltinVerification/1'
 GOLDEN='audit/quakec_builtin_golden.json'; ORACLE='tools/oracle/quakec_builtin_oracle.c'
 
-def sha(path: Path) -> str: return hashlib.sha256(path.read_bytes()).hexdigest()
-def f32(value: float) -> float: return struct.unpack('<f', struct.pack('<f', value))[0]
-def fbits(value: float) -> int: return struct.unpack('<I', struct.pack('<f', f32(value)))[0]
+def sha(path: Path) -> str:
+    """Compute the SHA-256 digest of the requested file."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+def f32(value: float) -> float:
+    """Round a value through the IEEE-754 binary32 representation."""
+    return struct.unpack('<f', struct.pack('<f', value))[0]
+def fbits(value: float) -> int:
+    """Return the IEEE-754 binary32 bit pattern for a Python float."""
+    return struct.unpack('<I', struct.pack('<f', f32(value)))[0]
 def c_one(value: float) -> str:
+    """Reproduce the reference c one operation for differential testing."""
     value=f32(value)
     if value == int(value): return str(int(value))
     return f'{value:5.1f}'
 
 def rows():
+    """Build the deterministic result rows for this verifier."""
     seed=(1*214013+2531011)&0xffffffff; rv=(seed>>16)&0x7fff
     return [
       {'kind':'case','name':'builtin_count','value':79},
@@ -35,11 +47,13 @@ def rows():
     ]
 
 def document(root: Path):
+    """Render the canonical evidence document for this verifier."""
     return {'schema':SCHEMA,'package_id':PACKAGE_ID,'parent_package_id':PARENT_PACKAGE_ID,
             'sources':['pr_cmds.c','progs.h'],'rows':rows(),
             'reference':{'oracle':ORACLE,'oracle_sha256':sha(root/ORACLE)}}
 
 def compiler():
+    """Locate a supported C compiler for the reference oracle."""
     values=([os.environ['CC']] if os.environ.get('CC') else [])+['cc','gcc','clang']
     for value in values:
         parts=value.split()
@@ -47,6 +61,7 @@ def compiler():
     return None
 
 def run_oracle(root: Path):
+    """Run oracle and capture its deterministic result."""
     cc=compiler()
     if not cc: return True,'not available',[]
     with tempfile.TemporaryDirectory(prefix='mq-bp023-') as td:
@@ -58,11 +73,13 @@ def run_oracle(root: Path):
         return run.returncode==0,' '.join(cc),actual
 
 def builtin_items(text: str):
+    """Build the deterministic builtin items fixture used by this verifier."""
     marker='table = [' if 'table = [' in text else 'machine.builtins = ['
     block=text.split(marker,1)[1].split(']',1)[0]
     return [item.strip() for item in block.split(',') if item.strip()]
 
 def contract(root: Path):
+    """Evaluate the source and runtime evidence for this contract."""
     errors=[]
     source=(root/'src/miniquake/quakec/builtins.ml').read_text(encoding='utf-8-sig')
     tests=(root/'tests/quakec_builtin_tests.ml').read_text(encoding='utf-8-sig')
@@ -77,6 +94,7 @@ def contract(root: Path):
     return errors
 
 def main():
+    """Run the command-line workflow and return its process exit status."""
     ap=argparse.ArgumentParser(); ap.add_argument('root',nargs='?',default='.'); ap.add_argument('--root',dest='root_flag'); ap.add_argument('--write-golden',action='store_true'); ap.add_argument('--json-output'); a=ap.parse_args()
     root=Path(a.root_flag or a.root).resolve(); doc=document(root); golden=root/GOLDEN
     if a.write_golden:

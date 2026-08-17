@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+"""Verify the bp046 sprite sync checker compatibility and regression contract."""
+
 from __future__ import annotations
 import argparse,json,pathlib
 
 def main():
+ """Run the command-line workflow and return its process exit status."""
  ap=argparse.ArgumentParser(); ap.add_argument('--root',default='.'); ap.add_argument('--json-out','--json-output',dest='out'); ns=ap.parse_args(); root=pathlib.Path(ns.root).resolve(); errors=[]
  types=(root/'src/miniquake/types.ml').read_text(encoding='utf-8-sig'); client=(root/'src/miniquake/client.ml').read_text(encoding='utf-8-sig'); entities=(root/'src/miniquake/render/entities.ml').read_text(encoding='utf-8-sig'); host=(root/'src/miniquake/host.ml').read_text(encoding='utf-8-sig'); trace=(root/'src/miniquake/compat_trace.ml').read_text(encoding='utf-8-sig'); tests=(root/'tests/sprite_sync_parity_tests.ml').read_text(encoding='utf-8-sig')
  for label,text,marker in [('types',types,'  syncBase\nend struct'),('client',client,'function CL_AssignModelSyncBase(entity, previousModelIndex)'),('entities',entities,'time + entity.syncBase'),('host',host,'client.CL_SetModelSyncTypes(syncTypes)'),('trace',trace,'item.syncBase')]:

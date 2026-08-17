@@ -1268,6 +1268,24 @@ static mq_u32 mq_d3d_source_pixel_bytes(mq_u32 format) {
     return 1u;
 }
 
+/* Resolve a valid mip level without undefined oversized integer shifts. */
+static mq_i32 mq_d3d_texture_level_extent(const mq_d3d_texture_t *texture, mq_i32 level, mq_i32 *width, mq_i32 *height) {
+    mq_i32 current_width;
+    mq_i32 current_height;
+    mq_i32 current_level;
+    if (texture == MQ_NULL || texture->object == MQ_NULL || level < 0) return 0;
+    current_width = texture->width;
+    current_height = texture->height;
+    for (current_level = 0; current_level < level; ++current_level) {
+        if (current_width == 1 && current_height == 1) return 0;
+        if (current_width > 1) current_width /= 2;
+        if (current_height > 1) current_height /= 2;
+    }
+    if (width != MQ_NULL) *width = current_width;
+    if (height != MQ_NULL) *height = current_height;
+    return 1;
+}
+
 /* Allocate and upload a complete texture image. */
 void mq_d3d9_tex_image_2d(mq_u32 target, mq_i32 level, mq_i32 internal_format, mq_i32 width, mq_i32 height, mq_i32 border, mq_u32 format, mq_u32 type, const void *pixels) {
     mq_d3d_texture_t *texture;
@@ -1284,11 +1302,7 @@ void mq_d3d9_tex_image_2d(mq_u32 target, mq_i32 level, mq_i32 internal_format, m
     } else {
         mq_i32 expected_width;
         mq_i32 expected_height;
-        if (texture->object == MQ_NULL) return;
-        expected_width = texture->width >> level;
-        expected_height = texture->height >> level;
-        if (expected_width < 1) expected_width = 1;
-        if (expected_height < 1) expected_height = 1;
+        if (!mq_d3d_texture_level_extent(texture, level, &expected_width, &expected_height)) return;
         if (width != expected_width || height != expected_height) return;
     }
     result = MQ_D3D_METHOD(texture->object, 19, mq_d3d_texture_lock_rect_fn)(texture->object, (mq_u32)level, &locked, MQ_NULL, 0u);
@@ -1311,11 +1325,14 @@ void mq_d3d9_tex_sub_image_2d(mq_u32 target, mq_i32 level, mq_i32 x_offset, mq_i
     mq_u32 source_bytes;
     mq_i32 x;
     mq_i32 y;
+    mq_i32 level_width;
+    mq_i32 level_height;
     MQ_HRESULT result;
     (void)target;
-    if (mq_d3d_bound_texture >= MQ_D3D_MAX_TEXTURES || level < 0 || width < 1 || height < 1 || pixels == MQ_NULL || type != MQ_GL_UNSIGNED_BYTE) return;
+    if (mq_d3d_bound_texture >= MQ_D3D_MAX_TEXTURES || level < 0 || x_offset < 0 || y_offset < 0 || width < 1 || height < 1 || pixels == MQ_NULL || type != MQ_GL_UNSIGNED_BYTE) return;
     texture = &mq_d3d_textures[mq_d3d_bound_texture];
-    if (texture->object == MQ_NULL) return;
+    if (!mq_d3d_texture_level_extent(texture, level, &level_width, &level_height)) return;
+    if (width > level_width || height > level_height || x_offset > level_width - width || y_offset > level_height - height) return;
     result = MQ_D3D_METHOD(texture->object, 19, mq_d3d_texture_lock_rect_fn)(texture->object, (mq_u32)level, &locked, MQ_NULL, 0u);
     mq_d3d_last_error = result;
     if (!MQ_D3D_SUCCEEDED(result)) return;
@@ -1338,6 +1355,7 @@ void mq_d3d9_read_pixels(mq_i32 x, mq_i32 y, mq_i32 width, mq_i32 height, mq_u32
     mq_i32 column;
     MQ_HRESULT result;
     if (mq_d3d_device == MQ_NULL || pixels == MQ_NULL || width < 1 || height < 1 || format != MQ_GL_RGBA || type != MQ_GL_UNSIGNED_BYTE) return;
+    memset(pixels, 0, (size_t)((mq_u64)(mq_u32)width * (mq_u64)(mq_u32)height * 4u));
     result = MQ_D3D_METHOD(mq_d3d_device, 38, mq_d3d_get_render_target_fn)(mq_d3d_device, 0u, &render_target);
     if (!MQ_D3D_SUCCEEDED(result) || render_target == MQ_NULL) goto done;
     result = MQ_D3D_METHOD(render_target, 12, mq_d3d_surface_get_desc_fn)(render_target, &description);
@@ -1353,7 +1371,7 @@ void mq_d3d9_read_pixels(mq_i32 x, mq_i32 y, mq_i32 width, mq_i32 height, mq_u32
     for (row = 0; row < height; ++row) {
         mq_i32 source_y = mq_d3d_height - 1 - (y + row);
         mq_u8 *destination = (mq_u8 *)pixels + (mq_u64)row * (mq_u64)width * 4u;
-        if (source_y < 0 || source_y >= (mq_i32)description.Height) { memset(destination, 0, (mq_u64)width * 4u); continue; }
+        if (source_y < 0 || source_y >= (mq_i32)description.Height) continue;
         for (column = 0; column < width; ++column) {
             mq_i32 source_x = x + column;
             if (source_x >= 0 && source_x < (mq_i32)description.Width) {

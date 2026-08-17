@@ -1,3 +1,8 @@
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
+"""Verify the check opt001d 60fps compatibility and regression contract."""
+
 from __future__ import annotations
 import argparse,json
 from pathlib import Path

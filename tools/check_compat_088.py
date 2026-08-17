@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+"""Verify the check compat 088 compatibility and regression contract."""
+
 import argparse, json, pathlib, re, sys
 
 EXPECTED_STATUS = "stability_109_frozen_v1"
@@ -9,6 +15,7 @@ MAX_STATIC_ENTITIES = 128
 
 
 def fnv1a32(data: bytes) -> int:
+    """Compute the fixture's 32-bit FNV-1a fingerprint."""
     value = 0x811C9DC5
     for byte in data:
         value ^= byte
@@ -17,6 +24,7 @@ def fnv1a32(data: bytes) -> int:
 
 
 def client_entity_limit(server_before: int, server_after: int, entities_before: int) -> int:
+    """Compute the reference client entity limit value for a deterministic fixture."""
     if min(server_before, server_after, entities_before) < 0:
         return -1
     if server_before > MAX_EDICTS or server_after > MAX_EDICTS:
@@ -30,17 +38,20 @@ def client_entity_limit(server_before: int, server_after: int, entities_before: 
 
 
 def case_stable(case: dict) -> bool:
+    """Report whether one soak-test snapshot obeys the entity high-water limits."""
     limit = client_entity_limit(case['server_before'], case['server_after'], case['entities_before'])
     server_stable = case['server_after'] <= case['server_before'] <= MAX_EDICTS
     return server_stable and limit >= 0 and case['entities_after'] <= limit
 
 
 def _const_string(source: str, name: str) -> str:
+    """Extract a named MiniLang string constant from source text."""
     match = re.search(rf'^const\s+{re.escape(name)}\s*=\s*"([^"]+)"\s*$', source, flags=re.M)
     return match.group(1) if match else ""
 
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     ap = argparse.ArgumentParser()
     ap.add_argument('--root', default='.')
     ap.add_argument('--json', default='')

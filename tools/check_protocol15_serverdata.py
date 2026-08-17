@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """BP-012R1 Protocol 15 server-data golden-vector verifier.
 
 The Python model is intentionally independent of the MiniLang implementation.
@@ -77,37 +81,47 @@ class Check:
 
 class Writer:
     def __init__(self) -> None:
+        """Initialize the helper with its immutable verification inputs."""
         self.data = bytearray()
 
     def byte(self, value: int | float | bool) -> None:
+        """Compute the reference byte value for a deterministic fixture."""
         self.data.append(int(value) & 0xFF)
 
     char = byte
 
     def short(self, value: int | float) -> None:
+        """Compute the reference short value for a deterministic fixture."""
         self.data += struct.pack("<H", int(value) & 0xFFFF)
 
     def long(self, value: int | float) -> None:
+        """Compute the reference long value for a deterministic fixture."""
         self.data += struct.pack("<I", int(value) & 0xFFFFFFFF)
 
     def float32(self, value: int | float) -> float:
+        """Round a value through the IEEE-754 binary32 representation."""
         return struct.unpack("<f", struct.pack("<f", float(value)))[0]
 
     def string(self, value: str) -> None:
+        """Compute the reference string value for a deterministic fixture."""
         self.data += value.encode("latin-1") + b"\0"
 
     def coord(self, value: int | float) -> None:
+        """Compute the reference coord value for a deterministic fixture."""
         self.short(int(self.float32(value) * 8.0))
 
     def angle(self, value: int | float) -> None:
+        """Compute the reference angle value for a deterministic fixture."""
         rounded = self.float32(value)
         self.byte(int((int(rounded) * 256) / 360) & 0xFF)
 
     def vector(self, name: str) -> dict[str, Any]:
+        """Package one encoded protocol message as a deterministic vector row."""
         return {"name": name, "bytes": self.data.hex(), "length": len(self.data)}
 
 
 def write_precache_list(w: Writer, values: list[str]) -> None:
+    """Encode and write precache list to the fixture buffer."""
     for value in values[1:]:
         if not value:
             break
@@ -126,6 +140,7 @@ def write_serverinfo(
     cdtrack: int,
     viewentity: int,
 ) -> None:
+    """Encode and write serverinfo to the fixture buffer."""
     w.byte(SVC["print"])
     w.string(chr(2) + "\nVERSION 1.09 SERVER (" + str(int(crc)) + " CRC)")
     w.byte(SVC["serverinfo"])
@@ -153,6 +168,7 @@ def write_sound(
     attenuation: float,
     center: tuple[float, float, float],
 ) -> None:
+    """Encode and write sound to the fixture buffer."""
     channel = int(channel)
     volume = int(volume)
     attenuation = w.float32(attenuation)
@@ -183,6 +199,7 @@ def write_baseline(
     origin: tuple[float, float, float],
     angles: tuple[float, float, float],
 ) -> None:
+    """Encode and write baseline to the fixture buffer."""
     w.byte(SVC["spawnbaseline"])
     w.short(entity)
     w.byte(model)
@@ -195,6 +212,7 @@ def write_baseline(
 
 
 def clientdata_bits(data: dict[str, Any]) -> int:
+    """Build the deterministic clientdata bits fixture used by this verifier."""
     bits = SU_ITEMS | SU_WEAPON
     if data["view_height"] != 22:
         bits |= SU_VIEWHEIGHT
@@ -217,6 +235,7 @@ def clientdata_bits(data: dict[str, Any]) -> int:
 
 
 def write_clientdata(w: Writer, data: dict[str, Any]) -> int:
+    """Encode and write clientdata to the fixture buffer."""
     bits = clientdata_bits(data)
     w.byte(SVC["clientdata"])
     w.short(bits)
@@ -250,6 +269,7 @@ def write_clientdata(w: Writer, data: dict[str, Any]) -> int:
 
 
 def default_clientdata() -> dict[str, Any]:
+    """Build the deterministic default clientdata fixture used by this verifier."""
     return {
         "view_height": 22,
         "ideal_pitch": 0.0,
@@ -273,6 +293,7 @@ def default_clientdata() -> dict[str, Any]:
 
 
 def python_vectors() -> list[dict[str, Any]]:
+    """Build the deterministic python vectors consumed by this verifier."""
     vectors: list[dict[str, Any]] = []
 
     w = Writer()
@@ -344,6 +365,7 @@ def python_vectors() -> list[dict[str, Any]]:
 
 
 def initial_delivery_plan(spawned: bool, send_signon: bool, elapsed: float) -> int:
+    """Build the deterministic initial delivery plan fixture used by this verifier."""
     if spawned:
         return PLAN_SEND_UNRELIABLE | PLAN_RELIABLE_PHASE
     if not send_signon:
@@ -354,6 +376,7 @@ def initial_delivery_plan(spawned: bool, send_signon: bool, elapsed: float) -> i
 
 
 def reliable_delivery_plan(overflowed: bool, size: int, drop_asap: bool, can_send: bool) -> int:
+    """Build the deterministic reliable delivery plan fixture used by this verifier."""
     if overflowed:
         return RELIABLE_DROP_OVERFLOW
     if size <= 0 and not drop_asap:
@@ -366,6 +389,7 @@ def reliable_delivery_plan(overflowed: bool, size: int, drop_asap: bool, can_sen
 
 
 def initial_cases() -> list[dict[str, Any]]:
+    """Build the deterministic initial cases consumed by this verifier."""
     rows = [
         ("spawned", True, False, 0.0),
         ("spawned_signon_flag", True, True, 9.0),
@@ -382,6 +406,7 @@ def initial_cases() -> list[dict[str, Any]]:
 
 
 def reliable_cases() -> list[dict[str, Any]]:
+    """Build the deterministic reliable cases consumed by this verifier."""
     rows = [
         ("overflow", True, 1, False, True),
         ("empty", False, 0, False, False),
@@ -401,6 +426,7 @@ def reliable_cases() -> list[dict[str, Any]]:
 
 
 def datagram_cases() -> list[dict[str, Any]]:
+    """Build the deterministic datagram cases consumed by this verifier."""
     rows = [
         ("empty_source", 8, 0, 16),
         ("strictly_below", 8, 7, 16),
@@ -416,6 +442,7 @@ def datagram_cases() -> list[dict[str, Any]]:
 
 
 def encoded_update_size(bits: int) -> int:
+    """Encode update size using the Protocol 15 layout."""
     count = 1
     if bits & 1:  # U_MOREBITS
         count += 1
@@ -430,10 +457,12 @@ def encoded_update_size(bits: int) -> int:
 
 
 def can_write_fast_update(remaining: int, bits: int) -> bool:
+    """Report whether write fast update satisfies the required condition."""
     return remaining >= 16 and encoded_update_size(bits) <= remaining
 
 
 def fast_update_cases() -> list[dict[str, Any]]:
+    """Build the deterministic fast update cases consumed by this verifier."""
     full_short = 1 | 2 | 4 | 8 | 16 | 32 | 64 | 256 | 512 | 1024 | 2048 | 4096 | 8192
     full_long = full_short | 16384
     rows = [
@@ -453,6 +482,7 @@ def fast_update_cases() -> list[dict[str, Any]]:
 
 
 def constants() -> dict[str, int]:
+    """Build the deterministic constants fixture used by this verifier."""
     return {
         "PROTOCOL_VERSION": PROTOCOL_VERSION,
         "SVC_PRINT": SVC["print"],
@@ -486,6 +516,7 @@ def constants() -> dict[str, int]:
 
 
 def make_golden() -> dict[str, Any]:
+    """Build golden for deterministic verification."""
     return {
         "schema": GOLDEN_SCHEMA,
         "package": PACKAGE_ID,
@@ -501,6 +532,7 @@ def make_golden() -> dict[str, Any]:
 
 
 def compiler_candidates() -> list[list[str]]:
+    """Return candidate C compiler commands in preference order."""
     values: list[list[str]] = []
     for name in ("cc", "gcc", "clang"):
         path = shutil.which(name)
@@ -510,6 +542,7 @@ def compiler_candidates() -> list[list[str]]:
 
 
 def parse_oracle(stdout: str) -> dict[str, Any]:
+    """Parse oracle into its normalized representation."""
     vectors: list[dict[str, Any]] = []
     initial: list[dict[str, Any]] = []
     reliable: list[dict[str, Any]] = []
@@ -536,6 +569,7 @@ def parse_oracle(stdout: str) -> dict[str, Any]:
 
 
 def run_c_oracle(root: Path, require: bool) -> tuple[dict[str, Any] | None, list[str], list[str]]:
+    """Run c oracle and capture its deterministic result."""
     errors: list[str] = []
     warnings: list[str] = []
     source = root / "tools" / "oracle" / "protocol15_serverdata_oracle.c"
@@ -564,11 +598,13 @@ def run_c_oracle(root: Path, require: bool) -> tuple[dict[str, Any] | None, list
 
 
 def compare(name: str, actual: Any, expected: Any, errors: list[str]) -> None:
+    """Compare candidate evidence with its accepted reference and report differences."""
     if actual != expected:
         errors.append(f"{name} differs")
 
 
 def function_body(text: str, name: str) -> str:
+    """Extract one complete MiniLang function body from source text."""
     marker = f"function {name}("
     start = text.find(marker)
     if start < 0:
@@ -580,6 +616,7 @@ def function_body(text: str, name: str) -> str:
 
 
 def parse_minilang_constants(path: Path) -> dict[str, int]:
+    """Parse minilang constants into its normalized representation."""
     import re
     values: dict[str, int] = {}
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -592,6 +629,7 @@ def parse_minilang_constants(path: Path) -> dict[str, int]:
 
 
 def check_document(root: Path) -> Check:
+    """Validate document and return its contract findings."""
     golden_path = root / "audit" / "protocol15_serverdata_golden.json"
     errors: list[str] = []
     details: dict[str, Any] = {}
@@ -622,6 +660,7 @@ def check_document(root: Path) -> Check:
 
 
 def check_c_oracle(root: Path, require: bool) -> Check:
+    """Validate c oracle and return its contract findings."""
     expected = make_golden()
     oracle, errors, warnings = run_c_oracle(root, require)
     details: dict[str, Any] = {"executed": oracle is not None}
@@ -637,6 +676,7 @@ def check_c_oracle(root: Path, require: bool) -> Check:
 
 
 def check_source_contract(root: Path) -> Check:
+    """Validate source contract and return its contract findings."""
     errors: list[str] = []
     details: dict[str, Any] = {}
     try:
@@ -826,6 +866,7 @@ def check_source_contract(root: Path) -> Check:
 
 
 def verify(root: Path, require_c_oracle: bool) -> dict[str, Any]:
+    """Evaluate all source, golden and oracle evidence for this verifier."""
     checks = [check_document(root), check_c_oracle(root, require_c_oracle), check_source_contract(root)]
     return {
         "schema": REPORT_SCHEMA,
@@ -847,6 +888,7 @@ def verify(root: Path, require_c_oracle: bool) -> dict[str, Any]:
 
 
 def self_test() -> int:
+    """Exercise the tool with synthetic fixtures and verify its invariants."""
     golden = make_golden()
     assert len(golden["vectors"]) == 11
     by_name = {item["name"]: item for item in golden["vectors"]}
@@ -862,6 +904,7 @@ def self_test() -> int:
 
 
 def print_report(report: dict[str, Any]) -> None:
+    """Emit report in the requested report format."""
     print(f"MiniQuake {PACKAGE_ID} Protocol 15 server-data verification")
     for check in report["checks"]:
         print(f"  [{'PASS' if check['passed'] else 'FAIL'}] {check['name']}")
@@ -875,6 +918,7 @@ def print_report(report: dict[str, Any]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root_arg", nargs="?", type=Path)
     parser.add_argument("--root", dest="root_option", type=Path)

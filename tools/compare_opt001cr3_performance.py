@@ -1,12 +1,22 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
+"""Compare deterministic opt001cr3 performance evidence."""
+
 from __future__ import annotations
 import argparse,json
 from pathlib import Path
 from statistics import mean
 MAPS=('e1m1','e1m2'); MODES=('headless','render')
-def load(p): return json.loads(Path(p).read_text(encoding='utf-8-sig'))
-def imp(old,new): return 0.0 if old<=0 else (old-new)*100.0/old
+def load(p):
+    """Load and decode one JSON evidence report."""
+    return json.loads(Path(p).read_text(encoding='utf-8-sig'))
+def imp(old,new):
+    """Compute the percentage improvement from baseline to candidate."""
+    return 0.0 if old<=0 else (old-new)*100.0/old
 def main():
+ """Run the command-line workflow and return its process exit status."""
  ap=argparse.ArgumentParser(); ap.add_argument('--baseline',required=True); ap.add_argument('--build',required=True); ap.add_argument('--prefix',default='opt001cr3'); ap.add_argument('--json',required=True); ap.add_argument('--markdown',required=True); a=ap.parse_args()
  base=load(a.baseline); build=Path(a.build); errors=[]; regress=[]; comps={}; med=[]; p99=[]; throughput=[]
  for m in MAPS:

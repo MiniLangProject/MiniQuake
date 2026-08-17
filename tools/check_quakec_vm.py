@@ -1,13 +1,23 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """Verify BP-021 PR_ExecuteProgram byte, stack and pointer contracts."""
 from __future__ import annotations
 import argparse,hashlib,json,os,shutil,struct,subprocess,tempfile
 from pathlib import Path
 PACKAGE_ID='BP-021';PARENT_PACKAGE_ID='BP-020';SCHEMA='MiniQuakeQuakeCVMGolden/1';REPORT='MiniQuakeBP021QuakeCVMVerification/1';GOLDEN='audit/quakec_vm_golden.json';ORACLE='tools/oracle/quakec_vm_oracle.c'
 RUNTIME_FIXTURES=16
-def sha(p):return hashlib.sha256(Path(p).read_bytes()).hexdigest()
-def fbits(v):return struct.unpack('<I',struct.pack('<f',v))[0]
-def rows():return [
+def sha(p):
+    """Compute the SHA-256 digest of the requested file."""
+    return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+def fbits(v):
+    """Return the IEEE-754 binary32 bit pattern for a Python float."""
+    return struct.unpack('<I',struct.pack('<f',v))[0]
+def rows():
+    """Build the deterministic result rows for this verifier."""
+    return [
  {'kind':'case','name':'opcode_count','value':66},{'kind':'case','name':'max_stack_depth','value':32},
  {'kind':'case','name':'localstack_size','value':2048},{'kind':'case','name':'binary32_add_bits','value':fbits(float(16777216.0)+1.0)},
  {'kind':'case','name':'byte_strcmp_positive','value':1},{'kind':'case','name':'byte_strcmp_negative','value':-1},
@@ -16,13 +26,17 @@ def rows():return [
  {'kind':'case','name':'pointer_last_scalar_valid','value':1},{'kind':'case','name':'pointer_vector_crosses','value':1},
  {'kind':'case','name':'state_signed_zero_word','value':0x80000000},{'kind':'case','name':'state_changed_word','value':0x40600000},
  {'kind':'case','name':'state_nan_word','value':0x7fc00001}]
-def document(root):return {'schema':SCHEMA,'package_id':PACKAGE_ID,'parent_package_id':PARENT_PACKAGE_ID,'sources':['pr_exec.c','pr_comp.h'],'rows':rows(),'reference':{'oracle':ORACLE,'oracle_sha256':sha(root/ORACLE)}}
+def document(root):
+    """Render the canonical evidence document for this verifier."""
+    return {'schema':SCHEMA,'package_id':PACKAGE_ID,'parent_package_id':PARENT_PACKAGE_ID,'sources':['pr_exec.c','pr_comp.h'],'rows':rows(),'reference':{'oracle':ORACLE,'oracle_sha256':sha(root/ORACLE)}}
 def compiler():
+ """Locate a supported C compiler for the reference oracle."""
  for v in ([os.environ['CC']] if os.environ.get('CC') else [])+['cc','gcc','clang']:
   p=v.split()
   if shutil.which(p[0]):return p
  return None
 def run_oracle(root):
+ """Run oracle and capture its deterministic result."""
  cc=compiler()
  if not cc:return True,'not available',[]
  with tempfile.TemporaryDirectory(prefix='mq-bp021-') as td:
@@ -30,6 +44,7 @@ def run_oracle(root):
   if b.returncode:return False,b.stdout+b.stderr,[]
   r=subprocess.run([str(exe)],capture_output=True,text=True);return r.returncode==0,' '.join(cc),[json.loads(x) for x in r.stdout.splitlines() if x.strip()]
 def contract(root):
+ """Evaluate the source and runtime evidence for this contract."""
  errors=[];vm=(root/'src/miniquake/quakec/vm.ml').read_text(encoding='utf-8-sig');tests=(root/'tests/quakec_vm_tests.ml').read_text(encoding='utf-8-sig')
  for m in ('function canonicalString(text)','protocolText.decodeBytes','function validatePointer(machine, pointer, wordCount)','QuakeC pointer crosses an edict boundary','leftBytes = protocolText.encodeBytes(left)','machine.trace = false','function executeState(machine, frameOffset, thinkOffset)','loaded = try(entityField(machine, entityIndex, fieldOffset))','QuakeC entity outside edict table'):
   if m not in vm:errors.append('missing VM marker: '+m)
@@ -39,6 +54,7 @@ def contract(root):
  if vm.count('setWord(machine, op.OFS_RETURN')<3:errors.append('three-word return copy is not visible')
  return errors
 def main():
+ """Run the command-line workflow and return its process exit status."""
  ap=argparse.ArgumentParser();ap.add_argument('root',nargs='?',default='.');ap.add_argument('--root',dest='root_flag');ap.add_argument('--write-golden',action='store_true');ap.add_argument('--json-output');a=ap.parse_args();root=Path(a.root_flag or a.root).resolve();doc=document(root);g=root/GOLDEN
  if a.write_golden:g.parent.mkdir(parents=True,exist_ok=True);g.write_text(json.dumps(doc,indent=2)+'\n',encoding='utf-8')
  errors=[]

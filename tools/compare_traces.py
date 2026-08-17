@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
 """Compare two MiniQuake compatibility traces and report the first divergence.
 
 The tool uses only the Python standard library.  Exit status is 0 for byte-
@@ -44,14 +47,17 @@ class LineDifference:
 
 
 def sha256_bytes(data: bytes) -> str:
+    """Compute the SHA-256 digest of the supplied bytes."""
     return hashlib.sha256(data).hexdigest()
 
 
 def trace_info(path: Path, data: bytes, lines: list[str]) -> TraceInfo:
+    """Read trace metadata and normalized frame records from one file."""
     return TraceInfo(path.name, len(data), len(lines), sha256_bytes(data))
 
 
 def parse_fields(line: str) -> tuple[str, dict[str, str]]:
+    """Parse fields into its normalized representation."""
     parts = line.split("|")
     fields: dict[str, str] = {}
     for part in parts[1:]:
@@ -62,6 +68,7 @@ def parse_fields(line: str) -> tuple[str, dict[str, str]]:
 
 
 def frame_number(prefix: str) -> int | None:
+    """Compute the reference frame number value for a deterministic fixture."""
     if not prefix.startswith("frame="):
         return None
     try:
@@ -71,6 +78,7 @@ def frame_number(prefix: str) -> int | None:
 
 
 def first_difference(left_lines: list[str], right_lines: list[str]) -> LineDifference | None:
+    """Return difference from the normalized evidence."""
     count = max(len(left_lines), len(right_lines))
     for index in range(count):
         left_line = left_lines[index] if index < len(left_lines) else None
@@ -115,6 +123,7 @@ def first_difference(left_lines: list[str], right_lines: list[str]) -> LineDiffe
 
 
 def comparison(left_path: Path, right_path: Path) -> dict[str, object]:
+    """Compare comparison and report the first mismatch."""
     left_data = left_path.read_bytes()
     right_data = right_path.read_bytes()
     # MiniQuake emits UTF-8/ASCII with LF. splitlines() also tolerates a final LF.
@@ -131,6 +140,7 @@ def comparison(left_path: Path, right_path: Path) -> dict[str, object]:
 
 
 def print_human(report: dict[str, object]) -> None:
+    """Emit human in the requested report format."""
     left = report["left"]
     right = report["right"]
     assert isinstance(left, dict) and isinstance(right, dict)
@@ -157,6 +167,7 @@ def print_human(report: dict[str, object]) -> None:
 
 
 def self_test() -> None:
+    """Exercise the tool with synthetic fixtures and verify its invariants."""
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         a = root / "a.mqtrace"
@@ -180,6 +191,7 @@ def self_test() -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("left", nargs="?", help="first .mqtrace file")
     parser.add_argument("right", nargs="?", help="second .mqtrace file")

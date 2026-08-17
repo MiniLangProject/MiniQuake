@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
+"""Verify the check opt001cr3r6 compatibility and regression contract."""
+
 from __future__ import annotations
 import argparse, json, re
 from pathlib import Path
@@ -9,13 +14,17 @@ STATUS='opt001cr3r8_performance_audio_ui_candidate_v1'
 FINGERPRINT='0x1c001c10'
 
 def function_block(text: str, name: str) -> str:
+    """Extract one complete MiniLang function body from source text."""
     m=re.search(rf"(?ms)^function(?:\s+inline)?\s+{re.escape(name)}\b.*?^end function$", text)
     return m.group(0) if m else ""
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     ap=argparse.ArgumentParser(); ap.add_argument('--root',default='.'); ap.add_argument('--json',default=''); args=ap.parse_args()
     root=Path(args.root).resolve(); errors=[]
-    def text(rel): return (root/rel).read_text(encoding='utf-8')
+    def text(rel):
+        """Read one repository-relative UTF-8 source file for the enclosing check."""
+        return (root/rel).read_text(encoding='utf-8')
     main_src=text('src/main.ml'); vid=text('src/miniquake/gl_vidnt.ml'); world=text('src/miniquake/render/world.ml')
     bi=text('src/miniquake/build_info.ml'); allocation=text('tests/opt001c_contract_tests.ml')
     hot=text('tests/opt001cr3_hotpath_tests.ml'); runner=text('scripts/TEST_'+REV+'.ps1')

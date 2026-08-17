@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
 """Static contract for OPT-001CR2 artifact-prefix and handle-confirmation repair."""
 from __future__ import annotations
 
@@ -9,6 +12,7 @@ from pathlib import Path
 
 
 def sha256(path: Path) -> str:
+    """Compute the SHA-256 digest of the requested file."""
     h = hashlib.sha256()
     with path.open("rb") as fh:
         for block in iter(lambda: fh.read(1024 * 1024), b""):
@@ -17,12 +21,14 @@ def sha256(path: Path) -> str:
 
 
 def require(text: str, markers: list[str], label: str, errors: list[str]) -> None:
+    """Require require and record a clear failure otherwise."""
     for marker in markers:
         if marker not in text:
             errors.append(f"{label} missing marker: {marker}")
 
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", default=".")
     parser.add_argument("--json", default="")

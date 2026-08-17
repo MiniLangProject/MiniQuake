@@ -362,7 +362,7 @@ function create(args)
     -1,
     "",
     [],
-    -1,
+    0,
     1.0,
     false,
     false,
@@ -1163,6 +1163,20 @@ function destroyScene(session)
   return true
 end function
 
+// Clear the non-authoritative world retained solely for demo or remote
+// presentation. A live local server owns these fields and must keep them
+// across renderer rebuilds; an inactive server must not let an old demo BSP
+// suppress preparation of the next remote server's world.
+function clearInactivePresentationWorld(session)
+  if session.server.active then return false end if
+  session.server.worldModel = void
+  session.server.modelName = ""
+  session.server.modelPrecache = []
+  session.server.soundPrecache = []
+  session.server.levelName = ""
+  return true
+end function
+
 // Provide rebuild renderer resources behavior for the active subsystem.
 function rebuildRendererResources(session)
   videoState = glvid.VID_State()
@@ -1263,6 +1277,11 @@ function connectRemoteHost(session, hostName)
   if session.client.connected then client.disconnect(session.client) end if
   if session.server.active then Host_ShutdownServer(session, false) end if
   destroyScene(session)
+  // Demo playback stores its parsed BSP in session.server as a presentation
+  // cache even though no local server is active. Leaving that pointer alive
+  // makes the post-signon remote-scene guard believe the joined map is already
+  // prepared, so the client remains on the console background indefinitely.
+  clearInactivePresentationWorld(session)
   remoteClient = client.create(session.player)
   remoteClient.name = cvar.variableString(session.cvars, "_cl_name")
   remoteClient.colors = native.trunc(cvar.variableValue(session.cvars, "_cl_color"))
@@ -1286,6 +1305,7 @@ function connectRemoteHostInterop(session, hostName, timeoutMilliseconds, resend
   if session.client.connected then client.disconnect(session.client) end if
   if session.server.active then Host_ShutdownServer(session, false) end if
   destroyScene(session)
+  clearInactivePresentationWorld(session)
   remoteClient = client.create(session.player)
   remoteClient.name = cvar.variableString(session.cvars, "_cl_name")
   remoteClient.colors = native.trunc(cvar.variableValue(session.cvars, "_cl_color"))
@@ -1581,11 +1601,19 @@ end function
 function Host_Connect_f(session, arguments)
   remoteName = networkCommandAddress(arguments)
   if remoteName == "" then print "connect <server>"; return false end if
-  session.demoNumber = -1
+  // A retail attract demo can finish in the same frame as the menu action and
+  // leave its successor queued in Cbuf. Merely setting demonum to -1 does not
+  // remove that already queued playdemo; if it runs after the successful join
+  // it disconnects the new remote client and appears as a frozen full console.
+  stopAttractMode(session)
   connected = try(connectRemoteHost(session, remoteName))
   if connected is error then print connected.message; return false end if
-  client.reconnect(session.client)
-  return true
+  // Host_Connect_f in Quake finishes through Host_Reconnect_f. Restore an
+  // unambiguous gameplay input destination even when the command originated
+  // from a menu or console, then show the normal signon loading plaque.
+  setMenuActive(session, false)
+  setConsoleActive(session, false)
+  return Host_Reconnect_f(session)
 end function
 
 // Apply the Quake-compatible host savegame f behavior.
@@ -1867,10 +1895,6 @@ function Host_Startdemos_f(session, arguments)
     index = index + 1
   end while
   print count + " demo(s) in loop"
-  // host_cmd.c arms cls.demonum at slot zero before deciding whether the
-  // first demo can start immediately. The previous -1 guard prevented a
-  // directory-only launch from ever entering the attract loop.
-  session.demoNumber = 0
   // +map / validation starts are authoritative.  quake.rc is executed before
   // initialize() performs that direct map start in MiniQuake, so queuing
   // playdemo here would otherwise run after the requested map and tear down
@@ -1879,7 +1903,13 @@ function Host_Startdemos_f(session, arguments)
     session.demoNumber = -1
     return true
   end if
-  if not session.server.active and session.demoPlayback is void then
+  // client_static_t is zero-initialized in GLQuake, so a normal directory-only
+  // launch enters this command with demonum == 0. Host_Connect_f and
+  // CL_EstablishConnection deliberately change it to -1. Preserve that stop
+  // sentinel when quake.rc reaches startdemos after a startup +connect;
+  // otherwise playdemo disconnects the freshly joined multiplayer client.
+  if not session.server.active and session.demoNumber != -1 and session.demoPlayback is void and not session.client.connected then
+    session.demoNumber = 0
     queued = nextDemo(session)
     if queued then return true end if
   end if
@@ -2518,13 +2548,16 @@ end function
 
 // Apply the Quake-compatible host init behavior.
 function Host_Init(session)
-  // MiniLang's default small-object threshold runs a complete mark/sweep
-  // collection after 8 MiB of tiny allocations. Scanning Quake's live map,
-  // VM and renderer graph in the middle of Host_Frame creates visible
-  // 50-200 ms pauses. MiniQuake owns a 2 GiB reserved/committed heap and explicit safe
-  // collection points in diagnostic/validation flows; allocation-failure GC
-  // remains enabled by the runtime.
-  gc_set_limit(0)
+  // The original 8 MiB small-object threshold collected far too often during
+  // rendering. Disabling periodic collection entirely avoided those pauses,
+  // but every frame then retained its temporary allocation range until the
+  // 2 GiB arena filled. Two windowed multiplayer instances consequently
+  // committed roughly 4 GiB and fell into paging while both still displayed
+  // their last FPS value. A 256 MiB allocation interval keeps collections
+  // infrequent, bounds each process' resident growth, and retains OOM GC as a
+  // final safety net. Level transitions still collect explicitly under the
+  // loading plaque below.
+  gc_set_limit(268435456)
   // An empty requested map is meaningful: --play BASEDIR asks quake.rc to
   // start the retail attract demos and show the menu over their playback.
   attractStartup = session.startMap == ""
@@ -3097,6 +3130,10 @@ function handleExactMenuAction(session, result)
         playMenuSound(session, "misc/menu3.wav")
         return true
       end if
+      // Stop the attract loop at menu-action time, before the queued connect
+      // command's next host frame. This removes a next-demo command that may
+      // already have been queued earlier in the current frame.
+      stopAttractMode(session)
       setMenuActive(session, false)
       cmd.addText(session.commands, "connect \"" + result[1] + "\"\n")
       playMenuSound(session, "misc/menu2.wav")

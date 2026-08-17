@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """Shared source-guided checker for BP-035..BP-039 client/render block."""
 from __future__ import annotations
 import argparse, hashlib, json, os, shutil, struct, subprocess, tempfile
@@ -67,19 +71,23 @@ CONFIG = {
 }
 
 def f32(value: float) -> float:
+    """Round a value through the IEEE-754 binary32 representation."""
     return struct.unpack('<f', struct.pack('<f', float(value)))[0]
 
 def fbits(value: float) -> int:
+    """Return the IEEE-754 binary32 bit pattern for a Python float."""
     return struct.unpack('<I', struct.pack('<f', float(value)))[0]
 
 def quake_anglemod(value: float) -> float:
     # mathlib.c receives a float parameter, performs the quantization with
     # double constants, then stores the result back into a float.
+    """Reproduce the reference quake anglemod operation for differential testing."""
     a = f32(value)
     quantized = int(a * (65536.0 / 360.0)) & 65535
     return f32((360.0 / 65536.0) * quantized)
 
 def rows(component: str):
+    """Build the deterministic result rows for this verifier."""
     if component == '035':
         return [
             {'name':'lerp_half_fbits','value':fbits((1.95 - 1.9) / f32(2.0 - 1.9))},
@@ -138,9 +146,11 @@ def rows(component: str):
     ]
 
 def sha256(path: Path) -> str:
+    """Compute the SHA-256 digest of the requested file."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 def document(root: Path, component: str):
+    """Render the canonical evidence document for this verifier."""
     c = CONFIG[component]
     return {
         'schema': c['schema'], 'package_id': c['package'], 'parent_package_id': c['parent'],
@@ -150,6 +160,7 @@ def document(root: Path, component: str):
     }
 
 def compiler():
+    """Locate a supported C compiler for the reference oracle."""
     candidates = ([os.environ['CC']] if os.environ.get('CC') else []) + ['cc','gcc','clang']
     for candidate in candidates:
         parts = candidate.split()
@@ -157,6 +168,7 @@ def compiler():
     return None
 
 def run_oracle(root: Path, component: str):
+    """Run oracle and capture its deterministic result."""
     cc = compiler()
     if not cc: return True, 'not available', []
     oracle = root/CONFIG[component]['oracle']
@@ -171,6 +183,7 @@ def run_oracle(root: Path, component: str):
         return run.returncode == 0, ' '.join(cc), actual
 
 def check_contract(root: Path, component: str, allow_downstream_package: bool = False):
+    """Validate contract and return its contract findings."""
     c=CONFIG[component]; errors=[]
     for rel, markers in c['markers'].items():
         path=root/rel
@@ -229,6 +242,7 @@ def check_contract(root: Path, component: str, allow_downstream_package: bool = 
     return errors
 
 def run_component(component: str, argv=None):
+    """Run component and capture its deterministic result."""
     c=CONFIG[component]
     ap=argparse.ArgumentParser(); ap.add_argument('root',nargs='?',default='.'); ap.add_argument('--root',dest='root_flag'); ap.add_argument('--write-golden',action='store_true'); ap.add_argument('--json-output'); ap.add_argument('--allow-downstream-package',action='store_true')
     args=ap.parse_args(argv)

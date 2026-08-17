@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
 """Validate the BP-060..064R6 cross-process evidence wrapper contract."""
 
 from __future__ import annotations
@@ -20,6 +23,7 @@ class Report:
 
 
 def validate_text(text: str) -> Report:
+    """Validate text and return its contract findings."""
     errors: list[str] = []
     required = (
         '$DeliveryRevision = "BP-060-064R6"',
@@ -74,6 +78,7 @@ def validate_text(text: str) -> Report:
 
 
 def self_test() -> int:
+    """Exercise the tool with synthetic fixtures and verify its invariants."""
     good = "\n".join((
         '$DeliveryRevision = "BP-060-064R6"',
         "function Start-BackgroundCapturedProcess",
@@ -104,6 +109,7 @@ def self_test() -> int:
 
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root_pos", nargs="?")
     parser.add_argument("--root", dest="root_opt")

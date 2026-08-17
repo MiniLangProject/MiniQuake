@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
 """Source contract for OPT-001CR1 delivery syntax repair."""
 from __future__ import annotations
 
@@ -10,6 +13,7 @@ from pathlib import Path
 
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", default=".")
     parser.add_argument("--json", default="")

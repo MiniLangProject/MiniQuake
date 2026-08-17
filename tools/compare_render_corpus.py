@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
 """Validate MiniQuake's deterministic render corpus and optional GLQuake refs."""
 from __future__ import annotations
 import argparse, importlib.util, json, pathlib, sys, tempfile
@@ -7,6 +10,7 @@ SCENARIOS = ("start-064", "start-128", "e1m1-128")
 MIN_SSIM = 0.95
 
 def load_comparator(root: pathlib.Path):
+    """Load the render-comparison module used by the corpus check."""
     path = root / "tools" / "compare_render_evidence.py"
     spec = importlib.util.spec_from_file_location("mq_compare_render_evidence", path)
     if spec is None or spec.loader is None:
@@ -17,6 +21,7 @@ def load_comparator(root: pathlib.Path):
     return module
 
 def validate(root: pathlib.Path, mini: pathlib.Path, original: pathlib.Path | None) -> dict[str, object]:
+    """Validate candidate evidence and return its contract violations."""
     comparator = load_comparator(root)
     entries: list[dict[str, object]] = []
     ok = True
@@ -60,6 +65,7 @@ def validate(root: pathlib.Path, mini: pathlib.Path, original: pathlib.Path | No
     }
 
 def self_test(root: pathlib.Path) -> None:
+    """Exercise the tool with synthetic fixtures and verify its invariants."""
     comparator = load_comparator(root)
     with tempfile.TemporaryDirectory() as directory:
         base = pathlib.Path(directory)
@@ -76,6 +82,7 @@ def self_test(root: pathlib.Path) -> None:
     print("MiniQuake render-evidence corpus comparator self-test: PASS")
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", default=str(pathlib.Path(__file__).resolve().parents[1]))
     parser.add_argument("--mini-dir")

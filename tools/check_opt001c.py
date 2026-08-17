@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
 """Static OPT-001C frame-allocation and delivery contract checks."""
 from __future__ import annotations
 
@@ -13,12 +16,14 @@ PARENT = "OPT-001B"
 
 
 def require(text: str, markers: list[str], label: str, errors: list[str]) -> None:
+    """Require require and record a clear failure otherwise."""
     for marker in markers:
         if marker not in text:
             errors.append(f"{label} missing marker: {marker}")
 
 
 def trace_calls(text: str) -> list[tuple[int, str]]:
+    """Extract traced function calls and their argument lists from source text."""
     result: list[tuple[int, str]] = []
     for number, line in enumerate(text.splitlines(), 1):
         if "traceCommand(" in line and not line.lstrip().startswith("function traceCommand"):
@@ -27,6 +32,7 @@ def trace_calls(text: str) -> list[tuple[int, str]]:
 
 
 def gl11_guard_errors(text: str) -> tuple[list[str], int]:
+    """Return the contract violations found by the gl11 guard guard."""
     errors: list[str] = []
     calls = trace_calls(text)
     for number, line in calls:
@@ -38,6 +44,7 @@ def gl11_guard_errors(text: str) -> tuple[list[str], int]:
 
 
 def world_guard_errors(text: str) -> tuple[list[str], int]:
+    """Return the contract violations found by the world guard guard."""
     errors: list[str] = []
     lines = text.splitlines()
     calls = trace_calls(text)
@@ -50,6 +57,7 @@ def world_guard_errors(text: str) -> tuple[list[str], int]:
 
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", default=".")
     parser.add_argument("--json", default="")

@@ -1,21 +1,36 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+"""Verify the check server physics compatibility and regression contract."""
+
 from __future__ import annotations
 import argparse,hashlib,json,os,shutil,struct,subprocess,tempfile
 from pathlib import Path
 PACKAGE='BP-028';PARENT='BP-027';GOLDEN='audit/server_physics_golden.json';ORACLE='tools/oracle/server_physics_oracle.c'
 RUNTIME_FIXTURES=22
-def sha(p):return hashlib.sha256(Path(p).read_bytes()).hexdigest()
-def fbits(v):return struct.unpack('<I',struct.pack('<f',v))[0]
+def sha(p):
+    """Compute the SHA-256 digest of the requested file."""
+    return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+def fbits(v):
+    """Return the IEEE-754 binary32 bit pattern for a Python float."""
+    return struct.unpack('<I',struct.pack('<f',v))[0]
 def rows():
+ """Build the deterministic result rows for this verifier."""
  vals=[('stop_epsilon_bits',fbits(.1)),('step_size_bits',fbits(18.0)),('max_clip_planes',5),('fly_bumps',4),('push_overbounce_bits',fbits(1.0)),('bounce_overbounce_bits',fbits(1.5)),('default_gravity_bits',fbits(1.0)),('corpse_x_bits',fbits(0.0)),('corpse_y_bits',fbits(0.0)),('corpse_z_bits',fbits(-24.0)),('movetype_follow_allowed',0),('movetype_bouncemissile_allowed',0),('q2_dispatch_enabled',0),('touch_is_strict_overlap',0),('pusher_relink_required',1),('noclip_relink_required',1),('fixture_count',18),('strict_quake1',1)]
  return [{'kind':'case','name':n,'value':v} for n,v in vals]
-def doc(root):return {'schema':'MiniQuakeServerPhysicsGolden/1','package_id':PACKAGE,'parent_package_id':PARENT,'sources':['sv_phys.c','server.h','world.h'],'rows':rows(),'reference':{'oracle':ORACLE,'oracle_sha256':sha(root/ORACLE)}}
+def doc(root):
+    """Render the canonical evidence document for this verifier."""
+    return {'schema':'MiniQuakeServerPhysicsGolden/1','package_id':PACKAGE,'parent_package_id':PARENT,'sources':['sv_phys.c','server.h','world.h'],'rows':rows(),'reference':{'oracle':ORACLE,'oracle_sha256':sha(root/ORACLE)}}
 def cc():
+ """Locate a supported C compiler for the reference oracle."""
  for x in ([os.environ['CC']] if os.environ.get('CC') else [])+['cc','gcc','clang']:
   a=x.split()
   if shutil.which(a[0]):return a
  return None
 def oracle(root):
+ """Compile and run the reference oracle for this verifier."""
  c=cc()
  if not c:return True,'not available',[]
  with tempfile.TemporaryDirectory(prefix='mq-bp028-') as td:
@@ -23,6 +38,7 @@ def oracle(root):
   if b.returncode:return False,b.stdout+b.stderr,[]
   r=subprocess.run([str(e)],capture_output=True,text=True);return r.returncode==0,' '.join(c),[json.loads(z) for z in r.stdout.splitlines() if z.strip()]
 def contract(root):
+ """Evaluate the source and runtime evidence for this contract."""
  e=[];s=(root/'src/miniquake/physics.ml').read_text(encoding='utf-8-sig');t=(root/'tests/server_physics_parity_tests.ml').read_text(encoding='utf-8-sig');old=(root/'tests/sv_phys_port_tests.ml').read_text(encoding='utf-8-sig')
  for m in ('function strictQuake109()','function collapsePusherCorpseBounds(mins)','collision.linkEntity(server, pusherIndex, false)','collision.linkEntity(server, entityIndex, true)','function SV_Physics_NonClientEntity(server, entityIndex, frameTime, gravity, maxVelocity)'):
   if m not in s:e.append('missing physics marker: '+m)
@@ -35,6 +51,7 @@ def contract(root):
  if 'testStrictQuakeOneDispatch' not in old:e.append('legacy sv_phys regression still expects QUAKE2 auto-dispatch')
  return e
 def main():
+ """Run the command-line workflow and return its process exit status."""
  ap=argparse.ArgumentParser();ap.add_argument('root',nargs='?',default='.');ap.add_argument('--root',dest='rf');ap.add_argument('--write-golden',action='store_true');ap.add_argument('--json-output');a=ap.parse_args();root=Path(a.rf or a.root).resolve();d=doc(root);g=root/GOLDEN
  if a.write_golden:g.parent.mkdir(parents=True,exist_ok=True);g.write_text(json.dumps(d,indent=2)+'\n',encoding='utf-8')
  errors=[]

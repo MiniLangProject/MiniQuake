@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """Verify BP-013 Protocol-15 static/event/scoreboard/drop parity.
 
 The Python model is intentionally independent from the MiniLang implementation.
@@ -29,31 +33,38 @@ CASE_GROUPS = ("particle_count", "datagram_gate", "frag_compare", "stored_frag",
 
 
 def f32(value: float | int) -> float:
+    """Round a value through the IEEE-754 binary32 representation."""
     return struct.unpack("<f", struct.pack("<f", float(value)))[0]
 
 
 def c_float_product(left: float | int, right: float | int) -> float:
+    """Reproduce the reference c float product operation for differential testing."""
     return f32(f32(left) * f32(right))
 
 
 def byte(value: float | int) -> int:
+    """Compute the reference byte value for a deterministic fixture."""
     return int(value) & 0xFF
 
 
 def short_bytes(value: float | int) -> bytes:
+    """Compute the reference short bytes value for a deterministic fixture."""
     return struct.pack("<H", int(value) & 0xFFFF)
 
 
 def write_coord(output: bytearray, value: float | int) -> None:
+    """Encode and write coord to the fixture buffer."""
     output.extend(short_bytes(int(c_float_product(value, 8.0))))
 
 
 def write_angle(output: bytearray, value: float | int) -> None:
+    """Encode and write angle to the fixture buffer."""
     rounded = f32(value)
     output.append((int((int(rounded) * 256) / 360)) & 0xFF)
 
 
 def vector(name: str, output: bytes | bytearray) -> dict[str, Any]:
+    """Package one encoded protocol message as a deterministic vector row."""
     raw = bytes(output)
     return {"kind": "vector", "name": name, "bytes": raw.hex(), "length": len(raw)}
 
@@ -66,6 +77,7 @@ def write_spawn_static(
     origin: tuple[float, float, float],
     angles: tuple[float, float, float],
 ) -> bytearray:
+    """Encode and write spawn static to the fixture buffer."""
     output = bytearray((20, byte(model), byte(frame), byte(colormap), byte(skin)))
     for coordinate, angle in zip(origin, angles):
         write_coord(output, coordinate)
@@ -76,6 +88,7 @@ def write_spawn_static(
 def write_static_sound(
     origin: tuple[float, float, float], sound: int, volume: float, attenuation: float
 ) -> bytearray:
+    """Encode and write static sound to the fixture buffer."""
     output = bytearray((29,))
     for coordinate in origin:
         write_coord(output, coordinate)
@@ -90,6 +103,7 @@ def write_static_sound(
 
 
 def direction_byte(value: float) -> int:
+    """Compute the reference direction byte value for a deterministic fixture."""
     encoded = int(c_float_product(value, 16.0))
     return max(-128, min(127, encoded))
 
@@ -100,6 +114,7 @@ def write_particle(
     color: int,
     count: int,
 ) -> bytearray:
+    """Encode and write particle to the fixture buffer."""
     output = bytearray((18,))
     for coordinate in origin:
         write_coord(output, coordinate)
@@ -109,27 +124,33 @@ def write_particle(
 
 
 def quake_c_string(value: bytes) -> bytearray:
+    """Reproduce the reference quake c string operation for differential testing."""
     return bytearray(value.split(b"\0", 1)[0]) + bytearray((0,))
 
 
 def write_name(index: int, value: bytes) -> bytearray:
+    """Encode and write name to the fixture buffer."""
     return bytearray((13, byte(index))) + quake_c_string(value)
 
 
 def write_frags(index: int, value: float | int) -> bytearray:
+    """Encode and write frags to the fixture buffer."""
     return bytearray((14, byte(index))) + bytearray(short_bytes(value))
 
 
 def write_colors(index: int, value: int) -> bytearray:
+    """Encode and write colors to the fixture buffer."""
     return bytearray((17, byte(index), byte(value)))
 
 
 def color_component(value: int) -> int:
+    """Compute the reference color component value for a deterministic fixture."""
     result = int(value) & 15
     return min(result, 13)
 
 
 def expected_model() -> dict[str, Any]:
+    """Build the deterministic expected model fixture used by this verifier."""
     origin_a = (-12.25, 0.125, 4095.875)
     angles_a = (90.75, -90.9, 359.9)
     origin_b = (10.0, -20.0, 30.0)
@@ -182,6 +203,7 @@ def expected_model() -> dict[str, Any]:
 
 
 def complete_golden(root: Path) -> dict[str, Any]:
+    """Build the deterministic complete golden fixture used by this verifier."""
     model = expected_model()
     oracle = root / "tools" / "oracle" / "protocol15_events_oracle.c"
     return {
@@ -227,6 +249,7 @@ def complete_golden(root: Path) -> dict[str, Any]:
 
 
 def sha256_file(path: Path) -> str:
+    """Compute the SHA-256 digest of the requested file."""
     import hashlib
 
     digest = hashlib.sha256()
@@ -237,6 +260,7 @@ def sha256_file(path: Path) -> str:
 
 
 def parse_oracle(output: str) -> dict[str, Any]:
+    """Parse oracle into its normalized representation."""
     rows = [json.loads(line) for line in output.splitlines() if line.strip()]
     vectors = [row for row in rows if row.get("kind") == "vector"]
     cases: dict[str, list[dict[str, Any]]] = {}
@@ -250,12 +274,14 @@ def parse_oracle(output: str) -> dict[str, Any]:
 
 
 def function_body(text: str, name: str) -> str:
+    """Extract one complete MiniLang function body from source text."""
     pattern = re.compile(rf"(?ms)^function\s+{re.escape(name)}\s*\([^\n]*\)\s*\n(.*?)^end function\s*$")
     match = pattern.search(text)
     return match.group(1) if match else ""
 
 
 def source_contract(root: Path) -> tuple[list[str], dict[str, Any]]:
+    """Build the deterministic source contract fixture used by this verifier."""
     errors: list[str] = []
     paths = {
         "events": "src/miniquake/protocol_events.ml",
@@ -400,6 +426,7 @@ def source_contract(root: Path) -> tuple[list[str], dict[str, Any]]:
 
 
 def find_compilers() -> list[str]:
+    """Locate compilers from the available inputs."""
     result: list[str] = []
     for candidate in ("gcc", "clang", "cc"):
         path = shutil.which(candidate)
@@ -409,6 +436,7 @@ def find_compilers() -> list[str]:
 
 
 def compile_oracle(root: Path, compiler: str) -> tuple[dict[str, Any] | None, str]:
+    """Compile and execute the C reference oracle with one compiler."""
     source = root / "tools" / "oracle" / "protocol15_events_oracle.c"
     with tempfile.TemporaryDirectory(prefix="bp013-events-") as temp:
         executable = Path(temp) / ("oracle.exe" if os.name == "nt" else "oracle")
@@ -439,6 +467,7 @@ def compile_oracle(root: Path, compiler: str) -> tuple[dict[str, Any] | None, st
 
 
 def verify(root: Path, require_c_oracle: bool = False) -> dict[str, Any]:
+    """Evaluate all source, golden and oracle evidence for this verifier."""
     checks: list[dict[str, Any]] = []
     model = expected_model()
 
@@ -529,6 +558,7 @@ def verify(root: Path, require_c_oracle: bool = False) -> dict[str, Any]:
 
 
 def print_report(report: dict[str, Any]) -> None:
+    """Emit report in the requested report format."""
     print("MiniQuake BP-013 Protocol 15 event verification")
     for check in report["checks"]:
         print(f"  [{'PASS' if check['passed'] else 'FAIL'}] {check['name']}")
@@ -542,6 +572,7 @@ def print_report(report: dict[str, Any]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root_arg", nargs="?", type=Path)
     parser.add_argument("--root", type=Path)

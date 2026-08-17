@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
 """Self-contained integrity and source-hygiene verifier for MiniQuake.
 
 Historical subsystem semantics are checked by the source-guided component
@@ -208,6 +211,7 @@ class Check:
 
 
 def sha256(path: Path) -> str:
+    """Compute the SHA-256 digest of the requested file."""
     h = hashlib.sha256()
     with path.open("rb") as fh:
         for block in iter(lambda: fh.read(1024 * 1024), b""):
@@ -246,6 +250,7 @@ def refresh_manifest(root: Path) -> int:
 
 
 def parse_manifest(path: Path) -> dict[str, str]:
+    """Parse manifest into its normalized representation."""
     values: dict[str, str] = {}
     for number, raw in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), 1):
         if not raw.strip():
@@ -271,6 +276,7 @@ def check_required(root: Path) -> Check:
 
 
 def check_manifest(root: Path) -> Check:
+    """Validate manifest and return its contract findings."""
     errors: list[str] = []
     try:
         listed = parse_manifest(root / MANIFEST)
@@ -292,6 +298,7 @@ def check_manifest(root: Path) -> Check:
 
 
 def marker_errors(text: str, markers: list[str], label: str) -> list[str]:
+    """Return the contract violations found by the marker guard."""
     return [f"{label} missing marker: {m}" for m in markers if m not in text]
 
 
@@ -322,6 +329,7 @@ def check_identity(root: Path) -> Check:
 
 
 def check_r8_visual_parity(root: Path) -> Check:
+    """Validate r8 visual parity and return its contract findings."""
     errors: list[str] = []
     main = (root / "src/main.ml").read_text(encoding="utf-8-sig")
     world = (root / "src/miniquake/render/world.ml").read_text(encoding="utf-8-sig")
@@ -362,6 +370,7 @@ def check_r8_visual_parity(root: Path) -> Check:
 
 
 def check_r9_network_provenance(root: Path) -> Check:
+    """Validate r9 network provenance and return its contract findings."""
     errors: list[str] = []
     host = (root / "src/miniquake/host.ml").read_text(encoding="utf-8-sig")
     contract = (root / "src/miniquake/external_reference_contract.ml").read_text(encoding="utf-8-sig")
@@ -404,6 +413,7 @@ def check_r9_network_provenance(root: Path) -> Check:
 
 
 def check_r10_original_server_readiness(root: Path) -> Check:
+    """Validate r10 original server readiness and return its contract findings."""
     errors: list[str] = []
     runner = (root / "scripts" / "TEST_BP-090-094R12.ps1").read_text(encoding="utf-8-sig")
     testing = (root / "docs/archive/releases/BP-090-094R10_TESTING.md").read_text(encoding="utf-8-sig")
@@ -473,6 +483,7 @@ def check_r10_original_server_readiness(root: Path) -> Check:
 
 
 def check_r11_original_reference_handoff(root: Path) -> Check:
+    """Validate r11 original reference handoff and return its contract findings."""
     errors: list[str] = []
     runner = (root / "scripts" / "TEST_BP-090-094R12.ps1").read_text(encoding="utf-8-sig")
     prepare = (root / "tools/prepare_original_reference.py").read_text(encoding="utf-8-sig")
@@ -588,6 +599,7 @@ def check_r11_original_reference_handoff(root: Path) -> Check:
 
 
 def check_r12_persistent_original_connect(root: Path) -> Check:
+    """Validate r12 persistent original connect and return its contract findings."""
     errors: list[str] = []
     main = (root / "src/main.ml").read_text(encoding="utf-8-sig")
     host = (root / "src/miniquake/host.ml").read_text(encoding="utf-8-sig")
@@ -656,6 +668,7 @@ def check_r12_persistent_original_connect(root: Path) -> Check:
 
 
 def check_r13_pre_fallback_readiness_guard(root: Path) -> Check:
+    """Validate r13 pre fallback readiness guard and return its contract findings."""
     errors: list[str] = []
     main = (root / "src/main.ml").read_text(encoding="utf-8-sig")
     host = (root / "src/miniquake/host.ml").read_text(encoding="utf-8-sig")
@@ -727,6 +740,7 @@ def check_r13_pre_fallback_readiness_guard(root: Path) -> Check:
 
 
 def check_r14_original_capture_ensemble(root: Path) -> Check:
+    """Validate r14 original capture ensemble and return its contract findings."""
     errors=[]
     runner=(root/'scripts'/'TEST_BP-090-094R14.ps1').read_text(encoding='utf-8-sig')
     comparator=(root/'tools/compare_original_reference.py').read_text(encoding='utf-8-sig')
@@ -751,6 +765,7 @@ def check_r14_original_capture_ensemble(root: Path) -> Check:
     return Check('bp090094r14_original_capture_ensemble_contract',not errors,{'capture_completion':'validated_tga_size_hash_stability','original_runs':2,'minimum_reference_ssim':0.98,'candidate_reference_aggregation':'minimum_ssim','minimum_candidate_ssim':0.95},errors)
 
 def check_r15_visual_timestep_parity(root: Path) -> Check:
+    """Validate r15 visual timestep parity and return its contract findings."""
     errors: list[str] = []
     runner = (root / "scripts" / "TEST_BP-090-094R15.ps1").read_text(encoding="utf-8-sig")
     host = (root / "src/miniquake/host.ml").read_text(encoding="utf-8-sig")
@@ -835,6 +850,7 @@ def check_r15_visual_timestep_parity(root: Path) -> Check:
 
 
 def check_no_game_data(root: Path) -> Check:
+    """Validate no game data and return its contract findings."""
     errors: list[str] = []
     scanned = 0
     for path in package_files(root):
@@ -846,6 +862,7 @@ def check_no_game_data(root: Path) -> Check:
 
 
 def def_exports(path: Path) -> list[str]:
+    """Parse exported symbol names from a Windows module-definition file."""
     exports: list[str] = []
     in_exports = False
     for raw in path.read_text(encoding="utf-8-sig").splitlines():
@@ -861,6 +878,7 @@ def def_exports(path: Path) -> list[str]:
 
 
 def pe_machine(path: Path) -> int:
+    """Read the PE machine identifier from a Windows executable."""
     data = path.read_bytes()
     if len(data) < 0x40 or data[:2] != b"MZ":
         raise ValueError("not MZ")
@@ -880,11 +898,13 @@ FUNCTION_RE = re.compile(
 
 
 def strip_minilang_comments(text: str) -> str:
+    """Normalize minilang comments for deterministic comparison."""
     text = re.sub(r"/\*.*?\*/", lambda match: "\n" * match.group(0).count("\n"), text, flags=re.S)
     return re.sub(r"//[^\n]*", "", text)
 
 
 def check_current_entry_helper_namespace(root: Path) -> Check:
+    """Validate current entry helper namespace and return its contract findings."""
     relative = "tests/opt001cr3_hotpath_tests.ml"
     path = root / relative
     clean = strip_minilang_comments(path.read_text(encoding="utf-8"))
@@ -1033,6 +1053,7 @@ def ml_files(root: Path) -> list[Path]:
 
 
 def check_minilang(root: Path) -> Check:
+    """Validate minilang and return its contract findings."""
     errors: list[str] = []
     package_by_name: dict[str, Path] = {}
     main_files = 0
@@ -1069,6 +1090,7 @@ def check_minilang(root: Path) -> Check:
 
 
 def check_external_contract(root: Path) -> Check:
+    """Validate external contract and return its contract findings."""
     errors: list[str] = []
     contract = (root / "src/miniquake/external_reference_contract.ml").read_text(encoding="utf-8-sig")
     test = (root / "scripts" / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
@@ -1102,6 +1124,7 @@ def check_external_contract(root: Path) -> Check:
 
 
 def check_named_build_parameter_binding(root: Path) -> Check:
+    """Validate named build parameter binding and return its contract findings."""
     errors: list[str] = []
     current = (root / "scripts" / "TEST_OPT-001D.ps1").read_text(encoding="utf-8-sig")
     errors += marker_errors(current, [
@@ -1132,6 +1155,7 @@ def check_named_build_parameter_binding(root: Path) -> Check:
     )
 
 def check_live_output(root: Path) -> Check:
+    """Validate live output and return its contract findings."""
     errors: list[str] = []
     historical_test = (root / "scripts" / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
     current_test = (root / "scripts" / "TEST_OPT-001D.ps1").read_text(encoding="utf-8-sig")
@@ -1584,6 +1608,7 @@ def check_original_client_port_routing(root: Path) -> Check:
     )
 
 def check_inherited_contract_lineage(root: Path) -> Check:
+    """Validate inherited contract lineage and return its contract findings."""
     errors: list[str] = []
     build = (root / "build.ps1").read_text(encoding="utf-8-sig")
     collector = (root / "scripts" / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
@@ -1616,6 +1641,7 @@ def check_inherited_contract_lineage(root: Path) -> Check:
     )
 
 def check_external_checkers(root: Path) -> Check:
+    """Validate external checkers and return its contract findings."""
     errors: list[str] = []
     reports: dict[str, object] = {}
     for step in range(90, 95):
@@ -1631,6 +1657,7 @@ def check_external_checkers(root: Path) -> Check:
 
 
 def check_opt001b(root: Path) -> Check:
+    """Validate opt001b and return its contract findings."""
     out = root / "build" / "verify-opt001b.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     proc = subprocess.run(
@@ -1651,6 +1678,7 @@ def check_opt001b(root: Path) -> Check:
 
 
 def check_minilang_utf8_no_bom(root: Path) -> Check:
+    """Validate minilang utf8 no bom and return its contract findings."""
     errors: list[str] = []
     checked = 0
     bom_files: list[str] = []
@@ -1681,6 +1709,7 @@ def check_minilang_utf8_no_bom(root: Path) -> Check:
 
 
 def check_minilang_delimiters(root: Path) -> Check:
+    """Validate minilang delimiters and return its contract findings."""
     out = root / "build" / "verify-minilang-delimiters.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     proc = subprocess.run(
@@ -1748,6 +1777,7 @@ def check_embedded_vulkan_shaders(root: Path) -> Check:
 
 
 def check_opt001cr1(root: Path) -> Check:
+    """Validate opt001cr1 and return its contract findings."""
     out = root / "build" / "verify-opt001cr1.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     proc = subprocess.run(
@@ -1771,6 +1801,7 @@ def check_opt001cr1(root: Path) -> Check:
 
 
 def check_opt001cr2(root: Path) -> Check:
+    """Validate opt001cr2 and return its contract findings."""
     out = root / "build" / "verify-opt001cr2.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     proc = subprocess.run(
@@ -1794,6 +1825,7 @@ def check_opt001cr2(root: Path) -> Check:
 
 
 def check_opt001c(root: Path) -> Check:
+    """Validate opt001c and return its contract findings."""
     out = root / "build" / "verify-opt001c.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     proc = subprocess.run(
@@ -1818,6 +1850,7 @@ def check_opt001c(root: Path) -> Check:
 
 
 def check_opt001d(root: Path) -> Check:
+    """Validate opt001d and return its contract findings."""
     out = root / "build" / "verify-opt001d.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     proc = subprocess.run([sys.executable, str(root / "tools/check_opt001d.py"), "--root", str(root), "--json", str(out)], capture_output=True, text=True)
@@ -1831,6 +1864,7 @@ def check_opt001d(root: Path) -> Check:
     return Check("opt001d_performance_audio_ui", not errors, details, errors)
 
 def check_opt001cr3r6(root: Path) -> Check:
+    """Validate opt001cr3r6 and return its contract findings."""
     out = root / "build" / "verify-opt001cr3r6.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     proc = subprocess.run([sys.executable, str(root / "tools/check_opt001cr3r6.py"), "--root", str(root), "--json", str(out)], capture_output=True, text=True)
@@ -1846,6 +1880,7 @@ def check_opt001cr3r6(root: Path) -> Check:
 
 
 def check_opt001cr3(root: Path) -> Check:
+    """Validate opt001cr3 and return its contract findings."""
     out = root / "build" / "verify-opt001cr3.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     proc = subprocess.run([sys.executable, str(root / "tools/check_opt001cr3.py"), "--root", str(root), "--json", str(out)], capture_output=True, text=True)

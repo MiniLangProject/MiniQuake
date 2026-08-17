@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
 """Generate the source-guided WinQuake/GLQuake 1.09 function inventory.
 
 The extractor intentionally follows the formatting of the released id source:
@@ -67,11 +70,14 @@ ML_FUNCTION_RE = re.compile(
 
 
 def sha256_bytes(data: bytes) -> str:
+    """Compute the SHA-256 digest of the supplied bytes."""
     return hashlib.sha256(data).hexdigest()
 
 
 def strip_comments_preserve_lines(text: str) -> str:
+    """Normalize comments preserve lines for deterministic comparison."""
     def block(match: re.Match[str]) -> str:
+        """Replace a block comment with matching newlines to preserve source locations."""
         return "\n" * match.group(0).count("\n")
     text = re.sub(r"/\*.*?\*/", block, text, flags=re.S)
     return re.sub(r"//[^\n]*", "", text)
@@ -128,6 +134,7 @@ def quake2_positive_lines(text: str) -> set[int]:
 
 
 def ml_functions(root: Path) -> dict[str, list[str]]:
+    """Extract MiniLang function declarations from normalized source text."""
     result: dict[str, list[str]] = defaultdict(list)
     for path in sorted(root.rglob("*.ml")):
         relative = path.relative_to(root).as_posix()
@@ -138,6 +145,7 @@ def ml_functions(root: Path) -> dict[str, list[str]]:
 
 
 def source_definitions(root: Path) -> list[dict[str, object]]:
+    """Extract the source definitions used by the inventory."""
     definitions: list[dict[str, object]] = []
     for unit in SOURCE_UNITS:
         path = root / unit
@@ -162,6 +170,7 @@ def source_definitions(root: Path) -> list[dict[str, object]]:
 
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--original-root", required=True, type=Path)
     parser.add_argument("--miniquake-root", required=True, type=Path)

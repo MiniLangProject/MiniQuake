@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """Verify BP-014R1 Protocol-15 temp-entity, dynamic-sound and beam-view parity.
 
 The Python model is independent from the MiniLang implementation. When a C
@@ -27,6 +31,7 @@ CASE_GROUPS = ("temp_kind", "temp_size", "sound_scalar", "timing", "delivery")
 
 
 def sha256_file(path: Path) -> str:
+    """Compute the SHA-256 digest of the requested file."""
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for block in iter(lambda: handle.read(1024 * 1024), b""):
@@ -35,40 +40,49 @@ def sha256_file(path: Path) -> str:
 
 
 def f32(value: float | int) -> float:
+    """Round a value through the IEEE-754 binary32 representation."""
     return struct.unpack("<f", struct.pack("<f", float(value)))[0]
 
 
 def f32_bits(value: float | int) -> int:
+    """Return the IEEE-754 binary32 bit pattern for a Python float."""
     return struct.unpack("<I", struct.pack("<f", f32(value)))[0]
 
 
 def c_float_product(left: float | int, right: float | int) -> float:
+    """Reproduce the reference c float product operation for differential testing."""
     return f32(f32(left) * f32(right))
 
 
 def byte(value: float | int) -> int:
+    """Compute the reference byte value for a deterministic fixture."""
     return int(value) & 0xFF
 
 
 def short_bytes(value: float | int) -> bytes:
+    """Compute the reference short bytes value for a deterministic fixture."""
     return struct.pack("<H", int(value) & 0xFFFF)
 
 
 def write_coord(output: bytearray, value: float | int) -> None:
+    """Encode and write coord to the fixture buffer."""
     output.extend(short_bytes(int(c_float_product(value, 8.0))))
 
 
 def write_position(output: bytearray, value: tuple[float, float, float]) -> None:
+    """Encode and write position to the fixture buffer."""
     for coordinate in value:
         write_coord(output, coordinate)
 
 
 def vector(name: str, output: bytes | bytearray) -> dict[str, Any]:
+    """Package one encoded protocol message as a deterministic vector row."""
     raw = bytes(output)
     return {"kind": "vector", "name": name, "bytes": raw.hex(), "length": len(raw)}
 
 
 def write_temp_point(type_value: int, origin: tuple[float, float, float]) -> bytearray:
+    """Encode and write temp point to the fixture buffer."""
     output = bytearray((23, byte(type_value)))
     write_position(output, origin)
     return output
@@ -80,6 +94,7 @@ def write_temp_beam(
     start: tuple[float, float, float],
     end: tuple[float, float, float],
 ) -> bytearray:
+    """Encode and write temp beam to the fixture buffer."""
     output = bytearray((23, byte(type_value)))
     output.extend(short_bytes(entity))
     write_position(output, start)
@@ -90,6 +105,7 @@ def write_temp_beam(
 def write_temp_explosion2(
     origin: tuple[float, float, float], color_start: int, color_length: int
 ) -> bytearray:
+    """Encode and write temp explosion2 to the fixture buffer."""
     output = bytearray((23, 12))
     write_position(output, origin)
     output.extend((byte(color_start), byte(color_length)))
@@ -97,14 +113,17 @@ def write_temp_explosion2(
 
 
 def pack_sound_channel(entity: int, channel: int) -> int:
+    """Encode sound channel using the Protocol 15 layout."""
     return (int(entity) << 3) | (int(channel) & 7)
 
 
 def write_stop_sound(entity: int, channel: int) -> bytearray:
+    """Encode and write stop sound to the fixture buffer."""
     return bytearray((16,)) + bytearray(short_bytes(pack_sound_channel(entity, channel)))
 
 
 def sound_field_mask(volume: int, attenuation: float) -> int:
+    """Build the deterministic sound field mask fixture used by this verifier."""
     result = 0
     if int(volume) != 255:
         result |= 1
@@ -121,6 +140,7 @@ def write_dynamic_sound(
     attenuation: float,
     origin: tuple[float, float, float],
 ) -> bytearray:
+    """Encode and write dynamic sound to the fixture buffer."""
     attenuation = f32(attenuation)
     mask = sound_field_mask(volume, attenuation)
     output = bytearray((6, mask))
@@ -135,6 +155,7 @@ def write_dynamic_sound(
 
 
 def temp_kind(type_value: int) -> int:
+    """Build the deterministic temp kind fixture used by this verifier."""
     if type_value in (0, 1, 2, 3, 4, 7, 8, 10, 11):
         return 1
     if type_value in (5, 6, 9, 13):
@@ -145,10 +166,12 @@ def temp_kind(type_value: int) -> int:
 
 
 def temp_size(type_value: int) -> int:
+    """Build the deterministic temp size fixture used by this verifier."""
     return {1: 8, 2: 16, 3: 10}.get(temp_kind(type_value), 0)
 
 
 def reliable_plan(overflowed: bool, message_size: int, drop_asap: bool, can_send: bool) -> int:
+    """Build the deterministic reliable plan fixture used by this verifier."""
     if overflowed:
         return 1
     if message_size <= 0 and not drop_asap:
@@ -161,6 +184,7 @@ def reliable_plan(overflowed: bool, message_size: int, drop_asap: bool, can_send
 
 
 def expected_model() -> dict[str, Any]:
+    """Build the deterministic expected model fixture used by this verifier."""
     origin_a = (10.0, -20.0, 30.0)
     origin_b = (-12.25, 0.125, 4095.875)
     rounded_default = f32(1.00000001)
@@ -217,6 +241,7 @@ def expected_model() -> dict[str, Any]:
 
 
 def complete_golden(root: Path) -> dict[str, Any]:
+    """Build the deterministic complete golden fixture used by this verifier."""
     model = expected_model()
     oracle = root / "tools" / "oracle" / "protocol15_runtime_events_oracle.c"
     return {
@@ -253,6 +278,7 @@ def complete_golden(root: Path) -> dict[str, Any]:
 
 
 def parse_oracle(output: str) -> dict[str, Any]:
+    """Parse oracle into its normalized representation."""
     rows = [json.loads(line) for line in output.splitlines() if line.strip()]
     vectors = [row for row in rows if row.get("kind") == "vector"]
     cases: dict[str, list[dict[str, Any]]] = {}
@@ -266,12 +292,14 @@ def parse_oracle(output: str) -> dict[str, Any]:
 
 
 def function_body(text: str, name: str) -> str:
+    """Extract one complete MiniLang function body from source text."""
     pattern = re.compile(rf"(?ms)^function\s+{re.escape(name)}\s*\([^\n]*\)\s*\n(.*?)^end function\s*$")
     match = pattern.search(text)
     return match.group(1) if match else ""
 
 
 def source_contract(root: Path) -> tuple[list[str], dict[str, Any]]:
+    """Build the deterministic source contract fixture used by this verifier."""
     errors: list[str] = []
     paths = {
         "transients": "src/miniquake/protocol_transients.ml",
@@ -457,6 +485,7 @@ def source_contract(root: Path) -> tuple[list[str], dict[str, Any]]:
 
 
 def find_compilers() -> list[str]:
+    """Locate compilers from the available inputs."""
     result: list[str] = []
     for candidate in ("gcc", "clang", "cc"):
         path = shutil.which(candidate)
@@ -466,6 +495,7 @@ def find_compilers() -> list[str]:
 
 
 def compile_oracle(root: Path, compiler: str) -> tuple[dict[str, Any] | None, str]:
+    """Compile and execute the C reference oracle with one compiler."""
     source = root / "tools" / "oracle" / "protocol15_runtime_events_oracle.c"
     with tempfile.TemporaryDirectory(prefix="bp014r1-runtime-events-") as temp:
         executable = Path(temp) / ("oracle.exe" if os.name == "nt" else "oracle")
@@ -496,6 +526,7 @@ def compile_oracle(root: Path, compiler: str) -> tuple[dict[str, Any] | None, st
 
 
 def verify(root: Path, require_c_oracle: bool = False) -> dict[str, Any]:
+    """Evaluate all source, golden and oracle evidence for this verifier."""
     checks: list[dict[str, Any]] = []
     model = expected_model()
 
@@ -575,6 +606,7 @@ def verify(root: Path, require_c_oracle: bool = False) -> dict[str, Any]:
 
 
 def print_report(report: dict[str, Any]) -> None:
+    """Emit report in the requested report format."""
     print("MiniQuake BP-014R1 Protocol 15 runtime-event verification")
     for check in report["checks"]:
         print(f"  [{'PASS' if check['passed'] else 'FAIL'}] {check['name']}")
@@ -588,6 +620,7 @@ def print_report(report: dict[str, Any]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root_arg", nargs="?", type=Path)
     parser.add_argument("--root", type=Path)

@@ -1,3 +1,7 @@
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+# Collect distributable validation evidence while excluding proprietary Quake data.
+
 [CmdletBinding()]
 param([switch]$IncludeAllCurrentDocs)
 
@@ -25,6 +29,7 @@ $ForbiddenNames = @("pak0.pak", "pak1.pak", "progs.dat", "config.cfg", "autoexec
 $SyntheticBuildRoots = @("bp071_fs", "bp071-filesystem", "bp072-wad", "sys_win_differential")
 $SkippedBuildArtifacts = @()
 
+# Explain why an artifact must not enter the evidence archive.
 function Get-BuildArtifactExclusionReason([string]$Relative) {
   $Normalized = $Relative.Replace('/', '\').TrimStart('\')
   $Leaf = [IO.Path]::GetFileName($Normalized).ToLowerInvariant()
@@ -48,6 +53,7 @@ function Get-BuildArtifactExclusionReason([string]$Relative) {
   return ""
 }
 
+# Copy an allowed evidence file into the staging tree.
 function Copy-SafeFile([string]$Source, [string]$Relative) {
   if (-not (Test-Path -LiteralPath $Source -PathType Leaf)) { return }
   $Leaf = [IO.Path]::GetFileName($Source).ToLowerInvariant()

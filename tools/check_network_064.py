@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+"""Verify the check network 064 compatibility and regression contract."""
+
 import argparse,json,pathlib,sys
 
 def main():
+ """Run the command-line workflow and return its process exit status."""
  p=argparse.ArgumentParser();p.add_argument('--root',default='.');p.add_argument('--json',default='');a=p.parse_args();r=pathlib.Path(a.root).resolve();e=[]
  c=(r/'src/miniquake/network_platform_contract.ml').read_text(encoding='utf-8-sig');b=(r/'src/miniquake/build_info.ml').read_text(encoding='utf-8-sig');t=(r/'tests/network_platform_closure_tests.ml').read_text(encoding='utf-8-sig');v=(r/'tests/network_platform_evidence.ml').read_text(encoding='utf-8-sig');g=json.loads((r/'audit/network_platform_closure_golden.json').read_text())
  markers=['const STATUS = "network_platform_109_frozen_v1"','const FINGERPRINT = 0xb3ec7589','const DEFAULT_HOST_PORT = 26000','const CONTROL_PROTOCOL_VERSION = 3','const MAX_RELIABLE_MESSAGE = 8192','const MAX_DATAGRAM = 1024','const HOST_CACHE_SIZE = 8']

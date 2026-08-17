@@ -401,6 +401,10 @@ static mq_i32 mq_vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, V
     VkMemoryRequirements requirements;
     VkMemoryAllocateInfo allocation;
     mq_u32 type;
+    if (buffer == MQ_NULL || memory == MQ_NULL || size == 0u) return 0;
+    *buffer = VK_NULL_HANDLE;
+    *memory = VK_NULL_HANDLE;
+    if (mapped != MQ_NULL) *mapped = MQ_NULL;
     memset(&info, 0, sizeof(info));
     info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     info.size = size;
@@ -409,15 +413,22 @@ static mq_i32 mq_vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, V
     if (mq_vkCreateBuffer(mq_vk_device, &info, MQ_NULL, buffer) != VK_SUCCESS) return 0;
     mq_vkGetBufferMemoryRequirements(mq_vk_device, *buffer, &requirements);
     type = mq_vk_memory_type(requirements.memoryTypeBits, properties);
-    if (type == 0xffffffffu) return 0;
+    if (type == 0xffffffffu) goto fail;
     memset(&allocation, 0, sizeof(allocation));
     allocation.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocation.allocationSize = requirements.size;
     allocation.memoryTypeIndex = type;
-    if (mq_vkAllocateMemory(mq_vk_device, &allocation, MQ_NULL, memory) != VK_SUCCESS) return 0;
-    if (mq_vkBindBufferMemory(mq_vk_device, *buffer, *memory, 0u) != VK_SUCCESS) return 0;
-    if (mapped != MQ_NULL && mq_vkMapMemory(mq_vk_device, *memory, 0u, size, 0u, mapped) != VK_SUCCESS) return 0;
+    if (mq_vkAllocateMemory(mq_vk_device, &allocation, MQ_NULL, memory) != VK_SUCCESS) goto fail;
+    if (mq_vkBindBufferMemory(mq_vk_device, *buffer, *memory, 0u) != VK_SUCCESS) goto fail;
+    if (mapped != MQ_NULL && mq_vkMapMemory(mq_vk_device, *memory, 0u, size, 0u, mapped) != VK_SUCCESS) goto fail;
     return 1;
+fail:
+    if (*memory != VK_NULL_HANDLE) mq_vkFreeMemory(mq_vk_device, *memory, MQ_NULL);
+    if (*buffer != VK_NULL_HANDLE) mq_vkDestroyBuffer(mq_vk_device, *buffer, MQ_NULL);
+    *memory = VK_NULL_HANDLE;
+    *buffer = VK_NULL_HANDLE;
+    if (mapped != MQ_NULL) *mapped = MQ_NULL;
+    return 0;
 }
 
 /* Create and initialize create image. */
@@ -426,6 +437,9 @@ static mq_i32 mq_vk_create_image(mq_i32 width, mq_i32 height, mq_i32 levels, VkF
     VkMemoryRequirements requirements;
     VkMemoryAllocateInfo allocation;
     mq_u32 type;
+    if (image == MQ_NULL || memory == MQ_NULL || width < 1 || height < 1 || levels < 1) return 0;
+    *image = VK_NULL_HANDLE;
+    *memory = VK_NULL_HANDLE;
     memset(&info, 0, sizeof(info));
     info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     info.imageType = VK_IMAGE_TYPE_2D;
@@ -443,13 +457,20 @@ static mq_i32 mq_vk_create_image(mq_i32 width, mq_i32 height, mq_i32 levels, VkF
     if (mq_vkCreateImage(mq_vk_device, &info, MQ_NULL, image) != VK_SUCCESS) return 0;
     mq_vkGetImageMemoryRequirements(mq_vk_device, *image, &requirements);
     type = mq_vk_memory_type(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    if (type == 0xffffffffu) return 0;
+    if (type == 0xffffffffu) goto fail;
     memset(&allocation, 0, sizeof(allocation));
     allocation.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocation.allocationSize = requirements.size;
     allocation.memoryTypeIndex = type;
-    if (mq_vkAllocateMemory(mq_vk_device, &allocation, MQ_NULL, memory) != VK_SUCCESS) return 0;
-    return mq_vkBindImageMemory(mq_vk_device, *image, *memory, 0u) == VK_SUCCESS;
+    if (mq_vkAllocateMemory(mq_vk_device, &allocation, MQ_NULL, memory) != VK_SUCCESS) goto fail;
+    if (mq_vkBindImageMemory(mq_vk_device, *image, *memory, 0u) != VK_SUCCESS) goto fail;
+    return 1;
+fail:
+    if (*memory != VK_NULL_HANDLE) mq_vkFreeMemory(mq_vk_device, *memory, MQ_NULL);
+    if (*image != VK_NULL_HANDLE) mq_vkDestroyImage(mq_vk_device, *image, MQ_NULL);
+    *memory = VK_NULL_HANDLE;
+    *image = VK_NULL_HANDLE;
+    return 0;
 }
 
 /* Create an image view for backend texture access. */
@@ -499,7 +520,10 @@ static VkCommandBuffer mq_vk_one_time_begin(void) {
     memset(&begin, 0, sizeof(begin));
     begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    if (mq_vkBeginCommandBuffer(command, &begin) != VK_SUCCESS) return VK_NULL_HANDLE;
+    if (mq_vkBeginCommandBuffer(command, &begin) != VK_SUCCESS) {
+        mq_vkFreeCommandBuffers(mq_vk_device, mq_vk_command_pool, 1u, &command);
+        return VK_NULL_HANDLE;
+    }
     return command;
 }
 
@@ -508,15 +532,22 @@ static mq_i32 mq_vk_one_time_end(VkCommandBuffer command) {
     VkSubmitInfo submit;
     VkFenceCreateInfo fence_info;
     VkFence fence = VK_NULL_HANDLE;
-    if (command == VK_NULL_HANDLE || mq_vkEndCommandBuffer(command) != VK_SUCCESS) return 0;
+    mq_i32 submitted = 0;
+    mq_i32 success = 0;
+    if (command == VK_NULL_HANDLE) return 0;
+    if (mq_vkEndCommandBuffer(command) != VK_SUCCESS) goto done;
     memset(&fence_info, 0, sizeof(fence_info)); fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    if (mq_vkCreateFence(mq_vk_device, &fence_info, MQ_NULL, &fence) != VK_SUCCESS) return 0;
+    if (mq_vkCreateFence(mq_vk_device, &fence_info, MQ_NULL, &fence) != VK_SUCCESS) goto done;
     memset(&submit, 0, sizeof(submit)); submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO; submit.commandBufferCount = 1u; submit.pCommandBuffers = &command;
-    if (mq_vkQueueSubmit(mq_vk_queue, 1u, &submit, fence) != VK_SUCCESS) return 0;
-    mq_vkWaitForFences(mq_vk_device, 1u, &fence, VK_TRUE, ~(mq_u64)0u);
-    mq_vkDestroyFence(mq_vk_device, fence, MQ_NULL);
+    if (mq_vkQueueSubmit(mq_vk_queue, 1u, &submit, fence) != VK_SUCCESS) goto done;
+    submitted = 1;
+    if (mq_vkWaitForFences(mq_vk_device, 1u, &fence, VK_TRUE, ~(mq_u64)0u) != VK_SUCCESS) goto done;
+    success = 1;
+done:
+    if (submitted && !success) mq_vkDeviceWaitIdle(mq_vk_device);
+    if (fence != VK_NULL_HANDLE) mq_vkDestroyFence(mq_vk_device, fence, MQ_NULL);
     mq_vkFreeCommandBuffers(mq_vk_device, mq_vk_command_pool, 1u, &command);
-    return 1;
+    return success;
 }
 
 /* Release resources owned by destroy texture. */
@@ -531,7 +562,7 @@ static void mq_vk_destroy_texture(mq_vk_texture_t *texture) {
 /* Create the sampler matching the texture's filter and wrap state. */
 static mq_i32 mq_vk_sampler(mq_vk_texture_t *texture) {
     VkSamplerCreateInfo info;
-    if (texture->sampler != VK_NULL_HANDLE) mq_vkDestroySampler(mq_vk_device, texture->sampler, MQ_NULL);
+    VkSampler replacement = VK_NULL_HANDLE;
     memset(&info, 0, sizeof(info));
     info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     info.magFilter = texture->mag_filter == MQ_GL_LINEAR ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
@@ -541,7 +572,10 @@ static mq_i32 mq_vk_sampler(mq_vk_texture_t *texture) {
     info.addressModeV = texture->wrap_t == MQ_GL_CLAMP ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE : VK_SAMPLER_ADDRESS_MODE_REPEAT;
     info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     info.maxLod = (texture->min_filter == MQ_GL_NEAREST_MIPMAP_NEAREST || texture->min_filter == MQ_GL_LINEAR_MIPMAP_NEAREST || texture->min_filter == MQ_GL_NEAREST_MIPMAP_LINEAR || texture->min_filter == MQ_GL_LINEAR_MIPMAP_LINEAR) ? (float)(texture->uploaded_levels > 0 ? texture->uploaded_levels - 1 : 0) : 0.0f;
-    return mq_vkCreateSampler(mq_vk_device, &info, MQ_NULL, &texture->sampler) == VK_SUCCESS;
+    if (mq_vkCreateSampler(mq_vk_device, &info, MQ_NULL, &replacement) != VK_SUCCESS) return 0;
+    if (texture->sampler != VK_NULL_HANDLE) mq_vkDestroySampler(mq_vk_device, texture->sampler, MQ_NULL);
+    texture->sampler = replacement;
+    return 1;
 }
 
 /* Bind the texture image and sampler to its descriptor set. */
@@ -608,7 +642,10 @@ static mq_i32 mq_vk_create_pipeline(void) {
     memset(&shader_info, 0, sizeof(shader_info)); shader_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO; shader_info.codeSize = sizeof(mq_vulkan_vertex_spirv); shader_info.pCode = mq_vulkan_vertex_spirv;
     if (mq_vkCreateShaderModule(mq_vk_device, &shader_info, MQ_NULL, &vertex) != VK_SUCCESS) return 0;
     shader_info.codeSize = sizeof(mq_vulkan_fragment_spirv); shader_info.pCode = mq_vulkan_fragment_spirv;
-    if (mq_vkCreateShaderModule(mq_vk_device, &shader_info, MQ_NULL, &fragment) != VK_SUCCESS) return 0;
+    if (mq_vkCreateShaderModule(mq_vk_device, &shader_info, MQ_NULL, &fragment) != VK_SUCCESS) {
+        mq_vkDestroyShaderModule(mq_vk_device, vertex, MQ_NULL);
+        return 0;
+    }
     memset(stages, 0, sizeof(stages));
     stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO; stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT; stages[0].module = vertex; stages[0].pName = "main";
     stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO; stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT; stages[1].module = fragment; stages[1].pName = "main";
@@ -644,7 +681,11 @@ static void mq_vk_destroy_swapchain(void) {
     mq_vk_depth_view = VK_NULL_HANDLE; mq_vk_depth_image = VK_NULL_HANDLE; mq_vk_depth_memory = VK_NULL_HANDLE;
     for (i = 0u; i < mq_vk_image_count; ++i) if (mq_vk_image_views[i] != VK_NULL_HANDLE) mq_vkDestroyImageView(mq_vk_device, mq_vk_image_views[i], MQ_NULL);
     if (mq_vk_swapchain != VK_NULL_HANDLE) mq_vkDestroySwapchainKHR(mq_vk_device, mq_vk_swapchain, MQ_NULL);
-    mq_vk_swapchain = VK_NULL_HANDLE; mq_vk_image_count = 0u; memset(mq_vk_image_initialized, 0, sizeof(mq_vk_image_initialized));
+    mq_vk_swapchain = VK_NULL_HANDLE;
+    mq_vk_image_count = 0u;
+    memset(mq_vk_images, 0, sizeof(mq_vk_images));
+    memset(mq_vk_image_views, 0, sizeof(mq_vk_image_views));
+    memset(mq_vk_image_initialized, 0, sizeof(mq_vk_image_initialized));
 }
 
 /* Create and initialize create swapchain. */
@@ -654,24 +695,57 @@ static mq_i32 mq_vk_create_swapchain(mq_i32 width, mq_i32 height) {
     VkPresentModeKHR modes[16]; mq_u32 mode_count = 16u;
     VkSwapchainCreateInfoKHR info;
     VkPresentModeKHR present = VK_PRESENT_MODE_FIFO_KHR;
+    VkCompositeAlphaFlagBitsKHR composite_alpha;
+    VkResult result;
+    mq_u32 image_count;
     mq_u32 i;
     mq_u32 selected_format = 0u;
-    mq_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mq_vk_physical, mq_vk_surface, &capabilities);
-    mq_vkGetPhysicalDeviceSurfaceFormatsKHR(mq_vk_physical, mq_vk_surface, &format_count, formats);
-    mq_vkGetPhysicalDeviceSurfacePresentModesKHR(mq_vk_physical, mq_vk_surface, &mode_count, modes);
-    for (i = 0u; i < format_count; ++i) if (formats[i].format == VK_FORMAT_B8G8R8A8_UNORM || formats[i].format == VK_FORMAT_R8G8B8A8_UNORM) { selected_format = i; mq_vk_swapchain_format = formats[i].format; break; }
+    result = mq_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mq_vk_physical, mq_vk_surface, &capabilities);
+    if (result != VK_SUCCESS) goto fail;
+    result = mq_vkGetPhysicalDeviceSurfaceFormatsKHR(mq_vk_physical, mq_vk_surface, &format_count, formats);
+    if (result != VK_SUCCESS || format_count == 0u) goto fail;
+    result = mq_vkGetPhysicalDeviceSurfacePresentModesKHR(mq_vk_physical, mq_vk_surface, &mode_count, modes);
+    if (result != VK_SUCCESS || mode_count == 0u) goto fail;
+    if ((capabilities.supportedUsageFlags & (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT)) != (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT)) goto fail;
+    for (i = 0u; i < format_count; ++i) {
+        if (formats[i].format == VK_FORMAT_B8G8R8A8_UNORM || formats[i].format == VK_FORMAT_R8G8B8A8_UNORM) { selected_format = i; break; }
+    }
+    mq_vk_swapchain_format = formats[selected_format].format == VK_FORMAT_UNDEFINED ? VK_FORMAT_B8G8R8A8_UNORM : formats[selected_format].format;
     for (i = 0u; i < mode_count; ++i) if (modes[i] == VK_PRESENT_MODE_IMMEDIATE_KHR) present = modes[i];
-    mq_vk_extent.width = capabilities.currentExtent.width != 0xffffffffu ? capabilities.currentExtent.width : (mq_u32)width;
-    mq_vk_extent.height = capabilities.currentExtent.height != 0xffffffffu ? capabilities.currentExtent.height : (mq_u32)height;
-    memset(&info, 0, sizeof(info)); info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR; info.surface = mq_vk_surface; info.minImageCount = capabilities.minImageCount + 1u; if (capabilities.maxImageCount != 0u && info.minImageCount > capabilities.maxImageCount) info.minImageCount = capabilities.maxImageCount; info.imageFormat = mq_vk_swapchain_format; info.imageColorSpace = formats[selected_format].colorSpace; info.imageExtent = mq_vk_extent; info.imageArrayLayers = 1u; info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT; info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE; info.preTransform = capabilities.currentTransform; info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; info.presentMode = present; info.clipped = VK_TRUE;
-    if (mq_vkCreateSwapchainKHR(mq_vk_device, &info, MQ_NULL, &mq_vk_swapchain) != VK_SUCCESS) return 0;
-    mq_vk_image_count = 8u;
-    if (mq_vkGetSwapchainImagesKHR(mq_vk_device, mq_vk_swapchain, &mq_vk_image_count, mq_vk_images) != VK_SUCCESS || mq_vk_image_count > 8u) return 0;
-    for (i = 0u; i < mq_vk_image_count; ++i) if (!mq_vk_view(mq_vk_images[i], mq_vk_swapchain_format, VK_IMAGE_ASPECT_COLOR_BIT, 1, &mq_vk_image_views[i])) return 0;
-    if (!mq_vk_create_image((mq_i32)mq_vk_extent.width, (mq_i32)mq_vk_extent.height, 1, VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &mq_vk_depth_image, &mq_vk_depth_memory)) return 0;
-    if (!mq_vk_view(mq_vk_depth_image, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, 1, &mq_vk_depth_view)) return 0;
+    if (capabilities.currentExtent.width != 0xffffffffu) {
+        mq_vk_extent = capabilities.currentExtent;
+    } else {
+        mq_vk_extent.width = (mq_u32)width;
+        mq_vk_extent.height = (mq_u32)height;
+        if (mq_vk_extent.width < capabilities.minImageExtent.width) mq_vk_extent.width = capabilities.minImageExtent.width;
+        if (mq_vk_extent.width > capabilities.maxImageExtent.width) mq_vk_extent.width = capabilities.maxImageExtent.width;
+        if (mq_vk_extent.height < capabilities.minImageExtent.height) mq_vk_extent.height = capabilities.minImageExtent.height;
+        if (mq_vk_extent.height > capabilities.maxImageExtent.height) mq_vk_extent.height = capabilities.maxImageExtent.height;
+    }
+    composite_alpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    if ((capabilities.supportedCompositeAlpha & composite_alpha) == 0u) {
+        if ((capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR) != 0u) composite_alpha = VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR;
+        else if ((capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR) != 0u) composite_alpha = VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR;
+        else composite_alpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
+    }
+    memset(&info, 0, sizeof(info)); info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR; info.surface = mq_vk_surface; info.minImageCount = capabilities.minImageCount + 1u; if (capabilities.maxImageCount != 0u && info.minImageCount > capabilities.maxImageCount) info.minImageCount = capabilities.maxImageCount; info.imageFormat = mq_vk_swapchain_format; info.imageColorSpace = formats[selected_format].colorSpace; info.imageExtent = mq_vk_extent; info.imageArrayLayers = 1u; info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT; info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE; info.preTransform = capabilities.currentTransform; info.compositeAlpha = composite_alpha; info.presentMode = present; info.clipped = VK_TRUE;
+    result = mq_vkCreateSwapchainKHR(mq_vk_device, &info, MQ_NULL, &mq_vk_swapchain);
+    if (result != VK_SUCCESS) goto fail;
+    image_count = 0u;
+    result = mq_vkGetSwapchainImagesKHR(mq_vk_device, mq_vk_swapchain, &image_count, MQ_NULL);
+    if (result != VK_SUCCESS || image_count == 0u || image_count > 8u) goto fail;
+    mq_vk_image_count = image_count;
+    result = mq_vkGetSwapchainImagesKHR(mq_vk_device, mq_vk_swapchain, &mq_vk_image_count, mq_vk_images);
+    if (result != VK_SUCCESS || mq_vk_image_count != image_count) goto fail;
+    for (i = 0u; i < mq_vk_image_count; ++i) if (!mq_vk_view(mq_vk_images[i], mq_vk_swapchain_format, VK_IMAGE_ASPECT_COLOR_BIT, 1, &mq_vk_image_views[i])) goto fail;
+    if (!mq_vk_create_image((mq_i32)mq_vk_extent.width, (mq_i32)mq_vk_extent.height, 1, VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &mq_vk_depth_image, &mq_vk_depth_memory)) goto fail;
+    if (!mq_vk_view(mq_vk_depth_image, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, 1, &mq_vk_depth_view)) goto fail;
     mq_vk_width = (mq_i32)mq_vk_extent.width; mq_vk_height = (mq_i32)mq_vk_extent.height;
     return 1;
+fail:
+    mq_vk_last_error = result;
+    mq_vk_destroy_swapchain();
+    return 0;
 }
 
 /* Report whether available is available. */
@@ -792,7 +866,8 @@ static mq_i32 mq_vk_frame_begin(void) {
     VkRect2D scissor;
     VkResult result;
     if (frame->recording) return 1;
-    mq_vkWaitForFences(mq_vk_device, 1u, &frame->fence, VK_TRUE, ~(mq_u64)0u); mq_vkResetFences(mq_vk_device, 1u, &frame->fence);
+    result = mq_vkWaitForFences(mq_vk_device, 1u, &frame->fence, VK_TRUE, ~(mq_u64)0u);
+    if (result != VK_SUCCESS) { mq_vk_last_error = result; return 0; }
     result = mq_vkAcquireNextImageKHR(mq_vk_device, mq_vk_swapchain, ~(mq_u64)0u, frame->acquired, VK_NULL_HANDLE, &frame->image_index);
     if (result == VK_ERROR_OUT_OF_DATE_KHR) { if (!mq_vulkan_resize(mq_vk_width, mq_vk_height)) return 0; return mq_vk_frame_begin(); }
     if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) return 0;
@@ -889,9 +964,13 @@ void mq_vulkan_present(void) {
     if (!frame->recording && !mq_vk_frame_begin()) return;
     if (frame->rendering) { mq_vkCmdEndRendering(frame->command); frame->rendering = 0; }
     mq_vk_image_barrier(frame->command, mq_vk_images[frame->image_index], VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0u);
-    if (mq_vkEndCommandBuffer(frame->command) != VK_SUCCESS) return;
+    result = mq_vkEndCommandBuffer(frame->command);
+    if (result != VK_SUCCESS) { mq_vk_last_error = result; return; }
     memset(&submit, 0, sizeof(submit)); submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO; submit.waitSemaphoreCount = 1u; submit.pWaitSemaphores = &frame->acquired; submit.pWaitDstStageMask = &wait; submit.commandBufferCount = 1u; submit.pCommandBuffers = &frame->command; submit.signalSemaphoreCount = 1u; submit.pSignalSemaphores = &frame->complete;
-    if (mq_vkQueueSubmit(mq_vk_queue, 1u, &submit, frame->fence) != VK_SUCCESS) return;
+    result = mq_vkResetFences(mq_vk_device, 1u, &frame->fence);
+    if (result != VK_SUCCESS) { mq_vk_last_error = result; return; }
+    result = mq_vkQueueSubmit(mq_vk_queue, 1u, &submit, frame->fence);
+    if (result != VK_SUCCESS) { mq_vk_last_error = result; return; }
     memset(&present, 0, sizeof(present)); present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR; present.waitSemaphoreCount = 1u; present.pWaitSemaphores = &frame->complete; present.swapchainCount = 1u; present.pSwapchains = &mq_vk_swapchain; present.pImageIndices = &frame->image_index;
     result = mq_vkQueuePresentKHR(mq_vk_queue, &present); mq_vk_image_initialized[frame->image_index] = 1; frame->recording = 0; frame->image_index = MQ_VK_PRESENT_IMAGE_INVALID; mq_vk_frame_index = (mq_vk_frame_index + 1u) % MQ_VK_FRAMES;
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) mq_vulkan_resize(mq_vk_width, mq_vk_height);
@@ -970,9 +1049,37 @@ void mq_vulkan_ortho(mq_u32 left_bits, mq_u32 right_bits, mq_u32 bottom_bits, mq
 void mq_vulkan_frustum(mq_u32 left_bits, mq_u32 right_bits, mq_u32 bottom_bits, mq_u32 top_bits, mq_u32 near_bits, mq_u32 far_bits) { float l=mq_vk_bits_float(left_bits),r=mq_vk_bits_float(right_bits),b=mq_vk_bits_float(bottom_bits),t=mq_vk_bits_float(top_bits),n=mq_vk_bits_float(near_bits),f=mq_vk_bits_float(far_bits),m[16]; memset(m,0,sizeof(m)); m[0]=2.0f*n/(r-l); m[5]=2.0f*n/(t-b); m[8]=(r+l)/(r-l); m[9]=(t+b)/(t-b); m[10]=-(f+n)/(f-n); m[11]=-1.0f; m[14]=-(2.0f*f*n)/(f-n); mq_vk_postmultiply(m); }
 
 /* Bind the selected texture for subsequent draws. */
-void mq_vulkan_bind_texture(mq_u32 target, mq_u32 texture) { mq_vk_texture_t *entry; (void)target; mq_vk_bound_texture = texture < MQ_VK_MAX_TEXTURES ? texture : 0u; if(mq_vk_bound_texture==0u)return; entry=&mq_vk_textures[mq_vk_bound_texture]; if(entry->descriptor==VK_NULL_HANDLE)mq_vk_alloc_descriptor(entry); entry->allocated=1; }
+void mq_vulkan_bind_texture(mq_u32 target, mq_u32 texture) {
+    mq_vk_texture_t *entry;
+    (void)target;
+    mq_vk_bound_texture = texture < MQ_VK_MAX_TEXTURES ? texture : 0u;
+    if (mq_vk_bound_texture == 0u) return;
+    entry = &mq_vk_textures[mq_vk_bound_texture];
+    if (entry->descriptor == VK_NULL_HANDLE && !mq_vk_alloc_descriptor(entry)) {
+        mq_vk_bound_texture = 0u;
+        return;
+    }
+    entry->allocated = 1;
+}
 /* Allocate caller-visible texture identifiers. */
-void mq_vulkan_gen_textures(mq_i32 count, void *texture_ids) { mq_u32 *ids=(mq_u32*)texture_ids; mq_i32 i; if (ids==MQ_NULL) return; for(i=0;i<count;++i) { while(mq_vk_next_texture<MQ_VK_MAX_TEXTURES && mq_vk_textures[mq_vk_next_texture].allocated) ++mq_vk_next_texture; ids[i]=mq_vk_next_texture<MQ_VK_MAX_TEXTURES?mq_vk_next_texture++:0u; if(ids[i]!=0u) { if(mq_vk_textures[ids[i]].descriptor==VK_NULL_HANDLE)mq_vk_alloc_descriptor(&mq_vk_textures[ids[i]]); mq_vk_textures[ids[i]].allocated=1; mq_vk_textures[ids[i]].min_filter=MQ_GL_NEAREST; mq_vk_textures[ids[i]].mag_filter=MQ_GL_NEAREST; mq_vk_textures[ids[i]].wrap_s=MQ_GL_REPEAT; mq_vk_textures[ids[i]].wrap_t=MQ_GL_REPEAT; } } }
+void mq_vulkan_gen_textures(mq_i32 count, void *texture_ids) {
+    mq_u32 *ids = (mq_u32 *)texture_ids;
+    mq_i32 i;
+    if (ids == MQ_NULL || count < 1) return;
+    for (i = 0; i < count; ++i) {
+        mq_vk_texture_t *entry;
+        while (mq_vk_next_texture < MQ_VK_MAX_TEXTURES && mq_vk_textures[mq_vk_next_texture].allocated) ++mq_vk_next_texture;
+        if (mq_vk_next_texture >= MQ_VK_MAX_TEXTURES) { ids[i] = 0u; continue; }
+        entry = &mq_vk_textures[mq_vk_next_texture];
+        if (entry->descriptor == VK_NULL_HANDLE && !mq_vk_alloc_descriptor(entry)) { ids[i] = 0u; continue; }
+        ids[i] = mq_vk_next_texture++;
+        entry->allocated = 1;
+        entry->min_filter = MQ_GL_NEAREST;
+        entry->mag_filter = MQ_GL_NEAREST;
+        entry->wrap_s = MQ_GL_REPEAT;
+        entry->wrap_t = MQ_GL_REPEAT;
+    }
+}
 /* Release resources owned by delete textures. */
 void mq_vulkan_delete_textures(mq_i32 count, const void *texture_ids) { const mq_u32 *ids=(const mq_u32*)texture_ids; mq_i32 i; if(ids==MQ_NULL)return; for(i=0;i<count;++i) if(ids[i]>0u&&ids[i]<MQ_VK_MAX_TEXTURES) { mq_vk_texture_t *entry=&mq_vk_textures[ids[i]]; VkDescriptorSet descriptor=entry->descriptor; mq_vk_destroy_texture(entry); entry->descriptor=descriptor; if(ids[i]<mq_vk_next_texture)mq_vk_next_texture=ids[i]; } }
 /* Update fixed-function texture sampling state. */
@@ -980,13 +1087,203 @@ void mq_vulkan_tex_parameter_i(mq_u32 target, mq_u32 name, mq_i32 value) { mq_vk
 /* Update fixed-function texture sampling state. */
 void mq_vulkan_tex_env_i(mq_u32 target, mq_u32 name, mq_i32 value) { (void)target; if(name==MQ_GL_TEXTURE_ENV_MODE)mq_vk_texture_environment=value; }
 /* Return the source pixel stride for the selected format. */
-static mq_u32 mq_vk_source_bytes(mq_u32 format){return format==MQ_GL_RGBA?4u:(format==MQ_GL_RGB?3u:1u);} static void mq_vk_pixel(mq_u8*d,const mq_u8*s,mq_u32 format){if(format==MQ_GL_RGBA){d[0]=s[0];d[1]=s[1];d[2]=s[2];d[3]=s[3];}else if(format==MQ_GL_RGB){d[0]=s[0];d[1]=s[1];d[2]=s[2];d[3]=255u;}else{d[0]=d[1]=d[2]=s[0];d[3]=255u;}}
+static mq_u32 mq_vk_source_bytes(mq_u32 format) { return format == MQ_GL_RGBA ? 4u : (format == MQ_GL_RGB ? 3u : 1u); }
+
+/* Convert one source pixel into the backend's RGBA upload format. */
+static void mq_vk_pixel(mq_u8 *destination, const mq_u8 *source, mq_u32 format) {
+    if (format == MQ_GL_RGBA) {
+        destination[0] = source[0]; destination[1] = source[1]; destination[2] = source[2]; destination[3] = source[3];
+    } else if (format == MQ_GL_RGB) {
+        destination[0] = source[0]; destination[1] = source[1]; destination[2] = source[2]; destination[3] = 255u;
+    } else {
+        destination[0] = source[0]; destination[1] = source[0]; destination[2] = source[0]; destination[3] = 255u;
+    }
+}
+
+/* Resolve a valid mip level without undefined oversized integer shifts. */
+static mq_i32 mq_vk_texture_level_extent(const mq_vk_texture_t *texture, mq_i32 level, mq_i32 *width, mq_i32 *height) {
+    mq_i32 current_width;
+    mq_i32 current_height;
+    mq_i32 current_level;
+    if (texture == MQ_NULL || texture->image == VK_NULL_HANDLE || level < 0 || level >= texture->levels) return 0;
+    current_width = texture->width;
+    current_height = texture->height;
+    for (current_level = 0; current_level < level; ++current_level) {
+        if (current_width > 1) current_width /= 2;
+        if (current_height > 1) current_height /= 2;
+    }
+    if (width != MQ_NULL) *width = current_width;
+    if (height != MQ_NULL) *height = current_height;
+    return 1;
+}
+
 /* Allocate and upload a complete texture image. */
-void mq_vulkan_tex_image_2d(mq_u32 target, mq_i32 level, mq_i32 internal_format, mq_i32 width, mq_i32 height, mq_i32 border, mq_u32 format, mq_u32 type, const void *pixels) { mq_vk_texture_t *texture; VkCommandBuffer command; VkBufferImageCopy region; mq_u32 source_bytes; mq_i32 x,y; (void)target;(void)internal_format;(void)border;if(mq_vk_bound_texture>=MQ_VK_MAX_TEXTURES||level<0||pixels==MQ_NULL||type!=MQ_GL_UNSIGNED_BYTE)return;texture=mq_vk_bound_texture==0u?&mq_vk_white_texture:&mq_vk_textures[mq_vk_bound_texture];if(level==0){VkDescriptorSet descriptor=texture->descriptor;mq_i32 allocated=texture->allocated;mq_vk_destroy_texture(texture);texture->descriptor=descriptor;texture->allocated=allocated;texture->width=width;texture->height=height;texture->levels=1;while((width>>texture->levels)>0||(height>>texture->levels)>0)++texture->levels;texture->uploaded_levels=0;if(!mq_vk_create_image(width,height,texture->levels,VK_FORMAT_R8G8B8A8_UNORM,VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_SAMPLED_BIT,&texture->image,&texture->memory)||!mq_vk_view(texture->image,VK_FORMAT_R8G8B8A8_UNORM,VK_IMAGE_ASPECT_COLOR_BIT,texture->levels,&texture->view))return;texture->min_filter=MQ_GL_NEAREST;texture->mag_filter=MQ_GL_NEAREST;texture->wrap_s=MQ_GL_REPEAT;texture->wrap_t=MQ_GL_REPEAT;mq_vk_sampler(texture);}source_bytes=mq_vk_source_bytes(format);if((mq_u64)width*height*4u>mq_vk_staging_size)return;for(y=0;y<height;++y)for(x=0;x<width;++x)mq_vk_pixel(&mq_vk_staging[(y*width+x)*4],&((const mq_u8*)pixels)[(y*width+x)*source_bytes],format);command=mq_vk_one_time_begin();mq_vk_image_barrier(command,texture->image,VK_IMAGE_ASPECT_COLOR_BIT,(mq_u32)level,1u,VK_IMAGE_LAYOUT_UNDEFINED,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0u,VK_ACCESS_TRANSFER_WRITE_BIT);memset(&region,0,sizeof(region));region.imageSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT;region.imageSubresource.mipLevel=(mq_u32)level;region.imageSubresource.layerCount=1u;region.imageExtent.width=(mq_u32)width;region.imageExtent.height=(mq_u32)height;region.imageExtent.depth=1u;mq_vkCmdCopyBufferToImage(command,mq_vk_staging_buffer,texture->image,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1u,&region);mq_vk_image_barrier(command,texture->image,VK_IMAGE_ASPECT_COLOR_BIT,(mq_u32)level,1u,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,VK_ACCESS_TRANSFER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT);mq_vk_one_time_end(command);if(texture->uploaded_levels<level+1)texture->uploaded_levels=level+1;mq_vk_sampler(texture);mq_vk_update_descriptor(texture); }
+void mq_vulkan_tex_image_2d(mq_u32 target, mq_i32 level, mq_i32 internal_format, mq_i32 width, mq_i32 height, mq_i32 border, mq_u32 format, mq_u32 type, const void *pixels) {
+    mq_vk_texture_t *texture;
+    VkCommandBuffer command;
+    VkBufferImageCopy region;
+    VkDescriptorSet descriptor = VK_NULL_HANDLE;
+    mq_u32 source_bytes;
+    mq_i32 allocated = 0;
+    mq_i32 expected_width;
+    mq_i32 expected_height;
+    mq_i32 mip_width;
+    mq_i32 mip_height;
+    mq_i32 created = 0;
+    mq_i32 x;
+    mq_i32 y;
+    (void)target; (void)internal_format; (void)border;
+    if (mq_vk_bound_texture >= MQ_VK_MAX_TEXTURES || level < 0 || width < 1 || height < 1 || pixels == MQ_NULL || type != MQ_GL_UNSIGNED_BYTE || mq_vk_staging == MQ_NULL) return;
+    if ((mq_u64)(mq_u32)width * (mq_u64)(mq_u32)height * 4u > mq_vk_staging_size) return;
+    texture = mq_vk_bound_texture == 0u ? &mq_vk_white_texture : &mq_vk_textures[mq_vk_bound_texture];
+    if (level == 0) {
+        descriptor = texture->descriptor;
+        allocated = texture->allocated;
+        mq_vk_destroy_texture(texture);
+        texture->descriptor = descriptor;
+        texture->allocated = allocated;
+        texture->width = width;
+        texture->height = height;
+        texture->levels = 1;
+        mip_width = width;
+        mip_height = height;
+        while (mip_width > 1 || mip_height > 1) {
+            if (mip_width > 1) mip_width /= 2;
+            if (mip_height > 1) mip_height /= 2;
+            ++texture->levels;
+        }
+        if (!mq_vk_create_image(width, height, texture->levels, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, &texture->image, &texture->memory)) goto fail;
+        if (!mq_vk_view(texture->image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, texture->levels, &texture->view)) goto fail;
+        texture->min_filter = MQ_GL_NEAREST;
+        texture->mag_filter = MQ_GL_NEAREST;
+        texture->wrap_s = MQ_GL_REPEAT;
+        texture->wrap_t = MQ_GL_REPEAT;
+        created = 1;
+    } else {
+        if (!mq_vk_texture_level_extent(texture, level, &expected_width, &expected_height)) return;
+        if (width != expected_width || height != expected_height) return;
+    }
+    source_bytes = mq_vk_source_bytes(format);
+    for (y = 0; y < height; ++y) {
+        for (x = 0; x < width; ++x) {
+            mq_u64 destination_offset = ((mq_u64)(mq_u32)y * (mq_u32)width + (mq_u32)x) * 4u;
+            mq_u64 source_offset = ((mq_u64)(mq_u32)y * (mq_u32)width + (mq_u32)x) * source_bytes;
+            mq_vk_pixel(&mq_vk_staging[destination_offset], &((const mq_u8 *)pixels)[source_offset], format);
+        }
+    }
+    command = mq_vk_one_time_begin();
+    if (command == VK_NULL_HANDLE) goto fail;
+    mq_vk_image_barrier(command, texture->image, VK_IMAGE_ASPECT_COLOR_BIT, (mq_u32)level, 1u, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, VK_ACCESS_TRANSFER_WRITE_BIT);
+    memset(&region, 0, sizeof(region));
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = (mq_u32)level;
+    region.imageSubresource.layerCount = 1u;
+    region.imageExtent.width = (mq_u32)width;
+    region.imageExtent.height = (mq_u32)height;
+    region.imageExtent.depth = 1u;
+    mq_vkCmdCopyBufferToImage(command, mq_vk_staging_buffer, texture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &region);
+    mq_vk_image_barrier(command, texture->image, VK_IMAGE_ASPECT_COLOR_BIT, (mq_u32)level, 1u, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
+    if (!mq_vk_one_time_end(command)) goto fail;
+    if (texture->uploaded_levels < level + 1) texture->uploaded_levels = level + 1;
+    if (!mq_vk_sampler(texture)) goto fail;
+    mq_vk_update_descriptor(texture);
+    return;
+fail:
+    if (created || level == 0) {
+        descriptor = texture->descriptor;
+        allocated = texture->allocated;
+        mq_vk_destroy_texture(texture);
+        texture->descriptor = descriptor;
+        texture->allocated = allocated;
+    }
+}
+
 /* Upload a rectangular update into an existing texture image. */
-void mq_vulkan_tex_sub_image_2d(mq_u32 target, mq_i32 level, mq_i32 x_offset, mq_i32 y_offset, mq_i32 width, mq_i32 height, mq_u32 format, mq_u32 type, const void *pixels){mq_vk_texture_t*texture;VkCommandBuffer command;VkBufferImageCopy region;mq_u32 source_bytes;mq_i32 x,y;(void)target;if(mq_vk_bound_texture>=MQ_VK_MAX_TEXTURES||pixels==MQ_NULL||type!=MQ_GL_UNSIGNED_BYTE)return;texture=&mq_vk_textures[mq_vk_bound_texture];source_bytes=mq_vk_source_bytes(format);for(y=0;y<height;++y)for(x=0;x<width;++x)mq_vk_pixel(&mq_vk_staging[(y*width+x)*4],&((const mq_u8*)pixels)[(y*width+x)*source_bytes],format);command=mq_vk_one_time_begin();mq_vk_image_barrier(command,texture->image,VK_IMAGE_ASPECT_COLOR_BIT,(mq_u32)level,1u,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_ACCESS_SHADER_READ_BIT,VK_ACCESS_TRANSFER_WRITE_BIT);memset(&region,0,sizeof(region));region.imageSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT;region.imageSubresource.mipLevel=(mq_u32)level;region.imageSubresource.layerCount=1u;region.imageOffset.x=x_offset;region.imageOffset.y=y_offset;region.imageExtent.width=(mq_u32)width;region.imageExtent.height=(mq_u32)height;region.imageExtent.depth=1u;mq_vkCmdCopyBufferToImage(command,mq_vk_staging_buffer,texture->image,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1u,&region);mq_vk_image_barrier(command,texture->image,VK_IMAGE_ASPECT_COLOR_BIT,(mq_u32)level,1u,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,VK_ACCESS_TRANSFER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT);mq_vk_one_time_end(command);}
+void mq_vulkan_tex_sub_image_2d(mq_u32 target, mq_i32 level, mq_i32 x_offset, mq_i32 y_offset, mq_i32 width, mq_i32 height, mq_u32 format, mq_u32 type, const void *pixels) {
+    mq_vk_texture_t *texture;
+    VkCommandBuffer command;
+    VkBufferImageCopy region;
+    mq_u32 source_bytes;
+    mq_i32 level_width;
+    mq_i32 level_height;
+    mq_i32 x;
+    mq_i32 y;
+    (void)target;
+    if (mq_vk_bound_texture >= MQ_VK_MAX_TEXTURES || level < 0 || x_offset < 0 || y_offset < 0 || width < 1 || height < 1 || pixels == MQ_NULL || type != MQ_GL_UNSIGNED_BYTE || mq_vk_staging == MQ_NULL) return;
+    if ((mq_u64)(mq_u32)width * (mq_u64)(mq_u32)height * 4u > mq_vk_staging_size) return;
+    texture = mq_vk_bound_texture == 0u ? &mq_vk_white_texture : &mq_vk_textures[mq_vk_bound_texture];
+    if (!mq_vk_texture_level_extent(texture, level, &level_width, &level_height) || level >= texture->uploaded_levels) return;
+    if (width > level_width || height > level_height || x_offset > level_width - width || y_offset > level_height - height) return;
+    source_bytes = mq_vk_source_bytes(format);
+    for (y = 0; y < height; ++y) {
+        for (x = 0; x < width; ++x) {
+            mq_u64 destination_offset = ((mq_u64)(mq_u32)y * (mq_u32)width + (mq_u32)x) * 4u;
+            mq_u64 source_offset = ((mq_u64)(mq_u32)y * (mq_u32)width + (mq_u32)x) * source_bytes;
+            mq_vk_pixel(&mq_vk_staging[destination_offset], &((const mq_u8 *)pixels)[source_offset], format);
+        }
+    }
+    command = mq_vk_one_time_begin();
+    if (command == VK_NULL_HANDLE) return;
+    mq_vk_image_barrier(command, texture->image, VK_IMAGE_ASPECT_COLOR_BIT, (mq_u32)level, 1u, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
+    memset(&region, 0, sizeof(region));
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = (mq_u32)level;
+    region.imageSubresource.layerCount = 1u;
+    region.imageOffset.x = x_offset;
+    region.imageOffset.y = y_offset;
+    region.imageExtent.width = (mq_u32)width;
+    region.imageExtent.height = (mq_u32)height;
+    region.imageExtent.depth = 1u;
+    mq_vkCmdCopyBufferToImage(command, mq_vk_staging_buffer, texture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &region);
+    mq_vk_image_barrier(command, texture->image, VK_IMAGE_ASPECT_COLOR_BIT, (mq_u32)level, 1u, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
+    mq_vk_one_time_end(command);
+}
+
 /* Read pixels into caller-owned storage. */
-void mq_vulkan_read_pixels(mq_i32 x,mq_i32 y,mq_i32 width,mq_i32 height,mq_u32 format,mq_u32 type,void*pixels){mq_vk_frame_t*frame=&mq_vk_frames[mq_vk_frame_index];VkBufferImageCopy region;mq_u8 *destination=(mq_u8*)pixels;mq_i32 row,column;if(pixels==MQ_NULL||format!=MQ_GL_RGBA||type!=MQ_GL_UNSIGNED_BYTE||width<1||height<1||(mq_u64)width*height*4u>mq_vk_staging_size||!mq_vk_frame_begin())return;if(frame->rendering){mq_vkCmdEndRendering(frame->command);frame->rendering=0;}mq_vk_image_barrier(frame->command,mq_vk_images[frame->image_index],VK_IMAGE_ASPECT_COLOR_BIT,0u,1u,VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,VK_ACCESS_TRANSFER_READ_BIT);memset(&region,0,sizeof(region));region.bufferRowLength=(mq_u32)width;region.imageSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT;region.imageSubresource.layerCount=1u;region.imageOffset.x=x;region.imageOffset.y=mq_vk_height-y-height;region.imageExtent.width=(mq_u32)width;region.imageExtent.height=(mq_u32)height;region.imageExtent.depth=1u;mq_vkCmdCopyImageToBuffer(frame->command,mq_vk_images[frame->image_index],VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,mq_vk_staging_buffer,1u,&region);mq_vk_image_barrier(frame->command,mq_vk_images[frame->image_index],VK_IMAGE_ASPECT_COLOR_BIT,0u,1u,VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,VK_ACCESS_TRANSFER_READ_BIT,VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);mq_vulkan_present();mq_vkDeviceWaitIdle(mq_vk_device);for(row=0;row<height;++row){const mq_u8*source=&mq_vk_staging[(mq_u64)(height-1-row)*width*4u];for(column=0;column<width;++column){mq_u64 offset=((mq_u64)row*width+column)*4u;if(mq_vk_swapchain_format==VK_FORMAT_B8G8R8A8_UNORM){destination[offset]=source[column*4u+2u];destination[offset+1u]=source[column*4u+1u];destination[offset+2u]=source[column*4u];}else{destination[offset]=source[column*4u];destination[offset+1u]=source[column*4u+1u];destination[offset+2u]=source[column*4u+2u];}destination[offset+3u]=source[column*4u+3u];}}}
+void mq_vulkan_read_pixels(mq_i32 x, mq_i32 y, mq_i32 width, mq_i32 height, mq_u32 format, mq_u32 type, void *pixels) {
+    mq_vk_frame_t *frame = &mq_vk_frames[mq_vk_frame_index];
+    VkBufferImageCopy region;
+    mq_u8 *destination = (mq_u8 *)pixels;
+    mq_u64 byte_count;
+    mq_i32 row;
+    mq_i32 column;
+    if (pixels == MQ_NULL || format != MQ_GL_RGBA || type != MQ_GL_UNSIGNED_BYTE || width < 1 || height < 1) return;
+    byte_count = (mq_u64)(mq_u32)width * (mq_u64)(mq_u32)height * 4u;
+    if (byte_count > mq_vk_staging_size) return;
+    memset(destination, 0, (size_t)byte_count);
+    if (x < 0 || y < 0 || width > mq_vk_width || height > mq_vk_height || x > mq_vk_width - width || y > mq_vk_height - height || !mq_vk_frame_begin()) return;
+    if (frame->rendering) { mq_vkCmdEndRendering(frame->command); frame->rendering = 0; }
+    mq_vk_image_barrier(frame->command, mq_vk_images[frame->image_index], VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT);
+    memset(&region, 0, sizeof(region));
+    region.bufferRowLength = (mq_u32)width;
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.layerCount = 1u;
+    region.imageOffset.x = x;
+    region.imageOffset.y = mq_vk_height - y - height;
+    region.imageExtent.width = (mq_u32)width;
+    region.imageExtent.height = (mq_u32)height;
+    region.imageExtent.depth = 1u;
+    mq_vkCmdCopyImageToBuffer(frame->command, mq_vk_images[frame->image_index], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, mq_vk_staging_buffer, 1u, &region);
+    mq_vk_image_barrier(frame->command, mq_vk_images[frame->image_index], VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+    mq_vulkan_present();
+    if (mq_vkDeviceWaitIdle(mq_vk_device) != VK_SUCCESS) return;
+    for (row = 0; row < height; ++row) {
+        const mq_u8 *source = &mq_vk_staging[(mq_u64)(mq_u32)(height - 1 - row) * (mq_u32)width * 4u];
+        for (column = 0; column < width; ++column) {
+            mq_u64 offset = ((mq_u64)(mq_u32)row * (mq_u32)width + (mq_u32)column) * 4u;
+            if (mq_vk_swapchain_format == VK_FORMAT_B8G8R8A8_UNORM) {
+                destination[offset] = source[column * 4u + 2u];
+                destination[offset + 1u] = source[column * 4u + 1u];
+                destination[offset + 2u] = source[column * 4u];
+            } else {
+                destination[offset] = source[column * 4u];
+                destination[offset + 1u] = source[column * 4u + 1u];
+                destination[offset + 2u] = source[column * 4u + 2u];
+            }
+            destination[offset + 3u] = source[column * 4u + 3u];
+        }
+    }
+}
 const char*mq_vulkan_get_string(mq_u32 name){if(name==MQ_GL_VENDOR)return"Khronos Group";if(name==MQ_GL_RENDERER)return mq_vk_device_name;if(name==MQ_GL_VERSION)return"Vulkan 1.3";return"";}
 /* Return the current get error value. */
 mq_u32 mq_vulkan_get_error(void){mq_u32 value=(mq_u32)mq_vk_last_error;mq_vk_last_error=0;return value;}void mq_vulkan_finish(void){if(mq_vk_device!=VK_NULL_HANDLE)mq_vkDeviceWaitIdle(mq_vk_device);}void mq_vulkan_flush(void){}void mq_vulkan_draw_buffer(mq_u32 mode){(void)mode;}

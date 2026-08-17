@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
 """Verify and stage the original GLQuake 1.09 binary for external tests.
 
 The binary is read from a user-supplied original Quake source archive (or an
@@ -27,10 +30,12 @@ SCHEMA_VERSION = 1
 
 
 def sha256_bytes(data: bytes) -> str:
+    """Compute the SHA-256 digest of the supplied bytes."""
     return hashlib.sha256(data).hexdigest()
 
 
 def pe_machine(data: bytes) -> int:
+    """Read the PE machine identifier from a Windows executable."""
     if len(data) < 0x40 or data[:2] != b"MZ":
         raise ValueError("reference is not an MZ executable")
     pe_offset = struct.unpack_from("<I", data, 0x3C)[0]
@@ -40,6 +45,7 @@ def pe_machine(data: bytes) -> int:
 
 
 def find_archive_member(zf: zipfile.ZipFile) -> str:
+    """Locate archive member from the available inputs."""
     wanted = EXPECTED_MEMBER.lower()
     matches = [name for name in zf.namelist() if name.replace("\\", "/").lower() == wanted]
     if not matches:
@@ -50,6 +56,7 @@ def find_archive_member(zf: zipfile.ZipFile) -> str:
 
 
 def load_reference(archive: Path | None, executable: Path | None) -> tuple[bytes, str, str]:
+    """Load and validate the pinned original-reference manifest."""
     if archive is not None:
         with zipfile.ZipFile(archive) as zf:
             member = find_archive_member(zf)
@@ -59,6 +66,7 @@ def load_reference(archive: Path | None, executable: Path | None) -> tuple[bytes
 
 
 def link_or_copy(source: Path, destination: Path) -> str:
+    """Create a local reference link, falling back to a byte copy when required."""
     destination.parent.mkdir(parents=True, exist_ok=True)
     try:
         os.link(source, destination)
@@ -69,6 +77,7 @@ def link_or_copy(source: Path, destination: Path) -> str:
 
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser()
     source = parser.add_mutually_exclusive_group(required=False)
     source.add_argument("--archive", type=Path, help="OriginalQuakeSourceCode.zip")

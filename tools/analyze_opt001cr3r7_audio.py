@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
+"""Analyze opt001cr3r7 audio validation evidence."""
+
 from __future__ import annotations
 import argparse, json
 from pathlib import Path
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     ap=argparse.ArgumentParser()
     ap.add_argument('--build',required=True)
     ap.add_argument('--prefix',required=True)

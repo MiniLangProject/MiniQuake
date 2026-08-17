@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
+"""Verify the check opt001cr3r5 window default compatibility and regression contract."""
+
 from pathlib import Path
 import sys
 root=Path(sys.argv[sys.argv.index("--root")+1] if "--root" in sys.argv else ".")

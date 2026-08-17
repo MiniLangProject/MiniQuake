@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
+"""Verify the check opt001cr3r7 compatibility and regression contract."""
+
 from __future__ import annotations
 import argparse,json,re
 from pathlib import Path
 REV='OPT-001CR3R7'; PARENT='OPT-001CR3R6'
 STATUS='opt001cr3r7_audio_transition_hotpath_candidate_v1'; FINGERPRINT='0x1c001c0d'
 def main():
+    """Run the command-line workflow and return its process exit status."""
     ap=argparse.ArgumentParser(); ap.add_argument('--root',default='.'); ap.add_argument('--json',default=''); a=ap.parse_args()
     root=Path(a.root).resolve(); errors=[]
-    def text(rel): return (root/rel).read_text(encoding='utf-8')
+    def text(rel):
+        """Read one repository-relative UTF-8 source file for the enclosing check."""
+        return (root/rel).read_text(encoding='utf-8')
     bi=text('src/miniquake/build_info.ml'); host=text('src/miniquake/host.ml'); mixer=text('src/miniquake/sound/mixer.ml')
     world=text('src/miniquake/render/world.ml'); hot=text('tests/opt001cr3_hotpath_tests.ml'); runner=text('scripts/TEST_OPT-001CR3R7.ps1')
     markers=[f'const OPTIMIZATION_STATUS = "{STATUS}"',f'const OPTIMIZATION_FINGERPRINT = {FINGERPRINT}',

@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """Source-guided C-oracle verifier for BP-040..BP-044 world rendering."""
 from __future__ import annotations
 import argparse, hashlib, json, os, shutil, subprocess, tempfile
@@ -113,9 +117,12 @@ ROWS = {
  ],
 }
 
-def sha256(path: Path) -> str: return hashlib.sha256(path.read_bytes()).hexdigest()
+def sha256(path: Path) -> str:
+    """Compute the SHA-256 digest of the requested file."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 def document(root: Path, component: str):
+    """Render the canonical evidence document for this verifier."""
     c=CONFIG[component]
     return {'schema':c['schema'],'package_id':c['package'],'parent_package_id':c['parent'],
             'sources':['gl_rmain.c','gl_rsurf.c','gl_rlight.c','gl_warp.c','gl_refrag.c'],
@@ -123,6 +130,7 @@ def document(root: Path, component: str):
             'reference':{'oracle':c['oracle'],'oracle_sha256':sha256(root/c['oracle'])}}
 
 def compiler():
+    """Locate a supported C compiler for the reference oracle."""
     candidates=([os.environ['CC']] if os.environ.get('CC') else [])+['cc','gcc','clang']
     for candidate in candidates:
         parts=candidate.split()
@@ -130,6 +138,7 @@ def compiler():
     return None
 
 def run_oracle(root: Path, component: str):
+    """Run oracle and capture its deterministic result."""
     cc=compiler()
     if not cc: return True,'not available',[]
     source=root/CONFIG[component]['oracle']
@@ -143,6 +152,7 @@ def run_oracle(root: Path, component: str):
         return run.returncode==0,' '.join(cc),rows
 
 def check_contract(root: Path, component: str):
+    """Validate contract and return its contract findings."""
     c=CONFIG[component]; errors=[]
     for relative, markers in c['markers'].items():
         path=root/relative
@@ -179,6 +189,7 @@ def check_contract(root: Path, component: str):
     return errors
 
 def run_component(component: str, argv=None):
+    """Run component and capture its deterministic result."""
     c=CONFIG[component]
     ap=argparse.ArgumentParser(); ap.add_argument('root',nargs='?',default='.'); ap.add_argument('--root',dest='root_flag'); ap.add_argument('--write-golden',action='store_true'); ap.add_argument('--json-output')
     args=ap.parse_args(argv); root=Path(args.root_flag or args.root).resolve(); doc=document(root,component); golden=root/c['golden']

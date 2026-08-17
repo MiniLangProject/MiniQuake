@@ -41,6 +41,15 @@ C_FUNCTION_RE = re.compile(
     r"[A-Za-z_][A-Za-z0-9_\s*]*?\s+([A-Za-z_][A-Za-z0-9_]*)\s*"
     r"\([^;{}]*\)\s*\{"
 )
+POWERSHELL_FUNCTION_RE = re.compile(
+    r"(?im)^\s*function\s+([A-Za-z_][A-Za-z0-9_-]*)\b"
+)
+MAINTAINED_POWERSHELL = (
+    "build.ps1",
+    "scripts/COLLECT_RESULTS.ps1",
+    "scripts/test.ps1",
+    "scripts/validate_real_game.ps1",
+)
 
 
 @dataclass(frozen=True)
@@ -65,11 +74,23 @@ def source_files(root: Path) -> list[Path]:
         )
     files.extend((native / "shaders").glob("*.vert"))
     files.extend((native / "shaders").glob("*.frag"))
+    files.extend((root / "tools").glob("*.py"))
+    files.extend(root / relative for relative in MAINTAINED_POWERSHELL)
     return sorted({path for path in files if path.is_file()})
 
 
-def header_text(text: str) -> str:
+def header_text(text: str, suffix: str = "") -> str:
     """Return the leading comment region used for licence classification."""
+    if suffix in {".py", ".ps1"}:
+        lines = text.splitlines(keepends=True)
+        header: list[str] = []
+        for index, line in enumerate(lines):
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or (index == 0 and stripped.startswith("#!")):
+                header.append(line)
+                continue
+            break
+        return "".join(header)
     package = text.find("\npackage ")
     include = text.find("\n#include ")
     candidates = [offset for offset in (package, include) if offset >= 0]
@@ -85,7 +106,10 @@ def preceding_comment(lines: list[str], index: int) -> bool:
     if cursor < 0:
         return False
     previous = lines[cursor].strip()
-    return previous.startswith("//") or previous.endswith("*/")
+    return (
+        previous.startswith(("//", "#"))
+        or previous.endswith(("*/", "#>"))
+    )
 
 
 def complex_function_findings(
@@ -147,7 +171,7 @@ def complex_function_findings(
 def audit_file(path: Path, root: Path) -> tuple[list[Finding], int, int, int, int]:
     """Audit one file and return findings plus function coverage counters."""
     text = path.read_text(encoding="utf-8-sig", errors="replace")
-    header = header_text(text)
+    header = header_text(text, path.suffix.lower())
     findings: list[Finding] = []
     relative = path.relative_to(root)
 
@@ -171,6 +195,8 @@ def audit_file(path: Path, root: Path) -> tuple[list[Finding], int, int, int, in
         findings.append(Finding(relative, 1, "id-derived source must remain GPL-2.0-or-later"))
     if licences == ["Apache-2.0"] and DERIVED_HINT_RE.search(header):
         findings.append(Finding(relative, 1, "source description suggests Quake derivation but declares Apache-2.0"))
+    if path.suffix == ".ps1" and licences and licences != ["Apache-2.0"]:
+        findings.append(Finding(relative, 1, "maintained PowerShell tooling must use Apache-2.0"))
 
     documented = 0
     complex_count = 0
@@ -183,6 +209,8 @@ def audit_file(path: Path, root: Path) -> tuple[list[Finding], int, int, int, in
         findings.extend(complex_findings)
     elif path.suffix == ".c":
         functions = list(C_FUNCTION_RE.finditer(text))
+    elif path.suffix == ".ps1":
+        functions = list(POWERSHELL_FUNCTION_RE.finditer(text))
     else:
         functions = []
     if functions:

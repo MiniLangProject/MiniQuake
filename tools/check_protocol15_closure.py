@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Copyright (c) 1996-1997 Id Software, Inc.
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """Verify the cumulative BP-015..BP-019 Protocol 15 closure and freeze."""
 from __future__ import annotations
 
@@ -58,10 +62,12 @@ COMPONENT_CHECKERS = [
 
 
 def sha(path: Path) -> str:
+    """Compute the SHA-256 digest of the requested file."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def values() -> dict[str, list[int]]:
+    """Build the deterministic values consumed by this verifier."""
     return {
         "svc": list(range(1, 21)) + list(range(22, 35)),
         "clc": list(range(1, 5)),
@@ -73,6 +79,7 @@ def values() -> dict[str, list[int]]:
 
 
 def fingerprint() -> int:
+    """Compute the contract fingerprint from its canonical fixture values."""
     groups = values()
     sequence = [15, 0x535643, *groups["svc"], 0x434C43, *groups["clc"],
                 0x55424954, *groups["update"], 0x53554249, *groups["client"],
@@ -84,6 +91,7 @@ def fingerprint() -> int:
 
 
 def rows() -> list[dict[str, object]]:
+    """Build the deterministic result rows for this verifier."""
     groups = values()
     pairs = [
         ("protocol_version", 15),
@@ -104,6 +112,7 @@ def rows() -> list[dict[str, object]]:
 
 
 def document(root: Path) -> dict[str, object]:
+    """Render the canonical evidence document for this verifier."""
     return {
         "schema": SCHEMA,
         "package_id": PACKAGE_ID,
@@ -120,6 +129,7 @@ def document(root: Path) -> dict[str, object]:
 
 
 def freeze_document(root: Path) -> dict[str, object]:
+    """Build the deterministic freeze document fixture used by this verifier."""
     return {
         "schema": "MiniQuakeProtocol15Freeze/1",
         "block_id": BLOCK_ID,
@@ -142,6 +152,7 @@ def freeze_document(root: Path) -> dict[str, object]:
 
 
 def compiler() -> list[str] | None:
+    """Locate a supported C compiler for the reference oracle."""
     candidates: list[str] = []
     if os.environ.get("CC"):
         candidates.append(os.environ["CC"])
@@ -154,6 +165,7 @@ def compiler() -> list[str] | None:
 
 
 def run_oracle(root: Path) -> tuple[bool, str, list[dict[str, object]]]:
+    """Run oracle and capture its deterministic result."""
     cc = compiler()
     if not cc:
         return True, "not available", []
@@ -173,6 +185,7 @@ def run_oracle(root: Path) -> tuple[bool, str, list[dict[str, object]]]:
 
 
 def run_components(root: Path) -> tuple[list[dict[str, object]], list[str]]:
+    """Run components and capture its deterministic result."""
     outcomes: list[dict[str, object]] = []
     errors: list[str] = []
     for package, relative in COMPONENT_CHECKERS:
@@ -212,6 +225,7 @@ def run_components(root: Path) -> tuple[list[dict[str, object]], list[str]]:
 
 
 def contract(root: Path) -> list[str]:
+    """Evaluate the source and runtime evidence for this contract."""
     errors: list[str] = []
     module = (root / "src/miniquake/protocol15_freeze.ml").read_text(encoding="utf-8-sig")
     tests = (root / "tests/protocol15_closure_tests.ml").read_text(encoding="utf-8-sig")
@@ -251,6 +265,7 @@ def contract(root: Path) -> list[str]:
 
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser()
     parser.add_argument("root", nargs="?", default=".")
     parser.add_argument("--root", dest="root_flag")

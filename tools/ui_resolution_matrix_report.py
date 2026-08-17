@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
 """Validate MiniQuake UI matrix captures and build per-scene contact sheets."""
 
 from __future__ import annotations
@@ -23,6 +26,7 @@ SCENES = (
 
 
 def ui_scale(width: int, height: int) -> int:
+    """Compute the integral virtual-console scale for one resolution."""
     value = int(min(width / 640.0, height / 480.0) + 0.5)
     if value == 1 and width >= 960 and height >= 600:
         value = 2
@@ -30,6 +34,7 @@ def ui_scale(width: int, height: int) -> int:
 
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser()
     parser.add_argument("prefix", type=Path)
     parser.add_argument("--cell-width", type=int, default=384)

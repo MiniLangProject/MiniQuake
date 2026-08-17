@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nils Kopal
+# SPDX-License-Identifier: Apache-2.0
+
+"""Verify the check opt001cr3r8 compatibility and regression contract."""
+
 from __future__ import annotations
 
 import argparse
@@ -13,10 +18,12 @@ FINGERPRINT = "0x1c001c10"
 
 
 def marker_errors(text: str, markers: tuple[str, ...], label: str) -> list[str]:
+    """Return the contract violations found by the marker guard."""
     return [f"{label} missing marker: {marker}" for marker in markers if marker not in text]
 
 
 def main() -> int:
+    """Run the command-line workflow and return its process exit status."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", default=".")
     parser.add_argument("--json", default="")
@@ -25,6 +32,7 @@ def main() -> int:
     errors: list[str] = []
 
     def text(rel: str) -> str:
+        """Read one repository-relative UTF-8 source file for the enclosing check."""
         return (root / rel).read_text(encoding="utf-8")
 
     build_info = text("src/miniquake/build_info.ml")
