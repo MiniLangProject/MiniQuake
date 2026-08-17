@@ -464,17 +464,106 @@ function airMove(player, command, frameTime, maxSpeed, acceleration, friction, e
   end if
 end function
 
+// Relink a recovered client immediately and pull trigger-side physical changes
+// back into its detached PlayerState mirror. In WinQuake these are the same
+// edict; omitting the pull would let a teleport touch be overwritten later in
+// the current movement frame.
+function relinkRecoveredPlayer(player, server, entityIndex)
+  collision.linkEntity(server, entityIndex, true)
+  player.origin = collision.entityVector(server, entityIndex, "origin", player.origin)
+  player.velocity = collision.entityVector(server, entityIndex, "velocity", player.velocity)
+  player.moveType = native.trunc(collision.entityFloat(server, entityIndex, "movetype", player.moveType))
+  player.flags = native.trunc(collision.entityFloat(server, entityIndex, "flags", player.flags))
+  player.health = collision.entityFloat(server, entityIndex, "health", player.health)
+  player.teleportTime = collision.entityFloat(server, entityIndex, "teleport_time", player.teleportTime)
+  player.onGround = (player.flags & c.FL_ONGROUND) != 0
+  return true
+end function
+
+// Separate a client from a live actor when both full hulls already overlap and
+// neither oldorigin nor Quake's small precision-recovery offsets can escape.
+// Spawn/teleport protection remains the responsibility of stock spawn_tdeath:
+// its teleport_time window suppresses this fallback until QuakeC has had its
+// force_retouch frames and can award the correct telefrag.
+function separateActorOverlap(player, server, entityIndex, blockerIndex, original)
+  if blockerIndex <= 0 or blockerIndex == entityIndex then return false end if
+  blockerSolid = native.trunc(collision.entityFloat(server, blockerIndex, "solid", c.SOLID_NOT))
+  if blockerSolid != c.SOLID_SLIDEBOX then return false end if
+  if player.teleportTime > server.time then return false end if
+
+  // Build all six exact face-separation positions, then try them from the
+  // smallest displacement outward. Every candidate is validated against the
+  // complete world and dynamic-edict set before it can become authoritative.
+  blockerOrigin = collision.entityVectorZero(server, blockerIndex, "origin")
+  blockerMins = collision.entityVectorZero(server, blockerIndex, "mins")
+  blockerMaxs = collision.entityVectorZero(server, blockerIndex, "maxs")
+  epsilon = c.DIST_EPSILON
+  candidates = [
+    t.Vec3(blockerOrigin.x + blockerMins.x - player.maxs.x - epsilon, original.y, original.z),
+    t.Vec3(blockerOrigin.x + blockerMaxs.x - player.mins.x + epsilon, original.y, original.z),
+    t.Vec3(original.x, blockerOrigin.y + blockerMins.y - player.maxs.y - epsilon, original.z),
+    t.Vec3(original.x, blockerOrigin.y + blockerMaxs.y - player.mins.y + epsilon, original.z),
+    t.Vec3(original.x, original.y, blockerOrigin.z + blockerMaxs.z - player.mins.z + epsilon),
+    t.Vec3(original.x, original.y, blockerOrigin.z + blockerMins.z - player.maxs.z - epsilon),
+  ]
+  distances = []
+  for each candidate in candidates
+    dx = candidate.x - original.x
+    dy = candidate.y - original.y
+    dz = candidate.z - original.z
+    distances = distances + [dx * dx + dy * dy + dz * dz]
+  end for
+
+  attempted = array(len(candidates), false)
+  attempt = 0
+  while attempt < len(candidates)
+    nearest = -1
+    nearestDistance = 0.0
+    index = 0
+    while index < len(candidates)
+      if not attempted[index] and (nearest < 0 or distances[index] < nearestDistance) then
+        nearest = index
+        nearestDistance = distances[index]
+      end if
+      index = index + 1
+    end while
+    if nearest < 0 then break end if
+    attempted[nearest] = true
+    player.origin = candidates[nearest]
+    collision.setEntityVector(server, entityIndex, "origin", player.origin)
+    if collision.testEntityPosition(server, entityIndex) < 0 then
+      relinkRecoveredPlayer(player, server, entityIndex)
+      return true
+    end if
+    attempt = attempt + 1
+  end while
+
+  player.origin = original
+  collision.setEntityVector(server, entityIndex, "origin", original)
+  return false
+end function
+
 // Validate stuck and report any incompatibility.
 function checkStuck(player, map, server, entityIndex)
   if server is void then return false end if
-  if collision.testEntityPosition(server, entityIndex) < 0 then
+  // Preserve the stock oldorigin and 3x3x18 precision search first. Actor-face
+  // separation is deliberately the final fallback, so ordinary world-hull
+  // recovery and its observable offsets remain unchanged.
+  originTrace = collision.move(
+    server, player.origin, player.mins, player.maxs, player.origin,
+    c.MOVE_NORMAL, entityIndex,
+  )
+  if not originTrace.startSolid then
     player.oldOrigin = math.copy(player.origin)
     return false
   end if
   original = math.copy(player.origin)
   player.origin = math.copy(player.oldOrigin)
   collision.setEntityVector(server, entityIndex, "origin", player.origin)
-  if collision.testEntityPosition(server, entityIndex) < 0 then return true end if
+  if collision.testEntityPosition(server, entityIndex) < 0 then
+    relinkRecoveredPlayer(player, server, entityIndex)
+    return true
+  end if
   player.origin = original
   z = 0
   while z < 18
@@ -484,13 +573,17 @@ function checkStuck(player, map, server, entityIndex)
       while y <= 1
         player.origin = t.Vec3(original.x + x, original.y + y, original.z + z)
         collision.setEntityVector(server, entityIndex, "origin", player.origin)
-        if collision.testEntityPosition(server, entityIndex) < 0 then return true end if
+        if collision.testEntityPosition(server, entityIndex) < 0 then
+          relinkRecoveredPlayer(player, server, entityIndex)
+          return true
+        end if
         y = y + 1
       end while
       x = x + 1
     end while
     z = z + 1
   end while
+  if separateActorOverlap(player, server, entityIndex, originTrace.entity, original) then return true end if
   player.origin = original
   collision.setEntityVector(server, entityIndex, "origin", player.origin)
   return false

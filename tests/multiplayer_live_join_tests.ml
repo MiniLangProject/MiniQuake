@@ -91,6 +91,28 @@ function runMenuHost(baseDirectory, port, frameTarget, windowed)
   return 0
 end function
 
+// Run a bounded direct listen server for headless cross-process regressions
+// that test transport and gameplay rather than the attract-menu transition.
+function runDirectHost(baseDirectory, port, frameTarget)
+  session = host.create([
+    "--play", baseDirectory, "-game", "id1", "-listen", "4", "-port", "" + port,
+    "-nosound", "-headless", "+map", "start",
+  ])
+  initialized = try(host.initialize(session))
+  if initialized is error then return fail(session, "direct host init: " + initialized.message) end if
+  frames = 0
+  while frames < frameTarget
+    result = try(host.frame(session, 0.02))
+    if result is error then return fail(session, "direct host frame: " + result.message) end if
+    if frames == 5 then print "MiniQuake multiplayer direct host: READY" end if
+    win.sleep(1)
+    frames = frames + 1
+  end while
+  print "MiniQuake multiplayer direct host: PASS"
+  host.shutdown(session)
+  return 0
+end function
+
 // Queue the exact direct-address action emitted by the LAN configuration menu.
 function queueMenuJoin(session, hostName, port)
   host.setMenuActive(session, true)
@@ -108,9 +130,16 @@ function main(args)
     if hostPort is void or hostFrames is void then return fail(void, "invalid menu host numeric argument") end if
     return runMenuHost(args[1], native.trunc(hostPort), native.trunc(hostFrames), args[0] == "host-window-menu")
   end if
+  if len(args) >= 4 and args[0] == "host-direct" then
+    hostPort = toNumber(args[2])
+    hostFrames = toNumber(args[3])
+    if hostPort is void or hostFrames is void then return fail(void, "invalid direct host numeric argument") end if
+    return runDirectHost(args[1], native.trunc(hostPort), native.trunc(hostFrames))
+  end if
   if len(args) < 4 then
     print "usage: multiplayer_live_join_tests BASE HOST PORT POST_FRAMES [menu]"
     print "   or: multiplayer_live_join_tests host-menu BASE PORT FRAMES"
+    print "   or: multiplayer_live_join_tests host-direct BASE PORT FRAMES"
     return 2
   end if
   port = toNumber(args[2])
