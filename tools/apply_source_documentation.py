@@ -56,7 +56,6 @@ DERIVED_TOOL_PREFIXES = (
 
 MAINTAINED_POWERSHELL_DESCRIPTIONS = {
     "build.ps1": "Build MiniQuake and run the selected source and runtime verification gates.",
-    "scripts/COLLECT_RESULTS.ps1": "Collect distributable validation evidence while excluding proprietary Quake data.",
     "scripts/test.ps1": "Run the current MiniQuake acceptance package.",
     "scripts/validate_real_game.ps1": "Run retail-data validation against a caller-supplied Quake installation.",
 }

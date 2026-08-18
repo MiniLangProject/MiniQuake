@@ -46,7 +46,6 @@ POWERSHELL_FUNCTION_RE = re.compile(
 )
 MAINTAINED_POWERSHELL = (
     "build.ps1",
-    "scripts/COLLECT_RESULTS.ps1",
     "scripts/test.ps1",
     "scripts/validate_real_game.ps1",
 )

@@ -691,8 +691,6 @@ def check_source_contract(root: Path) -> Check:
             "builtins": root / "src/miniquake/quakec/builtins.ml",
             "tests": root / "tests/protocol15_serverdata_tests.ml",
             "build": root / "build.ps1",
-            "acceptance": root / "scripts" / "TEST_BP-012R1.ps1",
-            "collector": root / "scripts" / "COLLECT_RESULTS.ps1",
         }
         files = {key: path.read_text(encoding="utf-8-sig") for key, path in paths.items()}
 
@@ -751,15 +749,6 @@ def check_source_contract(root: Path) -> Check:
             "build": (
                 "check_protocol15_serverdata.py", "MiniQuakeProtocol15ServerDataTests.exe",
                 "protocol15-serverdata-tests", "protocol15_serverdata=",
-            ),
-            "acceptance": (
-                '$PackageId = "BP-012R1"', '$ParentPackageId = "BP-012"',
-                "check_protocol15_serverdata.py", "bp012r1-protocol15-serverdata.json",
-                "MiniQuakeProtocol15ServerDataTests.exe", "acceptance test: PASS",
-            ),
-            "collector": (
-                "MiniQuakeProtocol15ServerDataTests.exe",
-                "BP-012_PROTOCOL15_SERVERDATA_AUDIT.md", "protocol15_serverdata_golden.json",
             ),
         }
         for key, required in markers.items():

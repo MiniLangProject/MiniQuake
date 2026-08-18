@@ -568,31 +568,16 @@ if (-not $SkipPreflight -and $null -ne $PythonExe) {
   }
 
   $ProtocolServerDataChecker = Join-Path $Root "tools\check_protocol15_serverdata.py"
-  if (-not (Test-Path -LiteralPath $ProtocolServerDataChecker -PathType Leaf)) {
-    throw "Protocol 15 server-data checker is missing: $ProtocolServerDataChecker"
-  }
   & $PythonExe @PythonPrefixArgs $ProtocolServerDataChecker --root $Root
-  if ($LASTEXITCODE -ne 0) {
-    throw "$PackageId Protocol 15 server-data preflight failed."
-  }
+  if ($LASTEXITCODE -ne 0) { throw "$PackageId Protocol 15 server-data preflight failed." }
 
   $ProtocolEventChecker = Join-Path $Root "tools\check_protocol15_events.py"
-  if (-not (Test-Path -LiteralPath $ProtocolEventChecker -PathType Leaf)) {
-    throw "Protocol 15 event checker is missing: $ProtocolEventChecker"
-  }
   & $PythonExe @PythonPrefixArgs $ProtocolEventChecker --root $Root
-  if ($LASTEXITCODE -ne 0) {
-    throw "$PackageId Protocol 15 static-event, particle, scoreboard and drop preflight failed."
-  }
+  if ($LASTEXITCODE -ne 0) { throw "$PackageId Protocol 15 event preflight failed." }
 
   $ProtocolRuntimeEventChecker = Join-Path $Root "tools\check_protocol15_runtime_events.py"
-  if (-not (Test-Path -LiteralPath $ProtocolRuntimeEventChecker -PathType Leaf)) {
-    throw "Protocol 15 runtime-event checker is missing: $ProtocolRuntimeEventChecker"
-  }
   & $PythonExe @PythonPrefixArgs $ProtocolRuntimeEventChecker --root $Root
-  if ($LASTEXITCODE -ne 0) {
-    throw "$PackageId Protocol 15 temporary-entity, dynamic-sound and delivery-boundary preflight failed."
-  }
+  if ($LASTEXITCODE -ne 0) { throw "$PackageId Protocol 15 runtime-event preflight failed." }
 
   $ProtocolSignonChecker = Join-Path $Root "tools\check_protocol15_signon.py"
   if (-not (Test-Path -LiteralPath $ProtocolSignonChecker -PathType Leaf)) {
@@ -909,23 +894,6 @@ if (-not $SkipPreflight -and $null -ne $PythonExe) {
     $ReportPath = Join-Path $Output $ReportName
     $CheckerArgs = @("--root", $Root, "--json", $ReportPath, "--allow-downstream-package")
     & $PythonExe @PythonPrefixArgs $CheckerPath @CheckerArgs
-    if ($LASTEXITCODE -ne 0) { throw ($PackageId + " " + $Checker.Name + " preflight failed.") }
-  }
-
-
-  $ExternalReferenceCheckers = @(
-    [ordered]@{ Name = "BP-090 original reference"; Path = "tools\check_external_090.py" },
-    [ordered]@{ Name = "BP-091 original server interop"; Path = "tools\check_external_091.py" },
-    [ordered]@{ Name = "BP-092 original client interop"; Path = "tools\check_external_092.py" },
-    [ordered]@{ Name = "BP-093 original visual reference"; Path = "tools\check_external_093.py" },
-    [ordered]@{ Name = "BP-094 external compatibility closure"; Path = "tools\check_external_094.py" }
-  )
-  foreach ($Checker in $ExternalReferenceCheckers) {
-    $CheckerPath = Join-Path $Root $Checker.Path
-    if (-not (Test-Path -LiteralPath $CheckerPath -PathType Leaf)) { throw ($Checker.Name + " checker is missing: " + $CheckerPath) }
-    $ReportName = ([IO.Path]::GetFileNameWithoutExtension($Checker.Path) + "-report.json")
-    $ReportPath = Join-Path $Output $ReportName
-    & $PythonExe @PythonPrefixArgs $CheckerPath --root $Root --json $ReportPath
     if ($LASTEXITCODE -ne 0) { throw ($PackageId + " " + $Checker.Name + " preflight failed.") }
   }
 } elseif ($SkipPreflight) {

@@ -22,7 +22,9 @@ optimization packages. The current tree includes:
   BSP wall, floor, ledge, or doorway polygons;
 - persistent modern free-look, configurable mouse-Y inversion and sensitivity,
   plus a one-time migration from retail keyboard-look bindings to W/A/S/D
-  movement; and
+  movement;
+- a compact build/test/retail-validation script surface, with obsolete delivery
+  diffs and historical PowerShell package runners removed; and
 - expanded deterministic, differential, retail, and soak validation tooling.
 
 For the current qualification level, see

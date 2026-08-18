@@ -35,142 +35,6 @@ FORBIDDEN_NAMES = {
     "glquake.exe", "opengl32.dll", "originalquakesourcecode.zip",
 }
 
-_LEGACY_REQUIRED_PATHS = {
-    "TEST_OPT-001D.ps1", "docs/archive/changelog/CHANGELOG_OPT-001D.md",
-    "docs/archive/releases/OPT-001D_TESTING.md", "docs/archive/releases/OPT-001D_CHANGELOG.md",
-    "docs/archive/releases/OPT-001D_RESULT_ANALYSIS.md", "docs/archive/releases/OPT-001D_HOTFIX_REPORT.json",
-    "audit/opt001d_audio_transition_hotpath.json", "tools/check_opt001d.py",
-    "tools/analyze_opt001d_audio.py", "patches/OPT-001D.diff",
-    "TEST_OPT-001CR3R6.ps1", "docs/archive/changelog/CHANGELOG_OPT-001CR3R6.md",
-    "docs/archive/releases/OPT-001CR3R6_TESTING.md", "docs/archive/releases/OPT-001CR3R6_CHANGELOG.md",
-    "docs/archive/releases/OPT-001CR3R6_RESULT_ANALYSIS.md", "docs/archive/releases/OPT-001CR3R6_HOTFIX_REPORT.json",
-    "audit/opt001cr3r6_windowed_transition.json", "tools/check_opt001cr3r6.py",
-    "patches/OPT-001CR3R6.diff",
-    "TEST_OPT-001CR3R2.ps1", "docs/archive/changelog/CHANGELOG_OPT-001CR3R2.md",
-    "docs/archive/releases/OPT-001CR3R2_TESTING.md", "docs/archive/releases/OPT-001CR3R2_CHANGELOG.md",
-    "docs/archive/releases/OPT-001CR3R2_RESULT_ANALYSIS.md", "docs/archive/releases/OPT-001CR3R2_HOTFIX_REPORT.json",
-    "tools/run_process_live.py", "audit/opt001cr3r2_live_exitcode.json",
-    "patches/OPT-001CR3R2.diff",
-    "TEST_OPT-001CR3R1.ps1", "docs/archive/changelog/CHANGELOG_OPT-001CR3R1.md",
-    "docs/archive/releases/OPT-001CR3R1_TESTING.md", "docs/archive/releases/OPT-001CR3R1_CHANGELOG.md",
-    "docs/archive/releases/OPT-001CR3R1_RESULT_ANALYSIS.md", "docs/archive/releases/OPT-001CR3R1_HOTFIX_REPORT.json",
-    "audit/opt001cr3r1_compiler_safe_inline.json", "patches/OPT-001CR3R1.diff",
-    "TEST_OPT-001CR3.ps1", "docs/archive/changelog/CHANGELOG_OPT-001CR3.md",
-    "docs/archive/releases/OPT-001CR3_TESTING.md", "docs/archive/releases/OPT-001CR3_CHANGELOG.md",
-    "docs/archive/releases/OPT-001CR3_DELIVERY_REPORT.json", "patches/OPT-001CR3.diff",
-    "tests/opt001cr3_hotpath_tests.ml", "tools/check_opt001cr3.py",
-    "tools/compare_opt001cr3_performance.py", "audit/opt001cr3_inline_array_hotpath.json",
-    "audit/opt001cr2_accepted_baseline.json",
-    "TEST_OPT-001CR2.ps1", "docs/archive/changelog/CHANGELOG_OPT-001CR2.md",
-    "docs/archive/releases/OPT-001CR2_TESTING.md", "docs/archive/releases/OPT-001CR2_RESULT_ANALYSIS.md",
-    "docs/archive/releases/OPT-001CR2_HOTFIX_REPORT.json", "docs/archive/releases/OPT-001CR2_DELIVERY_REPORT.json",
-    "patches/OPT-001CR2.diff", "tools/check_opt001cr2.py",
-    "audit/opt001cr2_harness_golden.json",
-    "TEST_OPT-001CR1.ps1", "docs/archive/changelog/CHANGELOG_OPT-001CR1.md",
-    "docs/archive/releases/OPT-001CR1_TESTING.md", "docs/archive/releases/OPT-001CR1_RESULT_ANALYSIS.md",
-    "docs/archive/releases/OPT-001CR1_HOTFIX_REPORT.json", "docs/archive/releases/OPT-001CR1_DELIVERY_REPORT.json",
-    "patches/OPT-001CR1.diff", "tools/check_opt001cr1.py",
-    "tools/check_minilang_delimiters.py", "audit/opt001cr1_syntax_golden.json",
-    "TEST_OPT-001C.ps1", "docs/archive/changelog/CHANGELOG_OPT-001C.md",
-    "docs/archive/releases/OPT-001C_TESTING.md", "docs/archive/releases/OPT-001C_ALLOCATION_CONTRACT.md",
-    "docs/archive/releases/OPT-001C_DELIVERY_REPORT.json", "patches/OPT-001C.diff",
-    "tests/opt001c_contract_tests.ml", "tools/check_opt001c.py",
-    "tools/compare_opt001c_performance.py",
-    "audit/opt001c_allocation_golden.json", "audit/opt001b_performance_baseline.json",
-    "TEST_OPT-001B.ps1", "docs/archive/changelog/CHANGELOG_OPT-001B.md",
-    "docs/archive/releases/OPT-001B_TESTING.md", "docs/archive/releases/OPT-001B_CORRECTNESS_CONTRACT.md",
-    "docs/archive/releases/OPT-001B_DELIVERY_REPORT.json", "patches/OPT-001B.diff",
-    "tests/opt001b_contract_tests.ml", "tools/check_opt001b.py",
-    "audit/opt001b_correctness_golden.json",
-    "TEST_OPT-001A.ps1", "docs/archive/changelog/CHANGELOG_OPT-001A.md",
-    "docs/archive/releases/OPT-001A_TESTING.md", "docs/archive/releases/OPT-001A_BASELINE_CONTRACT.md",
-    "docs/archive/releases/OPT-001A_DELIVERY_REPORT.json", "patches/OPT-001A.diff",
-    "src/miniquake/optimization_baseline.ml", "tests/opt001a_contract_tests.ml",
-    "tools/check_opt001a.py", "tools/analyze_opt001a.py",
-    "audit/opt001a_baseline_golden.json",
-    "COPYING", "README.md", "build.ps1", "COLLECT_RESULTS.ps1", "test.ps1",
-    "TEST_BP-090-094.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094.md",
-    "TEST_BP-090-094R15.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R15.md",
-    "docs/archive/releases/BP-090-094R15_TESTING.md", "docs/archive/releases/BP-090-094R15_RESULT_ANALYSIS.md",
-    "docs/archive/releases/BP-090-094R15_HOTFIX_REPORT.json", "patches/BP-094R15.diff",
-    "TEST_BP-090-094R14.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R14.md",
-    "docs/archive/releases/BP-090-094R14_TESTING.md", "docs/archive/releases/BP-090-094R14_RESULT_ANALYSIS.md",
-    "docs/archive/releases/BP-090-094R14_HOTFIX_REPORT.json", "patches/BP-094R14.diff",
-    "TEST_BP-090-094R13.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R13.md",
-    "docs/archive/releases/BP-090-094R13_TESTING.md", "docs/archive/releases/BP-090-094R13_RESULT_ANALYSIS.md",
-    "docs/archive/releases/BP-090-094R13_HOTFIX_REPORT.json", "patches/BP-094R13.diff",
-    "TEST_BP-090-094R12.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R12.md",
-    "docs/archive/releases/BP-090-094R12_TESTING.md", "docs/archive/releases/BP-090-094R12_RESULT_ANALYSIS.md",
-    "docs/archive/releases/BP-090-094R12_HOTFIX_REPORT.json", "patches/BP-094R12.diff",
-    "TEST_BP-090-094R11.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R11.md",
-    "docs/archive/releases/BP-090-094R11_TESTING.md", "docs/archive/releases/BP-090-094R11_RESULT_ANALYSIS.md",
-    "docs/archive/releases/BP-090-094R11_HOTFIX_REPORT.json", "patches/BP-094R11.diff",
-    "TEST_BP-090-094R10.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R10.md",
-    "docs/archive/releases/BP-090-094R10_TESTING.md", "docs/archive/releases/BP-090-094R10_RESULT_ANALYSIS.md",
-    "docs/archive/releases/BP-090-094R10_HOTFIX_REPORT.json", "patches/BP-094R10.diff",
-    "TEST_BP-090-094R9.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R9.md",
-    "docs/archive/releases/BP-090-094R9_TESTING.md", "docs/archive/releases/BP-090-094R9_RESULT_ANALYSIS.md",
-    "docs/archive/releases/BP-090-094R9_HOTFIX_REPORT.json", "patches/BP-094R9.diff",
-    "TEST_BP-090-094R8.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R8.md",
-    "docs/archive/releases/BP-090-094R8_TESTING.md", "docs/archive/releases/BP-090-094R8_RESULT_ANALYSIS.md",
-    "docs/archive/releases/BP-090-094R8_HOTFIX_REPORT.json", "docs/archive/releases/BP-093_R7_VISUAL_DIAGNOSTIC_ANALYSIS.md",
-    "docs/archive/releases/BP-093_R7_VISUAL_DIAGNOSTIC_ANALYSIS.json", "patches/BP-094R8.diff",
-    "TEST_BP-090-094R7.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R7.md",
-    "docs/archive/releases/BP-090-094R7_TESTING.md", "docs/archive/releases/BP-090-094R7_RESULT_ANALYSIS.md",
-    "docs/archive/releases/BP-090-094R7_HOTFIX_REPORT.json", "patches/BP-094R7.diff",
-    "TEST_BP-090-094R6.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R6.md",
-    "docs/archive/releases/BP-090-094R6_TESTING.md", "docs/archive/releases/BP-090-094R6_RESULT_ANALYSIS.md",
-    "docs/archive/releases/BP-090-094R6_HOTFIX_REPORT.json", "patches/BP-094R6.diff",
-    "TEST_BP-090-094R5.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R5.md",
-    "docs/archive/releases/BP-090-094R5_TESTING.md", "docs/archive/releases/BP-090-094R5_RESULT_ANALYSIS.md",
-    "docs/archive/releases/BP-090-094R5_HOTFIX_REPORT.json", "patches/BP-094R5.diff",
-    "TEST_BP-090-094R4.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R4.md",
-    "docs/archive/releases/BP-090-094R4_TESTING.md", "docs/archive/releases/BP-090-094R4_RESULT_ANALYSIS.md",
-    "docs/archive/releases/BP-090-094R4_HOTFIX_REPORT.json", "patches/BP-094R4.diff",
-    "TEST_BP-090-094R3.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R3.md",
-    "docs/archive/releases/BP-090-094R3_TESTING.md", "docs/archive/releases/BP-090-094R3_RESULT_ANALYSIS.md",
-    "docs/archive/releases/BP-090-094R3_HOTFIX_REPORT.json", "patches/BP-094R3.diff",
-    "TEST_BP-090-094R2.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R2.md",
-    "docs/archive/releases/BP-090-094R2_TESTING.md", "docs/archive/releases/BP-090-094R2_RESULT_ANALYSIS.md",
-    "docs/archive/releases/BP-090-094R2_HOTFIX_REPORT.json", "patches/BP-094R2.diff",
-    "TEST_BP-090-094R1.ps1", "docs/archive/changelog/CHANGELOG_BP-090-094R1.md",
-    "docs/archive/releases/BP-090-094R1_TESTING.md", "docs/archive/releases/BP-090-094R1_RESULT_ANALYSIS.md",
-    "docs/archive/releases/BP-090-094R1_HOTFIX_REPORT.json", "patches/BP-094R1.diff",
-    "BLOCK_LEDGER.json",
-    "PORT_LEDGER.json", "docs/status/PORT_STATUS.md", MANIFEST,
-    "docs/archive/releases/BP-090-094_TESTING.md", "docs/archive/releases/BP-085-089R8_ACCEPTANCE_ANALYSIS.md",
-    "src/main.ml", "src/miniquake/build_info.ml", "src/miniquake/host.ml",
-    "src/miniquake/external_reference_contract.ml",
-    "tests/original_reference_provenance_tests.ml",
-    "tests/original_server_interop_tests.ml",
-    "tests/original_client_interop_tests.ml",
-    "tests/original_visual_reference_tests.ml",
-    "tests/external_compat_closure_tests.ml",
-    "tools/prepare_original_reference.py", "tools/compare_original_reference.py",
-    "tools/check_external_090.py", "tools/check_external_091.py",
-    "tools/check_external_092.py", "tools/check_external_093.py",
-    "tools/check_external_094.py",
-    "audit/original_reference_golden.json",
-    "audit/original_server_interop_golden.json",
-    "audit/original_client_interop_golden.json",
-    "audit/original_client_port_routing_golden.json",
-    "audit/original_visual_reference_golden.json",
-    "audit/external_compat_closure_golden.json",
-    "native/miniquake_native.dll", "native/miniquake_native.def",
-    "native/miniquake_text.dll", "native/miniquake_text.def",
-    "patches/BP-090.diff", "patches/BP-091.diff", "patches/BP-092.diff",
-    "patches/BP-093.diff", "patches/BP-094.diff",
-}
-
-# Historical root-level PowerShell entry points now live together in scripts/.
-# Keep the legacy inventory readable while resolving those entries canonically.
-_LEGACY_REQUIRED_PATHS = {
-    f"scripts/{path}"
-    if path.endswith(".ps1") and path != "build.ps1" and "/" not in path
-    else path
-    for path in _LEGACY_REQUIRED_PATHS
-}
-
 CURRENT_REQUIRED_PATHS = {
     ".gitignore", "COPYING", "LICENSES/Apache-2.0.txt", "README.md",
     "docs/CHANGELOG.md", "docs/archive/README.md",
@@ -1090,11 +954,9 @@ def check_minilang(root: Path) -> Check:
 
 
 def check_external_contract(root: Path) -> Check:
-    """Validate external contract and return its contract findings."""
+    """Validate the pinned external-reference contract and comparison tools."""
     errors: list[str] = []
     contract = (root / "src/miniquake/external_reference_contract.ml").read_text(encoding="utf-8-sig")
-    test = (root / "scripts" / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
-    collector = (root / "scripts" / "COLLECT_RESULTS.ps1").read_text(encoding="utf-8-sig")
     prepare = (root / "tools/prepare_original_reference.py").read_text(encoding="utf-8-sig")
     comparator = (root / "tools/compare_original_reference.py").read_text(encoding="utf-8-sig")
     errors += marker_errors(contract, [
@@ -1106,15 +968,6 @@ def check_external_contract(root: Path) -> Check:
     ], "external contract")
     errors += marker_errors(prepare, ["EXPECTED_SIZE = 435_712", "EXPECTED_MACHINE = 0x014C", '"legacy_opengl32_staged": False'], "reference stager")
     errors += marker_errors(comparator, ['"normalization": "none"', '"alignment": "temporal_candidate_selection_only"', "default=0.95"], "visual comparator")
-    errors += marker_errors(test, [
-        "Run-OriginalServerMiniClientPair", "Run-MiniServerOriginalClientPair", "Run-OriginalVisualCapture",
-        "two deterministic pairs in each Protocol-15 direction", "original GLQuake deterministic capture",
-        "--render-demo-evidence", "min_ssim=0.95",
-    ], "acceptance runner")
-    errors += marker_errors(collector, [
-        "bp090-094-original-reference", "original_reference_binary_in_result_archive=$false",
-        "quake_game_data_in_result_archive=$false",
-    ], "collector")
     return Check(
         "external_reference_contract", not errors,
         {"reference_sha256": "04862c...d588", "minimum_ssim": 0.95, "interop_directions": 2, "visual_scenarios": 3},
@@ -1124,71 +977,43 @@ def check_external_contract(root: Path) -> Check:
 
 
 def check_named_build_parameter_binding(root: Path) -> Check:
-    """Validate named build parameter binding and return its contract findings."""
+    """Require the current wrapper to pass a named hashtable to build.ps1."""
     errors: list[str] = []
-    current = (root / "scripts" / "TEST_OPT-001D.ps1").read_text(encoding="utf-8-sig")
+    current = (root / "scripts" / "test.ps1").read_text(encoding="utf-8-sig")
     errors += marker_errors(current, [
-        'function Invoke-LiveBuild(', '"-File", $ScriptPath',
-        '"-Compiler", $Compiler', '"-StdLib", $StdLib',
-        '"-Configuration", "Release"', '"-NoRunTests"', '"-SkipPreflight"',
-        'output_mode=python_binary_passthrough_named_build_binding',
+        "$BuildParameters = @{", "Configuration = $Configuration",
+        "$BuildParameters.Compiler = $Compiler", "$BuildParameters.StdLib = $StdLib",
+        '& (Join-Path $Root "build.ps1") @BuildParameters',
     ], "current runner")
-    for forbidden in ('$BuildArguments =', '@BuildArguments', '-EncodedCommand', 'Invoke-LivePowerShellScript'):
+    for forbidden in ('$BuildArguments =', '@BuildArguments', '-EncodedCommand'):
         if forbidden in current:
             errors.append(f"current runner retains unsafe parameter binding marker: {forbidden}")
-    # Ensure the named tokens occur in the actual subprocess argument list, not only in comments.
-    build_fn = re.search(r'(?ms)^function Invoke-LiveBuild\b.*?^}', current)
-    block = build_fn.group(0) if build_fn else ""
-    sequence = ['"-File", $ScriptPath', '"-Compiler", $Compiler', '"-StdLib", $StdLib', '"-Configuration", "Release"']
-    positions = [block.find(item) for item in sequence]
-    if not block or any(pos < 0 for pos in positions) or positions != sorted(positions):
-        errors.append("Invoke-LiveBuild does not pass ordered named build parameters")
     return Check(
         "named_build_parameter_binding", not errors,
         {
-            "mode": "powershell_file_named_arguments",
+            "mode": "powershell_named_hashtable",
             "encoded_command": False,
             "array_splat": False,
-            "configuration": "Release",
+            "configuration": "caller_selected",
         },
         errors,
     )
 
 def check_live_output(root: Path) -> Check:
-    """Validate live output and return its contract findings."""
+    """Validate unbuffered compiler output and the reusable live-process helper."""
     errors: list[str] = []
-    historical_test = (root / "scripts" / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
-    current_test = (root / "scripts" / "TEST_OPT-001D.ps1").read_text(encoding="utf-8-sig")
     live_runner = (root / "tools/run_process_live.py").read_text(encoding="utf-8-sig")
     build = (root / "build.ps1").read_text(encoding="utf-8-sig")
-    for label, script_text in (("historical test", historical_test), ("current test", current_test), ("build", build)):
-        if "PYTHONUNBUFFERED" not in script_text:
-            errors.append(f"{label} script does not force unbuffered Python")
-    if "@(& $Executable @Arguments 2>&1)" in historical_test:
-        errors.append("historical acceptance runner reintroduced full-process output buffering")
-    required = [
-        "tools\\run_process_live.py", "output_mode=python_binary_passthrough_named_build_binding",
-        "Invoke-ExternalProcessLive", "dependent tests skipped because build failed",
-        "Show-LogTail", "Get-Content -LiteralPath $LogPath -Tail",
-    ]
-    errors += marker_errors(current_test, required, "current runner")
-    if "Tee-Object" in current_test:
-        errors.append("current runner reintroduced a PowerShell Tee-Object pipeline")
+    if "PYTHONUNBUFFERED" not in build:
+        errors.append("build.ps1 does not force unbuffered Python")
     errors += marker_errors(live_runner, [
         "subprocess.Popen(", "stderr=subprocess.STDOUT", "text=False",
         "os.read(fd, 4096)", "stream_mode=binary_passthrough",
         "except BaseException:", "child_exit_code=", "--status-json", "write_status(",
     ], "live process runner")
-    errors += marker_errors(current_test, [
-        "2>&1 | Out-Host", '$SavedErrorActionPreference = $ErrorActionPreference',
-        '$ErrorActionPreference = "Continue"', '$StatusPath = $LogPath + ".status.json"',
-        "$PackageVerifyCode -is [array]",
-    ], "scalar live runner")
-    if re.search(r"(?m)^\s*& \$PythonExe @RunnerArguments\s*$", current_test):
-        errors.append("current runner leaks native stdout into the function return stream")
     return Check(
         "live_output", not errors,
-        {"python_unbuffered": True, "current_build_output_mode": "python_binary_passthrough_named_build_binding", "dependent_test_barrier": True},
+        {"python_unbuffered": True, "live_process_mode": "binary_passthrough"},
         errors,
     )
 
@@ -1218,13 +1043,6 @@ def check_powershell_elseif_syntax(root: Path) -> Check:
                 errors.append(
                     f"{rel}:{line_number}: invalid PowerShell `else if`; use `elseif`"
                 )
-    current = root / "scripts" / "TEST_OPT-001D.ps1"
-    if current.is_file():
-        source = current.read_text(encoding="utf-8-sig", errors="replace")
-        if "} elseif ($AllowFailure) {" not in source:
-            errors.append(
-                "TEST_OPT-001D.ps1 is missing the validated AllowFailure elseif branch"
-            )
     return Check(
         "powershell_elseif_syntax",
         not errors,
@@ -1260,11 +1078,6 @@ def check_powershell_interpolation_safety(root: Path) -> Check:
                     f"{rel}:{line_number}: ambiguous ${name}: interpolation; "
                     f"use ${{{name}}}: before a literal colon"
                 )
-    runner = (root / "scripts" / "TEST_BP-090-094R7.ps1").read_text(encoding="utf-8-sig")
-    if '${Scenario}: $OriginalHashA vs $OriginalHashB' not in runner:
-        errors.append("R7 runner does not contain the braced Scenario interpolation")
-    if '$Scenario: $OriginalHashA vs $OriginalHashB' in runner:
-        errors.append("R7 runner still contains the invalid unbraced Scenario interpolation")
     return Check(
         "powershell_variable_colon_interpolation",
         not errors,

@@ -292,7 +292,6 @@ def source_contract(root: Path) -> tuple[list[str], dict[str, Any]]:
         "client": "src/miniquake/client_protocol.ml",
         "tests": "tests/protocol15_event_tests.ml",
         "build": "build.ps1",
-        "acceptance": "scripts/TEST_BP-013.ps1",
         "build_info": "src/miniquake/build_info.ml",
     }
     texts: dict[str, str] = {}
@@ -363,11 +362,6 @@ def source_contract(root: Path) -> tuple[list[str], dict[str, Any]]:
             'MiniQuakeProtocol15EventTests.exe',
             'check_protocol15_events.py',
             'protocol15_events=',
-        ],
-        "acceptance": [
-            'check_protocol15_events.py',
-            'bp013-protocol15-events.json',
-            'MiniQuakeProtocol15EventTests.exe',
         ],
         # Component checkers validate their protocol implementation, not the
         # identity of the cumulative package that happens to contain it.

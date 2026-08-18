@@ -1,47 +1,49 @@
 # Copyright (c) 2026 Nils Kopal
 # SPDX-License-Identifier: Apache-2.0
-# Run retail-data validation against a caller-supplied Quake installation.
+# Validate MiniQuake against a caller-supplied retail Quake installation.
 
 [CmdletBinding()]
 param(
   [Parameter(Mandatory = $true)]
   [string]$QuakeBase,
-
   [string]$Map = "start",
   [string]$Game = "id1",
   [int]$Frames = 300,
-  [int]$TraceFrames = 128,
-  [int]$RenderEvidenceFrame = 128,
   [string]$Compiler = "",
   [string]$StdLib = "",
   [string]$Python = "",
   [switch]$SkipBuild,
-  [switch]$NetworkTests,
-  [switch]$BisectOnFailure
+  [switch]$NetworkTests
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $Root = Split-Path -Parent $PSScriptRoot
-$TestScript = Join-Path $PSScriptRoot "TEST_BP-045-049.ps1"
-$PowerShellExecutable = (Get-Process -Id $PID).Path
-$Arguments = @(
-  "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $TestScript,
-  "-QuakeBase", $QuakeBase,
-  "-Map", $Map,
-  "-Game", $Game,
-  "-Frames", [string]$Frames,
-  "-TraceFrames", [string]$TraceFrames,
-  "-RenderEvidenceFrame", [string]$RenderEvidenceFrame
-)
-if (-not [string]::IsNullOrWhiteSpace($Compiler)) { $Arguments += @("-Compiler", $Compiler) }
-if (-not [string]::IsNullOrWhiteSpace($StdLib)) { $Arguments += @("-StdLib", $StdLib) }
-if (-not [string]::IsNullOrWhiteSpace($Python)) { $Arguments += @("-Python", $Python) }
-if ($SkipBuild) { $Arguments += "-SkipBuild" }
-if ($NetworkTests) { $Arguments += "-NetworkTests" }
-if ($BisectOnFailure) { $Arguments += "-BisectOnFailure" }
+$GameExecutable = Join-Path $Root "build\MiniQuake.exe"
 
-& $PowerShellExecutable @Arguments
-$ExitCode = [int]$LASTEXITCODE
-exit $ExitCode
+if (-not $SkipBuild) {
+  $BuildParameters = @{}
+  if (-not [string]::IsNullOrWhiteSpace($Compiler)) { $BuildParameters.Compiler = $Compiler }
+  if (-not [string]::IsNullOrWhiteSpace($StdLib)) { $BuildParameters.StdLib = $StdLib }
+  if (-not [string]::IsNullOrWhiteSpace($Python)) { $BuildParameters.Python = $Python }
+  if ($NetworkTests) { $BuildParameters.NetworkTests = $true }
+  & (Join-Path $Root "build.ps1") @BuildParameters
+}
+
+if (-not (Test-Path -LiteralPath $GameExecutable -PathType Leaf)) {
+  throw "MiniQuake executable does not exist: $GameExecutable"
+}
+if (-not (Test-Path -LiteralPath $QuakeBase -PathType Container)) {
+  throw "Quake directory does not exist: $QuakeBase"
+}
+
+# Run asset validation, deterministic simulation, and a real renderer pass.
+& $GameExecutable --validate-game $QuakeBase $Map -game $Game
+if ($LASTEXITCODE -ne 0) { throw "Asset validation failed with exit code $LASTEXITCODE" }
+& $GameExecutable --validate-runtime $QuakeBase $Map $Frames -game $Game
+if ($LASTEXITCODE -ne 0) { throw "Runtime validation failed with exit code $LASTEXITCODE" }
+& $GameExecutable --render-smoke $QuakeBase $Map $Frames -game $Game
+if ($LASTEXITCODE -ne 0) { throw "Renderer validation failed with exit code $LASTEXITCODE" }
+
+Write-Host "MiniQuake retail validation passed." -ForegroundColor Green

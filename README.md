@@ -204,8 +204,8 @@ or `musicinfo` in the console to diagnose soundtrack discovery and playback.
 
 ## Tests and verification
 
-The normal build compiles and runs the asset-free test suite. The top-level
-test wrapper executes the current acceptance package:
+The normal build compiles and runs the asset-free test suite. The compact test
+wrapper invokes that same current build without historical package runners:
 
 ```powershell
 .\scripts\test.ps1 -QuakeBase $QuakeBase
@@ -240,7 +240,6 @@ manifest with `python .\tools\verify.py --root . --refresh-manifest`.
 | `scripts/` | Maintainer and retail-validation workflows |
 | `docs/` | Current documentation and historical acceptance records |
 | `audit/` | Machine-readable compatibility and performance evidence |
-| `patches/` | Historical delivery evidence retained for legacy verification |
 
 ## Legal and licensing
 
