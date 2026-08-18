@@ -453,6 +453,7 @@ typedef struct MQ_SHADOW_TRIANGLE {
     float minimum[3];
     float maximum[3];
     float centroid[3];
+    mq_u32 surface_id;
 } MQ_SHADOW_TRIANGLE;
 
 typedef struct MQ_SHADOW_NODE {
@@ -546,13 +547,13 @@ static mq_i32 mq_shadow_build_node(mq_u32 start, mq_u32 count) {
     return node_index;
 }
 
-/* Upload world-surface triangles and rebuild the native shadow-ray BVH. */
-MQ_EXPORT mq_i32 mq_shadow_world_upload(const mq_u8 *data, mq_u32 byte_count) {
+/* Upload strided world triangles and rebuild the native shadow-ray BVH. */
+static mq_i32 mq_shadow_world_upload_stride(const mq_u8 *data, mq_u32 byte_count, mq_u32 stride, mq_i32 indexed) {
     mq_u32 triangle_count;
     mq_u32 triangle_index;
     mq_shadow_world_clear();
-    if (!data || byte_count == 0u || (byte_count % 36u) != 0u) return 0;
-    triangle_count = byte_count / 36u;
+    if (!data || byte_count == 0u || stride < 36u || (byte_count % stride) != 0u) return 0;
+    triangle_count = byte_count / stride;
     if (triangle_count == 0u || triangle_count > 1048576u) return 0;
     mq_shadow_triangles = (MQ_SHADOW_TRIANGLE *)VirtualAlloc((LPVOID)0, (mq_u64)triangle_count * sizeof(MQ_SHADOW_TRIANGLE), 0x3000u /* COMMIT|RESERVE */, 0x04u /* READWRITE */);
     mq_shadow_indices = (mq_u32 *)VirtualAlloc((LPVOID)0, (mq_u64)triangle_count * sizeof(mq_u32), 0x3000u, 0x04u);
@@ -567,7 +568,10 @@ MQ_EXPORT mq_i32 mq_shadow_world_upload(const mq_u8 *data, mq_u32 byte_count) {
         float edge_a[3];
         float edge_b[3];
         float length;
-        memcpy(triangle->vertex, data + triangle_index * 36u, 36u);
+        const mq_u8 *record = data + triangle_index * stride;
+        memcpy(triangle->vertex, record, 36u);
+        if (indexed) memcpy(&triangle->surface_id, record + 36u, 4u);
+        else triangle->surface_id = triangle_index;
         for (component = 0u; component < 3u; ++component) {
             float first = triangle->vertex[component];
             float second = triangle->vertex[3u + component];
@@ -595,6 +599,16 @@ MQ_EXPORT mq_i32 mq_shadow_world_upload(const mq_u8 *data, mq_u32 byte_count) {
     mq_shadow_node_count = 0u;
     mq_shadow_build_node(0u, triangle_count);
     return (mq_i32)triangle_count;
+}
+
+/* Upload legacy coordinate-only triangles with one conservative id per triangle. */
+MQ_EXPORT mq_i32 mq_shadow_world_upload(const mq_u8 *data, mq_u32 byte_count) {
+    return mq_shadow_world_upload_stride(data, byte_count, 36u, 0);
+}
+
+/* Upload triangles tagged with their render-BSP receiver surface. */
+MQ_EXPORT mq_i32 mq_shadow_world_upload_surfaces(const mq_u8 *data, mq_u32 byte_count) {
+    return mq_shadow_world_upload_stride(data, byte_count, 40u, 1);
 }
 
 /* Test a finite ray against an AABB using direction state shared by the ray. */
@@ -691,7 +705,9 @@ static mq_i32 mq_shadow_trace_one(const float *ray, float *result) {
     {
         MQ_SHADOW_TRIANGLE *triangle = &mq_shadow_triangles[best_triangle];
         float normal_dot = triangle->normal[0] * direction[0] + triangle->normal[1] * direction[1] + triangle->normal[2] * direction[2];
-        result[0] = 1.0f;
+        /* Surface ids are exact in float for Quake's bounded BSP face count.
+         * Zero remains the miss sentinel consumed by existing batch callers. */
+        result[0] = (float)(triangle->surface_id + 1u);
         result[1] = best_fraction;
         result[2] = origin[0] + direction[0] * best_fraction;
         result[3] = origin[1] + direction[1] * best_fraction;
@@ -4207,6 +4223,7 @@ static float mq_shadow_alias_projected[MQ_SHADOW_ALIAS_CACHE_SIZE][3];
 static float mq_shadow_alias_normal[MQ_SHADOW_ALIAS_CACHE_SIZE][3];
 static float mq_shadow_alias_source[MQ_SHADOW_ALIAS_CACHE_SIZE][3];
 static float mq_shadow_alias_travel[MQ_SHADOW_ALIAS_CACHE_SIZE];
+static mq_u32 mq_shadow_alias_surface[MQ_SHADOW_ALIAS_CACHE_SIZE];
 static mq_u8 mq_shadow_alias_valid[MQ_SHADOW_ALIAS_CACHE_SIZE];
 static mq_u32 mq_shadow_alias_command_slot[MQ_SHADOW_ALIAS_COMMAND_MAX];
 static mq_u32 mq_shadow_alias_cache_key[MQ_SHADOW_ALIAS_CACHE_SIZE];
@@ -4251,6 +4268,7 @@ static mq_i32 mq_shadow_alias_edge_compatible(mq_u32 left, mq_u32 right) {
     float source_length;
     float projected_length;
     float travel_difference;
+    if (mq_shadow_alias_surface[left] != mq_shadow_alias_surface[right]) return 0;
     if (normal_dot < 0.65f) return 0;
     source_length = sqrtf(source_x * source_x + source_y * source_y + source_z * source_z);
     projected_length = sqrtf(projected_x * projected_x + projected_y * projected_y + projected_z * projected_z);
@@ -4325,6 +4343,7 @@ static mq_i32 mq_shadow_alias_project_vertex(
     mq_shadow_alias_normal[index][0] = result[5];
     mq_shadow_alias_normal[index][1] = result[6];
     mq_shadow_alias_normal[index][2] = result[7];
+    mq_shadow_alias_surface[index] = (mq_u32)(result[0] - 1.0f);
     {
         float travel_x = result[2] - world[0];
         float travel_y = result[3] - world[1];

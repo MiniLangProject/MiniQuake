@@ -52,6 +52,7 @@ projectionZ = array(INITIAL_VERTEX_CACHE, 0.0)
 projectionNormalX = array(INITIAL_VERTEX_CACHE, 0.0)
 projectionNormalY = array(INITIAL_VERTEX_CACHE, 0.0)
 projectionNormalZ = array(INITIAL_VERTEX_CACHE, 1.0)
+projectionSurface = array(INITIAL_VERTEX_CACHE, -1)
 projectionTravel = array(INITIAL_VERTEX_CACHE, 0.0)
 sourceX = array(INITIAL_VERTEX_CACHE, 0.0)
 sourceY = array(INITIAL_VERTEX_CACHE, 0.0)
@@ -70,7 +71,7 @@ worldTrianglePacket = bytes()
 function ensureVertexCapacity(index)
   global projectionStamp, projectionValid, projectionX, projectionY, projectionZ
   global projectionNormalX, projectionNormalY, projectionNormalZ
-  global projectionTravel
+  global projectionSurface, projectionTravel
   global sourceX, sourceY, sourceZ
   global minimumHitFraction, rayPreparedValid, rayPacket, hitPacket
   if index < len(projectionStamp) then return true end if
@@ -87,6 +88,7 @@ function ensureVertexCapacity(index)
   projectionNormalX = array(size, 0.0)
   projectionNormalY = array(size, 0.0)
   projectionNormalZ = array(size, 1.0)
+  projectionSurface = array(size, -1)
   projectionTravel = array(size, 0.0)
   sourceX = array(size, 0.0)
   sourceY = array(size, 0.0)
@@ -117,8 +119,13 @@ function ensureNativeWorld(worldMap, worldSurfaces)
     end if
   end for
   if triangleCount < 1 then return false end if
-  worldTrianglePacket = bytes(triangleCount * 36)
+  // Each triangle carries its owning render-surface index. Individual caster
+  // vertices can hit valid but disconnected polygons on opposite sides of a
+  // wall or doorway; retaining this identity prevents the rasterizer from
+  // inventing a shadow triangle through the space between those receivers.
+  worldTrianglePacket = bytes(triangleCount * 40)
   offset = 0
+  surfaceIndex = 0
   for each surface in worldSurfaces
     if surface is not void and (surface.flags & c.SURF_DRAWSKY) == 0 and len(surface.vertices) >= 3 then
       triangleIndex = 1
@@ -135,12 +142,14 @@ function ensureNativeWorld(worldMap, worldSurfaces)
         byteio.putF32(worldTrianglePacket, offset + 24, third.x)
         byteio.putF32(worldTrianglePacket, offset + 28, third.y)
         byteio.putF32(worldTrianglePacket, offset + 32, third.z)
-        offset = offset + 36
+        byteio.putU32(worldTrianglePacket, offset + 36, surfaceIndex)
+        offset = offset + 40
         triangleIndex = triangleIndex + 1
       end while
     end if
+    surfaceIndex = surfaceIndex + 1
   end for
-  nativeWorldReady = native.shadowWorldUpload(worldTrianglePacket, len(worldTrianglePacket)) == triangleCount
+  nativeWorldReady = native.shadowWorldUploadSurfaces(worldTrianglePacket, len(worldTrianglePacket)) == triangleCount
   return nativeWorldReady
 end function
 
@@ -319,10 +328,10 @@ end function
 
 // Validate and store one native or scalar ray result with a receiver-normal
 // bias that prevents depth fighting on the actual world polygon.
-function acceptProjection(index, hit, fraction, hitX, hitY, hitZ, normalX, normalY, normalZ)
+function acceptProjection(index, hit, receiverSurface, fraction, hitX, hitY, hitZ, normalX, normalY, normalZ)
   global projectionValid, projectionX, projectionY, projectionZ
   global projectionNormalX, projectionNormalY, projectionNormalZ
-  global projectionTravel
+  global projectionSurface, projectionTravel
   if not hit or not rayPreparedValid[index] then return false end if
   if fraction <= minimumHitFraction[index] then return false end if
   // A near point light can otherwise magnify individual MDL triangles across
@@ -335,6 +344,7 @@ function acceptProjection(index, hit, fraction, hitX, hitY, hitZ, normalX, norma
   projectionNormalX[index] = normalX
   projectionNormalY[index] = normalY
   projectionNormalZ[index] = normalZ
+  projectionSurface[index] = receiverSurface
   travelX = hitX - sourceX[index]
   travelY = hitY - sourceY[index]
   travelZ = hitZ - sourceZ[index]
@@ -358,6 +368,7 @@ function tracePreparedVertices(count)
         offset = index * 32
         if acceptProjection(
           index, byteio.f32(hitPacket, offset) > 0.5,
+          native.trunc(byteio.f32(hitPacket, offset)) - 1,
           byteio.f32(hitPacket, offset + 4),
           byteio.f32(hitPacket, offset + 8), byteio.f32(hitPacket, offset + 12), byteio.f32(hitPacket, offset + 16),
           byteio.f32(hitPacket, offset + 20), byteio.f32(hitPacket, offset + 24), byteio.f32(hitPacket, offset + 28),
@@ -378,7 +389,7 @@ function tracePreparedVertices(count)
         byteio.f32(rayPacket, offset + 12), byteio.f32(rayPacket, offset + 16), byteio.f32(rayPacket, offset + 20),
       ) then
         if acceptProjection(
-          index, true, glRlight.ShadowRayFraction(),
+          index, true, -1, glRlight.ShadowRayFraction(),
           glRlight.ShadowRayX(), glRlight.ShadowRayY(), glRlight.ShadowRayZ(),
           glRlight.ShadowRayNormalX(), glRlight.ShadowRayNormalY(), glRlight.ShadowRayNormalZ(),
         ) then traced = traced + 1 end if
@@ -435,8 +446,17 @@ function inline receiverEdgeContinuity(sourceLength, projectedLength, travelDiff
   return travelDifference <= sourceLength * 1.5 + 12.0
 end function
 
+// Require native ray hits to remain on one concrete BSP receiver polygon.
+// The scalar fallback cannot expose a surface id and retains the geometric
+// normal/stretch checks below, represented by its negative sentinel.
+function inline receiverSurfaceContinuity(leftSurface, rightSurface)
+  if leftSurface < 0 or rightSurface < 0 then return true end if
+  return leftSurface == rightSurface
+end function
+
 // Test one projected edge for a compatible receiver plane and bounded stretch.
 function receiverEdgeCompatible(left, right)
+  if not receiverSurfaceContinuity(projectionSurface[left], projectionSurface[right]) then return false end if
   normalDot = projectionNormalX[left] * projectionNormalX[right] + projectionNormalY[left] * projectionNormalY[right] + projectionNormalZ[left] * projectionNormalZ[right]
   if normalDot < 0.65 then return false end if
   sourceDeltaX = sourceX[left] - sourceX[right]
@@ -475,6 +495,11 @@ end function
 // Return one cached projected z coordinate.
 function inline projectedPointZ(index)
   return projectionZ[index]
+end function
+
+// Return the render-BSP surface reached by one cached native ray.
+function inline projectedPointSurface(index)
+  return projectionSurface[index]
 end function
 
 // Report whether one vertex reached a compatible receiver in this sample.

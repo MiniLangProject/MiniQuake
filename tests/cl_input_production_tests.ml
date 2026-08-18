@@ -12,6 +12,7 @@ import miniquake.net_loop as netloop
 import miniquake.net_main as netmain
 import miniquake.sizebuf as sz
 import miniquake.message as msg
+import miniquake.platform.win32 as win
 
 // Assert that the condition holds and identify a failing test.
 function require(value, name)
@@ -23,6 +24,13 @@ end function
 function equal(actual, expected, name)
   if actual != expected then return error(9881, name + ": expected " + expected + ", got " + actual) end if
   return true
+end function
+
+// Assert floating-point proximity for scaled mouse-angle tests.
+function near(actual, expected, tolerance, name)
+  difference = actual - expected
+  if difference < 0.0 then difference = -difference end if
+  return require(difference <= tolerance, name + ": expected " + expected + ", got " + actual)
 end function
 
 // Create and initialize without devices.
@@ -203,29 +211,107 @@ function testGameplayTransitionDropsStaleMenuEvent()
   return true
 end function
 
+// Verify persistent free-look consumes both mouse axes as view rotation even
+// when legacy lookstrafe and +strafe state remain in an old configuration.
+function testModernFreeLookAxesAndScaling()
+  input.IN_ClearStates()
+  input.IN_SetFreeLook(true)
+  input.inStrafe[2] = 1
+  command = input.createCommand()
+  input.IN_MoveDelta(command, 4.0, 10.0, 2.0, 0.022, 0.022, 0.8, 1.0, true, true)
+  near(command.viewAngles.y, -0.176, 0.0001, "free-look yaw sensitivity")
+  near(command.viewAngles.x, 0.44, 0.0001, "free-look pitch sensitivity")
+  equal(command.forwardMove, 0.0, "free-look mouse Y never moves player")
+  equal(command.sideMove, 0.0, "free-look mouse X never strafes player")
+
+  inverted = input.createCommand()
+  input.IN_MoveDelta(inverted, 0.0, 10.0, 2.0, 0.022, -0.022, 0.8, 1.0, false, false)
+  near(inverted.viewAngles.x, -0.44, 0.0001, "negative m_pitch inverts mouse Y")
+  input.IN_SetFreeLook(false)
+  input.IN_ClearStates()
+  return true
+end function
+
+// Verify the one-time compatibility layout removes case-duplicate classic
+// look bindings and installs movement-only W/A/S/D commands.
+function testModernWasdMigration()
+  input.resetBindings()
+  input.setBindingCode(65, "+lookup")
+  input.setBindingCode(68, "+moveup")
+  input.bindKey("a", "+lookup")
+  input.bindKey("d", "+moveup")
+  input.unbindKey("w")
+  input.unbindKey("s")
+  input.applyModernMovementBindings()
+  equal(input.bindingForCode(119), "+forward", "W migrates to forward")
+  equal(input.bindingForCode(115), "+back", "S migrates to back")
+  equal(input.bindingForCode(97), "+moveleft", "A migrates to strafe left")
+  equal(input.bindingForCode(100), "+moveright", "D migrates to strafe right")
+  equal(input.bindingForCode(65), "", "upper-case A alias cleared")
+  equal(input.bindingForCode(68), "", "upper-case D alias cleared")
+
+  // Drive the same native virtual-key snapshot used by the interactive game,
+  // proving the migrated bindings reach movement rather than view angles.
+  input.IN_ClearStates()
+  live = input.createCommand()
+  win.inputTestPush(1, 87, 1)
+  input.buildOriginalMove(live, c.SIGNONS, 4.0, 3.0, 0.022, 0.022, false, 200.0, 200.0, 350.0, 200.0, false, true, false, false)
+  equal(live.forwardMove, 100.0, "physical W starts forward movement")
+  win.inputTestPush(1, 87, 0)
+  input.buildOriginalMove(live, c.SIGNONS, 4.0, 3.0, 0.022, 0.022, false, 200.0, 200.0, 350.0, 200.0, false, true, false, false)
+
+  win.inputTestPush(1, 83, 1)
+  input.buildOriginalMove(live, c.SIGNONS, 4.0, 3.0, 0.022, 0.022, false, 200.0, 200.0, 350.0, 200.0, false, true, false, false)
+  equal(live.forwardMove, -100.0, "physical S starts backward movement")
+  win.inputTestPush(1, 83, 0)
+  input.buildOriginalMove(live, c.SIGNONS, 4.0, 3.0, 0.022, 0.022, false, 200.0, 200.0, 350.0, 200.0, false, true, false, false)
+
+  win.inputTestPush(1, 65, 1)
+  input.buildOriginalMove(live, c.SIGNONS, 4.0, 3.0, 0.022, 0.022, false, 200.0, 200.0, 350.0, 200.0, false, true, false, false)
+  equal(live.sideMove, -175.0, "physical A starts left strafe")
+  win.inputTestPush(1, 65, 0)
+  input.buildOriginalMove(live, c.SIGNONS, 4.0, 3.0, 0.022, 0.022, false, 200.0, 200.0, 350.0, 200.0, false, true, false, false)
+
+  win.inputTestPush(1, 68, 1)
+  input.buildOriginalMove(live, c.SIGNONS, 4.0, 3.0, 0.022, 0.022, false, 200.0, 200.0, 350.0, 200.0, false, true, false, false)
+  equal(live.sideMove, 175.0, "physical D starts right strafe")
+  equal(live.viewAngles.x, 0.0, "WASD leaves pitch unchanged")
+  equal(live.viewAngles.y, 0.0, "WASD leaves yaw unchanged")
+  win.inputTestPush(1, 68, 0)
+  input.resetBindings()
+  input.IN_ClearStates()
+  return true
+end function
+
 // Parse command-line arguments and run the selected operation.
 function main(args)
   result = try(testDemoConsumesWithoutNetwork())
   if result is error then print "FAIL demo input consumption: " + result.message; return 1 end if
-  print "[1/7] demo command snapshot / edge consumption"
+  print "[1/9] demo command snapshot / edge consumption"
   result = try(testUiDestinationStillBuildsMove())
   if result is error then print "FAIL UI input consumption: " + result.message; return 1 end if
-  print "[2/7] console/menu held move / edge consumption"
+  print "[2/9] console/menu held move / edge consumption"
   result = try(testNoclipStrafeVerticalMouse())
   if result is error then print "FAIL noclip mouse branch: " + result.message; return 1 end if
-  print "[3/7] noclip strafe vertical mouse"
+  print "[3/9] noclip strafe vertical mouse"
   result = try(testBackwardMoveKeepsSignedWireValue())
   if result is error then print "FAIL backward input/wire path: " + result.message; return 1 end if
-  print "[4/7] backward input / signed Protocol 15 move"
+  print "[4/9] backward input / signed Protocol 15 move"
   result = try(testGameplayTransitionConsumesQueuedActions())
   if result is error then print "FAIL gameplay-transition input gate: " + result.message; return 1 end if
-  print "[5/7] menu/map transition input gate"
+  print "[5/9] menu/map transition input gate"
   result = try(testGameplayTransitionIgnoresNewMovement())
   if result is error then print "FAIL gameplay-transition movement snapshot: " + result.message; return 1 end if
-  print "[6/7] post-transition movement cannot extend input gate"
+  print "[6/9] post-transition movement cannot extend input gate"
   result = try(testGameplayTransitionDropsStaleMenuEvent())
   if result is error then print "FAIL stale menu-transition event: " + result.message; return 1 end if
-  print "[7/7] stale menu key cannot retain transition gate"
-  print "CL_INPUT PRODUCTION TESTS PASSED (7/7)"
+  print "[7/9] stale menu key cannot retain transition gate"
+  result = try(testModernFreeLookAxesAndScaling())
+  if result is error then print "FAIL modern free-look: " + result.message; return 1 end if
+  print "[8/9] free-look axes / inversion / sensitivity"
+  result = try(testModernWasdMigration())
+  if result is error then print "FAIL modern WASD migration: " + result.message; return 1 end if
+  print "[9/9] one-time modern WASD migration"
+  print "CL_INPUT PRODUCTION TESTS PASSED (9/9)"
   return 0
 end function

@@ -140,6 +140,10 @@ function createCvars(commandLine, registered)
   registerCvar(registry, "m_filter", "0", true, false)
   registerCvar(registry, "lookspring", "0", true, false)
   registerCvar(registry, "lookstrafe", "0", true, false)
+  registerCvar(registry, "freelook", "1", true, false)
+  // Version zero identifies configurations written before MiniQuake adopted
+  // modern WASD defaults.  It is archived after the one-time migration.
+  registerCvar(registry, "cl_inputversion", "0", true, false)
   registerCvar(registry, "cl_forwardspeed", "200", true, false)
   registerCvar(registry, "cl_backspeed", "200", true, false)
   registerCvar(registry, "cl_sidespeed", "350", true, false)
@@ -2583,6 +2587,19 @@ function queueStartupCommands(session)
   return true
 end function
 
+// Upgrade legacy retail/default.cfg controls once, after every startup script
+// has run.  This repairs existing installations without overriding bindings
+// that the player customizes after the migrated configuration is saved.
+function migrateModernInputConfiguration(session)
+  if cvar.variableValue(session.cvars, "cl_inputversion") >= 1.0 then return false end if
+  input.applyModernMovementBindings()
+  cvar.set(session.cvars, "lookspring", "0")
+  cvar.set(session.cvars, "lookstrafe", "0")
+  cvar.set(session.cvars, "freelook", "1")
+  cvar.set(session.cvars, "cl_inputversion", "1")
+  return true
+end function
+
 // Apply the Quake-compatible host init behavior.
 function Host_Init(session)
   // The original 8 MiB small-object threshold collected far too often during
@@ -2672,6 +2689,7 @@ function Host_Init(session)
 
   queueStartupCommands(session)
   executeCommandBuffer(session, 4096)
+  migrateModernInputConfiguration(session)
   if not session.headless and session.windowCreated then
     if glvid.VID_ApplyConfiguredRenderer() then print glvid.VID_State().lastModeMessage end if
     if glvid.VID_ApplyConfiguredResolution() then print glvid.VID_State().lastModeMessage end if
@@ -3082,7 +3100,9 @@ function executeMenuSelection(session)
     setMenuActive(session, false)
     setConsoleActive(session, true)
   else if action == "reset_defaults" then
-    cmd.addText(session.commands, "exec default.cfg\n")
+    // The retail file restores the 1996 keyboard-look layout. Apply the modern
+    // movement bindings afterwards so Reset Defaults matches a fresh install.
+    cmd.addText(session.commands, "exec default.cfg\nunbind W\nunbind S\nunbind A\nunbind D\nbind w +forward\nbind s +back\nbind a +moveleft\nbind d +moveright\nlookspring 0\nlookstrafe 0\nfreelook 1\ncl_inputversion 1\n")
     menu.setStatus(session.menu, "DEFAULT CONTROLS RESTORED")
     playMenuSound(session, "misc/menu2.wav")
   else if action == "video_options" then
@@ -3489,6 +3509,7 @@ function sendClientIntentions(session)
     )
     deviceActive = not inputSuppressed and not transitionSuppressed and not session.headless and session.windowCreated and win.hasFocus()
     minimized = session.windowCreated and win.minimized()
+    input.IN_SetFreeLook(cvar.variableValue(session.cvars, "freelook") != 0.0)
     input.buildOriginalMove(
       command,
       session.client.signon,

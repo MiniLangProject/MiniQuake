@@ -20,6 +20,7 @@ EXPORTS
   mq_render_available
   mq_shadow_world_clear
   mq_shadow_world_upload
+  mq_shadow_world_upload_surfaces
   mq_shadow_trace_batch
   mq_win_create
   mq_win_destroy

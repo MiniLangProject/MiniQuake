@@ -267,6 +267,21 @@ function testSettingsPersistence()
   root = "build\\settings_persistence_fixture"
   configPath = qfs.join(root, "id1\\config.cfg")
   qfs.COM_CreatePath(configPath)
+
+  legacy = host.create(["-basedir", root, "-headless", "-nosound", "-nolan"])
+  gameInput.bindKey("a", "+lookup")
+  gameInput.bindKey("d", "+moveup")
+  gameInput.unbindKey("w")
+  gameInput.unbindKey("s")
+  yes(host.migrateModernInputConfiguration(legacy), "legacy controls migrated")
+  equal(gameInput.commandForKey("w"), "+forward", "migrated W binding")
+  equal(gameInput.commandForKey("s"), "+back", "migrated S binding")
+  equal(gameInput.commandForKey("a"), "+moveleft", "migrated A binding")
+  equal(gameInput.commandForKey("d"), "+moveright", "migrated D binding")
+  equal(cvar.variableString(legacy.cvars, "freelook"), "1", "migrated free-look")
+  equal(cvar.variableString(legacy.cvars, "lookstrafe"), "0", "migrated lookstrafe")
+  no(host.migrateModernInputConfiguration(legacy), "input migration is one-time")
+
   saved = host.create(["-basedir", root, "-headless", "-nosound", "-nolan"])
   settings = [
     ["vid_width", "1920"], ["vid_height", "1080"], ["vid_bpp", "32"],
@@ -274,6 +289,7 @@ function testSettingsPersistence()
     ["r_lighting", "1"], ["r_shadows", "1"], ["r_shadowquality", "2"],
     ["r_textureupscale", "6"],
     ["gamma", "0.750000"], ["viewsize", "110"], ["sensitivity", "4.500000"],
+    ["m_pitch", "-0.022000"], ["freelook", "1"], ["cl_inputversion", "1"],
     ["volume", "0.600000"], ["bgmvolume", "0.800000"],
     ["host_maxfps", "240"], ["_windowed_mouse", "1"],
   ]

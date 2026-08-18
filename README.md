@@ -123,7 +123,10 @@ parameter block for the complete build interface.
 | Console | `` ` `` |
 
 Bindings can be changed through **Options > Customize Controls** or with the
-original `bind` console command.
+original `bind` console command. Persistent free-look is enabled by default;
+mouse sensitivity and vertical-axis inversion are available directly in the
+Options menu. The archived `freelook` cvar can restore classic hold-to-look
+behavior when set to `0`.
 
 ## Cheats
 

@@ -183,6 +183,7 @@ function testRayShadowOcclusion()
   rayShadow.beginProjectionSample(0.0, 0.0)
   require(rayShadow.projectVertex(0, 0.0, 0.0, 0.0), "wall beyond caster receives light ray")
   require(rayShadow.projectedPointX(0) > 0.0 and rayShadow.projectedPointX(0) < 1.0, "wall receiver carries outward depth bias")
+  equal(rayShadow.projectedPointSurface(0), 0, "native wall ray retains receiver surface identity")
 
   entity.origin.x = -5.0
   require(rayShadow.configureBrush(wall.map, wall.surfaces, entity, true, 10.0, 0.0, 0.0), "occluded wall ray context")
@@ -197,6 +198,9 @@ function testRayShadowReceiverContinuity()
   require(rayShadow.receiverEdgeContinuity(16.0, 18.0, 15.0), "continuous floor receiver remains connected")
   require(not rayShadow.receiverEdgeContinuity(16.0, 66.0, 64.0), "ledge discontinuity rejects stretched shadow edge")
   require(not rayShadow.receiverEdgeContinuity(4.0, 80.0, 2.0), "excessive projected stretch rejects thin line")
+  require(rayShadow.receiverSurfaceContinuity(7, 7), "one BSP receiver surface remains connected")
+  require(not rayShadow.receiverSurfaceContinuity(7, 8), "separate wall polygons cannot be bridged")
+  require(rayShadow.receiverSurfaceContinuity(-1, 8), "scalar fallback retains geometric continuity policy")
   return true
 end function
 

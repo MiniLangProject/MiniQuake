@@ -70,11 +70,11 @@ function optionsItems()
     "Reset to defaults",
     "Screen size",
     "Brightness",
-    "Mouse Speed",
+    "Mouse Sensitivity",
     "CD Music Volume",
     "Sound Volume",
     "Always Run",
-    "Invert Mouse",
+    "Invert Mouse Y",
     "Lookspring",
     "Lookstrafe",
     "Video Options",
@@ -771,11 +771,11 @@ function drawOptions(state, texture, transform, realtime, registry)
   virtualString(texture, 16.0, 48.0, "     Reset to defaults", transform, 255)
   virtualString(texture, 16.0, 56.0, "           Screen size", transform, 255)
   virtualString(texture, 16.0, 64.0, "            Brightness", transform, 255)
-  virtualString(texture, 16.0, 72.0, "           Mouse Speed", transform, 255)
+  virtualString(texture, 16.0, 72.0, "     Mouse Sensitivity", transform, 255)
   virtualString(texture, 16.0, 80.0, "       CD Music Volume", transform, 255)
   virtualString(texture, 16.0, 88.0, "          Sound Volume", transform, 255)
   virtualString(texture, 16.0, 96.0, "            Always Run", transform, 255)
-  virtualString(texture, 16.0, 104.0, "          Invert Mouse", transform, 255)
+  virtualString(texture, 16.0, 104.0, "        Invert Mouse Y", transform, 255)
   virtualString(texture, 16.0, 112.0, "            Lookspring", transform, 255)
   virtualString(texture, 16.0, 120.0, "            Lookstrafe", transform, 255)
   if state.videoDrawCallback is not void then virtualString(texture, 16.0, 128.0, "         Video Options", transform, 255) end if
@@ -1795,7 +1795,9 @@ function M_AdjustSliders(state, registry, direction)
     menuCvar.setValue(registry, "cl_forwardspeed", speed)
     menuCvar.setValue(registry, "cl_backspeed", speed)
   else if selection == 9 then
-    menuCvar.setValue(registry, "m_pitch", -menuCvar.variableValue(registry, "m_pitch"))
+    pitch = menuCvar.variableValue(registry, "m_pitch")
+    if pitch == 0.0 then pitch = 0.022 end if
+    menuCvar.setValue(registry, "m_pitch", -pitch)
   else if selection == 10 then
     value = 1.0
     if menuCvar.variableValue(registry, "lookspring") != 0.0 then value = 0.0 end if

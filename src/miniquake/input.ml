@@ -70,6 +70,7 @@ polledKeyQueryMask = bytes(256)
 eventKeyDownStates = bytes(256)
 gameplayTransitionBlocked = false
 gameplayTransitionHeldCodes = []
+alwaysMouseLook = false
 
 // cl_input.c's kbutton_t is deliberately represented as a three-element
 // mutable value: two independently held key numbers followed by the original
@@ -451,6 +452,23 @@ function resetBindings()
   bindKey("6", "impulse 6")
   bindKey("7", "impulse 7")
   bindKey("8", "impulse 8")
+  return true
+end function
+
+// Install the modern movement layout once when upgrading an original Quake
+// configuration.  Key_StringToKeynum deliberately distinguishes one-character
+// upper- and lower-case names, while live Win32 polling uses the lower-case
+// slots installed by resetBindings.  Clear stale upper-case aliases so one
+// physical key cannot own two different kbutton commands.
+function applyModernMovementBindings()
+  setBindingCode(87, "")
+  setBindingCode(83, "")
+  setBindingCode(65, "")
+  setBindingCode(68, "")
+  setBindingCode(119, "+forward")
+  setBindingCode(115, "+back")
+  setBindingCode(97, "+moveleft")
+  setBindingCode(100, "+moveright")
   return true
 end function
 
@@ -1515,18 +1533,30 @@ function applyMouse(command, mouseSensitivity, yawScale, pitchScale, filterEnabl
   return applyMouseDelta(command, delta[0], delta[1], mouseSensitivity, yawScale, pitchScale)
 end function
 
+// Select modern persistent free-look without changing the original +mlook
+// button state.  Differential tests and compatibility callers retain stock
+// Quake behavior until the production host explicitly enables this mode.
+function IN_SetFreeLook(enabled)
+  global alwaysMouseLook
+  alwaysMouseLook = enabled
+  return alwaysMouseLook
+end function
+
 // Mirror Quake's IN_MoveDelta routine and its observable state changes.
 function IN_MoveDelta(command, deltaX, deltaY, mouseSensitivity, yawScale, pitchScale, sideScale, forwardScale, lookStrafe, noclipAngleHack)
   mouseX = deltaX * mouseSensitivity
   mouseY = deltaY * mouseSensitivity
-  if (inStrafe[2] & 1) != 0 or (lookStrafe and (inMLook[2] & 1) != 0) then
+  mouseLookActive = alwaysMouseLook or (inMLook[2] & 1) != 0
+  // Free-look owns both mouse axes. Legacy +strafe/lookstrafe remapping remains
+  // available when free-look is disabled, preserving the original input path.
+  if not alwaysMouseLook and ((inStrafe[2] & 1) != 0 or (lookStrafe and (inMLook[2] & 1) != 0)) then
     command.sideMove = command.sideMove + sideScale * mouseX
   else
     command.viewAngles.y = command.viewAngles.y - yawScale * mouseX
   end if
 
-  if (inMLook[2] & 1) != 0 then requestStopPitchDrift() end if
-  if (inMLook[2] & 1) != 0 and (inStrafe[2] & 1) == 0 then
+  if mouseLookActive then requestStopPitchDrift() end if
+  if alwaysMouseLook or ((inMLook[2] & 1) != 0 and (inStrafe[2] & 1) == 0) then
     command.viewAngles.x = command.viewAngles.x + pitchScale * mouseY
     command.viewAngles.x = math.clamp(command.viewAngles.x, -70.0, 80.0)
   else if (inStrafe[2] & 1) != 0 and noclipAngleHack then

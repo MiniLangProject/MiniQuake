@@ -83,10 +83,13 @@ def main() -> int:
     native = (root / "native" / "miniquake_native.c").read_text(encoding="utf-8-sig")
     shadow_edge = function_body(native, "mq_shadow_alias_edge_compatible")
     require("mq_shadow_alias_travel" in shadow_edge, "native alias shadows do not reject receiver travel discontinuities", errors)
+    require("mq_shadow_alias_surface[left] != mq_shadow_alias_surface[right]" in shadow_edge, "native alias shadows can bridge distinct BSP receiver surfaces", errors)
     require("source_length * 3.0f + 24.0f" in shadow_edge, "native alias-shadow projected stretch differs from MiniLang policy", errors)
     require("source_length * 1.5f + 12.0f" in shadow_edge, "native alias-shadow receiver continuity differs from MiniLang policy", errors)
     shadow_trace = function_body(native, "mq_shadow_trace_one")
     require("inverse_direction[axis] =" in shadow_trace, "shadow BVH repeats reciprocal work for every visited node", errors)
+    require("triangle->surface_id + 1u" in shadow_trace, "shadow hits do not retain their BSP receiver surface", errors)
+    require("mq_shadow_world_upload_surfaces" in native, "indexed BSP shadow upload export is missing", errors)
     require(native.count("signed_count == (-2147483647 - 1)") >= 4, "an alias command parser can overflow while negating INT_MIN", errors)
     alias_shadow = function_body(native, "mq_gl_draw_alias_ray_shadow")
     require("mq_shadow_submit_vertices" in alias_shadow and "mq_gl_vertex3" not in alias_shadow, "alias shadows still replay every vertex through immediate mode", errors)
@@ -96,7 +99,7 @@ def main() -> int:
         for error in errors:
             print("  " + error)
         return 1
-    print("native renderer safety tests: PASS (24 invariants)")
+    print("native renderer safety tests: PASS (27 invariants)")
     return 0
 
 

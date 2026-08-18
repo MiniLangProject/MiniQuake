@@ -26,6 +26,7 @@ extern function renderBackend() from "miniquake_native.dll" symbol "mq_render_ba
 extern function renderAvailable(backend as i32) from "miniquake_native.dll" symbol "mq_render_available" returns i32
 extern function shadowWorldClear() from "miniquake_native.dll" symbol "mq_shadow_world_clear" returns void
 extern function shadowWorldUpload(data as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_shadow_world_upload" returns i32
+extern function shadowWorldUploadSurfaces(data as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_shadow_world_upload_surfaces" returns i32
 extern function shadowTraceBatch(rays as bytes, rayBytes as u32, results as bytes, resultBytes as u32) from "miniquake_native.dll" symbol "mq_shadow_trace_batch" returns i32
 
 extern function winCreate(title as wstr, width as i32, height as i32, fullscreen as i32) from "miniquake_native.dll" symbol "mq_win_create" returns ptr
