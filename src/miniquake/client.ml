@@ -474,6 +474,22 @@ function CL_RelinkEntities(client)
         entity.angles.z = interpolatedAngle(entity.previousMessageAngles.z, entity.messageAngles.z, entityFraction)
         modelFlags = modelFlagsForIndex(entity.modelIndex)
         if (modelFlags & c.EF_ROTATE) != 0 then entity.angles.y = binaryObjectRotation end if
+        if index == client.viewEntity and client.player is not void and not client.localAuthoritative then
+          // GLQuake builds both the first-person camera and the intermission
+          // camera from cl_entities[cl.viewentity] after this interpolation.
+          // MiniQuake keeps the gameplay-facing PlayerState separately, so
+          // leaving it at the newest packet position made demo cameras jump
+          // at the server snapshot rate even though the view entity itself
+          // was moving smoothly. Mirror the interpolated entity in place;
+          // local listen-server play retains its unquantized authoritative
+          // PlayerState through the localAuthoritative guard above.
+          client.player.origin.x = entity.origin.x
+          client.player.origin.y = entity.origin.y
+          client.player.origin.z = entity.origin.z
+          client.player.renderAngles.x = entity.angles.x
+          client.player.renderAngles.y = entity.angles.y
+          client.player.renderAngles.z = entity.angles.z
+        end if
         if (entity.effects & c.EF_BRIGHTFIELD) != 0 then
           queueRelinkParticleEffect("entity_particles", math.copy(entity.origin))
         end if

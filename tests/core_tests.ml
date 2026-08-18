@@ -39,6 +39,7 @@ import miniquake.format.progs as progs
 import miniquake.render.gl_warp as glWarp
 import miniquake.render.gl_rlight as glRlight
 import miniquake.render.draw2d as draw2d
+import miniquake.render.texture_upscale as textureUpscale
 import miniquake.screen as screenCompat
 
 // Assert exact equality and report both values on failure.
@@ -1162,89 +1163,154 @@ function testGlWarpAndRlightParity()
   return true
 end function
 
+// Verify dimensions, edge rules and stable names for every texture scaler.
+function testTextureUpscaling()
+  fixture = bytes(3 * 3 * 4)
+  pixel = 0
+  while pixel < 9
+    fixture[pixel * 4 + 2] = 255
+    fixture[pixel * 4 + 3] = 255
+    pixel = pixel + 1
+  end while
+  // A matching red north/west pair around the blue center exercises the
+  // canonical ScaleNx corner rule and both edge-directed smoothers.
+  north = (0 * 3 + 1) * 4
+  west = (1 * 3 + 0) * 4
+  fixture[north] = 255; fixture[north + 2] = 0
+  fixture[west] = 255; fixture[west + 2] = 0
+
+  assertEqual(textureUpscale.modeName(-12), "OFF", "upscale lower clamp")
+  assertEqual(textureUpscale.modeName(99), "XBR4X", "upscale upper clamp")
+  assertEqual(textureUpscale.scaleFactor(textureUpscale.UPSCALE_SCALE3X), 3, "Scale3x factor")
+
+  nearest = textureUpscale.apply(fixture, 3, 3, textureUpscale.UPSCALE_NEAREST_2X)
+  assertEqual(nearest[1], 6, "nearest width")
+  assertEqual(nearest[2], 6, "nearest height")
+  centerTopLeft = (2 * 6 + 2) * 4
+  assertEqual(nearest[0][centerTopLeft + 2], 255, "nearest keeps center blue")
+
+  scaled2 = textureUpscale.apply(fixture, 3, 3, textureUpscale.UPSCALE_SCALE2X)
+  assertEqual(scaled2[1], 6, "Scale2x width")
+  assertEqual(scaled2[0][centerTopLeft], 255, "Scale2x joins matching corner")
+  assertEqual(scaled2[0][centerTopLeft + 4 + 2], 255, "Scale2x preserves unmatched corner")
+
+  scaled3 = textureUpscale.apply(fixture, 3, 3, textureUpscale.UPSCALE_SCALE3X)
+  assertEqual(scaled3[1], 9, "Scale3x width")
+  assertEqual(scaled3[2], 9, "Scale3x height")
+  assertEqual(scaled3[0][(3 * 9 + 3) * 4], 255, "Scale3x joins matching corner")
+
+  hq2 = textureUpscale.apply(fixture, 3, 3, textureUpscale.UPSCALE_HQ2X)
+  assertTrue(hq2[0][centerTopLeft] > 0, "HQ2x smooths diagonal red")
+  assertTrue(hq2[0][centerTopLeft + 2] < 255, "HQ2x reduces diagonal blue")
+  xbr2 = textureUpscale.apply(fixture, 3, 3, textureUpscale.UPSCALE_XBR2X)
+  assertTrue(xbr2[0][centerTopLeft] > 0, "xBR2x smooths diagonal red")
+  xbr4 = textureUpscale.apply(fixture, 3, 3, textureUpscale.UPSCALE_XBR4X)
+  assertEqual(xbr4[1], 12, "xBR4x width")
+  assertEqual(xbr4[2], 12, "xBR4x height")
+
+  registry = cvar.createRegistry()
+  registry.variables = [cvar.create("r_textureupscale", "2", true, false)]
+  draw2d.configureDraw(void, bytes(768), registry)
+  integrated = draw2d.GL_UpscaleTextureRgba(fixture, 3, 3)
+  assertEqual(integrated[1], 6, "draw upload honors archived scale mode")
+  assertEqual(integrated[0][centerTopLeft], 255, "draw upload applies selected algorithm")
+  cvar.setValue(registry, "r_textureupscale", 0)
+  unscaled = draw2d.GL_UpscaleTextureRgba(fixture, 3, 3)
+  assertEqual(unscaled[1], 3, "draw upload preserves legacy size when disabled")
+
+  invalid = try(textureUpscale.apply(bytes(3), 1, 1, textureUpscale.UPSCALE_SCALE2X))
+  assertTrue(invalid is error, "truncated RGBA input is rejected")
+  return true
+end function
+
 // Parse command-line arguments and run the selected operation.
 function main(args)
   // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   passed = 0
-  print "MiniQuake core tests starting: 16"
+  print "MiniQuake core tests starting: 17"
 
-  print "[01/16] CRC-CCITT"
+  print "[01/17] CRC-CCITT"
   result = try(testCrc())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[02/16] byte I/O"
+  print "[02/17] byte I/O"
   result = try(testByteIo())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[03/16] Quake messages"
+  print "[03/17] Quake messages"
   result = try(testMessage())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[04/16] math"
+  print "[04/17] math"
   result = try(testMath())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[05/16] cvars"
+  print "[05/17] cvars"
   result = try(testCvar())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[06/16] PACK"
+  print "[06/17] PACK"
   result = try(testPack())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[07/16] WAD2"
+  print "[07/17] WAD2"
   result = try(testWad())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[08/16] loopback network"
+  print "[08/17] loopback network"
   result = try(testLoopback())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[09/16] memory lifetimes"
+  print "[09/17] memory lifetimes"
   result = try(testMemoryLifetimes())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[10/16] box hull"
+  print "[10/17] box hull"
   result = try(testBoxHull())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[11/16] BSP entities/PVS"
+  print "[11/17] BSP entities/PVS"
   result = try(testBspEntityAndPvs())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[12/16] WAV"
+  print "[12/17] WAV"
   result = try(testWave())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[13/16] DEM roundtrip"
+  print "[13/17] DEM roundtrip"
   result = try(testDemoRoundtrip())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[14/16] protocol 15"
+  print "[14/17] protocol 15"
   result = try(testServerProtocol())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[15/16] QuakeC arithmetic"
+  print "[15/17] QuakeC arithmetic"
   result = try(testQuakeCArithmetic())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[16/16] GL warp/light parity"
+  print "[16/17] GL warp/light parity"
   result = try(testGlWarpAndRlightParity())
+  if result is error then print "FAIL: " + result.message; return 1 end if
+  passed = passed + 1
+
+  print "[17/17] texture upscaling"
+  result = try(testTextureUpscaling())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 

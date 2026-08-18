@@ -177,6 +177,7 @@ function createCvars(commandLine, registered)
   registerCvar(registry, "r_lighting", "0", true, false)
   registerCvar(registry, "r_shadows", "1", true, false)
   registerCvar(registry, "r_shadowquality", "1", true, false)
+  registerCvar(registry, "r_textureupscale", "0", true, false)
   registerCvar(registry, "gl_subdivide_size", "128", true, false)
   registerCvar(registry, "gl_nobind", "0", false, false)
   registerCvar(registry, "gl_max_size", "1024", false, false)
@@ -2580,6 +2581,11 @@ function Host_Init(session)
     session.height = video.height
     session.fullscreen = video.modeState == glvid.MS_FULLDIB
     session.windowCreated = true
+    // World/model uploads can happen while quake.rc executes, before
+    // screen.initialize reaches Draw_Init. Publish the live registry and
+    // gamma-adjusted palette now so archived load-time texture scaling also
+    // applies to the very first map or attract demo.
+    draw2d.configureDraw(session.filesystem, video.palette, session.cvars)
     menu.M_SetVideoCallbacks(session.menu, glvid.VID_MenuDrawCallback, glvid.VID_MenuKeyCallback)
     updateMouseCapture(session)
   end if
@@ -3097,6 +3103,28 @@ function handleExactMenuAction(session, result)
         menu.setStatus(session.menu, changed.message)
         playMenuSound(session, "misc/menu3.wav")
       else
+        menu.setStatus(session.menu, glvid.VID_State().lastModeMessage)
+        writeConfiguration(session)
+        playMenuSound(session, "misc/menu2.wav")
+      end if
+      return true
+    end if
+    if result[0] == "texture_upscale" then
+      // Texture scaling is a load-time operation, so rebuild only graphics
+      // resources on the current backend.  If that rebuild fails, restore the
+      // archived selection and make one best-effort rebuild of the old set.
+      previousMode = result[1]
+      selectedName = result[3]
+      changed = restartRenderer(session, win.renderer())
+      if changed is error then
+        cvar.setValue(session.cvars, "r_textureupscale", previousMode)
+        recovered = restartRenderer(session, win.renderer())
+        message = "Texture upscaling failed: " + changed.message
+        if recovered is error then message = message + "; recovery failed: " + recovered.message end if
+        menu.setStatus(session.menu, message)
+        playMenuSound(session, "misc/menu3.wav")
+      else
+        glvid.VID_State().lastModeMessage = "TEXTURE UPSCALING " + selectedName + " applied."
         menu.setStatus(session.menu, glvid.VID_State().lastModeMessage)
         writeConfiguration(session)
         playMenuSound(session, "misc/menu2.wav")

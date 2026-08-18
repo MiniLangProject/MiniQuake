@@ -272,6 +272,7 @@ function testSettingsPersistence()
     ["vid_width", "1920"], ["vid_height", "1080"], ["vid_bpp", "32"],
     ["vid_fullscreen", "1"], ["vid_renderer", "vulkan"],
     ["r_lighting", "1"], ["r_shadows", "1"], ["r_shadowquality", "2"],
+    ["r_textureupscale", "6"],
     ["gamma", "0.750000"], ["viewsize", "110"], ["sensitivity", "4.500000"],
     ["volume", "0.600000"], ["bgmvolume", "0.800000"],
     ["host_maxfps", "240"], ["_windowed_mouse", "1"],

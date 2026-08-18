@@ -18,6 +18,7 @@ import miniquake.render.gl11 as gl
 import miniquake.native as native
 import miniquake.byteio as bio
 import miniquake.sound.mixer as sound
+import miniquake.render.texture_upscale as textureUpscale
 import std.math as stdmath
 import std.string as string
 
@@ -117,6 +118,7 @@ videoMenuRendererFocus = false
 videoMenuLightingFocus = false
 videoMenuShadowFocus = false
 videoMenuShadowQualityFocus = false
+videoMenuTextureUpscaleFocus = false
 rendererSelectionOverride = -1
 
 // Apply the Quake-compatible vid renderer from name behavior.
@@ -1202,7 +1204,7 @@ end function
 
 // Apply the Quake-compatible vid menu reset behavior.
 function VID_MenuReset()
-  global videoMenuSelection, videoMenuDisplayFocus, videoMenuRendererFocus, videoMenuLightingFocus, videoMenuShadowFocus, videoMenuShadowQualityFocus
+  global videoMenuSelection, videoMenuDisplayFocus, videoMenuRendererFocus, videoMenuLightingFocus, videoMenuShadowFocus, videoMenuShadowQualityFocus, videoMenuTextureUpscaleFocus
   state = VID_State()
   // The original video menu opens on the active resolution.  Display mode and
   // renderer are separate entries above the grid and are reached with UP.
@@ -1213,6 +1215,7 @@ function VID_MenuReset()
   videoMenuLightingFocus = false
   videoMenuShadowFocus = false
   videoMenuShadowQualityFocus = false
+  videoMenuTextureUpscaleFocus = false
   count = VID_MenuModeCount()
   if count == 0 then videoMenuSelection = NO_MODE; return videoMenuSelection end if
   selected = state.currentMode
@@ -1290,6 +1293,12 @@ function VID_MenuShadowQualityFocused()
   return videoMenuShadowQualityFocus
 end function
 
+// Report whether the load-time texture-upscaling row owns keyboard focus.
+function VID_MenuTextureUpscaleFocused()
+  global videoMenuTextureUpscaleFocus
+  return videoMenuTextureUpscaleFocus
+end function
+
 // Toggle the archived classic/enhanced renderer policy without changing maps.
 function VID_ToggleEnhancedLighting()
   state = VID_State()
@@ -1332,6 +1341,20 @@ function VID_AdjustEnhancedShadowQuality(direction)
   name = ["LOW", "MEDIUM", "HIGH"][value]
   state.lastModeMessage = "SHADOW QUALITY " + name + " applied."
   return true
+end function
+
+// Cycle the archived load-time texture-upscaling algorithm.
+function VID_AdjustTextureUpscale(direction)
+  state = VID_State()
+  if state.registry is void or cvar.find(state.registry, "r_textureupscale") is void then return false end if
+  previous = textureUpscale.clampMode(cvar.variableValue(state.registry, "r_textureupscale"))
+  value = previous
+  if direction < 0 then value = value - 1 else value = value + 1 end if
+  if value < 0 then value = textureUpscale.UPSCALE_MODE_COUNT - 1 end if
+  if value >= textureUpscale.UPSCALE_MODE_COUNT then value = 0 end if
+  cvar.setValue(state.registry, "r_textureupscale", value)
+  state.lastModeMessage = "TEXTURE UPSCALING " + textureUpscale.modeName(value) + " selected."
+  return [previous, value]
 end function
 
 // Apply the Quake-compatible vid save resolution cvars behavior.
@@ -1518,6 +1541,7 @@ function VID_MenuDraw()
   lightingName = "CLASSIC"
   shadowsName = "OFF"
   shadowQualityName = "MEDIUM"
+  textureUpscaleName = "OFF"
   if state.registry is not void then
     if cvar.variableValue(state.registry, "r_lighting") != 0.0 then lightingName = "ENHANCED" end if
     if cvar.variableValue(state.registry, "r_shadows") != 0.0 then shadowsName = "ON" end if
@@ -1525,6 +1549,9 @@ function VID_MenuDraw()
     if shadowQuality < 0 then shadowQuality = 0 end if
     if shadowQuality > 2 then shadowQuality = 2 end if
     shadowQualityName = ["LOW", "MEDIUM", "HIGH"][shadowQuality]
+    if cvar.find(state.registry, "r_textureupscale") is not void then
+      textureUpscaleName = textureUpscale.modeName(cvar.variableValue(state.registry, "r_textureupscale"))
+    end if
   end if
   commands = [
     ["picture", "gfx/vidmodes.lmp"],
@@ -1532,6 +1559,7 @@ function VID_MenuDraw()
     ["lighting", lightingName, VID_MenuLightingFocused()],
     ["shadows", shadowsName, VID_MenuShadowFocused()],
     ["shadow_quality", shadowQualityName, VID_MenuShadowQualityFocused()],
+    ["texture_upscale", textureUpscaleName, VID_MenuTextureUpscaleFocused()],
     ["renderer", VID_RendererName(win.renderer()), VID_MenuRendererFocused()],
     ["display", modeName, VID_MenuDisplayFocused()],
   ]
@@ -1541,7 +1569,7 @@ function VID_MenuDraw()
     mode = state.modes[index]
     current = index == state.currentMode
     if state.modeState == MS_WINDOWED and mode.width == state.windowWidth and mode.height == state.windowHeight then current = true end if
-    commands = commands + [["mode", index, mode.description, current, count % VID_ROW_SIZE, native.trunc(count / VID_ROW_SIZE), index == selection and not VID_MenuDisplayFocused() and not VID_MenuRendererFocused() and not VID_MenuLightingFocused() and not VID_MenuShadowFocused() and not VID_MenuShadowQualityFocused()]]
+    commands = commands + [["mode", index, mode.description, current, count % VID_ROW_SIZE, native.trunc(count / VID_ROW_SIZE), index == selection and not VID_MenuDisplayFocused() and not VID_MenuRendererFocused() and not VID_MenuLightingFocused() and not VID_MenuShadowFocused() and not VID_MenuShadowQualityFocused() and not VID_MenuTextureUpscaleFocused()]]
     count = count + 1
     index = index + 1
   end while
@@ -1557,7 +1585,7 @@ end function
 // Apply the Quake-compatible vid menu key behavior.
 function VID_MenuKey(key)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
-  global videoMenuDisplayFocus, videoMenuRendererFocus, videoMenuLightingFocus, videoMenuShadowFocus, videoMenuShadowQualityFocus
+  global videoMenuDisplayFocus, videoMenuRendererFocus, videoMenuLightingFocus, videoMenuShadowFocus, videoMenuShadowQualityFocus, videoMenuTextureUpscaleFocus
   if key == keys.K_ESCAPE then return "options" end if
   if videoMenuLightingFocus then
     if key == keys.K_DOWNARROW then videoMenuLightingFocus = false; videoMenuShadowFocus = true; return "move" end if
@@ -1578,7 +1606,7 @@ function VID_MenuKey(key)
     return "none"
   end if
   if videoMenuShadowQualityFocus then
-    if key == keys.K_DOWNARROW then videoMenuShadowQualityFocus = false; videoMenuRendererFocus = true; return "move" end if
+    if key == keys.K_DOWNARROW then videoMenuShadowQualityFocus = false; videoMenuTextureUpscaleFocus = true; return "move" end if
     if key == keys.K_UPARROW then videoMenuShadowQualityFocus = false; videoMenuShadowFocus = true; return "move" end if
     if key == keys.K_LEFTARROW or key == keys.K_RIGHTARROW or key == keys.K_ENTER then
       direction = 1
@@ -1588,9 +1616,21 @@ function VID_MenuKey(key)
     end if
     return "none"
   end if
+  if videoMenuTextureUpscaleFocus then
+    if key == keys.K_DOWNARROW then videoMenuTextureUpscaleFocus = false; videoMenuRendererFocus = true; return "move" end if
+    if key == keys.K_UPARROW then videoMenuTextureUpscaleFocus = false; videoMenuShadowQualityFocus = true; return "move" end if
+    if key == keys.K_LEFTARROW or key == keys.K_RIGHTARROW or key == keys.K_ENTER then
+      direction = 1
+      if key == keys.K_LEFTARROW then direction = -1 end if
+      changed = VID_AdjustTextureUpscale(direction)
+      if changed is array then return ["texture_upscale", changed[0], changed[1], textureUpscale.modeName(changed[1])] end if
+      return "lighting_error"
+    end if
+    return "none"
+  end if
   if videoMenuRendererFocus then
     if key == keys.K_DOWNARROW then videoMenuRendererFocus = false; videoMenuDisplayFocus = true; return "move" end if
-    if key == keys.K_UPARROW then videoMenuRendererFocus = false; videoMenuShadowQualityFocus = true; return "move" end if
+    if key == keys.K_UPARROW then videoMenuRendererFocus = false; videoMenuTextureUpscaleFocus = true; return "move" end if
     if key == keys.K_LEFTARROW or key == keys.K_RIGHTARROW or key == keys.K_ENTER then
       direction = 1
       if key == keys.K_LEFTARROW then direction = -1 end if

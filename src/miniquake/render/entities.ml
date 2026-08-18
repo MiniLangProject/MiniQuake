@@ -225,6 +225,8 @@ function uploadIndexedTexture(width, height, pixels, palette, transparent)
   if width <= 0 or height <= 0 then return 0 end if
   if len(pixels) < width * height then return 0 end if
   rgba = worldRenderer.indexedToRgba(pixels, palette, transparent)
+  prepared = draw2d.GL_UpscaleTextureRgba(rgba, width, height)
+  if prepared is error then return 0 end if
   texture = gl.generateTexture()
   gl.bindTexture(texture)
   // R_TranslatePlayerSkin uses non-mipmapped linear filtering.
@@ -232,7 +234,7 @@ function uploadIndexedTexture(width, height, pixels, palette, transparent)
   gl.textureParameter(gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)
   gl.textureParameter(gl.GL_TEXTURE_WRAP_S, gl.GL_REPEAT)
   gl.textureParameter(gl.GL_TEXTURE_WRAP_T, gl.GL_REPEAT)
-  gl.uploadRgba(width, height, rgba)
+  gl.uploadRgba(prepared[1], prepared[2], prepared[0])
   return texture
 end function
 

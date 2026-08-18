@@ -7,6 +7,8 @@ optimization packages. The current tree includes:
 - Protocol 15, QuakeC, savegame, demo, physics, client, server, and frontend
   compatibility work;
 - OpenGL 1.1, Direct3D 9, and Vulkan renderer backends;
+- optional load-time Nearest, ScaleNx, HQ2x, and xBR texture upscaling shared
+  by all rendering backends;
 - OGG soundtrack playback using classic Quake CD-track semantics;
 - resolution-aware menus, console, HUD, and window/fullscreen controls;
 - startup attract demos when `--play` receives only the Quake directory;

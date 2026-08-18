@@ -1226,23 +1226,28 @@ function drawVideo(state, texture, transform, realtime)
     if command[0] == "lighting" then
       lightingText = "LIGHTING      < " + command[1] + " >"
       lightingX = (320.0 - len(bytes(lightingText)) * 8.0) * 0.5
-      if command[2] then M_DrawCharacter(texture, lightingX - 12.0, 28.0, 12 + (menuNative.trunc(realtime * 4.0) & 1), transform) end if
-      virtualCenteredString(texture, 28.0, lightingText, transform, 255)
+      if command[2] then M_DrawCharacter(texture, lightingX - 12.0, 26.0, 12 + (menuNative.trunc(realtime * 4.0) & 1), transform) end if
+      virtualCenteredString(texture, 26.0, lightingText, transform, 255)
     else if command[0] == "shadows" then
       shadowText = "SHADOWS       < " + command[1] + " >"
       shadowX = (320.0 - len(bytes(shadowText)) * 8.0) * 0.5
-      if command[2] then M_DrawCharacter(texture, shadowX - 12.0, 40.0, 12 + (menuNative.trunc(realtime * 4.0) & 1), transform) end if
-      virtualCenteredString(texture, 40.0, shadowText, transform, 255)
+      if command[2] then M_DrawCharacter(texture, shadowX - 12.0, 36.0, 12 + (menuNative.trunc(realtime * 4.0) & 1), transform) end if
+      virtualCenteredString(texture, 36.0, shadowText, transform, 255)
     else if command[0] == "shadow_quality" then
       qualityText = "SHADOW QUALITY < " + command[1] + " >"
       qualityX = (320.0 - len(bytes(qualityText)) * 8.0) * 0.5
-      if command[2] then M_DrawCharacter(texture, qualityX - 12.0, 52.0, 12 + (menuNative.trunc(realtime * 4.0) & 1), transform) end if
-      virtualCenteredString(texture, 52.0, qualityText, transform, 255)
+      if command[2] then M_DrawCharacter(texture, qualityX - 12.0, 46.0, 12 + (menuNative.trunc(realtime * 4.0) & 1), transform) end if
+      virtualCenteredString(texture, 46.0, qualityText, transform, 255)
+    else if command[0] == "texture_upscale" then
+      upscaleText = "TEXTURE SCALE < " + command[1] + " >"
+      upscaleX = (320.0 - len(bytes(upscaleText)) * 8.0) * 0.5
+      if command[2] then M_DrawCharacter(texture, upscaleX - 12.0, 56.0, 12 + (menuNative.trunc(realtime * 4.0) & 1), transform) end if
+      virtualCenteredString(texture, 56.0, upscaleText, transform, 255)
     else if command[0] == "renderer" then
       rendererText = "RENDERER      < " + command[1] + " >"
       rendererX = (320.0 - len(bytes(rendererText)) * 8.0) * 0.5
-      if command[2] then M_DrawCharacter(texture, rendererX - 12.0, 64.0, 12 + (menuNative.trunc(realtime * 4.0) & 1), transform) end if
-      virtualCenteredString(texture, 64.0, rendererText, transform, 255)
+      if command[2] then M_DrawCharacter(texture, rendererX - 12.0, 66.0, 12 + (menuNative.trunc(realtime * 4.0) & 1), transform) end if
+      virtualCenteredString(texture, 66.0, rendererText, transform, 255)
     else if command[0] == "display" then
       displayText = "DISPLAY MODE  < " + command[1] + " >"
       displayX = (320.0 - len(bytes(displayText)) * 8.0) * 0.5

@@ -3853,18 +3853,22 @@ function R_InitSky(texture)
   if pixels is error then return pixels end if
   solidRgba = pixels[0]
   alphaRgba = pixels[1]
+  solidPrepared = draw2d.GL_UpscaleTextureRgba(solidRgba, 128, 128)
+  if solidPrepared is error then return solidPrepared end if
+  alphaPrepared = draw2d.GL_UpscaleTextureRgba(alphaRgba, 128, 128)
+  if alphaPrepared is error then return alphaPrepared end if
 
   // Match MiniQuake: allocate each texture once, reuse it on later maps, use
   // internal formats 3/4, and force linear filtering for both sky layers.
   if solidskytexture == 0 then solidskytexture = gl.generateTexture() end if
   gl.bindTexture(solidskytexture)
-  native.glTexImage2D(gl.GL_TEXTURE_2D, 0, 3, 128, 128, 0, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, solidRgba)
+  native.glTexImage2D(gl.GL_TEXTURE_2D, 0, 3, solidPrepared[1], solidPrepared[2], 0, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, solidPrepared[0])
   gl.textureParameter(gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR)
   gl.textureParameter(gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)
 
   if alphaskytexture == 0 then alphaskytexture = gl.generateTexture() end if
   gl.bindTexture(alphaskytexture)
-  native.glTexImage2D(gl.GL_TEXTURE_2D, 0, 4, 128, 128, 0, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, alphaRgba)
+  native.glTexImage2D(gl.GL_TEXTURE_2D, 0, 4, alphaPrepared[1], alphaPrepared[2], 0, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, alphaPrepared[0])
   gl.textureParameter(gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR)
   gl.textureParameter(gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)
 

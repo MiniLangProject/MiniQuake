@@ -153,12 +153,21 @@ the option is enabled. **Shadow Quality** selects low, medium, or high filtering
 Classic lighting remains the compatibility fallback; set Shadows to Off as well
 for the unextended GLQuake presentation.
 
+**Texture Scale** optionally enlarges world, model, sprite, sky, and translated
+player textures when they are loaded. Available modes are Off, Nearest 2x,
+Scale2x, Scale3x, HQ2x, xBR2x, and xBR4x. The preprocessing is shared by all
+three renderers; HUD, menu/font art, lightmaps, and particle textures retain
+their original sizing. Changing the option rebuilds graphics resources without
+restarting the game and stores the choice in `config.cfg`.
+
 The corresponding archived console variables are:
 
 ```text
 r_lighting 0       // 0 = classic, 1 = enhanced
 r_shadows 1        // 0 = disabled, 1 = enabled
 r_shadowquality 1  // 0 = low, 1 = medium, 2 = high
+r_textureupscale 0 // 0=off, 1=nearest2x, 2=Scale2x, 3=Scale3x,
+                   // 4=HQ2x, 5=xBR2x, 6=xBR4x
 ```
 
 Changes made in the menu are stored in `config.cfg`. If a backend cannot create

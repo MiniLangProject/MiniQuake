@@ -359,12 +359,33 @@ end function
 // Verify view entity origin against the expected Quake behavior.
 function testViewEntityOrigin()
   value = newClient()
+  client.CL_SetModelFlags([0, 0])
   entity = activeEntity(value, 3, 1)
   entity.origin = t.Vec3(4.0, 5.0, 6.0)
   value.viewEntity = 3
   origin = client.CL_ViewEntityOrigin(value)
   near(origin.x, 4.0, 0.0, "view origin x")
   near(origin.z, 6.0, 0.0, "view origin z")
+
+  // The renderer consumes PlayerState, whereas GLQuake consumes the relinked
+  // cl_entities[cl.viewentity] directly. Ensure the bridge follows the
+  // interpolated entity rather than retaining the newest packet snapshot.
+  entity.previousMessageOrigin = t.Vec3(0.0, 2.0, 4.0)
+  entity.messageOrigin = t.Vec3(10.0, 12.0, 14.0)
+  entity.previousMessageAngles = t.Vec3(0.0, 350.0, 2.0)
+  entity.messageAngles = t.Vec3(0.0, 10.0, 6.0)
+  value.player.origin = t.Vec3(10.0, 12.0, 14.0)
+  value.demoPlayback = true
+  value.noLerp = false
+  value.time = 1.95
+  client.CL_RelinkEntities(value)
+  near(entity.origin.x, 5.0, 0.00001, "interpolated view entity x")
+  near(value.player.origin.x, 5.0, 0.00001, "demo camera follows interpolated x")
+  near(value.player.origin.y, 7.0, 0.00001, "demo camera follows interpolated y")
+  near(value.player.origin.z, 9.0, 0.00001, "demo camera follows interpolated z")
+  near(value.player.renderAngles.y, 360.0, 0.00001, "intermission yaw follows interpolated view entity")
+  near(value.player.renderAngles.z, 4.0, 0.00001, "view roll follows interpolated view entity")
+  client.CL_SetModelFlags([0])
   return true
 end function
 

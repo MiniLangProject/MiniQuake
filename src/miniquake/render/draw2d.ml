@@ -17,6 +17,7 @@ import miniquake.wad as wad
 import miniquake.cvar as cvar
 import miniquake.constants as c
 import miniquake.array_util as arrayutil
+import miniquake.render.texture_upscale as textureUpscale
 import std.string as string
 
 const MAX_SCRAPS = 2
@@ -44,6 +45,7 @@ currenttexture = -1
 gl_nobind = 0.0
 gl_max_size = 1024.0
 gl_picmip = 0.0
+gl_textureupscale = 0
 gl_filter_min = gl.GL_LINEAR_MIPMAP_NEAREST
 gl_filter_max = gl.GL_LINEAR
 gl_lightmap_format = 4
@@ -304,7 +306,7 @@ end function
 
 // Update module state for draw cvars.
 function syncDrawCvars()
-  global gl_nobind, gl_max_size, gl_picmip
+  global gl_nobind, gl_max_size, gl_picmip, gl_textureupscale
   if drawCvars is void then return false end if
   variable = cvar.find(drawCvars, "gl_nobind")
   if variable is not void then gl_nobind = variable.value end if
@@ -312,6 +314,8 @@ function syncDrawCvars()
   if variable is not void then gl_max_size = variable.value end if
   variable = cvar.find(drawCvars, "gl_picmip")
   if variable is not void then gl_picmip = variable.value end if
+  variable = cvar.find(drawCvars, "r_textureupscale")
+  if variable is not void then gl_textureupscale = textureUpscale.clampMode(variable.value) end if
   return true
 end function
 
@@ -552,6 +556,35 @@ function nextPowerOfTwo(value)
   return result
 end function
 
+// Return the active backend-neutral texture-upscale selection.
+function GL_TextureUpscaleMode()
+  syncDrawCvars()
+  return textureUpscale.clampMode(gl_textureupscale)
+end function
+
+// Return the effective upload limit. Opt-in high-resolution scaling raises
+// the historical 1024 default to 2048 while still respecting a larger
+// explicit gl_max_size selected by a mod or advanced configuration.
+function effectiveTextureMaximum()
+  maximum = native.trunc(gl_max_size)
+  if maximum < 1 then maximum = 1 end if
+  if GL_TextureUpscaleMode() != textureUpscale.UPSCALE_OFF and maximum < 2048 then maximum = 2048 end if
+  if maximum > 4096 then maximum = 4096 end if
+  return maximum
+end function
+
+// Upscale one non-UI RGBA texture before the ordinary power-of-two and mip
+// processing. Textures which cannot gain resolution within the configured
+// upload limit remain unchanged instead of allocating a throwaway image.
+function GL_UpscaleTextureRgba(data, width, height)
+  mode = GL_TextureUpscaleMode()
+  if mode == textureUpscale.UPSCALE_OFF then return [data, width, height] end if
+  factor = textureUpscale.scaleFactor(mode)
+  maximum = effectiveTextureMaximum()
+  if width * factor > maximum or height * factor > maximum then return [data, width, height] end if
+  return textureUpscale.apply(data, width, height, mode)
+end function
+
 // Create and initialize upload32 levels.
 function BuildUpload32Levels(data, width, height, mipmap)
   syncDrawCvars()
@@ -564,11 +597,12 @@ function BuildUpload32Levels(data, width, height, mipmap)
   scaledHeight = scaledHeight >> shift
   if scaledWidth < 1 then scaledWidth = 1 end if
   if scaledHeight < 1 then scaledHeight = 1 end if
-  maximum = native.trunc(gl_max_size)
-  if maximum < 1 then maximum = 1 end if
+  maximum = effectiveTextureMaximum()
   if scaledWidth > maximum then scaledWidth = maximum end if
   if scaledHeight > maximum then scaledHeight = maximum end if
-  if scaledWidth * scaledHeight > 524288 then return error(3318, "GL_LoadTexture: too big") end if
+  maximumPixels = 524288
+  if GL_TextureUpscaleMode() != textureUpscale.UPSCALE_OFF then maximumPixels = 16777216 end if
+  if scaledWidth * scaledHeight > maximumPixels then return error(3318, "GL_LoadTexture: too big") end if
   pixels = data
   if scaledWidth != width or scaledHeight != height then pixels = GL_ResampleTexture(data, width, height, scaledWidth, scaledHeight) else pixels = slice(data, 0, width * height * 4) end if
   // GL_Upload32 submits every level before GL_MipMap quarters its shared
@@ -650,7 +684,10 @@ function GL_Upload8_EXT(data, width, height, mipmap, alpha)
   // upload, preserving rendered color and transparency.
   converted = indexedToUploadRgba(data, width, height, alpha)
   if converted is error then return converted end if
-  return GL_Upload32(converted[0], width, height, mipmap, converted[1])
+  prepared = [converted[0], width, height]
+  if mipmap then prepared = GL_UpscaleTextureRgba(converted[0], width, height) end if
+  if prepared is error then return prepared end if
+  return GL_Upload32(prepared[0], prepared[1], prepared[2], mipmap, converted[1])
 end function
 
 // Mirror Quake's GL_Upload8 routine and its observable state changes.
@@ -658,7 +695,10 @@ function GL_Upload8(data, width, height, mipmap, alpha)
   if not alpha and ((width * height) & 3) != 0 then return error(3321, "GL_Upload8: s&3") end if
   converted = indexedToUploadRgba(data, width, height, alpha)
   if converted is error then return converted end if
-  return GL_Upload32(converted[0], width, height, mipmap, converted[1])
+  prepared = [converted[0], width, height]
+  if mipmap then prepared = GL_UpscaleTextureRgba(converted[0], width, height) end if
+  if prepared is error then return prepared end if
+  return GL_Upload32(prepared[0], prepared[1], prepared[2], mipmap, converted[1])
 end function
 
 // Mirror Quake's GL_LoadTexture routine and its observable state changes.
@@ -970,6 +1010,7 @@ function Draw_Init(filesystem, palette, width, height, cvars)
     if cvar.find(cvars, "gl_nobind") is void then cvars.variables = [cvar.create("gl_nobind", "0", false, false)] + cvars.variables end if
     if cvar.find(cvars, "gl_max_size") is void then cvars.variables = [cvar.create("gl_max_size", "1024", false, false)] + cvars.variables end if
     if cvar.find(cvars, "gl_picmip") is void then cvars.variables = [cvar.create("gl_picmip", "0", false, false)] + cvars.variables end if
+    if cvar.find(cvars, "r_textureupscale") is void then cvars.variables = [cvar.create("r_textureupscale", "0", true, false)] + cvars.variables end if
   end if
   syncDrawCvars()
   rendererName = gl.getString(gl.GL_RENDERER)
@@ -1361,7 +1402,7 @@ end function
 function Draw_DifferentialReset(palette)
   global drawFilesystem, drawPalette, drawWad, drawCvars, drawVideoWidth, drawVideoHeight, drawViewport
   global draw_chars, draw_disc, draw_backtile, conback, menuplyr_pixels
-  global char_texture, translate_texture, currenttexture, gl_nobind, gl_max_size, gl_picmip
+  global char_texture, translate_texture, currenttexture, gl_nobind, gl_max_size, gl_picmip, gl_textureupscale
   global gl_filter_min, gl_filter_max, texels, pic_texels, pic_count, drawSbarChanges
   global menu_cachepics, wad_cachepics, drawPictureObjects, drawPictureCoordinates, drawPicturePixels
   global glTextureNames, glTextureIds, glTextureWidths, glTextureHeights, glTextureMipmaps, texture_extension_number
@@ -1384,6 +1425,7 @@ function Draw_DifferentialReset(palette)
   gl_nobind = 0.0
   gl_max_size = 1024.0
   gl_picmip = 0.0
+  gl_textureupscale = 0
   gl_filter_min = gl.GL_LINEAR_MIPMAP_NEAREST
   gl_filter_max = gl.GL_LINEAR
   texels = 0

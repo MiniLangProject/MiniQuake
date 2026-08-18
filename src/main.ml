@@ -73,13 +73,13 @@ function printUsage()
   print "                             report signon, QuakeC, collision and heap checks"
   print "  --render-smoke BASE MAP [FRAMES] [-game DIR]"
   print "                             run the textured host and exit automatically"
-  print "  --render-evidence BASE MAP FRAME PREFIX [-game DIR] [-width N] [-height N] [-renderer NAME] [-lighting 0|1] [-shadows 0|1] [-shadowquality 0|1|2] [-menu] [-console]"
+  print "  --render-evidence BASE MAP FRAME PREFIX [-game DIR] [-width N] [-height N] [-renderer NAME] [-lighting 0|1] [-shadows 0|1] [-shadowquality 0|1|2] [-textureupscale 0..6] [-menu] [-console]"
   print "                             capture deterministic TGA after UI and before swap"
   print "  --endscreen-evidence BASE PREFIX [-game DIR] [-width N] [-height N]"
   print "                             capture the real e1m1 QuakeC intermission overlay"
   print "  --ui-resolution-matrix BASE PREFIX [-game DIR]"
   print "                             capture every UI surface at every offered resolution"
-  print "  --render-demo-evidence BASE DEMO FRAME PREFIX [-game DIR] [-width N] [-height N] [-renderer NAME] [-lighting 0|1] [-shadows 0|1] [-shadowquality 0|1|2]"
+  print "  --render-demo-evidence BASE DEMO FRAME PREFIX [-game DIR] [-width N] [-height N] [-renderer NAME] [-lighting 0|1] [-shadows 0|1] [-shadowquality 0|1|2] [-textureupscale 0..6]"
   print "                             capture a deterministic demo frame for external comparison"
   print "  --original-interop-server BASE MAP PORT FRAMES PREFIX [-game DIR]"
   print "                             run MiniQuake server for an original MiniQuake client"
@@ -450,6 +450,9 @@ function runRenderEvidenceCommand(arguments)
   if hasNamedOption(arguments, "-shadowquality") then
     renderArguments = renderArguments + ["+r_shadowquality", "" + integerNamedOption(arguments, "-shadowquality", 1, 0, 2)]
   end if
+  if hasNamedOption(arguments, "-textureupscale") then
+    renderArguments = renderArguments + ["+r_textureupscale", "" + integerNamedOption(arguments, "-textureupscale", 0, 0, 6)]
+  end if
   renderArguments = renderArguments + ["+map", arguments[2]]
   if hasNamedOption(arguments, "-menu") then renderArguments = renderArguments + ["+menu_main"] end if
   if hasNamedOption(arguments, "-console") then renderArguments = renderArguments + ["+toggleconsole"] end if
@@ -514,6 +517,9 @@ function runRenderDemoEvidenceCommand(arguments)
   end if
   if hasNamedOption(arguments, "-shadowquality") then
     renderArguments = renderArguments + ["+r_shadowquality", "" + integerNamedOption(arguments, "-shadowquality", 1, 0, 2)]
+  end if
+  if hasNamedOption(arguments, "-textureupscale") then
+    renderArguments = renderArguments + ["+r_textureupscale", "" + integerNamedOption(arguments, "-textureupscale", 0, 0, 6)]
   end if
   renderArguments = renderArguments + ["+timedemo", arguments[2]]
   return host.runRenderEvidence(renderArguments, frames, arguments[4])

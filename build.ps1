@@ -1771,7 +1771,7 @@ if (-not $SkipTests) {
     Invoke-MiniQuakeTestBinary `
       -Label "core tests" `
       -Executable $TestExe `
-      -ProgressHint "The last printed [NN/16] line identifies the active test; if no test line appeared, the process failed during image loading or module initialization."
+      -ProgressHint "The last printed [NN/17] line identifies the active test; if no test line appeared, the process failed during image loading or module initialization."
     $CoreTestStatus = "PASS"
 
     if ($null -ne $MilestoneTestExe) {

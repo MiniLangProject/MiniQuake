@@ -247,7 +247,9 @@ function main(args)
   state.currentMode = 1
   menuTrace = video.VID_MenuDraw()
   print "{\"function\":\"VID_MenuDraw\",\"case\":\"two-modes\"," +
-    "\"prints\":8,\"wmodes\":" + (len(menuTrace) - 7) + "}"
+    // Normalize MiniQuake's optional Texture Scale row out of the original
+    // GLQuake differential count while retaining it in the live menu trace.
+    "\"prints\":8,\"wmodes\":" + (len(menuTrace) - 8) + "}"
   video.VID_MenuKey(keys.K_ESCAPE)
   print "{\"function\":\"VID_MenuKey\",\"case\":\"escape\",\"options\":1}"
   return 0
