@@ -18,9 +18,9 @@
     "src/miniquake/world_bsp.ml": "747c0af69cee4cf7ddc89837db8de026b6eaa5ea26d446950cf5e8c61010b49c",
     "src/miniquake/server_collision.ml": "fbcee409e15f0cf704683352e9685a2a601af8de6c1188ca15919e841c326a5c",
     "src/miniquake/server_move.ml": "7c2f2a579856f43af29c82ea2d7688a47665559b250f6b0847dd35040f5d5bf4",
-    "src/miniquake/physics.ml": "f6096c7bfc496ae82e35d417129d3e55d0142e7c296ad1507c42471f125e6d53",
+    "src/miniquake/physics.ml": "853c7d8fae3829835867821de294f9fc3ded30128cf11f542f2e120a4007a7ec",
     "src/miniquake/sv_user.ml": "b5765bfee1deee084579aae12bfebb347cfe1af4b88431904e66d5a73e58cfd8",
-    "src/miniquake/server.ml": "29067153103d8953e5101f96f7ec45bf539a8314b9412080dc003daa3bcbccf3",
+    "src/miniquake/server.ml": "0199a68fe2c4339a2b8cdec03c3e7f9f3c1298a3db06a3f9654a3ae4aa08af34",
     "src/miniquake/world_physics_contract.ml": "f1b403436bf90a0fe78d162f1ce7b3bb662e2c07b44edd24d19a750351eb605f"
   },
   "runtime_fixtures": 20

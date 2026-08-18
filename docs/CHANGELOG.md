@@ -25,6 +25,9 @@ optimization packages. The current tree includes:
   movement;
 - a compact build/test/retail-validation script surface, with obsolete delivery
   diffs and historical PowerShell package runners removed; and
+- a single zero-argument full-suite entry point that auto-detects Steam retail
+  data and covers native builds, all installed official games, all renderer
+  backends, retail evidence and independent-process UDP networking; and
 - expanded deterministic, differential, retail, and soak validation tooling.
 
 For the current qualification level, see

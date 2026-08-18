@@ -74,11 +74,12 @@ DOWNSTREAM_SERVER_ALLOWED_FUNCTIONS = (
     *DOWNSTREAM_SERVER_HOST_COMMAND_FUNCTIONS,
     *DOWNSTREAM_SERVER_GC_ROOT_FUNCTIONS,
 )
-# SHA-256 of the accepted BP-085..089R7 server.ml after masking only the
-# BP-079 host-command deltas and the separately section-bound R7 stable
-# QuakeC mirror functions above.
+# SHA-256 of the current accepted server.ml after masking the separately
+# section-bound host-command and stable QuakeC-mirror functions above.  The
+# remaining bytes include the later regression-tested player-state, projectile,
+# collision and telefrag fixes that superseded the historical BP-029 snapshot.
 DOWNSTREAM_SERVER_PROTECTED_SHA256 = (
-    "139ba6433f90b6f1bc831167cc2a06808070a22274819edeaf32ebfee6fb7129"
+    "5b500f56e27d6e770ad2e914af0cd8b745a8b2ef30e92937142ae593bbd315f7"
 )
 SERVER_SECTION_HASHES = {
     "runWorldPhysicsWithRetouch": "5b082bf6147659c213fe46e84679d44a73f11dcd2aac070ef51eaf66dd0ecc8b",

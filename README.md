@@ -204,14 +204,27 @@ or `musicinfo` in the console to diagnose soundtrack discovery and playback.
 
 ## Tests and verification
 
-The normal build compiles and runs the asset-free test suite. The compact test
-wrapper invokes that same current build without historical package runners:
+The complete acceptance suite now has one entry point:
+
+```powershell
+.\scripts\test.ps1
+```
+
+With no arguments it detects the standard Steam Quake installation, rebuilds
+the native bridges, runs every source/preflight and compiled MiniLang test,
+exercises UDP loopback and an independent two-process handshake, and performs
+asset, runtime, render and renderer-switch validation for every installed
+official game (`id1`, `hipnotic` and `rogue`). It also runs the retail-only
+QuakeC, movement, cheat, Chthon, telefrag, audio, save and demo evidence gates.
+
+Use an explicit installation when Quake is elsewhere, or set the persistent
+`MINIQUAKE_QUAKE_BASE` environment variable:
 
 ```powershell
 .\scripts\test.ps1 -QuakeBase $QuakeBase
 ```
 
-Retail validation requires locally installed game data:
+Focused retail validation without the full source suite remains available:
 
 ```powershell
 .\scripts\validate_real_game.ps1 -QuakeBase $QuakeBase
