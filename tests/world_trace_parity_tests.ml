@@ -129,6 +129,15 @@ end function
 // Verify translated brush hit end against the expected Quake behavior.
 function testTranslatedBrushHitEnd()
   map = makeTraceMap()
+  assertEqual(bspworld.precacheCollisionHulls(map), 3, "precache world hull count")
+  pointHull = bspworld.createModelHull(map, 1, 0)
+  repeatedPointHull = bspworld.createModelHull(map, 1, 0)
+  playerHull = bspworld.createModelHull(map, 1, 1)
+  repeatedPlayerHull = bspworld.createModelHull(map, 1, 1)
+  assertEqual(nativeRawValue(repeatedPointHull), nativeRawValue(pointHull), "cached submodel point hull identity")
+  assertEqual(nativeRawValue(repeatedPlayerHull), nativeRawValue(playerHull), "cached submodel player hull identity")
+
+  // Caching changes object lifetime only; collision coordinates remain exact.
   trace = bspworld.traceBrushModel(map, 1, t.Vec3(100.0, 0.0, 0.0), t.Vec3(80.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), t.Vec3(120.0, 0.0, 0.0))
   assertTrue(trace.fraction > 0.49 and trace.fraction < 0.51, "translated hit fraction")
   assertTrue(trace.endPosition.x > 99.9 and trace.endPosition.x < 100.0, "translated hit world end")

@@ -33,6 +33,12 @@ clearStaticCacheOnCreate = true
 visibleFaceCountRenderer = void
 visibleFaceCountLeaf = -2
 visibleFaceCountValue = 0
+// R_RecursiveWorldNode must not visit BSP branches which contain no PVS
+// surfaces.  GLQuake stores this as node->visframe; MiniQuake keeps the same
+// derived state in a renderer-local byte mask so an unchanged view leaf does
+// not force a complete BSP walk on every displayed frame.
+rCompatVisibleNodeRenderer = void
+rCompatVisibleNodes = bytes()
 
 // Initialize state for starts with.
 function startsWith(text, prefix)
@@ -772,13 +778,74 @@ end function
 // Report whether mark all visible holds for the active state.
 function markAllVisible(renderer)
   global visibleFaceCountRenderer, visibleFaceCountLeaf, visibleFaceCountValue
+  global rCompatVisibleNodeRenderer, rCompatVisibleNodes
   renderer.visibleFaces = bytes(len(renderer.map.faces), 1)
+  rCompatVisibleNodeRenderer = renderer
+  rCompatVisibleNodes = bytes(len(renderer.map.nodes), 1)
   // Invalidate the cached leaf so returning from r_novis recomputes the PVS.
   renderer.viewLeaf = -1
   visibleFaceCountRenderer = renderer
   visibleFaceCountLeaf = -1
   visibleFaceCountValue = len(renderer.map.faces)
   return visibleFaceCountValue
+end function
+
+// Mark the exact node path to each PVS-visible leaf.  GLQuake propagates
+// node->visframe from visible leaves rather than from faces: a leaf with no
+// marksurfaces may still contain efrags/static entities and must keep every
+// ancestor visible.  The temporary value two guards malformed cyclic data.
+function markVisibleNodeSubtree(map, visibility, currentLeaf, rowBytes, visibleNodes, nodeNumber)
+  if nodeNumber < 0 then
+    leafIndex = -1 - nodeNumber
+    if leafIndex < 0 or leafIndex >= len(map.leafs) then return false end if
+    if leafIndex == currentLeaf then return true end if
+    bitIndex = leafIndex - 1
+    if bitIndex < 0 or bitIndex >= rowBytes * 8 then return false end if
+    return (visibility[bitIndex >> 3] & (1 << (bitIndex & 7))) != 0
+  end if
+  if nodeNumber >= len(map.nodes) then return false end if
+  if visibleNodes[nodeNumber] == 2 then return false end if
+  visibleNodes[nodeNumber] = 2
+  node = map.nodes[nodeNumber]
+  visible = markVisibleNodeSubtree(map, visibility, currentLeaf, rowBytes, visibleNodes, node.child0)
+  if markVisibleNodeSubtree(map, visibility, currentLeaf, rowBytes, visibleNodes, node.child1) then visible = true end if
+  if visible then visibleNodes[nodeNumber] = 1 else visibleNodes[nodeNumber] = 0 end if
+  return visible
+end function
+
+// Rebuild the GLQuake-compatible node visibility mask only when the PVS face
+// mask changes.  This moves the complete tree scan from every render frame to
+// the much rarer event of entering a different BSP leaf.
+function rebuildVisibleNodes(renderer)
+  global rCompatVisibleNodeRenderer, rCompatVisibleNodes
+  if renderer is void or renderer.map is void then return false end if
+  nodeCount = len(renderer.map.nodes)
+  if len(rCompatVisibleNodes) != nodeCount then
+    rCompatVisibleNodes = bytes(nodeCount, 0)
+  else
+    index = 0
+    while index < nodeCount
+      rCompatVisibleNodes[index] = 0
+      index = index + 1
+    end while
+  end if
+  rCompatVisibleNodeRenderer = renderer
+  if nodeCount == 0 or len(renderer.map.models) == 0 or len(renderer.map.models[0].headNodes) == 0 then return true end if
+  if renderer.viewLeaf < 0 then
+    index = 0
+    while index < nodeCount
+      rCompatVisibleNodes[index] = 1
+      index = index + 1
+    end while
+    return true
+  end if
+  visibility = world.leafPvs(renderer.map, renderer.viewLeaf)
+  rowBytes = (renderer.map.models[0].visibleLeafs + 7) >> 3
+  markVisibleNodeSubtree(
+    renderer.map, visibility, renderer.viewLeaf, rowBytes,
+    rCompatVisibleNodes, renderer.map.models[0].headNodes[0],
+  )
+  return true
 end function
 
 // Report whether count visible faces holds for the active state.
@@ -796,10 +863,12 @@ end function
 // Report whether mark visible holds for the active state.
 function markVisible(renderer, viewOrigin)
   global visibleFaceCountRenderer, visibleFaceCountLeaf, visibleFaceCountValue
+  global rCompatVisibleNodeRenderer, rCompatVisibleNodes
   map = renderer.map
   if len(map.leafs) <= 1 or len(map.models) == 0 then return markAllVisible(renderer) end if
   currentLeaf = world.leafForPoint(map, viewOrigin)
   if currentLeaf == renderer.viewLeaf and len(renderer.visibleFaces) == len(map.faces) then
+    if rCompatVisibleNodeRenderer != renderer or len(rCompatVisibleNodes) != len(map.nodes) then rebuildVisibleNodes(renderer) end if
     if visibleFaceCountRenderer == renderer and visibleFaceCountLeaf == currentLeaf then return visibleFaceCountValue end if
     visibleFaceCountRenderer = renderer
     visibleFaceCountLeaf = currentLeaf
@@ -848,6 +917,7 @@ function markVisible(renderer, viewOrigin)
     leafIndex = leafIndex + 1
   end while
   renderer.visibleFaces = visibleFaces
+  rebuildVisibleNodes(renderer)
   visibleFaceCountRenderer = renderer
   visibleFaceCountLeaf = currentLeaf
   visibleFaceCountValue = count
@@ -1353,6 +1423,7 @@ function R_ResetWorldCompatibility()
   global lightspot, lightplane, speedscale, solidskytexture, alphaskytexture
   global r_framecount, r_visframecount, c_brush_polys, nColinElim, mirror, mirror_plane
   global currentTextureFrame, rCompatMtexRecordFaces, rCompatMtexRecords, rCompatMtexRecordCount, rCompatMtexRecordStamp, rCompatMtexTextureIds, rCompatMtexTextureChecked, rCompatSurfaceBatchKeys
+  global rCompatVisibleNodeRenderer, rCompatVisibleNodes
 
   rCompatRenderer = void
   rCompatViewOrigin = void
@@ -1430,6 +1501,8 @@ function R_ResetWorldCompatibility()
   mirror = false
   mirror_plane = void
   currentTextureFrame = 0
+  rCompatVisibleNodeRenderer = void
+  rCompatVisibleNodes = bytes()
   return true
 end function
 
@@ -3323,6 +3396,10 @@ function R_RecursiveWorldNode(nodeNumber)
   global skychain, waterchain
   if rCompatRenderer is void or nodeNumber < 0 then return 0 end if
   if nodeNumber >= len(rCompatRenderer.map.nodes) then return 0 end if
+  // GLQuake checks node->visframe before plane work and recursion.  The mask
+  // is absent only in direct differential fixtures which intentionally call
+  // this routine without first executing R_MarkLeaves.
+  if rCompatVisibleNodeRenderer == rCompatRenderer and len(rCompatVisibleNodes) == len(rCompatRenderer.map.nodes) and rCompatVisibleNodes[nodeNumber] == 0 then return 0 end if
   node = rCompatRenderer.map.nodes[nodeNumber]
   plane = rCompatRenderer.map.planes[node.planeIndex]
   distance = compatPlaneDistance(plane, rCompatViewOrigin)

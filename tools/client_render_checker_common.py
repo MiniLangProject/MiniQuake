@@ -12,8 +12,8 @@ CONFIG = {
     '035': {
         'package':'BP-035','parent':'BP-034R1','schema':'MiniQuakeClientStateGolden/1',
         'golden':'audit/client_state_render_golden.json','oracle':'tools/oracle/client_state_oracle.c',
-        'test':'tests/client_state_render_tests.ml','fixtures':20,
-        'success':'MiniQuake BP-035 client state/render tests passed: 20',
+        'test':'tests/client_state_render_tests.ml','fixtures':21,
+        'success':'MiniQuake BP-035 client state/render tests passed: 21',
         'markers':{
             'src/miniquake/client.ml':[
                 'function clientFloat(value)', 'function clientLerp(previous, current, fraction)',

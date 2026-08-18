@@ -13,6 +13,7 @@ import miniquake.platform.win32 as win
 
 const MAX_UDP_PAYLOAD = 65507
 defaultBindAddress = "0.0.0.0"
+receiveScratch = bytes(2048)
 
 // Initialize state for open.
 function open(port)
@@ -116,10 +117,15 @@ end function
 
 // Provide receive behavior for the active subsystem.
 function receive(socketValue, capacity)
+  global receiveScratch
   if socketValue is void or not socketValue.open then return error(3208, "UDP_Read: socket is closed") end if
   if capacity < 1 then capacity = 1 end if
   if capacity > 65535 then capacity = 65535 end if
-  buffer = bytes(capacity)
+  // recvfrom is synchronous and the exact packet returned below is a copy.
+  // Reuse the staging buffer so a non-blocking poll with no packet does not
+  // allocate and immediately discard 2 KiB on every host frame.
+  if len(receiveScratch) < capacity then receiveScratch = bytes(capacity) end if
+  buffer = receiveScratch
   count = native.udpReceive(socketValue.handle, buffer, capacity)
   if count < 0 then return error(3209, "UDP_Read: WSA error " + native.udpLastError()) end if
   if count == 0 then return void end if

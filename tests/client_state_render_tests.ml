@@ -38,9 +38,37 @@ end function
 
 // Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
-  print "[" + number + "/20] " + name
+  print "[" + number + "/21] " + name
   result = try(fn())
   if result is error then print "FAIL: " + result.message; return false end if
+  return true
+end function
+
+// Verify the steady-state relink path reuses entity-owned vectors while trail
+// events retain independent old/new position snapshots.
+function testRelinkVectorReuseAndTrailSnapshot()
+  value = newClient()
+  entity = activeEntity(value, 1, 1)
+  entity.origin = t.Vec3(2.0, 3.0, 4.0)
+  entity.angles = t.Vec3(5.0, 6.0, 7.0)
+  entity.previousMessageOrigin = t.Vec3(0.0, 0.0, 0.0)
+  entity.messageOrigin = t.Vec3(10.0, 20.0, 30.0)
+  originIdentity = nativeRawValue(entity.origin)
+  angleIdentity = nativeRawValue(entity.angles)
+  client.CL_SetModelFlags([0, c.EF_ROCKET])
+  value.noLerp = false
+  value.time = 1.95
+  client.CL_TakeRelinkParticleEffects()
+  client.CL_RelinkEntities(value)
+  equal(nativeRawValue(entity.origin), originIdentity, "relink origin vector reused")
+  equal(nativeRawValue(entity.angles), angleIdentity, "relink angle vector reused")
+  trailEvents = client.CL_TakeRelinkParticleEffects()
+  equal(len(trailEvents), 1, "rocket trail event count")
+  near(trailEvents[0].payload[0].x, 2.0, 0.0, "trail old origin snapshot")
+  near(trailEvents[0].payload[1].x, 5.0, 0.00001, "trail new origin snapshot")
+  entity.origin.x = 99.0
+  near(trailEvents[0].payload[1].x, 5.0, 0.00001, "trail snapshot independent")
+  client.CL_SetModelFlags([0])
   return true
 end function
 
@@ -69,10 +97,12 @@ end function
 function testDlightKeyReuse()
   client.CL_ClearDlights()
   first = client.CL_AllocDlightAt(17, 1.0)
+  originIdentity = nativeRawValue(first.origin)
   first.radius = 99.0
   first.die = 2.0
   second = client.CL_AllocDlightAt(17, 1.0)
   equal(client.CL_DlightIndexForKey(17), 0, "key slot")
+  equal(nativeRawValue(second.origin), originIdentity, "keyed dlight origin vector reused")
   near(second.radius, 0.0, 0.0, "key reset")
   return true
 end function
@@ -348,6 +378,7 @@ function main(args)
     ["lerp half", testLerpHalf],
     ["lerp gap clamp", testLerpGapClamp],
     ["no lerp pin", testNoLerpPinsTime],
+    ["relink vector reuse and trail snapshot", testRelinkVectorReuseAndTrailSnapshot],
     ["angle wrap", testAngleWrap],
     ["view entity hidden", testViewEntityHidden],
     ["chase view entity", testChaseIncludesViewEntity],
@@ -368,7 +399,7 @@ function main(args)
     if run(index + 1, tests[index][0], tests[index][1]) then passed = passed + 1 end if
     index = index + 1
   end while
-  if passed != 20 then return 1 end if
-  print "MiniQuake BP-035 client state/render tests passed: 20"
+  if passed != 21 then return 1 end if
+  print "MiniQuake BP-035 client state/render tests passed: 21"
   return 0
 end function

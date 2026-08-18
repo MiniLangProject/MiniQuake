@@ -270,6 +270,9 @@ MQ_DLLIMPORT MQ_BOOL MQ_WINAPI FreeLibrary(MQ_HMODULE module);
 #define MQ_D3D_MAX_TEXTURES 16384u
 #define MQ_D3D_MAX_VERTICES 65536u
 #define MQ_D3D_MATRIX_STACK 64u
+#define MQ_D3D_RENDER_STATE_CACHE_SIZE 256u
+#define MQ_D3D_STAGE_STATE_CACHE_SIZE 32u
+#define MQ_D3D_SAMPLER_STATE_CACHE_SIZE 32u
 
 static void *mq_d3d_object = MQ_NULL;
 static void *mq_d3d_device = MQ_NULL;
@@ -313,6 +316,17 @@ static mq_i32 mq_d3d_enhanced_draw_kind_value = 0;
 static mq_i32 mq_d3d_enhanced_light_count = 0;
 static float mq_d3d_enhanced_view[16];
 static float mq_d3d_enhanced_lights[16];
+/* Direct3D state setters are COM calls and remain surprisingly expensive in
+ * the GLQuake-style renderer, which deliberately repeats state restoration at
+ * pass boundaries.  Cache only successful device writes; reset/loss paths
+ * invalidate every entry before rebuilding the default state. */
+static mq_u32 mq_d3d_render_state_cache[MQ_D3D_RENDER_STATE_CACHE_SIZE];
+static mq_u8 mq_d3d_render_state_valid[MQ_D3D_RENDER_STATE_CACHE_SIZE];
+static mq_u32 mq_d3d_stage_state_cache[MQ_D3D_STAGE_STATE_CACHE_SIZE];
+static mq_u8 mq_d3d_stage_state_valid[MQ_D3D_STAGE_STATE_CACHE_SIZE];
+static mq_u32 mq_d3d_sampler_state_cache[MQ_D3D_SAMPLER_STATE_CACHE_SIZE];
+static mq_u8 mq_d3d_sampler_state_valid[MQ_D3D_SAMPLER_STATE_CACHE_SIZE];
+static void *mq_d3d_applied_texture_object = MQ_NULL;
 
 typedef mq_u32 (MQ_WINAPI *mq_d3d_release_fn)(void *self);
 typedef MQ_HRESULT (MQ_WINAPI *mq_d3d_create_device_fn)(void *, mq_u32, mq_i32, MQ_HWND, mq_u32, mq_d3d_present_parameters_t *, void **);
@@ -475,24 +489,65 @@ static void mq_d3d_apply_viewport(void) {
     mq_d3d_last_error = MQ_D3D_METHOD(mq_d3d_device, 47, mq_d3d_set_viewport_fn)(mq_d3d_device, &viewport);
 }
 
+/* Forget device-side state after create, reset, loss or shutdown. */
+static void mq_d3d_invalidate_state_cache(void) {
+    memset(mq_d3d_render_state_valid, 0, sizeof(mq_d3d_render_state_valid));
+    memset(mq_d3d_stage_state_valid, 0, sizeof(mq_d3d_stage_state_valid));
+    memset(mq_d3d_sampler_state_valid, 0, sizeof(mq_d3d_sampler_state_valid));
+    mq_d3d_applied_texture_object = MQ_NULL;
+}
+
 /* Update backend state for render state. */
 static void mq_d3d_set_render_state(mq_i32 state, mq_u32 value) {
     if (mq_d3d_device != MQ_NULL) {
-        mq_d3d_last_error = MQ_D3D_METHOD(mq_d3d_device, 57, mq_d3d_set_render_state_fn)(mq_d3d_device, state, value);
+        MQ_HRESULT result;
+        if (state >= 0 && (mq_u32)state < MQ_D3D_RENDER_STATE_CACHE_SIZE &&
+            mq_d3d_render_state_valid[state] && mq_d3d_render_state_cache[state] == value) {
+            mq_d3d_last_error = 0;
+            return;
+        }
+        result = MQ_D3D_METHOD(mq_d3d_device, 57, mq_d3d_set_render_state_fn)(mq_d3d_device, state, value);
+        mq_d3d_last_error = result;
+        if (MQ_D3D_SUCCEEDED(result) && state >= 0 && (mq_u32)state < MQ_D3D_RENDER_STATE_CACHE_SIZE) {
+            mq_d3d_render_state_cache[state] = value;
+            mq_d3d_render_state_valid[state] = 1u;
+        }
     }
 }
 
 /* Update backend state for stage state. */
 static void mq_d3d_set_stage_state(mq_i32 state, mq_u32 value) {
     if (mq_d3d_device != MQ_NULL) {
-        mq_d3d_last_error = MQ_D3D_METHOD(mq_d3d_device, 67, mq_d3d_set_texture_stage_state_fn)(mq_d3d_device, 0u, state, value);
+        MQ_HRESULT result;
+        if (state >= 0 && (mq_u32)state < MQ_D3D_STAGE_STATE_CACHE_SIZE &&
+            mq_d3d_stage_state_valid[state] && mq_d3d_stage_state_cache[state] == value) {
+            mq_d3d_last_error = 0;
+            return;
+        }
+        result = MQ_D3D_METHOD(mq_d3d_device, 67, mq_d3d_set_texture_stage_state_fn)(mq_d3d_device, 0u, state, value);
+        mq_d3d_last_error = result;
+        if (MQ_D3D_SUCCEEDED(result) && state >= 0 && (mq_u32)state < MQ_D3D_STAGE_STATE_CACHE_SIZE) {
+            mq_d3d_stage_state_cache[state] = value;
+            mq_d3d_stage_state_valid[state] = 1u;
+        }
     }
 }
 
 /* Update backend state for sampler state. */
 static void mq_d3d_set_sampler_state(mq_i32 state, mq_u32 value) {
     if (mq_d3d_device != MQ_NULL) {
-        mq_d3d_last_error = MQ_D3D_METHOD(mq_d3d_device, 69, mq_d3d_set_sampler_state_fn)(mq_d3d_device, 0u, state, value);
+        MQ_HRESULT result;
+        if (state >= 0 && (mq_u32)state < MQ_D3D_SAMPLER_STATE_CACHE_SIZE &&
+            mq_d3d_sampler_state_valid[state] && mq_d3d_sampler_state_cache[state] == value) {
+            mq_d3d_last_error = 0;
+            return;
+        }
+        result = MQ_D3D_METHOD(mq_d3d_device, 69, mq_d3d_set_sampler_state_fn)(mq_d3d_device, 0u, state, value);
+        mq_d3d_last_error = result;
+        if (MQ_D3D_SUCCEEDED(result) && state >= 0 && (mq_u32)state < MQ_D3D_SAMPLER_STATE_CACHE_SIZE) {
+            mq_d3d_sampler_state_cache[state] = value;
+            mq_d3d_sampler_state_valid[state] = 1u;
+        }
     }
 }
 
@@ -539,8 +594,9 @@ static void mq_d3d_apply_bound_texture(void) {
         texture = &mq_d3d_textures[mq_d3d_bound_texture];
         object = texture->object;
     }
-    if (mq_d3d_device != MQ_NULL) {
+    if (mq_d3d_device != MQ_NULL && object != mq_d3d_applied_texture_object) {
         mq_d3d_last_error = MQ_D3D_METHOD(mq_d3d_device, 65, mq_d3d_set_texture_fn)(mq_d3d_device, 0u, object);
+        if (MQ_D3D_SUCCEEDED(mq_d3d_last_error)) mq_d3d_applied_texture_object = object;
     }
     if (texture != MQ_NULL) {
         mq_d3d_set_sampler_state(MQ_D3DSAMP_MINFILTER, mq_d3d_min_filter_value(texture->min_filter));
@@ -821,6 +877,7 @@ mq_i32 mq_d3d9_initialize(mq_ptr window, mq_i32 width, mq_i32 height) {
     mq_d3d_projection_top = 0u;
     mq_d3d_identity(mq_d3d_modelview_stack[0]);
     mq_d3d_identity(mq_d3d_projection_stack[0]);
+    mq_d3d_invalidate_state_cache();
     mq_d3d_default_state();
     mq_d3d_create_enhanced_shaders();
     mq_d3d_last_error = 0;
@@ -838,6 +895,7 @@ void mq_d3d9_shutdown(void) {
     mq_d3d_height = 0;
     mq_d3d_vertex_count = 0u;
     mq_d3d_using_ex = 0;
+    mq_d3d_invalidate_state_cache();
 }
 
 /* Report whether 9 ready is available. */
@@ -859,6 +917,7 @@ mq_i32 mq_d3d9_resize(mq_i32 width, mq_i32 height) {
     mq_d3d_height = height;
     if (mq_d3d_viewport_width > width) mq_d3d_viewport_width = width;
     if (mq_d3d_viewport_height > height) mq_d3d_viewport_height = height;
+    mq_d3d_invalidate_state_cache();
     mq_d3d_default_state();
     mq_d3d_create_enhanced_shaders();
     return 1;

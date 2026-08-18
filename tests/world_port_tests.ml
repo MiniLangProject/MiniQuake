@@ -162,8 +162,10 @@ function testAreaTreeLinksAndPvs()
 
   game.edicts[5].angles = t.Vec3(0.0, 90.0, 0.0)
   worldPort.SV_LinkEdict(state, 5, false)
-  assertVec(state.absMins[5], 39.0, -6.0, -6.0, "rotated BSP mins")
-  assertVec(state.absMaxs[5], 51.0, 6.0, 6.0, "rotated BSP maxs")
+  // WinQuake 1.09 is compiled without the QUAKE2 rotating-brush branch.
+  // Angles affect rendering, but server broad-phase bounds remain axis-aligned.
+  assertVec(state.absMins[5], 39.0, -3.0, -4.0, "GLQuake BSP mins")
+  assertVec(state.absMaxs[5], 51.0, 3.0, 4.0, "GLQuake BSP maxs")
 
   assertTrue(worldPort.SV_UnlinkEdict(state, 4), "unlink linked entity")
   assertEqual(state.linkedNode[4], -1, "unlink node marker")
@@ -171,7 +173,7 @@ function testAreaTreeLinksAndPvs()
   return true
 end function
 
-// Verify entity hull and rotation against the expected Quake behavior.
+// Verify entity hulls and WinQuake's non-QUAKE2 brush-angle behavior.
 function testEntityHullAndRotation()
   fixture = makeFixture()
   game = fixture[0]
@@ -184,11 +186,14 @@ function testEntityHullAndRotation()
   assertEqual(trace.entity, 3, "clip box entity")
   assertTrue(trace.fraction > 0.3 and trace.fraction < 0.4, "clip box fraction")
 
+  // WinQuake retains the angle field for drawing but traces the server hull in
+  // its original orientation. A yaw value must therefore still hit the local
+  // X plane and report an X-facing collision normal.
   game.edicts[5].angles = t.Vec3(0.0, 90.0, 0.0)
-  rotated = worldPort.SV_ClipMoveToEntity(state, 5, t.Vec3(45.0, -20.0, 0.0), t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), t.Vec3(45.0, 20.0, 0.0))
-  assertEqual(rotated.entity, 5, "rotated brush entity")
-  assertTrue(rotated.fraction > 0.4 and rotated.fraction < 0.6, "rotated brush fraction")
-  assertTrue(worldAbsolute(rotated.plane.normal.y) > 0.9, "rotated brush plane")
+  angled = worldPort.SV_ClipMoveToEntity(state, 5, t.Vec3(35.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0), t.Vec3(55.0, 0.0, 0.0))
+  assertEqual(angled.entity, 5, "angled brush entity")
+  assertTrue(angled.fraction > 0.4 and angled.fraction < 0.6, "GLQuake brush fraction")
+  assertTrue(worldAbsolute(angled.plane.normal.x) > 0.9, "GLQuake brush plane")
   return true
 end function
 
@@ -246,7 +251,7 @@ function main(args)
   print "[2/4] area links/PVS/triggers"
   result = try(testAreaTreeLinksAndPvs())
   if result is error then print "FAIL: " + result.message; return 1 end if
-  print "[3/4] entity hulls/rotated BSP"
+  print "[3/4] entity hulls/GLQuake BSP angles"
   result = try(testEntityHullAndRotation())
   if result is error then print "FAIL: " + result.message; return 1 end if
   print "[4/4] SV_Move filters/doors"

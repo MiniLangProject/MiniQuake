@@ -48,6 +48,7 @@ function testDemoConsumesWithoutNetwork()
   input.inJump[2] = 3
   input.IN_Impulse(9)
   command = input.createCommand()
+  command.viewAngles = t.Vec3(11.0, 22.0, 33.0)
   buildWithoutDevices(command, demoClient.signon, false)
   equal(command.forwardMove, 200.0, "demo held forward")
   equal(command.buttons, c.BUTTON_ATTACK | c.BUTTON_JUMP, "demo button bits")
@@ -56,10 +57,14 @@ function testDemoConsumesWithoutNetwork()
   equal(input.inJump[2], 1, "demo jump edge consumed")
   equal(input.inImpulse, 0, "demo impulse consumed")
   client.CL_SetMoveMessageCount(7)
+  snapshotIdentity = nativeRawValue(demoClient.command.viewAngles)
   equal(client.CL_SendCmd(demoClient, command), 0, "demo send command skips network")
   equal(client.CL_MoveMessageCount(), 7, "demo does not advance movemessages")
   equal(demoClient.outgoing.curSize, 0, "demo clears reliable buffer")
   equal(demoClient.command.forwardMove, 200.0, "demo command snapshot")
+  equal(nativeRawValue(demoClient.command.viewAngles), snapshotIdentity, "demo view snapshot vector reused")
+  command.viewAngles.x = 99.0
+  equal(demoClient.command.viewAngles.x, 11.0, "demo view snapshot remains independent")
   return true
 end function
 

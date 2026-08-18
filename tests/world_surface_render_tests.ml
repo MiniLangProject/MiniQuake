@@ -28,7 +28,7 @@ end function
 
 // Execute one named test case and record its pass/fail result.
 function run(number, name, fn)
-  print "[" + number + "/21] " + name
+  print "[" + number + "/22] " + name
   result = try(fn())
   if result is error then print "FAIL: " + result.message; return false end if
   return true
@@ -238,6 +238,35 @@ function testVisibleFaceMaskReuse()
   return true
 end function
 
+// Verify that node visibility follows PVS-visible leaves even when a leaf has
+// no marksurfaces. Such leaves can still own efrags/static entities in Quake.
+function testFacelessVisibleLeafKeepsNodePath()
+  minimum = t.Vec3(-64.0, -64.0, -64.0)
+  maximum = t.Vec3(64.0, 64.0, 64.0)
+  zero = t.Vec3(0.0, 0.0, 0.0)
+  plane = t.BspPlane(t.Vec3(1.0, 0.0, 0.0), 0.0, 0)
+  root = t.BspNode(0, 1, 2, minimum, maximum, 0, 0)
+  visibleBranch = t.BspNode(0, -2, -1, minimum, maximum, 0, 0)
+  hiddenBranch = t.BspNode(0, -3, -1, minimum, maximum, 0, 0)
+  solid = t.BspLeaf(c.CONTENTS_SOLID, -1, minimum, maximum, 0, 0, bytes(4))
+  visibleLeaf = t.BspLeaf(c.CONTENTS_EMPTY, -1, minimum, maximum, 0, 0, bytes(4))
+  hiddenLeaf = t.BspLeaf(c.CONTENTS_EMPTY, -1, minimum, maximum, 0, 0, bytes(4))
+  model = t.BspModel(minimum, maximum, zero, [0, 0, 0, 0], 2, 0, 0)
+  map = t.BspMap(
+    "faceless-pvs.bsp", bytes(), c.BSP_VERSION, [], "", [], [plane], [], [], bytes(),
+    [root, visibleBranch, hiddenBranch], [], [], bytes(), [],
+    [solid, visibleLeaf, hiddenLeaf], [], [], [], [model],
+  )
+  visibility = bytes(1, 0)
+  visibility[0] = 1
+  visibleNodes = bytes(3, 0)
+  yes(worldRender.markVisibleNodeSubtree(map, visibility, 1, 1, visibleNodes, 0), "root visible")
+  equal(visibleNodes[0], 1, "root path retained")
+  equal(visibleNodes[1], 1, "faceless visible leaf path retained")
+  equal(visibleNodes[2], 0, "unrelated hidden branch rejected")
+  return true
+end function
+
 passed = 0
 if run(1, "world front-facing surface", testWorldFrontVisible) then passed = passed + 1 end if
 if run(2, "world back-face rejection", testWorldFrontCulled) then passed = passed + 1 end if
@@ -260,6 +289,7 @@ if run(18, "sky chain classification", testSkyFlagRetained) then passed = passed
 if run(19, "water chain classification", testWaterFlagRetained) then passed = passed + 1 end if
 if run(20, "void chain rejection", testVoidSurfaceRejected) then passed = passed + 1 end if
 if run(21, "PVS face-mask storage reuse", testVisibleFaceMaskReuse) then passed = passed + 1 end if
+if run(22, "faceless PVS leaf node path", testFacelessVisibleLeafKeepsNodePath) then passed = passed + 1 end if
 
-if passed != 21 then error(4099, "BP-040 world surface tests failed: " + passed + "/21") end if
-print "MiniQuake BP-040 world surface tests passed: 21"
+if passed != 22 then error(4099, "BP-040 world surface tests failed: " + passed + "/22") end if
+print "MiniQuake BP-040 world surface tests passed: 22"

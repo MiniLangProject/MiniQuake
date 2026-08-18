@@ -72,7 +72,11 @@ end function
 
 // Update module state for dynamic light.
 function resetDynamicLight(light, key)
-  light.origin = t.Vec3(0.0, 0.0, 0.0)
+  // Dynamic lights come from a fixed pool. Preserve each slot's origin vector
+  // as well, otherwise every keyed light refresh allocates a replacement.
+  light.origin.x = 0.0
+  light.origin.y = 0.0
+  light.origin.z = 0.0
   light.radius = 0.0
   light.die = 0.0
   light.decay = 0.0
@@ -339,24 +343,27 @@ function addEntityEffectDlights(entity, currentTime)
   effects = entity.effects
   if (effects & c.EF_MUZZLEFLASH) != 0 then
     light = CL_AllocDlight(entity.number)
-    light.origin = math.copy(entity.origin)
-    light.origin.z = light.origin.z + 16.0
     axes = math.angleVectors(entity.angles)
-    light.origin = math.add(light.origin, math.scale(axes[0], 18.0))
+    light.origin.x = entity.origin.x + axes[0].x * 18.0
+    light.origin.y = entity.origin.y + axes[0].y * 18.0
+    light.origin.z = entity.origin.z + 16.0 + axes[0].z * 18.0
     light.radius = clientFloat(200.0 + (nextDlightRandom() & 31))
     light.minLight = 32.0
     light.die = clientFloat(currentTime + 0.1)
   end if
   if (effects & c.EF_BRIGHTLIGHT) != 0 then
     light = CL_AllocDlight(entity.number)
-    light.origin = math.copy(entity.origin)
-    light.origin.z = light.origin.z + 16.0
+    light.origin.x = entity.origin.x
+    light.origin.y = entity.origin.y
+    light.origin.z = entity.origin.z + 16.0
     light.radius = clientFloat(400.0 + (nextDlightRandom() & 31))
     light.die = clientFloat(currentTime + 0.001)
   end if
   if (effects & c.EF_DIMLIGHT) != 0 then
     light = CL_AllocDlight(entity.number)
-    light.origin = math.copy(entity.origin)
+    light.origin.x = entity.origin.x
+    light.origin.y = entity.origin.y
+    light.origin.z = entity.origin.z
     light.radius = clientFloat(200.0 + (nextDlightRandom() & 31))
     light.die = clientFloat(currentTime + 0.001)
   end if
@@ -444,28 +451,27 @@ function CL_RelinkEntities(client)
       else if entity.messageTime != client.messageTimes[0] then
         entity.modelIndex = 0
       else
-        oldOrigin = math.copy(entity.origin)
+        oldOriginX = entity.origin.x
+        oldOriginY = entity.origin.y
+        oldOriginZ = entity.origin.z
         entityFraction = fraction
-        delta = t.Vec3(
-          clientFloat(entity.messageOrigin.x - entity.previousMessageOrigin.x),
-          clientFloat(entity.messageOrigin.y - entity.previousMessageOrigin.y),
-          clientFloat(entity.messageOrigin.z - entity.previousMessageOrigin.z),
-        )
-        if delta.x > 100.0 or delta.x < -100.0 then entityFraction = clientFloat(1.0) end if
-        if delta.y > 100.0 or delta.y < -100.0 then entityFraction = clientFloat(1.0) end if
-        if delta.z > 100.0 or delta.z < -100.0 then entityFraction = clientFloat(1.0) end if
+        deltaX = clientFloat(entity.messageOrigin.x - entity.previousMessageOrigin.x)
+        deltaY = clientFloat(entity.messageOrigin.y - entity.previousMessageOrigin.y)
+        deltaZ = clientFloat(entity.messageOrigin.z - entity.previousMessageOrigin.z)
+        if deltaX > 100.0 or deltaX < -100.0 then entityFraction = clientFloat(1.0) end if
+        if deltaY > 100.0 or deltaY < -100.0 then entityFraction = clientFloat(1.0) end if
+        if deltaZ > 100.0 or deltaZ < -100.0 then entityFraction = clientFloat(1.0) end if
         if entity.forceLink then entityFraction = clientFloat(1.0) end if
         previousOrigin = entity.previousMessageOrigin
-        entity.origin = t.Vec3(
-          clientLerp(previousOrigin.x, entity.messageOrigin.x, entityFraction),
-          clientLerp(previousOrigin.y, entity.messageOrigin.y, entityFraction),
-          clientLerp(previousOrigin.z, entity.messageOrigin.z, entityFraction),
-        )
-        entity.angles = t.Vec3(
-          interpolatedAngle(entity.previousMessageAngles.x, entity.messageAngles.x, entityFraction),
-          interpolatedAngle(entity.previousMessageAngles.y, entity.messageAngles.y, entityFraction),
-          interpolatedAngle(entity.previousMessageAngles.z, entity.messageAngles.z, entityFraction),
-        )
+        // cl_entities owns these vectors for the complete client lifetime.
+        // Updating their components avoids three transient Vec3 allocations
+        // per active entity and frame without changing the sampled values.
+        entity.origin.x = clientLerp(previousOrigin.x, entity.messageOrigin.x, entityFraction)
+        entity.origin.y = clientLerp(previousOrigin.y, entity.messageOrigin.y, entityFraction)
+        entity.origin.z = clientLerp(previousOrigin.z, entity.messageOrigin.z, entityFraction)
+        entity.angles.x = interpolatedAngle(entity.previousMessageAngles.x, entity.messageAngles.x, entityFraction)
+        entity.angles.y = interpolatedAngle(entity.previousMessageAngles.y, entity.messageAngles.y, entityFraction)
+        entity.angles.z = interpolatedAngle(entity.previousMessageAngles.z, entity.messageAngles.z, entityFraction)
         modelFlags = modelFlagsForIndex(entity.modelIndex)
         if (modelFlags & c.EF_ROTATE) != 0 then entity.angles.y = binaryObjectRotation end if
         if (entity.effects & c.EF_BRIGHTFIELD) != 0 then
@@ -473,23 +479,25 @@ function CL_RelinkEntities(client)
         end if
         addEntityEffectDlights(entity, client.time)
         if (modelFlags & c.EF_GIB) != 0 then
-          queueRelinkParticleEffect("rocket_trail", [oldOrigin, math.copy(entity.origin), 2])
+          queueRelinkParticleEffect("rocket_trail", [t.Vec3(oldOriginX, oldOriginY, oldOriginZ), math.copy(entity.origin), 2])
         else if (modelFlags & c.EF_ZOMGIB) != 0 then
-          queueRelinkParticleEffect("rocket_trail", [oldOrigin, math.copy(entity.origin), 4])
+          queueRelinkParticleEffect("rocket_trail", [t.Vec3(oldOriginX, oldOriginY, oldOriginZ), math.copy(entity.origin), 4])
         else if (modelFlags & c.EF_TRACER) != 0 then
-          queueRelinkParticleEffect("rocket_trail", [oldOrigin, math.copy(entity.origin), 3])
+          queueRelinkParticleEffect("rocket_trail", [t.Vec3(oldOriginX, oldOriginY, oldOriginZ), math.copy(entity.origin), 3])
         else if (modelFlags & c.EF_TRACER2) != 0 then
-          queueRelinkParticleEffect("rocket_trail", [oldOrigin, math.copy(entity.origin), 5])
+          queueRelinkParticleEffect("rocket_trail", [t.Vec3(oldOriginX, oldOriginY, oldOriginZ), math.copy(entity.origin), 5])
         else if (modelFlags & c.EF_ROCKET) != 0 then
-          queueRelinkParticleEffect("rocket_trail", [oldOrigin, math.copy(entity.origin), 0])
+          queueRelinkParticleEffect("rocket_trail", [t.Vec3(oldOriginX, oldOriginY, oldOriginZ), math.copy(entity.origin), 0])
           light = CL_AllocDlight(entity.number)
-          light.origin = math.copy(entity.origin)
+          light.origin.x = entity.origin.x
+          light.origin.y = entity.origin.y
+          light.origin.z = entity.origin.z
           light.radius = 200.0
           light.die = clientFloat(client.time + 0.01)
         else if (modelFlags & c.EF_GRENADE) != 0 then
-          queueRelinkParticleEffect("rocket_trail", [oldOrigin, math.copy(entity.origin), 1])
+          queueRelinkParticleEffect("rocket_trail", [t.Vec3(oldOriginX, oldOriginY, oldOriginZ), math.copy(entity.origin), 1])
         else if (modelFlags & c.EF_TRACER3) != 0 then
-          queueRelinkParticleEffect("rocket_trail", [oldOrigin, math.copy(entity.origin), 6])
+          queueRelinkParticleEffect("rocket_trail", [t.Vec3(oldOriginX, oldOriginY, oldOriginZ), math.copy(entity.origin), 6])
         end if
         entity.forceLink = false
         if index != client.viewEntity or clChaseActive then
@@ -1104,8 +1112,12 @@ function sendMove(client, command)
   global clMoveMessages
   if not client.spawned then return 0 end if
 
-  // cl.cmd = *cmd: retain an independent copy for rendering/demo state.
-  client.command.viewAngles = math.copy(command.viewAngles)
+  // cl.cmd = *cmd: retain independent scalar values for rendering/demo state.
+  // The destination vector already belongs to cl.cmd, so replacing it every
+  // frame only creates garbage and is not required by the C struct copy.
+  client.command.viewAngles.x = command.viewAngles.x
+  client.command.viewAngles.y = command.viewAngles.y
+  client.command.viewAngles.z = command.viewAngles.z
   client.command.forwardMove = command.forwardMove
   client.command.sideMove = command.sideMove
   client.command.upMove = command.upMove

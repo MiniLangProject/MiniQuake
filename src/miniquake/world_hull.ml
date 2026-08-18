@@ -84,33 +84,46 @@ function traceLine(box, start, finish)
   hitDistance = 0.0
   valid = true
 
-  startValues = [start.x, start.y, start.z]
-  endValues = [finish.x, finish.y, finish.z]
-  mins = [box.mins.x, box.mins.y, box.mins.z]
-  maxs = [box.maxs.x, box.maxs.y, box.maxs.z]
-
   axis = 0
   while axis < 3 and valid
-    delta = endValues[axis] - startValues[axis]
+    // Select scalar components directly. Constructing four temporary arrays
+    // here allocated them for every player, monster and projectile box trace.
+    startValue = start.x
+    endValue = finish.x
+    minimum = box.mins.x
+    maximum = box.maxs.x
+    if axis == 1 then
+      startValue = start.y
+      endValue = finish.y
+      minimum = box.mins.y
+      maximum = box.maxs.y
+    else if axis == 2 then
+      startValue = start.z
+      endValue = finish.z
+      minimum = box.mins.z
+      maximum = box.maxs.z
+    end if
+    delta = endValue - startValue
     if delta == 0.0 then
       // The maximum plane is the empty side of the six-node box hull, so a
       // parallel segment exactly on maxs is outside, not inside the solid.
-      if startValues[axis] < mins[axis] or startValues[axis] >= maxs[axis] then valid = false end if
+      // This is the scalar equivalent of startValues[axis] >= maxs[axis].
+      if startValue < minimum or startValue >= maximum then valid = false end if
     else
-      nearValue = mins[axis]
-      farValue = maxs[axis]
+      nearValue = minimum
+      farValue = maximum
       nearNormal = 0.0
       if delta > 0.0 then
-        nearValue = mins[axis] - c.DIST_EPSILON
-        farValue = maxs[axis] + c.DIST_EPSILON
+        nearValue = minimum - c.DIST_EPSILON
+        farValue = maximum + c.DIST_EPSILON
         nearNormal = -1.0
       else
-        nearValue = maxs[axis] + c.DIST_EPSILON
-        farValue = mins[axis] - c.DIST_EPSILON
+        nearValue = maximum + c.DIST_EPSILON
+        farValue = minimum - c.DIST_EPSILON
         nearNormal = 1.0
       end if
-      nearTime = (nearValue - startValues[axis]) / delta
-      farTime = (farValue - startValues[axis]) / delta
+      nearTime = (nearValue - startValue) / delta
+      farTime = (farValue - startValue) / delta
       if nearTime > entry then
         entry = nearTime
         if axis == 0 then hitNormal = t.Vec3(nearNormal, 0.0, 0.0) end if
@@ -118,7 +131,7 @@ function traceLine(box, start, finish)
         if axis == 2 then hitNormal = t.Vec3(0.0, 0.0, nearNormal) end if
         // The recursive hull trace reports the actual box plane, not the
         // epsilon-shifted impact point used to calculate the safe fraction.
-        if delta > 0.0 then hitDistance = -mins[axis] else hitDistance = maxs[axis] end if
+        if delta > 0.0 then hitDistance = -minimum else hitDistance = maximum end if
       end if
       if farTime < exit then exit = farTime end if
       if entry > exit then valid = false end if

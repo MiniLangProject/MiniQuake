@@ -11,8 +11,8 @@ from pathlib import Path
 CONFIG = {
   '040': dict(package='BP-040', parent='BP-039', schema='MiniQuakeWorldSurfaceGolden/1',
       golden='audit/world_surface_render_golden.json', oracle='tools/oracle/world_surface_render_oracle.c',
-      test='tests/world_surface_render_tests.ml', fixtures=21,
-      success='MiniQuake BP-040 world surface tests passed: 21',
+      test='tests/world_surface_render_tests.ml', fixtures=22,
+      success='MiniQuake BP-040 world surface tests passed: 22',
       markers={
         'src/miniquake/render/world.ml': [
           'function R_ResetTextureChains()', 'function R_ChainSurface(surface)',

@@ -41,6 +41,8 @@ paintAccumulatorScratch = array(MIX_FRAMES * 2, 0)
 paintLeftVolumeScratch = array(MAX_CHANNELS, 0)
 paintRightVolumeScratch = array(MAX_CHANNELS, 0)
 paintSurvivorScratch = array(MAX_CHANNELS, void)
+paintStaticEffectScratch = array(MAX_CHANNELS, void)
+paintStaticRepresentativeScratch = array(MAX_CHANNELS, 0)
 paintOutputScratch = bytes(MIX_FRAMES * 4)
 
 // Create and initialize the module state.
@@ -763,6 +765,16 @@ function mixChannelWithStereoVolumes(mixer, channel, accumulator, frameCount, le
   if channel.endTime <= 0 then channel.endTime = mixer.paintedTime + totalSamples - channel.sample end if
   localTime = mixer.paintedTime
   blockEnd = mixer.paintedTime + frameCount
+  // Width and stereo volume are invariant for the whole channel paint.  Keep
+  // the two inner sample loops branch-free; this is the dominant sound hot
+  // path and preserves the exact 8-bit scale-table and 16-bit shift results.
+  width = channel.effect.width
+  left8 = leftVolumeValue
+  right8 = rightVolumeValue
+  if left8 > 255 then left8 = 255 end if
+  if right8 > 255 then right8 = 255 end if
+  left8Scale = (left8 >> 3) * 8
+  right8Scale = (right8 >> 3) * 8
   while localTime < blockEnd and channel.active
     count = blockEnd - localTime
     if channel.endTime < blockEnd then count = channel.endTime - localTime end if
@@ -772,23 +784,22 @@ function mixChannelWithStereoVolumes(mixer, channel, accumulator, frameCount, le
     // a loop restart inside the same 512-frame paint block.  This oddity is
     // audible and is deliberately preserved.
     frame = 0
-    while frame < count
-      if channel.effect.width == 1 then
+    if width == 1 then
+      while frame < count
         sample8 = channel.effect.samples[channel.sample + frame]
         if sample8 >= 128 then sample8 = sample8 - 256 end if
-        leftVolume = leftVolumeValue
-        rightVolume = rightVolumeValue
-        if leftVolume > 255 then leftVolume = 255 end if
-        if rightVolume > 255 then rightVolume = 255 end if
-        accumulator[frame * 2] = accumulator[frame * 2] + sample8 * (leftVolume >> 3) * 8
-        accumulator[frame * 2 + 1] = accumulator[frame * 2 + 1] + sample8 * (rightVolume >> 3) * 8
-      else
+        accumulator[frame * 2] = accumulator[frame * 2] + sample8 * left8Scale
+        accumulator[frame * 2 + 1] = accumulator[frame * 2 + 1] + sample8 * right8Scale
+        frame = frame + 1
+      end while
+    else
+      while frame < count
         sample = bio.i16(channel.effect.samples, (channel.sample + frame) * 2)
         accumulator[frame * 2] = accumulator[frame * 2] + ((sample * leftVolumeValue) >> 8)
         accumulator[frame * 2 + 1] = accumulator[frame * 2 + 1] + ((sample * rightVolumeValue) >> 8)
-      end if
-      frame = frame + 1
-    end while
+        frame = frame + 1
+      end while
+    end if
     channel.sample = channel.sample + count
     localTime = localTime + count
 
@@ -820,6 +831,7 @@ end function
 // Mix into a caller-owned PCM buffer using persistent paint scratch storage.
 function mixIntoOutput(mixer, frameCount, output)
   global paintAccumulatorScratch, paintLeftVolumeScratch, paintRightVolumeScratch, paintSurvivorScratch
+  global paintStaticEffectScratch, paintStaticRepresentativeScratch
   if frameCount <= 0 then return output end if
   // Accumulate all channels at full precision and clamp only once.  Clamping
   // the output buffer after every channel made the result depend on channel
@@ -837,25 +849,37 @@ function mixIntoOutput(mixer, frameCount, output)
     paintLeftVolumeScratch = array(channelCount, 0)
     paintRightVolumeScratch = array(channelCount, 0)
     paintSurvivorScratch = array(channelCount, void)
+    paintStaticEffectScratch = array(channelCount, void)
+    paintStaticRepresentativeScratch = array(channelCount, 0)
   end if
   channelIndex = 0
+  staticEffectCount = 0
   while channelIndex < channelCount
     channel = mixer.channels[channelIndex]
     channelVolumesInto(mixer, channel, paintLeftVolumeScratch, paintRightVolumeScratch, channelIndex)
     if channel.channelNumber == STATIC_CHANNEL and channel.effect is not void then
-      prior = 0
-      combined = false
-      while prior < channelIndex and not combined
-        priorChannel = mixer.channels[prior]
-        if priorChannel.channelNumber == STATIC_CHANNEL and priorChannel.effect == channel.effect and priorChannel.active then
-          paintLeftVolumeScratch[prior] = paintLeftVolumeScratch[prior] + paintLeftVolumeScratch[channelIndex]
-          paintRightVolumeScratch[prior] = paintRightVolumeScratch[prior] + paintRightVolumeScratch[channelIndex]
-          paintLeftVolumeScratch[channelIndex] = 0
-          paintRightVolumeScratch[channelIndex] = 0
-          combined = true
+      // Static channels are phase-locked by effect.  The original linear scan
+      // over all earlier channels becomes quadratic with many torches.  Track
+      // only the first active representative of each distinct effect, which
+      // selects the same channel and preserves the exact accumulation order.
+      representative = -1
+      effectIndex = 0
+      while effectIndex < staticEffectCount and representative < 0
+        if paintStaticEffectScratch[effectIndex] == channel.effect then
+          representative = paintStaticRepresentativeScratch[effectIndex]
         end if
-        prior = prior + 1
+        effectIndex = effectIndex + 1
       end while
+      if representative >= 0 then
+        paintLeftVolumeScratch[representative] = paintLeftVolumeScratch[representative] + paintLeftVolumeScratch[channelIndex]
+        paintRightVolumeScratch[representative] = paintRightVolumeScratch[representative] + paintRightVolumeScratch[channelIndex]
+        paintLeftVolumeScratch[channelIndex] = 0
+        paintRightVolumeScratch[channelIndex] = 0
+      else if channel.active then
+        paintStaticEffectScratch[staticEffectCount] = channel.effect
+        paintStaticRepresentativeScratch[staticEffectCount] = channelIndex
+        staticEffectCount = staticEffectCount + 1
+      end if
     end if
     channelIndex = channelIndex + 1
   end while

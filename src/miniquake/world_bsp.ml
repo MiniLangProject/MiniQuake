@@ -23,6 +23,8 @@ fatPvsScratchMapKey = 0
 fatPvsScratch = bytes()
 collisionHullCacheMapKey = 0
 collisionHullCache = []
+modelHullCacheMapKey = 0
+modelHullCache = []
 
 // Create the zero-initialized state for vector.
 function zeroVector()
@@ -94,18 +96,39 @@ end function
 // of short-lived objects per gameplay frame.
 function precacheCollisionHulls(map)
   global collisionHullCacheMapKey, collisionHullCache
+  global modelHullCacheMapKey, modelHullCache
   if map is void or len(map.models) == 0 then
     collisionHullCacheMapKey = 0
     collisionHullCache = []
+    modelHullCacheMapKey = 0
+    modelHullCache = []
     return 0
   end if
   collisionHullCacheMapKey = 0
   collisionHullCache = []
+  modelHullCacheMapKey = 0
+  modelHullCache = []
   hull0 = createHull(map, 0)
   hull1 = createHull(map, 1)
   hull2 = createHull(map, 2)
   collisionHullCacheMapKey = nativeRawValue(map)
   collisionHullCache = [hull0, hull1, hull2]
+
+  // A moving brush trace previously rebuilt its hull descriptor every time.
+  // Hull zero was substantially worse: createModelHull also expanded the
+  // complete drawing-node table for every door/platform collision. Cache all
+  // immutable model/size combinations while the loading plaque is visible.
+  modelHullCache = arrayutil.makeEmptyArray(len(map.models) * 3)
+  modelIndex = 0
+  while modelIndex < len(map.models)
+    hullIndex = 0
+    while hullIndex < 3
+      modelHullCache[modelIndex * 3 + hullIndex] = createModelHull(map, modelIndex, hullIndex)
+      hullIndex = hullIndex + 1
+    end while
+    modelIndex = modelIndex + 1
+  end while
+  modelHullCacheMapKey = collisionHullCacheMapKey
   return 3
 end function
 
@@ -560,13 +583,24 @@ end function
 function createModelHull(map, modelIndex, hullIndex)
   if modelIndex < 0 or modelIndex >= len(map.models) then return error(2510, "bad BSP submodel index") end if
   if hullIndex < 0 or hullIndex > 2 then return error(2511, "bad BSP hull index") end if
+  mapKey = nativeRawValue(map)
+  cacheIndex = modelIndex * 3 + hullIndex
+  if modelHullCacheMapKey == mapKey and len(modelHullCache) == len(map.models) * 3 then
+    return modelHullCache[cacheIndex]
+  end if
   model = map.models[modelIndex]
   first = model.headNodes[hullIndex]
   nodes = map.clipNodes
   clipMins = zeroVector()
   clipMaxs = zeroVector()
   if hullIndex == 0 then
-    nodes = drawingClipNodes(map)
+    // The drawing-node conversion is identical for every submodel. Reuse the
+    // map's precached hull-zero node table while the per-model cache is built.
+    if collisionHullCacheMapKey == mapKey and len(collisionHullCache) == 3 then
+      nodes = collisionHullCache[0].clipNodes
+    else
+      nodes = drawingClipNodes(map)
+    end if
   else if hullIndex == 1 then
     clipMins = t.Vec3(-16.0, -16.0, -24.0)
     clipMaxs = t.Vec3(16.0, 16.0, 32.0)

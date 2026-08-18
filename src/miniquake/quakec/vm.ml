@@ -29,6 +29,8 @@ globalLookupValues = array(LOOKUP_CACHE_SIZE, -2)
 functionLookupKeys = array(LOOKUP_CACHE_SIZE)
 functionLookupRawKeys = array(LOOKUP_CACHE_SIZE, 0)
 functionLookupValues = array(LOOKUP_CACHE_SIZE, -2)
+programStringCacheMachine = void
+programStringCache = []
 
 // Ensure sufficient storage or state for lookup machine.
 function ensureLookupMachine(machine)
@@ -48,6 +50,22 @@ function ensureLookupMachine(machine)
   functionLookupKeys = array(LOOKUP_CACHE_SIZE)
   functionLookupRawKeys = array(LOOKUP_CACHE_SIZE, 0)
   functionLookupValues = array(LOOKUP_CACHE_SIZE, -2)
+  return true
+end function
+
+// Ensure immutable progs.dat strings have one decoded value per byte offset.
+function ensureProgramStringCache(machine)
+  global programStringCacheMachine, programStringCache
+  if programStringCacheMachine is not void and
+      nativeRawValue(programStringCacheMachine) == nativeRawValue(machine) and
+      len(programStringCache) == len(machine.program.strings) then
+    return true
+  end if
+  // The original string lump never changes after PR_LoadProgs. QuakeC may
+  // legally address a suffix inside a stored string, so cache by exact raw
+  // byte offset rather than only by definition/string-table entry.
+  programStringCacheMachine = machine
+  programStringCache = arrayutil.makeEmptyArray(len(machine.program.strings))
   return true
 end function
 
@@ -135,11 +153,15 @@ function stringValue(machine, rawValue)
     return ""
   end if
   if rawValue < 0 or rawValue >= len(machine.program.strings) then return "" end if
+  ensureProgramStringCache(machine)
+  if programStringCache[rawValue] is not void then return programStringCache[rawValue] end if
   endOffset = rawValue
   while endOffset < len(machine.program.strings) and machine.program.strings[endOffset] != 0
     endOffset = endOffset + 1
   end while
-  return protocolText.decodeBytes(slice(machine.program.strings, rawValue, endOffset - rawValue))
+  decoded = protocolText.decodeBytes(slice(machine.program.strings, rawValue, endOffset - rawValue))
+  programStringCache[rawValue] = decoded
+  return decoded
 end function
 
 // Report whether canonical string.

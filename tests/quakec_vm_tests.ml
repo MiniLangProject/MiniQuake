@@ -236,6 +236,7 @@ function testProgramStringLatin1()
   machine = simpleMachine([t.QuakeCStatement(op.OP_DONE, 0, 0, 0)])
   text = vm.stringValue(machine, 1)
   equal(hex(protocolText.encodeBytes(text)), "e9", "program string byte")
+  equal(nativeRawValue(vm.stringValue(machine, 1)), nativeRawValue(text), "program string decode cache")
   return true
 end function
 
