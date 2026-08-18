@@ -125,6 +125,17 @@ parameter block for the complete build interface.
 Bindings can be changed through **Options > Customize Controls** or with the
 original `bind` console command.
 
+## Cheats
+
+Single-player games and privileged multiplayer clients support the original
+commands `god`, `notarget`, `noclip`, `fly`, and `give <item> <value>`.
+The stock QuakeC cheats such as `impulse 9` (all weapons) are also supported.
+MiniQuake additionally provides `invisible`, which toggles AI invisibility:
+standard monsters stop targeting the player and cannot acquire the player
+again until the command is disabled. The player model remains rendered.
+Enter `cheats` or `cheatcodes` in the console to display the complete in-game
+cheat reference, including command syntax.
+
 ## Rendering and display
 
 Choose a renderer from **Options > Video Mode** or on the command line:

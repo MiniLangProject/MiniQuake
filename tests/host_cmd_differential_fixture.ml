@@ -64,9 +64,9 @@ function main(args)
   print "{\"function\":\"Host_God_f\",\"case\":\"console_disconnected\",\"sent\":" + boolText(host.Host_God_f(godSession)) + "}"
 
   commands = host.Host_InitCommands()
-  // The MiniLang host registry also aggregates four pr_edict.c commands and
-  // the Cache_Init `flush` command, which live in separate original units.
-  print "{\"function\":\"Host_InitCommands\",\"case\":\"stock_commands\",\"commands\":" + (len(commands) - 5) + "}"
+  // The MiniLang host registry also aggregates four pr_edict.c commands, the
+  // Cache_Init `flush` command, and two MiniQuake-only cheat-help aliases.
+  print "{\"function\":\"Host_InitCommands\",\"case\":\"stock_commands\",\"commands\":" + (len(commands) - 7) + "}"
 
   kickSession = newSession()
   print "{\"function\":\"Host_Kick_f\",\"case\":\"inactive_console\",\"sent\":" + boolText(host.Host_Kick_f(kickSession, ["kick"])) + "}"

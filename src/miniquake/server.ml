@@ -919,6 +919,61 @@ function Host_Notarget_f(server, clientValue)
   return true
 end function
 
+// Drop references from active monsters to a player who has become invisible.
+// FL_NOTARGET prevents new checkclient acquisitions; clearing existing enemy
+// state makes the custom command take effect immediately for alerted monsters.
+function clearInvisibleClientTargets(server, clientValue)
+  if server.machine is void or server.machine.context is void then return 0 end if
+  runtime = server.machine.context.edicts
+  if runtime is void then return 0 end if
+  flagsOffset = vm.fieldOffset(server.machine, "flags")
+  enemyOffset = vm.fieldOffset(server.machine, "enemy")
+  oldEnemyOffset = vm.fieldOffset(server.machine, "oldenemy")
+  goalEntityOffset = vm.fieldOffset(server.machine, "goalentity")
+  if flagsOffset < 0 then return 0 end if
+
+  cleared = 0
+  entityIndex = server.maxClients + 1
+  while entityIndex < runtime.numEdicts
+    if not runtime.freeFlags[entityIndex] then
+      flags = native.trunc(vm.entityFloat(server.machine, entityIndex, flagsOffset))
+      if (flags & c.FL_MONSTER) != 0 then
+        changed = false
+        if enemyOffset >= 0 and vm.entityField(server.machine, entityIndex, enemyOffset) == clientValue.edictIndex then
+          vm.setEntityField(server.machine, entityIndex, enemyOffset, 0)
+          changed = true
+        end if
+        if oldEnemyOffset >= 0 and vm.entityField(server.machine, entityIndex, oldEnemyOffset) == clientValue.edictIndex then
+          vm.setEntityField(server.machine, entityIndex, oldEnemyOffset, 0)
+          changed = true
+        end if
+        if goalEntityOffset >= 0 and vm.entityField(server.machine, entityIndex, goalEntityOffset) == clientValue.edictIndex then
+          vm.setEntityField(server.machine, entityIndex, goalEntityOffset, 0)
+          changed = true
+        end if
+        if changed then cleared = cleared + 1 end if
+      end if
+    end if
+    entityIndex = entityIndex + 1
+  end while
+  return cleared
+end function
+
+// Toggle the MiniQuake AI-invisibility cheat. The stock FL_NOTARGET bit keeps
+// standard QuakeC and compatible mods on their original target-selection path.
+function Host_Invisible_f(server, clientValue)
+  if not privilegedCommandAllowed(server, clientValue) then return false end if
+  flags = native.trunc(clientFloat(server, clientValue, "flags", 0.0)) ^ c.FL_NOTARGET
+  setClientFloat(server, clientValue, "flags", flags)
+  if (flags & c.FL_NOTARGET) != 0 then
+    clearInvisibleClientTargets(server, clientValue)
+    clientPrint(clientValue, "invisible ON\n")
+  else
+    clientPrint(clientValue, "invisible OFF\n")
+  end if
+  return true
+end function
+
 // Apply the Quake-compatible host noclip f behavior.
 function Host_Noclip_f(server, clientValue)
   if not privilegedCommandAllowed(server, clientValue) then return false end if
@@ -1184,6 +1239,7 @@ function executeStringCommand(server, client, text, player)
   if name == "status" then return Host_Status_f(server, client) end if
   if name == "god" then return Host_God_f(server, client) end if
   if name == "notarget" then return Host_Notarget_f(server, client) end if
+  if name == "invisible" then return Host_Invisible_f(server, client) end if
   if name == "noclip" then return Host_Noclip_f(server, client) end if
   if name == "fly" then return Host_Fly_f(server, client) end if
   if name == "ping" then return Host_Ping_f(server, client) end if
@@ -1212,7 +1268,11 @@ function readMove(server, reader, client)
   client.command.sideMove = msg.readShort(reader)
   client.command.upMove = msg.readShort(reader)
   client.command.buttons = msg.readByte(reader)
-  client.command.impulse = msg.readByte(reader)
+  // The stock server retains the last non-zero impulse until client physics
+  // consumes it. This matters while a single-player console pauses simulation:
+  // later neutral move packets must not erase an entered `impulse 9` cheat.
+  impulse = msg.readByte(reader)
+  if impulse != 0 then client.command.impulse = impulse end if
   client.command.msec = 0
   return clientTime
 end function
@@ -1278,6 +1338,12 @@ function readClientMessage(server, client, data, player)
       readMove(server, reader, client)
     else if command == c.CLC_STRINGCMD then
       executeStringCommand(server, client, msg.readString(reader), player)
+      // Host cheat/give commands mutate the authoritative QuakeC edict. Mirror
+      // those changes immediately so the frame's PlayerState-to-edict upload
+      // cannot overwrite them before simulation resumes after closing console.
+      if client.active and client.spawned and server.machine is not void then
+        syncPlayerFromQuakeC(server, client, player)
+      end if
     else
       server.diagnostics = server.diagnostics + ["SV_ReadClientMessage: unknown command char " + command]
       return false
@@ -2892,6 +2958,12 @@ function syncQuakeCSnapshotEdictAt(server, entityIndex, offsets)
   oldOriginX = item.origin.x
   oldOriginY = item.origin.y
   oldOriginZ = item.origin.z
+  oldMinsX = item.mins.x
+  oldMinsY = item.mins.y
+  oldMinsZ = item.mins.z
+  oldMaxsX = item.maxs.x
+  oldMaxsY = item.maxs.y
+  oldMaxsZ = item.maxs.z
   oldModelHandle = item.modelHandle
   oldModelIndex = item.modelIndex
   // SV_WriteEntitiesToClient rejects entities whose entvars_t::model string
@@ -2916,8 +2988,21 @@ function syncQuakeCSnapshotEdictAt(server, entityIndex, offsets)
   item.effects = native.trunc(qcFloatAt(machine, entityIndex, offsets[6], 0.0))
   item.origin = syncQcVectorIntoAt(machine, entityIndex, offsets[7], "origin", item.origin, 0.0, 0.0, 0.0)
   item.angles = syncQcVectorIntoAt(machine, entityIndex, offsets[8], "angles", item.angles, 0.0, 0.0, 0.0)
+  // Runtime QuakeC may change an entity's bounds at the same instant that it
+  // assigns a model. Chthon is the stock example: boss_awake expands a
+  // point-sized dormant edict to its full 256x256x280 bounds. PVS linking
+  // consumes the mirror bounds below, so leaving them stale can hide the boss
+  // while its priority projectiles remain visible.
+  item.mins = syncQcVectorIntoAt(machine, entityIndex, offsets[10], "mins", item.mins, 0.0, 0.0, 0.0)
+  item.maxs = syncQcVectorIntoAt(machine, entityIndex, offsets[11], "maxs", item.maxs, 0.0, 0.0, 0.0)
   item.moveType = native.trunc(qcFloatAt(machine, entityIndex, offsets[13], c.MOVETYPE_NONE))
-  if oldOriginX != item.origin.x or oldOriginY != item.origin.y or oldOriginZ != item.origin.z or oldModelIndex != item.modelIndex then
+  // FL_ITEM changes the stock SV_WriteEntitiesToClient leaf expansion, hence
+  // it is snapshot state even though it is not written onto protocol 15.
+  item.flags = native.trunc(qcFloatAt(machine, entityIndex, offsets[15], 0.0))
+  if oldOriginX != item.origin.x or oldOriginY != item.origin.y or oldOriginZ != item.origin.z or
+    oldMinsX != item.mins.x or oldMinsY != item.mins.y or oldMinsZ != item.mins.z or
+    oldMaxsX != item.maxs.x or oldMaxsY != item.maxs.y or oldMaxsZ != item.maxs.z or
+    oldModelIndex != item.modelIndex then
     item.leafNums = []
   end if
   return item

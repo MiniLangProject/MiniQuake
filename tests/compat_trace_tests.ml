@@ -250,6 +250,22 @@ function bp001TestSynchronizedEdictGcRoots()
   assertEqual(game.edicts[77].modelHandle, 1, "non-zero empty pickup handle enters snapshot")
   assertEqual(game.edicts[77].model, "", "non-zero empty pickup string clears")
 
+  // Stock e1m7 starts Chthon as a point-sized dormant edict. boss_awake sets
+  // the model and expands mins/maxs during gameplay, so the snapshot-only
+  // synchronizer must refresh the bounds and invalidate its cached PVS leaves
+  // without relying on a later full physics synchronization.
+  game.edicts[77].leafNums = [3]
+  vm.setEntityVector(machine, 77, 16, t.Vec3(-128.0, -128.0, -24.0))
+  vm.setEntityVector(machine, 77, 19, t.Vec3(128.0, 128.0, 256.0))
+  vm.setEntityFloat(machine, 77, 24, c.FL_ITEM)
+  serverRuntime.syncQuakeCSnapshotEdicts(game)
+  assertEqual(game.edicts[77].mins.x, -128.0, "runtime snapshot minimum x")
+  assertEqual(game.edicts[77].mins.z, -24.0, "runtime snapshot minimum z")
+  assertEqual(game.edicts[77].maxs.y, 128.0, "runtime snapshot maximum y")
+  assertEqual(game.edicts[77].maxs.z, 256.0, "runtime snapshot maximum z")
+  assertEqual(game.edicts[77].flags, c.FL_ITEM, "runtime snapshot PVS flags")
+  assertEqual(len(game.edicts[77].leafNums), 0, "runtime bounds invalidate PVS leaves")
+
   gc_set_limit(1048576)
   serverRuntime.shutdown(game)
   return true

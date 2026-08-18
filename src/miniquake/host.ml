@@ -1529,6 +1529,40 @@ function Host_Notarget_f(session)
   return Host_ForwardToServer(session, "notarget")
 end function
 
+// Forward the MiniQuake AI-invisibility cheat to the authoritative server.
+function Host_Invisible_f(session)
+  return Host_ForwardToServer(session, "invisible")
+end function
+
+// Return the console help shown for MiniQuake's supported cheat commands.
+function Host_CheatHelpLines()
+  return [
+    "Available cheats:",
+    "  god                 toggle invulnerability",
+    "  notarget            toggle stock AI no-target mode",
+    "  invisible           hide from AI and clear current targets",
+    "  noclip              toggle collision-free movement",
+    "  fly                 toggle flying movement",
+    "  give <2-8> 1        give the selected stock weapon",
+    "  give h <value>      set health",
+    "  give s/n/r/c <value> set shells/nails/rockets/cells",
+    "  impulse 9           give all stock weapons",
+    "  impulse 11          advance the rune/serverflags cheat",
+    "  impulse 255         grant 30 seconds of Quad Damage",
+    "Mission packs: hipnotic give 6a/9/0; rogue give l/m/p.",
+    "Cheats require single-player or a privileged multiplayer client.",
+  ]
+end function
+
+// Print the complete cheat reference from either accepted help alias.
+function Host_Cheats_f(session)
+  lines = Host_CheatHelpLines()
+  for each line in lines
+    console.appendLine(session.console, line)
+  end for
+  return true
+end function
+
 // Apply the Quake-compatible host noclip f behavior.
 function Host_Noclip_f(session)
   return Host_ForwardToServer(session, "noclip")
@@ -2014,7 +2048,7 @@ end function
 // Apply the Quake-compatible host init commands behavior.
 function Host_InitCommands()
   return [
-    "status", "quit", "god", "notarget", "fly", "map", "restart",
+    "status", "quit", "god", "notarget", "invisible", "cheats", "cheatcodes", "fly", "map", "restart",
     "changelevel", "connect", "reconnect", "name", "noclip", "version",
     "say", "say_team", "tell", "color", "kill", "pause", "spawn", "begin",
     "prespawn", "kick", "ping", "load", "save", "give", "startdemos",
@@ -2032,6 +2066,8 @@ function Host_DispatchCommand(session, text, arguments)
   if name == "disconnect" then return Host_Disconnect_f(session) end if
   if name == "god" then return Host_God_f(session) end if
   if name == "notarget" then return Host_Notarget_f(session) end if
+  if name == "invisible" then return Host_Invisible_f(session) end if
+  if name == "cheats" or name == "cheatcodes" then return Host_Cheats_f(session) end if
   if name == "noclip" then return Host_Noclip_f(session) end if
   if name == "fly" then return Host_Fly_f(session) end if
   if name == "ping" then return Host_Ping_f(session) end if

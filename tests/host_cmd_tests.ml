@@ -15,6 +15,7 @@ import miniquake.cmd as cmd
 import miniquake.player_move as movement
 import miniquake.mathlib as math
 import miniquake.sizebuf as sz
+import miniquake.message as msg
 import miniquake.native as native
 import miniquake.byteio as bio
 
@@ -83,6 +84,10 @@ function makeServer()
     t.QuakeCDef(c.EV_FLOAT, 9, 0, "ammo_rockets"),
     t.QuakeCDef(c.EV_FLOAT, 10, 0, "ammo_cells"),
     t.QuakeCDef(c.EV_FLOAT, 11, 0, "weapon"),
+    t.QuakeCDef(c.EV_FLOAT, 12, 0, "impulse"),
+    t.QuakeCDef(c.EV_ENTITY, 13, 0, "enemy"),
+    t.QuakeCDef(c.EV_ENTITY, 14, 0, "oldenemy"),
+    t.QuakeCDef(c.EV_ENTITY, 15, 0, "goalentity"),
   ]
   globalDefs = [t.QuakeCDef(c.EV_FLOAT | c.DEF_SAVEGLOBAL, 40, 0, "serverflags")]
   dummy = t.QuakeCFunction(0, 0, 0, 0, "", "", 0, [])
@@ -106,7 +111,8 @@ function makeServer()
   registerVariable(registry, "teamplay", "1")
   registerVariable(registry, "pausable", "1")
   runtime = server.createEdictRuntime(8, 2)
-  context = server.createQuakeCContext(gameServer, void, registry, cmd.create(), runtime)
+  filesystem = t.FileSystem("", "id1", [], "", false, false, true, false)
+  context = server.createQuakeCContext(gameServer, filesystem, registry, cmd.create(), runtime)
   vm.setContext(machine, context)
   machine.edictFree = runtime.freeFlags
   gameServer.machine = machine
@@ -129,6 +135,30 @@ function makeServer()
   server.setClientFloat(gameServer, gameServer.clients[0], "team", 1.0)
   server.setClientFloat(gameServer, gameServer.clients[1], "team", 2.0)
   return gameServer
+end function
+
+// Build one client string-command packet using the Protocol-15 wire format.
+function stringCommandPacket(text)
+  packet = sz.alloc(128)
+  msg.writeByte(packet, c.CLC_STRINGCMD)
+  msg.writeString(packet, text)
+  return sz.dataSlice(packet)
+end function
+
+// Build a neutral move packet whose zero impulse must preserve a queued cheat.
+function neutralMovePacket()
+  packet = sz.alloc(32)
+  msg.writeByte(packet, c.CLC_MOVE)
+  msg.writeFloat(packet, 0.0)
+  msg.writeByte(packet, 0)
+  msg.writeByte(packet, 0)
+  msg.writeByte(packet, 0)
+  msg.writeShort(packet, 0)
+  msg.writeShort(packet, 0)
+  msg.writeShort(packet, 0)
+  msg.writeByte(packet, 0)
+  msg.writeByte(packet, 0)
+  return sz.dataSlice(packet)
 end function
 
 // Verify client commands against the expected Quake behavior.
@@ -188,6 +218,91 @@ function testClientCommands()
   return true
 end function
 
+// Verify cheats survive the PlayerState/QuakeC boundary and paused move input.
+function testCheatStateSynchronization()
+  gameServer = makeServer()
+  first = gameServer.clients[0]
+  player = movement.create(t.Vec3(0.0, 0.0, 24.0), t.Vec3(0.0, 0.0, 0.0))
+  player.health = 100.0
+
+  assertTrue(
+    server.readClientMessage(gameServer, first, stringCommandPacket("god"), player),
+    "god string command accepted",
+  )
+  assertTrue((player.flags & c.FL_GODMODE) != 0, "god mirrors into PlayerState")
+  server.syncPlayerToQuakeC(gameServer, first, player)
+  assertTrue(
+    (native.trunc(server.clientFloat(gameServer, first, "flags", 0.0)) & c.FL_GODMODE) != 0,
+    "god survives the following PlayerState upload",
+  )
+
+  assertTrue(
+    server.readClientMessage(gameServer, first, stringCommandPacket("give 8 1"), player),
+    "weapon give command accepted",
+  )
+  assertTrue((player.items & c.IT_LIGHTNING) != 0, "give weapon mirrors into PlayerState")
+  assertTrue(
+    server.readClientMessage(gameServer, first, stringCommandPacket("give s 77"), player),
+    "ammunition give command accepted",
+  )
+  assertEqual(player.shells, 77, "give ammunition mirrors into PlayerState")
+  server.readClientMessage(gameServer, first, stringCommandPacket("give h 250"), player)
+  assertEqual(player.health, 250.0, "give health mirrors into PlayerState")
+
+  server.readClientMessage(gameServer, first, stringCommandPacket("notarget"), player)
+  assertTrue((player.flags & c.FL_NOTARGET) != 0, "notarget mirrors into PlayerState")
+  server.readClientMessage(gameServer, first, stringCommandPacket("notarget"), player)
+  assertTrue((player.flags & c.FL_NOTARGET) == 0, "second notarget disables cheat")
+  server.readClientMessage(gameServer, first, stringCommandPacket("noclip"), player)
+  assertEqual(player.moveType, c.MOVETYPE_NOCLIP, "noclip mirrors into PlayerState")
+  assertTrue(player.noclip, "noclip mirror updates convenience flag")
+  server.readClientMessage(gameServer, first, stringCommandPacket("noclip"), player)
+  assertEqual(player.moveType, c.MOVETYPE_WALK, "second noclip restores walking")
+  server.readClientMessage(gameServer, first, stringCommandPacket("fly"), player)
+  assertEqual(player.moveType, c.MOVETYPE_FLY, "fly mirrors into PlayerState")
+  server.readClientMessage(gameServer, first, stringCommandPacket("fly"), player)
+  assertEqual(player.moveType, c.MOVETYPE_WALK, "second fly restores walking")
+
+  first.command.impulse = 9
+  assertTrue(
+    server.readClientMessage(gameServer, first, neutralMovePacket(), player),
+    "neutral move after console impulse accepted",
+  )
+  assertEqual(first.command.impulse, 9, "zero move impulse preserves queued impulse 9")
+  server.syncCommandToQuakeC(gameServer, first)
+  assertEqual(
+    native.trunc(server.clientFloat(gameServer, first, "impulse", 0.0)),
+    9,
+    "impulse 9 reaches QuakeC",
+  )
+  assertEqual(first.command.impulse, 0, "QuakeC synchronization consumes impulse once")
+
+  runtime = gameServer.machine.context.edicts
+  runtime.numEdicts = 4
+  gameServer.numEdicts = 4
+  runtime.freeFlags[3] = false
+  server.setQcEntityFloat(gameServer, 3, "flags", c.FL_MONSTER)
+  server.setQcEntityWord(gameServer, 3, "enemy", first.edictIndex)
+  server.setQcEntityWord(gameServer, 3, "oldenemy", first.edictIndex)
+  server.setQcEntityWord(gameServer, 3, "goalentity", first.edictIndex)
+  assertTrue(
+    server.readClientMessage(gameServer, first, stringCommandPacket("invisible"), player),
+    "invisible command accepted",
+  )
+  assertTrue((player.flags & c.FL_NOTARGET) != 0, "invisible mirrors FL_NOTARGET")
+  assertEqual(server.qcWord(gameServer.machine, 3, "enemy", -1), 0, "invisible clears monster enemy")
+  assertEqual(server.qcWord(gameServer.machine, 3, "oldenemy", -1), 0, "invisible clears monster oldenemy")
+  assertEqual(server.qcWord(gameServer.machine, 3, "goalentity", -1), 0, "invisible clears monster goalentity")
+  server.syncPlayerToQuakeC(gameServer, first, player)
+  assertTrue(
+    (native.trunc(server.clientFloat(gameServer, first, "flags", 0.0)) & c.FL_NOTARGET) != 0,
+    "invisible survives the following PlayerState upload",
+  )
+  server.readClientMessage(gameServer, first, stringCommandPacket("invisible"), player)
+  assertTrue((player.flags & c.FL_NOTARGET) == 0, "second invisible command disables cheat")
+  return true
+end function
+
 // Verify save format against the expected Quake behavior.
 function testSaveFormat()
   comment = savegame.Host_SavegameComment("Entrance", 1, 12)
@@ -227,21 +342,42 @@ function testRegistration()
   assertTrue(contains(commands, "edictcount"), "PR edictcount registered")
   assertTrue(contains(commands, "profile"), "PR profile registered")
   assertTrue(contains(commands, "flush"), "Cache_Init flush command registered")
+  assertTrue(contains(commands, "invisible"), "AI-invisibility cheat registered")
+  assertTrue(contains(commands, "cheats"), "cheat help command registered")
+  assertTrue(contains(commands, "cheatcodes"), "cheat help alias registered")
+
+  helpLines = host.Host_CheatHelpLines()
+  assertTrue(contains(helpLines, "  god                 toggle invulnerability"), "god help listed")
+  assertTrue(contains(helpLines, "  invisible           hide from AI and clear current targets"), "invisible help listed")
+  assertTrue(contains(helpLines, "  impulse 9           give all stock weapons"), "impulse help listed")
+  assertTrue(contains(helpLines, "  impulse 11          advance the rune/serverflags cheat"), "rune cheat listed")
+  assertTrue(contains(helpLines, "  impulse 255         grant 30 seconds of Quad Damage"), "quad cheat listed")
+
+  helpSession = host.create([])
+  before = len(helpSession.console.lines)
+  assertTrue(host.executeCommand(helpSession, "cheats"), "cheats console command accepted")
+  assertTrue(len(helpSession.console.lines) > before, "cheats prints console help")
+  aliasBefore = len(helpSession.console.lines)
+  assertTrue(host.executeCommand(helpSession, "cheatcodes"), "cheatcodes console command accepted")
+  assertTrue(len(helpSession.console.lines) > aliasBefore, "cheatcodes prints console help")
   return true
 end function
 
 // Parse command-line arguments and run the selected operation.
 function main(args)
-  print "MiniQuake host_cmd tests starting: 3"
+  print "MiniQuake host_cmd tests starting: 4"
   result = try(testClientCommands())
   if result is error then print "FAIL client commands: " + result.message; return 1 end if
-  print "[1/3] client command source/privilege/protocol"
+  print "[1/4] client command source/privilege/protocol"
   result = try(testSaveFormat())
   if result is error then print "FAIL save format: " + result.message; return 1 end if
-  print "[2/3] save v5 roundtrip"
+  print "[2/4] save v5 roundtrip"
+  result = try(testCheatStateSynchronization())
+  if result is error then print "FAIL cheat synchronization: " + result.message; return 1 end if
+  print "[3/4] god/give/impulse/invisible synchronization"
   result = try(testRegistration())
   if result is error then print "FAIL registration: " + result.message; return 1 end if
-  print "[3/3] host/PR command registration"
-  print "MiniQuake host_cmd tests passed: 3"
+  print "[4/4] host/PR command registration"
+  print "MiniQuake host_cmd tests passed: 4"
   return 0
 end function

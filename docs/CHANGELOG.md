@@ -13,7 +13,12 @@ optimization packages. The current tree includes:
 - resolution-aware menus, console, HUD, and window/fullscreen controls;
 - startup attract demos when `--play` receives only the Quake directory;
 - input transition fixes, retail gameplay corrections, and frame-time
-  optimizations; and
+  optimizations;
+- persistent stock cheat state, the `invisible` AI-invisibility command, and
+  the `cheats`/`cheatcodes` in-game command reference;
+- runtime QuakeC bounds synchronization so dynamically activated large
+  entities such as Chthon remain present in Protocol-15 PVS snapshots;
+  and
 - expanded deterministic, differential, retail, and soak validation tooling.
 
 For the current qualification level, see
