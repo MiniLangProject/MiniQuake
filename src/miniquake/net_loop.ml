@@ -19,6 +19,7 @@ messagesSent = 0
 messagesReceived = 0
 unreliableMessagesSent = 0
 unreliableMessagesReceived = 0
+datagramSearchSocket = void
 
 const LOOP_MAX_MESSAGE = 8192
 const HOST_CACHE_SIZE = 8
@@ -456,6 +457,9 @@ end function
 
 // Provide datagram search for hosts behavior for the active subsystem.
 function _Datagram_SearchForHosts(searchSocket, hosts, port, timeoutMilliseconds, xmit)
+  // Differential/source-surface callers may exercise the no-landriver path
+  // with no control socket, matching Datagram_SearchForHosts' skipped driver.
+  if searchSocket is void then return hosts end if
   if xmit then
     sent = try(udp.broadcast(searchSocket, port, control.requestServerInfo()))
     if sent is error then return sent end if
@@ -463,10 +467,16 @@ function _Datagram_SearchForHosts(searchSocket, hosts, port, timeoutMilliseconds
   if timeoutMilliseconds < 0 then timeoutMilliseconds = 0 end if
   elapsed = 0
   result = hosts
-  while elapsed < timeoutMilliseconds and len(result) < HOST_CACHE_SIZE
+  // The original control socket is non-blocking and is polled once even when
+  // the caller supplies no wait horizon. This lets NET_Poll drain replies over
+  // several frames without turning one menu frame into a 100-ms busy wait.
+  firstPoll = true
+  while (firstPoll or elapsed < timeoutMilliseconds) and len(result) < HOST_CACHE_SIZE
+    firstPoll = false
     received = try(udp.receive(searchSocket, 2048))
     if received is error then return received end if
     if received is void then
+      if timeoutMilliseconds == 0 then break end if
       win.sleep(1)
     else
       // _Datagram_SearchForHosts ignores replies whose IPv4 address matches
@@ -494,15 +504,31 @@ end function
 
 // Mirror Quake's Datagram_SearchForHosts routine and its observable state changes.
 function Datagram_SearchForHosts(state, xmit, port, timeoutMilliseconds)
+  global datagramSearchSocket
   if not state.lanEnabled then return error(3436, "Datagram networking disabled by -nolan") end if
-  if xmit then state.hostCache = [] end if
-  opened = udp.open(0)
-  if opened is error then return opened end if
-  result = try(_Datagram_SearchForHosts(opened, state.hostCache, port, timeoutMilliseconds, xmit))
-  udp.close(opened)
+  if datagramSearchSocket is void or not datagramSearchSocket.open then
+    opened = udp.open(0)
+    if opened is error then return opened end if
+    datagramSearchSocket = opened
+  end if
+  result = try(_Datagram_SearchForHosts(datagramSearchSocket, state.hostCache, port, timeoutMilliseconds, xmit))
   if result is error then return result end if
   state.hostCache = result
   return result
+end function
+
+// Finish a multi-frame server search and release its persistent control socket.
+function Datagram_EndHostSearch()
+  global datagramSearchSocket
+  if datagramSearchSocket is void then return false end if
+  udp.close(datagramSearchSocket)
+  datagramSearchSocket = void
+  return true
+end function
+
+// Report whether LAN discovery currently owns its non-blocking control socket.
+function Datagram_HostSearchActive()
+  return datagramSearchSocket is not void and datagramSearchSocket.open
 end function
 
 // Provide listener address behavior for the active subsystem.
@@ -832,6 +858,7 @@ end function
 
 // Mirror Quake's Datagram_Shutdown routine and its observable state changes.
 function Datagram_Shutdown(state)
+  Datagram_EndHostSearch()
   if state.listener is not void then stopListening(state) end if
   for each socket in state.remoteSockets
     if not socket.disconnected then close(socket) end if

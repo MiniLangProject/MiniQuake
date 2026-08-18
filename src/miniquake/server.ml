@@ -1677,9 +1677,22 @@ function writeVisibleEntityClassReserved(
   index = 1
   while index < server.numEdicts and index < len(server.edicts)
     item = server.edicts[index]
+    classVisible = false
+    if item is not void and not item.free then
+      // A fast projectile can cross a BSP portal between two snapshots.  Its
+      // cached/current leaf can then be outside this client's PVS for the
+      // projectile's entire short lifetime even though its trajectory is
+      // visible.  Priority projectiles are few and depth-occluded by the
+      // world, so keep their renderable updates independent of that leaf race.
+      if priorityProjectiles then
+        classVisible = item.modelIndex != 0 and item.model != ""
+      else
+        classVisible = entityVisible(server, pvs, item, clientEdict)
+      end if
+    end if
     if item is not void and index != clientEdict and not item.free and
       entityIsPriorityProjectile(item) == priorityProjectiles and
-      entityVisible(server, pvs, item, clientEdict) then
+      classVisible then
       if not writePlannedEntityUpdateReserved(server, buffer, item, reservedBytes) then return written end if
       written = written + 1
     end if

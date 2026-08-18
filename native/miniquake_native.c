@@ -597,17 +597,22 @@ MQ_EXPORT mq_i32 mq_shadow_world_upload(const mq_u8 *data, mq_u32 byte_count) {
     return (mq_i32)triangle_count;
 }
 
-/* Test a finite ray against an AABB without allocating inverse-direction state. */
-static mq_i32 mq_shadow_ray_box(const float *origin, const float *direction, const MQ_SHADOW_NODE *node, float maximum_fraction) {
+/* Test a finite ray against an AABB using direction state shared by the ray. */
+static mq_i32 mq_shadow_ray_box(
+    const float *origin,
+    const float *inverse_direction,
+    const mq_u8 *parallel,
+    const MQ_SHADOW_NODE *node,
+    float maximum_fraction
+) {
     float minimum_fraction = 0.0f;
     mq_u32 axis;
     for (axis = 0u; axis < 3u; ++axis) {
-        if (direction[axis] > -0.0000001f && direction[axis] < 0.0000001f) {
+        if (parallel[axis]) {
             if (origin[axis] < node->minimum[axis] || origin[axis] > node->maximum[axis]) return 0;
         } else {
-            float inverse = 1.0f / direction[axis];
-            float first = (node->minimum[axis] - origin[axis]) * inverse;
-            float second = (node->maximum[axis] - origin[axis]) * inverse;
+            float first = (node->minimum[axis] - origin[axis]) * inverse_direction[axis];
+            float second = (node->maximum[axis] - origin[axis]) * inverse_direction[axis];
             if (first > second) { float temporary = first; first = second; second = temporary; }
             if (first > minimum_fraction) minimum_fraction = first;
             if (second < maximum_fraction) maximum_fraction = second;
@@ -655,14 +660,22 @@ static mq_i32 mq_shadow_trace_one(const float *ray, float *result) {
     mq_i32 stack_count = 0;
     float origin[3] = {ray[0], ray[1], ray[2]};
     float direction[3] = {ray[3] - ray[0], ray[4] - ray[1], ray[5] - ray[2]};
+    float inverse_direction[3];
+    mq_u8 parallel[3];
     float best_fraction = 1.0f;
     mq_i32 best_triangle = -1;
+    mq_u32 axis;
     if (!mq_shadow_nodes || mq_shadow_node_count == 0u) return 0;
+    /* A ray visits many BVH nodes, so calculate its three reciprocals once. */
+    for (axis = 0u; axis < 3u; ++axis) {
+        parallel[axis] = (mq_u8)(direction[axis] > -0.0000001f && direction[axis] < 0.0000001f);
+        inverse_direction[axis] = parallel[axis] ? 0.0f : 1.0f / direction[axis];
+    }
     stack[stack_count++] = 0;
     while (stack_count > 0) {
         mq_i32 node_index = stack[--stack_count];
         MQ_SHADOW_NODE *node = &mq_shadow_nodes[node_index];
-        if (!mq_shadow_ray_box(origin, direction, node, best_fraction)) continue;
+        if (!mq_shadow_ray_box(origin, inverse_direction, parallel, node, best_fraction)) continue;
         if (node->count != 0u) {
             mq_u32 item;
             for (item = node->start; item < node->start + node->count; ++item) {
@@ -4135,23 +4148,57 @@ MQ_EXPORT void mq_gl_vertex3(mq_u32 x_bits, mq_u32 y_bits, mq_u32 z_bits) {
     }
     glVertex3f(x, y, z);
 }
+#define MQ_SHADOW_DRAW_VERTICES 16383u
+static float mq_shadow_draw_vertices[MQ_SHADOW_DRAW_VERTICES * 5u];
+
+/* Submit projected shadow triangles in one backend draw instead of replaying
+ * every vertex through the immediate-mode dispatcher. */
+static mq_i32 mq_shadow_submit_vertices(mq_u32 vertex_count) {
+    if (vertex_count == 0u || vertex_count > MQ_SHADOW_DRAW_VERTICES || (vertex_count % 3u) != 0u) return 0;
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+        return mq_d3d9_draw_interleaved_t2f_v3f(mq_shadow_draw_vertices, vertex_count) > 0;
+    }
+    if (mq_render_backend_value == MQ_RENDER_VULKAN) {
+        return mq_vulkan_draw_interleaved_t2f_v3f(mq_shadow_draw_vertices, vertex_count) > 0;
+    }
+    glInterleavedArrays(0x2A27u /* GL_T2F_V3F */, 0, mq_shadow_draw_vertices);
+    glDrawArrays(0x0004u /* GL_TRIANGLES */, 0, (mq_i32)vertex_count);
+    return 1;
+}
+
 /* Draw packed world-space shadow triangles through one MiniLang/native crossing. */
 MQ_EXPORT mq_i32 mq_gl_draw_shadow_batch(const mq_u8 *data, mq_u32 byte_count) {
     mq_u32 offset = 0u;
+    mq_u32 vertex_count = 0u;
+    mq_i32 drawn = 0;
     if (!data || byte_count == 0u || (byte_count % 36u) != 0u) return 0;
-    mq_gl_begin(0x0004u /* GL_TRIANGLES */);
     while (offset < byte_count) {
         mq_u32 x_bits;
         mq_u32 y_bits;
         mq_u32 z_bits;
+        mq_u32 output;
+        if (vertex_count == MQ_SHADOW_DRAW_VERTICES) {
+            if (!mq_shadow_submit_vertices(vertex_count)) return drawn;
+            drawn += (mq_i32)(vertex_count / 3u);
+            vertex_count = 0u;
+        }
         memcpy(&x_bits, data + offset, 4u);
         memcpy(&y_bits, data + offset + 4u, 4u);
         memcpy(&z_bits, data + offset + 8u, 4u);
-        mq_gl_vertex3(x_bits, y_bits, z_bits);
+        output = vertex_count * 5u;
+        mq_shadow_draw_vertices[output] = 0.0f;
+        mq_shadow_draw_vertices[output + 1u] = 0.0f;
+        mq_shadow_draw_vertices[output + 2u] = mq_bits_to_float(x_bits);
+        mq_shadow_draw_vertices[output + 3u] = mq_bits_to_float(y_bits);
+        mq_shadow_draw_vertices[output + 4u] = mq_bits_to_float(z_bits);
+        vertex_count += 1u;
         offset += 12u;
     }
-    mq_gl_end();
-    return (mq_i32)(byte_count / 36u);
+    if (vertex_count > 0u) {
+        if (!mq_shadow_submit_vertices(vertex_count)) return drawn;
+        drawn += (mq_i32)(vertex_count / 3u);
+    }
+    return drawn;
 }
 
 #define MQ_SHADOW_ALIAS_COMMAND_MAX 1024u
@@ -4159,6 +4206,7 @@ MQ_EXPORT mq_i32 mq_gl_draw_shadow_batch(const mq_u8 *data, mq_u32 byte_count) {
 static float mq_shadow_alias_projected[MQ_SHADOW_ALIAS_CACHE_SIZE][3];
 static float mq_shadow_alias_normal[MQ_SHADOW_ALIAS_CACHE_SIZE][3];
 static float mq_shadow_alias_source[MQ_SHADOW_ALIAS_CACHE_SIZE][3];
+static float mq_shadow_alias_travel[MQ_SHADOW_ALIAS_CACHE_SIZE];
 static mq_u8 mq_shadow_alias_valid[MQ_SHADOW_ALIAS_CACHE_SIZE];
 static mq_u32 mq_shadow_alias_command_slot[MQ_SHADOW_ALIAS_COMMAND_MAX];
 static mq_u32 mq_shadow_alias_cache_key[MQ_SHADOW_ALIAS_CACHE_SIZE];
@@ -4202,10 +4250,14 @@ static mq_i32 mq_shadow_alias_edge_compatible(mq_u32 left, mq_u32 right) {
     float projected_z = mq_shadow_alias_projected[left][2] - mq_shadow_alias_projected[right][2];
     float source_length;
     float projected_length;
+    float travel_difference;
     if (normal_dot < 0.65f) return 0;
     source_length = sqrtf(source_x * source_x + source_y * source_y + source_z * source_z);
     projected_length = sqrtf(projected_x * projected_x + projected_y * projected_y + projected_z * projected_z);
-    return projected_length <= source_length * 6.0f + 96.0f;
+    travel_difference = mq_shadow_alias_travel[left] - mq_shadow_alias_travel[right];
+    if (travel_difference < 0.0f) travel_difference = -travel_difference;
+    if (projected_length > source_length * 3.0f + 24.0f) return 0;
+    return travel_difference <= source_length * 1.5f + 12.0f;
 }
 
 /* Project one transformed alias vertex through the native world BVH. */
@@ -4273,6 +4325,12 @@ static mq_i32 mq_shadow_alias_project_vertex(
     mq_shadow_alias_normal[index][0] = result[5];
     mq_shadow_alias_normal[index][1] = result[6];
     mq_shadow_alias_normal[index][2] = result[7];
+    {
+        float travel_x = result[2] - world[0];
+        float travel_y = result[3] - world[1];
+        float travel_z = result[4] - world[2];
+        mq_shadow_alias_travel[index] = sqrtf(travel_x * travel_x + travel_y * travel_y + travel_z * travel_z);
+    }
     return 1;
 }
 
@@ -4303,6 +4361,7 @@ MQ_EXPORT mq_i32 mq_gl_draw_alias_ray_shadow(
     float roll_cosine = (float)cos((double)roll);
     float roll_sine = (float)sin((double)roll);
     mq_u32 offset = 0u;
+    mq_u32 draw_vertex_count = 0u;
     mq_i32 drawn = 0;
     if (!data || byte_count < 4u || !mq_shadow_nodes) return 0;
     ++mq_shadow_alias_generation;
@@ -4317,7 +4376,6 @@ MQ_EXPORT mq_i32 mq_gl_draw_alias_ray_shadow(
         scale[2] *= 2.0f;
         scale_origin[2] -= 30.0f;
     }
-    mq_gl_begin(0x0004u /* GL_TRIANGLES */);
     while (offset + 4u <= byte_count) {
         mq_i32 signed_count;
         mq_u32 count;
@@ -4325,6 +4383,7 @@ MQ_EXPORT mq_i32 mq_gl_draw_alias_ray_shadow(
         memcpy(&signed_count, data + offset, 4u);
         offset += 4u;
         if (signed_count == 0) break;
+        if (signed_count == (-2147483647 - 1)) break;
         count = signed_count < 0 ? (mq_u32)(-signed_count) : (mq_u32)signed_count;
         if (count > MQ_SHADOW_ALIAS_COMMAND_MAX || offset + count * 12u > byte_count) break;
         for (index = 0u; index < count; ++index) {
@@ -4350,15 +4409,30 @@ MQ_EXPORT mq_i32 mq_gl_draw_alias_ray_shadow(
                 mq_shadow_alias_edge_compatible(first, second) &&
                 mq_shadow_alias_edge_compatible(second, third) &&
                 mq_shadow_alias_edge_compatible(third, first)) {
-                mq_gl_vertex3(mq_float_to_bits(mq_shadow_alias_projected[first][0]), mq_float_to_bits(mq_shadow_alias_projected[first][1]), mq_float_to_bits(mq_shadow_alias_projected[first][2]));
-                mq_gl_vertex3(mq_float_to_bits(mq_shadow_alias_projected[second][0]), mq_float_to_bits(mq_shadow_alias_projected[second][1]), mq_float_to_bits(mq_shadow_alias_projected[second][2]));
-                mq_gl_vertex3(mq_float_to_bits(mq_shadow_alias_projected[third][0]), mq_float_to_bits(mq_shadow_alias_projected[third][1]), mq_float_to_bits(mq_shadow_alias_projected[third][2]));
-                ++drawn;
+                mq_u32 slots[3] = {first, second, third};
+                mq_u32 corner;
+                if (draw_vertex_count == MQ_SHADOW_DRAW_VERTICES) {
+                    if (!mq_shadow_submit_vertices(draw_vertex_count)) return drawn;
+                    drawn += (mq_i32)(draw_vertex_count / 3u);
+                    draw_vertex_count = 0u;
+                }
+                for (corner = 0u; corner < 3u; ++corner) {
+                    mq_u32 output = draw_vertex_count * 5u;
+                    mq_u32 slot = slots[corner];
+                    mq_shadow_draw_vertices[output] = 0.0f;
+                    mq_shadow_draw_vertices[output + 1u] = 0.0f;
+                    mq_shadow_draw_vertices[output + 2u] = mq_shadow_alias_projected[slot][0];
+                    mq_shadow_draw_vertices[output + 3u] = mq_shadow_alias_projected[slot][1];
+                    mq_shadow_draw_vertices[output + 4u] = mq_shadow_alias_projected[slot][2];
+                    draw_vertex_count += 1u;
+                }
             }
         }
         offset += count * 12u;
     }
-    mq_gl_end();
+    if (draw_vertex_count > 0u && mq_shadow_submit_vertices(draw_vertex_count)) {
+        drawn += (mq_i32)(draw_vertex_count / 3u);
+    }
     return drawn;
 }
 /* Update the current immediate-mode texture coordinates. */
@@ -4615,6 +4689,7 @@ static mq_i32 mq_alias_stream_valid(const mq_u8 *data, mq_u32 byte_count) {
         mq_u32 count;
         offset += 4u;
         if (signed_count == 0) return 1;
+        if (signed_count == (-2147483647 - 1)) return 0;
         count = signed_count < 0 ? (mq_u32)(-signed_count) : (mq_u32)signed_count;
         if (count > (byte_count - offset) / 12u) return 0;
         offset += count * 12u;
@@ -4657,6 +4732,7 @@ static mq_i32 mq_alias_build_triangles(
             *triangle_count_out = triangle_count;
             return output_count > 0u;
         }
+        if (signed_count == (-2147483647 - 1)) return 0;
         count = signed_count < 0 ? (mq_u32)(-signed_count) : (mq_u32)signed_count;
         if (count < 3u || count > MQ_ALIAS_COMMAND_VERTICES ||
             count > (byte_count - offset) / 12u ||
@@ -4997,6 +5073,7 @@ MQ_EXPORT mq_i32 mq_gl_draw_alias_batch(
         mq_u32 mode;
         offset += 4u;
         if (signed_count == 0) break;
+        if (signed_count == (-2147483647 - 1)) return triangles;
         count = signed_count < 0 ? (mq_u32)(-signed_count) : (mq_u32)signed_count;
         mode = signed_count < 0 ? 0x0006u : 0x0005u; /* GL_TRIANGLE_FAN/STRIP */
         if (count > (byte_count - offset) / 12u) return triangles;

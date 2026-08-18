@@ -655,13 +655,30 @@ function VID_Build15To8(state)
   return state.table15
 end function
 
+// Report whether the complete lookup-table palette is already installed.
+// SCR_BringDownConsole restores the base palette during every level change;
+// rebuilding the 8.4-million-comparison 15-to-8 table for identical bytes is
+// observable only as a loading hitch, never as a changed rendering result.
+function VID_PaletteMatches(state, palette)
+  if len(state.palette) < 768 or len(state.table16) != 256 or len(state.table24) != 256 then return false end if
+  index = 0
+  while index < 768
+    if state.palette[index] != palette[index] then return false end if
+    index = index + 1
+  end while
+  return true
+end function
+
 // Apply the Quake-compatible vid set palette behavior.
 function VID_SetPalette(palette)
   state = VID_State()
   if palette is void or len(palette) < 768 then return error(3908, "VID_SetPalette: invalid palette") end if
+  if VID_PaletteMatches(state, palette) then return true end if
   state.palette = bytes(768)
-  state.table16 = []
-  state.table24 = []
+  // These tables have fixed source-defined sizes. Allocate them once instead
+  // of growing 256 intermediate MiniLang arrays through concatenation.
+  state.table16 = array(256, 0)
+  state.table24 = array(256, 0)
   index = 0
   while index < 256
     red = palette[index * 3]
@@ -670,8 +687,8 @@ function VID_SetPalette(palette)
     state.palette[index * 3] = red
     state.palette[index * 3 + 1] = green
     state.palette[index * 3 + 2] = blue
-    state.table16 = state.table16 + [((red >> 3) << 11) | ((green >> 2) << 5) | (blue >> 3)]
-    state.table24 = state.table24 + [(255 << 24) | red | (green << 8) | (blue << 16)]
+    state.table16[index] = ((red >> 3) << 11) | ((green >> 2) << 5) | (blue >> 3)
+    state.table24[index] = (255 << 24) | red | (green << 8) | (blue << 16)
     index = index + 1
   end while
   state.table24[255] = state.table24[255] & 0xffffff

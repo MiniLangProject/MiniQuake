@@ -191,6 +191,15 @@ function testRayShadowOcclusion()
   return true
 end function
 
+// Verify that neighboring caster vertices cannot bridge a receiver-height
+// discontinuity into a long translucent triangle at a crate or pickup edge.
+function testRayShadowReceiverContinuity()
+  require(rayShadow.receiverEdgeContinuity(16.0, 18.0, 15.0), "continuous floor receiver remains connected")
+  require(not rayShadow.receiverEdgeContinuity(16.0, 66.0, 64.0), "ledge discontinuity rejects stretched shadow edge")
+  require(not rayShadow.receiverEdgeContinuity(4.0, 80.0, 2.0), "excessive projected stretch rejects thin line")
+  return true
+end function
+
 // Verify frame selection against the expected Quake behavior.
 function testFrameSelection()
   source = aliasSource("progs/fixture.mdl")
@@ -482,20 +491,22 @@ end function
 
 // Parse command-line arguments and run the selected operation.
 function main(args)
+  testRayShadowReceiverContinuity()
+  print "[1/8] ray-shadow receiver-edge continuity"
   testFrameSelection()
-  print "[1/7] alias frame selection"
+  print "[2/8] alias frame selection"
   testAliasStateBranches()
-  print "[2/7] alias GL state / lighting branches"
+  print "[3/8] alias GL state / lighting branches"
   testOpaqueThenSpriteOrdering()
-  print "[3/7] opaque then sprite ordering"
+  print "[4/8] opaque then sprite ordering"
   testProductionProjectionDepth()
-  print "[4/7] production projection depth range"
+  print "[5/8] production projection depth range"
   testMeshTerminationAndCacheBranches()
-  print "[5/7] mesh termination and cache branches"
+  print "[6/8] mesh termination and cache branches"
   testExternalBrushDrawPath()
-  print "[6/7] external BSP pickup draw path"
+  print "[7/8] external BSP pickup draw path"
   testRayShadowOcclusion()
-  print "[7/7] ray-shadow wall receiver and occlusion"
+  print "[8/8] ray-shadow wall receiver and occlusion"
   print "Alias renderer port tests passed."
   return 0
 end function

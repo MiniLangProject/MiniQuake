@@ -1081,7 +1081,7 @@ void mq_vulkan_gen_textures(mq_i32 count, void *texture_ids) {
     }
 }
 /* Release resources owned by delete textures. */
-void mq_vulkan_delete_textures(mq_i32 count, const void *texture_ids) { const mq_u32 *ids=(const mq_u32*)texture_ids; mq_i32 i; if(ids==MQ_NULL)return; for(i=0;i<count;++i) if(ids[i]>0u&&ids[i]<MQ_VK_MAX_TEXTURES) { mq_vk_texture_t *entry=&mq_vk_textures[ids[i]]; VkDescriptorSet descriptor=entry->descriptor; mq_vk_destroy_texture(entry); entry->descriptor=descriptor; if(ids[i]<mq_vk_next_texture)mq_vk_next_texture=ids[i]; } }
+void mq_vulkan_delete_textures(mq_i32 count, const void *texture_ids) { const mq_u32 *ids=(const mq_u32*)texture_ids; mq_i32 i; if(ids==MQ_NULL||count<=0)return; for(i=0;i<count;++i) if(ids[i]>0u&&ids[i]<MQ_VK_MAX_TEXTURES) { mq_vk_texture_t *entry=&mq_vk_textures[ids[i]]; VkDescriptorSet descriptor=entry->descriptor; mq_vk_destroy_texture(entry); entry->descriptor=descriptor; if(mq_vk_bound_texture==ids[i])mq_vk_bound_texture=0u; if(ids[i]<mq_vk_next_texture)mq_vk_next_texture=ids[i]; } }
 /* Update fixed-function texture sampling state. */
 void mq_vulkan_tex_parameter_i(mq_u32 target, mq_u32 name, mq_i32 value) { mq_vk_texture_t *texture; (void)target; if(mq_vk_bound_texture>=MQ_VK_MAX_TEXTURES)return; texture=mq_vk_bound_texture==0u?&mq_vk_white_texture:&mq_vk_textures[mq_vk_bound_texture]; if(name==MQ_GL_TEXTURE_MIN_FILTER)texture->min_filter=value;else if(name==MQ_GL_TEXTURE_MAG_FILTER)texture->mag_filter=value;else if(name==MQ_GL_TEXTURE_WRAP_S)texture->wrap_s=value;else if(name==MQ_GL_TEXTURE_WRAP_T)texture->wrap_t=value; if(texture->view!=VK_NULL_HANDLE){mq_vk_sampler(texture);mq_vk_update_descriptor(texture);} }
 /* Update fixed-function texture sampling state. */

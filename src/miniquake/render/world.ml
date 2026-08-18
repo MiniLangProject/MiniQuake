@@ -1517,7 +1517,7 @@ function compatEmptyPlane()
 end function
 
 // Provide compat abs behavior for the active subsystem.
-function compatAbs(value)
+function inline compatAbs(value)
   if value < 0.0 then return -value end if
   return value
 end function

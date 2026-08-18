@@ -41,7 +41,9 @@ end function
 
 // Return backend name derived from the active module state.
 function backendName()
-  if native.renderBackend() == 1 then return "Direct3D 9" end if
+  backend = native.renderBackend()
+  if backend == 1 then return "Direct3D 9" end if
+  if backend == 2 then return "Vulkan" end if
   return "OpenGL"
 end function
 
@@ -385,12 +387,14 @@ end function
 
 // Release or remove state for texture.
 function deleteTexture(texture)
+  global boundTextureName
   ids = bytes(4)
   ids[0] = texture & 255
   ids[1] = (texture >> 8) & 255
   ids[2] = (texture >> 16) & 255
   ids[3] = (texture >> 24) & 255
   native.glDeleteTextures(1, ids)
+  if boundTextureName == texture then boundTextureName = -1 end if
 end function
 
 // Provide texture parameter behavior for the active subsystem.

@@ -239,7 +239,7 @@ function uploadIndexedTexture(width, height, pixels, palette, transparent)
 end function
 
 // Provide translated player texture behavior for the active subsystem.
-function translatedPlayerTexture(entityNumber)
+function inline translatedPlayerTexture(entityNumber)
   if entityNumber < 0 or entityNumber >= len(translatedPlayerTextures) then return 0 end if
   return translatedPlayerTextures[entityNumber]
 end function
@@ -593,7 +593,11 @@ end function
 
 // Render alias.
 function drawAlias(renderer, model, entity, time, viewModel, enhancedOverlay)
-  uploadAlias(renderer, model)
+  // Close the preceding model's optional shadow tail before measuring this
+  // model's lazy upload.  Without this diagnostic-only boundary the profiler
+  // mislabeled ray projection as repeated texture upload work.
+  optBaseline.checkpoint("alias_native")
+  if not model.uploaded then uploadAlias(renderer, model) end if
   optBaseline.checkpoint("alias_upload")
   source = model.aliasModel
   frame = aliasFrame(source, entity.frame, time)
@@ -703,6 +707,10 @@ function drawAlias(renderer, model, entity, time, viewModel, enhancedOverlay)
     gl.color(255, 255, 255, 255)
     gl.popMatrix()
   end if
+  // Attribute the complete native draw/shadow tail before the next alias model
+  // reaches its upload checkpoint.  Normal gameplay profiling is disabled, so
+  // these boundaries have no release-frame cost.
+  optBaseline.checkpoint("alias_native")
   return drawn
 end function
 

@@ -77,19 +77,46 @@ function testProjectileSnapshotPriority()
   rocket.modelIndex = 3
   rocket.moveType = c.MOVETYPE_FLYMISSILE
   rocket.origin = t.Vec3(128.0, 64.0, 32.0)
+  // Deliberately place the projectile in a leaf absent from the supplied PVS.
+  // Fast portal crossings must not hide a short-lived projectile for every
+  // snapshot of its flight.
+  rocket.leafNums = [2]
   entities = entities + [rocket]
+  grenade = edict.create(71)
+  grenade.model = "progs/grenade.mdl"
+  grenade.modelIndex = 4
+  grenade.moveType = c.MOVETYPE_BOUNCE
+  grenade.origin = t.Vec3(144.0, 72.0, 36.0)
+  grenade.leafNums = [2]
+  entities = entities + [grenade]
   gameServer.edicts = entities
   gameServer.numEdicts = len(entities)
+
+  minimum = t.Vec3(-256.0, -256.0, -256.0)
+  maximum = t.Vec3(256.0, 256.0, 256.0)
+  plane = t.BspPlane(t.Vec3(1.0, 0.0, 0.0), 0.0, 0)
+  node = t.BspNode(0, -2, -3, minimum, maximum, 0, 0)
+  leaf0 = t.BspLeaf(c.CONTENTS_SOLID, -1, minimum, maximum, 0, 0, bytes(1))
+  leaf1 = t.BspLeaf(c.CONTENTS_EMPTY, 0, minimum, maximum, 0, 0, bytes(1))
+  leaf2 = t.BspLeaf(c.CONTENTS_EMPTY, 1, minimum, maximum, 0, 0, bytes(1))
+  worldModel = t.BspModel(minimum, maximum, t.Vec3(0.0, 0.0, 0.0), [0, 0, 0, 0], 2, 0, 0)
+  gameServer.worldModel = t.BspMap(
+    "projectile-pvs.bsp", bytes(), c.BSP_VERSION, [], "", [], [plane], [], [],
+    bytes([1, 2]), [node], [], [], bytes(), [], [leaf0, leaf1, leaf2], [], [], [], [worldModel],
+  )
+  assertFalse(server.entityVisible(gameServer, bytes([1]), rocket, 1), "rocket fixture starts outside PVS")
+  assertFalse(server.entityVisible(gameServer, bytes([1]), grenade, 1), "grenade fixture starts outside PVS")
 
   // A 64-byte fixture cannot contain every low-numbered filler. The planner
   // must nevertheless emit the player followed by the high-numbered rocket.
   buffer = sz.alloc(64)
-  written = server.writeVisibleEntityUpdatesReserved(gameServer, buffer, bytes(), 1, 0)
-  assertTrue(written >= 2, "dense snapshot writes player and projectile")
+  written = server.writeVisibleEntityUpdatesReserved(gameServer, buffer, bytes([1]), 1, 0)
+  assertTrue(written >= 3, "dense snapshot writes player and both projectiles")
   parsed = clientProtocol.CL_ParseServerMessage(sz.dataSlice(buffer))
-  assertTrue(len(parsed.events) >= 2, "dense snapshot has fast updates")
+  assertTrue(len(parsed.events) >= 3, "dense snapshot has fast updates")
   assertEqual(parsed.events[0].payload[0], 1, "player update is first")
   assertEqual(parsed.events[1].payload[0], 70, "rocket update precedes filler saturation")
+  assertEqual(parsed.events[2].payload[0], 71, "grenade update precedes filler saturation")
   return true
 end function
 

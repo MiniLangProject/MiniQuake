@@ -474,6 +474,9 @@ end function
 function NET_Slist_f(state, silent, localOnly, port)
   global networkState, slistInProgress, slistSilent, slistLocal, slistStartTime, hostCacheCount, hostcache, slistPort
   if slistInProgress then return false end if
+  // A prior search may have had its poll queue cancelled by a menu change.
+  // Start each discovery cycle with exactly one fresh control endpoint.
+  netloop.Datagram_EndHostSearch()
   networkState = state
   slistSilent = silent
   slistLocal = localOnly
@@ -493,7 +496,9 @@ function Slist_Send()
   global hostcache, hostCacheCount
   if not slistInProgress or networkState is void then return false end if
   localState = networkState
-  result = try(netloop.Datagram_SearchForHosts(localState, true, slistPort, 100))
+  // net_dgrm.c broadcasts and drains a non-blocking persistent control socket;
+  // replies are collected by Slist_Poll over the following 1.5 seconds.
+  result = try(netloop.Datagram_SearchForHosts(localState, true, slistPort, 0))
   remoteHosts = []
   if result is not error then remoteHosts = result end if
   hostcache = remoteHosts
@@ -504,7 +509,11 @@ function Slist_Send()
   // not suppress this result.
   if slistLocal and localState.mapName != "" then
     localHosts = netloop.Loop_SearchForHosts(localState, true, 0)
-    hostcache = localHosts + remoteHosts
+    localAlreadyPresent = false
+    for each discovered in remoteHosts
+      if len(discovered) > 0 and discovered[0] == "local" then localAlreadyPresent = true end if
+    end for
+    if not localAlreadyPresent then hostcache = localHosts + remoteHosts end if
   end if
   localState.hostCache = hostcache
   hostCacheCount = len(hostcache)
@@ -517,8 +526,14 @@ end function
 function Slist_Poll()
   global hostcache, hostCacheCount, slistInProgress, slistSilent, slistLocal
   if not slistInProgress or networkState is void then return false end if
+  localState = networkState
+  // Drain all replies that arrived since the preceding frame without waiting.
   // Datagram_SearchForHosts stores the accumulated cache on the driver state.
-  hostcache = networkState.hostCache
+  if localState.lanEnabled then
+    result = try(netloop.Datagram_SearchForHosts(localState, false, slistPort, 0))
+    if result is not error then localState.hostCache = result end if
+  end if
+  hostcache = localState.hostCache
   hostCacheCount = len(hostcache)
   if SetNetTime() - slistStartTime < 1.5 then
     SchedulePollProcedure("slist_poll", 0.1, void)
@@ -527,6 +542,7 @@ function Slist_Poll()
   slistInProgress = false
   slistSilent = false
   slistLocal = true
+  netloop.Datagram_EndHostSearch()
   return false
 end function
 

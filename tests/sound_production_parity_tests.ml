@@ -193,6 +193,32 @@ function testLoopBoundaryPcmAndQueueTiming()
   audible = mixer.mix(inaudible, 1)
   assertEqual(bio.i16(audible, 0), 996, "channel resumes from start until absolute end")
   assertEqual(len(inaudible.channels), 0, "absolute channel end expires")
+
+  clipped = mixer.create(void, 22050)
+  clipped.enabled = true
+  clipped.masterVolume = 1.0
+  clipped.listenerEntity = 1
+  clippedEffect = makeEffect("clip.wav", [32767, -32768], -1)
+  clipped.channels = [makeChannel(1, 1, clippedEffect, 0, 2.0)]
+  clippedOutput = mixer.mix(clipped, 2)
+  assertEqual(bio.i16(clippedOutput, 0), 32767, "flattened PCM transfer clamps positive")
+  assertEqual(bio.i16(clippedOutput, 4), -32768, "flattened PCM transfer clamps negative")
+
+  music = mixer.create(void, 22050)
+  music.enabled = true
+  music.masterVolume = 1.0
+  music.musicVolume = 1.0
+  musicSamples = bytes(8)
+  bio.putI16(musicSamples, 0, 1000)
+  bio.putI16(musicSamples, 2, -2000)
+  bio.putI16(musicSamples, 4, -3000)
+  bio.putI16(musicSamples, 6, 4000)
+  music.music = t.MusicTrack(2, bytes(), musicSamples, 22050, 2, 2, 0, false, true, false, 0, 2)
+  musicOutput = mixer.mix(music, 2)
+  assertEqual(bio.i16(musicOutput, 0), 1000, "flattened music decode reads stereo left")
+  assertEqual(bio.i16(musicOutput, 2), -2000, "flattened music decode reads stereo right")
+  assertEqual(bio.i16(musicOutput, 4), -3000, "flattened music decode preserves signed left")
+  assertEqual(bio.i16(musicOutput, 6), 4000, "flattened music decode preserves signed right")
   return true
 end function
 

@@ -73,12 +73,30 @@ def main() -> int:
     d3d_read = function_body(d3d9, "mq_d3d9_read_pixels")
     require("memset(pixels, 0" in d3d_read, "D3D9 readback can expose uninitialized clipped pixels", errors)
 
+    d3d_delete = function_body(d3d9, "mq_d3d9_delete_textures")
+    require("id < mq_d3d_next_texture" in d3d_delete, "D3D9 texture identifiers are not reused after deletion", errors)
+    require("id > 0u" in d3d_delete, "D3D9 incorrectly deletes reserved texture identifier zero", errors)
+
+    vk_delete = function_body(vulkan, "mq_vulkan_delete_textures")
+    require("mq_vk_bound_texture==ids[i]" in vk_delete, "Vulkan keeps a deleted texture bound", errors)
+
+    native = (root / "native" / "miniquake_native.c").read_text(encoding="utf-8-sig")
+    shadow_edge = function_body(native, "mq_shadow_alias_edge_compatible")
+    require("mq_shadow_alias_travel" in shadow_edge, "native alias shadows do not reject receiver travel discontinuities", errors)
+    require("source_length * 3.0f + 24.0f" in shadow_edge, "native alias-shadow projected stretch differs from MiniLang policy", errors)
+    require("source_length * 1.5f + 12.0f" in shadow_edge, "native alias-shadow receiver continuity differs from MiniLang policy", errors)
+    shadow_trace = function_body(native, "mq_shadow_trace_one")
+    require("inverse_direction[axis] =" in shadow_trace, "shadow BVH repeats reciprocal work for every visited node", errors)
+    require(native.count("signed_count == (-2147483647 - 1)") >= 4, "an alias command parser can overflow while negating INT_MIN", errors)
+    alias_shadow = function_body(native, "mq_gl_draw_alias_ray_shadow")
+    require("mq_shadow_submit_vertices" in alias_shadow and "mq_gl_vertex3" not in alias_shadow, "alias shadows still replay every vertex through immediate mode", errors)
+
     if errors:
         print("native renderer safety tests: FAIL")
         for error in errors:
             print("  " + error)
         return 1
-    print("native renderer safety tests: PASS (15 invariants)")
+    print("native renderer safety tests: PASS (24 invariants)")
     return 0
 
 

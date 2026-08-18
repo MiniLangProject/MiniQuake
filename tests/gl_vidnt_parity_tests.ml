@@ -255,6 +255,24 @@ function testPaletteTables()
   assertEqual(state.table24[0], 255 << 24, "opaque black packing")
   assertEqual(state.table24[255], 0xffffff, "palette index 255 transparent")
   assertEqual(state.table15[0], 4, "15-bit nearest palette lookup")
+  table16Storage = nativeRawValue(state.table16)
+  table24Storage = nativeRawValue(state.table24)
+  table15Storage = nativeRawValue(state.table15)
+  video.VID_SetPalette(palette)
+  assertEqual(nativeRawValue(state.table16), table16Storage, "identical palette reuses 8-to-16 table")
+  assertEqual(nativeRawValue(state.table24), table24Storage, "identical palette reuses 8-to-24 table")
+  assertEqual(nativeRawValue(state.table15), table15Storage, "identical palette reuses 15-to-8 table")
+  state.palette = bytes(0)
+  assertEqual(video.VID_PaletteMatches(state, palette), false, "short installed palette cannot match")
+  changed = bytes(768)
+  index = 0
+  while index < len(palette)
+    changed[index] = palette[index]
+    index = index + 1
+  end while
+  changed[0] = 255
+  video.VID_SetPalette(changed)
+  assertEqual(state.table24[0], (255 << 24) | 255, "changed palette rebuilds lookup tables")
   return true
 end function
 

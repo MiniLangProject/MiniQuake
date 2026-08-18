@@ -794,7 +794,12 @@ function mixChannelWithStereoVolumes(mixer, channel, accumulator, frameCount, le
       end while
     else
       while frame < count
-        sample = bio.i16(channel.effect.samples, (channel.sample + frame) * 2)
+        // The cache loader already validates the complete 16-bit sample
+        // range. Decode directly here so the real-time inner loop does not
+        // call byteio's generic type/range validator for every PCM sample.
+        sampleOffset = (channel.sample + frame) * 2
+        sample = channel.effect.samples[sampleOffset] | (channel.effect.samples[sampleOffset + 1] << 8)
+        if sample >= 0x8000 then sample = sample - 0x10000 end if
         accumulator[frame * 2] = accumulator[frame * 2] + ((sample * leftVolumeValue) >> 8)
         accumulator[frame * 2 + 1] = accumulator[frame * 2 + 1] + ((sample * rightVolumeValue) >> 8)
         frame = frame + 1
@@ -930,8 +935,24 @@ function mixIntoOutput(mixer, frameCount, output)
   if len(output) < frameCount * 4 then output = bytes(frameCount * 4) end if
   frame = 0
   while frame < frameCount
-    bio.putI16(output, frame * 4, clampSample(accumulator[frame * 2]))
-    bio.putI16(output, frame * 4 + 2, clampSample(accumulator[frame * 2 + 1]))
+    // Flatten clamp and little-endian transfer into the hot loop. The output
+    // size was checked above, so byteio's per-sample range validation would be
+    // redundant for all 1,024 writes in a normal stereo paint block.
+    leftSample = accumulator[frame * 2]
+    if leftSample > 32767 then leftSample = 32767
+    else if leftSample < -32768 then leftSample = -32768
+    else leftSample = native.trunc(leftSample)
+    end if
+    rightSample = accumulator[frame * 2 + 1]
+    if rightSample > 32767 then rightSample = 32767
+    else if rightSample < -32768 then rightSample = -32768
+    else rightSample = native.trunc(rightSample)
+    end if
+    outputOffset = frame * 4
+    output[outputOffset] = leftSample & 255
+    output[outputOffset + 1] = (leftSample >> 8) & 255
+    output[outputOffset + 2] = rightSample & 255
+    output[outputOffset + 3] = (rightSample >> 8) & 255
     frame = frame + 1
   end while
   return output
@@ -989,11 +1010,16 @@ function mixMusic(mixer, accumulator, frameCount)
     left = 0
     right = 0
     if track.channels == 1 then
-      left = bio.i16(track.samples, chunkFrame * 2)
+      sampleOffset = chunkFrame * 2
+      left = track.samples[sampleOffset] | (track.samples[sampleOffset + 1] << 8)
+      if left >= 0x8000 then left = left - 0x10000 end if
       right = left
     else
-      left = bio.i16(track.samples, chunkFrame * 4)
-      right = bio.i16(track.samples, chunkFrame * 4 + 2)
+      sampleOffset = chunkFrame * 4
+      left = track.samples[sampleOffset] | (track.samples[sampleOffset + 1] << 8)
+      right = track.samples[sampleOffset + 2] | (track.samples[sampleOffset + 3] << 8)
+      if left >= 0x8000 then left = left - 0x10000 end if
+      if right >= 0x8000 then right = right - 0x10000 end if
     end if
     accumulator[frame * 2] = accumulator[frame * 2] + left * mixer.musicVolume
     accumulator[frame * 2 + 1] = accumulator[frame * 2 + 1] + right * mixer.musicVolume

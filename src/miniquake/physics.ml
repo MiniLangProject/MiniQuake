@@ -1257,7 +1257,10 @@ end function
 
 // Apply the Quake-compatible sv physics follow behavior.
 function SV_Physics_Follow(server, entityIndex, frameTime)
-  SV_RunThink(server, entityIndex, frameTime)
+  // The QUAKE2-conditioned source body returns immediately when a scheduled
+  // think frees the follower.  Continuing here would repopulate the cleared
+  // origin from aiment/v_angle and leave stale state in a freed edict slot.
+  if not SV_RunThink(server, entityIndex, frameTime) then return false end if
   aimEntity = collision.entityWord(server, entityIndex, "aiment", 0)
   aimOrigin = collision.entityVectorZero(server, aimEntity, "origin")
   offset = collision.entityVectorZero(server, entityIndex, "v_angle")

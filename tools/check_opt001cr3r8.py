@@ -86,7 +86,7 @@ def main() -> int:
     ), "mixer")
     errors += marker_errors(world, (
         'if currentLeaf == renderer.viewLeaf and len(renderer.visibleFaces) == len(map.faces) then',
-        'return countVisibleFaces(renderer.visibleFaces)',
+        'visibleFaceCountValue = countVisibleFaces(renderer.visibleFaces)',
         'renderer.viewLeaf = -1',
     ), "world")
 
@@ -102,8 +102,8 @@ def main() -> int:
         errors.append(f"aggressive scalar inline budget too small: {inline_functions} < 20")
 
     errors += marker_errors(hotpath_test, (
-        'opt001dPassed = 0',
-        'function opt001dCheck(condition, label)',
+        'opt001cr3r8Passed = 0',
+        'function opt001cr3r8Check(condition, label)',
         'buildInfo.OPTIMIZATION_DELIVERY_REVISION == "OPT-001D"',
         'buildInfo.OPTIMIZATION_STATUS == "opt001d_performance_audio_ui_candidate_v1"',
         'video.VID_WindowTitleForFps(-10) == "MiniQuake - 0 FPS"',

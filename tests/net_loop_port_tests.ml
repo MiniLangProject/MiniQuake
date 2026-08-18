@@ -167,23 +167,48 @@ function testParallelRemoteIsolation()
   return true
 end function
 
+// Verify that LAN discovery reuses one non-blocking control socket across the
+// send/poll phases instead of opening, waiting and closing inside one frame.
+function testPersistentHostSearchLifecycle()
+  state = loopPort.createState()
+  loopRequire(loopPort.Datagram_Init(state, false) == 0, "datagram discovery enabled")
+  // NET_Slist_f owns cache reset. Repeated discovery broadcasts must retain
+  // replies already collected during the same 1.5-second search window.
+  retained = [["192.0.2.1:26000", "Retained", "start", 1, 4]]
+  state.hostCache = retained
+  first = try(loopPort.Datagram_SearchForHosts(state, true, 65534, 0))
+  loopRequire(first is not error, "non-blocking discovery broadcast")
+  loopRequire(len(first) >= 1 and first[0][1] == "Retained", "broadcast retains prior replies")
+  loopRequire(loopPort.Datagram_HostSearchActive(), "discovery socket persists after broadcast")
+  second = try(loopPort.Datagram_SearchForHosts(state, false, 65534, 0))
+  loopRequire(second is not error, "non-blocking discovery reply poll")
+  loopRequire(loopPort.Datagram_HostSearchActive(), "discovery socket persists across poll")
+  loopRequire(loopPort.Datagram_EndHostSearch(), "discovery socket closes explicitly")
+  loopRequire(not loopPort.Datagram_HostSearchActive(), "discovery socket is released")
+  loopPort.Datagram_Shutdown(state)
+  return true
+end function
+
 // Parse command-line arguments and run the selected operation.
 function main(args)
-  print "[1/5] init, search and IntAlign"
+  print "[1/6] init, search and IntAlign"
   result = try(testInitSearchAndAlignment())
   if result is error then print "init/search/alignment failed"; return 1 end if
-  print "[2/5] connection and message order"
+  print "[2/6] connection and message order"
   result = try(testConnectionAndMessageOrder())
   if result is error then print "connection/message failed"; return 1 end if
-  print "[3/5] capacity, close and reconnect"
+  print "[3/6] capacity, close and reconnect"
   result = try(testCapacityCloseAndReconnect())
   if result is error then print "capacity/close/reconnect failed"; return 1 end if
-  print "[4/5] datagram reconnect classification"
+  print "[4/6] datagram reconnect classification"
   result = try(testDatagramReconnectClassification())
   if result is error then print "datagram reconnect classification failed"; return 1 end if
-  print "[5/5] parallel remote sequence isolation"
+  print "[5/6] parallel remote sequence isolation"
   result = try(testParallelRemoteIsolation())
   if result is error then print "parallel remote isolation failed"; return 1 end if
-  print "NET_LOOP PORT TESTS PASSED (5/5)"
+  print "[6/6] persistent non-blocking host search"
+  result = try(testPersistentHostSearchLifecycle())
+  if result is error then print "persistent host search failed"; return 1 end if
+  print "NET_LOOP PORT TESTS PASSED (6/6)"
   return 0
 end function

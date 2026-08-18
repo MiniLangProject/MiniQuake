@@ -474,7 +474,7 @@ function SV_WriteEntitiesToClientReserved(state, clientEntity, buffer, reservedB
     item = state.server.edicts[index]
     if index != clientIndex and item is not void and not item.free and
       runtime.entityIsPriorityProjectile(item) and
-      svmEntityVisible(state, item, clientIndex, pvs) then
+      item.modelIndex != 0 and item.model != "" then
       bits = svmEntityBits(item)
       if not protocolUpdate.canWriteWithReservedTail(buffer, bits, reservedBytes) then
         state.diagnostics = state.diagnostics + ["packet overflow during projectile updates"]

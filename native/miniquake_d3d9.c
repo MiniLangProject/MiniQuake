@@ -1258,10 +1258,11 @@ void mq_d3d9_delete_textures(mq_i32 count, const void *texture_ids) {
     if (ids == MQ_NULL || count <= 0) return;
     for (index = 0; index < count; ++index) {
         mq_u32 id = ids[index];
-        if (id < MQ_D3D_MAX_TEXTURES) {
+        if (id > 0u && id < MQ_D3D_MAX_TEXTURES) {
             if (mq_d3d_textures[id].object != MQ_NULL) mq_d3d_release(&mq_d3d_textures[id].object);
             memset(&mq_d3d_textures[id], 0, sizeof(mq_d3d_textures[id]));
             if (mq_d3d_bound_texture == id) { mq_d3d_bound_texture = 0u; mq_d3d_apply_bound_texture(); }
+            if (id > 0u && id < mq_d3d_next_texture) mq_d3d_next_texture = id;
         }
     }
 }

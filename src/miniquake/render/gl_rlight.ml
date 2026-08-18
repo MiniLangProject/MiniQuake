@@ -257,7 +257,7 @@ fastLightPlane = void
 fastLightHit = false
 
 // Provide fast plane distance behavior for the active subsystem.
-function fastPlaneDistance(plane, x, y, z)
+function inline fastPlaneDistance(plane, x, y, z)
   if plane.type == 0 then return x - plane.dist end if
   if plane.type == 1 then return y - plane.dist end if
   if plane.type == 2 then return z - plane.dist end if

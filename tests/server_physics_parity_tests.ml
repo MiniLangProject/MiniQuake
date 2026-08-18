@@ -304,6 +304,19 @@ function testStrictQuakeOneDispatch()
   followResult = try(physics.SV_Physics(game, 0.1, 800.0, 2000.0))
   physAssertTrue(followResult is error, "MOVETYPE_FOLLOW rejected by Quake 1")
 
+  // The dormant QUAKE2 pendant remains callable for source completeness. Its
+  // SV_RunThink early return is still significant: remove(self) must leave the
+  // freed edict cleared instead of restoring origin from aiment + v_angle.
+  vm.setEntityFloat(machine, 2, 23, 10.05)
+  vm.setEntityField(machine, 2, 24, 4)
+  followThinkResult = physics.SV_Physics_Follow(game, 2, 0.1)
+  physAssertEqual(followThinkResult, false, "freed follower stops physics")
+  physAssertTrue(machine.edictFree[2], "follow think frees self")
+  freedFollowOrigin = vm.entityVector(machine, 2, 1)
+  physAssertNear(freedFollowOrigin.x, 0.0, "freed follower x remains cleared")
+  physAssertNear(freedFollowOrigin.y, 0.0, "freed follower y remains cleared")
+  physAssertNear(freedFollowOrigin.z, 0.0, "freed follower z remains cleared")
+
   game = makePhysicsFixture(4)
   machine = game.machine
   game.worldModel = makePhysicsMap(c.CONTENTS_EMPTY)

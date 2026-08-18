@@ -52,6 +52,7 @@ projectionZ = array(INITIAL_VERTEX_CACHE, 0.0)
 projectionNormalX = array(INITIAL_VERTEX_CACHE, 0.0)
 projectionNormalY = array(INITIAL_VERTEX_CACHE, 0.0)
 projectionNormalZ = array(INITIAL_VERTEX_CACHE, 1.0)
+projectionTravel = array(INITIAL_VERTEX_CACHE, 0.0)
 sourceX = array(INITIAL_VERTEX_CACHE, 0.0)
 sourceY = array(INITIAL_VERTEX_CACHE, 0.0)
 sourceZ = array(INITIAL_VERTEX_CACHE, 0.0)
@@ -69,6 +70,7 @@ worldTrianglePacket = bytes()
 function ensureVertexCapacity(index)
   global projectionStamp, projectionValid, projectionX, projectionY, projectionZ
   global projectionNormalX, projectionNormalY, projectionNormalZ
+  global projectionTravel
   global sourceX, sourceY, sourceZ
   global minimumHitFraction, rayPreparedValid, rayPacket, hitPacket
   if index < len(projectionStamp) then return true end if
@@ -85,6 +87,7 @@ function ensureVertexCapacity(index)
   projectionNormalX = array(size, 0.0)
   projectionNormalY = array(size, 0.0)
   projectionNormalZ = array(size, 1.0)
+  projectionTravel = array(size, 0.0)
   sourceX = array(size, 0.0)
   sourceY = array(size, 0.0)
   sourceZ = array(size, 0.0)
@@ -319,6 +322,7 @@ end function
 function acceptProjection(index, hit, fraction, hitX, hitY, hitZ, normalX, normalY, normalZ)
   global projectionValid, projectionX, projectionY, projectionZ
   global projectionNormalX, projectionNormalY, projectionNormalZ
+  global projectionTravel
   if not hit or not rayPreparedValid[index] then return false end if
   if fraction <= minimumHitFraction[index] then return false end if
   // A near point light can otherwise magnify individual MDL triangles across
@@ -331,6 +335,10 @@ function acceptProjection(index, hit, fraction, hitX, hitY, hitZ, normalX, norma
   projectionNormalX[index] = normalX
   projectionNormalY[index] = normalY
   projectionNormalZ[index] = normalZ
+  travelX = hitX - sourceX[index]
+  travelY = hitY - sourceY[index]
+  travelZ = hitZ - sourceZ[index]
+  projectionTravel[index] = native.sqrt(travelX * travelX + travelY * travelY + travelZ * travelZ)
   projectionValid[index] = true
   return true
 end function
@@ -418,6 +426,15 @@ function projectVertex(index, packedX, packedY, packedZ)
   return projectionValid[index]
 end function
 
+// Reject receiver discontinuities before the rasterizer interpolates a source
+// edge across empty space.  The allowance scales with the caster edge so a
+// normal slope remains intact, while an adjacent ledge/floor pair cannot form
+// the long translucent triangles previously visible around crate corners.
+function inline receiverEdgeContinuity(sourceLength, projectedLength, travelDifference)
+  if projectedLength > sourceLength * 3.0 + 24.0 then return false end if
+  return travelDifference <= sourceLength * 1.5 + 12.0
+end function
+
 // Test one projected edge for a compatible receiver plane and bounded stretch.
 function receiverEdgeCompatible(left, right)
   normalDot = projectionNormalX[left] * projectionNormalX[right] + projectionNormalY[left] * projectionNormalY[right] + projectionNormalZ[left] * projectionNormalZ[right]
@@ -430,7 +447,9 @@ function receiverEdgeCompatible(left, right)
   projectedDeltaY = projectionY[left] - projectionY[right]
   projectedDeltaZ = projectionZ[left] - projectionZ[right]
   projectedLength = native.sqrt(projectedDeltaX * projectedDeltaX + projectedDeltaY * projectedDeltaY + projectedDeltaZ * projectedDeltaZ)
-  return projectedLength <= sourceLength * 6.0 + 96.0
+  travelDifference = projectionTravel[left] - projectionTravel[right]
+  if travelDifference < 0.0 then travelDifference = -travelDifference end if
+  return receiverEdgeContinuity(sourceLength, projectedLength, travelDifference)
 end function
 
 // Reject a triangle whose rays land across an abrupt BSP corner or stretch far
@@ -444,26 +463,26 @@ function receiverTriangleCompatible(first, second, third)
 end function
 
 // Return one cached projected x coordinate.
-function projectedPointX(index)
+function inline projectedPointX(index)
   return projectionX[index]
 end function
 
 // Return one cached projected y coordinate.
-function projectedPointY(index)
+function inline projectedPointY(index)
   return projectionY[index]
 end function
 
 // Return one cached projected z coordinate.
-function projectedPointZ(index)
+function inline projectedPointZ(index)
   return projectionZ[index]
 end function
 
 // Report whether one vertex reached a compatible receiver in this sample.
-function projectedPointValid(index)
+function inline projectedPointValid(index)
   return index >= 0 and index < len(projectionValid) and projectionStamp[index] == projectionGeneration and projectionValid[index]
 end function
 
 // Report whether the current caster has a valid render-BSP context.
-function isReady()
+function inline isReady()
   return ready
 end function
