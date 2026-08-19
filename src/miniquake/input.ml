@@ -106,6 +106,16 @@ buttonCommandNames = [
   "+moveright", "+speed", "+strafe", "+attack", "+use", "+jump",
 ]
 
+// Keep the matching kbutton references beside the canonical names. The live
+// poll visits every command once per frame, so resolving the same 17 constant
+// strings through buttonForCommand would only allocate lowercase copies and
+// repeat its linear comparison chain.
+buttonCommandButtons = [
+  inKLook, inMLook, inUp, inDown, inLeft, inRight,
+  inForward, inBack, inLookup, inLookdown, inMoveleft,
+  inMoveright, inSpeed, inStrafe, inAttack, inUse, inJump,
+]
+
 // Create and initialize button.
 function createButton()
   return [0, 0, 0]
@@ -1043,13 +1053,16 @@ function IN_PollButtonCommands()
 
   // A binding can change while its key owns a kbutton.  Releasing stale owners
   // after the single poll retains the original two-key ownership behavior.
-  for each command in buttonCommandNames
-    button = buttonForCommand(command)
+  commandIndex = 0
+  while commandIndex < len(buttonCommandNames)
+    command = buttonCommandNames[commandIndex]
+    button = buttonCommandButtons[commandIndex]
     first = button[0]
     second = button[1]
     if first != 0 and not polledBindingHoldsKey(command, first, mouseButtons) then KeyUp(button, first) end if
     if second != 0 and not polledBindingHoldsKey(command, second, mouseButtons) then KeyUp(button, second) end if
-  end for
+    commandIndex = commandIndex + 1
+  end while
   return true
 end function
 

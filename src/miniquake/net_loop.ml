@@ -718,9 +718,15 @@ function sendMessage(socket, buffer)
   end if
   if socket.peer is void then return -1 end if
   payload = slice(buffer.data, 0, buffer.curSize)
-  if loopQueuedBytes(socket.peer) + len(payload) + 4 > LOOP_MAX_MESSAGE then return error(3437, "Loop_SendMessage: overflow") end if
-  socket.peer.messages = socket.peer.messages + [payload]
-  socket.peer.messageTypes = socket.peer.messageTypes + [1]
+  if len(socket.peer.messages) == 0 then
+    if len(payload) + 4 > LOOP_MAX_MESSAGE then return error(3437, "Loop_SendMessage: overflow") end if
+    socket.peer.messages = [payload]
+    socket.peer.messageTypes = [1]
+  else
+    if loopQueuedBytes(socket.peer) + len(payload) + 4 > LOOP_MAX_MESSAGE then return error(3437, "Loop_SendMessage: overflow") end if
+    socket.peer.messages = socket.peer.messages + [payload]
+    socket.peer.messageTypes = socket.peer.messageTypes + [1]
+  end if
   socket.canSend = false
   socket.lastSendTime = win.ticks() / 1000.0
   return 1
@@ -744,9 +750,15 @@ function sendUnreliableMessage(socket, buffer)
   payload = slice(buffer.data, 0, buffer.curSize)
   // net_loop.c tests byte+short overhead here (three bytes), although the
   // stored record is subsequently padded to a four-byte boundary.
-  if loopQueuedBytes(socket.peer) + len(payload) + 3 > LOOP_MAX_MESSAGE then return 0 end if
-  socket.peer.messages = socket.peer.messages + [payload]
-  socket.peer.messageTypes = socket.peer.messageTypes + [2]
+  if len(socket.peer.messages) == 0 then
+    if len(payload) + 3 > LOOP_MAX_MESSAGE then return 0 end if
+    socket.peer.messages = [payload]
+    socket.peer.messageTypes = [2]
+  else
+    if loopQueuedBytes(socket.peer) + len(payload) + 3 > LOOP_MAX_MESSAGE then return 0 end if
+    socket.peer.messages = socket.peer.messages + [payload]
+    socket.peer.messageTypes = socket.peer.messageTypes + [2]
+  end if
   socket.lastSendTime = win.ticks() / 1000.0
   return 1
 end function
@@ -772,8 +784,13 @@ function pumpRemote(socket)
       // loop, exactly like Datagram_GetMessage in net_dgrm.c.
       if result[3] is bytes then udp.send(socket.udp, socket.address, socket.port, result[3]) end if
       if result[0] > 0 then
-        socket.messages = socket.messages + [result[1]]
-        socket.messageTypes = socket.messageTypes + [result[0]]
+        if len(socket.messages) == 0 then
+          socket.messages = [result[1]]
+          socket.messageTypes = [result[0]]
+        else
+          socket.messages = socket.messages + [result[1]]
+          socket.messageTypes = socket.messageTypes + [result[0]]
+        end if
         processed = processed + 1
         socket.lastReceiveTime = now
       end if
@@ -798,11 +815,20 @@ function getMessage(socket, destination)
     pumped = pumpRemote(socket)
     if pumped is error then return -1 end if
   end if
-  if len(socket.messages) == 0 then return 0 end if
+  messageCount = len(socket.messages)
+  if messageCount == 0 then return 0 end if
   payload = socket.messages[0]
   messageType = socket.messageTypes[0]
-  socket.messages = arrayTail(socket.messages)
-  socket.messageTypes = arrayTail(socket.messageTypes)
+  // A host frame normally consumes the only queued packet. Avoid building and
+  // walking two temporary tail arrays for that overwhelmingly common case;
+  // retain arrayTail for bursts so ordering and queue semantics stay exact.
+  if messageCount == 1 then
+    socket.messages = []
+    socket.messageTypes = []
+  else
+    socket.messages = arrayTail(socket.messages)
+    socket.messageTypes = arrayTail(socket.messageTypes)
+  end if
   sz.clear(destination)
   sz.write(destination, payload, 0, len(payload))
   if messageType == 1 and socket.transport == "loop" and socket.peer is not void then socket.peer.canSend = true end if

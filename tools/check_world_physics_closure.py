@@ -59,6 +59,7 @@ DOWNSTREAM_SERVER_GC_ROOT_FUNCTIONS = (
     "synchronizedVectorTarget",
     "setSynchronizedVector",
     "syncQcVectorInto",
+    "syncQcVectorIntoAt",
     "resizeSynchronizedEdictArray",
     "ensureSynchronizedBaseline",
     "ensureSynchronizedEdict",
@@ -78,8 +79,10 @@ DOWNSTREAM_SERVER_ALLOWED_FUNCTIONS = (
 # section-bound host-command and stable QuakeC-mirror functions above.  The
 # remaining bytes include the later regression-tested player-state, projectile,
 # collision and telefrag fixes that superseded the historical BP-029 snapshot.
+# Each synchronized-vector helper is bound separately so compiler-safe removal
+# of redundant post-construction validation cannot weaken the remaining mask.
 DOWNSTREAM_SERVER_PROTECTED_SHA256 = (
-    "5b500f56e27d6e770ad2e914af0cd8b745a8b2ef30e92937142ae593bbd315f7"
+    "eefb01fe2aa4d60a7589f925499074bb509051e63868d02f3353a65c664b7108"
 )
 SERVER_SECTION_HASHES = {
     "runWorldPhysicsWithRetouch": "5b082bf6147659c213fe46e84679d44a73f11dcd2aac070ef51eaf66dd0ecc8b",
@@ -88,9 +91,10 @@ SERVER_SECTION_HASHES = {
 }
 SERVER_GC_ROOT_SECTION_HASHES = {
     "requireSynchronizedVector": "ec5668c4a4f343926434df4f9f256fcc4658ce668df851bc24248d98f57d5145",
-    "synchronizedVectorTarget": "449008466f28f53ce997efe08e67b5bbcd12838e668a9c1d3f8f51385a5f23aa",
+    "synchronizedVectorTarget": "ad6d06242d93a70f749d1bd4fe713d4b503f33fde1b13239d863d6230f1dc734",
     "setSynchronizedVector": "2224733cf08b38279f043cbb565ff2ff8c0da73199ec77dac61479393e69bea0",
-    "syncQcVectorInto": "9e3e8ca62fb5a5aebf7deed1bc6d8a3342ad1ab4d91ccf5d7d4aef5b15650058",
+    "syncQcVectorInto": "539b24aabd4d4329ae5b6ba911250c0402a73867db06be6e2021c66081b44a2e",
+    "syncQcVectorIntoAt": "dccd20c403b6b6de5cecec71613df9fa14e253eac0ac909af056de672ce50775",
     "resizeSynchronizedEdictArray": "feffb4ecf5ae81d17ec447f5c2e0d8535e566406518c5ea91172aa05346dd795",
     "ensureSynchronizedBaseline": "4373f3023d269bd09c9e4af1461b8c3046aeb4a6da501f4b47c0f39d801bbe92",
     "ensureSynchronizedEdict": "021e99d057bb0d8065985edbc3135f94c32ef3cde31672dd0f96c5c96fdd2562",

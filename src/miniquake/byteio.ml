@@ -20,26 +20,26 @@ function requireRange(data, offset, count)
 end function
 
 // Read an unsigned 8-bit value from the byte buffer.
-function u8(data, offset)
+function inline u8(data, offset)
   requireRange(data, offset, 1)
   return data[offset]
 end function
 
 // Read a signed 8-bit value from the byte buffer.
-function i8(data, offset)
+function inline i8(data, offset)
   value = u8(data, offset)
   if value >= 128 then value = value - 256 end if
   return value
 end function
 
 // Read a little-endian unsigned 16-bit value from the byte buffer.
-function u16(data, offset)
+function inline u16(data, offset)
   requireRange(data, offset, 2)
   return data[offset] | (data[offset + 1] << 8)
 end function
 
 // Read a little-endian signed 16-bit value from the byte buffer.
-function i16(data, offset)
+function inline i16(data, offset)
   value = u16(data, offset)
   if value >= 0x8000 then value = value - 0x10000 end if
   return value
@@ -62,24 +62,24 @@ function i32(data, offset)
 end function
 
 // Read an IEEE-754 single-precision value from the byte buffer.
-function f32(data, offset)
+function inline f32(data, offset)
   return native.bitsFloat(u32(data, offset))
 end function
 
 // Encode and write u8.
-function putU8(data, offset, value)
+function inline putU8(data, offset, value)
   requireRange(data, offset, 1)
   data[offset] = value & 255
   return offset + 1
 end function
 
 // Encode and write i8.
-function putI8(data, offset, value)
+function inline putI8(data, offset, value)
   return putU8(data, offset, value)
 end function
 
 // Encode and write u16.
-function putU16(data, offset, value)
+function inline putU16(data, offset, value)
   requireRange(data, offset, 2)
   data[offset] = value & 255
   data[offset + 1] = (value >> 8) & 255
@@ -87,7 +87,7 @@ function putU16(data, offset, value)
 end function
 
 // Encode and write i16.
-function putI16(data, offset, value)
+function inline putI16(data, offset, value)
   return putU16(data, offset, value)
 end function
 
@@ -107,7 +107,7 @@ function putI32(data, offset, value)
 end function
 
 // Encode and write f32.
-function putF32(data, offset, value)
+function inline putF32(data, offset, value)
   return putU32(data, offset, native.floatBits(value))
 end function
 

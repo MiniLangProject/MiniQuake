@@ -42,12 +42,15 @@ staticRendererKey = 0
 staticModelRendererKey = 0
 staticEntityArrayKey = 0
 staticEntityCount = -1
+visibleEntityGeneration = 1
+visibleEntityStamp = array(c.MAX_EDICTS + c.MAX_STATIC_ENTITIES, 0)
 
 // Update subsystem configuration for configure.
 function Configure(renderer, entityRenderer, entityStates)
   global refragLeafs, refragNodes, refragPlanes, refragBspModels
   global refragModels, refragEntities, refragLeafEfrags, refragEntityEfrags
   global r_pefragtopnode, r_addent, cl_visedicts, cl_numvisedicts
+  global visibleEntityGeneration, visibleEntityStamp
   refragLeafs = renderer.map.leafs
   refragNodes = renderer.map.nodes
   refragPlanes = renderer.map.planes
@@ -70,6 +73,8 @@ function Configure(renderer, entityRenderer, entityStates)
   r_addent = void
   cl_visedicts = []
   cl_numvisedicts = 0
+  visibleEntityGeneration = 1
+  visibleEntityStamp = array(c.MAX_EDICTS + c.MAX_STATIC_ENTITIES, 0)
   return true
 end function
 
@@ -233,10 +238,23 @@ end function
 // preserving their priority at MAX_VISEDICTS. One builder replaces the old
 // per-leaf copy loop and avoids frame-time allocation bursts in large maps.
 function R_AppendVisiblePvs(dynamicEntities, pvs)
-  global cl_visedicts, cl_numvisedicts
+  global cl_visedicts, cl_numvisedicts, visibleEntityGeneration, visibleEntityStamp
   builder = arrayutil.createArrayBuilder(c.MAX_VISEDICTS)
+  // Entity numbers are bounded by the Protocol-15 edict table plus the
+  // renderer-local static range.  A generation stamp replaces the former
+  // linear scan of the complete visible prefix for every efrag reference.
+  // Dynamic entries retain their original order and duplicate behavior; they
+  // merely seed the set used to suppress matching static entries.
+  visibleEntityGeneration = visibleEntityGeneration + 1
+  if visibleEntityGeneration > 1000000000 then
+    visibleEntityStamp = array(len(visibleEntityStamp), 0)
+    visibleEntityGeneration = 1
+  end if
   for each entity in dynamicEntities
-    if entity is not void and entity.modelIndex > 0 and builder.count < c.MAX_VISEDICTS then arrayutil.pushArrayBuilder(builder, entity) end if
+    if entity is not void and entity.modelIndex > 0 and builder.count < c.MAX_VISEDICTS then
+      arrayutil.pushArrayBuilder(builder, entity)
+      if entity.number >= 0 and entity.number < len(visibleEntityStamp) then visibleEntityStamp[entity.number] = visibleEntityGeneration end if
+    end if
   end for
   leafIndex = 0
   while leafIndex < len(refragLeafEfrags) and builder.count < c.MAX_VISEDICTS
@@ -245,12 +263,21 @@ function R_AppendVisiblePvs(dynamicEntities, pvs)
       for each reference in refragLeafEfrags[leafIndex]
         entity = reference.entity
         present = false
-        index = 0
-        while index < builder.count
-          if builder.values[index].number == entity.number then present = true; index = builder.count else index = index + 1 end if
-        end while
+        if entity.number >= 0 and entity.number < len(visibleEntityStamp) then
+          present = visibleEntityStamp[entity.number] == visibleEntityGeneration
+        else
+          // Preserve compatibility for synthetic fixtures with numbers beyond
+          // the original engine limits instead of indexing outside the stamp.
+          index = 0
+          while index < builder.count
+            if builder.values[index].number == entity.number then present = true; index = builder.count else index = index + 1 end if
+          end while
+        end if
         modelValid = entity.modelIndex > 0 and entity.modelIndex < len(refragModels)
-        if modelValid and not present and builder.count < c.MAX_VISEDICTS then arrayutil.pushArrayBuilder(builder, entity) end if
+        if modelValid and not present and builder.count < c.MAX_VISEDICTS then
+          arrayutil.pushArrayBuilder(builder, entity)
+          if entity.number >= 0 and entity.number < len(visibleEntityStamp) then visibleEntityStamp[entity.number] = visibleEntityGeneration end if
+        end if
       end for
     end if
     leafIndex = leafIndex + 1

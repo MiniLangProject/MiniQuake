@@ -48,6 +48,7 @@ scoreboardtop = []
 scoreboardbottom = []
 scoreboardlines = 0
 sbarTrace = []
+sbarTraceEnabled = false
 
 // Provide remember sbar picture behavior for the active subsystem.
 function rememberSbarPicture(name, value)
@@ -310,13 +311,15 @@ end function
 // Mirror Quake's Sbar_Init routine and its observable state changes.
 function Sbar_Init(gameDirectory)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
-  global sbarInitialized, sbarHipnotic, sbarRogue, sbarPictureNames, sbarPictures, sbarLoadTrace
+  global sbarInitialized, sbarHipnotic, sbarRogue, sbarPictureNames, sbarPictures, sbarLoadTrace, sbarTrace, sbarTraceEnabled
   if sbarInitialized and ((gameDirectory == "hipnotic") == sbarHipnotic) and ((gameDirectory == "rogue") == sbarRogue) then return true end if
   sbarHipnotic = bio.lower(gameDirectory) == "hipnotic"
   sbarRogue = bio.lower(gameDirectory) == "rogue"
   sbarPictureNames = []
   sbarPictures = []
   sbarLoadTrace = []
+  sbarTrace = []
+  sbarTraceEnabled = false
   index = 0
   while index < 10
     loadSbarPicture("num_" + index)
@@ -388,11 +391,13 @@ end function
 
 // Mirror Quake's Sbar_Shutdown routine and its observable state changes.
 function Sbar_Shutdown()
-  global sbarInitialized, sbarPictures, sbarPictureNames, sbarLoadTrace, sbarState, sbarFontTexture
+  global sbarInitialized, sbarPictures, sbarPictureNames, sbarLoadTrace, sbarState, sbarFontTexture, sbarTrace, sbarTraceEnabled
   sbarInitialized = false
   sbarPictures = []
   sbarPictureNames = []
   sbarLoadTrace = []
+  sbarTrace = []
+  sbarTraceEnabled = false
   sbarState = void
   sbarFontTexture = 0
   return true
@@ -421,7 +426,7 @@ function Sbar_DifferentialReset(pictures)
   global sbarState, sbarFontTexture, sbarPlayer, sbarClient, sbarWidth, sbarHeight
   global sbarGameType, sbarTeamplay, sbarPictures, sbarPictureNames, sbarInjectedPictures
   global fragsort, scoreboardtext, scoreboardtop, scoreboardbottom, scoreboardlines
-  global sbarTrace, sbarLoadTrace, sbarConsoleCurrent, sbarNumPages
+  global sbarTrace, sbarTraceEnabled, sbarLoadTrace, sbarConsoleCurrent, sbarNumPages
   global sbarCopyEverything, sbarFullUpdate
   sb_updates = 0
   sb_showscores = false
@@ -448,6 +453,7 @@ function Sbar_DifferentialReset(pictures)
   scoreboardbottom = []
   scoreboardlines = 0
   sbarTrace = []
+  sbarTraceEnabled = true
   sbarLoadTrace = []
   sbarConsoleCurrent = -1.0
   sbarNumPages = 999999
@@ -477,8 +483,9 @@ end function
 
 // Mirror Quake's Sbar_DifferentialClearTrace routine and its observable state changes.
 function Sbar_DifferentialClearTrace()
-  global sbarTrace
+  global sbarTrace, sbarTraceEnabled
   sbarTrace = []
+  sbarTraceEnabled = true
   return true
 end function
 
@@ -508,6 +515,7 @@ end function
 // Trace sbar through the collision world.
 function traceSbar(command)
   global sbarTrace
+  if not sbarTraceEnabled then return true end if
   sbarTrace = sbarTrace + [command]
   return true
 end function
@@ -948,7 +956,7 @@ end function
 // Mirror Quake's Sbar_Draw routine and its observable state changes.
 function Sbar_Draw()
   global sb_updates, sbarTrace, sbarCopyEverything
-  sbarTrace = []
+  if sbarTraceEnabled then sbarTrace = [] end if
   if sbarPlayer is void then return false end if
   if sbarConsoleCurrent == sbarHeight then return false end if
   // The original stops issuing status-bar draws after every buffered page has

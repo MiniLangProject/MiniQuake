@@ -23,8 +23,11 @@ optimization packages. The current tree includes:
 - persistent modern free-look, configurable mouse-Y inversion and sensitivity,
   plus a one-time migration from retail keyboard-look bindings to W/A/S/D
   movement;
+- measured hot-path refinements for QuakeC vector synchronization, byte I/O,
+  input polling, loopback queues, BSP visibility traversal, HUD diagnostics,
+  and exact-key projected-shadow ray reuse;
 - a compact build/test/retail-validation script surface, with obsolete delivery
-  diffs and historical PowerShell package runners removed; and
+  diffs and historical PowerShell package runners removed;
 - a single zero-argument full-suite entry point that auto-detects Steam retail
   data and covers native builds, all installed official games, all renderer
   backends, retail evidence and independent-process UDP networking; and

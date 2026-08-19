@@ -3391,36 +3391,55 @@ function R_DrawBrushModel(entity)
   return R_DrawBrushModelForSubmodel(entity, entity.modelIndex)
 end function
 
-// Apply the Quake-compatible r recursive world node behavior.
-function R_RecursiveWorldNode(nodeNumber)
-  global skychain, waterchain
-  if rCompatRenderer is void or nodeNumber < 0 then return 0 end if
-  if nodeNumber >= len(rCompatRenderer.map.nodes) then return 0 end if
+// Traverse one visible BSP subtree with frame-stable collection sizes.  The
+// public wrapper computes these values once; recursive calls no longer repeat
+// array-length and visible-mask identity checks at every node and surface.
+function compatRecursiveWorldNode(nodeNumber, nodeCount, surfaceCount, visibleFaceCount, useVisibleMask)
+  global skychain, waterchain, rCompatTextureChainBuilders, rCompatSequentialBuilder
+  if nodeNumber < 0 or nodeNumber >= nodeCount then return 0 end if
   // GLQuake checks node->visframe before plane work and recursion.  The mask
   // is absent only in direct differential fixtures which intentionally call
   // this routine without first executing R_MarkLeaves.
-  if rCompatVisibleNodeRenderer == rCompatRenderer and len(rCompatVisibleNodes) == len(rCompatRenderer.map.nodes) and rCompatVisibleNodes[nodeNumber] == 0 then return 0 end if
+  if useVisibleMask and rCompatVisibleNodes[nodeNumber] == 0 then return 0 end if
   node = rCompatRenderer.map.nodes[nodeNumber]
   plane = rCompatRenderer.map.planes[node.planeIndex]
-  distance = compatPlaneDistance(plane, rCompatViewOrigin)
+  distance = 0.0
+  if plane.type == 0 then distance = rCompatViewOrigin.x - plane.dist
+  else if plane.type == 1 then distance = rCompatViewOrigin.y - plane.dist
+  else if plane.type == 2 then distance = rCompatViewOrigin.z - plane.dist
+  else distance = rCompatViewOrigin.x * plane.normal.x + rCompatViewOrigin.y * plane.normal.y + rCompatViewOrigin.z * plane.normal.z - plane.dist
+  end if
   side = 0
   if distance < 0.0 then side = 1 end if
   firstChild = node.child0
   secondChild = node.child1
   if side == 1 then firstChild = node.child1; secondChild = node.child0 end if
-  count = R_RecursiveWorldNode(firstChild)
+  count = compatRecursiveWorldNode(firstChild, nodeCount, surfaceCount, visibleFaceCount, useVisibleMask)
   faceIndex = node.firstFace
   lastFace = faceIndex + node.numFaces
-  while faceIndex < lastFace and faceIndex < len(rCompatRenderer.surfaces)
-    if faceIndex >= 0 and faceIndex < len(rCompatRenderer.visibleFaces) and rCompatRenderer.visibleFaces[faceIndex] != 0 then
+  while faceIndex < lastFace and faceIndex < surfaceCount
+    if faceIndex >= 0 and faceIndex < visibleFaceCount and rCompatRenderer.visibleFaces[faceIndex] != 0 then
       surface = rCompatRenderer.surfaces[faceIndex]
-      if R_SurfaceFacesViewer(surface, distance) then
+      facesViewer = (surface.flags & GLQUAKE_SURF_UNDERWATER) != 0
+      if not facesViewer then facesViewer = not ((distance < 0.0) != ((surface.flags & c.SURF_PLANEBACK) != 0)) end if
+      if facesViewer then
         if rCompatTextureSort then
-          R_ChainSurface(surface)
+          textureIndex = surface.textureIndex
+          if textureIndex >= 0 and textureIndex < len(rCompatTextureChainBuilders) then
+            builder = rCompatTextureChainBuilders[textureIndex]
+            if builder is bool then
+              builder = arrayutil.createArrayBuilder(32)
+              rCompatTextureChainBuilders[textureIndex] = builder
+            end if
+            arrayutil.pushArrayBuilder(builder, surface)
+          end if
         else if (surface.flags & c.SURF_DRAWSKY) != 0 then
           skychain = [surface] + skychain
         else if (surface.flags & c.SURF_DRAWTURB) != 0 then
           waterchain = [surface] + waterchain
+        else if rCompatCollectSequential then
+          arrayutil.pushArrayBuilder(rCompatSequentialBuilder, surface)
+          count = count + 1
         else
           R_DrawSequentialPoly(surface)
           count = count + 1
@@ -3429,8 +3448,18 @@ function R_RecursiveWorldNode(nodeNumber)
     end if
     faceIndex = faceIndex + 1
   end while
-  count = count + R_RecursiveWorldNode(secondChild)
+  count = count + compatRecursiveWorldNode(secondChild, nodeCount, surfaceCount, visibleFaceCount, useVisibleMask)
   return count
+end function
+
+// Apply the Quake-compatible r recursive world node behavior.
+function R_RecursiveWorldNode(nodeNumber)
+  if rCompatRenderer is void then return 0 end if
+  nodeCount = len(rCompatRenderer.map.nodes)
+  surfaceCount = len(rCompatRenderer.surfaces)
+  visibleFaceCount = len(rCompatRenderer.visibleFaces)
+  useVisibleMask = rCompatVisibleNodeRenderer == rCompatRenderer and len(rCompatVisibleNodes) == nodeCount
+  return compatRecursiveWorldNode(nodeNumber, nodeCount, surfaceCount, visibleFaceCount, useVisibleMask)
 end function
 
 // Apply the Quake-compatible r draw world behavior.

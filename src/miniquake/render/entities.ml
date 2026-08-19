@@ -477,7 +477,10 @@ function aliasShade(model, entity, time, viewModel)
   lights = worldRenderer.R_ActiveDynamicLights()
   hasActiveLight = false
   for each light in lights
-    if light is not void and light.radius > 0.0 and light.die >= time then hasActiveLight = true end if
+    // Cache eligibility needs only the existence of one live light.  Stop at
+    // the first match instead of scanning all MAX_DLIGHTS slots before the
+    // contribution pass below performs the complete ordered traversal.
+    if light is not void and light.radius > 0.0 and light.die >= time then hasActiveLight = true; break end if
   end for
   number = entity.number
   stamp = native.trunc(time * 10.0)
@@ -949,10 +952,12 @@ function renderSubmitted(renderer, worldRendererValue, entities, hiddenEntityNum
   // R_DrawEntitiesOnList renders opaque alias/brush models first and performs
   // a second pass for alpha-tested sprites.  Keeping the passes separate is
   // observable where a sprite intersects an alias model.
+  entityCount = len(entities)
+  modelCount = len(renderer.models)
   index = 0
-  while index < len(entities)
+  while index < entityCount
     entity = entities[index]
-    if entity is not void and (hiddenEntityNumber is void or entity.number != hiddenEntityNumber) and entity.modelIndex > 0 and entity.modelIndex < len(renderer.models) then
+    if entity is not void and (hiddenEntityNumber is void or entity.number != hiddenEntityNumber) and entity.modelIndex > 0 and entity.modelIndex < modelCount then
       model = renderer.models[entity.modelIndex]
       if model.kind == MODEL_BRUSH then
         drawResult = try(drawBrush(worldRendererValue, model, entity, time))
@@ -968,9 +973,9 @@ function renderSubmitted(renderer, worldRendererValue, entities, hiddenEntityNum
     index = index + 1
   end while
   index = 0
-  while index < len(entities)
+  while index < entityCount
     entity = entities[index]
-    if entity is not void and (hiddenEntityNumber is void or entity.number != hiddenEntityNumber) and entity.modelIndex > 0 and entity.modelIndex < len(renderer.models) then
+    if entity is not void and (hiddenEntityNumber is void or entity.number != hiddenEntityNumber) and entity.modelIndex > 0 and entity.modelIndex < modelCount then
       model = renderer.models[entity.modelIndex]
       if model.kind == MODEL_SPRITE then
         drawResult = try(drawSprite(renderer, model, entity, viewRight, viewUp, time))
@@ -996,10 +1001,12 @@ function renderEnhancedSubmitted(renderer, worldRendererValue, entities, hiddenE
   gl.depthFunc(worldRenderer.R_CurrentDepthFunction())
   enhanced.beginOverlay()
   rendered = 0
+  entityCount = len(entities)
+  modelCount = len(renderer.models)
   index = 0
-  while index < len(entities)
+  while index < entityCount
     entity = entities[index]
-    if entity is not void and (hiddenEntityNumber is void or entity.number != hiddenEntityNumber) and entity.modelIndex > 0 and entity.modelIndex < len(renderer.models) then
+    if entity is not void and (hiddenEntityNumber is void or entity.number != hiddenEntityNumber) and entity.modelIndex > 0 and entity.modelIndex < modelCount then
       model = renderer.models[entity.modelIndex]
       if model.kind == MODEL_BRUSH then
         result = try(drawBrushEnhanced(worldRendererValue, model, entity, time))

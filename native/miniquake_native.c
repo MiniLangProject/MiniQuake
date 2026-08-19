@@ -471,6 +471,24 @@ static MQ_SHADOW_NODE *mq_shadow_nodes = (MQ_SHADOW_NODE *)0;
 static mq_u32 mq_shadow_triangle_count = 0u;
 static mq_u32 mq_shadow_node_count = 0u;
 
+/*
+ * Projected entity shadows submit the same immutable world-space rays for
+ * stationary pickups and for the repeated poses of idle alias models.  Keep
+ * exact-bit results from the current BSP so those rays do not walk the BVH on
+ * every rendered frame.  Four-way probing keeps lookups bounded; a collision
+ * may evict an entry but can never return a result for a different ray.
+ */
+#define MQ_SHADOW_RAY_CACHE_SIZE 131072u
+#define MQ_SHADOW_RAY_CACHE_PROBES 4u
+typedef struct MQ_SHADOW_RAY_CACHE_ENTRY {
+    mq_u32 generation;
+    mq_u32 ray_bits[6];
+    float result[8];
+    mq_u8 hit;
+} MQ_SHADOW_RAY_CACHE_ENTRY;
+static MQ_SHADOW_RAY_CACHE_ENTRY mq_shadow_ray_cache[MQ_SHADOW_RAY_CACHE_SIZE];
+static mq_u32 mq_shadow_ray_cache_generation = 1u;
+
 /* Return the lesser scalar without depending on compiler runtime helpers. */
 static float mq_shadow_minimum(float left, float right) { return left < right ? left : right; }
 /* Return the greater scalar without depending on compiler runtime helpers. */
@@ -486,6 +504,11 @@ MQ_EXPORT void mq_shadow_world_clear(void) {
     mq_shadow_nodes = (MQ_SHADOW_NODE *)0;
     mq_shadow_triangle_count = 0u;
     mq_shadow_node_count = 0u;
+    ++mq_shadow_ray_cache_generation;
+    if (mq_shadow_ray_cache_generation == 0u) {
+        memset(mq_shadow_ray_cache, 0, sizeof(mq_shadow_ray_cache));
+        mq_shadow_ray_cache_generation = 1u;
+    }
 }
 
 /* Sort one index range in-place by triangle centroid for median BVH splitting. */
@@ -720,6 +743,53 @@ static mq_i32 mq_shadow_trace_one(const float *ray, float *result) {
     return 1;
 }
 
+/* Hash six exact IEEE-754 words without changing any ray arithmetic. */
+static mq_u32 mq_shadow_ray_hash(const mq_u32 *ray_bits) {
+    mq_u32 hash = 2166136261u;
+    mq_u32 index;
+    for (index = 0u; index < 6u; ++index) {
+        hash ^= ray_bits[index];
+        hash *= 16777619u;
+        hash ^= hash >> 13u;
+    }
+    return hash;
+}
+
+/* Return a cached immutable-world trace or populate one bounded cache slot. */
+static mq_i32 mq_shadow_trace_cached(const float *ray, float *result) {
+    mq_u32 ray_bits[6];
+    mq_u32 hash;
+    mq_u32 probe;
+    mq_u32 replacement;
+    mq_i32 hit;
+    memcpy(ray_bits, ray, sizeof(ray_bits));
+    hash = mq_shadow_ray_hash(ray_bits);
+    replacement = hash & (MQ_SHADOW_RAY_CACHE_SIZE - 1u);
+    for (probe = 0u; probe < MQ_SHADOW_RAY_CACHE_PROBES; ++probe) {
+        mq_u32 slot = (replacement + probe) & (MQ_SHADOW_RAY_CACHE_SIZE - 1u);
+        MQ_SHADOW_RAY_CACHE_ENTRY *entry = &mq_shadow_ray_cache[slot];
+        if (entry->generation != mq_shadow_ray_cache_generation) {
+            replacement = slot;
+            break;
+        }
+        if (entry->ray_bits[0] == ray_bits[0] && entry->ray_bits[1] == ray_bits[1] &&
+            entry->ray_bits[2] == ray_bits[2] && entry->ray_bits[3] == ray_bits[3] &&
+            entry->ray_bits[4] == ray_bits[4] && entry->ray_bits[5] == ray_bits[5]) {
+            if (entry->hit) memcpy(result, entry->result, sizeof(entry->result));
+            return entry->hit != 0u;
+        }
+    }
+    hit = mq_shadow_trace_one(ray, result);
+    {
+        MQ_SHADOW_RAY_CACHE_ENTRY *entry = &mq_shadow_ray_cache[replacement];
+        entry->generation = mq_shadow_ray_cache_generation;
+        memcpy(entry->ray_bits, ray_bits, sizeof(entry->ray_bits));
+        entry->hit = (mq_u8)(hit != 0);
+        if (hit) memcpy(entry->result, result, sizeof(entry->result));
+    }
+    return hit;
+}
+
 /* Trace a packed array of six-float segments into eight-float hit records. */
 MQ_EXPORT mq_i32 mq_shadow_trace_batch(const mq_u8 *rays, mq_u32 ray_bytes, mq_u8 *results, mq_u32 result_bytes) {
     mq_u32 ray_count;
@@ -731,7 +801,7 @@ MQ_EXPORT mq_i32 mq_shadow_trace_batch(const mq_u8 *rays, mq_u32 ray_bytes, mq_u
         float ray[6];
         float result[8] = {0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
         memcpy(ray, rays + index * 24u, 24u);
-        mq_shadow_trace_one(ray, result);
+        mq_shadow_trace_cached(ray, result);
         memcpy(results + index * 32u, result, 32u);
     }
     return (mq_i32)ray_count;
@@ -4334,7 +4404,7 @@ static mq_i32 mq_shadow_alias_project_vertex(
         ray[4] = world[1] + delta[1] * 768.0f;
         ray[5] = world[2] + delta[2] * 768.0f;
     }
-    if (!mq_shadow_trace_one(ray, result)) return 0;
+    if (!mq_shadow_trace_cached(ray, result)) return 0;
     if (result[1] <= minimum_fraction) return 0;
     if (point_light_active && minimum_fraction > 0.0f && result[1] > minimum_fraction * 3.0f) return 0;
     mq_shadow_alias_projected[index][0] = result[2] + result[5] * 0.65f;

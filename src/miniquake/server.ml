@@ -2765,8 +2765,9 @@ end function
 // appears, then copy raw QuakeC words into the existing structs.
 function synchronizedVectorTarget(value, entityIndex, fieldName, x, y, z)
   if t.isVec3Value(value) then return value end if
-  created = t.Vec3(x, y, z)
-  return requireSynchronizedVector(created, entityIndex, fieldName)
+  // A freshly constructed Vec3 already satisfies the invariant; re-running
+  // the dynamic type guard only adds work to first-use synchronization.
+  return t.Vec3(x, y, z)
 end function
 
 // Update module state for synchronized vector.
@@ -2791,7 +2792,8 @@ function syncQcVectorInto(machine, entityIndex, fieldName, target, x, y, z)
     result.y = y
     result.z = z
   end if
-  return requireSynchronizedVector(result, entityIndex, fieldName)
+  // synchronizedVectorTarget has already validated or created the target.
+  return result
 end function
 
 // Update module state for qc vector into at.
@@ -2806,7 +2808,8 @@ function syncQcVectorIntoAt(machine, entityIndex, offset, fieldName, target, x, 
     result.y = y
     result.z = z
   end if
-  return requireSynchronizedVector(result, entityIndex, fieldName)
+  // synchronizedVectorTarget has already validated or created the target.
+  return result
 end function
 
 // Provide resize synchronized edict array behavior for the active subsystem.
