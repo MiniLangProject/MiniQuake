@@ -81,6 +81,16 @@ def main() -> int:
         errors,
     )
 
+    d3d_create = function_body(d3d9, "mq_d3d_texture_create")
+    require(
+        "Direct3DCreate9(MQ_D3D_SDK_VERSION)" in d3d9
+        and "Direct3DCreate9Ex" not in d3d9
+        and "MQ_D3DPOOL_MANAGED" in d3d_create
+        and "MQ_D3DPOOL_DEFAULT" not in d3d_create,
+        "D3D9 textures can be discarded across device reset or Alt-Tab",
+        errors,
+    )
+
     d3d_delete = function_body(d3d9, "mq_d3d9_delete_textures")
     require("id < mq_d3d_next_texture" in d3d_delete, "D3D9 texture identifiers are not reused after deletion", errors)
     require("id > 0u" in d3d_delete, "D3D9 incorrectly deletes reserved texture identifier zero", errors)
@@ -107,7 +117,7 @@ def main() -> int:
         for error in errors:
             print("  " + error)
         return 1
-    print("native renderer safety tests: PASS (28 invariants)")
+    print("native renderer safety tests: PASS (29 invariants)")
     return 0
 
 

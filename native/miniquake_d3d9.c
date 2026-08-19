@@ -103,7 +103,6 @@ typedef struct mq_d3d_texture_s {
 } mq_d3d_texture_t;
 
 MQ_DLLIMPORT void *MQ_WINAPI Direct3DCreate9(mq_u32 sdk_version);
-MQ_DLLIMPORT MQ_HRESULT MQ_WINAPI Direct3DCreate9Ex(mq_u32 sdk_version, void **direct3d);
 MQ_DLLIMPORT void * __cdecl memcpy(void *destination, const void *source, mq_u64 count);
 MQ_DLLIMPORT void * __cdecl memset(void *destination, mq_i32 value, mq_u64 count);
 MQ_DLLIMPORT double __cdecl sin(double value);
@@ -129,10 +128,8 @@ MQ_DLLIMPORT MQ_BOOL MQ_WINAPI FreeLibrary(MQ_HMODULE module);
 #define MQ_D3DMULTISAMPLE_NONE 0
 #define MQ_D3DSWAPEFFECT_DISCARD 1
 #define MQ_D3DPRESENT_INTERVAL_IMMEDIATE 0x80000000u
-#define MQ_D3DPOOL_DEFAULT 0
 #define MQ_D3DPOOL_MANAGED 1
 #define MQ_D3DPOOL_SYSTEMMEM 2
-#define MQ_D3DUSAGE_DYNAMIC 0x00000200u
 #define MQ_D3DCLEAR_TARGET 0x00000001u
 #define MQ_D3DCLEAR_ZBUFFER 0x00000002u
 #define MQ_D3DLOCK_READONLY 0x00000010u
@@ -308,7 +305,6 @@ static float mq_d3d_projection_stack[MQ_D3D_MATRIX_STACK][16];
 static mq_u32 mq_d3d_modelview_top = 0u;
 static mq_u32 mq_d3d_projection_top = 0u;
 static mq_i32 mq_d3d_matrices_dirty = 1;
-static mq_i32 mq_d3d_using_ex = 0;
 static void *mq_d3d_enhanced_vertex_shader = MQ_NULL;
 static void *mq_d3d_enhanced_pixel_shader = MQ_NULL;
 static mq_i32 mq_d3d_enhanced_enabled = 0;
@@ -330,7 +326,6 @@ static void *mq_d3d_applied_texture_object = MQ_NULL;
 
 typedef mq_u32 (MQ_WINAPI *mq_d3d_release_fn)(void *self);
 typedef MQ_HRESULT (MQ_WINAPI *mq_d3d_create_device_fn)(void *, mq_u32, mq_i32, MQ_HWND, mq_u32, mq_d3d_present_parameters_t *, void **);
-typedef MQ_HRESULT (MQ_WINAPI *mq_d3d_create_device_ex_fn)(void *, mq_u32, mq_i32, MQ_HWND, mq_u32, mq_d3d_present_parameters_t *, const void *, void **);
 typedef MQ_HRESULT (MQ_WINAPI *mq_d3d_check_device_type_fn)(void *, mq_u32, mq_i32, mq_i32, mq_i32, MQ_BOOL);
 typedef MQ_HRESULT (MQ_WINAPI *mq_d3d_get_display_mode_fn)(void *, mq_u32, mq_d3d_display_mode_t *);
 typedef MQ_HRESULT (MQ_WINAPI *mq_d3d_reset_fn)(void *, mq_d3d_present_parameters_t *);
@@ -790,10 +785,7 @@ static void mq_d3d_release_textures(void) {
 
 /* Report whether 9 available is available. */
 mq_i32 mq_d3d9_available(void) {
-    void *probe = MQ_NULL;
-    if (!MQ_D3D_SUCCEEDED(Direct3DCreate9Ex(MQ_D3D_SDK_VERSION, &probe)) || probe == MQ_NULL) {
-        probe = Direct3DCreate9(MQ_D3D_SDK_VERSION);
-    }
+    void *probe = Direct3DCreate9(MQ_D3D_SDK_VERSION);
     if (probe == MQ_NULL) return 0;
     MQ_D3D_METHOD(probe, 2, mq_d3d_release_fn)(probe);
     return 1;
@@ -802,7 +794,6 @@ mq_i32 mq_d3d9_available(void) {
 /* Create and initialize 9 initialize. */
 mq_i32 mq_d3d9_initialize(mq_ptr window, mq_i32 width, mq_i32 height) {
     mq_d3d_create_device_fn create_device;
-    mq_d3d_create_device_ex_fn create_device_ex;
     mq_d3d_check_device_type_fn check_device_type;
     mq_d3d_get_display_mode_fn get_display_mode;
     mq_d3d_display_mode_t display_mode;
@@ -810,8 +801,15 @@ mq_i32 mq_d3d9_initialize(mq_ptr window, mq_i32 width, mq_i32 height) {
     mq_u32 behavior;
     if (window == MQ_NULL || width < 1 || height < 1) return 0;
     mq_d3d9_shutdown();
-    mq_d3d_using_ex = MQ_D3D_SUCCEEDED(Direct3DCreate9Ex(MQ_D3D_SDK_VERSION, &mq_d3d_object)) && mq_d3d_object != MQ_NULL;
-    if (!mq_d3d_using_ex) mq_d3d_object = Direct3DCreate9(MQ_D3D_SDK_VERSION);
+    /*
+     * Keep texture resources in D3DPOOL_MANAGED so the Direct3D runtime
+     * restores them after Reset, Alt-Tab and display-mode changes.  D3D9Ex
+     * rejects the managed pool and previously forced every Quake texture into
+     * D3DPOOL_DEFAULT; a reset could then leave valid texture identifiers
+     * pointing at discarded contents, producing white UI rectangles and
+     * flat-colored world triangles until the whole renderer was restarted.
+     */
+    mq_d3d_object = Direct3DCreate9(MQ_D3D_SDK_VERSION);
     if (mq_d3d_object == MQ_NULL) return 0;
     memset(&mq_d3d_present, 0, sizeof(mq_d3d_present));
     mq_d3d_present.BackBufferWidth = (mq_u32)width;
@@ -841,19 +839,15 @@ mq_i32 mq_d3d9_initialize(mq_ptr window, mq_i32 width, mq_i32 height) {
         return 0;
     }
     create_device = MQ_D3D_METHOD(mq_d3d_object, 16, mq_d3d_create_device_fn);
-    create_device_ex = mq_d3d_using_ex ? MQ_D3D_METHOD(mq_d3d_object, 20, mq_d3d_create_device_ex_fn) : MQ_NULL;
     behavior = MQ_D3DCREATE_FPU_PRESERVE | MQ_D3DCREATE_HARDWARE_VERTEXPROCESSING;
-    if (create_device_ex != MQ_NULL) result = create_device_ex(mq_d3d_object, 0u, MQ_D3DDEVTYPE_HAL, window, behavior, &mq_d3d_present, MQ_NULL, &mq_d3d_device);
-    else result = create_device(mq_d3d_object, 0u, MQ_D3DDEVTYPE_HAL, window, behavior, &mq_d3d_present, &mq_d3d_device);
+    result = create_device(mq_d3d_object, 0u, MQ_D3DDEVTYPE_HAL, window, behavior, &mq_d3d_present, &mq_d3d_device);
     if (!MQ_D3D_SUCCEEDED(result)) {
         behavior = MQ_D3DCREATE_FPU_PRESERVE | MQ_D3DCREATE_SOFTWARE_VERTEXPROCESSING;
-        if (create_device_ex != MQ_NULL) result = create_device_ex(mq_d3d_object, 0u, MQ_D3DDEVTYPE_HAL, window, behavior, &mq_d3d_present, MQ_NULL, &mq_d3d_device);
-        else result = create_device(mq_d3d_object, 0u, MQ_D3DDEVTYPE_HAL, window, behavior, &mq_d3d_present, &mq_d3d_device);
+        result = create_device(mq_d3d_object, 0u, MQ_D3DDEVTYPE_HAL, window, behavior, &mq_d3d_present, &mq_d3d_device);
     }
     if (!MQ_D3D_SUCCEEDED(result)) {
         mq_d3d_present.AutoDepthStencilFormat = MQ_D3DFMT_D16;
-        if (create_device_ex != MQ_NULL) result = create_device_ex(mq_d3d_object, 0u, MQ_D3DDEVTYPE_HAL, window, behavior, &mq_d3d_present, MQ_NULL, &mq_d3d_device);
-        else result = create_device(mq_d3d_object, 0u, MQ_D3DDEVTYPE_HAL, window, behavior, &mq_d3d_present, &mq_d3d_device);
+        result = create_device(mq_d3d_object, 0u, MQ_D3DDEVTYPE_HAL, window, behavior, &mq_d3d_present, &mq_d3d_device);
     }
     if (!MQ_D3D_SUCCEEDED(result) || mq_d3d_device == MQ_NULL) {
         mq_d3d_last_error = result;
@@ -898,7 +892,6 @@ void mq_d3d9_shutdown(void) {
     mq_d3d_width = 0;
     mq_d3d_height = 0;
     mq_d3d_vertex_count = 0u;
-    mq_d3d_using_ex = 0;
     mq_d3d_invalidate_state_cache();
 }
 
@@ -1299,8 +1292,7 @@ static mq_i32 mq_d3d_texture_create(mq_d3d_texture_t *texture, mq_i32 base_width
     if (texture->object != MQ_NULL) mq_d3d_release(&texture->object);
     result = MQ_D3D_METHOD(mq_d3d_device, 23, mq_d3d_create_texture_fn)(
         mq_d3d_device, (mq_u32)base_width, (mq_u32)base_height, 0u,
-        mq_d3d_using_ex ? MQ_D3DUSAGE_DYNAMIC : 0u,
-        MQ_D3DFMT_A8R8G8B8, mq_d3d_using_ex ? MQ_D3DPOOL_DEFAULT : MQ_D3DPOOL_MANAGED,
+        0u, MQ_D3DFMT_A8R8G8B8, MQ_D3DPOOL_MANAGED,
         &object, (MQ_HANDLE *)MQ_NULL);
     mq_d3d_last_error = result;
     if (!MQ_D3D_SUCCEEDED(result) || object == MQ_NULL) return 0;

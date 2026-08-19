@@ -2691,7 +2691,41 @@ function Host_Init(session)
   executeCommandBuffer(session, 4096)
   migrateModernInputConfiguration(session)
   if not session.headless and session.windowCreated then
-    if glvid.VID_ApplyConfiguredRenderer() then print glvid.VID_State().lastModeMessage end if
+    // config.cfg is intentionally executed after VID_Init, matching Quake's
+    // startup order.  It can therefore select a different backend only after
+    // quake.rc has already started a map or attract demo and uploaded its
+    // world, models and 2-D pictures.  Switching just the native device here
+    // leaves those resources associated with the destroyed backend while the
+    // MiniLang texture identifiers still look valid; D3D then renders white
+    // menu blocks and stretched triangles.  Use the same complete teardown
+    // and rebuild as the live menu renderer switch whenever the archived
+    // backend differs, while preserving an explicit command-line override.
+    configuredBackend = glvid.VID_RendererFromName(cvar.variableString(session.cvars, "vid_renderer"))
+    if glvid.VID_CommandLineRenderer(session.arguments) < 0 and configuredBackend != win.renderer() then
+      // VID_RestartRenderer temporarily reapplies the currently live mode so
+      // a normal in-menu backend switch keeps its dimensions.  During startup
+      // those dimensions are still the 640x480 bootstrap mode, while these
+      // cvars already contain the user's archived target. Preserve the target
+      // across the device rebuild so VID_ApplyConfiguredResolution below can
+      // still apply it.
+      configuredWidth = cvar.variableValue(session.cvars, "vid_width")
+      configuredHeight = cvar.variableValue(session.cvars, "vid_height")
+      configuredBpp = cvar.variableValue(session.cvars, "vid_bpp")
+      configuredFullscreen = cvar.variableValue(session.cvars, "vid_fullscreen")
+      configuredRestart = try(restartRenderer(session, configuredBackend))
+      if configuredRestart is error then return configuredRestart end if
+      cvar.setValue(session.cvars, "vid_width", configuredWidth)
+      cvar.setValue(session.cvars, "vid_height", configuredHeight)
+      cvar.setValue(session.cvars, "vid_bpp", configuredBpp)
+      cvar.setValue(session.cvars, "vid_fullscreen", configuredFullscreen)
+      // screen.shutdown deliberately preserves the high-level loading state,
+      // but resets its warm-up counter.  Re-arm that counter for the newly
+      // created device; otherwise the first post-restart frame interprets a
+      // zero-count pending plaque as the old 60-second synchronous-loading
+      // block and freezes all subsequent menu redraws.
+      if session.renderer is not void then screen.SCR_FinishLoadingAfterUpdates(5) end if
+      print glvid.VID_State().lastModeMessage
+    end if
     if glvid.VID_ApplyConfiguredResolution() then print glvid.VID_State().lastModeMessage end if
     session.width = win.width()
     session.height = win.height()

@@ -94,6 +94,16 @@ def contract(root):
  dispatch=function(host,'Host_DispatchCommand')
  for marker in ('return Host_Quit_f(session)','return Host_Disconnect_f(session)','return Host_Map_f(session, arguments)','return Host_Restart_f(session)'):
   if marker not in dispatch: errors.append('missing host command route: '+marker)
+ init_body=function(host,'Host_Init')
+ if 'glvid.VID_ApplyConfiguredRenderer()' in init_body: errors.append('startup renderer switch bypasses resource rebuild')
+ for marker in (
+   'configuredBackend != win.renderer()',
+   'restartRenderer(session, configuredBackend)',
+   'cvar.setValue(session.cvars, "vid_width", configuredWidth)',
+   'cvar.setValue(session.cvars, "vid_height", configuredHeight)',
+   'screen.SCR_FinishLoadingAfterUpdates(5)',
+ ):
+  if marker not in init_body: errors.append('missing startup renderer lifecycle marker: '+marker)
  if 'host lifecycle closure tests passed: 25' not in test: errors.append('expected 25 BP-034 fixtures')
  return errors
 def main():
