@@ -50,6 +50,12 @@ scoreboardlines = 0
 sbarTrace = []
 sbarTraceEnabled = false
 
+// Immutable name tables are shared by every HUD frame. Keeping them at module
+// scope avoids rebuilding identical arrays while the inventory bar is drawn.
+sbarWeaponNames = ["shotgun", "sshotgun", "nailgun", "snailgun", "rlaunch", "srlaunch", "lightng"]
+sbarRogueWeaponNames = ["r_lava", "r_superlava", "r_gren", "r_multirock", "r_plasma"]
+sbarBaseItemNames = ["sb_key1", "sb_key2", "sb_invis", "sb_invuln", "sb_suit", "sb_quad"]
+
 // Provide remember sbar picture behavior for the active subsystem.
 function rememberSbarPicture(name, value)
   global sbarPictures, sbarPictureNames
@@ -523,38 +529,38 @@ end function
 // Provide sbar direct pic behavior for the active subsystem.
 function sbarDirectPic(x, y, pic)
   if pic is void then return false end if
-  traceSbar(["pic", pic.name, x, y])
+  if sbarTraceEnabled then traceSbar(["pic", pic.name, x, y]) end if
   return draw.Draw_Pic(x, y, pic)
 end function
 
 // Provide sbar direct trans pic behavior for the active subsystem.
 function sbarDirectTransPic(x, y, pic)
   if pic is void then return false end if
-  traceSbar(["transpic", pic.name, x, y])
+  if sbarTraceEnabled then traceSbar(["transpic", pic.name, x, y]) end if
   return draw.Draw_TransPic(x, y, pic)
 end function
 
 // Provide sbar direct character behavior for the active subsystem.
 function sbarDirectCharacter(x, y, num)
-  traceSbar(["char", num, x, y])
+  if sbarTraceEnabled then traceSbar(["char", num, x, y]) end if
   return draw.Draw_Character(x, y, num)
 end function
 
 // Provide sbar direct string behavior for the active subsystem.
 function sbarDirectString(x, y, text)
-  traceSbar(["string", text, x, y])
+  if sbarTraceEnabled then traceSbar(["string", text, x, y]) end if
   return draw.Draw_String(x, y, text)
 end function
 
 // Provide sbar direct fill behavior for the active subsystem.
 function sbarDirectFill(x, y, width, height, color)
-  traceSbar(["fill", x, y, width, height, color])
+  if sbarTraceEnabled then traceSbar(["fill", x, y, width, height, color]) end if
   return draw.Draw_Fill(x, y, width, height, color)
 end function
 
 // Provide sbar direct tile clear behavior for the active subsystem.
 function sbarDirectTileClear(x, y, width, height)
-  traceSbar(["tileclear", x, y, width, height])
+  if sbarTraceEnabled then traceSbar(["tileclear", x, y, width, height]) end if
   return draw.Draw_TileClear(x, y, width, height)
 end function
 
@@ -563,7 +569,7 @@ function Sbar_DrawPic(x, y, pic)
   if pic is void then return false end if
   drawX = sbarXOffset() + x * sbarScale
   drawY = sbarHeight + (y - SBAR_HEIGHT) * sbarScale
-  traceSbar(["pic", pic.name, drawX, drawY])
+  if sbarTraceEnabled then traceSbar(["pic", pic.name, drawX, drawY]) end if
   if sbarScale <= 1.0 then return draw.Draw_Pic(drawX, drawY, pic) end if
   return draw.Draw_PicSizedNearest(pic, drawX, drawY, pic.width * sbarScale, pic.height * sbarScale, 255)
 end function
@@ -573,7 +579,7 @@ function Sbar_DrawTransPic(x, y, pic)
   if pic is void then return false end if
   drawX = sbarXOffset() + x * sbarScale
   drawY = sbarHeight + (y - SBAR_HEIGHT) * sbarScale
-  traceSbar(["transpic", pic.name, drawX, drawY])
+  if sbarTraceEnabled then traceSbar(["transpic", pic.name, drawX, drawY]) end if
   if sbarScale <= 1.0 then return draw.Draw_TransPic(drawX, drawY, pic) end if
   return draw.Draw_PicSizedNearest(pic, drawX, drawY, pic.width * sbarScale, pic.height * sbarScale, 255)
 end function
@@ -582,7 +588,7 @@ end function
 function Sbar_DrawCharacter(x, y, num)
   drawX = sbarXOffset() + (x + 4) * sbarScale
   drawY = sbarHeight + (y - SBAR_HEIGHT) * sbarScale
-  traceSbar(["char", num, drawX, drawY])
+  if sbarTraceEnabled then traceSbar(["char", num, drawX, drawY]) end if
   if sbarScale <= 1.0 then return draw.Draw_Character(drawX, drawY, num) end if
   return draw.character(sbarFontTexture, drawX, drawY, num, sbarScale, 255)
 end function
@@ -591,7 +597,7 @@ end function
 function Sbar_DrawString(x, y, text)
   drawX = sbarXOffset() + x * sbarScale
   drawY = sbarHeight + (y - SBAR_HEIGHT) * sbarScale
-  traceSbar(["string", text, drawX, drawY])
+  if sbarTraceEnabled then traceSbar(["string", text, drawX, drawY]) end if
   if sbarScale <= 1.0 then return draw.Draw_String(drawX, drawY, text) end if
   return draw.string(sbarFontTexture, drawX, drawY, text, sbarScale, 255)
 end function
@@ -613,8 +619,7 @@ end function
 
 // Mirror Quake's Sbar_DrawNum routine and its observable state changes.
 function Sbar_DrawNum(x, y, num, digits, color)
-  converted = Sbar_itoa(num)
-  text = bytes(converted[0])
+  text = bytes("" + native.trunc(num))
   start = 0
   if len(text) > digits then start = len(text) - digits end if
   if len(text) < digits then x = x + (digits - len(text)) * 24 end if
@@ -664,8 +669,10 @@ end function
 // Provide pad frag behavior for the active subsystem.
 function padFrag(value)
   text = "" + native.trunc(value)
-  while len(bytes(text)) < 3
+  length = len(bytes(text))
+  while length < 3
     text = " " + text
+    length = length + 1
   end while
   return text
 end function
@@ -768,6 +775,15 @@ function sbarActiveWeapon()
   return native.trunc(stat(c.STAT_ACTIVEWEAPON, sbarPlayer.activeWeapon))
 end function
 
+// Return one of the four stock ammunition counters without constructing a
+// frame-local aggregate array.
+function inline inventoryAmmoCount(index)
+  if index == 0 then return stat(c.STAT_SHELLS, sbarPlayer.shells) end if
+  if index == 1 then return stat(c.STAT_NAILS, sbarPlayer.nails) end if
+  if index == 2 then return stat(c.STAT_ROCKETS, sbarPlayer.rockets) end if
+  return stat(c.STAT_CELLS, sbarPlayer.cells)
+end function
+
 // Mirror Quake's Sbar_DrawInventory routine and its observable state changes.
 function Sbar_DrawInventory()
   if sbarPlayer is void then return false end if
@@ -781,13 +797,12 @@ function Sbar_DrawInventory()
     end if
   else Sbar_DrawPic(0, -24, loadedSbarPicture("ibar"))
   end if
-  weapons = ["shotgun", "sshotgun", "nailgun", "snailgun", "rlaunch", "srlaunch", "lightng"]
   index = 0
   while index < 7
     bit = c.IT_SHOTGUN << index
     if (items & bit) != 0 then
       flash = weaponFlash(index, active, currentTime)
-      Sbar_DrawPic(index * 24, -16, loadedSbarPicture(flashWeaponName("", weapons[index], flash)))
+      Sbar_DrawPic(index * 24, -16, loadedSbarPicture(flashWeaponName("", sbarWeaponNames[index], flash)))
     end if
     index = index + 1
   end while
@@ -816,22 +831,15 @@ function Sbar_DrawInventory()
     end if
   end if
   if sbarRogue and active >= c.RIT_LAVA_NAILGUN then
-    names = ["r_lava", "r_superlava", "r_gren", "r_multirock", "r_plasma"]
     index = 0
     while index < 5
-      if active == (c.RIT_LAVA_NAILGUN << index) then Sbar_DrawPic((index + 2) * 24, -16, loadedSbarPicture(names[index])) end if
+      if active == (c.RIT_LAVA_NAILGUN << index) then Sbar_DrawPic((index + 2) * 24, -16, loadedSbarPicture(sbarRogueWeaponNames[index])) end if
       index = index + 1
     end while
   end if
-  counts = [
-    stat(c.STAT_SHELLS, sbarPlayer.shells),
-    stat(c.STAT_NAILS, sbarPlayer.nails),
-    stat(c.STAT_ROCKETS, sbarPlayer.rockets),
-    stat(c.STAT_CELLS, sbarPlayer.cells),
-  ]
   index = 0
   while index < 4
-    text = fragGlyphs(counts[index])
+    text = fragGlyphs(inventoryAmmoCount(index))
     digit = 0
     while digit < 3
       if text[digit] != 32 then Sbar_DrawCharacter((6 * index + 1 + digit) * 8 - 2, -24, 18 + text[digit] - 48) end if
@@ -839,11 +847,10 @@ function Sbar_DrawInventory()
     end while
     index = index + 1
   end while
-  baseItems = ["sb_key1", "sb_key2", "sb_invis", "sb_invuln", "sb_suit", "sb_quad"]
   index = 0
   while index < 6
     if (items & (1 << (17 + index))) != 0 then
-      if not sbarHipnotic or index > 1 then Sbar_DrawPic(192 + index * 16, -16, loadedSbarPicture(baseItems[index])) end if
+      if not sbarHipnotic or index > 1 then Sbar_DrawPic(192 + index * 16, -16, loadedSbarPicture(sbarBaseItemNames[index])) end if
       itemNeedsRefresh(17 + index, currentTime)
     end if
     index = index + 1
@@ -1015,8 +1022,7 @@ end function
 
 // Mirror Quake's Sbar_IntermissionNumber routine and its observable state changes.
 function Sbar_IntermissionNumber(x, y, num, digits, color)
-  converted = Sbar_itoa(num)
-  text = bytes(converted[0])
+  text = bytes("" + native.trunc(num))
   start = 0
   if len(text) > digits then start = len(text) - digits end if
   if len(text) < digits then x = x + (digits - len(text)) * 24 end if
@@ -1038,7 +1044,7 @@ function sbarOverlayPic(x, y, pic, transform, transparent)
   drawY = transform[1] + y * transform[2]
   command = "pic"
   if transparent then command = "transpic" end if
-  traceSbar([command, pic.name, drawX, drawY, transform[2]])
+  if sbarTraceEnabled then traceSbar([command, pic.name, drawX, drawY, transform[2]]) end if
   return draw.Draw_PicSizedNearest(
     pic,
     drawX,
@@ -1067,7 +1073,7 @@ function sbarCanvasCharacter(x, y, num, transform)
   drawX = transform[0] + x * transform[2]
   drawY = transform[1] + y * transform[2]
   if transform[2] <= 1.0 then return sbarDirectCharacter(native.trunc(drawX), native.trunc(drawY), num) end if
-  traceSbar(["char", num, drawX, drawY])
+  if sbarTraceEnabled then traceSbar(["char", num, drawX, drawY]) end if
   return draw.character(sbarFontTexture, drawX, drawY, num, transform[2], 255)
 end function
 
@@ -1076,7 +1082,7 @@ function sbarCanvasString(x, y, text, transform)
   drawX = transform[0] + x * transform[2]
   drawY = transform[1] + y * transform[2]
   if transform[2] <= 1.0 then return sbarDirectString(native.trunc(drawX), native.trunc(drawY), text) end if
-  traceSbar(["string", text, drawX, drawY])
+  if sbarTraceEnabled then traceSbar(["string", text, drawX, drawY]) end if
   return draw.string(sbarFontTexture, drawX, drawY, text, transform[2], 255)
 end function
 
@@ -1094,8 +1100,7 @@ end function
 
 // Mirror Quake's Sbar_IntermissionNumberScaled routine and its observable state changes.
 function Sbar_IntermissionNumberScaled(x, y, num, digits, color, transform)
-  converted = Sbar_itoa(num)
-  text = bytes(converted[0])
+  text = bytes("" + native.trunc(num))
   start = 0
   if len(text) > digits then start = len(text) - digits end if
   if len(text) < digits then x = x + (digits - len(text)) * 24 end if
@@ -1133,7 +1138,7 @@ function Sbar_DeathmatchOverlay()
     sbarCanvasCharacter(x + 8, y, text[0], transform); sbarCanvasCharacter(x + 16, y, text[1], transform); sbarCanvasCharacter(x + 24, y, text[2], transform)
     if clientIndex == sbarClient.viewEntity - 1 then sbarCanvasCharacter(x - 8, y, 12, transform) end if
     sbarCanvasString(x + 64, y, score.name, transform)
-    traceSbar(["score", clientIndex, score.frags, score.name, transform[0] + x * transform[2], transform[1] + y * transform[2]])
+    if sbarTraceEnabled then traceSbar(["score", clientIndex, score.frags, score.name, transform[0] + x * transform[2], transform[1] + y * transform[2]]) end if
     y = y + 10
     index = index + 1
   end while
@@ -1171,7 +1176,7 @@ function Sbar_MiniDeathmatchOverlay()
     sbarCanvasCharacter(x + 8, y, text[0], transform); sbarCanvasCharacter(x + 16, y, text[1], transform); sbarCanvasCharacter(x + 24, y, text[2], transform)
     if clientIndex == sbarClient.viewEntity - 1 then sbarCanvasCharacter(x, y, 16, transform); sbarCanvasCharacter(x + 32, y, 17, transform) end if
     sbarCanvasString(x + 48, y, score.name, transform)
-    traceSbar(["miniscore", clientIndex, score.frags, score.name, x * sbarScale, y * sbarScale])
+    if sbarTraceEnabled then traceSbar(["miniscore", clientIndex, score.frags, score.name, x * sbarScale, y * sbarScale]) end if
     y = y + 8
     index = index + 1
   end while
@@ -1219,7 +1224,7 @@ function Sbar_IntermissionOverlay()
     sbarOverlayPic(232, 144, loadedSbarPicture("num_slash"), transform, true)
     Sbar_IntermissionNumberScaled(240, 144, stat(c.STAT_TOTALMONSTERS, 0), 3, 0, transform)
   end if
-  traceSbar(["intermission", minutes, seconds])
+  if sbarTraceEnabled then traceSbar(["intermission", minutes, seconds]) end if
   return true
 end function
 
@@ -1233,11 +1238,11 @@ function Sbar_FinaleOverlay()
   if transform[2] <= 1.0 then
     drawX = native.trunc((sbarWidth - finale.width) / 2)
     sbarDirectTransPic(drawX, 16, finale)
-    traceSbar(["finale", drawX, 16])
+    if sbarTraceEnabled then traceSbar(["finale", drawX, 16]) end if
   else
     virtualX = (320.0 - finale.width) * 0.5
     sbarOverlayPic(virtualX, 16, finale, transform, true)
-    traceSbar(["finale", transform[0] + virtualX * transform[2], transform[1] + 16.0 * transform[2], transform[2]])
+    if sbarTraceEnabled then traceSbar(["finale", transform[0] + virtualX * transform[2], transform[1] + 16.0 * transform[2], transform[2]]) end if
   end if
   return true
 end function

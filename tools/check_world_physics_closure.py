@@ -60,6 +60,7 @@ DOWNSTREAM_SERVER_GC_ROOT_FUNCTIONS = (
     "setSynchronizedVector",
     "syncQcVectorInto",
     "syncQcVectorIntoAt",
+    "syncEstablishedQcVectorIntoAt",
     "resizeSynchronizedEdictArray",
     "ensureSynchronizedBaseline",
     "ensureSynchronizedEdict",
@@ -68,6 +69,8 @@ DOWNSTREAM_SERVER_GC_ROOT_FUNCTIONS = (
     "syncQuakeCEdictRange",
     "syncQuakeCEdicts",
     "syncLoadedQuakeCEdicts",
+    "syncQuakeCSnapshotEdictAt",
+    "syncQuakeCSnapshotEdicts",
     "syncPlayerToQuakeC",
     "syncPlayerFromQuakeC",
 )
@@ -82,7 +85,7 @@ DOWNSTREAM_SERVER_ALLOWED_FUNCTIONS = (
 # Each synchronized-vector helper is bound separately so compiler-safe removal
 # of redundant post-construction validation cannot weaken the remaining mask.
 DOWNSTREAM_SERVER_PROTECTED_SHA256 = (
-    "eefb01fe2aa4d60a7589f925499074bb509051e63868d02f3353a65c664b7108"
+    "cbe0fb083e1ee809e6f8177f0d742aaf0317ebae00866202ba1678d540474570"
 )
 SERVER_SECTION_HASHES = {
     "runWorldPhysicsWithRetouch": "5b082bf6147659c213fe46e84679d44a73f11dcd2aac070ef51eaf66dd0ecc8b",
@@ -95,6 +98,7 @@ SERVER_GC_ROOT_SECTION_HASHES = {
     "setSynchronizedVector": "2224733cf08b38279f043cbb565ff2ff8c0da73199ec77dac61479393e69bea0",
     "syncQcVectorInto": "539b24aabd4d4329ae5b6ba911250c0402a73867db06be6e2021c66081b44a2e",
     "syncQcVectorIntoAt": "dccd20c403b6b6de5cecec71613df9fa14e253eac0ac909af056de672ce50775",
+    "syncEstablishedQcVectorIntoAt": "822bf200b5e3da8039ad437d4d119fe01ef3640b9eadeba5246ae6f3f7527dde",
     "resizeSynchronizedEdictArray": "feffb4ecf5ae81d17ec447f5c2e0d8535e566406518c5ea91172aa05346dd795",
     "ensureSynchronizedBaseline": "4373f3023d269bd09c9e4af1461b8c3046aeb4a6da501f4b47c0f39d801bbe92",
     "ensureSynchronizedEdict": "021e99d057bb0d8065985edbc3135f94c32ef3cde31672dd0f96c5c96fdd2562",
@@ -103,6 +107,8 @@ SERVER_GC_ROOT_SECTION_HASHES = {
     "syncQuakeCEdictRange": "68c2a956d1b1a40bb97a69b5b54896591cb034a8bca8ad552225caca755ebde8",
     "syncQuakeCEdicts": "20487d24c832a3806d321883ccaccf5f7a7a3a20a892777009d5c2abe8759edc",
     "syncLoadedQuakeCEdicts": "dd64b00262cbab549e47098747ad2e6af8e61bd1985b49b7d59f54af724b3de7",
+    "syncQuakeCSnapshotEdictAt": "0378875877db9959e14d529939e2e38a4a73b94bae8e07aeed4832fae9d0316a",
+    "syncQuakeCSnapshotEdicts": "11d5c682650dfd92209c2a82c39ec3befd6a77d857c22633fb59be505b8d2842",
     "syncPlayerToQuakeC": "4ef4bfc0a9023055caee8af2d8345c230d84764d34f06e15215c45a53f78dad0",
     "syncPlayerFromQuakeC": "5ab8e9e2863d17f8399b18665a5ed8b08041ab0181a2597cf0db0272ee30d010",
 }

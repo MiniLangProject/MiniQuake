@@ -20,6 +20,16 @@ const CSHIFT_CONTENTS = 0
 const CSHIFT_DAMAGE = 1
 const CSHIFT_BONUS = 2
 const CSHIFT_POWERUP = 3
+
+// V_RenderView's compatibility trace contains only fixed stage names. Share
+// the immutable variants instead of rebuilding nested arrays every frame.
+viewTraceEmpty = []
+viewTracePaused = [["R_PushDlights"], ["R_RenderView"]]
+viewTracePausedStereo = [["R_PushDlights"], ["R_RenderView", "left"], ["R_PushDlights"], ["R_RenderView", "right"]]
+viewTraceRefdef = [["V_CalcRefdef"], ["R_PushDlights"], ["R_RenderView"]]
+viewTraceRefdefStereo = [["V_CalcRefdef"], ["R_PushDlights"], ["R_RenderView", "left"], ["R_PushDlights"], ["R_RenderView", "right"]]
+viewTraceIntermission = [["V_CalcIntermissionRefdef"], ["R_PushDlights"], ["R_RenderView"]]
+viewTraceIntermissionStereo = [["V_CalcIntermissionRefdef"], ["R_PushDlights"], ["R_RenderView", "left"], ["R_PushDlights"], ["R_RenderView", "right"]]
 const NUM_CSHIFTS = 4
 
 // Provide empty gamma behavior for the active subsystem.
@@ -323,32 +333,58 @@ end function
 
 // Mirror Quake's V_SetContentsColor routine and its observable state changes.
 function V_SetContentsColor(state, contents)
+  shift = state.cshifts[CSHIFT_CONTENTS]
   if contents == c.CONTENTS_EMPTY or contents == c.CONTENTS_SOLID then
-    state.cshifts[CSHIFT_CONTENTS] = [state.emptyCshift[0], state.emptyCshift[1], state.emptyCshift[2], state.emptyCshift[3]]
+    shift[0] = state.emptyCshift[0]
+    shift[1] = state.emptyCshift[1]
+    shift[2] = state.emptyCshift[2]
+    shift[3] = state.emptyCshift[3]
   else if contents == c.CONTENTS_LAVA then
-    state.cshifts[CSHIFT_CONTENTS] = [255.0, 80.0, 0.0, 150.0]
+    shift[0] = 255.0
+    shift[1] = 80.0
+    shift[2] = 0.0
+    shift[3] = 150.0
   else if contents == c.CONTENTS_SLIME then
-    state.cshifts[CSHIFT_CONTENTS] = [0.0, 25.0, 5.0, 150.0]
+    shift[0] = 0.0
+    shift[1] = 25.0
+    shift[2] = 5.0
+    shift[3] = 150.0
   else
-    state.cshifts[CSHIFT_CONTENTS] = [130.0, 80.0, 50.0, 128.0]
+    shift[0] = 130.0
+    shift[1] = 80.0
+    shift[2] = 50.0
+    shift[3] = 128.0
   end if
-  return state.cshifts[CSHIFT_CONTENTS]
+  return shift
 end function
 
 // Mirror Quake's V_CalcPowerupCshift routine and its observable state changes.
 function V_CalcPowerupCshift(state, items)
+  shift = state.cshifts[CSHIFT_POWERUP]
   if (items & c.IT_QUAD) != 0 then
-    state.cshifts[CSHIFT_POWERUP] = [0.0, 0.0, 255.0, 30.0]
+    shift[0] = 0.0
+    shift[1] = 0.0
+    shift[2] = 255.0
+    shift[3] = 30.0
   else if (items & c.IT_SUIT) != 0 then
-    state.cshifts[CSHIFT_POWERUP] = [0.0, 255.0, 0.0, 20.0]
+    shift[0] = 0.0
+    shift[1] = 255.0
+    shift[2] = 0.0
+    shift[3] = 20.0
   else if (items & c.IT_INVISIBILITY) != 0 then
-    state.cshifts[CSHIFT_POWERUP] = [100.0, 100.0, 100.0, 100.0]
+    shift[0] = 100.0
+    shift[1] = 100.0
+    shift[2] = 100.0
+    shift[3] = 100.0
   else if (items & c.IT_INVULNERABILITY) != 0 then
-    state.cshifts[CSHIFT_POWERUP] = [255.0, 255.0, 0.0, 30.0]
+    shift[0] = 255.0
+    shift[1] = 255.0
+    shift[2] = 0.0
+    shift[3] = 30.0
   else
-    state.cshifts[CSHIFT_POWERUP][3] = 0.0
+    shift[3] = 0.0
   end if
-  return state.cshifts[CSHIFT_POWERUP]
+  return shift
 end function
 
 // Mirror Quake's V_CalcBlend routine and its observable state changes.
@@ -372,7 +408,10 @@ function V_CalcBlend(state, cshiftPercent)
   end while
   if alpha > 1.0 then alpha = 1.0 end if
   if alpha < 0.0 then alpha = 0.0 end if
-  state.blend = [red / 255.0, green / 255.0, blue / 255.0, alpha]
+  state.blend[0] = red / 255.0
+  state.blend[1] = green / 255.0
+  state.blend[2] = blue / 255.0
+  state.blend[3] = alpha
   return state.blend
 end function
 
@@ -647,7 +686,7 @@ end function
 
 // Mirror Quake's V_RenderView routine and its observable state changes.
 function V_RenderView(state, player, client, registry, frameTime, paused, demoPlayback, intermission, forcedConsole)
-  state.commandTrace = []
+  state.commandTrace = viewTraceEmpty
   if forcedConsole then return state end if
   // view.c drives bob, idle motion, pitch drift and weapon animation from
   // cl.time, not from the newest svc_time sample (cl.mtime[0]).
@@ -659,6 +698,7 @@ function V_RenderView(state, player, client, registry, frameTime, paused, demoPl
     cvar.set(registry, "scr_ofsz", "0")
   end if
 
+  traceKind = 0
   if intermission != 0 then
     V_CalcIntermissionRefdef(
       state,
@@ -671,7 +711,7 @@ function V_RenderView(state, player, client, registry, frameTime, paused, demoPl
       cvar.variableValue(registry, "v_iroll_level"),
       cvar.variableValue(registry, "v_ipitch_level"),
     )
-    state.commandTrace = state.commandTrace + [["V_CalcIntermissionRefdef"]]
+    traceKind = 2
   else if not paused then
     V_CalcRefdef(
       state,
@@ -686,13 +726,15 @@ function V_RenderView(state, player, client, registry, frameTime, paused, demoPl
       demoPlayback,
       registry,
     )
-    state.commandTrace = state.commandTrace + [["V_CalcRefdef"]]
+    traceKind = 1
   end if
 
-  state.commandTrace = state.commandTrace + [["R_PushDlights"]]
   lcdOffset = cvar.variableValue(registry, "lcd_x")
   if lcdOffset != 0.0 then
-    state.commandTrace = state.commandTrace + [["R_RenderView", "left"], ["R_PushDlights"], ["R_RenderView", "right"]]
+    if traceKind == 2 then state.commandTrace = viewTraceIntermissionStereo
+    else if traceKind == 1 then state.commandTrace = viewTraceRefdefStereo
+    else state.commandTrace = viewTracePausedStereo
+    end if
     // The original leaves r_refdef at the right-eye position after the second
     // stereo pass.  Its global `right` vector was last written by V_CalcRoll
     // from the player entity angles, not by the later local offset basis.
@@ -702,7 +744,10 @@ function V_RenderView(state, player, client, registry, frameTime, paused, demoPl
     state.origin.y = state.origin.y + stereoRight.y * lcdOffset
     state.origin.z = state.origin.z + stereoRight.z * lcdOffset
   else
-    state.commandTrace = state.commandTrace + [["R_RenderView"]]
+    if traceKind == 2 then state.commandTrace = viewTraceIntermission
+    else if traceKind == 1 then state.commandTrace = viewTraceRefdef
+    else state.commandTrace = viewTracePaused
+    end if
   end if
   return state
 end function

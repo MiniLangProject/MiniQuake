@@ -19,16 +19,29 @@ import miniquake.mathlib as math
 import miniquake.native as native
 import miniquake.array_util as arrayutil
 
+animatedLightStyleSources = []
+animatedLightStyleBytes = []
+
 // Apply the Quake-compatible r animate light into behavior.
 function R_AnimateLightInto(lightStyles, currentTime, values)
+  global animatedLightStyleSources, animatedLightStyleBytes
   if values is void or len(values) != c.MAX_LIGHTSTYLES then values = arrayutil.makeFilledArray(c.MAX_LIGHTSTYLES, 256) end if
+  if len(animatedLightStyleSources) != c.MAX_LIGHTSTYLES then
+    animatedLightStyleSources = arrayutil.makeFilledArray(c.MAX_LIGHTSTYLES, void)
+    animatedLightStyleBytes = arrayutil.makeFilledArray(c.MAX_LIGHTSTYLES, void)
+  end if
   tick = native.trunc(currentTime * 10.0)
   index = 0
   while index < c.MAX_LIGHTSTYLES
     values[index] = 256
     style = ""
     if index < len(lightStyles) then style = lightStyles[index] end if
-    data = bytes(style)
+    data = animatedLightStyleBytes[index]
+    if data is void or animatedLightStyleSources[index] != style then
+      data = bytes(style)
+      animatedLightStyleSources[index] = style
+      animatedLightStyleBytes[index] = data
+    end if
     if len(data) > 0 then
       character = data[tick % len(data)] - 97
       values[index] = character * 22

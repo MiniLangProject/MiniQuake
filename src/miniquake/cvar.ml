@@ -78,6 +78,10 @@ end function
 
 // Consume pending state for take server changes.
 function takeServerChanges(registry)
+  // Host drains this queue twice per frame, while server cvars change only on
+  // explicit commands. Preserve the existing empty object in the common case
+  // instead of replacing it with another short-lived empty array.
+  if len(registry.serverChanges) == 0 then return registry.serverChanges end if
   changes = registry.serverChanges
   registry.serverChanges = []
   return changes

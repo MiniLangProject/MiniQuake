@@ -189,6 +189,45 @@ function setPhysicsBox(machine, entityIndex, origin, mins, maxs, moveType, solid
   vm.setEntityFloat(machine, entityIndex, 20, solid)
 end function
 
+// Verify that free snapshot slots retain stable mirror storage and that a
+// later ED_Alloc-style reuse refreshes every visible field from QuakeC.
+function testSnapshotFreeReuse()
+  game = makePhysicsFixture(4)
+  runtime = game.machine.context.edicts
+  server.syncQuakeCEdicts(game)
+  item = game.edicts[3]
+  itemIdentity = nativeRawValue(item)
+  baselineIdentity = nativeRawValue(item.baseline)
+
+  runtime.freeFlags[3] = true
+  runtime.freeTimes[3] = 10.5
+  vm.setEntityVector(game.machine, 3, 1, t.Vec3(99.0, 98.0, 97.0))
+  server.syncQuakeCSnapshotEdicts(game)
+  physAssertTrue(game.edicts[3].free, "snapshot free flag")
+  physAssertEqual(nativeRawValue(game.edicts[3]), itemIdentity, "free slot mirror identity")
+  physAssertEqual(nativeRawValue(game.edicts[3].baseline), baselineIdentity, "free slot baseline identity")
+  physAssertNear(game.edicts[3].freeTime, 10.5, "free slot timestamp")
+
+  runtime.freeFlags[3] = false
+  vm.setEntityVector(game.machine, 3, 1, t.Vec3(42.0, 43.0, 44.0))
+  server.syncQuakeCSnapshotEdicts(game)
+  physAssertTrue(not game.edicts[3].free, "reused slot becomes live")
+  physAssertEqual(game.edicts[3].number, 3, "reused slot number")
+  physAssertEqual(nativeRawValue(game.edicts[3]), itemIdentity, "reused slot mirror identity")
+  physAssertEqual(nativeRawValue(game.edicts[3].baseline), baselineIdentity, "reused slot baseline identity")
+  physAssertNear(game.edicts[3].origin.x, 42.0, "reused slot origin x")
+  physAssertNear(game.edicts[3].origin.y, 43.0, "reused slot origin y")
+  physAssertNear(game.edicts[3].origin.z, 44.0, "reused slot origin z")
+
+  runtime.freeFlags[3] = true
+  server.syncQuakeCSnapshotEdicts(game)
+  runtime.freeFlags[3] = false
+  vm.setEntityVector(game.machine, 3, 1, t.Vec3(88.0, 89.0, 90.0))
+  server.syncQuakeCSnapshotEdicts(game)
+  physAssertNear(game.edicts[3].origin.x, 88.0, "second reuse refreshes stale origin")
+  return true
+end function
+
 // Verify velocity gravity and think against the expected Quake behavior.
 function testVelocityGravityAndThink()
   game = makePhysicsFixture(3)
@@ -445,6 +484,7 @@ function testMultiplayerUsesIndependentPlayerStates()
   physAssertNear(vm.entityFloat(machine, 1, 44), 11.0, "first client keeps own health")
   physAssertNear(vm.entityFloat(machine, 2, 44), 22.0, "second client keeps own health")
   physAssertNear(hostPlayer.origin.x, 99.0, "remote clients do not overwrite host mirror")
+  testSnapshotFreeReuse()
   return true
 end function
 

@@ -384,25 +384,41 @@ function Con_DrawInput(state, realtime)
   visible = state.lineWidth
   start = 0
   if len(text) + 1 >= visible then start = len(text) + 1 - visible end if
-  output = []
+  output = arrays.makeEmptyArray(len(text) - start + 1)
+  outputIndex = 0
   index = start
   while index < len(text)
-    output = output + [text[index]]
+    output[outputIndex] = text[index]
+    outputIndex = outputIndex + 1
     index = index + 1
   end while
-  output = output + [cursor]
+  output[outputIndex] = cursor
   return output
 end function
 
 // Mirror Quake's Con_NotifyRows routine and its observable state changes.
 function Con_NotifyRows(state, realtime, notifyTime)
-  rows = []
+  rowCount = 0
   first = state.currentLine - NUM_CON_TIMES + 1
   line = first
   while line <= state.currentLine
     if line >= 0 then
       generated = state.notifyTimes[line % NUM_CON_TIMES]
-      if generated != 0.0 and realtime - generated <= notifyTime then rows = rows + [lineBytes(state, line)] end if
+      if generated != 0.0 and realtime - generated <= notifyTime then rowCount = rowCount + 1 end if
+    end if
+    line = line + 1
+  end while
+  if rowCount == 0 then return [] end if
+  rows = arrays.makeEmptyArray(rowCount)
+  rowIndex = 0
+  line = first
+  while line <= state.currentLine
+    if line >= 0 then
+      generated = state.notifyTimes[line % NUM_CON_TIMES]
+      if generated != 0.0 and realtime - generated <= notifyTime then
+        rows[rowIndex] = lineBytes(state, line)
+        rowIndex = rowIndex + 1
+      end if
     end if
     line = line + 1
   end while
@@ -412,15 +428,19 @@ end function
 // Mirror Quake's Con_DrawNotify routine and its observable state changes.
 function Con_DrawNotify(state, realtime, notifyTime, messageMode, chatText)
   rows = Con_NotifyRows(state, realtime, notifyTime)
-  commands = []
+  commandCount = len(rows)
+  if messageMode then commandCount = commandCount + 1 end if
+  commands = arrays.makeEmptyArray(commandCount)
+  commandIndex = 0
   y = 0
   for each row in rows
-    commands = commands + [["text", 8, y, row]]
+    commands[commandIndex] = ["text", 8, y, row]
+    commandIndex = commandIndex + 1
     y = y + 8
   end for
   if messageMode then
     chat = bytes("say:" + chatText)
-    commands = commands + [["chat", 8, y, chat, 10 + (native.trunc(realtime * 4.0) & 1)]]
+    commands[commandIndex] = ["chat", 8, y, chat, 10 + (native.trunc(realtime * 4.0) & 1)]
     y = y + 8
   end if
   if y > state.notifyPixelLines then state.notifyPixelLines = y end if
@@ -432,12 +452,14 @@ end function
 function Con_ConsoleRows(state, pixelLines)
   rows = native.trunc((pixelLines - 16) / 8)
   if rows < 0 then rows = 0 end if
-  output = []
+  output = arrays.makeEmptyArray(rows)
+  outputIndex = 0
   line = state.currentLine - rows + 1
   while line <= state.currentLine
     selected = line - backscrollLines
     if selected < 0 then selected = 0 end if
-    output = output + [lineBytes(state, selected)]
+    output[outputIndex] = lineBytes(state, selected)
+    outputIndex = outputIndex + 1
     line = line + 1
   end while
   return output
@@ -447,14 +469,19 @@ end function
 function Con_DrawConsole(state, pixelLines, drawInput, realtime)
   if pixelLines <= 0 then return [] end if
   state.visiblePixelLines = pixelLines
-  commands = [["background", pixelLines]]
   rows = Con_ConsoleRows(state, pixelLines)
+  commandCount = 1 + len(rows)
+  if drawInput then commandCount = commandCount + 1 end if
+  commands = arrays.makeEmptyArray(commandCount)
+  commands[0] = ["background", pixelLines]
+  commandIndex = 1
   y = pixelLines - 16 - len(rows) * 8
   for each row in rows
-    commands = commands + [["text", 8, y, row]]
+    commands[commandIndex] = ["text", 8, y, row]
+    commandIndex = commandIndex + 1
     y = y + 8
   end for
-  if drawInput then commands = commands + [["input", Con_DrawInput(state, realtime)]] end if
+  if drawInput then commands[commandIndex] = ["input", Con_DrawInput(state, realtime)] end if
   state.drawTrace = commands
   return commands
 end function

@@ -22,7 +22,8 @@ const MAX_BEAMS = 24
 const MAX_TEMP_ENTITIES = 64
 const BEAM_STEP = 30.0
 
-currentTemporary = []
+emptyTemporary = []
+currentTemporary = emptyTemporary
 
 // Render float.
 function renderFloat(value)
@@ -140,8 +141,18 @@ function buildTemporaryEntities(compactBeams, client, currentTime, visibleCount)
   if available < 0 then available = 0 end if
   capacity = MAX_TEMP_ENTITIES
   if available < capacity then capacity = available end if
-  builder = arrays.createArrayBuilder(capacity)
+  // Most frames have no active lightning beam. Avoid allocating the 64-slot
+  // builder and its exact-sized result for that empty handoff.
+  if capacity <= 0 or len(compactBeams) == 0 then
+    currentTemporary = emptyTemporary
+    return currentTemporary
+  end if
   active = transients.activeCompactBeamList(compactBeams, currentTime)
+  if len(active) == 0 then
+    currentTemporary = emptyTemporary
+    return currentTemporary
+  end if
+  builder = arrays.createArrayBuilder(capacity)
   beamIndex = 0
   while beamIndex < len(active) and builder.count < capacity
     effect = active[beamIndex][0]
@@ -177,7 +188,7 @@ end function
 // Update module state for temporary entities.
 function clearTemporaryEntities()
   global currentTemporary
-  currentTemporary = []
+  currentTemporary = emptyTemporary
   return true
 end function
 

@@ -45,6 +45,7 @@ directInput = false
 mouseOldButtonState = 0
 mouseAccumX = 0.0
 mouseAccumY = 0.0
+mouseDeltaScratch = [0.0, 0.0]
 joyAvailable = false
 joyAdvancedInitialized = false
 joyHasPov = false
@@ -384,16 +385,21 @@ end function
 function setBindingCode(code, command)
   global bindings
   if code < 0 or code > 255 then return false end if
+  // Preserve the user-facing command at slot 2 and cache its normalized form
+  // privately at slot 3. Config execution can rebuild the polling cache after
+  // every bind; normalizing once here avoids an otherwise quadratic stream of
+  // temporary strings without changing binding order or text serialization.
+  normalizedCommand = lower(command)
   index = 0
   while index < len(bindings)
     if bindings[index][0] == code then
-      bindings[index] = [code, keyNameForCode(code), command]
+      bindings[index] = [code, keyNameForCode(code), command, normalizedCommand]
       rebuildPolledBindings()
       return true
     end if
     index = index + 1
   end while
-  bindings = bindings + [[code, keyNameForCode(code), command]]
+  bindings = bindings + [[code, keyNameForCode(code), command, normalizedCommand]]
   rebuildPolledBindings()
   return true
 end function
@@ -487,7 +493,7 @@ function bindingsForCommand(command)
   wanted = lower(command)
   result = []
   for each item in bindings
-    if lower(item[2]) == wanted then
+    if item[3] == wanted then
       result = result + [item[1]]
       if len(result) >= 2 then return result end if
     end if
@@ -509,7 +515,7 @@ function unbindCommand(command)
   wanted = lower(command)
   result = []
   for each item in bindings
-    if lower(item[2]) != wanted then result = result + [item] end if
+    if item[3] != wanted then result = result + [item] end if
   end for
   bindings = result
   rebuildPolledBindings()
@@ -676,7 +682,7 @@ end function
 function actionDown(command)
   wanted = lower(command)
   for each item in bindings
-    if lower(item[2]) == wanted and keyIsDown(item[0]) then return true end if
+    if item[3] == wanted and keyIsDown(item[0]) then return true end if
   end for
   return false
 end function
@@ -685,7 +691,7 @@ end function
 function actionPressed(command)
   wanted = lower(command)
   for each item in bindings
-    if lower(item[2]) == wanted then
+    if item[3] == wanted then
       code = item[0]
       if keyPressedForCode(code) then return true end if
     end if
@@ -694,8 +700,7 @@ function actionPressed(command)
 end function
 
 // Provide button for command behavior for the active subsystem.
-function buttonForCommand(command)
-  wanted = lower(command)
+function buttonForNormalizedCommand(wanted)
   if wanted == "+klook" then return inKLook end if
   if wanted == "+mlook" then return inMLook end if
   if wanted == "+moveup" then return inUp end if
@@ -716,6 +721,11 @@ function buttonForCommand(command)
   return void
 end function
 
+// Resolve an arbitrary-case button command through its canonical name.
+function buttonForCommand(command)
+  return buttonForNormalizedCommand(lower(command))
+end function
+
 // Parse the exact canonical impulse binding accepted by the original polling
 // path.  Non-impulse and non-canonical command strings return zero.
 function impulseForCommand(command)
@@ -732,8 +742,8 @@ function rebuildPolledBindings()
   global polledBindings
   result = []
   for each item in bindings
-    command = lower(item[2])
-    button = buttonForCommand(command)
+    command = item[3]
+    button = buttonForNormalizedCommand(command)
     impulse = 0
     if button is void then impulse = impulseForCommand(command) end if
     if button is not void or impulse != 0 then
@@ -763,7 +773,7 @@ function bindingHoldsKey(command, key)
   if key == -1 then return true end if
   wanted = lower(command)
   for each item in bindings
-    if item[0] == key and lower(item[2]) == wanted and keyIsDown(key) then return true end if
+    if item[0] == key and item[3] == wanted and keyIsDown(key) then return true end if
   end for
   return false
 end function
@@ -831,11 +841,11 @@ end function
 // into cl_input.c. This preserves ownership when two bound keys hold one
 // action, and also preserves a press/release completed between two frames.
 function synchronizeButton(command)
-  button = buttonForCommand(command)
-  if button is void then return false end if
   wanted = lower(command)
+  button = buttonForNormalizedCommand(wanted)
+  if button is void then return false end if
   for each item in bindings
-    if lower(item[2]) == wanted then
+    if item[3] == wanted then
       code = item[0]
       if keyIsDown(code) then
         // WM_KEYDOWN records an edge as well as the held state.  Key_Event has
@@ -1194,6 +1204,11 @@ function IN_ActivateMouse()
   global mouseActivateToggle, mouseActive, mouseCaptured
   mouseActivateToggle = true
   if not mouseInitialized then return false end if
+  // GL_EndRendering requests capture on every windowed gameplay frame, just
+  // like GLQuake. The native grab and filter reset are transition work: doing
+  // them again while already active allocates a mouse-delta result, discards
+  // filter history and can manufacture periodic GC hitches.
+  if mouseActive and mouseCaptured then return true end if
   win.captureMouse(true)
   mouseCaptured = true
   mouseActive = true
@@ -1211,6 +1226,10 @@ end function
 function IN_DeactivateMouse()
   global mouseActivateToggle, mouseActive, mouseCaptured
   mouseActivateToggle = false
+  // Menu/console frames request release repeatedly.  The native bridge is
+  // already idempotent, so mirror its transition guard here and avoid two
+  // axis drains plus filter resets while the device is already inactive.
+  if not mouseActive and not mouseCaptured then return true end if
   if mouseInitialized then win.captureMouse(false) end if
   mouseCaptured = false
   mouseActive = false
@@ -1267,8 +1286,11 @@ end function
 // Mirror Quake's IN_ClearStates routine and its observable state changes.
 function IN_ClearStates()
   global inImpulse
-  for each command in buttonCommands()
-    resetButton(buttonForCommand(command))
+  // The command/button table is fixed and parallel. Use the persistent button
+  // references directly; resolving every constant command allocated 17
+  // lowercase strings per deterministic render frame and drove periodic GC.
+  for each button in buttonCommandButtons
+    resetButton(button)
   end for
   inImpulse = 0
   IN_ClearDeviceStates()
@@ -1316,7 +1338,7 @@ end function
 function captureGameplayTransitionHeldCodes()
   result = []
   for each item in bindings
-    command = bytes(lower(item[2]))
+    command = bytes(item[3])
     if len(command) > 0 and command[0] == 43 and keyIsDown(item[0]) then
       present = false
       for each code in result
@@ -1408,21 +1430,26 @@ function CL_InitInput()
 end function
 
 // Provide command button behavior for the active subsystem.
-function commandButton(command)
-  source = bytes(lower(command))
+function commandButtonNormalized(command)
+  source = bytes(command)
   if len(source) == 0 then return void end if
   if source[0] == 45 then
     source[0] = 43
-    return buttonForCommand(decode(source))
+    return buttonForNormalizedCommand(decode(source))
   end if
-  return buttonForCommand(command)
+  return buttonForNormalizedCommand(command)
+end function
+
+// Resolve an arbitrary-case signed input command to its shared kbutton.
+function commandButton(command)
+  return commandButtonNormalized(lower(command))
 end function
 
 // Execute input command.
 function dispatchInputCommand(command, key, value)
   wanted = lower(command)
   if wanted == "impulse" then return IN_Impulse(value) end if
-  button = commandButton(wanted)
+  button = commandButtonNormalized(wanted)
   if button is void then return false end if
   source = bytes(wanted)
   if source[0] == 43 then return KeyDown(button, key) end if
@@ -1495,7 +1522,10 @@ function resetMouse()
   mouseFilterReady = false
   mouseAccumX = 0.0
   mouseAccumY = 0.0
-  win.mouseDelta()
+  // Drain both native relative axes without constructing the convenience
+  // two-element array returned by platform.mouseDelta.
+  native.winMouseDx()
+  native.winMouseDy()
   return true
 end function
 
@@ -1508,13 +1538,14 @@ function setMouseCapture(enabled)
   return mouseCaptured
 end function
 
-// Provide filtered mouse delta behavior for the active subsystem.
-function filteredMouseDelta(filterEnabled)
+// Sample filtered mouse motion into caller-owned two-element storage.
+function sampleFilteredMouseDelta(filterEnabled, output)
   global oldMouseX, oldMouseY, mouseFilterReady, mouseAccumX, mouseAccumY
-  if not mouseActive then return [0.0, 0.0] end if
-  raw = win.mouseDelta()
-  mouseX = raw[0] * 1.0 + mouseAccumX
-  mouseY = raw[1] * 1.0 + mouseAccumY
+  if not mouseActive then output[0] = 0.0; output[1] = 0.0; return output end if
+  // Read the same native axes in the same order as platform.mouseDelta, but
+  // retain them as scalars so the live per-frame path creates no pair array.
+  mouseX = native.winMouseDx() * 1.0 + mouseAccumX
+  mouseY = native.winMouseDy() * 1.0 + mouseAccumY
   mouseAccumX = 0.0
   mouseAccumY = 0.0
   filteredX = mouseX
@@ -1528,7 +1559,18 @@ function filteredMouseDelta(filterEnabled)
   oldMouseX = mouseX
   oldMouseY = mouseY
   mouseFilterReady = true
-  return [filteredX, filteredY]
+  output[0] = filteredX
+  output[1] = filteredY
+  return output
+end function
+
+// Provide filtered mouse delta behavior for the active subsystem.
+function filteredMouseDelta(filterEnabled)
+  global mouseDeltaScratch
+  sampleFilteredMouseDelta(filterEnabled, mouseDeltaScratch)
+  // Public compatibility callers receive an independent result just as they
+  // did before; production movement consumes the persistent scratch directly.
+  return [mouseDeltaScratch[0], mouseDeltaScratch[1]]
 end function
 
 // IN_MouseMove first multiplies raw cursor motion by sensitivity and then by
@@ -1542,8 +1584,9 @@ end function
 
 // Apply mouse to the active subsystem state.
 function applyMouse(command, mouseSensitivity, yawScale, pitchScale, filterEnabled)
-  delta = filteredMouseDelta(filterEnabled)
-  return applyMouseDelta(command, delta[0], delta[1], mouseSensitivity, yawScale, pitchScale)
+  global mouseDeltaScratch
+  sampleFilteredMouseDelta(filterEnabled, mouseDeltaScratch)
+  return applyMouseDelta(command, mouseDeltaScratch[0], mouseDeltaScratch[1], mouseSensitivity, yawScale, pitchScale)
 end function
 
 // Select modern persistent free-look without changing the original +mlook
@@ -1602,11 +1645,12 @@ end function
 
 // Mirror Quake's IN_MouseMove routine and its observable state changes.
 function IN_MouseMove(command, mouseSensitivity, yawScale, pitchScale, filterEnabled, sideScale, forwardScale, lookStrafe, noclipAngleHack)
-  delta = filteredMouseDelta(filterEnabled)
+  global mouseDeltaScratch
+  sampleFilteredMouseDelta(filterEnabled, mouseDeltaScratch)
   moved = IN_MoveDelta(
     command,
-    delta[0],
-    delta[1],
+    mouseDeltaScratch[0],
+    mouseDeltaScratch[1],
     mouseSensitivity,
     yawScale,
     pitchScale,
@@ -1615,7 +1659,7 @@ function IN_MouseMove(command, mouseSensitivity, yawScale, pitchScale, filterEna
     lookStrafe,
     noclipAngleHack,
   )
-  if delta[0] != 0.0 or delta[1] != 0.0 then win.centerCursor() end if
+  if mouseDeltaScratch[0] != 0.0 or mouseDeltaScratch[1] != 0.0 then win.centerCursor() end if
   return moved
 end function
 
@@ -1707,10 +1751,11 @@ end function
 function IN_Accumulate()
   global mouseAccumX, mouseAccumY
   if not mouseActive or directInput then return false end if
-  raw = win.mouseDelta()
-  mouseAccumX = mouseAccumX + raw[0]
-  mouseAccumY = mouseAccumY + raw[1]
-  if raw[0] != 0 or raw[1] != 0 then win.centerCursor() end if
+  rawX = native.winMouseDx()
+  rawY = native.winMouseDy()
+  mouseAccumX = mouseAccumX + rawX
+  mouseAccumY = mouseAccumY + rawY
+  if rawX != 0 or rawY != 0 then win.centerCursor() end if
   return true
 end function
 

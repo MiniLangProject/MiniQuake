@@ -46,6 +46,10 @@ const HELP_PAGES = 6
 const MNET_IPX = 1
 const MNET_TCP = 2
 
+cachedLayoutWidth = -1
+cachedLayoutHeight = -1
+cachedLayout = []
+
 // Provide main items behavior for the active subsystem.
 function mainItems()
   return ["Single Player", "Multiplayer", "Options", "Help", "Quit"]
@@ -551,7 +555,13 @@ end function
 
 // Provide layout behavior for the active subsystem.
 function layout(width, height)
-  return menuUiContract.virtualCanvasLayout(width, height)
+  global cachedLayoutWidth, cachedLayoutHeight, cachedLayout
+  if width != cachedLayoutWidth or height != cachedLayoutHeight or len(cachedLayout) != 3 then
+    cachedLayoutWidth = width
+    cachedLayoutHeight = height
+    cachedLayout = menuUiContract.virtualCanvasLayout(width, height)
+  end if
+  return cachedLayout
 end function
 
 // Provide virtual picture behavior for the active subsystem.

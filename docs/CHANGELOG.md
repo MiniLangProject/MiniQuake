@@ -23,8 +23,9 @@ optimization packages. The current tree includes:
 - persistent modern free-look, configurable mouse-Y inversion and sensitivity,
   plus a one-time migration from retail keyboard-look bindings to W/A/S/D
   movement;
-- measured hot-path refinements for QuakeC vector synchronization, byte I/O,
-  input polling, loopback queues, BSP visibility traversal, HUD diagnostics,
+- measured hot-path refinements for QuakeC vector synchronization and snapshot
+  mirrors, byte I/O, input polling and mouse capture, loopback queues, BSP
+  visibility traversal, HUD/console/view construction, animated lightstyles,
   and exact-key projected-shadow ray reuse;
 - a compact build/test/retail-validation script surface, with obsolete delivery
   diffs and historical PowerShell package runners removed;

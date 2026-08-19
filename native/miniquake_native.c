@@ -4299,6 +4299,9 @@ static mq_u32 mq_shadow_alias_command_slot[MQ_SHADOW_ALIAS_COMMAND_MAX];
 static mq_u32 mq_shadow_alias_cache_key[MQ_SHADOW_ALIAS_CACHE_SIZE];
 static mq_u32 mq_shadow_alias_cache_generation[MQ_SHADOW_ALIAS_CACHE_SIZE];
 static mq_u32 mq_shadow_alias_generation = 1u;
+static mq_u32 mq_shadow_alias_angle_bits[3];
+static float mq_shadow_alias_angle_trig[6];
+static mq_i32 mq_shadow_alias_angle_valid = 0;
 
 /* Resolve one compressed MDL position in the sample-local projection cache. */
 static mq_u32 mq_shadow_alias_cache_slot(mq_u8 x, mq_u8 y, mq_u8 z, mq_i32 *created) {
@@ -4354,7 +4357,8 @@ static mq_i32 mq_shadow_alias_project_vertex(
     const float *origin, const float *scale_origin, const float *scale,
     float yaw_cosine, float yaw_sine, float pitch_cosine, float pitch_sine,
     float roll_cosine, float roll_sine, mq_i32 point_light_active,
-    const float *point_light, float sample_x, float sample_y
+    const float *point_light, float sample_x, float sample_y,
+    const float *fallback_direction
 ) {
     float local_x = packed_x * scale[0] + scale_origin[0];
     float local_y = packed_y * scale[1] + scale_origin[1];
@@ -4392,17 +4396,12 @@ static mq_i32 mq_shadow_alias_project_vertex(
         ray[5] = world[2] + delta[2] * inverse * 768.0f;
         minimum_fraction = (distance + 0.25f) / (distance + 768.0f);
     } else {
-        float delta[3] = {0.45f + sample_x * 0.018f, 0.35f + sample_y * 0.018f, -1.0f};
-        float inverse = 1.0f / sqrtf(delta[0] * delta[0] + delta[1] * delta[1] + delta[2] * delta[2]);
-        delta[0] *= inverse;
-        delta[1] *= inverse;
-        delta[2] *= inverse;
-        ray[0] = world[0] + delta[0] * 0.25f;
-        ray[1] = world[1] + delta[1] * 0.25f;
-        ray[2] = world[2] + delta[2] * 0.25f;
-        ray[3] = world[0] + delta[0] * 768.0f;
-        ray[4] = world[1] + delta[1] * 768.0f;
-        ray[5] = world[2] + delta[2] * 768.0f;
+        ray[0] = world[0] + fallback_direction[0] * 0.25f;
+        ray[1] = world[1] + fallback_direction[1] * 0.25f;
+        ray[2] = world[2] + fallback_direction[2] * 0.25f;
+        ray[3] = world[0] + fallback_direction[0] * 768.0f;
+        ray[4] = world[1] + fallback_direction[1] * 768.0f;
+        ray[5] = world[2] + fallback_direction[2] * 768.0f;
     }
     if (!mq_shadow_trace_cached(ray, result)) return 0;
     if (result[1] <= minimum_fraction) return 0;
@@ -4440,19 +4439,54 @@ MQ_EXPORT mq_i32 mq_gl_draw_alias_ray_shadow(
     float point_light[3] = {mq_bits_to_float(light_x_bits), mq_bits_to_float(light_y_bits), mq_bits_to_float(light_z_bits)};
     float sample_x = mq_bits_to_float(sample_x_bits);
     float sample_y = mq_bits_to_float(sample_y_bits);
-    float yaw = mq_bits_to_float(angle_y_bits) * 0.01745329251994329577f;
-    float pitch = -mq_bits_to_float(angle_x_bits) * 0.01745329251994329577f;
-    float roll = mq_bits_to_float(angle_z_bits) * 0.01745329251994329577f;
-    float yaw_cosine = (float)cos((double)yaw);
-    float yaw_sine = (float)sin((double)yaw);
-    float pitch_cosine = (float)cos((double)pitch);
-    float pitch_sine = (float)sin((double)pitch);
-    float roll_cosine = (float)cos((double)roll);
-    float roll_sine = (float)sin((double)roll);
+    float fallback_direction[3] = {0.0f, 0.0f, -1.0f};
+    float yaw_cosine;
+    float yaw_sine;
+    float pitch_cosine;
+    float pitch_sine;
+    float roll_cosine;
+    float roll_sine;
     mq_u32 offset = 0u;
     mq_u32 draw_vertex_count = 0u;
     mq_i32 drawn = 0;
     if (!data || byte_count < 4u || !mq_shadow_nodes) return 0;
+    if (!mq_shadow_alias_angle_valid ||
+        mq_shadow_alias_angle_bits[0] != angle_x_bits ||
+        mq_shadow_alias_angle_bits[1] != angle_y_bits ||
+        mq_shadow_alias_angle_bits[2] != angle_z_bits) {
+        float yaw = mq_bits_to_float(angle_y_bits) * 0.01745329251994329577f;
+        float pitch = -mq_bits_to_float(angle_x_bits) * 0.01745329251994329577f;
+        float roll = mq_bits_to_float(angle_z_bits) * 0.01745329251994329577f;
+        mq_shadow_alias_angle_bits[0] = angle_x_bits;
+        mq_shadow_alias_angle_bits[1] = angle_y_bits;
+        mq_shadow_alias_angle_bits[2] = angle_z_bits;
+        mq_shadow_alias_angle_trig[0] = (float)cos((double)yaw);
+        mq_shadow_alias_angle_trig[1] = (float)sin((double)yaw);
+        mq_shadow_alias_angle_trig[2] = (float)cos((double)pitch);
+        mq_shadow_alias_angle_trig[3] = (float)sin((double)pitch);
+        mq_shadow_alias_angle_trig[4] = (float)cos((double)roll);
+        mq_shadow_alias_angle_trig[5] = (float)sin((double)roll);
+        mq_shadow_alias_angle_valid = 1;
+    }
+    yaw_cosine = mq_shadow_alias_angle_trig[0];
+    yaw_sine = mq_shadow_alias_angle_trig[1];
+    pitch_cosine = mq_shadow_alias_angle_trig[2];
+    pitch_sine = mq_shadow_alias_angle_trig[3];
+    roll_cosine = mq_shadow_alias_angle_trig[4];
+    roll_sine = mq_shadow_alias_angle_trig[5];
+    if (!point_light_active) {
+        float fallback_inverse;
+        fallback_direction[0] = 0.45f + sample_x * 0.018f;
+        fallback_direction[1] = 0.35f + sample_y * 0.018f;
+        fallback_inverse = 1.0f / sqrtf(
+            fallback_direction[0] * fallback_direction[0] +
+            fallback_direction[1] * fallback_direction[1] +
+            fallback_direction[2] * fallback_direction[2]
+        );
+        fallback_direction[0] *= fallback_inverse;
+        fallback_direction[1] *= fallback_inverse;
+        fallback_direction[2] *= fallback_inverse;
+    }
     ++mq_shadow_alias_generation;
     if (mq_shadow_alias_generation == 0u) {
         mq_u32 cache_index;
@@ -4485,7 +4519,7 @@ MQ_EXPORT mq_i32 mq_gl_draw_alias_ray_shadow(
                     slot, (float)vertex[8], (float)vertex[9], (float)vertex[10],
                     origin, scale_origin, scale,
                     yaw_cosine, yaw_sine, pitch_cosine, pitch_sine, roll_cosine, roll_sine,
-                    point_light_active, point_light, sample_x, sample_y
+                    point_light_active, point_light, sample_x, sample_y, fallback_direction
                 );
             }
         }

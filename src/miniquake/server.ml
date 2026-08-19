@@ -2812,6 +2812,24 @@ function syncQcVectorIntoAt(machine, entityIndex, offset, fieldName, target, x, 
   return result
 end function
 
+// Copy one snapshot vector into an established mirror slot. Spawn and load
+// synchronization have already validated every nested Vec3 before the server
+// can publish snapshots, so repeating a dynamic type-name lookup here for four
+// vectors on every live edict only burns frame time. Keep the guarded helper
+// above for lifecycle boundaries where incomplete external state is possible.
+function syncEstablishedQcVectorIntoAt(machine, entityIndex, offset, target, x, y, z)
+  if offset >= 0 then
+    target.x = vm.entityFloat(machine, entityIndex, offset)
+    target.y = vm.entityFloat(machine, entityIndex, offset + 1)
+    target.z = vm.entityFloat(machine, entityIndex, offset + 2)
+  else
+    target.x = x
+    target.y = y
+    target.z = z
+  end if
+  return target
+end function
+
 // Provide resize synchronized edict array behavior for the active subsystem.
 function resizeSynchronizedEdictArray(server, requiredCount)
   if requiredCount < 0 or requiredCount > server.maxEdicts then
@@ -2953,7 +2971,12 @@ end function
 function syncQuakeCSnapshotEdictAt(server, entityIndex, offsets)
   machine = server.machine
   runtime = machine.context.edicts
-  item = ensureSynchronizedEdict(server, entityIndex)
+  // The mirror is fully constructed at spawn/load and retains stable slots,
+  // just like Quake's sv.edicts array. Only a newly raised high-water slot can
+  // be absent here; avoid revalidating the established Edict/Baseline/Vec3
+  // object graph for every live entity on every client snapshot.
+  item = server.edicts[entityIndex]
+  if item is void then item = ensureSynchronizedEdict(server, entityIndex) end if
   item.free = runtime.freeFlags[entityIndex]
   if entityIndex < len(runtime.freeTimes) then item.freeTime = runtime.freeTimes[entityIndex] end if
   if item.free then return item end if
@@ -2989,15 +3012,15 @@ function syncQuakeCSnapshotEdictAt(server, entityIndex, offsets)
   item.skin = native.trunc(qcFloatAt(machine, entityIndex, offsets[4], 0.0))
   item.colormap = native.trunc(qcFloatAt(machine, entityIndex, offsets[5], 0.0))
   item.effects = native.trunc(qcFloatAt(machine, entityIndex, offsets[6], 0.0))
-  item.origin = syncQcVectorIntoAt(machine, entityIndex, offsets[7], "origin", item.origin, 0.0, 0.0, 0.0)
-  item.angles = syncQcVectorIntoAt(machine, entityIndex, offsets[8], "angles", item.angles, 0.0, 0.0, 0.0)
+  item.origin = syncEstablishedQcVectorIntoAt(machine, entityIndex, offsets[7], item.origin, 0.0, 0.0, 0.0)
+  item.angles = syncEstablishedQcVectorIntoAt(machine, entityIndex, offsets[8], item.angles, 0.0, 0.0, 0.0)
   // Runtime QuakeC may change an entity's bounds at the same instant that it
   // assigns a model. Chthon is the stock example: boss_awake expands a
   // point-sized dormant edict to its full 256x256x280 bounds. PVS linking
   // consumes the mirror bounds below, so leaving them stale can hide the boss
   // while its priority projectiles remain visible.
-  item.mins = syncQcVectorIntoAt(machine, entityIndex, offsets[10], "mins", item.mins, 0.0, 0.0, 0.0)
-  item.maxs = syncQcVectorIntoAt(machine, entityIndex, offsets[11], "maxs", item.maxs, 0.0, 0.0, 0.0)
+  item.mins = syncEstablishedQcVectorIntoAt(machine, entityIndex, offsets[10], item.mins, 0.0, 0.0, 0.0)
+  item.maxs = syncEstablishedQcVectorIntoAt(machine, entityIndex, offsets[11], item.maxs, 0.0, 0.0, 0.0)
   item.moveType = native.trunc(qcFloatAt(machine, entityIndex, offsets[13], c.MOVETYPE_NONE))
   // FL_ITEM changes the stock SV_WriteEntitiesToClient leaf expansion, hence
   // it is snapshot state even though it is not written onto protocol 15.
@@ -3089,9 +3112,22 @@ function syncQuakeCSnapshotEdicts(server)
   count = recomputeEdictCount(server)
   resizeSynchronizedEdictArray(server, count)
   offsets = synchronizedEdictOffsets(server.machine)
+  runtime = server.machine.context.edicts
   index = 0
   while index < count
-    server.edicts[index] = syncQuakeCSnapshotEdictAt(server, index, offsets)
+    // ED_Free never lowers num_edicts, so a typical retail map keeps many free
+    // slots below the high-water mark. They need only expose their current
+    // free state; copying fields and checking the complete mirror type graph
+    // cannot affect Protocol 15 and creates avoidable GC pressure.
+    if runtime.freeFlags[index] then
+      item = server.edicts[index]
+      if item is void then item = ensureSynchronizedEdict(server, index) end if
+      item.free = true
+      if index < len(runtime.freeTimes) then item.freeTime = runtime.freeTimes[index] end if
+      server.edicts[index] = item
+    else
+      server.edicts[index] = syncQuakeCSnapshotEdictAt(server, index, offsets)
+    end if
     index = index + 1
   end while
   return count
