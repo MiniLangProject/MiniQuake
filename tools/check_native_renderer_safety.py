@@ -73,6 +73,14 @@ def main() -> int:
     d3d_read = function_body(d3d9, "mq_d3d9_read_pixels")
     require("memset(pixels, 0" in d3d_read, "D3D9 readback can expose uninitialized clipped pixels", errors)
 
+    d3d_shaders = function_body(d3d9, "mq_d3d_create_enhanced_shaders")
+    require(
+        "row_major float4x4 mq_mvp" in d3d_shaders
+        and "row_major float4x4 mq_mv" in d3d_shaders,
+        "D3D9 enhanced lighting can transpose world geometry during muzzle flashes",
+        errors,
+    )
+
     d3d_delete = function_body(d3d9, "mq_d3d9_delete_textures")
     require("id < mq_d3d_next_texture" in d3d_delete, "D3D9 texture identifiers are not reused after deletion", errors)
     require("id > 0u" in d3d_delete, "D3D9 incorrectly deletes reserved texture identifier zero", errors)
@@ -99,7 +107,7 @@ def main() -> int:
         for error in errors:
             print("  " + error)
         return 1
-    print("native renderer safety tests: PASS (27 invariants)")
+    print("native renderer safety tests: PASS (28 invariants)")
     return 0
 
 

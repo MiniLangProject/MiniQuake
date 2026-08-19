@@ -638,7 +638,11 @@ static void mq_d3d_release_enhanced_shaders(void) {
 /* Compile and create the shared per-pixel additive light program. */
 static mq_i32 mq_d3d_create_enhanced_shaders(void) {
     static const char vertex_source[] =
-        "float4x4 mq_mvp:register(c0);float4x4 mq_mv:register(c4);"
+        /* The bridge uploads transposed OpenGL matrices for Direct3D's
+         * row-vector convention.  Declare that layout explicitly; HLSL's
+         * column-major default otherwise transposes the enhanced overlay a
+         * second time and stretches muzzle-lit world triangles on screen. */
+        "row_major float4x4 mq_mvp:register(c0);row_major float4x4 mq_mv:register(c4);"
         "struct I{float3 p:POSITION0;float4 c:COLOR0;float2 uv:TEXCOORD0;};"
         "struct O{float4 p:POSITION0;float2 uv:TEXCOORD0;float3 e:TEXCOORD1;};"
         "O main(I i){O o;float4 p=float4(i.p,1);o.p=mul(p,mq_mvp);"
