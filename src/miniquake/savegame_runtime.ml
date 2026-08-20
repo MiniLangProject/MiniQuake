@@ -30,8 +30,8 @@ function synchronizeLoadedServer(server)
   // The stable mirror keeps the provisional baselines that SV_SpawnServer
   // created, restores every saved slot including trailing free records, and
   // never recomputes the saved high-water mark from freeFlags.
-  synchronized = try(serverRuntime.syncLoadedQuakeCEdicts(server, savedCount))
-  if synchronized is error then return synchronized end if
+  synchronizationResult = try(serverRuntime.syncLoadedQuakeCEdicts(server, savedCount))
+  if synchronizationResult is error then return synchronizationResult end if
 
   serverRuntime.assignModelIndexes(server)
 

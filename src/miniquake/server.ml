@@ -3062,8 +3062,8 @@ function syncQuakeCEdictRange(server, count)
 
   index = 0
   while index < count
-    synchronized = syncQuakeCEdictAt(server, index, offsets)
-    server.edicts[index] = synchronized
+    synchronizedEdict = syncQuakeCEdictAt(server, index, offsets)
+    server.edicts[index] = synchronizedEdict
     index = index + 1
   end while
 

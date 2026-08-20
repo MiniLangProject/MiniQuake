@@ -1079,8 +1079,8 @@ function loadGame(session, requestedName)
   if started is error then return started end if
   restored = savegame.apply(session.server, saved)
   if restored is error then return failedMapTransition(session, restored) end if
-  synchronized = saveRuntime.synchronizeLoadedServer(session.server)
-  if synchronized is error then return failedMapTransition(session, synchronized) end if
+  synchronizationResult = saveRuntime.synchronizeLoadedServer(session.server)
+  if synchronizationResult is error then return failedMapTransition(session, synchronizationResult) end if
   if len(session.server.clients) > 0 then
     server.syncPlayerFromQuakeC(session.server, session.server.clients[0], session.player)
   end if

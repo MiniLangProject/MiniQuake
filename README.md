@@ -17,6 +17,63 @@ Protocol 15 while providing a smooth modern desktop experience.
 
 ![The scaled in-game console](docs/screenshots/console.png)
 
+### Complete level gallery
+
+The gallery covers all 73 playable maps shipped with the original game and
+the two official mission packs supported by MiniQuake. Every image was rendered
+by MiniQuake at 1920x1080 with HQ2x texture scaling, enhanced lighting, and
+high-quality shadows. The JPEG previews are progressive and open at full
+resolution when clicked. Captures use each map's authored spawn viewpoint.
+
+<details>
+<summary><strong>Quake — 38 maps</strong></summary>
+
+| | | |
+| --- | --- | --- |
+| **START**<br>[![START](docs/screenshots/levels/start.jpg)](docs/screenshots/levels/start.jpg) | **E1M1**<br>[![E1M1](docs/screenshots/levels/e1m1.jpg)](docs/screenshots/levels/e1m1.jpg) | **E1M2**<br>[![E1M2](docs/screenshots/levels/e1m2.jpg)](docs/screenshots/levels/e1m2.jpg) |
+| **E1M3**<br>[![E1M3](docs/screenshots/levels/e1m3.jpg)](docs/screenshots/levels/e1m3.jpg) | **E1M4**<br>[![E1M4](docs/screenshots/levels/e1m4.jpg)](docs/screenshots/levels/e1m4.jpg) | **E1M5**<br>[![E1M5](docs/screenshots/levels/e1m5.jpg)](docs/screenshots/levels/e1m5.jpg) |
+| **E1M6**<br>[![E1M6](docs/screenshots/levels/e1m6.jpg)](docs/screenshots/levels/e1m6.jpg) | **E1M7**<br>[![E1M7](docs/screenshots/levels/e1m7.jpg)](docs/screenshots/levels/e1m7.jpg) | **E1M8**<br>[![E1M8](docs/screenshots/levels/e1m8.jpg)](docs/screenshots/levels/e1m8.jpg) |
+| **E2M1**<br>[![E2M1](docs/screenshots/levels/e2m1.jpg)](docs/screenshots/levels/e2m1.jpg) | **E2M2**<br>[![E2M2](docs/screenshots/levels/e2m2.jpg)](docs/screenshots/levels/e2m2.jpg) | **E2M3**<br>[![E2M3](docs/screenshots/levels/e2m3.jpg)](docs/screenshots/levels/e2m3.jpg) |
+| **E2M4**<br>[![E2M4](docs/screenshots/levels/e2m4.jpg)](docs/screenshots/levels/e2m4.jpg) | **E2M5**<br>[![E2M5](docs/screenshots/levels/e2m5.jpg)](docs/screenshots/levels/e2m5.jpg) | **E2M6**<br>[![E2M6](docs/screenshots/levels/e2m6.jpg)](docs/screenshots/levels/e2m6.jpg) |
+| **E2M7**<br>[![E2M7](docs/screenshots/levels/e2m7.jpg)](docs/screenshots/levels/e2m7.jpg) | **E3M1**<br>[![E3M1](docs/screenshots/levels/e3m1.jpg)](docs/screenshots/levels/e3m1.jpg) | **E3M2**<br>[![E3M2](docs/screenshots/levels/e3m2.jpg)](docs/screenshots/levels/e3m2.jpg) |
+| **E3M3**<br>[![E3M3](docs/screenshots/levels/e3m3.jpg)](docs/screenshots/levels/e3m3.jpg) | **E3M4**<br>[![E3M4](docs/screenshots/levels/e3m4.jpg)](docs/screenshots/levels/e3m4.jpg) | **E3M5**<br>[![E3M5](docs/screenshots/levels/e3m5.jpg)](docs/screenshots/levels/e3m5.jpg) |
+| **E3M6**<br>[![E3M6](docs/screenshots/levels/e3m6.jpg)](docs/screenshots/levels/e3m6.jpg) | **E3M7**<br>[![E3M7](docs/screenshots/levels/e3m7.jpg)](docs/screenshots/levels/e3m7.jpg) | **E4M1**<br>[![E4M1](docs/screenshots/levels/e4m1.jpg)](docs/screenshots/levels/e4m1.jpg) |
+| **E4M2**<br>[![E4M2](docs/screenshots/levels/e4m2.jpg)](docs/screenshots/levels/e4m2.jpg) | **E4M3**<br>[![E4M3](docs/screenshots/levels/e4m3.jpg)](docs/screenshots/levels/e4m3.jpg) | **E4M4**<br>[![E4M4](docs/screenshots/levels/e4m4.jpg)](docs/screenshots/levels/e4m4.jpg) |
+| **E4M5**<br>[![E4M5](docs/screenshots/levels/e4m5.jpg)](docs/screenshots/levels/e4m5.jpg) | **E4M6**<br>[![E4M6](docs/screenshots/levels/e4m6.jpg)](docs/screenshots/levels/e4m6.jpg) | **E4M7**<br>[![E4M7](docs/screenshots/levels/e4m7.jpg)](docs/screenshots/levels/e4m7.jpg) |
+| **E4M8**<br>[![E4M8](docs/screenshots/levels/e4m8.jpg)](docs/screenshots/levels/e4m8.jpg) | **END**<br>[![END](docs/screenshots/levels/end.jpg)](docs/screenshots/levels/end.jpg) | **DM1**<br>[![DM1](docs/screenshots/levels/dm1.jpg)](docs/screenshots/levels/dm1.jpg) |
+| **DM2**<br>[![DM2](docs/screenshots/levels/dm2.jpg)](docs/screenshots/levels/dm2.jpg) | **DM3**<br>[![DM3](docs/screenshots/levels/dm3.jpg)](docs/screenshots/levels/dm3.jpg) | **DM4**<br>[![DM4](docs/screenshots/levels/dm4.jpg)](docs/screenshots/levels/dm4.jpg) |
+| **DM5**<br>[![DM5](docs/screenshots/levels/dm5.jpg)](docs/screenshots/levels/dm5.jpg) | **DM6**<br>[![DM6](docs/screenshots/levels/dm6.jpg)](docs/screenshots/levels/dm6.jpg) | |
+
+</details>
+
+<details>
+<summary><strong>Scourge of Armagon — 18 maps</strong></summary>
+
+| | | |
+| --- | --- | --- |
+| **START**<br>[![Scourge of Armagon START](docs/screenshots/levels/hipnotic-start.jpg)](docs/screenshots/levels/hipnotic-start.jpg) | **HIP1M1**<br>[![HIP1M1](docs/screenshots/levels/hipnotic-hip1m1.jpg)](docs/screenshots/levels/hipnotic-hip1m1.jpg) | **HIP1M2**<br>[![HIP1M2](docs/screenshots/levels/hipnotic-hip1m2.jpg)](docs/screenshots/levels/hipnotic-hip1m2.jpg) |
+| **HIP1M3**<br>[![HIP1M3](docs/screenshots/levels/hipnotic-hip1m3.jpg)](docs/screenshots/levels/hipnotic-hip1m3.jpg) | **HIP1M4**<br>[![HIP1M4](docs/screenshots/levels/hipnotic-hip1m4.jpg)](docs/screenshots/levels/hipnotic-hip1m4.jpg) | **HIP1M5**<br>[![HIP1M5](docs/screenshots/levels/hipnotic-hip1m5.jpg)](docs/screenshots/levels/hipnotic-hip1m5.jpg) |
+| **HIP2M1**<br>[![HIP2M1](docs/screenshots/levels/hipnotic-hip2m1.jpg)](docs/screenshots/levels/hipnotic-hip2m1.jpg) | **HIP2M2**<br>[![HIP2M2](docs/screenshots/levels/hipnotic-hip2m2.jpg)](docs/screenshots/levels/hipnotic-hip2m2.jpg) | **HIP2M3**<br>[![HIP2M3](docs/screenshots/levels/hipnotic-hip2m3.jpg)](docs/screenshots/levels/hipnotic-hip2m3.jpg) |
+| **HIP2M4**<br>[![HIP2M4](docs/screenshots/levels/hipnotic-hip2m4.jpg)](docs/screenshots/levels/hipnotic-hip2m4.jpg) | **HIP2M5**<br>[![HIP2M5](docs/screenshots/levels/hipnotic-hip2m5.jpg)](docs/screenshots/levels/hipnotic-hip2m5.jpg) | **HIP2M6**<br>[![HIP2M6](docs/screenshots/levels/hipnotic-hip2m6.jpg)](docs/screenshots/levels/hipnotic-hip2m6.jpg) |
+| **HIP3M1**<br>[![HIP3M1](docs/screenshots/levels/hipnotic-hip3m1.jpg)](docs/screenshots/levels/hipnotic-hip3m1.jpg) | **HIP3M2**<br>[![HIP3M2](docs/screenshots/levels/hipnotic-hip3m2.jpg)](docs/screenshots/levels/hipnotic-hip3m2.jpg) | **HIP3M3**<br>[![HIP3M3](docs/screenshots/levels/hipnotic-hip3m3.jpg)](docs/screenshots/levels/hipnotic-hip3m3.jpg) |
+| **HIP3M4**<br>[![HIP3M4](docs/screenshots/levels/hipnotic-hip3m4.jpg)](docs/screenshots/levels/hipnotic-hip3m4.jpg) | **HIPEND**<br>[![HIPEND](docs/screenshots/levels/hipnotic-hipend.jpg)](docs/screenshots/levels/hipnotic-hipend.jpg) | **HIPDM1**<br>[![HIPDM1](docs/screenshots/levels/hipnotic-hipdm1.jpg)](docs/screenshots/levels/hipnotic-hipdm1.jpg) |
+
+</details>
+
+<details>
+<summary><strong>Dissolution of Eternity — 17 maps</strong></summary>
+
+| | | |
+| --- | --- | --- |
+| **START**<br>[![Dissolution of Eternity START](docs/screenshots/levels/rogue-start.jpg)](docs/screenshots/levels/rogue-start.jpg) | **R1M1**<br>[![R1M1](docs/screenshots/levels/rogue-r1m1.jpg)](docs/screenshots/levels/rogue-r1m1.jpg) | **R1M2**<br>[![R1M2](docs/screenshots/levels/rogue-r1m2.jpg)](docs/screenshots/levels/rogue-r1m2.jpg) |
+| **R1M3**<br>[![R1M3](docs/screenshots/levels/rogue-r1m3.jpg)](docs/screenshots/levels/rogue-r1m3.jpg) | **R1M4**<br>[![R1M4](docs/screenshots/levels/rogue-r1m4.jpg)](docs/screenshots/levels/rogue-r1m4.jpg) | **R1M5**<br>[![R1M5](docs/screenshots/levels/rogue-r1m5.jpg)](docs/screenshots/levels/rogue-r1m5.jpg) |
+| **R1M6**<br>[![R1M6](docs/screenshots/levels/rogue-r1m6.jpg)](docs/screenshots/levels/rogue-r1m6.jpg) | **R1M7**<br>[![R1M7](docs/screenshots/levels/rogue-r1m7.jpg)](docs/screenshots/levels/rogue-r1m7.jpg) | **R2M1**<br>[![R2M1](docs/screenshots/levels/rogue-r2m1.jpg)](docs/screenshots/levels/rogue-r2m1.jpg) |
+| **R2M2**<br>[![R2M2](docs/screenshots/levels/rogue-r2m2.jpg)](docs/screenshots/levels/rogue-r2m2.jpg) | **R2M3**<br>[![R2M3](docs/screenshots/levels/rogue-r2m3.jpg)](docs/screenshots/levels/rogue-r2m3.jpg) | **R2M4**<br>[![R2M4](docs/screenshots/levels/rogue-r2m4.jpg)](docs/screenshots/levels/rogue-r2m4.jpg) |
+| **R2M5**<br>[![R2M5](docs/screenshots/levels/rogue-r2m5.jpg)](docs/screenshots/levels/rogue-r2m5.jpg) | **R2M6**<br>[![R2M6](docs/screenshots/levels/rogue-r2m6.jpg)](docs/screenshots/levels/rogue-r2m6.jpg) | **R2M7**<br>[![R2M7](docs/screenshots/levels/rogue-r2m7.jpg)](docs/screenshots/levels/rogue-r2m7.jpg) |
+| **R2M8**<br>[![R2M8](docs/screenshots/levels/rogue-r2m8.jpg)](docs/screenshots/levels/rogue-r2m8.jpg) | **CTF1**<br>[![CTF1](docs/screenshots/levels/rogue-ctf1.jpg)](docs/screenshots/levels/rogue-ctf1.jpg) | |
+
+</details>
+
 ## Highlights
 
 - Engine and game-facing behavior implemented in MiniLang.

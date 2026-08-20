@@ -47,8 +47,8 @@ end function
 function bp087PrepareLoadedSave(session, saved)
   applied = try(savegame.apply(session.server, saved))
   if applied is error then return applied end if
-  synchronized = try(saveRuntime.synchronizeLoadedServer(session.server))
-  if synchronized is error then return synchronized end if
+  synchronizationResult = try(saveRuntime.synchronizeLoadedServer(session.server))
+  if synchronizationResult is error then return synchronizationResult end if
   return true
 end function
 
