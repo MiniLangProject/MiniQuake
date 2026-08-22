@@ -7,6 +7,7 @@ MiniLang parity and regression tests for tests/gl_mesh_differential_fixture.ml.
 import miniquake.types as t
 import miniquake.render.alias_mesh as mesh
 
+// Group the deterministic mesh fixture fields used by this test fixture.
 struct MeshFixture
   filename
   triangles

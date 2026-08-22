@@ -26,6 +26,7 @@ import miniquake.byteio as bio
 import miniquake.native as native
 import miniquake.array_util as arrayutil
 
+// Track mutable sv user state across subsystem calls.
 struct SvUserState
   server
   frameTime

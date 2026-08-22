@@ -23,6 +23,7 @@ typedef mq_ptr MQ_HWND;
 typedef mq_ptr MQ_HANDLE;
 typedef mq_ptr MQ_HMODULE;
 
+/* Store the Direct3D 9 ABI fields for one D3D present parameters. */
 typedef struct mq_d3d_present_parameters_s {
     mq_u32 BackBufferWidth;
     mq_u32 BackBufferHeight;
@@ -40,6 +41,7 @@ typedef struct mq_d3d_present_parameters_s {
     mq_u32 PresentationInterval;
 } mq_d3d_present_parameters_t;
 
+/* Store the Direct3D 9 ABI fields for one D3D viewport. */
 typedef struct mq_d3d_viewport_s {
     mq_u32 X;
     mq_u32 Y;
@@ -49,15 +51,18 @@ typedef struct mq_d3d_viewport_s {
     float MaxZ;
 } mq_d3d_viewport_t;
 
+/* Store the Direct3D 9 ABI fields for one D3D matrix. */
 typedef struct mq_d3d_matrix_s {
     float m[4][4];
 } mq_d3d_matrix_t;
 
+/* Store the Direct3D 9 ABI fields for one D3D locked rect. */
 typedef struct mq_d3d_locked_rect_s {
     mq_i32 Pitch;
     void *pBits;
 } mq_d3d_locked_rect_t;
 
+/* Store the Direct3D 9 ABI fields for one D3D rect. */
 typedef struct mq_d3d_rect_s {
     mq_i32 left;
     mq_i32 top;
@@ -65,6 +70,7 @@ typedef struct mq_d3d_rect_s {
     mq_i32 bottom;
 } mq_d3d_rect_t;
 
+/* Store the Direct3D 9 ABI fields for one D3D surface desc. */
 typedef struct mq_d3d_surface_desc_s {
     mq_i32 Format;
     mq_i32 Type;
@@ -76,6 +82,7 @@ typedef struct mq_d3d_surface_desc_s {
     mq_u32 Height;
 } mq_d3d_surface_desc_t;
 
+/* Store the Direct3D 9 ABI fields for one D3D display mode. */
 typedef struct mq_d3d_display_mode_s {
     mq_u32 Width;
     mq_u32 Height;
@@ -83,6 +90,7 @@ typedef struct mq_d3d_display_mode_s {
     mq_i32 Format;
 } mq_d3d_display_mode_t;
 
+/* Store the Direct3D 9 ABI fields for one D3D vertex. */
 typedef struct mq_d3d_vertex_s {
     float x;
     float y;
@@ -92,6 +100,7 @@ typedef struct mq_d3d_vertex_s {
     float t;
 } mq_d3d_vertex_t;
 
+/* Store the Direct3D 9 ABI fields for one D3D texture. */
 typedef struct mq_d3d_texture_s {
     void *object;
     mq_i32 width;
@@ -983,6 +992,7 @@ mq_i32 mq_d3d9_draw_interleaved_t2f_v3f(const float *vertices, mq_u32 vertex_cou
     return (mq_i32)(vertex_count / 3u);
 }
 
+/* Store the Direct3D 9 ABI fields for one D3D alias input. */
 typedef struct mq_d3d_alias_input_s {
     float s;
     float t;

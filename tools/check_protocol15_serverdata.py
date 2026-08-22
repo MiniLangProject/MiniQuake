@@ -72,6 +72,7 @@ RELIABLE_SEND = 4
 
 @dataclass
 class Check:
+    """Represent one check discovered by the source verifier."""
     name: str
     passed: bool
     details: dict[str, Any] = field(default_factory=dict)
@@ -80,6 +81,7 @@ class Check:
 
 
 class Writer:
+    """Encode one bounded Protocol 15 message for differential checks."""
     def __init__(self) -> None:
         """Initialize the helper with its immutable verification inputs."""
         self.data = bytearray()

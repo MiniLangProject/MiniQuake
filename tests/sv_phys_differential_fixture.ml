@@ -12,6 +12,7 @@ import miniquake.server as server
 import miniquake.quakec.vm as vm
 import miniquake.quakec.opcodes as op
 
+// Group the deterministic physics diff map fields used by this test fixture.
 struct PhysicsDiffMap
   models
   nodes

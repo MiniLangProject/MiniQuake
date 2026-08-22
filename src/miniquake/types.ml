@@ -7,17 +7,20 @@ Quake-compatible MiniLang implementation of miniquake.types.
 */
 package miniquake.types
 
+// Store one three-dimensional vector in Quake world coordinates.
 struct Vec3
   x
   y
   z
 end struct
 
+// Group the fields that describe one link.
 struct Link
   previous
   next
 end struct
 
+// Group the fields that describe one common file handle.
 struct CommonFileHandle
   data
   position
@@ -27,6 +30,7 @@ struct CommonFileHandle
   source
 end struct
 
+// Group the fields that describe one plane.
 struct Plane
   normal
   dist
@@ -34,6 +38,7 @@ struct Plane
   signBits
 end struct
 
+// Track storage and runtime state for one size buffer.
 struct SizeBuffer
   data
   maxSize
@@ -42,12 +47,14 @@ struct SizeBuffer
   overflowed
 end struct
 
+// Group the fields that describe one message reader.
 struct MessageReader
   data
   readCount
   badRead
 end struct
 
+// Group the fields that describe one cvar.
 struct Cvar
   name
   string
@@ -56,17 +63,20 @@ struct Cvar
   server
 end struct
 
+// Own the coordinated data required by the cvar registry.
 struct CvarRegistry
   variables
   serverChanges
   lookup
 end struct
 
+// Group the fields that describe one command alias.
 struct CommandAlias
   name
   value
 end struct
 
+// Own the coordinated data required by the command system.
 struct CommandSystem
   commands
   aliases
@@ -76,12 +86,14 @@ struct CommandSystem
   wait
 end struct
 
+// Group the fields that describe one pack file.
 struct PackFile
   name
   offset
   length
 end struct
 
+// Store the parsed data and relationships for one pack archive.
 struct PackArchive
   filename
   data
@@ -89,6 +101,7 @@ struct PackArchive
   numFiles
 end struct
 
+// Group the fields that describe one WAD lump.
 struct WadLump
   filePosition
   diskSize
@@ -98,6 +111,7 @@ struct WadLump
   name
 end struct
 
+// Store the parsed data and relationships for one WAD archive.
 struct WadArchive
   filename
   data
@@ -105,6 +119,7 @@ struct WadArchive
   numLumps
 end struct
 
+// Track storage and runtime state for one loop socket.
 struct LoopSocket
   peer
   messages
@@ -123,6 +138,7 @@ struct LoopSocket
   landriver
 end struct
 
+// Track mutable loop state across subsystem calls.
 struct LoopState
   client
   server
@@ -142,6 +158,7 @@ struct LoopState
   lanEnabled
 end struct
 
+// Group the fields that describe one memory block.
 struct MemoryBlock
   kind
   name
@@ -151,21 +168,25 @@ struct MemoryBlock
   allocationIndex
 end struct
 
+// Track mutable memory state across subsystem calls.
 struct MemoryState
   capacity
   blocks
   totalAllocated
 end struct
 
+// Group the fields that describe one cache user.
 struct CacheUser
   block
 end struct
 
+// Group the fields that describe one hull.
 struct Hull
   mins
   maxs
 end struct
 
+// Group the fields that describe one trace.
 struct Trace
   allSolid
   startSolid
@@ -177,35 +198,42 @@ struct Trace
   entity
 end struct
 
+// Group the fields that describe one entity pair.
 struct EntityPair
   key
   value
 end struct
 
+// Group the fields that describe one entity.
 struct Entity
   pairs
 end struct
 
+// Group the fields that describe one lump.
 struct Lump
   offset
   length
 end struct
 
+// Describe one BSP plane consumed by the renderer or asset loader.
 struct BspPlane
   normal
   dist
   type
 end struct
 
+// Describe one BSP vertex consumed by the renderer or asset loader.
 struct BspVertex
   position
 end struct
 
+// Describe one BSP edge consumed by the renderer or asset loader.
 struct BspEdge
   vertex0
   vertex1
 end struct
 
+// Group the fields that describe one BSP node.
 struct BspNode
   planeIndex
   child0
@@ -216,12 +244,14 @@ struct BspNode
   numFaces
 end struct
 
+// Group the fields that describe one BSP clip node.
 struct BspClipNode
   planeIndex
   child0
   child1
 end struct
 
+// Group the fields that describe one BSP tex info.
 struct BspTexInfo
   s
   t
@@ -229,6 +259,7 @@ struct BspTexInfo
   flags
 end struct
 
+// Describe one BSP face consumed by the renderer or asset loader.
 struct BspFace
   planeIndex
   side
@@ -239,6 +270,7 @@ struct BspFace
   lightOffset
 end struct
 
+// Group the fields that describe one BSP leaf.
 struct BspLeaf
   contents
   visibilityOffset
@@ -249,6 +281,7 @@ struct BspLeaf
   ambient
 end struct
 
+// Store the parsed data and relationships for one BSP model.
 struct BspModel
   mins
   maxs
@@ -259,6 +292,7 @@ struct BspModel
   numFaces
 end struct
 
+// Describe one BSP texture consumed by the renderer or asset loader.
 struct BspTexture
   name
   width
@@ -267,6 +301,7 @@ struct BspTexture
   pixels
 end struct
 
+// Store the parsed data and relationships for one BSP map.
 struct BspMap
   filename
   data
@@ -290,18 +325,21 @@ struct BspMap
   models
 end struct
 
+// Group the fields that describe one MDL skin.
 struct MdlSkin
   grouped
   intervals
   images
 end struct
 
+// Group the fields that describe one MDL tex coord.
 struct MdlTexCoord
   onSeam
   s
   t
 end struct
 
+// Group the fields that describe one MDL triangle.
 struct MdlTriangle
   facesFront
   vertex0
@@ -309,6 +347,7 @@ struct MdlTriangle
   vertex2
 end struct
 
+// Describe one MDL vertex consumed by the renderer or asset loader.
 struct MdlVertex
   x
   y
@@ -316,6 +355,7 @@ struct MdlVertex
   normalIndex
 end struct
 
+// Describe one runtime MDL frame and its observable Quake state.
 struct MdlFrame
   name
   mins
@@ -323,12 +363,14 @@ struct MdlFrame
   vertices
 end struct
 
+// Group the fields that describe one MDL frame set.
 struct MdlFrameSet
   grouped
   intervals
   frames
 end struct
 
+// Store the parsed data and relationships for one MDL model.
 struct MdlModel
   filename
   data
@@ -352,6 +394,7 @@ struct MdlModel
   frames
 end struct
 
+// Describe one runtime sprite frame and its observable Quake state.
 struct SpriteFrame
   originX
   originY
@@ -360,12 +403,14 @@ struct SpriteFrame
   pixels
 end struct
 
+// Group the fields that describe one sprite frame set.
 struct SpriteFrameSet
   grouped
   intervals
   frames
 end struct
 
+// Store the parsed data and relationships for one sprite model.
 struct SpriteModel
   filename
   data
@@ -380,6 +425,7 @@ struct SpriteModel
   frames
 end struct
 
+// Group the fields that describe one QuakeC statement.
 struct QuakeCStatement
   op
   a
@@ -387,6 +433,7 @@ struct QuakeCStatement
   c
 end struct
 
+// Group the fields that describe one QuakeC def.
 struct QuakeCDef
   type
   offset
@@ -394,6 +441,7 @@ struct QuakeCDef
   name
 end struct
 
+// Group the fields that describe one QuakeC function.
 struct QuakeCFunction
   firstStatement
   parmStart
@@ -405,6 +453,7 @@ struct QuakeCFunction
   parmSize
 end struct
 
+// Store the parsed data and relationships for one QuakeC program.
 struct QuakeCProgram
   filename
   data
@@ -419,12 +468,14 @@ struct QuakeCProgram
   entityFields
 end struct
 
+// Describe one runtime QuakeC call frame and its observable Quake state.
 struct QuakeCCallFrame
   statement
   functionIndex
   savedLocals
 end struct
 
+// Group the fields that describe one QuakeC machine.
 struct QuakeCMachine
   program
   globals
@@ -452,6 +503,7 @@ struct QuakeCMachine
   fastExecutionDepth
 end struct
 
+// Group the fields that describe one wave info.
 struct WaveInfo
   rate
   width
@@ -462,17 +514,20 @@ struct WaveInfo
   dataLength
 end struct
 
+// Group the fields that describe one demo message.
 struct DemoMessage
   viewAngles
   payload
 end struct
 
+// Group the fields that describe one demo.
 struct Demo
   forcedTrack
   messages
   trackHeader
 end struct
 
+// Group the fields that describe one save game.
 struct SaveGame
   version
   comment
@@ -485,11 +540,13 @@ struct SaveGame
   entities
 end struct
 
+// Group the fields that describe one protocol event.
 struct ProtocolEvent
   command
   payload
 end struct
 
+// Collect the outcome and diagnostics for one protocol result.
 struct ProtocolResult
   events
   bytesRead
@@ -519,11 +576,13 @@ struct ProtocolClientData
   standardQuake
 end struct
 
+// Group the fields that describe one search path.
 struct SearchPath
   directory
   archive
 end struct
 
+// Own the coordinated data required by the file system.
 struct FileSystem
   baseDirectory
   gameDirectory
@@ -535,6 +594,7 @@ struct FileSystem
   progsHack
 end struct
 
+// Own the coordinated data required by the model registry.
 struct ModelRegistry
   names
   models
@@ -544,6 +604,7 @@ struct ModelRegistry
   noVis
 end struct
 
+// Group the fields that describe one user command.
 struct UserCommand
   viewAngles
   forwardMove
@@ -554,6 +615,7 @@ struct UserCommand
   msec
 end struct
 
+// Track mutable chase state across subsystem calls.
 struct ChaseState
   active
   back
@@ -562,6 +624,7 @@ struct ChaseState
 end struct
 
 
+// Track mutable client state across subsystem calls.
 struct ClientState
   protocol
   time
@@ -572,6 +635,7 @@ struct ClientState
   messages
 end struct
 
+// Track mutable server state across subsystem calls.
 struct ServerState
   active
   time
@@ -581,6 +645,7 @@ struct ServerState
   reliableDatagram
 end struct
 
+// Group the fields that describe one particle.
 struct Particle
   origin
   velocity
@@ -590,6 +655,7 @@ struct Particle
   type
 end struct
 
+// Describe one runtime temporary entity and its observable Quake state.
 struct TemporaryEntity
   type
   origin
@@ -597,6 +663,7 @@ struct TemporaryEntity
   entity
 end struct
 
+// Track mutable audio state across subsystem calls.
 struct AudioState
   opened
   rate
@@ -619,6 +686,7 @@ struct CommandLine
   standardQuake
 end struct
 
+// Group the fields that describe one host timing.
 struct HostTiming
   realtime
   oldRealtime
@@ -627,6 +695,7 @@ struct HostTiming
   filteredFrames
 end struct
 
+// Group the fields that describe one entity baseline.
 struct EntityBaseline
   modelIndex
   frame
@@ -637,6 +706,7 @@ struct EntityBaseline
   angles
 end struct
 
+// Describe one runtime quake edict and its observable Quake state.
 struct QuakeEdict
   number
   free
@@ -667,6 +737,7 @@ struct QuakeEdict
   leafNums
 end struct
 
+// Group the fields that describe one server client.
 struct ServerClient
   active
   spawned
@@ -689,6 +760,7 @@ struct ServerClient
   datagramBuffer
 end struct
 
+// Group the fields that describe one game server.
 struct GameServer
   active
   loading
@@ -725,6 +797,7 @@ struct GameServer
   diagnostics
 end struct
 
+// Group the fields that describe one local client.
 struct LocalClient
   connected
   signon
@@ -778,6 +851,7 @@ struct LocalClient
   standardQuake
 end struct
 
+// Group the fields that describe one client score.
 struct ClientScore
   name
   enterTime
@@ -785,6 +859,7 @@ struct ClientScore
   colors
 end struct
 
+// Track mutable player state across subsystem calls.
 struct PlayerState
   origin
   velocity
@@ -820,6 +895,7 @@ struct PlayerState
   deadFlag
 end struct
 
+// Store the parsed data and relationships for one BSP collision hull.
 struct BspCollisionHull
   map
   clipNodes
@@ -830,6 +906,7 @@ struct BspCollisionHull
   clipMaxs
 end struct
 
+// Describe one render vertex consumed by the renderer or asset loader.
 struct RenderVertex
   position
   s
@@ -838,6 +915,7 @@ struct RenderVertex
   lightT
 end struct
 
+// Describe one render surface consumed by the renderer or asset loader.
 struct RenderSurface
   faceIndex
   textureIndex
@@ -851,6 +929,7 @@ struct RenderSurface
   lightmapId
 end struct
 
+// Describe one render texture consumed by the renderer or asset loader.
 struct RenderTexture
   name
   width
@@ -860,6 +939,7 @@ struct RenderTexture
   transparent
 end struct
 
+// Group the fields that describe one world renderer.
 struct WorldRenderer
   map
   palette
@@ -876,6 +956,7 @@ struct WorldRenderer
   waterAlpha
 end struct
 
+// Own the coordinated data required by the game session.
 struct GameSession
   arguments
   filesystem
@@ -960,6 +1041,7 @@ struct LaunchOptions
   timedemo
 end struct
 
+// Collect the outcome and diagnostics for one game validation.
 struct GameValidation
   ok
   messages
@@ -970,6 +1052,7 @@ struct GameValidation
   progsFunctions
 end struct
 
+// Group the fields that describe one lightmap page.
 struct LightmapPage
   glId
   pixels
@@ -977,6 +1060,7 @@ struct LightmapPage
   dirty
 end struct
 
+// Own the coordinated data required by the edict runtime.
 struct EdictRuntime
   maxEdicts
   numEdicts
@@ -984,6 +1068,7 @@ struct EdictRuntime
   freeTimes
 end struct
 
+// Own the coordinated data required by the QuakeC context.
 struct QuakeCContext
   filesystem
   worldMap
@@ -1014,6 +1099,7 @@ struct QuakeCContext
   checkPvs
 end struct
 
+// Describe one runtime dynamic light and its observable Quake state.
 struct DynamicLight
   origin
   radius
@@ -1023,6 +1109,7 @@ struct DynamicLight
   key
 end struct
 
+// Track mutable client entity state across subsystem calls.
 struct ClientEntityState
   number
   modelIndex
@@ -1042,6 +1129,7 @@ struct ClientEntityState
   syncBase
 end struct
 
+// Group the fields that describe one sound effect.
 struct SoundEffect
   name
   samples
@@ -1051,6 +1139,7 @@ struct SoundEffect
   loopStart
 end struct
 
+// Track storage and runtime state for one mixer channel.
 struct MixerChannel
   entityNumber
   channelNumber
@@ -1064,6 +1153,7 @@ struct MixerChannel
   endTime
 end struct
 
+// Group the fields that describe one music track.
 struct MusicTrack
   number
   source
@@ -1079,6 +1169,7 @@ struct MusicTrack
   sampleFrames
 end struct
 
+// Group the fields that describe one sound mixer.
 struct SoundMixer
   audioState
   filesystem
@@ -1102,6 +1193,7 @@ struct SoundMixer
   playVolumeHash
 end struct
 
+// Track mutable console state across subsystem calls.
 struct ConsoleState
   lines
   maxLines
@@ -1136,6 +1228,7 @@ struct ConsoleState
   dedicated
 end struct
 
+// Group the fields that describe one menu picture.
 struct MenuPicture
   name
   width
@@ -1143,6 +1236,7 @@ struct MenuPicture
   textureId
 end struct
 
+// Track mutable menu state across subsystem calls.
 struct MenuState
   active
   selection
@@ -1188,6 +1282,7 @@ struct MenuState
   loadable
 end struct
 
+// Track mutable view state across subsystem calls.
 struct ViewState
   origin
   angles
@@ -1224,12 +1319,14 @@ struct ViewState
   emptyCshift
 end struct
 
+// Store the parsed data and relationships for one alias GPU model.
 struct AliasGpuModel
   source
   textureIds
   uploaded
 end struct
 
+// Store the parsed data and relationships for one sprite GPU model.
 struct SpriteGpuModel
   source
   textureIds
@@ -1237,6 +1334,7 @@ struct SpriteGpuModel
 end struct
 
 
+// Store the parsed data and relationships for one client render model.
 struct ClientRenderModel
   name
   kind
@@ -1247,6 +1345,7 @@ struct ClientRenderModel
   uploaded
 end struct
 
+// Group the fields that describe one entity renderer.
 struct EntityRenderer
   filesystem
   palette
@@ -1254,6 +1353,7 @@ struct EntityRenderer
   renderedEntities
 end struct
 
+// Track storage and runtime state for one UDP socket.
 struct UdpSocket
   handle
   port
@@ -1263,12 +1363,14 @@ struct UdpSocket
   broadcast
 end struct
 
+// Group the fields that describe one WinSock address.
 struct WinSockAddress
   family
   address
   port
 end struct
 
+// Collect the outcome and diagnostics for one host soak result.
 struct HostSoakResult
   frames
   liveBefore
@@ -1279,6 +1381,7 @@ struct HostSoakResult
 end struct
 
 
+// Collect the outcome and diagnostics for one UDP smoke result.
 struct UdpSmokeResult
   ok
   senderPort
@@ -1291,6 +1394,7 @@ struct UdpSmokeResult
   errorCode
 end struct
 
+// Collect the outcome and diagnostics for one compatibility trace result.
 struct CompatibilityTraceResult
   ok
   framesRequested
@@ -1306,6 +1410,7 @@ struct CompatibilityTraceResult
   cleanShutdown
 end struct
 
+// Collect the outcome and diagnostics for one runtime validation.
 struct RuntimeValidation
   ok
   messages
@@ -1326,6 +1431,7 @@ struct RuntimeValidation
   cleanShutdown
 end struct
 
+// Group the fields that describe one demo playback.
 struct DemoPlayback
   recording
   client
@@ -1342,6 +1448,7 @@ struct DemoPlayback
   finishResult
 end struct
 
+// Collect the outcome and diagnostics for one demo verification.
 struct DemoVerification
   ok
   messages
@@ -1354,12 +1461,14 @@ struct DemoVerification
   prints
 end struct
 
+// Group the fields that describe one datagram packet.
 struct DatagramPacket
   flags
   sequence
   payload
 end struct
 
+// Track storage and runtime state for one datagram channel.
 struct DatagramChannel
   sendSequence
   receiveSequence

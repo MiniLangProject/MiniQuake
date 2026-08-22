@@ -35,6 +35,7 @@ extern function CreateDirectoryW(
   security as ptr
 ) from "kernel32.dll" returns bool
 
+// Track mutable sys win state across subsystem calls.
 struct SysWinState
   useNative
   handles

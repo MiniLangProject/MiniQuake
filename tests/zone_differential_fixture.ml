@@ -8,6 +8,7 @@ import miniquake.native as native
 import miniquake.zone as zone
 import miniquake.memory as memory
 
+// Group the deterministic zone fixture command line fields used by this test fixture.
 struct ZoneFixtureCommandLine
   args
 end struct

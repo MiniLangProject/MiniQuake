@@ -14,6 +14,7 @@ import miniquake.native as native
 import miniquake.message as msg
 import miniquake.sizebuf as sz
 
+// Group the deterministic sv user differential map fields used by this test fixture.
 struct SvUserDifferentialMap
   models
   nodes

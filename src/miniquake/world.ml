@@ -22,6 +22,7 @@ const AREA_DEPTH = 4
 const AREA_NODES = 32
 const MAX_ENT_LEAFS = 16
 
+// Group the fields that describe one area node.
 struct AreaNode
   axis
   dist
@@ -31,6 +32,7 @@ struct AreaNode
   solidEdicts
 end struct
 
+// Track mutable world area state across subsystem calls.
 struct WorldAreaState
   server
   map
@@ -45,6 +47,7 @@ struct WorldAreaState
   touchEvents
 end struct
 
+// Group the fields that describe one move clip.
 struct MoveClip
   boxMins
   boxMaxs

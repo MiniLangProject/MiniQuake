@@ -37,6 +37,7 @@ const MULTICAST_ALL = 0
 const MULTICAST_PVS = 1
 const MULTICAST_PHS = 2
 
+// Track mutable sv main state across subsystem calls.
 struct SvMainState
   server
   network

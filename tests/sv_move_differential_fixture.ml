@@ -11,6 +11,7 @@ import miniquake.server as server
 import miniquake.server_move as movePort
 import miniquake.quakec.vm as vm
 
+// Group the deterministic move differential map fields used by this test fixture.
 struct MoveDifferentialMap
   models
   nodes

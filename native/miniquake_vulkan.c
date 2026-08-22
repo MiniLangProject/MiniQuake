@@ -34,6 +34,7 @@ typedef unsigned __int64 size_t;
 typedef void *MQ_HMODULE;
 typedef void *MQ_HINSTANCE;
 typedef VkFlags VkWin32SurfaceCreateFlagsKHR;
+/* Mirror the Win32 vk win32 surface create info khr ABI layout without requiring SDK declarations. */
 typedef struct VkWin32SurfaceCreateInfoKHR {
     VkStructureType sType;
     const void *pNext;
@@ -114,12 +115,14 @@ MQ_DLLIMPORT double __cdecl sqrt(double value);
 #define MQ_GL_VERSION 0x1F02u
 #define MQ_GL_EXTENSIONS 0x1F03u
 
+/* Store the Vulkan backend fields for one vk vertex. */
 typedef struct mq_vk_vertex_s {
     float x, y, z;
     float s, t;
     float r, g, b, a;
 } mq_vk_vertex_t;
 
+/* Store the Vulkan backend fields for one vk push. */
 typedef struct mq_vk_push_s {
     float transform[16];
     float alpha_reference[4];
@@ -127,6 +130,7 @@ typedef struct mq_vk_push_s {
     float lights[8];
 } mq_vk_push_t;
 
+/* Store the Vulkan backend fields for one vk texture. */
 typedef struct mq_vk_texture_s {
     VkImage image;
     VkDeviceMemory memory;
@@ -144,6 +148,7 @@ typedef struct mq_vk_texture_s {
     mq_i32 allocated;
 } mq_vk_texture_t;
 
+/* Store the Vulkan backend fields for one vk frame. */
 typedef struct mq_vk_frame_s {
     VkCommandBuffer command;
     VkFence fence;
@@ -992,6 +997,7 @@ void mq_vulkan_end(void) {
 
 /* Submit draw interleaved t2f v3f geometry to the active backend command buffer. */
 mq_i32 mq_vulkan_draw_interleaved_t2f_v3f(const float *vertices, mq_u32 count) { mq_u32 i, first = 0u; if (vertices == MQ_NULL) return 0; while (first < count) { mq_u32 chunk = count - first; if (chunk > 65536u) chunk = 65535u; chunk -= chunk % 3u; for (i = 0u; i < chunk; ++i) { const float *source = &vertices[(first + i) * 5u]; mq_vk_vertex_t *destination = &mq_vk_immediate[i]; destination->x = source[2]; destination->y = source[3]; destination->z = source[4]; destination->s = source[0]; destination->t = source[1]; destination->r = mq_vk_current_color[0]; destination->g = mq_vk_current_color[1]; destination->b = mq_vk_current_color[2]; destination->a = mq_vk_current_color[3]; } mq_vk_draw(mq_vk_immediate, chunk, MQ_GL_TRIANGLES); first += chunk; } return (mq_i32)(count / 3u); }
+/* Store the Vulkan backend fields for one vk alias input. */
 typedef struct mq_vk_alias_input_s { float s, t; mq_u8 r, g, b, a; float x, y, z; } mq_vk_alias_input_t;
 /* Submit draw interleaved t2f c4ub v3f geometry to the active backend command buffer. */
 mq_i32 mq_vulkan_draw_interleaved_t2f_c4ub_v3f(const void *vertices, mq_u32 count) { const mq_vk_alias_input_t *source = (const mq_vk_alias_input_t *)vertices; mq_u32 i, first = 0u; if (vertices == MQ_NULL) return 0; while (first < count) { mq_u32 chunk = count - first; if (chunk > 65536u) chunk = 65535u; chunk -= chunk % 3u; for (i = 0u; i < chunk; ++i) { mq_vk_vertex_t *destination = &mq_vk_immediate[i]; destination->x = source[first + i].x; destination->y = source[first + i].y; destination->z = source[first + i].z; destination->s = source[first + i].s; destination->t = source[first + i].t; destination->r = source[first + i].r / 255.0f; destination->g = source[first + i].g / 255.0f; destination->b = source[first + i].b / 255.0f; destination->a = source[first + i].a / 255.0f; } mq_vk_draw(mq_vk_immediate, chunk, MQ_GL_TRIANGLES); first += chunk; } return (mq_i32)(count / 3u); }

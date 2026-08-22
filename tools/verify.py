@@ -68,6 +68,7 @@ NATIVE_BRIDGES = {
 
 @dataclass
 class Check:
+    """Represent one check discovered by the source verifier."""
     name: str
     passed: bool
     details: dict[str, object]

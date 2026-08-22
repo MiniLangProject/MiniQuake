@@ -8,6 +8,7 @@ Focused zone.c/zone.h behavioral tests.
 import miniquake.zone as zone
 import miniquake.memory as memory
 
+// Group the deterministic test command line fields used by this test fixture.
 struct TestCommandLine
   args
 end struct

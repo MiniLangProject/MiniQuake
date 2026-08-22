@@ -12,6 +12,7 @@ import miniquake.server as server
 import miniquake.server_move as movePort
 import miniquake.quakec.vm as vm
 
+// Group the deterministic move test map fields used by this test fixture.
 struct MoveTestMap
   models
   nodes

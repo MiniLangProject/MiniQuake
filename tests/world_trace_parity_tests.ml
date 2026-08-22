@@ -13,6 +13,7 @@ import miniquake.world as worldPort
 import miniquake.server as server
 import miniquake.edict as edict
 
+// Group the deterministic trace test map fields used by this test fixture.
 struct TraceTestMap
   models
   nodes

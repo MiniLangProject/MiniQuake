@@ -34,6 +34,7 @@ const MS_WINDOWED = 0
 const MS_FULLDIB = 2
 const MS_UNINIT = 3
 
+// Group the fields that describe one video mode.
 struct VideoMode
   type
   width
@@ -47,6 +48,7 @@ struct VideoMode
   description
 end struct
 
+// Track mutable video state across subsystem calls.
 struct VideoState
   modes
   badMode

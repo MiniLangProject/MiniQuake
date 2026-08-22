@@ -8,6 +8,7 @@ import miniquake.net_main as netmain
 import miniquake.net_loop as netloop
 import miniquake.sizebuf as sz
 
+// Group the deterministic fixture client fields used by this test fixture.
 struct FixtureClient
   active
   socket

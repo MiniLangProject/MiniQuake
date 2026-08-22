@@ -21,6 +21,7 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class TraceInfo:
+    """Store normalized trace info data used by the verification workflow."""
     name: str
     bytes: int
     lines: int
@@ -29,6 +30,7 @@ class TraceInfo:
 
 @dataclass(frozen=True)
 class FieldDifference:
+    """Store normalized field difference data used by the verification workflow."""
     field: str
     left: str | None
     right: str | None
@@ -36,6 +38,7 @@ class FieldDifference:
 
 @dataclass(frozen=True)
 class LineDifference:
+    """Store normalized line difference data used by the verification workflow."""
     line_index: int
     kind: str
     frame: int | None

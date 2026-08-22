@@ -34,6 +34,7 @@ float enhancedLight(vec4 light, vec3 normal) {
     return attenuation * diffuse;
 }
 
+// Shade one fragment with the selected classic or enhanced-lighting path.
 void main() {
     if (pushData.depthRange.z > 0.5) {
         vec4 sampled = texture(colorTexture, texcoord);

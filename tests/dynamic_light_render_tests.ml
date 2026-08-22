@@ -8,6 +8,7 @@ import miniquake.render.world as worldRender
 import miniquake.types as t
 import miniquake.constants as c
 
+// Group the deterministic brush entity fields used by this test fixture.
 struct BrushEntity
   modelIndex
   origin

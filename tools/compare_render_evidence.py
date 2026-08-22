@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Image:
+    """Store decoded image pixels and dimensions for visual comparison."""
     width: int
     height: int
     rgb: bytes

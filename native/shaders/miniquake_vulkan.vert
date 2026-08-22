@@ -19,6 +19,7 @@ layout(location = 0) out vec2 texcoord;
 layout(location = 1) out vec4 color;
 layout(location = 2) out vec3 eyePosition;
 
+// Transform one submitted vertex into Vulkan clip space.
 void main() {
     gl_Position = pushData.transform * vec4(inPosition, 1.0);
     gl_Position.z = (gl_Position.z + gl_Position.w) * 0.5;

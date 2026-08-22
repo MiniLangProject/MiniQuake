@@ -14,6 +14,7 @@ import miniquake.sizebuf as sz
 import miniquake.message as msg
 import miniquake.mathlib as math
 
+// Group the deterministic sv user test map fields used by this test fixture.
 struct SvUserTestMap
   models
   nodes

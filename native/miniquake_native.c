@@ -73,6 +73,7 @@ typedef mq_u16 ATOM;
 typedef mq_u32 MMRESULT;
 typedef mq_u64 SOCKET;
 
+/* Mirror the Win32 sockaddr in ABI layout without requiring SDK declarations. */
 typedef struct MQ_SOCKADDR_IN {
     mq_u16 sin_family;
     mq_u16 sin_port;
@@ -80,6 +81,7 @@ typedef struct MQ_SOCKADDR_IN {
     mq_u8 sin_zero[8];
 } MQ_SOCKADDR_IN;
 
+/* Mirror the Win32 hostent ABI layout without requiring SDK declarations. */
 typedef struct MQ_HOSTENT {
     char *h_name;
     char **h_aliases;
@@ -88,16 +90,19 @@ typedef struct MQ_HOSTENT {
     char **h_addr_list;
 } MQ_HOSTENT;
 
+/* Mirror the Win32 point ABI layout without requiring SDK declarations. */
 typedef struct MQ_POINT {
     LONG x;
     LONG y;
 } MQ_POINT;
 
+/* Mirror the Win32 coord ABI layout without requiring SDK declarations. */
 typedef struct MQ_COORD {
     mq_i16 X;
     mq_i16 Y;
 } MQ_COORD;
 
+/* Mirror the Win32 small rect ABI layout without requiring SDK declarations. */
 typedef struct MQ_SMALL_RECT {
     mq_i16 Left;
     mq_i16 Top;
@@ -105,6 +110,7 @@ typedef struct MQ_SMALL_RECT {
     mq_i16 Bottom;
 } MQ_SMALL_RECT;
 
+/* Mirror the Win32 console screen buffer info ABI layout without requiring SDK declarations. */
 typedef struct MQ_CONSOLE_SCREEN_BUFFER_INFO {
     MQ_COORD dwSize;
     MQ_COORD dwCursorPosition;
@@ -113,6 +119,7 @@ typedef struct MQ_CONSOLE_SCREEN_BUFFER_INFO {
     MQ_COORD dwMaximumWindowSize;
 } MQ_CONSOLE_SCREEN_BUFFER_INFO;
 
+/* Mirror the Win32 key event record ABI layout without requiring SDK declarations. */
 typedef struct MQ_KEY_EVENT_RECORD {
     BOOL bKeyDown;
     WORD wRepeatCount;
@@ -125,6 +132,7 @@ typedef struct MQ_KEY_EVENT_RECORD {
     DWORD dwControlKeyState;
 } MQ_KEY_EVENT_RECORD;
 
+/* Mirror the Win32 input record ABI layout without requiring SDK declarations. */
 typedef struct MQ_INPUT_RECORD {
     WORD EventType;
     union {
@@ -133,6 +141,7 @@ typedef struct MQ_INPUT_RECORD {
     } Event;
 } MQ_INPUT_RECORD;
 
+/* Mirror the Win32 rect ABI layout without requiring SDK declarations. */
 typedef struct MQ_RECT {
     LONG left;
     LONG top;
@@ -140,6 +149,7 @@ typedef struct MQ_RECT {
     LONG bottom;
 } MQ_RECT;
 
+/* Mirror the Win32 msg ABI layout without requiring SDK declarations. */
 typedef struct MQ_MSG {
     HWND hwnd;
     UINT message;
@@ -152,6 +162,7 @@ typedef struct MQ_MSG {
 
 typedef LRESULT (MQ_WINAPI *MQ_WNDPROC)(HWND, UINT, WPARAM, LPARAM);
 
+/* Mirror the Win32 wndclassexw ABI layout without requiring SDK declarations. */
 typedef struct MQ_WNDCLASSEXW {
     UINT cbSize;
     UINT style;
@@ -167,6 +178,7 @@ typedef struct MQ_WNDCLASSEXW {
     HICON hIconSm;
 } MQ_WNDCLASSEXW;
 
+/* Mirror the Win32 pixelformatdescriptor ABI layout without requiring SDK declarations. */
 typedef struct MQ_PIXELFORMATDESCRIPTOR {
     WORD nSize;
     WORD nVersion;
@@ -196,11 +208,13 @@ typedef struct MQ_PIXELFORMATDESCRIPTOR {
     DWORD dwDamageMask;
 } MQ_PIXELFORMATDESCRIPTOR;
 
+/* Mirror the Win32 pointl ABI layout without requiring SDK declarations. */
 typedef struct MQ_POINTL {
     LONG x;
     LONG y;
 } MQ_POINTL;
 
+/* Mirror the Win32 devmodew ABI layout without requiring SDK declarations. */
 typedef struct MQ_DEVMODEW {
     WCHAR dmDeviceName[32];
     WORD dmSpecVersion;
@@ -250,6 +264,7 @@ typedef struct MQ_DEVMODEW {
     DWORD dmPanningHeight;
 } MQ_DEVMODEW;
 
+/* Mirror the Win32 waveformatex ABI layout without requiring SDK declarations. */
 typedef struct MQ_WAVEFORMATEX {
     WORD wFormatTag;
     WORD nChannels;
@@ -260,6 +275,7 @@ typedef struct MQ_WAVEFORMATEX {
     WORD cbSize;
 } MQ_WAVEFORMATEX;
 
+/* Mirror the Win32 wavehdr ABI layout without requiring SDK declarations. */
 typedef struct MQ_WAVEHDR {
     CHAR *lpData;
     DWORD dwBufferLength;
@@ -271,6 +287,7 @@ typedef struct MQ_WAVEHDR {
     ULONG_PTR reserved;
 } MQ_WAVEHDR;
 
+/* Mirror the Win32 mmtime ABI layout without requiring SDK declarations. */
 typedef struct MQ_MMTIME {
     UINT wType;
     union {
@@ -283,6 +300,7 @@ typedef struct MQ_MMTIME {
     } u;
 } MQ_MMTIME;
 
+/* Mirror the Win32 joyinfoex ABI layout without requiring SDK declarations. */
 typedef struct MQ_JOYINFOEX {
     DWORD dwSize;
     DWORD dwFlags;
@@ -299,6 +317,7 @@ typedef struct MQ_JOYINFOEX {
     DWORD dwReserved2;
 } MQ_JOYINFOEX;
 
+/* Mirror the Win32 joycapsw ABI layout without requiring SDK declarations. */
 typedef struct MQ_JOYCAPSW {
     WORD wMid;
     WORD wPid;
@@ -342,6 +361,7 @@ typedef struct MQ_JOYCAPSW {
 #define MQ_ML_TAG_FLOAT 5u
 #define MQ_ML_OBJ_FLOAT 4u
 
+/* Group the fields that describe one ml float object. */
 typedef struct MQ_ML_FLOAT_OBJECT {
     mq_u32 type;
     mq_u32 padding;
@@ -456,6 +476,7 @@ typedef struct MQ_SHADOW_TRIANGLE {
     mq_u32 surface_id;
 } MQ_SHADOW_TRIANGLE;
 
+/* Store the native shadow-acceleration data for one shadow node. */
 typedef struct MQ_SHADOW_NODE {
     float minimum[3];
     float maximum[3];
@@ -480,6 +501,7 @@ static mq_u32 mq_shadow_node_count = 0u;
  */
 #define MQ_SHADOW_RAY_CACHE_SIZE 131072u
 #define MQ_SHADOW_RAY_CACHE_PROBES 4u
+/* Store the native shadow-acceleration data for one shadow ray cache entry. */
 typedef struct MQ_SHADOW_RAY_CACHE_ENTRY {
     mq_u32 generation;
     mq_u32 ray_bits[6];
@@ -1129,6 +1151,7 @@ MQ_DLLIMPORT void MQ_WINAPI glDisableClientState(mq_u32 array);
 #define MQ_STATIC_GEOMETRY_CACHE_MAX 32768
 #define MQ_STATIC_GEOMETRY_HASH_SIZE 65536
 
+/* Group the fields that describe one static geometry entry. */
 typedef struct mq_static_geometry_entry_s {
     mq_u64 key;
     mq_i32 pass;
@@ -1443,6 +1466,7 @@ static mq_u32 mq_alias_list_id[MQ_ALIAS_LIST_CACHE_MAX];
 static mq_i32 mq_alias_list_triangles[MQ_ALIAS_LIST_CACHE_MAX];
 static mq_u32 mq_alias_list_count = 0u;
 
+/* Describe one alias vertex consumed by the renderer or asset loader. */
 typedef struct mq_alias_vertex_s {
     float s;
     float t;

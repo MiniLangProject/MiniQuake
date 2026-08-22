@@ -15,6 +15,7 @@ import miniquake.byteio as bio
 import miniquake.common as common
 import miniquake.cvar as cv
 import miniquake.native as native
+import miniquake.array_util as arrayutil
 
 const DEFAULT_M_YAW = 0.022
 const DEFAULT_M_PITCH = 0.022
@@ -740,17 +741,20 @@ end function
 // Bind commands that are handled solely by Key_Event are intentionally absent.
 function rebuildPolledBindings()
   global polledBindings
-  result = []
+  // A config can install hundreds of bindings, and setBindingCode rebuilds
+  // this derived cache after every change. Use one geometrically managed
+  // buffer instead of copying the complete result prefix for each match.
+  builder = arrayutil.createArrayBuilder(len(bindings))
   for each item in bindings
     command = item[3]
     button = buttonForNormalizedCommand(command)
     impulse = 0
     if button is void then impulse = impulseForCommand(command) end if
     if button is not void or impulse != 0 then
-      result = result + [[item[0], button, impulse, command]]
+      arrayutil.pushArrayBuilder(builder, [item[0], button, impulse, command])
     end if
   end for
-  polledBindings = result
+  polledBindings = arrayutil.finishArrayBuilder(builder)
   index = 0
   while index < len(polledKeyQueryMask)
     polledKeyQueryMask[index] = 0

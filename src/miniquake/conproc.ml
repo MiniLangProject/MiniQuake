@@ -17,6 +17,7 @@ const CCOM_GET_SCR_LINES = 0x4
 const CCOM_SET_SCR_LINES = 0x5
 const INFINITE = 0xffffffff
 
+// Track mutable con proc state across subsystem calls.
 struct ConProcState
   fileBuffer
   parentSend

@@ -14,6 +14,7 @@ const HUNK_SENTINEL = 0x1df001ed
 const HUNK_HEADER_SIZE = 16
 const CACHE_HEADER_SIZE = 40
 
+// Group the fields that describe one hunk block.
 struct HunkBlock
   kind
   name
@@ -27,6 +28,7 @@ struct HunkBlock
   sentinel
 end struct
 
+// Group the fields that describe one cache block.
 struct CacheBlock
   kind
   name
@@ -41,11 +43,13 @@ struct CacheBlock
   user
 end struct
 
+// Group the fields that describe one cache user.
 struct CacheUser
   block
   manager
 end struct
 
+// Own the coordinated data required by the memory manager.
 struct MemoryManager
   capacity
   blocks

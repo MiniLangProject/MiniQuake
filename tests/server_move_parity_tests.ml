@@ -12,6 +12,7 @@ import miniquake.server_move as movePort
 import miniquake.server_collision as collision
 import miniquake.quakec.vm as vm
 
+// Group the deterministic move parity map fields used by this test fixture.
 struct MoveParityMap
   models
   nodes

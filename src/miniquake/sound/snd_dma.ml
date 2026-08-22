@@ -25,6 +25,7 @@ const SOUND_NOMINAL_CLIP_DISTANCE = 1000.0
 const DEFAULT_SOUND_PACKET_VOLUME = 255
 const DEFAULT_SOUND_PACKET_ATTENUATION = 1.0
 
+// Own the coordinated data required by the sound system.
 struct SoundSystem
   filesystem
   mixState

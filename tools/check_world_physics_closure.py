@@ -104,7 +104,7 @@ SERVER_GC_ROOT_SECTION_HASHES = {
     "ensureSynchronizedEdict": "021e99d057bb0d8065985edbc3135f94c32ef3cde31672dd0f96c5c96fdd2562",
     "syncQuakeCEdict": "e284ddf91cee35f98352528f9985a544ef55d56ec907fffff166de05736117e2",
     "recomputeEdictCount": "c76b03b6df1ad59e54b32dd623a71854c23b11cd85556d6f630401e71502ae7e",
-    "syncQuakeCEdictRange": "68c2a956d1b1a40bb97a69b5b54896591cb034a8bca8ad552225caca755ebde8",
+    "syncQuakeCEdictRange": "ea7150eb825114558af5e527a08ab2cffff92f13a15360e71b72803ef18e7647",
     "syncQuakeCEdicts": "20487d24c832a3806d321883ccaccf5f7a7a3a20a892777009d5c2abe8759edc",
     "syncLoadedQuakeCEdicts": "dd64b00262cbab549e47098747ad2e6af8e61bd1985b49b7d59f54af724b3de7",
     "syncQuakeCSnapshotEdictAt": "0378875877db9959e14d529939e2e38a4a73b94bae8e07aeed4832fae9d0316a",

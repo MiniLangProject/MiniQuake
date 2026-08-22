@@ -9,6 +9,7 @@ import miniquake.native as native
 import miniquake.cvar as cvarPort
 import miniquake.host as hostPort
 
+// Group the deterministic cvar command session fields used by this test fixture.
 struct CvarCommandSession
   cvars
 end struct

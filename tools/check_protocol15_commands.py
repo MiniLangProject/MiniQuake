@@ -59,6 +59,7 @@ MOVETYPE_STEP = 4
 
 @dataclass
 class Check:
+    """Represent one check discovered by the source verifier."""
     name: str
     passed: bool
     details: dict[str, object] = field(default_factory=dict)
@@ -68,6 +69,7 @@ class Check:
 
 @dataclass
 class Report:
+    """Collect the machine-readable outcome of one verification run."""
     package_id: str
     root: str
     passed: bool
@@ -75,6 +77,7 @@ class Report:
 
 
 class Writer:
+    """Encode one bounded Protocol 15 message for differential checks."""
     def __init__(self) -> None:
         """Initialize the helper with its immutable verification inputs."""
         self.data = bytearray()

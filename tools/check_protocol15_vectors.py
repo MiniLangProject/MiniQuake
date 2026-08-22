@@ -33,6 +33,7 @@ TEXT_ABI = "quake_latin1_cstring_v1"
 
 @dataclass
 class Check:
+    """Represent one check discovered by the source verifier."""
     name: str
     passed: bool
     details: dict[str, object] = field(default_factory=dict)
@@ -42,6 +43,7 @@ class Check:
 
 @dataclass
 class Report:
+    """Collect the machine-readable outcome of one verification run."""
     package_id: str
     root: str
     passed: bool
@@ -58,6 +60,7 @@ def sha256(path: Path) -> str:
 
 
 class Buffer:
+    """Encode deterministic protocol bytes for the reference vectors."""
     def __init__(self, maximum: int, allow_overflow: bool = False) -> None:
         """Initialize the helper with its immutable verification inputs."""
         self.data = bytearray(maximum)

@@ -14,6 +14,7 @@ const ZONE_ADMIN_SIZE = 32
 const BLOCK_HEADER_SIZE = 24
 const TRASH_SIZE = 4
 
+// Group the fields that describe one zone block.
 struct ZoneBlock
   kind
   name
@@ -29,6 +30,7 @@ struct ZoneBlock
   trashId
 end struct
 
+// Track mutable zone state across subsystem calls.
 struct ZoneState
   capacity
   blocks

@@ -12,6 +12,7 @@ import miniquake.server as server
 import miniquake.server_collision as collision
 import miniquake.quakec.vm as vm
 
+// Group the deterministic collision map fields used by this test fixture.
 struct CollisionMap
   models
   nodes

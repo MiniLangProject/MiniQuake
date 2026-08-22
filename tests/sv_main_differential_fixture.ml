@@ -14,6 +14,7 @@ import miniquake.sizebuf as sz
 import miniquake.message as msg
 import miniquake.net_loop as netloop
 
+// Group the deterministic sv main differential map fields used by this test fixture.
 struct SvMainDifferentialMap
   models
   nodes

@@ -24,11 +24,13 @@ struct AliasMeshVertex
   t
 end struct
 
+// Group the fields that describe one alias mesh command.
 struct AliasMeshCommand
   count
   vertices
 end struct
 
+// Group the fields that describe one alias mesh.
 struct AliasMesh
   commands
   vertexOrder

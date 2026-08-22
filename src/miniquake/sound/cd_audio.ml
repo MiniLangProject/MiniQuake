@@ -17,6 +17,7 @@ import miniquake.byteio as bio
 import miniquake.native as native
 import miniquake.common as common
 
+// Track mutable cd audio state across subsystem calls.
 struct CdAudioState
   mixer
   initialized

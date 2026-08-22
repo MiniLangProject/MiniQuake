@@ -26,11 +26,13 @@ struct SoundCache
   data
 end struct
 
+// Group the fields that describe one sound descriptor.
 struct SoundDescriptor
   name
   cache
 end struct
 
+// Group the fields that describe one chunk cursor.
 struct ChunkCursor
   data
   endOffset

@@ -9,6 +9,7 @@ import miniquake.client_render_handoff as bp050Handoff
 import miniquake.types as bp050Types
 import miniquake.constants as bp050Constants
 
+// Group the deterministic bp050 entity fields used by this test fixture.
 struct Bp050Entity
   number
   modelIndex

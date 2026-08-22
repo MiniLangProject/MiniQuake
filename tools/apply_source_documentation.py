@@ -97,6 +97,7 @@ def strip_existing_header(text: str) -> tuple[str, str]:
             or "GNU General Public License" in line
             or "Free Software Foundation" in line
             or line.startswith("See COPYING")
+            or line.startswith("GPL-")
         ):
             continue
         description.append(line)
@@ -291,6 +292,14 @@ def c_function_summary(name: str) -> str:
     )
     words = split_words(normalized)
     lower = words.lower()
+    if lower == "main":
+        return "/* Run the standalone differential oracle and emit its fixture rows. */"
+    if lower == "die":
+        return "/* Abort the oracle after reporting an invalid fixture condition. */"
+    if lower.startswith(("row", "emit", "print ")) or lower.endswith(" row"):
+        return "/* Emit one deterministic result row for the differential oracle. */"
+    if lower in {"bits", "fbits", "float bits", "from bits"}:
+        return "/* Convert the fixture value to or from its IEEE-754 bit pattern. */"
     exact_summaries = {
         "view": "Create an image view for backend texture access.",
         "sampler": "Create the sampler matching the texture's filter and wrap state.",
@@ -505,6 +514,126 @@ def document_c_functions(text: str) -> str:
     return text
 
 
+def type_summary(name: str, *, kind: str, test_context: bool = False) -> str:
+    """Describe one MiniLang or native aggregate declaration in plain English."""
+    clean = re.sub(r"^(?:MQ_|mq_)", "", name)
+    clean = re.sub(r"_(?:s|t)$", "", clean)
+    phrase = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", " ", clean or kind)
+    phrase = split_words(phrase)
+    lower = phrase.lower()
+    display = lower
+    for acronym in ("bsp", "crc", "d3d", "dma", "gl", "gpu", "mdl", "ogg", "pcm", "udp", "wad"):
+        display = re.sub(rf"\b{acronym}\b", acronym.upper(), display)
+    display = re.sub(r"\bquake c\b", "QuakeC", display)
+    display = re.sub(r"\bwin sock\b", "WinSock", display)
+    display = re.sub(r"\bsizebuf\b", "size buffer", display)
+    display = re.sub(r"\bclientdata\b", "client data", display)
+    win32_layouts = {
+        "MQ_SOCKADDR_IN", "MQ_HOSTENT", "MQ_POINT", "MQ_COORD", "MQ_SMALL_RECT",
+        "MQ_CONSOLE_SCREEN_BUFFER_INFO", "MQ_KEY_EVENT_RECORD", "MQ_INPUT_RECORD",
+        "MQ_RECT", "MQ_MSG", "MQ_WNDCLASSEXW", "MQ_PIXELFORMATDESCRIPTOR",
+        "MQ_POINTL", "MQ_DEVMODEW", "MQ_WAVEFORMATEX", "MQ_WAVEHDR", "MQ_MMTIME",
+        "MQ_JOYINFOEX", "MQ_JOYCAPSW", "MQ_LARGE_INTEGER",
+    }
+    if name in win32_layouts or name == "VkWin32SurfaceCreateInfoKHR":
+        return f"Mirror the Win32 {display} ABI layout without requiring SDK declarations."
+    if name.startswith("mq_d3d"):
+        return f"Store the Direct3D 9 ABI fields for one {display}."
+    if name.startswith("mq_vk"):
+        return f"Store the Vulkan backend fields for one {display}."
+    if "SHADOW" in name:
+        return f"Store the native shadow-acceleration data for one {display}."
+    if test_context:
+        return f"Group the deterministic {display} fields used by this test fixture."
+    if lower == "vec3":
+        return "Store one three-dimensional vector in Quake world coordinates."
+    if lower.endswith(" state"):
+        return f"Track mutable {display[:-len(' state')]} state across subsystem calls."
+    if lower.endswith((" result", " validation", " verification")):
+        return f"Collect the outcome and diagnostics for one {display}."
+    if lower.endswith((" vertex", " plane", " edge", " face", " surface", " texture")):
+        return f"Describe one {display} consumed by the renderer or asset loader."
+    if lower.endswith((" model", " archive", " program", " map", " hull")):
+        return f"Store the parsed data and relationships for one {display}."
+    if lower.endswith((" buffer", " channel", " socket", " stream")):
+        return f"Track storage and runtime state for one {display}."
+    if lower.endswith((" registry", " manager", " system", " context", " runtime", " session")):
+        return f"Own the coordinated data required by the {display}."
+    if lower.endswith((" entity", " edict", " particle", " light", " frame")):
+        return f"Describe one runtime {display} and its observable Quake state."
+    return f"Group the fields that describe one {display}."
+
+
+def refresh_ml_struct_summaries(text: str, *, test_context: bool = False) -> str:
+    """Refresh only single-line structure summaries emitted by this tool."""
+    from check_source_documentation import ML_STRUCT_RE
+
+    replacements: list[tuple[int, int, str]] = []
+    generated = re.compile(
+        r"// (?:Group the |Track mutable|Track storage|"
+        r"Store the parsed|Own the coordinated|Describe one|Collect the outcome)[^\n]*\.\n$"
+    )
+    for match in ML_STRUCT_RE.finditer(text):
+        previous = generated.search(text[:match.start()])
+        if previous is None:
+            continue
+        summary = type_summary(match.group(1), kind="struct", test_context=test_context)
+        replacements.append((previous.start(), previous.end(), f"// {summary}\n"))
+    for start, end, comment in reversed(replacements):
+        text = text[:start] + comment + text[end:]
+    return text
+
+
+def document_ml_structs(text: str, *, test_context: bool = False) -> str:
+    """Insert concise comments before undocumented MiniLang structures."""
+    from check_source_documentation import ML_STRUCT_RE
+
+    inserts: list[tuple[int, str]] = []
+    for match in ML_STRUCT_RE.finditer(text):
+        if not has_preceding_comment(text, match.start()):
+            summary = type_summary(match.group(1), kind="struct", test_context=test_context)
+            inserts.append((match.start(), f"// {summary}\n"))
+    for offset, comment in reversed(inserts):
+        text = text[:offset] + comment + text[offset:]
+    return text
+
+
+def document_c_types(text: str) -> str:
+    """Insert concise comments before undocumented native aggregate types."""
+    from check_source_documentation import C_TYPE_RE, c_type_name
+
+    inserts: list[tuple[int, str]] = []
+    for match in C_TYPE_RE.finditer(text):
+        if not has_preceding_comment(text, match.start()):
+            name = c_type_name(text, match)
+            summary = type_summary(name, kind=match.group(1))
+            inserts.append((match.start(), f"/* {summary} */\n"))
+    for offset, comment in reversed(inserts):
+        text = text[:offset] + comment + text[offset:]
+    return text
+
+
+def refresh_c_type_summaries(text: str) -> str:
+    """Refresh only native type summaries emitted by this maintenance tool."""
+    from check_source_documentation import C_TYPE_RE, c_type_name
+
+    replacements: list[tuple[int, int, str]] = []
+    generated = re.compile(
+        r"/\* (?:Group the |Track mutable|Track storage|Store the parsed|"
+        r"Own the coordinated|Describe one|Collect the outcome)[^\n]*\. \*/\n$"
+    )
+    for match in C_TYPE_RE.finditer(text):
+        previous = generated.search(text[:match.start()])
+        if previous is None:
+            continue
+        name = c_type_name(text, match)
+        summary = type_summary(name, kind=match.group(1))
+        replacements.append((previous.start(), previous.end(), f"/* {summary} */\n"))
+    for start, end, comment in reversed(replacements):
+        text = text[:start] + comment + text[end:]
+    return text
+
+
 def refresh_generic_c_summaries(text: str) -> str:
     """Refresh C summaries emitted by older maintenance-script revisions."""
     from check_source_documentation import C_FUNCTION_RE
@@ -527,7 +656,9 @@ def refresh_generic_c_summaries(text: str) -> str:
 def apply_c(path: Path) -> bool:
     """Document C function definitions without altering their implementation."""
     original = path.read_text(encoding="utf-8-sig", errors="replace")
-    updated = refresh_generic_c_summaries(original)
+    updated = original
+    updated = refresh_c_type_summaries(updated)
+    updated = document_c_types(updated)
     updated = document_c_functions(updated)
     if updated == original:
         return False
@@ -535,7 +666,7 @@ def apply_c(path: Path) -> bool:
     return True
 
 
-def has_preceding_comment(text: str, start: int) -> bool:
+def has_preceding_comment(text: str, start: int, *, hash_comments: bool = False) -> bool:
     """Report whether the declaration at start already has documentation."""
     prefix = text[:start]
     lines = prefix.splitlines()
@@ -543,7 +674,8 @@ def has_preceding_comment(text: str, start: int) -> bool:
     while cursor >= 0 and not lines[cursor].strip():
         cursor -= 1
     return cursor >= 0 and (
-        lines[cursor].strip().startswith(("//", "#"))
+        lines[cursor].strip().startswith("//")
+        or (hash_comments and lines[cursor].strip().startswith("#"))
         or lines[cursor].strip().endswith(("*/", "#>"))
     )
 
@@ -823,11 +955,10 @@ def apply_ml(path: Path, root: Path) -> bool:
             description = f"Quake-compatible MiniLang implementation of {unit}."
     licence = "GPL-2.0-or-later"
     updated = header(licence, description, derived=derived) + body
-    updated = refresh_generated_summaries(updated)
     test_context = relative.startswith("tests/")
-    updated = refresh_weak_summaries(updated, test_context=test_context)
+    updated = refresh_ml_struct_summaries(updated, test_context=test_context)
+    updated = document_ml_structs(updated, test_context=test_context)
     updated = document_functions(updated, test_context=test_context)
-    updated = document_complex_function_bodies(updated, test_context=test_context)
     if updated == original:
         return False
     path.write_text(updated, encoding="utf-8", newline="\n")
@@ -1112,12 +1243,77 @@ def add_python_function_docstrings(text: str) -> str:
     return text
 
 
+def python_class_summary(name: str) -> str:
+    """Return a concise docstring for one maintenance-tool data type."""
+    phrase = split_words(name)
+    if name in {"Check", "Finding", "Issue"}:
+        return f"Represent one {phrase} discovered by the source verifier."
+    if name == "Report":
+        return "Collect the machine-readable outcome of one verification run."
+    if name == "Buffer":
+        return "Encode deterministic protocol bytes for the reference vectors."
+    if name == "Writer":
+        return "Encode one bounded Protocol 15 message for differential checks."
+    if name == "Image":
+        return "Store decoded image pixels and dimensions for visual comparison."
+    return f"Store normalized {phrase} data used by the verification workflow."
+
+
+def add_python_class_docstrings(text: str) -> str:
+    """Document every Python class while preserving decorators and statements."""
+    tree = ast.parse(text)
+    lines = text.splitlines(keepends=True)
+    starts: list[int] = []
+    offset = 0
+    for line in lines:
+        starts.append(offset)
+        offset += len(line)
+    inserts: list[tuple[int, str]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef) or ast.get_docstring(node) is not None:
+            continue
+        first = node.body[0]
+        indent = " " * first.col_offset
+        inserts.append(
+            (starts[first.lineno - 1], f'{indent}"""{python_class_summary(node.name)}"""\n')
+        )
+    for offset, docstring in sorted(inserts, reverse=True):
+        text = text[:offset] + docstring + text[offset:]
+    return text
+
+
 def apply_python_tool(path: Path) -> bool:
     """Apply headers and semantic docstrings to one maintained Python tool."""
     original = path.read_text(encoding="utf-8-sig", errors="replace")
     updated = add_python_header(original, path)
     updated = add_python_module_docstring(updated, path)
+    updated = add_python_class_docstrings(updated)
     updated = add_python_function_docstrings(updated)
+    if updated == original:
+        return False
+    path.write_text(updated, encoding="utf-8", newline="\n")
+    return True
+
+
+def apply_shader(path: Path) -> bool:
+    """Document every maintained GLSL function entry point."""
+    from check_source_documentation import SHADER_FUNCTION_RE
+
+    original = path.read_text(encoding="utf-8-sig", errors="replace")
+    inserts: list[tuple[int, str]] = []
+    for match in SHADER_FUNCTION_RE.finditer(original):
+        if has_preceding_comment(original, match.start()):
+            continue
+        if match.group(1) == "main" and path.suffix == ".vert":
+            summary = "Transform one submitted vertex into Vulkan clip space."
+        elif match.group(1) == "main":
+            summary = "Shade one fragment with the selected classic or enhanced-lighting path."
+        else:
+            summary = f"Evaluate {split_words(match.group(1))} for the active shader stage."
+        inserts.append((match.start(), f"// {summary}\n"))
+    updated = original
+    for offset, comment in reversed(inserts):
+        updated = updated[:offset] + comment + updated[offset:]
     if updated == original:
         return False
     path.write_text(updated, encoding="utf-8", newline="\n")
@@ -1176,7 +1372,7 @@ def apply_powershell_tool(path: Path, relative: str) -> bool:
     )
     inserts: list[tuple[int, str]] = []
     for match in function_re.finditer(updated):
-        if not has_preceding_comment(updated, match.start()):
+        if not has_preceding_comment(updated, match.start(), hash_comments=True):
             summary = powershell_function_summary(match.group("name"))
             inserts.append((match.start(), f'{match.group("indent")}# {summary}\n'))
     for offset, comment in reversed(inserts):
@@ -1212,6 +1408,10 @@ def main() -> int:
             changed += int(apply_ml(path, root))
         for path in sorted((root / "native").glob("*.c")):
             changed += int(apply_c(path))
+        for path in sorted((root / "native" / "shaders").glob("*.vert")):
+            changed += int(apply_shader(path))
+        for path in sorted((root / "native" / "shaders").glob("*.frag")):
+            changed += int(apply_shader(path))
     for path in sorted((root / "tools").glob("*.py")):
         changed += int(apply_python_tool(path))
     for relative in MAINTAINED_POWERSHELL_DESCRIPTIONS:

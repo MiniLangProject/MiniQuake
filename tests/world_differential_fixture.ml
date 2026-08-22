@@ -11,6 +11,7 @@ import miniquake.world as worldPort
 import miniquake.server as server
 import miniquake.edict as edict
 
+// Group the deterministic world differential map fields used by this test fixture.
 struct WorldDifferentialMap
   models
   nodes

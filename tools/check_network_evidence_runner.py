@@ -15,6 +15,7 @@ from pathlib import Path
 
 @dataclass
 class Report:
+    """Collect the machine-readable outcome of one verification run."""
     schema_version: int = 1
     check: str = "bp060064r6_network_evidence_process_contract"
     passed: bool = False

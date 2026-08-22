@@ -19,6 +19,7 @@ const WAV_MASK = 0x3f
 const WAV_BUFFER_SIZE = 0x0400
 const SECONDARY_BUFFER_SIZE = 0x10000
 
+// Group the fields that describe one wave header.
 struct WaveHeader
   index
   bufferOffset
@@ -29,6 +30,7 @@ struct WaveHeader
   generation
 end struct
 
+// Track mutable windows sound state across subsystem calls.
 struct WindowsSoundState
   simulated
   sampleRate

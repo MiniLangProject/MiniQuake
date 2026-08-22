@@ -14,6 +14,7 @@ import miniquake.render.gl11 as gl
 
 const MAX_PUFFS = 64
 
+// Group the fields that describe one test puff.
 struct TestPuff
   plane
   origin
@@ -24,6 +25,7 @@ struct TestPuff
   length
 end struct
 
+// Track mutable GL test state across subsystem calls.
 struct GlTestState
   puffs
   worldMap

@@ -17,6 +17,7 @@ import miniquake.protocol_transients as transients
 
 const MAX_BEAMS = 24
 
+// Group the fields that describe one temp beam.
 struct TempBeam
   entity
   model
@@ -25,6 +26,7 @@ struct TempBeam
   endPosition
 end struct
 
+// Describe one runtime temp render entity and its observable Quake state.
 struct TempRenderEntity
   origin
   model
@@ -32,6 +34,7 @@ struct TempRenderEntity
   colormap
 end struct
 
+// Track mutable temp entity state across subsystem calls.
 struct TempEntityState
   beams
   numTempEntities

@@ -43,6 +43,7 @@ typedef unsigned short WCHAR;
 typedef const WCHAR *LPCWSTR;
 typedef mq_u32 DWORD;
 typedef mq_i32 BOOL;
+/* Mirror the Win32 large integer ABI layout without requiring SDK declarations. */
 typedef struct MQ_LARGE_INTEGER { mq_i64 QuadPart; } MQ_LARGE_INTEGER;
 
 MQ_DLLIMPORT HANDLE MQ_WINAPI CreateFileW(LPCWSTR filename, DWORD access, DWORD share,

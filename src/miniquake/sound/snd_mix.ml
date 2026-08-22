@@ -16,6 +16,7 @@ import miniquake.array_util as arrays
 const PAINTBUFFER_SIZE = 512
 const MAX_CHANNELS = 128
 
+// Track storage and runtime state for one DMA sound buffer.
 struct DmaSoundBuffer
   gameAlive
   soundAlive
@@ -29,6 +30,7 @@ struct DmaSoundBuffer
   buffer
 end struct
 
+// Track storage and runtime state for one sound channel.
 struct SoundChannel
   sfx
   leftVolume
@@ -43,6 +45,7 @@ struct SoundChannel
   masterVolume
 end struct
 
+// Track mutable mix state across subsystem calls.
 struct MixState
   dma
   channels

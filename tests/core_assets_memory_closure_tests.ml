@@ -9,6 +9,7 @@ import miniquake.memory as memory
 import miniquake.protocol_text as quakeText
 import miniquake.core_assets_memory_contract as contract
 
+// Group the deterministic bp074 command line fields used by this test fixture.
 struct BP074CommandLine
   args
 end struct

@@ -23,6 +23,7 @@ EXCLUDED_PARTS = {"build", ".git", "__pycache__", ".pytest_cache"}
 
 @dataclass
 class Issue:
+    """Represent one issue discovered by the source verifier."""
     path: str
     line: int
     column: int

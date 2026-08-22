@@ -16,6 +16,7 @@ import miniquake.quakec.opcodes as op
 import miniquake.quakec.edict as qcEdict
 import miniquake.server_collision as collision
 
+// Group the deterministic physics test map fields used by this test fixture.
 struct PhysicsTestMap
   models
   nodes
