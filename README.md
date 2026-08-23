@@ -103,6 +103,11 @@ See [the current port status](docs/status/PORT_STATUS.md) for the maintained
 summary. Historical implementation and acceptance records are retained under
 [`docs/archive`](docs/archive/README.md).
 
+Prebuilt Windows x64 packages are published on the
+[GitHub Releases page](https://github.com/MiniLangProject/MiniQuake/releases).
+Release archives contain the engine executable and its native runtime bridges,
+but never include proprietary Quake game data.
+
 ## Quick start
 
 Build MiniQuake, then point it at the directory that contains `id1`:

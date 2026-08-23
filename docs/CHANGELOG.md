@@ -1,5 +1,16 @@
 # Changelog
 
+## v2026.08.23
+
+- Rebuilt the Windows x64 release with MiniLangPy compiler revision `d663ea9`,
+  including its optimized local type-flow and indexed-loop lowering.
+- Reduced the release executable from 58,796,544 to 56,537,600 bytes while
+  retaining the BP-094 package identity and Protocol 15 compatibility profile.
+- Revalidated package identity, the `e1m1` headless and rendered retail smoke
+  paths, and all 23 OPT-001CR3R8 hotpath/window contracts.
+- Published the engine and its required native runtime bridges without any
+  proprietary Quake data.
+
 MiniQuake was developed through a large series of source-porting and
 optimization packages. The current tree includes:
 
