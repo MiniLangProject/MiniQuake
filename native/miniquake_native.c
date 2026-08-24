@@ -902,6 +902,9 @@ static mq_u32 mq_gl_alias_program = 0u;
 static mq_i32 mq_gl_alias_program_attempted = 0;
 static mq_i32 mq_gl_alias_state_location = -1;
 static mq_i32 mq_gl_alias_program_active = 0;
+static mq_u32 mq_gl_md2_shadow_program = 0u;
+static mq_i32 mq_gl_md2_shadow_program_attempted = 0;
+static mq_i32 mq_gl_md2_shadow_state_location = -1;
 static mq_u32 mq_gl_enhanced_program = 0u;
 static mq_i32 mq_gl_enhanced_program_attempted = 0;
 static mq_i32 mq_gl_enhanced_enabled = 0;
@@ -1081,6 +1084,84 @@ static mq_i32 mq_gl_create_alias_program(void) {
     mq_gl_alias_state_location =
         mq_gl_get_attrib_location_value(program, "mq_state");
     mq_gl_use_program_value(0u);
+    return 1;
+}
+
+/* Create the classic Quake II planar MD2 shadow program. Projection happens
+ * in entity-local space exactly like GL_DrawAliasShadow, while the already
+ * interpolated geometry remains in the bounded alias VBO cache. */
+static mq_i32 mq_gl_create_md2_shadow_program(void) {
+    static const char *vertex_source =
+        "#version 120\n"
+        "attribute vec4 mq_shadow;"
+        "void main(){vec4 p=gl_Vertex;"
+        "p.x-=mq_shadow.x*(p.z+mq_shadow.z);"
+        "p.y-=mq_shadow.y*(p.z+mq_shadow.z);"
+        "p.z=-mq_shadow.z+1.0;"
+        "gl_Position=gl_ModelViewProjectionMatrix*p;}\n";
+    static const char *fragment_source =
+        "#version 120\n"
+        "void main(){gl_FragColor=vec4(0.0,0.0,0.0,0.5);}\n";
+    mq_u32 vertex_shader;
+    mq_u32 fragment_shader;
+    mq_u32 program;
+    mq_i32 compiled = 0;
+    mq_i32 linked = 0;
+    if (mq_gl_md2_shadow_program != 0u) return 1;
+    if (mq_gl_md2_shadow_program_attempted) return 0;
+    mq_gl_md2_shadow_program_attempted = 1;
+    if (!mq_valid_wgl_proc((const void *)mq_gl_create_shader_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_shader_source_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_compile_shader_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_get_shader_iv_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_delete_shader_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_create_program_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_attach_shader_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_link_program_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_get_program_iv_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_use_program_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_delete_program_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_get_attrib_location_value) ||
+        !mq_valid_wgl_proc((const void *)mq_gl_vertex_attrib_4f_value)) return 0;
+    vertex_shader = mq_gl_create_shader_value(0x8B31u /* GL_VERTEX_SHADER */);
+    fragment_shader = mq_gl_create_shader_value(0x8B30u /* GL_FRAGMENT_SHADER */);
+    if (vertex_shader == 0u || fragment_shader == 0u) return 0;
+    mq_gl_shader_source_value(vertex_shader, 1, &vertex_source, (const mq_i32 *)0);
+    mq_gl_compile_shader_value(vertex_shader);
+    mq_gl_get_shader_iv_value(vertex_shader, 0x8B81u /* GL_COMPILE_STATUS */, &compiled);
+    if (!compiled) {
+        mq_gl_delete_shader_value(vertex_shader);
+        mq_gl_delete_shader_value(fragment_shader);
+        return 0;
+    }
+    compiled = 0;
+    mq_gl_shader_source_value(fragment_shader, 1, &fragment_source, (const mq_i32 *)0);
+    mq_gl_compile_shader_value(fragment_shader);
+    mq_gl_get_shader_iv_value(fragment_shader, 0x8B81u /* GL_COMPILE_STATUS */, &compiled);
+    if (!compiled) {
+        mq_gl_delete_shader_value(vertex_shader);
+        mq_gl_delete_shader_value(fragment_shader);
+        return 0;
+    }
+    program = mq_gl_create_program_value();
+    if (program == 0u) {
+        mq_gl_delete_shader_value(vertex_shader);
+        mq_gl_delete_shader_value(fragment_shader);
+        return 0;
+    }
+    mq_gl_attach_shader_value(program, vertex_shader);
+    mq_gl_attach_shader_value(program, fragment_shader);
+    mq_gl_link_program_value(program);
+    mq_gl_get_program_iv_value(program, 0x8B82u /* GL_LINK_STATUS */, &linked);
+    mq_gl_delete_shader_value(vertex_shader);
+    mq_gl_delete_shader_value(fragment_shader);
+    if (!linked) {
+        mq_gl_delete_program_value(program);
+        return 0;
+    }
+    mq_gl_md2_shadow_program = program;
+    mq_gl_md2_shadow_state_location =
+        mq_gl_get_attrib_location_value(program, "mq_shadow");
     return 1;
 }
 
@@ -1637,7 +1718,20 @@ static mq_u32 mq_alias_rgb_geometry_state[MQ_ALIAS_RGB_GEOMETRY_CACHE_MAX];
 static mq_u32 mq_alias_rgb_geometry_bytes[MQ_ALIAS_RGB_GEOMETRY_CACHE_MAX];
 static mq_u32 mq_alias_rgb_geometry_vbo[MQ_ALIAS_RGB_GEOMETRY_CACHE_MAX];
 static mq_u32 mq_alias_rgb_lightcoord_vbo[MQ_ALIAS_RGB_GEOMETRY_CACHE_MAX];
+static mq_u32 mq_alias_rgb_geometry_vertices[MQ_ALIAS_RGB_GEOMETRY_CACHE_MAX];
 static float mq_alias_rgb_lightcoords[MQ_ALIAS_TRIANGLE_VERTICES * 3u];
+
+/* Mix model identity and quantized animation state into the direct-map slot. */
+static mq_u32 mq_alias_rgb_geometry_slot(mq_u64 geometry_key, mq_u32 geometry_state) {
+    mq_u64 mixed = geometry_key ^ (geometry_key >> 32) ^
+        ((mq_u64)geometry_state * 0x9e3779b97f4a7c15ull);
+    mixed ^= mixed >> 30;
+    mixed *= 0xbf58476d1ce4e5b9ull;
+    mixed ^= mixed >> 27;
+    mixed *= 0x94d049bb133111ebull;
+    mixed ^= mixed >> 31;
+    return (mq_u32)mixed & (MQ_ALIAS_RGB_GEOMETRY_CACHE_MAX - 1u);
+}
 
 /* Draw cached multitextured geometry through the native fast path. */
 static void mq_static_multitexture_draw_vbo(mq_u32 scene) {
@@ -1985,6 +2079,7 @@ MQ_EXPORT void mq_gl_static_geometry_clear(void) {
         for (i = 0; i < (mq_i32)MQ_ALIAS_RGB_GEOMETRY_CACHE_MAX; ++i) {
             mq_alias_rgb_geometry_vbo[i] = 0u;
             mq_alias_rgb_lightcoord_vbo[i] = 0u;
+            mq_alias_rgb_geometry_vertices[i] = 0u;
         }
         return;
     }
@@ -2034,6 +2129,7 @@ MQ_EXPORT void mq_gl_static_geometry_clear(void) {
     for (i = 0; i < (mq_i32)MQ_ALIAS_RGB_GEOMETRY_CACHE_MAX; ++i) {
         mq_alias_rgb_geometry_vbo[i] = 0u;
         mq_alias_rgb_lightcoord_vbo[i] = 0u;
+        mq_alias_rgb_geometry_vertices[i] = 0u;
     }
 }
 
@@ -3024,6 +3120,9 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
     mq_gl_alias_program_attempted = 0;
     mq_gl_alias_state_location = -1;
     mq_gl_alias_program_active = 0;
+    mq_gl_md2_shadow_program = 0u;
+    mq_gl_md2_shadow_program_attempted = 0;
+    mq_gl_md2_shadow_state_location = -1;
     mq_gl_enhanced_program = 0u;
     mq_gl_enhanced_program_attempted = 0;
     mq_gl_enhanced_enabled = 0;
@@ -3063,6 +3162,7 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
     mq_gl_delete_buffers_value = (mq_gl_delete_buffers_proc)wglGetProcAddress("glDeleteBuffers");
     mq_gl_create_world_program();
     mq_gl_create_alias_program();
+    mq_gl_create_md2_shadow_program();
     mq_gl_create_enhanced_program();
 
     /* GLQuake predates driver-controlled swap synchronization and never
@@ -3155,6 +3255,13 @@ MQ_EXPORT void mq_win_destroy(void) {
         mq_gl_alias_program_attempted = 0;
         mq_gl_alias_state_location = -1;
         mq_gl_alias_program_active = 0;
+        if (mq_gl_md2_shadow_program != 0u &&
+            mq_valid_wgl_proc((const void *)mq_gl_delete_program_value)) {
+            mq_gl_delete_program_value(mq_gl_md2_shadow_program);
+            mq_gl_md2_shadow_program = 0u;
+        }
+        mq_gl_md2_shadow_program_attempted = 0;
+        mq_gl_md2_shadow_state_location = -1;
         if (mq_gl_enhanced_program != 0u && mq_valid_wgl_proc((const void *)mq_gl_delete_program_value)) {
             mq_gl_delete_program_value(mq_gl_enhanced_program);
             mq_gl_enhanced_program = 0u;
@@ -5623,14 +5730,7 @@ MQ_EXPORT mq_i32 mq_gl_draw_md2_rgb(
         mq_gl_create_alias_program();
 
     if (lookup_path) {
-        mq_u64 mixed = geometry_key ^ (geometry_key >> 32) ^
-            ((mq_u64)geometry_state * 0x9e3779b97f4a7c15ull);
-        mixed ^= mixed >> 30;
-        mixed *= 0xbf58476d1ce4e5b9ull;
-        mixed ^= mixed >> 27;
-        mixed *= 0x94d049bb133111ebull;
-        mixed ^= mixed >> 31;
-        mq_u32 slot = (mq_u32)mixed & (MQ_ALIAS_RGB_GEOMETRY_CACHE_MAX - 1u);
+        mq_u32 slot = mq_alias_rgb_geometry_slot(geometry_key, geometry_state);
         mq_u32 geometry_vbo = mq_alias_rgb_geometry_vbo[slot];
         mq_u32 lightcoord_vbo = mq_alias_rgb_lightcoord_vbo[slot];
         if (geometry_vbo == 0u || lightcoord_vbo == 0u ||
@@ -5682,6 +5782,7 @@ MQ_EXPORT mq_i32 mq_gl_draw_md2_rgb(
             mq_alias_rgb_geometry_bytes[slot] = byte_count;
             mq_alias_rgb_geometry_vbo[slot] = geometry_vbo;
             mq_alias_rgb_lightcoord_vbo[slot] = lightcoord_vbo;
+            mq_alias_rgb_geometry_vertices[slot] = vertex_count;
         }
         if (!mq_gl_alias_program_active) {
             mq_gl_use_program_value(mq_gl_alias_program);
@@ -5770,6 +5871,190 @@ MQ_EXPORT mq_i32 mq_gl_draw_md2_rgb(
         glDisableClientState(0x8074u /* GL_VERTEX_ARRAY */);
     }
     return (mq_i32)(vertex_count / 3u);
+}
+
+/* Draw the Quake II 3.19 planar alias shadow from the same quantized MD2
+ * animation state as the colored model. Modern OpenGL reuses its geometry
+ * VBO; compatibility backends project one bounded native scratch buffer. */
+MQ_EXPORT mq_i32 mq_gl_draw_md2_shadow(
+    const mq_u8 *data,
+    mq_u32 byte_count,
+    mq_u32 frame_index,
+    mq_u32 old_frame_index,
+    mq_u32 back_lerp_bits,
+    const mq_u8 *normal_vectors,
+    mq_u32 normal_count,
+    mq_u64 geometry_key,
+    mq_u32 geometry_state,
+    mq_u32 triangle_count,
+    mq_u32 shade_x_bits,
+    mq_u32 shade_y_bits,
+    mq_u32 light_height_bits
+) {
+    const mq_u32 md2_ident = 844121161u;
+    const mq_u32 md2_version = 8u;
+    mq_u32 skin_width;
+    mq_u32 skin_height;
+    mq_u32 frame_size;
+    mq_u32 num_xyz;
+    mq_u32 num_st;
+    mq_u32 num_tris;
+    mq_u32 num_frames;
+    mq_u32 ofs_st;
+    mq_u32 ofs_tris;
+    mq_u32 ofs_frames;
+    mq_u32 ofs_end;
+    mq_u32 vertex_count;
+    mq_u32 vertex;
+    mq_u32 slot;
+    mq_u32 error_guard;
+    mq_i32 lookup_path;
+    float back_lerp = mq_bits_to_float(back_lerp_bits);
+    float shade_x = mq_bits_to_float(shade_x_bits);
+    float shade_y = mq_bits_to_float(shade_y_bits);
+    float light_height = mq_bits_to_float(light_height_bits);
+    if (!data || !normal_vectors || byte_count < 68u || normal_count != 162u) return 0;
+    if (mq_md2_u32(data, 0u) != md2_ident ||
+        mq_md2_u32(data, 4u) != md2_version) return 0;
+    skin_width = mq_md2_u32(data, 8u);
+    skin_height = mq_md2_u32(data, 12u);
+    frame_size = mq_md2_u32(data, 16u);
+    num_xyz = mq_md2_u32(data, 24u);
+    num_st = mq_md2_u32(data, 28u);
+    num_tris = mq_md2_u32(data, 32u);
+    num_frames = mq_md2_u32(data, 40u);
+    ofs_st = mq_md2_u32(data, 48u);
+    ofs_tris = mq_md2_u32(data, 52u);
+    ofs_frames = mq_md2_u32(data, 56u);
+    ofs_end = mq_md2_u32(data, 64u);
+    if (skin_width == 0u || skin_height == 0u || num_xyz == 0u ||
+        num_st == 0u || num_tris == 0u || num_frames == 0u ||
+        num_xyz > 2048u || num_tris > 4096u || num_frames > 512u ||
+        triangle_count != num_tris || frame_index >= num_frames ||
+        old_frame_index >= num_frames ||
+        !(back_lerp >= 0.0f && back_lerp <= 1.0f) ||
+        !(light_height >= -2048.0f && light_height <= 2048.0f)) return 0;
+    vertex_count = num_tris * 3u;
+    if (vertex_count > MQ_ALIAS_TRIANGLE_VERTICES ||
+        frame_size < 40u + num_xyz * 4u || ofs_end > byte_count ||
+        (mq_u64)ofs_st + (mq_u64)num_st * 4u > (mq_u64)ofs_end ||
+        (mq_u64)ofs_tris + (mq_u64)num_tris * 12u > (mq_u64)ofs_end ||
+        (mq_u64)ofs_frames + (mq_u64)num_frames * frame_size >
+            (mq_u64)ofs_end) return 0;
+
+    if (mq_render_backend_value == MQ_RENDER_OPENGL &&
+        mq_gl_alias_program_active &&
+        mq_valid_wgl_proc((const void *)mq_gl_use_program_value)) {
+        mq_gl_use_program_value(0u);
+        mq_gl_alias_program_active = 0;
+    }
+    lookup_path = mq_render_backend_value == MQ_RENDER_OPENGL &&
+        mq_valid_wgl_proc((const void *)mq_gl_gen_buffers_value) &&
+        mq_valid_wgl_proc((const void *)mq_gl_bind_buffer_value) &&
+        mq_valid_wgl_proc((const void *)mq_gl_buffer_data_value) &&
+        mq_valid_wgl_proc((const void *)mq_gl_delete_buffers_value) &&
+        mq_gl_create_md2_shadow_program();
+    slot = mq_alias_rgb_geometry_slot(geometry_key, geometry_state);
+    if (lookup_path) {
+        mq_u32 geometry_vbo = mq_alias_rgb_geometry_vbo[slot];
+        mq_u32 lightcoord_vbo = mq_alias_rgb_lightcoord_vbo[slot];
+        if (geometry_vbo == 0u || lightcoord_vbo == 0u ||
+            mq_alias_rgb_geometry_key[slot] != geometry_key ||
+            mq_alias_rgb_geometry_state[slot] != geometry_state ||
+            mq_alias_rgb_geometry_bytes[slot] != byte_count ||
+            mq_alias_rgb_geometry_vertices[slot] != vertex_count) {
+            if (geometry_vbo != 0u) mq_gl_delete_buffers_value(1, &geometry_vbo);
+            if (lightcoord_vbo != 0u) mq_gl_delete_buffers_value(1, &lightcoord_vbo);
+            geometry_vbo = 0u;
+            lightcoord_vbo = 0u;
+            mq_alias_rgb_geometry_vbo[slot] = 0u;
+            mq_alias_rgb_lightcoord_vbo[slot] = 0u;
+            if (!mq_md2_expand_geometry(
+                    data, skin_width, skin_height, frame_size, num_xyz,
+                    num_st, num_tris, ofs_st, ofs_tris, ofs_frames,
+                    frame_index, old_frame_index, back_lerp,
+                    normal_vectors, normal_count)) return 0;
+            mq_gl_gen_buffers_value(1, &geometry_vbo);
+            mq_gl_gen_buffers_value(1, &lightcoord_vbo);
+            if (geometry_vbo == 0u || lightcoord_vbo == 0u) {
+                if (geometry_vbo != 0u) mq_gl_delete_buffers_value(1, &geometry_vbo);
+                if (lightcoord_vbo != 0u) mq_gl_delete_buffers_value(1, &lightcoord_vbo);
+                return 0;
+            }
+            mq_gl_bind_buffer_value(0x8892u /* GL_ARRAY_BUFFER */, geometry_vbo);
+            mq_gl_buffer_data_value(
+                0x8892u /* GL_ARRAY_BUFFER */,
+                (mq_i64)(vertex_count * sizeof(mq_md2_geometry_vertex_t)),
+                mq_md2_geometry_vertices, 0x88E4u /* GL_STATIC_DRAW */);
+            mq_gl_bind_buffer_value(0x8892u /* GL_ARRAY_BUFFER */, lightcoord_vbo);
+            mq_gl_buffer_data_value(
+                0x8892u /* GL_ARRAY_BUFFER */,
+                (mq_i64)(vertex_count * 3u * sizeof(float)),
+                mq_alias_rgb_lightcoords, 0x88E4u /* GL_STATIC_DRAW */);
+            mq_alias_rgb_geometry_key[slot] = geometry_key;
+            mq_alias_rgb_geometry_state[slot] = geometry_state;
+            mq_alias_rgb_geometry_bytes[slot] = byte_count;
+            mq_alias_rgb_geometry_vbo[slot] = geometry_vbo;
+            mq_alias_rgb_lightcoord_vbo[slot] = lightcoord_vbo;
+            mq_alias_rgb_geometry_vertices[slot] = vertex_count;
+        }
+        for (error_guard = 0u; error_guard < 8u && glGetError() != 0u;
+             ++error_guard) {}
+        mq_gl_use_program_value(mq_gl_md2_shadow_program);
+        if (mq_gl_md2_shadow_state_location >= 0) {
+            mq_gl_vertex_attrib_4f_value((mq_u32)mq_gl_md2_shadow_state_location,
+                shade_x, shade_y, light_height, 0.0f);
+        }
+        glEnableClientState(0x8074u /* GL_VERTEX_ARRAY */);
+        mq_gl_bind_buffer_value(0x8892u /* GL_ARRAY_BUFFER */, geometry_vbo);
+        glVertexPointer(3, 0x1406u /* GL_FLOAT */,
+            (mq_i32)sizeof(mq_md2_geometry_vertex_t), (const void *)8);
+        glDrawArrays(0x0004u /* GL_TRIANGLES */, 0, (mq_i32)vertex_count);
+        glDisableClientState(0x8074u /* GL_VERTEX_ARRAY */);
+        mq_gl_bind_buffer_value(0x8892u /* GL_ARRAY_BUFFER */, 0u);
+        mq_gl_use_program_value(0u);
+        if (glGetError() != 0u) return 0;
+        return (mq_i32)num_tris;
+    }
+
+    if (!mq_md2_expand_geometry(
+            data, skin_width, skin_height, frame_size, num_xyz, num_st,
+            num_tris, ofs_st, ofs_tris, ofs_frames, frame_index,
+            old_frame_index, back_lerp, normal_vectors, normal_count)) return 0;
+    for (vertex = 0u; vertex < vertex_count; ++vertex) {
+        const mq_md2_geometry_vertex_t *source = &mq_md2_geometry_vertices[vertex];
+        mq_alias_vertex_t *output = &mq_alias_triangle_vertices[vertex];
+        output->s = 0.0f;
+        output->t = 0.0f;
+        output->r = 0u;
+        output->g = 0u;
+        output->b = 0u;
+        output->a = 128u;
+        output->x = source->x - shade_x * (source->z + light_height);
+        output->y = source->y - shade_y * (source->z + light_height);
+        output->z = -light_height + 1.0f;
+    }
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+        if (mq_d3d9_draw_interleaved_t2f_c4ub_v3f(
+                mq_alias_triangle_vertices, vertex_count) <= 0) return 0;
+    } else if (mq_render_backend_value == MQ_RENDER_VULKAN) {
+        if (mq_vulkan_draw_interleaved_t2f_c4ub_v3f(
+                mq_alias_triangle_vertices, vertex_count) <= 0) return 0;
+    } else {
+        if (mq_valid_wgl_proc((const void *)mq_gl_client_active_texture_value)) {
+            mq_gl_client_active_texture_value(0x84C0u /* GL_TEXTURE0 */);
+        }
+        if (mq_valid_wgl_proc((const void *)mq_gl_bind_buffer_value)) {
+            mq_gl_bind_buffer_value(0x8892u /* GL_ARRAY_BUFFER */, 0u);
+        }
+        glInterleavedArrays(0x2A29u /* GL_T2F_C4UB_V3F */,
+            (mq_i32)sizeof(mq_alias_vertex_t), mq_alias_triangle_vertices);
+        glDrawArrays(0x0004u /* GL_TRIANGLES */, 0, (mq_i32)vertex_count);
+        glDisableClientState(0x8078u /* GL_TEXTURE_COORD_ARRAY */);
+        glDisableClientState(0x8076u /* GL_COLOR_ARRAY */);
+        glDisableClientState(0x8074u /* GL_VERTEX_ARRAY */);
+    }
+    return (mq_i32)num_tris;
 }
 
 /* End a run of Quake II alias draws before fixed-function geometry resumes. */
