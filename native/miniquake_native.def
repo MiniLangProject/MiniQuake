@@ -185,6 +185,8 @@ EXPORTS
   mq_gl_active_texture
   mq_gl_multi_tex_coord2
   mq_gl_draw_alias_batch
+  mq_gl_draw_md2_rgb
+  mq_gl_draw_alias_rgb_end
   mq_gl_draw_shadow_batch
   mq_gl_draw_alias_ray_shadow
   mq_gl_draw_particle_batch
