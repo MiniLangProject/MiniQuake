@@ -20,6 +20,7 @@ param(
   [switch]$NetworkTests,
   [switch]$RebuildNative,
   [switch]$Listings,
+  [switch]$SkipIcon,
   [switch]$SkipPreflight
 )
 
@@ -33,6 +34,8 @@ $Root = $PSScriptRoot
 $Output = Join-Path $Root "build"
 $Source = Join-Path $Root "src"
 $Parent = Split-Path -Parent $Root
+$IconToolSource = Join-Path $Root "tools\exe_icon_injector.ml"
+$IconAsset = Join-Path $Root "icons\MiniQuake.ico"
 $PackageId = "BP-094"
 $ParentPackageId = "BP-093"
 $NativeTextAbi = "caller_owned_bytes_v1"
@@ -388,6 +391,7 @@ New-Item -ItemType Directory -Force -Path $Output | Out-Null
 # for current BP-044 products by the result collector.
 $PackageBuildArtifacts = @(
   "MiniQuake.exe",
+  "tools\exe_icon_injector.exe",
   "MiniQuakeOPT001AContractTests.exe",
   "MiniQuakeOPT001BCorrectnessTests.exe",
   "MiniQuakeOPT001CAllocationTests.exe",
@@ -972,6 +976,31 @@ if ($Listings) {
   $CommonArgs += @("--asm", "--asm-pe", "--asm-data")
 }
 
+$IconToolExe = Join-Path $Output "tools\exe_icon_injector.exe"
+if (-not $SkipIcon) {
+  if (-not (Test-Path -LiteralPath $IconToolSource -PathType Leaf)) {
+    throw "MiniQuake icon injector source is missing: $IconToolSource"
+  }
+  if (-not (Test-Path -LiteralPath $IconAsset -PathType Leaf)) {
+    throw "MiniQuake icon is missing: $IconAsset"
+  }
+
+  # The injector is a standalone console utility. It deliberately uses the
+  # same compiler and standard library as the game so the complete branding
+  # step remains reproducible from source without an external resource editor.
+  $IconToolArgs = @(
+    "-I", $Source,
+    "-I", $StdImportRoot,
+    "--keep-going", "--max-errors", "50",
+    "--subsystem", "console"
+  )
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $IconToolExe) | Out-Null
+  Write-Host "[MiniQuake] compiling icon injector $IconToolExe"
+  Invoke-MiniLangCompile -InputFile $IconToolSource -OutputFile $IconToolExe -CompilerArguments $IconToolArgs -Label "icon-injector"
+} else {
+  Write-Warning "MiniQuake executable icon injection was explicitly skipped."
+}
+
 $Opt001CR3HotpathExe = Join-Path $Output "MiniQuakeOPT001CR3HotpathTests.exe"
 Write-Host "[MiniQuake] compiling $Opt001CR3HotpathExe"
 Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\opt001cr3_hotpath_tests.ml") -OutputFile $Opt001CR3HotpathExe -CompilerArguments $CommonArgs -Label "opt001cr3-hotpath-tests"
@@ -979,6 +1008,20 @@ Invoke-MiniLangCompile -InputFile (Join-Path $Root "tests\opt001cr3_hotpath_test
 $GameExe = Join-Path $Output "MiniQuake.exe"
 Write-Host "[MiniQuake] compiling $GameExe"
 Invoke-MiniLangCompile -InputFile (Join-Path $Source "main.ml") -OutputFile $GameExe -CompilerArguments $CommonArgs -Label "game"
+
+if (-not $SkipIcon) {
+  Write-Host "[MiniQuake] injecting application icon"
+  & $IconToolExe $GameExe $IconAsset "1" "1033"
+  $IconExitCode = [int]$LASTEXITCODE
+  if ($IconExitCode -ne 0) {
+    # Do not leave an apparently successful but unbranded game executable
+    # behind when the final resource transaction failed.
+    if (Test-Path -LiteralPath $GameExe -PathType Leaf) {
+      Remove-Item -Force -LiteralPath $GameExe
+    }
+    throw "MiniQuake icon injection failed with exit code $IconExitCode."
+  }
+}
 
 $Opt001AContractExe = Join-Path $Output "MiniQuakeOPT001AContractTests.exe"
 Write-Host "[MiniQuake] compiling $Opt001AContractExe"

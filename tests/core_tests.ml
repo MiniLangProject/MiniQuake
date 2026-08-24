@@ -38,6 +38,7 @@ import miniquake.quakec.edict as qcedict
 import miniquake.format.progs as progs
 import miniquake.render.gl_warp as glWarp
 import miniquake.render.gl_rlight as glRlight
+import miniquake.render.colored_lightmaps as coloredLightmaps
 import miniquake.render.draw2d as draw2d
 import miniquake.render.texture_upscale as textureUpscale
 import miniquake.screen as screenCompat
@@ -1045,6 +1046,9 @@ function testGlWarpAndRlightParity()
   water = glWarp.WaterTexCoords(64.0, 0.0, 0.0)
   assertNear(water[0], 1.0, 0.000001, "water warp s")
   assertNear(water[1], 7.93984 / 64.0, 0.000001, "water warp table t")
+  smoothWater = glWarp.SmoothWaterTexCoords(64.0, 0.0, 0.03125)
+  assertTrue(smoothWater[0] != water[0] or smoothWater[1] != water[1], "enhanced water uses interpolated phase")
+  assertNear(glWarp.InterpolatedTurb(0.0), glWarp.turbsin[0], 0.000001, "smooth water exact table point")
   assertEqual(glWarp.WrappedSpeedScale(20.0, 8.0), 32.0, "sky speed wrap")
 
   zero = t.Vec3(0.0, 0.0, 0.0)
@@ -1223,94 +1227,117 @@ function testTextureUpscaling()
   return true
 end function
 
+// Verify strict QLIT-v1 decoding without relying on retail sidecar files.
+function testColoredLightmaps()
+  payload = bytes([81, 76, 73, 84, 1, 0, 0, 0, 10, 20, 30, 40, 50, 60])
+  decoded = coloredLightmaps.decode(payload, 2)
+  assertTrue(decoded is bytes, "QLIT payload accepted")
+  assertEqual(len(decoded), 6, "QLIT RGB sample length")
+  assertEqual(decoded[0], 10, "QLIT first red sample")
+  assertEqual(decoded[5], 60, "QLIT last blue sample")
+
+  badMagic = bytes([88, 76, 73, 84, 1, 0, 0, 0, 10, 20, 30])
+  assertTrue(coloredLightmaps.decode(badMagic, 1) is void, "QLIT bad magic rejected")
+  badVersion = bytes([81, 76, 73, 84, 2, 0, 0, 0, 10, 20, 30])
+  assertTrue(coloredLightmaps.decode(badVersion, 1) is void, "QLIT bad version rejected")
+  truncated = bytes([81, 76, 73, 84, 1, 0, 0, 0, 10, 20])
+  assertTrue(coloredLightmaps.decode(truncated, 1) is void, "QLIT truncated payload rejected")
+  return true
+end function
+
 // Parse command-line arguments and run the selected operation.
 function main(args)
   // Set up deterministic fixtures first, then exercise parity cases and aggregate failures.
   passed = 0
-  print "MiniQuake core tests starting: 17"
+  print "MiniQuake core tests starting: 18"
 
-  print "[01/17] CRC-CCITT"
+  print "[01/18] CRC-CCITT"
   result = try(testCrc())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[02/17] byte I/O"
+  print "[02/18] byte I/O"
   result = try(testByteIo())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[03/17] Quake messages"
+  print "[03/18] Quake messages"
   result = try(testMessage())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[04/17] math"
+  print "[04/18] math"
   result = try(testMath())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[05/17] cvars"
+  print "[05/18] cvars"
   result = try(testCvar())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[06/17] PACK"
+  print "[06/18] PACK"
   result = try(testPack())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[07/17] WAD2"
+  print "[07/18] WAD2"
   result = try(testWad())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[08/17] loopback network"
+  print "[08/18] loopback network"
   result = try(testLoopback())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[09/17] memory lifetimes"
+  print "[09/18] memory lifetimes"
   result = try(testMemoryLifetimes())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[10/17] box hull"
+  print "[10/18] box hull"
   result = try(testBoxHull())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[11/17] BSP entities/PVS"
+  print "[11/18] BSP entities/PVS"
   result = try(testBspEntityAndPvs())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[12/17] WAV"
+  print "[12/18] WAV"
   result = try(testWave())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[13/17] DEM roundtrip"
+  print "[13/18] DEM roundtrip"
   result = try(testDemoRoundtrip())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[14/17] protocol 15"
+  print "[14/18] protocol 15"
   result = try(testServerProtocol())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[15/17] QuakeC arithmetic"
+  print "[15/18] QuakeC arithmetic"
   result = try(testQuakeCArithmetic())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[16/17] GL warp/light parity"
+  print "[16/18] GL warp/light parity"
   result = try(testGlWarpAndRlightParity())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 
-  print "[17/17] texture upscaling"
+  print "[17/18] texture upscaling"
   result = try(testTextureUpscaling())
+  if result is error then print "FAIL: " + result.message; return 1 end if
+  passed = passed + 1
+
+  print "[18/18] colored lightmaps"
+  result = try(testColoredLightmaps())
   if result is error then print "FAIL: " + result.message; return 1 end if
   passed = passed + 1
 

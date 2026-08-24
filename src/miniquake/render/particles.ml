@@ -13,6 +13,7 @@ import miniquake.render.gl11 as gl
 import miniquake.native as native
 
 particleTexture = 0
+enhancedParticles = false
 const PARTICLE_BATCH_RECORD_BYTES = 16
 const PARTICLE_BATCH_CAPACITY = 8192
 // Allocate this sizeable scratch buffer on first use.  Keeping it out of the
@@ -49,6 +50,40 @@ function particleTexturePixels()
   return pixels
 end function
 
+// Build a softly feathered circular sprite for the Enhanced particle pass.
+function softParticleTexturePixels()
+  size = 16
+  pixels = bytes(size * size * 4)
+  y = 0
+  while y < size
+    x = 0
+    while x < size
+      dx = x - 7.5
+      dy = y - 7.5
+      alpha = 255 - native.trunc((dx * dx + dy * dy) * 4.5)
+      if alpha < 0 then alpha = 0 end if
+      if alpha > 255 then alpha = 255 end if
+      offset = (y * size + x) * 4
+      pixels[offset] = 255
+      pixels[offset + 1] = 255
+      pixels[offset + 2] = 255
+      pixels[offset + 3] = alpha
+      x = x + 1
+    end while
+    y = y + 1
+  end while
+  return pixels
+end function
+
+// Switch particle presentation without changing the simulation particle list.
+function ConfigureEnhancedParticles(enabled)
+  global enhancedParticles
+  if enhancedParticles == enabled then return enhancedParticles end if
+  R_ShutdownParticleTexture()
+  enhancedParticles = enabled
+  return enhancedParticles
+end function
+
 // Restore the single-texture state assumed by GLQuake's particle pass.
 function prepareParticleTextureState()
   // Native world batches bind both texture units without updating MiniLang's
@@ -72,7 +107,9 @@ function R_InitParticleTexture()
   prepareParticleTextureState()
   particleTexture = gl.generateTexture()
   gl.bindTexture(particleTexture)
-  gl.uploadRgba(8, 8, particleTexturePixels())
+  if enhancedParticles then gl.uploadRgba(16, 16, softParticleTexturePixels())
+  else gl.uploadRgba(8, 8, particleTexturePixels())
+  end if
   gl.textureParameter(gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR)
   gl.textureParameter(gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)
   return particleTexture
@@ -125,9 +162,18 @@ end function
 function drawParticleBatch(count, viewOrigin, viewForward, viewUp, viewRight)
   global particleBatch
   if count <= 0 then return 0 end if
+  if enhancedParticles then
+    return native.glDrawParticleBatchStyled(
+      particleBatch,
+      count * PARTICLE_BATCH_RECORD_BYTES,
+      native.floatBits(viewOrigin.x), native.floatBits(viewOrigin.y), native.floatBits(viewOrigin.z),
+      native.floatBits(viewForward.x), native.floatBits(viewForward.y), native.floatBits(viewForward.z),
+      native.floatBits(viewUp.x), native.floatBits(viewUp.y), native.floatBits(viewUp.z),
+      native.floatBits(viewRight.x), native.floatBits(viewRight.y), native.floatBits(viewRight.z),
+    )
+  end if
   return native.glDrawParticleBatch(
-    particleBatch,
-    count * PARTICLE_BATCH_RECORD_BYTES,
+    particleBatch, count * PARTICLE_BATCH_RECORD_BYTES,
     native.floatBits(viewOrigin.x), native.floatBits(viewOrigin.y), native.floatBits(viewOrigin.z),
     native.floatBits(viewForward.x), native.floatBits(viewForward.y), native.floatBits(viewForward.z),
     native.floatBits(viewUp.x), native.floatBits(viewUp.y), native.floatBits(viewUp.z),

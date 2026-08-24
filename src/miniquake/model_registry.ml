@@ -16,6 +16,7 @@ import miniquake.format.bsp as bsp
 import miniquake.format.mdl as mdl
 import miniquake.format.sprite as sprite
 import miniquake.render.gl_warp as glWarp
+import miniquake.render.colored_lightmaps as coloredLightmaps
 import miniquake.world_bsp as world
 import miniquake.array_util as arrayutil
 
@@ -140,6 +141,10 @@ function Mod_LoadModel(registry, filesystem, index, crash)
   if loaded is error then return loaded end if
   model = loaded[0]
   if model is error then return model end if
+  // Colored light data is an optional renderer sidecar, never part of BSP29
+  // gameplay state. Keep it associated by object identity instead of changing
+  // the public BspMap layout used by protocol and differential fixtures.
+  if loaded[1] == MOD_BRUSH then coloredLightmaps.loadForMap(filesystem, model) end if
   registry.models[index] = model
   registry.types[index] = loaded[1]
   registry.needLoad[index] = false

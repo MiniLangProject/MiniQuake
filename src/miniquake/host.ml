@@ -25,6 +25,7 @@ import miniquake.player_move as movement
 import miniquake.input as input
 import miniquake.keys as keys
 import miniquake.render.world as worldRenderer
+import miniquake.render.colored_lightmaps as coloredLightmaps
 import miniquake.render.gl11 as gl
 import miniquake.render.enhanced as enhancedRenderer
 import miniquake.render.entities as entityRenderer
@@ -182,6 +183,9 @@ function createCvars(commandLine, registered)
   registerCvar(registry, "r_shadows", "1", true, false)
   registerCvar(registry, "r_shadowquality", "1", true, false)
   registerCvar(registry, "r_textureupscale", "0", true, false)
+  registerCvar(registry, "r_modelinterpolate", "1", true, false)
+  registerCvar(registry, "r_anisotropy", "4", true, false)
+  registerCvar(registry, "r_coloredlightmaps", "1", true, false)
   registerCvar(registry, "gl_subdivide_size", "128", true, false)
   registerCvar(registry, "gl_nobind", "0", false, false)
   registerCvar(registry, "gl_max_size", "1024", false, false)
@@ -765,6 +769,11 @@ function transitionMap(session, mapName, preserveClients, saveChangeParms, defer
     if videoState.initialized then palette = videoState.palette end if
     // Build the world first so external BSP pickup models cannot replace the
     // active world-surface root while they are parsed and uploaded.
+    coloredLightmaps.loadForMap(session.filesystem, session.server.worldModel)
+    worldRenderer.R_ConfigureColoredLightmaps(
+      cvar.variableValue(session.cvars, "r_lighting") != 0.0 and
+      cvar.variableValue(session.cvars, "r_coloredlightmaps") != 0.0,
+    )
     session.renderer = try(worldRenderer.create(session.server.worldModel, palette))
     if session.renderer is error then return failedMapTransition(session, session.renderer) end if
     worldRenderer.R_SetMultitextureCompatibility(videoState.multitexture, false)
@@ -1193,6 +1202,11 @@ function rebuildRendererResources(session)
     if session.entityRenderer is error then return session.entityRenderer end if
     precached = try(entityRenderer.precache(session.entityRenderer))
     if precached is error then return precached end if
+    coloredLightmaps.loadForMap(session.filesystem, session.server.worldModel)
+    worldRenderer.R_ConfigureColoredLightmaps(
+      cvar.variableValue(session.cvars, "r_lighting") != 0.0 and
+      cvar.variableValue(session.cvars, "r_coloredlightmaps") != 0.0,
+    )
     session.renderer = try(worldRenderer.create(session.server.worldModel, palette))
     if session.renderer is error then return session.renderer end if
     worldRenderer.R_SetMultitextureCompatibility(videoState.multitexture, false)
@@ -1234,6 +1248,7 @@ function prepareDemoScene(session)
   if mapData is error then return mapData end if
   worldModel = bsp.parse(mapData, modelName)
   if worldModel is error then return worldModel end if
+  coloredLightmaps.loadForMap(session.filesystem, worldModel)
   session.server.worldModel = worldModel
   session.server.modelName = modelName
   session.server.modelPrecache = session.client.modelPrecache
@@ -1245,6 +1260,10 @@ function prepareDemoScene(session)
     if palette is error then return palette end if
     videoState = glvid.VID_State()
     if videoState.initialized then palette = videoState.palette end if
+    worldRenderer.R_ConfigureColoredLightmaps(
+      cvar.variableValue(session.cvars, "r_lighting") != 0.0 and
+      cvar.variableValue(session.cvars, "r_coloredlightmaps") != 0.0,
+    )
     session.renderer = try(worldRenderer.create(worldModel, palette))
     if session.renderer is error then return session.renderer end if
     worldRenderer.R_SetMultitextureCompatibility(videoState.multitexture, false)
@@ -3304,6 +3323,10 @@ function handleExactMenuAction(session, result)
     return true
   end if
   if result == "lighting_applied" then
+    // The same compact menu result is shared by inexpensive render options.
+    // Reapplying sampler state is harmless for lighting/shadow changes and
+    // makes anisotropy changes visible immediately on resident textures.
+    draw2d.Draw_ApplyAnisotropy()
     writeConfiguration(session)
     playMenuSound(session, "misc/menu2.wav")
     return true
@@ -3801,6 +3824,7 @@ function _Host_Frame(session, elapsedSeconds)
     enhancedRequested = cvar.variableValue(session.cvars, "r_lighting") != 0.0
     enhancedShadows = cvar.variableValue(session.cvars, "r_shadows") != 0.0
     enhancedShadowQuality = native.trunc(cvar.variableValue(session.cvars, "r_shadowquality"))
+    modelInterpolation = cvar.variableValue(session.cvars, "r_modelinterpolate") != 0.0
     enhancedActive = worldRenderer.R_ConfigureEnhancedLighting(
       enhancedRequested,
       enhancedShadows,
@@ -3811,7 +3835,9 @@ function _Host_Frame(session, elapsedSeconds)
     // enhancedActive made an archived `r_lighting 0` silently disable the
     // visibly enabled Shadows menu option during normal first-person starts.
     entityRenderer.ConfigureAliasRendering(true, false, enhancedShadows, false, true)
+    entityRenderer.ConfigureModelInterpolation(modelInterpolation)
     entityRenderer.ConfigureEnhancedShadowQuality(enhancedRenderer.shadowQuality())
+    particleRenderer.ConfigureEnhancedParticles(enhancedRequested)
 
     session.renderer.fullbright = rFullbright != 0.0
     session.renderer.wireframe = rWireframe != 0.0

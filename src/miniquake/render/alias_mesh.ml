@@ -522,6 +522,48 @@ function drawAliasMesh(model, frame, mesh)
   return drawn
 end function
 
+// Render a diagnostic/scalar MDL mesh interpolated between two poses. The
+// production path performs the same blend inside the native batch bridge.
+function drawAliasMeshLerped(model, previousFrame, currentFrame, fraction, mesh)
+  if previousFrame is void or currentFrame is void or mesh is void then return 0 end if
+  if fraction < 0.0 then fraction = 0.0 end if
+  if fraction > 1.0 then fraction = 1.0 end if
+  // Replay the immutable command topology and blend only packed pose
+  // positions; texture coordinates and current-pose normals stay canonical.
+  drawn = 0
+  for each command in mesh.commands
+    if command.count == 0 then break end if
+    count = command.count
+    mode = compatAliasGl.GL_TRIANGLE_STRIP
+    if count < 0 then count = -count; mode = compatAliasGl.GL_TRIANGLE_FAN end if
+    compatAliasGl.begin(mode)
+    index = 0
+    while index < count and index < len(command.vertices)
+      item = command.vertices[index]
+      vertexIndex = item.vertexIndex
+      if vertexIndex >= 0 and vertexIndex < len(previousFrame.vertices) and vertexIndex < len(currentFrame.vertices) then
+        previous = previousFrame.vertices[vertexIndex]
+        current = currentFrame.vertices[vertexIndex]
+        normalIndex = current.normalIndex
+        light = shadelight
+        if normalIndex >= 0 and normalIndex < len(shadedots) then light = shadedots[normalIndex] * shadelight end if
+        colorValue = clampByte(light * 255.0)
+        compatAliasGl.color(colorValue, colorValue, colorValue, 255)
+        compatAliasGl.texcoord2(item.s, item.t)
+        compatAliasGl.vertex3(
+          previous.x + (current.x - previous.x) * fraction,
+          previous.y + (current.y - previous.y) * fraction,
+          previous.z + (current.z - previous.z) * fraction,
+        )
+      end if
+      index = index + 1
+    end while
+    compatAliasGl.finishPrimitive()
+    drawn = drawn + count - 2
+  end for
+  return drawn
+end function
+
 // Render alias model batch.
 function drawAliasModelBatch(model, frame, mesh, origin, angles, doubleEyes, smooth)
   batch = aliasBatchData(frame, mesh)
@@ -532,6 +574,26 @@ function drawAliasModelBatch(model, frame, mesh, origin, angles, doubleEyes, smo
   if smooth then smoothValue = 1 end if
   return compatAliasNative.glDrawAliasModel(
     batch, len(batch), dots, len(shadedots), compatAliasNative.floatBits(shadelight),
+    compatAliasNative.floatBits(origin.x), compatAliasNative.floatBits(origin.y), compatAliasNative.floatBits(origin.z),
+    compatAliasNative.floatBits(angles.x), compatAliasNative.floatBits(angles.y), compatAliasNative.floatBits(angles.z),
+    compatAliasNative.floatBits(model.scaleOrigin.x), compatAliasNative.floatBits(model.scaleOrigin.y), compatAliasNative.floatBits(model.scaleOrigin.z),
+    compatAliasNative.floatBits(model.scale.x), compatAliasNative.floatBits(model.scale.y), compatAliasNative.floatBits(model.scale.z),
+    eyesValue, smoothValue,
+  )
+end function
+
+// Render an interpolated alias model with one native call on every backend.
+function drawAliasModelBatchLerped(model, previousFrame, currentFrame, fraction, mesh, origin, angles, doubleEyes, smooth)
+  previousBatch = aliasBatchData(previousFrame, mesh)
+  currentBatch = aliasBatchData(currentFrame, mesh)
+  dots = aliasShadeDotData(shadeRow)
+  eyesValue = 0
+  smoothValue = 0
+  if doubleEyes then eyesValue = 1 end if
+  if smooth then smoothValue = 1 end if
+  return compatAliasNative.glDrawAliasModelLerp(
+    previousBatch, len(previousBatch), currentBatch, len(currentBatch), compatAliasNative.floatBits(fraction),
+    dots, len(shadedots), compatAliasNative.floatBits(shadelight),
     compatAliasNative.floatBits(origin.x), compatAliasNative.floatBits(origin.y), compatAliasNative.floatBits(origin.z),
     compatAliasNative.floatBits(angles.x), compatAliasNative.floatBits(angles.y), compatAliasNative.floatBits(angles.z),
     compatAliasNative.floatBits(model.scaleOrigin.x), compatAliasNative.floatBits(model.scaleOrigin.y), compatAliasNative.floatBits(model.scaleOrigin.z),

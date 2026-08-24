@@ -1,5 +1,9 @@
 # MiniQuake
 
+<p align="center">
+  <img src="icons/MiniQuake.png" width="240" alt="MiniQuake application icon">
+</p>
+
 MiniQuake is an unofficial Windows x64 port of the original GLQuake/WinQuake
 1.09 engine to [MiniLang](https://github.com/MiniLangProject). The project aims
 to preserve Quake's observable behavior, data formats, QuakeC semantics, and
@@ -166,9 +170,11 @@ Explicit compiler paths:
   -StdLib C:\path\to\MiniLangCompilerPy
 ```
 
-The release executable is written to `build/MiniQuake.exe`. Useful build
-switches include `-Configuration Debug`, `-SkipTests`, `-NetworkTests`, and
-`-RebuildNative`. Run `Get-Help .\build.ps1 -Detailed` or inspect the script's
+The release executable is written to `build/MiniQuake.exe`. The build compiles
+the repository-local MiniLang icon injector and embeds the multi-resolution
+`icons/MiniQuake.ico` automatically. Useful build switches include
+`-Configuration Debug`, `-SkipTests`, `-NetworkTests`, `-RebuildNative`, and
+`-SkipIcon`. Run `Get-Help .\build.ps1 -Detailed` or inspect the script's
 parameter block for the complete build interface.
 
 ## Default controls
@@ -222,12 +228,22 @@ and Vulkan is loaded dynamically from `vulkan-1.dll` when available.
 The **Lighting** entry in **Options > Video Mode** switches between the original
 GLQuake-compatible presentation and MiniQuake's optional enhanced lighting on
 all three backends. Enhanced lighting adds per-pixel Protocol-15 dynamic lights
-while retaining Quake's original lightmaps and art direction. **Shadows** are
+while retaining Quake's original lightmaps and art direction. It also enables
+soft, camera-facing particles and automatically uses standard QLIT v1
+`maps/<name>.lit` sidecars when a selected game or mod supplies them. Invalid or
+mismatched sidecars are ignored safely. Water retains Quake's canonical sine
+warp but interpolates between table entries to avoid visible stepping. **Shadows** are
 independent of that lighting choice: opaque enemies, pickups, crates, doors,
 platforms, and other modelled objects cast geometry-projected shadows whenever
 the option is enabled. **Shadow Quality** selects low, medium, or high filtering.
 Classic lighting remains the compatibility fallback; set Shadows to Off as well
 for the unextended GLQuake presentation.
+
+**Model Smoothing** interpolates animated alias-model poses, removing the
+characteristic low-frame-rate stepping from monsters, weapons, and projectiles
+without changing QuakeC timing or collision. **Texture Filter** selects 1x, 2x,
+4x, 8x, or 16x anisotropic filtering for mipmapped 3-D textures. Unsupported
+levels are clamped by the active OpenGL, Direct3D 9, or Vulkan device.
 
 **Texture Scale** optionally enlarges world, model, sprite, sky, and translated
 player textures when they are loaded. Available modes are Off, Nearest 2x,
@@ -242,6 +258,9 @@ The corresponding archived console variables are:
 r_lighting 0       // 0 = classic, 1 = enhanced
 r_shadows 1        // 0 = disabled, 1 = enabled
 r_shadowquality 1  // 0 = low, 1 = medium, 2 = high
+r_modelinterpolate 1 // 0 = original stepped poses, 1 = smooth poses
+r_anisotropy 4       // 1, 2, 4, 8, or 16; hardware-clamped
+r_coloredlightmaps 1 // use matching QLIT v1 sidecars in enhanced mode
 r_textureupscale 0 // 0=off, 1=nearest2x, 2=Scale2x, 3=Scale3x,
                    // 4=HQ2x, 5=xBR2x, 6=xBR4x
 ```

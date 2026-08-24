@@ -2,12 +2,17 @@
 
 ## v2026.08.23
 
-- Rebuilt the Windows x64 release with MiniLangPy compiler revision `d663ea9`,
-  including its optimized local type-flow and indexed-loop lowering.
-- Reduced the release executable from 58,796,544 to 56,537,600 bytes while
+- Rebuilt the Windows x64 release with MiniLangPy compiler revision `d7e143a`,
   retaining the BP-094 package identity and Protocol 15 compatibility profile.
-- Revalidated package identity, the `e1m1` headless and rendered retail smoke
-  paths, and all 23 OPT-001CR3R8 hotpath/window contracts.
+- Added smooth alias-model pose interpolation, renderer-wide anisotropic
+  filtering, optional QLIT v1 colored lightmaps, soft enhanced particles and
+  smoothly sampled canonical water warp behavior.
+- Added an original square MiniQuake application icon, a repository-local
+  MiniLang PE resource injector and automatic build-time branding for Explorer,
+  Alt-Tab, the taskbar and the game window.
+- Revalidated source integrity, native renderer safety, executable identity,
+  PE icon resources and retail renderer switching across OpenGL, Direct3D 9
+  and Vulkan.
 - Published the engine and its required native runtime bridges without any
   proprietary Quake data.
 

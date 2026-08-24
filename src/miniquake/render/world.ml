@@ -19,6 +19,7 @@ import miniquake.render.gl_warp as glWarp
 import miniquake.render.gl_rlight as glRlight
 import miniquake.render.ray_shadow as rayShadow
 import miniquake.render.special_paths as specialPaths
+import miniquake.render.colored_lightmaps as coloredLightmaps
 import miniquake.world_bsp as world
 import miniquake.format.bsp as bsp
 import miniquake.array_util as arrayutil
@@ -1375,6 +1376,8 @@ lightmap_rectchange = []
 allocated = []
 lightmaps = bytes()
 rCompatLightmapScratch = bytes()
+rCompatColoredLighting = void
+coloredLightmapsRequested = false
 skychain = []
 waterchain = []
 rCompatLightmapBuilders = []
@@ -1423,7 +1426,7 @@ function R_ResetWorldCompatibility()
   global lightspot, lightplane, speedscale, solidskytexture, alphaskytexture
   global r_framecount, r_visframecount, c_brush_polys, nColinElim, mirror, mirror_plane
   global currentTextureFrame, rCompatMtexRecordFaces, rCompatMtexRecords, rCompatMtexRecordCount, rCompatMtexRecordStamp, rCompatMtexTextureIds, rCompatMtexTextureChecked, rCompatSurfaceBatchKeys
-  global rCompatVisibleNodeRenderer, rCompatVisibleNodes
+  global rCompatVisibleNodeRenderer, rCompatVisibleNodes, rCompatColoredLighting
 
   rCompatRenderer = void
   rCompatViewOrigin = void
@@ -1477,6 +1480,7 @@ function R_ResetWorldCompatibility()
   allocated = []
   lightmaps = bytes()
   rCompatLightmapScratch = bytes()
+  rCompatColoredLighting = void
   skychain = []
   waterchain = []
   rCompatMtexRecordFaces = []
@@ -1950,6 +1954,27 @@ function compatHashLightmapRows(page, firstRow, rowCount)
   return compatFnv1a(lightmaps, offset, rowCount * GLQUAKE_BLOCK_WIDTH * lightmap_bytes)
 end function
 
+// Return the active atlas transfer format without changing compatibility
+// traces for ordinary grayscale BSP light data.
+function compatLightmapFormat()
+  if rCompatColoredLighting is bytes then return gl.GL_RGBA end if
+  return gl.GL_LUMINANCE
+end function
+
+// Transfer one dirty atlas rectangle using the format selected at map load.
+function compatUploadLightmapSubImage(page, rectangle)
+  if rectangle[3] <= 0 then return false end if
+  uploadOffset = (page * GLQUAKE_BLOCK_HEIGHT + rectangle[1]) * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
+  uploadLength = rectangle[3] * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
+  pixels = slice(lightmaps, uploadOffset, uploadLength)
+  if rCompatColoredLighting is bytes then
+    gl.uploadRgbaSubImage(0, rectangle[1], GLQUAKE_BLOCK_WIDTH, rectangle[3], pixels)
+  else
+    gl.uploadLuminanceSubImage(0, rectangle[1], GLQUAKE_BLOCK_WIDTH, rectangle[3], pixels)
+  end if
+  return true
+end function
+
 // Provide compat copy surface lightmap to atlas behavior for the active subsystem.
 function compatCopySurfaceLightmapToAtlas(surface, pixels)
   index = compatSurfaceIndex(surface)
@@ -1997,8 +2022,13 @@ function R_ConfigureWorldCompatibility(
   global rCompatViewRight, rCompatViewUp, rCompatDlights, rCompatLightStyles
   global rCompatBlend, rCompatTime, rCompatRealtime, rCompatFrameTime
   global rCompatFlashBlend, rCompatDynamic, rCompatNoVis, rCompatSurfaceWarpPolys
+  global rCompatColoredLighting
   if rCompatRenderer != renderer then rCompatSurfaceWarpPolys = [] end if
   rCompatRenderer = renderer
+  rCompatColoredLighting = void
+  if coloredLightmapsRequested and renderer is not void then
+    rCompatColoredLighting = coloredLightmaps.forMap(renderer.map)
+  end if
   rCompatViewOrigin = viewOrigin
   rCompatViewAngles = viewAngles
   rCompatViewForward = viewForward
@@ -2015,6 +2045,15 @@ function R_ConfigureWorldCompatibility(
   rCompatNoVis = noVis
   compatEnsureWorldState()
   return true
+end function
+
+// Select whether optional QLIT sidecars may replace the scalar lightmap
+// samples when the next world atlas is built. The Classic renderer calls this
+// with false, preserving byte-for-byte GLQuake lightmap behavior.
+function R_ConfigureColoredLightmaps(enabled)
+  global coloredLightmapsRequested
+  coloredLightmapsRequested = enabled
+  return coloredLightmapsRequested
 end function
 
 // Configure the optional renderer extension.  This never mutates Quake world
@@ -2411,7 +2450,16 @@ function R_AddDynamicLights(surface)
             distance = td + (sd >> 1)
             if sd > td then distance = sd + (td >> 1) end if
             if distance < minimum then
-              blocklights[sampleT * smax + sampleS] = blocklights[sampleT * smax + sampleS] + native.trunc((radius - distance) * 256.0)
+              addition = native.trunc((radius - distance) * 256.0)
+              destination = sampleT * smax + sampleS
+              if rCompatColoredLighting is bytes then
+                destination = destination * 3
+                blocklights[destination] = blocklights[destination] + addition
+                blocklights[destination + 1] = blocklights[destination + 1] + addition
+                blocklights[destination + 2] = blocklights[destination + 2] + addition
+              else
+                blocklights[destination] = blocklights[destination] + addition
+              end if
             end if
             sampleS = sampleS + 1
           end while
@@ -2451,19 +2499,22 @@ function R_BuildLightMap(surface, destination, stride)
   if destination is void then destination = bytes(required) end if
   if destination is not bytes then return error(3761, "R_BuildLightMap: destination must be bytes") end if
   if len(destination) < required then return error(3762, "R_BuildLightMap: destination is too small") end if
-  if len(blocklights) < count then blocklights = arrayutil.makeFilledArray(count, 0) end if
+  colored = rCompatColoredLighting is bytes and len(rCompatColoredLighting) >= len(rCompatRenderer.map.lighting) * 3
+  accumulationCount = count
+  if colored then accumulationCount = count * 3 end if
+  if len(blocklights) < accumulationCount then blocklights = arrayutil.makeFilledArray(accumulationCount, 0) end if
 
   rCompatSurfaceCachedDlight[index] = rCompatSurfaceDlightFrame[index] == r_framecount
   fullbright = rCompatRenderer.fullbright
   if fullbright or len(rCompatRenderer.map.lighting) == 0 or value.lightOffset < 0 then
     sample = 0
-    while sample < count
+    while sample < accumulationCount
       blocklights[sample] = 255 * 256
       sample = sample + 1
     end while
   else
     sample = 0
-    while sample < count
+    while sample < accumulationCount
       blocklights[sample] = 0
       sample = sample + 1
     end while
@@ -2477,7 +2528,15 @@ function R_BuildLightMap(surface, destination, stride)
       sourceOffset = value.lightOffset + mapNumber * count
       sample = 0
       while sample < count and sourceOffset + sample < len(rCompatRenderer.map.lighting)
-        blocklights[sample] = blocklights[sample] + rCompatRenderer.map.lighting[sourceOffset + sample] * scaleValue
+        if colored then
+          coloredSource = (sourceOffset + sample) * 3
+          coloredDestination = sample * 3
+          blocklights[coloredDestination] = blocklights[coloredDestination] + rCompatColoredLighting[coloredSource] * scaleValue
+          blocklights[coloredDestination + 1] = blocklights[coloredDestination + 1] + rCompatColoredLighting[coloredSource + 1] * scaleValue
+          blocklights[coloredDestination + 2] = blocklights[coloredDestination + 2] + rCompatColoredLighting[coloredSource + 2] * scaleValue
+        else
+          blocklights[sample] = blocklights[sample] + rCompatRenderer.map.lighting[sourceOffset + sample] * scaleValue
+        end if
         sample = sample + 1
       end while
       mapNumber = mapNumber + 1
@@ -2489,14 +2548,27 @@ function R_BuildLightMap(surface, destination, stride)
   while y < height
     x = 0
     while x < width
-      lightValue = blocklights[y * width + x] >> 7
-      if lightValue > 255 then lightValue = 255 end if
-      outputValue = 255 - lightValue
       destinationOffset = y * stride + x * lightmap_bytes
-      if lightmap_bytes == 4 then
+      if colored then
+        coloredSource = (y * width + x) * 3
+        channel = 0
+        while channel < 3
+          lightValue = blocklights[coloredSource + channel] >> 7
+          if lightValue > 255 then lightValue = 255 end if
+          destination[destinationOffset + channel] = 255 - lightValue
+          channel = channel + 1
+        end while
+        destination[destinationOffset + 3] = 255
+      else if lightmap_bytes == 4 then
         // GL_RGBA leaves RGB untouched and stores the inverted light in alpha.
+        lightValue = blocklights[y * width + x] >> 7
+        if lightValue > 255 then lightValue = 255 end if
+        outputValue = 255 - lightValue
         destination[destinationOffset + 3] = outputValue
       else
+        lightValue = blocklights[y * width + x] >> 7
+        if lightValue > 255 then lightValue = 255 end if
+        outputValue = 255 - lightValue
         destination[destinationOffset] = outputValue
       end if
       x = x + 1
@@ -2646,14 +2718,10 @@ function R_DrawSequentialPoly(surface)
         traceHash = compatHashLightmapRows(page, rectangle[1], rectangle[3])
         tracedUpload = gl.traceCommand("upload_subimage", [
           gl.GL_TEXTURE_2D, 0, 0, rectangle[1], GLQUAKE_BLOCK_WIDTH,
-          rectangle[3], gl.GL_LUMINANCE, gl.GL_UNSIGNED_BYTE, traceHash,
+          rectangle[3], compatLightmapFormat(), gl.GL_UNSIGNED_BYTE, traceHash,
         ])
       end if
-      if not tracedUpload and rectangle[3] > 0 then
-        uploadOffset = (page * GLQUAKE_BLOCK_HEIGHT + rectangle[1]) * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
-        uploadLength = rectangle[3] * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
-        gl.uploadLuminanceSubImage(0, rectangle[1], GLQUAKE_BLOCK_WIDTH, rectangle[3], slice(lightmaps, uploadOffset, uploadLength))
-      end if
+      if not tracedUpload then compatUploadLightmapSubImage(page, rectangle) end if
       rCompatLightmapModified[page] = false
       compatResetLightmapRectangle(page)
     end if
@@ -2907,11 +2975,7 @@ function R_DrawMultitextureBatch(surfaces, surfaceCount)
     if rCompatLightmapModified[page] then
       rectangle = rCompatLightmapRectChange[page]
       gl.bindTexture(lightmap_textures + page)
-      if rectangle[3] > 0 then
-        uploadOffset = (page * GLQUAKE_BLOCK_HEIGHT + rectangle[1]) * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
-        uploadLength = rectangle[3] * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
-        gl.uploadLuminanceSubImage(0, rectangle[1], GLQUAKE_BLOCK_WIDTH, rectangle[3], slice(lightmaps, uploadOffset, uploadLength))
-      end if
+      compatUploadLightmapSubImage(page, rectangle)
       rCompatLightmapModified[page] = false
       compatResetLightmapRectangle(page)
     end if
@@ -2970,14 +3034,10 @@ function R_BlendLightmaps()
           traceHash = compatHashLightmapRows(page, rectangle[1], rectangle[3])
           tracedUpload = gl.traceCommand("upload_subimage", [
             gl.GL_TEXTURE_2D, 0, 0, rectangle[1], GLQUAKE_BLOCK_WIDTH,
-            rectangle[3], gl.GL_LUMINANCE, gl.GL_UNSIGNED_BYTE, traceHash,
+            rectangle[3], compatLightmapFormat(), gl.GL_UNSIGNED_BYTE, traceHash,
           ])
         end if
-        if not tracedUpload and rectangle[3] > 0 then
-          uploadOffset = (page * GLQUAKE_BLOCK_HEIGHT + rectangle[1]) * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
-          uploadLength = rectangle[3] * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
-          gl.uploadLuminanceSubImage(0, rectangle[1], GLQUAKE_BLOCK_WIDTH, rectangle[3], slice(lightmaps, uploadOffset, uploadLength))
-        end if
+        if not tracedUpload then compatUploadLightmapSubImage(page, rectangle) end if
         rCompatLightmapModified[page] = false
         compatResetLightmapRectangle(page)
       end if
@@ -3677,6 +3737,7 @@ function GL_BuildLightmaps()
   renderer.lightmaps = []
   r_framecount = 1
   lightmap_bytes = 1
+  if rCompatColoredLighting is bytes then lightmap_bytes = 4 end if
   active_lightmaps = 0
   if lightmap_textures == 0 then lightmap_textures = gl.reserveTextureNames(GLQUAKE_MAX_LIGHTMAPS) end if
   count = 0
@@ -3707,11 +3768,16 @@ function GL_BuildLightmaps()
     if gl.traceEnabled() then
       tracedUpload = gl.traceCommand("upload_lightmap", [
         gl.GL_TEXTURE_2D, 0, lightmap_bytes, GLQUAKE_BLOCK_WIDTH,
-        GLQUAKE_BLOCK_HEIGHT, 0, gl.GL_LUMINANCE, gl.GL_UNSIGNED_BYTE,
+        GLQUAKE_BLOCK_HEIGHT, 0, compatLightmapFormat(), gl.GL_UNSIGNED_BYTE,
         compatFnv1a(lightmaps, pageOffset, pageLength),
       ])
     end if
-    if not tracedUpload then gl.uploadLuminance(GLQUAKE_BLOCK_WIDTH, GLQUAKE_BLOCK_HEIGHT, slice(lightmaps, pageOffset, pageLength)) end if
+    if not tracedUpload then
+      pagePixels = slice(lightmaps, pageOffset, pageLength)
+      if rCompatColoredLighting is bytes then gl.uploadRgba(GLQUAKE_BLOCK_WIDTH, GLQUAKE_BLOCK_HEIGHT, pagePixels)
+      else gl.uploadLuminance(GLQUAKE_BLOCK_WIDTH, GLQUAKE_BLOCK_HEIGHT, pagePixels)
+      end if
+    end if
     page = page + 1
   end while
   return count
@@ -3784,6 +3850,15 @@ function EmitWaterPolys(surface)
       tIndex = native.trunc((originalS * 0.125 + rCompatRealtime) * GLQUAKE_TURBSCALE) & 255
       textureS = glWarp.warpFloat((originalS + glWarp.turbsin[sIndex]) / 64.0)
       textureT = glWarp.warpFloat((originalT + glWarp.turbsin[tIndex]) / 64.0)
+      if enhanced.isEnabled() then
+        // Interpolate the same canonical sine table in Enhanced mode. Keep the
+        // scalar path allocation-free because water vertices are rebuilt every
+        // rendered frame.
+        sPhase = glWarp.warpFloat((originalT * 0.125 + rCompatRealtime) * GLQUAKE_TURBSCALE)
+        tPhase = glWarp.warpFloat((originalS * 0.125 + rCompatRealtime) * GLQUAKE_TURBSCALE)
+        textureS = glWarp.warpFloat((originalS + glWarp.InterpolatedTurb(sPhase)) / 64.0)
+        textureT = glWarp.warpFloat((originalT + glWarp.InterpolatedTurb(tPhase)) / 64.0)
+      end if
       gl.texcoord2(textureS, textureT)
       gl.vertex3(point.x, point.y, point.z)
     end for

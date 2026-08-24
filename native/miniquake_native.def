@@ -188,7 +188,9 @@ EXPORTS
   mq_gl_draw_shadow_batch
   mq_gl_draw_alias_ray_shadow
   mq_gl_draw_particle_batch
+  mq_gl_draw_particle_batch_styled
   mq_gl_draw_alias_model
+  mq_gl_draw_alias_model_lerp
   mq_gl_static_geometry_call
   mq_gl_static_geometry_call_batch
   mq_gl_static_geometry_call_multitexture_batch

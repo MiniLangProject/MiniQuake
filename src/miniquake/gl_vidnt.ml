@@ -120,7 +120,9 @@ videoMenuRendererFocus = false
 videoMenuLightingFocus = false
 videoMenuShadowFocus = false
 videoMenuShadowQualityFocus = false
+videoMenuModelInterpolationFocus = false
 videoMenuTextureUpscaleFocus = false
+videoMenuAnisotropyFocus = false
 rendererSelectionOverride = -1
 
 // Apply the Quake-compatible vid renderer from name behavior.
@@ -1223,7 +1225,7 @@ end function
 
 // Apply the Quake-compatible vid menu reset behavior.
 function VID_MenuReset()
-  global videoMenuSelection, videoMenuDisplayFocus, videoMenuRendererFocus, videoMenuLightingFocus, videoMenuShadowFocus, videoMenuShadowQualityFocus, videoMenuTextureUpscaleFocus
+  global videoMenuSelection, videoMenuDisplayFocus, videoMenuRendererFocus, videoMenuLightingFocus, videoMenuShadowFocus, videoMenuShadowQualityFocus, videoMenuModelInterpolationFocus, videoMenuTextureUpscaleFocus, videoMenuAnisotropyFocus
   state = VID_State()
   // The original video menu opens on the active resolution.  Display mode and
   // renderer are separate entries above the grid and are reached with UP.
@@ -1234,7 +1236,9 @@ function VID_MenuReset()
   videoMenuLightingFocus = false
   videoMenuShadowFocus = false
   videoMenuShadowQualityFocus = false
+  videoMenuModelInterpolationFocus = false
   videoMenuTextureUpscaleFocus = false
+  videoMenuAnisotropyFocus = false
   count = VID_MenuModeCount()
   if count == 0 then videoMenuSelection = NO_MODE; return videoMenuSelection end if
   selected = state.currentMode
@@ -1312,10 +1316,22 @@ function VID_MenuShadowQualityFocused()
   return videoMenuShadowQualityFocus
 end function
 
+// Report whether the alias-pose interpolation row owns keyboard focus.
+function VID_MenuModelInterpolationFocused()
+  global videoMenuModelInterpolationFocus
+  return videoMenuModelInterpolationFocus
+end function
+
 // Report whether the load-time texture-upscaling row owns keyboard focus.
 function VID_MenuTextureUpscaleFocused()
   global videoMenuTextureUpscaleFocus
   return videoMenuTextureUpscaleFocus
+end function
+
+// Report whether the anisotropic texture-filter row owns keyboard focus.
+function VID_MenuAnisotropyFocused()
+  global videoMenuAnisotropyFocus
+  return videoMenuAnisotropyFocus
 end function
 
 // Toggle the archived classic/enhanced renderer policy without changing maps.
@@ -1362,6 +1378,19 @@ function VID_AdjustEnhancedShadowQuality(direction)
   return true
 end function
 
+// Toggle archived interpolation between consecutive MDL animation poses.
+function VID_ToggleModelInterpolation()
+  state = VID_State()
+  if state.registry is void or cvar.find(state.registry, "r_modelinterpolate") is void then return false end if
+  enabled = cvar.variableValue(state.registry, "r_modelinterpolate") == 0.0
+  value = 0.0
+  name = "OFF"
+  if enabled then value = 1.0; name = "ON" end if
+  cvar.setValue(state.registry, "r_modelinterpolate", value)
+  state.lastModeMessage = "MODEL INTERPOLATION " + name + " applied."
+  return true
+end function
+
 // Cycle the archived load-time texture-upscaling algorithm.
 function VID_AdjustTextureUpscale(direction)
   state = VID_State()
@@ -1374,6 +1403,28 @@ function VID_AdjustTextureUpscale(direction)
   cvar.setValue(state.registry, "r_textureupscale", value)
   state.lastModeMessage = "TEXTURE UPSCALING " + textureUpscale.modeName(value) + " selected."
   return [previous, value]
+end function
+
+// Cycle the archived cross-backend anisotropic filtering level.
+function VID_AdjustAnisotropy(direction)
+  state = VID_State()
+  if state.registry is void or cvar.find(state.registry, "r_anisotropy") is void then return false end if
+  levels = [1, 2, 4, 8, 16]
+  current = native.trunc(cvar.variableValue(state.registry, "r_anisotropy"))
+  index = 0
+  while index < len(levels) and levels[index] != current
+    index = index + 1
+  end while
+  if index >= len(levels) then index = 0 end if
+  if direction < 0 then index = index - 1 else index = index + 1 end if
+  if index < 0 then index = len(levels) - 1 end if
+  if index >= len(levels) then index = 0 end if
+  value = levels[index]
+  cvar.setValue(state.registry, "r_anisotropy", value)
+  name = "OFF"
+  if value > 1 then name = value + "X" end if
+  state.lastModeMessage = "ANISOTROPIC FILTERING " + name + " selected."
+  return true
 end function
 
 // Apply the Quake-compatible vid save resolution cvars behavior.
@@ -1560,7 +1611,9 @@ function VID_MenuDraw()
   lightingName = "CLASSIC"
   shadowsName = "OFF"
   shadowQualityName = "MEDIUM"
+  modelInterpolationName = "ON"
   textureUpscaleName = "OFF"
+  anisotropyName = "OFF"
   if state.registry is not void then
     if cvar.variableValue(state.registry, "r_lighting") != 0.0 then lightingName = "ENHANCED" end if
     if cvar.variableValue(state.registry, "r_shadows") != 0.0 then shadowsName = "ON" end if
@@ -1568,8 +1621,13 @@ function VID_MenuDraw()
     if shadowQuality < 0 then shadowQuality = 0 end if
     if shadowQuality > 2 then shadowQuality = 2 end if
     shadowQualityName = ["LOW", "MEDIUM", "HIGH"][shadowQuality]
+    if cvar.find(state.registry, "r_modelinterpolate") is not void and cvar.variableValue(state.registry, "r_modelinterpolate") == 0.0 then modelInterpolationName = "OFF" end if
     if cvar.find(state.registry, "r_textureupscale") is not void then
       textureUpscaleName = textureUpscale.modeName(cvar.variableValue(state.registry, "r_textureupscale"))
+    end if
+    if cvar.find(state.registry, "r_anisotropy") is not void then
+      anisotropy = native.trunc(cvar.variableValue(state.registry, "r_anisotropy"))
+      if anisotropy > 1 then anisotropyName = anisotropy + "X" end if
     end if
   end if
   commands = [
@@ -1578,7 +1636,9 @@ function VID_MenuDraw()
     ["lighting", lightingName, VID_MenuLightingFocused()],
     ["shadows", shadowsName, VID_MenuShadowFocused()],
     ["shadow_quality", shadowQualityName, VID_MenuShadowQualityFocused()],
+    ["model_interpolation", modelInterpolationName, VID_MenuModelInterpolationFocused()],
     ["texture_upscale", textureUpscaleName, VID_MenuTextureUpscaleFocused()],
+    ["anisotropy", anisotropyName, VID_MenuAnisotropyFocused()],
     ["renderer", VID_RendererName(win.renderer()), VID_MenuRendererFocused()],
     ["display", modeName, VID_MenuDisplayFocused()],
   ]
@@ -1588,7 +1648,7 @@ function VID_MenuDraw()
     mode = state.modes[index]
     current = index == state.currentMode
     if state.modeState == MS_WINDOWED and mode.width == state.windowWidth and mode.height == state.windowHeight then current = true end if
-    commands = commands + [["mode", index, mode.description, current, count % VID_ROW_SIZE, native.trunc(count / VID_ROW_SIZE), index == selection and not VID_MenuDisplayFocused() and not VID_MenuRendererFocused() and not VID_MenuLightingFocused() and not VID_MenuShadowFocused() and not VID_MenuShadowQualityFocused() and not VID_MenuTextureUpscaleFocused()]]
+    commands = commands + [["mode", index, mode.description, current, count % VID_ROW_SIZE, native.trunc(count / VID_ROW_SIZE), index == selection and not VID_MenuDisplayFocused() and not VID_MenuRendererFocused() and not VID_MenuLightingFocused() and not VID_MenuShadowFocused() and not VID_MenuShadowQualityFocused() and not VID_MenuModelInterpolationFocused() and not VID_MenuTextureUpscaleFocused() and not VID_MenuAnisotropyFocused()]]
     count = count + 1
     index = index + 1
   end while
@@ -1604,7 +1664,7 @@ end function
 // Apply the Quake-compatible vid menu key behavior.
 function VID_MenuKey(key)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
-  global videoMenuDisplayFocus, videoMenuRendererFocus, videoMenuLightingFocus, videoMenuShadowFocus, videoMenuShadowQualityFocus, videoMenuTextureUpscaleFocus
+  global videoMenuDisplayFocus, videoMenuRendererFocus, videoMenuLightingFocus, videoMenuShadowFocus, videoMenuShadowQualityFocus, videoMenuModelInterpolationFocus, videoMenuTextureUpscaleFocus, videoMenuAnisotropyFocus
   if key == keys.K_ESCAPE then return "options" end if
   if videoMenuLightingFocus then
     if key == keys.K_DOWNARROW then videoMenuLightingFocus = false; videoMenuShadowFocus = true; return "move" end if
@@ -1625,7 +1685,7 @@ function VID_MenuKey(key)
     return "none"
   end if
   if videoMenuShadowQualityFocus then
-    if key == keys.K_DOWNARROW then videoMenuShadowQualityFocus = false; videoMenuTextureUpscaleFocus = true; return "move" end if
+    if key == keys.K_DOWNARROW then videoMenuShadowQualityFocus = false; videoMenuModelInterpolationFocus = true; return "move" end if
     if key == keys.K_UPARROW then videoMenuShadowQualityFocus = false; videoMenuShadowFocus = true; return "move" end if
     if key == keys.K_LEFTARROW or key == keys.K_RIGHTARROW or key == keys.K_ENTER then
       direction = 1
@@ -1635,9 +1695,18 @@ function VID_MenuKey(key)
     end if
     return "none"
   end if
+  if videoMenuModelInterpolationFocus then
+    if key == keys.K_DOWNARROW then videoMenuModelInterpolationFocus = false; videoMenuTextureUpscaleFocus = true; return "move" end if
+    if key == keys.K_UPARROW then videoMenuModelInterpolationFocus = false; videoMenuShadowQualityFocus = true; return "move" end if
+    if key == keys.K_LEFTARROW or key == keys.K_RIGHTARROW or key == keys.K_ENTER then
+      if VID_ToggleModelInterpolation() then return "lighting_applied" end if
+      return "lighting_error"
+    end if
+    return "none"
+  end if
   if videoMenuTextureUpscaleFocus then
-    if key == keys.K_DOWNARROW then videoMenuTextureUpscaleFocus = false; videoMenuRendererFocus = true; return "move" end if
-    if key == keys.K_UPARROW then videoMenuTextureUpscaleFocus = false; videoMenuShadowQualityFocus = true; return "move" end if
+    if key == keys.K_DOWNARROW then videoMenuTextureUpscaleFocus = false; videoMenuAnisotropyFocus = true; return "move" end if
+    if key == keys.K_UPARROW then videoMenuTextureUpscaleFocus = false; videoMenuModelInterpolationFocus = true; return "move" end if
     if key == keys.K_LEFTARROW or key == keys.K_RIGHTARROW or key == keys.K_ENTER then
       direction = 1
       if key == keys.K_LEFTARROW then direction = -1 end if
@@ -1647,9 +1716,20 @@ function VID_MenuKey(key)
     end if
     return "none"
   end if
+  if videoMenuAnisotropyFocus then
+    if key == keys.K_DOWNARROW then videoMenuAnisotropyFocus = false; videoMenuRendererFocus = true; return "move" end if
+    if key == keys.K_UPARROW then videoMenuAnisotropyFocus = false; videoMenuTextureUpscaleFocus = true; return "move" end if
+    if key == keys.K_LEFTARROW or key == keys.K_RIGHTARROW or key == keys.K_ENTER then
+      direction = 1
+      if key == keys.K_LEFTARROW then direction = -1 end if
+      if VID_AdjustAnisotropy(direction) then return "lighting_applied" end if
+      return "lighting_error"
+    end if
+    return "none"
+  end if
   if videoMenuRendererFocus then
     if key == keys.K_DOWNARROW then videoMenuRendererFocus = false; videoMenuDisplayFocus = true; return "move" end if
-    if key == keys.K_UPARROW then videoMenuRendererFocus = false; videoMenuTextureUpscaleFocus = true; return "move" end if
+    if key == keys.K_UPARROW then videoMenuRendererFocus = false; videoMenuAnisotropyFocus = true; return "move" end if
     if key == keys.K_LEFTARROW or key == keys.K_RIGHTARROW or key == keys.K_ENTER then
       direction = 1
       if key == keys.K_LEFTARROW then direction = -1 end if

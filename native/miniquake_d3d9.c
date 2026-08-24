@@ -109,6 +109,7 @@ typedef struct mq_d3d_texture_s {
     mq_i32 mag_filter;
     mq_i32 wrap_s;
     mq_i32 wrap_t;
+    mq_i32 anisotropy;
 } mq_d3d_texture_t;
 
 MQ_DLLIMPORT void *MQ_WINAPI Direct3DCreate9(mq_u32 sdk_version);
@@ -197,11 +198,13 @@ MQ_DLLIMPORT MQ_BOOL MQ_WINAPI FreeLibrary(MQ_HMODULE module);
 #define MQ_D3DSAMP_MAGFILTER 5
 #define MQ_D3DSAMP_MINFILTER 6
 #define MQ_D3DSAMP_MIPFILTER 7
+#define MQ_D3DSAMP_MAXANISOTROPY 10
 #define MQ_D3DTADDRESS_WRAP 1
 #define MQ_D3DTADDRESS_CLAMP 3
 #define MQ_D3DTEXF_NONE 0
 #define MQ_D3DTEXF_POINT 1
 #define MQ_D3DTEXF_LINEAR 2
+#define MQ_D3DTEXF_ANISOTROPIC 3
 
 #define MQ_D3DPT_POINTLIST 1
 #define MQ_D3DPT_LINELIST 2
@@ -257,6 +260,7 @@ MQ_DLLIMPORT MQ_BOOL MQ_WINAPI FreeLibrary(MQ_HMODULE module);
 #define MQ_GL_TEXTURE_MAG_FILTER 0x2800u
 #define MQ_GL_TEXTURE_WRAP_S 0x2802u
 #define MQ_GL_TEXTURE_WRAP_T 0x2803u
+#define MQ_GL_TEXTURE_MAX_ANISOTROPY_EXT 0x84FEu
 #define MQ_GL_NEAREST 0x2600u
 #define MQ_GL_LINEAR 0x2601u
 #define MQ_GL_NEAREST_MIPMAP_NEAREST 0x2700u
@@ -603,9 +607,15 @@ static void mq_d3d_apply_bound_texture(void) {
         if (MQ_D3D_SUCCEEDED(mq_d3d_last_error)) mq_d3d_applied_texture_object = object;
     }
     if (texture != MQ_NULL) {
-        mq_d3d_set_sampler_state(MQ_D3DSAMP_MINFILTER, mq_d3d_min_filter_value(texture->min_filter));
-        mq_d3d_set_sampler_state(MQ_D3DSAMP_MAGFILTER, texture->mag_filter == MQ_GL_LINEAR ? MQ_D3DTEXF_LINEAR : MQ_D3DTEXF_POINT);
+        if (texture->anisotropy > 1) {
+            mq_d3d_set_sampler_state(MQ_D3DSAMP_MINFILTER, MQ_D3DTEXF_ANISOTROPIC);
+            mq_d3d_set_sampler_state(MQ_D3DSAMP_MAGFILTER, MQ_D3DTEXF_ANISOTROPIC);
+        } else {
+            mq_d3d_set_sampler_state(MQ_D3DSAMP_MINFILTER, mq_d3d_min_filter_value(texture->min_filter));
+            mq_d3d_set_sampler_state(MQ_D3DSAMP_MAGFILTER, texture->mag_filter == MQ_GL_LINEAR ? MQ_D3DTEXF_LINEAR : MQ_D3DTEXF_POINT);
+        }
         mq_d3d_set_sampler_state(MQ_D3DSAMP_MIPFILTER, mq_d3d_mip_filter_value(texture->min_filter));
+        mq_d3d_set_sampler_state(MQ_D3DSAMP_MAXANISOTROPY, texture->anisotropy > 1 ? (mq_u32)texture->anisotropy : 1u);
         mq_d3d_set_sampler_state(MQ_D3DSAMP_ADDRESSU, texture->wrap_s == MQ_GL_CLAMP ? MQ_D3DTADDRESS_CLAMP : MQ_D3DTADDRESS_WRAP);
         mq_d3d_set_sampler_state(MQ_D3DSAMP_ADDRESSV, texture->wrap_t == MQ_GL_CLAMP ? MQ_D3DTADDRESS_CLAMP : MQ_D3DTADDRESS_WRAP);
     }
@@ -1284,6 +1294,7 @@ void mq_d3d9_tex_parameter_i(mq_u32 target, mq_u32 name, mq_i32 value) {
     else if (name == MQ_GL_TEXTURE_MAG_FILTER) texture->mag_filter = value;
     else if (name == MQ_GL_TEXTURE_WRAP_S) texture->wrap_s = value;
     else if (name == MQ_GL_TEXTURE_WRAP_T) texture->wrap_t = value;
+    else if (name == MQ_GL_TEXTURE_MAX_ANISOTROPY_EXT) { if (value < 1) value = 1; if (value > 16) value = 16; texture->anisotropy = value; }
     mq_d3d_apply_bound_texture();
 }
 
@@ -1313,6 +1324,7 @@ static mq_i32 mq_d3d_texture_create(mq_d3d_texture_t *texture, mq_i32 base_width
     if (texture->mag_filter == 0) texture->mag_filter = MQ_GL_NEAREST;
     if (texture->wrap_s == 0) texture->wrap_s = MQ_GL_REPEAT;
     if (texture->wrap_t == 0) texture->wrap_t = MQ_GL_REPEAT;
+    if (texture->anisotropy == 0) texture->anisotropy = 1;
     return 1;
 }
 

@@ -99,6 +99,7 @@ MQ_DLLIMPORT double __cdecl sqrt(double value);
 #define MQ_GL_TEXTURE_MAG_FILTER 0x2800u
 #define MQ_GL_TEXTURE_WRAP_S 0x2802u
 #define MQ_GL_TEXTURE_WRAP_T 0x2803u
+#define MQ_GL_TEXTURE_MAX_ANISOTROPY_EXT 0x84FEu
 #define MQ_GL_NEAREST 0x2600u
 #define MQ_GL_LINEAR 0x2601u
 #define MQ_GL_NEAREST_MIPMAP_NEAREST 0x2700u
@@ -145,6 +146,7 @@ typedef struct mq_vk_texture_s {
     mq_i32 mag_filter;
     mq_i32 wrap_s;
     mq_i32 wrap_t;
+    mq_i32 anisotropy;
     mq_i32 allocated;
 } mq_vk_texture_t;
 
@@ -292,6 +294,8 @@ static mq_i32 mq_vk_width = 0;
 static mq_i32 mq_vk_height = 0;
 static mq_i32 mq_vk_last_error = 0;
 static char mq_vk_device_name[VK_MAX_PHYSICAL_DEVICE_NAME_SIZE];
+static mq_i32 mq_vk_sampler_anisotropy_enabled = 0;
+static float mq_vk_max_sampler_anisotropy = 1.0f;
 static mq_i32 mq_vk_enhanced_enabled = 0;
 static mq_i32 mq_vk_enhanced_draw_kind_value = 0;
 static mq_i32 mq_vk_enhanced_light_count = 0;
@@ -576,6 +580,10 @@ static mq_i32 mq_vk_sampler(mq_vk_texture_t *texture) {
     info.addressModeU = texture->wrap_s == MQ_GL_CLAMP ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE : VK_SAMPLER_ADDRESS_MODE_REPEAT;
     info.addressModeV = texture->wrap_t == MQ_GL_CLAMP ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE : VK_SAMPLER_ADDRESS_MODE_REPEAT;
     info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    if (mq_vk_sampler_anisotropy_enabled && texture->anisotropy > 1) {
+        info.anisotropyEnable = VK_TRUE;
+        info.maxAnisotropy = mq_vk_clamp((float)texture->anisotropy, 1.0f, mq_vk_max_sampler_anisotropy);
+    }
     info.maxLod = (texture->min_filter == MQ_GL_NEAREST_MIPMAP_NEAREST || texture->min_filter == MQ_GL_LINEAR_MIPMAP_NEAREST || texture->min_filter == MQ_GL_NEAREST_MIPMAP_LINEAR || texture->min_filter == MQ_GL_LINEAR_MIPMAP_LINEAR) ? (float)(texture->uploaded_levels > 0 ? texture->uploaded_levels - 1 : 0) : 0.0f;
     if (mq_vkCreateSampler(mq_vk_device, &info, MQ_NULL, &replacement) != VK_SUCCESS) return 0;
     if (texture->sampler != VK_NULL_HANDLE) mq_vkDestroySampler(mq_vk_device, texture->sampler, MQ_NULL);
@@ -795,14 +803,14 @@ mq_i32 mq_vulkan_initialize(mq_ptr window, mq_i32 width, mq_i32 height) {
         if (mq_vk_physical != VK_NULL_HANDLE) break;
     }
     if (mq_vk_physical == VK_NULL_HANDLE) goto fail;
-    { VkPhysicalDeviceProperties properties; mq_vkGetPhysicalDeviceProperties(mq_vk_physical, &properties); memcpy(mq_vk_device_name, properties.deviceName, sizeof(mq_vk_device_name)); }
+    { VkPhysicalDeviceProperties properties; mq_vkGetPhysicalDeviceProperties(mq_vk_physical, &properties); memcpy(mq_vk_device_name, properties.deviceName, sizeof(mq_vk_device_name)); mq_vk_max_sampler_anisotropy = properties.limits.maxSamplerAnisotropy; }
     memset(&features, 0, sizeof(features)); memset(&features13, 0, sizeof(features13)); memset(&dynamic1, 0, sizeof(dynamic1)); memset(&dynamic3, 0, sizeof(dynamic3));
     features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2; features.pNext = &features13; features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES; features13.pNext = &dynamic1; dynamic1.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT; dynamic1.pNext = &dynamic3; dynamic3.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT;
     mq_vkGetPhysicalDeviceFeatures2(mq_vk_physical, &features);
     if (!features13.dynamicRendering || !dynamic1.extendedDynamicState || !dynamic3.extendedDynamicState3PolygonMode || !dynamic3.extendedDynamicState3ColorBlendEnable || !dynamic3.extendedDynamicState3ColorBlendEquation) goto fail;
     features13.pNext = &dynamic1; dynamic1.pNext = &dynamic3; dynamic3.pNext = MQ_NULL;
     memset(&queue_info, 0, sizeof(queue_info)); queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO; queue_info.queueFamilyIndex = mq_vk_queue_family; queue_info.queueCount = 1u; queue_info.pQueuePriorities = &priority;
-    memset(&enabled_features, 0, sizeof(enabled_features)); enabled_features.fillModeNonSolid = features.features.fillModeNonSolid;
+    memset(&enabled_features, 0, sizeof(enabled_features)); enabled_features.fillModeNonSolid = features.features.fillModeNonSolid; enabled_features.samplerAnisotropy = features.features.samplerAnisotropy; mq_vk_sampler_anisotropy_enabled = enabled_features.samplerAnisotropy != VK_FALSE;
     memset(&device_info, 0, sizeof(device_info)); device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO; device_info.pNext = &features13; device_info.pEnabledFeatures = &enabled_features; device_info.queueCreateInfoCount = 1u; device_info.pQueueCreateInfos = &queue_info; device_info.enabledExtensionCount = 3u; device_info.ppEnabledExtensionNames = device_extensions;
     if (mq_vkCreateDevice(mq_vk_physical, &device_info, MQ_NULL, &mq_vk_device) != VK_SUCCESS) goto fail;
     mq_vk_get_device_proc = (PFN_vkGetDeviceProcAddr)mq_vk_get_instance_proc(mq_vk_instance, "vkGetDeviceProcAddr"); if (mq_vk_get_device_proc == MQ_NULL) goto fail;
@@ -1084,12 +1092,13 @@ void mq_vulkan_gen_textures(mq_i32 count, void *texture_ids) {
         entry->mag_filter = MQ_GL_NEAREST;
         entry->wrap_s = MQ_GL_REPEAT;
         entry->wrap_t = MQ_GL_REPEAT;
+        entry->anisotropy = 1;
     }
 }
 /* Release resources owned by delete textures. */
 void mq_vulkan_delete_textures(mq_i32 count, const void *texture_ids) { const mq_u32 *ids=(const mq_u32*)texture_ids; mq_i32 i; if(ids==MQ_NULL||count<=0)return; for(i=0;i<count;++i) if(ids[i]>0u&&ids[i]<MQ_VK_MAX_TEXTURES) { mq_vk_texture_t *entry=&mq_vk_textures[ids[i]]; VkDescriptorSet descriptor=entry->descriptor; mq_vk_destroy_texture(entry); entry->descriptor=descriptor; if(mq_vk_bound_texture==ids[i])mq_vk_bound_texture=0u; if(ids[i]<mq_vk_next_texture)mq_vk_next_texture=ids[i]; } }
 /* Update fixed-function texture sampling state. */
-void mq_vulkan_tex_parameter_i(mq_u32 target, mq_u32 name, mq_i32 value) { mq_vk_texture_t *texture; (void)target; if(mq_vk_bound_texture>=MQ_VK_MAX_TEXTURES)return; texture=mq_vk_bound_texture==0u?&mq_vk_white_texture:&mq_vk_textures[mq_vk_bound_texture]; if(name==MQ_GL_TEXTURE_MIN_FILTER)texture->min_filter=value;else if(name==MQ_GL_TEXTURE_MAG_FILTER)texture->mag_filter=value;else if(name==MQ_GL_TEXTURE_WRAP_S)texture->wrap_s=value;else if(name==MQ_GL_TEXTURE_WRAP_T)texture->wrap_t=value; if(texture->view!=VK_NULL_HANDLE){mq_vk_sampler(texture);mq_vk_update_descriptor(texture);} }
+void mq_vulkan_tex_parameter_i(mq_u32 target, mq_u32 name, mq_i32 value) { mq_vk_texture_t *texture; (void)target; if(mq_vk_bound_texture>=MQ_VK_MAX_TEXTURES)return; texture=mq_vk_bound_texture==0u?&mq_vk_white_texture:&mq_vk_textures[mq_vk_bound_texture]; if(name==MQ_GL_TEXTURE_MIN_FILTER)texture->min_filter=value;else if(name==MQ_GL_TEXTURE_MAG_FILTER)texture->mag_filter=value;else if(name==MQ_GL_TEXTURE_WRAP_S)texture->wrap_s=value;else if(name==MQ_GL_TEXTURE_WRAP_T)texture->wrap_t=value;else if(name==MQ_GL_TEXTURE_MAX_ANISOTROPY_EXT){if(value<1)value=1;if(value>16)value=16;texture->anisotropy=value;} if(texture->view!=VK_NULL_HANDLE){mq_vk_sampler(texture);mq_vk_update_descriptor(texture);} }
 /* Update fixed-function texture sampling state. */
 void mq_vulkan_tex_env_i(mq_u32 target, mq_u32 name, mq_i32 value) { (void)target; if(name==MQ_GL_TEXTURE_ENV_MODE)mq_vk_texture_environment=value; }
 /* Return the source pixel stride for the selected format. */

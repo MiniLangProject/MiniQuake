@@ -339,6 +339,7 @@ const GL_TEXTURE1_SGIS = 0x835F
 const GL_LUMINANCE = 0x1909
 const GL_TEXTURE_WRAP_S = 0x2802
 const GL_TEXTURE_WRAP_T = 0x2803
+const GL_TEXTURE_MAX_ANISOTROPY_EXT = 0x84FE
 const GL_REPEAT = 0x2901
 const GL_CLAMP = 0x2900
 const GL_TEXTURE_ENV = 0x2300
@@ -447,6 +448,13 @@ end function
 function uploadLuminanceSubImage(x, y, width, height, pixels)
   if diagnosticTraceEnabled and traceCommand("upload_luminance_subimage", [x, y, width, height]) then return void end if
   native.glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_LUMINANCE, GL_UNSIGNED_BYTE, pixels)
+end function
+
+// Upload an rgba rectangle into an existing texture. Colored lightmap pages
+// use this path while the original scalar atlas keeps its luminance command.
+function uploadRgbaSubImage(x, y, width, height, pixels)
+  if diagnosticTraceEnabled and traceCommand("upload_rgba_subimage", [x, y, width, height]) then return void end if
+  native.glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels)
 end function
 
 // Read and validate pixels rgba.

@@ -38,6 +38,11 @@ aliasShadows = false
 aliasShadowQuality = 1
 aliasNoColors = false
 aliasDoubleEyes = true
+aliasPoseInterpolation = false
+aliasPosePrevious = []
+aliasPoseCurrent = []
+aliasPoseModels = []
+aliasPoseChangeTimes = []
 aliasShadeCacheValid = []
 aliasShadeCacheStamp = []
 aliasShadeCacheModel = []
@@ -81,6 +86,17 @@ function resetAliasShadeCache()
   return true
 end function
 
+// Reset per-entity MDL pose history at every map/renderer transition.
+function resetAliasPoseCache()
+  global aliasPosePrevious, aliasPoseCurrent, aliasPoseModels, aliasPoseChangeTimes
+  count = c.MAX_EDICTS + 1
+  aliasPosePrevious = arrayutil.makeEmptyArray(count)
+  aliasPoseCurrent = arrayutil.makeEmptyArray(count)
+  aliasPoseModels = arrayutil.makeEmptyArray(count)
+  aliasPoseChangeTimes = arrayutil.makeFilledArray(count, 0.0)
+  return true
+end function
+
 // Update subsystem configuration for configure alias rendering.
 function ConfigureAliasRendering(smoothModels, affineModels, shadows, noColors, doubleEyes)
   global aliasSmoothModels, aliasAffineModels, aliasShadows, aliasNoColors, aliasDoubleEyes
@@ -93,6 +109,14 @@ function ConfigureAliasRendering(smoothModels, affineModels, shadows, noColors, 
     aliasSmoothModels, aliasAffineModels, aliasShadows,
     aliasNoColors, aliasDoubleEyes,
   ]
+end function
+
+// Enable or disable temporal interpolation between consecutive MDL poses.
+function ConfigureModelInterpolation(enabled)
+  global aliasPoseInterpolation
+  if aliasPoseInterpolation != enabled then resetAliasPoseCache() end if
+  aliasPoseInterpolation = enabled
+  return aliasPoseInterpolation
 end function
 
 // Provide alias rendering configuration behavior for the active subsystem.
@@ -211,6 +235,7 @@ function create(filesystem, palette, modelPrecache)
   global renderModelRegistry, externalBrushRendererRoots, externalBrushRendererNames
   aliasMesh.clearCaches()
   resetAliasShadeCache()
+  resetAliasPoseCache()
   renderModelRegistry = modelRegistry.Mod_Init(modelRegistry.create(), void)
   externalBrushRendererRoots = []
   externalBrushRendererNames = []
@@ -433,6 +458,45 @@ function aliasFrame(source, frameNumber, time)
   return set.frames[0]
 end function
 
+// Return [previous pose, current pose, blend fraction] for one render entity.
+// Networked Quake changes MDL frame numbers at the 10 Hz server cadence; this
+// short history removes visible pose stepping without changing simulation.
+function aliasPoseBlend(source, entity, currentFrame, time, viewModel)
+  if not aliasPoseInterpolation or currentFrame is void then return [currentFrame, currentFrame, 1.0] end if
+  slot = entity.number
+  if viewModel then slot = c.MAX_EDICTS end if
+  if slot <= 0 or slot > c.MAX_EDICTS then return [currentFrame, currentFrame, 1.0] end if
+  cached = aliasPoseCurrent[slot]
+  cachedModel = aliasPoseModels[slot]
+  modelChanged = cachedModel is void or nativeRawValue(cachedModel) != nativeRawValue(source)
+  if modelChanged or cached is void or time < aliasPoseChangeTimes[slot] then
+    // Root the model object so a compacting GC updates this cache entry and
+    // does not create a one-frame interpolation reset after collection.
+    aliasPoseModels[slot] = source
+    aliasPosePrevious[slot] = currentFrame
+    aliasPoseCurrent[slot] = currentFrame
+    aliasPoseChangeTimes[slot] = time
+    return [currentFrame, currentFrame, 1.0]
+  end if
+  if nativeRawValue(cached) != nativeRawValue(currentFrame) then
+    aliasPosePrevious[slot] = cached
+    aliasPoseCurrent[slot] = currentFrame
+    aliasPoseChangeTimes[slot] = time
+  end if
+  duration = 0.1
+  frameIndex = entity.frame
+  if frameIndex >= 0 and frameIndex < len(source.frames) then
+    frameSet = source.frames[frameIndex]
+    if frameSet.grouped and len(frameSet.intervals) > 0 and frameSet.intervals[0] > 0.0 then duration = frameSet.intervals[0] end if
+  end if
+  fraction = (time - aliasPoseChangeTimes[slot]) / duration
+  if fraction < 0.0 then fraction = 0.0 end if
+  if fraction > 1.0 then fraction = 1.0 end if
+  previous = aliasPosePrevious[slot]
+  if previous is void then previous = aliasPoseCurrent[slot]; fraction = 1.0 end if
+  return [previous, aliasPoseCurrent[slot], fraction]
+end function
+
 // Provide sprite frame and texture behavior for the active subsystem.
 function spriteFrameAndTexture(model, entity, time)
   source = model.spriteModel
@@ -605,6 +669,10 @@ function drawAlias(renderer, model, entity, time, viewModel, enhancedOverlay)
   source = model.aliasModel
   frame = aliasFrame(source, entity.frame, time)
   if frame is void then return 0 end if
+  pose = aliasPoseBlend(source, entity, frame, time, viewModel)
+  previousFrame = pose[0]
+  frame = pose[1]
+  poseFraction = pose[2]
   // R_DrawAliasModel starts from texture unit zero even when the world pass
   // used multitexturing immediately before the entity pass.
   worldRenderer.GL_DisableMultitexture()
@@ -632,7 +700,11 @@ function drawAlias(renderer, model, entity, time, viewModel, enhancedOverlay)
   doubleEyes = model.name == "progs/eyes.mdl" and aliasDoubleEyes
   drawn = 0
   if not gl.traceEnabled() and gl.nativeBatchAvailable() then
-    drawn = aliasMesh.drawAliasModelBatch(source, frame, mesh, entity.origin, entity.angles, doubleEyes, aliasSmoothModels)
+    if poseFraction < 1.0 and previousFrame is not void and nativeRawValue(previousFrame) != nativeRawValue(frame) then
+      drawn = aliasMesh.drawAliasModelBatchLerped(source, previousFrame, frame, poseFraction, mesh, entity.origin, entity.angles, doubleEyes, aliasSmoothModels)
+    else
+      drawn = aliasMesh.drawAliasModelBatch(source, frame, mesh, entity.origin, entity.angles, doubleEyes, aliasSmoothModels)
+    end if
   else
     gl.pushMatrix()
     gl.translate(entity.origin.x, entity.origin.y, entity.origin.z)
@@ -651,7 +723,11 @@ function drawAlias(renderer, model, entity, time, viewModel, enhancedOverlay)
     gl.enable(gl.GL_CULL_FACE)
     if aliasSmoothModels then gl.shadeModel(gl.GL_SMOOTH) end if
     gl.textureEnvironment(gl.GL_MODULATE)
-    drawn = aliasMesh.drawAliasMesh(source, frame, mesh)
+    if poseFraction < 1.0 and previousFrame is not void and nativeRawValue(previousFrame) != nativeRawValue(frame) then
+      drawn = aliasMesh.drawAliasMeshLerped(source, previousFrame, frame, poseFraction, mesh)
+    else
+      drawn = aliasMesh.drawAliasMesh(source, frame, mesh)
+    end if
     gl.textureEnvironment(gl.GL_REPLACE)
     gl.shadeModel(gl.GL_FLAT)
     gl.color(255, 255, 255, 255)

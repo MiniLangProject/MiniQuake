@@ -21,6 +21,24 @@
 #define MQ_RENDER_VULKAN 2
 static mq_i32 mq_render_backend_value = MQ_RENDER_OPENGL;
 
+/* Find one complete token in an OpenGL extension string without CRT helpers. */
+static mq_i32 mq_gl_extension_present(const char *extensions, const char *name) {
+    const char *start;
+    if (extensions == (const char *)0 || name == (const char *)0 || *name == 0) return 0;
+    start = extensions;
+    while (*start != 0) {
+        const char *left;
+        const char *right;
+        while (*start == ' ') ++start;
+        left = start;
+        right = name;
+        while (*left != 0 && *left != ' ' && *right != 0 && *left == *right) { ++left; ++right; }
+        if (*right == 0 && (*left == 0 || *left == ' ')) return 1;
+        while (*start != 0 && *start != ' ') ++start;
+    }
+    return 0;
+}
+
 /* Wait for readiness on the requested socket set. */
 MQ_EXPORT mq_i32 mq_render_select(mq_i32 backend) {
     if (backend != MQ_RENDER_OPENGL && backend != MQ_RENDER_DIRECT3D9 && backend != MQ_RENDER_VULKAN) return 0;
@@ -439,6 +457,7 @@ MQ_DLLIMPORT BOOL MQ_WINAPI ClientToScreen(HWND window, MQ_POINT *point);
 MQ_DLLIMPORT mq_i32 MQ_WINAPI ShowCursor(BOOL show);
 MQ_DLLIMPORT HCURSOR MQ_WINAPI LoadCursorW(HINSTANCE instance, LPCWSTR cursor_name);
 MQ_DLLIMPORT HICON MQ_WINAPI LoadIconW(HINSTANCE instance, LPCWSTR icon_name);
+MQ_DLLIMPORT HANDLE MQ_WINAPI LoadImageW(HINSTANCE instance, LPCWSTR name, UINT type, mq_i32 width, mq_i32 height, UINT flags);
 MQ_DLLIMPORT HDC MQ_WINAPI GetDC(HWND window);
 MQ_DLLIMPORT mq_i32 MQ_WINAPI ReleaseDC(HWND window, HDC dc);
 MQ_DLLIMPORT HWND MQ_WINAPI SetCapture(HWND window);
@@ -899,8 +918,8 @@ static mq_i32 mq_gl_create_world_program(void) {
         "#version 120\n"
         "uniform sampler2D mq_base;uniform sampler2D mq_light;"
         "void main(){vec4 b=texture2D(mq_base,gl_TexCoord[0].st);"
-        "float l=texture2D(mq_light,gl_TexCoord[1].st).r;"
-        "gl_FragColor=vec4(b.rgb*(1.0-l),b.a);}\n";
+        "vec3 l=texture2D(mq_light,gl_TexCoord[1].st).rgb;"
+        "gl_FragColor=vec4(b.rgb*(vec3(1.0)-l),b.a);}\n";
     mq_u32 vertex_shader;
     mq_u32 fragment_shader;
     mq_u32 program;
@@ -1486,7 +1505,7 @@ static mq_alias_vertex_t mq_alias_command_vertices[MQ_ALIAS_COMMAND_VERTICES];
 static mq_alias_vertex_t mq_alias_triangle_vertices[MQ_ALIAS_TRIANGLE_VERTICES];
 #define MQ_PARTICLE_BATCH_MAX 8192u
 #define MQ_PARTICLE_RECORD_BYTES 16u
-static mq_alias_vertex_t mq_particle_vertices[MQ_PARTICLE_BATCH_MAX * 3u];
+static mq_alias_vertex_t mq_particle_vertices[MQ_PARTICLE_BATCH_MAX * 6u];
 static mq_u64 mq_alias_vbo_hash[MQ_ALIAS_VBO_CACHE_MAX];
 static mq_u64 mq_alias_vbo_signature[MQ_ALIAS_VBO_CACHE_MAX];
 static mq_u32 mq_alias_vbo_bytes[MQ_ALIAS_VBO_CACHE_MAX];
@@ -1951,6 +1970,10 @@ MQ_EXPORT void mq_gl_static_geometry_clear(void) {
 #define MQ_KEY_EVENT 0x0001u
 #define MQ_SM_CXSCREEN 0
 #define MQ_SM_CYSCREEN 1
+#define MQ_SM_CXICON 11
+#define MQ_SM_CYICON 12
+#define MQ_SM_CXSMICON 49
+#define MQ_SM_CYSMICON 50
 #define MQ_ENUM_CURRENT_SETTINGS 0xFFFFFFFFu
 #define MQ_CDS_FULLSCREEN 0x00000004u
 #define MQ_CDS_TEST 0x00000002u
@@ -1966,6 +1989,9 @@ MQ_EXPORT void mq_gl_static_geometry_clear(void) {
 #define MQ_MB_SETFOREGROUND 0x00010000u
 #define MQ_IDC_ARROW ((LPCWSTR)(ULONG_PTR)32512u)
 #define MQ_IDI_APPLICATION ((LPCWSTR)(ULONG_PTR)32512u)
+#define MQ_IDI_MINIQUAKE ((LPCWSTR)(ULONG_PTR)1u)
+#define MQ_IMAGE_ICON 1u
+#define MQ_LR_SHARED 0x00008000u
 #define MQ_AF_INET 2
 #define MQ_SOCK_DGRAM 2
 #define MQ_IPPROTO_UDP 17
@@ -2679,6 +2705,8 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
     MQ_WNDCLASSEXW window_class;
     MQ_PIXELFORMATDESCRIPTOR pixel_format;
     MQ_RECT rectangle;
+    HICON large_icon;
+    HICON small_icon;
     DWORD style;
     DWORD ex_style;
     mq_i32 window_x;
@@ -2704,18 +2732,42 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
     }
 
     if (!mq_class_registered) {
+        /* Load both Windows icon roles from the executable's multi-resolution
+         * icon group. The generic application icon remains a safe fallback for
+         * diagnostic builds produced with build.ps1 -SkipIcon. */
+        large_icon = (HICON)LoadImageW(
+            mq_instance,
+            MQ_IDI_MINIQUAKE,
+            MQ_IMAGE_ICON,
+            GetSystemMetrics(MQ_SM_CXICON),
+            GetSystemMetrics(MQ_SM_CYICON),
+            MQ_LR_SHARED);
+        if (large_icon == MQ_NULL) {
+            large_icon = LoadIconW(MQ_NULL, MQ_IDI_APPLICATION);
+        }
+        small_icon = (HICON)LoadImageW(
+            mq_instance,
+            MQ_IDI_MINIQUAKE,
+            MQ_IMAGE_ICON,
+            GetSystemMetrics(MQ_SM_CXSMICON),
+            GetSystemMetrics(MQ_SM_CYSMICON),
+            MQ_LR_SHARED);
+        if (small_icon == MQ_NULL) {
+            small_icon = large_icon;
+        }
+
         window_class.cbSize = (UINT)sizeof(window_class);
         window_class.style = MQ_CS_OWNDC | MQ_CS_HREDRAW | MQ_CS_VREDRAW;
         window_class.lpfnWndProc = mq_window_proc;
         window_class.cbClsExtra = 0;
         window_class.cbWndExtra = 0;
         window_class.hInstance = mq_instance;
-        window_class.hIcon = LoadIconW(MQ_NULL, MQ_IDI_APPLICATION);
+        window_class.hIcon = large_icon;
         window_class.hCursor = LoadCursorW(MQ_NULL, MQ_IDC_ARROW);
         window_class.hbrBackground = MQ_NULL;
         window_class.lpszMenuName = MQ_NULL;
         window_class.lpszClassName = mq_window_class_name;
-        window_class.hIconSm = window_class.hIcon;
+        window_class.hIconSm = small_icon;
         if (RegisterClassExW(&window_class) == 0) {
             mq_restore_requested_display_mode();
             return MQ_NULL;
@@ -4651,7 +4703,19 @@ MQ_EXPORT void mq_gl_gen_textures(mq_i32 count, void *texture_ids) { if (mq_rend
 /* Release resources owned by delete textures. */
 MQ_EXPORT void mq_gl_delete_textures(mq_i32 count, const void *texture_ids) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_delete_textures(count, texture_ids); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_delete_textures(count, texture_ids); return; } glDeleteTextures(count, (const mq_u32 *)texture_ids); }
 /* Update fixed-function texture sampling state. */
-MQ_EXPORT void mq_gl_tex_parameter_i(mq_u32 target, mq_u32 name, mq_i32 value) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_tex_parameter_i(target, name, value); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_tex_parameter_i(target, name, value); return; } glTexParameteri(target, name, value); }
+MQ_EXPORT void mq_gl_tex_parameter_i(mq_u32 target, mq_u32 name, mq_i32 value) {
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_tex_parameter_i(target, name, value); return; }
+    if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_tex_parameter_i(target, name, value); return; }
+    if (name == 0x84FEu /* GL_TEXTURE_MAX_ANISOTROPY_EXT */) {
+        const char *extensions = (const char *)glGetString(0x1F03u /* GL_EXTENSIONS */);
+        float maximum = 1.0f;
+        if (!mq_gl_extension_present(extensions, "GL_EXT_texture_filter_anisotropic")) return;
+        glGetFloatv(0x84FFu /* GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT */, &maximum);
+        if (value < 1) value = 1;
+        if ((float)value > maximum) value = (mq_i32)maximum;
+    }
+    glTexParameteri(target, name, value);
+}
 /* Update fixed-function texture sampling state. */
 MQ_EXPORT void mq_gl_tex_env_i(mq_u32 target, mq_u32 name, mq_i32 value) { if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) { mq_d3d9_tex_env_i(target, name, value); return; } if (mq_render_backend_value == MQ_RENDER_VULKAN) { mq_vulkan_tex_env_i(target, name, value); return; } glTexEnvi(target, name, value); }
 /* Allocate and upload a complete texture image. */
@@ -4948,6 +5012,119 @@ static mq_i32 mq_alias_build_triangles(
     return 0;
 }
 
+/* Expand two matching MDL command streams while interpolating packed poses. */
+static mq_i32 mq_alias_build_triangles_lerp(
+    const mq_u8 *previous_data, mq_u32 previous_byte_count,
+    const mq_u8 *current_data, mq_u32 current_byte_count,
+    float fraction,
+    const mq_u8 *shade_dots, mq_u32 shade_dot_count, float shade_light,
+    mq_u32 *vertex_count_out, mq_i32 *triangle_count_out
+) {
+    mq_u32 previous_offset = 0u;
+    mq_u32 current_offset = 0u;
+    mq_u32 output_count = 0u;
+    mq_i32 triangle_count = 0;
+    if (fraction < 0.0f) fraction = 0.0f;
+    if (fraction > 1.0f) fraction = 1.0f;
+    while (previous_offset + 4u <= previous_byte_count && current_offset + 4u <= current_byte_count) {
+        mq_i32 previous_count;
+        mq_i32 current_count;
+        mq_u32 count;
+        mq_u32 vertex;
+        mq_u32 triangle;
+        memcpy(&previous_count, previous_data + previous_offset, 4u);
+        memcpy(&current_count, current_data + current_offset, 4u);
+        previous_offset += 4u;
+        current_offset += 4u;
+        if (previous_count != current_count) return 0;
+        if (current_count == 0) {
+            *vertex_count_out = output_count;
+            *triangle_count_out = triangle_count;
+            return output_count > 0u;
+        }
+        if (current_count == (-2147483647 - 1)) return 0;
+        count = current_count < 0 ? (mq_u32)(-current_count) : (mq_u32)current_count;
+        if (count < 3u || count > MQ_ALIAS_COMMAND_VERTICES ||
+            count > (previous_byte_count - previous_offset) / 12u ||
+            count > (current_byte_count - current_offset) / 12u ||
+            (count - 2u) * 3u > MQ_ALIAS_TRIANGLE_VERTICES - output_count) return 0;
+        for (vertex = 0u; vertex < count; ++vertex) {
+            const mq_u8 *previous = previous_data + previous_offset;
+            const mq_u8 *current = current_data + current_offset;
+            mq_u32 s_bits;
+            mq_u32 t_bits;
+            mq_u32 normal = current[11u];
+            float light = shade_light;
+            mq_i32 color_value;
+            mq_alias_vertex_t *item = &mq_alias_command_vertices[vertex];
+            memcpy(&s_bits, current, 4u);
+            memcpy(&t_bits, current + 4u, 4u);
+            if (normal < shade_dot_count) {
+                mq_u32 dot_bits;
+                memcpy(&dot_bits, shade_dots + normal * 4u, 4u);
+                light = mq_bits_to_float(dot_bits) * shade_light;
+            }
+            color_value = (mq_i32)(light * 255.0f);
+            if (color_value < 0) color_value = 0;
+            if (color_value > 255) color_value = 255;
+            item->s = mq_bits_to_float(s_bits);
+            item->t = mq_bits_to_float(t_bits);
+            item->r = item->g = item->b = (mq_u8)color_value;
+            item->a = 255u;
+            item->x = (float)previous[8u] + ((float)current[8u] - (float)previous[8u]) * fraction;
+            item->y = (float)previous[9u] + ((float)current[9u] - (float)previous[9u]) * fraction;
+            item->z = (float)previous[10u] + ((float)current[10u] - (float)previous[10u]) * fraction;
+            previous_offset += 12u;
+            current_offset += 12u;
+        }
+        for (triangle = 0u; triangle < count - 2u; ++triangle) {
+            mq_u32 indices[3];
+            mq_u32 corner;
+            if (current_count < 0) {
+                indices[0] = 0u; indices[1] = triangle + 1u; indices[2] = triangle + 2u;
+            } else if ((triangle & 1u) == 0u) {
+                indices[0] = triangle; indices[1] = triangle + 1u; indices[2] = triangle + 2u;
+            } else {
+                indices[0] = triangle + 1u; indices[1] = triangle; indices[2] = triangle + 2u;
+            }
+            for (corner = 0u; corner < 3u; ++corner) {
+                mq_alias_triangle_vertices[output_count++] = mq_alias_command_vertices[indices[corner]];
+            }
+            triangle_count += 1;
+        }
+    }
+    return 0;
+}
+
+/* Submit a transient interpolated alias stream on every supported backend. */
+static mq_i32 mq_gl_draw_alias_batch_lerp(
+    const mq_u8 *previous_data, mq_u32 previous_byte_count,
+    const mq_u8 *current_data, mq_u32 current_byte_count, float fraction,
+    const mq_u8 *shade_dots, mq_u32 shade_dot_count, float shade_light
+) {
+    mq_u32 vertex_count = 0u;
+    mq_i32 triangle_count = 0;
+    if (previous_data == MQ_NULL || current_data == MQ_NULL || shade_dots == MQ_NULL) return 0;
+    if (!mq_alias_build_triangles_lerp(
+            previous_data, previous_byte_count, current_data, current_byte_count,
+            fraction, shade_dots, shade_dot_count, shade_light,
+            &vertex_count, &triangle_count)) return 0;
+    if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
+        if (mq_d3d9_draw_interleaved_t2f_c4ub_v3f(mq_alias_triangle_vertices, vertex_count) <= 0) return 0;
+    } else if (mq_render_backend_value == MQ_RENDER_VULKAN) {
+        if (mq_vulkan_draw_interleaved_t2f_c4ub_v3f(mq_alias_triangle_vertices, vertex_count) <= 0) return 0;
+    } else {
+        if (mq_valid_wgl_proc((const void *)mq_gl_client_active_texture_value)) mq_gl_client_active_texture_value(0x84C0u);
+        if (mq_valid_wgl_proc((const void *)mq_gl_bind_buffer_value)) mq_gl_bind_buffer_value(0x8892u, 0u);
+        glInterleavedArrays(0x2A29u /* GL_T2F_C4UB_V3F */, (mq_i32)sizeof(mq_alias_vertex_t), mq_alias_triangle_vertices);
+        glDrawArrays(0x0004u /* GL_TRIANGLES */, 0, (mq_i32)vertex_count);
+        glDisableClientState(0x8078u);
+        glDisableClientState(0x8076u);
+        glDisableClientState(0x8074u);
+    }
+    return triangle_count;
+}
+
 /* Manage cached native geometry for the renderer fast path. */
 static void mq_alias_draw_vbo(mq_u32 cache_index) {
     if (mq_valid_wgl_proc((const void *)mq_gl_client_active_texture_value)) {
@@ -4963,7 +5140,7 @@ static void mq_alias_draw_vbo(mq_u32 cache_index) {
 }
 
 /* Decode and draw all GLQuake particles through one MiniLang/native crossing. */
-MQ_EXPORT mq_i32 mq_gl_draw_particle_batch(
+static mq_i32 mq_gl_draw_particle_batch_internal(
     const mq_u8 *data,
     mq_u32 byte_count,
     mq_u32 view_origin_x_bits,
@@ -4977,10 +5154,12 @@ MQ_EXPORT mq_i32 mq_gl_draw_particle_batch(
     mq_u32 view_up_z_bits,
     mq_u32 view_right_x_bits,
     mq_u32 view_right_y_bits,
-    mq_u32 view_right_z_bits
+    mq_u32 view_right_z_bits,
+    mq_i32 styled
 ) {
     mq_u32 particle_count;
     mq_u32 particle;
+    mq_u32 vertex_count;
     float view_origin_x = mq_bits_to_float(view_origin_x_bits);
     float view_origin_y = mq_bits_to_float(view_origin_y_bits);
     float view_origin_z = mq_bits_to_float(view_origin_z_bits);
@@ -5017,33 +5196,47 @@ MQ_EXPORT mq_i32 mq_gl_draw_particle_batch(
             (origin_y - view_origin_y) * view_forward_y +
             (origin_z - view_origin_z) * view_forward_z;
         float scale = distance >= 20.0f ? 1.0f + distance * 0.004f : 1.0f;
+        mq_u32 vertices_per_particle = styled ? 6u : 3u;
         mq_u32 vertex;
-        for (vertex = 0u; vertex < 3u; ++vertex) {
-            mq_alias_vertex_t *output = &mq_particle_vertices[particle * 3u + vertex];
-            output->s = vertex == 1u ? 1.0f : 0.0f;
-            output->t = vertex == 2u ? 1.0f : 0.0f;
+        for (vertex = 0u; vertex < vertices_per_particle; ++vertex) {
+            mq_alias_vertex_t *output = &mq_particle_vertices[particle * vertices_per_particle + vertex];
             output->r = record[0];
             output->g = record[1];
             output->b = record[2];
             output->a = record[3];
-            output->x = origin_x;
-            output->y = origin_y;
-            output->z = origin_z;
-            if (vertex == 1u) {
-                output->x += scale * scaled_up_x;
-                output->y += scale * scaled_up_y;
-                output->z += scale * scaled_up_z;
-            } else if (vertex == 2u) {
-                output->x += scale * scaled_right_x;
-                output->y += scale * scaled_right_y;
-                output->z += scale * scaled_right_z;
+            if (styled) {
+                static const mq_u8 corners[6] = {0u, 1u, 2u, 0u, 2u, 3u};
+                mq_u32 corner = corners[vertex];
+                float right_sign = (corner == 1u || corner == 2u) ? 1.0f : -1.0f;
+                float up_sign = corner >= 2u ? 1.0f : -1.0f;
+                output->s = right_sign > 0.0f ? 1.0f : 0.0f;
+                output->t = up_sign > 0.0f ? 0.0f : 1.0f;
+                output->x = origin_x + scale * (scaled_right_x * right_sign + scaled_up_x * up_sign);
+                output->y = origin_y + scale * (scaled_right_y * right_sign + scaled_up_y * up_sign);
+                output->z = origin_z + scale * (scaled_right_z * right_sign + scaled_up_z * up_sign);
+            } else {
+                output->s = vertex == 1u ? 1.0f : 0.0f;
+                output->t = vertex == 2u ? 1.0f : 0.0f;
+                output->x = origin_x;
+                output->y = origin_y;
+                output->z = origin_z;
+                if (vertex == 1u) {
+                    output->x += scale * scaled_up_x;
+                    output->y += scale * scaled_up_y;
+                    output->z += scale * scaled_up_z;
+                } else if (vertex == 2u) {
+                    output->x += scale * scaled_right_x;
+                    output->y += scale * scaled_right_y;
+                    output->z += scale * scaled_right_z;
+                }
             }
         }
     }
+    vertex_count = particle_count * (styled ? 6u : 3u);
     if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {
-        if (mq_d3d9_draw_interleaved_t2f_c4ub_v3f(mq_particle_vertices, particle_count * 3u) <= 0) return 0;
+        if (mq_d3d9_draw_interleaved_t2f_c4ub_v3f(mq_particle_vertices, vertex_count) <= 0) return 0;
     } else if (mq_render_backend_value == MQ_RENDER_VULKAN) {
-        if (mq_vulkan_draw_interleaved_t2f_c4ub_v3f(mq_particle_vertices, particle_count * 3u) <= 0) return 0;
+        if (mq_vulkan_draw_interleaved_t2f_c4ub_v3f(mq_particle_vertices, vertex_count) <= 0) return 0;
     } else {
         if (mq_valid_wgl_proc((const void *)mq_gl_client_active_texture_value)) {
             mq_gl_client_active_texture_value(0x84C0u /* GL_TEXTURE0 */);
@@ -5052,12 +5245,44 @@ MQ_EXPORT mq_i32 mq_gl_draw_particle_batch(
             mq_gl_bind_buffer_value(0x8892u /* GL_ARRAY_BUFFER */, 0u);
         }
         glInterleavedArrays(0x2A29u /* GL_T2F_C4UB_V3F */, (mq_i32)sizeof(mq_alias_vertex_t), mq_particle_vertices);
-        glDrawArrays(0x0004u /* GL_TRIANGLES */, 0, (mq_i32)(particle_count * 3u));
+        glDrawArrays(0x0004u /* GL_TRIANGLES */, 0, (mq_i32)vertex_count);
         glDisableClientState(0x8078u /* GL_TEXTURE_COORD_ARRAY */);
         glDisableClientState(0x8076u /* GL_COLOR_ARRAY */);
         glDisableClientState(0x8074u /* GL_VERTEX_ARRAY */);
     }
     return (mq_i32)particle_count;
+}
+
+/* Decode and draw original GLQuake triangular particles. */
+MQ_EXPORT mq_i32 mq_gl_draw_particle_batch(
+    const mq_u8 *data, mq_u32 byte_count,
+    mq_u32 view_origin_x_bits, mq_u32 view_origin_y_bits, mq_u32 view_origin_z_bits,
+    mq_u32 view_forward_x_bits, mq_u32 view_forward_y_bits, mq_u32 view_forward_z_bits,
+    mq_u32 view_up_x_bits, mq_u32 view_up_y_bits, mq_u32 view_up_z_bits,
+    mq_u32 view_right_x_bits, mq_u32 view_right_y_bits, mq_u32 view_right_z_bits
+) {
+    return mq_gl_draw_particle_batch_internal(
+        data, byte_count,
+        view_origin_x_bits, view_origin_y_bits, view_origin_z_bits,
+        view_forward_x_bits, view_forward_y_bits, view_forward_z_bits,
+        view_up_x_bits, view_up_y_bits, view_up_z_bits,
+        view_right_x_bits, view_right_y_bits, view_right_z_bits, 0);
+}
+
+/* Decode and draw centered soft particle quads for the Enhanced profile. */
+MQ_EXPORT mq_i32 mq_gl_draw_particle_batch_styled(
+    const mq_u8 *data, mq_u32 byte_count,
+    mq_u32 view_origin_x_bits, mq_u32 view_origin_y_bits, mq_u32 view_origin_z_bits,
+    mq_u32 view_forward_x_bits, mq_u32 view_forward_y_bits, mq_u32 view_forward_z_bits,
+    mq_u32 view_up_x_bits, mq_u32 view_up_y_bits, mq_u32 view_up_z_bits,
+    mq_u32 view_right_x_bits, mq_u32 view_right_y_bits, mq_u32 view_right_z_bits
+) {
+    return mq_gl_draw_particle_batch_internal(
+        data, byte_count,
+        view_origin_x_bits, view_origin_y_bits, view_origin_z_bits,
+        view_forward_x_bits, view_forward_y_bits, view_forward_z_bits,
+        view_up_x_bits, view_up_y_bits, view_up_z_bits,
+        view_right_x_bits, view_right_y_bits, view_right_z_bits, 1);
 }
 
 /* Submit draw alias batch geometry to the active backend command buffer. */
@@ -5348,6 +5573,91 @@ MQ_EXPORT mq_i32 mq_gl_draw_alias_model(
     triangles = mq_gl_draw_alias_batch(data, byte_count, shade_dots, shade_dot_count, shade_light_bits);
     glTexEnvi(0x2300u, 0x2200u, 0x1E01u); /* GL_REPLACE */
     glShadeModel(0x1D00u); /* GL_FLAT */
+    glColor4ub(255u, 255u, 255u, 255u);
+    glDisable(0x0B44u);
+    glPopMatrix();
+    return triangles;
+}
+
+/* Transform and draw one MDL model interpolated between two cached poses. */
+MQ_EXPORT mq_i32 mq_gl_draw_alias_model_lerp(
+    const mq_u8 *previous_data, mq_u32 previous_byte_count,
+    const mq_u8 *current_data, mq_u32 current_byte_count, mq_u32 fraction_bits,
+    const mq_u8 *shade_dots, mq_u32 shade_dot_count, mq_u32 shade_light_bits,
+    mq_u32 origin_x, mq_u32 origin_y, mq_u32 origin_z,
+    mq_u32 angle_x, mq_u32 angle_y, mq_u32 angle_z,
+    mq_u32 scale_origin_x, mq_u32 scale_origin_y, mq_u32 scale_origin_z,
+    mq_u32 scale_x, mq_u32 scale_y, mq_u32 scale_z,
+    mq_i32 double_eyes, mq_i32 smooth
+) {
+    float sox = mq_bits_to_float(scale_origin_x);
+    float soy = mq_bits_to_float(scale_origin_y);
+    float soz = mq_bits_to_float(scale_origin_z);
+    float sx = mq_bits_to_float(scale_x);
+    float sy = mq_bits_to_float(scale_y);
+    float sz = mq_bits_to_float(scale_z);
+    float fraction = mq_bits_to_float(fraction_bits);
+    float shade_light = mq_bits_to_float(shade_light_bits);
+    mq_i32 triangles;
+    if (mq_render_backend_value != MQ_RENDER_OPENGL) {
+        void (*push_matrix)(void) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_push_matrix : mq_vulkan_push_matrix;
+        void (*pop_matrix)(void) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_pop_matrix : mq_vulkan_pop_matrix;
+        void (*translate)(mq_u32,mq_u32,mq_u32) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_translate : mq_vulkan_translate;
+        void (*rotate)(mq_u32,mq_u32,mq_u32,mq_u32) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_rotate : mq_vulkan_rotate;
+        void (*scale)(mq_u32,mq_u32,mq_u32) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_scale : mq_vulkan_scale;
+        void (*cull_face)(mq_u32) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_cull_face : mq_vulkan_cull_face;
+        void (*enable)(mq_u32) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_enable : mq_vulkan_enable;
+        void (*disable)(mq_u32) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_disable : mq_vulkan_disable;
+        void (*shade_model)(mq_u32) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_shade_model : mq_vulkan_shade_model;
+        void (*tex_env)(mq_u32,mq_u32,mq_i32) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_tex_env_i : mq_vulkan_tex_env_i;
+        void (*color)(mq_u32,mq_u32,mq_u32,mq_u32) = mq_render_backend_value == MQ_RENDER_DIRECT3D9 ? mq_d3d9_color4ub : mq_vulkan_color4ub;
+        push_matrix();
+        translate(origin_x, origin_y, origin_z);
+        rotate(angle_y, mq_float_to_bits(0.0f), mq_float_to_bits(0.0f), mq_float_to_bits(1.0f));
+        rotate(mq_float_to_bits(-mq_bits_to_float(angle_x)), mq_float_to_bits(0.0f), mq_float_to_bits(1.0f), mq_float_to_bits(0.0f));
+        rotate(angle_z, mq_float_to_bits(1.0f), mq_float_to_bits(0.0f), mq_float_to_bits(0.0f));
+        if (double_eyes) {
+            translate(scale_origin_x, scale_origin_y, mq_float_to_bits(soz - 30.0f));
+            scale(mq_float_to_bits(sx * 2.0f), mq_float_to_bits(sy * 2.0f), mq_float_to_bits(sz * 2.0f));
+        } else {
+            translate(scale_origin_x, scale_origin_y, scale_origin_z);
+            scale(scale_x, scale_y, scale_z);
+        }
+        cull_face(0x0404u);
+        enable(0x0B44u);
+        if (smooth) shade_model(0x1D01u);
+        tex_env(0x2300u, 0x2200u, 0x2100u);
+        triangles = mq_gl_draw_alias_batch_lerp(
+            previous_data, previous_byte_count, current_data, current_byte_count,
+            fraction, shade_dots, shade_dot_count, shade_light);
+        tex_env(0x2300u, 0x2200u, 0x1E01u);
+        shade_model(0x1D00u);
+        color(255u, 255u, 255u, 255u);
+        disable(0x0B44u);
+        pop_matrix();
+        return triangles;
+    }
+    glPushMatrix();
+    glTranslatef(mq_bits_to_float(origin_x), mq_bits_to_float(origin_y), mq_bits_to_float(origin_z));
+    glRotatef(mq_bits_to_float(angle_y), 0.0f, 0.0f, 1.0f);
+    glRotatef(-mq_bits_to_float(angle_x), 0.0f, 1.0f, 0.0f);
+    glRotatef(mq_bits_to_float(angle_z), 1.0f, 0.0f, 0.0f);
+    if (double_eyes) {
+        glTranslatef(sox, soy, soz - 30.0f);
+        glScalef(sx * 2.0f, sy * 2.0f, sz * 2.0f);
+    } else {
+        glTranslatef(sox, soy, soz);
+        glScalef(sx, sy, sz);
+    }
+    glCullFace(0x0404u);
+    glEnable(0x0B44u);
+    if (smooth) glShadeModel(0x1D01u);
+    glTexEnvi(0x2300u, 0x2200u, 0x2100u);
+    triangles = mq_gl_draw_alias_batch_lerp(
+        previous_data, previous_byte_count, current_data, current_byte_count,
+        fraction, shade_dots, shade_dot_count, shade_light);
+    glTexEnvi(0x2300u, 0x2200u, 0x1E01u);
+    glShadeModel(0x1D00u);
     glColor4ub(255u, 255u, 255u, 255u);
     glDisable(0x0B44u);
     glPopMatrix();

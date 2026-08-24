@@ -225,6 +225,29 @@ function WaterTexCoords(originalS, originalT, realtime)
   return [textureS, textureT]
 end function
 
+// Interpolate adjacent entries in GLQuake's canonical turbulence table. This
+// preserves the original wave shape while removing visible 256-step texture
+// coordinate jumps in the optional Enhanced presentation.
+function InterpolatedTurb(indexValue)
+  base = native.trunc(indexValue)
+  if indexValue < base then base = base - 1 end if
+  fraction = warpFloat(indexValue - base)
+  first = turbsin[base & 255]
+  second = turbsin[(base + 1) & 255]
+  return warpFloat(first + (second - first) * fraction)
+end function
+
+// Return smoothly interpolated water coordinates for the Enhanced profile.
+function SmoothWaterTexCoords(originalS, originalT, realtime)
+  originalS = warpFloat(originalS)
+  originalT = warpFloat(originalT)
+  sPhase = warpFloat((originalT * 0.125 + realtime) * TURBSCALE)
+  tPhase = warpFloat((originalS * 0.125 + realtime) * TURBSCALE)
+  textureS = warpFloat((originalS + InterpolatedTurb(sPhase)) / 64.0)
+  textureT = warpFloat((originalT + InterpolatedTurb(tPhase)) / 64.0)
+  return [textureS, textureT]
+end function
+
 // Add water polys to the destination state.
 function EmitWaterPolys(polygons, realtime)
   result = arrayutil.makeEmptyArray(len(polygons))

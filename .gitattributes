@@ -20,6 +20,7 @@
 # Generated and media files must never undergo line-ending conversion.
 *.dll binary
 *.exe binary
+*.ico binary
 *.png binary
 *.spv binary
 *.tga binary

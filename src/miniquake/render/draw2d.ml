@@ -46,6 +46,7 @@ gl_nobind = 0.0
 gl_max_size = 1024.0
 gl_picmip = 0.0
 gl_textureupscale = 0
+gl_anisotropy = 1
 gl_filter_min = gl.GL_LINEAR_MIPMAP_NEAREST
 gl_filter_max = gl.GL_LINEAR
 gl_lightmap_format = 4
@@ -306,7 +307,7 @@ end function
 
 // Update module state for draw cvars.
 function syncDrawCvars()
-  global gl_nobind, gl_max_size, gl_picmip, gl_textureupscale
+  global gl_nobind, gl_max_size, gl_picmip, gl_textureupscale, gl_anisotropy
   if drawCvars is void then return false end if
   variable = cvar.find(drawCvars, "gl_nobind")
   if variable is not void then gl_nobind = variable.value end if
@@ -316,6 +317,12 @@ function syncDrawCvars()
   if variable is not void then gl_picmip = variable.value end if
   variable = cvar.find(drawCvars, "r_textureupscale")
   if variable is not void then gl_textureupscale = textureUpscale.clampMode(variable.value) end if
+  variable = cvar.find(drawCvars, "r_anisotropy")
+  if variable is not void then
+    gl_anisotropy = native.trunc(variable.value)
+    if gl_anisotropy < 2 then gl_anisotropy = 1 end if
+    if gl_anisotropy > 16 then gl_anisotropy = 16 end if
+  end if
   return true
 end function
 
@@ -646,8 +653,11 @@ function GL_Upload32(data, width, height, mipmap, alpha)
   end while
   texels = texels + levels[0][0] * levels[0][1]
   if mipmap then
-    gl.textureParameter(gl.GL_TEXTURE_MIN_FILTER, gl_filter_min)
+    minimumFilter = gl_filter_min
+    if gl_anisotropy > 1 then minimumFilter = gl.GL_LINEAR_MIPMAP_LINEAR end if
+    gl.textureParameter(gl.GL_TEXTURE_MIN_FILTER, minimumFilter)
     gl.textureParameter(gl.GL_TEXTURE_MAG_FILTER, gl_filter_max)
+    gl.textureParameter(gl.GL_TEXTURE_MAX_ANISOTROPY_EXT, gl_anisotropy)
   else
     gl.textureParameter(gl.GL_TEXTURE_MIN_FILTER, gl_filter_max)
     gl.textureParameter(gl.GL_TEXTURE_MAG_FILTER, gl_filter_max)
@@ -1000,6 +1010,26 @@ function Draw_TextureMode_f(arguments)
   return selected[0]
 end function
 
+// Apply the archived anisotropy level to every resident mipmapped texture.
+// This makes the Video Mode selection effective immediately without a costly
+// renderer or map restart.
+function Draw_ApplyAnisotropy()
+  syncDrawCvars()
+  minimumFilter = gl_filter_min
+  if gl_anisotropy > 1 then minimumFilter = gl.GL_LINEAR_MIPMAP_LINEAR end if
+  index = 0
+  while index < len(glTextureIds)
+    if glTextureMipmaps[index] then
+      GL_Bind(glTextureIds[index])
+      gl.textureParameter(gl.GL_TEXTURE_MIN_FILTER, minimumFilter)
+      gl.textureParameter(gl.GL_TEXTURE_MAG_FILTER, gl_filter_max)
+      gl.textureParameter(gl.GL_TEXTURE_MAX_ANISOTROPY_EXT, gl_anisotropy)
+    end if
+    index = index + 1
+  end while
+  return gl_anisotropy
+end function
+
 // Render init.
 function Draw_Init(filesystem, palette, width, height, cvars)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
@@ -1011,6 +1041,7 @@ function Draw_Init(filesystem, palette, width, height, cvars)
     if cvar.find(cvars, "gl_max_size") is void then cvars.variables = [cvar.create("gl_max_size", "1024", false, false)] + cvars.variables end if
     if cvar.find(cvars, "gl_picmip") is void then cvars.variables = [cvar.create("gl_picmip", "0", false, false)] + cvars.variables end if
     if cvar.find(cvars, "r_textureupscale") is void then cvars.variables = [cvar.create("r_textureupscale", "0", true, false)] + cvars.variables end if
+    if cvar.find(cvars, "r_anisotropy") is void then cvars.variables = [cvar.create("r_anisotropy", "1", true, false)] + cvars.variables end if
   end if
   syncDrawCvars()
   rendererName = gl.getString(gl.GL_RENDERER)
@@ -1402,7 +1433,7 @@ end function
 function Draw_DifferentialReset(palette)
   global drawFilesystem, drawPalette, drawWad, drawCvars, drawVideoWidth, drawVideoHeight, drawViewport
   global draw_chars, draw_disc, draw_backtile, conback, menuplyr_pixels
-  global char_texture, translate_texture, currenttexture, gl_nobind, gl_max_size, gl_picmip, gl_textureupscale
+  global char_texture, translate_texture, currenttexture, gl_nobind, gl_max_size, gl_picmip, gl_textureupscale, gl_anisotropy
   global gl_filter_min, gl_filter_max, texels, pic_texels, pic_count, drawSbarChanges
   global menu_cachepics, wad_cachepics, drawPictureObjects, drawPictureCoordinates, drawPicturePixels
   global glTextureNames, glTextureIds, glTextureWidths, glTextureHeights, glTextureMipmaps, texture_extension_number
@@ -1426,6 +1457,7 @@ function Draw_DifferentialReset(palette)
   gl_max_size = 1024.0
   gl_picmip = 0.0
   gl_textureupscale = 0
+  gl_anisotropy = 1
   gl_filter_min = gl.GL_LINEAR_MIPMAP_NEAREST
   gl_filter_max = gl.GL_LINEAR
   texels = 0
