@@ -112,12 +112,24 @@ def main() -> int:
     alias_shadow = function_body(native, "mq_gl_draw_alias_ray_shadow")
     require("mq_shadow_submit_vertices" in alias_shadow and "mq_gl_vertex3" not in alias_shadow, "alias shadows still replay every vertex through immediate mode", errors)
 
+    particle_batch = function_body(native, "mq_gl_draw_particle_batch_internal")
+    require(
+        "styled ? MQ_ENHANCED_PARTICLE_HALF_SIZE : MQ_CLASSIC_PARTICLE_AXIS_SIZE" in particle_batch,
+        "enhanced particles no longer use their compact world-space quad size",
+        errors,
+    )
+    require(
+        "if (!styled && distance >= 20.0f)" in particle_batch,
+        "enhanced particles incorrectly retain GLQuake's distance-size compensation",
+        errors,
+    )
+
     if errors:
         print("native renderer safety tests: FAIL")
         for error in errors:
             print("  " + error)
         return 1
-    print("native renderer safety tests: PASS (29 invariants)")
+    print("native renderer safety tests: PASS (31 invariants)")
     return 0
 
 

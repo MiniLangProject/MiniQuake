@@ -31,7 +31,7 @@ end function
 
 // Execute one named test case and record its pass/fail result.
 function runTest(number, name, fn)
-  print "  [" + number + "/10] " + name
+  print "  [" + number + "/11] " + name
   result = try(fn())
   if result is error then
     print "    FAIL: " + result.message
@@ -405,6 +405,17 @@ function testHeadlessInputIsolation()
   return true
 end function
 
+// Verify that transient 0x0/minimized client areas never enter the renderer.
+// Win32 reports these dimensions during Alt-Tab and taskbar minimization.
+function testMinimizedRenderIsolation()
+  assertEqual(host.shouldRenderWindowFrame(true, false, 640, 480), true, "visible client area rendered")
+  assertEqual(host.shouldRenderWindowFrame(true, true, 640, 480), false, "minimized window skipped")
+  assertEqual(host.shouldRenderWindowFrame(true, false, 0, 480), false, "zero-width window skipped")
+  assertEqual(host.shouldRenderWindowFrame(true, false, 640, 0), false, "zero-height window skipped")
+  assertEqual(host.shouldRenderWindowFrame(false, false, 640, 480), false, "missing window skipped")
+  return true
+end function
+
 // Verify trace schemas against the expected Quake behavior.
 function testTraceSchemas()
   session = makeSession()
@@ -430,10 +441,11 @@ function main(args)
   if runTest("08", "snapshot and summary schemas", testTraceSchemas) then passed = passed + 1 end if
   if runTest("09", "sparse client entity diagnostics", testSparseClientEntities) then passed = passed + 1 end if
   if runTest("10", "headless live-input isolation", testHeadlessInputIsolation) then passed = passed + 1 end if
-  if passed != 10 then
-    print "MiniQuake BP-001R3 diagnostics tests failed: " + passed + "/10"
+  if runTest("11", "minimized-window render isolation", testMinimizedRenderIsolation) then passed = passed + 1 end if
+  if passed != 11 then
+    print "MiniQuake BP-001R3 diagnostics tests failed: " + passed + "/11"
     return 1
   end if
-  print "MiniQuake BP-001R3 diagnostics tests passed: 10"
+  print "MiniQuake BP-001R3 diagnostics tests passed: 11"
   return 0
 end function

@@ -23,7 +23,7 @@ rendering, audio, UDP, controller and codec facilities.
   `native/text_build`) are excluded from source integrity checks.
 - Proprietary Quake data is not part of the repository. Retail qualification
   uses a local Quake installation.
-- The `v2026.08.23` Windows x64 release is built with MiniLangPy revision
+- The `v2026.08.24` Windows x64 release is built with MiniLangPy revision
   `d7e143a`; its package contains only MiniQuake, the required native runtime
   bridges, documentation and license notices.
 

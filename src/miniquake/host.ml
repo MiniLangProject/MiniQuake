@@ -3531,6 +3531,14 @@ function inline shouldPollLiveButtonBindings(headless, destinationIsGame, consol
   return not headless and destinationIsGame and not consoleActive and not menuActive
 end function
 
+// Report whether the current Win32 client area can accept a complete render
+// frame. Minimizing a window makes GetClientRect transiently return 0x0; the
+// original WinQuake loop skips that frame instead of feeding invalid dimensions
+// into the screen and status-bar layout code.
+function inline shouldRenderWindowFrame(windowCreated, minimized, width, height)
+  return windowCreated and not minimized and width > 0 and height > 0
+end function
+
 // Provide deterministic input requested behavior for the active subsystem.
 function deterministicInputRequested(session)
   return common.hasParm(session.arguments, "-noinput")
@@ -3767,14 +3775,30 @@ function _Host_Frame(session, elapsedSeconds)
   // Before a world renderer exists, Con_Printf during signon still forces the
   // 2D console update that the original calls directly.  With a renderer, the
   // regular screen phase below consumes the request in the same frame.
-  if forceConsoleUpdate and session.renderer is void and session.windowCreated and not screen.SCR_ShouldSkipUpdate(session.timing.realtime) then
+  windowWidth = 0
+  windowHeight = 0
+  windowMinimized = true
+  if session.windowCreated then
+    windowMinimized = win.minimized()
+    if not windowMinimized then
+      windowWidth = win.width()
+      windowHeight = win.height()
+    end if
+  end if
+  renderWindowFrame = shouldRenderWindowFrame(
+    session.windowCreated,
+    windowMinimized,
+    windowWidth,
+    windowHeight,
+  )
+  if forceConsoleUpdate and session.renderer is void and renderWindowFrame and not screen.SCR_ShouldSkipUpdate(session.timing.realtime) then
     screen.SCR_UpdateScreen(
       session.console,
       session.menu,
       session.view,
       session.player,
-      win.width(),
-      win.height(),
+      windowWidth,
+      windowHeight,
       session.server.mapName,
       false,
       session.timing.realtime,
@@ -3803,7 +3827,7 @@ function _Host_Frame(session, elapsedSeconds)
     mixer.update(session.mixer, session.timing.frameTime, frameMixAhead)
   end if
 
-  if session.renderer is not void and session.windowCreated and not screen.SCR_ShouldSkipUpdate(session.timing.realtime) then
+  if session.renderer is not void and renderWindowFrame and not screen.SCR_ShouldSkipUpdate(session.timing.realtime) then
     screen.SCR_ConfigureClient(session.client)
     // Frame-local hot-Cvar cache: command execution for this frame is already
     // complete, so repeated linear string lookups below can safely share values.
@@ -3842,8 +3866,8 @@ function _Host_Frame(session, elapsedSeconds)
     session.renderer.fullbright = rFullbright != 0.0
     session.renderer.wireframe = rWireframe != 0.0
     session.renderer.waterAlpha = rWaterAlpha
-    width = win.width()
-    height = win.height()
+    width = windowWidth
+    height = windowHeight
     screenRefdef = screen.SCR_CalcRefdef(width, height, session.cvars, screen.SCR_IntermissionMode())
     view.V_SetContentsColor(session.view, worldRenderer.ViewContents(session.renderer, session.view.origin))
     view.V_CalcBlend(session.view, glCshiftPercent)

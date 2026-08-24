@@ -1,5 +1,21 @@
 # Changelog
 
+## v2026.08.24
+
+- Corrected enhanced particle sizing so effects retain a compact world-space
+  size and become naturally smaller with distance under perspective projection,
+  while preserving GLQuake's original distance compensation in classic mode.
+- Prevented rendering while the Win32 client area is minimized or transiently
+  reports a zero width or height, fixing the `Draw_TransPic: bad coordinates`
+  crash during Alt-Tab and fullscreen display suspension.
+- Added a second invalid-size guard to loading-plaque and map-transition screen
+  updates so automatic level changes remain safe while the game is in the
+  background.
+- Extended native renderer safety coverage to 31 invariants and compatibility
+  diagnostics to 11 cases, including minimized and zero-size window states.
+- Revalidated the source manifest, core tests, all three renderer backends and
+  a real fullscreen minimize/background transition before publication.
+
 ## v2026.08.23
 
 - Rebuilt the Windows x64 release with MiniLangPy compiler revision `d7e143a`,

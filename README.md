@@ -229,7 +229,8 @@ The **Lighting** entry in **Options > Video Mode** switches between the original
 GLQuake-compatible presentation and MiniQuake's optional enhanced lighting on
 all three backends. Enhanced lighting adds per-pixel Protocol-15 dynamic lights
 while retaining Quake's original lightmaps and art direction. It also enables
-soft, camera-facing particles and automatically uses standard QLIT v1
+compact, camera-facing particles with perspective-correct world-space sizing
+and automatically uses standard QLIT v1
 `maps/<name>.lit` sidecars when a selected game or mod supplies them. Invalid or
 mismatched sidecars are ignored safely. Water retains Quake's canonical sine
 warp but interpolates between table entries to avoid visible stepping. **Shadows** are

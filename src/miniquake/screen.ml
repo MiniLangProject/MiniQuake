@@ -939,6 +939,11 @@ function SCR_UpdateScreen(
   screenRealtime = realtime
   screenVideoWidth = width
   if screenCommandTraceEnabled then lastScreenCommands = [] end if
+  // Win32 exposes a transient 0x0 client area while a window is minimized or
+  // its fullscreen display mode is suspended. Loading-plaque and map-transition
+  // updates can reach this function outside the ordinary Host_Frame render gate,
+  // so reject the non-drawable frame before calculating any UI coordinates.
+  if width <= 0 or height <= 0 then return lastScreenCommands end if
   if block_drawing or scr_skipupdate or not scr_initialized then return lastScreenCommands end if
   if SCR_ShouldSkipUpdate(realtime) then
     if screenCommandTraceEnabled then lastScreenCommands = [["skip-loading"]] end if

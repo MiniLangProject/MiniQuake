@@ -1612,6 +1612,8 @@ static mq_md2_geometry_vertex_t mq_md2_geometry_vertices[MQ_ALIAS_TRIANGLE_VERTI
 static mq_u8 mq_md2_normal_indices[MQ_ALIAS_TRIANGLE_VERTICES];
 #define MQ_PARTICLE_BATCH_MAX 8192u
 #define MQ_PARTICLE_RECORD_BYTES 16u
+#define MQ_CLASSIC_PARTICLE_AXIS_SIZE 1.5f
+#define MQ_ENHANCED_PARTICLE_HALF_SIZE 0.75f
 static mq_alias_vertex_t mq_particle_vertices[MQ_PARTICLE_BATCH_MAX * 6u];
 static mq_u64 mq_alias_vbo_hash[MQ_ALIAS_VBO_CACHE_MAX];
 static mq_u64 mq_alias_vbo_signature[MQ_ALIAS_VBO_CACHE_MAX];
@@ -5320,12 +5322,16 @@ static mq_i32 mq_gl_draw_particle_batch_internal(
     float view_forward_x = mq_bits_to_float(view_forward_x_bits);
     float view_forward_y = mq_bits_to_float(view_forward_y_bits);
     float view_forward_z = mq_bits_to_float(view_forward_z_bits);
-    float scaled_up_x = mq_bits_to_float(view_up_x_bits) * 1.5f;
-    float scaled_up_y = mq_bits_to_float(view_up_y_bits) * 1.5f;
-    float scaled_up_z = mq_bits_to_float(view_up_z_bits) * 1.5f;
-    float scaled_right_x = mq_bits_to_float(view_right_x_bits) * 1.5f;
-    float scaled_right_y = mq_bits_to_float(view_right_y_bits) * 1.5f;
-    float scaled_right_z = mq_bits_to_float(view_right_z_bits) * 1.5f;
+    /* Classic GLQuake draws a right triangle and deliberately grows it with
+     * distance. Enhanced particles instead use a compact constant-world-size
+     * quad, so perspective projection naturally makes distant effects smaller. */
+    float axis_size = styled ? MQ_ENHANCED_PARTICLE_HALF_SIZE : MQ_CLASSIC_PARTICLE_AXIS_SIZE;
+    float scaled_up_x = mq_bits_to_float(view_up_x_bits) * axis_size;
+    float scaled_up_y = mq_bits_to_float(view_up_y_bits) * axis_size;
+    float scaled_up_z = mq_bits_to_float(view_up_z_bits) * axis_size;
+    float scaled_right_x = mq_bits_to_float(view_right_x_bits) * axis_size;
+    float scaled_right_y = mq_bits_to_float(view_right_y_bits) * axis_size;
+    float scaled_right_z = mq_bits_to_float(view_right_z_bits) * axis_size;
     if (data == MQ_NULL || byte_count == 0u || byte_count % MQ_PARTICLE_RECORD_BYTES != 0u) return 0;
     particle_count = byte_count / MQ_PARTICLE_RECORD_BYTES;
     if (particle_count > MQ_PARTICLE_BATCH_MAX) return 0;
@@ -5349,7 +5355,8 @@ static mq_i32 mq_gl_draw_particle_batch_internal(
         float distance = (origin_x - view_origin_x) * view_forward_x +
             (origin_y - view_origin_y) * view_forward_y +
             (origin_z - view_origin_z) * view_forward_z;
-        float scale = distance >= 20.0f ? 1.0f + distance * 0.004f : 1.0f;
+        float scale = 1.0f;
+        if (!styled && distance >= 20.0f) scale = 1.0f + distance * 0.004f;
         mq_u32 vertices_per_particle = styled ? 6u : 3u;
         mq_u32 vertex;
         for (vertex = 0u; vertex < vertices_per_particle; ++vertex) {
