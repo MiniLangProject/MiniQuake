@@ -37,7 +37,9 @@ acceptance gates; they cannot be replaced by source accounting alone.
 
 The reported engine identity remains `BP-094` / `OPT-001D` so existing build
 and evidence consumers keep working. `SOURCE_MANIFEST.sha256` independently
-binds the current deliverable file set.
+binds the current deliverable file set. Its text entries use canonical LF line
+endings while binary entries remain byte-exact, making the hashes independent
+of the checkout platform.
 
 ## Reproducible checks
 

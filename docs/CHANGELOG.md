@@ -2,6 +2,14 @@
 
 ## v2026.08.24
 
+- Made source-manifest verification reproducible across Windows and Unix by
+  hashing text with canonical LF line endings while retaining byte-exact binary
+  hashes. The manifest now also covers the latest native renderer artifacts.
+- Added a production-path regression test for minimized and zero-sized screen
+  updates plus numerical enhanced-particle geometry checks, increasing native
+  renderer safety coverage from 31 to 35 invariants.
+- Added Win32 raw-mouse input and completed the Quake II MD2 rendering path with
+  optimized shared pose interpolation plus planar and softened model shadows.
 - Corrected enhanced particle sizing so effects retain a compact world-space
   size and become naturally smaller with distance under perspective projection,
   while preserving GLQuake's original distance compensation in classic mode.

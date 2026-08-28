@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import sys
 
 
@@ -30,6 +31,14 @@ def require(condition: bool, message: str, errors: list[str]) -> None:
     """Append a readable failure when one safety invariant is absent."""
     if not condition:
         errors.append(message)
+
+
+def float_define(source: str, name: str) -> float | None:
+    """Return one floating-point preprocessor constant when it is present."""
+    match = re.search(rf"^#define\s+{re.escape(name)}\s+([0-9]+(?:\.[0-9]+)?)f$", source, re.MULTILINE)
+    if match is None:
+        return None
+    return float(match.group(1))
 
 
 def main() -> int:
@@ -124,12 +133,34 @@ def main() -> int:
         errors,
     )
 
+    classic_axis = float_define(native, "MQ_CLASSIC_PARTICLE_AXIS_SIZE")
+    enhanced_half_size = float_define(native, "MQ_ENHANCED_PARTICLE_HALF_SIZE")
+    require(classic_axis == 1.5, "classic particle axis size differs from GLQuake", errors)
+    require(enhanced_half_size == 0.75, "enhanced particle half-size is no longer compact", errors)
+    require(
+        "static const mq_u8 corners[6] = {0u, 1u, 2u, 0u, 2u, 3u}" in particle_batch
+        and "scaled_right_x * right_sign + scaled_up_x * up_sign" in particle_batch,
+        "enhanced particle quad topology or symmetric world-space projection changed",
+        errors,
+    )
+    if enhanced_half_size is not None:
+        full_world_size = enhanced_half_size * 2.0
+        near_projected_size = full_world_size / 64.0
+        far_projected_size = full_world_size / 256.0
+        require(
+            abs(full_world_size - 1.5) < 0.000001
+            and far_projected_size < near_projected_size
+            and abs(near_projected_size - far_projected_size * 4.0) < 0.000001,
+            "enhanced particle geometry no longer follows inverse-distance perspective sizing",
+            errors,
+        )
+
     if errors:
         print("native renderer safety tests: FAIL")
         for error in errors:
             print("  " + error)
         return 1
-    print("native renderer safety tests: PASS (31 invariants)")
+    print("native renderer safety tests: PASS (35 invariants)")
     return 0
 
 

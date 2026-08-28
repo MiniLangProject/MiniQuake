@@ -16,6 +16,7 @@ import miniquake.quakec.vm as vm
 import miniquake.constants as c
 import miniquake.compat_trace as trace
 import miniquake.compat_diagnostics as diagnostics
+import miniquake.screen as screen
 
 // Assert exact equality and report both values on failure.
 function assertEqual(actual, expected, name)
@@ -413,6 +414,23 @@ function testMinimizedRenderIsolation()
   assertEqual(host.shouldRenderWindowFrame(true, false, 0, 480), false, "zero-width window skipped")
   assertEqual(host.shouldRenderWindowFrame(true, false, 640, 0), false, "zero-height window skipped")
   assertEqual(host.shouldRenderWindowFrame(false, false, 640, 480), false, "missing window skipped")
+
+  // Exercise the production screen guard with initialization forced on and
+  // deliberately invalid dependencies. Reaching any layout or draw operation
+  // would therefore fail the test instead of silently testing only a predicate.
+  screen.SCR_SetCommandTraceEnabled(true)
+  screen.SCR_DifferentialSetInitialized(true)
+  zeroWidth = try(screen.SCR_UpdateScreen(
+    void, void, void, void, 0, 480, "", false, 0.0, 0.0, void,
+    false, false, 0, false, 0.0, false, false, false, false,
+  ))
+  zeroHeight = try(screen.SCR_UpdateScreen(
+    void, void, void, void, 640, 0, "", false, 0.0, 0.0, void,
+    false, false, 0, false, 0.0, false, false, false, false,
+  ))
+  screen.SCR_DifferentialSetInitialized(false)
+  assertEqual(len(zeroWidth), 0, "zero-width screen update emits no commands")
+  assertEqual(len(zeroHeight), 0, "zero-height screen update emits no commands")
   return true
 end function
 

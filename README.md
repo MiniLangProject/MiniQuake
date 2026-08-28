@@ -322,7 +322,9 @@ python .\tools\check_minilang_delimiters.py --root .
 ```
 
 After an intentional repository change, maintainers can refresh the integrity
-manifest with `python .\tools\verify.py --root . --refresh-manifest`.
+manifest with `python .\tools\verify.py --root . --refresh-manifest`. Manifest
+hashes use canonical LF bytes for text files and exact bytes for binary files,
+so verification is reproducible across Windows and Unix checkouts.
 
 ## Repository layout
 

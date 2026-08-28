@@ -845,6 +845,14 @@ function SCR_DifferentialSetBlocked(value)
   return block_drawing
 end function
 
+// Set the initialized flag for deterministic guard-order fixtures. Production
+// startup continues to own this state through SCR_Init and shutdown.
+function SCR_DifferentialSetInitialized(value)
+  global scr_initialized
+  scr_initialized = value
+  return scr_initialized
+end function
+
 // Mirror Quake's SCR_DifferentialState routine and its observable state changes.
 function SCR_DifferentialState()
   return [

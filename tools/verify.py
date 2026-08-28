@@ -22,6 +22,15 @@ from pathlib import Path
 
 MANIFEST = "SOURCE_MANIFEST.sha256"
 
+# SOURCE_MANIFEST.sha256 must describe the same source package on Windows and
+# Unix. Git can leave an older Windows worktree with CRLF bytes even after
+# .gitattributes starts enforcing LF, so text entries are hashed in their
+# canonical repository form. Binary artifacts remain byte-for-byte protected.
+MANIFEST_BINARY_SUFFIXES = {
+    ".bmp", ".dll", ".exe", ".gif", ".ico", ".jpeg", ".jpg", ".png",
+    ".spv", ".tga", ".webp", ".zip",
+}
+
 EXCLUDED_DIRS = {
     ".git", "build", "build_perf", "__pycache__", ".pytest_cache",
     "text_build",
@@ -84,6 +93,20 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def canonical_manifest_bytes(path: Path, data: bytes) -> bytes:
+    """Return bytes used by the cross-platform source manifest contract."""
+    is_binary = path.suffix.lower() in MANIFEST_BINARY_SUFFIXES or b"\0" in data
+    if not is_binary:
+        data = data.replace(b"\r\n", b"\n")
+    return data
+
+
+def manifest_sha256(path: Path) -> str:
+    """Hash a package file with platform-independent text line endings."""
+    data = canonical_manifest_bytes(path, path.read_bytes())
+    return hashlib.sha256(data).hexdigest()
+
+
 def package_files(root: Path) -> list[Path]:
     """Return deliverable files while excluding generated build/report trees."""
     result: list[Path] = []
@@ -102,9 +125,9 @@ def package_files(root: Path) -> list[Path]:
 
 
 def refresh_manifest(root: Path) -> int:
-    """Atomically bind the manifest to the current deliverable file set."""
+    """Atomically bind the manifest to the canonical deliverable file set."""
     entries = [
-        f"{sha256(path)} *{path.relative_to(root).as_posix()}\n"
+        f"{manifest_sha256(path)} *{path.relative_to(root).as_posix()}\n"
         for path in package_files(root)
     ]
     destination = root / MANIFEST
@@ -153,11 +176,34 @@ def check_manifest(root: Path) -> Check:
     for rel in sorted(set(listed) - set(actual)):
         errors.append(f"manifest path is missing: {rel}")
     for rel in sorted(set(actual) & set(listed)):
-        if sha256(actual[rel]) != listed[rel]:
+        if manifest_sha256(actual[rel]) != listed[rel]:
             errors.append(f"hash mismatch: {rel}")
     return Check(
         "source_manifest", not errors,
-        {"listed_files": len(listed), "actual_files": len(actual), "manifest_sha256": sha256(root / MANIFEST)},
+        {
+            "listed_files": len(listed),
+            "actual_files": len(actual),
+            "text_line_endings": "canonical_lf",
+            "manifest_sha256": sha256(root / MANIFEST),
+        },
+        errors,
+    )
+
+
+def check_manifest_portability() -> Check:
+    """Verify text normalization without weakening binary byte integrity."""
+    lf_text = b"first\nsecond\n"
+    crlf_text = b"first\r\nsecond\r\n"
+    binary = b"binary\r\nbytes"
+    errors: list[str] = []
+    if canonical_manifest_bytes(Path("sample.txt"), crlf_text) != lf_text:
+        errors.append("CRLF text does not normalize to canonical LF bytes")
+    if canonical_manifest_bytes(Path("sample.dll"), binary) != binary:
+        errors.append("binary manifest entries are not byte-exact")
+    return Check(
+        "source_manifest_portability",
+        not errors,
+        {"text_line_endings": "canonical_lf", "binary_hashing": "byte_exact"},
         errors,
     )
 
@@ -1730,6 +1776,7 @@ def main() -> int:
     checks = [
         check_required(root),
         check_manifest(root),
+        check_manifest_portability(),
         check_identity(root),
         check_minilang_utf8_no_bom(root),
         check_minilang_entry_function_shadow_arity(root),
