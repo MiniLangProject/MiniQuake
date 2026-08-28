@@ -188,6 +188,7 @@ EXPORTS
   mq_gl_draw_alias_batch
   mq_gl_draw_md2_rgb
   mq_gl_draw_md2_shadow
+  mq_gl_draw_md2_shadow_soft
   mq_gl_draw_alias_rgb_end
   mq_gl_draw_shadow_batch
   mq_gl_draw_alias_ray_shadow

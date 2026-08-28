@@ -42,6 +42,7 @@ IMPORTS: dict[str, list[str]] = {
         "GetForegroundWindow", "GetCursorPos", "SetCursorPos", "ClientToScreen",
         "ShowCursor", "LoadCursorW", "LoadIconW", "LoadImageW", "GetDC", "ReleaseDC",
         "SetCapture", "ReleaseCapture", "ClipCursor", "EnumDisplaySettingsW",
+        "RegisterRawInputDevices", "GetRawInputData",
         "ChangeDisplaySettingsW", "IsIconic", "SetForegroundWindow",
         "MessageBoxW", "MsgWaitForMultipleObjects",
     ],

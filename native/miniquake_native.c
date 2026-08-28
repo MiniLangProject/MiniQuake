@@ -178,6 +178,39 @@ typedef struct MQ_MSG {
     DWORD lPrivate;
 } MQ_MSG;
 
+/* Mirror the Win32 raw-input mouse ABI without requiring SDK declarations. */
+typedef struct MQ_RAWINPUTDEVICE {
+    WORD usage_page;
+    WORD usage;
+    DWORD flags;
+    HWND target;
+} MQ_RAWINPUTDEVICE;
+
+/* Mirror the Win32 raw-input header ABI without requiring SDK declarations. */
+typedef struct MQ_RAWINPUTHEADER {
+    DWORD type;
+    DWORD size;
+    HANDLE device;
+    WPARAM parameter;
+} MQ_RAWINPUTHEADER;
+
+/* Mirror the Win32 raw mouse payload ABI without requiring SDK declarations. */
+typedef struct MQ_RAWMOUSE {
+    WORD flags;
+    WORD padding;
+    DWORD buttons;
+    DWORD raw_buttons;
+    LONG last_x;
+    LONG last_y;
+    DWORD extra_information;
+} MQ_RAWMOUSE;
+
+/* Raw keyboard/HID payloads are intentionally not decoded by this bridge. */
+typedef struct MQ_RAWINPUT {
+    MQ_RAWINPUTHEADER header;
+    MQ_RAWMOUSE mouse;
+} MQ_RAWINPUT;
+
 typedef LRESULT (MQ_WINAPI *MQ_WNDPROC)(HWND, UINT, WPARAM, LPARAM);
 
 /* Mirror the Win32 wndclassexw ABI layout without requiring SDK declarations. */
@@ -463,6 +496,8 @@ MQ_DLLIMPORT mq_i32 MQ_WINAPI ReleaseDC(HWND window, HDC dc);
 MQ_DLLIMPORT HWND MQ_WINAPI SetCapture(HWND window);
 MQ_DLLIMPORT BOOL MQ_WINAPI ReleaseCapture(void);
 MQ_DLLIMPORT BOOL MQ_WINAPI ClipCursor(const MQ_RECT *rect);
+MQ_DLLIMPORT BOOL MQ_WINAPI RegisterRawInputDevices(const MQ_RAWINPUTDEVICE *devices, UINT count, UINT size);
+MQ_DLLIMPORT UINT MQ_WINAPI GetRawInputData(HANDLE input, UINT command, LPVOID data, UINT *size, UINT header_size);
 MQ_DLLIMPORT BOOL MQ_WINAPI EnumDisplaySettingsW(LPCWSTR device_name, DWORD mode_number, MQ_DEVMODEW *mode);
 MQ_DLLIMPORT LONG MQ_WINAPI ChangeDisplaySettingsW(MQ_DEVMODEW *mode, DWORD flags);
 MQ_DLLIMPORT BOOL MQ_WINAPI IsIconic(HWND window);
@@ -905,6 +940,7 @@ static mq_i32 mq_gl_alias_program_active = 0;
 static mq_u32 mq_gl_md2_shadow_program = 0u;
 static mq_i32 mq_gl_md2_shadow_program_attempted = 0;
 static mq_i32 mq_gl_md2_shadow_state_location = -1;
+static float mq_gl_md2_shadow_alpha = 0.5f;
 static mq_u32 mq_gl_enhanced_program = 0u;
 static mq_i32 mq_gl_enhanced_program_attempted = 0;
 static mq_i32 mq_gl_enhanced_enabled = 0;
@@ -1095,16 +1131,16 @@ static mq_i32 mq_gl_create_alias_program(void) {
 static mq_i32 mq_gl_create_md2_shadow_program(void) {
     static const char *vertex_source =
         "#version 120\n"
-        "attribute vec4 mq_shadow;"
+        "attribute vec4 mq_shadow;varying float mq_alpha;"
         "void main(){vec4 p=vec4(mix(gl_MultiTexCoord2.xyz,gl_Vertex.xyz,"
         "1.0-gl_MultiTexCoord3.x),1.0);"
         "p.x-=mq_shadow.x*(p.z+mq_shadow.z);"
         "p.y-=mq_shadow.y*(p.z+mq_shadow.z);"
         "p.z=-mq_shadow.z+1.0;"
-        "gl_Position=gl_ModelViewProjectionMatrix*p;}\n";
+        "mq_alpha=mq_shadow.w;gl_Position=gl_ModelViewProjectionMatrix*p;}\n";
     static const char *fragment_source =
         "#version 120\n"
-        "void main(){gl_FragColor=vec4(0.0,0.0,0.0,0.5);}\n";
+        "varying float mq_alpha;void main(){gl_FragColor=vec4(0.0,0.0,0.0,mq_alpha);}\n";
     mq_u32 vertex_shader;
     mq_u32 fragment_shader;
     mq_u32 program;
@@ -2167,6 +2203,7 @@ MQ_EXPORT void mq_gl_static_geometry_clear(void) {
 #define MQ_WM_CLOSE 0x0010u
 #define MQ_WM_QUIT 0x0012u
 #define MQ_WM_ACTIVATEAPP 0x001Cu
+#define MQ_WM_INPUT 0x00FFu
 #define MQ_WM_KEYDOWN 0x0100u
 #define MQ_WM_KEYUP 0x0101u
 #define MQ_WM_CHAR 0x0102u
@@ -2228,6 +2265,10 @@ MQ_EXPORT void mq_gl_static_geometry_clear(void) {
 #define MQ_DM_PELSHEIGHT 0x00100000u
 #define MQ_DM_DISPLAYFREQUENCY 0x00400000u
 #define MQ_SIZE_MINIMIZED 1u
+#define MQ_RIM_TYPEMOUSE 0u
+#define MQ_RID_INPUT 0x10000003u
+#define MQ_HID_USAGE_PAGE_GENERIC 0x01u
+#define MQ_HID_USAGE_GENERIC_MOUSE 0x02u
 #define MQ_IDYES 6
 #define MQ_MB_YESNO 0x00000004u
 #define MQ_MB_ICONQUESTION 0x00000020u
@@ -2299,6 +2340,7 @@ static mq_i32 mq_cursor_captured = 0;
 static mq_i32 mq_mouse_ready = 0;
 static mq_i32 mq_mouse_delta_x = 0;
 static mq_i32 mq_mouse_delta_y = 0;
+static mq_i32 mq_raw_mouse_registered = 0;
 static mq_i32 mq_mouse_wheel_delta = 0;
 #define MQ_INPUT_QUEUE_CAPACITY 256
 static mq_u32 mq_input_queue[MQ_INPUT_QUEUE_CAPACITY];
@@ -2578,6 +2620,19 @@ static void mq_restore_requested_display_mode(void) {
 
 /* Resolve a procedure from the dynamically loaded backend module. */
 static LRESULT MQ_WINAPI mq_window_proc(HWND window, UINT message, WPARAM w_param, LPARAM l_param) {
+    if (message == MQ_WM_INPUT && mq_raw_mouse_registered &&
+        mq_cursor_captured && mq_active_app) {
+        MQ_RAWINPUT input;
+        UINT input_size = (UINT)sizeof(input);
+        if (GetRawInputData((HANDLE)l_param, MQ_RID_INPUT, &input,
+                &input_size, (UINT)sizeof(MQ_RAWINPUTHEADER)) == input_size &&
+            input.header.type == MQ_RIM_TYPEMOUSE) {
+            mq_mouse_delta_x += input.mouse.last_x;
+            mq_mouse_delta_y += input.mouse.last_y;
+            mq_mouse_ready = 1;
+        }
+        return 0;
+    }
     if (message == MQ_WM_MOVE) {
         mq_window_x_value = (mq_i16)(l_param & 0xFFFF);
         mq_window_y_value = (mq_i16)((l_param >> 16) & 0xFFFF);
@@ -2959,6 +3014,7 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
     mq_i32 window_width;
     mq_i32 window_height;
     mq_i32 chosen_format;
+    MQ_RAWINPUTDEVICE raw_mouse;
 
     if (mq_window != MQ_NULL) {
         return mq_window;
@@ -3065,6 +3121,17 @@ MQ_EXPORT mq_ptr mq_win_create(const unsigned short *title, mq_i32 width, mq_i32
         mq_restore_requested_display_mode();
         return MQ_NULL;
     }
+
+    /* Raw Input reports high-resolution relative motion without quantizing it
+     * through the desktop cursor or synthesizing a mouse move for every
+     * recenter. Keep the established cursor path as a fallback for old or
+     * restricted Windows sessions where registration is unavailable. */
+    raw_mouse.usage_page = MQ_HID_USAGE_PAGE_GENERIC;
+    raw_mouse.usage = MQ_HID_USAGE_GENERIC_MOUSE;
+    raw_mouse.flags = 0u;
+    raw_mouse.target = mq_window;
+    mq_raw_mouse_registered = RegisterRawInputDevices(
+        &raw_mouse, 1u, (UINT)sizeof(raw_mouse)) != 0;
 
     mq_window_dc = GetDC(mq_window);
     if (mq_window_dc == MQ_NULL) {
@@ -3297,6 +3364,7 @@ MQ_EXPORT void mq_win_destroy(void) {
     mq_running = 0;
     mq_active_app = 0;
     mq_minimized = 0;
+    mq_raw_mouse_registered = 0;
 }
 
 /* Poll the native queue without blocking the game loop. */
@@ -3315,7 +3383,8 @@ MQ_EXPORT mq_i32 mq_win_poll(void) {
         DispatchMessageW(&message);
     }
 
-    if (mq_running && mq_cursor_captured && mq_window != MQ_NULL && GetForegroundWindow() == mq_window) {
+    if (!mq_raw_mouse_registered && mq_running && mq_cursor_captured &&
+        mq_window != MQ_NULL && GetForegroundWindow() == mq_window) {
         MQ_RECT rectangle;
         if (GetClientRect(mq_window, &rectangle)) {
             center.x = (rectangle.right - rectangle.left) / 2;
@@ -3335,7 +3404,7 @@ MQ_EXPORT mq_i32 mq_win_poll(void) {
                 }
             }
         }
-    } else {
+    } else if (!mq_raw_mouse_registered) {
         mq_mouse_ready = 0;
     }
     return mq_running;
@@ -6037,7 +6106,7 @@ MQ_EXPORT mq_i32 mq_gl_draw_md2_shadow(
         mq_gl_use_program_value(mq_gl_md2_shadow_program);
         if (mq_gl_md2_shadow_state_location >= 0) {
             mq_gl_vertex_attrib_4f_value((mq_u32)mq_gl_md2_shadow_state_location,
-                shade_x, shade_y, light_height, 0.0f);
+                shade_x, shade_y, light_height, mq_gl_md2_shadow_alpha);
         }
         glEnableClientState(0x8074u /* GL_VERTEX_ARRAY */);
         mq_gl_bind_buffer_value(0x8892u /* GL_ARRAY_BUFFER */, geometry_vbo);
@@ -6077,7 +6146,7 @@ MQ_EXPORT mq_i32 mq_gl_draw_md2_shadow(
         output->r = 0u;
         output->g = 0u;
         output->b = 0u;
-        output->a = 128u;
+        output->a = (mq_u8)(mq_gl_md2_shadow_alpha * 255.0f);
         output->x = source_x - shade_x * (source_z + light_height);
         output->y = source_y - shade_y * (source_z + light_height);
         output->z = -light_height + 1.0f;
@@ -6103,6 +6172,54 @@ MQ_EXPORT mq_i32 mq_gl_draw_md2_shadow(
         glDisableClientState(0x8074u /* GL_VERTEX_ARRAY */);
     }
     return (mq_i32)num_tris;
+}
+
+/* Submit a five-tap planar alias shadow through one native crossing. The
+ * small translated projections approximate MiniQuake's soft contact penumbra
+ * while retaining Quake II's BSP-derived receiver height and cached MD2 VBO.
+ * Backend-neutral compatibility paths keep one classic projection because
+ * their matrix ownership lives outside OpenGL. */
+MQ_EXPORT mq_i32 mq_gl_draw_md2_shadow_soft(
+    const mq_u8 *data,
+    mq_u32 byte_count,
+    mq_u32 frame_index,
+    mq_u32 old_frame_index,
+    mq_u32 back_lerp_bits,
+    const mq_u8 *normal_vectors,
+    mq_u32 normal_count,
+    mq_u64 geometry_key,
+    mq_u32 geometry_state,
+    mq_u32 triangle_count,
+    mq_u32 shade_x_bits,
+    mq_u32 shade_y_bits,
+    mq_u32 light_height_bits
+) {
+    static const float offsets[5][2] = {
+        {0.0f, 0.0f}, {-2.0f, 0.0f}, {2.0f, 0.0f},
+        {0.0f, -2.0f}, {0.0f, 2.0f}
+    };
+    mq_i32 tap;
+    mq_i32 result = 0;
+    if (mq_render_backend_value != MQ_RENDER_OPENGL) {
+        return mq_gl_draw_md2_shadow(data, byte_count, frame_index,
+            old_frame_index, back_lerp_bits, normal_vectors, normal_count,
+            geometry_key, geometry_state, triangle_count, shade_x_bits,
+            shade_y_bits, light_height_bits);
+    }
+    mq_gl_md2_shadow_alpha = 0.11f;
+    for (tap = 0; tap < 5; ++tap) {
+        glPushMatrix();
+        glTranslatef(offsets[tap][0], offsets[tap][1], 0.0f);
+        if (mq_gl_draw_md2_shadow(data, byte_count, frame_index,
+                old_frame_index, back_lerp_bits, normal_vectors, normal_count,
+                geometry_key, geometry_state, triangle_count, shade_x_bits,
+                shade_y_bits, light_height_bits) == (mq_i32)triangle_count) {
+            result = (mq_i32)triangle_count;
+        }
+        glPopMatrix();
+    }
+    mq_gl_md2_shadow_alpha = 0.5f;
+    return result;
 }
 
 /* End a run of Quake II alias draws before fixed-function geometry resumes. */
