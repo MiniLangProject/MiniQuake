@@ -1006,7 +1006,9 @@ static mq_i32 mq_gl_create_alias_program(void) {
     static const char *vertex_source =
         "#version 120\n"
         "attribute vec4 mq_state;varying vec4 mq_color;"
-        "void main(){gl_Position=ftransform();gl_TexCoord[0]=gl_MultiTexCoord0;"
+        "void main(){vec4 p=vec4(mix(gl_MultiTexCoord2.xyz,gl_Vertex.xyz,"
+        "1.0-gl_MultiTexCoord3.x),1.0);"
+        "gl_Position=gl_ModelViewProjectionMatrix*p;gl_TexCoord[0]=gl_MultiTexCoord0;"
         "float a=mq_state.w*0.3926990817;"
         "vec3 v=vec3(cos(-a),sin(-a),1.0)*0.7071067812;"
         "float d=dot(gl_MultiTexCoord1.xyz,v);if(d<0.0)d*=0.3;"
@@ -1094,7 +1096,8 @@ static mq_i32 mq_gl_create_md2_shadow_program(void) {
     static const char *vertex_source =
         "#version 120\n"
         "attribute vec4 mq_shadow;"
-        "void main(){vec4 p=gl_Vertex;"
+        "void main(){vec4 p=vec4(mix(gl_MultiTexCoord2.xyz,gl_Vertex.xyz,"
+        "1.0-gl_MultiTexCoord3.x),1.0);"
         "p.x-=mq_shadow.x*(p.z+mq_shadow.z);"
         "p.y-=mq_shadow.y*(p.z+mq_shadow.z);"
         "p.z=-mq_shadow.z+1.0;"
@@ -1675,13 +1678,17 @@ typedef struct mq_alias_vertex_s {
     float z;
 } mq_alias_vertex_t;
 
-/* Expanded texture/position record stored in the bounded MD2 VBO cache. */
+/* Texture coordinates and both source poses stored in the bounded MD2 VBO
+ * cache. OpenGL interpolates the two positions in the vertex shader. */
 typedef struct mq_md2_geometry_vertex_s {
     float s;
     float t;
     float x;
     float y;
     float z;
+    float old_x;
+    float old_y;
+    float old_z;
 } mq_md2_geometry_vertex_t;
 
 #define MQ_ALIAS_VBO_CACHE_MAX 512u
@@ -1721,7 +1728,7 @@ static mq_u32 mq_alias_rgb_lightcoord_vbo[MQ_ALIAS_RGB_GEOMETRY_CACHE_MAX];
 static mq_u32 mq_alias_rgb_geometry_vertices[MQ_ALIAS_RGB_GEOMETRY_CACHE_MAX];
 static float mq_alias_rgb_lightcoords[MQ_ALIAS_TRIANGLE_VERTICES * 3u];
 
-/* Mix model identity and quantized animation state into the direct-map slot. */
+/* Mix model identity and the immutable MD2 frame pair into the direct-map slot. */
 static mq_u32 mq_alias_rgb_geometry_slot(mq_u64 geometry_key, mq_u32 geometry_state) {
     mq_u64 mixed = geometry_key ^ (geometry_key >> 32) ^
         ((mq_u64)geometry_state * 0x9e3779b97f4a7c15ull);
@@ -3347,6 +3354,21 @@ MQ_EXPORT void mq_win_swap(void) {
     if (mq_window_dc != MQ_NULL) {
         SwapBuffers(mq_window_dc);
     }
+}
+
+/* Select presentation synchronization for the current OpenGL context. */
+MQ_EXPORT mq_i32 mq_win_set_swap_interval(mq_i32 interval) {
+    mq_wgl_swap_interval_proc swap_interval;
+    if (mq_render_backend_value != MQ_RENDER_OPENGL ||
+        mq_gl_context == MQ_NULL || interval < 0 || interval > 1) return 0;
+    swap_interval = (mq_wgl_swap_interval_proc)
+        wglGetProcAddress("wglSwapIntervalEXT");
+    if (swap_interval == MQ_NULL ||
+        swap_interval == (mq_wgl_swap_interval_proc)1 ||
+        swap_interval == (mq_wgl_swap_interval_proc)2 ||
+        swap_interval == (mq_wgl_swap_interval_proc)3 ||
+        swap_interval == (mq_wgl_swap_interval_proc)-1) return 0;
+    return swap_interval(interval) ? 1 : 0;
 }
 
 /* Read or update the requested native input state. */
@@ -5589,7 +5611,6 @@ static mq_i32 mq_md2_expand_geometry(
 ) {
     mq_u32 current_frame = ofs_frames + frame_index * frame_size;
     mq_u32 previous_frame = ofs_frames + old_frame_index * frame_size;
-    float front_lerp = 1.0f - back_lerp;
     float current_scale[3];
     float current_translate[3];
     float previous_scale[3];
@@ -5597,6 +5618,7 @@ static mq_i32 mq_md2_expand_geometry(
     mq_u32 triangle;
     mq_u32 axis;
     mq_u32 output = 0u;
+    (void)back_lerp;
     for (axis = 0u; axis < 3u; ++axis) {
         current_scale[axis] = mq_md2_f32(data, current_frame + axis * 4u);
         current_translate[axis] = mq_md2_f32(data, current_frame + 12u + axis * 4u);
@@ -5630,21 +5652,18 @@ static mq_i32 mq_md2_expand_geometry(
             if (normal >= normal_count) return 0;
             destination->s = (float)texture_s / (float)skin_width;
             destination->t = (float)texture_t / (float)skin_height;
-            destination->x =
-                ((float)data[current_vertex] * current_scale[0] +
-                    current_translate[0]) * front_lerp +
-                ((float)data[previous_vertex] * previous_scale[0] +
-                    previous_translate[0]) * back_lerp;
-            destination->y =
-                ((float)data[current_vertex + 1u] * current_scale[1] +
-                    current_translate[1]) * front_lerp +
-                ((float)data[previous_vertex + 1u] * previous_scale[1] +
-                    previous_translate[1]) * back_lerp;
-            destination->z =
-                ((float)data[current_vertex + 2u] * current_scale[2] +
-                    current_translate[2]) * front_lerp +
-                ((float)data[previous_vertex + 2u] * previous_scale[2] +
-                    previous_translate[2]) * back_lerp;
+            destination->x = (float)data[current_vertex] * current_scale[0] +
+                current_translate[0];
+            destination->y = (float)data[current_vertex + 1u] *
+                current_scale[1] + current_translate[1];
+            destination->z = (float)data[current_vertex + 2u] *
+                current_scale[2] + current_translate[2];
+            destination->old_x = (float)data[previous_vertex] *
+                previous_scale[0] + previous_translate[0];
+            destination->old_y = (float)data[previous_vertex + 1u] *
+                previous_scale[1] + previous_translate[1];
+            destination->old_z = (float)data[previous_vertex + 2u] *
+                previous_scale[2] + previous_translate[2];
             mq_md2_normal_indices[output] = (mq_u8)normal;
             memcpy(&mq_alias_rgb_lightcoords[output * 3u],
                 normal_vectors + normal * 12u, 12u);
@@ -5722,6 +5741,7 @@ MQ_EXPORT mq_i32 mq_gl_draw_md2_rgb(
         (mq_u64)ofs_frames + (mq_u64)num_frames * frame_size >
             (mq_u64)ofs_end) return 0;
     lookup_path = mq_render_backend_value == MQ_RENDER_OPENGL &&
+        mq_valid_wgl_proc((const void *)mq_gl_multi_tex_coord2f_value) &&
         mq_valid_wgl_proc((const void *)mq_gl_client_active_texture_value) &&
         mq_valid_wgl_proc((const void *)mq_gl_gen_buffers_value) &&
         mq_valid_wgl_proc((const void *)mq_gl_bind_buffer_value) &&
@@ -5806,7 +5826,16 @@ MQ_EXPORT mq_i32 mq_gl_draw_md2_rgb(
         glEnableClientState(0x8078u /* GL_TEXTURE_COORD_ARRAY */);
         mq_gl_bind_buffer_value(0x8892u /* GL_ARRAY_BUFFER */, lightcoord_vbo);
         glTexCoordPointer(3, 0x1406u /* GL_FLOAT */, 0, (const void *)0);
+        mq_gl_client_active_texture_value(0x84C2u /* GL_TEXTURE2 */);
+        glEnableClientState(0x8078u /* GL_TEXTURE_COORD_ARRAY */);
+        mq_gl_bind_buffer_value(0x8892u /* GL_ARRAY_BUFFER */, geometry_vbo);
+        glTexCoordPointer(3, 0x1406u /* GL_FLOAT */,
+            (mq_i32)sizeof(mq_md2_geometry_vertex_t), (const void *)20);
+        mq_gl_multi_tex_coord2f_value(0x84C3u /* GL_TEXTURE3 */,
+            back_lerp, 0.0f);
         glDrawArrays(0x0004u /* GL_TRIANGLES */, 0, (mq_i32)vertex_count);
+        glDisableClientState(0x8078u /* GL_TEXTURE_COORD_ARRAY */);
+        mq_gl_client_active_texture_value(0x84C1u /* GL_TEXTURE1 */);
         glDisableClientState(0x8078u /* GL_TEXTURE_COORD_ARRAY */);
         mq_gl_client_active_texture_value(0x84C0u /* GL_TEXTURE0 */);
         glDisableClientState(0x8078u /* GL_TEXTURE_COORD_ARRAY */);
@@ -5839,9 +5868,12 @@ MQ_EXPORT mq_i32 mq_gl_draw_md2_rgb(
         if (blue < 0) blue = 0; else if (blue > 255) blue = 255;
         output->s = source->s;
         output->t = source->t;
-        output->x = source->x;
-        output->y = source->y;
-        output->z = source->z;
+        output->x = source->x * (1.0f - back_lerp) +
+            source->old_x * back_lerp;
+        output->y = source->y * (1.0f - back_lerp) +
+            source->old_y * back_lerp;
+        output->z = source->z * (1.0f - back_lerp) +
+            source->old_z * back_lerp;
         output->r = (mq_u8)red;
         output->g = (mq_u8)green;
         output->b = (mq_u8)blue;
@@ -5949,6 +5981,8 @@ MQ_EXPORT mq_i32 mq_gl_draw_md2_shadow(
         mq_gl_alias_program_active = 0;
     }
     lookup_path = mq_render_backend_value == MQ_RENDER_OPENGL &&
+        mq_valid_wgl_proc((const void *)mq_gl_multi_tex_coord2f_value) &&
+        mq_valid_wgl_proc((const void *)mq_gl_client_active_texture_value) &&
         mq_valid_wgl_proc((const void *)mq_gl_gen_buffers_value) &&
         mq_valid_wgl_proc((const void *)mq_gl_bind_buffer_value) &&
         mq_valid_wgl_proc((const void *)mq_gl_buffer_data_value) &&
@@ -6009,7 +6043,15 @@ MQ_EXPORT mq_i32 mq_gl_draw_md2_shadow(
         mq_gl_bind_buffer_value(0x8892u /* GL_ARRAY_BUFFER */, geometry_vbo);
         glVertexPointer(3, 0x1406u /* GL_FLOAT */,
             (mq_i32)sizeof(mq_md2_geometry_vertex_t), (const void *)8);
+        mq_gl_client_active_texture_value(0x84C2u /* GL_TEXTURE2 */);
+        glEnableClientState(0x8078u /* GL_TEXTURE_COORD_ARRAY */);
+        glTexCoordPointer(3, 0x1406u /* GL_FLOAT */,
+            (mq_i32)sizeof(mq_md2_geometry_vertex_t), (const void *)20);
+        mq_gl_multi_tex_coord2f_value(0x84C3u /* GL_TEXTURE3 */,
+            back_lerp, 0.0f);
         glDrawArrays(0x0004u /* GL_TRIANGLES */, 0, (mq_i32)vertex_count);
+        glDisableClientState(0x8078u /* GL_TEXTURE_COORD_ARRAY */);
+        mq_gl_client_active_texture_value(0x84C0u /* GL_TEXTURE0 */);
         glDisableClientState(0x8074u /* GL_VERTEX_ARRAY */);
         mq_gl_bind_buffer_value(0x8892u /* GL_ARRAY_BUFFER */, 0u);
         mq_gl_use_program_value(0u);
@@ -6024,14 +6066,20 @@ MQ_EXPORT mq_i32 mq_gl_draw_md2_shadow(
     for (vertex = 0u; vertex < vertex_count; ++vertex) {
         const mq_md2_geometry_vertex_t *source = &mq_md2_geometry_vertices[vertex];
         mq_alias_vertex_t *output = &mq_alias_triangle_vertices[vertex];
+        float source_x = source->x * (1.0f - back_lerp) +
+            source->old_x * back_lerp;
+        float source_y = source->y * (1.0f - back_lerp) +
+            source->old_y * back_lerp;
+        float source_z = source->z * (1.0f - back_lerp) +
+            source->old_z * back_lerp;
         output->s = 0.0f;
         output->t = 0.0f;
         output->r = 0u;
         output->g = 0u;
         output->b = 0u;
         output->a = 128u;
-        output->x = source->x - shade_x * (source->z + light_height);
-        output->y = source->y - shade_y * (source->z + light_height);
+        output->x = source_x - shade_x * (source_z + light_height);
+        output->y = source_y - shade_y * (source_z + light_height);
         output->z = -light_height + 1.0f;
     }
     if (mq_render_backend_value == MQ_RENDER_DIRECT3D9) {

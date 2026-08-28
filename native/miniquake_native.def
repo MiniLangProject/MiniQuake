@@ -26,6 +26,7 @@ EXPORTS
   mq_win_destroy
   mq_win_poll
   mq_win_swap
+  mq_win_set_swap_interval
   mq_win_key_down
   mq_win_key_pressed
   mq_win_key_snapshot
