@@ -648,20 +648,12 @@ function appendLimited(target, source)
   if appendCount > available then appendCount = available end if
   if appendCount <= 0 then return target end if
   result = arrays.makeEmptyArray(len(target) + appendCount)
-  index = 0
   // R_AllocParticle links each new particle at active_particles' head.
   // Preserve that ordering when the compatibility wrappers merge a newly
-  // spawned batch into the session-owned active array.
-  while index < appendCount
-    result[index] = source[index]
-    index = index + 1
-  end while
-  targetIndex = 0
-  while targetIndex < len(target)
-    result[index] = target[targetIndex]
-    targetIndex = targetIndex + 1
-    index = index + 1
-  end while
+  // spawned batch into the session-owned active array.  Both ranges target a
+  // new array, so native shallow copies are safe and retain particle identity.
+  copyArray(result, 0, source, 0, appendCount)
+  copyArray(result, appendCount, target, 0, len(target))
   return result
 end function
 

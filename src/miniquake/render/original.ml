@@ -219,11 +219,10 @@ function compatEnsureEfragState()
   if len(rCompatEntityEfrags) < entityCount then
     old = rCompatEntityEfrags
     rCompatEntityEfrags = compatRmainArrays.makeEmptyArray(entityCount)
-    index = 0
-    while index < len(old)
-      rCompatEntityEfrags[index] = old[index]
-      index = index + 1
-    end while
+    // Existing per-entity link arrays must keep their identity when capacity
+    // grows; copyArray is shallow and therefore matches the old loop.
+    copyArray(rCompatEntityEfrags, 0, old, 0, len(old))
+    index = len(old)
     while index < entityCount
       rCompatEntityEfrags[index] = []
       index = index + 1

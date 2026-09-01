@@ -39,11 +39,9 @@ end function
 function copyArrayLinear(source)
   sourceCount = len(source)
   result = makeEmptyArray(sourceCount)
-  index = 0
-  while index < sourceCount
-    result[index] = source[index]
-    index = index + 1
-  end while
+  // The destination is new and therefore cannot overlap the source.  Use the
+  // native bulk copy instead of dispatching one MiniLang assignment per item.
+  copyArray(result, 0, source, 0, sourceCount)
   return result
 end function
 
@@ -51,11 +49,9 @@ end function
 function copyArrayPrefix(source, count)
   if count < 0 or count > len(source) then return error(1181, "array prefix outside source") end if
   result = makeEmptyArray(count)
-  index = 0
-  while index < count
-    result[index] = source[index]
-    index = index + 1
-  end while
+  // Keep the explicit bounds check above so callers retain the original
+  // MiniQuake error instead of relying on copyArray's clamping behavior.
+  copyArray(result, 0, source, 0, count)
   return result
 end function
 
@@ -72,11 +68,7 @@ function growArrayTo(source, requiredCount, fillValue)
 
   result = makeFilledArray(capacity, fillValue)
   sourceCount = len(source)
-  index = 0
-  while index < sourceCount
-    result[index] = source[index]
-    index = index + 1
-  end while
+  copyArray(result, 0, source, 0, sourceCount)
   return result
 end function
 
@@ -90,7 +82,12 @@ end function
 // Add state for push array builder.
 function pushArrayBuilder(builder, value)
   if builder.count >= len(builder.values) then
-    builder.values = builder.values + builder.values
+    oldValues = builder.values
+    grownValues = makeEmptyArray(len(oldValues) * 2)
+    // Only the populated prefix is observable.  A native shallow copy keeps
+    // record/array identity while avoiding concatenation's duplicate tail.
+    copyArray(grownValues, 0, oldValues, 0, builder.count)
+    builder.values = grownValues
   end if
   builder.values[builder.count] = value
   builder.count = builder.count + 1

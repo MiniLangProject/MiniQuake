@@ -333,33 +333,22 @@ function insertCacheSorted(state, block)
   while index < len(state.caches) and state.caches[index].start < block.start
     index = index + 1
   end while
-  result = array(len(state.caches) + 1)
-  sourceIndex = 0
-  destinationIndex = 0
-  while destinationIndex < len(result)
-    if destinationIndex == index then
-      result[destinationIndex] = block
-    else
-      result[destinationIndex] = state.caches[sourceIndex]
-      sourceIndex = sourceIndex + 1
-    end if
-    destinationIndex = destinationIndex + 1
-  end while
+  oldCount = len(state.caches)
+  result = array(oldCount + 1)
+  // The insertion splits the old array into two non-overlapping source ranges.
+  copyArray(result, 0, state.caches, 0, index)
+  result[index] = block
+  copyArray(result, index + 1, state.caches, index, oldCount - index)
   state.caches = result
 end function
 
 // Release state for remove cache at.
 function removeCacheAt(state, index)
-  result = array(len(state.caches) - 1)
-  sourceIndex = 0
-  destinationIndex = 0
-  while sourceIndex < len(state.caches)
-    if sourceIndex != index then
-      result[destinationIndex] = state.caches[sourceIndex]
-      destinationIndex = destinationIndex + 1
-    end if
-    sourceIndex = sourceIndex + 1
-  end while
+  oldCount = len(state.caches)
+  result = array(oldCount - 1)
+  // Compact around the removed cache block without changing object identity.
+  copyArray(result, 0, state.caches, 0, index)
+  copyArray(result, index, state.caches, index + 1, oldCount - index - 1)
   state.caches = result
 end function
 

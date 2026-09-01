@@ -575,12 +575,8 @@ function trimOldest(lines, maximum)
   if len(lines) <= maximum then return lines end if
   result = arrays.makeEmptyArray(maximum)
   sourceIndex = len(lines) - maximum
-  targetIndex = 0
-  while sourceIndex < len(lines)
-    result[targetIndex] = lines[sourceIndex]
-    sourceIndex = sourceIndex + 1
-    targetIndex = targetIndex + 1
-  end while
+  // Retain the newest line references in their original order.
+  copyArray(result, 0, lines, sourceIndex, maximum)
   return result
 end function
 
@@ -592,11 +588,7 @@ function visibleLines(state, count)
   visibleCount = len(state.lines) - start
   if visibleCount > count then visibleCount = count end if
   result = arrays.makeEmptyArray(visibleCount)
-  index = 0
-  while index < visibleCount
-    result[index] = state.lines[start + index]
-    index = index + 1
-  end while
+  copyArray(result, 0, state.lines, start, visibleCount)
   return result
 end function
 

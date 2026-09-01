@@ -257,11 +257,8 @@ function parseBytes(data)
   if len(blocks) < 1 then return error(3706, "savegame has no global block") end if
   entityCount = len(blocks) - 1
   entities = arrayutil.makeEmptyArray(entityCount)
-  index = 0
-  while index < entityCount
-    entities[index] = blocks[index + 1]
-    index = index + 1
-  end while
+  // Block zero stores globals; the remaining parsed blocks are entity records.
+  copyArray(entities, 0, blocks, 1, entityCount)
   return t.SaveGame(version, comment, spawnParms, skill, mapName, time, lightStyles, blocks[0], entities)
 end function
 

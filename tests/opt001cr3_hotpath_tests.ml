@@ -52,7 +52,18 @@ function main(args)
 
   filled = arrays.makeFilledArray(5, 7)
   opt001cr3r8Check(len(filled) == 5, "filled array length")
-  opt001cr3r8Check(filled[0] == 7 and filled[4] == 7, "filled array values")
+  builder = arrays.createArrayBuilder(2)
+  arrays.pushArrayBuilder(builder, 11)
+  arrays.pushArrayBuilder(builder, 22)
+  arrays.pushArrayBuilder(builder, 33)
+  built = arrays.finishArrayBuilder(builder)
+  grown = arrays.growArrayTo([41, 42], 3, 99)
+  opt001cr3r8Check(
+    filled[0] == 7 and filled[4] == 7 and
+    len(built) == 3 and built[0] == 11 and built[1] == 22 and built[2] == 33 and
+    len(grown) == 4 and grown[0] == 41 and grown[1] == 42 and grown[2] == 99 and grown[3] == 99,
+    "native array fill, builder growth, prefix copy and capacity growth",
+  )
   stats = clientState.zeroStats(32)
   opt001cr3r8Check(len(stats) == 32 and stats[0] == 0 and stats[31] == 0, "zero stats exact allocation")
   identity = keys.identityValues(8)

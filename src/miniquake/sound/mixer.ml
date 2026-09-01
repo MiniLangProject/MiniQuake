@@ -913,11 +913,8 @@ function mixIntoOutput(mixer, frameCount, output)
   // sound completion, matching the fixed-slot behavior of snd_mix.c.
   if removed then
     survivors = arrays.makeEmptyArray(survivorCount)
-    survivorIndex = 0
-    while survivorIndex < survivorCount
-      survivors[survivorIndex] = paintSurvivorScratch[survivorIndex]
-      survivorIndex = survivorIndex + 1
-    end while
+    // Survivor order and channel identity are preserved by the shallow copy.
+    copyArray(survivors, 0, paintSurvivorScratch, 0, survivorCount)
     mixer.channels = survivors
   end if
   mixer.paintedTime = mixer.paintedTime + frameCount

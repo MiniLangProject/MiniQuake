@@ -2841,11 +2841,9 @@ function resizeSynchronizedEdictArray(server, requiredCount)
   resized = arrayutil.makeEmptyArray(requiredCount)
   copyCount = len(previous)
   if copyCount > requiredCount then copyCount = requiredCount end if
-  index = 0
-  while index < copyCount
-    resized[index] = previous[index]
-    index = index + 1
-  end while
+  // Edict records remain shared with QuakeC; this must be a shallow prefix
+  // copy when the synchronized table grows or shrinks.
+  copyArray(resized, 0, previous, 0, copyCount)
   server.edicts = resized
   return resized
 end function

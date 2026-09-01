@@ -281,17 +281,11 @@ function BuildTris()
             besttype = type
             bestlen = candidateLength
             bestverts = compatAliasArrays.makeEmptyArray(bestlen + 2)
-            j = 0
-            while j < bestlen + 2
-              bestverts[j] = stripverts[j]
-              j = j + 1
-            end while
+            // Candidate buffers are reused by the strip/fan search.  Snapshot
+            // the winning prefixes before the next candidate overwrites them.
+            copyArray(bestverts, 0, stripverts, 0, bestlen + 2)
             besttris = compatAliasArrays.makeEmptyArray(bestlen)
-            j = 0
-            while j < bestlen
-              besttris[j] = striptris[j]
-              j = j + 1
-            end while
+            copyArray(besttris, 0, striptris, 0, bestlen)
           end if
           startv = startv + 1
         end while

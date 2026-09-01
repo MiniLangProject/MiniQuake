@@ -288,11 +288,10 @@ function synchronize(renderer, modelPrecache)
   targetCount = len(modelPrecache)
   if oldCount >= targetCount then return oldCount end if
   models = arrayutil.makeEmptyArray(targetCount)
-  index = 0
-  while index < oldCount
-    models[index] = renderer.models[index]
-    index = index + 1
-  end while
+  // Preserve already loaded model objects with a shallow bulk copy.  Loading
+  // only begins at the first newly added precache slot.
+  copyArray(models, 0, renderer.models, 0, oldCount)
+  index = oldCount
   while index < targetCount
     if index == 1 then
       models[index] = loadWorldModel(renderer, modelPrecache[index])

@@ -1,5 +1,26 @@
 # Changelog
 
+## v2026.09.01
+
+- Migrated safe, non-overlapping MiniLang array transfers to the native
+  `copyArray` primitive across synchronized edict storage, render snapshots,
+  particles, savegames, sound mixing, console lines, memory tables and other
+  fixed-array hot paths.
+- Corrected growable-array expansion so only the populated prefix is copied
+  into empty enlarged storage instead of duplicating the previous capacity.
+- Added regression coverage for prefix and growth copies and refreshed the
+  frozen world/physics implementation fingerprint for the reviewed server
+  resize path.
+- Confirmed deterministic parity with byte-identical 300-frame traces and the
+  same final state hash between loop-copy and native-copy builds made with the
+  same MiniLangPy compiler revision.
+- Measured a conservative paired-median OpenGL improvement of 18% in the
+  5,000-frame workload. Headless throughput and map-loading time remained
+  neutral within run-to-run noise, so no unsupported general speedup is
+  claimed.
+- Revalidated all 59 optimization and hot-path checks, the complete source
+  inventory and the full one-script build and acceptance suite before release.
+
 ## v2026.08.24
 
 - Made source-manifest verification reproducible across Windows and Unix by

@@ -103,6 +103,14 @@ mod or hardware configuration. Retail map traversal, renderer comparisons,
 network interoperability, and long-running soak tests remain important release
 gates.
 
+Frequently copied engine arrays use MiniLang's native `copyArray` operation
+for safe, non-overlapping bulk transfers. This covers synchronized edict growth,
+renderer snapshots, particles, savegames, audio survivors, console storage and
+other fixed-array hot paths without changing their observable order or bounds.
+An A/B build with the same compiler produced byte-identical deterministic traces;
+the measured OpenGL workload improved by a conservative paired median of 18%,
+while headless and map-loading results remained within normal measurement noise.
+
 See [the current port status](docs/status/PORT_STATUS.md) for the maintained
 summary. Historical implementation and acceptance records are retained under
 [`docs/archive`](docs/archive/README.md).
@@ -325,6 +333,11 @@ After an intentional repository change, maintainers can refresh the integrity
 manifest with `python .\tools\verify.py --root . --refresh-manifest`. Manifest
 hashes use canonical LF bytes for text files and exact bytes for binary files,
 so verification is reproducible across Windows and Unix checkouts.
+
+The `copyArray` regression and hot-path suites additionally verify prefix,
+split-range and growth copies together with their engine integrations. The
+current release passes all 59 optimization and hot-path checks and the complete
+one-script acceptance run.
 
 ## Repository layout
 

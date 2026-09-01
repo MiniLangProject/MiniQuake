@@ -99,7 +99,7 @@ SERVER_GC_ROOT_SECTION_HASHES = {
     "syncQcVectorInto": "539b24aabd4d4329ae5b6ba911250c0402a73867db06be6e2021c66081b44a2e",
     "syncQcVectorIntoAt": "dccd20c403b6b6de5cecec71613df9fa14e253eac0ac909af056de672ce50775",
     "syncEstablishedQcVectorIntoAt": "822bf200b5e3da8039ad437d4d119fe01ef3640b9eadeba5246ae6f3f7527dde",
-    "resizeSynchronizedEdictArray": "feffb4ecf5ae81d17ec447f5c2e0d8535e566406518c5ea91172aa05346dd795",
+    "resizeSynchronizedEdictArray": "e1f064fb522c2a3e9e70232a2a8e5603d9b2bfb4b10b4014086210ceab345f99",
     "ensureSynchronizedBaseline": "4373f3023d269bd09c9e4af1461b8c3046aeb4a6da501f4b47c0f39d801bbe92",
     "ensureSynchronizedEdict": "021e99d057bb0d8065985edbc3135f94c32ef3cde31672dd0f96c5c96fdd2562",
     "syncQuakeCEdict": "e284ddf91cee35f98352528f9985a544ef55d56ec907fffff166de05736117e2",

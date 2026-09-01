@@ -1,6 +1,6 @@
 # MiniQuake current port status
 
-Updated: 2026-08-24
+Updated: 2026-09-01
 
 MiniQuake targets GLQuake/WinQuake 1.09 behavior on Windows x64, Protocol 15
 and the original Quake data formats. Engine behavior is implemented in
@@ -23,9 +23,14 @@ rendering, audio, UDP, controller and codec facilities.
   `native/text_build`) are excluded from source integrity checks.
 - Proprietary Quake data is not part of the repository. Retail qualification
   uses a local Quake installation.
-- The `v2026.08.24` Windows x64 release is built with MiniLangPy revision
+- The `v2026.09.01` Windows x64 release is built with MiniLangPy revision
   `d7e143a`; its package contains only MiniQuake, the required native runtime
   bridges, documentation and license notices.
+- Safe fixed-array hot paths use MiniLang's native `copyArray` primitive.
+  Differential traces remain byte-identical, all 59 optimization checks pass,
+  and a 5,000-frame OpenGL A/B workload measured an 18% conservative
+  paired-median improvement. Headless and map-loading measurements remained
+  neutral within normal noise.
 
 ## Compatibility qualification
 

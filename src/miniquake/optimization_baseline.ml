@@ -208,11 +208,9 @@ end function
 function sortedDurations()
   count = profileFrameCount
   values = array(count, 0)
-  index = 0
-  while index < count
-    values[index] = profileDurations[index]
-    index = index + 1
-  end while
+  // Copy the recorded prefix in one native operation before sorting the
+  // private snapshot in place.
+  copyArray(values, 0, profileDurations, 0, count)
 
   index = 1
   while index < count

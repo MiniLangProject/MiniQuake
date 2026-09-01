@@ -89,33 +89,23 @@ end function
 
 // Add state for insert after.
 function insertAfter(state, index, block)
-  result = array(len(state.blocks) + 1)
-  sourceIndex = 0
-  destinationIndex = 0
-  while destinationIndex < len(result)
-    if destinationIndex == index + 1 then
-      result[destinationIndex] = block
-    else
-      result[destinationIndex] = state.blocks[sourceIndex]
-      sourceIndex = sourceIndex + 1
-    end if
-    destinationIndex = destinationIndex + 1
-  end while
+  oldCount = len(state.blocks)
+  insertionIndex = index + 1
+  result = array(oldCount + 1)
+  // Preserve the linked block ordering around the inserted fragment.
+  copyArray(result, 0, state.blocks, 0, insertionIndex)
+  result[insertionIndex] = block
+  copyArray(result, insertionIndex + 1, state.blocks, insertionIndex, oldCount - insertionIndex)
   state.blocks = result
 end function
 
 // Release state for remove at.
 function removeAt(state, index)
-  result = array(len(state.blocks) - 1)
-  sourceIndex = 0
-  destinationIndex = 0
-  while sourceIndex < len(state.blocks)
-    if sourceIndex != index then
-      result[destinationIndex] = state.blocks[sourceIndex]
-      destinationIndex = destinationIndex + 1
-    end if
-    sourceIndex = sourceIndex + 1
-  end while
+  oldCount = len(state.blocks)
+  result = array(oldCount - 1)
+  // Compact the two retained ranges into the newly allocated block array.
+  copyArray(result, 0, state.blocks, 0, index)
+  copyArray(result, index, state.blocks, index + 1, oldCount - index - 1)
   state.blocks = result
 end function
 
