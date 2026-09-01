@@ -19,7 +19,9 @@
   neutral within run-to-run noise, so no unsupported general speedup is
   claimed.
 - Revalidated all 59 optimization and hot-path checks, the complete source
-  inventory and the full one-script build and acceptance suite before release.
+  inventory and the standard build acceptance matrix before release. The
+  separately selectable live network run was not part of this
+  compiler-focused measurement pass.
 
 ## v2026.08.24
 

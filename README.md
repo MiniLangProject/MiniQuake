@@ -337,7 +337,9 @@ so verification is reproducible across Windows and Unix checkouts.
 The `copyArray` regression and hot-path suites additionally verify prefix,
 split-range and growth copies together with their engine integrations. The
 current release passes all 59 optimization and hot-path checks and the complete
-one-script acceptance run.
+standard build validation. Live two-process networking remains available
+through the full-suite script and was not requested for this compiler-focused
+measurement run.
 
 ## Repository layout
 
