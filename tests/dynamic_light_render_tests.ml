@@ -5,6 +5,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
 BP-042: dynamic-light marking, frame order, and brush-model light roots.
 */
 import miniquake.render.world as worldRender
+import miniquake.render.enhanced as enhancedRender
 import miniquake.types as t
 import miniquake.constants as c
 
@@ -161,6 +162,10 @@ end function
 function testFlashBlendSkipsMarks()
   setup([light(64.0, 2.0)], true, true, true)
   equal(worldRender.R_PushDlights(), 0, "flashblend skip")
+  viewOrigin = t.Vec3(0.0, 0.0, 0.0)
+  no(enhancedRender.worldLightEligible(light(64.0, 1.0), 1.0, viewOrigin), "viewer-contained light excluded from enhanced world pass")
+  remote = t.DynamicLight(t.Vec3(128.0, 0.0, 8.0), 64.0, 1.0, 0.0, 0.0, 0)
+  yes(enhancedRender.worldLightEligible(remote, 1.0, viewOrigin), "remote light retained in enhanced world pass")
   return true
 end function
 

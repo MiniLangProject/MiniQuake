@@ -75,6 +75,21 @@ function putLightFloat(offset, value)
   byteio.putU32(lightPacket, offset, native.floatBits(value))
 end function
 
+// Decide whether a dynamic light belongs in the per-pixel world pass. GLQuake
+// treats a camera contained by the inner 35 percent of a flashblend light as a
+// screen tint rather than world geometry. Feeding that same light to the
+// enhanced shader made the local player's randomly sized Quad/EF_DIMLIGHT
+// alternate between an orange world light and the blue powerup cshift.
+function worldLightEligible(light, currentTime, viewOrigin)
+  if light is void or viewOrigin is void or light.die < currentTime or light.radius <= light.minLight or light.radius <= 0.0 then return false end if
+  innerRadius = light.radius * 0.35
+  deltaX = light.origin.x - viewOrigin.x
+  deltaY = light.origin.y - viewOrigin.y
+  deltaZ = light.origin.z - viewOrigin.z
+  distanceSquared = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ
+  return distanceSquared >= innerRadius * innerRadius
+end function
+
 // Select the strongest active lights, pack them into the reusable bridge
 // buffer, and capture the current view matrix in the native backend.
 function beginFrame(dynamicLights, currentTime, viewOrigin)
@@ -93,7 +108,7 @@ function beginFrame(dynamicLights, currentTime, viewOrigin)
   lightLimit = c.MAX_DLIGHTS
   while index < len(dynamicLights) and index < lightLimit
     light = dynamicLights[index]
-    if light is not void and light.die >= currentTime and light.radius > light.minLight and light.radius > 0.0 then
+    if worldLightEligible(light, currentTime, viewOrigin) then
       score = light.radius
       insertAt = activeLightCount
       scan = 0

@@ -2339,10 +2339,20 @@ function R_PolyBlendProduction(blend, enabled)
   gl.vertex3(10.0, -100.0, -100.0)
   gl.vertex3(10.0, 100.0, -100.0)
   gl.finishPrimitive()
+  // The original renderer rebuilt most of this state at the next R_SetupGL,
+  // but Direct3D/Vulkan translate immediate commands into deferred batches.
+  // Establish a complete compatibility fence here so a persistent powerup
+  // cshift (especially Quad Damage) cannot bleed into the next entity-shadow
+  // batch while a frame is submitted or presented asynchronously.
   gl.color(255, 255, 255, 255)
   gl.disable(gl.GL_BLEND)
+  gl.blendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
   gl.enable(gl.GL_TEXTURE_2D)
   gl.enable(gl.GL_ALPHA_TEST)
+  gl.enable(gl.GL_DEPTH_TEST)
+  gl.depthMask(true)
+  gl.depthFunc(R_CurrentDepthFunction())
+  gl.textureEnvironment(gl.GL_REPLACE)
   return true
 end function
 

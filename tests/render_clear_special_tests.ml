@@ -20,7 +20,7 @@ function bp051Yes(value, name)
 end function
 // Execute one named test case and record its pass/fail result.
 function bp051Run(number, name, fn)
-  print "[" + number + "/20] " + name
+  print "[" + number + "/21] " + name
   value = try(fn())
   if value is error then print "FAIL: " + value.message; return false end if
   return true
@@ -187,6 +187,38 @@ function bp051ClearConstants()
   return true
 end function
 
+// Verify that a persistent Quad-style polyblend restores every render state
+// consumed by the projected-shadow pass on the following frame.
+function bp051PowerupPolyBlendStateFence()
+  bp051World.R_ConfigureSpecialCompatibility(1.0, false, true, false, false)
+  bp051World.R_ClearProduction()
+  expectedDepth = bp051World.R_CurrentDepthFunction()
+  bp051Gl.Trace_Begin()
+  bp051Yes(bp051World.R_PolyBlendProduction([0.0, 0.0, 1.0, 30.0 / 255.0], true), "quad polyblend drawn")
+  trace = bp051Gl.Trace_End()
+  white = false
+  standardBlend = false
+  depthEnabled = false
+  depthWritable = false
+  depthRestored = false
+  textureReplace = false
+  for each command in trace
+    if command[0] == "color" and command[1] == [1.0, 1.0, 1.0, 1.0] then white = true end if
+    if command[0] == "blend_function" and command[1] == [bp051Gl.GL_SRC_ALPHA, bp051Gl.GL_ONE_MINUS_SRC_ALPHA] then standardBlend = true end if
+    if command[0] == "enable" and command[1] == [bp051Gl.GL_DEPTH_TEST] then depthEnabled = true end if
+    if command[0] == "depth_mask" and command[1] == [1] then depthWritable = true end if
+    if command[0] == "depth_func" and command[1] == [expectedDepth] then depthRestored = true end if
+    if command[0] == "texture_environment" and command[1][2] == bp051Gl.GL_REPLACE then textureReplace = true end if
+  end for
+  bp051Yes(white, "polyblend restores white color")
+  bp051Yes(standardBlend, "polyblend restores shadow blend factors")
+  bp051Yes(depthEnabled, "polyblend restores depth testing")
+  bp051Yes(depthWritable, "polyblend restores depth writes")
+  bp051Yes(depthRestored, "polyblend restores active z-trick comparison")
+  bp051Yes(textureReplace, "polyblend restores texture replacement")
+  return true
+end function
+
 passed = 0
 if bp051Run(1, "mirror depth clear", bp051MirrorDepth) then passed = passed + 1 end if
 if bp051Run(2, "mirror color clear", bp051MirrorColor) then passed = passed + 1 end if
@@ -208,5 +240,6 @@ if bp051Run(17, "exact alpha one", bp051ExactAlphaOne) then passed = passed + 1 
 if bp051Run(18, "non-one mirror alpha", bp051AlphaAboveOne) then passed = passed + 1 end if
 if bp051Run(19, "depth constants", bp051DepthConstants) then passed = passed + 1 end if
 if bp051Run(20, "clear constants", bp051ClearConstants) then passed = passed + 1 end if
-if passed != 20 then print "MiniQuake BP-051 render-clear special tests failed: " + passed + "/20"; error(5199, "BP-051 render clear") end if
-print "MiniQuake BP-051 render-clear special tests passed: 20"
+if bp051Run(21, "powerup polyblend state fence", bp051PowerupPolyBlendStateFence) then passed = passed + 1 end if
+if passed != 21 then print "MiniQuake BP-051 render-clear special tests failed: " + passed + "/21"; error(5199, "BP-051 render clear") end if
+print "MiniQuake BP-051 render-clear special tests passed: 21"

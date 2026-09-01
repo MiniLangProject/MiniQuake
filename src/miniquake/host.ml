@@ -3973,12 +3973,16 @@ function _Host_Frame(session, elapsedSeconds)
         end if
       end if
       compatDiagnostics.checkpoint(session, "screen_mirror")
+      // Close the optional per-pixel program before Quake's full-screen color
+      // shift. Quad Damage is the most persistent non-zero polyblend and used
+      // to leave translated backends with an ambiguous shader/state boundary,
+      // corrupting the projected-shadow presentation on following frames.
+      enhancedRenderer.endFrame()
       worldRenderer.R_PolyBlendProduction(
         session.view.blend,
         glPolyBlend,
       )
       compatDiagnostics.checkpoint(session, "screen_polyblend")
-      enhancedRenderer.endFrame()
     else
       compatDiagnostics.checkpoint(session, "screen_world")
       compatDiagnostics.checkpoint(session, "screen_entities")
