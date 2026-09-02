@@ -1,5 +1,8 @@
 # MiniQuake
 
+[![License: GPL-2.0](https://img.shields.io/badge/License-GPL--2.0-blue.svg)](COPYING)
+[![Language: MiniLang](https://img.shields.io/badge/written%20in-MiniLang-5b5bd6.svg)](.)
+
 <p align="center">
   <img src="icons/MiniQuake.png" width="240" alt="MiniQuake application icon">
 </p>
