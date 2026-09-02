@@ -15,49 +15,74 @@ import miniquake.native as native
 import miniquake.sound.mixer as sound
 import miniquake.protocol_transients as transients
 
+/// Defines the max beams value used by `miniquake.temp_entities`.
 const MAX_BEAMS = 24
 
 // Group the fields that describe one temp beam.
 struct TempBeam
+  /// Stores the entity value in `miniquake.temp_entities.TempBeam`.
   entity
+  /// Stores the model value in `miniquake.temp_entities.TempBeam`.
   model
+  /// Stores the end time value in `miniquake.temp_entities.TempBeam`.
   endTime
+  /// Stores the start value in `miniquake.temp_entities.TempBeam`.
   start
+  /// Stores the end position value in `miniquake.temp_entities.TempBeam`.
   endPosition
 end struct
 
 // Describe one runtime temp render entity and its observable Quake state.
 struct TempRenderEntity
+  /// Stores the origin value in `miniquake.temp_entities.TempRenderEntity`.
   origin
+  /// Stores the model value in `miniquake.temp_entities.TempRenderEntity`.
   model
+  /// Stores the angles value in `miniquake.temp_entities.TempRenderEntity`.
   angles
+  /// Stores the colormap value in `miniquake.temp_entities.TempRenderEntity`.
   colormap
 end struct
 
 // Track mutable temp entity state across subsystem calls.
 struct TempEntityState
+  /// Stores the beams value in `miniquake.temp_entities.TempEntityState`.
   beams
+  /// Stores the num temp entities value in `miniquake.temp_entities.TempEntityState`.
   numTempEntities
+  /// Stores the temp entities value in `miniquake.temp_entities.TempEntityState`.
   tempEntities
+  /// Stores the visible entities value in `miniquake.temp_entities.TempEntityState`.
   visibleEntities
+  /// Stores the precached sounds value in `miniquake.temp_entities.TempEntityState`.
   precachedSounds
+  /// Stores the precached models value in `miniquake.temp_entities.TempEntityState`.
   precachedModels
+  /// Stores the sound events value in `miniquake.temp_entities.TempEntityState`.
   soundEvents
+  /// Stores the particle events value in `miniquake.temp_entities.TempEntityState`.
   particleEvents
+  /// Stores the dynamic lights value in `miniquake.temp_entities.TempEntityState`.
   dynamicLights
+  /// Stores the diagnostics value in `miniquake.temp_entities.TempEntityState`.
   diagnostics
+  /// Stores the random seed value in `miniquake.temp_entities.TempEntityState`.
   randomSeed
+  /// Stores the colormap value in `miniquake.temp_entities.TempEntityState`.
   colormap
 end struct
 
-// Read and validate position.
+/// Read and validate position.
+/// @param reader The reader input consumed by `readPosition`.
 function readPosition(reader)
   return t.Vec3(msg.readCoord(reader), msg.readCoord(reader), msg.readCoord(reader))
 end function
 
-// Mirrors CL_ParseTEnt's wire consumption.  Keeping this in the protocol layer
-// is important: treating svc_temp_entity as a one-byte payload desynchronizes
-// every command that follows it in the same server message.
+/// Mirrors CL_ParseTEnt's wire consumption.  Keeping this in the protocol layer
+/// is important: treating svc_temp_entity as a one-byte payload desynchronizes
+/// every command that follows it in the same server message.
+/// @param reader The reader input consumed by `parseType`.
+/// @param type The type input consumed by `parseType`.
 function parseType(reader, type)
   origin = t.Vec3(0.0, 0.0, 0.0)
   endPosition = t.Vec3(0.0, 0.0, 0.0)
@@ -81,22 +106,24 @@ function parseType(reader, type)
   return t.TemporaryEntity(type, origin, endPosition, entity)
 end function
 
-// Read and validate the requested value.
+/// Implements the `parse` operation for `miniquake.temp_entities` (parse).
+/// @param reader The reader input consumed by `parse`.
 function parse(reader)
   return parseType(reader, msg.readByte(reader))
 end function
 
-// Provide empty beam behavior for the active subsystem.
+/// Implements the `emptyBeam` operation for `miniquake.temp_entities` (empty beam).
 function emptyBeam()
   return TempBeam(0, "", 0.0, t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
 end function
 
-// Provide empty dynamic light behavior for the active subsystem.
+/// Implements the `emptyDynamicLight` operation for `miniquake.temp_entities` (empty dynamic light).
 function emptyDynamicLight()
   return t.DynamicLight(t.Vec3(0.0, 0.0, 0.0), 0.0, 0.0, 0.0, 0.0, 0)
 end function
 
-// Apply the Quake-compatible cl init tents behavior.
+/// Apply the Quake-compatible cl init tents behavior.
+/// @param mixer The mixer input consumed by `CL_InitTEnts`.
 function CL_InitTEnts(mixer)
   sounds = [
     "wizard/hit.wav",
@@ -123,19 +150,24 @@ function CL_InitTEnts(mixer)
   return TempEntityState(beams, 0, [], [], sounds, [], [], [], lights, [], 1, void)
 end function
 
-// Apply the Quake-compatible cl set random seed behavior.
+/// Apply the Quake-compatible cl set random seed behavior.
+/// @param state Mutable `miniquake.temp_entities` state used by `CL_SetRandomSeed`.
+/// @param seed The seed input consumed by `CL_SetRandomSeed`.
 function CL_SetRandomSeed(state, seed)
   state.randomSeed = seed & 0xffffffff
   return state.randomSeed
 end function
 
-// Apply the Quake-compatible cl rand behavior.
+/// Apply the Quake-compatible cl rand behavior.
+/// @param state Mutable `miniquake.temp_entities` state used by `CL_Rand`.
 function CL_Rand(state)
   state.randomSeed = (state.randomSeed * 214013 + 2531011) & 0xffffffff
   return (state.randomSeed >> 16) & 0x7fff
 end function
 
-// Add state for append unique.
+/// Add state for append unique.
+/// @param values The values input consumed by `appendUnique`.
+/// @param value Value consumed by `appendUnique`.
 function appendUnique(values, value)
   for each current in values
     if current == value then return values end if
@@ -143,7 +175,8 @@ function appendUnique(values, value)
   return values + [value]
 end function
 
-// Provide beam type for model behavior for the active subsystem.
+/// Implements the `beamTypeForModel` operation for `miniquake.temp_entities` (beam type for model).
+/// @param model Model resource processed by the operation.
 function beamTypeForModel(model)
   if model == "progs/bolt.mdl" then return c.TE_LIGHTNING1 end if
   if model == "progs/bolt2.mdl" then return c.TE_LIGHTNING2 end if
@@ -151,7 +184,8 @@ function beamTypeForModel(model)
   return c.TE_BEAM
 end function
 
-// Return beam model for type derived from the active module state.
+/// Return beam model for type derived from the active module state.
+/// @param type The type input consumed by `beamModelForType`.
 function beamModelForType(type)
   if type == c.TE_LIGHTNING1 then return "progs/bolt.mdl" end if
   if type == c.TE_LIGHTNING2 then return "progs/bolt2.mdl" end if
@@ -160,7 +194,13 @@ function beamModelForType(type)
   return ""
 end function
 
-// Update module state for beam.
+/// Update module state for beam.
+/// @param beam The beam input consumed by `setBeam`.
+/// @param entity Entity affected by the operation.
+/// @param model Model resource processed by the operation.
+/// @param start The start input consumed by `setBeam`.
+/// @param finish The finish input consumed by `setBeam`.
+/// @param currentTime Time value used by the operation.
 function setBeam(beam, entity, model, start, finish, currentTime)
   beam.entity = entity
   beam.model = model
@@ -170,7 +210,11 @@ function setBeam(beam, entity, model, start, finish, currentTime)
   return beam
 end function
 
-// Apply the Quake-compatible cl parse beam behavior.
+/// Apply the Quake-compatible cl parse beam behavior.
+/// @param state Mutable `miniquake.temp_entities` state used by `CL_ParseBeam`.
+/// @param reader The reader input consumed by `CL_ParseBeam`.
+/// @param model Model resource processed by the operation.
+/// @param currentTime Time value used by the operation.
 function CL_ParseBeam(state, reader, model, currentTime)
   entity = msg.readShort(reader)
   start = readPosition(reader)
@@ -201,17 +245,28 @@ function CL_ParseBeam(state, reader, model, currentTime)
   return event
 end function
 
-// Add state for append sound event.
+/// Add state for append sound event.
+/// @param state Mutable `miniquake.temp_entities` state used by `appendSoundEvent`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param origin World-space origin of the operation.
 function appendSoundEvent(state, name, origin)
   state.soundEvents = state.soundEvents + [[-1, 0, name, math.copy(origin), 1.0, 1.0]]
 end function
 
-// Add state for append particle event.
+/// Add state for append particle event.
+/// @param state Mutable `miniquake.temp_entities` state used by `appendParticleEvent`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param origin World-space origin of the operation.
+/// @param color Color value used by the operation.
+/// @param count Number of entries or units to process.
+/// @param extra The extra input consumed by `appendParticleEvent`.
 function appendParticleEvent(state, name, origin, color, count, extra)
   state.particleEvents = state.particleEvents + [[name, math.copy(origin), color, count, extra]]
 end function
 
-// Allocate and initialize temp dlight.
+/// Allocate and initialize temp dlight.
+/// @param state Mutable `miniquake.temp_entities` state used by `allocateTempDlight`.
+/// @param currentTime Time value used by the operation.
 function allocateTempDlight(state, currentTime)
   index = 0
   while index < len(state.dynamicLights)
@@ -230,7 +285,10 @@ function allocateTempDlight(state, currentTime)
   return state.dynamicLights[0]
 end function
 
-// Add state for append explosion light.
+/// Add state for append explosion light.
+/// @param state Mutable `miniquake.temp_entities` state used by `appendExplosionLight`.
+/// @param origin World-space origin of the operation.
+/// @param currentTime Time value used by the operation.
 function appendExplosionLight(state, origin, currentTime)
   light = allocateTempDlight(state, currentTime)
   light.origin = math.copy(origin)
@@ -240,7 +298,9 @@ function appendExplosionLight(state, origin, currentTime)
   return light
 end function
 
-// Add state for append spike sound.
+/// Add state for append spike sound.
+/// @param state Mutable `miniquake.temp_entities` state used by `appendSpikeSound`.
+/// @param origin World-space origin of the operation.
 function appendSpikeSound(state, origin)
   if CL_Rand(state) % 5 != 0 then
     appendSoundEvent(state, "weapons/tink1.wav", origin)
@@ -253,7 +313,10 @@ function appendSpikeSound(state, origin)
   return name
 end function
 
-// Apply the Quake-compatible cl parse tent behavior.
+/// Apply the Quake-compatible cl parse tent behavior.
+/// @param state Mutable `miniquake.temp_entities` state used by `CL_ParseTEnt`.
+/// @param reader The reader input consumed by `CL_ParseTEnt`.
+/// @param currentTime Time value used by the operation.
 function CL_ParseTEnt(state, reader, currentTime)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   type = msg.readByte(reader)
@@ -298,7 +361,8 @@ function CL_ParseTEnt(state, reader, currentTime)
   return value
 end function
 
-// Apply the Quake-compatible cl new temp entity behavior.
+/// Apply the Quake-compatible cl new temp entity behavior.
+/// @param state Mutable `miniquake.temp_entities` state used by `CL_NewTempEntity`.
 function CL_NewTempEntity(state)
   if len(state.visibleEntities) >= c.MAX_VISEDICTS then return void end if
   if state.numTempEntities >= c.MAX_TEMP_ENTITIES then return void end if
@@ -314,7 +378,11 @@ function CL_NewTempEntity(state)
   return entity
 end function
 
-// Apply the Quake-compatible cl update tents behavior.
+/// Apply the Quake-compatible cl update tents behavior.
+/// @param state Mutable `miniquake.temp_entities` state used by `CL_UpdateTEnts`.
+/// @param currentTime Time value used by the operation.
+/// @param viewEntity The view entity input consumed by `CL_UpdateTEnts`.
+/// @param viewOrigin The view origin input consumed by `CL_UpdateTEnts`.
 function CL_UpdateTEnts(state, currentTime, viewEntity, viewOrigin)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   state.numTempEntities = 0

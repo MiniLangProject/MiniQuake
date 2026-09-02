@@ -15,58 +15,106 @@ import miniquake.native as native
 import miniquake.array_util as arrays
 import miniquake.common as common
 
+/// Defines the max sfx value used by `miniquake.sound.snd_dma`.
 const MAX_SFX = 512
+/// Defines the max channels value used by `miniquake.sound.snd_dma`.
 const MAX_CHANNELS = 128
+/// Defines the max dynamic channels value used by `miniquake.sound.snd_dma`.
 const MAX_DYNAMIC_CHANNELS = 8
+/// Defines the num ambients value used by `miniquake.sound.snd_dma`.
 const NUM_AMBIENTS = 4
+/// Defines the dynamic first value used by `miniquake.sound.snd_dma`.
 const DYNAMIC_FIRST = NUM_AMBIENTS
+/// Defines the static first value used by `miniquake.sound.snd_dma`.
 const STATIC_FIRST = NUM_AMBIENTS + MAX_DYNAMIC_CHANNELS
+/// Defines the sound nominal clip distance value used by `miniquake.sound.snd_dma`.
 const SOUND_NOMINAL_CLIP_DISTANCE = 1000.0
+/// Defines the default sound packet volume value used by `miniquake.sound.snd_dma`.
 const DEFAULT_SOUND_PACKET_VOLUME = 255
+/// Defines the default sound packet attenuation value used by `miniquake.sound.snd_dma`.
 const DEFAULT_SOUND_PACKET_ATTENUATION = 1.0
 
 // Own the coordinated data required by the sound system.
 struct SoundSystem
+  /// Stores the filesystem value in `miniquake.sound.snd_dma.SoundSystem`.
   filesystem
+  /// Stores the mix state value in `miniquake.sound.snd_dma.SoundSystem`.
   mixState
+  /// Stores the initialized value in `miniquake.sound.snd_dma.SoundSystem`.
   initialized
+  /// Stores the started value in `miniquake.sound.snd_dma.SoundSystem`.
   started
+  /// Stores the blocked value in `miniquake.sound.snd_dma.SoundSystem`.
   blocked
+  /// Stores the ambient enabled value in `miniquake.sound.snd_dma.SoundSystem`.
   ambientEnabled
+  /// Stores the fake dma value in `miniquake.sound.snd_dma.SoundSystem`.
   fakeDma
+  /// Stores the dma opened value in `miniquake.sound.snd_dma.SoundSystem`.
   dmaOpened
+  /// Stores the fake dma updates value in `miniquake.sound.snd_dma.SoundSystem`.
   fakeDmaUpdates
+  /// Stores the no sound value in `miniquake.sound.snd_dma.SoundSystem`.
   noSound
+  /// Stores the precache enabled value in `miniquake.sound.snd_dma.SoundSystem`.
   precacheEnabled
+  /// Stores the load as8 bit value in `miniquake.sound.snd_dma.SoundSystem`.
   loadAs8Bit
+  /// Stores the ambient level value in `miniquake.sound.snd_dma.SoundSystem`.
   ambientLevel
+  /// Stores the ambient fade value in `miniquake.sound.snd_dma.SoundSystem`.
   ambientFade
+  /// Stores the no extra update value in `miniquake.sound.snd_dma.SoundSystem`.
   noExtraUpdate
+  /// Stores the show value in `miniquake.sound.snd_dma.SoundSystem`.
   show
+  /// Stores the mix ahead value in `miniquake.sound.snd_dma.SoundSystem`.
   mixAhead
+  /// Stores the desired speed value in `miniquake.sound.snd_dma.SoundSystem`.
   desiredSpeed
+  /// Stores the desired bits value in `miniquake.sound.snd_dma.SoundSystem`.
   desiredBits
+  /// Stores the known sfx value in `miniquake.sound.snd_dma.SoundSystem`.
   knownSfx
+  /// Stores the ambient sfx value in `miniquake.sound.snd_dma.SoundSystem`.
   ambientSfx
+  /// Stores the listener origin value in `miniquake.sound.snd_dma.SoundSystem`.
   listenerOrigin
+  /// Stores the listener forward value in `miniquake.sound.snd_dma.SoundSystem`.
   listenerForward
+  /// Stores the listener right value in `miniquake.sound.snd_dma.SoundSystem`.
   listenerRight
+  /// Stores the listener up value in `miniquake.sound.snd_dma.SoundSystem`.
   listenerUp
+  /// Stores the listener entity value in `miniquake.sound.snd_dma.SoundSystem`.
   listenerEntity
+  /// Stores the old sample position value in `miniquake.sound.snd_dma.SoundSystem`.
   oldSamplePosition
+  /// Stores the completed buffers value in `miniquake.sound.snd_dma.SoundSystem`.
   completedBuffers
+  /// Stores the random seed value in `miniquake.sound.snd_dma.SoundSystem`.
   randomSeed
+  /// Stores the play hash value in `miniquake.sound.snd_dma.SoundSystem`.
   playHash
+  /// Stores the play volume hash value in `miniquake.sound.snd_dma.SoundSystem`.
   playVolumeHash
+  /// Stores the submit calls value in `miniquake.sound.snd_dma.SoundSystem`.
   submitCalls
+  /// Stores the paint calls value in `miniquake.sound.snd_dma.SoundSystem`.
   paintCalls
+  /// Stores the last paint time value in `miniquake.sound.snd_dma.SoundSystem`.
   lastPaintTime
+  /// Stores the accumulate calls value in `miniquake.sound.snd_dma.SoundSystem`.
   accumulateCalls
+  /// Stores the registered commands value in `miniquake.sound.snd_dma.SoundSystem`.
   registeredCommands
+  /// Stores the registered cvars value in `miniquake.sound.snd_dma.SoundSystem`.
   registeredCvars
 end struct
 
-// Create and initialize the module state.
+/// Implements the `create` operation for `miniquake.sound.snd_dma` (create).
+/// @param filesystem The filesystem input consumed by `create`.
+/// @param sampleRate The sample rate input consumed by `create`.
 function create(filesystem, sampleRate)
   dma = sndmix.createDma(sampleRate, 16, 2, 32768)
   return SoundSystem(
@@ -110,8 +158,9 @@ function create(filesystem, sampleRate)
   )
 end function
 
-// sound.h platform-facing API.  The native DLL owns waveOut handles; the
-// portable sound core only controls its lifetime and supplies PCM blocks.
+/// sound.h platform-facing API.  The native DLL owns waveOut handles; the
+/// portable sound core only controls its lifetime and supplies PCM blocks.
+/// @param system The system input consumed by `SNDDMA_Init`.
 function SNDDMA_Init(system)
   if system.fakeDma then
     system.dmaOpened = true
@@ -122,12 +171,14 @@ function SNDDMA_Init(system)
   return system.dmaOpened
 end function
 
-// Mirror Quake's SNDDMA_GetDMAPos routine and its observable state changes.
+/// Mirror Quake's SNDDMA_GetDMAPos routine and its observable state changes.
+/// @param system The system input consumed by `SNDDMA_GetDMAPos`.
 function inline SNDDMA_GetDMAPos(system)
   return system.mixState.dma.samplePosition
 end function
 
-// Mirror Quake's SNDDMA_Submit routine and its observable state changes.
+/// Mirror Quake's SNDDMA_Submit routine and its observable state changes.
+/// @param system The system input consumed by `SNDDMA_Submit`.
 function SNDDMA_Submit(system)
   system.submitCalls = system.submitCalls + 1
   if system.fakeDma then return true end if
@@ -136,20 +187,24 @@ function SNDDMA_Submit(system)
   return native.audioSubmit(dma.buffer, len(dma.buffer)) != 0
 end function
 
-// Mirror Quake's SNDDMA_Shutdown routine and its observable state changes.
+/// Mirror Quake's SNDDMA_Shutdown routine and its observable state changes.
+/// @param system The system input consumed by `SNDDMA_Shutdown`.
 function SNDDMA_Shutdown(system)
   if system.dmaOpened and not system.fakeDma then native.audioClose() end if
   system.dmaOpened = false
   return true
 end function
 
-// Apply the Quake-compatible s init paint channels behavior.
+/// Apply the Quake-compatible s init paint channels behavior.
+/// @param system The system input consumed by `S_InitPaintChannels`.
 function S_InitPaintChannels(system)
   sndmix.clearPaintBuffer(system.mixState, sndmix.PAINTBUFFER_SIZE)
   return sndmix.SND_InitScaletable(system.mixState)
 end function
 
-// Report whether argument.
+/// Report whether argument.
+/// @param arguments Command-line arguments to inspect or execute.
+/// @param wanted The wanted input consumed by `hasArgument`.
 function hasArgument(arguments, wanted)
   if arguments is void then return false end if
   for each argument in arguments
@@ -158,19 +213,22 @@ function hasArgument(arguments, wanted)
   return false
 end function
 
-// Apply the Quake-compatible s ambient off behavior.
+/// Apply the Quake-compatible s ambient off behavior.
+/// @param system The system input consumed by `S_AmbientOff`.
 function S_AmbientOff(system)
   system.ambientEnabled = false
   return false
 end function
 
-// Apply the Quake-compatible s ambient on behavior.
+/// Apply the Quake-compatible s ambient on behavior.
+/// @param system The system input consumed by `S_AmbientOn`.
 function S_AmbientOn(system)
   system.ambientEnabled = true
   return true
 end function
 
-// Apply the Quake-compatible s sound info f behavior.
+/// Apply the Quake-compatible s sound info f behavior.
+/// @param system The system input consumed by `S_SoundInfo_f`.
 function S_SoundInfo_f(system)
   if not system.started or system.mixState.dma is void then return ["sound system not started"] end if
   dma = system.mixState.dma
@@ -186,7 +244,8 @@ function S_SoundInfo_f(system)
   ]
 end function
 
-// Apply the Quake-compatible s startup behavior.
+/// Apply the Quake-compatible s startup behavior.
+/// @param system The system input consumed by `S_Startup`.
 function S_Startup(system)
   if not system.initialized then return false end if
   if not SNDDMA_Init(system) then
@@ -199,7 +258,10 @@ function S_Startup(system)
   return true
 end function
 
-// Apply the Quake-compatible s init behavior.
+/// Apply the Quake-compatible s init behavior.
+/// @param system The system input consumed by `S_Init`.
+/// @param arguments Command-line arguments to inspect or execute.
+/// @param memorySize Size of the requested data or resource.
 function S_Init(system, arguments, memorySize)
   if hasArgument(arguments, "-nosound") then
     system.noSound = true
@@ -243,7 +305,8 @@ function S_Init(system, arguments, memorySize)
   return true
 end function
 
-// Apply the Quake-compatible s shutdown behavior.
+/// Apply the Quake-compatible s shutdown behavior.
+/// @param system The system input consumed by `S_Shutdown`.
 function S_Shutdown(system)
   if not system.started then return false end if
   system.mixState.dma.gameAlive = false
@@ -252,7 +315,9 @@ function S_Shutdown(system)
   return true
 end function
 
-// Apply the Quake-compatible s find name behavior.
+/// Apply the Quake-compatible s find name behavior.
+/// @param system The system input consumed by `S_FindName`.
+/// @param name Stable name that identifies the requested object or option.
 function S_FindName(system, name)
   if name is void then return error(2480, "S_FindName: NULL") end if
   if len(bytes(name)) >= 64 then return error(2481, "Sound name too long: " + name) end if
@@ -265,7 +330,9 @@ function S_FindName(system, name)
   return descriptor
 end function
 
-// Apply the Quake-compatible s touch sound behavior.
+/// Apply the Quake-compatible s touch sound behavior.
+/// @param system The system input consumed by `S_TouchSound`.
+/// @param name Stable name that identifies the requested object or option.
 function S_TouchSound(system, name)
   if not system.started then return false end if
   descriptor = S_FindName(system, name)
@@ -273,7 +340,9 @@ function S_TouchSound(system, name)
   return descriptor.cache is not void
 end function
 
-// Apply the Quake-compatible s precache sound behavior.
+/// Apply the Quake-compatible s precache sound behavior.
+/// @param system The system input consumed by `S_PrecacheSound`.
+/// @param name Stable name that identifies the requested object or option.
 function S_PrecacheSound(system, name)
   if not system.started or system.noSound then return void end if
   descriptor = S_FindName(system, name)
@@ -285,7 +354,10 @@ function S_PrecacheSound(system, name)
   return descriptor
 end function
 
-// Mirror Quake's SND_PickChannel routine and its observable state changes.
+/// Mirror Quake's SND_PickChannel routine and its observable state changes.
+/// @param system The system input consumed by `SND_PickChannel`.
+/// @param entityNumber The entity number input consumed by `SND_PickChannel`.
+/// @param entityChannel The entity channel input consumed by `SND_PickChannel`.
 function SND_PickChannel(system, entityNumber, entityChannel)
   firstToDie = -1
   lifeLeft = 0x7fffffff
@@ -311,12 +383,15 @@ function SND_PickChannel(system, entityNumber, entityChannel)
   return target
 end function
 
-// Provide sound f32 behavior for the active subsystem.
+/// Implements the `soundF32` operation for `miniquake.sound.snd_dma` (sound f32).
+/// @param value Value consumed by `soundF32`.
 function soundF32(value)
   return native.bitsFloat(native.floatBits(value))
 end function
 
-// Mirror Quake's SND_Spatialize routine and its observable state changes.
+/// Mirror Quake's SND_Spatialize routine and its observable state changes.
+/// @param system The system input consumed by `SND_Spatialize`.
+/// @param channel The channel input consumed by `SND_Spatialize`.
 function SND_Spatialize(system, channel)
   if channel.entityNumber == system.listenerEntity then
     channel.leftVolume = channel.masterVolume
@@ -348,14 +423,22 @@ function SND_Spatialize(system, channel)
   return [channel.leftVolume, channel.rightVolume]
 end function
 
-// Return next random for the active module state.
+/// Return next random for the active module state.
+/// @param system The system input consumed by `nextRandom`.
 function nextRandom(system)
   // WinQuake/MiniQuake uses the Microsoft C runtime rand() sequence.
   system.randomSeed = (system.randomSeed * 214013 + 2531011) & 0xffffffff
   return (system.randomSeed >> 16) & 0x7fff
 end function
 
-// Apply the Quake-compatible s start sound behavior.
+/// Apply the Quake-compatible s start sound behavior.
+/// @param system The system input consumed by `S_StartSound`.
+/// @param entityNumber The entity number input consumed by `S_StartSound`.
+/// @param entityChannel The entity channel input consumed by `S_StartSound`.
+/// @param descriptor The descriptor input consumed by `S_StartSound`.
+/// @param origin World-space origin of the operation.
+/// @param volume The volume input consumed by `S_StartSound`.
+/// @param attenuation The attenuation input consumed by `S_StartSound`.
 function S_StartSound(system, entityNumber, entityChannel, descriptor, origin, volume, attenuation)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if not system.started or descriptor is void or system.noSound then return false end if
@@ -399,7 +482,10 @@ function S_StartSound(system, entityNumber, entityChannel, descriptor, origin, v
   return true
 end function
 
-// Apply the Quake-compatible s stop sound behavior.
+/// Apply the Quake-compatible s stop sound behavior.
+/// @param system The system input consumed by `S_StopSound`.
+/// @param entityNumber The entity number input consumed by `S_StopSound`.
+/// @param entityChannel The entity channel input consumed by `S_StopSound`.
 function S_StopSound(system, entityNumber, entityChannel)
   // Preserve the original 1.09 loop bounds, including its first-eight-slots
   // quirk rather than silently widening this to every channel.
@@ -416,7 +502,8 @@ function S_StopSound(system, entityNumber, entityChannel)
   return false
 end function
 
-// Apply the Quake-compatible s clear buffer behavior.
+/// Apply the Quake-compatible s clear buffer behavior.
+/// @param system The system input consumed by `S_ClearBuffer`.
 function S_ClearBuffer(system)
   if not system.started or system.mixState.dma is void then return false end if
   clearValue = 0
@@ -431,7 +518,9 @@ function S_ClearBuffer(system)
   return true
 end function
 
-// Apply the Quake-compatible s stop all sounds behavior.
+/// Apply the Quake-compatible s stop all sounds behavior.
+/// @param system The system input consumed by `S_StopAllSounds`.
+/// @param clear The clear input consumed by `S_StopAllSounds`.
 function S_StopAllSounds(system, clear)
   if not system.started then return false end if
   system.mixState.totalChannels = STATIC_FIRST
@@ -444,12 +533,18 @@ function S_StopAllSounds(system, clear)
   return true
 end function
 
-// Apply the Quake-compatible s stop all sounds c behavior.
+/// Apply the Quake-compatible s stop all sounds c behavior.
+/// @param system The system input consumed by `S_StopAllSoundsC`.
 function S_StopAllSoundsC(system)
   return S_StopAllSounds(system, true)
 end function
 
-// Apply the Quake-compatible s static sound behavior.
+/// Apply the Quake-compatible s static sound behavior.
+/// @param system The system input consumed by `S_StaticSound`.
+/// @param descriptor The descriptor input consumed by `S_StaticSound`.
+/// @param origin World-space origin of the operation.
+/// @param volume The volume input consumed by `S_StaticSound`.
+/// @param attenuation The attenuation input consumed by `S_StaticSound`.
 function S_StaticSound(system, descriptor, origin, volume, attenuation)
   if descriptor is void then return false end if
   if system.mixState.totalChannels >= MAX_CHANNELS then return false end if
@@ -471,7 +566,10 @@ function S_StaticSound(system, descriptor, origin, volume, attenuation)
   return true
 end function
 
-// Apply the Quake-compatible s update ambient sounds behavior.
+/// Apply the Quake-compatible s update ambient sounds behavior.
+/// @param system The system input consumed by `S_UpdateAmbientSounds`.
+/// @param ambientLevels The ambient levels input consumed by `S_UpdateAmbientSounds`.
+/// @param frameTime Time value used by the operation.
 function S_UpdateAmbientSounds(system, ambientLevels, frameTime)
   if not system.ambientEnabled then return false end if
   // With no world model the original returns without disturbing the
@@ -509,7 +607,8 @@ function S_UpdateAmbientSounds(system, ambientLevels, frameTime)
   return true
 end function
 
-// Provide combine static channels behavior for the active subsystem.
+/// Implements the `combineStaticChannels` operation for `miniquake.sound.snd_dma` (combine static channels).
+/// @param system The system input consumed by `combineStaticChannels`.
 function combineStaticChannels(system)
   index = STATIC_FIRST
   while index < system.mixState.totalChannels
@@ -532,7 +631,9 @@ function combineStaticChannels(system)
   end while
 end function
 
-// Return soundtime.
+/// Return soundtime.
+/// @param system The system input consumed by `GetSoundtime`.
+/// @param samplePosition The sample position input consumed by `GetSoundtime`.
 function GetSoundtime(system, samplePosition)
   dma = system.mixState.dma
   fullSamples = dma.samples / dma.channels
@@ -550,7 +651,9 @@ function GetSoundtime(system, samplePosition)
   return system.mixState.soundTime
 end function
 
-// Apply the Quake-compatible s update behavior.
+/// Apply the Quake-compatible s update behavior.
+/// @param system The system input consumed by `S_Update_`.
+/// @param samplePosition The sample position input consumed by `S_Update_`.
 function S_Update_(system, samplePosition)
   if not system.started or system.blocked > 0 then return 0 end if
   GetSoundtime(system, samplePosition)
@@ -567,7 +670,15 @@ function S_Update_(system, samplePosition)
   return endTime
 end function
 
-// Apply the Quake-compatible s update behavior.
+/// Apply the Quake-compatible s update behavior.
+/// @param system The system input consumed by `S_Update`.
+/// @param origin World-space origin of the operation.
+/// @param forward The forward input consumed by `S_Update`.
+/// @param right The right input consumed by `S_Update`.
+/// @param up The up input consumed by `S_Update`.
+/// @param ambientLevels The ambient levels input consumed by `S_Update`.
+/// @param frameTime Time value used by the operation.
+/// @param samplePosition The sample position input consumed by `S_Update`.
 function S_Update(system, origin, forward, right, up, ambientLevels, frameTime, samplePosition)
   if not system.started or system.blocked > 0 then return false end if
   system.listenerOrigin = math.copy(origin)
@@ -586,7 +697,9 @@ function S_Update(system, origin, forward, right, up, ambientLevels, frameTime, 
   return true
 end function
 
-// Apply the Quake-compatible s extra update behavior.
+/// Apply the Quake-compatible s extra update behavior.
+/// @param system The system input consumed by `S_ExtraUpdate`.
+/// @param samplePosition The sample position input consumed by `S_ExtraUpdate`.
 function S_ExtraUpdate(system, samplePosition)
   // WinQuake accumulates pending mouse input before honoring
   // snd_noextraupdate.
@@ -595,7 +708,8 @@ function S_ExtraUpdate(system, samplePosition)
   return S_Update_(system, samplePosition)
 end function
 
-// Report whether extension.
+/// Report whether extension.
+/// @param name Stable name that identifies the requested object or option.
 function hasExtension(name)
   data = bytes(name)
   index = 0
@@ -606,7 +720,9 @@ function hasExtension(name)
   return false
 end function
 
-// Apply the Quake-compatible s play behavior.
+/// Apply the Quake-compatible s play behavior.
+/// @param system The system input consumed by `S_Play`.
+/// @param arguments Command-line arguments to inspect or execute.
 function S_Play(system, arguments)
   played = 0
   for each argument in arguments
@@ -623,7 +739,9 @@ function S_Play(system, arguments)
   return played
 end function
 
-// Apply the Quake-compatible s play vol behavior.
+/// Apply the Quake-compatible s play vol behavior.
+/// @param system The system input consumed by `S_PlayVol`.
+/// @param arguments Command-line arguments to inspect or execute.
 function S_PlayVol(system, arguments)
   played = 0
   index = 0
@@ -643,7 +761,8 @@ function S_PlayVol(system, arguments)
   return played
 end function
 
-// Apply the Quake-compatible s sound list behavior.
+/// Apply the Quake-compatible s sound list behavior.
+/// @param system The system input consumed by `S_SoundList`.
 function S_SoundList(system)
   entries = arrays.createArrayBuilder(len(system.knownSfx))
   total = 0
@@ -658,7 +777,9 @@ function S_SoundList(system)
   return [arrays.finishArrayBuilder(entries), total]
 end function
 
-// Apply the Quake-compatible s local sound behavior.
+/// Apply the Quake-compatible s local sound behavior.
+/// @param system The system input consumed by `S_LocalSound`.
+/// @param sound The sound input consumed by `S_LocalSound`.
 function S_LocalSound(system, sound)
   if system.noSound or not system.started then return false end if
   descriptor = S_PrecacheSound(system, sound)
@@ -666,17 +787,20 @@ function S_LocalSound(system, sound)
   return S_StartSound(system, system.listenerEntity, -1, descriptor, t.Vec3(0.0, 0.0, 0.0), 1.0, 1.0)
 end function
 
-// Apply the Quake-compatible s clear precache behavior.
+/// Apply the Quake-compatible s clear precache behavior.
+/// @param system The system input consumed by `S_ClearPrecache`.
 function S_ClearPrecache(system)
   return true
 end function
 
-// Apply the Quake-compatible s begin precaching behavior.
+/// Apply the Quake-compatible s begin precaching behavior.
+/// @param system The system input consumed by `S_BeginPrecaching`.
 function S_BeginPrecaching(system)
   return true
 end function
 
-// Apply the Quake-compatible s end precaching behavior.
+/// Apply the Quake-compatible s end precaching behavior.
+/// @param system The system input consumed by `S_EndPrecaching`.
 function S_EndPrecaching(system)
   return true
 end function

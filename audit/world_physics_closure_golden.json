@@ -13,15 +13,15 @@
     "BP-029"
   ],
   "authoritative_files": {
-    "src/miniquake/world_hull.ml": "85ef6d71deb6095851f659e4162087c0db75ce90f2d5cf8fbb8f35d0d829ca28",
-    "src/miniquake/world.ml": "cfb78e7942043f060c0071e2eee4c85932bc844cec625203d917d2f160482cf8",
-    "src/miniquake/world_bsp.ml": "747c0af69cee4cf7ddc89837db8de026b6eaa5ea26d446950cf5e8c61010b49c",
-    "src/miniquake/server_collision.ml": "fbcee409e15f0cf704683352e9685a2a601af8de6c1188ca15919e841c326a5c",
-    "src/miniquake/server_move.ml": "7c2f2a579856f43af29c82ea2d7688a47665559b250f6b0847dd35040f5d5bf4",
-    "src/miniquake/physics.ml": "853c7d8fae3829835867821de294f9fc3ded30128cf11f542f2e120a4007a7ec",
-    "src/miniquake/sv_user.ml": "30eec3f5c325ad5e0df46a9c0d515de628d5fd64610285ad34c06272109c19f5",
-    "src/miniquake/server.ml": "41d9704398e6a659804fd0b191c2f193fccca273c8c9d515077e51de2c7e4572",
-    "src/miniquake/world_physics_contract.ml": "f1b403436bf90a0fe78d162f1ce7b3bb662e2c07b44edd24d19a750351eb605f"
+    "src/miniquake/world_hull.ml": "d2d369d40777e7202269d2f3d6d67ccb56f411ba2a38a854eceecc360c6e494a",
+    "src/miniquake/world.ml": "c4627def180cb2c6c81ca493ec8494b6f7ca57ea80f96b03d7ff9c1f2e980ce8",
+    "src/miniquake/world_bsp.ml": "88b1f5d0f3d768f0d2370cb08dbb2b2a0da3f59a7712cf5e33d49ef50728801e",
+    "src/miniquake/server_collision.ml": "ba14d7038a5bbd26b2d93a46d5e2c86af4f1de21d008493722c347febff1fac6",
+    "src/miniquake/server_move.ml": "f7c03ed3fa9bf117cd9792a15e75c0fcb753c7e877573e5c3112e89e861b523a",
+    "src/miniquake/physics.ml": "2c76c249ef90858a001f00fa22da894bc710c2ac68ee4a2a9d994e9e7aa83e83",
+    "src/miniquake/sv_user.ml": "8d677892bf3b579736faf32cef4efe2db5b25a786f15e322f909559bafc9bcab",
+    "src/miniquake/server.ml": "b9d9f7370366b606cefc7cdd4aeafbd0cb55df2895e62f6c743163f2543a40e8",
+    "src/miniquake/world_physics_contract.ml": "06116984bbb8221b92ca1dbf1d2ea780a2c32944566891ba187f98119fcddfd9"
   },
   "runtime_fixtures": 20
 }

@@ -1,0 +1,96 @@
+# Package `miniquake.common`
+
+[Home](README.md) · [Packages](Packages.md)
+
+## Files
+
+- [src/miniquake/common.ml](File-src-miniquake-common-ml-466436205.md)
+
+## Symbols
+
+- [`miniquake.common.atof`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-atof-function-atof-text-src-miniquake-common-ml-44319216) — function
+- [`miniquake.common.atoi`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-atoi-function-atoi-text-src-miniquake-common-ml-1914868872) — function
+- [`miniquake.common.baseDirectory`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-basedirectory-function-basedirectory-commandline-src-miniquake-common-ml-562005324) — function
+- [`miniquake.common.cAtof`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-catof-function-catof-text-src-miniquake-common-ml-1101165974) — function
+- [`miniquake.common.cAtoi`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-catoi-function-catoi-text-src-miniquake-common-ml-914622676) — function
+- [`miniquake.common.checkParm`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-checkparm-function-checkparm-commandline-name-src-miniquake-common-ml-256881261) — function
+- [`miniquake.common.ClearLink`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-clearlink-function-clearlink-link-src-miniquake-common-ml-566942171) — function
+- [`miniquake.common.clearLink`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-clearlink-function-clearlink-link-src-miniquake-common-ml-528379931) — function
+- [`miniquake.common.COM_CheckParm`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-com-checkparm-function-com-checkparm-commandline-name-src-miniquake-common-ml-266031153) — function
+- [`miniquake.common.COM_DefaultExtension`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-com-defaultextension-function-com-defaultextension-pathname-extension-src-miniquake-common-ml-372525974) — function
+- [`miniquake.common.COM_FileBase`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-com-filebase-function-com-filebase-pathname-src-miniquake-common-ml-1299853077) — function
+- [`miniquake.common.COM_FileExtension`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-com-fileextension-function-com-fileextension-pathname-src-miniquake-common-ml-1002883883) — function
+- [`miniquake.common.COM_Init`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-com-init-function-com-init-basedir-arguments-src-miniquake-common-ml-1169242277) — function
+- [`miniquake.common.COM_InitArgv`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-com-initargv-function-com-initargv-arguments-src-miniquake-common-ml-1087090673) — function
+- [`miniquake.common.COM_Parse`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-com-parse-function-com-parse-text-startoffset-src-miniquake-common-ml-462747489) — function
+- [`miniquake.common.COM_SkipPath`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-com-skippath-function-com-skippath-pathname-src-miniquake-common-ml-900097177) — function
+- [`miniquake.common.COM_StripExtension`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-com-stripextension-function-com-stripextension-pathname-src-miniquake-common-ml-947503341) — function
+- [`miniquake.common.create`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-create-function-create-args-src-miniquake-common-ml-357580826) — function
+- [`miniquake.common.defaultExtension`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-defaultextension-function-defaultextension-pathname-extension-src-miniquake-common-ml-1699520794) — function
+- [`miniquake.common.describe`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-describe-function-describe-commandline-src-miniquake-common-ml-371663796) — function
+- [`miniquake.common.fileBase`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-filebase-function-filebase-pathname-src-miniquake-common-ml-527206545) — function
+- [`miniquake.common.fileExtension`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-fileextension-function-fileextension-pathname-src-miniquake-common-ml-1404575955) — function
+- [`miniquake.common.fixedFloat`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-fixedfloat-function-fixedfloat-value-src-miniquake-common-ml-1642825822) — function
+- [`miniquake.common.FloatNoSwap`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-floatnoswap-function-floatnoswap-value-src-miniquake-common-ml-142789278) — function
+- [`miniquake.common.floatOption`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-floatoption-function-floatoption-commandline-name-fallback-src-miniquake-common-ml-323053645) — function
+- [`miniquake.common.FloatSwap`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-floatswap-function-floatswap-value-src-miniquake-common-ml-1512711624) — function
+- [`miniquake.common.formatFlag`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-formatflag-function-formatflag-value-src-miniquake-common-ml-1642042306) — function
+- [`miniquake.common.gameDirectory`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-gamedirectory-function-gamedirectory-commandline-src-miniquake-common-ml-614653962) — function
+- [`miniquake.common.hasParm`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-hasparm-function-hasparm-commandline-name-src-miniquake-common-ml-648698637) — function
+- [`miniquake.common.hexadecimal`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-hexadecimal-function-hexadecimal-value-upper-src-miniquake-common-ml-1954880802) — function
+- [`miniquake.common.hexDigit`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-hexdigit-function-hexdigit-value-src-miniquake-common-ml-1610896326) — function
+- [`miniquake.common.InsertLinkAfter`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-insertlinkafter-function-insertlinkafter-link-after-src-miniquake-common-ml-345327513) — function
+- [`miniquake.common.insertLinkAfter`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-insertlinkafter-function-insertlinkafter-link-after-src-miniquake-common-ml-1146501017) — function
+- [`miniquake.common.InsertLinkBefore`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-insertlinkbefore-function-insertlinkbefore-link-before-src-miniquake-common-ml-882584196) — function
+- [`miniquake.common.insertLinkBefore`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-insertlinkbefore-function-insertlinkbefore-link-before-src-miniquake-common-ml-1225779332) — function
+- [`miniquake.common.integerOption`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-integeroption-function-integeroption-commandline-name-fallback-src-miniquake-common-ml-109832445) — function
+- [`miniquake.common.joinArguments`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-joinarguments-function-joinarguments-args-src-miniquake-common-ml-441011634) — function
+- [`miniquake.common.LongNoSwap`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-longnoswap-function-longnoswap-value-src-miniquake-common-ml-699530286) — function
+- [`miniquake.common.LongSwap`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-longswap-function-longswap-value-src-miniquake-common-ml-285373150) — function
+- [`miniquake.common.memCompare`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-memcompare-function-memcompare-first-second-count-src-miniquake-common-ml-632022486) — function
+- [`miniquake.common.memCopy`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-memcopy-function-memcopy-destination-source-count-src-miniquake-common-ml-369296777) — function
+- [`miniquake.common.memorySearch`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-memorysearch-function-memorysearch-data-count-search-src-miniquake-common-ml-1265231192) — function
+- [`miniquake.common.memsearch`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-memsearch-function-memsearch-data-count-search-src-miniquake-common-ml-187787474) — function
+- [`miniquake.common.memSet`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-memset-function-memset-destination-fill-count-src-miniquake-common-ml-30786653) — function
+- [`miniquake.common.parmValue`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-parmvalue-function-parmvalue-commandline-name-fallback-src-miniquake-common-ml-1071510233) — function
+- [`miniquake.common.parseToken`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-parsetoken-function-parsetoken-text-startoffset-src-miniquake-common-ml-1651164499) — function
+- [`miniquake.common.plusValue`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-plusvalue-function-plusvalue-commandline-commandname-fallback-src-miniquake-common-ml-886039232) — function
+- [`miniquake.common.punctuation`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-punctuation-function-punctuation-value-src-miniquake-common-ml-600229022) — function
+- [`miniquake.common.Q_atof`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-q-atof-function-q-atof-text-src-miniquake-common-ml-313212476) — function
+- [`miniquake.common.Q_atoi`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-q-atoi-function-q-atoi-text-src-miniquake-common-ml-375100564) — function
+- [`miniquake.common.Q_memcmp`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-q-memcmp-function-q-memcmp-first-second-count-src-miniquake-common-ml-1880083378) — function
+- [`miniquake.common.Q_memcpy`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-q-memcpy-function-q-memcpy-destination-source-count-src-miniquake-common-ml-319603021) — function
+- [`miniquake.common.Q_memset`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-q-memset-function-q-memset-destination-fill-count-src-miniquake-common-ml-2016859877) — function
+- [`miniquake.common.Q_strcasecmp`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-q-strcasecmp-function-q-strcasecmp-first-second-src-miniquake-common-ml-1643878011) — function
+- [`miniquake.common.Q_strcat`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-q-strcat-function-q-strcat-destination-source-src-miniquake-common-ml-568192758) — function
+- [`miniquake.common.Q_strcmp`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-q-strcmp-function-q-strcmp-first-second-src-miniquake-common-ml-1888364691) — function
+- [`miniquake.common.Q_strcpy`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-q-strcpy-function-q-strcpy-source-src-miniquake-common-ml-1382844646) — function
+- [`miniquake.common.Q_strlen`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-q-strlen-function-q-strlen-text-src-miniquake-common-ml-1283559436) — function
+- [`miniquake.common.Q_strncasecmp`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-q-strncasecmp-function-q-strncasecmp-first-second-count-src-miniquake-common-ml-1201228932) — function
+- [`miniquake.common.Q_strncmp`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-q-strncmp-function-q-strncmp-first-second-count-src-miniquake-common-ml-1161461812) — function
+- [`miniquake.common.Q_strncpy`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-q-strncpy-function-q-strncpy-source-count-src-miniquake-common-ml-42795479) — function
+- [`miniquake.common.Q_strrchr`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-q-strrchr-function-q-strrchr-text-character-src-miniquake-common-ml-610365807) — function
+- [`miniquake.common.quakeFloat`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-quakefloat-function-quakefloat-value-src-miniquake-common-ml-211235582) — function
+- [`miniquake.common.quakeInt32`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-quakeint32-function-quakeint32-value-src-miniquake-common-ml-608707514) — function
+- [`miniquake.common.quoteCommandArgument`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-quotecommandargument-function-quotecommandargument-text-src-miniquake-common-ml-1418664412) — function
+- [`miniquake.common.RemoveLink`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-removelink-function-removelink-link-src-miniquake-common-ml-1344738657) — function
+- [`miniquake.common.removeLink`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-removelink-function-removelink-link-src-miniquake-common-ml-648115105) — function
+- [`miniquake.common.ShortNoSwap`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-shortnoswap-function-shortnoswap-value-src-miniquake-common-ml-1794751374) — function
+- [`miniquake.common.ShortSwap`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-shortswap-function-shortswap-value-src-miniquake-common-ml-1857046140) — function
+- [`miniquake.common.signedShort`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-signedshort-function-signedshort-value-src-miniquake-common-ml-1090906126) — function
+- [`miniquake.common.skipPath`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-skippath-function-skippath-pathname-src-miniquake-common-ml-634911453) — function
+- [`miniquake.common.startsWithMarker`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-startswithmarker-function-startswithmarker-text-marker-src-miniquake-common-ml-1847180762) — function
+- [`miniquake.common.stringCompare`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-stringcompare-function-stringcompare-first-second-src-miniquake-common-ml-2069062003) — function
+- [`miniquake.common.stringCompareCount`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-stringcomparecount-function-stringcomparecount-first-second-count-src-miniquake-common-ml-2024118034) — function
+- [`miniquake.common.stringCompareInsensitive`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-stringcompareinsensitive-function-stringcompareinsensitive-first-second-src-miniquake-common-ml-1029340655) — function
+- [`miniquake.common.stringCompareInsensitiveCount`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-stringcompareinsensitivecount-function-stringcompareinsensitivecount-first-second-count-src-miniquake-common-ml-1820203714) — function
+- [`miniquake.common.stringConcat`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-stringconcat-function-stringconcat-destination-source-src-miniquake-common-ml-1445716210) — function
+- [`miniquake.common.stringCopy`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-stringcopy-function-stringcopy-text-src-miniquake-common-ml-1953657048) — function
+- [`miniquake.common.stringCopyCount`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-stringcopycount-function-stringcopycount-text-count-src-miniquake-common-ml-1716131593) — function
+- [`miniquake.common.stringLastIndex`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-stringlastindex-function-stringlastindex-text-character-src-miniquake-common-ml-1133148525) — function
+- [`miniquake.common.stringLength`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-stringlength-function-stringlength-text-src-miniquake-common-ml-1235066624) — function
+- [`miniquake.common.stripExtension`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-stripextension-function-stripextension-pathname-src-miniquake-common-ml-901519669) — function
+- [`miniquake.common.stuffCommands`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-stuffcommands-function-stuffcommands-commandline-src-miniquake-common-ml-495824568) — function
+- [`miniquake.common.substring`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-substring-function-substring-text-offset-count-src-miniquake-common-ml-158252430) — function
+- [`miniquake.common.upperAscii`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-upperascii-function-upperascii-value-src-miniquake-common-ml-951539842) — function
+- [`miniquake.common.va`](File-src-miniquake-common-ml-466436205.md#function-function-miniquake-common-va-function-va-format-arguments-src-miniquake-common-ml-1118788174) — function

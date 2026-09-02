@@ -18,12 +18,21 @@ import miniquake.client as clientRuntime
 import miniquake.cvar as cvar
 import miniquake.protocol_transients as transients
 
-// Add state for append particles.
+/// Add state for append particles.
+/// @param current The current input consumed by `appendParticles`.
+/// @param spawned The spawned input consumed by `appendParticles`.
 function appendParticles(current, spawned)
   return particleSystem.appendLimited(current, spawned)
 end function
 
-// Return a validated safe sound value.
+/// Return a validated safe sound value.
+/// @param mixer The mixer input consumed by `safeSound`.
+/// @param entityNumber The entity number input consumed by `safeSound`.
+/// @param channelNumber The channel number input consumed by `safeSound`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param origin World-space origin of the operation.
+/// @param volume The volume input consumed by `safeSound`.
+/// @param attenuation The attenuation input consumed by `safeSound`.
 function safeSound(mixer, entityNumber, channelNumber, name, origin, volume, attenuation)
   if mixer is void or not mixer.enabled or name == "" then return false end if
   result = try(sound.startSound(mixer, entityNumber, channelNumber, name, origin, volume, attenuation))
@@ -31,8 +40,9 @@ function safeSound(mixer, entityNumber, channelNumber, name, origin, volume, att
   return result
 end function
 
-// Load the client-owned temporary-entity sounds that are not necessarily
-// named by a mod's QuakeC sound precache list.
+/// Load the client-owned temporary-entity sounds that are not necessarily
+/// named by a mod's QuakeC sound precache list.
+/// @param mixer The mixer input consumed by `precacheTemporarySounds`.
 function precacheTemporarySounds(mixer)
   return sound.precache(mixer, [
     "wizard/hit.wav",
@@ -57,7 +67,12 @@ function spikeImpactSound()
   return "weapons/ric3.wav"
 end function
 
-// Execute temporary.
+/// Execute temporary.
+/// @param value Value consumed by `processTemporary`.
+/// @param mixer The mixer input consumed by `processTemporary`.
+/// @param currentParticles The current particles input consumed by `processTemporary`.
+/// @param currentTemporary The current temporary input consumed by `processTemporary`.
+/// @param currentTime Time value used by the operation.
 function processTemporary(value, mixer, currentParticles, currentTemporary, currentTime)
   spawned = []
   type = value.type
@@ -109,30 +124,45 @@ function processTemporary(value, mixer, currentParticles, currentTemporary, curr
   return [currentParticles, currentTemporary]
 end function
 
-// Retained state mirrors the original fixed cl_beams[MAX_BEAMS] array.  Expired
-// entries are kept because CL_ParseBeam first searches by entity before it
-// searches for a free or expired slot.
+/// Retained state mirrors the original fixed cl_beams[MAX_BEAMS] array.  Expired
+/// entries are kept because CL_ParseBeam first searches by entity before it
+/// searches for a free or expired slot.
+/// @param currentTemporary The current temporary input consumed by `retainTemporarySlots`.
 function retainTemporarySlots(currentTemporary)
   return transients.normalizeCompactBeamList(currentTemporary)
 end function
 
-// Active view mirrors CL_UpdateTEnts: an expired beam is not rendered or
-// exposed to callers, while the retained state above still remembers its slot.
+/// Active view mirrors CL_UpdateTEnts: an expired beam is not rendered or
+/// exposed to callers, while the retained state above still remembers its slot.
+/// @param currentTemporary The current temporary input consumed by `pruneTemporary`.
+/// @param currentTime Time value used by the operation.
 function pruneTemporary(currentTemporary, currentTime)
   return transients.activeCompactBeamList(currentTemporary, currentTime)
 end function
 
-// Provide server info rule text behavior for the active subsystem.
+/// Implements the `serverInfoRuleText` operation for `miniquake.client_effects` (server info rule text).
 function serverInfoRuleText()
   return "\n\n\u001d\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001e\u001f\n\n"
 end function
 
-// Provide server info level text behavior for the active subsystem.
+/// Implements the `serverInfoLevelText` operation for `miniquake.client_effects` (server info level text).
+/// @param levelName Name that identifies the requested value or resource.
 function serverInfoLevelText(levelName)
   return "\u0002" + levelName + "\n"
 end function
 
-// Execute the requested value.
+/// Execute the requested value.
+/// @param events The events input consumed by `process`.
+/// @param client Client state participating in the operation.
+/// @param player The player input consumed by `process`.
+/// @param mixer The mixer input consumed by `process`.
+/// @param viewState Mutable state used by `process`.
+/// @param consoleState Mutable state used by `process`.
+/// @param commandSystem The command system input consumed by `process`.
+/// @param currentParticles The current particles input consumed by `process`.
+/// @param currentTemporary The current temporary input consumed by `process`.
+/// @param currentTime Time value used by the operation.
+/// @param registry The registry input consumed by `process`.
 function process(events, client, player, mixer, viewState, consoleState, commandSystem, currentParticles, currentTemporary, currentTime, registry)
   currentTemporary = retainTemporarySlots(currentTemporary)
   for each item in events

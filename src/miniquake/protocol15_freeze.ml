@@ -12,14 +12,23 @@ package miniquake.protocol15_freeze
 
 import miniquake.constants as c
 
+/// Defines the status value used by `miniquake.protocol15_freeze`.
 const STATUS = "protocol15_frozen_v1"
+/// Defines the protocol version value used by `miniquake.protocol15_freeze`.
 const PROTOCOL_VERSION = 15
+/// Defines the svc valid count value used by `miniquake.protocol15_freeze`.
 const SVC_VALID_COUNT = 33
+/// Defines the clc valid count value used by `miniquake.protocol15_freeze`.
 const CLC_VALID_COUNT = 4
+/// Defines the fast update mask value used by `miniquake.protocol15_freeze`.
 const FAST_UPDATE_MASK = 0x7fff
+/// Defines the client data mask value used by `miniquake.protocol15_freeze`.
 const CLIENT_DATA_MASK = 0x7eff
+/// Defines the sound mask value used by `miniquake.protocol15_freeze`.
 const SOUND_MASK = 0x0007
+/// Defines the temp entity count value used by `miniquake.protocol15_freeze`.
 const TEMP_ENTITY_COUNT = 14
+/// Defines the fingerprint value used by `miniquake.protocol15_freeze`.
 const FINGERPRINT = 0x0cf1e12a
 
 // Report whether valid svc commands.
@@ -63,7 +72,7 @@ function soundBits()
   return [c.SND_VOLUME, c.SND_ATTENUATION, c.SND_LOOPING]
 end function
 
-// Provide temporary entity types behavior for the active subsystem.
+/// Implements the `temporaryEntityTypes` operation for `miniquake.protocol15_freeze` (temporary entity types).
 function temporaryEntityTypes()
   return [
     c.TE_SPIKE, c.TE_SUPERSPIKE, c.TE_GUNSHOT, c.TE_EXPLOSION,
@@ -73,7 +82,9 @@ function temporaryEntityTypes()
   ]
 end function
 
-// Provide contains behavior for the active subsystem.
+/// Implements the `contains` operation for `miniquake.protocol15_freeze` (contains).
+/// @param values The values input consumed by `contains`.
+/// @param wanted The wanted input consumed by `contains`.
 function contains(values, wanted)
   for each value in values
     if value == wanted then return true end if
@@ -81,22 +92,26 @@ function contains(values, wanted)
   return false
 end function
 
-// Report whether is valid svc.
+/// Report whether is valid svc.
+/// @param command Console or protocol command to execute.
 function isValidSvc(command)
   return contains(validSvcCommands(), command)
 end function
 
-// Report whether is reserved svc.
+/// Report whether is reserved svc.
+/// @param command Console or protocol command to execute.
 function isReservedSvc(command)
   return command == c.SVC_BAD or command == c.SVC_SPAWNBINARY
 end function
 
-// Report whether is valid clc.
+/// Report whether is valid clc.
+/// @param command Console or protocol command to execute.
 function isValidClc(command)
   return contains(validClcCommands(), command)
 end function
 
-// Provide combine mask behavior for the active subsystem.
+/// Implements the `combineMask` operation for `miniquake.protocol15_freeze` (combine mask).
+/// @param values The values input consumed by `combineMask`.
 function combineMask(values)
   result = 0
   for each value in values
@@ -105,12 +120,16 @@ function combineMask(values)
   return result
 end function
 
-// Return fingerprint value derived from the active module state.
+/// Return fingerprint value derived from the active module state.
+/// @param current The current input consumed by `fingerprintValue`.
+/// @param value Value consumed by `fingerprintValue`.
 function inline fingerprintValue(current, value)
   return ((current ^ (value & 0xffffffff)) * 16777619) & 0xffffffff
 end function
 
-// Return fingerprint values derived from the active module state.
+/// Return fingerprint values derived from the active module state.
+/// @param current The current input consumed by `fingerprintValues`.
+/// @param values The values input consumed by `fingerprintValues`.
 function fingerprintValues(current, values)
   result = current
   for each value in values
@@ -119,7 +138,7 @@ function fingerprintValues(current, values)
   return result
 end function
 
-// Provide protocol fingerprint behavior for the active subsystem.
+/// Implements the `protocolFingerprint` operation for `miniquake.protocol15_freeze` (protocol fingerprint).
 function protocolFingerprint()
   result = 2166136261
   result = fingerprintValue(result, c.PROTOCOL_VERSION)

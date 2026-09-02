@@ -15,24 +15,36 @@ import miniquake.native as native
 import miniquake.common as common
 import std.math as stdmath
 
+/// Defines the pi value used by `miniquake.view`.
 const PI = 3.141592653589793
+/// Defines the cshift contents value used by `miniquake.view`.
 const CSHIFT_CONTENTS = 0
+/// Defines the cshift damage value used by `miniquake.view`.
 const CSHIFT_DAMAGE = 1
+/// Defines the cshift bonus value used by `miniquake.view`.
 const CSHIFT_BONUS = 2
+/// Defines the cshift powerup value used by `miniquake.view`.
 const CSHIFT_POWERUP = 3
 
 // V_RenderView's compatibility trace contains only fixed stage names. Share
 // the immutable variants instead of rebuilding nested arrays every frame.
 viewTraceEmpty = []
+/// Tracks the module-level view trace paused state owned by `miniquake.view`.
 viewTracePaused = [["R_PushDlights"], ["R_RenderView"]]
+/// Tracks the module-level view trace paused stereo state owned by `miniquake.view`.
 viewTracePausedStereo = [["R_PushDlights"], ["R_RenderView", "left"], ["R_PushDlights"], ["R_RenderView", "right"]]
+/// Tracks the module-level view trace refdef state owned by `miniquake.view`.
 viewTraceRefdef = [["V_CalcRefdef"], ["R_PushDlights"], ["R_RenderView"]]
+/// Tracks the module-level view trace refdef stereo state owned by `miniquake.view`.
 viewTraceRefdefStereo = [["V_CalcRefdef"], ["R_PushDlights"], ["R_RenderView", "left"], ["R_PushDlights"], ["R_RenderView", "right"]]
+/// Tracks the module-level view trace intermission state owned by `miniquake.view`.
 viewTraceIntermission = [["V_CalcIntermissionRefdef"], ["R_PushDlights"], ["R_RenderView"]]
+/// Tracks the module-level view trace intermission stereo state owned by `miniquake.view`.
 viewTraceIntermissionStereo = [["V_CalcIntermissionRefdef"], ["R_PushDlights"], ["R_RenderView", "left"], ["R_PushDlights"], ["R_RenderView", "right"]]
+/// Defines the num cshifts value used by `miniquake.view`.
 const NUM_CSHIFTS = 4
 
-// Provide empty gamma behavior for the active subsystem.
+/// Implements the `emptyGamma` operation for `miniquake.view` (empty gamma).
 function emptyGamma()
   table = []
   index = 0
@@ -43,12 +55,12 @@ function emptyGamma()
   return table
 end function
 
-// Provide empty ramps behavior for the active subsystem.
+/// Implements the `emptyRamps` operation for `miniquake.view` (empty ramps).
 function emptyRamps()
   return [emptyGamma(), emptyGamma(), emptyGamma()]
 end function
 
-// Create and initialize the module state.
+/// Implements the `create` operation for `miniquake.view` (create).
 function create()
   state = t.ViewState(
     t.Vec3(0.0, 0.0, 0.0),
@@ -98,7 +110,9 @@ function create()
   return V_Init(state)
 end function
 
-// Update module state for the requested operation.
+/// Implements the `reset` operation for `miniquake.view` (reset).
+/// @param state Mutable `miniquake.view` state used by `reset`.
+/// @param playerOrigin The player origin input consumed by `reset`.
 function reset(state, playerOrigin)
   state.oldZ = playerOrigin.z
   state.oldZValid = true
@@ -117,9 +131,10 @@ function reset(state, playerOrigin)
   return state
 end function
 
-// The cl-owned fields used by view.c are cleared by CL_ClearState's memset.
-// Renderer statics (oldz, old gun angles, damage kick globals, gamma state and
-// the user-configurable cshift_empty) intentionally survive map changes.
+/// The cl-owned fields used by view.c are cleared by CL_ClearState's memset.
+/// Renderer statics (oldz, old gun angles, damage kick globals, gamma state and
+/// the user-configurable cshift_empty) intentionally survive map changes.
+/// @param state Mutable `miniquake.view` state used by `V_ClearClientState`.
 function V_ClearClientState(state)
   state.pitchVelocity = 0.0
   state.noDrift = false
@@ -144,13 +159,18 @@ function V_ClearClientState(state)
   return state
 end function
 
-// Provide absolute behavior for the active subsystem.
+/// Implements the `absolute` operation for `miniquake.view` (absolute).
+/// @param value Value consumed by `absolute`.
 function absolute(value)
   if value < 0.0 then return -value end if
   return value
 end function
 
-// V_CalcRoll is also consumed by sv_user.c in the original engine.
+/// V_CalcRoll is also consumed by sv_user.c in the original engine.
+/// @param angles Orientation angles used by the operation.
+/// @param velocity Velocity applied by the operation.
+/// @param rollAngle The roll angle input consumed by `V_CalcRoll`.
+/// @param rollSpeed The roll speed input consumed by `V_CalcRoll`.
 function V_CalcRoll(angles, velocity, rollAngle, rollSpeed)
   vectors = math.angleVectors(angles)
   side = math.dot(velocity, vectors[1])
@@ -163,12 +183,21 @@ function V_CalcRoll(angles, velocity, rollAngle, rollSpeed)
   return side * sign
 end function
 
-// Provide calc roll behavior for the active subsystem.
+/// Implements the `calcRoll` operation for `miniquake.view` (calc roll).
+/// @param angles Orientation angles used by the operation.
+/// @param velocity Velocity applied by the operation.
+/// @param rollAngle The roll angle input consumed by `calcRoll`.
+/// @param rollSpeed The roll speed input consumed by `calcRoll`.
 function calcRoll(angles, velocity, rollAngle, rollSpeed)
   return V_CalcRoll(angles, velocity, rollAngle, rollSpeed)
 end function
 
-// Mirror Quake's V_CalcBob routine and its observable state changes.
+/// Mirror Quake's V_CalcBob routine and its observable state changes.
+/// @param time Simulation or presentation time for the operation.
+/// @param velocity Velocity applied by the operation.
+/// @param bobAmount The bob amount input consumed by `V_CalcBob`.
+/// @param bobCycle The bob cycle input consumed by `V_CalcBob`.
+/// @param bobUp The bob up input consumed by `V_CalcBob`.
 function V_CalcBob(time, velocity, bobAmount, bobCycle, bobUp)
   if bobCycle <= 0.0 then return 0.0 end if
   if bobUp <= 0.0 then bobUp = 0.01 end if
@@ -188,12 +217,20 @@ function V_CalcBob(time, velocity, bobAmount, bobCycle, bobUp)
   return bob
 end function
 
-// Provide calc bob behavior for the active subsystem.
+/// Implements the `calcBob` operation for `miniquake.view` (calc bob).
+/// @param time Simulation or presentation time for the operation.
+/// @param velocity Velocity applied by the operation.
+/// @param bobAmount The bob amount input consumed by `calcBob`.
+/// @param bobCycle The bob cycle input consumed by `calcBob`.
+/// @param bobUp The bob up input consumed by `calcBob`.
 function calcBob(time, velocity, bobAmount, bobCycle, bobUp)
   return V_CalcBob(time, velocity, bobAmount, bobCycle, bobUp)
 end function
 
-// Mirror Quake's V_StartPitchDrift routine and its observable state changes.
+/// Mirror Quake's V_StartPitchDrift routine and its observable state changes.
+/// @param state Mutable `miniquake.view` state used by `V_StartPitchDrift`.
+/// @param clientTime Time value used by the operation.
+/// @param centerSpeed The center speed input consumed by `V_StartPitchDrift`.
 function V_StartPitchDrift(state, clientTime, centerSpeed)
   if state.lastStop == clientTime then return state end if
   if state.noDrift or state.pitchVelocity == 0.0 then
@@ -204,7 +241,9 @@ function V_StartPitchDrift(state, clientTime, centerSpeed)
   return state
 end function
 
-// Mirror Quake's V_StopPitchDrift routine and its observable state changes.
+/// Mirror Quake's V_StopPitchDrift routine and its observable state changes.
+/// @param state Mutable `miniquake.view` state used by `V_StopPitchDrift`.
+/// @param clientTime Time value used by the operation.
 function V_StopPitchDrift(state, clientTime)
   state.lastStop = clientTime
   state.noDrift = true
@@ -212,7 +251,19 @@ function V_StopPitchDrift(state, clientTime)
   return state
 end function
 
-// Mirror Quake's V_DriftPitch routine and its observable state changes.
+/// Mirror Quake's V_DriftPitch routine and its observable state changes.
+/// @param state Mutable `miniquake.view` state used by `V_DriftPitch`.
+/// @param viewAngles The view angles input consumed by `V_DriftPitch`.
+/// @param idealPitch The ideal pitch input consumed by `V_DriftPitch`.
+/// @param forwardMove The forward move input consumed by `V_DriftPitch`.
+/// @param forwardSpeed The forward speed input consumed by `V_DriftPitch`.
+/// @param frameTime Time value used by the operation.
+/// @param clientTime Time value used by the operation.
+/// @param centerMove The center move input consumed by `V_DriftPitch`.
+/// @param centerSpeed The center speed input consumed by `V_DriftPitch`.
+/// @param noclipAngleHack The noclip angle hack input consumed by `V_DriftPitch`.
+/// @param onGround The on ground input consumed by `V_DriftPitch`.
+/// @param demoPlayback The demo playback input consumed by `V_DriftPitch`.
 function V_DriftPitch(state, viewAngles, idealPitch, forwardMove, forwardSpeed, frameTime, clientTime, centerMove, centerSpeed, noclipAngleHack, onGround, demoPlayback)
   if noclipAngleHack or not onGround or demoPlayback then
     state.driftMove = 0.0
@@ -244,7 +295,9 @@ function V_DriftPitch(state, viewAngles, idealPitch, forwardMove, forwardSpeed, 
   return viewAngles
 end function
 
-// Create and initialize gamma table.
+/// Create and initialize gamma table.
+/// @param state Mutable `miniquake.view` state used by `BuildGammaTable`.
+/// @param gamma The gamma input consumed by `BuildGammaTable`.
 function BuildGammaTable(state, gamma)
   index = 0
   if gamma == 1.0 then
@@ -264,7 +317,9 @@ function BuildGammaTable(state, gamma)
   return state.gammaTable
 end function
 
-// Mirror Quake's V_CheckGamma routine and its observable state changes.
+/// Mirror Quake's V_CheckGamma routine and its observable state changes.
+/// @param state Mutable `miniquake.view` state used by `V_CheckGamma`.
+/// @param gamma The gamma input consumed by `V_CheckGamma`.
 function V_CheckGamma(state, gamma)
   if gamma == state.oldGamma then return false end if
   state.oldGamma = gamma
@@ -272,7 +327,16 @@ function V_CheckGamma(state, gamma)
   return true
 end function
 
-// Mirror Quake's V_ParseDamage routine and its observable state changes.
+/// Mirror Quake's V_ParseDamage routine and its observable state changes.
+/// @param state Mutable `miniquake.view` state used by `V_ParseDamage`.
+/// @param armor The armor input consumed by `V_ParseDamage`.
+/// @param blood The blood input consumed by `V_ParseDamage`.
+/// @param source Source value or collection to read.
+/// @param entityOrigin The entity origin input consumed by `V_ParseDamage`.
+/// @param entityAngles The entity angles input consumed by `V_ParseDamage`.
+/// @param kickRoll The kick roll input consumed by `V_ParseDamage`.
+/// @param kickPitch The kick pitch input consumed by `V_ParseDamage`.
+/// @param kickTime Time value used by the operation.
 function V_ParseDamage(state, armor, blood, source, entityOrigin, entityAngles, kickRoll, kickPitch, kickTime)
   count = blood * 0.5 + armor * 0.5
   if count < 10.0 then count = 10.0 end if
@@ -307,7 +371,9 @@ function V_ParseDamage(state, armor, blood, source, entityOrigin, entityAngles, 
   return state
 end function
 
-// Mirror Quake's V_cshift_f routine and its observable state changes.
+/// Mirror Quake's V_cshift_f routine and its observable state changes.
+/// @param state Mutable `miniquake.view` state used by `V_cshift_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function V_cshift_f(state, arguments)
   // view.c uses atoi(Cmd_Argv(...)) for every component.  In particular,
   // decimal suffixes are truncated and malformed/empty values become zero;
@@ -325,13 +391,16 @@ function V_cshift_f(state, arguments)
   return state
 end function
 
-// Mirror Quake's V_BonusFlash_f routine and its observable state changes.
+/// Mirror Quake's V_BonusFlash_f routine and its observable state changes.
+/// @param state Mutable `miniquake.view` state used by `V_BonusFlash_f`.
 function V_BonusFlash_f(state)
   state.cshifts[CSHIFT_BONUS] = [215.0, 186.0, 69.0, 50.0]
   return state
 end function
 
-// Mirror Quake's V_SetContentsColor routine and its observable state changes.
+/// Mirror Quake's V_SetContentsColor routine and its observable state changes.
+/// @param state Mutable `miniquake.view` state used by `V_SetContentsColor`.
+/// @param contents The contents input consumed by `V_SetContentsColor`.
 function V_SetContentsColor(state, contents)
   shift = state.cshifts[CSHIFT_CONTENTS]
   if contents == c.CONTENTS_EMPTY or contents == c.CONTENTS_SOLID then
@@ -358,7 +427,9 @@ function V_SetContentsColor(state, contents)
   return shift
 end function
 
-// Mirror Quake's V_CalcPowerupCshift routine and its observable state changes.
+/// Mirror Quake's V_CalcPowerupCshift routine and its observable state changes.
+/// @param state Mutable `miniquake.view` state used by `V_CalcPowerupCshift`.
+/// @param items The items input consumed by `V_CalcPowerupCshift`.
 function V_CalcPowerupCshift(state, items)
   shift = state.cshifts[CSHIFT_POWERUP]
   if (items & c.IT_QUAD) != 0 then
@@ -387,7 +458,9 @@ function V_CalcPowerupCshift(state, items)
   return shift
 end function
 
-// Mirror Quake's V_CalcBlend routine and its observable state changes.
+/// Mirror Quake's V_CalcBlend routine and its observable state changes.
+/// @param state Mutable `miniquake.view` state used by `V_CalcBlend`.
+/// @param cshiftPercent The cshift percent input consumed by `V_CalcBlend`.
 function V_CalcBlend(state, cshiftPercent)
   red = 0.0
   green = 0.0
@@ -415,9 +488,14 @@ function V_CalcBlend(state, cshiftPercent)
   return state.blend
 end function
 
-// This is the GLQUAKE V_UpdatePalette path.  It also constructs the original
-// three gamma ramps so a diagnostic build can compare the software-palette
-// result without asking the platform bridge to own game policy.
+/// This is the GLQUAKE V_UpdatePalette path.  It also constructs the original
+/// three gamma ramps so a diagnostic build can compare the software-palette
+/// result without asking the platform bridge to own game policy.
+/// @param state Mutable `miniquake.view` state used by `V_UpdatePalette`.
+/// @param items The items input consumed by `V_UpdatePalette`.
+/// @param frameTime Time value used by the operation.
+/// @param cshiftPercent The cshift percent input consumed by `V_UpdatePalette`.
+/// @param gamma The gamma input consumed by `V_UpdatePalette`.
 function V_UpdatePalette(state, items, frameTime, cshiftPercent, gamma)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   V_CalcPowerupCshift(state, items)
@@ -465,14 +543,25 @@ function V_UpdatePalette(state, items, frameTime, cshiftPercent, gamma)
   return true
 end function
 
-// Provide angledelta behavior for the active subsystem.
+/// Implements the `angledelta` operation for `miniquake.view` (angledelta).
+/// @param angle The angle input consumed by `angledelta`.
 function angledelta(angle)
   angle = math.anglemod(angle)
   if angle > 180.0 then angle = angle - 360.0 end if
   return angle
 end function
 
-// Provide calc gun angle behavior for the active subsystem.
+/// Implements the `CalcGunAngle` operation for `miniquake.view` (calc gun angle).
+/// @param state Mutable `miniquake.view` state used by `CalcGunAngle`.
+/// @param clientTime Time value used by the operation.
+/// @param frameTime Time value used by the operation.
+/// @param idleScale The idle scale input consumed by `CalcGunAngle`.
+/// @param yawCycle The yaw cycle input consumed by `CalcGunAngle`.
+/// @param rollCycle The roll cycle input consumed by `CalcGunAngle`.
+/// @param pitchCycle The pitch cycle input consumed by `CalcGunAngle`.
+/// @param yawLevel The yaw level input consumed by `CalcGunAngle`.
+/// @param rollLevel The roll level input consumed by `CalcGunAngle`.
+/// @param pitchLevel The pitch level input consumed by `CalcGunAngle`.
 function CalcGunAngle(state, clientTime, frameTime, idleScale, yawCycle, rollCycle, pitchCycle, yawLevel, rollLevel, pitchLevel)
   // view.c computes both deltas from the same r_refdef angles; retaining that
   // historical quirk makes the target angles zero and only eases old values.
@@ -500,7 +589,9 @@ function CalcGunAngle(state, clientTime, frameTime, idleScale, yawCycle, rollCyc
   return state.gunAngles
 end function
 
-// Mirror Quake's V_BoundOffsets routine and its observable state changes.
+/// Mirror Quake's V_BoundOffsets routine and its observable state changes.
+/// @param state Mutable `miniquake.view` state used by `V_BoundOffsets`.
+/// @param entityOrigin The entity origin input consumed by `V_BoundOffsets`.
 function V_BoundOffsets(state, entityOrigin)
   if state.origin.x < entityOrigin.x - 14.0 then state.origin.x = entityOrigin.x - 14.0 end if
   if state.origin.x > entityOrigin.x + 14.0 then state.origin.x = entityOrigin.x + 14.0 end if
@@ -511,7 +602,16 @@ function V_BoundOffsets(state, entityOrigin)
   return state.origin
 end function
 
-// Mirror Quake's V_AddIdle routine and its observable state changes.
+/// Mirror Quake's V_AddIdle routine and its observable state changes.
+/// @param state Mutable `miniquake.view` state used by `V_AddIdle`.
+/// @param clientTime Time value used by the operation.
+/// @param idleScale The idle scale input consumed by `V_AddIdle`.
+/// @param yawCycle The yaw cycle input consumed by `V_AddIdle`.
+/// @param rollCycle The roll cycle input consumed by `V_AddIdle`.
+/// @param pitchCycle The pitch cycle input consumed by `V_AddIdle`.
+/// @param yawLevel The yaw level input consumed by `V_AddIdle`.
+/// @param rollLevel The roll level input consumed by `V_AddIdle`.
+/// @param pitchLevel The pitch level input consumed by `V_AddIdle`.
 function V_AddIdle(state, clientTime, idleScale, yawCycle, rollCycle, pitchCycle, yawLevel, rollLevel, pitchLevel)
   state.angles.z = state.angles.z + idleScale * math.sin(clientTime * rollCycle) * rollLevel
   state.angles.x = state.angles.x + idleScale * math.sin(clientTime * pitchCycle) * pitchLevel
@@ -519,7 +619,15 @@ function V_AddIdle(state, clientTime, idleScale, yawCycle, rollCycle, pitchCycle
   return state.angles
 end function
 
-// Mirror Quake's V_CalcViewRoll routine and its observable state changes.
+/// Mirror Quake's V_CalcViewRoll routine and its observable state changes.
+/// @param state Mutable `miniquake.view` state used by `V_CalcViewRoll`.
+/// @param entityAngles The entity angles input consumed by `V_CalcViewRoll`.
+/// @param velocity Velocity applied by the operation.
+/// @param health The health input consumed by `V_CalcViewRoll`.
+/// @param frameTime Time value used by the operation.
+/// @param rollAngle The roll angle input consumed by `V_CalcViewRoll`.
+/// @param rollSpeed The roll speed input consumed by `V_CalcViewRoll`.
+/// @param kickTime Time value used by the operation.
 function V_CalcViewRoll(state, entityAngles, velocity, health, frameTime, rollAngle, rollSpeed, kickTime)
   side = V_CalcRoll(entityAngles, velocity, rollAngle, rollSpeed)
   state.roll = side
@@ -536,7 +644,16 @@ function V_CalcViewRoll(state, entityAngles, velocity, health, frameTime, rollAn
   return state.angles
 end function
 
-// Mirror Quake's V_CalcIntermissionRefdef routine and its observable state changes.
+/// Mirror Quake's V_CalcIntermissionRefdef routine and its observable state changes.
+/// @param state Mutable `miniquake.view` state used by `V_CalcIntermissionRefdef`.
+/// @param player The player input consumed by `V_CalcIntermissionRefdef`.
+/// @param clientTime Time value used by the operation.
+/// @param yawCycle The yaw cycle input consumed by `V_CalcIntermissionRefdef`.
+/// @param rollCycle The roll cycle input consumed by `V_CalcIntermissionRefdef`.
+/// @param pitchCycle The pitch cycle input consumed by `V_CalcIntermissionRefdef`.
+/// @param yawLevel The yaw level input consumed by `V_CalcIntermissionRefdef`.
+/// @param rollLevel The roll level input consumed by `V_CalcIntermissionRefdef`.
+/// @param pitchLevel The pitch level input consumed by `V_CalcIntermissionRefdef`.
 function V_CalcIntermissionRefdef(state, player, clientTime, yawCycle, rollCycle, pitchCycle, yawLevel, rollLevel, pitchLevel)
   state.origin = math.copy(player.origin)
   state.angles = math.copy(player.renderAngles)
@@ -550,7 +667,10 @@ function V_CalcIntermissionRefdef(state, player, clientTime, yawCycle, rollCycle
   return state
 end function
 
-// Provide smooth stair step behavior for the active subsystem.
+/// Implements the `smoothStairStep` operation for `miniquake.view` (smooth stair step).
+/// @param state Mutable `miniquake.view` state used by `smoothStairStep`.
+/// @param player The player input consumed by `smoothStairStep`.
+/// @param frameTime Time value used by the operation.
 function smoothStairStep(state, player, frameTime)
   if not state.oldZValid then
     state.oldZ = player.origin.z
@@ -569,7 +689,18 @@ function smoothStairStep(state, player, frameTime)
   return 0.0
 end function
 
-// Mirror Quake's V_CalcRefdef routine and its observable state changes.
+/// Mirror Quake's V_CalcRefdef routine and its observable state changes.
+/// @param state Mutable `miniquake.view` state used by `V_CalcRefdef`.
+/// @param player The player input consumed by `V_CalcRefdef`.
+/// @param viewAngles The view angles input consumed by `V_CalcRefdef`.
+/// @param idealPitch The ideal pitch input consumed by `V_CalcRefdef`.
+/// @param forwardMove The forward move input consumed by `V_CalcRefdef`.
+/// @param forwardSpeed The forward speed input consumed by `V_CalcRefdef`.
+/// @param clientTime Time value used by the operation.
+/// @param frameTime Time value used by the operation.
+/// @param stepFrameTime Time value used by the operation.
+/// @param demoPlayback The demo playback input consumed by `V_CalcRefdef`.
+/// @param registry The registry input consumed by `V_CalcRefdef`.
 function V_CalcRefdef(state, player, viewAngles, idealPitch, forwardMove, forwardSpeed, clientTime, frameTime, stepFrameTime, demoPlayback, registry)
   opt001dCvarVIpitchLevel = cvar.variableValue(registry, "v_ipitch_level")
   opt001dCvarVIrollLevel = cvar.variableValue(registry, "v_iroll_level")
@@ -684,7 +815,16 @@ function V_CalcRefdef(state, player, viewAngles, idealPitch, forwardMove, forwar
   return state
 end function
 
-// Mirror Quake's V_RenderView routine and its observable state changes.
+/// Mirror Quake's V_RenderView routine and its observable state changes.
+/// @param state Mutable `miniquake.view` state used by `V_RenderView`.
+/// @param player The player input consumed by `V_RenderView`.
+/// @param client Client state participating in the operation.
+/// @param registry The registry input consumed by `V_RenderView`.
+/// @param frameTime Time value used by the operation.
+/// @param paused The paused input consumed by `V_RenderView`.
+/// @param demoPlayback The demo playback input consumed by `V_RenderView`.
+/// @param intermission The intermission input consumed by `V_RenderView`.
+/// @param forcedConsole The forced console input consumed by `V_RenderView`.
 function V_RenderView(state, player, client, registry, frameTime, paused, demoPlayback, intermission, forcedConsole)
   state.commandTrace = viewTraceEmpty
   if forcedConsole then return state end if
@@ -752,12 +892,14 @@ function V_RenderView(state, player, client, registry, frameTime, paused, demoPl
   return state
 end function
 
-// Mirror Quake's V_CommandTrace routine and its observable state changes.
+/// Mirror Quake's V_CommandTrace routine and its observable state changes.
+/// @param state Mutable `miniquake.view` state used by `V_CommandTrace`.
 function V_CommandTrace(state)
   return state.commandTrace
 end function
 
-// Mirror Quake's V_Init routine and its observable state changes.
+/// Mirror Quake's V_Init routine and its observable state changes.
+/// @param state Mutable `miniquake.view` state used by `V_Init`.
 function V_Init(state)
   state.commandTrace = [
     ["Cmd_AddCommand", "v_cshift"],
@@ -795,14 +937,24 @@ function V_Init(state)
   return state
 end function
 
-// Compatibility entry points retained for the existing focused tests.
+/// Compatibility entry points retained for the existing focused tests.
+/// @param state Mutable `miniquake.view` state used by `addDamage`.
+/// @param count Number of entries or units to process.
+/// @param fromDirection The from direction input consumed by `addDamage`.
+/// @param viewAngles The view angles input consumed by `addDamage`.
+/// @param kickRoll The kick roll input consumed by `addDamage`.
+/// @param kickPitch The kick pitch input consumed by `addDamage`.
+/// @param kickTime Time value used by the operation.
 function addDamage(state, count, fromDirection, viewAngles, kickRoll, kickPitch, kickTime)
   V_ParseDamage(state, 0.0, count * 2.0, fromDirection, t.Vec3(0.0, 0.0, 0.0), viewAngles, kickRoll, kickPitch, kickTime)
   V_CalcBlend(state, 100.0)
   return state
 end function
 
-// Provide decay damage behavior for the active subsystem.
+/// Implements the `decayDamage` operation for `miniquake.view` (decay damage).
+/// @param state Mutable `miniquake.view` state used by `decayDamage`.
+/// @param frameTime Time value used by the operation.
+/// @param kickTime Time value used by the operation.
 function decayDamage(state, frameTime, kickTime)
   state.damageTime = state.damageTime - frameTime
   if state.damageTime < 0.0 then state.damageTime = 0.0 end if
@@ -814,7 +966,18 @@ function decayDamage(state, frameTime, kickTime)
   return state
 end function
 
-// Compute the requested value.
+/// Compute the requested value.
+/// @param state Mutable `miniquake.view` state used by `calculate`.
+/// @param player The player input consumed by `calculate`.
+/// @param cameraAngles The camera angles input consumed by `calculate`.
+/// @param clientTime Time value used by the operation.
+/// @param frameTime Time value used by the operation.
+/// @param bobAmount The bob amount input consumed by `calculate`.
+/// @param bobCycle The bob cycle input consumed by `calculate`.
+/// @param bobUp The bob up input consumed by `calculate`.
+/// @param rollAngle The roll angle input consumed by `calculate`.
+/// @param rollSpeed The roll speed input consumed by `calculate`.
+/// @param kickTime Time value used by the operation.
 function calculate(state, player, cameraAngles, clientTime, frameTime, bobAmount, bobCycle, bobUp, rollAngle, rollSpeed, kickTime)
   state.bob = V_CalcBob(clientTime, player.velocity, bobAmount, bobCycle, bobUp)
   state.roll = V_CalcRoll(cameraAngles, player.velocity, rollAngle, rollSpeed)

@@ -16,38 +16,57 @@ import miniquake.array_util as arrayutil
 import miniquake.protocol_text as quakeText
 import std.fs as fs
 
+/// Invokes the native `CreateDirectoryW` bridge operation used by `miniquake.filesystem`.
+/// @param path Filesystem path to process.
+/// @param security The security input consumed by `CreateDirectoryW`.
+/// @returns The newly created value returned by `CreateDirectoryW`.
 extern function CreateDirectoryW(path as wstr, security as ptr) from "kernel32.dll" returns bool
+/// Invokes the native `GetFileAttributesExW` bridge operation used by `miniquake.filesystem`.
+/// @param path Filesystem path to process.
+/// @param infoLevel The info level input consumed by `GetFileAttributesExW`.
+/// @param data Input data consumed by the operation.
+/// @returns The value resolved by `GetFileAttributesExW`.
 extern function GetFileAttributesExW(path as wstr, infoLevel as i32, data as bytes) from "kernel32.dll" returns bool
 
-// Create and initialize the module state.
+/// Implements the `create` operation for `miniquake.filesystem` (create).
+/// @param baseDirectory Root directory containing the Quake installation.
+/// @param gameDirectory Selected Quake game-data directory.
 function create(baseDirectory, gameDirectory)
   return t.FileSystem(baseDirectory, gameDirectory, [], "", false, false, true, false)
 end function
 
-// Provide join behavior for the active subsystem.
+/// Implements the `join` operation for `miniquake.filesystem` (join).
+/// @param a The a input consumed by `join`.
+/// @param b The b input consumed by `join`.
 function join(a, b)
   return fs.joinPath(a, b)
 end function
 
-// Convert name into its canonical representation.
+/// Convert name into its canonical representation.
+/// @param name Stable name that identifies the requested object or option.
 function normalizeName(name)
   // COM_FindFile uses strcmp for PACK entries.  Windows itself supplies the
   // case-insensitive behavior for loose directory files.
   return name
 end function
 
-// Add state for add directory.
+/// Add state for add directory.
+/// @param system The system input consumed by `addDirectory`.
+/// @param directory The directory input consumed by `addDirectory`.
 function addDirectory(system, directory)
   system.searchPaths = [t.SearchPath(directory, void)] + system.searchPaths
   return true
 end function
 
-// Read and validate pack file.
+/// Read and validate pack file.
+/// @param filename Path of the file to process.
 function loadPackFile(filename)
   return pak.load(filename)
 end function
 
-// Add state for add pack.
+/// Add state for add pack.
+/// @param system The system input consumed by `addPack`.
+/// @param filename Path of the file to process.
 function addPack(system, filename)
   archive = loadPackFile(filename)
   system.searchPaths = [t.SearchPath("", archive)] + system.searchPaths
@@ -55,7 +74,9 @@ function addPack(system, filename)
   return archive
 end function
 
-// Add state for add game directory.
+/// Add state for add game directory.
+/// @param system The system input consumed by `addGameDirectory`.
+/// @param directory The directory input consumed by `addGameDirectory`.
 function addGameDirectory(system, directory)
   // Match COM_AddGameDirectory: pakN overrides the loose directory, higher N
   // overrides lower N, and the first missing sequential PAK terminates probing.
@@ -70,7 +91,9 @@ function addGameDirectory(system, directory)
   return system
 end function
 
-// Provide standard behavior for the active subsystem.
+/// Implements the `standard` operation for `miniquake.filesystem` (standard).
+/// @param baseDirectory Root directory containing the Quake installation.
+/// @param gameName Name that identifies the requested value or resource.
 function standard(baseDirectory, gameName)
   system = create(baseDirectory, gameName)
   addGameDirectory(system, fs.joinPath(baseDirectory, "id1"))
@@ -82,12 +105,15 @@ function standard(baseDirectory, gameName)
   return system
 end function
 
-// Initialize state for initialize.
+/// Initializes ialize for `miniquake.filesystem`.
+/// @param baseDirectory Root directory containing the Quake installation.
+/// @param gameName Name that identifies the requested value or resource.
 function initialize(baseDirectory, gameName)
   return standard(baseDirectory, gameName)
 end function
 
-// Provide trim trailing separator behavior for the active subsystem.
+/// Implements the `trimTrailingSeparator` operation for `miniquake.filesystem` (trim trailing separator).
+/// @param path Filesystem path to process.
 function trimTrailingSeparator(path)
   source = bytes(path)
   if len(source) > 0 and (source[len(source) - 1] == 47 or source[len(source) - 1] == 92) then
@@ -96,7 +122,9 @@ function trimTrailingSeparator(path)
   return path
 end function
 
-// Initialize state for initialize arguments.
+/// Initialize state for initialize arguments.
+/// @param suppliedBaseDirectory The supplied base directory input consumed by `initializeArguments`.
+/// @param commandLine The command line input consumed by `initializeArguments`.
 function initializeArguments(suppliedBaseDirectory, commandLine)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   baseDirectory = common.parmValue(commandLine, "-basedir", suppliedBaseDirectory)
@@ -157,12 +185,14 @@ function initializeArguments(suppliedBaseDirectory, commandLine)
   return system
 end function
 
-// Initialize state for init filesystem.
+/// Initialize state for init filesystem.
+/// @param suppliedBaseDirectory The supplied base directory input consumed by `initFilesystem`.
+/// @param commandLine The command line input consumed by `initFilesystem`.
 function initFilesystem(suppliedBaseDirectory, commandLine)
   return initializeArguments(suppliedBaseDirectory, commandLine)
 end function
 
-// Provide registered words behavior for the active subsystem.
+/// Registers ed words for `miniquake.filesystem`.
 function registeredWords()
   return [
     0,0,0,0,0,0,0,0,0,0,26112,0,0,0,26112,0,
@@ -176,7 +206,8 @@ function registeredWords()
   ]
 end function
 
-// Validate registered and report any incompatibility.
+/// Validate registered and report any incompatibility.
+/// @param system The system input consumed by `checkRegistered`.
 function checkRegistered(system)
   opened = try(resolve(system, "gfx/pop.lmp"))
   system.staticRegistered = false
@@ -200,7 +231,8 @@ function checkRegistered(system)
   return true
 end function
 
-// Provide contains directory separator behavior for the active subsystem.
+/// Implements the `containsDirectorySeparator` operation for `miniquake.filesystem` (contains directory separator).
+/// @param name Stable name that identifies the requested object or option.
 function containsDirectorySeparator(name)
   source = bytes(name)
   for each value in source
@@ -209,7 +241,8 @@ function containsDirectorySeparator(name)
   return false
 end function
 
-// Create and initialize path.
+/// Create and initialize path.
+/// @param path Filesystem path to process.
 function createPath(path)
   source = bytes(path)
   index = 1
@@ -223,7 +256,9 @@ function createPath(path)
   return true
 end function
 
-// Return cache path derived from the active module state.
+/// Return cache path derived from the active module state.
+/// @param system The system input consumed by `cachePath`.
+/// @param netPath Filesystem path used by the operation.
 function cachePath(system, netPath)
   if system.cacheDirectory == "" then return netPath end if
   suffix = netPath
@@ -234,7 +269,9 @@ function cachePath(system, netPath)
   return system.cacheDirectory + suffix
 end function
 
-// Transfer data for copy file.
+/// Transfer data for copy file.
+/// @param netPath Filesystem path used by the operation.
+/// @param destination Destination value or collection to update.
 function copyFile(netPath, destination)
   createPath(destination)
   copied = fs.copyFile(netPath, destination, true)
@@ -242,7 +279,8 @@ function copyFile(netPath, destination)
   return true
 end function
 
-// Provide file time behavior for the active subsystem.
+/// Implements the `fileTime` operation for `miniquake.filesystem` (file time).
+/// @param path Filesystem path to process.
 function fileTime(path)
   data = bytes(36)
   if not GetFileAttributesExW(path, 0, data) then return -1 end if
@@ -251,7 +289,9 @@ function fileTime(path)
   return high * 4294967296 + low
 end function
 
-// Return cached location derived from the active module state.
+/// Return cached location derived from the active module state.
+/// @param system The system input consumed by `cachedLocation`.
+/// @param netPath Filesystem path used by the operation.
 function cachedLocation(system, netPath)
   if system.cacheDirectory == "" then return netPath end if
   destination = cachePath(system, netPath)
@@ -262,7 +302,9 @@ function cachedLocation(system, netPath)
   return destination
 end function
 
-// Provide resolve behavior for the active subsystem.
+/// Implements the `resolve` operation for `miniquake.filesystem` (resolve).
+/// @param system The system input consumed by `resolve`.
+/// @param name Stable name that identifies the requested object or option.
 function resolve(system, name)
   normalized = normalizeName(name)
   searchIndex = 0
@@ -299,28 +341,36 @@ function resolve(system, name)
   return error(1650, "COM_FindFile: " + name + " not found")
 end function
 
-// Read and validate file.
+/// Read and validate file.
+/// @param system The system input consumed by `readFile`.
+/// @param name Stable name that identifies the requested object or option.
 function readFile(system, name)
   found = resolve(system, name)
   if found is error then return found end if
   return found[0]
 end function
 
-// Read and validate text.
+/// Reads text for `miniquake.filesystem`.
+/// @param system The system input consumed by `readText`.
+/// @param name Stable name that identifies the requested object or option.
 function readText(system, name)
   data = readFile(system, name)
   if data is error then return data end if
   return quakeText.decodeBytes(data)
 end function
 
-// Return file.
+/// Return file.
+/// @param system The system input consumed by `findFile`.
+/// @param name Stable name that identifies the requested object or option.
 function findFile(system, name)
   found = resolve(system, name)
   if found is error then return found end if
   return [found[0], len(found[0]), found[1]]
 end function
 
-// Initialize state for open file.
+/// Initialize state for open file.
+/// @param system The system input consumed by `openFile`.
+/// @param name Stable name that identifies the requested object or option.
 function openFile(system, name)
   found = resolve(system, name)
   if found is error then return [-1, void] end if
@@ -328,7 +378,9 @@ function openFile(system, name)
   return [len(found[0]), handle]
 end function
 
-// Provide f open file behavior for the active subsystem.
+/// Implements the `fOpenFile` operation for `miniquake.filesystem` (f open file).
+/// @param system The system input consumed by `fOpenFile`.
+/// @param name Stable name that identifies the requested object or option.
 function fOpenFile(system, name)
   found = resolve(system, name)
   if found is error then return [-1, void] end if
@@ -336,7 +388,9 @@ function fOpenFile(system, name)
   return [len(found[0]), handle]
 end function
 
-// Handle seek and update the associated state.
+/// Handle seek and update the associated state.
+/// @param handle The handle input consumed by `handleSeek`.
+/// @param position Position used by the operation.
 function handleSeek(handle, position)
   if handle is void or handle.closed then return error(1655, "COM file handle is closed") end if
   if position < 0 or position > handle.length then return error(1656, "COM file seek outside file") end if
@@ -344,7 +398,9 @@ function handleSeek(handle, position)
   return position
 end function
 
-// Handle read and update the associated state.
+/// Handle read and update the associated state.
+/// @param handle The handle input consumed by `handleRead`.
+/// @param count Number of entries or units to process.
 function handleRead(handle, count)
   if handle is void or handle.closed then return error(1655, "COM file handle is closed") end if
   if count < 0 then return error(1657, "COM file read has negative size") end if
@@ -355,7 +411,8 @@ function handleRead(handle, count)
   return data
 end function
 
-// Release state for close file.
+/// Release state for close file.
+/// @param handle The handle input consumed by `closeFile`.
 function closeFile(handle)
   if handle is void then return false end if
   // COM_CloseFile deliberately leaves the shared PACK handle open.
@@ -363,9 +420,11 @@ function closeFile(handle)
   return true
 end function
 
-// COM_LoadFile always allocated one extra byte and NUL-terminated it.  Keep
-// readFile as the raw COM_FindFile view used by binary parsers, and expose the
-// load-family behavior explicitly.
+/// COM_LoadFile always allocated one extra byte and NUL-terminated it.  Keep
+/// readFile as the raw COM_FindFile view used by binary parsers, and expose the
+/// load-family behavior explicitly.
+/// @param system The system input consumed by `loadFile`.
+/// @param name Stable name that identifies the requested object or option.
 function loadFile(system, name)
   source = readFile(system, name)
   destination = bytes(len(source) + 1)
@@ -374,22 +433,31 @@ function loadFile(system, name)
   return destination
 end function
 
-// Read and validate hunk file.
+/// Read and validate hunk file.
+/// @param system The system input consumed by `loadHunkFile`.
+/// @param name Stable name that identifies the requested object or option.
 function loadHunkFile(system, name)
   return loadFile(system, name)
 end function
 
-// Read and validate temp file.
+/// Read and validate temp file.
+/// @param system The system input consumed by `loadTempFile`.
+/// @param name Stable name that identifies the requested object or option.
 function loadTempFile(system, name)
   return loadFile(system, name)
 end function
 
-// Read and validate cache file.
+/// Read and validate cache file.
+/// @param system The system input consumed by `loadCacheFile`.
+/// @param name Stable name that identifies the requested object or option.
 function loadCacheFile(system, name)
   return loadFile(system, name)
 end function
 
-// Read and validate stack file.
+/// Read and validate stack file.
+/// @param system The system input consumed by `loadStackFile`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param buffer The buffer input consumed by `loadStackFile`.
 function loadStackFile(system, name, buffer)
   source = readFile(system, name)
   required = len(source) + 1
@@ -400,14 +468,19 @@ function loadStackFile(system, name, buffer)
   return destination
 end function
 
-// Transfer data for copy terminated.
+/// Transfer data for copy terminated.
+/// @param destination Destination value or collection to update.
+/// @param source Source value or collection to read.
 function copyTerminated(destination, source)
   bio.copyInto(destination, 0, source, 0, len(source))
   destination[len(source)] = 0
   return destination
 end function
 
-// Read and validate hunk allocation.
+/// Read and validate hunk allocation.
+/// @param system The system input consumed by `loadHunkAllocation`.
+/// @param memoryState Mutable state used by `loadHunkAllocation`.
+/// @param name Stable name that identifies the requested object or option.
 function loadHunkAllocation(system, memoryState, name)
   source = readFile(system, name)
   if source is error then return source end if
@@ -416,7 +489,10 @@ function loadHunkAllocation(system, memoryState, name)
   return block
 end function
 
-// Read and validate temp allocation.
+/// Read and validate temp allocation.
+/// @param system The system input consumed by `loadTempAllocation`.
+/// @param memoryState Mutable state used by `loadTempAllocation`.
+/// @param name Stable name that identifies the requested object or option.
 function loadTempAllocation(system, memoryState, name)
   source = readFile(system, name)
   if source is error then return source end if
@@ -425,7 +501,10 @@ function loadTempAllocation(system, memoryState, name)
   return block
 end function
 
-// Read and validate zone allocation.
+/// Read and validate zone allocation.
+/// @param system The system input consumed by `loadZoneAllocation`.
+/// @param memoryState Mutable state used by `loadZoneAllocation`.
+/// @param name Stable name that identifies the requested object or option.
 function loadZoneAllocation(system, memoryState, name)
   source = readFile(system, name)
   if source is error then return source end if
@@ -434,7 +513,10 @@ function loadZoneAllocation(system, memoryState, name)
   return block
 end function
 
-// Read and validate cache allocation.
+/// Read and validate cache allocation.
+/// @param system The system input consumed by `loadCacheAllocation`.
+/// @param memoryState Mutable state used by `loadCacheAllocation`.
+/// @param name Stable name that identifies the requested object or option.
 function loadCacheAllocation(system, memoryState, name)
   source = readFile(system, name)
   if source is error then return source end if
@@ -443,7 +525,11 @@ function loadCacheAllocation(system, memoryState, name)
   return user
 end function
 
-// Read and validate stack allocation.
+/// Read and validate stack allocation.
+/// @param system The system input consumed by `loadStackAllocation`.
+/// @param memoryState Mutable state used by `loadStackAllocation`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param buffer The buffer input consumed by `loadStackAllocation`.
 function loadStackAllocation(system, memoryState, name, buffer)
   source = readFile(system, name)
   if source is error then return source end if
@@ -456,7 +542,9 @@ function loadStackAllocation(system, memoryState, name, buffer)
   return [block.data, block]
 end function
 
-// Report whether file exists holds for the active state.
+/// Report whether file exists holds for the active state.
+/// @param system The system input consumed by `fileExists`.
+/// @param name Stable name that identifies the requested object or option.
 function fileExists(system, name)
   // Existence checks must not materialize an entire PAK entry.  In particular,
   // Host_Map_f probes multi-megabyte BSP files before it changes any running
@@ -479,55 +567,75 @@ function fileExists(system, name)
   return false
 end function
 
-// Report whether exists holds for the active state.
+/// Report whether exists holds for the active state.
+/// @param system The system input consumed by `exists`.
+/// @param name Stable name that identifies the requested object or option.
 function exists(system, name)
   return fileExists(system, name)
 end function
 
-// Return location.
+/// Return location.
+/// @param system The system input consumed by `findLocation`.
+/// @param name Stable name that identifies the requested object or option.
 function findLocation(system, name)
   found = try(resolve(system, name))
   if found is error then return "" end if
   return found[1]
 end function
 
-// Return game path derived from the active module state.
+/// Return game path derived from the active module state.
+/// @param system The system input consumed by `gamePath`.
+/// @param name Stable name that identifies the requested object or option.
 function gamePath(system, name)
   return fs.joinPath(fs.joinPath(system.baseDirectory, system.gameDirectory), name)
 end function
 
-// Encode and write file.
+/// Encode and write file.
+/// @param system The system input consumed by `writeFile`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param data Input data consumed by the operation.
 function writeFile(system, name, data)
   return fs.writeAllBytes(gamePath(system, name), data)
 end function
 
-// Encode and write bytes.
+/// Writes bytes for `miniquake.filesystem`.
+/// @param system The system input consumed by `writeBytes`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param data Input data consumed by the operation.
 function writeBytes(system, name, data)
   return writeFile(system, name, data)
 end function
 
-// Encode and write text.
+/// Writes text for `miniquake.filesystem`.
+/// @param system The system input consumed by `writeText`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param text Text to parse or process.
 function writeText(system, name, text)
   data = quakeText.encodeBytes(text)
   if data is error then return data end if
   return fs.writeAllBytes(gamePath(system, name), data)
 end function
 
-// Return music track name derived from the active module state.
+/// Return music track name derived from the active module state.
+/// @param track The track input consumed by `musicTrackName`.
 function musicTrackName(track)
   number = "" + track
   if track >= 0 and track < 10 then number = "0" + number end if
   return "track" + number + ".ogg"
 end function
 
-// Read and validate loose music track.
+/// Read and validate loose music track.
+/// @param directory The directory input consumed by `readLooseMusicTrack`.
+/// @param filename Path of the file to process.
 function readLooseMusicTrack(directory, filename)
   candidate = fs.joinPath(fs.joinPath(directory, "music"), filename)
   if fs.exists(candidate) then return fs.readAllBytes(candidate) end if
   return error(1651, candidate + " not found")
 end function
 
-// Provide rerelease music directory behavior for the active subsystem.
+/// Implements the `rereleaseMusicDirectory` operation for `miniquake.filesystem` (rerelease music directory).
+/// @param system The system input consumed by `rereleaseMusicDirectory`.
+/// @param gameDirectory Selected Quake game-data directory.
 function rereleaseMusicDirectory(system, gameDirectory)
   return fs.joinPath(
     fs.joinPath(
@@ -538,7 +646,9 @@ function rereleaseMusicDirectory(system, gameDirectory)
   )
 end function
 
-// Return music track path derived from the active module state.
+/// Return music track path derived from the active module state.
+/// @param system The system input consumed by `musicTrackPath`.
+/// @param track The track input consumed by `musicTrackPath`.
 function musicTrackPath(system, track)
   filename = musicTrackName(track)
   // Return an OS path only for loose files.  PAK-contained or otherwise
@@ -555,7 +665,9 @@ function musicTrackPath(system, track)
   return ""
 end function
 
-// Read and validate music track.
+/// Read and validate music track.
+/// @param system The system input consumed by `readMusicTrack`.
+/// @param track The track input consumed by `readMusicTrack`.
 function readMusicTrack(system, track)
   filename = musicTrackName(track)
   classic = try(readFile(system, "music/" + filename))
@@ -573,7 +685,8 @@ function readMusicTrack(system, track)
   return error(1651, "music/" + filename + " not found below " + system.gameDirectory + " or rerelease")
 end function
 
-// Inspect the requested value and emit its decoded metadata.
+/// Implements the `describe` operation for `miniquake.filesystem` (describe).
+/// @param system The system input consumed by `describe`.
 function describe(system)
   text = "basedir=" + system.baseDirectory + " game=" + system.gameDirectory
   for each searchPath in system.searchPaths
@@ -586,7 +699,8 @@ function describe(system)
   return text
 end function
 
-// Return path command text for the active module state.
+/// Return path command text for the active module state.
+/// @param system The system input consumed by `pathCommandText`.
 function pathCommandText(system)
   text = "Current search path:"
   for each searchPath in system.searchPaths
@@ -599,7 +713,8 @@ function pathCommandText(system)
   return text
 end function
 
-// Return search path summary derived from the active module state.
+/// Return search path summary derived from the active module state.
+/// @param system The system input consumed by `searchPathSummary`.
 function searchPathSummary(system)
   result = arrayutil.makeEmptyArray(len(system.searchPaths))
   index = 0
@@ -616,7 +731,8 @@ function searchPathSummary(system)
 end function
 
 
-// Release or remove state for the requested value.
+/// Release or remove state for the requested value.
+/// @param system The system input consumed by `release`.
 function release(system)
   if system is void then return false end if
   for each searchPath in system.searchPaths
@@ -631,7 +747,8 @@ function release(system)
   return true
 end function
 
-// Return pack file count derived from the active module state.
+/// Return pack file count derived from the active module state.
+/// @param system The system input consumed by `packFileCount`.
 function packFileCount(system)
   count = 0
   for each searchPath in system.searchPaths
@@ -640,7 +757,8 @@ function packFileCount(system)
   return count
 end function
 
-// Report whether is modified.
+/// Report whether is modified.
+/// @param system The system input consumed by `isModified`.
 function isModified(system)
   if system.modified or system.gameDirectory != "id1" then return true end if
   for each searchPath in system.searchPaths
@@ -651,90 +769,121 @@ function isModified(system)
   return false
 end function
 
-// Original WinQuake/common.c filesystem entry points.  The state that was
-// global in C is explicit in MiniLang, but the observable operations are the
-// same and remain independently differential-testable.
+/// Original WinQuake/common.c filesystem entry points.  The state that was
+/// global in C is explicit in MiniLang, but the observable operations are the
+/// same and remain independently differential-testable.
+/// @param system The system input consumed by `COM_CheckRegistered`.
 function COM_CheckRegistered(system)
   return checkRegistered(system)
 end function
 
-// Mirror Quake's COM_Path_f routine and its observable state changes.
+/// Mirror Quake's COM_Path_f routine and its observable state changes.
+/// @param system The system input consumed by `COM_Path_f`.
 function COM_Path_f(system)
   return pathCommandText(system)
 end function
 
-// Mirror Quake's COM_WriteFile routine and its observable state changes.
+/// Mirror Quake's COM_WriteFile routine and its observable state changes.
+/// @param system The system input consumed by `COM_WriteFile`.
+/// @param filename Path of the file to process.
+/// @param data Input data consumed by the operation.
 function COM_WriteFile(system, filename, data)
   return writeFile(system, filename, data)
 end function
 
-// Mirror Quake's COM_CreatePath routine and its observable state changes.
+/// Mirror Quake's COM_CreatePath routine and its observable state changes.
+/// @param path Filesystem path to process.
 function COM_CreatePath(path)
   return createPath(path)
 end function
 
-// Mirror Quake's COM_CopyFile routine and its observable state changes.
+/// Mirror Quake's COM_CopyFile routine and its observable state changes.
+/// @param netPath Filesystem path used by the operation.
+/// @param cachePath Filesystem path used by the operation.
 function COM_CopyFile(netPath, cachePath)
   return copyFile(netPath, cachePath)
 end function
 
-// Mirror Quake's COM_FindFile routine and its observable state changes.
+/// Mirror Quake's COM_FindFile routine and its observable state changes.
+/// @param system The system input consumed by `COM_FindFile`.
+/// @param filename Path of the file to process.
 function COM_FindFile(system, filename)
   return findFile(system, filename)
 end function
 
-// Mirror Quake's COM_OpenFile routine and its observable state changes.
+/// Mirror Quake's COM_OpenFile routine and its observable state changes.
+/// @param system The system input consumed by `COM_OpenFile`.
+/// @param filename Path of the file to process.
 function COM_OpenFile(system, filename)
   return openFile(system, filename)
 end function
 
-// Mirror Quake's COM_FOpenFile routine and its observable state changes.
+/// Mirror Quake's COM_FOpenFile routine and its observable state changes.
+/// @param system The system input consumed by `COM_FOpenFile`.
+/// @param filename Path of the file to process.
 function COM_FOpenFile(system, filename)
   return fOpenFile(system, filename)
 end function
 
-// Mirror Quake's COM_CloseFile routine and its observable state changes.
+/// Mirror Quake's COM_CloseFile routine and its observable state changes.
+/// @param handle The handle input consumed by `COM_CloseFile`.
 function COM_CloseFile(handle)
   return closeFile(handle)
 end function
 
-// Mirror Quake's COM_LoadFile routine and its observable state changes.
+/// Mirror Quake's COM_LoadFile routine and its observable state changes.
+/// @param system The system input consumed by `COM_LoadFile`.
+/// @param path Filesystem path to process.
 function COM_LoadFile(system, path)
   return loadFile(system, path)
 end function
 
-// Mirror Quake's COM_LoadHunkFile routine and its observable state changes.
+/// Mirror Quake's COM_LoadHunkFile routine and its observable state changes.
+/// @param system The system input consumed by `COM_LoadHunkFile`.
+/// @param path Filesystem path to process.
 function COM_LoadHunkFile(system, path)
   return loadHunkFile(system, path)
 end function
 
-// Mirror Quake's COM_LoadTempFile routine and its observable state changes.
+/// Mirror Quake's COM_LoadTempFile routine and its observable state changes.
+/// @param system The system input consumed by `COM_LoadTempFile`.
+/// @param path Filesystem path to process.
 function COM_LoadTempFile(system, path)
   return loadTempFile(system, path)
 end function
 
-// Mirror Quake's COM_LoadCacheFile routine and its observable state changes.
+/// Mirror Quake's COM_LoadCacheFile routine and its observable state changes.
+/// @param system The system input consumed by `COM_LoadCacheFile`.
+/// @param path Filesystem path to process.
 function COM_LoadCacheFile(system, path)
   return loadCacheFile(system, path)
 end function
 
-// Mirror Quake's COM_LoadStackFile routine and its observable state changes.
+/// Mirror Quake's COM_LoadStackFile routine and its observable state changes.
+/// @param system The system input consumed by `COM_LoadStackFile`.
+/// @param path Filesystem path to process.
+/// @param buffer The buffer input consumed by `COM_LoadStackFile`.
 function COM_LoadStackFile(system, path, buffer)
   return loadStackFile(system, path, buffer)
 end function
 
-// Mirror Quake's COM_LoadPackFile routine and its observable state changes.
+/// Mirror Quake's COM_LoadPackFile routine and its observable state changes.
+/// @param filename Path of the file to process.
 function COM_LoadPackFile(filename)
   archive = loadPackFile(filename)
   return [archive, not pak.isOriginalPak0Directory(archive)]
 end function
 
-// Mirror Quake's COM_AddGameDirectory routine and its observable state changes.
+/// Mirror Quake's COM_AddGameDirectory routine and its observable state changes.
+/// @param system The system input consumed by `COM_AddGameDirectory`.
+/// @param directory The directory input consumed by `COM_AddGameDirectory`.
 function COM_AddGameDirectory(system, directory)
   return addGameDirectory(system, directory)
 end function
 
-// Mirror Quake's COM_InitFilesystem routine and its observable state changes.
+/// Mirror Quake's COM_InitFilesystem routine and its observable state changes.
+/// @param suppliedBaseDirectory The supplied base directory input consumed by `COM_InitFilesystem`.
+/// @param commandLine The command line input consumed by `COM_InitFilesystem`.
 function COM_InitFilesystem(suppliedBaseDirectory, commandLine)
   return initFilesystem(suppliedBaseDirectory, commandLine)
 end function

@@ -11,16 +11,25 @@ package miniquake.render.texture_upscale
 
 import miniquake.native as native
 
+/// Defines the upscale off value used by `miniquake.render.texture_upscale`.
 const UPSCALE_OFF = 0
+/// Defines the upscale nearest 2 x value used by `miniquake.render.texture_upscale`.
 const UPSCALE_NEAREST_2X = 1
+/// Defines the upscale scale2 x value used by `miniquake.render.texture_upscale`.
 const UPSCALE_SCALE2X = 2
+/// Defines the upscale scale3 x value used by `miniquake.render.texture_upscale`.
 const UPSCALE_SCALE3X = 3
+/// Defines the upscale hq2 x value used by `miniquake.render.texture_upscale`.
 const UPSCALE_HQ2X = 4
+/// Defines the upscale xbr2 x value used by `miniquake.render.texture_upscale`.
 const UPSCALE_XBR2X = 5
+/// Defines the upscale xbr4 x value used by `miniquake.render.texture_upscale`.
 const UPSCALE_XBR4X = 6
+/// Defines the upscale mode count value used by `miniquake.render.texture_upscale`.
 const UPSCALE_MODE_COUNT = 7
 
-// Clamp a persisted or console-provided mode to the supported range.
+/// Clamp a persisted or console-provided mode to the supported range.
+/// @param mode The mode input consumed by `clampMode`.
 function clampMode(mode)
   mode = native.trunc(mode)
   if mode < UPSCALE_OFF then return UPSCALE_OFF end if
@@ -28,13 +37,15 @@ function clampMode(mode)
   return mode
 end function
 
-// Return the stable English display name for one texture-upscale mode.
+/// Return the stable English display name for one texture-upscale mode.
+/// @param mode The mode input consumed by `modeName`.
 function modeName(mode)
   mode = clampMode(mode)
   return ["OFF", "NEAREST 2X", "SCALE2X", "SCALE3X", "HQ2X", "XBR2X", "XBR4X"][mode]
 end function
 
-// Return the integer enlargement factor associated with a mode.
+/// Return the integer enlargement factor associated with a mode.
+/// @param mode The mode input consumed by `scaleFactor`.
 function scaleFactor(mode)
   mode = clampMode(mode)
   if mode == UPSCALE_SCALE3X then return 3 end if
@@ -43,7 +54,10 @@ function scaleFactor(mode)
   return 2
 end function
 
-// Validate dimensions and the complete RGBA source span before scaling.
+/// Validate dimensions and the complete RGBA source span before scaling.
+/// @param pixels The pixels input consumed by `validateSource`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function validateSource(pixels, width, height)
   if width <= 0 or height <= 0 then return error(4060, "texture upscale: invalid dimensions") end if
   pixelCount = width * height
@@ -52,7 +66,10 @@ function validateSource(pixels, width, height)
   return pixelCount
 end function
 
-// Report exact equality for two RGBA pixels in the same byte buffer.
+/// Report exact equality for two RGBA pixels in the same byte buffer.
+/// @param pixels The pixels input consumed by `pixelsEqual`.
+/// @param first The first input consumed by `pixelsEqual`.
+/// @param second The second input consumed by `pixelsEqual`.
 function pixelsEqual(pixels, first, second)
   return pixels[first] == pixels[second] and
     pixels[first + 1] == pixels[second + 1] and
@@ -60,13 +77,17 @@ function pixelsEqual(pixels, first, second)
     pixels[first + 3] == pixels[second + 3]
 end function
 
-// Return an absolute integer without converting the hot scaler path to float.
+/// Return an absolute integer without converting the hot scaler path to float.
+/// @param value Value consumed by `absoluteInteger`.
 function absoluteInteger(value)
   if value < 0 then return -value end if
   return value
 end function
 
-// Measure perceptual RGBA distance with extra weight on green and alpha.
+/// Measure perceptual RGBA distance with extra weight on green and alpha.
+/// @param pixels The pixels input consumed by `pixelDistance`.
+/// @param first The first input consumed by `pixelDistance`.
+/// @param second The second input consumed by `pixelDistance`.
 function pixelDistance(pixels, first, second)
   red = absoluteInteger(pixels[first] - pixels[second])
   green = absoluteInteger(pixels[first + 1] - pixels[second + 1])
@@ -75,12 +96,20 @@ function pixelDistance(pixels, first, second)
   return red * 3 + green * 6 + blue * 2 + alpha * 8
 end function
 
-// Report perceptual similarity at the supplied HQ/xBR edge threshold.
+/// Report perceptual similarity at the supplied HQ/xBR edge threshold.
+/// @param pixels The pixels input consumed by `pixelsSimilar`.
+/// @param first The first input consumed by `pixelsSimilar`.
+/// @param second The second input consumed by `pixelsSimilar`.
+/// @param threshold The threshold input consumed by `pixelsSimilar`.
 function pixelsSimilar(pixels, first, second, threshold)
   return pixelDistance(pixels, first, second) <= threshold
 end function
 
-// Copy one complete pixel into an already allocated destination image.
+/// Copy one complete pixel into an already allocated destination image.
+/// @param destination Destination value or collection to update.
+/// @param destinationOffset Zero-based offset of the requested data.
+/// @param source Source value or collection to read.
+/// @param sourceOffset Zero-based offset of the requested data.
 function copyPixel(destination, destinationOffset, source, sourceOffset)
   destination[destinationOffset] = source[sourceOffset]
   destination[destinationOffset + 1] = source[sourceOffset + 1]
@@ -89,9 +118,17 @@ function copyPixel(destination, destinationOffset, source, sourceOffset)
   return destinationOffset + 4
 end function
 
-// Blend a center pixel with two edge neighbors in premultiplied-alpha space.
-// This prevents the hidden RGB value of Quake palette index 255 from forming
-// colored fringes around sprite and alias-model cutouts.
+/// Blend a center pixel with two edge neighbors in premultiplied-alpha space.
+/// This prevents the hidden RGB value of Quake palette index 255 from forming
+/// colored fringes around sprite and alias-model cutouts.
+/// @param destination Destination value or collection to update.
+/// @param destinationOffset Zero-based offset of the requested data.
+/// @param source Source value or collection to read.
+/// @param center The center input consumed by `blendCorner`.
+/// @param first The first input consumed by `blendCorner`.
+/// @param second The second input consumed by `blendCorner`.
+/// @param centerWeight The center weight input consumed by `blendCorner`.
+/// @param neighborWeight The neighbor weight input consumed by `blendCorner`.
 function blendCorner(destination, destinationOffset, source, center, first, second, centerWeight, neighborWeight)
   totalWeight = centerWeight + neighborWeight * 2
   centerAlpha = source[center + 3]
@@ -115,7 +152,11 @@ function blendCorner(destination, destinationOffset, source, center, first, seco
   return destinationOffset + 4
 end function
 
-// Enlarge an RGBA image with exact nearest-neighbor replication.
+/// Enlarge an RGBA image with exact nearest-neighbor replication.
+/// @param pixels The pixels input consumed by `nearest`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param factor The factor input consumed by `nearest`.
 function nearest(pixels, width, height, factor)
   validated = validateSource(pixels, width, height)
   if validated is error then return validated end if
@@ -137,7 +178,10 @@ function nearest(pixels, width, height, factor)
   return [output, outputWidth, outputHeight]
 end function
 
-// Apply the canonical Scale2x neighborhood rules to an RGBA image.
+/// Apply the canonical Scale2x neighborhood rules to an RGBA image.
+/// @param pixels The pixels input consumed by `scale2x`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function scale2x(pixels, width, height)
   // Validate and allocate once, then apply the four canonical neighborhood
   // choices independently for every source pixel.
@@ -187,7 +231,10 @@ function scale2x(pixels, width, height)
   return [output, outputWidth, outputHeight]
 end function
 
-// Apply the canonical Scale3x 3x3 neighborhood rules to an RGBA image.
+/// Apply the canonical Scale3x 3x3 neighborhood rules to an RGBA image.
+/// @param pixels The pixels input consumed by `scale3x`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function scale3x(pixels, width, height)
   // Expand each source texel to a 3x3 block whose edge cells are selected
   // from the complete A..I neighborhood before any destination write.
@@ -242,7 +289,13 @@ function scale3x(pixels, width, height)
   return [output, outputWidth, outputHeight]
 end function
 
-// Blend one HQ2x corner when its two adjoining colors form a coherent edge.
+/// Blend one HQ2x corner when its two adjoining colors form a coherent edge.
+/// @param output Destination buffer updated with the HQ-filtered corner.
+/// @param destination Destination value or collection to update.
+/// @param pixels The pixels input consumed by `hqCorner`.
+/// @param center The center input consumed by `hqCorner`.
+/// @param first The first input consumed by `hqCorner`.
+/// @param second The second input consumed by `hqCorner`.
 function hqCorner(output, destination, pixels, center, first, second)
   if pixelsSimilar(pixels, first, second, 420) and not pixelsSimilar(pixels, center, first, 420) and not pixelsSimilar(pixels, center, second, 420) then
     blendCorner(output, destination, pixels, center, first, second, 4, 2)
@@ -250,7 +303,16 @@ function hqCorner(output, destination, pixels, center, first, second)
   return true
 end function
 
-// Blend one xBR corner after comparing the two competing diagonal gradients.
+/// Blend one xBR corner after comparing the two competing diagonal gradients.
+/// @param output Destination buffer updated with the xBR-filtered corner.
+/// @param destination Destination value or collection to update.
+/// @param pixels The pixels input consumed by `xbrCorner`.
+/// @param center The center input consumed by `xbrCorner`.
+/// @param first The first input consumed by `xbrCorner`.
+/// @param second The second input consumed by `xbrCorner`.
+/// @param diagonal The diagonal input consumed by `xbrCorner`.
+/// @param farFirst The far first input consumed by `xbrCorner`.
+/// @param farSecond The far second input consumed by `xbrCorner`.
 function xbrCorner(output, destination, pixels, center, first, second, diagonal, farFirst, farSecond)
   if not pixelsSimilar(pixels, first, second, 720) then return false end if
   if pixelsSimilar(pixels, center, first, 420) or pixelsSimilar(pixels, center, second, 420) then return false end if
@@ -267,7 +329,11 @@ function xbrCorner(output, destination, pixels, center, first, second, diagonal,
   return false
 end function
 
-// Apply HQ2x or xBR2x edge-directed smoothing without touching flat regions.
+/// Apply HQ2x or xBR2x edge-directed smoothing without touching flat regions.
+/// @param pixels The pixels input consumed by `edgeAware2x`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param xbr The xbr input consumed by `edgeAware2x`.
 function edgeAware2x(pixels, width, height, xbr)
   // Seed all four output corners with the center color, then replace only
   // corners where the HQ or xBR gradient test establishes a coherent edge.
@@ -322,7 +388,11 @@ function edgeAware2x(pixels, width, height, xbr)
   return [output, outputWidth, outputHeight]
 end function
 
-// Apply one selected load-time upscaler and return [pixels, width, height].
+/// Apply one selected load-time upscaler and return [pixels, width, height].
+/// @param pixels The pixels input consumed by `apply`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param mode The mode input consumed by `apply`.
 function apply(pixels, width, height, mode)
   mode = clampMode(mode)
   if mode == UPSCALE_OFF then

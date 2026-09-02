@@ -11,23 +11,30 @@ import miniquake.types as t
 import miniquake.native as native
 import miniquake.platform.win32 as win
 
+/// Defines the max udp payload value used by `miniquake.net_udp`.
 const MAX_UDP_PAYLOAD = 65507
+/// Tracks the module-level default bind address state owned by `miniquake.net_udp`.
 defaultBindAddress = "0.0.0.0"
+/// Tracks the module-level receive scratch state owned by `miniquake.net_udp`.
 receiveScratch = bytes(2048)
 
-// Initialize state for open.
+/// Implements the `open` operation for `miniquake.net_udp` (open).
+/// @param port The port input consumed by `open`.
 function open(port)
   return openBound(port, defaultBindAddress)
 end function
 
-// Update subsystem configuration for configure bind address.
+/// Update subsystem configuration for configure bind address.
+/// @param address Network address of the peer.
 function configureBindAddress(address)
   global defaultBindAddress
   if address is void or address == "" then defaultBindAddress = "0.0.0.0" else defaultBindAddress = address end if
   return defaultBindAddress
 end function
 
-// Initialize state for open bound.
+/// Initialize state for open bound.
+/// @param port The port input consumed by `openBound`.
+/// @param bindAddress The bind address input consumed by `openBound`.
 function openBound(port, bindAddress)
   if port < 0 or port > 65535 then return error(3200, "UDP_OpenSocket: invalid port " + port) end if
   handle = native.udpOpenBound(port, bindAddress)
@@ -43,7 +50,8 @@ function openBound(port, bindAddress)
   return t.UdpSocket(handle, actualPort, "0.0.0.0", true, actualAddress, false)
 end function
 
-// Release state for close.
+/// Implements the `close` operation for `miniquake.net_udp` (close).
+/// @param socketValue The socket value input consumed by `close`.
 function close(socketValue)
   if socketValue is void or not socketValue.open then return false end if
   native.udpClose(socketValue.handle)
@@ -52,7 +60,11 @@ function close(socketValue)
   return true
 end function
 
-// Send the requested value through the active connection.
+/// Send the requested value through the active connection.
+/// @param socketValue The socket value input consumed by `send`.
+/// @param address Network address of the peer.
+/// @param port The port input consumed by `send`.
+/// @param payload The payload input consumed by `send`.
 function send(socketValue, address, port, payload)
   if socketValue is void or not socketValue.open then return error(3203, "UDP_Write: socket is closed") end if
   if payload is not bytes then return error(3204, "UDP_Write: payload must be bytes") end if
@@ -63,14 +75,18 @@ function send(socketValue, address, port, payload)
   return written
 end function
 
-// Provide broadcast behavior for the active subsystem.
+/// Implements the `broadcast` operation for `miniquake.net_udp` (broadcast).
+/// @param socketValue The socket value input consumed by `broadcast`.
+/// @param port The port input consumed by `broadcast`.
+/// @param payload The payload input consumed by `broadcast`.
 function broadcast(socketValue, port, payload)
   capable = try(makeBroadcastCapable(socketValue))
   if capable is error then return capable end if
   return send(socketValue, "255.255.255.255", port, payload)
 end function
 
-// Create and initialize broadcast capable.
+/// Create and initialize broadcast capable.
+/// @param socketValue The socket value input consumed by `makeBroadcastCapable`.
 function makeBroadcastCapable(socketValue)
   if socketValue is void or not socketValue.open then return error(3211, "UDP_Broadcast: socket is closed") end if
   if socketValue.broadcast then return true end if
@@ -79,7 +95,8 @@ function makeBroadcastCapable(socketValue)
   return true
 end function
 
-// Provide peek behavior for the active subsystem.
+/// Implements the `peek` operation for `miniquake.net_udp` (peek).
+/// @param socketValue The socket value input consumed by `peek`.
 function peek(socketValue)
   if socketValue is void or not socketValue.open then return error(3213, "UDP_Peek: socket is closed") end if
   count = native.udpPeek(socketValue.handle)
@@ -87,7 +104,7 @@ function peek(socketValue)
   return count
 end function
 
-// Provide local address behavior for the active subsystem.
+/// Implements the `localAddress` operation for `miniquake.net_udp` (local address).
 function localAddress()
   address = native.udpLocalAddress()
   if address is void or address == "" then return "127.0.0.1" end if
@@ -101,21 +118,25 @@ function hostName()
   return value
 end function
 
-// Return resolve name derived from the active module state.
+/// Return resolve name derived from the active module state.
+/// @param name Stable name that identifies the requested object or option.
 function resolveName(name)
   value = native.udpResolveName(name)
   if value is void or value == "" then return error(3215, "UDP_GetAddrFromName: WSA error " + native.udpLastError()) end if
   return value
 end function
 
-// Return reverse name derived from the active module state.
+/// Return reverse name derived from the active module state.
+/// @param address Network address of the peer.
 function reverseName(address)
   value = native.udpReverseName(address)
   if value is void or value == "" then return error(3216, "UDP_GetNameFromAddr: WSA error " + native.udpLastError()) end if
   return value
 end function
 
-// Provide receive behavior for the active subsystem.
+/// Implements the `receive` operation for `miniquake.net_udp` (receive).
+/// @param socketValue The socket value input consumed by `receive`.
+/// @param capacity Maximum number of entries the destination can hold.
 function receive(socketValue, capacity)
   global receiveScratch
   if socketValue is void or not socketValue.open then return error(3208, "UDP_Read: socket is closed") end if
@@ -136,7 +157,8 @@ function receive(socketValue, capacity)
   return [slice(buffer, 0, count), address, port]
 end function
 
-// Provide smoke behavior for the active subsystem.
+/// Implements the `smoke` operation for `miniquake.net_udp` (smoke).
+/// @param timeoutMilliseconds The timeout milliseconds input consumed by `smoke`.
 function smoke(timeoutMilliseconds)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   receiverResult = try(open(0))

@@ -16,23 +16,35 @@ import miniquake.screen as screen
 import miniquake.native as native
 import std.fs as fs
 
+/// Defines the evidence schema value used by `miniquake.render_evidence`.
 const EVIDENCE_SCHEMA = 1
+/// Defines the sample grid value used by `miniquake.render_evidence`.
 const SAMPLE_GRID = 16
+/// Defines the fnv offset value used by `miniquake.render_evidence`.
 const FNV_OFFSET = 2166136261
+/// Defines the fnv prime value used by `miniquake.render_evidence`.
 const FNV_PRIME = 16777619
 
+/// Tracks the module-level capture requested state owned by `miniquake.render_evidence`.
 captureRequested = false
+/// Tracks the module-level capture target frame state owned by `miniquake.render_evidence`.
 captureTargetFrame = -1
+/// Tracks the module-level capture prefix state owned by `miniquake.render_evidence`.
 capturePrefix = ""
+/// Tracks the module-level capture done state owned by `miniquake.render_evidence`.
 captureDone = false
+/// Tracks the module-level capture result state owned by `miniquake.render_evidence`.
 captureResult = void
 
-// Fold byte into the deterministic rolling hash.
+/// Returns whether `miniquake.render_evidence` has h byte.
+/// @param state Mutable `miniquake.render_evidence` state used by `hashByte`.
+/// @param value Value consumed by `hashByte`.
 function inline hashByte(state, value)
   return (((state & 0xffffffff) ^ (value & 255)) * FNV_PRIME) & 0xffffffff
 end function
 
-// Fold bytes into the deterministic rolling hash.
+/// Fold bytes into the deterministic rolling hash.
+/// @param data Input data consumed by the operation.
 function hashBytes(data)
   result = FNV_OFFSET
   index = 0
@@ -43,7 +55,10 @@ function hashBytes(data)
   return result
 end function
 
-// Build deterministic test data for coordinate.
+/// Build deterministic test data for coordinate.
+/// @param cell The cell input consumed by `sampleCoordinate`.
+/// @param extent The extent input consumed by `sampleCoordinate`.
+/// @param gridSize Size of the requested data or resource.
 function sampleCoordinate(cell, extent, gridSize)
   if extent <= 1 then return 0 end if
   coordinate = native.trunc(((cell * 2 + 1) * extent) / (gridSize * 2))
@@ -52,7 +67,11 @@ function sampleCoordinate(cell, extent, gridSize)
   return coordinate
 end function
 
-// Build deterministic test data for pixel hash.
+/// Build deterministic test data for pixel hash.
+/// @param rgba The rgba input consumed by `samplePixelHash`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param gridSize Size of the requested data or resource.
 function samplePixelHash(rgba, width, height, gridSize)
   if width <= 0 or height <= 0 or gridSize <= 0 then return FNV_OFFSET end if
   required = width * height * 4
@@ -76,7 +95,8 @@ function samplePixelHash(rgba, width, height, gridSize)
   return result
 end function
 
-// Provide non black pixels behavior for the active subsystem.
+/// Implements the `nonBlackPixels` operation for `miniquake.render_evidence` (non black pixels).
+/// @param rgba The rgba input consumed by `nonBlackPixels`.
 function nonBlackPixels(rgba)
   count = 0
   index = 0
@@ -87,17 +107,19 @@ function nonBlackPixels(rgba)
   return count
 end function
 
-// Return tga path derived from the active module state.
+/// Return tga path derived from the active module state.
+/// @param prefix The prefix input consumed by `tgaPath`.
 function tgaPath(prefix)
   return prefix + ".tga"
 end function
 
-// Return summary path derived from the active module state.
+/// Return summary path derived from the active module state.
+/// @param prefix The prefix input consumed by `summaryPath`.
 function summaryPath(prefix)
   return prefix + "-summary.json"
 end function
 
-// Update module state for the requested operation.
+/// Implements the `reset` operation for `miniquake.render_evidence` (reset).
 function reset()
   global captureRequested, captureTargetFrame, capturePrefix, captureDone, captureResult
   captureRequested = false
@@ -108,7 +130,9 @@ function reset()
   return true
 end function
 
-// Update subsystem configuration for configure.
+/// Implements the `configure` operation for `miniquake.render_evidence` (configure).
+/// @param prefix The prefix input consumed by `configure`.
+/// @param targetFrame The target frame input consumed by `configure`.
 function configure(prefix, targetFrame)
   global captureRequested, captureTargetFrame, capturePrefix, captureDone, captureResult
   if typeof(prefix) != "string" or prefix == "" then return error(4801, "render evidence prefix is empty") end if
@@ -121,13 +145,14 @@ function configure(prefix, targetFrame)
   return true
 end function
 
-// Report whether should capture.
+/// Report whether should capture.
+/// @param frameNumber The frame number input consumed by `shouldCapture`.
 function shouldCapture(frameNumber)
   if not captureRequested or captureDone then return false end if
   return frameNumber >= captureTargetFrame
 end function
 
-// Provide captured behavior for the active subsystem.
+/// Implements the `captured` operation for `miniquake.render_evidence` (captured).
 function captured()
   return captureDone
 end function
@@ -137,13 +162,24 @@ function lastResult()
   return captureResult
 end function
 
-// Provide bool text behavior for the active subsystem.
+/// Implements the `boolText` operation for `miniquake.render_evidence` (bool text).
+/// @param value Value consumed by `boolText`.
 function boolText(value)
   if value then return "true" end if
   return "false"
 end function
 
-// Provide summary json behavior for the active subsystem.
+/// Implements the `summaryJson` operation for `miniquake.render_evidence` (summary json).
+/// @param frameNumber The frame number input consumed by `summaryJson`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param pixelBytes Byte data consumed by the operation.
+/// @param tgaBytes Byte data consumed by the operation.
+/// @param pixelHash The pixel hash input consumed by `summaryJson`.
+/// @param tgaHash The tga hash input consumed by `summaryJson`.
+/// @param sampleHash The sample hash input consumed by `summaryJson`.
+/// @param nonBlack The non black input consumed by `summaryJson`.
+/// @param imagePath Filesystem path used by the operation.
 function summaryJson(frameNumber, width, height, pixelBytes, tgaBytes, pixelHash, tgaHash, sampleHash, nonBlack, imagePath)
   result = "{"
   result = result + "\"schema\":" + EVIDENCE_SCHEMA + ","
@@ -166,7 +202,10 @@ function summaryJson(frameNumber, width, height, pixelBytes, tgaBytes, pixelHash
   return result
 end function
 
-// Provide capture if requested behavior for the active subsystem.
+/// Implements the `captureIfRequested` operation for `miniquake.render_evidence` (capture if requested).
+/// @param frameNumber The frame number input consumed by `captureIfRequested`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function captureIfRequested(frameNumber, width, height)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global captureRequested, captureDone, captureResult

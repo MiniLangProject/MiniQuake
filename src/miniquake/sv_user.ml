@@ -28,28 +28,44 @@ import miniquake.array_util as arrayutil
 
 // Track mutable sv user state across subsystem calls.
 struct SvUserState
+  /// Stores the server value in `miniquake.sv_user.SvUserState`.
   server
+  /// Stores the frame time value in `miniquake.sv_user.SvUserState`.
   frameTime
+  /// Stores the max speed value in `miniquake.sv_user.SvUserState`.
   maxSpeed
+  /// Stores the acceleration value in `miniquake.sv_user.SvUserState`.
   acceleration
+  /// Stores the friction value in `miniquake.sv_user.SvUserState`.
   friction
+  /// Stores the edge friction value in `miniquake.sv_user.SvUserState`.
   edgeFriction
+  /// Stores the stop speed value in `miniquake.sv_user.SvUserState`.
   stopSpeed
+  /// Stores the ideal pitch scale value in `miniquake.sv_user.SvUserState`.
   idealPitchScale
+  /// Stores the paused value in `miniquake.sv_user.SvUserState`.
   paused
+  /// Stores the frozen value in `miniquake.sv_user.SvUserState`.
   frozen
+  /// Stores the key destination value in `miniquake.sv_user.SvUserState`.
   keyDestination
+  /// Stores the ideal pitches value in `miniquake.sv_user.SvUserState`.
   idealPitches
+  /// Stores the command events value in `miniquake.sv_user.SvUserState`.
   commandEvents
+  /// Stores the diagnostics value in `miniquake.sv_user.SvUserState`.
   diagnostics
 end struct
 
-// Provide quake float behavior for the active subsystem.
+/// Implements the `quakeFloat` operation for `miniquake.sv_user` (quake float).
+/// @param value Value consumed by `quakeFloat`.
 function quakeFloat(value)
   return native.bitsFloat(native.floatBits(value))
 end function
 
-// Apply the Quake-compatible sv user init behavior.
+/// Apply the Quake-compatible sv user init behavior.
+/// @param server Server state participating in the operation.
 function SV_UserInit(server)
   count = 1
   if server is not void then count = server.maxClients end if
@@ -71,7 +87,9 @@ function SV_UserInit(server)
   )
 end function
 
-// Apply the Quake-compatible sv user set frame time behavior.
+/// Apply the Quake-compatible sv user set frame time behavior.
+/// @param state Mutable `miniquake.sv_user` state used by `SV_UserSetFrameTime`.
+/// @param frameTime Time value used by the operation.
 function SV_UserSetFrameTime(state, frameTime)
   state.frameTime = frameTime
   if state.frameTime < 0.0 then state.frameTime = 0.0 end if
@@ -79,7 +97,13 @@ function SV_UserSetFrameTime(state, frameTime)
   return state.frameTime
 end function
 
-// Apply the Quake-compatible sv user set movement behavior.
+/// Apply the Quake-compatible sv user set movement behavior.
+/// @param state Mutable `miniquake.sv_user` state used by `SV_UserSetMovement`.
+/// @param maxSpeed The max speed input consumed by `SV_UserSetMovement`.
+/// @param acceleration The acceleration input consumed by `SV_UserSetMovement`.
+/// @param friction The friction input consumed by `SV_UserSetMovement`.
+/// @param edgeFriction The edge friction input consumed by `SV_UserSetMovement`.
+/// @param stopSpeed The stop speed input consumed by `SV_UserSetMovement`.
 function SV_UserSetMovement(state, maxSpeed, acceleration, friction, edgeFriction, stopSpeed)
   state.maxSpeed = maxSpeed
   state.acceleration = acceleration
@@ -89,20 +113,28 @@ function SV_UserSetMovement(state, maxSpeed, acceleration, friction, edgeFrictio
   return true
 end function
 
-// Apply the Quake-compatible sv user set paused behavior.
+/// Apply the Quake-compatible sv user set paused behavior.
+/// @param state Mutable `miniquake.sv_user` state used by `SV_UserSetPaused`.
+/// @param paused The paused input consumed by `SV_UserSetPaused`.
+/// @param keyDestination The key destination input consumed by `SV_UserSetPaused`.
 function SV_UserSetPaused(state, paused, keyDestination)
   state.paused = paused
   state.keyDestination = keyDestination
   return paused
 end function
 
-// Apply the Quake-compatible sv user set frozen behavior.
+/// Apply the Quake-compatible sv user set frozen behavior.
+/// @param state Mutable `miniquake.sv_user` state used by `SV_UserSetFrozen`.
+/// @param frozen The frozen input consumed by `SV_UserSetFrozen`.
 function SV_UserSetFrozen(state, frozen)
   state.frozen = frozen
   return frozen
 end function
 
-// Apply the Quake-compatible sv ideal pitch from heights behavior.
+/// Apply the Quake-compatible sv ideal pitch from heights behavior.
+/// @param state Mutable `miniquake.sv_user` state used by `SV_IdealPitchFromHeights`.
+/// @param heights The heights input consumed by `SV_IdealPitchFromHeights`.
+/// @param clientIndex Zero-based index of the requested entry.
 function SV_IdealPitchFromHeights(state, heights, clientIndex)
   if clientIndex < 0 or clientIndex >= len(state.idealPitches) then return error(2880, "SV_SetIdealPitch: bad client") end if
   direction = 0
@@ -130,7 +162,11 @@ function SV_IdealPitchFromHeights(state, heights, clientIndex)
   return state.idealPitches[clientIndex]
 end function
 
-// Provide svu trace ideal pitch behavior for the active subsystem.
+/// Implements the `svuTraceIdealPitch` operation for `miniquake.sv_user` (svu trace ideal pitch).
+/// @param state Mutable `miniquake.sv_user` state used by `svuTraceIdealPitch`.
+/// @param player The player input consumed by `svuTraceIdealPitch`.
+/// @param map The map input consumed by `svuTraceIdealPitch`.
+/// @param clientIndex Zero-based index of the requested entry.
 function svuTraceIdealPitch(state, player, map, clientIndex)
   if clientIndex < 0 or clientIndex >= len(state.idealPitches) then return error(2880, "SV_SetIdealPitch: bad client") end if
   if (player.flags & c.FL_ONGROUND) == 0 or map is void then return state.idealPitches[clientIndex] end if
@@ -154,12 +190,20 @@ function svuTraceIdealPitch(state, player, map, clientIndex)
   return SV_IdealPitchFromHeights(state, heights, clientIndex)
 end function
 
-// SV_SetIdealPitch
+/// SV_SetIdealPitch
+/// @param state Mutable `miniquake.sv_user` state used by `SV_SetIdealPitch`.
+/// @param player The player input consumed by `SV_SetIdealPitch`.
+/// @param map The map input consumed by `SV_SetIdealPitch`.
+/// @param clientIndex Zero-based index of the requested entry.
 function SV_SetIdealPitch(state, player, map, clientIndex)
   return svuTraceIdealPitch(state, player, map, clientIndex)
 end function
 
-// SV_UserFriction
+/// SV_UserFriction
+/// @param state Mutable `miniquake.sv_user` state used by `SV_UserFriction`.
+/// @param player The player input consumed by `SV_UserFriction`.
+/// @param map The map input consumed by `SV_UserFriction`.
+/// @param entityIndex Zero-based index of the requested entry.
 function SV_UserFriction(state, player, map, entityIndex)
   physics.applyFriction(
     player,
@@ -174,32 +218,47 @@ function SV_UserFriction(state, player, map, entityIndex)
   return player
 end function
 
-// SV_Accelerate.  One MiniLang entry represents both the disabled experimental
-// #if 0 definition and the active no-argument definition in the source file.
+/// SV_Accelerate.  One MiniLang entry represents both the disabled experimental
+/// #if 0 definition and the active no-argument definition in the source file.
+/// @param state Mutable `miniquake.sv_user` state used by `SV_Accelerate`.
+/// @param player The player input consumed by `SV_Accelerate`.
+/// @param wishDirection The wish direction input consumed by `SV_Accelerate`.
+/// @param wishSpeed The wish speed input consumed by `SV_Accelerate`.
 function SV_Accelerate(state, player, wishDirection, wishSpeed)
   physics.accelerate(player, wishDirection, wishSpeed, state.frameTime, state.acceleration)
   return player
 end function
 
-// SV_AirAccelerate
+/// SV_AirAccelerate
+/// @param state Mutable `miniquake.sv_user` state used by `SV_AirAccelerate`.
+/// @param player The player input consumed by `SV_AirAccelerate`.
+/// @param wishVelocity The wish velocity input consumed by `SV_AirAccelerate`.
+/// @param wishSpeed The wish speed input consumed by `SV_AirAccelerate`.
 function SV_AirAccelerate(state, player, wishVelocity, wishSpeed)
   physics.airAccelerate(player, wishVelocity, wishSpeed, state.frameTime, state.acceleration)
   return player
 end function
 
-// DropPunchAngle
+/// DropPunchAngle
+/// @param state Mutable `miniquake.sv_user` state used by `DropPunchAngle`.
+/// @param player The player input consumed by `DropPunchAngle`.
 function DropPunchAngle(state, player)
   physics.dropPunchAngle(player, state.frameTime)
   return player
 end function
 
-// SV_WaterMove
+/// SV_WaterMove
+/// @param state Mutable `miniquake.sv_user` state used by `SV_WaterMove`.
+/// @param player The player input consumed by `SV_WaterMove`.
+/// @param command Console or protocol command to execute.
 function SV_WaterMove(state, player, command)
   physics.waterMove(player, command, state.frameTime, state.maxSpeed, state.acceleration, state.friction)
   return player
 end function
 
-// SV_WaterJump
+/// SV_WaterJump
+/// @param state Mutable `miniquake.sv_user` state used by `SV_WaterJump`.
+/// @param player The player input consumed by `SV_WaterJump`.
 function SV_WaterJump(state, player)
   serverTime = 0.0
   if state.server is not void then serverTime = state.server.time end if
@@ -212,7 +271,12 @@ function SV_WaterJump(state, player)
   return player
 end function
 
-// SV_AirMove
+/// SV_AirMove
+/// @param state Mutable `miniquake.sv_user` state used by `SV_AirMove`.
+/// @param player The player input consumed by `SV_AirMove`.
+/// @param command Console or protocol command to execute.
+/// @param map The map input consumed by `SV_AirMove`.
+/// @param entityIndex Zero-based index of the requested entry.
 function SV_AirMove(state, player, command, map, entityIndex)
   physics.airMove(
     player,
@@ -230,7 +294,11 @@ function SV_AirMove(state, player, command, map, entityIndex)
   return player
 end function
 
-// SV_ClientThink
+/// SV_ClientThink
+/// @param state Mutable `miniquake.sv_user` state used by `SV_ClientThink`.
+/// @param clientValue The client value input consumed by `SV_ClientThink`.
+/// @param player The player input consumed by `SV_ClientThink`.
+/// @param map The map input consumed by `SV_ClientThink`.
 function SV_ClientThink(state, clientValue, player, map)
   if state.frozen or player.moveType == c.MOVETYPE_NONE then return player end if
   player.onGround = (player.flags & c.FL_ONGROUND) != 0
@@ -256,7 +324,11 @@ function SV_ClientThink(state, clientValue, player, map)
   return player
 end function
 
-// SV_ReadClientMove
+/// SV_ReadClientMove
+/// @param state Mutable `miniquake.sv_user` state used by `SV_ReadClientMove`.
+/// @param reader The reader input consumed by `SV_ReadClientMove`.
+/// @param clientValue The client value input consumed by `SV_ReadClientMove`.
+/// @param player The player input consumed by `SV_ReadClientMove`.
 function SV_ReadClientMove(state, reader, clientValue, player)
   clientTime = msg.readFloat(reader)
   ping = quakeFloat(state.server.time - clientTime)
@@ -285,7 +357,9 @@ function SV_ReadClientMove(state, reader, clientValue, player)
   return clientTime
 end function
 
-// Provide svu starts with behavior for the active subsystem.
+/// Implements the `svuStartsWith` operation for `miniquake.sv_user` (svu starts with).
+/// @param text Text to parse or process.
+/// @param prefix The prefix input consumed by `svuStartsWith`.
 function svuStartsWith(text, prefix)
   source = bytes(bio.lower(text))
   wanted = bytes(prefix)
@@ -298,7 +372,8 @@ function svuStartsWith(text, prefix)
   return true
 end function
 
-// Provide svu allowed command behavior for the active subsystem.
+/// Implements the `svuAllowedCommand` operation for `miniquake.sv_user` (svu allowed command).
+/// @param text Text to parse or process.
 function svuAllowedCommand(text)
   prefixes = [
     "status", "god", "notarget", "fly", "name", "noclip", "say",
@@ -311,7 +386,11 @@ function svuAllowedCommand(text)
   return false
 end function
 
-// Provide svu execute string behavior for the active subsystem.
+/// Implements the `svuExecuteString` operation for `miniquake.sv_user` (svu execute string).
+/// @param state Mutable `miniquake.sv_user` state used by `svuExecuteString`.
+/// @param clientValue The client value input consumed by `svuExecuteString`.
+/// @param player The player input consumed by `svuExecuteString`.
+/// @param text Text to parse or process.
 function svuExecuteString(state, clientValue, player, text)
   // sv_user.c initializes ret from privileged, then lets the whitelist replace
   // it with src_client.  A privileged client therefore still executes allowed
@@ -333,9 +412,13 @@ function svuExecuteString(state, clientValue, player, text)
   return false
 end function
 
-// SV_ReadClientMessage.  The original outer NET_GetMessage loop lives in
-// SV_RunClients; this entry consumes one already-framed reliable/unreliable
-// payload and preserves the exact clc_* command ordering.
+/// SV_ReadClientMessage.  The original outer NET_GetMessage loop lives in
+/// SV_RunClients; this entry consumes one already-framed reliable/unreliable
+/// payload and preserves the exact clc_* command ordering.
+/// @param state Mutable `miniquake.sv_user` state used by `SV_ReadClientMessage`.
+/// @param clientValue The client value input consumed by `SV_ReadClientMessage`.
+/// @param data Input data consumed by the operation.
+/// @param player The player input consumed by `SV_ReadClientMessage`.
 function SV_ReadClientMessage(state, clientValue, data, player)
   reader = msg.beginReadingBytes(data)
   while msg.remaining(reader) > 0
@@ -362,7 +445,10 @@ function SV_ReadClientMessage(state, clientValue, data, player)
   return true
 end function
 
-// Provide svu read network messages behavior for the active subsystem.
+/// Implements the `svuReadNetworkMessages` operation for `miniquake.sv_user` (svu read network messages).
+/// @param state Mutable `miniquake.sv_user` state used by `svuReadNetworkMessages`.
+/// @param clientValue The client value input consumed by `svuReadNetworkMessages`.
+/// @param player The player input consumed by `svuReadNetworkMessages`.
 function svuReadNetworkMessages(state, clientValue, player)
   if clientValue.socket is void then return true end if
   destination = sz.alloc(c.MAX_MSGLEN)
@@ -375,7 +461,9 @@ function svuReadNetworkMessages(state, clientValue, player)
   end while
 end function
 
-// SV_RunClients
+/// SV_RunClients
+/// @param state Mutable `miniquake.sv_user` state used by `SV_RunClients`.
+/// @param player The player input consumed by `SV_RunClients`.
 function SV_RunClients(state, player)
   processed = 0
   for each clientValue in state.server.clients

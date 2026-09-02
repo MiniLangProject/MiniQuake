@@ -16,15 +16,18 @@ import miniquake.optimization_baseline as optBaseline
 import miniquake.quakec.vm as vm
 import std.fs as fs
 
+/// Defines the context schema value used by `miniquake.compat_diagnostics`.
 const CONTEXT_SCHEMA = 1
 
-// Provide bool text behavior for the active subsystem.
+/// Implements the `boolText` operation for `miniquake.compat_diagnostics` (bool text).
+/// @param value Value consumed by `boolText`.
 function boolText(value)
   if value then return "true" end if
   return "false"
 end function
 
-// Provide u32 hex behavior for the active subsystem.
+/// Implements the `u32Hex` operation for `miniquake.compat_diagnostics` (u32 hex).
+/// @param value Value consumed by `u32Hex`.
 function u32Hex(value)
   masked = value & 0xffffffff
   return hex(bytes([
@@ -35,12 +38,14 @@ function u32Hex(value)
   ]))
 end function
 
-// Provide f32 hex behavior for the active subsystem.
+/// Implements the `f32Hex` operation for `miniquake.compat_diagnostics` (f32 hex).
+/// @param value Value consumed by `f32Hex`.
 function f32Hex(value)
   return u32Hex(native.floatBits(value))
 end function
 
-// Provide json escape behavior for the active subsystem.
+/// Implements the `jsonEscape` operation for `miniquake.compat_diagnostics` (json escape).
+/// @param text Text to parse or process.
 function jsonEscape(text)
   source = bytes(text)
   result = ""
@@ -71,12 +76,14 @@ function jsonEscape(text)
   return result
 end function
 
-// Provide json string behavior for the active subsystem.
+/// Implements the `jsonString` operation for `miniquake.compat_diagnostics` (json string).
+/// @param text Text to parse or process.
 function jsonString(text)
   return "\"" + jsonEscape(text) + "\""
 end function
 
-// Provide vec json behavior for the active subsystem.
+/// Implements the `vecJson` operation for `miniquake.compat_diagnostics` (vec json).
+/// @param value Value consumed by `vecJson`.
 function vecJson(value)
   kind = typeName(value)
   if not t.isVec3Value(value) then return error(9300, "diagnostic vector expected Vec3, got " + kind) end if
@@ -93,7 +100,8 @@ function vecJson(value)
   return result
 end function
 
-// Provide stage text behavior for the active subsystem.
+/// Implements the `stageText` operation for `miniquake.compat_diagnostics` (stage text).
+/// @param stages The stages input consumed by `stageText`.
 function stageText(stages)
   result = ""
   index = 0
@@ -105,7 +113,8 @@ function stageText(stages)
   return result
 end function
 
-// Provide stage json behavior for the active subsystem.
+/// Implements the `stageJson` operation for `miniquake.compat_diagnostics` (stage json).
+/// @param stages The stages input consumed by `stageJson`.
 function stageJson(stages)
   result = "["
   index = 0
@@ -117,7 +126,8 @@ function stageJson(stages)
   return result + "]"
 end function
 
-// Report whether active server clients holds for the active state.
+/// Report whether active server clients holds for the active state.
+/// @param session The session input consumed by `activeServerClients`.
 function activeServerClients(session)
   count = 0
   for each item in session.server.clients
@@ -126,7 +136,8 @@ function activeServerClients(session)
   return count
 end function
 
-// Report whether active edicts holds for the active state.
+/// Report whether active edicts holds for the active state.
+/// @param session The session input consumed by `activeEdicts`.
 function activeEdicts(session)
   count = 0
   limit = session.server.numEdicts
@@ -139,7 +150,8 @@ function activeEdicts(session)
   return count
 end function
 
-// Return qc function name derived from the active module state.
+/// Return qc function name derived from the active module state.
+/// @param session The session input consumed by `qcFunctionName`.
 function qcFunctionName(session)
   machine = session.server.machine
   if machine is void then return "" end if
@@ -149,30 +161,34 @@ function qcFunctionName(session)
   return machine.program.functions[index].name
 end function
 
-// Provide qc statement behavior for the active subsystem.
+/// Implements the `qcStatement` operation for `miniquake.compat_diagnostics` (qc statement).
+/// @param session The session input consumed by `qcStatement`.
 function qcStatement(session)
   machine = session.server.machine
   if machine is void then return -1 end if
   return machine.statement
 end function
 
-// Provide qc call depth behavior for the active subsystem.
+/// Implements the `qcCallDepth` operation for `miniquake.compat_diagnostics` (qc call depth).
+/// @param session The session input consumed by `qcCallDepth`.
 function qcCallDepth(session)
   machine = session.server.machine
   if machine is void then return 0 end if
   return vm.callDepth(machine)
 end function
 
-// Return last stage for the active module state.
+/// Return last stage for the active module state.
+/// @param session The session input consumed by `lastStage`.
 function lastStage(session)
   if session.diagnosticLastStage != "" then return session.diagnosticLastStage end if
   if len(session.frameTrace) == 0 then return "before_filter" end if
   return session.frameTrace[len(session.frameTrace) - 1]
 end function
 
-// The MiniLang Win64 backend reserves a bounded expression-temporary area.
-// Keep serialized records as short, ordered appends instead of one very deep
-// binary + tree. This preserves the BP-001 byte format while compiling safely.
+/// The MiniLang Win64 backend reserves a bounded expression-temporary area.
+/// Keep serialized records as short, ordered appends instead of one very deep
+/// binary + tree. This preserves the BP-001 byte format while compiling safely.
+/// @param session The session input consumed by `hostContextJson`.
 function hostContextJson(session)
   result = "{"
   result = result + "\"frame_count\":" + session.timing.frameCount + ","
@@ -183,7 +199,8 @@ function hostContextJson(session)
   return result + "}"
 end function
 
-// Provide server context json behavior for the active subsystem.
+/// Implements the `serverContextJson` operation for `miniquake.compat_diagnostics` (server context json).
+/// @param session The session input consumed by `serverContextJson`.
 function serverContextJson(session)
   result = "{"
   result = result + "\"active\":" + boolText(session.server.active) + ","
@@ -196,7 +213,8 @@ function serverContextJson(session)
   return result + "}"
 end function
 
-// Provide client context json behavior for the active subsystem.
+/// Implements the `clientContextJson` operation for `miniquake.compat_diagnostics` (client context json).
+/// @param session The session input consumed by `clientContextJson`.
 function clientContextJson(session)
   result = "{"
   result = result + "\"connected\":" + boolText(session.client.connected) + ","
@@ -209,7 +227,8 @@ function clientContextJson(session)
   return result + "}"
 end function
 
-// Provide player context json behavior for the active subsystem.
+/// Implements the `playerContextJson` operation for `miniquake.compat_diagnostics` (player context json).
+/// @param session The session input consumed by `playerContextJson`.
 function playerContextJson(session)
   result = "{"
   result = result + "\"origin\":" + vecJson(session.player.origin) + ","
@@ -223,7 +242,8 @@ function playerContextJson(session)
   return result + "}"
 end function
 
-// Provide quake ccontext json behavior for the active subsystem.
+/// Implements the `quakeCContextJson` operation for `miniquake.compat_diagnostics` (quake c context json).
+/// @param session The session input consumed by `quakeCContextJson`.
 function quakeCContextJson(session)
   result = "{"
   result = result + "\"function\":" + jsonString(qcFunctionName(session)) + ","
@@ -232,7 +252,10 @@ function quakeCContextJson(session)
   return result + "}"
 end function
 
-// Provide context json behavior for the active subsystem.
+/// Implements the `contextJson` operation for `miniquake.compat_diagnostics` (context json).
+/// @param session The session input consumed by `contextJson`.
+/// @param phase The phase input consumed by `contextJson`.
+/// @param errorText The error text input consumed by `contextJson`.
 function contextJson(session, phase, errorText)
   result = "{"
   result = result + "\"schema\":\"MiniQuakeCrashContext/" + CONTEXT_SCHEMA + "\","
@@ -253,7 +276,10 @@ function contextJson(session, phase, errorText)
   return result + "}\n"
 end function
 
-// Provide persist behavior for the active subsystem.
+/// Implements the `persist` operation for `miniquake.compat_diagnostics` (persist).
+/// @param session The session input consumed by `persist`.
+/// @param phase The phase input consumed by `persist`.
+/// @param errorText The error text input consumed by `persist`.
 function persist(session, phase, errorText)
   if session.diagnosticContextPath == "" then return true end if
   written = try(fs.writeAllText(session.diagnosticContextPath, contextJson(session, phase, errorText)))
@@ -265,7 +291,8 @@ function persist(session, phase, errorText)
   return true
 end function
 
-// Report whether stage trace enabled holds for the active state.
+/// Report whether stage trace enabled holds for the active state.
+/// @param session The session input consumed by `stageTraceEnabled`.
 function inline stageTraceEnabled(session)
   // Headless sessions are also the deterministic diagnostics/test path.  Keep
   // their historical frame-stage contract, while the interactive renderer
@@ -273,7 +300,8 @@ function inline stageTraceEnabled(session)
   return session.diagnosticContextPath != "" or session.headless
 end function
 
-// Initialize state for begin frame.
+/// Initialize state for begin frame.
+/// @param session The session input consumed by `beginFrame`.
 function beginFrame(session)
   optBaseline.beginFrame()
   if not stageTraceEnabled(session) then return true end if
@@ -283,7 +311,9 @@ function beginFrame(session)
   return persist(session, "before_frame", "")
 end function
 
-// Provide checkpoint behavior for the active subsystem.
+/// Checks point for `miniquake.compat_diagnostics`.
+/// @param session The session input consumed by `checkpoint`.
+/// @param stage The stage input consumed by `checkpoint`.
 function checkpoint(session, stage)
   optBaseline.checkpoint(stage)
   session.diagnosticLastStage = stage
@@ -296,7 +326,8 @@ function checkpoint(session, stage)
   return true
 end function
 
-// Provide filtered frame behavior for the active subsystem.
+/// Implements the `filteredFrame` operation for `miniquake.compat_diagnostics` (filtered frame).
+/// @param session The session input consumed by `filteredFrame`.
 function filteredFrame(session)
   optBaseline.filteredFrame()
   session.diagnosticLastStage = "filtered"
@@ -304,7 +335,8 @@ function filteredFrame(session)
   return true
 end function
 
-// Handle frame and update the associated state.
+/// Handle frame and update the associated state.
+/// @param session The session input consumed by `completeFrame`.
 function completeFrame(session)
   optBaseline.completeFrame()
   session.diagnosticLastStage = "complete"
@@ -312,14 +344,18 @@ function completeFrame(session)
   return true
 end function
 
-// Provide post frame stage behavior for the active subsystem.
+/// Implements the `postFrameStage` operation for `miniquake.compat_diagnostics` (post frame stage).
+/// @param session The session input consumed by `postFrameStage`.
+/// @param stage The stage input consumed by `postFrameStage`.
 function postFrameStage(session, stage)
   session.diagnosticLastStage = stage
   if session.diagnosticContextPath != "" then persist(session, "post_frame", "") end if
   return true
 end function
 
-// Report frame and return the corresponding failure status.
+/// Report frame and return the corresponding failure status.
+/// @param session The session input consumed by `failFrame`.
+/// @param message Diagnostic message that explains a failure or event.
 function failFrame(session, message)
   if session.diagnosticContextPath != "" then persist(session, "frame_error", message) end if
   return true

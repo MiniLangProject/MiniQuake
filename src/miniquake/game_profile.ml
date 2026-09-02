@@ -12,11 +12,15 @@ package miniquake.game_profile
 import miniquake.common as common
 import miniquake.byteio as bio
 
+/// Defines the status value used by `miniquake.game_profile`.
 const STATUS = "game_profile_109_frozen_v1"
+/// Defines the fingerprint value used by `miniquake.game_profile`.
 const FINGERPRINT = 0x7a03b68d
+/// Defines the contract text value used by `miniquake.game_profile`.
 const CONTRACT_TEXT = "game-profile|id1-first|rogue-before-hipnotic|explicit-game-last|path-overrides|registered-gate|caching-once"
 
-// Provide requested directories behavior for the active subsystem.
+/// Implements the `requestedDirectories` operation for `miniquake.game_profile` (requested directories).
+/// @param commandLine The command line input consumed by `requestedDirectories`.
 function requestedDirectories(commandLine)
   result = ["id1"]
   if common.hasParm(commandLine, "-rogue") then result = result + ["rogue"] end if
@@ -28,19 +32,22 @@ function requestedDirectories(commandLine)
   return result
 end function
 
-// Provide effective game directory behavior for the active subsystem.
+/// Implements the `effectiveGameDirectory` operation for `miniquake.game_profile` (effective game directory).
+/// @param commandLine The command line input consumed by `effectiveGameDirectory`.
 function effectiveGameDirectory(commandLine)
   directories = requestedDirectories(commandLine)
   return directories[len(directories) - 1]
 end function
 
-// Report whether is mission pack.
+/// Report whether is mission pack.
+/// @param name Stable name that identifies the requested object or option.
 function isMissionPack(name)
   lower = bio.lower(name)
   return lower == "rogue" or lower == "hipnotic"
 end function
 
-// Return mission mode derived from the active module state.
+/// Return mission mode derived from the active module state.
+/// @param commandLine The command line input consumed by `missionMode`.
 function missionMode(commandLine)
   rogue = common.hasParm(commandLine, "-rogue")
   hipnotic = common.hasParm(commandLine, "-hipnotic")
@@ -50,14 +57,16 @@ function missionMode(commandLine)
   return "id1"
 end function
 
-// Provide explicit game behavior for the active subsystem.
+/// Implements the `explicitGame` operation for `miniquake.game_profile` (explicit game).
+/// @param commandLine The command line input consumed by `explicitGame`.
 function explicitGame(commandLine)
   position = common.checkParm(commandLine, "-game")
   if position == 0 or position >= len(commandLine.args) then return "" end if
   return commandLine.args[position]
 end function
 
-// Return path override for the active module state.
+/// Return path override for the active module state.
+/// @param commandLine The command line input consumed by `pathOverride`.
 function pathOverride(commandLine)
   position = common.checkParm(commandLine, "-path")
   if position == 0 then return [] end if
@@ -73,7 +82,8 @@ function pathOverride(commandLine)
   return result
 end function
 
-// Return expected search directory names derived from the active module state.
+/// Return expected search directory names derived from the active module state.
+/// @param commandLine The command line input consumed by `expectedSearchDirectoryNames`.
 function expectedSearchDirectoryNames(commandLine)
   override = pathOverride(commandLine)
   if len(override) > 0 then
@@ -94,7 +104,8 @@ function expectedSearchDirectoryNames(commandLine)
   return result
 end function
 
-// Return profile vector derived from the active module state.
+/// Return profile vector derived from the active module state.
+/// @param commandLine The command line input consumed by `profileVector`.
 function profileVector(commandLine)
   directories = requestedDirectories(commandLine)
   override = pathOverride(commandLine)

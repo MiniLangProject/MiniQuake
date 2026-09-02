@@ -17,37 +17,69 @@ import miniquake.constants as c
 // oracle.
 
 r_notexture_mip = void
+/// Tracks the module-level r notexture mips state owned by `miniquake.render.gl_rmisc`.
 r_notexture_mips = []
+/// Tracks the module-level r notexture offsets state owned by `miniquake.render.gl_rmisc`.
 r_notexture_offsets = []
+/// Tracks the module-level particletexture state owned by `miniquake.render.gl_rmisc`.
 particletexture = 0
+/// Tracks the module-level texture extension number state owned by `miniquake.render.gl_rmisc`.
 texture_extension_number = 1000
+/// Tracks the module-level playertextures state owned by `miniquake.render.gl_rmisc`.
 playertextures = 0
+/// Tracks the module-level envmap state owned by `miniquake.render.gl_rmisc`.
 envmap = false
+/// Tracks the module-level rmisc commands state owned by `miniquake.render.gl_rmisc`.
 rmiscCommands = 0
+/// Tracks the module-level rmisc cvars state owned by `miniquake.render.gl_rmisc`.
 rmiscCvars = 0
+/// Tracks the module-level rmisc init particles state owned by `miniquake.render.gl_rmisc`.
 rmiscInitParticles = 0
+/// Tracks the module-level rmisc clear particles state owned by `miniquake.render.gl_rmisc`.
 rmiscClearParticles = 0
+/// Tracks the module-level rmisc build lightmaps state owned by `miniquake.render.gl_rmisc`.
 rmiscBuildLightmaps = 0
+/// Tracks the module-level rmisc particle pixels state owned by `miniquake.render.gl_rmisc`.
 rmiscParticlePixels = bytes()
+/// Tracks the module-level rmisc skin pixels state owned by `miniquake.render.gl_rmisc`.
 rmiscSkinPixels = bytes()
+/// Tracks the module-level rmisc bound texture state owned by `miniquake.render.gl_rmisc`.
 rmiscBoundTexture = -1
+/// Tracks the module-level rmisc upload width state owned by `miniquake.render.gl_rmisc`.
 rmiscUploadWidth = 0
+/// Tracks the module-level rmisc upload height state owned by `miniquake.render.gl_rmisc`.
 rmiscUploadHeight = 0
+/// Tracks the module-level rmisc env directions state owned by `miniquake.render.gl_rmisc`.
 rmiscEnvDirections = []
+/// Tracks the module-level rmisc texture names state owned by `miniquake.render.gl_rmisc`.
 rmiscTextureNames = []
+/// Tracks the module-level rmisc leaf count state owned by `miniquake.render.gl_rmisc`.
 rmiscLeafCount = 0
+/// Tracks the module-level rmisc light styles state owned by `miniquake.render.gl_rmisc`.
 rmiscLightStyles = []
+/// Tracks the module-level rmisc sky texture state owned by `miniquake.render.gl_rmisc`.
 rmiscSkyTexture = -1
+/// Tracks the module-level rmisc mirror texture state owned by `miniquake.render.gl_rmisc`.
 rmiscMirrorTexture = -1
+/// Tracks the module-level rmisc render views state owned by `miniquake.render.gl_rmisc`.
 rmiscRenderViews = 0
+/// Tracks the module-level rmisc last yaw state owned by `miniquake.render.gl_rmisc`.
 rmiscLastYaw = 0.0
+/// Tracks the module-level rmisc last draw buffer state owned by `miniquake.render.gl_rmisc`.
 rmiscLastDrawBuffer = -1
+/// Tracks the module-level rmisc end rendering state owned by `miniquake.render.gl_rmisc`.
 rmiscEndRendering = 0
+/// Tracks the module-level rmisc skin state owned by `miniquake.render.gl_rmisc`.
 rmiscSkin = bytes()
+/// Tracks the module-level rmisc skin width state owned by `miniquake.render.gl_rmisc`.
 rmiscSkinWidth = 0
+/// Tracks the module-level rmisc skin height state owned by `miniquake.render.gl_rmisc`.
 rmiscSkinHeight = 0
+/// Tracks the module-level rmisc colors state owned by `miniquake.render.gl_rmisc`.
 rmiscColors = 0
+/// Tracks the module-level rmisc max size state owned by `miniquake.render.gl_rmisc`.
 rmiscMaxSize = 4
+/// Tracks the module-level rmisc player mip state owned by `miniquake.render.gl_rmisc`.
 rmiscPlayerMip = 0
 
 // Update module state for compatibility.
@@ -132,7 +164,7 @@ function R_InitTextures()
   return combined
 end function
 
-// Apply the Quake-compatible r init particle texture behavior.
+/// Implements the `R_InitParticleTexture` operation for `miniquake.render.gl_rmisc` (r init particle texture).
 function R_InitParticleTexture()
   global particletexture, texture_extension_number, rmiscParticlePixels
   global rmiscBoundTexture, rmiscUploadWidth, rmiscUploadHeight
@@ -185,7 +217,8 @@ function R_Envmap_f()
   return rmiscEnvDirections
 end function
 
-// Apply the Quake-compatible r init behavior.
+/// Apply the Quake-compatible r init behavior.
+/// @param multitexture The multitexture input consumed by `R_Init`.
 function R_Init(multitexture)
   global rmiscCommands, rmiscCvars, rmiscInitParticles
   global playertextures, texture_extension_number
@@ -200,7 +233,13 @@ function R_Init(multitexture)
   return textureSort
 end function
 
-// Update module state for player skin compatibility.
+/// Update module state for player skin compatibility.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param pixels The pixels input consumed by `SetPlayerSkinCompatibility`.
+/// @param colors The colors input consumed by `SetPlayerSkinCompatibility`.
+/// @param maxSize Size of the requested data or resource.
+/// @param playerMip The player mip input consumed by `SetPlayerSkinCompatibility`.
 function SetPlayerSkinCompatibility(width, height, pixels, colors, maxSize, playerMip)
   global rmiscSkinWidth, rmiscSkinHeight, rmiscSkin, rmiscColors
   global rmiscMaxSize, rmiscPlayerMip
@@ -213,14 +252,18 @@ function SetPlayerSkinCompatibility(width, height, pixels, colors, maxSize, play
   return true
 end function
 
-// Update module state for player texture base.
+/// Update module state for player texture base.
+/// @param value Value consumed by `SetPlayerTextureBase`.
 function SetPlayerTextureBase(value)
   global playertextures
   playertextures = value
   return playertextures
 end function
 
-// Return translated index derived from the active module state.
+/// Return translated index derived from the active module state.
+/// @param value Value consumed by `translatedIndex`.
+/// @param top The top input consumed by `translatedIndex`.
+/// @param bottom The bottom input consumed by `translatedIndex`.
 function translatedIndex(value, top, bottom)
   if value >= c.TOP_RANGE and value < c.TOP_RANGE + 16 then
     offset = value - c.TOP_RANGE
@@ -235,7 +278,8 @@ function translatedIndex(value, top, bottom)
   return value
 end function
 
-// Apply the Quake-compatible r translate player skin behavior.
+/// Apply the Quake-compatible r translate player skin behavior.
+/// @param playernum The playernum input consumed by `R_TranslatePlayerSkin`.
 function R_TranslatePlayerSkin(playernum)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global rmiscSkinPixels, rmiscBoundTexture, rmiscUploadWidth, rmiscUploadHeight
@@ -277,7 +321,9 @@ function R_TranslatePlayerSkin(playernum)
   return true
 end function
 
-// Update module state for new map compatibility.
+/// Update module state for new map compatibility.
+/// @param textureNames The texture names input consumed by `SetNewMapCompatibility`.
+/// @param leafCount Number of entries or units to process.
 function SetNewMapCompatibility(textureNames, leafCount)
   global rmiscTextureNames, rmiscLeafCount
   rmiscTextureNames = textureNames
@@ -285,7 +331,9 @@ function SetNewMapCompatibility(textureNames, leafCount)
   return true
 end function
 
-// Initialize state for starts with.
+/// Starts s with for `miniquake.render.gl_rmisc`.
+/// @param value Value consumed by `startsWith`.
+/// @param prefix The prefix input consumed by `startsWith`.
 function startsWith(value, prefix)
   left = bytes(value)
   right = bytes(prefix)

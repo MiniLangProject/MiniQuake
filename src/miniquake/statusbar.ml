@@ -15,48 +15,85 @@ import miniquake.byteio as bio
 import miniquake.array_util as arrayutil
 import miniquake.render_ui_contract as renderUiContract
 
+/// Defines the sbar height value used by `miniquake.statusbar`.
 const SBAR_HEIGHT = 24
+/// Defines the stat minus value used by `miniquake.statusbar`.
 const STAT_MINUS = 10
 
+/// Tracks the module-level sb updates state owned by `miniquake.statusbar`.
 sb_updates = 0
+/// Tracks the module-level sb showscores state owned by `miniquake.statusbar`.
 sb_showscores = false
+/// Tracks the module-level sb lines state owned by `miniquake.statusbar`.
 sb_lines = 48
+/// Tracks the module-level sbar logical lines state owned by `miniquake.statusbar`.
 sbarLogicalLines = 48
+/// Tracks the module-level sbar scale state owned by `miniquake.statusbar`.
 sbarScale = 1.0
+/// Tracks the module-level sbar initialized state owned by `miniquake.statusbar`.
 sbarInitialized = false
+/// Tracks the module-level sbar hipnotic state owned by `miniquake.statusbar`.
 sbarHipnotic = false
+/// Tracks the module-level sbar rogue state owned by `miniquake.statusbar`.
 sbarRogue = false
+/// Tracks the module-level status-bar state owned by `miniquake.statusbar`.
 sbarState = void
+/// Tracks the module-level sbar font texture state owned by `miniquake.statusbar`.
 sbarFontTexture = 0
+/// Tracks the module-level sbar player state owned by `miniquake.statusbar`.
 sbarPlayer = void
+/// Tracks the module-level sbar client state owned by `miniquake.statusbar`.
 sbarClient = void
+/// Tracks the module-level sbar width state owned by `miniquake.statusbar`.
 sbarWidth = 320
+/// Tracks the module-level sbar height state owned by `miniquake.statusbar`.
 sbarHeight = 200
+/// Tracks the module-level sbar game type state owned by `miniquake.statusbar`.
 sbarGameType = c.GAME_COOP
+/// Tracks the module-level sbar teamplay state owned by `miniquake.statusbar`.
 sbarTeamplay = 0.0
+/// Tracks the module-level sbar console current state owned by `miniquake.statusbar`.
 sbarConsoleCurrent = -1.0
+/// Tracks the module-level sbar num pages state owned by `miniquake.statusbar`.
 sbarNumPages = 999999
+/// Tracks the module-level sbar copy everything state owned by `miniquake.statusbar`.
 sbarCopyEverything = false
+/// Tracks the module-level sbar full update state owned by `miniquake.statusbar`.
 sbarFullUpdate = 0
+/// Tracks the module-level sbar pictures state owned by `miniquake.statusbar`.
 sbarPictures = []
+/// Tracks the module-level sbar picture names state owned by `miniquake.statusbar`.
 sbarPictureNames = []
+/// Tracks the module-level sbar injected pictures state owned by `miniquake.statusbar`.
 sbarInjectedPictures = []
+/// Tracks the module-level sbar load trace state owned by `miniquake.statusbar`.
 sbarLoadTrace = []
+/// Tracks the module-level fragsort state owned by `miniquake.statusbar`.
 fragsort = []
+/// Tracks the module-level scoreboardtext state owned by `miniquake.statusbar`.
 scoreboardtext = []
+/// Tracks the module-level scoreboardtop state owned by `miniquake.statusbar`.
 scoreboardtop = []
+/// Tracks the module-level scoreboardbottom state owned by `miniquake.statusbar`.
 scoreboardbottom = []
+/// Tracks the module-level scoreboardlines state owned by `miniquake.statusbar`.
 scoreboardlines = 0
+/// Tracks the module-level sbar trace state owned by `miniquake.statusbar`.
 sbarTrace = []
+/// Tracks the module-level sbar trace enabled state owned by `miniquake.statusbar`.
 sbarTraceEnabled = false
 
 // Immutable name tables are shared by every HUD frame. Keeping them at module
 // scope avoids rebuilding identical arrays while the inventory bar is drawn.
 sbarWeaponNames = ["shotgun", "sshotgun", "nailgun", "snailgun", "rlaunch", "srlaunch", "lightng"]
+/// Tracks the module-level sbar rogue weapon names state owned by `miniquake.statusbar`.
 sbarRogueWeaponNames = ["r_lava", "r_superlava", "r_gren", "r_multirock", "r_plasma"]
+/// Tracks the module-level sbar base item names state owned by `miniquake.statusbar`.
 sbarBaseItemNames = ["sb_key1", "sb_key2", "sb_invis", "sb_invuln", "sb_suit", "sb_quad"]
 
-// Provide remember sbar picture behavior for the active subsystem.
+/// Implements the `rememberSbarPicture` operation for `miniquake.statusbar` (remember sbar picture).
+/// @param name Stable name that identifies the requested object or option.
+/// @param value Value consumed by `rememberSbarPicture`.
 function rememberSbarPicture(name, value)
   global sbarPictures, sbarPictureNames
   if value is error then return value end if
@@ -65,7 +102,8 @@ function rememberSbarPicture(name, value)
   return value
 end function
 
-// Read and validate sbar picture.
+/// Read and validate sbar picture.
+/// @param name Stable name that identifies the requested object or option.
 function loadSbarPicture(name)
   global sbarLoadTrace
   sbarLoadTrace = sbarLoadTrace + [name]
@@ -80,7 +118,8 @@ function loadSbarPicture(name)
   return rememberSbarPicture(name, draw.Draw_PicFromWad(name))
 end function
 
-// Provide loaded sbar picture behavior for the active subsystem.
+/// Loads ed sbar picture for `miniquake.statusbar`.
+/// @param name Stable name that identifies the requested object or option.
 function loadedSbarPicture(name)
   index = 0
   while index < len(sbarPictureNames)
@@ -97,20 +136,30 @@ function loadedSbarPicture(name)
   return void
 end function
 
-// Provide picture behavior for the active subsystem.
+/// Implements the `picture` operation for `miniquake.statusbar` (picture).
+/// @param state Mutable `miniquake.statusbar` state used by `picture`.
+/// @param name Stable name that identifies the requested object or option.
 function picture(state, name)
   if state is void then return void end if
   return menu.findWadPicture(state, name)
 end function
 
-// Render picture.
+/// Render picture.
+/// @param state Mutable `miniquake.statusbar` state used by `drawPicture`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param x The x input consumed by `drawPicture`.
+/// @param y The y input consumed by `drawPicture`.
+/// @param scale The scale input consumed by `drawPicture`.
+/// @param alpha The alpha input consumed by `drawPicture`.
 function drawPicture(state, name, x, y, scale, alpha)
   value = picture(state, name)
   if value is void or value.textureId == 0 then return false end if
   return draw.Draw_PicScaled(value, x, y, scale, alpha)
 end function
 
-// Provide scale for behavior for the active subsystem.
+/// Implements the `scaleFor` operation for `miniquake.statusbar` (scale for).
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function scaleFor(width, height)
   // The WinQuake status area is authored at 320 pixels. Use an integral scale
   // so the original indexed artwork remains crisp while avoiding an oversized
@@ -123,7 +172,14 @@ function scaleFor(width, height)
   return value * 1.0
 end function
 
-// Render number.
+/// Render number.
+/// @param state Mutable `miniquake.statusbar` state used by `drawNumber`.
+/// @param x The x input consumed by `drawNumber`.
+/// @param y The y input consumed by `drawNumber`.
+/// @param number The number input consumed by `drawNumber`.
+/// @param digits The digits input consumed by `drawNumber`.
+/// @param alternate The alternate input consumed by `drawNumber`.
+/// @param scale The scale input consumed by `drawNumber`.
 function drawNumber(state, x, y, number, digits, alternate, scale)
   value = native.trunc(number)
   source = bytes("" + value)
@@ -147,14 +203,24 @@ function drawNumber(state, x, y, number, digits, alternate, scale)
   return true
 end function
 
-// Provide small ammo digit behavior for the active subsystem.
+/// Implements the `smallAmmoDigit` operation for `miniquake.statusbar` (small ammo digit).
+/// @param texture Texture resource processed by the operation.
+/// @param x The x input consumed by `smallAmmoDigit`.
+/// @param y The y input consumed by `smallAmmoDigit`.
+/// @param digit The digit input consumed by `smallAmmoDigit`.
+/// @param scale The scale input consumed by `smallAmmoDigit`.
 function smallAmmoDigit(texture, x, y, digit, scale)
   if digit < 0 or digit > 9 then return false end if
   draw.character(texture, x, y, 18 + digit, scale, 255)
   return true
 end function
 
-// Render small ammo.
+/// Render small ammo.
+/// @param texture Texture resource processed by the operation.
+/// @param x The x input consumed by `drawSmallAmmo`.
+/// @param y The y input consumed by `drawSmallAmmo`.
+/// @param number The number input consumed by `drawSmallAmmo`.
+/// @param scale The scale input consumed by `drawSmallAmmo`.
 function drawSmallAmmo(texture, x, y, number, scale)
   value = native.trunc(number)
   if value < 0 then value = 0 end if
@@ -168,7 +234,9 @@ function drawSmallAmmo(texture, x, y, number, scale)
   return true
 end function
 
-// Provide face name for behavior for the active subsystem.
+/// Implements the `faceNameFor` operation for `miniquake.statusbar` (face name for).
+/// @param items The items input consumed by `faceNameFor`.
+/// @param health The health input consumed by `faceNameFor`.
 function faceNameFor(items, health)
   if (items & (c.IT_INVISIBILITY | c.IT_INVULNERABILITY)) == (c.IT_INVISIBILITY | c.IT_INVULNERABILITY) then return "face_inv2" end if
   if (items & c.IT_QUAD) != 0 then return "face_quad" end if
@@ -181,12 +249,14 @@ function faceNameFor(items, health)
   return "face5"
 end function
 
-// Return face name derived from the active module state.
+/// Return face name derived from the active module state.
+/// @param player The player input consumed by `faceName`.
 function faceName(player)
   return faceNameFor(native.trunc(player.items), native.trunc(player.health))
 end function
 
-// Return armor name derived from the active module state.
+/// Return armor name derived from the active module state.
+/// @param items The items input consumed by `armorName`.
 function armorName(items)
   if (items & c.IT_ARMOR3) != 0 then return "sb_armor3" end if
   if (items & c.IT_ARMOR2) != 0 then return "sb_armor2" end if
@@ -194,7 +264,8 @@ function armorName(items)
   return ""
 end function
 
-// Return ammo name derived from the active module state.
+/// Return ammo name derived from the active module state.
+/// @param items The items input consumed by `ammoName`.
 function ammoName(items)
   if (items & c.IT_SHELLS) != 0 then return "sb_shells" end if
   if (items & c.IT_NAILS) != 0 then return "sb_nails" end if
@@ -203,7 +274,13 @@ function ammoName(items)
   return ""
 end function
 
-// Render inventory.
+/// Render inventory.
+/// @param state Mutable `miniquake.statusbar` state used by `drawInventory`.
+/// @param fontTexture The font texture input consumed by `drawInventory`.
+/// @param player The player input consumed by `drawInventory`.
+/// @param x The x input consumed by `drawInventory`.
+/// @param y The y input consumed by `drawInventory`.
+/// @param scale The scale input consumed by `drawInventory`.
 function drawInventory(state, fontTexture, player, x, y, scale)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   drawPicture(state, "ibar", x, y, scale, 255)
@@ -255,7 +332,12 @@ function drawInventory(state, fontTexture, player, x, y, scale)
   return true
 end function
 
-// Render main bar.
+/// Render main bar.
+/// @param state Mutable `miniquake.statusbar` state used by `drawMainBar`.
+/// @param player The player input consumed by `drawMainBar`.
+/// @param x The x input consumed by `drawMainBar`.
+/// @param y The y input consumed by `drawMainBar`.
+/// @param scale The scale input consumed by `drawMainBar`.
 function drawMainBar(state, player, x, y, scale)
   drawPicture(state, "sbar", x, y, scale, 255)
   items = native.trunc(player.items)
@@ -277,8 +359,16 @@ function drawMainBar(state, player, x, y, scale)
   return true
 end function
 
-// Sbar_Draw for the stock single-player layout. The original 320x24/48 qpics
-// are taken from the user's gfx.wad; no Quake art is embedded in MiniQuake.
+/// Sbar_Draw for the stock single-player layout. The original 320x24/48 qpics
+/// are taken from the user's gfx.wad; no Quake art is embedded in MiniQuake.
+/// @param state Mutable `miniquake.statusbar` state used by `render`.
+/// @param fontTexture The font texture input consumed by `render`.
+/// @param player The player input consumed by `render`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param viewSize Size of the requested data or resource.
+/// @param clientState Mutable state used by `render`.
+/// @param teamplay The teamplay input consumed by `render`.
 function render(state, fontTexture, player, width, height, viewSize, clientState, teamplay)
   if state is void or player is void or fontTexture == 0 then return false end if
   if picture(state, "sbar") is void then return false end if
@@ -314,7 +404,8 @@ function Sbar_Changed()
   return true
 end function
 
-// Mirror Quake's Sbar_Init routine and its observable state changes.
+/// Mirror Quake's Sbar_Init routine and its observable state changes.
+/// @param gameDirectory Selected Quake game-data directory.
 function Sbar_Init(gameDirectory)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global sbarInitialized, sbarHipnotic, sbarRogue, sbarPictureNames, sbarPictures, sbarLoadTrace, sbarTrace, sbarTraceEnabled
@@ -409,7 +500,9 @@ function Sbar_Shutdown()
   return true
 end function
 
-// Mirror Quake's Sbar_SetFrameState routine and its observable state changes.
+/// Mirror Quake's Sbar_SetFrameState routine and its observable state changes.
+/// @param consoleCurrent The console current input consumed by `Sbar_SetFrameState`.
+/// @param numPages The num pages input consumed by `Sbar_SetFrameState`.
 function Sbar_SetFrameState(consoleCurrent, numPages)
   global sbarConsoleCurrent, sbarNumPages
   sbarConsoleCurrent = consoleCurrent
@@ -417,16 +510,17 @@ function Sbar_SetFrameState(consoleCurrent, numPages)
   return true
 end function
 
-// Provide sbar items behavior for the active subsystem.
+/// Implements the `sbarItems` operation for `miniquake.statusbar` (sbar items).
 function sbarItems()
   if sbarClient is not void then return native.trunc(sbarClient.items) end if
   if sbarPlayer is not void then return native.trunc(sbarPlayer.items) end if
   return 0
 end function
 
-// Deterministic state injection for the direct pinned-source differential.
-// Production functions remain the code under test; only their globals/assets
-// are arranged without requiring retail gfx.wad or an OpenGL context.
+/// Deterministic state injection for the direct pinned-source differential.
+/// Production functions remain the code under test; only their globals/assets
+/// are arranged without requiring retail gfx.wad or an OpenGL context.
+/// @param pictures The pictures input consumed by `Sbar_DifferentialReset`.
 function Sbar_DifferentialReset(pictures)
   global sb_updates, sb_showscores, sb_lines, sbarLogicalLines, sbarScale, sbarInitialized, sbarHipnotic, sbarRogue
   global sbarState, sbarFontTexture, sbarPlayer, sbarClient, sbarWidth, sbarHeight
@@ -476,7 +570,12 @@ function Sbar_DifferentialState()
   ]
 end function
 
-// Mirror Quake's Sbar_DifferentialSetState routine and its observable state changes.
+/// Mirror Quake's Sbar_DifferentialSetState routine and its observable state changes.
+/// @param updates The updates input consumed by `Sbar_DifferentialSetState`.
+/// @param showScores The show scores input consumed by `Sbar_DifferentialSetState`.
+/// @param hipnoticValue The hipnotic value input consumed by `Sbar_DifferentialSetState`.
+/// @param rogueValue The rogue value input consumed by `Sbar_DifferentialSetState`.
+/// @param teamplayValue The teamplay value input consumed by `Sbar_DifferentialSetState`.
 function Sbar_DifferentialSetState(updates, showScores, hipnoticValue, rogueValue, teamplayValue)
   global sb_updates, sb_showscores, sbarHipnotic, sbarRogue, sbarTeamplay
   sb_updates = updates
@@ -495,7 +594,15 @@ function Sbar_DifferentialClearTrace()
   return true
 end function
 
-// Mirror Quake's Sbar_Configure routine and its observable state changes.
+/// Mirror Quake's Sbar_Configure routine and its observable state changes.
+/// @param state Mutable `miniquake.statusbar` state used by `Sbar_Configure`.
+/// @param fontTexture The font texture input consumed by `Sbar_Configure`.
+/// @param player The player input consumed by `Sbar_Configure`.
+/// @param clientState Mutable state used by `Sbar_Configure`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param lines The lines input consumed by `Sbar_Configure`.
+/// @param teamplay The teamplay input consumed by `Sbar_Configure`.
 function Sbar_Configure(state, fontTexture, player, clientState, width, height, lines, teamplay)
   global sbarState, sbarFontTexture, sbarPlayer, sbarClient, sbarWidth, sbarHeight, sb_lines, sbarLogicalLines, sbarScale, sbarGameType, sbarTeamplay
   sbarState = state
@@ -513,12 +620,13 @@ function Sbar_Configure(state, fontTexture, player, clientState, width, height, 
   return true
 end function
 
-// Provide sbar xoffset behavior for the active subsystem.
+/// Implements the `sbarXOffset` operation for `miniquake.statusbar` (sbar x offset).
 function sbarXOffset()
   return renderUiContract.statusbarScaledXOffset(sbarWidth, sbarGameType, sbarScale)
 end function
 
-// Trace sbar through the collision world.
+/// Trace sbar through the collision world.
+/// @param command Console or protocol command to execute.
 function traceSbar(command)
   global sbarTrace
   if not sbarTraceEnabled then return true end if
@@ -526,45 +634,69 @@ function traceSbar(command)
   return true
 end function
 
-// Provide sbar direct pic behavior for the active subsystem.
+/// Implements the `sbarDirectPic` operation for `miniquake.statusbar` (sbar direct pic).
+/// @param x The x input consumed by `sbarDirectPic`.
+/// @param y The y input consumed by `sbarDirectPic`.
+/// @param pic The pic input consumed by `sbarDirectPic`.
 function sbarDirectPic(x, y, pic)
   if pic is void then return false end if
   if sbarTraceEnabled then traceSbar(["pic", pic.name, x, y]) end if
   return draw.Draw_Pic(x, y, pic)
 end function
 
-// Provide sbar direct trans pic behavior for the active subsystem.
+/// Implements the `sbarDirectTransPic` operation for `miniquake.statusbar` (sbar direct trans pic).
+/// @param x The x input consumed by `sbarDirectTransPic`.
+/// @param y The y input consumed by `sbarDirectTransPic`.
+/// @param pic The pic input consumed by `sbarDirectTransPic`.
 function sbarDirectTransPic(x, y, pic)
   if pic is void then return false end if
   if sbarTraceEnabled then traceSbar(["transpic", pic.name, x, y]) end if
   return draw.Draw_TransPic(x, y, pic)
 end function
 
-// Provide sbar direct character behavior for the active subsystem.
+/// Implements the `sbarDirectCharacter` operation for `miniquake.statusbar` (sbar direct character).
+/// @param x The x input consumed by `sbarDirectCharacter`.
+/// @param y The y input consumed by `sbarDirectCharacter`.
+/// @param num The num input consumed by `sbarDirectCharacter`.
 function sbarDirectCharacter(x, y, num)
   if sbarTraceEnabled then traceSbar(["char", num, x, y]) end if
   return draw.Draw_Character(x, y, num)
 end function
 
-// Provide sbar direct string behavior for the active subsystem.
+/// Implements the `sbarDirectString` operation for `miniquake.statusbar` (sbar direct string).
+/// @param x The x input consumed by `sbarDirectString`.
+/// @param y The y input consumed by `sbarDirectString`.
+/// @param text Text to parse or process.
 function sbarDirectString(x, y, text)
   if sbarTraceEnabled then traceSbar(["string", text, x, y]) end if
   return draw.Draw_String(x, y, text)
 end function
 
-// Provide sbar direct fill behavior for the active subsystem.
+/// Implements the `sbarDirectFill` operation for `miniquake.statusbar` (sbar direct fill).
+/// @param x The x input consumed by `sbarDirectFill`.
+/// @param y The y input consumed by `sbarDirectFill`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param color Color value used by the operation.
 function sbarDirectFill(x, y, width, height, color)
   if sbarTraceEnabled then traceSbar(["fill", x, y, width, height, color]) end if
   return draw.Draw_Fill(x, y, width, height, color)
 end function
 
-// Provide sbar direct tile clear behavior for the active subsystem.
+/// Implements the `sbarDirectTileClear` operation for `miniquake.statusbar` (sbar direct tile clear).
+/// @param x The x input consumed by `sbarDirectTileClear`.
+/// @param y The y input consumed by `sbarDirectTileClear`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function sbarDirectTileClear(x, y, width, height)
   if sbarTraceEnabled then traceSbar(["tileclear", x, y, width, height]) end if
   return draw.Draw_TileClear(x, y, width, height)
 end function
 
-// Mirror Quake's Sbar_DrawPic routine and its observable state changes.
+/// Mirror Quake's Sbar_DrawPic routine and its observable state changes.
+/// @param x The x input consumed by `Sbar_DrawPic`.
+/// @param y The y input consumed by `Sbar_DrawPic`.
+/// @param pic The pic input consumed by `Sbar_DrawPic`.
 function Sbar_DrawPic(x, y, pic)
   if pic is void then return false end if
   drawX = sbarXOffset() + x * sbarScale
@@ -574,7 +706,10 @@ function Sbar_DrawPic(x, y, pic)
   return draw.Draw_PicSizedNearest(pic, drawX, drawY, pic.width * sbarScale, pic.height * sbarScale, 255)
 end function
 
-// Mirror Quake's Sbar_DrawTransPic routine and its observable state changes.
+/// Mirror Quake's Sbar_DrawTransPic routine and its observable state changes.
+/// @param x The x input consumed by `Sbar_DrawTransPic`.
+/// @param y The y input consumed by `Sbar_DrawTransPic`.
+/// @param pic The pic input consumed by `Sbar_DrawTransPic`.
 function Sbar_DrawTransPic(x, y, pic)
   if pic is void then return false end if
   drawX = sbarXOffset() + x * sbarScale
@@ -584,7 +719,10 @@ function Sbar_DrawTransPic(x, y, pic)
   return draw.Draw_PicSizedNearest(pic, drawX, drawY, pic.width * sbarScale, pic.height * sbarScale, 255)
 end function
 
-// Mirror Quake's Sbar_DrawCharacter routine and its observable state changes.
+/// Mirror Quake's Sbar_DrawCharacter routine and its observable state changes.
+/// @param x The x input consumed by `Sbar_DrawCharacter`.
+/// @param y The y input consumed by `Sbar_DrawCharacter`.
+/// @param num The num input consumed by `Sbar_DrawCharacter`.
 function Sbar_DrawCharacter(x, y, num)
   drawX = sbarXOffset() + (x + 4) * sbarScale
   drawY = sbarHeight + (y - SBAR_HEIGHT) * sbarScale
@@ -593,7 +731,10 @@ function Sbar_DrawCharacter(x, y, num)
   return draw.character(sbarFontTexture, drawX, drawY, num, sbarScale, 255)
 end function
 
-// Mirror Quake's Sbar_DrawString routine and its observable state changes.
+/// Mirror Quake's Sbar_DrawString routine and its observable state changes.
+/// @param x The x input consumed by `Sbar_DrawString`.
+/// @param y The y input consumed by `Sbar_DrawString`.
+/// @param text Text to parse or process.
 function Sbar_DrawString(x, y, text)
   drawX = sbarXOffset() + x * sbarScale
   drawY = sbarHeight + (y - SBAR_HEIGHT) * sbarScale
@@ -602,14 +743,17 @@ function Sbar_DrawString(x, y, text)
   return draw.string(sbarFontTexture, drawX, drawY, text, sbarScale, 255)
 end function
 
-// The C routine fills a caller buffer and returns its length.  MiniLang
-// returns [text, length].
+/// The C routine fills a caller buffer and returns its length.  MiniLang
+/// returns [text, length].
+/// @param num The num input consumed by `Sbar_itoa`.
 function Sbar_itoa(num)
   text = "" + native.trunc(num)
   return [text, len(bytes(text))]
 end function
 
-// Provide number picture behavior for the active subsystem.
+/// Implements the `numberPicture` operation for `miniquake.statusbar` (number picture).
+/// @param color Color value used by the operation.
+/// @param frame The frame input consumed by `numberPicture`.
 function numberPicture(color, frame)
   prefix = "num_"
   if color != 0 then prefix = "anum_" end if
@@ -617,7 +761,12 @@ function numberPicture(color, frame)
   return loadedSbarPicture(prefix + frame)
 end function
 
-// Mirror Quake's Sbar_DrawNum routine and its observable state changes.
+/// Mirror Quake's Sbar_DrawNum routine and its observable state changes.
+/// @param x The x input consumed by `Sbar_DrawNum`.
+/// @param y The y input consumed by `Sbar_DrawNum`.
+/// @param num The num input consumed by `Sbar_DrawNum`.
+/// @param digits The digits input consumed by `Sbar_DrawNum`.
+/// @param color Color value used by the operation.
 function Sbar_DrawNum(x, y, num, digits, color)
   text = bytes("" + native.trunc(num))
   start = 0
@@ -634,7 +783,8 @@ function Sbar_DrawNum(x, y, num, digits, color)
   return true
 end function
 
-// Mirror Quake's Sbar_SortFrags routine and its observable state changes.
+/// Mirror Quake's Sbar_SortFrags routine and its observable state changes.
+/// @param scores The scores input consumed by `Sbar_SortFrags`.
 function Sbar_SortFrags(scores)
   global fragsort, scoreboardlines
   fragsort = []
@@ -661,12 +811,14 @@ function Sbar_SortFrags(scores)
   return fragsort
 end function
 
-// Mirror Quake's Sbar_ColorForMap routine and its observable state changes.
+/// Mirror Quake's Sbar_ColorForMap routine and its observable state changes.
+/// @param mapColor The map color input consumed by `Sbar_ColorForMap`.
 function inline Sbar_ColorForMap(mapColor)
   return mapColor + 8
 end function
 
-// Provide pad frag behavior for the active subsystem.
+/// Implements the `padFrag` operation for `miniquake.statusbar` (pad frag).
+/// @param value Value consumed by `padFrag`.
 function padFrag(value)
   text = "" + native.trunc(value)
   length = len(bytes(text))
@@ -677,7 +829,8 @@ function padFrag(value)
   return text
 end function
 
-// Provide frag glyphs behavior for the active subsystem.
+/// Implements the `fragGlyphs` operation for `miniquake.statusbar` (frag glyphs).
+/// @param value Value consumed by `fragGlyphs`.
 function fragGlyphs(value)
   return slice(bytes(padFrag(value)), 0, 3)
 end function
@@ -704,7 +857,9 @@ function Sbar_UpdateScoreboard()
   return scoreboardlines
 end function
 
-// Provide stat behavior for the active subsystem.
+/// Implements the `stat` operation for `miniquake.statusbar` (stat).
+/// @param index Zero-based index of the requested entry.
+/// @param fallback Value to use when the requested input is unavailable or invalid.
 function stat(index, fallback)
   if sbarClient is not void and index >= 0 and index < len(sbarClient.stats) then return sbarClient.stats[index] end if
   return fallback
@@ -735,7 +890,10 @@ function Sbar_DrawScoreboard()
   return true
 end function
 
-// Provide weapon flash behavior for the active subsystem.
+/// Implements the `weaponFlash` operation for `miniquake.statusbar` (weapon flash).
+/// @param itemIndex Zero-based index of the requested entry.
+/// @param activeWeapon The active weapon input consumed by `weaponFlash`.
+/// @param currentTime Time value used by the operation.
 function weaponFlash(itemIndex, activeWeapon, currentTime)
   global sb_updates
   acquired = 0.0
@@ -750,14 +908,19 @@ function weaponFlash(itemIndex, activeWeapon, currentTime)
   return result
 end function
 
-// Return flash weapon name derived from the active module state.
+/// Return flash weapon name derived from the active module state.
+/// @param prefix The prefix input consumed by `flashWeaponName`.
+/// @param weapon The weapon input consumed by `flashWeaponName`.
+/// @param flash The flash input consumed by `flashWeaponName`.
 function flashWeaponName(prefix, weapon, flash)
   if flash == 0 then return "inv_" + weapon end if
   if flash == 1 then return "inv2_" + weapon end if
   return "inva" + (flash - 1) + "_" + weapon
 end function
 
-// Provide item needs refresh behavior for the active subsystem.
+/// Implements the `itemNeedsRefresh` operation for `miniquake.statusbar` (item needs refresh).
+/// @param itemIndex Zero-based index of the requested entry.
+/// @param currentTime Time value used by the operation.
 function itemNeedsRefresh(itemIndex, currentTime)
   global sb_updates
   if sbarClient is void or itemIndex >= len(sbarClient.itemGetTime) then return false end if
@@ -775,8 +938,9 @@ function sbarActiveWeapon()
   return native.trunc(stat(c.STAT_ACTIVEWEAPON, sbarPlayer.activeWeapon))
 end function
 
-// Return one of the four stock ammunition counters without constructing a
-// frame-local aggregate array.
+/// Return one of the four stock ammunition counters without constructing a
+/// frame-local aggregate array.
+/// @param index Zero-based index of the requested entry.
 function inline inventoryAmmoCount(index)
   if index == 0 then return stat(c.STAT_SHELLS, sbarPlayer.shells) end if
   if index == 1 then return stat(c.STAT_NAILS, sbarPlayer.nails) end if
@@ -940,7 +1104,8 @@ function Sbar_DrawFace()
   return Sbar_DrawPic(112, 0, loadedSbarPicture(face))
 end function
 
-// Return rogue armor name derived from the active module state.
+/// Return rogue armor name derived from the active module state.
+/// @param items The items input consumed by `rogueArmorName`.
 function rogueArmorName(items)
   if (items & c.RIT_ARMOR3) != 0 then return "sb_armor3" end if
   if (items & c.RIT_ARMOR2) != 0 then return "sb_armor2" end if
@@ -948,7 +1113,8 @@ function rogueArmorName(items)
   return ""
 end function
 
-// Return rogue ammo name derived from the active module state.
+/// Return rogue ammo name derived from the active module state.
+/// @param items The items input consumed by `rogueAmmoName`.
 function rogueAmmoName(items)
   if (items & c.RIT_SHELLS) != 0 then return "sb_shells" end if
   if (items & c.RIT_NAILS) != 0 then return "sb_nails" end if
@@ -1020,7 +1186,12 @@ function Sbar_Draw()
   return true
 end function
 
-// Mirror Quake's Sbar_IntermissionNumber routine and its observable state changes.
+/// Mirror Quake's Sbar_IntermissionNumber routine and its observable state changes.
+/// @param x The x input consumed by `Sbar_IntermissionNumber`.
+/// @param y The y input consumed by `Sbar_IntermissionNumber`.
+/// @param num The num input consumed by `Sbar_IntermissionNumber`.
+/// @param digits The digits input consumed by `Sbar_IntermissionNumber`.
+/// @param color Color value used by the operation.
 function Sbar_IntermissionNumber(x, y, num, digits, color)
   text = bytes("" + native.trunc(num))
   start = 0
@@ -1037,7 +1208,12 @@ function Sbar_IntermissionNumber(x, y, num, digits, color)
   return true
 end function
 
-// Provide sbar overlay pic behavior for the active subsystem.
+/// Implements the `sbarOverlayPic` operation for `miniquake.statusbar` (sbar overlay pic).
+/// @param x The x input consumed by `sbarOverlayPic`.
+/// @param y The y input consumed by `sbarOverlayPic`.
+/// @param pic The pic input consumed by `sbarOverlayPic`.
+/// @param transform The transform input consumed by `sbarOverlayPic`.
+/// @param transparent The transparent input consumed by `sbarOverlayPic`.
 function sbarOverlayPic(x, y, pic, transform, transparent)
   if pic is void then return false end if
   drawX = transform[0] + x * transform[2]
@@ -1055,7 +1231,11 @@ function sbarOverlayPic(x, y, pic, transform, transparent)
   )
 end function
 
-// Provide sbar canvas pic behavior for the active subsystem.
+/// Implements the `sbarCanvasPic` operation for `miniquake.statusbar` (sbar canvas pic).
+/// @param x The x input consumed by `sbarCanvasPic`.
+/// @param y The y input consumed by `sbarCanvasPic`.
+/// @param pic The pic input consumed by `sbarCanvasPic`.
+/// @param transform The transform input consumed by `sbarCanvasPic`.
 function sbarCanvasPic(x, y, pic, transform)
   if pic is void then return false end if
   if transform[2] <= 1.0 then
@@ -1068,7 +1248,11 @@ function sbarCanvasPic(x, y, pic, transform)
   return sbarOverlayPic(x, y, pic, transform, false)
 end function
 
-// Provide sbar canvas character behavior for the active subsystem.
+/// Implements the `sbarCanvasCharacter` operation for `miniquake.statusbar` (sbar canvas character).
+/// @param x The x input consumed by `sbarCanvasCharacter`.
+/// @param y The y input consumed by `sbarCanvasCharacter`.
+/// @param num The num input consumed by `sbarCanvasCharacter`.
+/// @param transform The transform input consumed by `sbarCanvasCharacter`.
 function sbarCanvasCharacter(x, y, num, transform)
   drawX = transform[0] + x * transform[2]
   drawY = transform[1] + y * transform[2]
@@ -1077,7 +1261,11 @@ function sbarCanvasCharacter(x, y, num, transform)
   return draw.character(sbarFontTexture, drawX, drawY, num, transform[2], 255)
 end function
 
-// Provide sbar canvas string behavior for the active subsystem.
+/// Implements the `sbarCanvasString` operation for `miniquake.statusbar` (sbar canvas string).
+/// @param x The x input consumed by `sbarCanvasString`.
+/// @param y The y input consumed by `sbarCanvasString`.
+/// @param text Text to parse or process.
+/// @param transform The transform input consumed by `sbarCanvasString`.
 function sbarCanvasString(x, y, text, transform)
   drawX = transform[0] + x * transform[2]
   drawY = transform[1] + y * transform[2]
@@ -1086,7 +1274,13 @@ function sbarCanvasString(x, y, text, transform)
   return draw.string(sbarFontTexture, drawX, drawY, text, transform[2], 255)
 end function
 
-// Provide sbar canvas fill behavior for the active subsystem.
+/// Implements the `sbarCanvasFill` operation for `miniquake.statusbar` (sbar canvas fill).
+/// @param x The x input consumed by `sbarCanvasFill`.
+/// @param y The y input consumed by `sbarCanvasFill`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param color Color value used by the operation.
+/// @param transform The transform input consumed by `sbarCanvasFill`.
 function sbarCanvasFill(x, y, width, height, color, transform)
   drawX = transform[0] + x * transform[2]
   drawY = transform[1] + y * transform[2]
@@ -1098,7 +1292,13 @@ function sbarCanvasFill(x, y, width, height, color, transform)
   return sbarDirectFill(drawX, drawY, drawWidth, drawHeight, color)
 end function
 
-// Mirror Quake's Sbar_IntermissionNumberScaled routine and its observable state changes.
+/// Mirror Quake's Sbar_IntermissionNumberScaled routine and its observable state changes.
+/// @param x The x input consumed by `Sbar_IntermissionNumberScaled`.
+/// @param y The y input consumed by `Sbar_IntermissionNumberScaled`.
+/// @param num The num input consumed by `Sbar_IntermissionNumberScaled`.
+/// @param digits The digits input consumed by `Sbar_IntermissionNumberScaled`.
+/// @param color Color value used by the operation.
+/// @param transform The transform input consumed by `Sbar_IntermissionNumberScaled`.
 function Sbar_IntermissionNumberScaled(x, y, num, digits, color, transform)
   text = bytes("" + native.trunc(num))
   start = 0
@@ -1252,7 +1452,14 @@ function Sbar_CommandTrace()
   return sbarTrace
 end function
 
-// Mirror Quake's Sbar_LayoutTrace routine and its observable state changes.
+/// Mirror Quake's Sbar_LayoutTrace routine and its observable state changes.
+/// @param gameDirectory Selected Quake game-data directory.
+/// @param player The player input consumed by `Sbar_LayoutTrace`.
+/// @param clientState Mutable state used by `Sbar_LayoutTrace`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param lines The lines input consumed by `Sbar_LayoutTrace`.
+/// @param teamplay The teamplay input consumed by `Sbar_LayoutTrace`.
 function Sbar_LayoutTrace(gameDirectory, player, clientState, width, height, lines, teamplay)
   global sbarHipnotic, sbarRogue
   previousHipnotic = sbarHipnotic

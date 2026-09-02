@@ -15,16 +15,23 @@ import miniquake.net_datagram as datagram
 import miniquake.net_control as control
 import miniquake.platform.win32 as win
 
+/// Tracks the module-level messages sent state owned by `miniquake.net_loop`.
 messagesSent = 0
+/// Tracks the module-level messages received state owned by `miniquake.net_loop`.
 messagesReceived = 0
+/// Tracks the module-level unreliable messages sent state owned by `miniquake.net_loop`.
 unreliableMessagesSent = 0
+/// Tracks the module-level unreliable messages received state owned by `miniquake.net_loop`.
 unreliableMessagesReceived = 0
+/// Tracks the module-level datagram search socket state owned by `miniquake.net_loop`.
 datagramSearchSocket = void
 
+/// Defines the loop max message value used by `miniquake.net_loop`.
 const LOOP_MAX_MESSAGE = 8192
+/// Defines the host cache size value used by `miniquake.net_loop`.
 const HOST_CACHE_SIZE = 8
 
-// Create and initialize state.
+/// Creates state for `miniquake.net_loop`.
 function createState()
   return t.LoopState(void, void, void, void, void, "UNNAMED", "", 0, 1, [], [], 0, 0, [], [], true)
 end function
@@ -35,20 +42,25 @@ function createSocket()
   return t.LoopSocket(void, [], [], true, false, "loop", void, "", 0, void, now, now, now, 0, 0)
 end function
 
-// Create and initialize remote socket.
+/// Create and initialize remote socket.
+/// @param udpSocket The udp socket input consumed by `createRemoteSocket`.
+/// @param address Network address of the peer.
+/// @param port The port input consumed by `createRemoteSocket`.
 function createRemoteSocket(udpSocket, address, port)
   now = win.ticks() / 1000.0
   return t.LoopSocket(void, [], [], true, false, "udp", udpSocket, address, port, datagram.createChannel(), now, now, now, 1, 0)
 end function
 
-// Convert address into its canonical representation.
+/// Convert address into its canonical representation.
+/// @param address Network address of the peer.
 function normalizeAddress(address)
   lowered = bio.lower(address)
   if lowered == "localhost" or lowered == "local" then return "127.0.0.1" end if
   return address
 end function
 
-// Provide numeric address parts behavior for the active subsystem.
+/// Implements the `numericAddressParts` operation for `miniquake.net_loop` (numeric address parts).
+/// @param address Network address of the peer.
 function numericAddressParts(address)
   source = bytes(address)
   if len(source) == 0 then return void end if
@@ -71,9 +83,10 @@ function numericAddressParts(address)
   return parts
 end function
 
-// WINS_GetAddrFromName routes digit-leading names through PartialIPAddress.
-// Preserve that user-visible connect syntax in the production UDP path even
-// though the x64 bridge uses sendto rather than the old landriver vtable.
+/// WINS_GetAddrFromName routes digit-leading names through PartialIPAddress.
+/// Preserve that user-visible connect syntax in the production UDP path even
+/// though the x64 bridge uses sendto rather than the old landriver vtable.
+/// @param address Network address of the peer.
 function expandPartialIPAddress(address)
   parts = numericAddressParts(address)
   if parts is void or len(parts) == 4 then return address end if
@@ -94,7 +107,9 @@ function expandPartialIPAddress(address)
   return combined[0] + "." + combined[1] + "." + combined[2] + "." + combined[3]
 end function
 
-// Read and validate address.
+/// Read and validate address.
+/// @param text Text to parse or process.
+/// @param defaultPort The default port input consumed by `parseAddress`.
 function parseAddress(text, defaultPort)
   data = bytes(text)
   colon = -1
@@ -117,14 +132,17 @@ function parseAddress(text, defaultPort)
   return [address, port]
 end function
 
-// Provide short text behavior for the active subsystem.
+/// Implements the `shortText` operation for `miniquake.net_loop` (short text).
+/// @param text Text to parse or process.
+/// @param maximum Largest accepted value.
 function shortText(text, maximum)
   data = bytes(text)
   if len(data) <= maximum then return text end if
   return decode(slice(data, 0, maximum))
 end function
 
-// Report whether is numeric address.
+/// Report whether is numeric address.
+/// @param address Network address of the peer.
 function isNumericAddress(address)
   data = bytes(address)
   if len(data) == 0 then return false end if
@@ -139,7 +157,8 @@ function isNumericAddress(address)
   return dots == 3
 end function
 
-// Return ipv4 number derived from the active module state.
+/// Return ipv4 number derived from the active module state.
+/// @param address Network address of the peer.
 function ipv4Number(address)
   data = bytes(address)
   parts = []
@@ -159,17 +178,22 @@ function ipv4Number(address)
   return ((parts[0] & 255) << 24) | ((parts[1] & 255) << 16) | ((parts[2] & 255) << 8) | (parts[3] & 255)
 end function
 
-// Provide str addr behavior for the active subsystem.
+/// Implements the `StrAddr` operation for `miniquake.net_loop` (str addr).
+/// @param address Network address of the peer.
+/// @param port The port input consumed by `StrAddr`.
 function StrAddr(address, port)
   return address + ":" + port
 end function
 
-// Provide ipv4 text behavior for the active subsystem.
+/// Implements the `ipv4Text` operation for `miniquake.net_loop` (ipv4 text).
+/// @param value Value consumed by `ipv4Text`.
 function inline ipv4Text(value)
   return ((value >> 24) & 255) + "." + ((value >> 16) & 255) + "." + ((value >> 8) & 255) + "." + (value & 255)
 end function
 
-// Mirror Quake's NET_Ban_f routine and its observable state changes.
+/// Mirror Quake's NET_Ban_f routine and its observable state changes.
+/// @param state Mutable `miniquake.net_loop` state used by `NET_Ban_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function NET_Ban_f(state, arguments)
   if len(arguments) <= 1 then
     if state.banAddress == 0 then return "Banning not active" end if
@@ -192,7 +216,9 @@ function NET_Ban_f(state, arguments)
   return ""
 end function
 
-// Add state for address is banned.
+/// Add state for address is banned.
+/// @param state Mutable `miniquake.net_loop` state used by `addressIsBanned`.
+/// @param address Network address of the peer.
 function addressIsBanned(state, address)
   if state.banAddress == 0 then return false end if
   numeric = ipv4Number(address)
@@ -200,7 +226,8 @@ function addressIsBanned(state, address)
   return (numeric & state.banMask) == state.banAddress
 end function
 
-// Provide compact remote sockets behavior for the active subsystem.
+/// Implements the `compactRemoteSockets` operation for `miniquake.net_loop` (compact remote sockets).
+/// @param state Mutable `miniquake.net_loop` state used by `compactRemoteSockets`.
 function compactRemoteSockets(state)
   active = []
   for each socket in state.remoteSockets
@@ -210,7 +237,9 @@ function compactRemoteSockets(state)
   return len(active)
 end function
 
-// Establish the requested value using the active network transport.
+/// Implements the `connect` operation for `miniquake.net_loop` (connect).
+/// @param state Mutable `miniquake.net_loop` state used by `connect`.
+/// @param host The host input consumed by `connect`.
 function connect(state, host)
   if host != "local" and host != "localhost" then
     target = host
@@ -244,7 +273,11 @@ function connect(state, host)
   return client
 end function
 
-// Establish remote using the active network transport.
+/// Establish remote using the active network transport.
+/// @param state Mutable `miniquake.net_loop` state used by `connectRemote`.
+/// @param address Network address of the peer.
+/// @param port The port input consumed by `connectRemote`.
+/// @param timeoutMilliseconds The timeout milliseconds input consumed by `connectRemote`.
 function connectRemote(state, address, port, timeoutMilliseconds)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if not state.lanEnabled then return error(3436, "Datagram networking disabled by -nolan") end if
@@ -292,10 +325,15 @@ function connectRemote(state, address, port, timeoutMilliseconds)
   return error(3433, "UDP connect timed out")
 end function
 
-// External original-binary interoperability needs a persistent control
-// socket.  Reusing the same source endpoint and resending inside Quake's
-// two-second duplicate window lets the original server repeat CCREP_ACCEPT
-// instead of treating each short-lived process as a crashed client.
+/// External original-binary interoperability needs a persistent control
+/// socket.  Reusing the same source endpoint and resending inside Quake's
+/// two-second duplicate window lets the original server repeat CCREP_ACCEPT
+/// instead of treating each short-lived process as a crashed client.
+/// @param state Mutable `miniquake.net_loop` state used by `connectRemotePersistent`.
+/// @param address Network address of the peer.
+/// @param port The port input consumed by `connectRemotePersistent`.
+/// @param timeoutMilliseconds The timeout milliseconds input consumed by `connectRemotePersistent`.
+/// @param resendMilliseconds The resend milliseconds input consumed by `connectRemotePersistent`.
 function connectRemotePersistent(state, address, port, timeoutMilliseconds, resendMilliseconds)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if not state.lanEnabled then return error(3436, "Datagram networking disabled by -nolan") end if
@@ -373,7 +411,9 @@ function connectRemotePersistent(state, address, port, timeoutMilliseconds, rese
   return error(3433, "UDP persistent connect timed out: local_port=" + localPort + " target=" + requestedAddress + ":" + port + " sends=" + sends + " receives=" + receives + " ignored=" + ignored)
 end function
 
-// Provide listen behavior for the active subsystem.
+/// Implements the `listen` operation for `miniquake.net_loop` (listen).
+/// @param state Mutable `miniquake.net_loop` state used by `listen`.
+/// @param port The port input consumed by `listen`.
 function listen(state, port)
   if not state.lanEnabled then return error(3436, "Datagram networking disabled by -nolan") end if
   if state.listener is not void then return state.listener end if
@@ -383,7 +423,8 @@ function listen(state, port)
   return opened
 end function
 
-// Finalize state for stop listening.
+/// Finalize state for stop listening.
+/// @param state Mutable `miniquake.net_loop` state used by `stopListening`.
 function stopListening(state)
   if state.listener is void then return false end if
   udp.close(state.listener)
@@ -392,7 +433,12 @@ function stopListening(state)
   return true
 end function
 
-// Update subsystem configuration for configure server.
+/// Update subsystem configuration for configure server.
+/// @param state Mutable `miniquake.net_loop` state used by `configureServer`.
+/// @param hostName Name that identifies the requested value or resource.
+/// @param mapName Name of the map to load or inspect.
+/// @param currentPlayers The current players input consumed by `configureServer`.
+/// @param maxPlayers The max players input consumed by `configureServer`.
 function configureServer(state, hostName, mapName, currentPlayers, maxPlayers)
   state.hostName = hostName
   state.mapName = mapName
@@ -401,14 +447,19 @@ function configureServer(state, hostName, mapName, currentPlayers, maxPlayers)
   return true
 end function
 
-// Update subsystem configuration for configure query data.
+/// Update subsystem configuration for configure query data.
+/// @param state Mutable `miniquake.net_loop` state used by `configureQueryData`.
+/// @param players The players input consumed by `configureQueryData`.
+/// @param rules The rules input consumed by `configureQueryData`.
 function configureQueryData(state, players, rules)
   state.playerInfo = players
   state.serverRules = rules
   return true
 end function
 
-// Apply the Quake-compatible host name exists behavior.
+/// Apply the Quake-compatible host name exists behavior.
+/// @param hosts The hosts input consumed by `hostNameExists`.
+/// @param name Stable name that identifies the requested object or option.
 function hostNameExists(hosts, name)
   wanted = bio.lower(name)
   for each cached in hosts
@@ -417,7 +468,9 @@ function hostNameExists(hosts, name)
   return false
 end function
 
-// Return unique host name derived from the active module state.
+/// Return unique host name derived from the active module state.
+/// @param hosts The hosts input consumed by `uniqueHostName`.
+/// @param requested The requested input consumed by `uniqueHostName`.
 function uniqueHostName(hosts, requested)
   candidate = shortText(requested, 15)
   if candidate == "" then candidate = "UNNAMED" end if
@@ -437,7 +490,10 @@ function uniqueHostName(hosts, requested)
   return candidate
 end function
 
-// Provide discovered address behavior for the active subsystem.
+/// Implements the `discoveredAddress` operation for `miniquake.net_loop` (discovered address).
+/// @param fields The fields input consumed by `discoveredAddress`.
+/// @param receivedAddress The received address input consumed by `discoveredAddress`.
+/// @param receivedPort The received port input consumed by `discoveredAddress`.
 function discoveredAddress(fields, receivedAddress, receivedPort)
   parsed = try(parseAddress(fields[0], receivedPort))
   if parsed is error then return receivedAddress + ":" + receivedPort end if
@@ -445,7 +501,9 @@ function discoveredAddress(fields, receivedAddress, receivedPort)
   return parsed[0] + ":" + parsed[1]
 end function
 
-// Provide search hosts behavior for the active subsystem.
+/// Implements the `searchHosts` operation for `miniquake.net_loop` (search hosts).
+/// @param port The port input consumed by `searchHosts`.
+/// @param timeoutMilliseconds The timeout milliseconds input consumed by `searchHosts`.
 function searchHosts(port, timeoutMilliseconds)
   opened = udp.open(0)
   if opened is error then return opened end if
@@ -455,7 +513,12 @@ function searchHosts(port, timeoutMilliseconds)
   return hosts
 end function
 
-// Provide datagram search for hosts behavior for the active subsystem.
+/// Implements the `_Datagram_SearchForHosts` operation for `miniquake.net_loop` (datagram search for hosts).
+/// @param searchSocket The search socket input consumed by `_Datagram_SearchForHosts`.
+/// @param hosts The hosts input consumed by `_Datagram_SearchForHosts`.
+/// @param port The port input consumed by `_Datagram_SearchForHosts`.
+/// @param timeoutMilliseconds The timeout milliseconds input consumed by `_Datagram_SearchForHosts`.
+/// @param xmit The xmit input consumed by `_Datagram_SearchForHosts`.
 function _Datagram_SearchForHosts(searchSocket, hosts, port, timeoutMilliseconds, xmit)
   // Differential/source-surface callers may exercise the no-landriver path
   // with no control socket, matching Datagram_SearchForHosts' skipped driver.
@@ -502,7 +565,11 @@ function _Datagram_SearchForHosts(searchSocket, hosts, port, timeoutMilliseconds
   return result
 end function
 
-// Mirror Quake's Datagram_SearchForHosts routine and its observable state changes.
+/// Mirror Quake's Datagram_SearchForHosts routine and its observable state changes.
+/// @param state Mutable `miniquake.net_loop` state used by `Datagram_SearchForHosts`.
+/// @param xmit The xmit input consumed by `Datagram_SearchForHosts`.
+/// @param port The port input consumed by `Datagram_SearchForHosts`.
+/// @param timeoutMilliseconds The timeout milliseconds input consumed by `Datagram_SearchForHosts`.
 function Datagram_SearchForHosts(state, xmit, port, timeoutMilliseconds)
   global datagramSearchSocket
   if not state.lanEnabled then return error(3436, "Datagram networking disabled by -nolan") end if
@@ -531,19 +598,24 @@ function Datagram_HostSearchActive()
   return datagramSearchSocket is not void and datagramSearchSocket.open
 end function
 
-// Provide listener address behavior for the active subsystem.
+/// Implements the `listenerAddress` operation for `miniquake.net_loop` (listener address).
+/// @param address Network address of the peer.
+/// @param port The port input consumed by `listenerAddress`.
 function listenerAddress(address, port)
   return address + ":" + port
 end function
 
-// Provide public listener address behavior for the active subsystem.
+/// Implements the `publicListenerAddress` operation for `miniquake.net_loop` (public listener address).
+/// @param state Mutable `miniquake.net_loop` state used by `publicListenerAddress`.
 function publicListenerAddress(state)
   address = state.listener.bindAddress
   if address == "" or address == "0.0.0.0" or address == "127.0.0.1" then address = udp.localAddress() end if
   return address + ":" + state.listener.port
 end function
 
-// Return next server rule for the active module state.
+/// Return next server rule for the active module state.
+/// @param rules The rules input consumed by `nextServerRule`.
+/// @param previous The previous input consumed by `nextServerRule`.
 function nextServerRule(rules, previous)
   start = 0
   if previous != "" then
@@ -565,7 +637,9 @@ function nextServerRule(rules, previous)
   return rules[start]
 end function
 
-// Provide matching remote behavior for the active subsystem.
+/// Implements the `matchingRemote` operation for `miniquake.net_loop` (matching remote).
+/// @param state Mutable `miniquake.net_loop` state used by `matchingRemote`.
+/// @param address Network address of the peer.
 function matchingRemote(state, address)
   for each socket in state.remoteSockets
     if not socket.disconnected and socket.transport == "udp" and socket.address == address then return socket end if
@@ -573,14 +647,18 @@ function matchingRemote(state, address)
   return void
 end function
 
-// Provide connection request action behavior for the active subsystem.
+/// Implements the `connectionRequestAction` operation for `miniquake.net_loop` (connection request action).
+/// @param existing The existing input consumed by `connectionRequestAction`.
+/// @param port The port input consumed by `connectionRequestAction`.
+/// @param now The now input consumed by `connectionRequestAction`.
 function connectionRequestAction(existing, port, now)
   if existing is void then return "new" end if
   if existing.port == port and now - existing.connectTime < 2.0 then return "duplicate" end if
   return "replace"
 end function
 
-// Advance listener by one processing step.
+/// Advance listener by one processing step.
+/// @param state Mutable `miniquake.net_loop` state used by `pumpListener`.
 function pumpListener(state)
   if state.listener is void then return 0 end if
   compactRemoteSockets(state)
@@ -670,12 +748,14 @@ function pumpListener(state)
   return processed
 end function
 
-// Validate new connections and report any incompatibility.
+/// Validate new connections and report any incompatibility.
+/// @param state Mutable `miniquake.net_loop` state used by `checkNewConnections`.
 function checkNewConnections(state)
   return Datagram_CheckNewConnections(state)
 end function
 
-// Provide array tail behavior for the active subsystem.
+/// Implements the `arrayTail` operation for `miniquake.net_loop` (array tail).
+/// @param values The values input consumed by `arrayTail`.
 function arrayTail(values)
   result = []
   i = 1
@@ -686,12 +766,14 @@ function arrayTail(values)
   return result
 end function
 
-// Provide int align behavior for the active subsystem.
+/// Implements the `IntAlign` operation for `miniquake.net_loop` (int align).
+/// @param value Value consumed by `IntAlign`.
 function inline IntAlign(value)
   return (value + 3) & ~3
 end function
 
-// Return loop queued bytes derived from the active module state.
+/// Return loop queued bytes derived from the active module state.
+/// @param socket Network socket used for communication.
 function loopQueuedBytes(socket)
   total = 0
   for each payload in socket.messages
@@ -700,7 +782,9 @@ function loopQueuedBytes(socket)
   return total
 end function
 
-// Send message through the active connection.
+/// Send message through the active connection.
+/// @param socket Network socket used for communication.
+/// @param buffer The buffer input consumed by `sendMessage`.
 function sendMessage(socket, buffer)
   global messagesSent
   if socket is void or socket.disconnected then return -1 end if
@@ -732,7 +816,9 @@ function sendMessage(socket, buffer)
   return 1
 end function
 
-// Send unreliable message through the active connection.
+/// Send unreliable message through the active connection.
+/// @param socket Network socket used for communication.
+/// @param buffer The buffer input consumed by `sendUnreliableMessage`.
 function sendUnreliableMessage(socket, buffer)
   global unreliableMessagesSent
   if socket is void or socket.disconnected then return -1 end if
@@ -763,7 +849,8 @@ function sendUnreliableMessage(socket, buffer)
   return 1
 end function
 
-// Advance remote by one processing step.
+/// Advance remote by one processing step.
+/// @param socket Network socket used for communication.
 function pumpRemote(socket)
   if socket is void or socket.disconnected or socket.transport != "udp" then return 0 end if
   now = win.ticks() / 1000.0
@@ -807,7 +894,9 @@ function pumpRemote(socket)
   return processed
 end function
 
-// Return message.
+/// Return message.
+/// @param socket Network socket used for communication.
+/// @param destination Destination value or collection to update.
 function getMessage(socket, destination)
   global messagesReceived, unreliableMessagesReceived
   if socket is void or socket.disconnected then return -1 end if
@@ -838,7 +927,8 @@ function getMessage(socket, destination)
   return messageType
 end function
 
-// Report whether can send message.
+/// Report whether can send message.
+/// @param socket Network socket used for communication.
 function canSendMessage(socket)
   if socket is void or socket.disconnected then return false end if
   if socket.transport == "udp" then
@@ -849,7 +939,9 @@ function canSendMessage(socket)
   return socket.canSend
 end function
 
-// Provide timed out behavior for the active subsystem.
+/// Implements the `timedOut` operation for `miniquake.net_loop` (timed out).
+/// @param socket Network socket used for communication.
+/// @param timeoutSeconds The timeout seconds input consumed by `timedOut`.
 function timedOut(socket, timeoutSeconds)
   if socket is void or socket.disconnected then return false end if
   if socket.transport != "udp" and socket.transport != "test-datagram" then return false end if
@@ -857,7 +949,8 @@ function timedOut(socket, timeoutSeconds)
   return win.ticks() / 1000.0 - socket.lastReceiveTime > timeoutSeconds
 end function
 
-// Release state for close.
+/// Implements the `close` operation for `miniquake.net_loop` (close).
+/// @param socket Network socket used for communication.
 function close(socket)
   if socket is void then return end if
   socket.disconnected = true
@@ -869,7 +962,9 @@ function close(socket)
   socket.peer = void
 end function
 
-// Mirror Quake's Datagram_Init routine and its observable state changes.
+/// Mirror Quake's Datagram_Init routine and its observable state changes.
+/// @param state Mutable `miniquake.net_loop` state used by `Datagram_Init`.
+/// @param noLan The no lan input consumed by `Datagram_Init`.
 function Datagram_Init(state, noLan)
   global messagesSent, messagesReceived, unreliableMessagesSent, unreliableMessagesReceived
   datagram.resetStats()
@@ -882,7 +977,8 @@ function Datagram_Init(state, noLan)
   return 0
 end function
 
-// Mirror Quake's Datagram_Shutdown routine and its observable state changes.
+/// Mirror Quake's Datagram_Shutdown routine and its observable state changes.
+/// @param state Mutable `miniquake.net_loop` state used by `Datagram_Shutdown`.
 function Datagram_Shutdown(state)
   Datagram_EndHostSearch()
   if state.listener is not void then stopListening(state) end if
@@ -894,20 +990,25 @@ function Datagram_Shutdown(state)
   return true
 end function
 
-// Mirror Quake's Datagram_Close routine and its observable state changes.
+/// Mirror Quake's Datagram_Close routine and its observable state changes.
+/// @param socket Network socket used for communication.
 function Datagram_Close(socket)
   close(socket)
   return true
 end function
 
-// Mirror Quake's Datagram_Listen routine and its observable state changes.
+/// Mirror Quake's Datagram_Listen routine and its observable state changes.
+/// @param state Mutable `miniquake.net_loop` state used by `Datagram_Listen`.
+/// @param enabled Whether the optional behavior is enabled.
+/// @param port The port input consumed by `Datagram_Listen`.
 function Datagram_Listen(state, enabled, port)
   if enabled then return listen(state, port) end if
   stopListening(state)
   return void
 end function
 
-// Provide datagram check new connections behavior for the active subsystem.
+/// Implements the `_Datagram_CheckNewConnections` operation for `miniquake.net_loop` (datagram check new connections).
+/// @param state Mutable `miniquake.net_loop` state used by `_Datagram_CheckNewConnections`.
 function _Datagram_CheckNewConnections(state)
   socket = state.pendingRemote
   state.pendingRemote = void
@@ -919,7 +1020,8 @@ function _Datagram_CheckNewConnections(state)
   return socket
 end function
 
-// Mirror Quake's Datagram_CheckNewConnections routine and its observable state changes.
+/// Mirror Quake's Datagram_CheckNewConnections routine and its observable state changes.
+/// @param state Mutable `miniquake.net_loop` state used by `Datagram_CheckNewConnections`.
 function Datagram_CheckNewConnections(state)
   socket = state.pending
   state.pending = void
@@ -937,7 +1039,10 @@ function Datagram_CheckNewConnections(state)
   return _Datagram_CheckNewConnections(state)
 end function
 
-// Provide resolve datagram target behavior for the active subsystem.
+/// Implements the `resolveDatagramTarget` operation for `miniquake.net_loop` (resolve datagram target).
+/// @param state Mutable `miniquake.net_loop` state used by `resolveDatagramTarget`.
+/// @param host The host input consumed by `resolveDatagramTarget`.
+/// @param defaultPort The default port input consumed by `resolveDatagramTarget`.
 function resolveDatagramTarget(state, host, defaultPort)
   target = host
   wanted = bio.lower(host)
@@ -947,37 +1052,60 @@ function resolveDatagramTarget(state, host, defaultPort)
   return parseAddress(target, defaultPort)
 end function
 
-// Provide datagram connect port behavior for the active subsystem.
+/// Implements the `_Datagram_ConnectPort` operation for `miniquake.net_loop` (datagram connect port).
+/// @param state Mutable `miniquake.net_loop` state used by `_Datagram_ConnectPort`.
+/// @param host The host input consumed by `_Datagram_ConnectPort`.
+/// @param timeoutMilliseconds The timeout milliseconds input consumed by `_Datagram_ConnectPort`.
+/// @param defaultPort The default port input consumed by `_Datagram_ConnectPort`.
 function _Datagram_ConnectPort(state, host, timeoutMilliseconds, defaultPort)
   parsed = resolveDatagramTarget(state, host, defaultPort)
   if parsed is error then return parsed end if
   return connectRemote(state, parsed[0], parsed[1], timeoutMilliseconds)
 end function
 
-// Mirror Quake's Datagram_ConnectPort routine and its observable state changes.
+/// Mirror Quake's Datagram_ConnectPort routine and its observable state changes.
+/// @param state Mutable `miniquake.net_loop` state used by `Datagram_ConnectPort`.
+/// @param host The host input consumed by `Datagram_ConnectPort`.
+/// @param timeoutMilliseconds The timeout milliseconds input consumed by `Datagram_ConnectPort`.
+/// @param defaultPort The default port input consumed by `Datagram_ConnectPort`.
 function Datagram_ConnectPort(state, host, timeoutMilliseconds, defaultPort)
   return _Datagram_ConnectPort(state, host, timeoutMilliseconds, defaultPort)
 end function
 
-// Mirror Quake's Datagram_ConnectPersistent routine and its observable state changes.
+/// Mirror Quake's Datagram_ConnectPersistent routine and its observable state changes.
+/// @param state Mutable `miniquake.net_loop` state used by `Datagram_ConnectPersistent`.
+/// @param host The host input consumed by `Datagram_ConnectPersistent`.
+/// @param timeoutMilliseconds The timeout milliseconds input consumed by `Datagram_ConnectPersistent`.
+/// @param resendMilliseconds The resend milliseconds input consumed by `Datagram_ConnectPersistent`.
+/// @param defaultPort The default port input consumed by `Datagram_ConnectPersistent`.
 function Datagram_ConnectPersistent(state, host, timeoutMilliseconds, resendMilliseconds, defaultPort)
   parsed = resolveDatagramTarget(state, host, defaultPort)
   if parsed is error then return parsed end if
   return connectRemotePersistent(state, parsed[0], parsed[1], timeoutMilliseconds, resendMilliseconds)
 end function
 
-// Compatibility wrapper for callers that intentionally use the historical
-// default port.  Public NET_Connect passes the active net_hostport instead.
+/// Compatibility wrapper for callers that intentionally use the historical
+/// default port.  Public NET_Connect passes the active net_hostport instead.
+/// @param state Mutable `miniquake.net_loop` state used by `_Datagram_Connect`.
+/// @param host The host input consumed by `_Datagram_Connect`.
+/// @param timeoutMilliseconds The timeout milliseconds input consumed by `_Datagram_Connect`.
 function _Datagram_Connect(state, host, timeoutMilliseconds)
   return _Datagram_ConnectPort(state, host, timeoutMilliseconds, 26000)
 end function
 
-// Mirror Quake's Datagram_Connect routine and its observable state changes.
+/// Mirror Quake's Datagram_Connect routine and its observable state changes.
+/// @param state Mutable `miniquake.net_loop` state used by `Datagram_Connect`.
+/// @param host The host input consumed by `Datagram_Connect`.
+/// @param timeoutMilliseconds The timeout milliseconds input consumed by `Datagram_Connect`.
 function Datagram_Connect(state, host, timeoutMilliseconds)
   return Datagram_ConnectPort(state, host, timeoutMilliseconds, 26000)
 end function
 
-// Verify poll against the expected Quake behavior.
+/// Verify poll against the expected Quake behavior.
+/// @param socket Network socket used for communication.
+/// @param expectedAddress The expected address input consumed by `Test_Poll`.
+/// @param expectedPort The expected port input consumed by `Test_Poll`.
+/// @param timeoutMilliseconds The timeout milliseconds input consumed by `Test_Poll`.
 function Test_Poll(socket, expectedAddress, expectedPort, timeoutMilliseconds)
   results = []
   elapsed = 0
@@ -995,7 +1123,10 @@ function Test_Poll(socket, expectedAddress, expectedPort, timeoutMilliseconds)
   return results
 end function
 
-// Verify f against the expected Quake behavior.
+/// Verify f against the expected Quake behavior.
+/// @param host The host input consumed by `Test_f`.
+/// @param maximumPlayers The maximum players input consumed by `Test_f`.
+/// @param timeoutMilliseconds The timeout milliseconds input consumed by `Test_f`.
 function Test_f(host, maximumPlayers, timeoutMilliseconds)
   parsedAddress = parseAddress(host, 26000)
   if parsedAddress is error then return parsedAddress end if
@@ -1012,7 +1143,11 @@ function Test_f(host, maximumPlayers, timeoutMilliseconds)
   return results
 end function
 
-// Mirror Quake's Test2_Poll routine and its observable state changes.
+/// Mirror Quake's Test2_Poll routine and its observable state changes.
+/// @param socket Network socket used for communication.
+/// @param expectedAddress The expected address input consumed by `Test2_Poll`.
+/// @param expectedPort The expected port input consumed by `Test2_Poll`.
+/// @param timeoutMilliseconds The timeout milliseconds input consumed by `Test2_Poll`.
 function Test2_Poll(socket, expectedAddress, expectedPort, timeoutMilliseconds)
   elapsed = 0
   while elapsed < timeoutMilliseconds
@@ -1028,7 +1163,9 @@ function Test2_Poll(socket, expectedAddress, expectedPort, timeoutMilliseconds)
   return error(3434, "rule query timed out")
 end function
 
-// Mirror Quake's Test2_f routine and its observable state changes.
+/// Mirror Quake's Test2_f routine and its observable state changes.
+/// @param host The host input consumed by `Test2_f`.
+/// @param timeoutMilliseconds The timeout milliseconds input consumed by `Test2_f`.
 function Test2_f(host, timeoutMilliseconds)
   parsedAddress = parseAddress(host, 26000)
   if parsedAddress is error then return parsedAddress end if
@@ -1051,8 +1188,9 @@ function Test2_f(host, timeoutMilliseconds)
   return error(3435, "rule query exceeded 1024 entries")
 end function
 
-// --------------------------------------------------------------------------
-// net_loop.c / net_loop.h compatibility surface
+/// --------------------------------------------------------------------------
+/// net_loop.c / net_loop.h compatibility surface
+/// @param dedicated The dedicated input consumed by `Loop_Init`.
 
 function Loop_Init(dedicated)
   if dedicated then return -1 end if
@@ -1064,13 +1202,17 @@ function Loop_Shutdown()
   return true
 end function
 
-// Mirror Quake's Loop_Listen routine and its observable state changes.
+/// Mirror Quake's Loop_Listen routine and its observable state changes.
+/// @param state Mutable `miniquake.net_loop` state used by `Loop_Listen`.
 function Loop_Listen(state)
   // The loop driver is always available in a non-dedicated process.
   return state
 end function
 
-// Mirror Quake's Loop_SearchForHosts routine and its observable state changes.
+/// Mirror Quake's Loop_SearchForHosts routine and its observable state changes.
+/// @param state Mutable `miniquake.net_loop` state used by `Loop_SearchForHosts`.
+/// @param serverActive The server active input consumed by `Loop_SearchForHosts`.
+/// @param driverLevel The driver level input consumed by `Loop_SearchForHosts`.
 function Loop_SearchForHosts(state, serverActive, driverLevel)
   if not serverActive then return state.hostCache end if
   displayName = state.hostName
@@ -1087,7 +1229,9 @@ function Loop_SearchForHosts(state, serverActive, driverLevel)
   return state.hostCache
 end function
 
-// Mirror Quake's Loop_Connect routine and its observable state changes.
+/// Mirror Quake's Loop_Connect routine and its observable state changes.
+/// @param state Mutable `miniquake.net_loop` state used by `Loop_Connect`.
+/// @param host The host input consumed by `Loop_Connect`.
 function Loop_Connect(state, host)
   // The original driver recognizes exactly "local"; "localhost" is a
   // MiniQuake NET_Connect convenience handled before this public entry point.
@@ -1095,7 +1239,8 @@ function Loop_Connect(state, host)
   return connect(state, host)
 end function
 
-// Mirror Quake's Loop_CheckNewConnections routine and its observable state changes.
+/// Mirror Quake's Loop_CheckNewConnections routine and its observable state changes.
+/// @param state Mutable `miniquake.net_loop` state used by `Loop_CheckNewConnections`.
 function Loop_CheckNewConnections(state)
   socket = state.pending
   state.pending = void
@@ -1111,32 +1256,41 @@ function Loop_CheckNewConnections(state)
   return socket
 end function
 
-// Mirror Quake's Loop_GetMessage routine and its observable state changes.
+/// Mirror Quake's Loop_GetMessage routine and its observable state changes.
+/// @param socket Network socket used for communication.
+/// @param destination Destination value or collection to update.
 function Loop_GetMessage(socket, destination)
   return getMessage(socket, destination)
 end function
 
-// Mirror Quake's Loop_SendMessage routine and its observable state changes.
+/// Mirror Quake's Loop_SendMessage routine and its observable state changes.
+/// @param socket Network socket used for communication.
+/// @param data Input data consumed by the operation.
 function Loop_SendMessage(socket, data)
   return sendMessage(socket, data)
 end function
 
-// Mirror Quake's Loop_SendUnreliableMessage routine and its observable state changes.
+/// Mirror Quake's Loop_SendUnreliableMessage routine and its observable state changes.
+/// @param socket Network socket used for communication.
+/// @param data Input data consumed by the operation.
 function Loop_SendUnreliableMessage(socket, data)
   return sendUnreliableMessage(socket, data)
 end function
 
-// Mirror Quake's Loop_CanSendMessage routine and its observable state changes.
+/// Mirror Quake's Loop_CanSendMessage routine and its observable state changes.
+/// @param socket Network socket used for communication.
 function Loop_CanSendMessage(socket)
   return canSendMessage(socket)
 end function
 
-// Mirror Quake's Loop_CanSendUnreliableMessage routine and its observable state changes.
+/// Mirror Quake's Loop_CanSendUnreliableMessage routine and its observable state changes.
+/// @param socket Network socket used for communication.
 function Loop_CanSendUnreliableMessage(socket)
   return true
 end function
 
-// Mirror Quake's Loop_Close routine and its observable state changes.
+/// Mirror Quake's Loop_Close routine and its observable state changes.
+/// @param socket Network socket used for communication.
 function Loop_Close(socket)
   close(socket)
   return true

@@ -12,23 +12,37 @@ import miniquake.quakec.opcodes as op
 import miniquake.quakec.vm as vm
 import miniquake.quakec.builtins as builtins
 
+/// Defines the status value used by `miniquake.quakec.contract`.
 const STATUS = "quakec_109_frozen_v1"
+/// Defines the expected version value used by `miniquake.quakec.contract`.
 const EXPECTED_VERSION = 6
+/// Defines the expected header crc value used by `miniquake.quakec.contract`.
 const EXPECTED_HEADER_CRC = 5927
+/// Defines the expected opcode count value used by `miniquake.quakec.contract`.
 const EXPECTED_OPCODE_COUNT = 66
+/// Defines the expected builtin count value used by `miniquake.quakec.contract`.
 const EXPECTED_BUILTIN_COUNT = 79
+/// Defines the expected fixme count value used by `miniquake.quakec.contract`.
 const EXPECTED_FIXME_COUNT = 14
+/// Defines the expected stack depth value used by `miniquake.quakec.contract`.
 const EXPECTED_STACK_DEPTH = 32
+/// Defines the expected localstack size value used by `miniquake.quakec.contract`.
 const EXPECTED_LOCALSTACK_SIZE = 2048
+/// Defines the fnv offset value used by `miniquake.quakec.contract`.
 const FNV_OFFSET = 2166136261
+/// Defines the fnv prime value used by `miniquake.quakec.contract`.
 const FNV_PRIME = 16777619
 
-// Fold byte into the deterministic rolling hash.
+/// Returns whether `miniquake.quakec.contract` has h byte.
+/// @param hash The hash input consumed by `hashByte`.
+/// @param value Value consumed by `hashByte`.
 function inline hashByte(hash, value)
   return ((hash ^ (value & 255)) * FNV_PRIME) & 0xffffffff
 end function
 
-// Fold word into the deterministic rolling hash.
+/// Fold word into the deterministic rolling hash.
+/// @param hash The hash input consumed by `hashWord`.
+/// @param value Value consumed by `hashWord`.
 function hashWord(hash, value)
   result = hash
   shift = 0
@@ -39,7 +53,9 @@ function hashWord(hash, value)
   return result
 end function
 
-// Fold text into the deterministic rolling hash.
+/// Fold text into the deterministic rolling hash.
+/// @param hash The hash input consumed by `hashText`.
+/// @param text Text to parse or process.
 function hashText(hash, text)
   result = hash
   data = bytes(text)
@@ -51,7 +67,7 @@ function hashText(hash, text)
   return hashByte(result, 0)
 end function
 
-// Provide contract fingerprint behavior for the active subsystem.
+/// Implements the `contractFingerprint` operation for `miniquake.quakec.contract` (contract fingerprint).
 function contractFingerprint()
   hash = FNV_OFFSET
   hash = hashWord(hash, EXPECTED_VERSION)
@@ -66,7 +82,7 @@ function contractFingerprint()
   return hash
 end function
 
-// Provide required globals behavior for the active subsystem.
+/// Validates d globals for `miniquake.quakec.contract`.
 function requiredGlobals()
   return [
     "self", "other", "world", "time", "frametime", "force_retouch", "mapname", "deathmatch", "coop", "teamplay",
@@ -79,7 +95,7 @@ function requiredGlobals()
   ]
 end function
 
-// Provide required fields behavior for the active subsystem.
+/// Validates d fields for `miniquake.quakec.contract`.
 function requiredFields()
   return [
     "modelindex", "absmin", "absmax", "ltime", "movetype", "solid", "origin", "oldorigin", "velocity", "angles",
@@ -93,7 +109,7 @@ function requiredFields()
   ]
 end function
 
-// Provide required functions behavior for the active subsystem.
+/// Validates d functions for `miniquake.quakec.contract`.
 function requiredFunctions()
   return [
     "main", "StartFrame", "PlayerPreThink", "PlayerPostThink", "ClientKill", "ClientConnect", "PutClientInServer",
@@ -101,7 +117,9 @@ function requiredFunctions()
   ]
 end function
 
-// Report whether definition.
+/// Report whether definition.
+/// @param definitions The definitions input consumed by `hasDefinition`.
+/// @param name Stable name that identifies the requested object or option.
 function hasDefinition(definitions, name)
   for each definition in definitions
     if definition.name == name then return true end if
@@ -109,7 +127,9 @@ function hasDefinition(definitions, name)
   return false
 end function
 
-// Report whether function.
+/// Report whether function.
+/// @param program The program input consumed by `hasFunction`.
+/// @param name Stable name that identifies the requested object or option.
 function hasFunction(program, name)
   for each functionValue in program.functions
     if functionValue.name == name then return true end if
@@ -117,7 +137,8 @@ function hasFunction(program, name)
   return false
 end function
 
-// Return builtin reference count derived from the active module state.
+/// Return builtin reference count derived from the active module state.
+/// @param program The program input consumed by `builtinReferenceCount`.
 function builtinReferenceCount(program)
   count = 0
   for each functionValue in program.functions
@@ -126,7 +147,8 @@ function builtinReferenceCount(program)
   return count
 end function
 
-// Provide maximum builtin reference behavior for the active subsystem.
+/// Implements the `maximumBuiltinReference` operation for `miniquake.quakec.contract` (maximum builtin reference).
+/// @param program The program input consumed by `maximumBuiltinReference`.
 function maximumBuiltinReference(program)
   maximum = 0
   for each functionValue in program.functions
@@ -138,7 +160,8 @@ function maximumBuiltinReference(program)
   return maximum
 end function
 
-// Validate the requested value and report any incompatibility.
+/// Implements the `validate` operation for `miniquake.quakec.contract` (validate).
+/// @param program The program input consumed by `validate`.
 function validate(program)
   if program.version != EXPECTED_VERSION then return error(3380, "QuakeC contract: expected version 6") end if
   if program.crc != EXPECTED_HEADER_CRC then return error(3381, "QuakeC contract: expected system CRC 5927") end if
@@ -171,7 +194,8 @@ function validate(program)
   return true
 end function
 
-// Provide program fingerprint behavior for the active subsystem.
+/// Implements the `programFingerprint` operation for `miniquake.quakec.contract` (program fingerprint).
+/// @param program The program input consumed by `programFingerprint`.
 function programFingerprint(program)
   hash = FNV_OFFSET
   hash = hashWord(hash, program.version)
@@ -202,7 +226,8 @@ function programFingerprint(program)
   return hash
 end function
 
-// Return summary derived from the active module state.
+/// Return summary derived from the active module state.
+/// @param program The program input consumed by `summary`.
 function summary(program)
   return [
     STATUS,

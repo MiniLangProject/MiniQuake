@@ -11,20 +11,27 @@ import miniquake.types as t
 import miniquake.constants as c
 import miniquake.native as native
 
-// Create and initialize the module state.
+/// Implements the `create` operation for `miniquake.host_timing` (create).
 function create()
   return t.HostTiming(0.0, 0.0, 0.0, 0, 0)
 end function
 
-// Provide binary32 behavior for the active subsystem.
+/// Implements the `binary32` operation for `miniquake.host_timing` (binary32).
+/// @param value Value consumed by `binary32`.
 function binary32(value)
   return native.bitsFloat(native.floatBits(value))
 end function
 
-// Exact Host_FilterTime core.  WinQuake receives a float delta from the
-// platform entry point, accumulates it in the double-precision realtime clock,
-// filters against the unmodified oldRealtime value and only then updates the
-// accepted frame time.
+/// Exact Host_FilterTime core.  WinQuake receives a float delta from the
+/// platform entry point, accumulates it in the double-precision realtime clock,
+/// filters against the unmodified oldRealtime value and only then updates the
+/// accepted frame time.
+/// @param timing The timing input consumed by `filterAbsolute`.
+/// @param newRealtime Time value used by the operation.
+/// @param maxFps The max fps input consumed by `filterAbsolute`.
+/// @param forcedFrameRate The forced frame rate input consumed by `filterAbsolute`.
+/// @param timedemo The timedemo input consumed by `filterAbsolute`.
+/// @param timeScale The time scale input consumed by `filterAbsolute`.
 function filterAbsolute(timing, newRealtime, maxFps, forcedFrameRate, timedemo, timeScale)
   timing.realtime = newRealtime
   delta = timing.realtime - timing.oldRealtime
@@ -48,7 +55,13 @@ function filterAbsolute(timing, newRealtime, maxFps, forcedFrameRate, timedemo, 
   return true
 end function
 
-// Provide filter behavior for the active subsystem.
+/// Implements the `filter` operation for `miniquake.host_timing` (filter).
+/// @param timing The timing input consumed by `filter`.
+/// @param elapsed The elapsed input consumed by `filter`.
+/// @param timedemo The timedemo input consumed by `filter`.
+/// @param forcedFrameRate The forced frame rate input consumed by `filter`.
+/// @param timeScale The time scale input consumed by `filter`.
+/// @param maxFps The max fps input consumed by `filter`.
 function filter(timing, elapsed, timedemo, forcedFrameRate, timeScale, maxFps)
   // _Host_Frame takes float time in WinQuake.  Preserve that boundary even
   // though MiniLang numeric expressions can otherwise retain more precision.
@@ -63,7 +76,8 @@ function filter(timing, elapsed, timedemo, forcedFrameRate, timeScale, maxFps)
   )
 end function
 
-// Provide milliseconds behavior for the active subsystem.
+/// Implements the `milliseconds` operation for `miniquake.host_timing` (milliseconds).
+/// @param timing The timing input consumed by `milliseconds`.
 function milliseconds(timing)
   value = timing.frameTime * 1000.0
   if value < 1.0 then return 1 end if

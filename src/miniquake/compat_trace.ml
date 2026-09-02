@@ -16,34 +16,44 @@ import miniquake.compat_diagnostics as diagnostics
 import miniquake.native as native
 import std.fs as fs
 
+/// Defines the trace schema value used by `miniquake.compat_trace`.
 const TRACE_SCHEMA = 1
+/// Defines the fnv offset value used by `miniquake.compat_trace`.
 const FNV_OFFSET = 2166136261
+/// Defines the fnv prime value used by `miniquake.compat_trace`.
 const FNV_PRIME = 16777619
 
-// Return bool number derived from the active module state.
+/// Return bool number derived from the active module state.
+/// @param value Value consumed by `boolNumber`.
 function boolNumber(value)
   if value then return 1 end if
   return 0
 end function
 
-// Return a validated safe text value.
+/// Return a validated safe text value.
+/// @param value Value consumed by `safeText`.
 function safeText(value)
   if value is string then return value end if
   return ""
 end function
 
-// Return qc function index derived from the active module state.
+/// Return qc function index derived from the active module state.
+/// @param session The session input consumed by `qcFunctionIndex`.
 function qcFunctionIndex(session)
   if session.server.machine is void then return -1 end if
   return session.server.machine.currentFunction
 end function
 
-// Fold byte into the deterministic rolling hash.
+/// Returns whether `miniquake.compat_trace` has h byte.
+/// @param state Mutable `miniquake.compat_trace` state used by `hashByte`.
+/// @param value Value consumed by `hashByte`.
 function inline hashByte(state, value)
   return (((state & 0xffffffff) ^ (value & 255)) * FNV_PRIME) & 0xffffffff
 end function
 
-// Fold word into the deterministic rolling hash.
+/// Fold word into the deterministic rolling hash.
+/// @param state Mutable `miniquake.compat_trace` state used by `hashWord`.
+/// @param value Value consumed by `hashWord`.
 function hashWord(state, value)
   word = value & 0xffffffff
   result = hashByte(state, word)
@@ -53,18 +63,25 @@ function hashWord(state, value)
   return result
 end function
 
-// Fold float into the deterministic rolling hash.
+/// Fold float into the deterministic rolling hash.
+/// @param state Mutable `miniquake.compat_trace` state used by `hashFloat`.
+/// @param value Value consumed by `hashFloat`.
 function hashFloat(state, value)
   return hashWord(state, native.floatBits(value))
 end function
 
-// Provide vec3 error behavior for the active subsystem.
+/// Implements the `vec3Error` operation for `miniquake.compat_trace` (vec3 error).
+/// @param label The label input consumed by `vec3Error`.
+/// @param value Value consumed by `vec3Error`.
 function vec3Error(label, value)
   return error(9301, label + " expected Vec3, got " + typeName(value))
 end function
 
-// Hash a Vec3 without keeping a heap object only inside a nested call
-// expression.  This is deliberately allocation-free after the type check.
+/// Hash a Vec3 without keeping a heap object only inside a nested call
+/// expression.  This is deliberately allocation-free after the type check.
+/// @param state Mutable `miniquake.compat_trace` state used by `hashVec3`.
+/// @param value Value consumed by `hashVec3`.
+/// @param label The label input consumed by `hashVec3`.
 function hashVec3(state, value, label)
   if not t.isVec3Value(value) then return vec3Error(label, value) end if
   x = value.x
@@ -76,7 +93,9 @@ function hashVec3(state, value, label)
   return result
 end function
 
-// Provide vec3 hex behavior for the active subsystem.
+/// Implements the `vec3Hex` operation for `miniquake.compat_trace` (vec3 hex).
+/// @param value Value consumed by `vec3Hex`.
+/// @param label The label input consumed by `vec3Hex`.
 function vec3Hex(value, label)
   if not t.isVec3Value(value) then return vec3Error(label, value) end if
   x = value.x
@@ -88,7 +107,9 @@ function vec3Hex(value, label)
   return result
 end function
 
-// Fold text seed into the deterministic rolling hash.
+/// Fold text seed into the deterministic rolling hash.
+/// @param state Mutable `miniquake.compat_trace` state used by `hashTextSeed`.
+/// @param text Text to parse or process.
 function hashTextSeed(state, text)
   source = bytes(text)
   result = state & 0xffffffff
@@ -100,12 +121,14 @@ function hashTextSeed(state, text)
   return result
 end function
 
-// Fold text into the deterministic rolling hash.
+/// Fold text into the deterministic rolling hash.
+/// @param text Text to parse or process.
 function hashText(text)
   return hashTextSeed(FNV_OFFSET, text)
 end function
 
-// Fold word array into the deterministic rolling hash.
+/// Fold word array into the deterministic rolling hash.
+/// @param words The words input consumed by `hashWordArray`.
 function hashWordArray(words)
   result = FNV_OFFSET
   index = 0
@@ -116,7 +139,9 @@ function hashWordArray(words)
   return result
 end function
 
-// Fold size buffer into the deterministic rolling hash.
+/// Fold size buffer into the deterministic rolling hash.
+/// @param state Mutable `miniquake.compat_trace` state used by `hashSizeBuffer`.
+/// @param buffer The buffer input consumed by `hashSizeBuffer`.
 function hashSizeBuffer(state, buffer)
   result = hashWord(state, buffer.curSize)
   limit = buffer.curSize
@@ -130,14 +155,16 @@ function hashSizeBuffer(state, buffer)
   return result
 end function
 
-// Provide globals hash behavior for the active subsystem.
+/// Implements the `globalsHash` operation for `miniquake.compat_trace` (globals hash).
+/// @param session The session input consumed by `globalsHash`.
 function globalsHash(session)
   machine = session.server.machine
   if machine is void then return 0 end if
   return hashWordArray(machine.globals)
 end function
 
-// Provide qc edicts hash behavior for the active subsystem.
+/// Implements the `qcEdictsHash` operation for `miniquake.compat_trace` (qc edicts hash).
+/// @param session The session input consumed by `qcEdictsHash`.
 function qcEdictsHash(session)
   machine = session.server.machine
   if machine is void then return 0 end if
@@ -163,7 +190,8 @@ function qcEdictsHash(session)
   return result
 end function
 
-// Provide server edicts hash behavior for the active subsystem.
+/// Implements the `serverEdictsHash` operation for `miniquake.compat_trace` (server edicts hash).
+/// @param session The session input consumed by `serverEdictsHash`.
 function serverEdictsHash(session)
   limit = session.server.numEdicts
   if limit > len(session.server.edicts) then limit = len(session.server.edicts) end if
@@ -202,10 +230,11 @@ function serverEdictsHash(session)
   return result
 end function
 
-// cl.entities is intentionally sparse.  SV_CreateBaseline omits non-model
-// entities, while CL_EntityNum grows the array with void slots up to the next
-// transmitted entity number.  Hash both the slot topology and the populated
-// records without dereferencing void.
+/// cl.entities is intentionally sparse.  SV_CreateBaseline omits non-model
+/// entities, while CL_EntityNum grows the array with void slots up to the next
+/// transmitted entity number.  Hash both the slot topology and the populated
+/// records without dereferencing void.
+/// @param session The session input consumed by `clientEntitiesHash`.
 function clientEntitiesHash(session)
   result = hashWord(FNV_OFFSET, len(session.client.entities))
   index = 0
@@ -233,7 +262,8 @@ function clientEntitiesHash(session)
   return result
 end function
 
-// Provide protocol hash behavior for the active subsystem.
+/// Implements the `protocolHash` operation for `miniquake.compat_trace` (protocol hash).
+/// @param session The session input consumed by `protocolHash`.
 function protocolHash(session)
   result = FNV_OFFSET
   result = hashSizeBuffer(result, session.server.datagram)
@@ -247,7 +277,8 @@ function protocolHash(session)
   return result
 end function
 
-// Provide stages hash behavior for the active subsystem.
+/// Implements the `stagesHash` operation for `miniquake.compat_trace` (stages hash).
+/// @param session The session input consumed by `stagesHash`.
 function stagesHash(session)
   result = FNV_OFFSET
   for each stage in session.frameTrace
@@ -257,9 +288,12 @@ function stagesHash(session)
   return result
 end function
 
-// BP-001 originally expressed the complete frame as one deeply nested + tree.
-// The Win64 backend has a bounded expression-temporary area, so keep every
-// canonical field in the same order but append it in compiler-safe statements.
+/// BP-001 originally expressed the complete frame as one deeply nested + tree.
+/// The Win64 backend has a bounded expression-temporary area, so keep every
+/// canonical field in the same order but append it in compiler-safe statements.
+/// @param session The session input consumed by `canonicalFrame`.
+/// @param frameIndex Zero-based index of the requested entry.
+/// @param accepted The accepted input consumed by `canonicalFrame`.
 function canonicalFrame(session, frameIndex, accepted)
   // Capture every nested/vector value and every allocation-sensitive digest
   // before the first long string concatenation.  The canonical formatter is a
@@ -319,20 +353,28 @@ function canonicalFrame(session, frameIndex, accepted)
   return result
 end function
 
-// Trace line through the collision world.
+/// Implements the `traceLine` operation for `miniquake.compat_trace` (trace line).
+/// @param session The session input consumed by `traceLine`.
+/// @param frameIndex Zero-based index of the requested entry.
+/// @param accepted The accepted input consumed by `traceLine`.
 function traceLine(session, frameIndex, accepted)
   canonical = canonicalFrame(session, frameIndex, accepted)
   return canonical + "|state_hash=" + diagnostics.u32Hex(hashText(canonical)) + "\n"
 end function
 
-// Provide raw edict hash behavior for the active subsystem.
+/// Implements the `rawEdictHash` operation for `miniquake.compat_trace` (raw edict hash).
+/// @param session The session input consumed by `rawEdictHash`.
+/// @param index Zero-based index of the requested entry.
 function rawEdictHash(session, index)
   machine = session.server.machine
   if machine is void or index < 0 or index >= len(machine.edicts) then return 0 end if
   return hashWordArray(machine.edicts[index])
 end function
 
-// Provide edict json behavior for the active subsystem.
+/// Implements the `edictJson` operation for `miniquake.compat_trace` (edict json).
+/// @param session The session input consumed by `edictJson`.
+/// @param index Zero-based index of the requested entry.
+/// @param item The item input consumed by `edictJson`.
 function edictJson(session, index, item)
   result = "{"
   result = result + "\"number\":" + item.number + ","
@@ -355,7 +397,8 @@ function edictJson(session, index, item)
   return result + "}"
 end function
 
-// Provide edicts json behavior for the active subsystem.
+/// Implements the `edictsJson` operation for `miniquake.compat_trace` (edicts json).
+/// @param session The session input consumed by `edictsJson`.
 function edictsJson(session)
   limit = session.server.numEdicts
   if limit > len(session.server.edicts) then limit = len(session.server.edicts) end if
@@ -370,7 +413,8 @@ function edictsJson(session)
   return result + "]"
 end function
 
-// Provide client entity json behavior for the active subsystem.
+/// Implements the `clientEntityJson` operation for `miniquake.compat_trace` (client entity json).
+/// @param item The item input consumed by `clientEntityJson`.
 function clientEntityJson(item)
   result = "{"
   result = result + "\"number\":" + item.number + ","
@@ -384,7 +428,8 @@ function clientEntityJson(item)
   return result + "}"
 end function
 
-// Provide client entities json behavior for the active subsystem.
+/// Implements the `clientEntitiesJson` operation for `miniquake.compat_trace` (client entities json).
+/// @param session The session input consumed by `clientEntitiesJson`.
 function clientEntitiesJson(session)
   result = "["
   index = 0
@@ -402,7 +447,8 @@ function clientEntitiesJson(session)
   return result + "]"
 end function
 
-// Provide resource json behavior for the active subsystem.
+/// Implements the `resourceJson` operation for `miniquake.compat_trace` (resource json).
+/// @param session The session input consumed by `resourceJson`.
 function resourceJson(session)
   values = host.resourceSnapshot(session)
   result = "{"
@@ -427,7 +473,8 @@ function resourceJson(session)
   return result + "}"
 end function
 
-// Provide snapshot host json behavior for the active subsystem.
+/// Implements the `snapshotHostJson` operation for `miniquake.compat_trace` (snapshot host json).
+/// @param session The session input consumed by `snapshotHostJson`.
 function snapshotHostJson(session)
   result = "{"
   result = result + "\"frame_count\":" + session.timing.frameCount + ","
@@ -438,7 +485,8 @@ function snapshotHostJson(session)
   return result + "}"
 end function
 
-// Provide snapshot server json behavior for the active subsystem.
+/// Implements the `snapshotServerJson` operation for `miniquake.compat_trace` (snapshot server json).
+/// @param session The session input consumed by `snapshotServerJson`.
 function snapshotServerJson(session)
   result = "{"
   result = result + "\"active\":" + diagnostics.boolText(session.server.active) + ","
@@ -451,7 +499,8 @@ function snapshotServerJson(session)
   return result + "}"
 end function
 
-// Provide snapshot client json behavior for the active subsystem.
+/// Implements the `snapshotClientJson` operation for `miniquake.compat_trace` (snapshot client json).
+/// @param session The session input consumed by `snapshotClientJson`.
 function snapshotClientJson(session)
   result = "{"
   result = result + "\"connected\":" + diagnostics.boolText(session.client.connected) + ","
@@ -463,7 +512,8 @@ function snapshotClientJson(session)
   return result + "}"
 end function
 
-// Provide snapshot player json behavior for the active subsystem.
+/// Implements the `snapshotPlayerJson` operation for `miniquake.compat_trace` (snapshot player json).
+/// @param session The session input consumed by `snapshotPlayerJson`.
 function snapshotPlayerJson(session)
   result = "{"
   result = result + "\"origin\":" + diagnostics.vecJson(session.player.origin) + ","
@@ -481,7 +531,8 @@ function snapshotPlayerJson(session)
   return result + "}"
 end function
 
-// Provide snapshot quake cjson behavior for the active subsystem.
+/// Implements the `snapshotQuakeCJson` operation for `miniquake.compat_trace` (snapshot quake c json).
+/// @param session The session input consumed by `snapshotQuakeCJson`.
 function snapshotQuakeCJson(session)
   result = "{"
   result = result + "\"function\":" + diagnostics.jsonString(diagnostics.qcFunctionName(session)) + ","
@@ -493,7 +544,8 @@ function snapshotQuakeCJson(session)
   return result + "}"
 end function
 
-// Provide snapshot digests json behavior for the active subsystem.
+/// Implements the `snapshotDigestsJson` operation for `miniquake.compat_trace` (snapshot digests json).
+/// @param session The session input consumed by `snapshotDigestsJson`.
 function snapshotDigestsJson(session)
   result = "{"
   result = result + "\"server_edicts\":\"" + diagnostics.u32Hex(serverEdictsHash(session)) + "\","
@@ -502,7 +554,11 @@ function snapshotDigestsJson(session)
   return result + "}"
 end function
 
-// Provide snapshot json behavior for the active subsystem.
+/// Implements the `snapshotJson` operation for `miniquake.compat_trace` (snapshot json).
+/// @param session The session input consumed by `snapshotJson`.
+/// @param frameIndex Zero-based index of the requested entry.
+/// @param phase The phase input consumed by `snapshotJson`.
+/// @param errorText The error text input consumed by `snapshotJson`.
 function snapshotJson(session, frameIndex, phase, errorText)
   canonical = canonicalFrame(session, frameIndex, true)
   result = "{"
@@ -527,21 +583,28 @@ function snapshotJson(session, frameIndex, phase, errorText)
   return result + "}\n"
 end function
 
-// Encode and write file.
+/// Encode and write file.
+/// @param path Filesystem path to process.
+/// @param text Text to parse or process.
 function writeFile(path, text)
   result = try(fs.writeAllText(path, text))
   if result is error then return result end if
   return true
 end function
 
-// Add state for append file.
+/// Add state for append file.
+/// @param path Filesystem path to process.
+/// @param text Text to parse or process.
 function appendFile(path, text)
   result = try(fs.appendAllText(path, text))
   if result is error then return result end if
   return true
 end function
 
-// Trace error line through the collision world.
+/// Trace error line through the collision world.
+/// @param frameIndex Zero-based index of the requested entry.
+/// @param lastStage The last stage input consumed by `traceErrorLine`.
+/// @param message Diagnostic message that explains a failure or event.
 function traceErrorLine(frameIndex, lastStage, message)
   result = "error_frame=" + frameIndex
   result = result + "|last_stage=" + lastStage
@@ -549,7 +612,8 @@ function traceErrorLine(frameIndex, lastStage, message)
   return result + "\n"
 end function
 
-// Update subsystem state for attempt shutdown.
+/// Update subsystem state for attempt shutdown.
+/// @param session The session input consumed by `attemptShutdown`.
 function attemptShutdown(session)
   result = try(host.shutdown(session))
   if result is error then return [false, result.message] end if
@@ -557,7 +621,19 @@ function attemptShutdown(session)
   return [true, ""]
 end function
 
-// Provide summary json behavior for the active subsystem.
+/// Implements the `summaryJson` operation for `miniquake.compat_trace` (summary json).
+/// @param ok The ok input consumed by `summaryJson`.
+/// @param requested The requested input consumed by `summaryJson`.
+/// @param written The written input consumed by `summaryJson`.
+/// @param accepted The accepted input consumed by `summaryJson`.
+/// @param rollingHash The rolling hash input consumed by `summaryJson`.
+/// @param tracePath Filesystem path used by the operation.
+/// @param snapshotPath Filesystem path used by the operation.
+/// @param contextPath Filesystem path used by the operation.
+/// @param lastStage The last stage input consumed by `summaryJson`.
+/// @param errorText The error text input consumed by `summaryJson`.
+/// @param cleanShutdown The clean shutdown input consumed by `summaryJson`.
+/// @param diagnosticWriteError The diagnostic write error input consumed by `summaryJson`.
 function summaryJson(ok, requested, written, accepted, rollingHash, tracePath, snapshotPath, contextPath, lastStage, errorText, cleanShutdown, diagnosticWriteError)
   result = "{"
   result = result + "\"schema\":\"MiniQuakeTraceSummary/" + TRACE_SCHEMA + "\","
@@ -578,7 +654,16 @@ function summaryJson(ok, requested, written, accepted, rollingHash, tracePath, s
   return result + "}\n"
 end function
 
-// Create and initialize result.
+/// Create and initialize result.
+/// @param ok The ok input consumed by `makeResult`.
+/// @param requested The requested input consumed by `makeResult`.
+/// @param written The written input consumed by `makeResult`.
+/// @param accepted The accepted input consumed by `makeResult`.
+/// @param rollingHash The rolling hash input consumed by `makeResult`.
+/// @param prefix The prefix input consumed by `makeResult`.
+/// @param lastStage The last stage input consumed by `makeResult`.
+/// @param errorText The error text input consumed by `makeResult`.
+/// @param cleanShutdown The clean shutdown input consumed by `makeResult`.
 function makeResult(ok, requested, written, accepted, rollingHash, prefix, lastStage, errorText, cleanShutdown)
   return t.CompatibilityTraceResult(
     ok,
@@ -596,7 +681,12 @@ function makeResult(ok, requested, written, accepted, rollingHash, prefix, lastS
   )
 end function
 
-// Execute internal.
+/// Execute internal.
+/// @param baseDirectory Root directory containing the Quake installation.
+/// @param gameDirectory Selected Quake game-data directory.
+/// @param mapName Name of the map to load or inspect.
+/// @param frameCount Number of entries or units to process.
+/// @param outputPrefix The output prefix input consumed by `runInternal`.
 function runInternal(baseDirectory, gameDirectory, mapName, frameCount, outputPrefix)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if gameDirectory == "" then gameDirectory = "id1" end if
@@ -753,9 +843,14 @@ function runInternal(baseDirectory, gameDirectory, mapName, frameCount, outputPr
   return makeResult(ok, frameCount, writtenFrames, acceptedFrames, rollingHash, outputPrefix, lastStageValue, failure, cleanShutdown)
 end function
 
-// No diagnostics-only failure may escape as an unclassified process exit.
-// Convert unexpected propagation into a regular failed result and leave an
-// emergency summary for the black-port feedback loop whenever possible.
+/// No diagnostics-only failure may escape as an unclassified process exit.
+/// Convert unexpected propagation into a regular failed result and leave an
+/// emergency summary for the black-port feedback loop whenever possible.
+/// @param baseDirectory Root directory containing the Quake installation.
+/// @param gameDirectory Selected Quake game-data directory.
+/// @param mapName Name of the map to load or inspect.
+/// @param frameCount Number of entries or units to process.
+/// @param outputPrefix The output prefix input consumed by `run`.
 function run(baseDirectory, gameDirectory, mapName, frameCount, outputPrefix)
   prefix = outputPrefix
   if prefix == "" then prefix = "miniquake-compat" end if
@@ -778,7 +873,8 @@ function run(baseDirectory, gameDirectory, mapName, frameCount, outputPrefix)
   return makeResult(false, requested, 0, 0, FNV_OFFSET, prefix, "unhandled", failure, false)
 end function
 
-// Format and emit result.
+/// Format and emit result.
+/// @param result Result value to report or translate into a status code.
 function printResult(result)
   print "MiniQuake deterministic compatibility trace"
   print "  trace=" + result.tracePath
@@ -793,7 +889,9 @@ function printResult(result)
   return result.ok
 end function
 
-// Provide contains text behavior for the active subsystem.
+/// Implements the `containsText` operation for `miniquake.compat_trace` (contains text).
+/// @param text Text to parse or process.
+/// @param needle The needle input consumed by `containsText`.
 function containsText(text, needle)
   source = bytes(text)
   wanted = bytes(needle)
@@ -813,7 +911,8 @@ function containsText(text, needle)
   return false
 end function
 
-// Return line count derived from the active module state.
+/// Return line count derived from the active module state.
+/// @param text Text to parse or process.
 function lineCount(text)
   source = bytes(text)
   count = 0
@@ -825,7 +924,8 @@ function lineCount(text)
   return count
 end function
 
-// Inspect the requested value and emit its decoded metadata.
+/// Implements the `inspect` operation for `miniquake.compat_trace` (inspect).
+/// @param path Filesystem path to process.
 function inspect(path)
   loaded = try(fs.readAllText(path))
   if loaded is error then print "MiniQuake compatibility report: " + loaded.message; return false end if

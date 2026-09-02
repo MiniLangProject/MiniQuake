@@ -48,7 +48,8 @@ function zeroSpawnParms()
   return arrayutil.makeFilledArray(16, 0.0)
 end function
 
-// Create and initialize server client.
+/// Create and initialize server client.
+/// @param index Zero-based index of the requested entry.
 function createServerClient(index)
   return t.ServerClient(
     false,
@@ -73,10 +74,13 @@ function createServerClient(index)
   )
 end function
 
-// The listen-server loopback client shares the host's render/input PlayerState.
-// Every remote client needs an independent mirror of its own QuakeC edict.
-// Socketless single-client fixtures predate ServerClient.playerState and keep
-// using the supplied host state so their public frameMode contract is stable.
+/// The listen-server loopback client shares the host's render/input PlayerState.
+/// Every remote client needs an independent mirror of its own QuakeC edict.
+/// Socketless single-client fixtures predate ServerClient.playerState and keep
+/// using the supplied host state so their public frameMode contract is stable.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `playerStateForClient`.
+/// @param hostPlayer The host player input consumed by `playerStateForClient`.
 function playerStateForClient(server, clientValue, hostPlayer)
   if clientValue.socket is not void and clientValue.socket.transport == "loop" then
     clientValue.playerState = hostPlayer
@@ -92,12 +96,13 @@ function playerStateForClient(server, clientValue, hostPlayer)
   return clientValue.playerState
 end function
 
-// Provide default light styles behavior for the active subsystem.
+/// Implements the `defaultLightStyles` operation for `miniquake.server` (default light styles).
 function defaultLightStyles()
   return arrayutil.makeFilledArray(64, "m")
 end function
 
-// Create and initialize the module state.
+/// Implements the `create` operation for `miniquake.server` (create).
+/// @param maxClients The max clients input consumed by `create`.
 function create(maxClients)
   if maxClients < 1 then maxClients = 1 end if
   if maxClients > c.MAX_CLIENTS then maxClients = c.MAX_CLIENTS end if
@@ -144,7 +149,9 @@ function create(maxClients)
   )
 end function
 
-// Provide resize clients behavior for the active subsystem.
+/// Implements the `resizeClients` operation for `miniquake.server` (resize clients).
+/// @param server Server state participating in the operation.
+/// @param requested The requested input consumed by `resizeClients`.
 function resizeClients(server, requested)
   if server.active then return error(2803, "maxplayers can not be changed while a server is running.") end if
   count = requested
@@ -162,7 +169,8 @@ function resizeClients(server, requested)
   return count
 end function
 
-// Report whether bsp suffix.
+/// Report whether bsp suffix.
+/// @param name Stable name that identifies the requested object or option.
 function hasBspSuffix(name)
   source = bytes(name)
   if len(source) < 4 then return false end if
@@ -170,7 +178,8 @@ function hasBspSuffix(name)
   return suffix == ".bsp" or suffix == ".BSP"
 end function
 
-// Return clean map name derived from the active module state.
+/// Return clean map name derived from the active module state.
+/// @param name Stable name that identifies the requested object or option.
 function cleanMapName(name)
   result = name
   if hasBspSuffix(result) then result = decode(slice(bytes(result), 0, len(bytes(result)) - 4)) end if
@@ -178,7 +187,8 @@ function cleanMapName(name)
   return result
 end function
 
-// Create and initialize player edict.
+/// Create and initialize player edict.
+/// @param number The number input consumed by `makePlayerEdict`.
 function makePlayerEdict(number)
   item = edict.create(number)
   item.className = "player"
@@ -192,7 +202,9 @@ function makePlayerEdict(number)
   return item
 end function
 
-// Read and validate edicts.
+/// Read and validate edicts.
+/// @param server Server state participating in the operation.
+/// @param map The map input consumed by `loadEdicts`.
 function loadEdicts(server, map)
   entityCount = len(map.entities)
   total = server.maxClients + entityCount
@@ -219,7 +231,9 @@ function loadEdicts(server, map)
   return result
 end function
 
-// Return model index derived from the active module state.
+/// Return model index derived from the active module state.
+/// @param server Server state participating in the operation.
+/// @param name Stable name that identifies the requested object or option.
 function modelIndex(server, name)
   index = 0
   while index < len(server.modelPrecache)
@@ -229,14 +243,16 @@ function modelIndex(server, name)
   return 0
 end function
 
-// Provide assign model indexes behavior for the active subsystem.
+/// Implements the `assignModelIndexes` operation for `miniquake.server` (assign model indexes).
+/// @param server Server state participating in the operation.
 function assignModelIndexes(server)
   for each item in server.edicts
     if item.model != "" then item.modelIndex = modelIndex(server, item.model) end if
   end for
 end function
 
-// Create and initialize model precache.
+/// Create and initialize model precache.
+/// @param server Server state participating in the operation.
 function buildModelPrecache(server)
   total = len(server.worldModel.models) + 1
   if total < 2 then total = 2 end if
@@ -251,7 +267,9 @@ function buildModelPrecache(server)
   assignModelIndexes(server)
 end function
 
-// Provide protocol baseline behavior for the active subsystem.
+/// Implements the `protocolBaseline` operation for `miniquake.server` (protocol baseline).
+/// @param server Server state participating in the operation.
+/// @param item The item input consumed by `protocolBaseline`.
 function protocolBaseline(server, item)
   modelIndexValue = 0
   colormapValue = 0
@@ -278,12 +296,15 @@ function protocolBaseline(server, item)
   return item.baseline
 end function
 
-// Encode and write baseline.
+/// Writes baseline for `miniquake.server`.
+/// @param buffer The buffer input consumed by `writeBaseline`.
+/// @param item The item input consumed by `writeBaseline`.
 function writeBaseline(buffer, item)
   return serverData.writeBaseline(buffer, item.number, item.baseline)
 end function
 
-// Add state for append baselines.
+/// Add state for append baselines.
+/// @param server Server state participating in the operation.
 function appendBaselines(server)
   entityNumber = 0
   while entityNumber < server.numEdicts and entityNumber < len(server.edicts)
@@ -298,13 +319,16 @@ function appendBaselines(server)
   return server.signon.curSize
 end function
 
-// Create and initialize signon.
+/// Create and initialize signon.
+/// @param server Server state participating in the operation.
 function buildSignon(server)
   sz.clear(server.signon)
   return appendBaselines(server)
 end function
 
-// Return sound index derived from the active module state.
+/// Return sound index derived from the active module state.
+/// @param server Server state participating in the operation.
+/// @param name Stable name that identifies the requested object or option.
 function soundIndex(server, name)
   index = 1
   while index < len(server.soundPrecache)
@@ -314,7 +338,9 @@ function soundIndex(server, name)
   return 0
 end function
 
-// Add state for append quake csignon.
+/// Add state for append quake csignon.
+/// @param server Server state participating in the operation.
+/// @param contextValue The context value input consumed by `appendQuakeCSignon`.
 function appendQuakeCSignon(server, contextValue)
   staticCount = 0
   for each baseline in contextValue.staticEntities
@@ -342,7 +368,9 @@ function appendQuakeCSignon(server, contextValue)
   return [staticCount, ambientCount]
 end function
 
-// Report spawn and return the corresponding failure status.
+/// Report spawn and return the corresponding failure status.
+/// @param server Server state participating in the operation.
+/// @param result Result value to report or translate into a status code.
 function failSpawn(server, result)
   server.loading = false
   server.active = false
@@ -358,7 +386,11 @@ function failSpawn(server, result)
   return result
 end function
 
-// Allocate and initialize the requested value.
+/// Implements the `spawn` operation for `miniquake.server` (spawn).
+/// @param server Server state participating in the operation.
+/// @param filesystem The filesystem input consumed by `spawn`.
+/// @param mapName Name of the map to load or inspect.
+/// @param skill The skill input consumed by `spawn`.
 function spawn(server, filesystem, mapName, skill)
   name = cleanMapName(mapName)
   if name == "" then return error(2800, "SV_SpawnServer: empty map name") end if
@@ -434,27 +466,33 @@ function spawn(server, filesystem, mapName, skill)
   return server
 end function
 
-// Send buffer through the active connection.
+/// Send buffer through the active connection.
+/// @param client Client state participating in the operation.
+/// @param buffer The buffer input consumed by `sendBuffer`.
 function sendBuffer(client, buffer)
   if client.socket is void then return -1 end if
   if not netmain.NET_CanSendMessage(client.socket) then return 0 end if
   return netmain.NET_SendMessage(client.socket, buffer)
 end function
 
-// Return server progs crc derived from the active module state.
+/// Return server progs crc derived from the active module state.
+/// @param server Server state participating in the operation.
 function serverProgsCrc(server)
   if server.progs is not void then return progs.runtimeCrc(server.progs) end if
   if server.machine is not void and server.machine.program is not void then return progs.runtimeCrc(server.machine.program) end if
   return 0
 end function
 
-// Return server game type derived from the active module state.
+/// Return server game type derived from the active module state.
+/// @param server Server state participating in the operation.
 function serverGameType(server)
   if not server.coop and server.deathmatch then return c.GAME_DEATHMATCH end if
   return c.GAME_COOP
 end function
 
-// Send server info through the active connection.
+/// Send server info through the active connection.
+/// @param server Server state participating in the operation.
+/// @param client Client state participating in the operation.
 function sendServerInfo(server, client)
   start = client.message.curSize
   serverData.writeServerInfo(
@@ -467,12 +505,16 @@ function sendServerInfo(server, client)
   return client.message.curSize - start
 end function
 
-// Return global spawn parm offset derived from the active module state.
+/// Return global spawn parm offset derived from the active module state.
+/// @param machine The machine input consumed by `globalSpawnParmOffset`.
+/// @param index Zero-based index of the requested entry.
 function globalSpawnParmOffset(machine, index)
   return vm.globalOffset(machine, "parm" + (index + 1))
 end function
 
-// Transfer data for copy globals to spawn parms.
+/// Transfer data for copy globals to spawn parms.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `copyGlobalsToSpawnParms`.
 function copyGlobalsToSpawnParms(server, clientValue)
   if server.machine is void then return false end if
   index = 0
@@ -484,7 +526,9 @@ function copyGlobalsToSpawnParms(server, clientValue)
   return true
 end function
 
-// Transfer data for copy spawn parms to globals.
+/// Transfer data for copy spawn parms to globals.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `copySpawnParmsToGlobals`.
 function copySpawnParmsToGlobals(server, clientValue)
   if server.machine is void then return false end if
   index = 0
@@ -496,7 +540,8 @@ function copySpawnParmsToGlobals(server, clientValue)
   return true
 end function
 
-// Update module state for client message for connect.
+/// Update module state for client message for connect.
+/// @param clientValue The client value input consumed by `resetClientMessageForConnect`.
 function resetClientMessageForConnect(clientValue)
   // SV_ConnectClient memset() resets both cursize and the sticky overflow bit,
   // then reenables allowoverflow on the embedded client message. SZ_Clear by
@@ -507,7 +552,9 @@ function resetClientMessageForConnect(clientValue)
   return clientValue.message
 end function
 
-// Provide accept local behavior for the active subsystem.
+/// Implements the `acceptLocal` operation for `miniquake.server` (accept local).
+/// @param server Server state participating in the operation.
+/// @param socket Network socket used for communication.
 function acceptLocal(server, socket)
   selected = void
   for each client in server.clients
@@ -543,7 +590,8 @@ function acceptLocal(server, socket)
   return selected
 end function
 
-// Transfer data for copy number array.
+/// Transfer data for copy number array.
+/// @param values The values input consumed by `copyNumberArray`.
 function copyNumberArray(values)
   result = []
   for each value in values
@@ -552,7 +600,8 @@ function copyNumberArray(values)
   return result
 end function
 
-// Encode and write spawn parms for change.
+/// Encode and write spawn parms for change.
+/// @param server Server state participating in the operation.
 function saveSpawnParmsForChange(server)
   if server.machine is void or server.machine.context is void then return false end if
   serverFlagsOffset = vm.globalOffset(server.machine, "serverflags")
@@ -566,7 +615,8 @@ function saveSpawnParmsForChange(server)
   return true
 end function
 
-// Provide preserve client connections behavior for the active subsystem.
+/// Implements the `preserveClientConnections` operation for `miniquake.server` (preserve client connections).
+/// @param server Server state participating in the operation.
 function preserveClientConnections(server)
   snapshot = []
   for each clientValue in server.clients
@@ -589,14 +639,16 @@ function preserveClientConnections(server)
   return snapshot
 end function
 
-// Send reconnect through the active connection.
+/// Send reconnect through the active connection.
+/// @param server Server state participating in the operation.
 function sendReconnect(server)
   buffer = sz.alloc(128)
   transients.writeReconnect(buffer)
   return netmain.NET_SendToAll(server.clients, buffer, 5.0)
 end function
 
-// Initialize state for begin change level.
+/// Initialize state for begin change level.
+/// @param server Server state participating in the operation.
 function beginChangeLevel(server)
   saveSpawnParmsForChange(server)
   snapshot = preserveClientConnections(server)
@@ -604,7 +656,9 @@ function beginChangeLevel(server)
   return snapshot
 end function
 
-// Finalize state for finish change level.
+/// Finalize state for finish change level.
+/// @param server Server state participating in the operation.
+/// @param snapshot The snapshot input consumed by `finishChangeLevel`.
 function finishChangeLevel(server, snapshot)
   index = 0
   restored = 0
@@ -637,7 +691,9 @@ function finishChangeLevel(server, snapshot)
   return restored
 end function
 
-// Encode and write signon stage2.
+/// Encode and write signon stage2.
+/// @param server Server state participating in the operation.
+/// @param client Client state participating in the operation.
 function writeSignonStage2(server, client)
   // Host_PreSpawn_f appends to client_t.message and merely marks sendsignon.
   // It must not attempt an immediate NET_SendMessage from the command parser.
@@ -650,8 +706,11 @@ function writeSignonStage2(server, client)
   return client.message.curSize - start
 end function
 
-// Reset the detached PlayerState mirror like SV_SpawnServer's cleared client
-// edict before ClientConnect and PutClientInServer initialize the new level.
+/// Reset the detached PlayerState mirror like SV_SpawnServer's cleared client
+/// edict before ClientConnect and PutClientInServer initialize the new level.
+/// @param player The player input consumed by `resetPlayerForSpawn`.
+/// @param origin World-space origin of the operation.
+/// @param angles Orientation angles used by the operation.
 function resetPlayerForSpawn(player, origin, angles)
   fresh = movement.create(origin, angles)
   player.origin = fresh.origin
@@ -689,7 +748,10 @@ function resetPlayerForSpawn(player, origin, angles)
   return player
 end function
 
-// Place one client at the new level's selected spawn point.
+/// Place one client at the new level's selected spawn point.
+/// @param server Server state participating in the operation.
+/// @param client Client state participating in the operation.
+/// @param player The player input consumed by `placeClient`.
 function placeClient(server, client, player)
   resetPlayerForSpawn(player, server.spawnPoint, server.spawnAngles)
   if client.edictIndex >= 0 and client.edictIndex < len(server.edicts) then
@@ -704,7 +766,10 @@ function placeClient(server, client, player)
   return true
 end function
 
-// Encode and write spawn.
+/// Encode and write spawn.
+/// @param server Server state participating in the operation.
+/// @param client Client state participating in the operation.
+/// @param player The player input consumed by `writeSpawn`.
 function writeSpawn(server, client, player)
   if server.loadGame then
     // Host_Spawn_f treats a restored game as fully initialized.  It merely
@@ -780,7 +845,8 @@ function writeSpawn(server, client, player)
   return buffer.curSize
 end function
 
-// Encode and write begin.
+/// Encode and write begin.
+/// @param client Client state participating in the operation.
 function writeBegin(client)
   // Host_Begin_f only marks the server-side client spawned.  Original Quake
   // never emits svc_signonnum 4; the first fast entity update promotes the
@@ -790,7 +856,9 @@ function writeBegin(client)
   return true
 end function
 
-// Provide client print behavior for the active subsystem.
+/// Implements the `clientPrint` operation for `miniquake.server` (client print).
+/// @param clientValue The client value input consumed by `clientPrint`.
+/// @param text Text to parse or process.
 function clientPrint(clientValue, text)
   if clientValue is void or not clientValue.active then return false end if
   msg.writeByte(clientValue.message, c.SVC_PRINT)
@@ -798,7 +866,9 @@ function clientPrint(clientValue, text)
   return true
 end function
 
-// Provide command text behavior for the active subsystem.
+/// Implements the `commandText` operation for `miniquake.server` (command text).
+/// @param args Command-line arguments supplied by the host process.
+/// @param first The first input consumed by `commandText`.
 function commandText(args, first)
   result = ""
   index = first
@@ -810,7 +880,9 @@ function commandText(args, first)
   return result
 end function
 
-// Return truncate bytes derived from the active module state.
+/// Return truncate bytes derived from the active module state.
+/// @param text Text to parse or process.
+/// @param maximum Largest accepted value.
 function truncateBytes(text, maximum)
   data = bytes(text)
   if len(data) <= maximum then return text end if
@@ -818,19 +890,30 @@ function truncateBytes(text, maximum)
   return decode(slice(data, 0, maximum))
 end function
 
-// Provide client float behavior for the active subsystem.
+/// Implements the `clientFloat` operation for `miniquake.server` (client float).
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `clientFloat`.
+/// @param fieldName Name that identifies the requested value or resource.
+/// @param fallback Value to use when the requested input is unavailable or invalid.
 function clientFloat(server, clientValue, fieldName, fallback)
   if server.machine is void then return fallback end if
   return qcFloat(server.machine, clientValue.edictIndex, fieldName, fallback)
 end function
 
-// Update module state for client float.
+/// Update module state for client float.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `setClientFloat`.
+/// @param fieldName Name that identifies the requested value or resource.
+/// @param value Value consumed by `setClientFloat`.
 function setClientFloat(server, clientValue, fieldName, value)
   if server.machine is void then return false end if
   return setQcEntityFloat(server, clientValue.edictIndex, fieldName, value)
 end function
 
-// Update module state for client name.
+/// Update module state for client name.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `setClientName`.
+/// @param newName Name that identifies the requested value or resource.
 function setClientName(server, clientValue, newName)
   limited = protocolEvents.truncatePlayerName(newName)
   previous = clientValue.name
@@ -843,14 +926,19 @@ function setClientName(server, clientValue, newName)
   return limited
 end function
 
-// Provide color component behavior for the active subsystem.
+/// Implements the `colorComponent` operation for `miniquake.server` (color component).
+/// @param value Value consumed by `colorComponent`.
 function colorComponent(value)
   result = native.trunc(value) & 15
   if result > 13 then result = 13 end if
   return result
 end function
 
-// Update module state for client colors.
+/// Update module state for client colors.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `setClientColors`.
+/// @param topValue The top value input consumed by `setClientColors`.
+/// @param bottomValue The bottom value input consumed by `setClientColors`.
 function setClientColors(server, clientValue, topValue, bottomValue)
   top = colorComponent(topValue)
   bottom = colorComponent(bottomValue)
@@ -861,12 +949,16 @@ function setClientColors(server, clientValue, topValue, bottomValue)
   return colors
 end function
 
-// Provide privileged command allowed behavior for the active subsystem.
+/// Implements the `privilegedCommandAllowed` operation for `miniquake.server` (privileged command allowed).
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `privilegedCommandAllowed`.
 function inline privilegedCommandAllowed(server, clientValue)
   return not server.deathmatch or clientValue.privileged
 end function
 
-// Apply the Quake-compatible host status f behavior.
+/// Apply the Quake-compatible host status f behavior.
+/// @param server Server state participating in the operation.
+/// @param requester The requester input consumed by `Host_Status_f`.
 function Host_Status_f(server, requester)
   clientPrint(requester, "host:    " + cvar.variableString(server.machine.context.cvars, "hostname") + "\n")
   clientPrint(requester, "version: " + c.QUAKE_VERSION + "\n")
@@ -901,7 +993,9 @@ function Host_Status_f(server, requester)
   return true
 end function
 
-// Apply the Quake-compatible host god f behavior.
+/// Apply the Quake-compatible host god f behavior.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `Host_God_f`.
 function Host_God_f(server, clientValue)
   if not privilegedCommandAllowed(server, clientValue) then return false end if
   flags = native.trunc(clientFloat(server, clientValue, "flags", 0.0)) ^ c.FL_GODMODE
@@ -910,7 +1004,9 @@ function Host_God_f(server, clientValue)
   return true
 end function
 
-// Apply the Quake-compatible host notarget f behavior.
+/// Apply the Quake-compatible host notarget f behavior.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `Host_Notarget_f`.
 function Host_Notarget_f(server, clientValue)
   if not privilegedCommandAllowed(server, clientValue) then return false end if
   flags = native.trunc(clientFloat(server, clientValue, "flags", 0.0)) ^ c.FL_NOTARGET
@@ -919,9 +1015,11 @@ function Host_Notarget_f(server, clientValue)
   return true
 end function
 
-// Drop references from active monsters to a player who has become invisible.
-// FL_NOTARGET prevents new checkclient acquisitions; clearing existing enemy
-// state makes the custom command take effect immediately for alerted monsters.
+/// Drop references from active monsters to a player who has become invisible.
+/// FL_NOTARGET prevents new checkclient acquisitions; clearing existing enemy
+/// state makes the custom command take effect immediately for alerted monsters.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `clearInvisibleClientTargets`.
 function clearInvisibleClientTargets(server, clientValue)
   if server.machine is void or server.machine.context is void then return 0 end if
   runtime = server.machine.context.edicts
@@ -959,8 +1057,10 @@ function clearInvisibleClientTargets(server, clientValue)
   return cleared
 end function
 
-// Toggle the MiniQuake AI-invisibility cheat. The stock FL_NOTARGET bit keeps
-// standard QuakeC and compatible mods on their original target-selection path.
+/// Toggle the MiniQuake AI-invisibility cheat. The stock FL_NOTARGET bit keeps
+/// standard QuakeC and compatible mods on their original target-selection path.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `Host_Invisible_f`.
 function Host_Invisible_f(server, clientValue)
   if not privilegedCommandAllowed(server, clientValue) then return false end if
   flags = native.trunc(clientFloat(server, clientValue, "flags", 0.0)) ^ c.FL_NOTARGET
@@ -974,7 +1074,9 @@ function Host_Invisible_f(server, clientValue)
   return true
 end function
 
-// Apply the Quake-compatible host noclip f behavior.
+/// Apply the Quake-compatible host noclip f behavior.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `Host_Noclip_f`.
 function Host_Noclip_f(server, clientValue)
   if not privilegedCommandAllowed(server, clientValue) then return false end if
   moveType = native.trunc(clientFloat(server, clientValue, "movetype", c.MOVETYPE_WALK))
@@ -988,7 +1090,9 @@ function Host_Noclip_f(server, clientValue)
   return true
 end function
 
-// Apply the Quake-compatible host fly f behavior.
+/// Apply the Quake-compatible host fly f behavior.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `Host_Fly_f`.
 function Host_Fly_f(server, clientValue)
   if not privilegedCommandAllowed(server, clientValue) then return false end if
   moveType = native.trunc(clientFloat(server, clientValue, "movetype", c.MOVETYPE_WALK))
@@ -1002,7 +1106,9 @@ function Host_Fly_f(server, clientValue)
   return true
 end function
 
-// Apply the Quake-compatible host ping f behavior.
+/// Apply the Quake-compatible host ping f behavior.
+/// @param server Server state participating in the operation.
+/// @param requester The requester input consumed by `Host_Ping_f`.
 function Host_Ping_f(server, requester)
   clientPrint(requester, "Client ping times:\n")
   for each clientValue in server.clients
@@ -1018,13 +1124,20 @@ function Host_Ping_f(server, requester)
   return true
 end function
 
-// Apply the Quake-compatible host name f behavior.
+/// Apply the Quake-compatible host name f behavior.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `Host_Name_f`.
+/// @param args Command-line arguments supplied by the host process.
 function Host_Name_f(server, clientValue, args)
   if len(args) < 2 then return clientPrint(clientValue, "\"name\" is \"" + clientValue.name + "\"\n") end if
   return setClientName(server, clientValue, commandText(args, 1))
 end function
 
-// Apply the Quake-compatible host say behavior.
+/// Apply the Quake-compatible host say behavior.
+/// @param server Server state participating in the operation.
+/// @param sender The sender input consumed by `Host_Say`.
+/// @param args Command-line arguments supplied by the host process.
+/// @param teamOnly The team only input consumed by `Host_Say`.
 function Host_Say(server, sender, args, teamOnly)
   if len(args) < 2 then return false end if
   body = commandText(args, 1)
@@ -1046,17 +1159,26 @@ function Host_Say(server, sender, args, teamOnly)
   return true
 end function
 
-// Apply the Quake-compatible host say f behavior.
+/// Apply the Quake-compatible host say f behavior.
+/// @param server Server state participating in the operation.
+/// @param sender The sender input consumed by `Host_Say_f`.
+/// @param args Command-line arguments supplied by the host process.
 function Host_Say_f(server, sender, args)
   return Host_Say(server, sender, args, false)
 end function
 
-// Apply the Quake-compatible host say team f behavior.
+/// Apply the Quake-compatible host say team f behavior.
+/// @param server Server state participating in the operation.
+/// @param sender The sender input consumed by `Host_Say_Team_f`.
+/// @param args Command-line arguments supplied by the host process.
 function Host_Say_Team_f(server, sender, args)
   return Host_Say(server, sender, args, true)
 end function
 
-// Apply the Quake-compatible host tell f behavior.
+/// Apply the Quake-compatible host tell f behavior.
+/// @param server Server state participating in the operation.
+/// @param sender The sender input consumed by `Host_Tell_f`.
+/// @param args Command-line arguments supplied by the host process.
 function Host_Tell_f(server, sender, args)
   if len(args) < 3 then return false end if
   targetName = args[1]
@@ -1074,7 +1196,10 @@ function Host_Tell_f(server, sender, args)
   return false
 end function
 
-// Apply the Quake-compatible host color f behavior.
+/// Apply the Quake-compatible host color f behavior.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `Host_Color_f`.
+/// @param args Command-line arguments supplied by the host process.
 function Host_Color_f(server, clientValue, args)
   if len(args) < 2 then
     clientPrint(clientValue, "\"color\" is \"" + (clientValue.colors >> 4) + " " + (clientValue.colors & 15) + "\"\n")
@@ -1086,7 +1211,9 @@ function Host_Color_f(server, clientValue, args)
   return true
 end function
 
-// Apply the Quake-compatible host kill f behavior.
+/// Apply the Quake-compatible host kill f behavior.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `Host_Kill_f`.
 function Host_Kill_f(server, clientValue)
   if clientFloat(server, clientValue, "health", 0.0) <= 0.0 then
     clientPrint(clientValue, "Can't suicide -- allready dead!\n")
@@ -1096,7 +1223,9 @@ function Host_Kill_f(server, clientValue)
   return true
 end function
 
-// Apply the Quake-compatible host pause f behavior.
+/// Apply the Quake-compatible host pause f behavior.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `Host_Pause_f`.
 function Host_Pause_f(server, clientValue)
   if cvar.variableValue(server.machine.context.cvars, "pausable") == 0.0 then
     clientPrint(clientValue, "Pause not allowed.\n")
@@ -1111,24 +1240,33 @@ function Host_Pause_f(server, clientValue)
   return true
 end function
 
-// Apply the Quake-compatible host pre spawn f behavior.
+/// Apply the Quake-compatible host pre spawn f behavior.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `Host_PreSpawn_f`.
 function Host_PreSpawn_f(server, clientValue)
   if clientValue.spawned then return clientPrint(clientValue, "prespawn not valid -- allready spawned\n") end if
   return writeSignonStage2(server, clientValue)
 end function
 
-// Apply the Quake-compatible host spawn f behavior.
+/// Apply the Quake-compatible host spawn f behavior.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `Host_Spawn_f`.
+/// @param player The player input consumed by `Host_Spawn_f`.
 function Host_Spawn_f(server, clientValue, player)
   if clientValue.spawned then return clientPrint(clientValue, "Spawn not valid -- allready spawned\n") end if
   return writeSpawn(server, clientValue, player)
 end function
 
-// Apply the Quake-compatible host begin f behavior.
+/// Apply the Quake-compatible host begin f behavior.
+/// @param clientValue The client value input consumed by `Host_Begin_f`.
 function Host_Begin_f(clientValue)
   return writeBegin(clientValue)
 end function
 
-// Apply the Quake-compatible host kick f behavior.
+/// Apply the Quake-compatible host kick f behavior.
+/// @param server Server state participating in the operation.
+/// @param sourceClient The source client input consumed by `Host_Kick_f`.
+/// @param args Command-line arguments supplied by the host process.
 function Host_Kick_f(server, sourceClient, args)
   if len(args) < 2 then return false end if
   if sourceClient is not void and server.deathmatch and not sourceClient.privileged then return false end if
@@ -1156,13 +1294,20 @@ function Host_Kick_f(server, sourceClient, args)
   return true
 end function
 
-// Update module state for give field.
+/// Update module state for give field.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `setGiveField`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param value Value consumed by `setGiveField`.
 function setGiveField(server, clientValue, name, value)
   if server.machine is void then return false end if
   return qcedict.setKeyValue(server.machine, clientValue.edictIndex, name, "" + value)
 end function
 
-// Apply the Quake-compatible host give f behavior.
+/// Apply the Quake-compatible host give f behavior.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `Host_Give_f`.
+/// @param args Command-line arguments supplied by the host process.
 function Host_Give_f(server, clientValue, args)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if len(args) < 3 or not privilegedCommandAllowed(server, clientValue) then return false end if
@@ -1226,7 +1371,11 @@ function Host_Give_f(server, clientValue, args)
   return true
 end function
 
-// Execute string command.
+/// Execute string command.
+/// @param server Server state participating in the operation.
+/// @param client Client state participating in the operation.
+/// @param text Text to parse or process.
+/// @param player The player input consumed by `executeStringCommand`.
 function executeStringCommand(server, client, text, player)
   args = cmd.tokenize(text)
   if len(args) == 0 then return false end if
@@ -1254,7 +1403,10 @@ function executeStringCommand(server, client, text, player)
   return false
 end function
 
-// Read and validate move.
+/// Read and validate move.
+/// @param server Server state participating in the operation.
+/// @param reader The reader input consumed by `readMove`.
+/// @param client Client state participating in the operation.
 function readMove(server, reader, client)
   clientTime = msg.readFloat(reader)
   ping = server.time - clientTime
@@ -1277,7 +1429,10 @@ function readMove(server, reader, client)
   return clientTime
 end function
 
-// Release state for drop client.
+/// Release state for drop client.
+/// @param server Server state participating in the operation.
+/// @param client Client state participating in the operation.
+/// @param crashed The crashed input consumed by `dropClient`.
 function dropClient(server, client, crashed)
   wasConnected = client.active and client.socket is not void
   if client.socket is not void and not crashed and netmain.NET_CanSendMessage(client.socket) then
@@ -1308,7 +1463,9 @@ function dropClient(server, client, crashed)
   return true
 end function
 
-// Release state for drop timed out clients.
+/// Release state for drop timed out clients.
+/// @param server Server state participating in the operation.
+/// @param timeoutSeconds The timeout seconds input consumed by `dropTimedOutClients`.
 function dropTimedOutClients(server, timeoutSeconds)
   dropped = 0
   for each client in server.clients
@@ -1320,7 +1477,11 @@ function dropTimedOutClients(server, timeoutSeconds)
   return dropped
 end function
 
-// Read and validate client message.
+/// Read and validate client message.
+/// @param server Server state participating in the operation.
+/// @param client Client state participating in the operation.
+/// @param data Input data consumed by the operation.
+/// @param player The player input consumed by `readClientMessage`.
 function readClientMessage(server, client, data, player)
   reader = msg.beginReadingBytes(data)
   while msg.remaining(reader) > 0
@@ -1356,7 +1517,9 @@ function readClientMessage(server, client, data, player)
   return true
 end function
 
-// Advance client messages by one processing step.
+/// Advance client messages by one processing step.
+/// @param server Server state participating in the operation.
+/// @param player The player input consumed by `pumpClientMessages`.
 function pumpClientMessages(server, player)
   destination = sz.alloc(c.MAX_MSGLEN)
   processed = 0
@@ -1383,7 +1546,8 @@ function pumpClientMessages(server, player)
   return processed
 end function
 
-// Provide entity center behavior for the active subsystem.
+/// Implements the `entityCenter` operation for `miniquake.server` (entity center).
+/// @param item The item input consumed by `entityCenter`.
 function entityCenter(item)
   return t.Vec3(
     item.origin.x + 0.5 * (item.mins.x + item.maxs.x),
@@ -1392,7 +1556,10 @@ function entityCenter(item)
   )
 end function
 
-// Encode and write damage.
+/// Encode and write damage.
+/// @param server Server state participating in the operation.
+/// @param client Client state participating in the operation.
+/// @param buffer The buffer input consumed by `writeDamage`.
 function writeDamage(server, client, buffer)
   entityIndex = client.edictIndex
   if server.machine is void or server.machine.context is void then return false end if
@@ -1415,8 +1582,12 @@ function writeDamage(server, client, buffer)
   return true
 end function
 
-// SV_SetIdealPitch. This mirrors sv_user.c's six point traces and deliberately
-// truncates each sampled height delta to the original C int `step`.
+/// SV_SetIdealPitch. This mirrors sv_user.c's six point traces and deliberately
+/// truncates each sampled height delta to the original C int `step`.
+/// @param server Server state participating in the operation.
+/// @param client Client state participating in the operation.
+/// @param player The player input consumed by `setClientIdealPitch`.
+/// @param pitchScale The pitch scale input consumed by `setClientIdealPitch`.
 function setClientIdealPitch(server, client, player, pitchScale)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   existing = 0.0
@@ -1467,7 +1638,11 @@ function setClientIdealPitch(server, client, player, pitchScale)
   return value
 end function
 
-// Encode and write fix angle.
+/// Encode and write fix angle.
+/// @param server Server state participating in the operation.
+/// @param client Client state participating in the operation.
+/// @param player The player input consumed by `writeFixAngle`.
+/// @param buffer The buffer input consumed by `writeFixAngle`.
 function writeFixAngle(server, client, player, buffer)
   entityIndex = client.edictIndex
   fixAngle = player.fixAngle
@@ -1488,14 +1663,21 @@ function writeFixAngle(server, client, player, buffer)
   return true
 end function
 
-// Encode and write damage and angle.
+/// Encode and write damage and angle.
+/// @param server Server state participating in the operation.
+/// @param client Client state participating in the operation.
+/// @param player The player input consumed by `writeDamageAndAngle`.
+/// @param buffer The buffer input consumed by `writeDamageAndAngle`.
 function writeDamageAndAngle(server, client, player, buffer)
   writeDamage(server, client, buffer)
   writeFixAngle(server, client, player, buffer)
   return true
 end function
 
-// Provide client items behavior for the active subsystem.
+/// Implements the `clientItems` operation for `miniquake.server` (client items).
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param player The player input consumed by `clientItems`.
 function clientItems(server, entityIndex, player)
   items = native.trunc(player.items)
   if server.machine is not void and server.machine.context is not void then
@@ -1508,7 +1690,10 @@ function clientItems(server, entityIndex, player)
   return items | (native.trunc(server.serverFlags) << 28)
 end function
 
-// Return client weapon model index derived from the active module state.
+/// Return client weapon model index derived from the active module state.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param fallback Value to use when the requested input is unavailable or invalid.
 function clientWeaponModelIndex(server, entityIndex, fallback)
   if server.machine is void or server.machine.context is void then return fallback end if
   modelName = qcString(server.machine, entityIndex, "weaponmodel", "")
@@ -1518,17 +1703,21 @@ function clientWeaponModelIndex(server, entityIndex, fallback)
   return value
 end function
 
-// PlayerState keeps groundedness in `onGround`, while the original network
-// writer consumes FL_ONGROUND from ent->v.flags. Rebuild this mirrored bit for
-// PlayerState-only adapter paths so stale flags cannot drop or invent
-// SU_ONGROUND. QuakeC-backed paths still replace the value with QC flags.
+/// PlayerState keeps groundedness in `onGround`, while the original network
+/// writer consumes FL_ONGROUND from ent->v.flags. Rebuild this mirrored bit for
+/// PlayerState-only adapter paths so stale flags cannot drop or invent
+/// SU_ONGROUND. QuakeC-backed paths still replace the value with QC flags.
+/// @param player The player input consumed by `playerProtocolFlags`.
 function playerProtocolFlags(player)
   baseFlags = native.trunc(player.flags) & ~c.FL_ONGROUND
   if player.onGround then return baseFlags | c.FL_ONGROUND end if
   return baseFlags
 end function
 
-// Return protocol client data derived from the active module state.
+/// Return protocol client data derived from the active module state.
+/// @param server Server state participating in the operation.
+/// @param client Client state participating in the operation.
+/// @param player The player input consumed by `protocolClientData`.
 function protocolClientData(server, client, player)
   entityIndex = client.edictIndex
   viewHeight = player.viewHeight
@@ -1570,13 +1759,20 @@ function protocolClientData(server, client, player)
   )
 end function
 
-// Encode and write client data for client.
+/// Encode and write client data for client.
+/// @param buffer The buffer input consumed by `writeClientDataForClient`.
+/// @param server Server state participating in the operation.
+/// @param client Client state participating in the operation.
+/// @param player The player input consumed by `writeClientDataForClient`.
 function writeClientDataForClient(buffer, server, client, player)
   result = serverData.writeClientData(buffer, protocolClientData(server, client, player))
   return result[0]
 end function
 
-// Encode and write client data with flags.
+/// Encode and write client data with flags.
+/// @param buffer The buffer input consumed by `writeClientDataWithFlags`.
+/// @param player The player input consumed by `writeClientDataWithFlags`.
+/// @param serverFlags The server flags input consumed by `writeClientDataWithFlags`.
 function writeClientDataWithFlags(buffer, player, serverFlags)
   data = t.ProtocolClientData(
     player.viewHeight, 0.0, player.punchAngle, player.velocity, playerProtocolFlags(player), player.waterLevel,
@@ -1589,12 +1785,18 @@ function writeClientDataWithFlags(buffer, player, serverFlags)
   return result[0]
 end function
 
-// Encode and write client data.
+/// Encode and write client data.
+/// @param buffer The buffer input consumed by `writeClientData`.
+/// @param player The player input consumed by `writeClientData`.
 function writeClientData(buffer, player)
   return writeClientDataWithFlags(buffer, player, 0)
 end function
 
-// Encode and write player update.
+/// Encode and write player update.
+/// @param server Server state participating in the operation.
+/// @param buffer The buffer input consumed by `writePlayerUpdate`.
+/// @param client Client state participating in the operation.
+/// @param player The player input consumed by `writePlayerUpdate`.
 function writePlayerUpdate(server, buffer, client, player)
   if client.edictIndex < 0 or client.edictIndex >= len(server.edicts) then
     return error(2810, "SV_WriteEntitiesToClient: missing player edict")
@@ -1616,7 +1818,11 @@ end function
 
 
 
-// Return entity float value derived from the active module state.
+/// Return entity float value derived from the active module state.
+/// @param server Server state participating in the operation.
+/// @param item The item input consumed by `entityFloatValue`.
+/// @param fieldName Name that identifies the requested value or resource.
+/// @param fallback Value to use when the requested input is unavailable or invalid.
 function entityFloatValue(server, item, fieldName, fallback)
   if server.machine is not void and server.machine.context is not void then
     return qcFloat(server.machine, item.number, fieldName, fallback)
@@ -1624,7 +1830,9 @@ function entityFloatValue(server, item, fieldName, fallback)
   return fallback
 end function
 
-// Return entity update values derived from the active module state.
+/// Return entity update values derived from the active module state.
+/// @param server Server state participating in the operation.
+/// @param item The item input consumed by `entityUpdateValues`.
 function entityUpdateValues(server, item)
   return [
     item.modelIndex,
@@ -1635,7 +1843,9 @@ function entityUpdateValues(server, item)
   ]
 end function
 
-// Return entity update bits derived from the active module state.
+/// Return entity update bits derived from the active module state.
+/// @param server Server state participating in the operation.
+/// @param item The item input consumed by `entityUpdateBits`.
 function entityUpdateBits(server, item)
   modelIndex = item.modelIndex
   frame = native.trunc(item.frame)
@@ -1648,7 +1858,10 @@ function entityUpdateBits(server, item)
   )
 end function
 
-// Encode and write entity update.
+/// Encode and write entity update.
+/// @param server Server state participating in the operation.
+/// @param buffer The buffer input consumed by `writeEntityUpdate`.
+/// @param item The item input consumed by `writeEntityUpdate`.
 function writeEntityUpdate(server, buffer, item)
   modelIndex = item.modelIndex
   frame = native.trunc(item.frame)
@@ -1665,7 +1878,11 @@ function writeEntityUpdate(server, buffer, item)
   )
 end function
 
-// Report whether entity visible holds for the active state.
+/// Report whether entity visible holds for the active state.
+/// @param server Server state participating in the operation.
+/// @param pvs The pvs input consumed by `entityVisible`.
+/// @param item The item input consumed by `entityVisible`.
+/// @param clientEdict The client edict input consumed by `entityVisible`.
 function entityVisible(server, pvs, item, clientEdict)
   if item.number == clientEdict then return true end if
   if item.modelIndex == 0 or item.model == "" then return false end if
@@ -1685,12 +1902,18 @@ function entityVisible(server, pvs, item, clientEdict)
   return world.anyLeafVisible(pvs, item.leafNums)
 end function
 
-// Add state for append datagram.
+/// Add state for append datagram.
+/// @param destination Destination value or collection to update.
+/// @param source Source value or collection to read.
 function appendDatagram(destination, source)
   return serverData.appendDatagramIfFits(destination, source)
 end function
 
-// Encode and write planned entity update reserved.
+/// Encode and write planned entity update reserved.
+/// @param server Server state participating in the operation.
+/// @param buffer The buffer input consumed by `writePlannedEntityUpdateReserved`.
+/// @param item The item input consumed by `writePlannedEntityUpdateReserved`.
+/// @param reservedBytes Byte data consumed by the operation.
 function writePlannedEntityUpdateReserved(server, buffer, item, reservedBytes)
   // Resolve the five QuakeC values only once. The former plan-then-write path
   // built two arrays and repeated all field lookups for every visible entity.
@@ -1713,24 +1936,34 @@ function writePlannedEntityUpdateReserved(server, buffer, item, reservedBytes)
   return true
 end function
 
-// Encode and write planned entity update.
+/// Encode and write planned entity update.
+/// @param server Server state participating in the operation.
+/// @param buffer The buffer input consumed by `writePlannedEntityUpdate`.
+/// @param item The item input consumed by `writePlannedEntityUpdate`.
 function writePlannedEntityUpdate(server, buffer, item)
   return writePlannedEntityUpdateReserved(server, buffer, item, 0)
 end function
 
-// Report whether an entity is a latency-sensitive projectile that must be
-// scheduled before ordinary snapshot entities. Rockets and expansion-pack
-// missiles use MOVETYPE_FLYMISSILE; the stock grenade is a bouncing entity
-// and therefore also needs its model-name discriminator.
+/// Report whether an entity is a latency-sensitive projectile that must be
+/// scheduled before ordinary snapshot entities. Rockets and expansion-pack
+/// missiles use MOVETYPE_FLYMISSILE; the stock grenade is a bouncing entity
+/// and therefore also needs its model-name discriminator.
+/// @param item The item input consumed by `entityIsPriorityProjectile`.
 function entityIsPriorityProjectile(item)
   if item is void then return false end if
   if item.moveType == c.MOVETYPE_FLYMISSILE then return true end if
   return item.moveType == c.MOVETYPE_BOUNCE and item.model == "progs/grenade.mdl"
 end function
 
-// Write one snapshot class while retaining the Protocol-15 packet budget.
-// The caller selects either priority projectiles or ordinary entities; the
-// client edict is handled separately so it can never be duplicated.
+/// Write one snapshot class while retaining the Protocol-15 packet budget.
+/// The caller selects either priority projectiles or ordinary entities; the
+/// client edict is handled separately so it can never be duplicated.
+/// @param server Server state participating in the operation.
+/// @param buffer The buffer input consumed by `writeVisibleEntityClassReserved`.
+/// @param pvs The pvs input consumed by `writeVisibleEntityClassReserved`.
+/// @param clientEdict The client edict input consumed by `writeVisibleEntityClassReserved`.
+/// @param reservedBytes Byte data consumed by the operation.
+/// @param priorityProjectiles The priority projectiles input consumed by `writeVisibleEntityClassReserved`.
 function writeVisibleEntityClassReserved(
   server,
   buffer,
@@ -1767,10 +2000,15 @@ function writeVisibleEntityClassReserved(
   return written
 end function
 
-// Write a complete visible-entity snapshot with the player and active
-// projectiles ahead of less time-sensitive entities. Protocol 15 accepts fast
-// updates in any entity order. Prioritization prevents a high-numbered rocket
-// or grenade from disappearing when a dense PVS reaches MAX_DATAGRAM.
+/// Write a complete visible-entity snapshot with the player and active
+/// projectiles ahead of less time-sensitive entities. Protocol 15 accepts fast
+/// updates in any entity order. Prioritization prevents a high-numbered rocket
+/// or grenade from disappearing when a dense PVS reaches MAX_DATAGRAM.
+/// @param server Server state participating in the operation.
+/// @param buffer The buffer input consumed by `writeVisibleEntityUpdatesReserved`.
+/// @param pvs The pvs input consumed by `writeVisibleEntityUpdatesReserved`.
+/// @param clientEdict The client edict input consumed by `writeVisibleEntityUpdatesReserved`.
+/// @param reservedBytes Byte data consumed by the operation.
 function writeVisibleEntityUpdatesReserved(server, buffer, pvs, clientEdict, reservedBytes)
   written = 0
   if clientEdict > 0 and clientEdict < server.numEdicts and clientEdict < len(server.edicts) then
@@ -1789,7 +2027,10 @@ function writeVisibleEntityUpdatesReserved(server, buffer, pvs, clientEdict, res
   return written
 end function
 
-// Send client frame through the active connection.
+/// Send client frame through the active connection.
+/// @param server Server state participating in the operation.
+/// @param client Client state participating in the operation.
+/// @param player The player input consumed by `sendClientFrame`.
 function sendClientFrame(server, client, player)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global sendClientEye
@@ -1831,17 +2072,26 @@ function sendClientFrame(server, client, player)
   return netmain.NET_SendUnreliableMessage(client.socket, buffer)
 end function
 
-// Return qc entity vector derived from the active module state.
+/// Return qc entity vector derived from the active module state.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param name Stable name that identifies the requested object or option.
 function qcEntityVector(server, entityIndex, name)
   return qcVector(server.machine, entityIndex, name, t.Vec3(0.0, 0.0, 0.0))
 end function
 
-// Provide qc set flags behavior for the active subsystem.
+/// Implements the `qcSetFlags` operation for `miniquake.server` (qc set flags).
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param flags The flags input consumed by `qcSetFlags`.
 function qcSetFlags(server, entityIndex, flags)
   setQcEntityFloat(server, entityIndex, "flags", flags)
 end function
 
-// Execute qc touch.
+/// Execute qc touch.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param otherIndex Zero-based index of the requested entry.
 function runQcTouch(server, entityIndex, otherIndex)
   touchField = vm.fieldOffset(server.machine, "touch")
   if touchField < 0 then return false end if
@@ -1854,7 +2104,13 @@ function runQcTouch(server, entityIndex, otherIndex)
   return true
 end function
 
-// Provide bounds overlap behavior for the active subsystem.
+/// Implements the `boundsOverlap` operation for `miniquake.server` (bounds overlap).
+/// @param originA The origin a input consumed by `boundsOverlap`.
+/// @param minsA The mins a input consumed by `boundsOverlap`.
+/// @param maxsA The maxs a input consumed by `boundsOverlap`.
+/// @param originB The origin b input consumed by `boundsOverlap`.
+/// @param minsB The mins b input consumed by `boundsOverlap`.
+/// @param maxsB The maxs b input consumed by `boundsOverlap`.
 function boundsOverlap(originA, minsA, maxsA, originB, minsB, maxsB)
   if originA.x + maxsA.x < originB.x + minsB.x then return false end if
   if originA.x + minsA.x > originB.x + maxsB.x then return false end if
@@ -1865,7 +2121,10 @@ function boundsOverlap(originA, minsA, maxsA, originB, minsB, maxsB)
   return true
 end function
 
-// Execute qc blocked.
+/// Execute qc blocked.
+/// @param server Server state participating in the operation.
+/// @param pusherIndex Zero-based index of the requested entry.
+/// @param otherIndex Zero-based index of the requested entry.
 function runQcBlocked(server, pusherIndex, otherIndex)
   blockedField = vm.fieldOffset(server.machine, "blocked")
   if blockedField < 0 then return false end if
@@ -1878,7 +2137,10 @@ function runQcBlocked(server, pusherIndex, otherIndex)
   return true
 end function
 
-// Execute entity think.
+/// Execute entity think.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param frameTime Time value used by the operation.
 function runEntityThink(server, entityIndex, frameTime)
   machine = server.machine
   nextThink = qcFloat(machine, entityIndex, "nextthink", 0.0)
@@ -1894,7 +2156,9 @@ function runEntityThink(server, entityIndex, frameTime)
   return not machine.context.edicts.freeFlags[entityIndex]
 end function
 
-// Execute pusher think.
+/// Execute pusher think.
+/// @param server Server state participating in the operation.
+/// @param pusherIndex Zero-based index of the requested entry.
 function executePusherThink(server, pusherIndex)
   thinkFunction = qcWord(server.machine, pusherIndex, "think", 0)
   setQcEntityFloat(server, pusherIndex, "nextthink", 0.0)
@@ -1906,9 +2170,12 @@ function executePusherThink(server, pusherIndex)
   return not server.machine.context.edicts.freeFlags[pusherIndex]
 end function
 
-// SV_PushMove. The pusher is moved first, every affected entity is carried by
-// the same delta, and the complete operation is rolled back when one entity
-// cannot be displaced. This is the stock Quake door/platform/train contract.
+/// SV_PushMove. The pusher is moved first, every affected entity is carried by
+/// the same delta, and the complete operation is rolled back when one entity
+/// cannot be displaced. This is the stock Quake door/platform/train contract.
+/// @param server Server state participating in the operation.
+/// @param pusherIndex Zero-based index of the requested entry.
+/// @param moveTime Time value used by the operation.
 function movePusher(server, pusherIndex, moveTime)
   velocity = qcEntityVector(server, pusherIndex, "velocity")
   pusherSolid = native.trunc(qcFloat(server.machine, pusherIndex, "solid", c.SOLID_BSP))
@@ -2011,7 +2278,10 @@ function movePusher(server, pusherIndex, moveTime)
   return true
 end function
 
-// Apply server-physics pusher semantics.
+/// Apply server-physics pusher semantics.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param frameTime Time value used by the operation.
 function physicsPusher(server, entityIndex, frameTime)
   oldLtime = qcFloat(server.machine, entityIndex, "ltime", 0.0)
   thinkTime = qcFloat(server.machine, entityIndex, "nextthink", 0.0)
@@ -2026,7 +2296,10 @@ function physicsPusher(server, entityIndex, frameTime)
   return true
 end function
 
-// Provide touch player triggers behavior for the active subsystem.
+/// Implements the `touchPlayerTriggers` operation for `miniquake.server` (touch player triggers).
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `touchPlayerTriggers`.
+/// @param player The player input consumed by `touchPlayerTriggers`.
 function touchPlayerTriggers(server, clientValue, player)
   if server.machine is void or server.machine.context is void then return 0 end if
   touched = 0
@@ -2048,7 +2321,11 @@ function touchPlayerTriggers(server, clientValue, player)
   return touched
 end function
 
-// Provide resolve player entity collision behavior for the active subsystem.
+/// Implements the `resolvePlayerEntityCollision` operation for `miniquake.server` (resolve player entity collision).
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `resolvePlayerEntityCollision`.
+/// @param player The player input consumed by `resolvePlayerEntityCollision`.
+/// @param oldOrigin The old origin input consumed by `resolvePlayerEntityCollision`.
 function resolvePlayerEntityCollision(server, clientValue, player, oldOrigin)
   if server.machine is void or server.machine.context is void or player.noclip then return false end if
   index = server.maxClients + 1
@@ -2074,7 +2351,11 @@ function resolvePlayerEntityCollision(server, clientValue, player, oldOrigin)
   return false
 end function
 
-// Transfer data for move qc entity.
+/// Transfer data for move qc entity.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param frameTime Time value used by the operation.
+/// @param gravity The gravity input consumed by `moveQcEntity`.
 function moveQcEntity(server, entityIndex, frameTime, gravity)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   machine = server.machine
@@ -2134,7 +2415,8 @@ function moveQcEntity(server, entityIndex, frameTime, gravity)
   return true
 end function
 
-// Apply server-physics frame parameters semantics.
+/// Apply server-physics frame parameters semantics.
+/// @param registry The registry input consumed by `physicsFrameParameters`.
 function physicsFrameParameters(registry)
   gravity = cvar.variableValue(registry, "sv_gravity")
   if gravity <= 0.0 then gravity = 800.0 end if
@@ -2143,7 +2425,11 @@ function physicsFrameParameters(registry)
   return [gravity, maxVelocity]
 end function
 
-// Execute world physics with retouch.
+/// Execute world physics with retouch.
+/// @param server Server state participating in the operation.
+/// @param frameTime Time value used by the operation.
+/// @param registry The registry input consumed by `runWorldPhysicsWithRetouch`.
+/// @param forceRetouch The force retouch input consumed by `runWorldPhysicsWithRetouch`.
 function runWorldPhysicsWithRetouch(server, frameTime, registry, forceRetouch)
   if server.machine is void or server.machine.context is void then return 0 end if
   if server.machine.context.edicts.numEdicts <= 0 then return 0 end if
@@ -2154,7 +2440,11 @@ function runWorldPhysicsWithRetouch(server, frameTime, registry, forceRetouch)
   return 0
 end function
 
-// Execute non client physics with retouch.
+/// Execute non client physics with retouch.
+/// @param server Server state participating in the operation.
+/// @param frameTime Time value used by the operation.
+/// @param registry The registry input consumed by `runNonClientPhysicsWithRetouch`.
+/// @param forceRetouch The force retouch input consumed by `runNonClientPhysicsWithRetouch`.
 function runNonClientPhysicsWithRetouch(server, frameTime, registry, forceRetouch)
   if server.machine is void or server.machine.context is void then return 0 end if
   parameters = physicsFrameParameters(registry)
@@ -2193,7 +2483,10 @@ function runNonClientPhysicsWithRetouch(server, frameTime, registry, forceRetouc
   return moved
 end function
 
-// Execute non client physics.
+/// Execute non client physics.
+/// @param server Server state participating in the operation.
+/// @param frameTime Time value used by the operation.
+/// @param registry The registry input consumed by `runNonClientPhysics`.
 function runNonClientPhysics(server, frameTime, registry)
   forceRetouch = physics.SV_ForceRetouchValue(server)
   moved = runWorldPhysicsWithRetouch(server, frameTime, registry, forceRetouch)
@@ -2202,7 +2495,9 @@ function runNonClientPhysics(server, frameTime, registry)
   return moved
 end function
 
-// Add state for queued sound origin.
+/// Add state for queued sound origin.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
 function queuedSoundOrigin(server, entityIndex)
   if entityIndex < 0 or entityIndex >= len(server.edicts) then return error(2816, "SV_StartSound: bad entity " + entityIndex) end if
   item = server.edicts[entityIndex]
@@ -2210,7 +2505,9 @@ function queuedSoundOrigin(server, entityIndex)
   return transients.soundCenter(item.origin, item.mins, item.maxs)
 end function
 
-// Encode and write queued sound.
+/// Encode and write queued sound.
+/// @param server Server state participating in the operation.
+/// @param event Runtime event to process.
 function writeQueuedSound(server, event)
   entityIndex = native.trunc(event[0])
   channel = native.trunc(event[1])
@@ -2231,14 +2528,17 @@ function writeQueuedSound(server, event)
   return true
 end function
 
-// Encode and write queued particle.
+/// Encode and write queued particle.
+/// @param server Server state participating in the operation.
+/// @param event Runtime event to process.
 function writeQueuedParticle(server, event)
   if not protocolEvents.canWriteTransient(server.datagram) then return false end if
   protocolEvents.writeParticle(server.datagram, event[0], event[1], event[2], event[3])
   return true
 end function
 
-// Provide flush quake cevents behavior for the active subsystem.
+/// Implements the `flushQuakeCEvents` operation for `miniquake.server` (flush quake c events).
+/// @param server Server state participating in the operation.
 function flushQuakeCEvents(server)
   if server.machine is void or server.machine.context is void then return 0 end if
   contextValue = server.machine.context
@@ -2254,7 +2554,9 @@ function flushQuakeCEvents(server)
   return written
 end function
 
-// Provide broadcast print behavior for the active subsystem.
+/// Implements the `broadcastPrint` operation for `miniquake.server` (broadcast print).
+/// @param server Server state participating in the operation.
+/// @param text Text to parse or process.
 function broadcastPrint(server, text)
   written = 0
   for each clientValue in server.clients
@@ -2267,7 +2569,8 @@ function broadcastPrint(server, text)
   return written
 end function
 
-// Update module state for reliable client state.
+/// Update module state for reliable client state.
+/// @param server Server state participating in the operation.
 function updateReliableClientState(server)
   changed = 0
   sourceIndex = 0
@@ -2292,7 +2595,8 @@ function updateReliableClientState(server)
   return changed
 end function
 
-// Provide distribute reliable datagram behavior for the active subsystem.
+/// Implements the `distributeReliableDatagram` operation for `miniquake.server` (distribute reliable datagram).
+/// @param server Server state participating in the operation.
 function distributeReliableDatagram(server)
   copied = 0
   if server.reliableDatagram.curSize > 0 then
@@ -2310,14 +2614,18 @@ function distributeReliableDatagram(server)
   return copied
 end function
 
-// Provide prepare reliable messages behavior for the active subsystem.
+/// Implements the `prepareReliableMessages` operation for `miniquake.server` (prepare reliable messages).
+/// @param server Server state participating in the operation.
 function prepareReliableMessages(server)
   updates = updateReliableClientState(server)
   copies = distributeReliableDatagram(server)
   return [updates, copies]
 end function
 
-// Send nop at through the active connection.
+/// Send nop at through the active connection.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `sendNopAt`.
+/// @param realtime Time value used by the operation.
 function sendNopAt(server, clientValue, realtime)
   buffer = sz.alloc(4)
   msg.writeChar(buffer, c.SVC_NOP)
@@ -2327,7 +2635,10 @@ function sendNopAt(server, clientValue, realtime)
   return result
 end function
 
-// Execute reliable client at.
+/// Execute reliable client at.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `processReliableClientAt`.
+/// @param realtime Time value used by the operation.
 function processReliableClientAt(server, clientValue, realtime)
   canSend = false
   if clientValue.message.curSize > 0 or clientValue.dropAsap then
@@ -2363,9 +2674,11 @@ function processReliableClientAt(server, clientValue, realtime)
   return result
 end function
 
-// Reliable-only pump used by the explicit local signon loop. The full server
-// frame calls sendClientMessagesAt so spawned clients receive their unreliable
-// datagram before this reliable phase.
+/// Reliable-only pump used by the explicit local signon loop. The full server
+/// frame calls sendClientMessagesAt so spawned clients receive their unreliable
+/// datagram before this reliable phase.
+/// @param server Server state participating in the operation.
+/// @param realtime Time value used by the operation.
 function sendReliableMessagesAt(server, realtime)
   // The public helper returns a two-element diagnostic array. Production only
   // needs the side effects and must not allocate that array every host frame.
@@ -2391,12 +2704,14 @@ function sendReliableMessagesAt(server, realtime)
   return sent
 end function
 
-// Send reliable messages through the active connection.
+/// Send reliable messages through the active connection.
+/// @param server Server state participating in the operation.
 function sendReliableMessages(server)
   return sendReliableMessagesAt(server, win.ticks() / 1000.0)
 end function
 
-// Provide cleanup muzzle flashes behavior for the active subsystem.
+/// Implements the `cleanupMuzzleFlashes` operation for `miniquake.server` (cleanup muzzle flashes).
+/// @param server Server state participating in the operation.
 function cleanupMuzzleFlashes(server)
   cleaned = 0
   index = 1
@@ -2417,7 +2732,10 @@ function cleanupMuzzleFlashes(server)
   return cleaned
 end function
 
-// Send client messages at through the active connection.
+/// Send client messages at through the active connection.
+/// @param server Server state participating in the operation.
+/// @param player The player input consumed by `sendClientMessagesAt`.
+/// @param realtime Time value used by the operation.
 function sendClientMessagesAt(server, player, realtime)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   updateReliableClientState(server)
@@ -2466,12 +2784,19 @@ function sendClientMessagesAt(server, player, realtime)
   return sent
 end function
 
-// Send client messages through the active connection.
+/// Send client messages through the active connection.
+/// @param server Server state participating in the operation.
+/// @param player The player input consumed by `sendClientMessages`.
 function sendClientMessages(server, player)
   return sendClientMessagesAt(server, player, win.ticks() / 1000.0)
 end function
 
-// Advance mode by one processing step.
+/// Advance mode by one processing step.
+/// @param server Server state participating in the operation.
+/// @param player The player input consumed by `frameMode`.
+/// @param frameTime Time value used by the operation.
+/// @param registry The registry input consumed by `frameMode`.
+/// @param simulate The simulate input consumed by `frameMode`.
 function frameMode(server, player, frameTime, registry, simulate)
   if not server.active then return false end if
   pumpClientMessages(server, player)
@@ -2558,12 +2883,17 @@ function frameMode(server, player, frameTime, registry, simulate)
   return true
 end function
 
-// Advance the requested value by one processing step.
+/// Implements the `frame` operation for `miniquake.server` (frame).
+/// @param server Server state participating in the operation.
+/// @param player The player input consumed by `frame`.
+/// @param frameTime Time value used by the operation.
+/// @param registry The registry input consumed by `frame`.
 function frame(server, player, frameTime, registry)
   return frameMode(server, player, frameTime, registry, not server.paused)
 end function
 
-// Release state for shutdown.
+/// Implements the `shutdown` operation for `miniquake.server` (shutdown).
+/// @param server Server state participating in the operation.
 function shutdown(server)
   for each client in server.clients
     wasConnected = client.active and client.socket is not void
@@ -2579,20 +2909,26 @@ function shutdown(server)
   return true
 end function
 
-// -----------------------------------------------------------------------------
-// QuakeC-backed server spawning and per-frame execution.
-// -----------------------------------------------------------------------------
+/// -----------------------------------------------------------------------------
+/// QuakeC-backed server spawning and per-frame execution.
+/// -----------------------------------------------------------------------------
+/// @param count Number of entries or units to process.
+/// @param defaultValue The default value input consumed by `boolArray`.
 
 function boolArray(count, defaultValue)
   return arrayutil.makeFilledArray(count, defaultValue)
 end function
 
-// Provide number array behavior for the active subsystem.
+/// Implements the `numberArray` operation for `miniquake.server` (number array).
+/// @param count Number of entries or units to process.
+/// @param defaultValue The default value input consumed by `numberArray`.
 function numberArray(count, defaultValue)
   return arrayutil.makeFilledArray(count, defaultValue)
 end function
 
-// Create and initialize edict runtime.
+/// Create and initialize edict runtime.
+/// @param maxEdicts The max edicts input consumed by `createEdictRuntime`.
+/// @param reservedClients The reserved clients input consumed by `createEdictRuntime`.
 function createEdictRuntime(maxEdicts, reservedClients)
   freeFlags = boolArray(maxEdicts, true)
   freeTimes = numberArray(maxEdicts, 0.0)
@@ -2604,7 +2940,8 @@ function createEdictRuntime(maxEdicts, reservedClients)
   return t.EdictRuntime(maxEdicts, reservedClients + 1, freeFlags, freeTimes)
 end function
 
-// Provide client message buffers behavior for the active subsystem.
+/// Implements the `clientMessageBuffers` operation for `miniquake.server` (client message buffers).
+/// @param server Server state participating in the operation.
 function clientMessageBuffers(server)
   result = arrayutil.makeEmptyArray(len(server.clients))
   index = 0
@@ -2615,7 +2952,8 @@ function clientMessageBuffers(server)
   return result
 end function
 
-// Provide client spawn parm buffers behavior for the active subsystem.
+/// Implements the `clientSpawnParmBuffers` operation for `miniquake.server` (client spawn parm buffers).
+/// @param server Server state participating in the operation.
 function clientSpawnParmBuffers(server)
   result = arrayutil.makeEmptyArray(len(server.clients))
   index = 0
@@ -2628,7 +2966,12 @@ function clientSpawnParmBuffers(server)
   return result
 end function
 
-// Create and initialize quake ccontext.
+/// Create and initialize quake ccontext.
+/// @param server Server state participating in the operation.
+/// @param filesystem The filesystem input consumed by `createQuakeCContext`.
+/// @param registry The registry input consumed by `createQuakeCContext`.
+/// @param commandSystem The command system input consumed by `createQuakeCContext`.
+/// @param runtime Time value used by the operation.
 function createQuakeCContext(server, filesystem, registry, commandSystem, runtime)
   return t.QuakeCContext(
     filesystem,
@@ -2661,28 +3004,44 @@ function createQuakeCContext(server, filesystem, registry, commandSystem, runtim
   )
 end function
 
-// Provide qc float behavior for the active subsystem.
+/// Implements the `qcFloat` operation for `miniquake.server` (qc float).
+/// @param machine The machine input consumed by `qcFloat`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param fieldName Name that identifies the requested value or resource.
+/// @param fallback Value to use when the requested input is unavailable or invalid.
 function qcFloat(machine, entityIndex, fieldName, fallback)
   offset = vm.fieldOffset(machine, fieldName)
   if offset < 0 then return fallback end if
   return vm.entityFloat(machine, entityIndex, offset)
 end function
 
-// Provide qc word behavior for the active subsystem.
+/// Implements the `qcWord` operation for `miniquake.server` (qc word).
+/// @param machine The machine input consumed by `qcWord`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param fieldName Name that identifies the requested value or resource.
+/// @param fallback Value to use when the requested input is unavailable or invalid.
 function qcWord(machine, entityIndex, fieldName, fallback)
   offset = vm.fieldOffset(machine, fieldName)
   if offset < 0 then return fallback end if
   return vm.entityField(machine, entityIndex, offset)
 end function
 
-// Return qc vector derived from the active module state.
+/// Return qc vector derived from the active module state.
+/// @param machine The machine input consumed by `qcVector`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param fieldName Name that identifies the requested value or resource.
+/// @param fallback Value to use when the requested input is unavailable or invalid.
 function qcVector(machine, entityIndex, fieldName, fallback)
   offset = vm.fieldOffset(machine, fieldName)
   if offset < 0 then return fallback end if
   return vm.entityVector(machine, entityIndex, offset)
 end function
 
-// Provide qc string behavior for the active subsystem.
+/// Implements the `qcString` operation for `miniquake.server` (qc string).
+/// @param machine The machine input consumed by `qcString`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param fieldName Name that identifies the requested value or resource.
+/// @param fallback Value to use when the requested input is unavailable or invalid.
 function qcString(machine, entityIndex, fieldName, fallback)
   offset = vm.fieldOffset(machine, fieldName)
   if offset < 0 then return fallback end if
@@ -2691,19 +3050,31 @@ function qcString(machine, entityIndex, fieldName, fallback)
   return value
 end function
 
-// Provide qc float at behavior for the active subsystem.
+/// Implements the `qcFloatAt` operation for `miniquake.server` (qc float at).
+/// @param machine The machine input consumed by `qcFloatAt`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param offset Zero-based offset of the requested data.
+/// @param fallback Value to use when the requested input is unavailable or invalid.
 function qcFloatAt(machine, entityIndex, offset, fallback)
   if offset < 0 then return fallback end if
   return vm.entityFloat(machine, entityIndex, offset)
 end function
 
-// Provide qc word at behavior for the active subsystem.
+/// Implements the `qcWordAt` operation for `miniquake.server` (qc word at).
+/// @param machine The machine input consumed by `qcWordAt`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param offset Zero-based offset of the requested data.
+/// @param fallback Value to use when the requested input is unavailable or invalid.
 function qcWordAt(machine, entityIndex, offset, fallback)
   if offset < 0 then return fallback end if
   return vm.entityField(machine, entityIndex, offset)
 end function
 
-// Provide qc string at behavior for the active subsystem.
+/// Implements the `qcStringAt` operation for `miniquake.server` (qc string at).
+/// @param machine The machine input consumed by `qcStringAt`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param offset Zero-based offset of the requested data.
+/// @param fallback Value to use when the requested input is unavailable or invalid.
 function qcStringAt(machine, entityIndex, offset, fallback)
   if offset < 0 then return fallback end if
   value = vm.entityString(machine, entityIndex, offset)
@@ -2711,10 +3082,11 @@ function qcStringAt(machine, entityIndex, offset, fallback)
   return value
 end function
 
-// The C engine resolves ddef_t offsets while loading progs.dat and then uses
-// direct word offsets for every edict.  Resolve the MiniLang mirror's fixed
-// synchronization set once per range instead of scanning fieldDefs 18 times
-// for every live edict on every server frame.
+/// The C engine resolves ddef_t offsets while loading progs.dat and then uses
+/// direct word offsets for every edict.  Resolve the MiniLang mirror's fixed
+/// synchronization set once per range instead of scanning fieldDefs 18 times
+/// for every live edict on every server frame.
+/// @param machine The machine input consumed by `synchronizedEdictOffsets`.
 function synchronizedEdictOffsets(machine)
   global synchronizedOffsetMachine, synchronizedOffsets
   if synchronizedOffsetMachine is not void and nativeRawValue(synchronizedOffsetMachine) == nativeRawValue(machine) then
@@ -2744,10 +3116,15 @@ function synchronizedEdictOffsets(machine)
   return synchronizedOffsets
 end function
 
+/// Tracks the module-level synchronized offset machine state owned by `miniquake.server`.
 synchronizedOffsetMachine = void
+/// Tracks the module-level synchronized offsets state owned by `miniquake.server`.
 synchronizedOffsets = []
 
-// Validate synchronized vector and report any invalid state.
+/// Validate synchronized vector and report any invalid state.
+/// @param value Value consumed by `requireSynchronizedVector`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param fieldName Name that identifies the requested value or resource.
 function requireSynchronizedVector(value, entityIndex, fieldName)
   if t.isVec3Value(value) then return value end if
   return error(
@@ -2757,12 +3134,18 @@ function requireSynchronizedVector(value, entityIndex, fieldName)
   )
 end function
 
-// The original server keeps edicts in one stable array and mutates their
-// fields in place.  Rebuilding every QuakeEdict and every nested Vec3 on each
-// frame creates avoidable allocation pressure and makes object lifetime depend
-// on expression-temporary GC roots.  Keep the derived MiniLang mirror stable:
-// allocate only when the high-water mark grows or a previously absent record
-// appears, then copy raw QuakeC words into the existing structs.
+/// The original server keeps edicts in one stable array and mutates their
+/// fields in place.  Rebuilding every QuakeEdict and every nested Vec3 on each
+/// frame creates avoidable allocation pressure and makes object lifetime depend
+/// on expression-temporary GC roots.  Keep the derived MiniLang mirror stable:
+/// allocate only when the high-water mark grows or a previously absent record
+/// appears, then copy raw QuakeC words into the existing structs.
+/// @param value Value consumed by `synchronizedVectorTarget`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param fieldName Name that identifies the requested value or resource.
+/// @param x The x input consumed by `synchronizedVectorTarget`.
+/// @param y The y input consumed by `synchronizedVectorTarget`.
+/// @param z The z input consumed by `synchronizedVectorTarget`.
 function synchronizedVectorTarget(value, entityIndex, fieldName, x, y, z)
   if t.isVec3Value(value) then return value end if
   // A freshly constructed Vec3 already satisfies the invariant; re-running
@@ -2770,7 +3153,13 @@ function synchronizedVectorTarget(value, entityIndex, fieldName, x, y, z)
   return t.Vec3(x, y, z)
 end function
 
-// Update module state for synchronized vector.
+/// Update module state for synchronized vector.
+/// @param value Value consumed by `setSynchronizedVector`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param fieldName Name that identifies the requested value or resource.
+/// @param x The x input consumed by `setSynchronizedVector`.
+/// @param y The y input consumed by `setSynchronizedVector`.
+/// @param z The z input consumed by `setSynchronizedVector`.
 function setSynchronizedVector(value, entityIndex, fieldName, x, y, z)
   result = synchronizedVectorTarget(value, entityIndex, fieldName, x, y, z)
   result.x = x
@@ -2779,7 +3168,14 @@ function setSynchronizedVector(value, entityIndex, fieldName, x, y, z)
   return result
 end function
 
-// Update module state for qc vector into.
+/// Update module state for qc vector into.
+/// @param machine The machine input consumed by `syncQcVectorInto`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param fieldName Name that identifies the requested value or resource.
+/// @param target The target input consumed by `syncQcVectorInto`.
+/// @param x The x input consumed by `syncQcVectorInto`.
+/// @param y The y input consumed by `syncQcVectorInto`.
+/// @param z The z input consumed by `syncQcVectorInto`.
 function syncQcVectorInto(machine, entityIndex, fieldName, target, x, y, z)
   result = synchronizedVectorTarget(target, entityIndex, fieldName, x, y, z)
   offset = vm.fieldOffset(machine, fieldName)
@@ -2796,7 +3192,15 @@ function syncQcVectorInto(machine, entityIndex, fieldName, target, x, y, z)
   return result
 end function
 
-// Update module state for qc vector into at.
+/// Update module state for qc vector into at.
+/// @param machine The machine input consumed by `syncQcVectorIntoAt`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param offset Zero-based offset of the requested data.
+/// @param fieldName Name that identifies the requested value or resource.
+/// @param target The target input consumed by `syncQcVectorIntoAt`.
+/// @param x The x input consumed by `syncQcVectorIntoAt`.
+/// @param y The y input consumed by `syncQcVectorIntoAt`.
+/// @param z The z input consumed by `syncQcVectorIntoAt`.
 function syncQcVectorIntoAt(machine, entityIndex, offset, fieldName, target, x, y, z)
   result = synchronizedVectorTarget(target, entityIndex, fieldName, x, y, z)
   if offset >= 0 then
@@ -2812,11 +3216,18 @@ function syncQcVectorIntoAt(machine, entityIndex, offset, fieldName, target, x, 
   return result
 end function
 
-// Copy one snapshot vector into an established mirror slot. Spawn and load
-// synchronization have already validated every nested Vec3 before the server
-// can publish snapshots, so repeating a dynamic type-name lookup here for four
-// vectors on every live edict only burns frame time. Keep the guarded helper
-// above for lifecycle boundaries where incomplete external state is possible.
+/// Copy one snapshot vector into an established mirror slot. Spawn and load
+/// synchronization have already validated every nested Vec3 before the server
+/// can publish snapshots, so repeating a dynamic type-name lookup here for four
+/// vectors on every live edict only burns frame time. Keep the guarded helper
+/// above for lifecycle boundaries where incomplete external state is possible.
+/// @param machine The machine input consumed by `syncEstablishedQcVectorIntoAt`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param offset Zero-based offset of the requested data.
+/// @param target The target input consumed by `syncEstablishedQcVectorIntoAt`.
+/// @param x The x input consumed by `syncEstablishedQcVectorIntoAt`.
+/// @param y The y input consumed by `syncEstablishedQcVectorIntoAt`.
+/// @param z The z input consumed by `syncEstablishedQcVectorIntoAt`.
 function syncEstablishedQcVectorIntoAt(machine, entityIndex, offset, target, x, y, z)
   if offset >= 0 then
     target.x = vm.entityFloat(machine, entityIndex, offset)
@@ -2830,7 +3241,9 @@ function syncEstablishedQcVectorIntoAt(machine, entityIndex, offset, target, x, 
   return target
 end function
 
-// Provide resize synchronized edict array behavior for the active subsystem.
+/// Implements the `resizeSynchronizedEdictArray` operation for `miniquake.server` (resize synchronized edict array).
+/// @param server Server state participating in the operation.
+/// @param requiredCount Number of entries or units to process.
 function resizeSynchronizedEdictArray(server, requiredCount)
   if requiredCount < 0 or requiredCount > server.maxEdicts then
     return error(2861, "SV_SyncQuakeCEdicts: invalid edict count " + requiredCount)
@@ -2848,7 +3261,9 @@ function resizeSynchronizedEdictArray(server, requiredCount)
   return resized
 end function
 
-// Ensure sufficient storage or state for synchronized baseline.
+/// Ensure sufficient storage or state for synchronized baseline.
+/// @param item The item input consumed by `ensureSynchronizedBaseline`.
+/// @param entityIndex Zero-based index of the requested entry.
 function ensureSynchronizedBaseline(item, entityIndex)
   baseline = item.baseline
   if not t.isEntityBaselineValue(baseline) then
@@ -2866,7 +3281,9 @@ function ensureSynchronizedBaseline(item, entityIndex)
   return baseline
 end function
 
-// Ensure sufficient storage or state for synchronized edict.
+/// Ensure sufficient storage or state for synchronized edict.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
 function ensureSynchronizedEdict(server, entityIndex)
   if entityIndex < 0 or entityIndex >= server.maxEdicts then
     return error(2862, "SV_SyncQuakeCEdict: invalid edict " + entityIndex)
@@ -2891,7 +3308,10 @@ function ensureSynchronizedEdict(server, entityIndex)
   return item
 end function
 
-// Update module state for quake cedict at.
+/// Update module state for quake cedict at.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param offsets The offsets input consumed by `syncQuakeCEdictAt`.
 function syncQuakeCEdictAt(server, entityIndex, offsets)
   machine = server.machine
   runtime = machine.context.edicts
@@ -2963,9 +3383,12 @@ function syncQuakeCEdictAt(server, entityIndex, offsets)
   return item
 end function
 
-// Synchronize only fields consumed by client snapshot encoding. Physics and
-// collision already operate on the authoritative VM edicts; the full mirror
-// remains available for lifecycle/save/compatibility boundaries.
+/// Synchronize only fields consumed by client snapshot encoding. Physics and
+/// collision already operate on the authoritative VM edicts; the full mirror
+/// remains available for lifecycle/save/compatibility boundaries.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param offsets The offsets input consumed by `syncQuakeCSnapshotEdictAt`.
 function syncQuakeCSnapshotEdictAt(server, entityIndex, offsets)
   machine = server.machine
   runtime = machine.context.edicts
@@ -3032,12 +3455,15 @@ function syncQuakeCSnapshotEdictAt(server, entityIndex, offsets)
   return item
 end function
 
-// Update module state for quake cedict.
+/// Update module state for quake cedict.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
 function syncQuakeCEdict(server, entityIndex)
   return syncQuakeCEdictAt(server, entityIndex, synchronizedEdictOffsets(server.machine))
 end function
 
-// Return recompute edict count derived from the active module state.
+/// Return recompute edict count derived from the active module state.
+/// @param server Server state participating in the operation.
 function recomputeEdictCount(server)
   runtime = server.machine.context.edicts
   // ED_Alloc owns a monotonically non-decreasing num_edicts high-water mark.
@@ -3052,7 +3478,9 @@ function recomputeEdictCount(server)
   return count
 end function
 
-// Update module state for quake cedict range.
+/// Update module state for quake cedict range.
+/// @param server Server state participating in the operation.
+/// @param count Number of entries or units to process.
 function syncQuakeCEdictRange(server, count)
   resizeSynchronizedEdictArray(server, count)
   server.numEdicts = count
@@ -3099,13 +3527,15 @@ function syncQuakeCEdictRange(server, count)
   return count
 end function
 
-// Update module state for quake cedicts.
+/// Update module state for quake cedicts.
+/// @param server Server state participating in the operation.
 function syncQuakeCEdicts(server)
   count = recomputeEdictCount(server)
   return syncQuakeCEdictRange(server, count)
 end function
 
-// Update the stable client-snapshot mirror without copying server-only fields.
+/// Update the stable client-snapshot mirror without copying server-only fields.
+/// @param server Server state participating in the operation.
 function syncQuakeCSnapshotEdicts(server)
   count = recomputeEdictCount(server)
   resizeSynchronizedEdictArray(server, count)
@@ -3131,7 +3561,9 @@ function syncQuakeCSnapshotEdicts(server)
   return count
 end function
 
-// Update module state for loaded quake cedicts.
+/// Update module state for loaded quake cedicts.
+/// @param server Server state participating in the operation.
+/// @param savedCount Number of entries or units to process.
 function syncLoadedQuakeCEdicts(server, savedCount)
   runtime = server.machine.context.edicts
   if savedCount < server.maxClients + 1 or savedCount > runtime.maxEdicts then
@@ -3142,7 +3574,13 @@ function syncLoadedQuakeCEdicts(server, savedCount)
   return syncQuakeCEdictRange(server, savedCount)
 end function
 
-// Allocate and initialize runtime.
+/// Allocate and initialize runtime.
+/// @param server Server state participating in the operation.
+/// @param filesystem The filesystem input consumed by `spawnRuntime`.
+/// @param mapName Name of the map to load or inspect.
+/// @param skill The skill input consumed by `spawnRuntime`.
+/// @param registry The registry input consumed by `spawnRuntime`.
+/// @param commandSystem The command system input consumed by `spawnRuntime`.
 function spawnRuntime(server, filesystem, mapName, skill, registry, commandSystem)
   // The C runtime owns one process-global rand() stream.  Preserve its latest
   // value across SV_SpawnServer even though the MiniLang QC context is rebuilt.
@@ -3214,25 +3652,40 @@ function spawnRuntime(server, filesystem, mapName, skill, registry, commandSyste
   return server
 end function
 
-// Update module state for qc entity vector.
+/// Update module state for qc entity vector.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param fieldName Name that identifies the requested value or resource.
+/// @param value Value consumed by `setQcEntityVector`.
 function setQcEntityVector(server, entityIndex, fieldName, value)
   offset = vm.fieldOffset(server.machine, fieldName)
   if offset >= 0 then vm.setEntityVector(server.machine, entityIndex, offset, value) end if
 end function
 
-// Update module state for qc entity float.
+/// Update module state for qc entity float.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param fieldName Name that identifies the requested value or resource.
+/// @param value Value consumed by `setQcEntityFloat`.
 function setQcEntityFloat(server, entityIndex, fieldName, value)
   offset = vm.fieldOffset(server.machine, fieldName)
   if offset >= 0 then vm.setEntityFloat(server.machine, entityIndex, offset, value) end if
 end function
 
-// Update module state for qc entity word.
+/// Update module state for qc entity word.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param fieldName Name that identifies the requested value or resource.
+/// @param value Value consumed by `setQcEntityWord`.
 function setQcEntityWord(server, entityIndex, fieldName, value)
   offset = vm.fieldOffset(server.machine, fieldName)
   if offset >= 0 then vm.setEntityField(server.machine, entityIndex, offset, value) end if
 end function
 
-// Update module state for player to quake c.
+/// Update module state for player to quake c.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `syncPlayerToQuakeC`.
+/// @param player The player input consumed by `syncPlayerToQuakeC`.
 function syncPlayerToQuakeC(server, clientValue, player)
   if server.machine is void then return false end if
   entityIndex = clientValue.edictIndex
@@ -3263,7 +3716,9 @@ function syncPlayerToQuakeC(server, clientValue, player)
   return true
 end function
 
-// Update module state for command to quake c.
+/// Update module state for command to quake c.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `syncCommandToQuakeC`.
 function syncCommandToQuakeC(server, clientValue)
   if server.machine is void then return false end if
   entityIndex = clientValue.edictIndex
@@ -3281,9 +3736,11 @@ function syncCommandToQuakeC(server, clientValue)
   return true
 end function
 
-// Warm the pure field/function lookup paths used by the first client physics
-// frame. No QuakeC code is executed and no game time advances; authoritative
-// player values are written and read back unchanged.
+/// Warm the pure field/function lookup paths used by the first client physics
+/// frame. No QuakeC code is executed and no game time advances; authoritative
+/// player values are written and read back unchanged.
+/// @param server Server state participating in the operation.
+/// @param fallbackPlayer The fallback player input consumed by `precacheClientFrameLookups`.
 function precacheClientFrameLookups(server, fallbackPlayer)
   if server.machine is void or server.machine.context is void then return 0 end if
   warmed = 0
@@ -3301,7 +3758,10 @@ function precacheClientFrameLookups(server, fallbackPlayer)
   return warmed
 end function
 
-// Update module state for player from quake c.
+/// Update module state for player from quake c.
+/// @param server Server state participating in the operation.
+/// @param clientValue The client value input consumed by `syncPlayerFromQuakeC`.
+/// @param player The player input consumed by `syncPlayerFromQuakeC`.
 function syncPlayerFromQuakeC(server, clientValue, player)
   if server.machine is void then return false end if
   entityIndex = clientValue.edictIndex
@@ -3379,7 +3839,11 @@ function syncPlayerFromQuakeC(server, clientValue, player)
   return true
 end function
 
-// Execute qc function.
+/// Execute qc function.
+/// @param server Server state participating in the operation.
+/// @param functionName Name that identifies the requested value or resource.
+/// @param selfIndex Zero-based index of the requested entry.
+/// @param otherIndex Zero-based index of the requested entry.
 function executeQcFunction(server, functionName, selfIndex, otherIndex)
   if server.machine is void then return false end if
   functionIndex = vm.functionIndex(server.machine, functionName)
@@ -3391,7 +3855,9 @@ function executeQcFunction(server, functionName, selfIndex, otherIndex)
   return true
 end function
 
-// Execute quake cframe.
+/// Execute quake cframe.
+/// @param server Server state participating in the operation.
+/// @param frameTime Time value used by the operation.
 function runQuakeCFrame(server, frameTime)
   if server.machine is void or server.machine.context is void then return 0 end if
   machine = server.machine

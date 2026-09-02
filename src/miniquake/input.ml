@@ -17,86 +17,161 @@ import miniquake.cvar as cv
 import miniquake.native as native
 import miniquake.array_util as arrayutil
 
+/// Defines the default m yaw value used by `miniquake.input`.
 const DEFAULT_M_YAW = 0.022
+/// Defines the default m pitch value used by `miniquake.input`.
 const DEFAULT_M_PITCH = 0.022
+/// Defines the default m side value used by `miniquake.input`.
 const DEFAULT_M_SIDE = 0.8
+/// Defines the default m forward value used by `miniquake.input`.
 const DEFAULT_M_FORWARD = 1.0
+/// Defines the default yaw speed value used by `miniquake.input`.
 const DEFAULT_YAW_SPEED = 140.0
+/// Defines the default pitch speed value used by `miniquake.input`.
 const DEFAULT_PITCH_SPEED = 150.0
+/// Defines the default angle speed key value used by `miniquake.input`.
 const DEFAULT_ANGLE_SPEED_KEY = 1.5
+/// Defines the default move speed key value used by `miniquake.input`.
 const DEFAULT_MOVE_SPEED_KEY = 2.0
+/// Defines the joy absolute axis value used by `miniquake.input`.
 const JOY_ABSOLUTE_AXIS = 0
+/// Defines the joy relative axis value used by `miniquake.input`.
 const JOY_RELATIVE_AXIS = 16
+/// Defines the joy max axes value used by `miniquake.input`.
 const JOY_MAX_AXES = 6
+/// Defines the axis nada value used by `miniquake.input`.
 const AXIS_NADA = 0
+/// Defines the axis forward value used by `miniquake.input`.
 const AXIS_FORWARD = 1
+/// Defines the axis look value used by `miniquake.input`.
 const AXIS_LOOK = 2
+/// Defines the axis side value used by `miniquake.input`.
 const AXIS_SIDE = 3
+/// Defines the axis turn value used by `miniquake.input`.
 const AXIS_TURN = 4
 
+/// Tracks the module-level old mouse x state owned by `miniquake.input`.
 oldMouseX = 0.0
+/// Tracks the module-level old mouse y state owned by `miniquake.input`.
 oldMouseY = 0.0
+/// Tracks the module-level mouse filter ready state owned by `miniquake.input`.
 mouseFilterReady = false
+/// Tracks the module-level mouse captured state owned by `miniquake.input`.
 mouseCaptured = false
+/// Tracks the module-level mouse initialized state owned by `miniquake.input`.
 mouseInitialized = false
+/// Tracks the module-level mouse active state owned by `miniquake.input`.
 mouseActive = false
+/// Tracks the module-level mouse activate toggle state owned by `miniquake.input`.
 mouseActivateToggle = false
+/// Tracks the module-level mouse show toggle state owned by `miniquake.input`.
 mouseShowToggle = true
+/// Tracks the module-level direct input state owned by `miniquake.input`.
 directInput = false
+/// Tracks the previous module-level mouse-button state owned by `miniquake.input`.
 mouseOldButtonState = 0
+/// Tracks the module-level mouse accum x state owned by `miniquake.input`.
 mouseAccumX = 0.0
+/// Tracks the module-level mouse accum y state owned by `miniquake.input`.
 mouseAccumY = 0.0
+/// Tracks the module-level mouse delta scratch state owned by `miniquake.input`.
 mouseDeltaScratch = [0.0, 0.0]
+/// Tracks the module-level joy available state owned by `miniquake.input`.
 joyAvailable = false
+/// Tracks the module-level joy advanced initialized state owned by `miniquake.input`.
 joyAdvancedInitialized = false
+/// Tracks the module-level joy has pov state owned by `miniquake.input`.
 joyHasPov = false
+/// Tracks the module-level joy button count state owned by `miniquake.input`.
 joyButtonCount = 0
+/// Tracks the previous module-level joystick-button state owned by `miniquake.input`.
 joyOldButtonState = 0
+/// Tracks the previous module-level joystick POV state owned by `miniquake.input`.
 joyOldPovState = 0
+/// Tracks the module-level joy axes state owned by `miniquake.input`.
 joyAxes = [32768, 32768, 32768, 32768, 32768, 32768]
+/// Tracks the module-level joy axis map state owned by `miniquake.input`.
 joyAxisMap = [AXIS_TURN, AXIS_FORWARD, AXIS_NADA, AXIS_NADA, AXIS_NADA, AXIS_NADA]
+/// Tracks the module-level joy control map state owned by `miniquake.input`.
 joyControlMap = [JOY_ABSOLUTE_AXIS, JOY_ABSOLUTE_AXIS, JOY_ABSOLUTE_AXIS, JOY_ABSOLUTE_AXIS, JOY_ABSOLUTE_AXIS, JOY_ABSOLUTE_AXIS]
+/// Tracks the module-level input registry state owned by `miniquake.input`.
 inputRegistry = void
+/// Tracks the module-level no mouse requested state owned by `miniquake.input`.
 noMouseRequested = false
+/// Tracks the module-level no joystick requested state owned by `miniquake.input`.
 noJoystickRequested = false
+/// Tracks the module-level direct input requested state owned by `miniquake.input`.
 directInputRequested = false
+/// Tracks the module-level joystick test snapshot state owned by `miniquake.input`.
 joystickTestSnapshot = false
+/// Tracks the module-level joystick startup override state owned by `miniquake.input`.
 joystickStartupOverride = void
+/// Tracks the module-level joy pov state owned by `miniquake.input`.
 joyPov = 65535
+/// Tracks the module-level joy snapshot buttons state owned by `miniquake.input`.
 joySnapshotButtons = 0
+/// Tracks the module-level bindings state owned by `miniquake.input`.
 bindings = []
+/// Tracks the module-level polled bindings state owned by `miniquake.input`.
 polledBindings = []
+/// Tracks the module-level polled key down snapshot state owned by `miniquake.input`.
 polledKeyDownSnapshot = bytes(256)
+/// Tracks the module-level polled key pressed snapshot state owned by `miniquake.input`.
 polledKeyPressedSnapshot = bytes(256)
+/// Tracks the module-level polled key query mask state owned by `miniquake.input`.
 polledKeyQueryMask = bytes(256)
+/// Tracks the module-level event key down states state owned by `miniquake.input`.
 eventKeyDownStates = bytes(256)
+/// Tracks the module-level gameplay transition blocked state owned by `miniquake.input`.
 gameplayTransitionBlocked = false
+/// Tracks the module-level gameplay transition held codes state owned by `miniquake.input`.
 gameplayTransitionHeldCodes = []
+/// Tracks the module-level always mouse look state owned by `miniquake.input`.
 alwaysMouseLook = false
 
 // cl_input.c's kbutton_t is deliberately represented as a three-element
 // mutable value: two independently held key numbers followed by the original
 // state bitfield (down=1, impulse-down=2, impulse-up=4).
 inMLook = [0, 0, 0]
+/// Tracks the module-level in k look state owned by `miniquake.input`.
 inKLook = [0, 0, 0]
+/// Tracks the module-level in left state owned by `miniquake.input`.
 inLeft = [0, 0, 0]
+/// Tracks the module-level in right state owned by `miniquake.input`.
 inRight = [0, 0, 0]
+/// Tracks the module-level in forward state owned by `miniquake.input`.
 inForward = [0, 0, 0]
+/// Tracks the module-level in back state owned by `miniquake.input`.
 inBack = [0, 0, 0]
+/// Tracks the module-level in lookup state owned by `miniquake.input`.
 inLookup = [0, 0, 0]
+/// Tracks the module-level in lookdown state owned by `miniquake.input`.
 inLookdown = [0, 0, 0]
+/// Tracks the module-level in moveleft state owned by `miniquake.input`.
 inMoveleft = [0, 0, 0]
+/// Tracks the module-level in moveright state owned by `miniquake.input`.
 inMoveright = [0, 0, 0]
+/// Tracks the module-level in strafe state owned by `miniquake.input`.
 inStrafe = [0, 0, 0]
+/// Tracks the module-level in speed state owned by `miniquake.input`.
 inSpeed = [0, 0, 0]
+/// Tracks the module-level in use state owned by `miniquake.input`.
 inUse = [0, 0, 0]
+/// Tracks the module-level in jump state owned by `miniquake.input`.
 inJump = [0, 0, 0]
+/// Tracks the module-level in attack state owned by `miniquake.input`.
 inAttack = [0, 0, 0]
+/// Tracks the module-level in up state owned by `miniquake.input`.
 inUp = [0, 0, 0]
+/// Tracks the module-level in down state owned by `miniquake.input`.
 inDown = [0, 0, 0]
+/// Tracks the module-level in impulse state owned by `miniquake.input`.
 inImpulse = 0
+/// Tracks the module-level pitch drift stop requested state owned by `miniquake.input`.
 pitchDriftStopRequested = false
+/// Tracks the module-level pitch drift start requested state owned by `miniquake.input`.
 pitchDriftStartRequested = false
+/// Tracks the module-level look spring enabled state owned by `miniquake.input`.
 lookSpringEnabled = false
 
 // Keep the stock kbutton command set in persistent storage.  Constructing this
@@ -123,9 +198,11 @@ function createButton()
   return [0, 0, 0]
 end function
 
-// KeyDown/KeyUp retain the original two-key ownership rule. A key number of
-// -1 is the console's manual, continuously-held form; void on KeyUp is the
-// original "unstick this action" command with no key-number argument.
+/// KeyDown/KeyUp retain the original two-key ownership rule. A key number of
+/// -1 is the console's manual, continuously-held form; void on KeyUp is the
+/// original "unstick this action" command with no key-number argument.
+/// @param button The button input consumed by `KeyDown`.
+/// @param key Key used to identify the requested entry.
 function KeyDown(button, key)
   if key is void then key = -1 end if
   if key == button[0] or key == button[1] then return false end if
@@ -142,7 +219,9 @@ function KeyDown(button, key)
   return true
 end function
 
-// Provide key up behavior for the active subsystem.
+/// Implements the `KeyUp` operation for `miniquake.input` (key up).
+/// @param button The button input consumed by `KeyUp`.
+/// @param key Key used to identify the requested entry.
 function KeyUp(button, key)
   if key is void then
     button[0] = 0
@@ -163,7 +242,8 @@ function KeyUp(button, key)
   return true
 end function
 
-// Apply the Quake-compatible cl key state behavior.
+/// Apply the Quake-compatible cl key state behavior.
+/// @param button The button input consumed by `CL_KeyState`.
 function CL_KeyState(button)
   impulseDown = (button[2] & 2) != 0
   impulseUp = (button[2] & 4) != 0
@@ -180,80 +260,115 @@ function CL_KeyState(button)
   return value
 end function
 
-// Mirror Quake's IN_KLookDown routine and its observable state changes.
+/// Mirror Quake's IN_KLookDown routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_KLookDown(key) return KeyDown(inKLook, key) end function
-// Mirror Quake's IN_KLookUp routine and its observable state changes.
+/// Mirror Quake's IN_KLookUp routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_KLookUp(key) return KeyUp(inKLook, key) end function
-// Mirror Quake's IN_MLookDown routine and its observable state changes.
+/// Mirror Quake's IN_MLookDown routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_MLookDown(key) return KeyDown(inMLook, key) end function
-// Mirror Quake's IN_MLookUp routine and its observable state changes.
+/// Mirror Quake's IN_MLookUp routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_MLookUp(key)
   result = KeyUp(inMLook, key)
   if (inMLook[2] & 1) == 0 and lookSpringEnabled then requestStartPitchDrift() end if
   return result
 end function
-// Mirror Quake's IN_UpDown routine and its observable state changes.
+/// Mirror Quake's IN_UpDown routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_UpDown(key) return KeyDown(inUp, key) end function
-// Mirror Quake's IN_UpUp routine and its observable state changes.
+/// Mirror Quake's IN_UpUp routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_UpUp(key) return KeyUp(inUp, key) end function
-// Mirror Quake's IN_DownDown routine and its observable state changes.
+/// Mirror Quake's IN_DownDown routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_DownDown(key) return KeyDown(inDown, key) end function
-// Mirror Quake's IN_DownUp routine and its observable state changes.
+/// Mirror Quake's IN_DownUp routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_DownUp(key) return KeyUp(inDown, key) end function
-// Mirror Quake's IN_LeftDown routine and its observable state changes.
+/// Mirror Quake's IN_LeftDown routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_LeftDown(key) return KeyDown(inLeft, key) end function
-// Mirror Quake's IN_LeftUp routine and its observable state changes.
+/// Mirror Quake's IN_LeftUp routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_LeftUp(key) return KeyUp(inLeft, key) end function
-// Mirror Quake's IN_RightDown routine and its observable state changes.
+/// Mirror Quake's IN_RightDown routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_RightDown(key) return KeyDown(inRight, key) end function
-// Mirror Quake's IN_RightUp routine and its observable state changes.
+/// Mirror Quake's IN_RightUp routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_RightUp(key) return KeyUp(inRight, key) end function
-// Mirror Quake's IN_ForwardDown routine and its observable state changes.
+/// Mirror Quake's IN_ForwardDown routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_ForwardDown(key) return KeyDown(inForward, key) end function
-// Mirror Quake's IN_ForwardUp routine and its observable state changes.
+/// Mirror Quake's IN_ForwardUp routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_ForwardUp(key) return KeyUp(inForward, key) end function
-// Mirror Quake's IN_BackDown routine and its observable state changes.
+/// Mirror Quake's IN_BackDown routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_BackDown(key) return KeyDown(inBack, key) end function
-// Mirror Quake's IN_BackUp routine and its observable state changes.
+/// Mirror Quake's IN_BackUp routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_BackUp(key) return KeyUp(inBack, key) end function
-// Mirror Quake's IN_LookupDown routine and its observable state changes.
+/// Mirror Quake's IN_LookupDown routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_LookupDown(key) return KeyDown(inLookup, key) end function
-// Mirror Quake's IN_LookupUp routine and its observable state changes.
+/// Mirror Quake's IN_LookupUp routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_LookupUp(key) return KeyUp(inLookup, key) end function
-// Mirror Quake's IN_LookdownDown routine and its observable state changes.
+/// Mirror Quake's IN_LookdownDown routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_LookdownDown(key) return KeyDown(inLookdown, key) end function
-// Mirror Quake's IN_LookdownUp routine and its observable state changes.
+/// Mirror Quake's IN_LookdownUp routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_LookdownUp(key) return KeyUp(inLookdown, key) end function
-// Mirror Quake's IN_MoveleftDown routine and its observable state changes.
+/// Mirror Quake's IN_MoveleftDown routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_MoveleftDown(key) return KeyDown(inMoveleft, key) end function
-// Mirror Quake's IN_MoveleftUp routine and its observable state changes.
+/// Mirror Quake's IN_MoveleftUp routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_MoveleftUp(key) return KeyUp(inMoveleft, key) end function
-// Mirror Quake's IN_MoverightDown routine and its observable state changes.
+/// Mirror Quake's IN_MoverightDown routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_MoverightDown(key) return KeyDown(inMoveright, key) end function
-// Mirror Quake's IN_MoverightUp routine and its observable state changes.
+/// Mirror Quake's IN_MoverightUp routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_MoverightUp(key) return KeyUp(inMoveright, key) end function
-// Mirror Quake's IN_SpeedDown routine and its observable state changes.
+/// Mirror Quake's IN_SpeedDown routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_SpeedDown(key) return KeyDown(inSpeed, key) end function
-// Mirror Quake's IN_SpeedUp routine and its observable state changes.
+/// Mirror Quake's IN_SpeedUp routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_SpeedUp(key) return KeyUp(inSpeed, key) end function
-// Mirror Quake's IN_StrafeDown routine and its observable state changes.
+/// Mirror Quake's IN_StrafeDown routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_StrafeDown(key) return KeyDown(inStrafe, key) end function
-// Mirror Quake's IN_StrafeUp routine and its observable state changes.
+/// Mirror Quake's IN_StrafeUp routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_StrafeUp(key) return KeyUp(inStrafe, key) end function
-// Mirror Quake's IN_AttackDown routine and its observable state changes.
+/// Mirror Quake's IN_AttackDown routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_AttackDown(key) return KeyDown(inAttack, key) end function
-// Mirror Quake's IN_AttackUp routine and its observable state changes.
+/// Mirror Quake's IN_AttackUp routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_AttackUp(key) return KeyUp(inAttack, key) end function
-// Mirror Quake's IN_UseDown routine and its observable state changes.
+/// Mirror Quake's IN_UseDown routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_UseDown(key) return KeyDown(inUse, key) end function
-// Mirror Quake's IN_UseUp routine and its observable state changes.
+/// Mirror Quake's IN_UseUp routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_UseUp(key) return KeyUp(inUse, key) end function
-// Mirror Quake's IN_JumpDown routine and its observable state changes.
+/// Mirror Quake's IN_JumpDown routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_JumpDown(key) return KeyDown(inJump, key) end function
-// Mirror Quake's IN_JumpUp routine and its observable state changes.
+/// Mirror Quake's IN_JumpUp routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function IN_JumpUp(key) return KeyUp(inJump, key) end function
 
-// Mirror Quake's IN_Impulse routine and its observable state changes.
+/// Mirror Quake's IN_Impulse routine and its observable state changes.
+/// @param value Value consumed by `IN_Impulse`.
 function IN_Impulse(value)
   global inImpulse
   if value is string then value = common.atoi(value) end if
@@ -261,14 +376,14 @@ function IN_Impulse(value)
   return inImpulse
 end function
 
-// Provide request stop pitch drift behavior for the active subsystem.
+/// Implements the `requestStopPitchDrift` operation for `miniquake.input` (request stop pitch drift).
 function requestStopPitchDrift()
   global pitchDriftStopRequested
   pitchDriftStopRequested = true
   return true
 end function
 
-// Provide request start pitch drift behavior for the active subsystem.
+/// Implements the `requestStartPitchDrift` operation for `miniquake.input` (request start pitch drift).
 function requestStartPitchDrift()
   global pitchDriftStartRequested
   pitchDriftStartRequested = true
@@ -284,19 +399,22 @@ function consumePitchDriftRequests()
   return result
 end function
 
-// Update module state for look spring.
+/// Update module state for look spring.
+/// @param enabled Whether the optional behavior is enabled.
 function setLookSpring(enabled)
   global lookSpringEnabled
   lookSpringEnabled = enabled
   return lookSpringEnabled
 end function
 
-// Convert data for lower.
+/// Convert data for lower.
+/// @param text Text to parse or process.
 function lower(text)
   return bio.lower(text)
 end function
 
-// Return key code for name derived from the active module state.
+/// Return key code for name derived from the active module state.
+/// @param name Stable name that identifies the requested object or option.
 function keyCodeForName(name)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   wanted = lower(name)
@@ -342,7 +460,8 @@ function keyCodeForName(name)
   return -1
 end function
 
-// Provide key name for code behavior for the active subsystem.
+/// Implements the `keyNameForCode` operation for `miniquake.input` (key name for code).
+/// @param code The code input consumed by `keyNameForCode`.
 function keyNameForCode(code)
   if code == -1 then return "<KEY NOT FOUND>" end if
   if code > 32 and code < 127 then return decode(bytes([code])) end if
@@ -374,7 +493,9 @@ function keyNameForCode(code)
   return "<UNKNOWN KEYNUM>"
 end function
 
-// Provide bind key behavior for the active subsystem.
+/// Implements the `bindKey` operation for `miniquake.input` (bind key).
+/// @param keyName Name that identifies the requested value or resource.
+/// @param command Console or protocol command to execute.
 function bindKey(keyName, command)
   global bindings
   code = keyCodeForName(keyName)
@@ -382,7 +503,9 @@ function bindKey(keyName, command)
   return setBindingCode(code, command)
 end function
 
-// Update module state for binding code.
+/// Update module state for binding code.
+/// @param code The code input consumed by `setBindingCode`.
+/// @param command Console or protocol command to execute.
 function setBindingCode(code, command)
   global bindings
   if code < 0 or code > 255 then return false end if
@@ -405,7 +528,8 @@ function setBindingCode(code, command)
   return true
 end function
 
-// Provide binding for code behavior for the active subsystem.
+/// Implements the `bindingForCode` operation for `miniquake.input` (binding for code).
+/// @param code The code input consumed by `bindingForCode`.
 function bindingForCode(code)
   for each item in bindings
     if item[0] == code then return item[2] end if
@@ -413,7 +537,8 @@ function bindingForCode(code)
   return void
 end function
 
-// Report whether binding code.
+/// Report whether binding code.
+/// @param code The code input consumed by `hasBindingCode`.
 function hasBindingCode(code)
   for each item in bindings
     if item[0] == code then return true end if
@@ -421,7 +546,8 @@ function hasBindingCode(code)
   return false
 end function
 
-// Provide unbind key behavior for the active subsystem.
+/// Implements the `unbindKey` operation for `miniquake.input` (unbind key).
+/// @param keyName Name that identifies the requested value or resource.
 function unbindKey(keyName)
   global bindings
   code = keyCodeForName(keyName)
@@ -435,7 +561,7 @@ function unbindKey(keyName)
   return true
 end function
 
-// Provide unbind all behavior for the active subsystem.
+/// Implements the `unbindAll` operation for `miniquake.input` (unbind all).
 function unbindAll()
   global bindings
   bindings = []
@@ -489,7 +615,8 @@ function applyModernMovementBindings()
   return true
 end function
 
-// Provide bindings for command behavior for the active subsystem.
+/// Implements the `bindingsForCommand` operation for `miniquake.input` (bindings for command).
+/// @param command Console or protocol command to execute.
 function bindingsForCommand(command)
   wanted = lower(command)
   result = []
@@ -502,7 +629,8 @@ function bindingsForCommand(command)
   return result
 end function
 
-// Provide binding for command behavior for the active subsystem.
+/// Implements the `bindingForCommand` operation for `miniquake.input` (binding for command).
+/// @param command Console or protocol command to execute.
 function bindingForCommand(command)
   found = bindingsForCommand(command)
   if len(found) == 0 then return "???" end if
@@ -510,7 +638,8 @@ function bindingForCommand(command)
   return found[0] + " or " + found[1]
 end function
 
-// Provide unbind command behavior for the active subsystem.
+/// Implements the `unbindCommand` operation for `miniquake.input` (unbind command).
+/// @param command Console or protocol command to execute.
 function unbindCommand(command)
   global bindings
   wanted = lower(command)
@@ -523,7 +652,8 @@ function unbindCommand(command)
   return true
 end function
 
-// Provide command for key behavior for the active subsystem.
+/// Implements the `commandForKey` operation for `miniquake.input` (command for key).
+/// @param keyName Name that identifies the requested value or resource.
 function commandForKey(keyName)
   code = keyCodeForName(keyName)
   binding = bindingForCode(code)
@@ -531,7 +661,8 @@ function commandForKey(keyName)
   return ""
 end function
 
-// Convert data for quote binding.
+/// Convert data for quote binding.
+/// @param text Text to parse or process.
 function quoteBinding(text)
   source = bytes(text)
   result = ""
@@ -545,7 +676,7 @@ function quoteBinding(text)
   return result
 end function
 
-// Provide binding text behavior for the active subsystem.
+/// Implements the `bindingText` operation for `miniquake.input` (binding text).
 function bindingText()
   text = ""
   code = 0
@@ -559,7 +690,8 @@ function bindingText()
   return text
 end function
 
-// Provide key is down behavior for the active subsystem.
+/// Implements the `keyIsDown` operation for `miniquake.input` (key is down).
+/// @param code The code input consumed by `keyIsDown`.
 function keyIsDown(code)
   if code == 200 then return (win.mouseButtons() & 1) != 0 end if
   if code == 201 then return (win.mouseButtons() & 2) != 0 end if
@@ -575,8 +707,10 @@ function keyIsDown(code)
   return win.keyDown(virtualKey)
 end function
 
-// Test a physical key while reusing the mouse snapshot captured for this poll.
-// Keyboard and joystick semantics deliberately remain identical to keyIsDown.
+/// Test a physical key while reusing the mouse snapshot captured for this poll.
+/// Keyboard and joystick semantics deliberately remain identical to keyIsDown.
+/// @param code The code input consumed by `keyIsDownWithMouseSnapshot`.
+/// @param mouseButtons The mouse buttons input consumed by `keyIsDownWithMouseSnapshot`.
 function keyIsDownWithMouseSnapshot(code, mouseButtons)
   if code == 200 then return (mouseButtons & 1) != 0 end if
   if code == 201 then return (mouseButtons & 2) != 0 end if
@@ -590,7 +724,8 @@ function keyIsDownWithMouseSnapshot(code, mouseButtons)
   return win.keyDown(virtualKey)
 end function
 
-// Provide virtual key for code behavior for the active subsystem.
+/// Implements the `virtualKeyForCode` operation for `miniquake.input` (virtual key for code).
+/// @param code The code input consumed by `virtualKeyForCode`.
 function virtualKeyForCode(code)
   if code >= 97 and code <= 122 then return code - 32 end if
   if code >= 48 and code <= 57 then return code end if
@@ -625,7 +760,8 @@ function virtualKeyForCode(code)
   return -1
 end function
 
-// Provide quake key for virtual key behavior for the active subsystem.
+/// Implements the `quakeKeyForVirtualKey` operation for `miniquake.input` (quake key for virtual key).
+/// @param virtualKey The virtual key input consumed by `quakeKeyForVirtualKey`.
 function quakeKeyForVirtualKey(virtualKey)
   if virtualKey >= 65 and virtualKey <= 90 then return virtualKey + 32 end if
   if virtualKey >= 48 and virtualKey <= 57 then return virtualKey end if
@@ -660,10 +796,11 @@ function quakeKeyForVirtualKey(virtualKey)
   return -1
 end function
 
-// gl_vidnt.c does not translate keyboard messages through virtual-key values.
-// It uses bits 16..23 of lParam, i.e. the hardware scan code.  Keeping that
-// mapping here preserves keypad/navigation distinctions and makes keyboard
-// input independent of the active Windows keyboard layout.
+/// gl_vidnt.c does not translate keyboard messages through virtual-key values.
+/// It uses bits 16..23 of lParam, i.e. the hardware scan code.  Keeping that
+/// mapping here preserves keypad/navigation distinctions and makes keyboard
+/// input independent of the active Windows keyboard layout.
+/// @param scanCode The scan code input consumed by `quakeKeyForScanCode`.
 function quakeKeyForScanCode(scanCode)
   if scanCode < 0 or scanCode > 127 then return 0 end if
   table = [
@@ -679,7 +816,8 @@ function quakeKeyForScanCode(scanCode)
   return table[scanCode]
 end function
 
-// Provide action down behavior for the active subsystem.
+/// Implements the `actionDown` operation for `miniquake.input` (action down).
+/// @param command Console or protocol command to execute.
 function actionDown(command)
   wanted = lower(command)
   for each item in bindings
@@ -688,7 +826,8 @@ function actionDown(command)
   return false
 end function
 
-// Provide action pressed behavior for the active subsystem.
+/// Implements the `actionPressed` operation for `miniquake.input` (action pressed).
+/// @param command Console or protocol command to execute.
 function actionPressed(command)
   wanted = lower(command)
   for each item in bindings
@@ -700,7 +839,8 @@ function actionPressed(command)
   return false
 end function
 
-// Provide button for command behavior for the active subsystem.
+/// Implements the `buttonForNormalizedCommand` operation for `miniquake.input` (button for normalized command).
+/// @param wanted The wanted input consumed by `buttonForNormalizedCommand`.
 function buttonForNormalizedCommand(wanted)
   if wanted == "+klook" then return inKLook end if
   if wanted == "+mlook" then return inMLook end if
@@ -722,13 +862,15 @@ function buttonForNormalizedCommand(wanted)
   return void
 end function
 
-// Resolve an arbitrary-case button command through its canonical name.
+/// Resolve an arbitrary-case button command through its canonical name.
+/// @param command Console or protocol command to execute.
 function buttonForCommand(command)
   return buttonForNormalizedCommand(lower(command))
 end function
 
-// Parse the exact canonical impulse binding accepted by the original polling
-// path.  Non-impulse and non-canonical command strings return zero.
+/// Parse the exact canonical impulse binding accepted by the original polling
+/// path.  Non-impulse and non-canonical command strings return zero.
+/// @param command Console or protocol command to execute.
 function impulseForCommand(command)
   source = bytes(command)
   if len(source) < 9 or decode(slice(source, 0, 8)) != "impulse " then return 0 end if
@@ -767,12 +909,14 @@ function rebuildPolledBindings()
   return true
 end function
 
-// Provide button commands behavior for the active subsystem.
+/// Implements the `buttonCommands` operation for `miniquake.input` (button commands).
 function buttonCommands()
   return buttonCommandNames
 end function
 
-// Provide binding holds key behavior for the active subsystem.
+/// Implements the `bindingHoldsKey` operation for `miniquake.input` (binding holds key).
+/// @param command Console or protocol command to execute.
+/// @param key Key used to identify the requested entry.
 function bindingHoldsKey(command, key)
   if key == -1 then return true end if
   wanted = lower(command)
@@ -782,8 +926,11 @@ function bindingHoldsKey(command, key)
   return false
 end function
 
-// Check a held owner against the pre-normalized polling cache and current
-// physical snapshot without allocating or rescanning unrelated bind commands.
+/// Check a held owner against the pre-normalized polling cache and current
+/// physical snapshot without allocating or rescanning unrelated bind commands.
+/// @param command Console or protocol command to execute.
+/// @param key Key used to identify the requested entry.
+/// @param mouseButtons The mouse buttons input consumed by `polledBindingHoldsKey`.
 function polledBindingHoldsKey(command, key, mouseButtons)
   if key == -1 then return true end if
   for each item in polledBindings
@@ -794,7 +941,9 @@ function polledBindingHoldsKey(command, key, mouseButtons)
   return false
 end function
 
-// Resolve a binding level from the frame-local bulk keyboard/mouse snapshot.
+/// Resolve a binding level from the frame-local bulk keyboard/mouse snapshot.
+/// @param code The code input consumed by `polledKeyDownAt`.
+/// @param mouseButtons The mouse buttons input consumed by `polledKeyDownAt`.
 function polledKeyDownAt(code, mouseButtons)
   if code == 200 then return (mouseButtons & 1) != 0 end if
   if code == 201 then return (mouseButtons & 2) != 0 end if
@@ -808,9 +957,11 @@ function polledKeyDownAt(code, mouseButtons)
   return polledKeyDownSnapshot[virtualKey] != 0
 end function
 
-// Record the ordered Quake key level delivered by the Win32 event queue.
-// Keeping this separate from kbutton ownership lets live polling repair a
-// consumed command without trusting a transient asynchronous key sample.
+/// Record the ordered Quake key level delivered by the Win32 event queue.
+/// Keeping this separate from kbutton ownership lets live polling repair a
+/// consumed command without trusting a transient asynchronous key sample.
+/// @param code The code input consumed by `setEventKeyState`.
+/// @param down The down input consumed by `setEventKeyState`.
 function setEventKeyState(code, down)
   if code < 0 or code >= len(eventKeyDownStates) then return false end if
   if down then eventKeyDownStates[code] = 1 else eventKeyDownStates[code] = 0 end if
@@ -827,23 +978,26 @@ function clearEventKeyStates()
   return true
 end function
 
-// Resolve a binding press edge from the frame-local bulk keyboard snapshot.
+/// Resolve a binding press edge from the frame-local bulk keyboard snapshot.
+/// @param code The code input consumed by `polledKeyPressedAt`.
 function polledKeyPressedAt(code)
   virtualKey = virtualKeyForCode(code)
   if virtualKey < 0 or virtualKey >= len(polledKeyPressedSnapshot) then return false end if
   return polledKeyPressedSnapshot[virtualKey] != 0
 end function
 
-// Provide key pressed for code behavior for the active subsystem.
+/// Implements the `keyPressedForCode` operation for `miniquake.input` (key pressed for code).
+/// @param code The code input consumed by `keyPressedForCode`.
 function keyPressedForCode(code)
   virtualKey = virtualKeyForCode(code)
   if virtualKey < 0 then return false end if
   return win.keyPressed(virtualKey)
 end function
 
-// Translate the native polling API into the same edge events Key_Event feeds
-// into cl_input.c. This preserves ownership when two bound keys hold one
-// action, and also preserves a press/release completed between two frames.
+/// Translate the native polling API into the same edge events Key_Event feeds
+/// into cl_input.c. This preserves ownership when two bound keys hold one
+/// action, and also preserves a press/release completed between two frames.
+/// @param command Console or protocol command to execute.
 function synchronizeButton(command)
   wanted = lower(command)
   button = buttonForNormalizedCommand(wanted)
@@ -872,7 +1026,9 @@ function synchronizeButton(command)
   return true
 end function
 
-// Return cvar value derived from the active module state.
+/// Return cvar value derived from the active module state.
+/// @param name Stable name that identifies the requested object or option.
+/// @param fallback Value to use when the requested input is unavailable or invalid.
 function cvarValue(name, fallback)
   if inputRegistry is void then return fallback end if
   variable = cv.find(inputRegistry, name)
@@ -902,7 +1058,8 @@ function Joy_AdvancedUpdate_f()
   return joyAxisMap
 end function
 
-// Provide raw value pointer behavior for the active subsystem.
+/// Implements the `RawValuePointer` operation for `miniquake.input` (raw value pointer).
+/// @param axis The axis input consumed by `RawValuePointer`.
 function RawValuePointer(axis)
   if axis < 0 or axis >= JOY_MAX_AXES then return 32768 end if
   return joyAxes[axis]
@@ -932,7 +1089,12 @@ function IN_StartupJoystick()
   return true
 end function
 
-// Update module state for joystick snapshot.
+/// Sets joystick snapshot for `miniquake.input`.
+/// @param axes The axes input consumed by `setJoystickSnapshot`.
+/// @param buttons The buttons input consumed by `setJoystickSnapshot`.
+/// @param pov The pov input consumed by `setJoystickSnapshot`.
+/// @param buttonCount Number of entries or units to process.
+/// @param hasPov The has pov input consumed by `setJoystickSnapshot`.
 function setJoystickSnapshot(axes, buttons, pov, buttonCount, hasPov)
   global joyAxes, joyOldButtonState, joyOldPovState, joyButtonCount
   global joyHasPov, joyAvailable, joystickTestSnapshot, joyPov, joySnapshotButtons
@@ -948,7 +1110,10 @@ function setJoystickSnapshot(axes, buttons, pov, buttonCount, hasPov)
   return true
 end function
 
-// Update module state for joystick snapshot.
+/// Updates joystick snapshot for `miniquake.input`.
+/// @param axes The axes input consumed by `updateJoystickSnapshot`.
+/// @param buttons The buttons input consumed by `updateJoystickSnapshot`.
+/// @param pov The pov input consumed by `updateJoystickSnapshot`.
 function updateJoystickSnapshot(axes, buttons, pov)
   global joyAxes, joyPov, joySnapshotButtons
   joyAxes = axes
@@ -957,7 +1122,7 @@ function updateJoystickSnapshot(axes, buttons, pov)
   return joystickTestSnapshot
 end function
 
-// Update module state for joystick snapshot.
+/// Clears joystick snapshot for `miniquake.input`.
 function clearJoystickSnapshot()
   global joyAvailable, joystickTestSnapshot, joyOldButtonState, joyOldPovState
   joyAvailable = false
@@ -967,7 +1132,9 @@ function clearJoystickSnapshot()
   return true
 end function
 
-// Mirror Quake's IN_DifferentialSetJoystickStartup routine and its observable state changes.
+/// Mirror Quake's IN_DifferentialSetJoystickStartup routine and its observable state changes.
+/// @param buttonCount Number of entries or units to process.
+/// @param hasPov The has pov input consumed by `IN_DifferentialSetJoystickStartup`.
 function IN_DifferentialSetJoystickStartup(buttonCount, hasPov)
   global joystickStartupOverride
   joystickStartupOverride = [buttonCount, hasPov]
@@ -1099,7 +1266,8 @@ function createCommand()
   return t.UserCommand(t.Vec3(0.0, 0.0, 0.0), 0.0, 0.0, 0.0, 0, 0, 0)
 end function
 
-// Update module state for button.
+/// Update module state for button.
+/// @param button The button input consumed by `resetButton`.
 function resetButton(button)
   button[0] = 0
   button[1] = 0
@@ -1107,7 +1275,11 @@ function resetButton(button)
   return button
 end function
 
-// Update subsystem configuration for configure platform.
+/// Update subsystem configuration for configure platform.
+/// @param registry The registry input consumed by `configurePlatform`.
+/// @param noMouse The no mouse input consumed by `configurePlatform`.
+/// @param noJoystick The no joystick input consumed by `configurePlatform`.
+/// @param useDirectInput The use direct input input consumed by `configurePlatform`.
 function configurePlatform(registry, noMouse, noJoystick, useDirectInput)
   global inputRegistry, noMouseRequested, noJoystickRequested, directInputRequested
   inputRegistry = registry
@@ -1117,7 +1289,18 @@ function configurePlatform(registry, noMouse, noJoystick, useDirectInput)
   return true
 end function
 
-// Mirror Quake's IN_DifferentialSetMouse routine and its observable state changes.
+/// Mirror Quake's IN_DifferentialSetMouse routine and its observable state changes.
+/// @param initialized The initialized input consumed by `IN_DifferentialSetMouse`.
+/// @param active The active input consumed by `IN_DifferentialSetMouse`.
+/// @param activateToggle The activate toggle input consumed by `IN_DifferentialSetMouse`.
+/// @param showToggle The show toggle input consumed by `IN_DifferentialSetMouse`.
+/// @param useDirectInput The use direct input input consumed by `IN_DifferentialSetMouse`.
+/// @param oldButtonState Mutable state used by `IN_DifferentialSetMouse`.
+/// @param accumulatedX The accumulated x input consumed by `IN_DifferentialSetMouse`.
+/// @param accumulatedY The accumulated y input consumed by `IN_DifferentialSetMouse`.
+/// @param previousX The previous x input consumed by `IN_DifferentialSetMouse`.
+/// @param previousY The previous y input consumed by `IN_DifferentialSetMouse`.
+/// @param filterReady The filter ready input consumed by `IN_DifferentialSetMouse`.
 function IN_DifferentialSetMouse(
   initialized,
   active,
@@ -1171,7 +1354,8 @@ function IN_DifferentialState()
   ]
 end function
 
-// Mirror Quake's Force_CenterView_f routine and its observable state changes.
+/// Mirror Quake's Force_CenterView_f routine and its observable state changes.
+/// @param command Console or protocol command to execute.
 function Force_CenterView_f(command)
   command.viewAngles.x = 0.0
   return command
@@ -1354,10 +1538,11 @@ function captureGameplayTransitionHeldCodes()
   return result
 end function
 
-// Query only the current physical device level for a control captured at a
-// menu/map boundary.  eventKeyDownStates intentionally is not consulted here:
-// it describes the pre-transition message stream and can remain set when the
-// renderer or a synchronous map load clears/recreates the native input queue.
+/// Query only the current physical device level for a control captured at a
+/// menu/map boundary.  eventKeyDownStates intentionally is not consulted here:
+/// it describes the pre-transition message stream and can remain set when the
+/// renderer or a synchronous map load clears/recreates the native input queue.
+/// @param code The code input consumed by `gameplayTransitionCodeDown`.
 function gameplayTransitionCodeDown(code)
   if code == 200 then return (win.mouseButtons() & 1) != 0 end if
   if code == 201 then return (win.mouseButtons() & 2) != 0 end if
@@ -1433,7 +1618,8 @@ function CL_InitInput()
   ]
 end function
 
-// Provide command button behavior for the active subsystem.
+/// Implements the `commandButtonNormalized` operation for `miniquake.input` (command button normalized).
+/// @param command Console or protocol command to execute.
 function commandButtonNormalized(command)
   source = bytes(command)
   if len(source) == 0 then return void end if
@@ -1444,12 +1630,16 @@ function commandButtonNormalized(command)
   return buttonForNormalizedCommand(command)
 end function
 
-// Resolve an arbitrary-case signed input command to its shared kbutton.
+/// Resolve an arbitrary-case signed input command to its shared kbutton.
+/// @param command Console or protocol command to execute.
 function commandButton(command)
   return commandButtonNormalized(lower(command))
 end function
 
-// Execute input command.
+/// Execute input command.
+/// @param command Console or protocol command to execute.
+/// @param key Key used to identify the requested entry.
+/// @param value Value consumed by `dispatchInputCommand`.
 function dispatchInputCommand(command, key, value)
   wanted = lower(command)
   if wanted == "impulse" then return IN_Impulse(value) end if
@@ -1460,7 +1650,12 @@ function dispatchInputCommand(command, key, value)
   return KeyUp(button, key)
 end function
 
-// Apply the Quake-compatible cl adjust angles behavior.
+/// Apply the Quake-compatible cl adjust angles behavior.
+/// @param command Console or protocol command to execute.
+/// @param frameTime Time value used by the operation.
+/// @param yawSpeed The yaw speed input consumed by `CL_AdjustAngles`.
+/// @param pitchSpeed The pitch speed input consumed by `CL_AdjustAngles`.
+/// @param angleSpeedKey The angle speed key input consumed by `CL_AdjustAngles`.
 function CL_AdjustAngles(command, frameTime, yawSpeed, pitchSpeed, angleSpeedKey)
   speed = frameTime
   if (inSpeed[2] & 1) != 0 then speed = speed * angleSpeedKey end if
@@ -1488,7 +1683,18 @@ function CL_AdjustAngles(command, frameTime, yawSpeed, pitchSpeed, angleSpeedKey
   return command
 end function
 
-// Apply the Quake-compatible cl base move behavior.
+/// Apply the Quake-compatible cl base move behavior.
+/// @param command Console or protocol command to execute.
+/// @param signon The signon input consumed by `CL_BaseMove`.
+/// @param frameTime Time value used by the operation.
+/// @param forwardSpeed The forward speed input consumed by `CL_BaseMove`.
+/// @param backSpeed The back speed input consumed by `CL_BaseMove`.
+/// @param sideSpeed The side speed input consumed by `CL_BaseMove`.
+/// @param upSpeed The up speed input consumed by `CL_BaseMove`.
+/// @param moveSpeedKey The move speed key input consumed by `CL_BaseMove`.
+/// @param yawSpeed The yaw speed input consumed by `CL_BaseMove`.
+/// @param pitchSpeed The pitch speed input consumed by `CL_BaseMove`.
+/// @param angleSpeedKey The angle speed key input consumed by `CL_BaseMove`.
 function CL_BaseMove(command, signon, frameTime, forwardSpeed, backSpeed, sideSpeed, upSpeed, moveSpeedKey, yawSpeed, pitchSpeed, angleSpeedKey)
   if signon != c.SIGNONS then return false end if
   CL_AdjustAngles(command, frameTime, yawSpeed, pitchSpeed, angleSpeedKey)
@@ -1533,16 +1739,19 @@ function resetMouse()
   return true
 end function
 
-// Keep the capture transition in one place.  Calling this every host frame is
-// intentional: it only touches Win32 when the desired state changes, while a
-// focus loss/reacquire reliably resets both native and filtered deltas.
+/// Keep the capture transition in one place.  Calling this every host frame is
+/// intentional: it only touches Win32 when the desired state changes, while a
+/// focus loss/reacquire reliably resets both native and filtered deltas.
+/// @param enabled Whether the optional behavior is enabled.
 function setMouseCapture(enabled)
   if enabled == mouseCaptured then return mouseCaptured end if
   if enabled then IN_ActivateMouse() else IN_DeactivateMouse() end if
   return mouseCaptured
 end function
 
-// Sample filtered mouse motion into caller-owned two-element storage.
+/// Sample filtered mouse motion into caller-owned two-element storage.
+/// @param filterEnabled The filter enabled input consumed by `sampleFilteredMouseDelta`.
+/// @param output Destination that receives the filtered mouse delta.
 function sampleFilteredMouseDelta(filterEnabled, output)
   global oldMouseX, oldMouseY, mouseFilterReady, mouseAccumX, mouseAccumY
   if not mouseActive then output[0] = 0.0; output[1] = 0.0; return output end if
@@ -1568,7 +1777,8 @@ function sampleFilteredMouseDelta(filterEnabled, output)
   return output
 end function
 
-// Provide filtered mouse delta behavior for the active subsystem.
+/// Implements the `filteredMouseDelta` operation for `miniquake.input` (filtered mouse delta).
+/// @param filterEnabled The filter enabled input consumed by `filteredMouseDelta`.
 function filteredMouseDelta(filterEnabled)
   global mouseDeltaScratch
   sampleFilteredMouseDelta(filterEnabled, mouseDeltaScratch)
@@ -1577,32 +1787,54 @@ function filteredMouseDelta(filterEnabled)
   return [mouseDeltaScratch[0], mouseDeltaScratch[1]]
 end function
 
-// IN_MouseMove first multiplies raw cursor motion by sensitivity and then by
-// m_yaw/m_pitch.  The former port treated sensitivity itself as degrees per
-// pixel, making the stock value 3 about 45 times too strong.
+/// IN_MouseMove first multiplies raw cursor motion by sensitivity and then by
+/// m_yaw/m_pitch.  The former port treated sensitivity itself as degrees per
+/// pixel, making the stock value 3 about 45 times too strong.
+/// @param command Console or protocol command to execute.
+/// @param deltaX The delta x input consumed by `applyMouseDelta`.
+/// @param deltaY The delta y input consumed by `applyMouseDelta`.
+/// @param mouseSensitivity The mouse sensitivity input consumed by `applyMouseDelta`.
+/// @param yawScale The yaw scale input consumed by `applyMouseDelta`.
+/// @param pitchScale The pitch scale input consumed by `applyMouseDelta`.
 function applyMouseDelta(command, deltaX, deltaY, mouseSensitivity, yawScale, pitchScale)
   command.viewAngles.y = math.angleMod(command.viewAngles.y - deltaX * mouseSensitivity * yawScale)
   command.viewAngles.x = math.clamp(command.viewAngles.x + deltaY * mouseSensitivity * pitchScale, -70.0, 80.0)
   return command
 end function
 
-// Apply mouse to the active subsystem state.
+/// Apply mouse to the active subsystem state.
+/// @param command Console or protocol command to execute.
+/// @param mouseSensitivity The mouse sensitivity input consumed by `applyMouse`.
+/// @param yawScale The yaw scale input consumed by `applyMouse`.
+/// @param pitchScale The pitch scale input consumed by `applyMouse`.
+/// @param filterEnabled The filter enabled input consumed by `applyMouse`.
 function applyMouse(command, mouseSensitivity, yawScale, pitchScale, filterEnabled)
   global mouseDeltaScratch
   sampleFilteredMouseDelta(filterEnabled, mouseDeltaScratch)
   return applyMouseDelta(command, mouseDeltaScratch[0], mouseDeltaScratch[1], mouseSensitivity, yawScale, pitchScale)
 end function
 
-// Select modern persistent free-look without changing the original +mlook
-// button state.  Differential tests and compatibility callers retain stock
-// Quake behavior until the production host explicitly enables this mode.
+/// Select modern persistent free-look without changing the original +mlook
+/// button state.  Differential tests and compatibility callers retain stock
+/// Quake behavior until the production host explicitly enables this mode.
+/// @param enabled Whether the optional behavior is enabled.
 function IN_SetFreeLook(enabled)
   global alwaysMouseLook
   alwaysMouseLook = enabled
   return alwaysMouseLook
 end function
 
-// Mirror Quake's IN_MoveDelta routine and its observable state changes.
+/// Mirror Quake's IN_MoveDelta routine and its observable state changes.
+/// @param command Console or protocol command to execute.
+/// @param deltaX The delta x input consumed by `IN_MoveDelta`.
+/// @param deltaY The delta y input consumed by `IN_MoveDelta`.
+/// @param mouseSensitivity The mouse sensitivity input consumed by `IN_MoveDelta`.
+/// @param yawScale The yaw scale input consumed by `IN_MoveDelta`.
+/// @param pitchScale The pitch scale input consumed by `IN_MoveDelta`.
+/// @param sideScale The side scale input consumed by `IN_MoveDelta`.
+/// @param forwardScale The forward scale input consumed by `IN_MoveDelta`.
+/// @param lookStrafe The look strafe input consumed by `IN_MoveDelta`.
+/// @param noclipAngleHack The noclip angle hack input consumed by `IN_MoveDelta`.
 function IN_MoveDelta(command, deltaX, deltaY, mouseSensitivity, yawScale, pitchScale, sideScale, forwardScale, lookStrafe, noclipAngleHack)
   mouseX = deltaX * mouseSensitivity
   mouseY = deltaY * mouseSensitivity
@@ -1627,7 +1859,8 @@ function IN_MoveDelta(command, deltaX, deltaY, mouseSensitivity, yawScale, pitch
   return command
 end function
 
-// Mirror Quake's IN_MouseEvent routine and its observable state changes.
+/// Mirror Quake's IN_MouseEvent routine and its observable state changes.
+/// @param mouseState Mutable state used by `IN_MouseEvent`.
 function IN_MouseEvent(mouseState)
   global mouseOldButtonState
   events = []
@@ -1647,7 +1880,16 @@ function IN_MouseEvent(mouseState)
   return events
 end function
 
-// Mirror Quake's IN_MouseMove routine and its observable state changes.
+/// Mirror Quake's IN_MouseMove routine and its observable state changes.
+/// @param command Console or protocol command to execute.
+/// @param mouseSensitivity The mouse sensitivity input consumed by `IN_MouseMove`.
+/// @param yawScale The yaw scale input consumed by `IN_MouseMove`.
+/// @param pitchScale The pitch scale input consumed by `IN_MouseMove`.
+/// @param filterEnabled The filter enabled input consumed by `IN_MouseMove`.
+/// @param sideScale The side scale input consumed by `IN_MouseMove`.
+/// @param forwardScale The forward scale input consumed by `IN_MouseMove`.
+/// @param lookStrafe The look strafe input consumed by `IN_MouseMove`.
+/// @param noclipAngleHack The noclip angle hack input consumed by `IN_MouseMove`.
 function IN_MouseMove(command, mouseSensitivity, yawScale, pitchScale, filterEnabled, sideScale, forwardScale, lookStrafe, noclipAngleHack)
   global mouseDeltaScratch
   sampleFilteredMouseDelta(filterEnabled, mouseDeltaScratch)
@@ -1667,13 +1909,16 @@ function IN_MouseMove(command, mouseSensitivity, yawScale, pitchScale, filterEna
   return moved
 end function
 
-// Return absolute value derived from the active module state.
+/// Return absolute value derived from the active module state.
+/// @param value Value consumed by `absoluteValue`.
 function absoluteValue(value)
   if value < 0.0 then return -value end if
   return value
 end function
 
-// Mirror Quake's IN_JoyMove routine and its observable state changes.
+/// Mirror Quake's IN_JoyMove routine and its observable state changes.
+/// @param command Console or protocol command to execute.
+/// @param frameSeconds The frame seconds input consumed by `IN_JoyMove`.
 function IN_JoyMove(command, frameSeconds)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if not joyAdvancedInitialized then Joy_AdvancedUpdate_f() end if
@@ -1742,7 +1987,19 @@ function IN_JoyMove(command, frameSeconds)
   return command
 end function
 
-// Mirror Quake's IN_Move routine and its observable state changes.
+/// Mirror Quake's IN_Move routine and its observable state changes.
+/// @param command Console or protocol command to execute.
+/// @param mouseSensitivity The mouse sensitivity input consumed by `IN_Move`.
+/// @param yawScale The yaw scale input consumed by `IN_Move`.
+/// @param pitchScale The pitch scale input consumed by `IN_Move`.
+/// @param filterEnabled The filter enabled input consumed by `IN_Move`.
+/// @param sideScale The side scale input consumed by `IN_Move`.
+/// @param forwardScale The forward scale input consumed by `IN_Move`.
+/// @param lookStrafe The look strafe input consumed by `IN_Move`.
+/// @param noclipAngleHack The noclip angle hack input consumed by `IN_Move`.
+/// @param frameSeconds The frame seconds input consumed by `IN_Move`.
+/// @param active The active input consumed by `IN_Move`.
+/// @param minimized The minimized input consumed by `IN_Move`.
 function IN_Move(command, mouseSensitivity, yawScale, pitchScale, filterEnabled, sideScale, forwardScale, lookStrafe, noclipAngleHack, frameSeconds, active, minimized)
   if active and not minimized then
     IN_MouseMove(command, mouseSensitivity, yawScale, pitchScale, filterEnabled, sideScale, forwardScale, lookStrafe, noclipAngleHack)
@@ -1781,14 +2038,18 @@ function CL_TakeImpulse()
   return value
 end function
 
-// Apply the Quake-compatible cl finish move behavior.
+/// Apply the Quake-compatible cl finish move behavior.
+/// @param command Console or protocol command to execute.
 function CL_FinishMove(command)
   command.buttons = CL_ButtonBits()
   command.impulse = CL_TakeImpulse()
   return command
 end function
 
-// Provide collect behavior for the active subsystem.
+/// Implements the `collect` operation for `miniquake.input` (collect).
+/// @param command Console or protocol command to execute.
+/// @param frameMilliseconds The frame milliseconds input consumed by `collect`.
+/// @param mouseSensitivity The mouse sensitivity input consumed by `collect`.
 function collect(command, frameMilliseconds, mouseSensitivity)
   applyMouse(command, mouseSensitivity, DEFAULT_M_YAW, DEFAULT_M_PITCH, false)
   command.forwardMove = 0.0
@@ -1810,7 +2071,8 @@ function collect(command, frameMilliseconds, mouseSensitivity)
   return command
 end function
 
-// Update module state for the requested operation.
+/// Implements the `clear` operation for `miniquake.input` (clear).
+/// @param command Console or protocol command to execute.
 function clear(command)
   command.forwardMove = 0.0
   command.sideMove = 0.0
@@ -1820,7 +2082,22 @@ function clear(command)
   return command
 end function
 
-// Create and initialize original move.
+/// Create and initialize original move.
+/// @param command Console or protocol command to execute.
+/// @param signon The signon input consumed by `buildOriginalMove`.
+/// @param frameMilliseconds The frame milliseconds input consumed by `buildOriginalMove`.
+/// @param mouseSensitivity The mouse sensitivity input consumed by `buildOriginalMove`.
+/// @param yawScale The yaw scale input consumed by `buildOriginalMove`.
+/// @param pitchScale The pitch scale input consumed by `buildOriginalMove`.
+/// @param filterEnabled The filter enabled input consumed by `buildOriginalMove`.
+/// @param forwardSpeed The forward speed input consumed by `buildOriginalMove`.
+/// @param backSpeed The back speed input consumed by `buildOriginalMove`.
+/// @param sideSpeed The side speed input consumed by `buildOriginalMove`.
+/// @param upSpeed The up speed input consumed by `buildOriginalMove`.
+/// @param noclipAngleHack The noclip angle hack input consumed by `buildOriginalMove`.
+/// @param pollButtonBindings The poll button bindings input consumed by `buildOriginalMove`.
+/// @param deviceActive The device active input consumed by `buildOriginalMove`.
+/// @param minimized The minimized input consumed by `buildOriginalMove`.
 function buildOriginalMove(command, signon, frameMilliseconds, mouseSensitivity, yawScale, pitchScale, filterEnabled, forwardSpeed, backSpeed, sideSpeed, upSpeed, noclipAngleHack, pollButtonBindings, deviceActive, minimized)
   if pollButtonBindings then IN_PollButtonCommands() end if
   built = CL_BaseMove(
@@ -1856,7 +2133,17 @@ function buildOriginalMove(command, signon, frameMilliseconds, mouseSensitivity,
   return command
 end function
 
-// Provide collect game behavior for the active subsystem.
+/// Implements the `collectGame` operation for `miniquake.input` (collect game).
+/// @param command Console or protocol command to execute.
+/// @param frameMilliseconds The frame milliseconds input consumed by `collectGame`.
+/// @param mouseSensitivity The mouse sensitivity input consumed by `collectGame`.
+/// @param yawScale The yaw scale input consumed by `collectGame`.
+/// @param pitchScale The pitch scale input consumed by `collectGame`.
+/// @param filterEnabled The filter enabled input consumed by `collectGame`.
+/// @param forwardSpeed The forward speed input consumed by `collectGame`.
+/// @param backSpeed The back speed input consumed by `collectGame`.
+/// @param sideSpeed The side speed input consumed by `collectGame`.
+/// @param upSpeed The up speed input consumed by `collectGame`.
 function collectGame(command, frameMilliseconds, mouseSensitivity, yawScale, pitchScale, filterEnabled, forwardSpeed, backSpeed, sideSpeed, upSpeed)
   return buildOriginalMove(
     command,

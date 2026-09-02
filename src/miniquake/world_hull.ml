@@ -11,12 +11,16 @@ import miniquake.types as t
 import miniquake.constants as c
 import miniquake.mathlib as math
 
-// Create and initialize box hull.
+/// Create and initialize box hull.
+/// @param mins The mins input consumed by `createBoxHull`.
+/// @param maxs The maxs input consumed by `createBoxHull`.
 function createBoxHull(mins, maxs)
   return t.Hull(mins, maxs)
 end function
 
-// Provide inside behavior for the active subsystem.
+/// Implements the `inside` operation for `miniquake.world_hull` (inside).
+/// @param box The box input consumed by `inside`.
+/// @param point The point input consumed by `inside`.
 function inside(box, point)
   // world.c's six-node box hull sends points exactly on a maximum plane to
   // CONTENTS_EMPTY, while minimum planes remain part of the solid half-space.
@@ -25,13 +29,18 @@ function inside(box, point)
     point.z >= box.mins.z and point.z < box.maxs.z
 end function
 
-// Provide true point contents behavior for the active subsystem.
+/// Implements the `truePointContents` operation for `miniquake.world_hull` (true point contents).
+/// @param box The box input consumed by `truePointContents`.
+/// @param point The point input consumed by `truePointContents`.
 function truePointContents(box, point)
   if inside(box, point) then return c.CONTENTS_SOLID end if
   return c.CONTENTS_EMPTY
 end function
 
-// Provide point contents from node behavior for the active subsystem.
+/// Implements the `pointContentsFromNode` operation for `miniquake.world_hull` (point contents from node).
+/// @param box The box input consumed by `pointContentsFromNode`.
+/// @param number The number input consumed by `pointContentsFromNode`.
+/// @param point The point input consumed by `pointContentsFromNode`.
 function pointContentsFromNode(box, number, point)
   // Exact six-node traversal created by WinQuake SV_InitBoxHull.  Callers may
   // start at any clipnode, which matters for the public SV_HullPointContents
@@ -62,12 +71,15 @@ function pointContentsFromNode(box, number, point)
   return node
 end function
 
-// Provide empty plane behavior for the active subsystem.
+/// Implements the `emptyPlane` operation for `miniquake.world_hull` (empty plane).
 function emptyPlane()
   return t.Plane(t.Vec3(0.0, 0.0, 0.0), 0.0, 0, 0)
 end function
 
-// Trace line through the collision world.
+/// Implements the `traceLine` operation for `miniquake.world_hull` (trace line).
+/// @param box The box input consumed by `traceLine`.
+/// @param start The start input consumed by `traceLine`.
+/// @param finish The finish input consumed by `traceLine`.
 function traceLine(box, start, finish)
   if inside(box, start) then
     // SV_RecursiveHullCheck permits a move that starts solid to escape into

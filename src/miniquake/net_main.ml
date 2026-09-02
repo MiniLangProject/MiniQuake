@@ -17,34 +17,60 @@ import miniquake.sizebuf as sz
 import miniquake.platform.win32 as win
 import miniquake.byteio as bio
 
+/// Tracks the module-level defaul tnet hostport state owned by `miniquake.net_main`.
 DEFAULTnet_hostport = 26000
+/// Tracks the module-level net hostport state owned by `miniquake.net_main`.
 net_hostport = 26000
+/// Tracks the module-level net time state owned by `miniquake.net_main`.
 net_time = 0.0
+/// Tracks the module-level net driverlevel state owned by `miniquake.net_main`.
 net_driverlevel = 0
+/// Tracks the module-level net numsockets state owned by `miniquake.net_main`.
 net_numsockets = 0
+/// Tracks the module-level net socket reserve state owned by `miniquake.net_main`.
 net_socketReserve = 1
+/// Tracks the module-level net activeconnections state owned by `miniquake.net_main`.
 net_activeconnections = 0
+/// Tracks the module-level net active sockets state owned by `miniquake.net_main`.
 net_activeSockets = []
+/// Tracks the module-level net free sockets state owned by `miniquake.net_main`.
 net_freeSockets = []
 
+/// Tracks the module-level messages sent state owned by `miniquake.net_main`.
 messagesSent = 0
+/// Tracks the module-level messages received state owned by `miniquake.net_main`.
 messagesReceived = 0
+/// Tracks the module-level unreliable messages sent state owned by `miniquake.net_main`.
 unreliableMessagesSent = 0
+/// Tracks the module-level unreliable messages received state owned by `miniquake.net_main`.
 unreliableMessagesReceived = 0
 
+/// Tracks the module-level listening state owned by `miniquake.net_main`.
 listening = false
+/// Tracks the module-level slist in progress state owned by `miniquake.net_main`.
 slistInProgress = false
+/// Tracks the module-level slist silent state owned by `miniquake.net_main`.
 slistSilent = false
+/// Tracks the module-level slist local state owned by `miniquake.net_main`.
 slistLocal = true
+/// Tracks the module-level slist start time state owned by `miniquake.net_main`.
 slistStartTime = 0.0
+/// Tracks the module-level slist last shown state owned by `miniquake.net_main`.
 slistLastShown = 0
+/// Tracks the module-level host cache count state owned by `miniquake.net_main`.
 hostCacheCount = 0
+/// Tracks the module-level hostcache state owned by `miniquake.net_main`.
 hostcache = []
+/// Tracks the module-level poll procedure list state owned by `miniquake.net_main`.
 pollProcedureList = []
 
+/// Tracks the module-level network state owned by `miniquake.net_main`.
 networkState = void
+/// Tracks the module-level maximum clients state owned by `miniquake.net_main`.
 maximumClients = 1
+/// Tracks the module-level slist port state owned by `miniquake.net_main`.
 slistPort = 26000
+/// Tracks the module-level net messagetimeout state owned by `miniquake.net_main`.
 net_messagetimeout = 300.0
 
 // Update module state for net time.
@@ -54,7 +80,8 @@ function SetNetTime()
   return net_time
 end function
 
-// Provide array tail behavior for the active subsystem.
+/// Implements the `arrayTail` operation for `miniquake.net_main` (array tail).
+/// @param values The values input consumed by `arrayTail`.
 function arrayTail(values)
   result = []
   index = 1
@@ -65,7 +92,9 @@ function arrayTail(values)
   return result
 end function
 
-// Report whether the requested socket identity is present in an array.
+/// Report whether the requested socket identity is present in an array.
+/// @param values The values input consumed by `socketArrayContains`.
+/// @param wanted The wanted input consumed by `socketArrayContains`.
 function socketArrayContains(values, wanted)
   for each socket in values
     if socket == wanted then return true end if
@@ -73,7 +102,9 @@ function socketArrayContains(values, wanted)
   return false
 end function
 
-// Return a socket array with every occurrence of one identity removed.
+/// Return a socket array with every occurrence of one identity removed.
+/// @param values The values input consumed by `socketArrayWithout`.
+/// @param unwanted The unwanted input consumed by `socketArrayWithout`.
 function socketArrayWithout(values, unwanted)
   result = []
   for each socket in values
@@ -84,7 +115,9 @@ function socketArrayWithout(values, unwanted)
   return result
 end function
 
-// Add one socket identity at most once.
+/// Add one socket identity at most once.
+/// @param values The values input consumed by `appendUniqueSocket`.
+/// @param socket Network socket used for communication.
 function appendUniqueSocket(values, socket)
   if socket is void or socketArrayContains(values, socket) then return values end if
   return values + [socket]
@@ -124,7 +157,8 @@ function compactActiveSockets()
   return len(active)
 end function
 
-// Update module state for qsocket.
+/// Update module state for qsocket.
+/// @param socket Network socket used for communication.
 function resetQSocket(socket)
   now = SetNetTime()
   socket.peer = void
@@ -173,10 +207,11 @@ function ensureSocketPool()
   return net_numsockets
 end function
 
-// Grow the fixed qsocket arena when maxplayers is raised before a server
-// starts. Host_FindMaxClients reserves at least four client slots in Quake;
-// MiniQuake resizes its server dynamically, so the network arena must mirror
-// that growth instead of retaining the two sockets from a single-player boot.
+/// Grow the fixed qsocket arena when maxplayers is raised before a server
+/// starts. Host_FindMaxClients reserves at least four client slots in Quake;
+/// MiniQuake resizes its server dynamically, so the network arena must mirror
+/// that growth instead of retaining the two sockets from a single-player boot.
+/// @param clientCount Number of entries or units to process.
 function ensureSocketPoolCapacity(clientCount)
   global net_numsockets, net_freeSockets
   wanted = clientCount + net_socketReserve
@@ -190,7 +225,8 @@ function ensureSocketPoolCapacity(clientCount)
   return net_numsockets
 end function
 
-// Mirror Quake's NET_TrackSocket routine and its observable state changes.
+/// Mirror Quake's NET_TrackSocket routine and its observable state changes.
+/// @param socket Network socket used for communication.
 function NET_TrackSocket(socket)
   global net_activeSockets, net_freeSockets
   if socket is void or socket is error then return socket end if
@@ -215,7 +251,8 @@ function NET_TrackSocket(socket)
   return socket
 end function
 
-// Mirror Quake's NET_FreeQSocket routine and its observable state changes.
+/// Mirror Quake's NET_FreeQSocket routine and its observable state changes.
+/// @param socket Network socket used for communication.
 function NET_FreeQSocket(socket)
   global net_activeSockets, net_freeSockets
   if socket is void then return false end if
@@ -269,7 +306,8 @@ function NET_ConnectionClosed()
   return net_activeconnections
 end function
 
-// Mirror Quake's NET_SetMaximumClients routine and its observable state changes.
+/// Mirror Quake's NET_SetMaximumClients routine and its observable state changes.
+/// @param count Number of entries or units to process.
 function NET_SetMaximumClients(count)
   global maximumClients
   maximumClients = count
@@ -278,7 +316,10 @@ function NET_SetMaximumClients(count)
   return maximumClients
 end function
 
-// Mirror Quake's NET_Listen_f routine and its observable state changes.
+/// Mirror Quake's NET_Listen_f routine and its observable state changes.
+/// @param state Mutable `miniquake.net_main` state used by `NET_Listen_f`.
+/// @param enabled Whether the optional behavior is enabled.
+/// @param port The port input consumed by `NET_Listen_f`.
 function NET_Listen_f(state, enabled, port)
   global listening, net_hostport
   if enabled is void then return listening end if
@@ -289,7 +330,11 @@ function NET_Listen_f(state, enabled, port)
   return listening
 end function
 
-// Mirror Quake's MaxPlayers_f routine and its observable state changes.
+/// Mirror Quake's MaxPlayers_f routine and its observable state changes.
+/// @param currentPlayers The current players input consumed by `MaxPlayers_f`.
+/// @param maximumLimit The maximum limit input consumed by `MaxPlayers_f`.
+/// @param serverActive The server active input consumed by `MaxPlayers_f`.
+/// @param requested The requested input consumed by `MaxPlayers_f`.
 function MaxPlayers_f(currentPlayers, maximumLimit, serverActive, requested)
   if requested is void then return [currentPlayers, currentPlayers > 1, currentPlayers > 1, ""] end if
   if serverActive then return [currentPlayers, listening, currentPlayers > 1, "maxplayers can not be changed while a server is running."] end if
@@ -303,7 +348,9 @@ function MaxPlayers_f(currentPlayers, maximumLimit, serverActive, requested)
   return [count, count > 1, count > 1, message]
 end function
 
-// Mirror Quake's NET_Port_f routine and its observable state changes.
+/// Mirror Quake's NET_Port_f routine and its observable state changes.
+/// @param state Mutable `miniquake.net_main` state used by `NET_Port_f`.
+/// @param requested The requested input consumed by `NET_Port_f`.
 function NET_Port_f(state, requested)
   global DEFAULTnet_hostport, net_hostport
   if requested is void then return net_hostport end if
@@ -350,7 +397,8 @@ function PrintSlistTrailer()
   return ["No Quake servers found.", ""]
 end function
 
-// Mirror Quake's NET_ReplaceHostCache routine and its observable state changes.
+/// Mirror Quake's NET_ReplaceHostCache routine and its observable state changes.
+/// @param items The items input consumed by `NET_ReplaceHostCache`.
 function NET_ReplaceHostCache(items)
   global hostcache, hostCacheCount
   hostcache = items
@@ -365,7 +413,8 @@ function NET_ClearPollProcedures()
   return true
 end function
 
-// Mirror Quake's NET_SetSlistStartTime routine and its observable state changes.
+/// Mirror Quake's NET_SetSlistStartTime routine and its observable state changes.
+/// @param value Value consumed by `NET_SetSlistStartTime`.
 function NET_SetSlistStartTime(value)
   global slistStartTime
   slistStartTime = value
@@ -388,7 +437,8 @@ function NET_SocketCounts()
   return [len(net_activeSockets), len(net_freeSockets), net_numsockets]
 end function
 
-// Return socket queued state derived from the active module state.
+/// Return socket queued state derived from the active module state.
+/// @param socket Network socket used for communication.
 function socketQueuedState(socket)
   if socket is void then return [0, 0] end if
   queuedMessages = 0
@@ -448,7 +498,10 @@ function NET_MessageCounters()
   return [messagesSent, messagesReceived, unreliableMessagesSent, unreliableMessagesReceived]
 end function
 
-// Provide schedule poll procedure behavior for the active subsystem.
+/// Implements the `SchedulePollProcedure` operation for `miniquake.net_main` (schedule poll procedure).
+/// @param procedureName Name that identifies the requested value or resource.
+/// @param timeOffset Zero-based offset of the requested data.
+/// @param argument The argument input consumed by `SchedulePollProcedure`.
 function SchedulePollProcedure(procedureName, timeOffset, argument)
   global pollProcedureList
   scheduled = SetNetTime() + timeOffset
@@ -470,7 +523,11 @@ function SchedulePollProcedure(procedureName, timeOffset, argument)
   return scheduled
 end function
 
-// Mirror Quake's NET_Slist_f routine and its observable state changes.
+/// Mirror Quake's NET_Slist_f routine and its observable state changes.
+/// @param state Mutable `miniquake.net_main` state used by `NET_Slist_f`.
+/// @param silent The silent input consumed by `NET_Slist_f`.
+/// @param localOnly The local only input consumed by `NET_Slist_f`.
+/// @param port The port input consumed by `NET_Slist_f`.
 function NET_Slist_f(state, silent, localOnly, port)
   global networkState, slistInProgress, slistSilent, slistLocal, slistStartTime, hostCacheCount, hostcache, slistPort
   if slistInProgress then return false end if
@@ -561,7 +618,9 @@ function NET_Poll()
   return executed
 end function
 
-// Provide cached address behavior for the active subsystem.
+/// Implements the `cachedAddress` operation for `miniquake.net_main` (cached address).
+/// @param state Mutable `miniquake.net_main` state used by `cachedAddress`.
+/// @param host The host input consumed by `cachedAddress`.
 function cachedAddress(state, host)
   wanted = host
   for each cached in state.hostCache
@@ -570,7 +629,10 @@ function cachedAddress(state, host)
   return wanted
 end function
 
-// Mirror Quake's NET_Connect routine and its observable state changes.
+/// Mirror Quake's NET_Connect routine and its observable state changes.
+/// @param state Mutable `miniquake.net_main` state used by `NET_Connect`.
+/// @param host The host input consumed by `NET_Connect`.
+/// @param timeoutMilliseconds The timeout milliseconds input consumed by `NET_Connect`.
 function NET_Connect(state, host, timeoutMilliseconds)
   SetNetTime()
   target = host
@@ -603,9 +665,13 @@ function NET_Connect(state, host, timeoutMilliseconds)
   return result
 end function
 
-// Strict external-reference connection path.  Unlike the regular Quake
-// menu connection, this keeps one UDP source endpoint alive and resends the
-// Protocol-3 request at a short interval until the original server accepts.
+/// Strict external-reference connection path.  Unlike the regular Quake
+/// menu connection, this keeps one UDP source endpoint alive and resends the
+/// Protocol-3 request at a short interval until the original server accepts.
+/// @param state Mutable `miniquake.net_main` state used by `NET_ConnectInterop`.
+/// @param host The host input consumed by `NET_ConnectInterop`.
+/// @param timeoutMilliseconds The timeout milliseconds input consumed by `NET_ConnectInterop`.
+/// @param resendMilliseconds The resend milliseconds input consumed by `NET_ConnectInterop`.
 function NET_ConnectInterop(state, host, timeoutMilliseconds, resendMilliseconds)
   SetNetTime()
   if host == "" then return error(3448, "NET_ConnectInterop requires a host") end if
@@ -618,7 +684,8 @@ function NET_ConnectInterop(state, host, timeoutMilliseconds, resendMilliseconds
   return result
 end function
 
-// Mirror Quake's NET_CheckNewConnections routine and its observable state changes.
+/// Mirror Quake's NET_CheckNewConnections routine and its observable state changes.
+/// @param state Mutable `miniquake.net_main` state used by `NET_CheckNewConnections`.
 function NET_CheckNewConnections(state)
   SetNetTime()
   result = netloop.Datagram_CheckNewConnections(state)
@@ -629,7 +696,8 @@ function NET_CheckNewConnections(state)
   return result
 end function
 
-// Mirror Quake's NET_Close routine and its observable state changes.
+/// Mirror Quake's NET_Close routine and its observable state changes.
+/// @param socket Network socket used for communication.
 function NET_Close(socket)
   if socket is void then return false end if
   SetNetTime()
@@ -656,19 +724,25 @@ function synchronizeCounters()
   return true
 end function
 
-// Mirror Quake's NET_SetMessageTimeout routine and its observable state changes.
+/// Mirror Quake's NET_SetMessageTimeout routine and its observable state changes.
+/// @param timeoutSeconds The timeout seconds input consumed by `NET_SetMessageTimeout`.
 function NET_SetMessageTimeout(timeoutSeconds)
   global net_messagetimeout
   net_messagetimeout = timeoutSeconds
   return net_messagetimeout
 end function
 
-// Mirror Quake's NET_SocketTimedOut routine and its observable state changes.
+/// Mirror Quake's NET_SocketTimedOut routine and its observable state changes.
+/// @param socket Network socket used for communication.
+/// @param timeoutSeconds The timeout seconds input consumed by `NET_SocketTimedOut`.
 function NET_SocketTimedOut(socket, timeoutSeconds)
   return netloop.timedOut(socket, timeoutSeconds)
 end function
 
-// Mirror Quake's NET_GetMessage routine and its observable state changes.
+/// Mirror Quake's NET_GetMessage routine and its observable state changes.
+/// @param socket Network socket used for communication.
+/// @param destination Destination value or collection to update.
+/// @param timeoutSeconds The timeout seconds input consumed by `NET_GetMessage`.
 function NET_GetMessage(socket, destination, timeoutSeconds)
   if socket is void or socket.disconnected then return -1 end if
   SetNetTime()
@@ -681,7 +755,9 @@ function NET_GetMessage(socket, destination, timeoutSeconds)
   return result
 end function
 
-// Mirror Quake's NET_SendMessage routine and its observable state changes.
+/// Mirror Quake's NET_SendMessage routine and its observable state changes.
+/// @param socket Network socket used for communication.
+/// @param data Input data consumed by the operation.
 function NET_SendMessage(socket, data)
   if socket is void or socket.disconnected then return -1 end if
   SetNetTime()
@@ -690,7 +766,9 @@ function NET_SendMessage(socket, data)
   return result
 end function
 
-// Mirror Quake's NET_SendUnreliableMessage routine and its observable state changes.
+/// Mirror Quake's NET_SendUnreliableMessage routine and its observable state changes.
+/// @param socket Network socket used for communication.
+/// @param data Input data consumed by the operation.
 function NET_SendUnreliableMessage(socket, data)
   if socket is void or socket.disconnected then return -1 end if
   SetNetTime()
@@ -699,20 +777,25 @@ function NET_SendUnreliableMessage(socket, data)
   return result
 end function
 
-// Mirror Quake's NET_CanSendMessage routine and its observable state changes.
+/// Mirror Quake's NET_CanSendMessage routine and its observable state changes.
+/// @param socket Network socket used for communication.
 function NET_CanSendMessage(socket)
   if socket is void or socket.disconnected then return false end if
   SetNetTime()
   return netloop.canSendMessage(socket)
 end function
 
-// Mirror Quake's NET_CanSendUnreliableMessage routine and its observable state changes.
+/// Mirror Quake's NET_CanSendUnreliableMessage routine and its observable state changes.
+/// @param socket Network socket used for communication.
 function NET_CanSendUnreliableMessage(socket)
   if socket is void or socket.disconnected then return false end if
   return true
 end function
 
-// Mirror Quake's NET_SendToAll routine and its observable state changes.
+/// Mirror Quake's NET_SendToAll routine and its observable state changes.
+/// @param clients The clients input consumed by `NET_SendToAll`.
+/// @param data Input data consumed by the operation.
+/// @param blocktime Time value used by the operation.
 function NET_SendToAll(clients, data, blocktime)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   state1 = []
@@ -766,7 +849,13 @@ function NET_SendToAll(clients, data, blocktime)
   return count
 end function
 
-// Mirror Quake's NET_Init routine and its observable state changes.
+/// Mirror Quake's NET_Init routine and its observable state changes.
+/// @param state Mutable `miniquake.net_main` state used by `NET_Init`.
+/// @param maxClients The max clients input consumed by `NET_Init`.
+/// @param dedicated The dedicated input consumed by `NET_Init`.
+/// @param listenRequested The listen requested input consumed by `NET_Init`.
+/// @param requestedPort The requested port input consumed by `NET_Init`.
+/// @param noLan The no lan input consumed by `NET_Init`.
 function NET_Init(state, maxClients, dedicated, listenRequested, requestedPort, noLan)
   global networkState, maximumClients, net_numsockets, net_socketReserve, net_activeSockets, net_freeSockets
   global net_activeconnections, listening, DEFAULTnet_hostport, net_hostport, pollProcedureList
@@ -798,7 +887,8 @@ function NET_Init(state, maxClients, dedicated, listenRequested, requestedPort, 
   return 0
 end function
 
-// Mirror Quake's NET_Shutdown routine and its observable state changes.
+/// Mirror Quake's NET_Shutdown routine and its observable state changes.
+/// @param state Mutable `miniquake.net_main` state used by `NET_Shutdown`.
 function NET_Shutdown(state)
   global net_numsockets, net_activeSockets, net_freeSockets, net_activeconnections, listening, pollProcedureList
   for each socket in net_activeSockets
@@ -814,7 +904,9 @@ function NET_Shutdown(state)
   return true
 end function
 
-// Report whether is id.
+/// Report whether is id.
+/// @param address Network address of the peer.
+/// @param idgodsEnabled The idgods enabled input consumed by `IsID`.
 function IsID(address, idgodsEnabled)
   if not idgodsEnabled then return false end if
   numeric = netloop.ipv4Number(address)

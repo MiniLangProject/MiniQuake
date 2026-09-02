@@ -10,14 +10,18 @@ package miniquake.launch
 import miniquake.types as t
 import miniquake.byteio as bio
 
-// Return first byte for the active module state.
+/// Return first byte for the active module state.
+/// @param text Text to parse or process.
 function firstByte(text)
   data = bytes(text)
   if len(data) == 0 then return -1 end if
   return data[0]
 end function
 
-// Provide substring behavior for the active subsystem.
+/// Implements the `substring` operation for `miniquake.launch` (substring).
+/// @param text Text to parse or process.
+/// @param offset Zero-based offset of the requested data.
+/// @param count Number of entries or units to process.
 function substring(text, offset, count)
   data = bytes(text)
   if offset < 0 then offset = 0 end if
@@ -27,7 +31,8 @@ function substring(text, offset, count)
   return decode(slice(data, offset, count))
 end function
 
-// Convert map name into its canonical representation.
+/// Convert map name into its canonical representation.
+/// @param name Stable name that identifies the requested object or option.
 function stripMapName(name)
   value = name
   lower = bio.lower(value)
@@ -43,7 +48,11 @@ function stripMapName(name)
   return value
 end function
 
-// Provide integer option behavior for the active subsystem.
+/// Implements the `integerOption` operation for `miniquake.launch` (integer option).
+/// @param text Text to parse or process.
+/// @param fallback Value to use when the requested input is unavailable or invalid.
+/// @param minimum Smallest accepted value.
+/// @param maximum Largest accepted value.
 function integerOption(text, fallback, minimum, maximum)
   value = toNumber(text)
   if value is void or value is not int then return fallback end if
@@ -52,14 +61,18 @@ function integerOption(text, fallback, minimum, maximum)
   return value
 end function
 
-// Return command name derived from the active module state.
+/// Return command name derived from the active module state.
+/// @param text Text to parse or process.
 function commandName(text)
   data = bytes(text)
   if len(data) <= 1 then return "" end if
   return bio.lower(decode(slice(data, 1, len(data) - 1)))
 end function
 
-// Add state for append plus command.
+/// Add state for append plus command.
+/// @param commands The commands input consumed by `appendPlusCommand`.
+/// @param args Command-line arguments supplied by the host process.
+/// @param startIndex Zero-based index of the requested entry.
 function appendPlusCommand(commands, args, startIndex)
   text = commandName(args[startIndex])
   index = startIndex + 1
@@ -72,7 +85,8 @@ function appendPlusCommand(commands, args, startIndex)
   return [commands + [text], index]
 end function
 
-// Provide words behavior for the active subsystem.
+/// Implements the `words` operation for `miniquake.launch` (words).
+/// @param text Text to parse or process.
 function words(text)
   source = bytes(text)
   result = []
@@ -108,7 +122,8 @@ function words(text)
   return result
 end function
 
-// Read and validate the requested value.
+/// Implements the `parse` operation for `miniquake.launch` (parse).
+/// @param args Command-line arguments supplied by the host process.
 function parse(args)
   basedir = "."
   gameDirectory = "id1"
@@ -246,7 +261,8 @@ function parse(args)
   )
 end function
 
-// Initialize state for startup text.
+/// Initialize state for startup text.
+/// @param options The options input consumed by `startupText`.
 function startupText(options)
   result = ""
   for each command in options.plusCommands
@@ -255,7 +271,9 @@ function startupText(options)
   return result
 end function
 
-// Report whether parm.
+/// Report whether parm.
+/// @param options The options input consumed by `hasParm`.
+/// @param name Stable name that identifies the requested object or option.
 function hasParm(options, name)
   wanted = bio.lower(name)
   for each value in options.originalArgs

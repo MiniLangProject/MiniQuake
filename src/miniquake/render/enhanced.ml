@@ -17,18 +17,28 @@ import miniquake.render.gl11 as gl
 // Keep a bounded dynamic-light packet for the native raster backends without
 // changing Quake's authoritative game state.
 const MAX_ENHANCED_LIGHTS = 16
+/// Defines the light floats value used by `miniquake.render.enhanced`.
 const LIGHT_FLOATS = 4
+/// Defines the light bytes value used by `miniquake.render.enhanced`.
 const LIGHT_BYTES = LIGHT_FLOATS * 4
 
+/// Tracks the module-level enabled state owned by `miniquake.render.enhanced`.
 enabled = false
+/// Tracks the module-level shadows enabled state owned by `miniquake.render.enhanced`.
 shadowsEnabled = false
+/// Tracks the module-level shadow quality value state owned by `miniquake.render.enhanced`.
 shadowQualityValue = 1
+/// Tracks the module-level light packet state owned by `miniquake.render.enhanced`.
 lightPacket = bytes(MAX_ENHANCED_LIGHTS * LIGHT_BYTES)
+/// Tracks the module-level selected light indexes state owned by `miniquake.render.enhanced`.
 selectedLightIndexes = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]
+/// Tracks the module-level selected light scores state owned by `miniquake.render.enhanced`.
 selectedLightScores = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+/// Tracks the module-level active light count state owned by `miniquake.render.enhanced`.
 activeLightCount = 0
 
-// Clamp a requested shadow quality to the stable menu/config range.
+/// Clamp a requested shadow quality to the stable menu/config range.
+/// @param value Value consumed by `clampShadowQuality`.
 function clampShadowQuality(value)
   result = native.trunc(value)
   if result < 0 then result = 0 end if
@@ -36,8 +46,11 @@ function clampShadowQuality(value)
   return result
 end function
 
-// Configure the shared native enhanced renderer while preserving Classic as
-// the safe fallback if the active backend cannot create its GPU program.
+/// Configure the shared native enhanced renderer while preserving Classic as
+/// the safe fallback if the active backend cannot create its GPU program.
+/// @param requestedEnabled The requested enabled input consumed by `configure`.
+/// @param requestedShadows The requested shadows input consumed by `configure`.
+/// @param requestedShadowQuality The requested shadow quality input consumed by `configure`.
 function configure(requestedEnabled, requestedShadows, requestedShadowQuality)
   global enabled, shadowsEnabled, shadowQualityValue, activeLightCount
   shadowQualityValue = clampShadowQuality(requestedShadowQuality)
@@ -69,17 +82,22 @@ function hasActiveLights()
   return enabled and activeLightCount > 0
 end function
 
-// Write one IEEE-754 light component without allocating a temporary byte
-// array.  Native receives {world x,y,z,radius} records.
+/// Write one IEEE-754 light component without allocating a temporary byte
+/// array.  Native receives {world x,y,z,radius} records.
+/// @param offset Zero-based offset of the requested data.
+/// @param value Value consumed by `putLightFloat`.
 function putLightFloat(offset, value)
   byteio.putU32(lightPacket, offset, native.floatBits(value))
 end function
 
-// Decide whether a dynamic light belongs in the per-pixel world pass. GLQuake
-// treats a camera contained by the inner 35 percent of a flashblend light as a
-// screen tint rather than world geometry. Feeding that same light to the
-// enhanced shader made the local player's randomly sized Quad/EF_DIMLIGHT
-// alternate between an orange world light and the blue powerup cshift.
+/// Decide whether a dynamic light belongs in the per-pixel world pass. GLQuake
+/// treats a camera contained by the inner 35 percent of a flashblend light as a
+/// screen tint rather than world geometry. Feeding that same light to the
+/// enhanced shader made the local player's randomly sized Quad/EF_DIMLIGHT
+/// alternate between an orange world light and the blue powerup cshift.
+/// @param light The light input consumed by `worldLightEligible`.
+/// @param currentTime Time value used by the operation.
+/// @param viewOrigin The view origin input consumed by `worldLightEligible`.
 function worldLightEligible(light, currentTime, viewOrigin)
   if light is void or viewOrigin is void or light.die < currentTime or light.radius <= light.minLight or light.radius <= 0.0 then return false end if
   innerRadius = light.radius * 0.35
@@ -90,8 +108,11 @@ function worldLightEligible(light, currentTime, viewOrigin)
   return distanceSquared >= innerRadius * innerRadius
 end function
 
-// Select the strongest active lights, pack them into the reusable bridge
-// buffer, and capture the current view matrix in the native backend.
+/// Select the strongest active lights, pack them into the reusable bridge
+/// buffer, and capture the current view matrix in the native backend.
+/// @param dynamicLights The dynamic lights input consumed by `beginFrame`.
+/// @param currentTime Time value used by the operation.
+/// @param viewOrigin The view origin input consumed by `beginFrame`.
 function beginFrame(dynamicLights, currentTime, viewOrigin)
   global lightPacket, selectedLightIndexes, selectedLightScores, activeLightCount
   if not enabled then return false end if

@@ -15,7 +15,8 @@ package miniquake.savegame_runtime
 import miniquake.server as serverRuntime
 import miniquake.server_collision as collision
 
-// Update module state for loaded server.
+/// Update module state for loaded server.
+/// @param server Server state participating in the operation.
 function synchronizeLoadedServer(server)
   if server.machine is void or server.machine.context is void then
     return error(3790, "loadgame runtime synchronization requires a QuakeC server")

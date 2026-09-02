@@ -14,15 +14,29 @@ import miniquake.native as native
 import miniquake.platform.win32 as win
 import std.fs as fs
 
+/// Defines the minimum win memory value used by `miniquake.sys_win`.
 const MINIMUM_WIN_MEMORY = 0x0880000
+/// Defines the maximum win memory value used by `miniquake.sys_win`.
 const MAXIMUM_WIN_MEMORY = 0x1000000
+/// Defines the console error timeout value used by `miniquake.sys_win`.
 const CONSOLE_ERROR_TIMEOUT = 60.0
+/// Defines the pause sleep value used by `miniquake.sys_win`.
 const PAUSE_SLEEP = 50
+/// Defines the not focus sleep value used by `miniquake.sys_win`.
 const NOT_FOCUS_SLEEP = 20
+/// Defines the max handles value used by `miniquake.sys_win`.
 const MAX_HANDLES = 10
+/// Defines the file begin value used by `miniquake.sys_win`.
 const FILE_BEGIN = 0
+/// Defines the invalid set file pointer value used by `miniquake.sys_win`.
 const INVALID_SET_FILE_POINTER = 0xffffffff
 
+/// Invokes the native `SetFilePointer` bridge operation used by `miniquake.sys_win`.
+/// @param handle The handle input consumed by `SetFilePointer`.
+/// @param distance The distance input consumed by `SetFilePointer`.
+/// @param distanceHigh The distance high input consumed by `SetFilePointer`.
+/// @param moveMethod The move method input consumed by `SetFilePointer`.
+/// @returns The `u32` result produced by `SetFilePointer`.
 extern function SetFilePointer(
   handle as ptr,
   distance as i32,
@@ -30,6 +44,10 @@ extern function SetFilePointer(
   moveMethod as u32
 ) from "kernel32.dll" returns u32
 
+/// Invokes the native `CreateDirectoryW` bridge operation used by `miniquake.sys_win`.
+/// @param path Filesystem path to process.
+/// @param security The security input consumed by `CreateDirectoryW`.
+/// @returns The newly created value returned by `CreateDirectoryW`.
 extern function CreateDirectoryW(
   path as wstr,
   security as ptr
@@ -37,50 +55,86 @@ extern function CreateDirectoryW(
 
 // Track mutable sys win state across subsystem calls.
 struct SysWinState
+  /// Stores the use native value in `miniquake.sys_win.SysWinState`.
   useNative
+  /// Stores the handles value in `miniquake.sys_win.SysWinState`.
   handles
+  /// Stores the checksum value in `miniquake.sys_win.SysWinState`.
   checksum
+  /// Stores the active app value in `miniquake.sys_win.SysWinState`.
   ActiveApp
+  /// Stores the minimized value in `miniquake.sys_win.SysWinState`.
   Minimized
+  /// Stores the win nt value in `miniquake.sys_win.SysWinState`.
   WinNT
+  /// Stores the is dedicated value in `miniquake.sys_win.SysWinState`.
   isDedicated
+  /// Stores the sc return on enter value in `miniquake.sys_win.SysWinState`.
   scReturnOnEnter
+  /// Stores the output log value in `miniquake.sys_win.SysWinState`.
   outputLog
+  /// Stores the console buffer value in `miniquake.sys_win.SysWinState`.
   consoleBuffer
+  /// Stores the console length value in `miniquake.sys_win.SysWinState`.
   consoleLength
+  /// Stores the console events value in `miniquake.sys_win.SysWinState`.
   consoleEvents
+  /// Stores the pfreq value in `miniquake.sys_win.SysWinState`.
   pfreq
+  /// Stores the lowshift value in `miniquake.sys_win.SysWinState`.
   lowshift
+  /// Stores the curtime value in `miniquake.sys_win.SysWinState`.
   curtime
+  /// Stores the lastcurtime value in `miniquake.sys_win.SysWinState`.
   lastcurtime
+  /// Stores the oldtime value in `miniquake.sys_win.SysWinState`.
   oldtime
+  /// Stores the first time value in `miniquake.sys_win.SysWinState`.
   firstTime
+  /// Stores the same time count value in `miniquake.sys_win.SysWinState`.
   sameTimeCount
+  /// Stores the counter queue value in `miniquake.sys_win.SysWinState`.
   counterQueue
+  /// Stores the test frequency value in `miniquake.sys_win.SysWinState`.
   testFrequency
+  /// Stores the arguments value in `miniquake.sys_win.SysWinState`.
   arguments
+  /// Stores the memory size value in `miniquake.sys_win.SysWinState`.
   memorySize
+  /// Stores the available memory value in `miniquake.sys_win.SysWinState`.
   availableMemory
+  /// Stores the total memory value in `miniquake.sys_win.SysWinState`.
   totalMemory
+  /// Stores the quit requested value in `miniquake.sys_win.SysWinState`.
   quitRequested
+  /// Stores the error text value in `miniquake.sys_win.SysWinState`.
   errorText
+  /// Stores the initialized value in `miniquake.sys_win.SysWinState`.
   initialized
+  /// Stores the code write requests value in `miniquake.sys_win.SysWinState`.
   codeWriteRequests
+  /// Stores the sent key events value in `miniquake.sys_win.SysWinState`.
   sentKeyEvents
+  /// Stores the slept milliseconds value in `miniquake.sys_win.SysWinState`.
   sleptMilliseconds
+  /// Stores the h file value in `miniquake.sys_win.SysWinState`.
   hFile
+  /// Stores the h parent value in `miniquake.sys_win.SysWinState`.
   hParent
+  /// Stores the h child value in `miniquake.sys_win.SysWinState`.
   hChild
 end struct
 
+/// Tracks the module-level Windows system state owned by `miniquake.sys_win`.
 sysWinState = void
 
-// Provide empty handles behavior for the active subsystem.
+/// Implements the `emptyHandles` operation for `miniquake.sys_win` (empty handles).
 function emptyHandles()
   return array(MAX_HANDLES, 0)
 end function
 
-// Mirror Quake's Sys_CreateState routine and its observable state changes.
+/// Mirror Quake's Sys_CreateState routine and its observable state changes.
+/// @param useNative The use native input consumed by `Sys_CreateState`.
 function Sys_CreateState(useNative)
   return SysWinState(
     useNative,
@@ -120,7 +174,8 @@ function Sys_CreateState(useNative)
   )
 end function
 
-// Mirror Quake's Sys_UseState routine and its observable state changes.
+/// Mirror Quake's Sys_UseState routine and its observable state changes.
+/// @param state Mutable `miniquake.sys_win` state used by `Sys_UseState`.
 function Sys_UseState(state)
   global sysWinState
   sysWinState = state
@@ -134,25 +189,31 @@ function Sys_State()
   return sysWinState
 end function
 
-// Provide signed32 behavior for the active subsystem.
+/// Implements the `signed32` operation for `miniquake.sys_win` (signed32).
+/// @param value Value consumed by `signed32`.
 function signed32(value)
   value = value & 0xffffffff
   if value >= 0x80000000 then return value - 0x100000000 end if
   return value
 end function
 
-// Read and validate i32.
+/// Read and validate i32.
+/// @param data Input data consumed by the operation.
+/// @param offset Zero-based offset of the requested data.
 function readI32(data, offset)
   value = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24)
   return signed32(value)
 end function
 
-// Read and validate u32.
+/// Read and validate u32.
+/// @param data Input data consumed by the operation.
 function inline readU32(data)
   return data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24)
 end function
 
-// Mirror Quake's Sys_PageIn routine and its observable state changes.
+/// Mirror Quake's Sys_PageIn routine and its observable state changes.
+/// @param memory The memory input consumed by `Sys_PageIn`.
+/// @param size Size of the requested data or resource.
 function Sys_PageIn(memory, size)
   state = Sys_State()
   if memory is void or typeof(memory) != "bytes" then return Sys_Error("Sys_PageIn: invalid memory") end if
@@ -172,7 +233,7 @@ function Sys_PageIn(memory, size)
   return state.checksum
 end function
 
-// Provide findhandle behavior for the active subsystem.
+/// Finds handle for `miniquake.sys_win`.
 function findhandle()
   state = Sys_State()
   index = 1
@@ -183,13 +244,15 @@ function findhandle()
   return Sys_Error("out of handles")
 end function
 
-// Report whether valid handle.
+/// Report whether valid handle.
+/// @param index Zero-based index of the requested entry.
 function validHandle(index)
   state = Sys_State()
   return index > 0 and index < MAX_HANDLES and state.handles[index] != 0
 end function
 
-// Provide filelength behavior for the active subsystem.
+/// Implements the `filelength` operation for `miniquake.sys_win` (filelength).
+/// @param handle The handle input consumed by `filelength`.
 function filelength(handle)
   state = Sys_State()
   if not validHandle(handle) then return -1 end if
@@ -201,7 +264,8 @@ function filelength(handle)
   return low
 end function
 
-// Mirror Quake's Sys_FileOpenRead routine and its observable state changes.
+/// Mirror Quake's Sys_FileOpenRead routine and its observable state changes.
+/// @param path Filesystem path to process.
 function Sys_FileOpenRead(path)
   state = Sys_State()
   index = findhandle()
@@ -220,7 +284,8 @@ function Sys_FileOpenRead(path)
   return [filelength(index), index]
 end function
 
-// Mirror Quake's Sys_FileOpenWrite routine and its observable state changes.
+/// Mirror Quake's Sys_FileOpenWrite routine and its observable state changes.
+/// @param path Filesystem path to process.
 function Sys_FileOpenWrite(path)
   state = Sys_State()
   index = findhandle()
@@ -239,7 +304,8 @@ function Sys_FileOpenWrite(path)
   return index
 end function
 
-// Mirror Quake's Sys_FileClose routine and its observable state changes.
+/// Mirror Quake's Sys_FileClose routine and its observable state changes.
+/// @param handle The handle input consumed by `Sys_FileClose`.
 function Sys_FileClose(handle)
   state = Sys_State()
   if not validHandle(handle) then return false end if
@@ -248,7 +314,9 @@ function Sys_FileClose(handle)
   return result
 end function
 
-// Mirror Quake's Sys_FileSeek routine and its observable state changes.
+/// Mirror Quake's Sys_FileSeek routine and its observable state changes.
+/// @param handle The handle input consumed by `Sys_FileSeek`.
+/// @param position Position used by the operation.
 function Sys_FileSeek(handle, position)
   state = Sys_State()
   if not validHandle(handle) then return false end if
@@ -256,7 +324,10 @@ function Sys_FileSeek(handle, position)
   return result != INVALID_SET_FILE_POINTER
 end function
 
-// Mirror Quake's Sys_FileRead routine and its observable state changes.
+/// Mirror Quake's Sys_FileRead routine and its observable state changes.
+/// @param handle The handle input consumed by `Sys_FileRead`.
+/// @param destination Destination value or collection to update.
+/// @param count Number of entries or units to process.
 function Sys_FileRead(handle, destination, count)
   state = Sys_State()
   if not validHandle(handle) or typeof(destination) != "bytes" then return -1 end if
@@ -267,7 +338,10 @@ function Sys_FileRead(handle, destination, count)
   return readU32(readCount)
 end function
 
-// Mirror Quake's Sys_FileWrite routine and its observable state changes.
+/// Mirror Quake's Sys_FileWrite routine and its observable state changes.
+/// @param handle The handle input consumed by `Sys_FileWrite`.
+/// @param data Input data consumed by the operation.
+/// @param count Number of entries or units to process.
 function Sys_FileWrite(handle, data, count)
   state = Sys_State()
   if not validHandle(handle) or typeof(data) != "bytes" then return -1 end if
@@ -278,19 +352,23 @@ function Sys_FileWrite(handle, data, count)
   return readU32(written)
 end function
 
-// Mirror Quake's Sys_FileTime routine and its observable state changes.
+/// Mirror Quake's Sys_FileTime routine and its observable state changes.
+/// @param path Filesystem path to process.
 function Sys_FileTime(path)
   if fs.isFile(path) then return 1 end if
   return -1
 end function
 
-// Mirror Quake's Sys_mkdir routine and its observable state changes.
+/// Mirror Quake's Sys_mkdir routine and its observable state changes.
+/// @param path Filesystem path to process.
 function Sys_mkdir(path)
   if fs.isDir(path) then return true end if
   return CreateDirectoryW(path, 0)
 end function
 
-// Mirror Quake's Sys_MakeCodeWriteable routine and its observable state changes.
+/// Mirror Quake's Sys_MakeCodeWriteable routine and its observable state changes.
+/// @param startAddress The start address input consumed by `Sys_MakeCodeWriteable`.
+/// @param length Length of the requested data in units appropriate to the operation.
 function Sys_MakeCodeWriteable(startAddress, length)
   state = Sys_State()
   state.codeWriteRequests = state.codeWriteRequests + [[startAddress, length]]
@@ -317,12 +395,13 @@ function inline Sys_PopFPCW()
   return true
 end function
 
-// Provide mask exceptions behavior for the active subsystem.
+/// Implements the `MaskExceptions` operation for `miniquake.sys_win` (mask exceptions).
 function MaskExceptions()
   return true
 end function
 
-// Provide list tail behavior for the active subsystem.
+/// Implements the `listTail` operation for `miniquake.sys_win` (list tail).
+/// @param values The values input consumed by `listTail`.
 function listTail(values)
   result = []
   index = 1
@@ -349,7 +428,9 @@ function nextCounter()
   return native.sysCounter()
 end function
 
-// Mirror Quake's Sys_SetCounterFixture routine and its observable state changes.
+/// Mirror Quake's Sys_SetCounterFixture routine and its observable state changes.
+/// @param frequency The frequency input consumed by `Sys_SetCounterFixture`.
+/// @param counters The counters input consumed by `Sys_SetCounterFixture`.
 function Sys_SetCounterFixture(frequency, counters)
   state = Sys_State()
   state.testFrequency = frequency
@@ -359,7 +440,9 @@ function Sys_SetCounterFixture(frequency, counters)
   return true
 end function
 
-// Return argument index derived from the active module state.
+/// Return argument index derived from the active module state.
+/// @param arguments Command-line arguments to inspect or execute.
+/// @param name Stable name that identifies the requested object or option.
 function argumentIndex(arguments, name)
   index = 0
   while index < len(arguments)
@@ -392,7 +475,8 @@ function Sys_Init()
   return true
 end function
 
-// Mirror Quake's Sys_Error routine and its observable state changes.
+/// Mirror Quake's Sys_Error routine and its observable state changes.
+/// @param text Text to parse or process.
 function Sys_Error(text)
   state = Sys_State()
   state.errorText = text
@@ -405,7 +489,8 @@ function Sys_Error(text)
   return error(2500, text)
 end function
 
-// Mirror Quake's Sys_Printf routine and its observable state changes.
+/// Mirror Quake's Sys_Printf routine and its observable state changes.
+/// @param text Text to parse or process.
 function Sys_Printf(text)
   state = Sys_State()
   state.outputLog = state.outputLog + text
@@ -470,7 +555,9 @@ function Sys_InitFloatTime()
   return state.curtime
 end function
 
-// Mirror Quake's Sys_ConsoleInject routine and its observable state changes.
+/// Mirror Quake's Sys_ConsoleInject routine and its observable state changes.
+/// @param character The character input consumed by `Sys_ConsoleInject`.
+/// @param keyDown The key down input consumed by `Sys_ConsoleInject`.
 function Sys_ConsoleInject(character, keyDown)
   state = Sys_State()
   state.consoleEvents = state.consoleEvents + [[keyDown, character]]
@@ -555,7 +642,8 @@ function Sys_SendKeyEvents()
   return not state.quitRequested
 end function
 
-// Provide sleep until input behavior for the active subsystem.
+/// Implements the `SleepUntilInput` operation for `miniquake.sys_win` (sleep until input).
+/// @param time Simulation or presentation time for the operation.
 function SleepUntilInput(time)
   state = Sys_State()
   if time < 0 then time = 0 end if
@@ -564,7 +652,8 @@ function SleepUntilInput(time)
   return true
 end function
 
-// Mirror Quake's Sys_ParseCommandLine routine and its observable state changes.
+/// Mirror Quake's Sys_ParseCommandLine routine and its observable state changes.
+/// @param commandLine The command line input consumed by `Sys_ParseCommandLine`.
 function Sys_ParseCommandLine(commandLine)
   source = bytes(commandLine)
   arguments = [""]
@@ -583,7 +672,10 @@ function Sys_ParseCommandLine(commandLine)
   return arguments
 end function
 
-// Mirror Quake's Sys_SelectMemorySize routine and its observable state changes.
+/// Mirror Quake's Sys_SelectMemorySize routine and its observable state changes.
+/// @param available The available input consumed by `Sys_SelectMemorySize`.
+/// @param total The total input consumed by `Sys_SelectMemorySize`.
+/// @param arguments Command-line arguments to inspect or execute.
 function Sys_SelectMemorySize(available, total, arguments)
   size = available
   if size < MINIMUM_WIN_MEMORY then size = MINIMUM_WIN_MEMORY end if
@@ -598,7 +690,9 @@ function Sys_SelectMemorySize(available, total, arguments)
   return size
 end function
 
-// Handle argument and update the associated state.
+/// Handle argument and update the associated state.
+/// @param arguments Command-line arguments to inspect or execute.
+/// @param name Stable name that identifies the requested object or option.
 function handleArgument(arguments, name)
   index = argumentIndex(arguments, name)
   if index < 0 or index + 1 >= len(arguments) then return 0 end if
@@ -607,7 +701,9 @@ function handleArgument(arguments, name)
   return native.trunc(value)
 end function
 
-// Provide win main behavior for the active subsystem.
+/// Implements the `WinMain` operation for `miniquake.sys_win` (win main).
+/// @param arguments Command-line arguments to inspect or execute.
+/// @param runner The runner input consumed by `WinMain`.
 function WinMain(arguments, runner)
   state = Sys_State()
   if typeof(arguments) == "string" then arguments = Sys_ParseCommandLine(arguments) end if

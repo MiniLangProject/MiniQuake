@@ -9,16 +9,24 @@ external MiniQuake visual reference corpus remain separate final gates.
 */
 package miniquake.compatibility_matrix
 
+/// Defines the status value used by `miniquake.compatibility_matrix`.
 const STATUS = "compat_109_release_candidate_v1"
+/// Defines the fingerprint value used by `miniquake.compatibility_matrix`.
 const FINGERPRINT = 0x29b72a98
+/// Defines the contract text value used by `miniquake.compatibility_matrix`.
 const CONTRACT_TEXT = "compat-release-candidate|contracts=18|source-functions=1094|maps=4|retail-demos=3|soak=2|optional-mission-packs|external-binary-pending|external-visual-pending"
+/// Defines the contract count value used by `miniquake.compatibility_matrix`.
 const CONTRACT_COUNT = 18
+/// Defines the source function count value used by `miniquake.compatibility_matrix`.
 const SOURCE_FUNCTION_COUNT = 1094
+/// Defines the black port map count value used by `miniquake.compatibility_matrix`.
 const BLACK_PORT_MAP_COUNT = 4
+/// Defines the retail demo count value used by `miniquake.compatibility_matrix`.
 const RETAIL_DEMO_COUNT = 3
+/// Defines the soak mode count value used by `miniquake.compatibility_matrix`.
 const SOAK_MODE_COUNT = 2
 
-// Provide accepted contracts behavior for the active subsystem.
+/// Implements the `acceptedContracts` operation for `miniquake.compatibility_matrix` (accepted contracts).
 function acceptedContracts()
   return [
     "protocol15_frozen_v1",
@@ -42,17 +50,17 @@ function acceptedContracts()
   ]
 end function
 
-// Provide pending external gates behavior for the active subsystem.
+/// Implements the `pendingExternalGates` operation for `miniquake.compatibility_matrix` (pending external gates).
 function pendingExternalGates()
   return ["original_binary_interop", "external_glquake_visual_reference"]
 end function
 
-// Validate the requested value and report any incompatibility.
+/// Implements the `validate` operation for `miniquake.compatibility_matrix` (validate).
 function validate()
   return len(acceptedContracts()) == CONTRACT_COUNT and len(pendingExternalGates()) == 2 and SOURCE_FUNCTION_COUNT == 1094 and BLACK_PORT_MAP_COUNT == 4 and RETAIL_DEMO_COUNT == 3 and SOAK_MODE_COUNT == 2
 end function
 
-// Return contract vector derived from the active module state.
+/// Implements the `contractVector` operation for `miniquake.compatibility_matrix` (contract vector).
 function contractVector()
   return [STATUS, FINGERPRINT, CONTRACT_COUNT, SOURCE_FUNCTION_COUNT, BLACK_PORT_MAP_COUNT, RETAIL_DEMO_COUNT, SOAK_MODE_COUNT, acceptedContracts(), pendingExternalGates()]
 end function

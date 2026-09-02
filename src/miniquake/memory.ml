@@ -10,80 +10,123 @@ package miniquake.memory
 import miniquake.zone as zone
 import miniquake.protocol_text as quakeText
 
+/// Defines the hunk sentinel value used by `miniquake.memory`.
 const HUNK_SENTINEL = 0x1df001ed
+/// Defines the hunk header size value used by `miniquake.memory`.
 const HUNK_HEADER_SIZE = 16
+/// Defines the cache header size value used by `miniquake.memory`.
 const CACHE_HEADER_SIZE = 40
 
 // Group the fields that describe one hunk block.
 struct HunkBlock
+  /// Stores the kind value in `miniquake.memory.HunkBlock`.
   kind
+  /// Stores the name value in `miniquake.memory.HunkBlock`.
   name
+  /// Stores the data value in `miniquake.memory.HunkBlock`.
   data
+  /// Stores the size value in `miniquake.memory.HunkBlock`.
   size
+  /// Stores the alive value in `miniquake.memory.HunkBlock`.
   alive
+  /// Stores the allocation index value in `miniquake.memory.HunkBlock`.
   allocationIndex
+  /// Stores the side value in `miniquake.memory.HunkBlock`.
   side
+  /// Stores the start value in `miniquake.memory.HunkBlock`.
   start
+  /// Stores the span value in `miniquake.memory.HunkBlock`.
   span
+  /// Stores the sentinel value in `miniquake.memory.HunkBlock`.
   sentinel
 end struct
 
 // Group the fields that describe one cache block.
 struct CacheBlock
+  /// Stores the kind value in `miniquake.memory.CacheBlock`.
   kind
+  /// Stores the name value in `miniquake.memory.CacheBlock`.
   name
+  /// Stores the data value in `miniquake.memory.CacheBlock`.
   data
+  /// Stores the size value in `miniquake.memory.CacheBlock`.
   size
+  /// Stores the alive value in `miniquake.memory.CacheBlock`.
   alive
+  /// Stores the allocation index value in `miniquake.memory.CacheBlock`.
   allocationIndex
+  /// Stores the start value in `miniquake.memory.CacheBlock`.
   start
+  /// Stores the span value in `miniquake.memory.CacheBlock`.
   span
+  /// Stores the lru stamp value in `miniquake.memory.CacheBlock`.
   lruStamp
+  /// Stores the owner value in `miniquake.memory.CacheBlock`.
   owner
+  /// Stores the user value in `miniquake.memory.CacheBlock`.
   user
 end struct
 
 // Group the fields that describe one cache user.
 struct CacheUser
+  /// Stores the block value in `miniquake.memory.CacheUser`.
   block
+  /// Stores the manager value in `miniquake.memory.CacheUser`.
   manager
 end struct
 
 // Own the coordinated data required by the memory manager.
 struct MemoryManager
+  /// Stores the capacity value in `miniquake.memory.MemoryManager`.
   capacity
+  /// Stores the blocks value in `miniquake.memory.MemoryManager`.
   blocks
+  /// Stores the total allocated value in `miniquake.memory.MemoryManager`.
   totalAllocated
+  /// Stores the low used value in `miniquake.memory.MemoryManager`.
   lowUsed
+  /// Stores the high used value in `miniquake.memory.MemoryManager`.
   highUsed
+  /// Stores the temp active value in `miniquake.memory.MemoryManager`.
   tempActive
+  /// Stores the temp mark value in `miniquake.memory.MemoryManager`.
   tempMark
+  /// Stores the caches value in `miniquake.memory.MemoryManager`.
   caches
+  /// Stores the lru clock value in `miniquake.memory.MemoryManager`.
   lruClock
+  /// Stores the next allocation index value in `miniquake.memory.MemoryManager`.
   nextAllocationIndex
+  /// Stores the main zone value in `miniquake.memory.MemoryManager`.
   mainZone
+  /// Stores the zone backing value in `miniquake.memory.MemoryManager`.
   zoneBacking
 end struct
 
-// Provide align16 behavior for the active subsystem.
+/// Implements the `align16` operation for `miniquake.memory` (align16).
+/// @param value Value consumed by `align16`.
 function inline align16(value)
   return (value + 15) & ~15
 end function
 
-// Return truncate name derived from the active module state.
+/// Return truncate name derived from the active module state.
+/// @param name Stable name that identifies the requested object or option.
+/// @param count Number of entries or units to process.
 function truncateName(name, count)
   data = quakeText.encodeBytes(name)
   if len(data) <= count then return quakeText.decodeBytes(data) end if
   return quakeText.decodeBytes(slice(data, 0, count))
 end function
 
-// Create and initialize the module state.
+/// Implements the `create` operation for `miniquake.memory` (create).
+/// @param capacity Maximum number of entries the destination can hold.
 function create(capacity)
   if capacity < 0 then return error(1600, "negative memory capacity") end if
   return MemoryManager(capacity, [], 0, 0, 0, false, 0, [], 0, 1, void, void)
 end function
 
-// Provide hunk payload used behavior for the active subsystem.
+/// Implements the `hunkPayloadUsed` operation for `miniquake.memory` (hunk payload used).
+/// @param state Mutable `miniquake.memory` state used by `hunkPayloadUsed`.
 function hunkPayloadUsed(state)
   total = 0
   for each block in state.blocks
@@ -92,7 +135,8 @@ function hunkPayloadUsed(state)
   return total
 end function
 
-// Provide cache payload used behavior for the active subsystem.
+/// Implements the `cachePayloadUsed` operation for `miniquake.memory` (cache payload used).
+/// @param state Mutable `miniquake.memory` state used by `cachePayloadUsed`.
 function cachePayloadUsed(state)
   total = 0
   for each block in state.caches
@@ -101,7 +145,8 @@ function cachePayloadUsed(state)
   return total
 end function
 
-// Provide zone payload used behavior for the active subsystem.
+/// Implements the `zonePayloadUsed` operation for `miniquake.memory` (zone payload used).
+/// @param state Mutable `miniquake.memory` state used by `zonePayloadUsed`.
 function zonePayloadUsed(state)
   if state.mainZone is void then return 0 end if
   total = 0
@@ -111,17 +156,26 @@ function zonePayloadUsed(state)
   return total
 end function
 
-// Provide used behavior for the active subsystem.
+/// Implements the `used` operation for `miniquake.memory` (used).
+/// @param state Mutable `miniquake.memory` state used by `used`.
 function used(state)
   return hunkPayloadUsed(state) + cachePayloadUsed(state) + zonePayloadUsed(state)
 end function
 
-// Release state for free hunk bytes.
+/// Release state for free hunk bytes.
+/// @param state Mutable `miniquake.memory` state used by `freeHunkBytes`.
 function inline freeHunkBytes(state)
   return state.capacity - state.lowUsed - state.highUsed
 end function
 
-// Create and initialize hunk block.
+/// Create and initialize hunk block.
+/// @param state Mutable `miniquake.memory` state used by `newHunkBlock`.
+/// @param requestedSize Size of the requested data or resource.
+/// @param name Stable name that identifies the requested object or option.
+/// @param kind The kind input consumed by `newHunkBlock`.
+/// @param side The side input consumed by `newHunkBlock`.
+/// @param start The start input consumed by `newHunkBlock`.
+/// @param span The span input consumed by `newHunkBlock`.
 function newHunkBlock(state, requestedSize, name, kind, side, start, span)
   block = HunkBlock(
     kind,
@@ -141,12 +195,14 @@ function newHunkBlock(state, requestedSize, name, kind, side, start, span)
   return block
 end function
 
-// Provide low mark behavior for the active subsystem.
+/// Implements the `lowMark` operation for `miniquake.memory` (low mark).
+/// @param state Mutable `miniquake.memory` state used by `lowMark`.
 function lowMark(state)
   return state.lowUsed
 end function
 
-// Provide high mark behavior for the active subsystem.
+/// Implements the `highMark` operation for `miniquake.memory` (high mark).
+/// @param state Mutable `miniquake.memory` state used by `highMark`.
 function highMark(state)
   if state.tempActive then
     mark = state.tempMark
@@ -156,7 +212,10 @@ function highMark(state)
   return state.highUsed
 end function
 
-// Return hunk alloc name derived from the active module state.
+/// Return hunk alloc name derived from the active module state.
+/// @param state Mutable `miniquake.memory` state used by `hunkAllocName`.
+/// @param size Size of the requested data or resource.
+/// @param name Stable name that identifies the requested object or option.
 function hunkAllocName(state, size, name)
   if size < 0 then return error(1601, "Hunk_Alloc: bad size: " + size) end if
   span = HUNK_HEADER_SIZE + align16(size)
@@ -167,12 +226,17 @@ function hunkAllocName(state, size, name)
   return newHunkBlock(state, size, name, "hunk", "low", start, span)
 end function
 
-// Provide hunk alloc behavior for the active subsystem.
+/// Implements the `hunkAlloc` operation for `miniquake.memory` (hunk alloc).
+/// @param state Mutable `miniquake.memory` state used by `hunkAlloc`.
+/// @param size Size of the requested data or resource.
 function hunkAlloc(state, size)
   return hunkAllocName(state, size, "unknown")
 end function
 
-// Return hunk high alloc name derived from the active module state.
+/// Return hunk high alloc name derived from the active module state.
+/// @param state Mutable `miniquake.memory` state used by `hunkHighAllocName`.
+/// @param size Size of the requested data or resource.
+/// @param name Stable name that identifies the requested object or option.
 function hunkHighAllocName(state, size, name)
   if size < 0 then return error(1604, "Hunk_HighAllocName: bad size: " + size) end if
   if state.tempActive then
@@ -188,7 +252,10 @@ function hunkHighAllocName(state, size, name)
   return newHunkBlock(state, size, name, "hunk", "high", start, span)
 end function
 
-// Provide hunk temp alloc behavior for the active subsystem.
+/// Implements the `hunkTempAlloc` operation for `miniquake.memory` (hunk temp alloc).
+/// @param state Mutable `miniquake.memory` state used by `hunkTempAlloc`.
+/// @param size Size of the requested data or resource.
+/// @param name Stable name that identifies the requested object or option.
 function hunkTempAlloc(state, size, name)
   aligned = align16(size)
   if state.tempActive then
@@ -206,7 +273,9 @@ function hunkTempAlloc(state, size, name)
   return block
 end function
 
-// Release state for free to low mark.
+/// Release state for free to low mark.
+/// @param state Mutable `miniquake.memory` state used by `freeToLowMark`.
+/// @param mark The mark input consumed by `freeToLowMark`.
 function freeToLowMark(state, mark)
   if mark < 0 or mark > state.lowUsed then return error(1603, "Hunk_FreeToLowMark: bad mark " + mark) end if
   for each block in state.blocks
@@ -219,7 +288,9 @@ function freeToLowMark(state, mark)
   return true
 end function
 
-// Release state for free to high mark.
+/// Release state for free to high mark.
+/// @param state Mutable `miniquake.memory` state used by `freeToHighMark`.
+/// @param mark The mark input consumed by `freeToHighMark`.
 function freeToHighMark(state, mark)
   if state.tempActive then
     tempRestore = state.tempMark
@@ -237,7 +308,8 @@ function freeToHighMark(state, mark)
   return true
 end function
 
-// Assert that the condition holds and identify a failing test.
+/// Implements the `hunkCheck` operation for `miniquake.memory` (hunk check).
+/// @param state Mutable `miniquake.memory` state used by `hunkCheck`.
 function hunkCheck(state)
   expected = 0
   for each block in state.blocks
@@ -253,7 +325,9 @@ function hunkCheck(state)
   return true
 end function
 
-// Provide hunk print behavior for the active subsystem.
+/// Implements the `hunkPrint` operation for `miniquake.memory` (hunk print).
+/// @param state Mutable `miniquake.memory` state used by `hunkPrint`.
+/// @param all The all input consumed by `hunkPrint`.
 function hunkPrint(state, all)
   text = "          :" + state.capacity + " total hunk size\n-------------------------"
   totalBlocks = 0
@@ -317,7 +391,9 @@ function hunkPrint(state, all)
   return text
 end function
 
-// Return cache start index derived from the active module state.
+/// Return cache start index derived from the active module state.
+/// @param state Mutable `miniquake.memory` state used by `cacheStartIndex`.
+/// @param block The block input consumed by `cacheStartIndex`.
 function cacheStartIndex(state, block)
   index = 0
   while index < len(state.caches)
@@ -327,7 +403,9 @@ function cacheStartIndex(state, block)
   return -1
 end function
 
-// Add state for insert cache sorted.
+/// Add state for insert cache sorted.
+/// @param state Mutable `miniquake.memory` state used by `insertCacheSorted`.
+/// @param block The block input consumed by `insertCacheSorted`.
 function insertCacheSorted(state, block)
   index = 0
   while index < len(state.caches) and state.caches[index].start < block.start
@@ -342,7 +420,9 @@ function insertCacheSorted(state, block)
   state.caches = result
 end function
 
-// Release state for remove cache at.
+/// Release state for remove cache at.
+/// @param state Mutable `miniquake.memory` state used by `removeCacheAt`.
+/// @param index Zero-based index of the requested entry.
 function removeCacheAt(state, index)
   oldCount = len(state.caches)
   result = array(oldCount - 1)
@@ -352,7 +432,10 @@ function removeCacheAt(state, index)
   state.caches = result
 end function
 
-// Provide cache try alloc behavior for the active subsystem.
+/// Implements the `cacheTryAlloc` operation for `miniquake.memory` (cache try alloc).
+/// @param state Mutable `miniquake.memory` state used by `cacheTryAlloc`.
+/// @param span The span input consumed by `cacheTryAlloc`.
+/// @param noBottom The no bottom input consumed by `cacheTryAlloc`.
 function cacheTryAlloc(state, span, noBottom)
   if span <= 0 then return -1 end if
   if len(state.caches) == 0 then
@@ -375,9 +458,12 @@ function cacheTryAlloc(state, span, noBottom)
   return -1
 end function
 
-// Cache_TryAlloc itself creates and links a cache header.  Cache_Alloc uses
-// the lower-level position search because it must fill the user/name/payload
-// fields atomically before exposing the new block.
+/// Cache_TryAlloc itself creates and links a cache header.  Cache_Alloc uses
+/// the lower-level position search because it must fill the user/name/payload
+/// fields atomically before exposing the new block.
+/// @param state Mutable `miniquake.memory` state used by `cacheTryAllocBlock`.
+/// @param span The span input consumed by `cacheTryAllocBlock`.
+/// @param noBottom The no bottom input consumed by `cacheTryAllocBlock`.
 function cacheTryAllocBlock(state, span, noBottom)
   start = cacheTryAlloc(state, span, noBottom)
   if start is error or start < 0 then return start end if
@@ -402,12 +488,14 @@ function cacheTryAllocBlock(state, span, noBottom)
   return block
 end function
 
-// Create and initialize cache user.
+/// Create and initialize cache user.
+/// @param state Mutable `miniquake.memory` state used by `newCacheUser`.
 function newCacheUser(state)
   return CacheUser(void, state)
 end function
 
-// Create and initialize lru.
+/// Create and initialize lru.
+/// @param block The block input consumed by `makeLru`.
 function makeLru(block)
   if block is void or not block.alive then return error(1609, "Cache_MakeLRU: NULL link") end if
   if block.lruStamp != 0 then return error(1610, "Cache_MakeLRU: active link") end if
@@ -417,7 +505,8 @@ function makeLru(block)
   return block
 end function
 
-// Provide unlink lru behavior for the active subsystem.
+/// Implements the `unlinkLru` operation for `miniquake.memory` (unlink lru).
+/// @param block The block input consumed by `unlinkLru`.
 function unlinkLru(block)
   if block is void or not block.alive or block.lruStamp == 0 then
     return error(1611, "Cache_UnlinkLRU: NULL link")
@@ -426,7 +515,8 @@ function unlinkLru(block)
   return block
 end function
 
-// Provide least recently used behavior for the active subsystem.
+/// Implements the `leastRecentlyUsed` operation for `miniquake.memory` (least recently used).
+/// @param state Mutable `miniquake.memory` state used by `leastRecentlyUsed`.
 function leastRecentlyUsed(state)
   result = void
   for each block in state.caches
@@ -435,7 +525,8 @@ function leastRecentlyUsed(state)
   return result
 end function
 
-// Provide cache free behavior for the active subsystem.
+/// Implements the `cacheFree` operation for `miniquake.memory` (cache free).
+/// @param user The user input consumed by `cacheFree`.
 function cacheFree(user)
   if user is void or user.block is void or not user.block.alive then
     return error(1630, "Cache_Free: not allocated")
@@ -452,7 +543,9 @@ function cacheFree(user)
   return true
 end function
 
-// Assert that the condition holds and identify a failing test.
+/// Implements the `cacheCheck` operation for `miniquake.memory` (cache check).
+/// @param state Mutable `miniquake.memory` state used by `cacheCheck`.
+/// @param user The user input consumed by `cacheCheck`.
 function cacheCheck(state, user)
   if user is void or user.block is void or not user.block.alive then return void end if
   unlinkLru(user.block)
@@ -460,7 +553,11 @@ function cacheCheck(state, user)
   return user.block.data
 end function
 
-// Provide cache alloc user behavior for the active subsystem.
+/// Implements the `cacheAllocUser` operation for `miniquake.memory` (cache alloc user).
+/// @param state Mutable `miniquake.memory` state used by `cacheAllocUser`.
+/// @param user The user input consumed by `cacheAllocUser`.
+/// @param size Size of the requested data or resource.
+/// @param name Stable name that identifies the requested object or option.
 function cacheAllocUser(state, user, size, name)
   if user.block is not void and user.block.alive then return error(1632, "Cache_Alloc: already allocated") end if
   if size <= 0 then return error(1633, "Cache_Alloc: size " + size) end if
@@ -496,7 +593,10 @@ function cacheAllocUser(state, user, size, name)
   return block.data
 end function
 
-// Provide cache alloc behavior for the active subsystem.
+/// Implements the `cacheAlloc` operation for `miniquake.memory` (cache alloc).
+/// @param state Mutable `miniquake.memory` state used by `cacheAlloc`.
+/// @param size Size of the requested data or resource.
+/// @param name Stable name that identifies the requested object or option.
 function cacheAlloc(state, size, name)
   user = newCacheUser(state)
   allocated = cacheAllocUser(state, user, size, name)
@@ -504,7 +604,8 @@ function cacheAlloc(state, size, name)
   return user
 end function
 
-// Provide cache move behavior for the active subsystem.
+/// Implements the `cacheMove` operation for `miniquake.memory` (cache move).
+/// @param block The block input consumed by `cacheMove`.
 function cacheMove(block)
   if block is void or not block.alive then return false end if
   state = block.owner
@@ -522,7 +623,9 @@ function cacheMove(block)
   return true
 end function
 
-// Provide cache free low behavior for the active subsystem.
+/// Implements the `cacheFreeLow` operation for `miniquake.memory` (cache free low).
+/// @param state Mutable `miniquake.memory` state used by `cacheFreeLow`.
+/// @param newLowHunk The new low hunk input consumed by `cacheFreeLow`.
 function cacheFreeLow(state, newLowHunk)
   while len(state.caches) > 0
     block = state.caches[0]
@@ -532,7 +635,9 @@ function cacheFreeLow(state, newLowHunk)
   return true
 end function
 
-// Provide cache free high behavior for the active subsystem.
+/// Implements the `cacheFreeHigh` operation for `miniquake.memory` (cache free high).
+/// @param state Mutable `miniquake.memory` state used by `cacheFreeHigh`.
+/// @param newHighHunk The new high hunk input consumed by `cacheFreeHigh`.
 function cacheFreeHigh(state, newHighHunk)
   while len(state.caches) > 0
     block = state.caches[len(state.caches) - 1]
@@ -544,7 +649,8 @@ function cacheFreeHigh(state, newHighHunk)
   return true
 end function
 
-// Provide cache flush behavior for the active subsystem.
+/// Implements the `cacheFlush` operation for `miniquake.memory` (cache flush).
+/// @param state Mutable `miniquake.memory` state used by `cacheFlush`.
 function cacheFlush(state)
   while len(state.caches) > 0
     cacheFree(state.caches[0].user)
@@ -552,7 +658,8 @@ function cacheFlush(state)
   return true
 end function
 
-// Provide cache print behavior for the active subsystem.
+/// Implements the `cachePrint` operation for `miniquake.memory` (cache print).
+/// @param state Mutable `miniquake.memory` state used by `cachePrint`.
 function cachePrint(state)
   text = ""
   for each block in state.caches
@@ -561,17 +668,20 @@ function cachePrint(state)
   return text
 end function
 
-// Provide cache report behavior for the active subsystem.
+/// Implements the `cacheReport` operation for `miniquake.memory` (cache report).
+/// @param state Mutable `miniquake.memory` state used by `cacheReport`.
 function cacheReport(state)
   return freeHunkBytes(state) / (1024.0 * 1024.0)
 end function
 
-// Provide cache compact behavior for the active subsystem.
+/// Implements the `cacheCompact` operation for `miniquake.memory` (cache compact).
+/// @param state Mutable `miniquake.memory` state used by `cacheCompact`.
 function cacheCompact(state)
   return true
 end function
 
-// Update subsystem state for cache init.
+/// Update subsystem state for cache init.
+/// @param state Mutable `miniquake.memory` state used by `cacheInit`.
 function cacheInit(state)
   for each block in state.caches
     block.alive = false
@@ -583,13 +693,18 @@ function cacheInit(state)
   return state
 end function
 
-// Return zone state derived from the active module state.
+/// Return zone state derived from the active module state.
+/// @param state Mutable `miniquake.memory` state used by `zoneState`.
 function zoneState(state)
   if state.mainZone is void then state.mainZone = zone.create(state.capacity) end if
   return state.mainZone
 end function
 
-// Provide zone tag malloc behavior for the active subsystem.
+/// Implements the `zoneTagMalloc` operation for `miniquake.memory` (zone tag malloc).
+/// @param state Mutable `miniquake.memory` state used by `zoneTagMalloc`.
+/// @param size Size of the requested data or resource.
+/// @param tag The tag input consumed by `zoneTagMalloc`.
+/// @param name Stable name that identifies the requested object or option.
 function zoneTagMalloc(state, size, tag, name)
   block = zone.tagMalloc(zoneState(state), size, tag)
   if block is void or block is error then return block end if
@@ -598,7 +713,10 @@ function zoneTagMalloc(state, size, tag, name)
   return block
 end function
 
-// Provide zone malloc behavior for the active subsystem.
+/// Implements the `zoneMalloc` operation for `miniquake.memory` (zone malloc).
+/// @param state Mutable `miniquake.memory` state used by `zoneMalloc`.
+/// @param size Size of the requested data or resource.
+/// @param name Stable name that identifies the requested object or option.
 function zoneMalloc(state, size, name)
   zone.check(zoneState(state))
   block = zoneTagMalloc(state, size, 1, name)
@@ -606,32 +724,41 @@ function zoneMalloc(state, size, name)
   return block
 end function
 
-// Provide zone free behavior for the active subsystem.
+/// Implements the `zoneFree` operation for `miniquake.memory` (zone free).
+/// @param block The block input consumed by `zoneFree`.
 function zoneFree(block)
   return zone.free(block)
 end function
 
-// Assert that the condition holds and identify a failing test.
+/// Implements the `zoneCheck` operation for `miniquake.memory` (zone check).
+/// @param state Mutable `miniquake.memory` state used by `zoneCheck`.
 function zoneCheck(state)
   return zone.check(zoneState(state))
 end function
 
-// Provide zone print behavior for the active subsystem.
+/// Implements the `zonePrint` operation for `miniquake.memory` (zone print).
+/// @param state Mutable `miniquake.memory` state used by `zonePrint`.
 function zonePrint(state)
   return zone.printHeap(zoneState(state))
 end function
 
-// Provide zone dump heap behavior for the active subsystem.
+/// Implements the `zoneDumpHeap` operation for `miniquake.memory` (zone dump heap).
+/// @param state Mutable `miniquake.memory` state used by `zoneDumpHeap`.
 function zoneDumpHeap(state)
   return zone.dumpHeap(zoneState(state))
 end function
 
-// Provide zone free memory behavior for the active subsystem.
+/// Implements the `zoneFreeMemory` operation for `miniquake.memory` (zone free memory).
+/// @param state Mutable `miniquake.memory` state used by `zoneFreeMemory`.
 function zoneFreeMemory(state)
   return zone.freeMemory(zoneState(state))
 end function
 
-// Allocate and initialize the requested value.
+/// Implements the `allocate` operation for `miniquake.memory` (allocate).
+/// @param state Mutable `miniquake.memory` state used by `allocate`.
+/// @param size Size of the requested data or resource.
+/// @param name Stable name that identifies the requested object or option.
+/// @param kind The kind input consumed by `allocate`.
 function allocate(state, size, name, kind)
   if kind == "zone" then return zoneMalloc(state, size, name) end if
   if kind == "temp" then return hunkTempAlloc(state, size, name) end if
@@ -639,7 +766,9 @@ function allocate(state, size, name, kind)
   return hunkAllocName(state, size, name)
 end function
 
-// Update subsystem state for memory init.
+/// Update subsystem state for memory init.
+/// @param capacity Maximum number of entries the destination can hold.
+/// @param zoneSize Size of the requested data or resource.
 function memoryInit(capacity, zoneSize)
   state = create(capacity)
   cacheInit(state)
@@ -650,7 +779,9 @@ function memoryInit(capacity, zoneSize)
   return state
 end function
 
-// Provide memory init arguments behavior for the active subsystem.
+/// Implements the `memoryInitArguments` operation for `miniquake.memory` (memory init arguments).
+/// @param capacity Maximum number of entries the destination can hold.
+/// @param commandLine The command line input consumed by `memoryInitArguments`.
 function memoryInitArguments(capacity, commandLine)
   zoneSize = zone.DYNAMIC_SIZE
   position = 0
@@ -675,128 +806,171 @@ function memoryInitArguments(capacity, commandLine)
   return memoryInit(capacity, zoneSize)
 end function
 
-// Explicit zone.c entry points. MemoryManager replaces the original global
-// hunk/cache variables, while marks remain byte offsets as in MiniQuake.
+/// Explicit zone.c entry points. MemoryManager replaces the original global
+/// hunk/cache variables, while marks remain byte offsets as in MiniQuake.
+/// @param state Mutable `miniquake.memory` state used by `Hunk_Check`.
 function Hunk_Check(state)
   return hunkCheck(state)
 end function
 
-// Mirror Quake's Hunk_Print routine and its observable state changes.
+/// Mirror Quake's Hunk_Print routine and its observable state changes.
+/// @param state Mutable `miniquake.memory` state used by `Hunk_Print`.
+/// @param all The all input consumed by `Hunk_Print`.
 function Hunk_Print(state, all)
   return hunkPrint(state, all)
 end function
 
-// Mirror Quake's Hunk_AllocName routine and its observable state changes.
+/// Mirror Quake's Hunk_AllocName routine and its observable state changes.
+/// @param state Mutable `miniquake.memory` state used by `Hunk_AllocName`.
+/// @param size Size of the requested data or resource.
+/// @param name Stable name that identifies the requested object or option.
 function Hunk_AllocName(state, size, name)
   return hunkAllocName(state, size, name)
 end function
 
-// Mirror Quake's Hunk_Alloc routine and its observable state changes.
+/// Mirror Quake's Hunk_Alloc routine and its observable state changes.
+/// @param state Mutable `miniquake.memory` state used by `Hunk_Alloc`.
+/// @param size Size of the requested data or resource.
 function Hunk_Alloc(state, size)
   return hunkAlloc(state, size)
 end function
 
-// Mirror Quake's Hunk_LowMark routine and its observable state changes.
+/// Mirror Quake's Hunk_LowMark routine and its observable state changes.
+/// @param state Mutable `miniquake.memory` state used by `Hunk_LowMark`.
 function Hunk_LowMark(state)
   return lowMark(state)
 end function
 
-// Mirror Quake's Hunk_FreeToLowMark routine and its observable state changes.
+/// Mirror Quake's Hunk_FreeToLowMark routine and its observable state changes.
+/// @param state Mutable `miniquake.memory` state used by `Hunk_FreeToLowMark`.
+/// @param mark The mark input consumed by `Hunk_FreeToLowMark`.
 function Hunk_FreeToLowMark(state, mark)
   return freeToLowMark(state, mark)
 end function
 
-// Mirror Quake's Hunk_HighMark routine and its observable state changes.
+/// Mirror Quake's Hunk_HighMark routine and its observable state changes.
+/// @param state Mutable `miniquake.memory` state used by `Hunk_HighMark`.
 function Hunk_HighMark(state)
   return highMark(state)
 end function
 
-// Mirror Quake's Hunk_FreeToHighMark routine and its observable state changes.
+/// Mirror Quake's Hunk_FreeToHighMark routine and its observable state changes.
+/// @param state Mutable `miniquake.memory` state used by `Hunk_FreeToHighMark`.
+/// @param mark The mark input consumed by `Hunk_FreeToHighMark`.
 function Hunk_FreeToHighMark(state, mark)
   return freeToHighMark(state, mark)
 end function
 
-// Mirror Quake's Hunk_HighAllocName routine and its observable state changes.
+/// Mirror Quake's Hunk_HighAllocName routine and its observable state changes.
+/// @param state Mutable `miniquake.memory` state used by `Hunk_HighAllocName`.
+/// @param size Size of the requested data or resource.
+/// @param name Stable name that identifies the requested object or option.
 function Hunk_HighAllocName(state, size, name)
   return hunkHighAllocName(state, size, name)
 end function
 
-// Mirror Quake's Hunk_TempAlloc routine and its observable state changes.
+/// Mirror Quake's Hunk_TempAlloc routine and its observable state changes.
+/// @param state Mutable `miniquake.memory` state used by `Hunk_TempAlloc`.
+/// @param size Size of the requested data or resource.
 function Hunk_TempAlloc(state, size)
   return hunkTempAlloc(state, size, "")
 end function
 
-// Mirror Quake's Cache_Move routine and its observable state changes.
+/// Mirror Quake's Cache_Move routine and its observable state changes.
+/// @param block The block input consumed by `Cache_Move`.
 function Cache_Move(block)
   return cacheMove(block)
 end function
 
-// Mirror Quake's Cache_FreeLow routine and its observable state changes.
+/// Mirror Quake's Cache_FreeLow routine and its observable state changes.
+/// @param state Mutable `miniquake.memory` state used by `Cache_FreeLow`.
+/// @param newLowHunk The new low hunk input consumed by `Cache_FreeLow`.
 function Cache_FreeLow(state, newLowHunk)
   return cacheFreeLow(state, newLowHunk)
 end function
 
-// Mirror Quake's Cache_FreeHigh routine and its observable state changes.
+/// Mirror Quake's Cache_FreeHigh routine and its observable state changes.
+/// @param state Mutable `miniquake.memory` state used by `Cache_FreeHigh`.
+/// @param newHighHunk The new high hunk input consumed by `Cache_FreeHigh`.
 function Cache_FreeHigh(state, newHighHunk)
   return cacheFreeHigh(state, newHighHunk)
 end function
 
-// Mirror Quake's Cache_UnlinkLRU routine and its observable state changes.
+/// Mirror Quake's Cache_UnlinkLRU routine and its observable state changes.
+/// @param block The block input consumed by `Cache_UnlinkLRU`.
 function Cache_UnlinkLRU(block)
   return unlinkLru(block)
 end function
 
-// Mirror Quake's Cache_MakeLRU routine and its observable state changes.
+/// Mirror Quake's Cache_MakeLRU routine and its observable state changes.
+/// @param block The block input consumed by `Cache_MakeLRU`.
 function Cache_MakeLRU(block)
   return makeLru(block)
 end function
 
-// Mirror Quake's Cache_TryAlloc routine and its observable state changes.
+/// Mirror Quake's Cache_TryAlloc routine and its observable state changes.
+/// @param state Mutable `miniquake.memory` state used by `Cache_TryAlloc`.
+/// @param size Size of the requested data or resource.
+/// @param noBottom The no bottom input consumed by `Cache_TryAlloc`.
 function Cache_TryAlloc(state, size, noBottom)
   return cacheTryAllocBlock(state, size, noBottom)
 end function
 
-// Mirror Quake's Cache_Flush routine and its observable state changes.
+/// Mirror Quake's Cache_Flush routine and its observable state changes.
+/// @param state Mutable `miniquake.memory` state used by `Cache_Flush`.
 function Cache_Flush(state)
   return cacheFlush(state)
 end function
 
-// Mirror Quake's Cache_Print routine and its observable state changes.
+/// Mirror Quake's Cache_Print routine and its observable state changes.
+/// @param state Mutable `miniquake.memory` state used by `Cache_Print`.
 function Cache_Print(state)
   return cachePrint(state)
 end function
 
-// Mirror Quake's Cache_Report routine and its observable state changes.
+/// Mirror Quake's Cache_Report routine and its observable state changes.
+/// @param state Mutable `miniquake.memory` state used by `Cache_Report`.
 function Cache_Report(state)
   return cacheReport(state)
 end function
 
-// Mirror Quake's Cache_Compact routine and its observable state changes.
+/// Mirror Quake's Cache_Compact routine and its observable state changes.
+/// @param state Mutable `miniquake.memory` state used by `Cache_Compact`.
 function Cache_Compact(state)
   return cacheCompact(state)
 end function
 
-// Mirror Quake's Cache_Init routine and its observable state changes.
+/// Mirror Quake's Cache_Init routine and its observable state changes.
+/// @param state Mutable `miniquake.memory` state used by `Cache_Init`.
 function Cache_Init(state)
   return cacheInit(state)
 end function
 
-// Mirror Quake's Cache_Free routine and its observable state changes.
+/// Mirror Quake's Cache_Free routine and its observable state changes.
+/// @param user The user input consumed by `Cache_Free`.
 function Cache_Free(user)
   return cacheFree(user)
 end function
 
-// Assert that the condition holds and identify a failing test.
+/// Implements the `Cache_Check` operation for `miniquake.memory` (cache check).
+/// @param state Mutable `miniquake.memory` state used by `Cache_Check`.
+/// @param user The user input consumed by `Cache_Check`.
 function Cache_Check(state, user)
   return cacheCheck(state, user)
 end function
 
-// Mirror Quake's Cache_Alloc routine and its observable state changes.
+/// Mirror Quake's Cache_Alloc routine and its observable state changes.
+/// @param state Mutable `miniquake.memory` state used by `Cache_Alloc`.
+/// @param user The user input consumed by `Cache_Alloc`.
+/// @param size Size of the requested data or resource.
+/// @param name Stable name that identifies the requested object or option.
 function Cache_Alloc(state, user, size, name)
   return cacheAllocUser(state, user, size, name)
 end function
 
-// Mirror Quake's Memory_Init routine and its observable state changes.
+/// Mirror Quake's Memory_Init routine and its observable state changes.
+/// @param capacity Maximum number of entries the destination can hold.
+/// @param zoneSize Size of the requested data or resource.
 function Memory_Init(capacity, zoneSize)
   return memoryInit(capacity, zoneSize)
 end function

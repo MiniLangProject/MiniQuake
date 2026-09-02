@@ -7,38 +7,58 @@ BP-049: frozen MiniQuake 1.09 model/UI/render-evidence contract.
 */
 package miniquake.model_ui_render_contract
 
+/// Defines the status value used by `miniquake.model_ui_render_contract`.
 const STATUS = "model_ui_render_109_frozen_v1"
+/// Defines the fingerprint value used by `miniquake.model_ui_render_contract`.
 const FINGERPRINT = 0x0a62f5b1
+/// Defines the fnv offset value used by `miniquake.model_ui_render_contract`.
 const FNV_OFFSET = 2166136261
+/// Defines the fnv prime value used by `miniquake.model_ui_render_contract`.
 const FNV_PRIME = 16777619
+/// Defines the alias shadedot quant value used by `miniquake.model_ui_render_contract`.
 const ALIAS_SHADEDOT_QUANT = 16
+/// Defines the sprite sync mode count value used by `miniquake.model_ui_render_contract`.
 const SPRITE_SYNC_MODE_COUNT = 2
+/// Defines the alias sprite pass count value used by `miniquake.model_ui_render_contract`.
 const ALIAS_SPRITE_PASS_COUNT = 2
+/// Defines the viewmodel depth milli value used by `miniquake.model_ui_render_contract`.
 const VIEWMODEL_DEPTH_MILLI = 300
+/// Defines the tga bits per pixel value used by `miniquake.model_ui_render_contract`.
 const TGA_BITS_PER_PIXEL = 24
+/// Defines the evidence schema value used by `miniquake.model_ui_render_contract`.
 const EVIDENCE_SCHEMA = 1
+/// Defines the evidence sample grid value used by `miniquake.model_ui_render_contract`.
 const EVIDENCE_SAMPLE_GRID = 16
+/// Defines the evidence ssim milli value used by `miniquake.model_ui_render_contract`.
 const EVIDENCE_SSIM_MILLI = 950
+/// Defines the max visible entities value used by `miniquake.model_ui_render_contract`.
 const MAX_VISIBLE_ENTITIES = 256
+/// Defines the normal overlay stage count value used by `miniquake.model_ui_render_contract`.
 const NORMAL_OVERLAY_STAGE_COUNT = 11
+/// Defines the multitexture reset value used by `miniquake.model_ui_render_contract`.
 const MULTITEXTURE_RESET = 1
+/// Defines the entity origin shadow value used by `miniquake.model_ui_render_contract`.
 const ENTITY_ORIGIN_SHADOW = 1
+/// Defines the sprite syncbase value used by `miniquake.model_ui_render_contract`.
 const SPRITE_SYNCBASE = 1
+/// Defines the capture after ui before swap value used by `miniquake.model_ui_render_contract`.
 const CAPTURE_AFTER_UI_BEFORE_SWAP = 1
+/// Defines the client render parent value used by `miniquake.model_ui_render_contract`.
 const CLIENT_RENDER_PARENT = "client_render_109_frozen_v1"
+/// Defines the world render parent value used by `miniquake.model_ui_render_contract`.
 const WORLD_RENDER_PARENT = "world_render_109_frozen_v1"
 
-// Return the stable compatibility-contract status string.
+/// Returns the compatibility status reported by `miniquake.model_ui_render_contract`.
 function inline status()
   return STATUS
 end function
 
-// Return the stable compatibility-contract fingerprint.
+/// Returns the compatibility fingerprint for `miniquake.model_ui_render_contract`.
 function inline fingerprint()
   return FINGERPRINT
 end function
 
-// Report whether canonical text.
+/// Returns whether `miniquake.model_ui_render_contract` can onical text.
 function canonicalText()
   result = "status=model_ui_render_109_frozen_v1\n"
   result = result + "alias=shade_quant16,shadow_origin,multitexture_zero\n"
@@ -62,12 +82,12 @@ function calculateFingerprint()
   return hash
 end function
 
-// Validate the requested value and report any invalid state.
+/// Implements the `verify` operation for `miniquake.model_ui_render_contract` (verify).
 function verify()
   return calculateFingerprint() == FINGERPRINT
 end function
 
-// Return constants for the active module state.
+/// Returns the compatibility constants exposed by `miniquake.model_ui_render_contract`.
 function constants()
   return [
     ALIAS_SHADEDOT_QUANT,

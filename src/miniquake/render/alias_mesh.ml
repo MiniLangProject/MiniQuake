@@ -19,59 +19,102 @@ import miniquake.render.ray_shadow as rayShadow
 // gl_mesh.c / alias-draw state.  MiniLang arrays replace the fixed C work
 // buffers but the strip/fan selection and vertex ordering are unchanged.
 struct AliasMeshVertex
+  /// Stores the vertex index value in `miniquake.render.alias_mesh.AliasMeshVertex`.
   vertexIndex
+  /// Stores the s value in `miniquake.render.alias_mesh.AliasMeshVertex`.
   s
+  /// Stores the t value in `miniquake.render.alias_mesh.AliasMeshVertex`.
   t
 end struct
 
 // Group the fields that describe one alias mesh command.
 struct AliasMeshCommand
+  /// Stores the count value in `miniquake.render.alias_mesh.AliasMeshCommand`.
   count
+  /// Stores the vertices value in `miniquake.render.alias_mesh.AliasMeshCommand`.
   vertices
 end struct
 
 // Group the fields that describe one alias mesh.
 struct AliasMesh
+  /// Stores the commands value in `miniquake.render.alias_mesh.AliasMesh`.
   commands
+  /// Stores the vertex order value in `miniquake.render.alias_mesh.AliasMesh`.
   vertexOrder
+  /// Stores the num commands value in `miniquake.render.alias_mesh.AliasMesh`.
   numCommands
+  /// Stores the num order value in `miniquake.render.alias_mesh.AliasMesh`.
   numOrder
 end struct
 
+/// Defines the alias mesh cache size value used by `miniquake.render.alias_mesh`.
 const ALIAS_MESH_CACHE_SIZE = 512
+/// Defines the alias batch cache size value used by `miniquake.render.alias_mesh`.
 const ALIAS_BATCH_CACHE_SIZE = 4096
 
+/// Tracks the module-level aliasmodel state owned by `miniquake.render.alias_mesh`.
 aliasmodel = void
+/// Tracks the module-level paliashdr state owned by `miniquake.render.alias_mesh`.
 paliashdr = void
+/// Tracks the module-level triangles state owned by `miniquake.render.alias_mesh`.
 triangles = []
+/// Tracks the module-level stverts state owned by `miniquake.render.alias_mesh`.
 stverts = []
+/// Tracks the module-level used state owned by `miniquake.render.alias_mesh`.
 used = []
+/// Tracks the module-level commands state owned by `miniquake.render.alias_mesh`.
 commands = []
+/// Tracks the module-level numcommands state owned by `miniquake.render.alias_mesh`.
 numcommands = 0
+/// Tracks the module-level vertexorder state owned by `miniquake.render.alias_mesh`.
 vertexorder = []
+/// Tracks the module-level numorder state owned by `miniquake.render.alias_mesh`.
 numorder = 0
+/// Tracks the module-level allverts state owned by `miniquake.render.alias_mesh`.
 allverts = 0
+/// Tracks the module-level alltris state owned by `miniquake.render.alias_mesh`.
 alltris = 0
+/// Tracks the module-level stripverts state owned by `miniquake.render.alias_mesh`.
 stripverts = []
+/// Tracks the module-level striptris state owned by `miniquake.render.alias_mesh`.
 striptris = []
+/// Tracks the module-level stripcount state owned by `miniquake.render.alias_mesh`.
 stripcount = 0
+/// Tracks the module-level lastposenum state owned by `miniquake.render.alias_mesh`.
 lastposenum = void
+/// Tracks the module-level shadelight state owned by `miniquake.render.alias_mesh`.
 shadelight = 1.0
+/// Tracks the module-level ambientlight state owned by `miniquake.render.alias_mesh`.
 ambientlight = 0.0
+/// Tracks the module-level shadevector state owned by `miniquake.render.alias_mesh`.
 shadevector = compatAliasTypes.Vec3(0.0, 0.0, 1.0)
+/// Tracks the module-level shadedots state owned by `miniquake.render.alias_mesh`.
 shadedots = compatAliasNormals.shadeDots[0]
+/// Tracks the module-level shade row state owned by `miniquake.render.alias_mesh`.
 shadeRow = 0
+/// Tracks the module-level lightspot state owned by `miniquake.render.alias_mesh`.
 lightspot = compatAliasTypes.Vec3(0.0, 0.0, 0.0)
+/// Tracks the module-level shadow point light active state owned by `miniquake.render.alias_mesh`.
 shadowPointLightActive = false
+/// Tracks the module-level shadow point light x state owned by `miniquake.render.alias_mesh`.
 shadowPointLightX = 0.0
+/// Tracks the module-level shadow point light y state owned by `miniquake.render.alias_mesh`.
 shadowPointLightY = 0.0
+/// Tracks the module-level shadow point light z state owned by `miniquake.render.alias_mesh`.
 shadowPointLightZ = 0.0
+/// Tracks the module-level current alias frame state owned by `miniquake.render.alias_mesh`.
 currentAliasFrame = void
+/// Tracks the module-level mesh cache model keys state owned by `miniquake.render.alias_mesh`.
 meshCacheModelKeys = array(ALIAS_MESH_CACHE_SIZE, 0)
+/// Tracks the module-level mesh cache values state owned by `miniquake.render.alias_mesh`.
 meshCacheValues = array(ALIAS_MESH_CACHE_SIZE)
+/// Tracks the module-level alias batch frame keys state owned by `miniquake.render.alias_mesh`.
 aliasBatchFrameKeys = array(ALIAS_BATCH_CACHE_SIZE, 0)
+/// Tracks the module-level alias batch mesh keys state owned by `miniquake.render.alias_mesh`.
 aliasBatchMeshKeys = array(ALIAS_BATCH_CACHE_SIZE, 0)
+/// Tracks the module-level alias batch values state owned by `miniquake.render.alias_mesh`.
 aliasBatchValues = array(ALIAS_BATCH_CACHE_SIZE)
+/// Tracks the module-level alias shade dot rows state owned by `miniquake.render.alias_mesh`.
 aliasShadeDotRows = array(16, void)
 
 // Update module state for caches.
@@ -85,14 +128,17 @@ function clearCaches()
   return true
 end function
 
-// Provide triangle vertex behavior for the active subsystem.
+/// Implements the `triangleVertex` operation for `miniquake.render.alias_mesh` (triangle vertex).
+/// @param triangle The triangle input consumed by `triangleVertex`.
+/// @param index Zero-based index of the requested entry.
 function triangleVertex(triangle, index)
   if index == 0 then return triangle.vertex0 end if
   if index == 1 then return triangle.vertex1 end if
   return triangle.vertex2
 end function
 
-// Update subsystem configuration for configure alias model.
+/// Update subsystem configuration for configure alias model.
+/// @param model Model resource processed by the operation.
 function configureAliasModel(model)
   global aliasmodel, paliashdr, triangles, stverts, used, stripverts, striptris
   aliasmodel = model
@@ -105,12 +151,17 @@ function configureAliasModel(model)
   return model
 end function
 
-// Provide shade dot row behavior for the active subsystem.
+/// Implements the `shadeDotRow` operation for `miniquake.render.alias_mesh` (shade dot row).
+/// @param yaw The yaw input consumed by `shadeDotRow`.
 function shadeDotRow(yaw)
   return (compatAliasNative.trunc(yaw * (16.0 / 360.0))) & 15
 end function
 
-// Update subsystem configuration for configure alias lighting.
+/// Update subsystem configuration for configure alias lighting.
+/// @param lightValue The light value input consumed by `configureAliasLighting`.
+/// @param ambientValue The ambient value input consumed by `configureAliasLighting`.
+/// @param yaw The yaw input consumed by `configureAliasLighting`.
+/// @param spot The spot input consumed by `configureAliasLighting`.
 function configureAliasLighting(lightValue, ambientValue, yaw, spot)
   global shadelight, ambientlight, shadevector, shadedots, shadeRow, lightspot
   shadelight = lightValue
@@ -137,8 +188,12 @@ function configureAliasLighting(lightValue, ambientValue, yaw, spot)
   return true
 end function
 
-// Select a model-local point light for physically directed projected shadows.
-// Disabling it retains GLQuake's stable directional fallback.
+/// Select a model-local point light for physically directed projected shadows.
+/// Disabling it retains GLQuake's stable directional fallback.
+/// @param enabled Whether the optional behavior is enabled.
+/// @param x The x input consumed by `configureAliasShadowPointLight`.
+/// @param y The y input consumed by `configureAliasShadowPointLight`.
+/// @param z The z input consumed by `configureAliasShadowPointLight`.
 function configureAliasShadowPointLight(enabled, x, y, z)
   global shadowPointLightActive, shadowPointLightX, shadowPointLightY, shadowPointLightZ
   shadowPointLightActive = enabled
@@ -148,8 +203,10 @@ function configureAliasShadowPointLight(enabled, x, y, z)
   return shadowPointLightActive
 end function
 
-// Exact gl_mesh.c candidate-strip walk.  Temporary used==2 markers are
-// cleared after each candidate while the starting triangle remains selected.
+/// Exact gl_mesh.c candidate-strip walk.  Temporary used==2 markers are
+/// cleared after each candidate while the starting triangle remains selected.
+/// @param starttri The starttri input consumed by `StripLength`.
+/// @param startv The startv input consumed by `StripLength`.
 function StripLength(starttri, startv)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global stripcount
@@ -202,7 +259,9 @@ function StripLength(starttri, startv)
   return stripcount
 end function
 
-// Return fan length derived from the active module state.
+/// Return fan length derived from the active module state.
+/// @param starttri The starttri input consumed by `FanLength`.
+/// @param startv The startv input consumed by `FanLength`.
 function FanLength(starttri, startv)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global stripcount
@@ -329,7 +388,8 @@ function BuildTris()
   return AliasMesh(commands, vertexorder, numcommands, numorder)
 end function
 
-// Provide cached mesh behavior for the active subsystem.
+/// Implements the `cachedMesh` operation for `miniquake.render.alias_mesh` (cached mesh).
+/// @param model Model resource processed by the operation.
 function cachedMesh(model)
   key = nativeRawValue(model)
   slot = ((key >> 3) ^ (key >> 13)) & (ALIAS_MESH_CACHE_SIZE - 1)
@@ -342,7 +402,9 @@ function cachedMesh(model)
   return void
 end function
 
-// Mirror Quake's GL_MakeAliasModelDisplayLists routine and its observable state changes.
+/// Mirror Quake's GL_MakeAliasModelDisplayLists routine and its observable state changes.
+/// @param model Model resource processed by the operation.
+/// @param header The header input consumed by `GL_MakeAliasModelDisplayLists`.
 function GL_MakeAliasModelDisplayLists(model, header)
   global meshCacheModelKeys, meshCacheValues, paliashdr
   existing = cachedMesh(model)
@@ -363,7 +425,10 @@ function GL_MakeAliasModelDisplayLists(model, header)
   return result
 end function
 
-// Advance for number by one processing step.
+/// Advance for number by one processing step.
+/// @param model Model resource processed by the operation.
+/// @param frameNumber The frame number input consumed by `frameForNumber`.
+/// @param time Simulation or presentation time for the operation.
 function frameForNumber(model, frameNumber, time)
   if len(model.frames) == 0 then return void end if
   index = frameNumber
@@ -376,7 +441,8 @@ function frameForNumber(model, frameNumber, time)
   return set.frames[pose]
 end function
 
-// Return a validated clamp byte value.
+/// Return a validated clamp byte value.
+/// @param value Value consumed by `clampByte`.
 function clampByte(value)
   result = compatAliasNative.trunc(value)
   if result < 0 then result = 0 end if
@@ -384,7 +450,9 @@ function clampByte(value)
   return result
 end function
 
-// Return alias batch data derived from the active module state.
+/// Return alias batch data derived from the active module state.
+/// @param frame The frame input consumed by `aliasBatchData`.
+/// @param mesh The mesh input consumed by `aliasBatchData`.
 function aliasBatchData(frame, mesh)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global aliasBatchFrameKeys, aliasBatchMeshKeys, aliasBatchValues
@@ -439,7 +507,8 @@ function aliasBatchData(frame, mesh)
   return data
 end function
 
-// Preload and register the alias model asset.
+/// Preload and register the alias model asset.
+/// @param model Model resource processed by the operation.
 function precacheAliasModel(model)
   if model is void then return 0 end if
   mesh = try(GL_MakeAliasModelDisplayLists(model, model))
@@ -454,7 +523,8 @@ function precacheAliasModel(model)
   return count
 end function
 
-// Return alias shade dot data derived from the active module state.
+/// Return alias shade dot data derived from the active module state.
+/// @param row The row input consumed by `aliasShadeDotData`.
 function aliasShadeDotData(row)
   global aliasShadeDotRows
   existing = aliasShadeDotRows[row]
@@ -480,7 +550,10 @@ function precacheAliasLightingRows()
   return index
 end function
 
-// Render alias mesh.
+/// Render alias mesh.
+/// @param model Model resource processed by the operation.
+/// @param frame The frame input consumed by `drawAliasMesh`.
+/// @param mesh The mesh input consumed by `drawAliasMesh`.
 function drawAliasMesh(model, frame, mesh)
   if frame is void or mesh is void then return 0 end if
   if not compatAliasGl.traceEnabled() and compatAliasGl.nativeBatchAvailable() then
@@ -516,8 +589,13 @@ function drawAliasMesh(model, frame, mesh)
   return drawn
 end function
 
-// Render a diagnostic/scalar MDL mesh interpolated between two poses. The
-// production path performs the same blend inside the native batch bridge.
+/// Render a diagnostic/scalar MDL mesh interpolated between two poses. The
+/// production path performs the same blend inside the native batch bridge.
+/// @param model Model resource processed by the operation.
+/// @param previousFrame The previous frame input consumed by `drawAliasMeshLerped`.
+/// @param currentFrame The current frame input consumed by `drawAliasMeshLerped`.
+/// @param fraction The fraction input consumed by `drawAliasMeshLerped`.
+/// @param mesh The mesh input consumed by `drawAliasMeshLerped`.
 function drawAliasMeshLerped(model, previousFrame, currentFrame, fraction, mesh)
   if previousFrame is void or currentFrame is void or mesh is void then return 0 end if
   if fraction < 0.0 then fraction = 0.0 end if
@@ -558,7 +636,14 @@ function drawAliasMeshLerped(model, previousFrame, currentFrame, fraction, mesh)
   return drawn
 end function
 
-// Render alias model batch.
+/// Render alias model batch.
+/// @param model Model resource processed by the operation.
+/// @param frame The frame input consumed by `drawAliasModelBatch`.
+/// @param mesh The mesh input consumed by `drawAliasModelBatch`.
+/// @param origin World-space origin of the operation.
+/// @param angles Orientation angles used by the operation.
+/// @param doubleEyes The double eyes input consumed by `drawAliasModelBatch`.
+/// @param smooth The smooth input consumed by `drawAliasModelBatch`.
 function drawAliasModelBatch(model, frame, mesh, origin, angles, doubleEyes, smooth)
   batch = aliasBatchData(frame, mesh)
   dots = aliasShadeDotData(shadeRow)
@@ -576,7 +661,16 @@ function drawAliasModelBatch(model, frame, mesh, origin, angles, doubleEyes, smo
   )
 end function
 
-// Render an interpolated alias model with one native call on every backend.
+/// Render an interpolated alias model with one native call on every backend.
+/// @param model Model resource processed by the operation.
+/// @param previousFrame The previous frame input consumed by `drawAliasModelBatchLerped`.
+/// @param currentFrame The current frame input consumed by `drawAliasModelBatchLerped`.
+/// @param fraction The fraction input consumed by `drawAliasModelBatchLerped`.
+/// @param mesh The mesh input consumed by `drawAliasModelBatchLerped`.
+/// @param origin World-space origin of the operation.
+/// @param angles Orientation angles used by the operation.
+/// @param doubleEyes The double eyes input consumed by `drawAliasModelBatchLerped`.
+/// @param smooth The smooth input consumed by `drawAliasModelBatchLerped`.
 function drawAliasModelBatchLerped(model, previousFrame, currentFrame, fraction, mesh, origin, angles, doubleEyes, smooth)
   previousBatch = aliasBatchData(previousFrame, mesh)
   currentBatch = aliasBatchData(currentFrame, mesh)
@@ -596,7 +690,9 @@ function drawAliasModelBatchLerped(model, previousFrame, currentFrame, fraction,
   )
 end function
 
-// Mirror Quake's GL_DrawAliasFrame routine and its observable state changes.
+/// Mirror Quake's GL_DrawAliasFrame routine and its observable state changes.
+/// @param header The header input consumed by `GL_DrawAliasFrame`.
+/// @param posenum The posenum input consumed by `GL_DrawAliasFrame`.
 function GL_DrawAliasFrame(header, posenum)
   global lastposenum, currentAliasFrame
   model = header
@@ -611,15 +707,23 @@ function GL_DrawAliasFrame(header, posenum)
   return drawAliasMesh(model, frame, mesh)
 end function
 
-// Provide alias shadow projection behavior for the active subsystem.
+/// Implements the `aliasShadowProjection` operation for `miniquake.render.alias_mesh` (alias shadow projection).
+/// @param entityOriginZ The entity origin z input consumed by `aliasShadowProjection`.
+/// @param lightSpotZ The light spot z input consumed by `aliasShadowProjection`.
 function aliasShadowProjection(entityOriginZ, lightSpotZ)
   lheight = entityOriginZ - lightSpotZ
   return [lheight, -lheight + 1.0]
 end function
 
-// gl_rmain.c computes the projected height from currententity->origin[2].
-// The vertex coordinates below are still model-local because the entity
-// transform is already active on the GL matrix stack.
+/// gl_rmain.c computes the projected height from currententity->origin[2].
+/// The vertex coordinates below are still model-local because the entity
+/// transform is already active on the GL matrix stack.
+/// @param header The header input consumed by `drawAliasShadowProjectionSampleAtOrigin`.
+/// @param posenum The posenum input consumed by `drawAliasShadowProjectionSampleAtOrigin`.
+/// @param entityOriginZ The entity origin z input consumed by `drawAliasShadowProjectionSampleAtOrigin`.
+/// @param offsetX The offset x input consumed by `drawAliasShadowProjectionSampleAtOrigin`.
+/// @param offsetY The offset y input consumed by `drawAliasShadowProjectionSampleAtOrigin`.
+/// @param contactOnly The contact only input consumed by `drawAliasShadowProjectionSampleAtOrigin`.
 function drawAliasShadowProjectionSampleAtOrigin(header, posenum, entityOriginZ, offsetX, offsetY, contactOnly)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   model = header
@@ -682,26 +786,47 @@ function drawAliasShadowProjectionSampleAtOrigin(header, posenum, entityOriginZ,
   return drawn
 end function
 
-// Draw one vertically projected model footprint as the stable contact core of
-// the enhanced shadow.  This is still the model mesh, not a generic blob.
+/// Draw one vertically projected model footprint as the stable contact core of
+/// the enhanced shadow.  This is still the model mesh, not a generic blob.
+/// @param header The header input consumed by `GL_DrawAliasContactShadowAtOrigin`.
+/// @param posenum The posenum input consumed by `GL_DrawAliasContactShadowAtOrigin`.
+/// @param entityOriginZ The entity origin z input consumed by `GL_DrawAliasContactShadowAtOrigin`.
 function GL_DrawAliasContactShadowAtOrigin(header, posenum, entityOriginZ)
   return drawAliasShadowProjectionSampleAtOrigin(header, posenum, entityOriginZ, 0.0, 0.0, true)
 end function
 
-// Draw one directional projected-shadow sample with the requested penumbra
-// offset while retaining the public GLQuake-compatible entry point.
+/// Draw one directional projected-shadow sample with the requested penumbra
+/// offset while retaining the public GLQuake-compatible entry point.
+/// @param header The header input consumed by `GL_DrawAliasShadowSampleAtOrigin`.
+/// @param posenum The posenum input consumed by `GL_DrawAliasShadowSampleAtOrigin`.
+/// @param entityOriginZ The entity origin z input consumed by `GL_DrawAliasShadowSampleAtOrigin`.
+/// @param offsetX The offset x input consumed by `GL_DrawAliasShadowSampleAtOrigin`.
+/// @param offsetY The offset y input consumed by `GL_DrawAliasShadowSampleAtOrigin`.
 function GL_DrawAliasShadowSampleAtOrigin(header, posenum, entityOriginZ, offsetX, offsetY)
   return drawAliasShadowProjectionSampleAtOrigin(header, posenum, entityOriginZ, offsetX, offsetY, false)
 end function
 
-// Draw the reference single-tap projected alias silhouette.
+/// Draw the reference single-tap projected alias silhouette.
+/// @param header The header input consumed by `GL_DrawAliasShadowAtOrigin`.
+/// @param posenum The posenum input consumed by `GL_DrawAliasShadowAtOrigin`.
+/// @param entityOriginZ The entity origin z input consumed by `GL_DrawAliasShadowAtOrigin`.
 function GL_DrawAliasShadowAtOrigin(header, posenum, entityOriginZ)
   return GL_DrawAliasShadowSampleAtOrigin(header, posenum, entityOriginZ, 0.0, 0.0)
 end function
 
-// Project every MDL triangle along a real light ray onto the first compatible
-// render-BSP polygon. The caster transform and world context are configured by
-// the entity renderer immediately before this call.
+/// Project every MDL triangle along a real light ray onto the first compatible
+/// render-BSP polygon. The caster transform and world context are configured by
+/// the entity renderer immediately before this call.
+/// @param header The header input consumed by `GL_DrawAliasRayShadowSample`.
+/// @param posenum The posenum input consumed by `GL_DrawAliasRayShadowSample`.
+/// @param entity Entity affected by the operation.
+/// @param doubleEyes The double eyes input consumed by `GL_DrawAliasRayShadowSample`.
+/// @param pointLightEnabled The point light enabled input consumed by `GL_DrawAliasRayShadowSample`.
+/// @param lightX The light x input consumed by `GL_DrawAliasRayShadowSample`.
+/// @param lightY The light y input consumed by `GL_DrawAliasRayShadowSample`.
+/// @param lightZ The light z input consumed by `GL_DrawAliasRayShadowSample`.
+/// @param offsetX The offset x input consumed by `GL_DrawAliasRayShadowSample`.
+/// @param offsetY The offset y input consumed by `GL_DrawAliasRayShadowSample`.
 function GL_DrawAliasRayShadowSample(header, posenum, entity, doubleEyes, pointLightEnabled, lightX, lightY, lightZ, offsetX, offsetY)
   model = header
   if model is void then model = paliashdr end if
@@ -754,12 +879,16 @@ function GL_DrawAliasRayShadowSample(header, posenum, entity, doubleEyes, pointL
   return drawn
 end function
 
-// Compatibility entry point retained for the direct differential wrapper.
+/// Compatibility entry point retained for the direct differential wrapper.
+/// @param header The header input consumed by `GL_DrawAliasShadow`.
+/// @param posenum The posenum input consumed by `GL_DrawAliasShadow`.
 function GL_DrawAliasShadow(header, posenum)
   return GL_DrawAliasShadowAtOrigin(header, posenum, 0.0)
 end function
 
-// Apply the Quake-compatible r setup alias frame behavior.
+/// Apply the Quake-compatible r setup alias frame behavior.
+/// @param frame The frame input consumed by `R_SetupAliasFrame`.
+/// @param header The header input consumed by `R_SetupAliasFrame`.
 function R_SetupAliasFrame(frame, header)
   global lastposenum, currentAliasFrame
   model = header
@@ -772,7 +901,10 @@ function R_SetupAliasFrame(frame, header)
   return GL_DrawAliasFrame(model, selected)
 end function
 
-// Update module state for up alias frame at time.
+/// Update module state for up alias frame at time.
+/// @param frame The frame input consumed by `setupAliasFrameAtTime`.
+/// @param header The header input consumed by `setupAliasFrameAtTime`.
+/// @param time Simulation or presentation time for the operation.
 function setupAliasFrameAtTime(frame, header, time)
   global lastposenum, currentAliasFrame
   model = header

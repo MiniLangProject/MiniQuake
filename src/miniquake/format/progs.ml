@@ -15,7 +15,9 @@ import miniquake.protocol_text as protocolText
 import miniquake.crc as crc16
 import std.fs as fs
 
-// Provide string at behavior for the active subsystem.
+/// Implements the `stringAt` operation for `miniquake.format.progs` (string at).
+/// @param strings The strings input consumed by `stringAt`.
+/// @param offset Zero-based offset of the requested data.
 function stringAt(strings, offset)
   if offset < 0 or offset >= len(strings) then return "" end if
   endOffset = offset
@@ -25,20 +27,25 @@ function stringAt(strings, offset)
   return protocolText.decodeBytes(slice(strings, offset, endOffset - offset))
 end function
 
-// Return type size derived from the active module state.
+/// Implements the `typeSize` operation for `miniquake.format.progs` (type size).
+/// @param valueType The value type input consumed by `typeSize`.
 function typeSize(valueType)
   baseType = valueType & 0x7fff
   if baseType == c.EV_VECTOR then return 3 end if
   return 1
 end function
 
-// Report whether valid type.
+/// Report whether valid type.
+/// @param valueType The value type input consumed by `validType`.
 function validType(valueType)
   baseType = valueType & 0x7fff
   return baseType >= c.EV_VOID and baseType <= c.EV_POINTER
 end function
 
-// Validate definition and report any incompatibility.
+/// Validate definition and report any incompatibility.
+/// @param definition The definition input consumed by `validateDefinition`.
+/// @param limit The limit input consumed by `validateDefinition`.
+/// @param sectionName Name that identifies the requested value or resource.
 function validateDefinition(definition, limit, sectionName)
   if not validType(definition.type) then
     return error(1910, "progs.dat " + sectionName + " has invalid type " + (definition.type & 0x7fff))
@@ -49,7 +56,8 @@ function validateDefinition(definition, limit, sectionName)
   return true
 end function
 
-// Validate loadable program and report any incompatibility.
+/// Validate loadable program and report any incompatibility.
+/// @param program The program input consumed by `validateLoadableProgram`.
 function validateLoadableProgram(program)
   // PR_LoadProgs performs only the loader-level checks that protect the
   // on-disk layout consumed by the engine.  Keep deeper diagnostics in the
@@ -69,7 +77,8 @@ function validateLoadableProgram(program)
   return true
 end function
 
-// Validate program and report any incompatibility.
+/// Validate program and report any incompatibility.
+/// @param program The program input consumed by `validateProgram`.
 function validateProgram(program)
   loadable = try(validateLoadableProgram(program))
   if loadable is error then return loadable end if
@@ -135,20 +144,28 @@ function validateProgram(program)
   return true
 end function
 
-// Return runtime crc derived from the active module state.
+/// Return runtime crc derived from the active module state.
+/// @param program The program input consumed by `runtimeCrc`.
 function runtimeCrc(program)
   if program is void then return 0 end if
   if typeof(program.data) != "bytes" or len(program.data) == 0 then return program.crc end if
   return crc16.CRC_Block(program.data, 0, len(program.data))
 end function
 
-// Validate section and report any incompatibility.
+/// Validate section and report any incompatibility.
+/// @param data Input data consumed by the operation.
+/// @param offset Zero-based offset of the requested data.
+/// @param count Number of entries or units to process.
+/// @param stride The stride input consumed by `checkSection`.
+/// @param name Stable name that identifies the requested object or option.
 function checkSection(data, offset, count, stride, name)
   if offset < 0 or count < 0 or offset + count * stride > len(data) then return error(1900, "progs.dat section outside file: " + name) end if
   return true
 end function
 
-// Read and validate the requested value.
+/// Implements the `parse` operation for `miniquake.format.progs` (parse).
+/// @param data Input data consumed by the operation.
+/// @param filename Path of the file to process.
 function parse(data, filename)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if len(data) < 60 then return error(1901, filename + ": progs.dat header is truncated") end if
@@ -247,7 +264,8 @@ function parse(data, filename)
   return program
 end function
 
-// Read and validate the requested value.
+/// Implements the `load` operation for `miniquake.format.progs` (load).
+/// @param filename Path of the file to process.
 function load(filename)
   data = fs.readAllBytes(filename)
   return parse(data, filename)

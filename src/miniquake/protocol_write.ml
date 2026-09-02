@@ -11,18 +11,24 @@ import miniquake.constants as c
 import miniquake.message as msg
 import miniquake.native as native
 
-// Encode and write string command.
+/// Encode and write string command.
+/// @param buffer The buffer input consumed by `writeStringCommand`.
+/// @param text Text to parse or process.
 function writeStringCommand(buffer, text)
   msg.writeByte(buffer, c.CLC_STRINGCMD)
   msg.writeString(buffer, text)
 end function
 
-// Encode and write disconnect.
+/// Encode and write disconnect.
+/// @param buffer The buffer input consumed by `writeDisconnect`.
 function writeDisconnect(buffer)
   msg.writeByte(buffer, c.CLC_DISCONNECT)
 end function
 
-// Encode and write move.
+/// Encode and write move.
+/// @param buffer The buffer input consumed by `writeMove`.
+/// @param command Console or protocol command to execute.
+/// @param clientTime Time value used by the operation.
 function writeMove(buffer, command, clientTime)
   msg.writeByte(buffer, c.CLC_MOVE)
   msg.writeFloat(buffer, clientTime)
@@ -40,7 +46,9 @@ function writeMove(buffer, command, clientTime)
   return buffer
 end function
 
-// Encode and write baseline.
+/// Writes baseline for `miniquake.protocol_write`.
+/// @param buffer The buffer input consumed by `writeBaseline`.
+/// @param baseline The baseline input consumed by `writeBaseline`.
 function writeBaseline(buffer, baseline)
   msg.writeByte(buffer, baseline[0])
   msg.writeByte(buffer, baseline[1])

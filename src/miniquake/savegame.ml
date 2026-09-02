@@ -17,17 +17,21 @@ import miniquake.quakec.edict as qcedict
 import miniquake.array_util as arrayutil
 import miniquake.protocol_text as protocolText
 
+/// Defines the savegame version value used by `miniquake.savegame`.
 const SAVEGAME_VERSION = 5
+/// Defines the savegame comment length value used by `miniquake.savegame`.
 const SAVEGAME_COMMENT_LENGTH = 39
 
-// Return type size derived from the active module state.
+/// Implements the `typeSize` operation for `miniquake.savegame` (type size).
+/// @param valueType The value type input consumed by `typeSize`.
 function typeSize(valueType)
   if valueType == c.EV_VECTOR then return 3 end if
   if valueType == c.EV_VOID then return 1 end if
   return 1
 end function
 
-// Return vector component name derived from the active module state.
+/// Return vector component name derived from the active module state.
+/// @param name Stable name that identifies the requested object or option.
 function vectorComponentName(name)
   data = bytes(name)
   if len(data) < 2 then return false end if
@@ -36,7 +40,10 @@ function vectorComponentName(name)
   return data[len(data) - 2] == 95
 end function
 
-// Provide words are zero behavior for the active subsystem.
+/// Implements the `wordsAreZero` operation for `miniquake.savegame` (words are zero).
+/// @param words The words input consumed by `wordsAreZero`.
+/// @param offset Zero-based offset of the requested data.
+/// @param count Number of entries or units to process.
 function wordsAreZero(words, offset, count)
   index = 0
   while index < count
@@ -46,13 +53,17 @@ function wordsAreZero(words, offset, count)
   return true
 end function
 
-// Return function name derived from the active module state.
+/// Return function name derived from the active module state.
+/// @param machine The machine input consumed by `functionName`.
+/// @param index Zero-based index of the requested entry.
 function functionName(machine, index)
   if index < 0 or index >= len(machine.program.functions) then return "" end if
   return machine.program.functions[index].name
 end function
 
-// Return field name derived from the active module state.
+/// Return field name derived from the active module state.
+/// @param machine The machine input consumed by `fieldName`.
+/// @param offset Zero-based offset of the requested data.
 function fieldName(machine, offset)
   for each definition in machine.program.fieldDefs
     if definition.offset == offset then return definition.name end if
@@ -60,31 +71,44 @@ function fieldName(machine, offset)
   return ""
 end function
 
-// Return ugly value derived from the active module state.
+/// Return ugly value derived from the active module state.
+/// @param machine The machine input consumed by `uglyValue`.
+/// @param words The words input consumed by `uglyValue`.
+/// @param definition The definition input consumed by `uglyValue`.
 function uglyValue(machine, words, definition)
   return qcedict.PR_UglyValueString(machine, definition.type, words, definition.offset)
 end function
 
-// Encode and write definitions.
+/// Encode and write definitions.
+/// @param machine The machine input consumed by `writeDefinitions`.
+/// @param words The words input consumed by `writeDefinitions`.
+/// @param definitions The definitions input consumed by `writeDefinitions`.
+/// @param globalsOnly The globals only input consumed by `writeDefinitions`.
 function writeDefinitions(machine, words, definitions, globalsOnly)
   firstIndex = 0
   if not globalsOnly then firstIndex = 1 end if
   return qcedict.serializeDefinitions(machine, words, definitions, firstIndex, globalsOnly)
 end function
 
-// Encode and write globals.
+/// Encode and write globals.
+/// @param machine The machine input consumed by `writeGlobals`.
 function writeGlobals(machine)
   return writeDefinitions(machine, machine.globals, machine.program.globalDefs, true)
 end function
 
-// Encode and write edict.
+/// Encode and write edict.
+/// @param machine The machine input consumed by `writeEdict`.
+/// @param entityIndex Zero-based index of the requested entry.
 function writeEdict(machine, entityIndex)
   if entityIndex < 0 or entityIndex >= len(machine.edicts) then return error(3700, "ED_Write: bad edict " + entityIndex) end if
   if machine.edictFree[entityIndex] then return "{\n}\n" end if
   return writeDefinitions(machine, machine.edicts[entityIndex], machine.program.fieldDefs, false)
 end function
 
-// Provide padded comment behavior for the active subsystem.
+/// Implements the `paddedComment` operation for `miniquake.savegame` (padded comment).
+/// @param levelName Name that identifies the requested value or resource.
+/// @param killed The killed input consumed by `paddedComment`.
+/// @param total The total input consumed by `paddedComment`.
 function paddedComment(levelName, killed, total)
   output = arrayutil.makeFilledArray(SAVEGAME_COMMENT_LENGTH, 32)
   // Savegames are Quake byte streams, not UTF-8 text files.  Use the same
@@ -120,14 +144,17 @@ function paddedComment(levelName, killed, total)
   return protocolText.decodeBytes(bytes(output))
 end function
 
-// Provide named global float behavior for the active subsystem.
+/// Implements the `namedGlobalFloat` operation for `miniquake.savegame` (named global float).
+/// @param machine The machine input consumed by `namedGlobalFloat`.
+/// @param name Stable name that identifies the requested object or option.
 function namedGlobalFloat(machine, name)
   offset = vm.globalOffset(machine, name)
   if offset < 0 then return 0.0 end if
   return vm.globalFloat(machine, offset)
 end function
 
-// Encode and write server.
+/// Encode and write server.
+/// @param server Server state participating in the operation.
 function serializeServer(server)
   if server.machine is void then return error(3701, "savegame requires an active QuakeC server") end if
   machine = server.machine
@@ -163,26 +190,31 @@ function serializeServer(server)
   return text
 end function
 
-// fopen(..., "w") writes the one-byte Quake text stream verbatim.  Keep
-// the in-memory string API for tests and command code, but make byte I/O the
-// authoritative savegame boundary.
+/// fopen(..., "w") writes the one-byte Quake text stream verbatim.  Keep
+/// the in-memory string API for tests and command code, but make byte I/O the
+/// authoritative savegame boundary.
+/// @param server Server state participating in the operation.
 function serializeBytes(server)
   text = serializeServer(server)
   if text is error then return text end if
   return protocolText.encodeBytes(text)
 end function
 
-// Encode and write text.
+/// Encodes text for `miniquake.savegame`.
+/// @param text Text to parse or process.
 function encodeText(text)
   return protocolText.encodeBytes(text)
 end function
 
-// Read and validate text.
+/// Decodes text for `miniquake.savegame`.
+/// @param data Input data consumed by the operation.
 function decodeText(data)
   return protocolText.decodeBytes(data)
 end function
 
-// Read and validate line.
+/// Read and validate line.
+/// @param data Input data consumed by the operation.
+/// @param offset Zero-based offset of the requested data.
 function readLine(data, offset)
   if offset < 0 or offset > len(data) then return error(3702, "savegame line offset outside file") end if
   finish = offset
@@ -196,7 +228,10 @@ function readLine(data, offset)
   return [line, finish]
 end function
 
-// Provide number line behavior for the active subsystem.
+/// Implements the `numberLine` operation for `miniquake.savegame` (number line).
+/// @param data Input data consumed by the operation.
+/// @param offset Zero-based offset of the requested data.
+/// @param label The label input consumed by `numberLine`.
 function numberLine(data, offset, label)
   line = readLine(data, offset)
   value = toNumber(line[0])
@@ -204,7 +239,10 @@ function numberLine(data, offset, label)
   return [value, line[1]]
 end function
 
-// Provide float line behavior for the active subsystem.
+/// Implements the `floatLine` operation for `miniquake.savegame` (float line).
+/// @param data Input data consumed by the operation.
+/// @param offset Zero-based offset of the requested data.
+/// @param label The label input consumed by `floatLine`.
 function floatLine(data, offset, label)
   line = readLine(data, offset)
   validated = toNumber(line[0])
@@ -215,7 +253,8 @@ function floatLine(data, offset, label)
   return [common.cAtof(line[0]), line[1]]
 end function
 
-// Read and validate bytes.
+/// Parses bytes for `miniquake.savegame`.
+/// @param data Input data consumed by the operation.
 function parseBytes(data)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if data is not bytes then return error(3712, "savegame parser requires bytes") end if
@@ -262,14 +301,17 @@ function parseBytes(data)
   return t.SaveGame(version, comment, spawnParms, skill, mapName, time, lightStyles, blocks[0], entities)
 end function
 
-// Read and validate the requested value.
+/// Implements the `parse` operation for `miniquake.savegame` (parse).
+/// @param text Text to parse or process.
 function parse(text)
   encoded = protocolText.encodeBytes(text)
   if encoded is error then return encoded end if
   return parseBytes(encoded)
 end function
 
-// Apply the requested value to the active subsystem state.
+/// Apply the requested value to the active subsystem state.
+/// @param server Server state participating in the operation.
+/// @param saved The saved input consumed by `apply`.
 function apply(server, saved)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if server.machine is void or server.machine.context is void then return error(3707, "loadgame requires a spawned QuakeC server") end if
@@ -312,7 +354,8 @@ function apply(server, saved)
   return true
 end function
 
-// Provide display comment behavior for the active subsystem.
+/// Implements the `displayComment` operation for `miniquake.savegame` (display comment).
+/// @param comment The comment input consumed by `displayComment`.
 function displayComment(comment)
   data = protocolText.encodeBytes(comment)
   index = 0
@@ -323,7 +366,8 @@ function displayComment(comment)
   return protocolText.decodeBytes(data)
 end function
 
-// Inspect comment bytes and emit its decoded metadata.
+/// Inspect comment bytes and emit its decoded metadata.
+/// @param data Input data consumed by the operation.
 function inspectCommentBytes(data)
   versionLine = numberLine(data, 0, "version")
   if native.trunc(versionLine[0]) != SAVEGAME_VERSION then return "" end if
@@ -331,14 +375,17 @@ function inspectCommentBytes(data)
   return displayComment(commentLine[0])
 end function
 
-// Inspect comment and emit its decoded metadata.
+/// Inspect comment and emit its decoded metadata.
+/// @param text Text to parse or process.
 function inspectComment(text)
   encoded = protocolText.encodeBytes(text)
   if encoded is error then return "" end if
   return inspectCommentBytes(encoded)
 end function
 
-// Report whether suffix insensitive.
+/// Report whether suffix insensitive.
+/// @param text Text to parse or process.
+/// @param suffix The suffix input consumed by `hasSuffixInsensitive`.
 function hasSuffixInsensitive(text, suffix)
   left = bytes(text)
   right = bytes(suffix)
@@ -355,7 +402,8 @@ function hasSuffixInsensitive(text, suffix)
   return true
 end function
 
-// Provide filename behavior for the active subsystem.
+/// Implements the `filename` operation for `miniquake.savegame` (filename).
+/// @param name Stable name that identifies the requested object or option.
 function filename(name)
   if name == "" then return error(3710, "empty savegame name") end if
   data = bytes(name)
@@ -370,31 +418,40 @@ function filename(name)
   return name + ".sav"
 end function
 
-// host_cmd.c entry points.  SaveGamestate/LoadGamestate are used only by the
-// QUAKE2 compile-time path in the reference, but retain useful in-memory
-// counterparts so the original functions have concrete MiniLang code sites.
+/// host_cmd.c entry points.  SaveGamestate/LoadGamestate are used only by the
+/// QUAKE2 compile-time path in the reference, but retain useful in-memory
+/// counterparts so the original functions have concrete MiniLang code sites.
+/// @param levelName Name that identifies the requested value or resource.
+/// @param killed The killed input consumed by `Host_SavegameComment`.
+/// @param total The total input consumed by `Host_SavegameComment`.
 function Host_SavegameComment(levelName, killed, total)
   return paddedComment(levelName, killed, total)
 end function
 
-// Encode and write gamestate.
+/// Encode and write gamestate.
+/// @param server Server state participating in the operation.
 function SaveGamestate(server)
   return serializeServer(server)
 end function
 
-// Encode and write gamestate bytes.
+/// Encode and write gamestate bytes.
+/// @param server Server state participating in the operation.
 function SaveGamestateBytes(server)
   return serializeBytes(server)
 end function
 
-// Read and validate gamestate bytes.
+/// Read and validate gamestate bytes.
+/// @param server Server state participating in the operation.
+/// @param data Input data consumed by the operation.
 function LoadGamestateBytes(server, data)
   saved = parseBytes(data)
   if saved is error then return saved end if
   return apply(server, saved)
 end function
 
-// Read and validate gamestate.
+/// Read and validate gamestate.
+/// @param server Server state participating in the operation.
+/// @param text Text to parse or process.
 function LoadGamestate(server, text)
   saved = parse(text)
   if saved is error then return saved end if

@@ -10,22 +10,38 @@ package miniquake.net_datagram
 import miniquake.types as t
 import miniquake.byteio as bio
 
+/// Defines the netflag length mask value used by `miniquake.net_datagram`.
 const NETFLAG_LENGTH_MASK = 0x0000ffff
+/// Defines the netflag data value used by `miniquake.net_datagram`.
 const NETFLAG_DATA = 0x00010000
+/// Defines the netflag ack value used by `miniquake.net_datagram`.
 const NETFLAG_ACK = 0x00020000
+/// Defines the netflag nak value used by `miniquake.net_datagram`.
 const NETFLAG_NAK = 0x00040000
+/// Defines the netflag eom value used by `miniquake.net_datagram`.
 const NETFLAG_EOM = 0x00080000
+/// Defines the netflag unreliable value used by `miniquake.net_datagram`.
 const NETFLAG_UNRELIABLE = 0x00100000
+/// Defines the netflag ctl value used by `miniquake.net_datagram`.
 const NETFLAG_CTL = 0x80000000
+/// Defines the net headersize value used by `miniquake.net_datagram`.
 const NET_HEADERSIZE = 8
+/// Defines the net maxmessage value used by `miniquake.net_datagram`.
 const NET_MAXMESSAGE = 8192
+/// Defines the max datagram value used by `miniquake.net_datagram`.
 const MAX_DATAGRAM = 1024
 
+/// Tracks the module-level packets sent state owned by `miniquake.net_datagram`.
 packetsSent = 0
+/// Tracks the module-level packets re sent state owned by `miniquake.net_datagram`.
 packetsReSent = 0
+/// Tracks the module-level packets received state owned by `miniquake.net_datagram`.
 packetsReceived = 0
+/// Tracks the module-level received duplicate count state owned by `miniquake.net_datagram`.
 receivedDuplicateCount = 0
+/// Tracks the module-level short packet count state owned by `miniquake.net_datagram`.
 shortPacketCount = 0
+/// Tracks the module-level dropped datagrams state owned by `miniquake.net_datagram`.
 droppedDatagrams = 0
 
 // Update module state for stats.
@@ -41,17 +57,22 @@ function resetStats()
   return true
 end function
 
-// Return next sequence for the active module state.
+/// Return next sequence for the active module state.
+/// @param sequence The sequence input consumed by `nextSequence`.
 function inline nextSequence(sequence)
   return (sequence + 1) & 0xffffffff
 end function
 
-// Provide previous sequence behavior for the active subsystem.
+/// Implements the `previousSequence` operation for `miniquake.net_datagram` (previous sequence).
+/// @param sequence The sequence input consumed by `previousSequence`.
 function inline previousSequence(sequence)
   return (sequence - 1) & 0xffffffff
 end function
 
-// Encode and write big u32.
+/// Encode and write big u32.
+/// @param data Input data consumed by the operation.
+/// @param offset Zero-based offset of the requested data.
+/// @param value Value consumed by `putBigU32`.
 function putBigU32(data, offset, value)
   data[offset] = (value >> 24) & 255
   data[offset + 1] = (value >> 16) & 255
@@ -60,7 +81,9 @@ function putBigU32(data, offset, value)
   return offset + 4
 end function
 
-// Provide big u32 behavior for the active subsystem.
+/// Implements the `bigU32` operation for `miniquake.net_datagram` (big u32).
+/// @param data Input data consumed by the operation.
+/// @param offset Zero-based offset of the requested data.
 function bigU32(data, offset)
   if offset < 0 or offset + 4 > len(data) then return error(3400, "Datagram header is truncated") end if
   return ((data[offset] & 255) << 24) | ((data[offset + 1] & 255) << 16) | ((data[offset + 2] & 255) << 8) | (data[offset + 3] & 255)
@@ -71,7 +94,9 @@ function createChannel()
   return t.DatagramChannel(0, 0, 0, 0, 0, 0, bytes(), bytes(), true, false, 0.0, 0)
 end function
 
-// Add state for append bytes.
+/// Add state for append bytes.
+/// @param a The a input consumed by `appendBytes`.
+/// @param b The b input consumed by `appendBytes`.
 function appendBytes(a, b)
   output = bytes(len(a) + len(b))
   bio.copyInto(output, 0, a, 0, len(a))
@@ -79,14 +104,19 @@ function appendBytes(a, b)
   return output
 end function
 
-// Release state for drop prefix.
+/// Release state for drop prefix.
+/// @param data Input data consumed by the operation.
+/// @param count Number of entries or units to process.
 function dropPrefix(data, count)
   if count >= len(data) then return bytes() end if
   if count <= 0 then return data end if
   return slice(data, count, len(data) - count)
 end function
 
-// Encode and write the requested data.
+/// Implements the `encode` operation for `miniquake.net_datagram` (encode).
+/// @param flags The flags input consumed by `encode`.
+/// @param sequence The sequence input consumed by `encode`.
+/// @param payload The payload input consumed by `encode`.
 function encode(flags, sequence, payload)
   if payload is not bytes then return error(3401, "Datagram payload must be bytes") end if
   control = (flags & NETFLAG_CTL) != 0
@@ -101,7 +131,8 @@ function encode(flags, sequence, payload)
   return output
 end function
 
-// Read and validate packet.
+/// Read and validate packet.
+/// @param data Input data consumed by the operation.
 function decodePacket(data)
   if data is not bytes or len(data) < 4 then return error(3403, "Datagram packet is shorter than its header") end if
   lengthAndFlags = bigU32(data, 0)
@@ -120,7 +151,10 @@ function decodePacket(data)
   return t.DatagramPacket(flags, sequence, slice(data, headerSize, len(data) - headerSize))
 end function
 
-// Provide reliable behavior for the active subsystem.
+/// Implements the `reliable` operation for `miniquake.net_datagram` (reliable).
+/// @param channel The channel input consumed by `reliable`.
+/// @param payload The payload input consumed by `reliable`.
+/// @param endOfMessage The end of message input consumed by `reliable`.
 function reliable(channel, payload, endOfMessage)
   global packetsSent
   flags = NETFLAG_DATA
@@ -131,7 +165,9 @@ function reliable(channel, payload, endOfMessage)
   return packet
 end function
 
-// Provide unreliable behavior for the active subsystem.
+/// Implements the `unreliable` operation for `miniquake.net_datagram` (unreliable).
+/// @param channel The channel input consumed by `unreliable`.
+/// @param payload The payload input consumed by `unreliable`.
 function unreliable(channel, payload)
   global packetsSent
   packet = encode(NETFLAG_UNRELIABLE, channel.unreliableSendSequence, payload)
@@ -140,22 +176,27 @@ function unreliable(channel, payload)
   return packet
 end function
 
-// Provide acknowledgement behavior for the active subsystem.
+/// Implements the `acknowledgement` operation for `miniquake.net_datagram` (acknowledgement).
+/// @param sequence The sequence input consumed by `acknowledgement`.
 function acknowledgement(sequence)
   return encode(NETFLAG_ACK, sequence, bytes())
 end function
 
-// Provide negative acknowledgement behavior for the active subsystem.
+/// Implements the `negativeAcknowledgement` operation for `miniquake.net_datagram` (negative acknowledgement).
+/// @param sequence The sequence input consumed by `negativeAcknowledgement`.
 function negativeAcknowledgement(sequence)
   return encode(NETFLAG_NAK, sequence, bytes())
 end function
 
-// Provide control behavior for the active subsystem.
+/// Implements the `control` operation for `miniquake.net_datagram` (control).
+/// @param payload The payload input consumed by `control`.
 function control(payload)
   return encode(NETFLAG_CTL, 0, payload)
 end function
 
-// Provide accept reliable behavior for the active subsystem.
+/// Implements the `acceptReliable` operation for `miniquake.net_datagram` (accept reliable).
+/// @param channel The channel input consumed by `acceptReliable`.
+/// @param packet Network packet to process.
 function acceptReliable(channel, packet)
   if (packet.flags & NETFLAG_DATA) == 0 then return false end if
   if packet.sequence != channel.receiveSequence then return false end if
@@ -163,7 +204,9 @@ function acceptReliable(channel, packet)
   return true
 end function
 
-// Provide accept unreliable behavior for the active subsystem.
+/// Implements the `acceptUnreliable` operation for `miniquake.net_datagram` (accept unreliable).
+/// @param channel The channel input consumed by `acceptUnreliable`.
+/// @param packet Network packet to process.
 function acceptUnreliable(channel, packet)
   if (packet.flags & NETFLAG_UNRELIABLE) == 0 then return false end if
   if packet.sequence < channel.unreliableReceiveSequence then return false end if
@@ -174,7 +217,9 @@ function acceptUnreliable(channel, packet)
   return true
 end function
 
-// Return next reliable packet for the active module state.
+/// Return next reliable packet for the active module state.
+/// @param channel The channel input consumed by `nextReliablePacket`.
+/// @param now The now input consumed by `nextReliablePacket`.
 function nextReliablePacket(channel, now)
   global packetsSent
   if len(channel.sendMessage) == 0 then
@@ -194,7 +239,10 @@ function nextReliablePacket(channel, now)
   return packet
 end function
 
-// Initialize state for begin reliable.
+/// Initialize state for begin reliable.
+/// @param channel The channel input consumed by `beginReliable`.
+/// @param payload The payload input consumed by `beginReliable`.
+/// @param now The now input consumed by `beginReliable`.
 function beginReliable(channel, payload, now)
   if payload is not bytes then return error(3410, "reliable message must be bytes") end if
   if len(payload) == 0 then return error(3411, "reliable message is empty") end if
@@ -205,7 +253,9 @@ function beginReliable(channel, payload, now)
   return nextReliablePacket(channel, now)
 end function
 
-// Provide resend reliable behavior for the active subsystem.
+/// Implements the `resendReliable` operation for `miniquake.net_datagram` (resend reliable).
+/// @param channel The channel input consumed by `resendReliable`.
+/// @param now The now input consumed by `resendReliable`.
 function resendReliable(channel, now)
   global packetsReSent
   if channel.canSend or len(channel.sendMessage) == 0 then return void end if
@@ -220,17 +270,22 @@ function resendReliable(channel, now)
   return encode(flags, previousSequence(channel.sendSequence), slice(channel.sendMessage, 0, dataLength))
 end function
 
-// Provide poll retransmit behavior for the active subsystem.
+/// Implements the `pollRetransmit` operation for `miniquake.net_datagram` (poll retransmit).
+/// @param channel The channel input consumed by `pollRetransmit`.
+/// @param now The now input consumed by `pollRetransmit`.
 function pollRetransmit(channel, now)
   if channel.canSend then return void end if
   if now - channel.lastSendTime <= 1.0 then return void end if
   return resendReliable(channel, now)
 end function
 
-// Returns [message type, payload, ACK/NAK response, immediate transport reply].
-// Matching ACKs only mark sendNext.  The transport flushes the next reliable
-// fragment after its receive loop, matching net_dgrm.c.  Message type follows
-// NET_GetMessage: 0 = none, 1 = reliable, 2 = unreliable.
+/// Returns [message type, payload, ACK/NAK response, immediate transport reply].
+/// Matching ACKs only mark sendNext.  The transport flushes the next reliable
+/// fragment after its receive loop, matching net_dgrm.c.  Message type follows
+/// NET_GetMessage: 0 = none, 1 = reliable, 2 = unreliable.
+/// @param channel The channel input consumed by `processPacket`.
+/// @param wirePacket The wire packet input consumed by `processPacket`.
+/// @param now The now input consumed by `processPacket`.
 function processPacket(channel, wirePacket, now)
   global packetsReceived, receivedDuplicateCount, shortPacketCount, droppedDatagrams
   if wirePacket is not bytes or len(wirePacket) < NET_HEADERSIZE then
@@ -299,29 +354,39 @@ function processPacket(channel, wirePacket, now)
   return [0, void, void, void]
 end function
 
-// Named net_dgrm.c entry points. The transport-facing net_loop module supplies
-// the UDP socket operations; these functions own the original channel state.
+/// Named net_dgrm.c entry points. The transport-facing net_loop module supplies
+/// the UDP socket operations; these functions own the original channel state.
+/// @param channel The channel input consumed by `Datagram_SendMessage`.
+/// @param payload The payload input consumed by `Datagram_SendMessage`.
+/// @param now The now input consumed by `Datagram_SendMessage`.
 function Datagram_SendMessage(channel, payload, now)
   return beginReliable(channel, payload, now)
 end function
 
-// Send message next through the active connection.
+/// Send message next through the active connection.
+/// @param channel The channel input consumed by `SendMessageNext`.
+/// @param now The now input consumed by `SendMessageNext`.
 function SendMessageNext(channel, now)
   return nextReliablePacket(channel, now)
 end function
 
-// Provide re send message behavior for the active subsystem.
+/// Implements the `ReSendMessage` operation for `miniquake.net_datagram` (re send message).
+/// @param channel The channel input consumed by `ReSendMessage`.
+/// @param now The now input consumed by `ReSendMessage`.
 function ReSendMessage(channel, now)
   return resendReliable(channel, now)
 end function
 
-// Mirror Quake's Datagram_FlushSendNext routine and its observable state changes.
+/// Mirror Quake's Datagram_FlushSendNext routine and its observable state changes.
+/// @param channel The channel input consumed by `Datagram_FlushSendNext`.
+/// @param now The now input consumed by `Datagram_FlushSendNext`.
 function Datagram_FlushSendNext(channel, now)
   if not channel.sendNext then return void end if
   return nextReliablePacket(channel, now)
 end function
 
-// Mirror Quake's Datagram_CanSendMessage routine and its observable state changes.
+/// Mirror Quake's Datagram_CanSendMessage routine and its observable state changes.
+/// @param channel The channel input consumed by `Datagram_CanSendMessage`.
 function Datagram_CanSendMessage(channel)
   // The C driver flushes sendNext here because it owns the socket.  The pure
   // MiniLang channel cannot perform I/O; net_loop.pumpRemote performs the same
@@ -329,28 +394,40 @@ function Datagram_CanSendMessage(channel)
   return channel.canSend
 end function
 
-// Mirror Quake's Datagram_CanSendUnreliableMessage routine and its observable state changes.
+/// Mirror Quake's Datagram_CanSendUnreliableMessage routine and its observable state changes.
+/// @param channel The channel input consumed by `Datagram_CanSendUnreliableMessage`.
 function Datagram_CanSendUnreliableMessage(channel)
   return true
 end function
 
-// Mirror Quake's Datagram_SendUnreliableMessage routine and its observable state changes.
+/// Mirror Quake's Datagram_SendUnreliableMessage routine and its observable state changes.
+/// @param channel The channel input consumed by `Datagram_SendUnreliableMessage`.
+/// @param payload The payload input consumed by `Datagram_SendUnreliableMessage`.
 function Datagram_SendUnreliableMessage(channel, payload)
   if payload is not bytes or len(payload) == 0 or len(payload) > MAX_DATAGRAM then return error(3415, "unreliable datagram must contain 1..MAX_DATAGRAM bytes") end if
   return unreliable(channel, payload)
 end function
 
-// Mirror Quake's Datagram_GetMessage routine and its observable state changes.
+/// Mirror Quake's Datagram_GetMessage routine and its observable state changes.
+/// @param channel The channel input consumed by `Datagram_GetMessage`.
+/// @param packet Network packet to process.
+/// @param now The now input consumed by `Datagram_GetMessage`.
 function Datagram_GetMessage(channel, packet, now)
   return processPacket(channel, packet, now)
 end function
 
-// Format and emit stats.
+/// Format and emit stats.
+/// @param channel The channel input consumed by `PrintStats`.
 function PrintStats(channel)
   return "canSend = " + channel.canSend + " sendSeq = " + channel.sendSequence + " recvSeq = " + channel.receiveSequence
 end function
 
-// Mirror Quake's NET_Stats_f routine and its observable state changes.
+/// Mirror Quake's NET_Stats_f routine and its observable state changes.
+/// @param channels Number of interleaved audio channels.
+/// @param messagesSent The messages sent input consumed by `NET_Stats_f`.
+/// @param messagesReceived The messages received input consumed by `NET_Stats_f`.
+/// @param unreliableSent The unreliable sent input consumed by `NET_Stats_f`.
+/// @param unreliableReceived The unreliable received input consumed by `NET_Stats_f`.
 function NET_Stats_f(channels, messagesSent, messagesReceived, unreliableSent, unreliableReceived)
   text = ""
   if channels is not void then

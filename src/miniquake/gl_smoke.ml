@@ -10,7 +10,9 @@ package miniquake.gl_smoke
 import miniquake.platform.win32 as win
 import miniquake.render.gl11 as gl
 
-// Render the requested value.
+/// Implements the `draw` operation for `miniquake.gl_smoke` (draw).
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function draw(width, height)
   gl.viewport(0, 0, width, height)
   gl.clearColor(0.08, 0.08, 0.1, 1.0)
@@ -30,7 +32,9 @@ function draw(width, height)
   gl.finishPrimitive()
 end function
 
-// Validate readback and report any incompatibility.
+/// Validate readback and report any incompatibility.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function validateReadback(width, height)
   gl.finish()
   center = gl.readPixelsRgba(width / 2, height / 2, 1, 1)
@@ -51,7 +55,8 @@ function validateReadback(width, height)
   return true
 end function
 
-// Execute frames.
+/// Execute frames.
+/// @param maxFrames The max frames input consumed by `runFrames`.
 function runFrames(maxFrames)
   if maxFrames < 0 then maxFrames = 0 end if
   win.create("MiniQuake OpenGL smoke test", 960, 540, 0)
@@ -85,7 +90,7 @@ function runFrames(maxFrames)
   return resultCode
 end function
 
-// Execute one named test case and record its pass/fail result.
+/// Implements the `run` operation for `miniquake.gl_smoke` (run).
 function run()
   return runFrames(0)
 end function

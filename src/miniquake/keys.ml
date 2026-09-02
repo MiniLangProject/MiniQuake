@@ -15,65 +15,117 @@ import miniquake.byteio as bio
 import miniquake.platform.win32 as win
 import miniquake.native as native
 
+/// Defines the maxcmdline value used by `miniquake.keys`.
 const MAXCMDLINE = 256
+/// Defines the key game value used by `miniquake.keys`.
 const KEY_GAME = 0
+/// Defines the key console value used by `miniquake.keys`.
 const KEY_CONSOLE = 1
+/// Defines the key message value used by `miniquake.keys`.
 const KEY_MESSAGE = 2
+/// Defines the key menu value used by `miniquake.keys`.
 const KEY_MENU = 3
 
+/// Defines the k tab value used by `miniquake.keys`.
 const K_TAB = 9
+/// Defines the k enter value used by `miniquake.keys`.
 const K_ENTER = 13
+/// Defines the k escape value used by `miniquake.keys`.
 const K_ESCAPE = 27
+/// Defines the k space value used by `miniquake.keys`.
 const K_SPACE = 32
+/// Defines the k backspace value used by `miniquake.keys`.
 const K_BACKSPACE = 127
+/// Defines the k uparrow value used by `miniquake.keys`.
 const K_UPARROW = 128
+/// Defines the k downarrow value used by `miniquake.keys`.
 const K_DOWNARROW = 129
+/// Defines the k leftarrow value used by `miniquake.keys`.
 const K_LEFTARROW = 130
+/// Defines the k rightarrow value used by `miniquake.keys`.
 const K_RIGHTARROW = 131
+/// Defines the k alt value used by `miniquake.keys`.
 const K_ALT = 132
+/// Defines the k ctrl value used by `miniquake.keys`.
 const K_CTRL = 133
+/// Defines the k shift value used by `miniquake.keys`.
 const K_SHIFT = 134
+/// Defines the k f1 value used by `miniquake.keys`.
 const K_F1 = 135
+/// Defines the k f12 value used by `miniquake.keys`.
 const K_F12 = 146
+/// Defines the k ins value used by `miniquake.keys`.
 const K_INS = 147
+/// Defines the k del value used by `miniquake.keys`.
 const K_DEL = 148
+/// Defines the k pgdn value used by `miniquake.keys`.
 const K_PGDN = 149
+/// Defines the k pgup value used by `miniquake.keys`.
 const K_PGUP = 150
+/// Defines the k home value used by `miniquake.keys`.
 const K_HOME = 151
+/// Defines the k end value used by `miniquake.keys`.
 const K_END = 152
+/// Defines the k mouse1 value used by `miniquake.keys`.
 const K_MOUSE1 = 200
+/// Defines the k mouse2 value used by `miniquake.keys`.
 const K_MOUSE2 = 201
+/// Defines the k mouse3 value used by `miniquake.keys`.
 const K_MOUSE3 = 202
+/// Defines the k joy1 value used by `miniquake.keys`.
 const K_JOY1 = 203
+/// Defines the k aux1 value used by `miniquake.keys`.
 const K_AUX1 = 207
+/// Defines the k mwheelup value used by `miniquake.keys`.
 const K_MWHEELUP = 239
+/// Defines the k mwheeldown value used by `miniquake.keys`.
 const K_MWHEELDOWN = 240
+/// Defines the k pause value used by `miniquake.keys`.
 const K_PAUSE = 255
 
+/// Tracks the module-level key lines state owned by `miniquake.keys`.
 keyLines = []
+/// Tracks the module-level key line pos state owned by `miniquake.keys`.
 keyLinePos = 1
+/// Tracks the module-level shift down state owned by `miniquake.keys`.
 shiftDown = false
+/// Tracks the module-level key last press state owned by `miniquake.keys`.
 keyLastPress = 0
+/// Tracks the module-level edit line state owned by `miniquake.keys`.
 editLine = 0
+/// Tracks the module-level history line state owned by `miniquake.keys`.
 historyLine = 0
+/// Tracks the module-level key dest state owned by `miniquake.keys`.
 keyDest = KEY_GAME
+/// Tracks the module-level key count state owned by `miniquake.keys`.
 keyCount = 0
+/// Tracks the module-level console keys state owned by `miniquake.keys`.
 consoleKeys = []
+/// Tracks the module-level menu bound state owned by `miniquake.keys`.
 menuBound = []
+/// Tracks the module-level key shift state owned by `miniquake.keys`.
 keyShift = []
+/// Tracks the module-level key repeats state owned by `miniquake.keys`.
 keyRepeats = []
+/// Tracks the module-level key down states state owned by `miniquake.keys`.
 keyDownStates = []
+/// Tracks the module-level chat buffer state owned by `miniquake.keys`.
 chatBuffer = ""
+/// Tracks the module-level team message state owned by `miniquake.keys`.
 teamMessage = false
+/// Tracks the module-level registered command names state owned by `miniquake.keys`.
 registeredCommandNames = []
+/// Tracks the module-level pending release commands state owned by `miniquake.keys`.
 pendingReleaseCommands = ""
 
-// Create the zero-initialized state for values.
+/// Create the zero-initialized state for values.
+/// @param count Number of entries or units to process.
 function zeroValues(count)
   return array(count, 0)
 end function
 
-// Return identity values derived from the active module state.
+/// Return identity values derived from the active module state.
+/// @param count Number of entries or units to process.
 function identityValues(count)
   result = array(count, 0)
   index = 0
@@ -84,19 +136,21 @@ function identityValues(count)
   return result
 end function
 
-// Update module state for destination.
+/// Update module state for destination.
+/// @param destination Destination value or collection to update.
 function setDestination(destination)
   global keyDest
   keyDest = destination
   return keyDest
 end function
 
-// Provide destination behavior for the active subsystem.
+/// Implements the `destination` operation for `miniquake.keys` (destination).
 function inline destination()
   return keyDest
 end function
 
-// Initialize state for begin message.
+/// Initialize state for begin message.
+/// @param team The team input consumed by `beginMessage`.
 function beginMessage(team)
   global keyDest, teamMessage, chatBuffer
   keyDest = KEY_MESSAGE
@@ -105,7 +159,8 @@ function beginMessage(team)
   return true
 end function
 
-// Mirror Quake's Key_StringToKeynum routine and its observable state changes.
+/// Mirror Quake's Key_StringToKeynum routine and its observable state changes.
+/// @param text Text to parse or process.
 function Key_StringToKeynum(text)
   if text is void or text == "" then return -1 end if
   source = bytes(text)
@@ -113,18 +168,22 @@ function Key_StringToKeynum(text)
   return input.keyCodeForName(text)
 end function
 
-// Mirror Quake's Key_KeynumToString routine and its observable state changes.
+/// Mirror Quake's Key_KeynumToString routine and its observable state changes.
+/// @param keynum The keynum input consumed by `Key_KeynumToString`.
 function Key_KeynumToString(keynum)
   return input.keyNameForCode(keynum)
 end function
 
-// Mirror Quake's Key_SetBinding routine and its observable state changes.
+/// Mirror Quake's Key_SetBinding routine and its observable state changes.
+/// @param keynum The keynum input consumed by `Key_SetBinding`.
+/// @param binding The binding input consumed by `Key_SetBinding`.
 function Key_SetBinding(keynum, binding)
   if keynum < 0 or keynum > 255 then return false end if
   return input.setBindingCode(keynum, binding)
 end function
 
-// Mirror Quake's Key_Unbind_f routine and its observable state changes.
+/// Mirror Quake's Key_Unbind_f routine and its observable state changes.
+/// @param arguments Command-line arguments to inspect or execute.
 function Key_Unbind_f(arguments)
   if len(arguments) != 2 then return "unbind <key> : remove commands from a key" end if
   keynum = Key_StringToKeynum(arguments[1])
@@ -143,7 +202,8 @@ function Key_Unbindall_f()
   return true
 end function
 
-// Mirror Quake's Key_Bind_f routine and its observable state changes.
+/// Mirror Quake's Key_Bind_f routine and its observable state changes.
+/// @param arguments Command-line arguments to inspect or execute.
 function Key_Bind_f(arguments)
   count = len(arguments)
   if count != 2 and count != 3 then return "bind <key> [command] : attach a command to a key" end if
@@ -268,7 +328,12 @@ function Key_Init()
   return true
 end function
 
-// Mirror Quake's Key_Console routine and its observable state changes.
+/// Mirror Quake's Key_Console routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
+/// @param state Mutable `miniquake.keys` state used by `Key_Console`.
+/// @param commandSystem The command system input consumed by `Key_Console`.
+/// @param registry The registry input consumed by `Key_Console`.
+/// @param visibleRows The visible rows input consumed by `Key_Console`.
 function Key_Console(key, state, commandSystem, registry, visibleRows)
   global editLine, historyLine, keyLinePos, keyLines
   if key == K_ENTER then
@@ -349,7 +414,8 @@ function Key_Console(key, state, commandSystem, registry, visibleRows)
   return ""
 end function
 
-// Mirror Quake's Key_Message routine and its observable state changes.
+/// Mirror Quake's Key_Message routine and its observable state changes.
+/// @param key Key used to identify the requested entry.
 function Key_Message(key)
   global keyDest, chatBuffer
   if key == K_ENTER then
@@ -375,7 +441,9 @@ function Key_Message(key)
   return ""
 end function
 
-// Provide plus release behavior for the active subsystem.
+/// Implements the `plusRelease` operation for `miniquake.keys` (plus release).
+/// @param binding The binding input consumed by `plusRelease`.
+/// @param key Key used to identify the requested entry.
 function plusRelease(binding, key)
   if binding is void or binding == "" then return "" end if
   source = bytes(binding)
@@ -383,9 +451,16 @@ function plusRelease(binding, key)
   return "-" + decode(slice(source, 1, len(source) - 1)) + " " + key + "\n"
 end function
 
-// Returns [commands-to-buffer, host-action, routed-key]. Host actions are
-// intentionally small: menu policy stays in menu/host while key routing and
-// binding semantics remain wholly owned here.
+/// Returns [commands-to-buffer, host-action, routed-key]. Host actions are
+/// intentionally small: menu policy stays in menu/host while key routing and
+/// binding semantics remain wholly owned here.
+/// @param key Key used to identify the requested entry.
+/// @param down The down input consumed by `Key_Event`.
+/// @param consoleState Mutable state used by `Key_Event`.
+/// @param commandSystem The command system input consumed by `Key_Event`.
+/// @param registry The registry input consumed by `Key_Event`.
+/// @param forcedConsole The forced console input consumed by `Key_Event`.
+/// @param demoPlayback The demo playback input consumed by `Key_Event`.
 function Key_Event(key, down, consoleState, commandSystem, registry, forcedConsole, demoPlayback)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global keyCount, keyLastPress, shiftDown, keyRepeats, keyDownStates
@@ -495,7 +570,7 @@ function Key_TakePendingCommands()
   return queued
 end function
 
-// Provide hardware key codes behavior for the active subsystem.
+/// Implements the `hardwareKeyCodes` operation for `miniquake.keys` (hardware key codes).
 function hardwareKeyCodes()
   result = [K_TAB, K_ENTER, K_ESCAPE, K_SPACE, K_BACKSPACE]
   code = 97

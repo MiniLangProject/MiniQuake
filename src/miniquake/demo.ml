@@ -14,14 +14,17 @@ import miniquake.array_util as arrays
 import miniquake.native as native
 import std.fs as fs
 
-// Report whether suffix insensitive.
+/// Report whether suffix insensitive.
+/// @param text Text to parse or process.
+/// @param suffix The suffix input consumed by `hasSuffixInsensitive`.
 function hasSuffixInsensitive(text, suffix)
   if len(bytes(text)) < len(bytes(suffix)) then return false end if
   start = len(bytes(text)) - len(bytes(suffix))
   return bio.lower(decode(slice(bytes(text), start, len(bytes(suffix))))) == bio.lower(suffix)
 end function
 
-// Provide filename behavior for the active subsystem.
+/// Implements the `filename` operation for `miniquake.demo` (filename).
+/// @param name Stable name that identifies the requested object or option.
 function filename(name)
   if name == "" then return error(3720, "empty demo name") end if
   data = bytes(name)
@@ -34,9 +37,10 @@ function filename(name)
   return name + ".dem"
 end function
 
-// CL_Record_f uses the C library atoi, not MiniLang toNumber/Q_atof.  It
-// skips leading ASCII whitespace, accepts an optional sign, consumes the
-// initial decimal digit run and returns zero when no digits are present.
+/// CL_Record_f uses the C library atoi, not MiniLang toNumber/Q_atof.  It
+/// skips leading ASCII whitespace, accepts an optional sign, consumes the
+/// initial decimal digit run and returns zero when no digits are present.
+/// @param text Text to parse or process.
 function recordTrackNumber(text)
   data = bytes(text)
   index = 0
@@ -58,12 +62,14 @@ function recordTrackNumber(text)
   return value * sign
 end function
 
-// Report whether is keepalive payload.
+/// Report whether is keepalive payload.
+/// @param payload The payload input consumed by `isKeepalivePayload`.
 function isKeepalivePayload(payload)
   return payload is bytes and len(payload) == 1 and payload[0] == c.SVC_NOP
 end function
 
-// Read and validate track.
+/// Read and validate track.
+/// @param data Input data consumed by the operation.
 function parseTrack(data)
   i = 0
   while i < len(data) and data[i] != 10
@@ -85,7 +91,8 @@ function parseTrack(data)
   return [value, i + 1, decode(slice(data, 0, i + 1))]
 end function
 
-// Read and validate the requested value.
+/// Implements the `parse` operation for `miniquake.demo` (parse).
+/// @param data Input data consumed by the operation.
 function parse(data)
   track = parseTrack(data)
   forcedTrack = track[0]
@@ -123,12 +130,14 @@ function parse(data)
   return t.Demo(forcedTrack, messages, trackHeader)
 end function
 
-// Read and validate the requested value.
+/// Implements the `load` operation for `miniquake.demo` (load).
+/// @param filename Path of the file to process.
 function load(filename)
   return parse(fs.readAllBytes(filename))
 end function
 
-// Encode and write the requested data.
+/// Implements the `serialize` operation for `miniquake.demo` (serialize).
+/// @param recording The recording input consumed by `serialize`.
 function serialize(recording)
   headerText = recording.trackHeader
   if headerText is void or headerText == "" then headerText = "" + recording.forcedTrack + "\n" end if
@@ -151,12 +160,17 @@ function serialize(recording)
   return output
 end function
 
-// Encode and write the requested data.
+/// Implements the `save` operation for `miniquake.demo` (save).
+/// @param filename Path of the file to process.
+/// @param recording The recording input consumed by `save`.
 function save(filename, recording)
   return fs.writeAllBytes(filename, serialize(recording))
 end function
 
-// Apply the Quake-compatible cl write demo message behavior.
+/// Apply the Quake-compatible cl write demo message behavior.
+/// @param recording The recording input consumed by `CL_WriteDemoMessage`.
+/// @param payload The payload input consumed by `CL_WriteDemoMessage`.
+/// @param viewAngles The view angles input consumed by `CL_WriteDemoMessage`.
 function CL_WriteDemoMessage(recording, payload, viewAngles)
   if recording is void then return error(2010, "CL_WriteDemoMessage: not recording") end if
   if len(payload) > c.MAX_MSGLEN then return error(2011, "Demo message > MAX_MSGLEN") end if
@@ -170,7 +184,9 @@ function CL_WriteDemoMessage(recording, payload, viewAngles)
   return len(recording.messages)
 end function
 
-// Apply the Quake-compatible cl stop f behavior.
+/// Apply the Quake-compatible cl stop f behavior.
+/// @param recording The recording input consumed by `CL_Stop_f`.
+/// @param viewAngles The view angles input consumed by `CL_Stop_f`.
 function CL_Stop_f(recording, viewAngles)
   if recording is void then return error(2012, "Not recording a demo.") end if
   disconnect = bytes(1)
@@ -180,7 +196,9 @@ function CL_Stop_f(recording, viewAngles)
   return recording
 end function
 
-// Apply the Quake-compatible cl record f behavior.
+/// Apply the Quake-compatible cl record f behavior.
+/// @param arguments Command-line arguments to inspect or execute.
+/// @param connected The connected input consumed by `CL_Record_f`.
 function CL_Record_f(arguments, connected)
   if len(arguments) != 2 and len(arguments) != 3 and len(arguments) != 4 then
     return error(2013, "record <demoname> [<map> [cd track]]")
@@ -197,7 +215,8 @@ function CL_Record_f(arguments, connected)
   return [name, t.Demo(track, [], "" + track + "\n"), mapName]
 end function
 
-// Apply the Quake-compatible cl play demo f behavior.
+/// Apply the Quake-compatible cl play demo f behavior.
+/// @param data Input data consumed by the operation.
 function CL_PlayDemo_f(data)
   return parse(data)
 end function

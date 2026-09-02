@@ -12,26 +12,34 @@ import miniquake.host as host
 import miniquake.world_bsp as world
 import miniquake.mathlib as math
 
-// Add state for append.
+/// Implements the `append` operation for `miniquake.runtime_validation` (append).
+/// @param messages The messages input consumed by `append`.
+/// @param level The level input consumed by `append`.
+/// @param text Text to parse or process.
 function inline append(messages, level, text)
   return messages + [level + " " + text]
 end function
 
-// Validation runs headless by design, so video-owned objects are absent.  Keep
-// all report bookkeeping void-safe and return zero for intentionally omitted
-// renderer data instead of dereferencing a missing renderer.
+/// Validation runs headless by design, so video-owned objects are absent.  Keep
+/// all report bookkeeping void-safe and return zero for intentionally omitted
+/// renderer data instead of dereferencing a missing renderer.
+/// @param worldModel The world model input consumed by `worldFaceCount`.
 function worldFaceCount(worldModel)
   if worldModel is void then return 0 end if
   return len(worldModel.faces)
 end function
 
-// Render surface count.
+/// Render surface count.
+/// @param renderer Renderer instance or backend used for drawing.
 function renderSurfaceCount(renderer)
   if renderer is void then return 0 end if
   return len(renderer.surfaces)
 end function
 
-// Provide failed report behavior for the active subsystem.
+/// Implements the `failedReport` operation for `miniquake.runtime_validation` (failed report).
+/// @param messages The messages input consumed by `failedReport`.
+/// @param mapName Name of the map to load or inspect.
+/// @param cleanShutdown The clean shutdown input consumed by `failedReport`.
 function failedReport(messages, mapName, cleanShutdown)
   return t.RuntimeValidation(
     false,
@@ -54,7 +62,11 @@ function failedReport(messages, mapName, cleanShutdown)
   )
 end function
 
-// Validate the requested value and report any incompatibility.
+/// Implements the `validate` operation for `miniquake.runtime_validation` (validate).
+/// @param baseDirectory Root directory containing the Quake installation.
+/// @param gameDirectory Selected Quake game-data directory.
+/// @param mapName Name of the map to load or inspect.
+/// @param frameCount Number of entries or units to process.
 function validate(baseDirectory, gameDirectory, mapName, frameCount)
   if mapName == "" then mapName = "start" end if
   if gameDirectory == "" then gameDirectory = "id1" end if
@@ -175,7 +187,8 @@ function validate(baseDirectory, gameDirectory, mapName, frameCount)
   )
 end function
 
-// Format and emit report.
+/// Implements the `printReport` operation for `miniquake.runtime_validation` (print report).
+/// @param report The report input consumed by `printReport`.
 function printReport(report)
   print "MiniQuake runtime validation: " + report.mapName
   for each line in report.messages

@@ -12,11 +12,17 @@ package miniquake.artifact_compat
 import miniquake.crc as crc
 import miniquake.native as native
 
+/// Defines the status value used by `miniquake.artifact_compat`.
 const STATUS = "artifact_compat_109_frozen_v1"
+/// Defines the fingerprint value used by `miniquake.artifact_compat`.
 const FINGERPRINT = 0x59531091
+/// Defines the contract text value used by `miniquake.artifact_compat`.
 const CONTRACT_TEXT = "artifact-compat|demo-protocol15|retail-demos=3|save-version=5|save-roundtrip|deterministic-evidence"
+/// Defines the savegame version value used by `miniquake.artifact_compat`.
 const SAVEGAME_VERSION = 5
+/// Defines the retail demo count value used by `miniquake.artifact_compat`.
 const RETAIL_DEMO_COUNT = 3
+/// Defines the save float format value used by `miniquake.artifact_compat`.
 const SAVE_FLOAT_FORMAT = "msvcrt_percent_f"
 
 // Return retail demo names derived from the active module state.
@@ -24,7 +30,9 @@ function retailDemoNames()
   return ["demo1.dem", "demo2.dem", "demo3.dem"]
 end function
 
-// Assert exact equality and report both values on failure.
+/// Assert exact equality and report both values on failure.
+/// @param left The left input consumed by `bytesEqual`.
+/// @param right The right input consumed by `bytesEqual`.
 function bytesEqual(left, right)
   if left is not bytes or right is not bytes or len(left) != len(right) then return false end if
   index = 0
@@ -35,17 +43,21 @@ function bytesEqual(left, right)
   return true
 end function
 
-// Return bytes crc derived from the active module state.
+/// Return bytes crc derived from the active module state.
+/// @param data Input data consumed by the operation.
 function bytesCrc(data)
   if data is not bytes then return -1 end if
   return crc.block(data, 0, len(data))
 end function
 
-// A Quake version-5 savegame is a deliberately lossy text snapshot.  Runtime
-// floats are written with six decimals and only DEF_SAVEGLOBAL globals are
-// archived.  Compare the parsed save-domain state instead of the complete live
-// VM state, which also contains transient globals that the original format does
-// not preserve.
+/// A Quake version-5 savegame is a deliberately lossy text snapshot.  Runtime
+/// floats are written with six decimals and only DEF_SAVEGLOBAL globals are
+/// archived.  Compare the parsed save-domain state instead of the complete live
+/// VM state, which also contains transient globals that the original format does
+/// not preserve.
+/// @param leftPairs The left pairs input consumed by `pairListDifference`.
+/// @param rightPairs The right pairs input consumed by `pairListDifference`.
+/// @param label The label input consumed by `pairListDifference`.
 function pairListDifference(leftPairs, rightPairs, label)
   if len(leftPairs) != len(rightPairs) then
     return label + " pair count: " + len(leftPairs) + " != " + len(rightPairs)
@@ -65,7 +77,9 @@ function pairListDifference(leftPairs, rightPairs, label)
   return ""
 end function
 
-// Encode and write semantic difference.
+/// Encode and write semantic difference.
+/// @param left The left input consumed by `saveSemanticDifference`.
+/// @param right The right input consumed by `saveSemanticDifference`.
 function saveSemanticDifference(left, right)
   if left.version != right.version then return "version" end if
   if left.comment != right.comment then return "comment" end if
@@ -98,13 +112,17 @@ function saveSemanticDifference(left, right)
   return ""
 end function
 
-// Compare semantic equal.
+/// Compare semantic equal.
+/// @param left The left input consumed by `saveSemanticEqual`.
+/// @param right The right input consumed by `saveSemanticEqual`.
 function saveSemanticEqual(left, right)
   return saveSemanticDifference(left, right) == ""
 end function
 
-// Return [first differing offset, left byte, right byte, left length, right
-// length].  Byte values are -1 when the corresponding stream ended first.
+/// Return [first differing offset, left byte, right byte, left length, right
+/// length].  Byte values are -1 when the corresponding stream ended first.
+/// @param left The left input consumed by `firstByteDifference`.
+/// @param right The right input consumed by `firstByteDifference`.
 function firstByteDifference(left, right)
   if left is not bytes or right is not bytes then return [-2, -1, -1, 0, 0] end if
   limit = len(left)
@@ -122,7 +140,10 @@ function firstByteDifference(left, right)
   return [index, leftValue, rightValue, len(left), len(right)]
 end function
 
-// Return demo summary derived from the active module state.
+/// Return demo summary derived from the active module state.
+/// @param recording The recording input consumed by `demoSummary`.
+/// @param report The report input consumed by `demoSummary`.
+/// @param sourceBytes Byte data consumed by the operation.
 function demoSummary(recording, report, sourceBytes)
   return [
     recording.forcedTrack,
@@ -137,12 +158,17 @@ function demoSummary(recording, report, sourceBytes)
   ]
 end function
 
-// Encode and write summary.
+/// Encode and write summary.
+/// @param saveBytes Byte data consumed by the operation.
+/// @param mapName Name of the map to load or inspect.
+/// @param timeValue The time value input consumed by `saveSummary`.
+/// @param edictHash The edict hash input consumed by `saveSummary`.
+/// @param globalsHash The globals hash input consumed by `saveSummary`.
 function saveSummary(saveBytes, mapName, timeValue, edictHash, globalsHash)
   return [SAVEGAME_VERSION, mapName, timeValue, len(saveBytes), bytesCrc(saveBytes), edictHash, globalsHash]
 end function
 
-// Return contract vector derived from the active module state.
+/// Implements the `contractVector` operation for `miniquake.artifact_compat` (contract vector).
 function contractVector()
   return [STATUS, FINGERPRINT, SAVEGAME_VERSION, RETAIL_DEMO_COUNT, retailDemoNames(), SAVE_FLOAT_FORMAT]
 end function

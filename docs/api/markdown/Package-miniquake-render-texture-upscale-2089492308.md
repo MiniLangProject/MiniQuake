@@ -1,0 +1,35 @@
+# Package `miniquake.render.texture_upscale`
+
+[Home](README.md) · [Packages](Packages.md)
+
+## Files
+
+- [src/miniquake/render/texture_upscale.ml](File-src-miniquake-render-texture-upscale-ml-880792328.md)
+
+## Symbols
+
+- [`miniquake.render.texture_upscale.absoluteInteger`](File-src-miniquake-render-texture-upscale-ml-880792328.md#function-function-miniquake-render-texture-upscale-absoluteinteger-function-absoluteinteger-value-src-miniquake-render-texture-upscale-ml-1414281695) — function
+- [`miniquake.render.texture_upscale.apply`](File-src-miniquake-render-texture-upscale-ml-880792328.md#function-function-miniquake-render-texture-upscale-apply-function-apply-pixels-width-height-mode-src-miniquake-render-texture-upscale-ml-341496519) — function
+- [`miniquake.render.texture_upscale.blendCorner`](File-src-miniquake-render-texture-upscale-ml-880792328.md#function-function-miniquake-render-texture-upscale-blendcorner-function-blendcorner-destination-destinationoffset-source-center-first-second-centerweight-neighborweight-src-miniquake-render-texture-upscale-ml-1145598250) — function
+- [`miniquake.render.texture_upscale.clampMode`](File-src-miniquake-render-texture-upscale-ml-880792328.md#function-function-miniquake-render-texture-upscale-clampmode-function-clampmode-mode-src-miniquake-render-texture-upscale-ml-1694939279) — function
+- [`miniquake.render.texture_upscale.copyPixel`](File-src-miniquake-render-texture-upscale-ml-880792328.md#function-function-miniquake-render-texture-upscale-copypixel-function-copypixel-destination-destinationoffset-source-sourceoffset-src-miniquake-render-texture-upscale-ml-1141059360) — function
+- [`miniquake.render.texture_upscale.edgeAware2x`](File-src-miniquake-render-texture-upscale-ml-880792328.md#function-function-miniquake-render-texture-upscale-edgeaware2x-function-edgeaware2x-pixels-width-height-xbr-src-miniquake-render-texture-upscale-ml-2037993332) — function
+- [`miniquake.render.texture_upscale.hqCorner`](File-src-miniquake-render-texture-upscale-ml-880792328.md#function-function-miniquake-render-texture-upscale-hqcorner-function-hqcorner-output-destination-pixels-center-first-second-src-miniquake-render-texture-upscale-ml-678466859) — function
+- [`miniquake.render.texture_upscale.modeName`](File-src-miniquake-render-texture-upscale-ml-880792328.md#function-function-miniquake-render-texture-upscale-modename-function-modename-mode-src-miniquake-render-texture-upscale-ml-570053731) — function
+- [`miniquake.render.texture_upscale.nearest`](File-src-miniquake-render-texture-upscale-ml-880792328.md#function-function-miniquake-render-texture-upscale-nearest-function-nearest-pixels-width-height-factor-src-miniquake-render-texture-upscale-ml-354216287) — function
+- [`miniquake.render.texture_upscale.pixelDistance`](File-src-miniquake-render-texture-upscale-ml-880792328.md#function-function-miniquake-render-texture-upscale-pixeldistance-function-pixeldistance-pixels-first-second-src-miniquake-render-texture-upscale-ml-1173206827) — function
+- [`miniquake.render.texture_upscale.pixelsEqual`](File-src-miniquake-render-texture-upscale-ml-880792328.md#function-function-miniquake-render-texture-upscale-pixelsequal-function-pixelsequal-pixels-first-second-src-miniquake-render-texture-upscale-ml-1977934623) — function
+- [`miniquake.render.texture_upscale.pixelsSimilar`](File-src-miniquake-render-texture-upscale-ml-880792328.md#function-function-miniquake-render-texture-upscale-pixelssimilar-function-pixelssimilar-pixels-first-second-threshold-src-miniquake-render-texture-upscale-ml-763757314) — function
+- [`miniquake.render.texture_upscale.scale2x`](File-src-miniquake-render-texture-upscale-ml-880792328.md#function-function-miniquake-render-texture-upscale-scale2x-function-scale2x-pixels-width-height-src-miniquake-render-texture-upscale-ml-1508359918) — function
+- [`miniquake.render.texture_upscale.scale3x`](File-src-miniquake-render-texture-upscale-ml-880792328.md#function-function-miniquake-render-texture-upscale-scale3x-function-scale3x-pixels-width-height-src-miniquake-render-texture-upscale-ml-1526681808) — function
+- [`miniquake.render.texture_upscale.scaleFactor`](File-src-miniquake-render-texture-upscale-ml-880792328.md#function-function-miniquake-render-texture-upscale-scalefactor-function-scalefactor-mode-src-miniquake-render-texture-upscale-ml-1692891369) — function
+- [`miniquake.render.texture_upscale.UPSCALE_HQ2X`](File-src-miniquake-render-texture-upscale-ml-880792328.md#constant-constant-miniquake-render-texture-upscale-upscale-hq2x-const-upscale-hq2x-4-src-miniquake-render-texture-upscale-ml-27563529) — constant
+- [`miniquake.render.texture_upscale.UPSCALE_MODE_COUNT`](File-src-miniquake-render-texture-upscale-ml-880792328.md#constant-constant-miniquake-render-texture-upscale-upscale-mode-count-const-upscale-mode-count-7-src-miniquake-render-texture-upscale-ml-1289682360) — constant
+- [`miniquake.render.texture_upscale.UPSCALE_NEAREST_2X`](File-src-miniquake-render-texture-upscale-ml-880792328.md#constant-constant-miniquake-render-texture-upscale-upscale-nearest-2x-const-upscale-nearest-2x-1-src-miniquake-render-texture-upscale-ml-1863306558) — constant
+- [`miniquake.render.texture_upscale.UPSCALE_OFF`](File-src-miniquake-render-texture-upscale-ml-880792328.md#constant-constant-miniquake-render-texture-upscale-upscale-off-const-upscale-off-0-src-miniquake-render-texture-upscale-ml-1434285945) — constant
+- [`miniquake.render.texture_upscale.UPSCALE_SCALE2X`](File-src-miniquake-render-texture-upscale-ml-880792328.md#constant-constant-miniquake-render-texture-upscale-upscale-scale2x-const-upscale-scale2x-2-src-miniquake-render-texture-upscale-ml-1180012171) — constant
+- [`miniquake.render.texture_upscale.UPSCALE_SCALE3X`](File-src-miniquake-render-texture-upscale-ml-880792328.md#constant-constant-miniquake-render-texture-upscale-upscale-scale3x-const-upscale-scale3x-3-src-miniquake-render-texture-upscale-ml-714991644) — constant
+- [`miniquake.render.texture_upscale.UPSCALE_XBR2X`](File-src-miniquake-render-texture-upscale-ml-880792328.md#constant-constant-miniquake-render-texture-upscale-upscale-xbr2x-const-upscale-xbr2x-5-src-miniquake-render-texture-upscale-ml-840782802) — constant
+- [`miniquake.render.texture_upscale.UPSCALE_XBR4X`](File-src-miniquake-render-texture-upscale-ml-880792328.md#constant-constant-miniquake-render-texture-upscale-upscale-xbr4x-const-upscale-xbr4x-6-src-miniquake-render-texture-upscale-ml-562860255) — constant
+- [`miniquake.render.texture_upscale.validateSource`](File-src-miniquake-render-texture-upscale-ml-880792328.md#function-function-miniquake-render-texture-upscale-validatesource-function-validatesource-pixels-width-height-src-miniquake-render-texture-upscale-ml-1244018938) — function
+- [`miniquake.render.texture_upscale.xbrCorner`](File-src-miniquake-render-texture-upscale-ml-880792328.md#function-function-miniquake-render-texture-upscale-xbrcorner-function-xbrcorner-output-destination-pixels-center-first-second-diagonal-farfirst-farsecond-src-miniquake-render-texture-upscale-ml-901007338) — function

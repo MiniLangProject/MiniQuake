@@ -12,12 +12,14 @@ import miniquake.constants as c
 import miniquake.mathlib as math
 import miniquake.world_bsp as world
 
-// Create the zero-initialized state for vector.
+/// Implements the `zeroVector` operation for `miniquake.player_move` (zero vector).
 function zeroVector()
   return t.Vec3(0.0, 0.0, 0.0)
 end function
 
-// Create and initialize the module state.
+/// Implements the `create` operation for `miniquake.player_move` (create).
+/// @param origin World-space origin of the operation.
+/// @param angles Orientation angles used by the operation.
 function create(origin, angles)
   return t.PlayerState(
     math.copy(origin),
@@ -55,7 +57,10 @@ function create(origin, angles)
   )
 end function
 
-// Trace velocity through the collision world.
+/// Implements the `clipVelocity` operation for `miniquake.player_move` (clip velocity).
+/// @param input The input input consumed by `clipVelocity`.
+/// @param normal The normal input consumed by `clipVelocity`.
+/// @param overbounce The overbounce input consumed by `clipVelocity`.
 function clipVelocity(input, normal, overbounce)
   backoff = math.dot(input, normal) * overbounce
   output = t.Vec3(
@@ -69,12 +74,15 @@ function clipVelocity(input, normal, overbounce)
   return output
 end function
 
-// Provide horizontal speed behavior for the active subsystem.
+/// Implements the `horizontalSpeed` operation for `miniquake.player_move` (horizontal speed).
+/// @param velocity Velocity applied by the operation.
 function horizontalSpeed(velocity)
   return math.length(t.Vec3(velocity.x, velocity.y, 0.0))
 end function
 
-// Validate water and report any incompatibility.
+/// Validate water and report any incompatibility.
+/// @param player The player input consumed by `checkWater`.
+/// @param map The map input consumed by `checkWater`.
 function checkWater(player, map)
   point = t.Vec3(player.origin.x, player.origin.y, player.origin.z + player.mins.z + 1.0)
   player.waterLevel = 0
@@ -91,7 +99,9 @@ function checkWater(player, map)
   return player.waterLevel > 1
 end function
 
-// Validate ground and report any incompatibility.
+/// Validate ground and report any incompatibility.
+/// @param player The player input consumed by `checkGround`.
+/// @param map The map input consumed by `checkGround`.
 function checkGround(player, map)
   finish = t.Vec3(player.origin.x, player.origin.y, player.origin.z - 2.0)
   trace = world.trace(map, player.origin, player.mins, player.maxs, finish)
@@ -100,7 +110,13 @@ function checkGround(player, map)
   return player.onGround
 end function
 
-// Provide user friction behavior for the active subsystem.
+/// Implements the `userFriction` operation for `miniquake.player_move` (user friction).
+/// @param player The player input consumed by `userFriction`.
+/// @param map The map input consumed by `userFriction`.
+/// @param frameTime Time value used by the operation.
+/// @param friction The friction input consumed by `userFriction`.
+/// @param edgeFriction The edge friction input consumed by `userFriction`.
+/// @param stopSpeed The stop speed input consumed by `userFriction`.
 function userFriction(player, map, frameTime, friction, edgeFriction, stopSpeed)
   speed = horizontalSpeed(player.velocity)
   if speed == 0.0 then return player end if
@@ -126,7 +142,12 @@ function userFriction(player, map, frameTime, friction, edgeFriction, stopSpeed)
   return player
 end function
 
-// Provide accelerate behavior for the active subsystem.
+/// Implements the `accelerate` operation for `miniquake.player_move` (accelerate).
+/// @param player The player input consumed by `accelerate`.
+/// @param wishDirection The wish direction input consumed by `accelerate`.
+/// @param wishSpeed The wish speed input consumed by `accelerate`.
+/// @param frameTime Time value used by the operation.
+/// @param acceleration The acceleration input consumed by `accelerate`.
 function accelerate(player, wishDirection, wishSpeed, frameTime, acceleration)
   currentSpeed = math.dot(player.velocity, wishDirection)
   addSpeed = wishSpeed - currentSpeed
@@ -137,7 +158,12 @@ function accelerate(player, wishDirection, wishSpeed, frameTime, acceleration)
   return player
 end function
 
-// Provide air accelerate behavior for the active subsystem.
+/// Implements the `airAccelerate` operation for `miniquake.player_move` (air accelerate).
+/// @param player The player input consumed by `airAccelerate`.
+/// @param wishVelocity The wish velocity input consumed by `airAccelerate`.
+/// @param wishSpeed The wish speed input consumed by `airAccelerate`.
+/// @param frameTime Time value used by the operation.
+/// @param acceleration The acceleration input consumed by `airAccelerate`.
 function airAccelerate(player, wishVelocity, wishSpeed, frameTime, acceleration)
   direction = math.normalize(wishVelocity)
   limitedSpeed = math.length(wishVelocity)
@@ -151,7 +177,10 @@ function airAccelerate(player, wishVelocity, wishSpeed, frameTime, acceleration)
   return player
 end function
 
-// Provide water move behavior for the active subsystem.
+/// Implements the `waterMove` operation for `miniquake.player_move` (water move).
+/// @param player The player input consumed by `waterMove`.
+/// @param command Console or protocol command to execute.
+/// @param frameTime Time value used by the operation.
 function waterMove(player, command, frameTime)
   vectors = math.angleVectors(player.viewAngles)
   forward = vectors[0]
@@ -191,7 +220,11 @@ function waterMove(player, command, frameTime)
   return player
 end function
 
-// Provide wish move behavior for the active subsystem.
+/// Implements the `wishMove` operation for `miniquake.player_move` (wish move).
+/// @param player The player input consumed by `wishMove`.
+/// @param command Console or protocol command to execute.
+/// @param frameTime Time value used by the operation.
+/// @param map The map input consumed by `wishMove`.
 function wishMove(player, command, frameTime, map)
   movementAngles = t.Vec3(0.0, player.viewAngles.y, 0.0)
   vectors = math.angleVectors(movementAngles)
@@ -221,7 +254,10 @@ function wishMove(player, command, frameTime, map)
   return player
 end function
 
-// Provide slide move behavior for the active subsystem.
+/// Implements the `slideMove` operation for `miniquake.player_move` (slide move).
+/// @param player The player input consumed by `slideMove`.
+/// @param map The map input consumed by `slideMove`.
+/// @param frameTime Time value used by the operation.
 function slideMove(player, map, frameTime)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   originalVelocity = math.copy(player.velocity)
@@ -296,7 +332,10 @@ function slideMove(player, map, frameTime)
   return blocked
 end function
 
-// Provide walk move behavior for the active subsystem.
+/// Implements the `walkMove` operation for `miniquake.player_move` (walk move).
+/// @param player The player input consumed by `walkMove`.
+/// @param map The map input consumed by `walkMove`.
+/// @param frameTime Time value used by the operation.
 function walkMove(player, map, frameTime)
   wasOnGround = player.onGround
   oldOrigin = math.copy(player.origin)
@@ -336,7 +375,11 @@ function walkMove(player, map, frameTime)
   return blocked
 end function
 
-// Apply command to the active subsystem state.
+/// Apply command to the active subsystem state.
+/// @param player The player input consumed by `applyCommand`.
+/// @param map The map input consumed by `applyCommand`.
+/// @param command Console or protocol command to execute.
+/// @param frameTime Time value used by the operation.
 function applyCommand(player, map, command, frameTime)
   player.viewAngles = math.copy(command.viewAngles)
   player.renderAngles.x = -player.viewAngles.x / 3.0
@@ -370,17 +413,25 @@ function applyCommand(player, map, command, frameTime)
   return player
 end function
 
-// Return camera origin derived from the active module state.
+/// Return camera origin derived from the active module state.
+/// @param player The player input consumed by `cameraOrigin`.
 function cameraOrigin(player)
   return t.Vec3(player.origin.x, player.origin.y, player.origin.z + player.viewHeight)
 end function
 
-// Create and initialize player.
+/// Create and initialize player.
+/// @param origin World-space origin of the operation.
+/// @param angles Orientation angles used by the operation.
 function createPlayer(origin, angles)
   return create(origin, angles)
 end function
 
-// Transfer data for move.
+/// Transfer data for move.
+/// @param player The player input consumed by `move`.
+/// @param map The map input consumed by `move`.
+/// @param command Console or protocol command to execute.
+/// @param frameTime Time value used by the operation.
+/// @param registry The registry input consumed by `move`.
 function move(player, map, command, frameTime, registry)
   return applyCommand(player, map, command, frameTime)
 end function

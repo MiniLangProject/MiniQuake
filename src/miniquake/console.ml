@@ -13,16 +13,25 @@ import miniquake.native as native
 import miniquake.array_util as arrays
 import std.fs as fs
 
+/// Defines the con textsize value used by `miniquake.console`.
 const CON_TEXTSIZE = 16384
+/// Defines the num con times value used by `miniquake.console`.
 const NUM_CON_TIMES = 4
+/// Defines the default linewidth value used by `miniquake.console`.
 const DEFAULT_LINEWIDTH = 38
+/// Defines the maxcmdline value used by `miniquake.console`.
 const MAXCMDLINE = 256
 
+/// Tracks the module-level backscroll lines state owned by `miniquake.console`.
 backscrollLines = 0
+/// Tracks the module-level notify box waiting state owned by `miniquake.console`.
 notifyBoxWaiting = false
+/// Tracks the module-level notify box saw down state owned by `miniquake.console`.
 notifyBoxSawDown = false
 
-// Return filled bytes derived from the active module state.
+/// Return filled bytes derived from the active module state.
+/// @param count Number of entries or units to process.
+/// @param value Value consumed by `filledBytes`.
 function filledBytes(count, value)
   output = bytes(count)
   index = 0
@@ -38,7 +47,8 @@ function zeroTimes()
   return [0.0, 0.0, 0.0, 0.0]
 end function
 
-// Create and initialize the module state.
+/// Implements the `create` operation for `miniquake.console` (create).
+/// @param maxLines The max lines input consumed by `create`.
 function create(maxLines)
   if maxLines < 32 then maxLines = 32 end if
   state = t.ConsoleState(
@@ -77,12 +87,13 @@ function create(maxLines)
   return state
 end function
 
-// Provide backscroll behavior for the active subsystem.
+/// Implements the `backscroll` operation for `miniquake.console` (backscroll).
 function inline backscroll()
   return backscrollLines
 end function
 
-// Update module state for backscroll.
+/// Update module state for backscroll.
+/// @param value Value consumed by `setBackscroll`.
 function setBackscroll(value)
   global backscrollLines
   if value < 0 then value = 0 end if
@@ -90,7 +101,10 @@ function setBackscroll(value)
   return backscrollLines
 end function
 
-// Provide adjust backscroll behavior for the active subsystem.
+/// Implements the `adjustBackscroll` operation for `miniquake.console` (adjust backscroll).
+/// @param state Mutable `miniquake.console` state used by `adjustBackscroll`.
+/// @param delta The delta input consumed by `adjustBackscroll`.
+/// @param visibleRows The visible rows input consumed by `adjustBackscroll`.
 function adjustBackscroll(state, delta, visibleRows)
   maximum = state.lineCount - visibleRows
   if maximum < 0 then maximum = 0 end if
@@ -100,13 +114,16 @@ function adjustBackscroll(state, delta, visibleRows)
   return setBackscroll(value)
 end function
 
-// Mirror Quake's Con_ClearNotify routine and its observable state changes.
+/// Mirror Quake's Con_ClearNotify routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_ClearNotify`.
 function Con_ClearNotify(state)
   state.notifyTimes = zeroTimes()
   return true
 end function
 
-// Mirror Quake's Con_CheckResize routine and its observable state changes.
+/// Mirror Quake's Con_CheckResize routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_CheckResize`.
+/// @param pixelWidth The pixel width input consumed by `Con_CheckResize`.
 function Con_CheckResize(state, pixelWidth)
   // con_x is deliberately not reset by MiniQuake's Con_CheckResize.  A resize
   // reformats the circular backing store but the next printed byte continues
@@ -157,7 +174,11 @@ function Con_CheckResize(state, pixelWidth)
   return true
 end function
 
-// Mirror Quake's Con_Init routine and its observable state changes.
+/// Mirror Quake's Con_Init routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_Init`.
+/// @param filesystem The filesystem input consumed by `Con_Init`.
+/// @param pixelWidth The pixel width input consumed by `Con_Init`.
+/// @param debugLog The debug log input consumed by `Con_Init`.
 function Con_Init(state, filesystem, pixelWidth, debugLog)
   state.filesystem = filesystem
   state.debugLog = debugLog
@@ -175,7 +196,8 @@ function Con_Init(state, filesystem, pixelWidth, debugLog)
   return ["toggleconsole", "messagemode", "messagemode2", "clear"]
 end function
 
-// Mirror Quake's Con_Linefeed routine and its observable state changes.
+/// Mirror Quake's Con_Linefeed routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_Linefeed`.
 function Con_Linefeed(state)
   state.cursorX = 0
   state.currentLine = state.currentLine + 1
@@ -190,7 +212,9 @@ function Con_Linefeed(state)
   return state.currentLine
 end function
 
-// Return line bytes derived from the active module state.
+/// Return line bytes derived from the active module state.
+/// @param state Mutable `miniquake.console` state used by `lineBytes`.
+/// @param logicalLine The logical line input consumed by `lineBytes`.
 function lineBytes(state, logicalLine)
   output = bytes(state.lineWidth)
   sourceLine = logicalLine % state.totalLines
@@ -204,7 +228,8 @@ function lineBytes(state, logicalLine)
   return output
 end function
 
-// Provide printable line behavior for the active subsystem.
+/// Implements the `printableLine` operation for `miniquake.console` (printable line).
+/// @param raw The raw input consumed by `printableLine`.
 function printableLine(raw)
   endIndex = len(raw)
   while endIndex > 0 and (raw[endIndex - 1] & 127) == 32
@@ -221,7 +246,8 @@ function printableLine(raw)
   return decode(output)
 end function
 
-// Update module state for lines.
+/// Update module state for lines.
+/// @param state Mutable `miniquake.console` state used by `syncLines`.
 function syncLines(state)
   count = state.lineCount
   if state.maxLines < count then count = state.maxLines end if
@@ -237,7 +263,10 @@ function syncLines(state)
   return state.lines
 end function
 
-// Mirror Quake's Con_Print routine and its observable state changes.
+/// Mirror Quake's Con_Print routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_Print`.
+/// @param text Text to parse or process.
+/// @param realtime Time value used by the operation.
 function Con_Print(state, text, realtime)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   state.realtime = realtime
@@ -288,14 +317,21 @@ function Con_Print(state, text, realtime)
   return len(source)
 end function
 
-// Mirror Quake's Con_DebugLog routine and its observable state changes.
+/// Mirror Quake's Con_DebugLog routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_DebugLog`.
+/// @param filename Path of the file to process.
+/// @param text Text to parse or process.
 function Con_DebugLog(state, filename, text)
   if state.filesystem is void then return false end if
   written = try(fs.appendAllText(qfs.gamePath(state.filesystem, filename), text))
   return written is not error
 end function
 
-// Mirror Quake's Con_Printf routine and its observable state changes.
+/// Mirror Quake's Con_Printf routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_Printf`.
+/// @param message Diagnostic message that explains a failure or event.
+/// @param dedicated The dedicated input consumed by `Con_Printf`.
+/// @param loadingDisabled The loading disabled input consumed by `Con_Printf`.
 function Con_Printf(state, message, dedicated, loadingDisabled)
   // Sys_Printf's side effect remains visible in every mode.
   print message
@@ -306,13 +342,21 @@ function Con_Printf(state, message, dedicated, loadingDisabled)
   return true
 end function
 
-// Mirror Quake's Con_DPrintf routine and its observable state changes.
+/// Mirror Quake's Con_DPrintf routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_DPrintf`.
+/// @param message Diagnostic message that explains a failure or event.
+/// @param developer The developer input consumed by `Con_DPrintf`.
+/// @param dedicated The dedicated input consumed by `Con_DPrintf`.
+/// @param loadingDisabled The loading disabled input consumed by `Con_DPrintf`.
 function Con_DPrintf(state, message, developer, dedicated, loadingDisabled)
   if not developer then return false end if
   return Con_Printf(state, message, dedicated, loadingDisabled)
 end function
 
-// Mirror Quake's Con_SafePrintf routine and its observable state changes.
+/// Mirror Quake's Con_SafePrintf routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_SafePrintf`.
+/// @param message Diagnostic message that explains a failure or event.
+/// @param dedicated The dedicated input consumed by `Con_SafePrintf`.
 function Con_SafePrintf(state, message, dedicated)
   state.safePrintDepth = state.safePrintDepth + 1
   result = Con_Printf(state, message, dedicated, true)
@@ -320,7 +364,8 @@ function Con_SafePrintf(state, message, dedicated)
   return result
 end function
 
-// Mirror Quake's Con_Clear_f routine and its observable state changes.
+/// Mirror Quake's Con_Clear_f routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_Clear_f`.
 function Con_Clear_f(state)
   // console.c only blanks con_text.  Cursor position, carriage-return state,
   // notify history and scroll position remain untouched.
@@ -329,12 +374,15 @@ function Con_Clear_f(state)
   return true
 end function
 
-// Update module state for the requested operation.
+/// Implements the `clear` operation for `miniquake.console` (clear).
+/// @param state Mutable `miniquake.console` state used by `clear`.
 function clear(state)
   return Con_Clear_f(state)
 end function
 
-// Mirror Quake's Con_ToggleConsole_f routine and its observable state changes.
+/// Mirror Quake's Con_ToggleConsole_f routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_ToggleConsole_f`.
+/// @param connected The connected input consumed by `Con_ToggleConsole_f`.
 function Con_ToggleConsole_f(state, connected)
   Con_ClearNotify(state)
   state.notifyUntil = 0.0
@@ -351,32 +399,39 @@ function Con_ToggleConsole_f(state, connected)
   return "console"
 end function
 
-// Update subsystem configuration for toggle.
+/// Update subsystem configuration for toggle.
+/// @param state Mutable `miniquake.console` state used by `toggle`.
 function toggle(state)
   state.active = not state.active
   Con_ClearNotify(state)
   return state.active
 end function
 
-// Update module state for active.
+/// Update module state for active.
+/// @param state Mutable `miniquake.console` state used by `setActive`.
+/// @param active The active input consumed by `setActive`.
 function setActive(state, active)
   state.active = active
   return state.active
 end function
 
-// Mirror Quake's Con_MessageMode_f routine and its observable state changes.
+/// Mirror Quake's Con_MessageMode_f routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_MessageMode_f`.
 function Con_MessageMode_f(state)
   state.active = false
   return false
 end function
 
-// Mirror Quake's Con_MessageMode2_f routine and its observable state changes.
+/// Mirror Quake's Con_MessageMode2_f routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_MessageMode2_f`.
 function Con_MessageMode2_f(state)
   state.active = false
   return true
 end function
 
-// Mirror Quake's Con_DrawInput routine and its observable state changes.
+/// Mirror Quake's Con_DrawInput routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_DrawInput`.
+/// @param realtime Time value used by the operation.
 function Con_DrawInput(state, realtime)
   if not state.active and not state.forcedUp then return [] end if
   cursor = 10 + (native.trunc(realtime * 4.0) & 1)
@@ -396,7 +451,10 @@ function Con_DrawInput(state, realtime)
   return output
 end function
 
-// Mirror Quake's Con_NotifyRows routine and its observable state changes.
+/// Mirror Quake's Con_NotifyRows routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_NotifyRows`.
+/// @param realtime Time value used by the operation.
+/// @param notifyTime Time value used by the operation.
 function Con_NotifyRows(state, realtime, notifyTime)
   rowCount = 0
   first = state.currentLine - NUM_CON_TIMES + 1
@@ -425,7 +483,12 @@ function Con_NotifyRows(state, realtime, notifyTime)
   return rows
 end function
 
-// Mirror Quake's Con_DrawNotify routine and its observable state changes.
+/// Mirror Quake's Con_DrawNotify routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_DrawNotify`.
+/// @param realtime Time value used by the operation.
+/// @param notifyTime Time value used by the operation.
+/// @param messageMode The message mode input consumed by `Con_DrawNotify`.
+/// @param chatText The chat text input consumed by `Con_DrawNotify`.
 function Con_DrawNotify(state, realtime, notifyTime, messageMode, chatText)
   rows = Con_NotifyRows(state, realtime, notifyTime)
   commandCount = len(rows)
@@ -448,7 +511,9 @@ function Con_DrawNotify(state, realtime, notifyTime, messageMode, chatText)
   return commands
 end function
 
-// Mirror Quake's Con_ConsoleRows routine and its observable state changes.
+/// Mirror Quake's Con_ConsoleRows routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_ConsoleRows`.
+/// @param pixelLines The pixel lines input consumed by `Con_ConsoleRows`.
 function Con_ConsoleRows(state, pixelLines)
   rows = native.trunc((pixelLines - 16) / 8)
   if rows < 0 then rows = 0 end if
@@ -465,7 +530,11 @@ function Con_ConsoleRows(state, pixelLines)
   return output
 end function
 
-// Mirror Quake's Con_DrawConsole routine and its observable state changes.
+/// Mirror Quake's Con_DrawConsole routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_DrawConsole`.
+/// @param pixelLines The pixel lines input consumed by `Con_DrawConsole`.
+/// @param drawInput The draw input input consumed by `Con_DrawConsole`.
+/// @param realtime Time value used by the operation.
 function Con_DrawConsole(state, pixelLines, drawInput, realtime)
   if pixelLines <= 0 then return [] end if
   state.visiblePixelLines = pixelLines
@@ -486,7 +555,9 @@ function Con_DrawConsole(state, pixelLines, drawInput, realtime)
   return commands
 end function
 
-// Mirror Quake's Con_NotifyBox routine and its observable state changes.
+/// Mirror Quake's Con_NotifyBox routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_NotifyBox`.
+/// @param text Text to parse or process.
 function Con_NotifyBox(state, text)
   global notifyBoxWaiting, notifyBoxSawDown
   border = decode(bytes([29, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 31]))
@@ -507,7 +578,9 @@ function inline Con_NotifyBoxPending()
   return notifyBoxWaiting
 end function
 
-// Mirror Quake's Con_NotifyBoxKey routine and its observable state changes.
+/// Mirror Quake's Con_NotifyBoxKey routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_NotifyBoxKey`.
+/// @param down The down input consumed by `Con_NotifyBoxKey`.
 function Con_NotifyBoxKey(state, down)
   global notifyBoxWaiting, notifyBoxSawDown
   if not notifyBoxWaiting then return false end if
@@ -525,7 +598,8 @@ function Con_NotifyBoxKey(state, down)
   return true
 end function
 
-// Mirror Quake's Con_CancelNotifyBox routine and its observable state changes.
+/// Mirror Quake's Con_CancelNotifyBox routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_CancelNotifyBox`.
 function Con_CancelNotifyBox(state)
   global notifyBoxWaiting, notifyBoxSawDown
   notifyBoxWaiting = false
@@ -534,7 +608,9 @@ function Con_CancelNotifyBox(state)
   return true
 end function
 
-// Mirror Quake's Con_Print_f routine and its observable state changes.
+/// Mirror Quake's Con_Print_f routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_Print_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function Con_Print_f(state, arguments)
   text = ""
   index = 1
@@ -546,31 +622,42 @@ function Con_Print_f(state, arguments)
   return Con_Printf(state, text + "\n", state.dedicated, false)
 end function
 
-// Mirror Quake's Con_LogCenterPrint routine and its observable state changes.
+/// Mirror Quake's Con_LogCenterPrint routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_LogCenterPrint`.
+/// @param text Text to parse or process.
+/// @param realtime Time value used by the operation.
 function Con_LogCenterPrint(state, text, realtime)
   Con_Print(state, "\n\n" + text + "\n\n", realtime)
   state.centerText = text
   return true
 end function
 
-// Mirror Quake's Con_Notify routine and its observable state changes.
+/// Mirror Quake's Con_Notify routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_Notify`.
+/// @param text Text to parse or process.
 function Con_Notify(state, text)
   return Con_NotifyBox(state, text)
 end function
 
-// Add state for append line.
+/// Add state for append line.
+/// @param state Mutable `miniquake.console` state used by `appendLine`.
+/// @param text Text to parse or process.
 function appendLine(state, text)
   Con_Print(state, text + "\n", state.realtime)
   return len(state.lines)
 end function
 
-// Add state for append.
+/// Implements the `append` operation for `miniquake.console` (append).
+/// @param state Mutable `miniquake.console` state used by `append`.
+/// @param text Text to parse or process.
 function append(state, text)
   Con_Print(state, text, state.realtime)
   return len(state.lines)
 end function
 
-// Provide trim oldest behavior for the active subsystem.
+/// Implements the `trimOldest` operation for `miniquake.console` (trim oldest).
+/// @param lines The lines input consumed by `trimOldest`.
+/// @param maximum Largest accepted value.
 function trimOldest(lines, maximum)
   if len(lines) <= maximum then return lines end if
   result = arrays.makeEmptyArray(maximum)
@@ -580,7 +667,9 @@ function trimOldest(lines, maximum)
   return result
 end function
 
-// Report whether visible lines holds for the active state.
+/// Report whether visible lines holds for the active state.
+/// @param state Mutable `miniquake.console` state used by `visibleLines`.
+/// @param count Number of entries or units to process.
 function visibleLines(state, count)
   if count <= 0 then return [] end if
   start = len(state.lines) - count - backscrollLines
@@ -592,13 +681,17 @@ function visibleLines(state, count)
   return result
 end function
 
-// Update module state for input.
+/// Update module state for input.
+/// @param state Mutable `miniquake.console` state used by `setInput`.
+/// @param text Text to parse or process.
 function setInput(state, text)
   state.inputText = text
   return text
 end function
 
-// Add state for append character.
+/// Add state for append character.
+/// @param state Mutable `miniquake.console` state used by `appendCharacter`.
+/// @param code The code input consumed by `appendCharacter`.
 function appendCharacter(state, code)
   if code < 32 or code > 126 then return false end if
   if len(bytes(state.inputText)) >= MAXCMDLINE - 2 then return false end if
@@ -606,7 +699,8 @@ function appendCharacter(state, code)
   return true
 end function
 
-// Provide backspace behavior for the active subsystem.
+/// Implements the `backspace` operation for `miniquake.console` (backspace).
+/// @param state Mutable `miniquake.console` state used by `backspace`.
 function backspace(state)
   data = bytes(state.inputText)
   if len(data) == 0 then return false end if
@@ -614,14 +708,19 @@ function backspace(state)
   return true
 end function
 
-// Consume pending state for take input.
+/// Consume pending state for take input.
+/// @param state Mutable `miniquake.console` state used by `takeInput`.
 function takeInput(state)
   text = state.inputText
   state.inputText = ""
   return text
 end function
 
-// Provide center print behavior for the active subsystem.
+/// Implements the `centerPrint` operation for `miniquake.console` (center print).
+/// @param state Mutable `miniquake.console` state used by `centerPrint`.
+/// @param text Text to parse or process.
+/// @param currentTime Time value used by the operation.
+/// @param duration The duration input consumed by `centerPrint`.
 function centerPrint(state, text, currentTime, duration)
   state.centerText = text
   state.centerUntil = currentTime + duration
@@ -629,7 +728,9 @@ function centerPrint(state, text, currentTime, duration)
   return true
 end function
 
-// Update module state for expired center.
+/// Update module state for expired center.
+/// @param state Mutable `miniquake.console` state used by `clearExpiredCenter`.
+/// @param currentTime Time value used by the operation.
 function clearExpiredCenter(state, currentTime)
   if state.centerUntil > 0.0 and currentTime >= state.centerUntil then
     state.centerText = ""
@@ -638,13 +739,16 @@ function clearExpiredCenter(state, currentTime)
   return state.centerText
 end function
 
-// Mirror Quake's Con_SetRealtime routine and its observable state changes.
+/// Mirror Quake's Con_SetRealtime routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_SetRealtime`.
+/// @param realtime Time value used by the operation.
 function Con_SetRealtime(state, realtime)
   state.realtime = realtime
   return realtime
 end function
 
-// Mirror Quake's Con_CommandTrace routine and its observable state changes.
+/// Mirror Quake's Con_CommandTrace routine and its observable state changes.
+/// @param state Mutable `miniquake.console` state used by `Con_CommandTrace`.
 function Con_CommandTrace(state)
   return state.drawTrace
 end function

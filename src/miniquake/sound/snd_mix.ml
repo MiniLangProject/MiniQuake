@@ -13,55 +13,94 @@ import miniquake.native as native
 import miniquake.types as t
 import miniquake.array_util as arrays
 
+/// Defines the paintbuffer size value used by `miniquake.sound.snd_mix`.
 const PAINTBUFFER_SIZE = 512
+/// Defines the max channels value used by `miniquake.sound.snd_mix`.
 const MAX_CHANNELS = 128
 
 // Track storage and runtime state for one DMA sound buffer.
 struct DmaSoundBuffer
+  /// Stores the game alive value in `miniquake.sound.snd_mix.DmaSoundBuffer`.
   gameAlive
+  /// Stores the sound alive value in `miniquake.sound.snd_mix.DmaSoundBuffer`.
   soundAlive
+  /// Stores the split buffer value in `miniquake.sound.snd_mix.DmaSoundBuffer`.
   splitBuffer
+  /// Stores the channels value in `miniquake.sound.snd_mix.DmaSoundBuffer`.
   channels
+  /// Stores the samples value in `miniquake.sound.snd_mix.DmaSoundBuffer`.
   samples
+  /// Stores the submission chunk value in `miniquake.sound.snd_mix.DmaSoundBuffer`.
   submissionChunk
+  /// Stores the sample position value in `miniquake.sound.snd_mix.DmaSoundBuffer`.
   samplePosition
+  /// Stores the sample bits value in `miniquake.sound.snd_mix.DmaSoundBuffer`.
   sampleBits
+  /// Stores the speed value in `miniquake.sound.snd_mix.DmaSoundBuffer`.
   speed
+  /// Stores the buffer value in `miniquake.sound.snd_mix.DmaSoundBuffer`.
   buffer
 end struct
 
 // Track storage and runtime state for one sound channel.
 struct SoundChannel
+  /// Stores the sfx value in `miniquake.sound.snd_mix.SoundChannel`.
   sfx
+  /// Stores the left volume value in `miniquake.sound.snd_mix.SoundChannel`.
   leftVolume
+  /// Stores the right volume value in `miniquake.sound.snd_mix.SoundChannel`.
   rightVolume
+  /// Stores the end time value in `miniquake.sound.snd_mix.SoundChannel`.
   endTime
+  /// Stores the position value in `miniquake.sound.snd_mix.SoundChannel`.
   position
+  /// Stores the looping value in `miniquake.sound.snd_mix.SoundChannel`.
   looping
+  /// Stores the entity number value in `miniquake.sound.snd_mix.SoundChannel`.
   entityNumber
+  /// Stores the entity channel value in `miniquake.sound.snd_mix.SoundChannel`.
   entityChannel
+  /// Stores the origin value in `miniquake.sound.snd_mix.SoundChannel`.
   origin
+  /// Stores the distance multiplier value in `miniquake.sound.snd_mix.SoundChannel`.
   distanceMultiplier
+  /// Stores the master volume value in `miniquake.sound.snd_mix.SoundChannel`.
   masterVolume
 end struct
 
 // Track mutable mix state across subsystem calls.
 struct MixState
+  /// Stores the dma value in `miniquake.sound.snd_mix.MixState`.
   dma
+  /// Stores the channels value in `miniquake.sound.snd_mix.MixState`.
   channels
+  /// Stores the total channels value in `miniquake.sound.snd_mix.MixState`.
   totalChannels
+  /// Stores the sound time value in `miniquake.sound.snd_mix.MixState`.
   soundTime
+  /// Stores the painted time value in `miniquake.sound.snd_mix.MixState`.
   paintedTime
+  /// Stores the volume value in `miniquake.sound.snd_mix.MixState`.
   volume
+  /// Stores the paint buffer value in `miniquake.sound.snd_mix.MixState`.
   paintBuffer
+  /// Stores the scale table value in `miniquake.sound.snd_mix.MixState`.
   scaleTable
+  /// Stores the linear source value in `miniquake.sound.snd_mix.MixState`.
   linearSource
+  /// Stores the linear count value in `miniquake.sound.snd_mix.MixState`.
   linearCount
+  /// Stores the linear output value in `miniquake.sound.snd_mix.MixState`.
   linearOutput
+  /// Stores the transfer volume value in `miniquake.sound.snd_mix.MixState`.
   transferVolume
 end struct
 
-// Create and initialize dma.
+/// Create and initialize dma.
+/// @param speed The speed input consumed by `createDma`.
+/// @param sampleBits The sample bits input consumed by `createDma`.
+/// @param channels Number of interleaved audio channels.
+/// @param samples The samples input consumed by `createDma`.
 function createDma(speed, sampleBits, channels, samples)
   if speed <= 0 then speed = 22050 end if
   if sampleBits != 8 and sampleBits != 16 then sampleBits = 16 end if
@@ -98,7 +137,8 @@ function createChannel()
   )
 end function
 
-// Update module state for channel.
+/// Update module state for channel.
+/// @param channel The channel input consumed by `resetChannel`.
 function resetChannel(channel)
   channel.sfx = void
   channel.leftVolume = 0
@@ -114,7 +154,8 @@ function resetChannel(channel)
   return channel
 end function
 
-// Create and initialize state.
+/// Creates state for `miniquake.sound.snd_mix`.
+/// @param dma The dma input consumed by `createState`.
 function createState(dma)
   channelBuilder = arrays.createArrayBuilder(MAX_CHANNELS)
   index = 0
@@ -140,28 +181,32 @@ function createState(dma)
   return state
 end function
 
-// Return signed byte derived from the active module state.
+/// Return signed byte derived from the active module state.
+/// @param value Value consumed by `signedByte`.
 function signedByte(value)
   value = value & 255
   if value >= 128 then return value - 256 end if
   return value
 end function
 
-// Provide sound i32 behavior for the active subsystem.
+/// Implements the `soundI32` operation for `miniquake.sound.snd_mix` (sound i32).
+/// @param value Value consumed by `soundI32`.
 function soundI32(value)
   result = value & 0xffffffff
   if result >= 0x80000000 then result = result - 0x100000000 end if
   return result
 end function
 
-// Provide clamp16 behavior for the active subsystem.
+/// Clamps 16 for `miniquake.sound.snd_mix`.
+/// @param value Value consumed by `clamp16`.
 function clamp16(value)
   if value > 32767 then return 32767 end if
   if value < -32768 then return -32768 end if
   return native.trunc(value)
 end function
 
-// Mirror Quake's SND_InitScaletable routine and its observable state changes.
+/// Mirror Quake's SND_InitScaletable routine and its observable state changes.
+/// @param state Mutable `miniquake.sound.snd_mix` state used by `SND_InitScaletable`.
 function SND_InitScaletable(state)
   row = 0
   while row < 32
@@ -175,7 +220,8 @@ function SND_InitScaletable(state)
   return state.scaleTable
 end function
 
-// Mirror Quake's Snd_WriteLinearBlastStereo16 routine and its observable state changes.
+/// Mirror Quake's Snd_WriteLinearBlastStereo16 routine and its observable state changes.
+/// @param state Mutable `miniquake.sound.snd_mix` state used by `Snd_WriteLinearBlastStereo16`.
 function Snd_WriteLinearBlastStereo16(state)
   index = 0
   while index < state.linearCount
@@ -187,7 +233,9 @@ function Snd_WriteLinearBlastStereo16(state)
   return state.linearCount
 end function
 
-// Apply the Quake-compatible s transfer stereo16 behavior.
+/// Apply the Quake-compatible s transfer stereo16 behavior.
+/// @param state Mutable `miniquake.sound.snd_mix` state used by `S_TransferStereo16`.
+/// @param endTime Time value used by the operation.
 function S_TransferStereo16(state, endTime)
   state.transferVolume = native.trunc(state.volume * 256.0)
   state.linearSource = 0
@@ -209,7 +257,9 @@ function S_TransferStereo16(state, endTime)
   return writtenFrames
 end function
 
-// Apply the Quake-compatible s transfer paint buffer behavior.
+/// Apply the Quake-compatible s transfer paint buffer behavior.
+/// @param state Mutable `miniquake.sound.snd_mix` state used by `S_TransferPaintBuffer`.
+/// @param endTime Time value used by the operation.
 function S_TransferPaintBuffer(state, endTime)
   if state.dma.sampleBits == 16 and state.dma.channels == 2 then
     return S_TransferStereo16(state, endTime)
@@ -237,7 +287,11 @@ function S_TransferPaintBuffer(state, endTime)
   return written
 end function
 
-// Mirror Quake's SND_PaintChannelFrom8 routine and its observable state changes.
+/// Mirror Quake's SND_PaintChannelFrom8 routine and its observable state changes.
+/// @param state Mutable `miniquake.sound.snd_mix` state used by `SND_PaintChannelFrom8`.
+/// @param channel The channel input consumed by `SND_PaintChannelFrom8`.
+/// @param cache The cache input consumed by `SND_PaintChannelFrom8`.
+/// @param count Number of entries or units to process.
 function SND_PaintChannelFrom8(state, channel, cache, count)
   if channel.leftVolume > 255 then channel.leftVolume = 255 end if
   if channel.rightVolume > 255 then channel.rightVolume = 255 end if
@@ -254,7 +308,11 @@ function SND_PaintChannelFrom8(state, channel, cache, count)
   return count
 end function
 
-// Mirror Quake's SND_PaintChannelFrom16 routine and its observable state changes.
+/// Mirror Quake's SND_PaintChannelFrom16 routine and its observable state changes.
+/// @param state Mutable `miniquake.sound.snd_mix` state used by `SND_PaintChannelFrom16`.
+/// @param channel The channel input consumed by `SND_PaintChannelFrom16`.
+/// @param cache The cache input consumed by `SND_PaintChannelFrom16`.
+/// @param count Number of entries or units to process.
 function SND_PaintChannelFrom16(state, channel, cache, count)
   index = 0
   while index < count
@@ -269,7 +327,9 @@ function SND_PaintChannelFrom16(state, channel, cache, count)
   return count
 end function
 
-// Update module state for paint buffer.
+/// Update module state for paint buffer.
+/// @param state Mutable `miniquake.sound.snd_mix` state used by `clearPaintBuffer`.
+/// @param frameCount Number of entries or units to process.
 function clearPaintBuffer(state, frameCount)
   index = 0
   while index < frameCount * 2
@@ -278,7 +338,9 @@ function clearPaintBuffer(state, frameCount)
   end while
 end function
 
-// Apply the Quake-compatible s paint channels behavior.
+/// Apply the Quake-compatible s paint channels behavior.
+/// @param state Mutable `miniquake.sound.snd_mix` state used by `S_PaintChannels`.
+/// @param endTime Time value used by the operation.
 function S_PaintChannels(state, endTime)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if endTime < state.paintedTime then return error(2470, "S_PaintChannels: end before painted time") end if

@@ -12,14 +12,19 @@ import miniquake.mathlib as math
 import miniquake.render.gl11 as gl
 import miniquake.native as native
 
+/// Tracks the module-level particle texture state owned by `miniquake.render.particles`.
 particleTexture = 0
+/// Tracks the module-level enhanced particles state owned by `miniquake.render.particles`.
 enhancedParticles = false
+/// Defines the particle batch record bytes value used by `miniquake.render.particles`.
 const PARTICLE_BATCH_RECORD_BYTES = 16
+/// Defines the particle batch capacity value used by `miniquake.render.particles`.
 const PARTICLE_BATCH_CAPACITY = 8192
 // Allocate this sizeable scratch buffer on first use.  Keeping it out of the
 // module initializer also keeps command-line/file inspection tools lightweight.
 particleBatch = bytes(0)
 
+/// Tracks the module-level dot texture state owned by `miniquake.render.particles`.
 dotTexture = [
   [0, 1, 1, 0, 0, 0, 0, 0],
   [1, 1, 1, 1, 0, 0, 0, 0],
@@ -31,7 +36,7 @@ dotTexture = [
   [0, 0, 0, 0, 0, 0, 0, 0],
 ]
 
-// Provide particle texture pixels behavior for the active subsystem.
+/// Implements the `particleTexturePixels` operation for `miniquake.render.particles` (particle texture pixels).
 function particleTexturePixels()
   pixels = bytes(8 * 8 * 4)
   x = 0
@@ -75,7 +80,8 @@ function softParticleTexturePixels()
   return pixels
 end function
 
-// Switch particle presentation without changing the simulation particle list.
+/// Switch particle presentation without changing the simulation particle list.
+/// @param enabled Whether the optional behavior is enabled.
 function ConfigureEnhancedParticles(enabled)
   global enhancedParticles
   if enhancedParticles == enabled then return enhancedParticles end if
@@ -100,7 +106,7 @@ function prepareParticleTextureState()
   return true
 end function
 
-// Apply the Quake-compatible r init particle texture behavior.
+/// Implements the `R_InitParticleTexture` operation for `miniquake.render.particles` (r init particle texture).
 function R_InitParticleTexture()
   global particleTexture
   if particleTexture != 0 then return particleTexture end if
@@ -126,7 +132,9 @@ function R_ShutdownParticleTexture()
   return true
 end function
 
-// Provide palette color behavior for the active subsystem.
+/// Implements the `paletteColor` operation for `miniquake.render.particles` (palette color).
+/// @param palette The palette input consumed by `paletteColor`.
+/// @param index Zero-based index of the requested entry.
 function paletteColor(palette, index)
   value = index & 255
   offset = value * 3
@@ -134,14 +142,17 @@ function paletteColor(palette, index)
   return [palette[offset], palette[offset + 1], palette[offset + 2]]
 end function
 
-// Return particle batch float bits derived from the active module state.
+/// Return particle batch float bits derived from the active module state.
+/// @param value Value consumed by `particleBatchFloatBits`.
 function inline particleBatchFloatBits(value)
   raw = nativeRawValue(value)
   if (raw & 7) == 5 then return raw >> 3 end if
   return native.floatBits(value)
 end function
 
-// Encode and write particle batch word.
+/// Encode and write particle batch word.
+/// @param offset Zero-based offset of the requested data.
+/// @param value Value consumed by `putParticleBatchWord`.
 function inline putParticleBatchWord(offset, value)
   global particleBatch
   particleBatch[offset] = value & 255
@@ -158,7 +169,12 @@ function ensureParticleBatch()
   return particleBatch
 end function
 
-// Submit the populated prefix of the reusable particle staging buffer.
+/// Submit the populated prefix of the reusable particle staging buffer.
+/// @param count Number of entries or units to process.
+/// @param viewOrigin The view origin input consumed by `drawParticleBatch`.
+/// @param viewForward The view forward input consumed by `drawParticleBatch`.
+/// @param viewUp The view up input consumed by `drawParticleBatch`.
+/// @param viewRight The view right input consumed by `drawParticleBatch`.
 function drawParticleBatch(count, viewOrigin, viewForward, viewUp, viewRight)
   global particleBatch
   if count <= 0 then return 0 end if
@@ -181,7 +197,12 @@ function drawParticleBatch(count, viewOrigin, viewForward, viewUp, viewRight)
   )
 end function
 
-// Provide particle geometry behavior for the active subsystem.
+/// Implements the `particleGeometry` operation for `miniquake.render.particles` (particle geometry).
+/// @param particle The particle input consumed by `particleGeometry`.
+/// @param viewOrigin The view origin input consumed by `particleGeometry`.
+/// @param viewForward The view forward input consumed by `particleGeometry`.
+/// @param viewUp The view up input consumed by `particleGeometry`.
+/// @param viewRight The view right input consumed by `particleGeometry`.
 function particleGeometry(particle, viewOrigin, viewForward, viewUp, viewRight)
   scaledUp = math.VectorScale(viewUp, 1.5)
   scaledRight = math.VectorScale(viewRight, 1.5)
@@ -197,7 +218,12 @@ function particleGeometry(particle, viewOrigin, viewForward, viewUp, viewRight)
   return [origin, upVertex, rightVertex, scale]
 end function
 
-// Apply the Quake-compatible r draw particles trace behavior.
+/// Apply the Quake-compatible r draw particles trace behavior.
+/// @param particles The particles input consumed by `R_DrawParticlesTrace`.
+/// @param viewOrigin The view origin input consumed by `R_DrawParticlesTrace`.
+/// @param viewForward The view forward input consumed by `R_DrawParticlesTrace`.
+/// @param viewUp The view up input consumed by `R_DrawParticlesTrace`.
+/// @param viewRight The view right input consumed by `R_DrawParticlesTrace`.
 function R_DrawParticlesTrace(particles, viewOrigin, viewForward, viewUp, viewRight)
   trace = [
     ["GL_Bind", "particletexture"],
@@ -222,7 +248,13 @@ function R_DrawParticlesTrace(particles, viewOrigin, viewForward, viewUp, viewRi
   ]
 end function
 
-// Render view.
+/// Render view.
+/// @param particles The particles input consumed by `renderView`.
+/// @param palette The palette input consumed by `renderView`.
+/// @param viewOrigin The view origin input consumed by `renderView`.
+/// @param viewForward The view forward input consumed by `renderView`.
+/// @param viewUp The view up input consumed by `renderView`.
+/// @param viewRight The view right input consumed by `renderView`.
 function renderView(particles, palette, viewOrigin, viewForward, viewUp, viewRight)
   global particleBatch
   if len(particles) == 0 then return 0 end if
@@ -265,8 +297,10 @@ function renderView(particles, palette, viewOrigin, viewForward, viewUp, viewRig
   return rendered
 end function
 
-// Compatibility entry point used by the integrated renderer until its view
-// vectors are passed explicitly.
+/// Compatibility entry point used by the integrated renderer until its view
+/// vectors are passed explicitly.
+/// @param particles The particles input consumed by `render`.
+/// @param palette The palette input consumed by `render`.
 function render(particles, palette)
   return renderView(
     particles,
@@ -278,7 +312,10 @@ function render(particles, palette)
   )
 end function
 
-// Render temporary.
+/// Render temporary.
+/// @param effects The effects input consumed by `renderTemporary`.
+/// @param currentTime Time value used by the operation.
+/// @param palette The palette input consumed by `renderTemporary`.
 function renderTemporary(effects, currentTime, palette)
   rendered = 0
   gl.disable(gl.GL_TEXTURE_2D)

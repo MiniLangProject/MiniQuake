@@ -11,11 +11,15 @@ import miniquake.byteio as bio
 import miniquake.common as common
 import miniquake.filesystem as qfs
 
+/// Tracks the module-level map keys state owned by `miniquake.render.colored_lightmaps`.
 mapKeys = []
+/// Tracks the module-level map values state owned by `miniquake.render.colored_lightmaps`.
 mapValues = []
 
-// Decode a version-one QLIT payload and verify that it exactly mirrors the
-// BSP's scalar light sample count. Invalid sidecars are ignored safely.
+/// Decode a version-one QLIT payload and verify that it exactly mirrors the
+/// BSP's scalar light sample count. Invalid sidecars are ignored safely.
+/// @param data Input data consumed by the operation.
+/// @param lightSampleCount Number of entries or units to process.
 function decode(data, lightSampleCount)
   if data is not bytes or len(data) < 8 then return void end if
   if data[0] != 81 or data[1] != 76 or data[2] != 73 or data[3] != 84 then return void end if
@@ -25,7 +29,9 @@ function decode(data, lightSampleCount)
   return slice(data, 8, expected)
 end function
 
-// Associate validated RGB light samples with the relocatable BSP object.
+/// Associate validated RGB light samples with the relocatable BSP object.
+/// @param map The map input consumed by `attach`.
+/// @param samples The samples input consumed by `attach`.
 function attach(map, samples)
   global mapKeys, mapValues
   if map is void or samples is void or samples is not bytes then return false end if
@@ -41,8 +47,10 @@ function attach(map, samples)
   return true
 end function
 
-// Load the optional sidecar through Quake's normal search path. This supports
-// loose files as well as .lit files supplied by a selected -game directory.
+/// Load the optional sidecar through Quake's normal search path. This supports
+/// loose files as well as .lit files supplied by a selected -game directory.
+/// @param filesystem The filesystem input consumed by `loadForMap`.
+/// @param map The map input consumed by `loadForMap`.
 function loadForMap(filesystem, map)
   if filesystem is void or map is void or map.filename == "" then return false end if
   name = common.stripExtension(map.filename) + ".lit"
@@ -54,7 +62,8 @@ function loadForMap(filesystem, map)
   return attach(map, samples)
 end function
 
-// Return RGB samples previously associated with this exact BSP instance.
+/// Return RGB samples previously associated with this exact BSP instance.
+/// @param map The map input consumed by `forMap`.
 function forMap(map)
   if map is void then return void end if
   index = 0

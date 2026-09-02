@@ -22,30 +22,48 @@ import miniquake.common as common
 // WinQuake reserves 128 software channels.  The former 32-channel limit could
 // evict looping/static sounds very quickly on a populated retail map.
 const MIX_FRAMES = 512
+/// Defines the music decode frames value used by `miniquake.sound.mixer`.
 const MUSIC_DECODE_FRAMES = 4096
+/// Defines the min queued buffers value used by `miniquake.sound.mixer`.
 const MIN_QUEUED_BUFFERS = 3
+/// Defines the max queued buffers value used by `miniquake.sound.mixer`.
 const MAX_QUEUED_BUFFERS = 7
+/// Defines the max channels value used by `miniquake.sound.mixer`.
 const MAX_CHANNELS = 128
+/// Defines the ambient water entity value used by `miniquake.sound.mixer`.
 const AMBIENT_WATER_ENTITY = -1001
+/// Defines the ambient wind entity value used by `miniquake.sound.mixer`.
 const AMBIENT_WIND_ENTITY = -1002
+/// Defines the static channel value used by `miniquake.sound.mixer`.
 const STATIC_CHANNEL = -32768
+/// Defines the max dynamic channels value used by `miniquake.sound.mixer`.
 const MAX_DYNAMIC_CHANNELS = 8
+/// Defines the static first value used by `miniquake.sound.mixer`.
 const STATIC_FIRST = 12
 
+/// Tracks the module-level random seed state owned by `miniquake.sound.mixer`.
 randomSeed = 1
 
 // S_PaintChannels owns fixed paint/volume buffers in the original engine.
 // Keep equivalent reusable storage so a real-time 44.1-kHz stream does not
 // allocate several large arrays for every 512-sample block.
 paintAccumulatorScratch = array(MIX_FRAMES * 2, 0)
+/// Tracks the module-level paint left volume scratch state owned by `miniquake.sound.mixer`.
 paintLeftVolumeScratch = array(MAX_CHANNELS, 0)
+/// Tracks the module-level paint right volume scratch state owned by `miniquake.sound.mixer`.
 paintRightVolumeScratch = array(MAX_CHANNELS, 0)
+/// Tracks the module-level paint survivor scratch state owned by `miniquake.sound.mixer`.
 paintSurvivorScratch = array(MAX_CHANNELS, void)
+/// Tracks the module-level paint static effect scratch state owned by `miniquake.sound.mixer`.
 paintStaticEffectScratch = array(MAX_CHANNELS, void)
+/// Tracks the module-level paint static representative scratch state owned by `miniquake.sound.mixer`.
 paintStaticRepresentativeScratch = array(MAX_CHANNELS, 0)
+/// Tracks the module-level paint output scratch state owned by `miniquake.sound.mixer`.
 paintOutputScratch = bytes(MIX_FRAMES * 4)
 
-// Create and initialize the module state.
+/// Implements the `create` operation for `miniquake.sound.mixer` (create).
+/// @param filesystem The filesystem input consumed by `create`.
+/// @param sampleRate The sample rate input consumed by `create`.
 function create(filesystem, sampleRate)
   if sampleRate <= 0 then sampleRate = 22050 end if
   return t.SoundMixer(
@@ -72,7 +90,8 @@ function create(filesystem, sampleRate)
   )
 end function
 
-// Initialize state for open.
+/// Implements the `open` operation for `miniquake.sound.mixer` (open).
+/// @param mixer The mixer input consumed by `open`.
 function open(mixer)
   opened = audio.open(mixer.audioState, mixer.sampleRate, 2, 2)
   if opened is error then
@@ -85,7 +104,8 @@ function open(mixer)
   return opened
 end function
 
-// Finalize state for stop all.
+/// Finalize state for stop all.
+/// @param mixer The mixer input consumed by `stopAll`.
 function stopAll(mixer)
   if mixer is void then return false end if
   mixer.channels = []
@@ -96,9 +116,10 @@ function stopAll(mixer)
   return true
 end function
 
-// S_BlockSound/S_UnblockSound production counterpart.  waveOutReset flushes
-// all queued headers on the first nesting level; no painting/submission takes
-// place until the matching final unblock.
+/// S_BlockSound/S_UnblockSound production counterpart.  waveOutReset flushes
+/// all queued headers on the first nesting level; no painting/submission takes
+/// place until the matching final unblock.
+/// @param mixer The mixer input consumed by `block`.
 function block(mixer)
   if mixer is void or not mixer.audioState.opened then return 0 end if
   mixer.blockDepth = mixer.blockDepth + 1
@@ -109,20 +130,23 @@ function block(mixer)
   return mixer.blockDepth
 end function
 
-// Provide unblock behavior for the active subsystem.
+/// Implements the `unblock` operation for `miniquake.sound.mixer` (unblock).
+/// @param mixer The mixer input consumed by `unblock`.
 function unblock(mixer)
   if mixer is void or not mixer.audioState.opened then return 0 end if
   if mixer.blockDepth > 0 then mixer.blockDepth = mixer.blockDepth - 1 end if
   return mixer.blockDepth
 end function
 
-// Provide block depth behavior for the active subsystem.
+/// Implements the `blockDepth` operation for `miniquake.sound.mixer` (block depth).
+/// @param mixer The mixer input consumed by `blockDepth`.
 function blockDepth(mixer)
   if mixer is void then return 0 end if
   return mixer.blockDepth
 end function
 
-// Finalize state for stop music.
+/// Finalize state for stop music.
+/// @param mixer The mixer input consumed by `stopMusic`.
 function stopMusic(mixer)
   if mixer is void then return false end if
   if mixer.music is not void then native.oggClose() end if
@@ -130,21 +154,26 @@ function stopMusic(mixer)
   return true
 end function
 
-// Provide pause music behavior for the active subsystem.
+/// Implements the `pauseMusic` operation for `miniquake.sound.mixer` (pause music).
+/// @param mixer The mixer input consumed by `pauseMusic`.
 function pauseMusic(mixer)
   if mixer.music is void or not mixer.music.playing then return false end if
   mixer.music.paused = true
   return true
 end function
 
-// Provide resume music behavior for the active subsystem.
+/// Implements the `resumeMusic` operation for `miniquake.sound.mixer` (resume music).
+/// @param mixer The mixer input consumed by `resumeMusic`.
 function resumeMusic(mixer)
   if mixer.music is void or not mixer.music.playing then return false end if
   mixer.music.paused = false
   return true
 end function
 
-// Play music through the active media subsystem.
+/// Play music through the active media subsystem.
+/// @param mixer The mixer input consumed by `playMusic`.
+/// @param track The track input consumed by `playMusic`.
+/// @param looping The looping input consumed by `playMusic`.
 function playMusic(mixer, track, looping)
   if mixer is void or not mixer.enabled then return false end if
   if track < 1 or track > 99 then return error(2410, "invalid music track " + track) end if
@@ -186,7 +215,9 @@ function playMusic(mixer, track, looping)
   return true
 end function
 
-// Read and validate music chunk.
+/// Read and validate music chunk.
+/// @param track The track input consumed by `decodeMusicChunk`.
+/// @param restart The restart input consumed by `decodeMusicChunk`.
 function decodeMusicChunk(track, restart)
   if restart then
     if native.oggSeekStart() == 0 then return false end if
@@ -207,7 +238,8 @@ function decodeMusicChunk(track, restart)
   return true
 end function
 
-// Release state for close.
+/// Implements the `close` operation for `miniquake.sound.mixer` (close).
+/// @param mixer The mixer input consumed by `close`.
 function close(mixer)
   stopMusic(mixer)
   stopAll(mixer)
@@ -219,7 +251,9 @@ function close(mixer)
   return true
 end function
 
-// Return effect index derived from the active module state.
+/// Return effect index derived from the active module state.
+/// @param mixer The mixer input consumed by `effectIndex`.
+/// @param name Stable name that identifies the requested object or option.
 function effectIndex(mixer, name)
   index = 0
   while index < len(mixer.effects)
@@ -229,7 +263,10 @@ function effectIndex(mixer, name)
   return -1
 end function
 
-// Convert data for convert to mono16.
+/// Convert data for convert to mono16.
+/// @param info The info input consumed by `convertToMono16`.
+/// @param source Source value or collection to read.
+/// @param targetRate The target rate input consumed by `convertToMono16`.
 function convertToMono16(info, source, targetRate)
   outputSamples = native.trunc(info.samples * targetRate / info.rate)
   if outputSamples < 1 then outputSamples = 1 end if
@@ -248,7 +285,9 @@ function convertToMono16(info, source, targetRate)
   return result
 end function
 
-// Read and validate effect.
+/// Read and validate effect.
+/// @param mixer The mixer input consumed by `loadEffect`.
+/// @param name Stable name that identifies the requested object or option.
 function loadEffect(mixer, name)
   existing = effectIndex(mixer, name)
   if existing >= 0 then return mixer.effects[existing] end if
@@ -264,7 +303,9 @@ function loadEffect(mixer, name)
   return effect
 end function
 
-// Preload and register the the requested value asset.
+/// Preload and register the the requested value asset.
+/// @param mixer The mixer input consumed by `precache`.
+/// @param names The names input consumed by `precache`.
 function precache(mixer, names)
   if mixer is void or not mixer.enabled then return [0, 0] end if
   loaded = 0
@@ -282,7 +323,10 @@ function precache(mixer, names)
   return [loaded, failed]
 end function
 
-// Return channel.
+/// Return channel.
+/// @param mixer The mixer input consumed by `findChannel`.
+/// @param entityNumber The entity number input consumed by `findChannel`.
+/// @param channelNumber The channel number input consumed by `findChannel`.
 function findChannel(mixer, entityNumber, channelNumber)
   for each channel in mixer.channels
     if channel.entityNumber == entityNumber and channel.channelNumber == channelNumber then return channel end if
@@ -290,14 +334,16 @@ function findChannel(mixer, entityNumber, channelNumber)
   return void
 end function
 
-// Report whether is dynamic channel.
+/// Report whether is dynamic channel.
+/// @param channel The channel input consumed by `isDynamicChannel`.
 function isDynamicChannel(channel)
   if channel.entityNumber == AMBIENT_WATER_ENTITY or channel.entityNumber == AMBIENT_WIND_ENTITY then return false end if
   if channel.channelNumber == STATIC_CHANNEL then return false end if
   return true
 end function
 
-// Return dynamic channel count derived from the active module state.
+/// Return dynamic channel count derived from the active module state.
+/// @param mixer The mixer input consumed by `dynamicChannelCount`.
 function dynamicChannelCount(mixer)
   count = 0
   for each channel in mixer.channels
@@ -306,7 +352,9 @@ function dynamicChannelCount(mixer)
   return count
 end function
 
-// Release state for remove channel at.
+/// Release state for remove channel at.
+/// @param mixer The mixer input consumed by `removeChannelAt`.
+/// @param victim The victim input consumed by `removeChannelAt`.
 function removeChannelAt(mixer, victim)
   if victim < 0 or victim >= len(mixer.channels) then return false end if
   builder = arrays.createArrayBuilder(len(mixer.channels) - 1)
@@ -320,10 +368,13 @@ function removeChannelAt(mixer, victim)
   return true
 end function
 
-// SND_PickChannel scans the fixed eight dynamic slots in order.  A matching
-// non-zero entity channel wins immediately; otherwise the sound with the
-// shortest remaining life is replaced, while a listener sound is protected
-// from a non-listener replacement.
+/// SND_PickChannel scans the fixed eight dynamic slots in order.  A matching
+/// non-zero entity channel wins immediately; otherwise the sound with the
+/// shortest remaining life is replaced, while a listener sound is protected
+/// from a non-listener replacement.
+/// @param mixer The mixer input consumed by `pickDynamicChannel`.
+/// @param newEntityNumber The new entity number input consumed by `pickDynamicChannel`.
+/// @param newChannelNumber The new channel number input consumed by `pickDynamicChannel`.
 function pickDynamicChannel(mixer, newEntityNumber, newChannelNumber)
   currentDynamicCount = dynamicChannelCount(mixer)
   victim = -1
@@ -353,7 +404,9 @@ function pickDynamicChannel(mixer, newEntityNumber, newChannelNumber)
   return victim
 end function
 
-// Release or consume state for discard oldest channel.
+/// Release or consume state for discard oldest channel.
+/// @param mixer The mixer input consumed by `discardOldestChannel`.
+/// @param newEntityNumber The new entity number input consumed by `discardOldestChannel`.
 function discardOldestChannel(mixer, newEntityNumber)
   victim = pickDynamicChannel(mixer, newEntityNumber, 0)
   if victim < 0 then return false end if
@@ -368,19 +421,28 @@ function nextRandom()
   return (randomSeed >> 16) & 0x7fff
 end function
 
-// Update module state for random seed.
+/// Update module state for random seed.
+/// @param seed The seed input consumed by `setRandomSeed`.
 function setRandomSeed(seed)
   global randomSeed
   randomSeed = seed & 0xffffffff
   return randomSeed
 end function
 
-// Provide mixer f32 behavior for the active subsystem.
+/// Implements the `mixerF32` operation for `miniquake.sound.mixer` (mixer f32).
+/// @param value Value consumed by `mixerF32`.
 function mixerF32(value)
   return native.bitsFloat(native.floatBits(value))
 end function
 
-// Initialize state for start sound.
+/// Initialize state for start sound.
+/// @param mixer The mixer input consumed by `startSound`.
+/// @param entityNumber The entity number input consumed by `startSound`.
+/// @param channelNumber The channel number input consumed by `startSound`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param origin World-space origin of the operation.
+/// @param volume The volume input consumed by `startSound`.
+/// @param attenuation The attenuation input consumed by `startSound`.
 function startSound(mixer, entityNumber, channelNumber, name, origin, volume, attenuation)
   if not mixer.enabled then return false end if
   dynamicBefore = dynamicChannelCount(mixer)
@@ -435,7 +497,12 @@ function startSound(mixer, entityNumber, channelNumber, name, origin, volume, at
   return true
 end function
 
-// Provide static sound behavior for the active subsystem.
+/// Implements the `staticSound` operation for `miniquake.sound.mixer` (static sound).
+/// @param mixer The mixer input consumed by `staticSound`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param origin World-space origin of the operation.
+/// @param volume The volume input consumed by `staticSound`.
+/// @param attenuation The attenuation input consumed by `staticSound`.
 function staticSound(mixer, name, origin, volume, attenuation)
   if mixer is void or not mixer.enabled or STATIC_FIRST + mixer.staticAllocations >= MAX_CHANNELS then return false end if
   // S_StaticSound consumes its fixed slot before loading/checking loopability.
@@ -458,7 +525,9 @@ function staticSound(mixer, name, origin, volume, attenuation)
   return true
 end function
 
-// Provide local sound behavior for the active subsystem.
+/// Implements the `localSound` operation for `miniquake.sound.mixer` (local sound).
+/// @param mixer The mixer input consumed by `localSound`.
+/// @param name Stable name that identifies the requested object or option.
 function localSound(mixer, name)
   if mixer is void or not mixer.enabled then return false end if
   entityNumber = mixer.listenerEntity
@@ -466,7 +535,8 @@ function localSound(mixer, name)
   return startSound(mixer, entityNumber, -1, name, mixer.listenerOrigin, 1.0, 0.0)
 end function
 
-// Report whether extension.
+/// Report whether extension.
+/// @param name Stable name that identifies the requested object or option.
 function hasExtension(name)
   source = bytes(name)
   for each value in source
@@ -475,7 +545,9 @@ function hasExtension(name)
   return false
 end function
 
-// Play the requested value through the active media subsystem.
+/// Play the requested value through the active media subsystem.
+/// @param mixer The mixer input consumed by `play`.
+/// @param arguments Command-line arguments to inspect or execute.
 function play(mixer, arguments)
   if mixer is void or not mixer.enabled then return 0 end if
   played = 0
@@ -490,7 +562,9 @@ function play(mixer, arguments)
   return played
 end function
 
-// Play vol through the active media subsystem.
+/// Play vol through the active media subsystem.
+/// @param mixer The mixer input consumed by `playVol`.
+/// @param arguments Command-line arguments to inspect or execute.
 function playVol(mixer, arguments)
   if mixer is void or not mixer.enabled then return 0 end if
   played = 0
@@ -508,7 +582,8 @@ function playVol(mixer, arguments)
   return played
 end function
 
-// Provide sound list behavior for the active subsystem.
+/// Implements the `soundList` operation for `miniquake.sound.mixer` (sound list).
+/// @param mixer The mixer input consumed by `soundList`.
 function soundList(mixer)
   entries = arrays.createArrayBuilder(len(mixer.effects))
   total = 0
@@ -520,7 +595,8 @@ function soundList(mixer)
   return [arrays.finishArrayBuilder(entries), total]
 end function
 
-// Provide sound info behavior for the active subsystem.
+/// Implements the `soundInfo` operation for `miniquake.sound.mixer` (sound info).
+/// @param mixer The mixer input consumed by `soundInfo`.
 function soundInfo(mixer)
   if mixer is void or not mixer.enabled or not mixer.audioState.opened then return [["status", "sound system not started"]] end if
   sampleMask = audio.capacity(mixer.audioState) * MIX_FRAMES * mixer.audioState.channels - 1
@@ -550,7 +626,8 @@ function soundInfo(mixer)
   return result
 end function
 
-// Provide music info behavior for the active subsystem.
+/// Implements the `musicInfo` operation for `miniquake.sound.mixer` (music info).
+/// @param mixer The mixer input consumed by `musicInfo`.
 function musicInfo(mixer)
   if mixer is void or not mixer.enabled then return [["status", "sound system not started"]] end if
   if mixer.music is void then return [["status", "no music track loaded"]] end if
@@ -567,7 +644,10 @@ function musicInfo(mixer)
   ]
 end function
 
-// Finalize state for stop sound.
+/// Finalize state for stop sound.
+/// @param mixer The mixer input consumed by `stopSound`.
+/// @param entityNumber The entity number input consumed by `stopSound`.
+/// @param channelNumber The channel number input consumed by `stopSound`.
 function stopSound(mixer, entityNumber, channelNumber)
   builder = arrays.createArrayBuilder(len(mixer.channels))
   stopped = 0
@@ -587,13 +667,19 @@ function stopSound(mixer, entityNumber, channelNumber)
   return stopped
 end function
 
-// Update module state for listener entity.
+/// Update module state for listener entity.
+/// @param mixer The mixer input consumed by `setListenerEntity`.
+/// @param entityNumber The entity number input consumed by `setListenerEntity`.
 function setListenerEntity(mixer, entityNumber)
   mixer.listenerEntity = entityNumber
   return entityNumber
 end function
 
-// Update module state for listener.
+/// Update module state for listener.
+/// @param mixer The mixer input consumed by `updateListener`.
+/// @param origin World-space origin of the operation.
+/// @param forward The forward input consumed by `updateListener`.
+/// @param right The right input consumed by `updateListener`.
 function updateListener(mixer, origin, forward, right)
   // snd_dma.c stores these in three persistent vec3_t arrays. Updating their
   // components avoids replacing three heap-backed Vec3 objects every frame.
@@ -609,7 +695,9 @@ function updateListener(mixer, origin, forward, right)
   return true
 end function
 
-// Update module state for entity origins.
+/// Update module state for entity origins.
+/// @param mixer The mixer input consumed by `updateEntityOrigins`.
+/// @param entities The entities input consumed by `updateEntityOrigins`.
 function updateEntityOrigins(mixer, entities)
   if mixer is void then return 0 end if
   updated = 0
@@ -628,7 +716,11 @@ function updateEntityOrigins(mixer, entities)
   return updated
 end function
 
-// Ensure sufficient storage or state for ambient channel.
+/// Ensure sufficient storage or state for ambient channel.
+/// @param mixer The mixer input consumed by `ensureAmbientChannel`.
+/// @param entityNumber The entity number input consumed by `ensureAmbientChannel`.
+/// @param channelNumber The channel number input consumed by `ensureAmbientChannel`.
+/// @param name Stable name that identifies the requested object or option.
 function ensureAmbientChannel(mixer, entityNumber, channelNumber, name)
   channel = findChannel(mixer, entityNumber, channelNumber)
   if channel is not void then return channel end if
@@ -651,7 +743,11 @@ function ensureAmbientChannel(mixer, entityNumber, channelNumber, name)
   return channel
 end function
 
-// Provide fade ambient channel behavior for the active subsystem.
+/// Implements the `fadeAmbientChannel` operation for `miniquake.sound.mixer` (fade ambient channel).
+/// @param channel The channel input consumed by `fadeAmbientChannel`.
+/// @param target The target input consumed by `fadeAmbientChannel`.
+/// @param step The step input consumed by `fadeAmbientChannel`.
+/// @param origin World-space origin of the operation.
 function fadeAmbientChannel(channel, target, step, origin)
   if channel is void then return false end if
   channel.origin.x = origin.x
@@ -668,15 +764,23 @@ function fadeAmbientChannel(channel, target, step, origin)
   return true
 end function
 
-// Provide ambient target behavior for the active subsystem.
+/// Implements the `ambientTarget` operation for `miniquake.sound.mixer` (ambient target).
+/// @param levelByte The level byte input consumed by `ambientTarget`.
+/// @param ambientLevel The ambient level input consumed by `ambientTarget`.
 function ambientTarget(levelByte, ambientLevel)
   scaled = levelByte * ambientLevel
   if scaled < 8.0 then return 0.0 end if
   return math.clamp(scaled / 255.0, 0.0, 1.0)
 end function
 
-// S_UpdateAmbientSounds: BSP leaves contain four ambient bytes.  Stock Quake
-// uses slot 0 for water and slot 1 for wind and fades them at ambient_fade.
+/// S_UpdateAmbientSounds: BSP leaves contain four ambient bytes.  Stock Quake
+/// uses slot 0 for water and slot 1 for wind and fades them at ambient_fade.
+/// @param mixer The mixer input consumed by `updateAmbient`.
+/// @param map The map input consumed by `updateAmbient`.
+/// @param origin World-space origin of the operation.
+/// @param frameTime Time value used by the operation.
+/// @param ambientLevel The ambient level input consumed by `updateAmbient`.
+/// @param ambientFade The ambient fade input consumed by `updateAmbient`.
 function updateAmbient(mixer, map, origin, frameTime, ambientLevel, ambientFade)
   if mixer is void or not mixer.enabled or map is void then return false end if
   waterTarget = 0.0
@@ -701,14 +805,20 @@ function updateAmbient(mixer, map, origin, frameTime, ambientLevel, ambientFade)
   return true
 end function
 
-// Return a validated clamp sample value.
+/// Return a validated clamp sample value.
+/// @param value Value consumed by `clampSample`.
 function clampSample(value)
   if value > 32767 then return 32767 end if
   if value < -32768 then return -32768 end if
   return native.trunc(value)
 end function
 
-// Calculate one channel's stereo volumes into reusable parallel arrays.
+/// Calculate one channel's stereo volumes into reusable parallel arrays.
+/// @param mixer The mixer input consumed by `channelVolumesInto`.
+/// @param channel The channel input consumed by `channelVolumesInto`.
+/// @param leftValues The left values input consumed by `channelVolumesInto`.
+/// @param rightValues The right values input consumed by `channelVolumesInto`.
+/// @param index Zero-based index of the requested entry.
 function channelVolumesInto(mixer, channel, leftValues, rightValues, index)
   master = native.trunc(mixerF32(mixerF32(channel.volume) * 255.0))
   // Sounds emitted by the view entity (weapon and menu sounds) are never
@@ -749,14 +859,22 @@ function channelVolumesInto(mixer, channel, leftValues, rightValues, index)
   return true
 end function
 
-// Provide channel volumes behavior for the active subsystem.
+/// Implements the `channelVolumes` operation for `miniquake.sound.mixer` (channel volumes).
+/// @param mixer The mixer input consumed by `channelVolumes`.
+/// @param channel The channel input consumed by `channelVolumes`.
 function channelVolumes(mixer, channel)
   global paintLeftVolumeScratch, paintRightVolumeScratch
   channelVolumesInto(mixer, channel, paintLeftVolumeScratch, paintRightVolumeScratch, 0)
   return [paintLeftVolumeScratch[0], paintRightVolumeScratch[0]]
 end function
 
-// Mix a channel using scalar stereo volumes.
+/// Mix a channel using scalar stereo volumes.
+/// @param mixer The mixer input consumed by `mixChannelWithStereoVolumes`.
+/// @param channel The channel input consumed by `mixChannelWithStereoVolumes`.
+/// @param accumulator The accumulator input consumed by `mixChannelWithStereoVolumes`.
+/// @param frameCount Number of entries or units to process.
+/// @param leftVolumeValue The left volume value input consumed by `mixChannelWithStereoVolumes`.
+/// @param rightVolumeValue The right volume value input consumed by `mixChannelWithStereoVolumes`.
 function mixChannelWithStereoVolumes(mixer, channel, accumulator, frameCount, leftVolumeValue, rightVolumeValue)
   if not channel.active or channel.effect is void then return false end if
   totalSamples = len(channel.effect.samples) / channel.effect.width
@@ -823,17 +941,29 @@ function mixChannelWithStereoVolumes(mixer, channel, accumulator, frameCount, le
   return channel.active
 end function
 
-// Mix channel with volumes into the active audio buffer.
+/// Mix channel with volumes into the active audio buffer.
+/// @param mixer The mixer input consumed by `mixChannelWithVolumes`.
+/// @param channel The channel input consumed by `mixChannelWithVolumes`.
+/// @param accumulator The accumulator input consumed by `mixChannelWithVolumes`.
+/// @param frameCount Number of entries or units to process.
+/// @param volumes The volumes input consumed by `mixChannelWithVolumes`.
 function mixChannelWithVolumes(mixer, channel, accumulator, frameCount, volumes)
   return mixChannelWithStereoVolumes(mixer, channel, accumulator, frameCount, volumes[0], volumes[1])
 end function
 
-// Mix channel into the active audio buffer.
+/// Mix channel into the active audio buffer.
+/// @param mixer The mixer input consumed by `mixChannel`.
+/// @param channel The channel input consumed by `mixChannel`.
+/// @param accumulator The accumulator input consumed by `mixChannel`.
+/// @param frameCount Number of entries or units to process.
 function mixChannel(mixer, channel, accumulator, frameCount)
   return mixChannelWithVolumes(mixer, channel, accumulator, frameCount, channelVolumes(mixer, channel))
 end function
 
-// Mix into a caller-owned PCM buffer using persistent paint scratch storage.
+/// Mix into a caller-owned PCM buffer using persistent paint scratch storage.
+/// @param mixer The mixer input consumed by `mixIntoOutput`.
+/// @param frameCount Number of entries or units to process.
+/// @param output Destination buffer that receives mixed PCM samples.
 function mixIntoOutput(mixer, frameCount, output)
   global paintAccumulatorScratch, paintLeftVolumeScratch, paintRightVolumeScratch, paintSurvivorScratch
   global paintStaticEffectScratch, paintStaticRepresentativeScratch
@@ -955,14 +1085,18 @@ function mixIntoOutput(mixer, frameCount, output)
   return output
 end function
 
-// Mix the requested value into the active audio buffer.
+/// Mix the requested value into the active audio buffer.
+/// @param mixer The mixer input consumed by `mix`.
+/// @param frameCount Number of entries or units to process.
 function mix(mixer, frameCount)
   if frameCount <= 0 then return bytes() end if
   return mixIntoOutput(mixer, frameCount, bytes(frameCount * 4))
 end function
 
-// Paint one backend block into the reusable submission buffer. audioSubmit
-// copies the samples synchronously into its fixed waveOut header ring.
+/// Paint one backend block into the reusable submission buffer. audioSubmit
+/// copies the samples synchronously into its fixed waveOut header ring.
+/// @param mixer The mixer input consumed by `mixForSubmit`.
+/// @param frameCount Number of entries or units to process.
 function mixForSubmit(mixer, frameCount)
   global paintOutputScratch
   required = frameCount * 4
@@ -970,7 +1104,10 @@ function mixForSubmit(mixer, frameCount)
   return mixIntoOutput(mixer, frameCount, paintOutputScratch)
 end function
 
-// Mix music into the active audio buffer.
+/// Mix music into the active audio buffer.
+/// @param mixer The mixer input consumed by `mixMusic`.
+/// @param accumulator The accumulator input consumed by `mixMusic`.
+/// @param frameCount Number of entries or units to process.
 function mixMusic(mixer, accumulator, frameCount)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   track = mixer.music
@@ -1026,7 +1163,10 @@ function mixMusic(mixer, accumulator, frameCount)
   return track.playing
 end function
 
-// Provide desired queued buffers behavior for the active subsystem.
+/// Implements the `desiredQueuedBuffers` operation for `miniquake.sound.mixer` (desired queued buffers).
+/// @param mixer The mixer input consumed by `desiredQueuedBuffers`.
+/// @param frameTime Time value used by the operation.
+/// @param mixAhead The mix ahead input consumed by `desiredQueuedBuffers`.
 function desiredQueuedBuffers(mixer, frameTime, mixAhead)
   if mixAhead < 0.0 then mixAhead = 0.0 end if
   if frameTime < 0.0 then frameTime = 0.0 end if
@@ -1041,7 +1181,10 @@ function desiredQueuedBuffers(mixer, frameTime, mixAhead)
   return target
 end function
 
-// Update module state for the requested operation.
+/// Implements the `update` operation for `miniquake.sound.mixer` (update).
+/// @param mixer The mixer input consumed by `update`.
+/// @param frameTime Time value used by the operation.
+/// @param mixAhead The mix ahead input consumed by `update`.
 function update(mixer, frameTime, mixAhead)
   if not mixer.enabled or blockDepth(mixer) > 0 then return 0 end if
   queuedBefore = audio.queued(mixer.audioState)

@@ -11,26 +11,38 @@ import miniquake.net_datagram as datagram
 import miniquake.sizebuf as sz
 import miniquake.message as msg
 
+/// Defines the net protocol version value used by `miniquake.net_control`.
 const NET_PROTOCOL_VERSION = 3
+/// Defines the game name value used by `miniquake.net_control`.
 const GAME_NAME = "QUAKE"
 
+/// Defines the ccreq connect value used by `miniquake.net_control`.
 const CCREQ_CONNECT = 0x01
+/// Defines the ccreq server info value used by `miniquake.net_control`.
 const CCREQ_SERVER_INFO = 0x02
+/// Defines the ccreq player info value used by `miniquake.net_control`.
 const CCREQ_PLAYER_INFO = 0x03
+/// Defines the ccreq rule info value used by `miniquake.net_control`.
 const CCREQ_RULE_INFO = 0x04
 
+/// Defines the ccrep accept value used by `miniquake.net_control`.
 const CCREP_ACCEPT = 0x81
+/// Defines the ccrep reject value used by `miniquake.net_control`.
 const CCREP_REJECT = 0x82
+/// Defines the ccrep server info value used by `miniquake.net_control`.
 const CCREP_SERVER_INFO = 0x83
+/// Defines the ccrep player info value used by `miniquake.net_control`.
 const CCREP_PLAYER_INFO = 0x84
+/// Defines the ccrep rule info value used by `miniquake.net_control`.
 const CCREP_RULE_INFO = 0x85
 
-// Provide wrap behavior for the active subsystem.
+/// Implements the `wrap` operation for `miniquake.net_control` (wrap).
+/// @param buffer The buffer input consumed by `wrap`.
 function wrap(buffer)
   return datagram.control(sz.dataSlice(buffer))
 end function
 
-// Provide request connect behavior for the active subsystem.
+/// Implements the `requestConnect` operation for `miniquake.net_control` (request connect).
 function requestConnect()
   buffer = sz.alloc(64)
   msg.writeByte(buffer, CCREQ_CONNECT)
@@ -39,7 +51,7 @@ function requestConnect()
   return wrap(buffer)
 end function
 
-// Provide request server info behavior for the active subsystem.
+/// Implements the `requestServerInfo` operation for `miniquake.net_control` (request server info).
 function requestServerInfo()
   buffer = sz.alloc(64)
   msg.writeByte(buffer, CCREQ_SERVER_INFO)
@@ -48,7 +60,8 @@ function requestServerInfo()
   return wrap(buffer)
 end function
 
-// Provide request player info behavior for the active subsystem.
+/// Implements the `requestPlayerInfo` operation for `miniquake.net_control` (request player info).
+/// @param playerNumber The player number input consumed by `requestPlayerInfo`.
 function requestPlayerInfo(playerNumber)
   buffer = sz.alloc(16)
   msg.writeByte(buffer, CCREQ_PLAYER_INFO)
@@ -56,7 +69,8 @@ function requestPlayerInfo(playerNumber)
   return wrap(buffer)
 end function
 
-// Provide request rule info behavior for the active subsystem.
+/// Implements the `requestRuleInfo` operation for `miniquake.net_control` (request rule info).
+/// @param previousRule The previous rule input consumed by `requestRuleInfo`.
 function requestRuleInfo(previousRule)
   buffer = sz.alloc(256)
   msg.writeByte(buffer, CCREQ_RULE_INFO)
@@ -64,7 +78,8 @@ function requestRuleInfo(previousRule)
   return wrap(buffer)
 end function
 
-// Provide reply accept behavior for the active subsystem.
+/// Implements the `replyAccept` operation for `miniquake.net_control` (reply accept).
+/// @param port The port input consumed by `replyAccept`.
 function replyAccept(port)
   buffer = sz.alloc(16)
   msg.writeByte(buffer, CCREP_ACCEPT)
@@ -72,7 +87,8 @@ function replyAccept(port)
   return wrap(buffer)
 end function
 
-// Provide reply reject behavior for the active subsystem.
+/// Implements the `replyReject` operation for `miniquake.net_control` (reply reject).
+/// @param reason The reason input consumed by `replyReject`.
 function replyReject(reason)
   buffer = sz.alloc(512)
   msg.writeByte(buffer, CCREP_REJECT)
@@ -80,7 +96,12 @@ function replyReject(reason)
   return wrap(buffer)
 end function
 
-// Provide reply server info behavior for the active subsystem.
+/// Implements the `replyServerInfo` operation for `miniquake.net_control` (reply server info).
+/// @param address Network address of the peer.
+/// @param hostName Name that identifies the requested value or resource.
+/// @param levelName Name that identifies the requested value or resource.
+/// @param currentPlayers The current players input consumed by `replyServerInfo`.
+/// @param maxPlayers The max players input consumed by `replyServerInfo`.
 function replyServerInfo(address, hostName, levelName, currentPlayers, maxPlayers)
   buffer = sz.alloc(512)
   msg.writeByte(buffer, CCREP_SERVER_INFO)
@@ -93,7 +114,13 @@ function replyServerInfo(address, hostName, levelName, currentPlayers, maxPlayer
   return wrap(buffer)
 end function
 
-// Provide reply player info behavior for the active subsystem.
+/// Implements the `replyPlayerInfo` operation for `miniquake.net_control` (reply player info).
+/// @param playerNumber The player number input consumed by `replyPlayerInfo`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param colors The colors input consumed by `replyPlayerInfo`.
+/// @param frags The frags input consumed by `replyPlayerInfo`.
+/// @param connectTime Time value used by the operation.
+/// @param address Network address of the peer.
 function replyPlayerInfo(playerNumber, name, colors, frags, connectTime, address)
   buffer = sz.alloc(512)
   msg.writeByte(buffer, CCREP_PLAYER_INFO)
@@ -106,7 +133,9 @@ function replyPlayerInfo(playerNumber, name, colors, frags, connectTime, address
   return wrap(buffer)
 end function
 
-// Provide reply rule info behavior for the active subsystem.
+/// Implements the `replyRuleInfo` operation for `miniquake.net_control` (reply rule info).
+/// @param rule The rule input consumed by `replyRuleInfo`.
+/// @param value Value consumed by `replyRuleInfo`.
 function replyRuleInfo(rule, value)
   buffer = sz.alloc(512)
   msg.writeByte(buffer, CCREP_RULE_INFO)
@@ -118,7 +147,8 @@ function replyRuleInfo(rule, value)
   return wrap(buffer)
 end function
 
-// Returns [command, fields].  The field order is the exact net.h wire order.
+/// Returns [command, fields].  The field order is the exact net.h wire order.
+/// @param wirePacket The wire packet input consumed by `parse`.
 function parse(wirePacket)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   packet = datagram.decodePacket(wirePacket)
@@ -165,7 +195,8 @@ function parse(wirePacket)
   return [command, fields]
 end function
 
-// Report whether valid quake request.
+/// Report whether valid quake request.
+/// @param parsed The parsed input consumed by `validQuakeRequest`.
 function validQuakeRequest(parsed)
   if parsed[0] != CCREQ_CONNECT and parsed[0] != CCREQ_SERVER_INFO then return false end if
   if parsed[1][0] != GAME_NAME then return false end if
@@ -175,12 +206,14 @@ function validQuakeRequest(parsed)
   return true
 end function
 
-// Report whether valid connect request.
+/// Report whether valid connect request.
+/// @param parsed The parsed input consumed by `validConnectRequest`.
 function inline validConnectRequest(parsed)
   return parsed[0] == CCREQ_CONNECT and parsed[1][0] == GAME_NAME and parsed[1][1] == NET_PROTOCOL_VERSION
 end function
 
-// Report whether valid server info request.
+/// Report whether valid server info request.
+/// @param parsed The parsed input consumed by `validServerInfoRequest`.
 function inline validServerInfoRequest(parsed)
   return parsed[0] == CCREQ_SERVER_INFO and parsed[1][0] == GAME_NAME
 end function

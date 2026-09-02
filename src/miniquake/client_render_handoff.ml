@@ -18,19 +18,27 @@ import miniquake.protocol_transients as transients
 import miniquake.particles as particles
 import miniquake.client as clientRuntime
 
+/// Defines the max beams value used by `miniquake.client_render_handoff`.
 const MAX_BEAMS = 24
+/// Defines the max temp entities value used by `miniquake.client_render_handoff`.
 const MAX_TEMP_ENTITIES = 64
+/// Defines the beam step value used by `miniquake.client_render_handoff`.
 const BEAM_STEP = 30.0
 
+/// Tracks the module-level empty temporary state owned by `miniquake.client_render_handoff`.
 emptyTemporary = []
+/// Tracks the module-level current temporary state owned by `miniquake.client_render_handoff`.
 currentTemporary = emptyTemporary
 
-// Render float.
+/// Render float.
+/// @param value Value consumed by `renderFloat`.
 function renderFloat(value)
   return native.bitsFloat(native.floatBits(value))
 end function
 
-// Return beam angles derived from the active module state.
+/// Return beam angles derived from the active module state.
+/// @param startPosition The start position input consumed by `beamAngles`.
+/// @param endPosition The end position input consumed by `beamAngles`.
 function beamAngles(startPosition, endPosition)
   distance = math.subtract(endPosition, startPosition)
   yaw = 0.0
@@ -47,7 +55,10 @@ function beamAngles(startPosition, endPosition)
   return t.Vec3(renderFloat(pitch), renderFloat(yaw), 0.0)
 end function
 
-// Return beam segment origins derived from the active module state.
+/// Return beam segment origins derived from the active module state.
+/// @param startPosition The start position input consumed by `beamSegmentOrigins`.
+/// @param endPosition The end position input consumed by `beamSegmentOrigins`.
+/// @param limit The limit input consumed by `beamSegmentOrigins`.
 function beamSegmentOrigins(startPosition, endPosition, limit)
   builder = arrays.createArrayBuilder(limit)
   distance = math.subtract(endPosition, startPosition)
@@ -67,13 +78,17 @@ function beamSegmentOrigins(startPosition, endPosition, limit)
   return arrays.finishArrayBuilder(builder)
 end function
 
-// Provide compact beam start behavior for the active subsystem.
+/// Implements the `compactBeamStart` operation for `miniquake.client_render_handoff` (compact beam start).
+/// @param value Value consumed by `compactBeamStart`.
+/// @param viewEntity The view entity input consumed by `compactBeamStart`.
+/// @param viewOrigin The view origin input consumed by `compactBeamStart`.
 function compactBeamStart(value, viewEntity, viewOrigin)
   if value.entity == viewEntity then return math.copy(viewOrigin) end if
   return math.copy(value.origin)
 end function
 
-// Return beam model name derived from the active module state.
+/// Return beam model name derived from the active module state.
+/// @param type The type input consumed by `beamModelName`.
 function beamModelName(type)
   if type == c.TE_LIGHTNING1 then return "progs/bolt.mdl" end if
   if type == c.TE_LIGHTNING2 then return "progs/bolt2.mdl" end if
@@ -82,7 +97,9 @@ function beamModelName(type)
   return ""
 end function
 
-// Return model index for name derived from the active module state.
+/// Return model index for name derived from the active module state.
+/// @param client Client state participating in the operation.
+/// @param name Stable name that identifies the requested object or option.
 function modelIndexForName(client, name)
   if len(client.modelPrecache) == 0 then client.modelPrecache = [""] end if
   index = 1
@@ -94,9 +111,10 @@ function modelIndexForName(client, name)
   return len(client.modelPrecache) - 1
 end function
 
-// CL_InitTEnts owns the lightning models rather than receiving them in the
-// server model list. Register them during signon so the first beam does not
-// parse and upload a model while gameplay is already visible.
+/// CL_InitTEnts owns the lightning models rather than receiving them in the
+/// server model list. Register them during signon so the first beam does not
+/// parse and upload a model while gameplay is already visible.
+/// @param client Client state participating in the operation.
 function precacheBeamModels(client)
   names = ["progs/bolt.mdl", "progs/bolt2.mdl", "progs/bolt3.mdl", "progs/beam.mdl"]
   for each name in names
@@ -105,7 +123,12 @@ function precacheBeamModels(client)
   return names
 end function
 
-// Create and initialize beam entity.
+/// Create and initialize beam entity.
+/// @param number The number input consumed by `makeBeamEntity`.
+/// @param modelIndex Zero-based index of the requested entry.
+/// @param origin World-space origin of the operation.
+/// @param angles Orientation angles used by the operation.
+/// @param currentTime Time value used by the operation.
 function makeBeamEntity(number, modelIndex, origin, angles, currentTime)
   entityOrigin = math.copy(origin)
   entityAngles = math.copy(angles)
@@ -133,8 +156,12 @@ function makeBeamEntity(number, modelIndex, origin, angles, currentTime)
   )
 end function
 
-// Mirrors CL_UpdateTEnts: reset per-frame temp storage, update player-owned
-// beam starts, append 30-unit model segments, and stop at either shared cap.
+/// Mirrors CL_UpdateTEnts: reset per-frame temp storage, update player-owned
+/// beam starts, append 30-unit model segments, and stop at either shared cap.
+/// @param compactBeams The compact beams input consumed by `buildTemporaryEntities`.
+/// @param client Client state participating in the operation.
+/// @param currentTime Time value used by the operation.
+/// @param visibleCount Number of entries or units to process.
 function buildTemporaryEntities(compactBeams, client, currentTime, visibleCount)
   global currentTemporary
   available = c.MAX_VISEDICTS - visibleCount
@@ -192,7 +219,10 @@ function clearTemporaryEntities()
   return true
 end function
 
-// Submit state for submit mirror entities.
+/// Submit state for submit mirror entities.
+/// @param visibleEntities The visible entities input consumed by `submitMirrorEntities`.
+/// @param temporaryEntities The temporary entities input consumed by `submitMirrorEntities`.
+/// @param viewEntity The view entity input consumed by `submitMirrorEntities`.
 function submitMirrorEntities(visibleEntities, temporaryEntities, viewEntity)
   result = submitEntities(visibleEntities, temporaryEntities)
   if viewEntity is void or viewEntity.modelIndex == 0 then return result end if
@@ -203,7 +233,9 @@ function submitMirrorEntities(visibleEntities, temporaryEntities, viewEntity)
   return result + [viewEntity]
 end function
 
-// Submit state for submit entities.
+/// Submit state for submit entities.
+/// @param visibleEntities The visible entities input consumed by `submitEntities`.
+/// @param temporaryEntities The temporary entities input consumed by `submitEntities`.
 function submitEntities(visibleEntities, temporaryEntities)
   // The overwhelmingly common frame has no active beam segments. The visible
   // list is already capped by CL_RelinkEntities, so it can be consumed directly

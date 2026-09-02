@@ -20,32 +20,57 @@ import miniquake.world_bsp as world
 // retain the original behavior.
 
 struct EfragRef
+  /// Stores the entity value in `miniquake.render.gl_refrag.EfragRef`.
   entity
+  /// Stores the leaf index value in `miniquake.render.gl_refrag.EfragRef`.
   leafIndex
 end struct
 
+/// Tracks the module-level refrag leafs state owned by `miniquake.render.gl_refrag`.
 refragLeafs = []
+/// Tracks the module-level refrag nodes state owned by `miniquake.render.gl_refrag`.
 refragNodes = []
+/// Tracks the module-level refrag planes state owned by `miniquake.render.gl_refrag`.
 refragPlanes = []
+/// Tracks the module-level refrag bsp models state owned by `miniquake.render.gl_refrag`.
 refragBspModels = []
+/// Tracks the module-level refrag models state owned by `miniquake.render.gl_refrag`.
 refragModels = []
+/// Tracks the module-level refrag entities state owned by `miniquake.render.gl_refrag`.
 refragEntities = []
+/// Tracks the module-level refrag leaf efrags state owned by `miniquake.render.gl_refrag`.
 refragLeafEfrags = []
+/// Tracks the module-level refrag entity efrags state owned by `miniquake.render.gl_refrag`.
 refragEntityEfrags = []
+/// Tracks the module-level r pefragtopnode state owned by `miniquake.render.gl_refrag`.
 r_pefragtopnode = void
+/// Tracks the module-level r addent state owned by `miniquake.render.gl_refrag`.
 r_addent = void
+/// Tracks the module-level r emins state owned by `miniquake.render.gl_refrag`.
 r_emins = void
+/// Tracks the module-level r emaxs state owned by `miniquake.render.gl_refrag`.
 r_emaxs = void
+/// Tracks the module-level cl visedicts state owned by `miniquake.render.gl_refrag`.
 cl_visedicts = []
+/// Tracks the module-level cl numvisedicts state owned by `miniquake.render.gl_refrag`.
 cl_numvisedicts = 0
+/// Tracks the module-level static renderer key state owned by `miniquake.render.gl_refrag`.
 staticRendererKey = 0
+/// Tracks the module-level static model renderer key state owned by `miniquake.render.gl_refrag`.
 staticModelRendererKey = 0
+/// Tracks the module-level static entity array key state owned by `miniquake.render.gl_refrag`.
 staticEntityArrayKey = 0
+/// Tracks the module-level static entity count state owned by `miniquake.render.gl_refrag`.
 staticEntityCount = -1
+/// Tracks the module-level visible entity generation state owned by `miniquake.render.gl_refrag`.
 visibleEntityGeneration = 1
+/// Tracks the module-level visible entity stamp state owned by `miniquake.render.gl_refrag`.
 visibleEntityStamp = array(c.MAX_EDICTS + c.MAX_STATIC_ENTITIES, 0)
 
-// Update subsystem configuration for configure.
+/// Implements the `Configure` operation for `miniquake.render.gl_refrag` (configure).
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param entityRenderer The entity renderer input consumed by `Configure`.
+/// @param entityStates The entity states input consumed by `Configure`.
 function Configure(renderer, entityRenderer, entityStates)
   global refragLeafs, refragNodes, refragPlanes, refragBspModels
   global refragModels, refragEntities, refragLeafEfrags, refragEntityEfrags
@@ -78,10 +103,13 @@ function Configure(renderer, entityRenderer, entityStates)
   return true
 end function
 
-// Rebuild the immutable signon-time static-entity efrag index only when its
-// map, model table or source array changes. Static renderer-local numbers sit
-// outside Protocol 15's edict range, but their shared EfragRef objects remain
-// fully linked from the BSP leaves used for frame visibility.
+/// Rebuild the immutable signon-time static-entity efrag index only when its
+/// map, model table or source array changes. Static renderer-local numbers sit
+/// outside Protocol 15's edict range, but their shared EfragRef objects remain
+/// fully linked from the BSP leaves used for frame visibility.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param entityRenderer The entity renderer input consumed by `ConfigureStaticEntities`.
+/// @param entityStates The entity states input consumed by `ConfigureStaticEntities`.
 function ConfigureStaticEntities(renderer, entityRenderer, entityStates)
   global staticRendererKey, staticModelRendererKey, staticEntityArrayKey, staticEntityCount
   if renderer is void or entityRenderer is void or entityStates is void then return false end if
@@ -101,7 +129,8 @@ function ConfigureStaticEntities(renderer, entityRenderer, entityStates)
   return true
 end function
 
-// Apply the Quake-compatible r remove efrags behavior.
+/// Apply the Quake-compatible r remove efrags behavior.
+/// @param ent The ent input consumed by `R_RemoveEfrags`.
 function R_RemoveEfrags(ent)
   global refragLeafEfrags, refragEntityEfrags
   if ent is void or ent.number < 0 or ent.number >= len(refragEntityEfrags) then return false end if
@@ -120,7 +149,8 @@ function R_RemoveEfrags(ent)
   return true
 end function
 
-// Add state for append efrag.
+/// Add state for append efrag.
+/// @param leafIndex Zero-based index of the requested entry.
 function appendEfrag(leafIndex)
   global refragLeafEfrags, refragEntityEfrags, r_pefragtopnode
   if r_addent is void or leafIndex < 0 or leafIndex >= len(refragLeafEfrags) then return false end if
@@ -135,7 +165,8 @@ function appendEfrag(leafIndex)
   return true
 end function
 
-// Apply the Quake-compatible r split entity on node behavior.
+/// Apply the Quake-compatible r split entity on node behavior.
+/// @param nodeNumber The node number input consumed by `R_SplitEntityOnNode`.
 function R_SplitEntityOnNode(nodeNumber)
   global r_pefragtopnode
   if r_addent is void then return 0 end if
@@ -160,7 +191,8 @@ function R_SplitEntityOnNode(nodeNumber)
   return count
 end function
 
-// Provide model bounds behavior for the active subsystem.
+/// Implements the `modelBounds` operation for `miniquake.render.gl_refrag` (model bounds).
+/// @param ent The ent input consumed by `modelBounds`.
 function modelBounds(ent)
   if ent.modelIndex <= 0 or ent.modelIndex >= len(refragModels) then return void end if
   model = refragModels[ent.modelIndex]
@@ -178,7 +210,8 @@ function modelBounds(ent)
   return [math.subtract(ent.origin, extent), math.add(ent.origin, extent)]
 end function
 
-// Apply the Quake-compatible r add efrags behavior.
+/// Apply the Quake-compatible r add efrags behavior.
+/// @param ent The ent input consumed by `R_AddEfrags`.
 function R_AddEfrags(ent)
   global r_addent, r_emins, r_emaxs, r_pefragtopnode
   if ent is void or len(refragBspModels) == 0 then return 0 end if
@@ -202,7 +235,8 @@ function R_BeginVisibleFrame()
   return true
 end function
 
-// Apply the Quake-compatible r store efrags behavior.
+/// Apply the Quake-compatible r store efrags behavior.
+/// @param leafIndex Zero-based index of the requested entry.
 function R_StoreEfrags(leafIndex)
   global cl_visedicts, cl_numvisedicts
   // World traversal calls R_StoreEfrags once for every visible leaf.  The C
@@ -233,10 +267,12 @@ function R_StoreEfrags(leafIndex)
   return cl_visedicts
 end function
 
-// Append efrag-linked statics from exactly the leaves in the current view PVS.
-// Dynamic entities are supplied first, matching CL_RelinkEntities ordering and
-// preserving their priority at MAX_VISEDICTS. One builder replaces the old
-// per-leaf copy loop and avoids frame-time allocation bursts in large maps.
+/// Append efrag-linked statics from exactly the leaves in the current view PVS.
+/// Dynamic entities are supplied first, matching CL_RelinkEntities ordering and
+/// preserving their priority at MAX_VISEDICTS. One builder replaces the old
+/// per-leaf copy loop and avoids frame-time allocation bursts in large maps.
+/// @param dynamicEntities The dynamic entities input consumed by `R_AppendVisiblePvs`.
+/// @param pvs The pvs input consumed by `R_AppendVisiblePvs`.
 function R_AppendVisiblePvs(dynamicEntities, pvs)
   global cl_visedicts, cl_numvisedicts, visibleEntityGeneration, visibleEntityStamp
   builder = arrayutil.createArrayBuilder(c.MAX_VISEDICTS)
@@ -292,7 +328,10 @@ function R_VisibleEntities()
   return cl_visedicts
 end function
 
-// Update module state for split state.
+/// Update module state for split state.
+/// @param entity Entity affected by the operation.
+/// @param mins The mins input consumed by `SetSplitState`.
+/// @param maxs The maxs input consumed by `SetSplitState`.
 function SetSplitState(entity, mins, maxs)
   global r_addent, r_emins, r_emaxs, r_pefragtopnode
   r_addent = entity
@@ -302,7 +341,8 @@ function SetSplitState(entity, mins, maxs)
   return true
 end function
 
-// Return state.
+/// Return state.
+/// @param entityNumber The entity number input consumed by `GetState`.
 function GetState(entityNumber)
   entityCount = 0
   if entityNumber >= 0 and entityNumber < len(refragEntityEfrags) then entityCount = len(refragEntityEfrags[entityNumber]) end if

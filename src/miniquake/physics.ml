@@ -16,16 +16,20 @@ import miniquake.server_collision as collision
 import miniquake.cvar as cvar
 import miniquake.quakec.vm as vm
 
+/// Defines the stop epsilon value used by `miniquake.physics`.
 const STOP_EPSILON = 0.1
+/// Defines the step size value used by `miniquake.physics`.
 const STEP_SIZE = 18.0
+/// Defines the max clip planes value used by `miniquake.physics`.
 const MAX_CLIP_PLANES = 5
 // These two movetypes are present in the QUAKE2-conditioned half of the
 // pinned MiniQuake source.  Keep them private to this pendant so the shared
 // protocol/constants surface remains the stock Quake 1 one.
 const MOVETYPE_BOUNCEMISSILE_COMPAT = 11
+/// Defines the movetype follow compat value used by `miniquake.physics`.
 const MOVETYPE_FOLLOW_COMPAT = 12
 
-// Create the zero-initialized state for vector.
+/// Implements the `zeroVector` operation for `miniquake.physics` (zero vector).
 function zeroVector()
   return t.Vec3(0.0, 0.0, 0.0)
 end function
@@ -36,12 +40,15 @@ function strictQuake109()
   return true
 end function
 
-// Provide collapse pusher corpse bounds behavior for the active subsystem.
+/// Implements the `collapsePusherCorpseBounds` operation for `miniquake.physics` (collapse pusher corpse bounds).
+/// @param mins The mins input consumed by `collapsePusherCorpseBounds`.
 function collapsePusherCorpseBounds(mins)
   return t.Vec3(0.0, 0.0, mins.z)
 end function
 
-// Create and initialize player.
+/// Create and initialize player.
+/// @param origin World-space origin of the operation.
+/// @param angles Orientation angles used by the operation.
 function createPlayer(origin, angles)
   return t.PlayerState(
     math.copy(origin),
@@ -79,12 +86,16 @@ function createPlayer(origin, angles)
   )
 end function
 
-// Return horizontal length derived from the active module state.
+/// Return horizontal length derived from the active module state.
+/// @param value Value consumed by `horizontalLength`.
 function horizontalLength(value)
   return math.length(t.Vec3(value.x, value.y, 0.0))
 end function
 
-// Trace velocity through the collision world.
+/// Implements the `clipVelocity` operation for `miniquake.physics` (clip velocity).
+/// @param input The input input consumed by `clipVelocity`.
+/// @param normal The normal input consumed by `clipVelocity`.
+/// @param overbounce The overbounce input consumed by `clipVelocity`.
 function clipVelocity(input, normal, overbounce)
   blocked = 0
   if normal.z > 0.0 then blocked = blocked | 1 end if
@@ -97,20 +108,31 @@ function clipVelocity(input, normal, overbounce)
   return [output, blocked]
 end function
 
-// Trace move through the collision world.
+/// Trace move through the collision world.
+/// @param server Server state participating in the operation.
+/// @param map The map input consumed by `traceMove`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param start The start input consumed by `traceMove`.
+/// @param mins The mins input consumed by `traceMove`.
+/// @param maxs The maxs input consumed by `traceMove`.
+/// @param finish The finish input consumed by `traceMove`.
+/// @param moveType The move type input consumed by `traceMove`.
 function traceMove(server, map, entityIndex, start, mins, maxs, finish, moveType)
   if server is void then return world.trace(map, start, mins, maxs, finish) end if
   return collision.move(server, start, mins, maxs, finish, moveType, entityIndex)
 end function
 
-// Provide mark ground behavior for the active subsystem.
+/// Implements the `markGround` operation for `miniquake.physics` (mark ground).
+/// @param player The player input consumed by `markGround`.
+/// @param entityIndex Zero-based index of the requested entry.
 function markGround(player, entityIndex)
   player.onGround = true
   player.flags = player.flags | c.FL_ONGROUND
   player.groundEntity = entityIndex
 end function
 
-// Update module state for ground.
+/// Update module state for ground.
+/// @param player The player input consumed by `clearGround`.
 function clearGround(player)
   player.onGround = false
   player.flags = player.flags & ~c.FL_ONGROUND
@@ -119,9 +141,14 @@ function clearGround(player)
   // serialized as the invalid QuakeC entity value 0xffffffff.
 end function
 
-// SV_FlyMove: the original four-bump, five-plane clipping algorithm.  The
-// detailed form also returns the last vertical wall trace used by
-// SV_WallFriction during step movement.
+/// SV_FlyMove: the original four-bump, five-plane clipping algorithm.  The
+/// detailed form also returns the last vertical wall trace used by
+/// SV_WallFriction during step movement.
+/// @param player The player input consumed by `flyMoveDetailed`.
+/// @param map The map input consumed by `flyMoveDetailed`.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param frameTime Time value used by the operation.
 function flyMoveDetailed(player, map, server, entityIndex, frameTime)
   originalVelocity = math.copy(player.velocity)
   primalVelocity = math.copy(player.velocity)
@@ -202,30 +229,47 @@ function flyMoveDetailed(player, map, server, entityIndex, frameTime)
   return [blocked, stepTrace]
 end function
 
-// Provide fly move internal behavior for the active subsystem.
+/// Implements the `flyMoveInternal` operation for `miniquake.physics` (fly move internal).
+/// @param player The player input consumed by `flyMoveInternal`.
+/// @param map The map input consumed by `flyMoveInternal`.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param frameTime Time value used by the operation.
 function flyMoveInternal(player, map, server, entityIndex, frameTime)
   return flyMoveDetailed(player, map, server, entityIndex, frameTime)[0]
 end function
 
-// Provide native solid behavior for the active subsystem.
+/// Implements the `nativeSolid` operation for `miniquake.physics` (native solid).
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
 function nativeSolid(server, entityIndex)
   if entityIndex == 0 then return c.SOLID_BSP end if
   return native.trunc(collision.entityFloat(server, entityIndex, "solid", c.SOLID_NOT))
 end function
 
-// Provide fly move behavior for the active subsystem.
+/// Implements the `flyMove` operation for `miniquake.physics` (fly move).
+/// @param player The player input consumed by `flyMove`.
+/// @param map The map input consumed by `flyMove`.
+/// @param frameTime Time value used by the operation.
 function flyMove(player, map, frameTime)
   return flyMoveInternal(player, map, void, -1, frameTime)
 end function
 
-// Provide position distance squared behavior for the active subsystem.
+/// Implements the `positionDistanceSquared` operation for `miniquake.physics` (position distance squared).
+/// @param a The a input consumed by `positionDistanceSquared`.
+/// @param b The b input consumed by `positionDistanceSquared`.
 function positionDistanceSquared(a, b)
   dx = a.x - b.x
   dy = a.y - b.y
   return dx * dx + dy * dy
 end function
 
-// Add state for push player.
+/// Add state for push player.
+/// @param server Server state participating in the operation.
+/// @param map The map input consumed by `pushPlayer`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param player The player input consumed by `pushPlayer`.
+/// @param move The move input consumed by `pushPlayer`.
 function pushPlayer(server, map, entityIndex, player, move)
   target = math.add(player.origin, move)
   trace = traceMove(server, map, entityIndex, player.origin, player.mins, player.maxs, target, c.MOVE_NORMAL)
@@ -234,7 +278,9 @@ function pushPlayer(server, map, entityIndex, player, move)
   return trace
 end function
 
-// Provide wall friction behavior for the active subsystem.
+/// Implements the `wallFriction` operation for `miniquake.physics` (wall friction).
+/// @param player The player input consumed by `wallFriction`.
+/// @param plane The plane input consumed by `wallFriction`.
 function wallFriction(player, plane)
   vectors = math.angleVectors(player.viewAngles)
   forward = vectors[0]
@@ -246,7 +292,12 @@ function wallFriction(player, plane)
   player.velocity.y = side.y * (1.0 + d)
 end function
 
-// Provide try unstick behavior for the active subsystem.
+/// Implements the `tryUnstick` operation for `miniquake.physics` (try unstick).
+/// @param player The player input consumed by `tryUnstick`.
+/// @param map The map input consumed by `tryUnstick`.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param oldVelocity The old velocity input consumed by `tryUnstick`.
 function tryUnstick(player, map, server, entityIndex, oldVelocity)
   oldOrigin = math.copy(player.origin)
   directions = [
@@ -272,7 +323,12 @@ function tryUnstick(player, map, server, entityIndex, oldVelocity)
   return 7
 end function
 
-// Provide walk move internal behavior for the active subsystem.
+/// Implements the `walkMoveInternal` operation for `miniquake.physics` (walk move internal).
+/// @param player The player input consumed by `walkMoveInternal`.
+/// @param map The map input consumed by `walkMoveInternal`.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param frameTime Time value used by the operation.
 function walkMoveInternal(player, map, server, entityIndex, frameTime)
   oldOnGround = (player.flags & c.FL_ONGROUND) != 0
   clearGround(player)
@@ -318,14 +374,19 @@ function walkMoveInternal(player, map, server, entityIndex, frameTime)
   return clip
 end function
 
-// Advance move by one processing step.
+/// Advance move by one processing step.
+/// @param player The player input consumed by `stepMove`.
+/// @param map The map input consumed by `stepMove`.
+/// @param frameTime Time value used by the operation.
 function stepMove(player, map, frameTime)
   return walkMoveInternal(player, map, void, -1, frameTime)
 end function
 
-// A diagnostic ground probe. Runtime physics intentionally does not snap the
-// player down every frame; WinQuake derives FL_ONGROUND from actual movement
-// impacts. The former repeated two-unit snap caused the visible fall/push loop.
+/// A diagnostic ground probe. Runtime physics intentionally does not snap the
+/// player down every frame; WinQuake derives FL_ONGROUND from actual movement
+/// impacts. The former repeated two-unit snap caused the visible fall/push loop.
+/// @param player The player input consumed by `checkGround`.
+/// @param map The map input consumed by `checkGround`.
 function checkGround(player, map)
   target = math.subtract(player.origin, t.Vec3(0.0, 0.0, 2.0))
   trace = world.trace(map, player.origin, player.mins, player.maxs, target)
@@ -338,7 +399,9 @@ function checkGround(player, map)
   return false
 end function
 
-// Update module state for water level.
+/// Update module state for water level.
+/// @param player The player input consumed by `updateWaterLevel`.
+/// @param map The map input consumed by `updateWaterLevel`.
 function updateWaterLevel(player, map)
   player.waterLevel = 0
   player.waterType = c.CONTENTS_EMPTY
@@ -359,7 +422,15 @@ function updateWaterLevel(player, map)
   return player.waterLevel
 end function
 
-// Apply friction to the active subsystem state.
+/// Apply friction to the active subsystem state.
+/// @param player The player input consumed by `applyFriction`.
+/// @param map The map input consumed by `applyFriction`.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param frameTime Time value used by the operation.
+/// @param friction The friction input consumed by `applyFriction`.
+/// @param edgeFriction The edge friction input consumed by `applyFriction`.
+/// @param stopSpeed The stop speed input consumed by `applyFriction`.
 function applyFriction(player, map, server, entityIndex, frameTime, friction, edgeFriction, stopSpeed)
   speed = horizontalLength(player.velocity)
   if speed == 0.0 then return end if
@@ -383,7 +454,12 @@ function applyFriction(player, map, server, entityIndex, frameTime, friction, ed
   player.velocity.z = player.velocity.z * scale
 end function
 
-// Provide accelerate behavior for the active subsystem.
+/// Implements the `accelerate` operation for `miniquake.physics` (accelerate).
+/// @param player The player input consumed by `accelerate`.
+/// @param wishDirection The wish direction input consumed by `accelerate`.
+/// @param wishSpeed The wish speed input consumed by `accelerate`.
+/// @param frameTime Time value used by the operation.
+/// @param acceleration The acceleration input consumed by `accelerate`.
 function accelerate(player, wishDirection, wishSpeed, frameTime, acceleration)
   currentSpeed = math.dot(player.velocity, wishDirection)
   addSpeed = wishSpeed - currentSpeed
@@ -393,7 +469,12 @@ function accelerate(player, wishDirection, wishSpeed, frameTime, acceleration)
   player.velocity = math.multiplyAdd(player.velocity, accelerationSpeed, wishDirection)
 end function
 
-// Provide air accelerate behavior for the active subsystem.
+/// Implements the `airAccelerate` operation for `miniquake.physics` (air accelerate).
+/// @param player The player input consumed by `airAccelerate`.
+/// @param wishVelocity The wish velocity input consumed by `airAccelerate`.
+/// @param wishSpeed The wish speed input consumed by `airAccelerate`.
+/// @param frameTime Time value used by the operation.
+/// @param acceleration The acceleration input consumed by `airAccelerate`.
 function airAccelerate(player, wishVelocity, wishSpeed, frameTime, acceleration)
   direction = math.normalize(wishVelocity)
   limitedSpeed = math.length(wishVelocity)
@@ -406,7 +487,13 @@ function airAccelerate(player, wishVelocity, wishSpeed, frameTime, acceleration)
   player.velocity = math.multiplyAdd(player.velocity, accelerationSpeed, direction)
 end function
 
-// Provide water move behavior for the active subsystem.
+/// Implements the `waterMove` operation for `miniquake.physics` (water move).
+/// @param player The player input consumed by `waterMove`.
+/// @param command Console or protocol command to execute.
+/// @param frameTime Time value used by the operation.
+/// @param maxSpeed The max speed input consumed by `waterMove`.
+/// @param acceleration The acceleration input consumed by `waterMove`.
+/// @param friction The friction input consumed by `waterMove`.
 function waterMove(player, command, frameTime, maxSpeed, acceleration, friction)
   vectors = math.angleVectors(player.viewAngles)
   wishVelocity = math.add(math.scale(vectors[0], command.forwardMove), math.scale(vectors[1], command.sideMove))
@@ -430,7 +517,9 @@ function waterMove(player, command, frameTime, maxSpeed, acceleration, friction)
   player.velocity = math.multiplyAdd(player.velocity, accelerationSpeed, wishDirection)
 end function
 
-// Release state for drop punch angle.
+/// Release state for drop punch angle.
+/// @param player The player input consumed by `dropPunchAngle`.
+/// @param frameTime Time value used by the operation.
 function dropPunchAngle(player, frameTime)
   magnitude = math.length(player.punchAngle)
   if magnitude == 0.0 then return end if
@@ -440,7 +529,18 @@ function dropPunchAngle(player, frameTime)
   player.punchAngle = math.scale(direction, magnitude)
 end function
 
-// Provide air move behavior for the active subsystem.
+/// Implements the `airMove` operation for `miniquake.physics` (air move).
+/// @param player The player input consumed by `airMove`.
+/// @param command Console or protocol command to execute.
+/// @param frameTime Time value used by the operation.
+/// @param maxSpeed The max speed input consumed by `airMove`.
+/// @param acceleration The acceleration input consumed by `airMove`.
+/// @param friction The friction input consumed by `airMove`.
+/// @param edgeFriction The edge friction input consumed by `airMove`.
+/// @param stopSpeed The stop speed input consumed by `airMove`.
+/// @param map The map input consumed by `airMove`.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
 function airMove(player, command, frameTime, maxSpeed, acceleration, friction, edgeFriction, stopSpeed, map, server, entityIndex)
   // WinQuake passes the complete ent->v.angles vector to AngleVectors. Pitch
   // therefore contributes to noclip/fly intentions; WALK still clears the
@@ -464,10 +564,13 @@ function airMove(player, command, frameTime, maxSpeed, acceleration, friction, e
   end if
 end function
 
-// Relink a recovered client immediately and pull trigger-side physical changes
-// back into its detached PlayerState mirror. In WinQuake these are the same
-// edict; omitting the pull would let a teleport touch be overwritten later in
-// the current movement frame.
+/// Relink a recovered client immediately and pull trigger-side physical changes
+/// back into its detached PlayerState mirror. In WinQuake these are the same
+/// edict; omitting the pull would let a teleport touch be overwritten later in
+/// the current movement frame.
+/// @param player The player input consumed by `relinkRecoveredPlayer`.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
 function relinkRecoveredPlayer(player, server, entityIndex)
   collision.linkEntity(server, entityIndex, true)
   player.origin = collision.entityVector(server, entityIndex, "origin", player.origin)
@@ -480,11 +583,16 @@ function relinkRecoveredPlayer(player, server, entityIndex)
   return true
 end function
 
-// Separate a client from a live actor when both full hulls already overlap and
-// neither oldorigin nor Quake's small precision-recovery offsets can escape.
-// Spawn/teleport protection remains the responsibility of stock spawn_tdeath:
-// its teleport_time window suppresses this fallback until QuakeC has had its
-// force_retouch frames and can award the correct telefrag.
+/// Separate a client from a live actor when both full hulls already overlap and
+/// neither oldorigin nor Quake's small precision-recovery offsets can escape.
+/// Spawn/teleport protection remains the responsibility of stock spawn_tdeath:
+/// its teleport_time window suppresses this fallback until QuakeC has had its
+/// force_retouch frames and can award the correct telefrag.
+/// @param player The player input consumed by `separateActorOverlap`.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param blockerIndex Zero-based index of the requested entry.
+/// @param original The original input consumed by `separateActorOverlap`.
 function separateActorOverlap(player, server, entityIndex, blockerIndex, original)
   if blockerIndex <= 0 or blockerIndex == entityIndex then return false end if
   blockerSolid = native.trunc(collision.entityFloat(server, blockerIndex, "solid", c.SOLID_NOT))
@@ -543,7 +651,11 @@ function separateActorOverlap(player, server, entityIndex, blockerIndex, origina
   return false
 end function
 
-// Validate stuck and report any incompatibility.
+/// Validate stuck and report any incompatibility.
+/// @param player The player input consumed by `checkStuck`.
+/// @param map The map input consumed by `checkStuck`.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
 function checkStuck(player, map, server, entityIndex)
   if server is void then return false end if
   // Preserve the stock oldorigin and 3x3x18 precision search first. Actor-face
@@ -589,7 +701,8 @@ function checkStuck(player, map, server, entityIndex)
   return false
 end function
 
-// Transfer data for movement settings.
+/// Transfer data for movement settings.
+/// @param registry The registry input consumed by `movementSettings`.
 function movementSettings(registry)
   maxSpeed = cvar.variableValue(registry, "sv_maxspeed")
   if maxSpeed <= 0.0 then maxSpeed = 320.0 end if
@@ -608,7 +721,9 @@ function movementSettings(registry)
   return [maxSpeed, acceleration, friction, edgeFriction, stopSpeed, gravity, maxVelocity]
 end function
 
-// Return a validated clamp velocity value.
+/// Return a validated clamp velocity value.
+/// @param player The player input consumed by `clampVelocity`.
+/// @param maximum Largest accepted value.
 function clampVelocity(player, maximum)
   if player.velocity.x > maximum then player.velocity.x = maximum end if
   if player.velocity.x < -maximum then player.velocity.x = -maximum end if
@@ -618,7 +733,14 @@ function clampVelocity(player, maximum)
   if player.velocity.z < -maximum then player.velocity.z = -maximum end if
 end function
 
-// Provide client think behavior for the active subsystem.
+/// Implements the `clientThink` operation for `miniquake.physics` (client think).
+/// @param player The player input consumed by `clientThink`.
+/// @param command Console or protocol command to execute.
+/// @param frameTime Time value used by the operation.
+/// @param settings The settings input consumed by `clientThink`.
+/// @param map The map input consumed by `clientThink`.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
 function clientThink(player, command, frameTime, settings, map, server, entityIndex)
   if player.moveType == c.MOVETYPE_NONE then return end if
   dropPunchAngle(player, frameTime)
@@ -644,7 +766,13 @@ function clientThink(player, command, frameTime, settings, map, server, entityIn
   airMove(player, command, frameTime, settings[0], settings[1], settings[2], settings[3], settings[4], map, server, entityIndex)
 end function
 
-// Transfer data for move server.
+/// Transfer data for move server.
+/// @param player The player input consumed by `moveServer`.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param command Console or protocol command to execute.
+/// @param frameTime Time value used by the operation.
+/// @param registry The registry input consumed by `moveServer`.
 function moveServer(player, server, entityIndex, command, frameTime, registry)
   if frameTime <= 0.0 then return player end if
   if frameTime > 0.1 then frameTime = 0.1 end if
@@ -700,8 +828,13 @@ function moveServer(player, server, entityIndex, command, frameTime, registry)
   return player
 end function
 
-// World-only compatibility path used by the synthetic tests and diagnostic
-// tools. It mirrors the server path without dynamic edicts or QuakeC impacts.
+/// World-only compatibility path used by the synthetic tests and diagnostic
+/// tools. It mirrors the server path without dynamic edicts or QuakeC impacts.
+/// @param player The player input consumed by `move`.
+/// @param map The map input consumed by `move`.
+/// @param command Console or protocol command to execute.
+/// @param frameTime Time value used by the operation.
+/// @param registry The registry input consumed by `move`.
 function move(player, map, command, frameTime, registry)
   if frameTime <= 0.0 then return player end if
   if frameTime > 0.1 then frameTime = 0.1 end if
@@ -720,20 +853,23 @@ function move(player, map, command, frameTime, registry)
   return player
 end function
 
-// --------------------------------------------------------------------------
-// sv_phys.c compatibility surface
-//
-// The lower-case helpers above are the convenient PlayerState API used by the
-// local client.  The functions below are the edict-oriented MiniQuake API.  They
-// intentionally keep the original names and ordering rules so protocol tests,
-// QuakeC and server code can use the same behavioral units as sv_phys.c.
+/// --------------------------------------------------------------------------
+/// sv_phys.c compatibility surface
+///
+/// The lower-case helpers above are the convenient PlayerState API used by the
+/// local client.  The functions below are the edict-oriented MiniQuake API.  They
+/// intentionally keep the original names and ordering rules so protocol tests,
+/// QuakeC and server code can use the same behavioral units as sv_phys.c.
+/// @param server Server state participating in the operation.
 
 function physicsEntityCount(server)
   if server is void or server.machine is void or server.machine.context is void then return 0 end if
   return server.machine.context.edicts.numEdicts
 end function
 
-// Apply server-physics entity free semantics.
+/// Apply server-physics entity free semantics.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
 function physicsEntityFree(server, entityIndex)
   if server is void or server.machine is void or server.machine.context is void then return true end if
   runtime = server.machine.context.edicts
@@ -741,19 +877,23 @@ function physicsEntityFree(server, entityIndex)
   return runtime.freeFlags[entityIndex]
 end function
 
-// Apply server-physics has base velocity semantics.
+/// Apply server-physics has base velocity semantics.
+/// @param server Server state participating in the operation.
 function physicsHasBaseVelocity(server)
   return collision.fieldOffset(server, "basevelocity") >= 0
 end function
 
-// Apply server-physics vector is zero semantics.
+/// Apply server-physics vector is zero semantics.
+/// @param value Value consumed by `physicsVectorIsZero`.
 function physicsVectorIsZero(value)
   return value.x == 0.0 and value.y == 0.0 and value.z == 0.0
 end function
 
-// The QUAKE2-conditioned MiniQuake branches use the presence of the extended
-// entvars layout.  Testing the field is the MiniLang equivalent: stock v6
-// progs.dat files have no basevelocity and therefore stay on the 1.09 path.
+/// The QUAKE2-conditioned MiniQuake branches use the presence of the extended
+/// entvars layout.  Testing the field is the MiniLang equivalent: stock v6
+/// progs.dat files have no basevelocity and therefore stay on the 1.09 path.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
 function physicsRefreshConveyorVelocity(server, entityIndex)
   baseVelocity = zeroVector()
   groundEntity = collision.entityWord(server, entityIndex, "groundentity", 0)
@@ -769,7 +909,9 @@ function physicsRefreshConveyorVelocity(server, entityIndex)
   return baseVelocity
 end function
 
-// Apply server-physics player from edict semantics.
+/// Apply server-physics player from edict semantics.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
 function physicsPlayerFromEdict(server, entityIndex)
   origin = collision.entityVectorZero(server, entityIndex, "origin")
   angles = collision.entityVectorZero(server, entityIndex, "v_angle")
@@ -793,7 +935,10 @@ function physicsPlayerFromEdict(server, entityIndex)
   return player
 end function
 
-// Apply server-physics write player edict semantics.
+/// Apply server-physics write player edict semantics.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param player The player input consumed by `physicsWritePlayerEdict`.
 function physicsWritePlayerEdict(server, entityIndex, player)
   collision.setEntityVector(server, entityIndex, "origin", player.origin)
   collision.setEntityVector(server, entityIndex, "oldorigin", player.oldOrigin)
@@ -811,7 +956,10 @@ function physicsWritePlayerEdict(server, entityIndex, player)
   return player
 end function
 
-// Apply server-physics queue sound semantics.
+/// Apply server-physics queue sound semantics.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param sample The sample input consumed by `physicsQueueSound`.
 function physicsQueueSound(server, entityIndex, sample)
   if server is void or server.machine is void or server.machine.context is void then return false end if
   contextValue = server.machine.context
@@ -819,7 +967,12 @@ function physicsQueueSound(server, entityIndex, sample)
   return true
 end function
 
-// Apply server-physics execute entity function semantics.
+/// Apply server-physics execute entity function semantics.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param otherIndex Zero-based index of the requested entry.
+/// @param fieldName Name that identifies the requested value or resource.
+/// @param executionTime Time value used by the operation.
 function physicsExecuteEntityFunction(server, entityIndex, otherIndex, fieldName, executionTime)
   functionIndex = collision.entityWord(server, entityIndex, fieldName, 0)
   if functionIndex == 0 then return false end if
@@ -830,7 +983,10 @@ function physicsExecuteEntityFunction(server, entityIndex, otherIndex, fieldName
   return true
 end function
 
-// Apply server-physics execute named function semantics.
+/// Apply server-physics execute named function semantics.
+/// @param server Server state participating in the operation.
+/// @param functionName Name that identifies the requested value or resource.
+/// @param entityIndex Zero-based index of the requested entry.
 function physicsExecuteNamedFunction(server, functionName, entityIndex)
   functionIndex = vm.functionIndex(server.machine, functionName)
   if functionIndex == 0 then return false end if
@@ -840,8 +996,9 @@ function physicsExecuteNamedFunction(server, functionName, entityIndex)
   return true
 end function
 
-// SV_CheckAllEnts is a diagnostic pass in MiniQuake. Return the offending edict
-// indexes as well as appending the original diagnostic text.
+/// SV_CheckAllEnts is a diagnostic pass in MiniQuake. Return the offending edict
+/// indexes as well as appending the original diagnostic text.
+/// @param server Server state participating in the operation.
 function SV_CheckAllEnts(server)
   invalid = []
   index = 1
@@ -860,7 +1017,10 @@ function SV_CheckAllEnts(server)
   return invalid
 end function
 
-// Apply the Quake-compatible sv check velocity behavior.
+/// Apply the Quake-compatible sv check velocity behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param maxVelocity The max velocity input consumed by `SV_CheckVelocity`.
 function SV_CheckVelocity(server, entityIndex, maxVelocity)
   maximum = maxVelocity
   if maximum <= 0.0 then maximum = 2000.0 end if
@@ -881,7 +1041,10 @@ function SV_CheckVelocity(server, entityIndex, maxVelocity)
   return velocity
 end function
 
-// Apply the Quake-compatible sv run think behavior.
+/// Apply the Quake-compatible sv run think behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param frameTime Time value used by the operation.
 function SV_RunThink(server, entityIndex, frameTime)
   thinkTime = collision.entityFloat(server, entityIndex, "nextthink", 0.0)
   if thinkTime <= 0.0 or thinkTime > server.time + frameTime then return true end if
@@ -896,7 +1059,10 @@ function SV_RunThink(server, entityIndex, frameTime)
   return not physicsEntityFree(server, entityIndex)
 end function
 
-// Apply the Quake-compatible sv impact behavior.
+/// Apply the Quake-compatible sv impact behavior.
+/// @param server Server state participating in the operation.
+/// @param firstEntity The first entity input consumed by `SV_Impact`.
+/// @param secondEntity The second entity input consumed by `SV_Impact`.
 function SV_Impact(server, firstEntity, secondEntity)
   oldSelf = vm.word(server.machine, c.QC_GLOBAL_SELF)
   oldOther = vm.word(server.machine, c.QC_GLOBAL_OTHER)
@@ -906,12 +1072,18 @@ function SV_Impact(server, firstEntity, secondEntity)
   return touched
 end function
 
-// Trace velocity through the collision world.
+/// Implements the `ClipVelocity` operation for `miniquake.physics` (clip velocity).
+/// @param input The input input consumed by `ClipVelocity`.
+/// @param normal The normal input consumed by `ClipVelocity`.
+/// @param overbounce The overbounce input consumed by `ClipVelocity`.
 function ClipVelocity(input, normal, overbounce)
   return clipVelocity(input, normal, overbounce)
 end function
 
-// Apply the Quake-compatible sv fly move behavior.
+/// Apply the Quake-compatible sv fly move behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param moveTime Time value used by the operation.
 function SV_FlyMove(server, entityIndex, moveTime)
   player = physicsPlayerFromEdict(server, entityIndex)
   result = flyMoveDetailed(player, server.worldModel, server, entityIndex, moveTime)
@@ -921,7 +1093,11 @@ function SV_FlyMove(server, entityIndex, moveTime)
   return result
 end function
 
-// Apply the Quake-compatible sv add gravity behavior.
+/// Apply the Quake-compatible sv add gravity behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param gravity The gravity input consumed by `SV_AddGravity`.
+/// @param frameTime Time value used by the operation.
 function SV_AddGravity(server, entityIndex, gravity, frameTime)
   entityGravity = collision.entityFloat(server, entityIndex, "gravity", 0.0)
   if entityGravity == 0.0 then entityGravity = 1.0 end if
@@ -931,7 +1107,10 @@ function SV_AddGravity(server, entityIndex, gravity, frameTime)
   return velocity
 end function
 
-// Apply the Quake-compatible sv push entity behavior.
+/// Apply the Quake-compatible sv push entity behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param push The push input consumed by `SV_PushEntity`.
 function SV_PushEntity(server, entityIndex, push)
   origin = collision.entityVectorZero(server, entityIndex, "origin")
   mins = collision.entityVectorZero(server, entityIndex, "mins")
@@ -949,7 +1128,11 @@ function SV_PushEntity(server, entityIndex, push)
   return trace
 end function
 
-// Apply server-physics strict overlap semantics.
+/// Apply server-physics strict overlap semantics.
+/// @param minsA The mins a input consumed by `physicsStrictOverlap`.
+/// @param maxsA The maxs a input consumed by `physicsStrictOverlap`.
+/// @param minsB The mins b input consumed by `physicsStrictOverlap`.
+/// @param maxsB The maxs b input consumed by `physicsStrictOverlap`.
 function physicsStrictOverlap(minsA, maxsA, minsB, maxsB)
   if minsA.x >= maxsB.x or maxsA.x <= minsB.x then return false end if
   if minsA.y >= maxsB.y or maxsA.y <= minsB.y then return false end if
@@ -957,12 +1140,18 @@ function physicsStrictOverlap(minsA, maxsA, minsB, maxsB)
   return true
 end function
 
-// Apply server-physics pusher blocked semantics.
+/// Apply server-physics pusher blocked semantics.
+/// @param server Server state participating in the operation.
+/// @param pusherIndex Zero-based index of the requested entry.
+/// @param blockedBy The blocked by input consumed by `physicsPusherBlocked`.
 function physicsPusherBlocked(server, pusherIndex, blockedBy)
   return physicsExecuteEntityFunction(server, pusherIndex, blockedBy, "blocked", server.time)
 end function
 
-// Apply the Quake-compatible sv push move behavior.
+/// Apply the Quake-compatible sv push move behavior.
+/// @param server Server state participating in the operation.
+/// @param pusherIndex Zero-based index of the requested entry.
+/// @param moveTime Time value used by the operation.
 function SV_PushMove(server, pusherIndex, moveTime)
   velocity = collision.entityVectorZero(server, pusherIndex, "velocity")
   oldLocalTime = collision.entityFloat(server, pusherIndex, "ltime", 0.0)
@@ -1049,8 +1238,11 @@ function SV_PushMove(server, pusherIndex, moveTime)
   return true
 end function
 
-// QUAKE2 kept a rotating-pusher sibling in this source file. It is not used by
-// MiniQuake 1.09, but retaining it makes the source-file pendant complete.
+/// QUAKE2 kept a rotating-pusher sibling in this source file. It is not used by
+/// MiniQuake 1.09, but retaining it makes the source-file pendant complete.
+/// @param server Server state participating in the operation.
+/// @param pusherIndex Zero-based index of the requested entry.
+/// @param moveTime Time value used by the operation.
 function SV_PushRotate(server, pusherIndex, moveTime)
   angularVelocity = collision.entityVectorZero(server, pusherIndex, "avelocity")
   oldLocalTime = collision.entityFloat(server, pusherIndex, "ltime", 0.0)
@@ -1137,7 +1329,10 @@ function SV_PushRotate(server, pusherIndex, moveTime)
   return true
 end function
 
-// Apply the Quake-compatible sv physics pusher behavior.
+/// Apply the Quake-compatible sv physics pusher behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param frameTime Time value used by the operation.
 function SV_Physics_Pusher(server, entityIndex, frameTime)
   oldLocalTime = collision.entityFloat(server, entityIndex, "ltime", 0.0)
   thinkTime = collision.entityFloat(server, entityIndex, "nextthink", 0.0)
@@ -1159,7 +1354,9 @@ function SV_Physics_Pusher(server, entityIndex, frameTime)
   return not physicsEntityFree(server, entityIndex)
 end function
 
-// Apply the Quake-compatible sv check stuck behavior.
+/// Apply the Quake-compatible sv check stuck behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
 function SV_CheckStuck(server, entityIndex)
   player = physicsPlayerFromEdict(server, entityIndex)
   unstuck = checkStuck(player, server.worldModel, server, entityIndex)
@@ -1167,7 +1364,9 @@ function SV_CheckStuck(server, entityIndex)
   return unstuck
 end function
 
-// Apply the Quake-compatible sv check water behavior.
+/// Apply the Quake-compatible sv check water behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
 function SV_CheckWater(server, entityIndex)
   origin = collision.entityVectorZero(server, entityIndex, "origin")
   mins = collision.entityVectorZero(server, entityIndex, "mins")
@@ -1194,7 +1393,10 @@ function SV_CheckWater(server, entityIndex)
   return waterLevel > 1
 end function
 
-// Apply the Quake-compatible sv wall friction behavior.
+/// Apply the Quake-compatible sv wall friction behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param trace The trace input consumed by `SV_WallFriction`.
 function SV_WallFriction(server, entityIndex, trace)
   player = physicsPlayerFromEdict(server, entityIndex)
   wallFriction(player, trace.plane)
@@ -1202,7 +1404,10 @@ function SV_WallFriction(server, entityIndex, trace)
   return player.velocity
 end function
 
-// Apply the Quake-compatible sv try unstick behavior.
+/// Apply the Quake-compatible sv try unstick behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param oldVelocity The old velocity input consumed by `SV_TryUnstick`.
 function SV_TryUnstick(server, entityIndex, oldVelocity)
   player = physicsPlayerFromEdict(server, entityIndex)
   result = tryUnstick(player, server.worldModel, server, entityIndex, oldVelocity)
@@ -1210,7 +1415,10 @@ function SV_TryUnstick(server, entityIndex, oldVelocity)
   return result
 end function
 
-// Apply the Quake-compatible sv walk move behavior.
+/// Apply the Quake-compatible sv walk move behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param frameTime Time value used by the operation.
 function SV_WalkMove(server, entityIndex, frameTime)
   player = physicsPlayerFromEdict(server, entityIndex)
   result = walkMoveInternal(player, server.worldModel, server, entityIndex, frameTime)
@@ -1218,7 +1426,12 @@ function SV_WalkMove(server, entityIndex, frameTime)
   return result
 end function
 
-// Apply the Quake-compatible sv physics client behavior.
+/// Apply the Quake-compatible sv physics client behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param frameTime Time value used by the operation.
+/// @param gravity The gravity input consumed by `SV_Physics_Client`.
+/// @param maxVelocity The max velocity input consumed by `SV_Physics_Client`.
 function SV_Physics_Client(server, entityIndex, frameTime, gravity, maxVelocity)
   if physicsEntityFree(server, entityIndex) then return false end if
   physicsExecuteNamedFunction(server, "PlayerPreThink", entityIndex)
@@ -1250,12 +1463,18 @@ function SV_Physics_Client(server, entityIndex, frameTime, gravity, maxVelocity)
   return not physicsEntityFree(server, entityIndex)
 end function
 
-// Apply the Quake-compatible sv physics none behavior.
+/// Apply the Quake-compatible sv physics none behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param frameTime Time value used by the operation.
 function SV_Physics_None(server, entityIndex, frameTime)
   return SV_RunThink(server, entityIndex, frameTime)
 end function
 
-// Apply the Quake-compatible sv physics follow behavior.
+/// Apply the Quake-compatible sv physics follow behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param frameTime Time value used by the operation.
 function SV_Physics_Follow(server, entityIndex, frameTime)
   // The QUAKE2-conditioned source body returns immediately when a scheduled
   // think frees the follower.  Continuing here would repopulate the cleared
@@ -1269,7 +1488,10 @@ function SV_Physics_Follow(server, entityIndex, frameTime)
   return not physicsEntityFree(server, entityIndex)
 end function
 
-// Apply the Quake-compatible sv physics noclip behavior.
+/// Apply the Quake-compatible sv physics noclip behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param frameTime Time value used by the operation.
 function SV_Physics_Noclip(server, entityIndex, frameTime)
   if not SV_RunThink(server, entityIndex, frameTime) then return false end if
   angles = collision.entityVectorZero(server, entityIndex, "angles")
@@ -1282,7 +1504,9 @@ function SV_Physics_Noclip(server, entityIndex, frameTime)
   return true
 end function
 
-// Apply the Quake-compatible sv check water transition behavior.
+/// Apply the Quake-compatible sv check water transition behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
 function SV_CheckWaterTransition(server, entityIndex)
   origin = collision.entityVectorZero(server, entityIndex, "origin")
   contents = world.pointContentsWorld(server.worldModel, origin)
@@ -1305,7 +1529,12 @@ function SV_CheckWaterTransition(server, entityIndex)
   return contents
 end function
 
-// Apply the Quake-compatible sv physics toss behavior.
+/// Apply the Quake-compatible sv physics toss behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param frameTime Time value used by the operation.
+/// @param gravity The gravity input consumed by `SV_Physics_Toss`.
+/// @param maxVelocity The max velocity input consumed by `SV_Physics_Toss`.
 function SV_Physics_Toss(server, entityIndex, frameTime, gravity, maxVelocity)
   if not SV_RunThink(server, entityIndex, frameTime) then return false end if
   flags = native.trunc(collision.entityFloat(server, entityIndex, "flags", 0.0))
@@ -1334,7 +1563,12 @@ function SV_Physics_Toss(server, entityIndex, frameTime, gravity, maxVelocity)
   return true
 end function
 
-// Apply the Quake-compatible sv physics step behavior.
+/// Apply the Quake-compatible sv physics step behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param frameTime Time value used by the operation.
+/// @param gravity The gravity input consumed by `SV_Physics_Step`.
+/// @param maxVelocity The max velocity input consumed by `SV_Physics_Step`.
 function SV_Physics_Step(server, entityIndex, frameTime, gravity, maxVelocity)
   flags = native.trunc(collision.entityFloat(server, entityIndex, "flags", 0.0))
   if (flags & (c.FL_ONGROUND | c.FL_FLY | c.FL_SWIM)) == 0 then
@@ -1352,8 +1586,13 @@ function SV_Physics_Step(server, entityIndex, frameTime, gravity, maxVelocity)
   return not physicsEntityFree(server, entityIndex)
 end function
 
-// The alternate QUAKE2 body is retained as a named compatibility entry point;
-// MiniQuake 1.09 dispatches the non-QUAKE2 SV_Physics_Step above.
+/// The alternate QUAKE2 body is retained as a named compatibility entry point;
+/// MiniQuake 1.09 dispatches the non-QUAKE2 SV_Physics_Step above.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param frameTime Time value used by the operation.
+/// @param gravity The gravity input consumed by `SV_Physics_Step_Quake2`.
+/// @param maxVelocity The max velocity input consumed by `SV_Physics_Step_Quake2`.
 function SV_Physics_Step_Quake2(server, entityIndex, frameTime, gravity, maxVelocity)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   physicsRefreshConveyorVelocity(server, entityIndex)
@@ -1432,7 +1671,8 @@ function SV_Physics_Step_Quake2(server, entityIndex, frameTime, gravity, maxVelo
   return not physicsEntityFree(server, entityIndex)
 end function
 
-// Apply the Quake-compatible sv force retouch value behavior.
+/// Apply the Quake-compatible sv force retouch value behavior.
+/// @param server Server state participating in the operation.
 function SV_ForceRetouchValue(server)
   if server is void or server.machine is void or server.machine.context is void then return 0.0 end if
   forceOffset = vm.globalOffset(server.machine, "force_retouch")
@@ -1440,7 +1680,10 @@ function SV_ForceRetouchValue(server)
   return vm.globalFloat(server.machine, forceOffset)
 end function
 
-// Apply the Quake-compatible sv force retouch entity behavior.
+/// Apply the Quake-compatible sv force retouch entity behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param forceRetouch The force retouch input consumed by `SV_ForceRetouchEntity`.
 function SV_ForceRetouchEntity(server, entityIndex, forceRetouch)
   if forceRetouch == 0.0 then return false end if
   if physicsEntityFree(server, entityIndex) then return false end if
@@ -1448,7 +1691,9 @@ function SV_ForceRetouchEntity(server, entityIndex, forceRetouch)
   return true
 end function
 
-// Apply the Quake-compatible sv finish force retouch behavior.
+/// Apply the Quake-compatible sv finish force retouch behavior.
+/// @param server Server state participating in the operation.
+/// @param forceRetouch The force retouch input consumed by `SV_FinishForceRetouch`.
 function SV_FinishForceRetouch(server, forceRetouch)
   if forceRetouch == 0.0 or server is void or server.machine is void then return false end if
   forceOffset = vm.globalOffset(server.machine, "force_retouch")
@@ -1457,10 +1702,15 @@ function SV_FinishForceRetouch(server, forceRetouch)
   return true
 end function
 
-// Dispatch one non-client edict through the exact unconditioned WinQuake 1.09
-// SV_Physics switch.  The integrated server frame uses this entry point after
-// it has run client movement, so the production path and the direct sv_main
-// pendant share the same pusher, toss, step, noclip and think semantics.
+/// Dispatch one non-client edict through the exact unconditioned WinQuake 1.09
+/// SV_Physics switch.  The integrated server frame uses this entry point after
+/// it has run client movement, so the production path and the direct sv_main
+/// pendant share the same pusher, toss, step, noclip and think semantics.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param frameTime Time value used by the operation.
+/// @param gravity The gravity input consumed by `SV_Physics_NonClientEntity`.
+/// @param maxVelocity The max velocity input consumed by `SV_Physics_NonClientEntity`.
 function SV_Physics_NonClientEntity(server, entityIndex, frameTime, gravity, maxVelocity)
   if physicsEntityFree(server, entityIndex) then return false end if
   moveType = native.trunc(collision.entityFloat(server, entityIndex, "movetype", c.MOVETYPE_NONE))
@@ -1480,7 +1730,11 @@ function SV_Physics_NonClientEntity(server, entityIndex, frameTime, gravity, max
   return true
 end function
 
-// Apply the Quake-compatible sv physics behavior.
+/// Apply the Quake-compatible sv physics behavior.
+/// @param server Server state participating in the operation.
+/// @param frameTime Time value used by the operation.
+/// @param gravity The gravity input consumed by `SV_Physics`.
+/// @param maxVelocity The max velocity input consumed by `SV_Physics`.
 function SV_Physics(server, frameTime, gravity, maxVelocity)
   if server is void or server.machine is void or server.machine.context is void then return 0 end if
   machine = server.machine
@@ -1513,7 +1767,12 @@ function SV_Physics(server, frameTime, gravity, maxVelocity)
   return processed
 end function
 
-// Apply the Quake-compatible sv trace toss behavior.
+/// Apply the Quake-compatible sv trace toss behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param ignoreEntity The ignore entity input consumed by `SV_Trace_Toss`.
+/// @param gravity The gravity input consumed by `SV_Trace_Toss`.
+/// @param maxVelocity The max velocity input consumed by `SV_Trace_Toss`.
 function SV_Trace_Toss(server, entityIndex, ignoreEntity, gravity, maxVelocity)
   origin = collision.entityVectorZero(server, entityIndex, "origin")
   velocity = collision.entityVectorZero(server, entityIndex, "velocity")

@@ -22,110 +22,204 @@ import miniquake.render.texture_upscale as textureUpscale
 import std.math as stdmath
 import std.string as string
 
+/// Defines the max mode list value used by `miniquake.gl_vidnt`.
 const MAX_MODE_LIST = 30
+/// Defines the max modedescs value used by `miniquake.gl_vidnt`.
 const MAX_MODEDESCS = 27
+/// Defines the vid row size value used by `miniquake.gl_vidnt`.
 const VID_ROW_SIZE = 3
+/// Defines the warp width value used by `miniquake.gl_vidnt`.
 const WARP_WIDTH = 320
+/// Defines the warp height value used by `miniquake.gl_vidnt`.
 const WARP_HEIGHT = 200
+/// Defines the mode windowed value used by `miniquake.gl_vidnt`.
 const MODE_WINDOWED = 0
+/// Defines the no mode value used by `miniquake.gl_vidnt`.
 const NO_MODE = -1
+/// Defines the mode fullscreen default value used by `miniquake.gl_vidnt`.
 const MODE_FULLSCREEN_DEFAULT = 1
+/// Defines the ms windowed value used by `miniquake.gl_vidnt`.
 const MS_WINDOWED = 0
+/// Defines the ms fulldib value used by `miniquake.gl_vidnt`.
 const MS_FULLDIB = 2
+/// Defines the ms uninit value used by `miniquake.gl_vidnt`.
 const MS_UNINIT = 3
 
 // Group the fields that describe one video mode.
 struct VideoMode
+  /// Stores the type value in `miniquake.gl_vidnt.VideoMode`.
   type
+  /// Stores the width value in `miniquake.gl_vidnt.VideoMode`.
   width
+  /// Stores the height value in `miniquake.gl_vidnt.VideoMode`.
   height
+  /// Stores the mode number value in `miniquake.gl_vidnt.VideoMode`.
   modeNumber
+  /// Stores the dib value in `miniquake.gl_vidnt.VideoMode`.
   dib
+  /// Stores the fullscreen value in `miniquake.gl_vidnt.VideoMode`.
   fullscreen
+  /// Stores the bpp value in `miniquake.gl_vidnt.VideoMode`.
   bpp
+  /// Stores the halfscreen value in `miniquake.gl_vidnt.VideoMode`.
   halfscreen
+  /// Stores the frequency value in `miniquake.gl_vidnt.VideoMode`.
   frequency
+  /// Stores the description value in `miniquake.gl_vidnt.VideoMode`.
   description
 end struct
 
 // Track mutable video state across subsystem calls.
 struct VideoState
+  /// Stores the modes value in `miniquake.gl_vidnt.VideoState`.
   modes
+  /// Stores the bad mode value in `miniquake.gl_vidnt.VideoState`.
   badMode
+  /// Stores the initialized value in `miniquake.gl_vidnt.VideoState`.
   initialized
+  /// Stores the windowed value in `miniquake.gl_vidnt.VideoState`.
   windowed
+  /// Stores the leave current mode value in `miniquake.gl_vidnt.VideoState`.
   leaveCurrentMode
+  /// Stores the can alt tab value in `miniquake.gl_vidnt.VideoState`.
   canAltTab
+  /// Stores the was suspended value in `miniquake.gl_vidnt.VideoState`.
   wasSuspended
+  /// Stores the active app value in `miniquake.gl_vidnt.VideoState`.
   activeApp
+  /// Stores the minimized value in `miniquake.gl_vidnt.VideoState`.
   minimized
+  /// Stores the windowed mouse value in `miniquake.gl_vidnt.VideoState`.
   windowedMouse
+  /// Stores the current mode value in `miniquake.gl_vidnt.VideoState`.
   currentMode
+  /// Stores the real mode value in `miniquake.gl_vidnt.VideoState`.
   realMode
+  /// Stores the default mode value in `miniquake.gl_vidnt.VideoState`.
   defaultMode
+  /// Stores the windowed default value in `miniquake.gl_vidnt.VideoState`.
   windowedDefault
+  /// Stores the mode state value in `miniquake.gl_vidnt.VideoState`.
   modeState
+  /// Stores the dib width value in `miniquake.gl_vidnt.VideoState`.
   dibWidth
+  /// Stores the dib height value in `miniquake.gl_vidnt.VideoState`.
   dibHeight
+  /// Stores the window x value in `miniquake.gl_vidnt.VideoState`.
   windowX
+  /// Stores the window y value in `miniquake.gl_vidnt.VideoState`.
   windowY
+  /// Stores the window width value in `miniquake.gl_vidnt.VideoState`.
   windowWidth
+  /// Stores the window height value in `miniquake.gl_vidnt.VideoState`.
   windowHeight
+  /// Stores the window center x value in `miniquake.gl_vidnt.VideoState`.
   windowCenterX
+  /// Stores the window center y value in `miniquake.gl_vidnt.VideoState`.
   windowCenterY
+  /// Stores the con width value in `miniquake.gl_vidnt.VideoState`.
   conWidth
+  /// Stores the con height value in `miniquake.gl_vidnt.VideoState`.
   conHeight
+  /// Stores the width value in `miniquake.gl_vidnt.VideoState`.
   width
+  /// Stores the height value in `miniquake.gl_vidnt.VideoState`.
   height
+  /// Stores the num pages value in `miniquake.gl_vidnt.VideoState`.
   numPages
+  /// Stores the recalc refdef value in `miniquake.gl_vidnt.VideoState`.
   recalcRefdef
+  /// Stores the max warp width value in `miniquake.gl_vidnt.VideoState`.
   maxWarpWidth
+  /// Stores the max warp height value in `miniquake.gl_vidnt.VideoState`.
   maxWarpHeight
+  /// Stores the palette value in `miniquake.gl_vidnt.VideoState`.
   palette
+  /// Stores the table16 value in `miniquake.gl_vidnt.VideoState`.
   table16
+  /// Stores the table24 value in `miniquake.gl_vidnt.VideoState`.
   table24
+  /// Stores the table15 value in `miniquake.gl_vidnt.VideoState`.
   table15
+  /// Stores the gamma value in `miniquake.gl_vidnt.VideoState`.
   gamma
+  /// Stores the gamma works value in `miniquake.gl_vidnt.VideoState`.
   gammaWorks
+  /// Stores the gl vendor value in `miniquake.gl_vidnt.VideoState`.
   glVendor
+  /// Stores the gl renderer value in `miniquake.gl_vidnt.VideoState`.
   glRenderer
+  /// Stores the gl version value in `miniquake.gl_vidnt.VideoState`.
   glVersion
+  /// Stores the gl extensions value in `miniquake.gl_vidnt.VideoState`.
   glExtensions
+  /// Stores the texture objects value in `miniquake.gl_vidnt.VideoState`.
   textureObjects
+  /// Stores the array extension value in `miniquake.gl_vidnt.VideoState`.
   arrayExtension
+  /// Stores the multitexture value in `miniquake.gl_vidnt.VideoState`.
   multitexture
+  /// Stores the is8bit value in `miniquake.gl_vidnt.VideoState`.
   is8bit
+  /// Stores the is permedia value in `miniquake.gl_vidnt.VideoState`.
   isPermedia
+  /// Stores the full sbar draw value in `miniquake.gl_vidnt.VideoState`.
   fullSbarDraw
+  /// Stores the registry value in `miniquake.gl_vidnt.VideoState`.
   registry
+  /// Stores the arguments value in `miniquake.gl_vidnt.VideoState`.
   arguments
+  /// Stores the last mode message value in `miniquake.gl_vidnt.VideoState`.
   lastModeMessage
+  /// Stores the draw trace value in `miniquake.gl_vidnt.VideoState`.
   drawTrace
+  /// Stores the create native value in `miniquake.gl_vidnt.VideoState`.
   createNative
+  /// Stores the skip update value in `miniquake.gl_vidnt.VideoState`.
   skipUpdate
+  /// Stores the block drawing value in `miniquake.gl_vidnt.VideoState`.
   blockDrawing
+  /// Stores the sound blocked value in `miniquake.gl_vidnt.VideoState`.
   soundBlocked
+  /// Stores the paused value in `miniquake.gl_vidnt.VideoState`.
   paused
+  /// Stores the force lock value in `miniquake.gl_vidnt.VideoState`.
   forceLock
+  /// Stores the desktop width value in `miniquake.gl_vidnt.VideoState`.
   desktopWidth
+  /// Stores the desktop height value in `miniquake.gl_vidnt.VideoState`.
   desktopHeight
+  /// Stores the sbar changed count value in `miniquake.gl_vidnt.VideoState`.
   sbarChangedCount
+  /// Stores the sound mixer value in `miniquake.gl_vidnt.VideoState`.
   soundMixer
 end struct
 
+/// Tracks the current module-level video state owned by `miniquake.gl_vidnt`.
 currentVideoState = void
+/// Tracks the module-level video menu selection state owned by `miniquake.gl_vidnt`.
 videoMenuSelection = NO_MODE
+/// Tracks the module-level video menu display focus state owned by `miniquake.gl_vidnt`.
 videoMenuDisplayFocus = false
+/// Tracks the module-level video menu renderer focus state owned by `miniquake.gl_vidnt`.
 videoMenuRendererFocus = false
+/// Tracks the module-level video menu lighting focus state owned by `miniquake.gl_vidnt`.
 videoMenuLightingFocus = false
+/// Tracks the module-level video menu shadow focus state owned by `miniquake.gl_vidnt`.
 videoMenuShadowFocus = false
+/// Tracks the module-level video menu shadow quality focus state owned by `miniquake.gl_vidnt`.
 videoMenuShadowQualityFocus = false
+/// Tracks the module-level video menu model interpolation focus state owned by `miniquake.gl_vidnt`.
 videoMenuModelInterpolationFocus = false
+/// Tracks the module-level video menu texture upscale focus state owned by `miniquake.gl_vidnt`.
 videoMenuTextureUpscaleFocus = false
+/// Tracks the module-level video menu anisotropy focus state owned by `miniquake.gl_vidnt`.
 videoMenuAnisotropyFocus = false
+/// Tracks the module-level renderer selection override state owned by `miniquake.gl_vidnt`.
 rendererSelectionOverride = -1
 
-// Apply the Quake-compatible vid renderer from name behavior.
+/// Apply the Quake-compatible vid renderer from name behavior.
+/// @param name Stable name that identifies the requested object or option.
 function VID_RendererFromName(name)
   lowered = bio.lower(name)
   if lowered == "vulkan" or lowered == "vk" then return win.RENDER_VULKAN end if
@@ -133,21 +227,24 @@ function VID_RendererFromName(name)
   return win.RENDER_OPENGL
 end function
 
-// Apply the Quake-compatible vid renderer name behavior.
+/// Apply the Quake-compatible vid renderer name behavior.
+/// @param backend The backend input consumed by `VID_RendererName`.
 function VID_RendererName(backend)
   if backend == win.RENDER_VULKAN then return "VULKAN" end if
   if backend == win.RENDER_DIRECT3D9 then return "DIRECT3D 9" end if
   return "OPENGL"
 end function
 
-// Return the stable token written to config.cfg for a renderer backend.
+/// Return the stable token written to config.cfg for a renderer backend.
+/// @param backend The backend input consumed by `VID_RendererConfigName`.
 function VID_RendererConfigName(backend)
   if backend == win.RENDER_VULKAN then return "vulkan" end if
   if backend == win.RENDER_DIRECT3D9 then return "direct3d9" end if
   return "opengl"
 end function
 
-// Apply the Quake-compatible vid command line renderer behavior.
+/// Apply the Quake-compatible vid command line renderer behavior.
+/// @param arguments Command-line arguments to inspect or execute.
 function VID_CommandLineRenderer(arguments)
   if common.hasParm(arguments, "-vulkan") or common.hasParm(arguments, "-vk") then return win.RENDER_VULKAN end if
   if common.hasParm(arguments, "-directx") or common.hasParm(arguments, "-d3d9") then return win.RENDER_DIRECT3D9 end if
@@ -157,7 +254,9 @@ function VID_CommandLineRenderer(arguments)
   return -1
 end function
 
-// Apply the Quake-compatible vid select configured renderer behavior.
+/// Apply the Quake-compatible vid select configured renderer behavior.
+/// @param arguments Command-line arguments to inspect or execute.
+/// @param registry The registry input consumed by `VID_SelectConfiguredRenderer`.
 function VID_SelectConfiguredRenderer(arguments, registry)
   global rendererSelectionOverride
   selected = rendererSelectionOverride
@@ -170,7 +269,13 @@ function VID_SelectConfiguredRenderer(arguments, registry)
   return selected
 end function
 
-// Create and initialize mode.
+/// Create and initialize mode.
+/// @param type The type input consumed by `makeMode`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param bpp The bpp input consumed by `makeMode`.
+/// @param frequency The frequency input consumed by `makeMode`.
+/// @param halfscreen The halfscreen input consumed by `makeMode`.
 function makeMode(type, width, height, bpp, frequency, halfscreen)
   description = "" + width + "x" + height
   if type == MS_FULLDIB then description = description + "x" + bpp end if
@@ -246,7 +351,8 @@ function createVideoState()
   )
 end function
 
-// Apply the Quake-compatible vid window title for fps behavior.
+/// Apply the Quake-compatible vid window title for fps behavior.
+/// @param fps The fps input consumed by `VID_WindowTitleForFps`.
 function inline VID_WindowTitleForFps(fps)
   safeFps = native.trunc(fps)
   if safeFps < 0 then safeFps = 0 end if
@@ -254,7 +360,8 @@ function inline VID_WindowTitleForFps(fps)
   return "MiniQuake - " + safeFps + " FPS"
 end function
 
-// Apply the Quake-compatible vid use state behavior.
+/// Apply the Quake-compatible vid use state behavior.
+/// @param state Mutable `miniquake.gl_vidnt` state used by `VID_UseState`.
 function VID_UseState(state)
   global currentVideoState
   currentVideoState = state
@@ -268,7 +375,8 @@ function VID_State()
   return currentVideoState
 end function
 
-// Apply the Quake-compatible vid set sound mixer behavior.
+/// Apply the Quake-compatible vid set sound mixer behavior.
+/// @param mixerState Mutable state used by `VID_SetSoundMixer`.
 function VID_SetSoundMixer(mixerState)
   state = VID_State()
   state.soundMixer = mixerState
@@ -316,13 +424,17 @@ function VID_SynchronizeSoundFocusIfNeeded()
   return false
 end function
 
-// Report whether text.
+/// Report whether text.
+/// @param value Value consumed by `hasText`.
+/// @param needle The needle input consumed by `hasText`.
 function hasText(value, needle)
   if value == "" or needle == "" then return false end if
   return string.indexOf(value, needle, 0) >= 0
 end function
 
-// Initialize state for starts with ignore case.
+/// Initialize state for starts with ignore case.
+/// @param value Value consumed by `startsWithIgnoreCase`.
+/// @param prefix The prefix input consumed by `startsWithIgnoreCase`.
 function startsWithIgnoreCase(value, prefix)
   source = bytes(value)
   wanted = bytes(prefix)
@@ -339,14 +451,16 @@ function startsWithIgnoreCase(value, prefix)
   return true
 end function
 
-// Apply the Quake-compatible vid handle pause behavior.
+/// Apply the Quake-compatible vid handle pause behavior.
+/// @param pause The pause input consumed by `VID_HandlePause`.
 function VID_HandlePause(pause)
   state = VID_State()
   state.paused = pause
   return true
 end function
 
-// Apply the Quake-compatible vid force lock state behavior.
+/// Apply the Quake-compatible vid force lock state behavior.
+/// @param lockState Mutable state used by `VID_ForceLockState`.
 function VID_ForceLockState(lockState)
   state = VID_State()
   state.forceLock = lockState
@@ -368,17 +482,31 @@ function VID_ForceUnlockedAndReturnState()
   return 0
 end function
 
-// Mirror Quake's D_BeginDirectRect routine and its observable state changes.
+/// Mirror Quake's D_BeginDirectRect routine and its observable state changes.
+/// @param x The x input consumed by `D_BeginDirectRect`.
+/// @param y The y input consumed by `D_BeginDirectRect`.
+/// @param bitmap The bitmap input consumed by `D_BeginDirectRect`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function D_BeginDirectRect(x, y, bitmap, width, height)
   return false
 end function
 
-// Mirror Quake's D_EndDirectRect routine and its observable state changes.
+/// Mirror Quake's D_EndDirectRect routine and its observable state changes.
+/// @param x The x input consumed by `D_EndDirectRect`.
+/// @param y The y input consumed by `D_EndDirectRect`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function D_EndDirectRect(x, y, width, height)
   return false
 end function
 
-// Provide center window behavior for the active subsystem.
+/// Implements the `CenterWindow` operation for `miniquake.gl_vidnt` (center window).
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param screenWidth The screen width input consumed by `CenterWindow`.
+/// @param screenHeight The screen height input consumed by `CenterWindow`.
+/// @param leftTopJustify The left top justify input consumed by `CenterWindow`.
 function CenterWindow(width, height, screenWidth, screenHeight, leftTopJustify)
   centerX = native.trunc((screenWidth - width) / 2)
   centerY = native.trunc((screenHeight - height) / 2)
@@ -388,7 +516,9 @@ function CenterWindow(width, height, screenWidth, screenHeight, leftTopJustify)
   return [centerX, centerY]
 end function
 
-// Apply the Quake-compatible vid mode less behavior.
+/// Apply the Quake-compatible vid mode less behavior.
+/// @param left The left input consumed by `VID_ModeLess`.
+/// @param right The right input consumed by `VID_ModeLess`.
 function VID_ModeLess(left, right)
   if left.width != right.width then return left.width < right.width end if
   if left.height != right.height then return left.height < right.height end if
@@ -396,7 +526,8 @@ function VID_ModeLess(left, right)
   return left.frequency < right.frequency
 end function
 
-// Apply the Quake-compatible vid sort modes behavior.
+/// Apply the Quake-compatible vid sort modes behavior.
+/// @param modes The modes input consumed by `VID_SortModes`.
 function VID_SortModes(modes)
   sorted = []
   for each candidate in modes
@@ -415,7 +546,9 @@ function VID_SortModes(modes)
   return sorted
 end function
 
-// Apply the Quake-compatible vid mode exists behavior.
+/// Apply the Quake-compatible vid mode exists behavior.
+/// @param modes The modes input consumed by `VID_ModeExists`.
+/// @param candidate The candidate input consumed by `VID_ModeExists`.
 function VID_ModeExists(modes, candidate)
   for each existing in modes
     // MiniQuake's vmode_t has no refresh-rate field. EnumDisplaySettings can
@@ -426,7 +559,9 @@ function VID_ModeExists(modes, candidate)
   return false
 end function
 
-// Apply the Quake-compatible vid set windowed mode behavior.
+/// Apply the Quake-compatible vid set windowed mode behavior.
+/// @param modeNumber The mode number input consumed by `VID_SetWindowedMode`.
+/// @param createNative The create native input consumed by `VID_SetWindowedMode`.
 function VID_SetWindowedMode(modeNumber, createNative)
   state = VID_State()
   mode = VID_GetModePtr(modeNumber)
@@ -452,7 +587,9 @@ function VID_SetWindowedMode(modeNumber, createNative)
   return true
 end function
 
-// Apply the Quake-compatible vid set full dibmode behavior.
+/// Apply the Quake-compatible vid set full dibmode behavior.
+/// @param modeNumber The mode number input consumed by `VID_SetFullDIBMode`.
+/// @param createNative The create native input consumed by `VID_SetFullDIBMode`.
 function VID_SetFullDIBMode(modeNumber, createNative)
   state = VID_State()
   mode = VID_GetModePtr(modeNumber)
@@ -483,7 +620,10 @@ function VID_SetFullDIBMode(modeNumber, createNative)
   return true
 end function
 
-// Apply the Quake-compatible vid set mode behavior.
+/// Apply the Quake-compatible vid set mode behavior.
+/// @param modeNumber The mode number input consumed by `VID_SetMode`.
+/// @param palette The palette input consumed by `VID_SetMode`.
+/// @param createNative The create native input consumed by `VID_SetMode`.
 function VID_SetMode(modeNumber, palette, createNative)
   state = VID_State()
   if modeNumber < 0 or modeNumber >= len(state.modes) then return error(3904, "Bad video mode") end if
@@ -634,7 +774,8 @@ function GL_EndRendering()
   return true
 end function
 
-// Apply the Quake-compatible vid build15 to8 behavior.
+/// Apply the Quake-compatible vid build15 to8 behavior.
+/// @param state Mutable `miniquake.gl_vidnt` state used by `VID_Build15To8`.
 function VID_Build15To8(state)
   value = 0
   while value < 32768
@@ -659,10 +800,12 @@ function VID_Build15To8(state)
   return state.table15
 end function
 
-// Report whether the complete lookup-table palette is already installed.
-// SCR_BringDownConsole restores the base palette during every level change;
-// rebuilding the 8.4-million-comparison 15-to-8 table for identical bytes is
-// observable only as a loading hitch, never as a changed rendering result.
+/// Report whether the complete lookup-table palette is already installed.
+/// SCR_BringDownConsole restores the base palette during every level change;
+/// rebuilding the 8.4-million-comparison 15-to-8 table for identical bytes is
+/// observable only as a loading hitch, never as a changed rendering result.
+/// @param state Mutable `miniquake.gl_vidnt` state used by `VID_PaletteMatches`.
+/// @param palette The palette input consumed by `VID_PaletteMatches`.
 function VID_PaletteMatches(state, palette)
   if len(state.palette) < 768 or len(state.table16) != 256 or len(state.table24) != 256 then return false end if
   index = 0
@@ -673,7 +816,8 @@ function VID_PaletteMatches(state, palette)
   return true
 end function
 
-// Apply the Quake-compatible vid set palette behavior.
+/// Apply the Quake-compatible vid set palette behavior.
+/// @param palette The palette input consumed by `VID_SetPalette`.
 function VID_SetPalette(palette)
   state = VID_State()
   if palette is void or len(palette) < 768 then return error(3908, "VID_SetPalette: invalid palette") end if
@@ -700,7 +844,8 @@ function VID_SetPalette(palette)
   return true
 end function
 
-// Apply the Quake-compatible vid shift palette behavior.
+/// Apply the Quake-compatible vid shift palette behavior.
+/// @param palette The palette input consumed by `VID_ShiftPalette`.
 function VID_ShiftPalette(palette)
   // The MiniQuake source intentionally leaves SetDeviceGammaRamp commented out.
   return false
@@ -727,14 +872,15 @@ function VID_Shutdown()
   return true
 end function
 
-// Provide b setup pixel format behavior for the active subsystem.
+/// Implements the `bSetupPixelFormat` operation for `miniquake.gl_vidnt` (b setup pixel format).
 function bSetupPixelFormat()
   state = VID_State()
   if not state.createNative then return true end if
   return win.contextReady()
 end function
 
-// Provide map key behavior for the active subsystem.
+/// Implements the `MapKey` operation for `miniquake.gl_vidnt` (map key).
+/// @param key Key used to identify the requested entry.
 function MapKey(key)
   scan = (key >> 16) & 255
   return input.quakeKeyForScanCode(scan)
@@ -753,7 +899,9 @@ function ClearAllStates()
   return true
 end function
 
-// Provide app activate behavior for the active subsystem.
+/// Implements the `AppActivate` operation for `miniquake.gl_vidnt` (app activate).
+/// @param active The active input consumed by `AppActivate`.
+/// @param minimized The minimized input consumed by `AppActivate`.
 function AppActivate(active, minimized)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   state = VID_State()
@@ -797,14 +945,18 @@ function AppActivate(active, minimized)
   return true
 end function
 
-// Provide signed word behavior for the active subsystem.
+/// Implements the `signedWord` operation for `miniquake.gl_vidnt` (signed word).
+/// @param value Value consumed by `signedWord`.
 function signedWord(value)
   result = value & 0xffff
   if result >= 0x8000 then result = result - 0x10000 end if
   return result
 end function
 
-// Provide main wnd proc behavior for the active subsystem.
+/// Implements the `MainWndProc` operation for `miniquake.gl_vidnt` (main wnd proc).
+/// @param message Diagnostic message that explains a failure or event.
+/// @param wParam The w param input consumed by `MainWndProc`.
+/// @param lParam The l param input consumed by `MainWndProc`.
 function MainWndProc(message, wParam, lParam)
   state = VID_State()
   if message == 0x0003 then
@@ -845,14 +997,16 @@ function VID_NumModes()
   return len(VID_State().modes)
 end function
 
-// Apply the Quake-compatible vid get mode ptr behavior.
+/// Apply the Quake-compatible vid get mode ptr behavior.
+/// @param modeNumber The mode number input consumed by `VID_GetModePtr`.
 function VID_GetModePtr(modeNumber)
   state = VID_State()
   if modeNumber >= 0 and modeNumber < len(state.modes) then return state.modes[modeNumber] end if
   return state.badMode
 end function
 
-// Apply the Quake-compatible vid get mode description behavior.
+/// Apply the Quake-compatible vid get mode description behavior.
+/// @param modeNumber The mode number input consumed by `VID_GetModeDescription`.
 function VID_GetModeDescription(modeNumber)
   state = VID_State()
   if modeNumber < 0 or modeNumber >= len(state.modes) then return "" end if
@@ -863,7 +1017,8 @@ function VID_GetModeDescription(modeNumber)
   return state.modes[modeNumber].description
 end function
 
-// Apply the Quake-compatible vid get ext mode description behavior.
+/// Apply the Quake-compatible vid get ext mode description behavior.
+/// @param modeNumber The mode number input consumed by `VID_GetExtModeDescription`.
 function VID_GetExtModeDescription(modeNumber)
   state = VID_State()
   if modeNumber < 0 or modeNumber >= len(state.modes) then return "" end if
@@ -889,7 +1044,8 @@ function VID_NumModes_f()
   return "" + count + " video modes are available"
 end function
 
-// Apply the Quake-compatible vid describe mode f behavior.
+/// Apply the Quake-compatible vid describe mode f behavior.
+/// @param arguments Command-line arguments to inspect or execute.
 function VID_DescribeMode_f(arguments)
   if len(arguments) < 2 then return "" end if
   state = VID_State()
@@ -917,7 +1073,8 @@ function VID_DescribeModes_f()
   return result
 end function
 
-// Apply the Quake-compatible vid init dib behavior.
+/// Apply the Quake-compatible vid init dib behavior.
+/// @param arguments Command-line arguments to inspect or execute.
 function VID_InitDIB(arguments)
   state = VID_State()
   width = common.integerOption(arguments, "-width", 640)
@@ -931,7 +1088,10 @@ function VID_InitDIB(arguments)
   return mode
 end function
 
-// Apply the Quake-compatible vid init full dib behavior.
+/// Apply the Quake-compatible vid init full dib behavior.
+/// @param enumeratedModes The enumerated modes input consumed by `VID_InitFullDIB`.
+/// @param testNative The test native input consumed by `VID_InitFullDIB`.
+/// @param noAdjustAspect The no adjust aspect input consumed by `VID_InitFullDIB`.
 function VID_InitFullDIB(enumeratedModes, testNative, noAdjustAspect)
   state = VID_State()
   fullscreenModes = []
@@ -988,7 +1148,8 @@ function VID_Init8bitPalette()
   return not disabled and state.is8bit
 end function
 
-// Validate gamma and report any incompatibility.
+/// Validate gamma and report any incompatibility.
+/// @param palette The palette input consumed by `Check_Gamma`.
 function Check_Gamma(palette)
   state = VID_State()
   // The shipped Windows GLQUAKE.EXE is the visual oracle. Its captured output
@@ -1011,7 +1172,8 @@ function Check_Gamma(palette)
   return gamma
 end function
 
-// Apply the Quake-compatible vid build gamma ramp behavior.
+/// Apply the Quake-compatible vid build gamma ramp behavior.
+/// @param gamma The gamma input consumed by `VID_BuildGammaRamp`.
 function VID_BuildGammaRamp(gamma)
   ramp = bytes(1536)
   channel = 0
@@ -1032,21 +1194,24 @@ function VID_BuildGammaRamp(gamma)
   return ramp
 end function
 
-// Apply the Quake-compatible vid apply gamma ramp behavior.
+/// Apply the Quake-compatible vid apply gamma ramp behavior.
+/// @param gamma The gamma input consumed by `VID_ApplyGammaRamp`.
 function VID_ApplyGammaRamp(gamma)
   state = VID_State()
   state.gammaWorks = win.setGammaRamp(VID_BuildGammaRamp(gamma))
   return state.gammaWorks
 end function
 
-// Apply the Quake-compatible vid windowed requested behavior.
+/// Apply the Quake-compatible vid windowed requested behavior.
+/// @param arguments Command-line arguments to inspect or execute.
 function VID_WindowedRequested(arguments)
   return common.hasParm(arguments, "-window") or
     common.hasParm(arguments, "-windowed") or
     common.hasParm(arguments, "-startwindowed")
 end function
 
-// Apply the Quake-compatible vid fullscreen requested behavior.
+/// Apply the Quake-compatible vid fullscreen requested behavior.
+/// @param arguments Command-line arguments to inspect or execute.
 function VID_FullscreenRequested(arguments)
   return common.hasParm(arguments, "-fullscreen") or
     common.hasParm(arguments, "-mode") or
@@ -1055,7 +1220,8 @@ function VID_FullscreenRequested(arguments)
     common.hasParm(arguments, "-force")
 end function
 
-// Apply the Quake-compatible vid find requested mode behavior.
+/// Apply the Quake-compatible vid find requested mode behavior.
+/// @param arguments Command-line arguments to inspect or execute.
 function VID_FindRequestedMode(arguments)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   state = VID_State()
@@ -1106,7 +1272,11 @@ function VID_FindRequestedMode(arguments)
   return NO_MODE
 end function
 
-// Apply the Quake-compatible vid init behavior.
+/// Apply the Quake-compatible vid init behavior.
+/// @param arguments Command-line arguments to inspect or execute.
+/// @param registry The registry input consumed by `VID_Init`.
+/// @param palette The palette input consumed by `VID_Init`.
+/// @param createNative The create native input consumed by `VID_Init`.
 function VID_Init(arguments, registry, palette, createNative)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if createNative then
@@ -1150,7 +1320,8 @@ function VID_Init(arguments, registry, palette, createNative)
   return state
 end function
 
-// Apply the Quake-compatible vid restart renderer behavior.
+/// Apply the Quake-compatible vid restart renderer behavior.
+/// @param backend The backend input consumed by `VID_RestartRenderer`.
 function VID_RestartRenderer(backend)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global rendererSelectionOverride
@@ -1270,7 +1441,8 @@ function VID_MenuSelection()
   return videoMenuSelection
 end function
 
-// Apply the Quake-compatible vid menu move behavior.
+/// Apply the Quake-compatible vid menu move behavior.
+/// @param delta The delta input consumed by `VID_MenuMove`.
 function VID_MenuMove(delta)
   global videoMenuSelection
   count = VID_MenuModeCount()
@@ -1364,7 +1536,8 @@ function VID_ToggleEnhancedShadows()
   return true
 end function
 
-// Cycle the archived soft-shadow sampling level in the requested direction.
+/// Cycle the archived soft-shadow sampling level in the requested direction.
+/// @param direction The direction input consumed by `VID_AdjustEnhancedShadowQuality`.
 function VID_AdjustEnhancedShadowQuality(direction)
   state = VID_State()
   if state.registry is void or cvar.find(state.registry, "r_shadowquality") is void then return false end if
@@ -1391,7 +1564,8 @@ function VID_ToggleModelInterpolation()
   return true
 end function
 
-// Cycle the archived load-time texture-upscaling algorithm.
+/// Cycle the archived load-time texture-upscaling algorithm.
+/// @param direction The direction input consumed by `VID_AdjustTextureUpscale`.
 function VID_AdjustTextureUpscale(direction)
   state = VID_State()
   if state.registry is void or cvar.find(state.registry, "r_textureupscale") is void then return false end if
@@ -1405,7 +1579,8 @@ function VID_AdjustTextureUpscale(direction)
   return [previous, value]
 end function
 
-// Cycle the archived cross-backend anisotropic filtering level.
+/// Cycle the archived cross-backend anisotropic filtering level.
+/// @param direction The direction input consumed by `VID_AdjustAnisotropy`.
 function VID_AdjustAnisotropy(direction)
   state = VID_State()
   if state.registry is void or cvar.find(state.registry, "r_anisotropy") is void then return false end if
@@ -1427,7 +1602,11 @@ function VID_AdjustAnisotropy(direction)
   return true
 end function
 
-// Apply the Quake-compatible vid save resolution cvars behavior.
+/// Apply the Quake-compatible vid save resolution cvars behavior.
+/// @param state Mutable `miniquake.gl_vidnt` state used by `VID_SaveResolutionCvars`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param bpp The bpp input consumed by `VID_SaveResolutionCvars`.
 function VID_SaveResolutionCvars(state, width, height, bpp)
   if state.registry is void then return false end if
   if cvar.find(state.registry, "vid_width") is not void then cvar.setValue(state.registry, "vid_width", width) end if
@@ -1458,7 +1637,14 @@ function VID_SaveCurrentConfigurationCvars()
   return true
 end function
 
-// Apply the Quake-compatible vid restore native mode behavior.
+/// Apply the Quake-compatible vid restore native mode behavior.
+/// @param state Mutable `miniquake.gl_vidnt` state used by `VID_RestoreNativeMode`.
+/// @param wasFullscreen The was fullscreen input consumed by `VID_RestoreNativeMode`.
+/// @param previousWidth The previous width input consumed by `VID_RestoreNativeMode`.
+/// @param previousHeight The previous height input consumed by `VID_RestoreNativeMode`.
+/// @param previousBpp The previous bpp input consumed by `VID_RestoreNativeMode`.
+/// @param previousFrequency The previous frequency input consumed by `VID_RestoreNativeMode`.
+/// @param previousHalfscreen The previous halfscreen input consumed by `VID_RestoreNativeMode`.
 function VID_RestoreNativeMode(state, wasFullscreen, previousWidth, previousHeight, previousBpp, previousFrequency, previousHalfscreen)
   if not state.createNative then return true end if
   if wasFullscreen then
@@ -1469,9 +1655,11 @@ function VID_RestoreNativeMode(state, wasFullscreen, previousWidth, previousHeig
   return win.resizeClient(previousWidth, previousHeight)
 end function
 
-// Change resolution and presentation style on the existing HWND/HDC/WGL
-// context.  Keeping the context alive is essential: all map textures, display
-// lists and renderer caches remain valid across the menu operation.
+/// Change resolution and presentation style on the existing HWND/HDC/WGL
+/// context.  Keeping the context alive is essential: all map textures, display
+/// lists and renderer caches remain valid across the menu operation.
+/// @param modeNumber The mode number input consumed by `VID_ApplyDisplayMode`.
+/// @param fullscreen The fullscreen input consumed by `VID_ApplyDisplayMode`.
 function VID_ApplyDisplayMode(modeNumber, fullscreen)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   state = VID_State()
@@ -1535,7 +1723,8 @@ function VID_ApplyDisplayMode(modeNumber, fullscreen)
   return true
 end function
 
-// Apply the Quake-compatible vid apply resolution behavior.
+/// Apply the Quake-compatible vid apply resolution behavior.
+/// @param modeNumber The mode number input consumed by `VID_ApplyResolution`.
 function VID_ApplyResolution(modeNumber)
   return VID_ApplyDisplayMode(modeNumber, VID_State().modeState == MS_FULLDIB)
 end function
@@ -1661,7 +1850,8 @@ function VID_MenuDraw()
   return commands
 end function
 
-// Apply the Quake-compatible vid menu key behavior.
+/// Apply the Quake-compatible vid menu key behavior.
+/// @param key Key used to identify the requested entry.
 function VID_MenuKey(key)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global videoMenuDisplayFocus, videoMenuRendererFocus, videoMenuLightingFocus, videoMenuShadowFocus, videoMenuShadowQualityFocus, videoMenuModelInterpolationFocus, videoMenuTextureUpscaleFocus, videoMenuAnisotropyFocus
@@ -1782,7 +1972,8 @@ function VID_MenuDrawCallback()
   return VID_MenuDraw()
 end function
 
-// Apply the Quake-compatible vid menu key callback behavior.
+/// Apply the Quake-compatible vid menu key callback behavior.
+/// @param key Key used to identify the requested entry.
 function VID_MenuKeyCallback(key)
   return VID_MenuKey(key)
 end function

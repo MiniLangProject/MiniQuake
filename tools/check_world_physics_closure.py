@@ -85,7 +85,7 @@ DOWNSTREAM_SERVER_ALLOWED_FUNCTIONS = (
 # Each synchronized-vector helper is bound separately so compiler-safe removal
 # of redundant post-construction validation cannot weaken the remaining mask.
 DOWNSTREAM_SERVER_PROTECTED_SHA256 = (
-    "cbe0fb083e1ee809e6f8177f0d742aaf0317ebae00866202ba1678d540474570"
+    "7a45c78f01091e8daebb0dfb2dbfbb1e2e4818fbc59524bfb9dfd74101192ec3"
 )
 SERVER_SECTION_HASHES = {
     "runWorldPhysicsWithRetouch": "5b082bf6147659c213fe46e84679d44a73f11dcd2aac070ef51eaf66dd0ecc8b",

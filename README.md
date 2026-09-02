@@ -118,6 +118,11 @@ See [the current port status](docs/status/PORT_STATUS.md) for the maintained
 summary. Historical implementation and acceptance records are retained under
 [`docs/archive`](docs/archive/README.md).
 
+Browse the [MiniDoc API reference](docs/api/markdown/README.md) for the
+generated package, source-file, symbol, dependency, metrics, and diagnostics
+documentation. A standalone HTML version is available under
+[`docs/api/html`](docs/api/html/index.html).
+
 Prebuilt Windows x64 packages are published on the
 [GitHub Releases page](https://github.com/MiniLangProject/MiniQuake/releases).
 Release archives contain the engine executable and its native runtime bridges,
@@ -353,7 +358,7 @@ measurement run.
 | `tests/` | Deterministic, differential, and retail test programs |
 | `tools/` | Verification, comparison, build, and evidence utilities |
 | `scripts/` | Maintainer and retail-validation workflows |
-| `docs/` | Current documentation and historical acceptance records |
+| `docs/` | Generated MiniDoc API reference, current documentation, screenshots, and historical acceptance records |
 | `audit/` | Machine-readable compatibility and performance evidence |
 
 ## Legal and licensing

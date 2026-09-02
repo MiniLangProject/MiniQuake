@@ -402,7 +402,13 @@ def check_source_contract(root: Path) -> Check:
         "test count": ("tests", "Protocol 15 command tests passed: 14"),
     }
     for label, (key, marker) in markers.items():
-        if marker not in files[key]: errors.append(f"missing {label}: {marker}")
+        # Declaration documentation is intentionally allowed between struct
+        # members. Strip only explicit MiniDoc lines for layout-sensitive
+        # markers; behavioral markers continue to inspect the original text.
+        source_text = files[key]
+        if label == "baseline effects field":
+            source_text = re.sub(r"(?m)^[ \t]*///[^\n]*(?:\n|$)", "", source_text)
+        if marker not in source_text: errors.append(f"missing {label}: {marker}")
     # No producer may write an explicit signon stage four packet.
     bad_pattern = re.compile(r"writeByte\([^\n]+SVC_SIGNONNUM[\s\S]{0,180}?writeByte\([^\n]+SIGNON_ACTIVE")
     for key in ("server", "client", "update", "signon"):

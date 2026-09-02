@@ -11,9 +11,11 @@ silently changing the wire format.
 */
 package miniquake.protocol_text
 
+/// Defines the text abi value used by `miniquake.protocol_text`.
 const TEXT_ABI = "quake_latin1_cstring_v1"
 
-// Encode and write bytes.
+/// Encodes bytes for `miniquake.protocol_text`.
+/// @param text Text to parse or process.
 function encodeBytes(text)
   if text is void then return bytes() end if
   if text is not string then return error(1310, "Quake C string requires string or void") end if
@@ -61,7 +63,8 @@ function encodeBytes(text)
   return slice(output, 0, outputCount)
 end function
 
-// Read and validate bytes.
+/// Decodes bytes for `miniquake.protocol_text`.
+/// @param data Input data consumed by the operation.
 function decodeBytes(data)
   if data is not bytes then return error(1314, "Quake byte string requires bytes") end if
 
@@ -91,19 +94,23 @@ function decodeBytes(data)
   return decoded
 end function
 
-// Encode and write d length.
+/// Encode and write d length.
+/// @param text Text to parse or process.
 function encodedLength(text)
   return len(encodeBytes(text))
 end function
 
-// Return round trip bytes derived from the active module state.
+/// Return round trip bytes derived from the active module state.
+/// @param data Input data consumed by the operation.
 function roundTripBytes(data)
   return encodeBytes(decodeBytes(data))
 end function
 
-// Truncate by Quake bytes rather than MiniLang's UTF-8 storage bytes. This is
-// the newName[15]=0 behavior needed by Host_Name_f while preserving every
-// extended Quake byte 0x80..0xff.
+/// Truncate by Quake bytes rather than MiniLang's UTF-8 storage bytes. This is
+/// the newName[15]=0 behavior needed by Host_Name_f while preserving every
+/// extended Quake byte 0x80..0xff.
+/// @param text Text to parse or process.
+/// @param maximum Largest accepted value.
 function truncate(text, maximum)
   if maximum <= 0 then return "" end if
   encoded = encodeBytes(text)

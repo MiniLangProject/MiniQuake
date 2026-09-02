@@ -12,7 +12,9 @@ import miniquake.byteio as bio
 import miniquake.native as native
 import std.fs as fs
 
-// Read and validate the requested value.
+/// Implements the `parse` operation for `miniquake.sound.wav` (parse).
+/// @param data Input data consumed by the operation.
+/// @param filename Path of the file to process.
 function parse(data, filename)
   if len(data) < 12 or bio.fourCC(data, 0) != "RIFF" or bio.fourCC(data, 8) != "WAVE" then
     return error(1950, filename + ": not a RIFF/WAVE file")
@@ -67,20 +69,29 @@ function parse(data, filename)
   return t.WaveInfo(rate, width, channels, samples, loopStart, dataOffset, dataLength)
 end function
 
-// Read and validate the requested value.
+/// Implements the `load` operation for `miniquake.sound.wav` (load).
+/// @param filename Path of the file to process.
 function load(filename)
   data = fs.readAllBytes(filename)
   return [parse(data, filename), data]
 end function
 
-// Build deterministic test data for at.
+/// Build deterministic test data for at.
+/// @param info The info input consumed by `sampleAt`.
+/// @param data Input data consumed by the operation.
+/// @param sampleIndex Zero-based index of the requested entry.
+/// @param channel The channel input consumed by `sampleAt`.
 function sampleAt(info, data, sampleIndex, channel)
   frameOffset = info.dataOffset + sampleIndex * info.width * info.channels + channel * info.width
   if info.width == 1 then return data[frameOffset] - 128 end if
   return bio.i16(data, frameOffset)
 end function
 
-// Provide resample behavior for the active subsystem.
+/// Implements the `resample` operation for `miniquake.sound.wav` (resample).
+/// @param info The info input consumed by `resample`.
+/// @param data Input data consumed by the operation.
+/// @param targetRate The target rate input consumed by `resample`.
+/// @param force8Bit The force8 bit input consumed by `resample`.
 function resample(info, data, targetRate, force8Bit)
   if targetRate <= 0 then return error(1957, "invalid resample rate") end if
   outSamples = native.trunc(info.samples * targetRate / info.rate)

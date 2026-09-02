@@ -11,25 +11,39 @@ package miniquake.render_ui_contract
 import miniquake.constants as c
 import miniquake.native as native
 
+/// Defines the statusbar width value used by `miniquake.render_ui_contract`.
 const STATUSBAR_WIDTH = 320
+/// Defines the statusbar height value used by `miniquake.render_ui_contract`.
 const STATUSBAR_HEIGHT = 24
+/// Defines the inventory height value used by `miniquake.render_ui_contract`.
 const INVENTORY_HEIGHT = 24
+/// Defines the tga header bytes value used by `miniquake.render_ui_contract`.
 const TGA_HEADER_BYTES = 18
+/// Defines the tga bytes per pixel value used by `miniquake.render_ui_contract`.
 const TGA_BYTES_PER_PIXEL = 3
 
-// Provide statusbar xoffset behavior for the active subsystem.
+/// Implements the `statusbarXOffset` operation for `miniquake.render_ui_contract` (statusbar x offset).
+/// @param width Requested width in pixels or data units.
+/// @param gameType The game type input consumed by `statusbarXOffset`.
 function statusbarXOffset(width, gameType)
   if gameType == c.GAME_DEATHMATCH then return 0 end if
   return native.trunc((width - STATUSBAR_WIDTH) / 2)
 end function
 
-// Provide statusbar scaled xoffset behavior for the active subsystem.
+/// Implements the `statusbarScaledXOffset` operation for `miniquake.render_ui_contract` (statusbar scaled x offset).
+/// @param width Requested width in pixels or data units.
+/// @param gameType The game type input consumed by `statusbarScaledXOffset`.
+/// @param scale The scale input consumed by `statusbarScaledXOffset`.
 function statusbarScaledXOffset(width, gameType, scale)
   if gameType == c.GAME_DEATHMATCH then return 0 end if
   return native.trunc((width - STATUSBAR_WIDTH * scale) / 2)
 end function
 
-// Provide overlay order behavior for the active subsystem.
+/// Implements the `overlayOrder` operation for `miniquake.render_ui_contract` (overlay order).
+/// @param dialog The dialog input consumed by `overlayOrder`.
+/// @param loading The loading input consumed by `overlayOrder`.
+/// @param intermission The intermission input consumed by `overlayOrder`.
+/// @param gameInput The game input input consumed by `overlayOrder`.
 function overlayOrder(dialog, loading, intermission, gameInput)
   if dialog then return ["set2d", "tileclear", "dialog", "hud", "fade", "notify-string"] end if
   if loading then return ["set2d", "tileclear", "loading", "hud"] end if
@@ -39,14 +53,16 @@ function overlayOrder(dialog, loading, intermission, gameInput)
   return ["set2d", "tileclear", "crosshair", "ram", "net", "turtle", "pause", "center", "hud", "console", "menu"]
 end function
 
-// GLQuake's menu helpers retain a 320-pixel logical canvas and only center it
-// horizontally. Modern high-DPI modes need enlargement, but fractional or
-// unbounded stretching makes the indexed font and qpics visibly uneven. Use a
-// conservative integral scale: original size around 640x480, 2x around 1080p,
-// and at most 4x on very large displays. Some valid widescreen modes (for
-// example 1176x664) fall just below the legacy 1.5x ratio threshold despite
-// having ample room for a 2x 320x200 canvas; promote those explicitly so the
-// original 8-pixel menu font does not become needlessly tiny.
+/// GLQuake's menu helpers retain a 320-pixel logical canvas and only center it
+/// horizontally. Modern high-DPI modes need enlargement, but fractional or
+/// unbounded stretching makes the indexed font and qpics visibly uneven. Use a
+/// conservative integral scale: original size around 640x480, 2x around 1080p,
+/// and at most 4x on very large displays. Some valid widescreen modes (for
+/// example 1176x664) fall just below the legacy 1.5x ratio threshold despite
+/// having ample room for a 2x 320x200 canvas; promote those explicitly so the
+/// original 8-pixel menu font does not become needlessly tiny.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function virtualCanvasScale(width, height)
   safeWidth = width
   safeHeight = height
@@ -63,31 +79,42 @@ function virtualCanvasScale(width, height)
   return value * 1.0
 end function
 
-// Console glyphs use the same nearest-neighbour integer enlargement as the
-// other indexed Quake UI art.  Keep the backing text buffer in logical pixels
-// so a resize changes wrapping at the same scale that is actually rendered.
+/// Console glyphs use the same nearest-neighbour integer enlargement as the
+/// other indexed Quake UI art.  Keep the backing text buffer in logical pixels
+/// so a resize changes wrapping at the same scale that is actually rendered.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function consoleScale(width, height)
   return virtualCanvasScale(width, height)
 end function
 
-// The status bar, inventory strip and their 8-pixel glyphs are authored for
-// the same 320-pixel Quake canvas as the menus.  Keeping one integral scale
-// avoids a tiny HUD at high resolutions and prevents filtered indexed art.
+/// The status bar, inventory strip and their 8-pixel glyphs are authored for
+/// the same 320-pixel Quake canvas as the menus.  Keeping one integral scale
+/// avoids a tiny HUD at high resolutions and prevents filtered indexed art.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function statusbarScale(width, height)
   return virtualCanvasScale(width, height)
 end function
 
-// Provide console logical width behavior for the active subsystem.
+/// Implements the `consoleLogicalWidth` operation for `miniquake.render_ui_contract` (console logical width).
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function consoleLogicalWidth(width, height)
   return native.trunc(width / consoleScale(width, height))
 end function
 
-// Provide console logical height behavior for the active subsystem.
+/// Implements the `consoleLogicalHeight` operation for `miniquake.render_ui_contract` (console logical height).
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param physicalHeight The physical height input consumed by `consoleLogicalHeight`.
 function consoleLogicalHeight(width, height, physicalHeight)
   return native.trunc(physicalHeight / consoleScale(width, height))
 end function
 
-// Provide virtual canvas layout behavior for the active subsystem.
+/// Implements the `virtualCanvasLayout` operation for `miniquake.render_ui_contract` (virtual canvas layout).
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function virtualCanvasLayout(width, height)
   scale = virtualCanvasScale(width, height)
   offsetX = (width - 320.0 * scale) * 0.5
@@ -104,18 +131,22 @@ function set2dStateOrder()
   ]
 end function
 
-// Return tga byte length derived from the active module state.
+/// Return tga byte length derived from the active module state.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function tgaByteLength(width, height)
   if width <= 0 or height <= 0 then return 0 end if
   return TGA_HEADER_BYTES + width * height * TGA_BYTES_PER_PIXEL
 end function
 
-// Provide view model depth maximum behavior for the active subsystem.
+/// Implements the `viewModelDepthMaximum` operation for `miniquake.render_ui_contract` (view model depth maximum).
 function viewModelDepthMaximum()
   return 0.3
 end function
 
-// Provide statusbar lines behavior for the active subsystem.
+/// Implements the `statusbarLines` operation for `miniquake.render_ui_contract` (statusbar lines).
+/// @param viewSize Size of the requested data or resource.
+/// @param intermission The intermission input consumed by `statusbarLines`.
 function statusbarLines(viewSize, intermission)
   if intermission != 0 then return 0 end if
   // MiniQuake clears and redraws a modern hardware backbuffer every frame.
@@ -127,7 +158,11 @@ function statusbarLines(viewSize, intermission)
   return STATUSBAR_HEIGHT + INVENTORY_HEIGHT
 end function
 
-// Provide statusbar physical lines behavior for the active subsystem.
+/// Implements the `statusbarPhysicalLines` operation for `miniquake.render_ui_contract` (statusbar physical lines).
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param viewSize Size of the requested data or resource.
+/// @param intermission The intermission input consumed by `statusbarPhysicalLines`.
 function statusbarPhysicalLines(width, height, viewSize, intermission)
   return native.trunc(statusbarLines(viewSize, intermission) * statusbarScale(width, height))
 end function

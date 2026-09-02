@@ -1,0 +1,93 @@
+# Package `miniquake.memory`
+
+[Home](README.md) · [Packages](Packages.md)
+
+## Files
+
+- [src/miniquake/memory.ml](File-src-miniquake-memory-ml-37601647.md)
+
+## Symbols
+
+- [`miniquake.memory.align16`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-align16-inline-function-align16-value-src-miniquake-memory-ml-1239360427) — function
+- [`miniquake.memory.allocate`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-allocate-function-allocate-state-size-name-kind-src-miniquake-memory-ml-1107195326) — function
+- [`miniquake.memory.Cache_Alloc`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cache-alloc-function-cache-alloc-state-user-size-name-src-miniquake-memory-ml-2119051145) — function
+- [`miniquake.memory.Cache_Check`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cache-check-function-cache-check-state-user-src-miniquake-memory-ml-406052301) — function
+- [`miniquake.memory.Cache_Compact`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cache-compact-function-cache-compact-state-src-miniquake-memory-ml-1864137098) — function
+- [`miniquake.memory.Cache_Flush`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cache-flush-function-cache-flush-state-src-miniquake-memory-ml-1773880272) — function
+- [`miniquake.memory.Cache_Free`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cache-free-function-cache-free-user-src-miniquake-memory-ml-1530134612) — function
+- [`miniquake.memory.Cache_FreeHigh`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cache-freehigh-function-cache-freehigh-state-newhighhunk-src-miniquake-memory-ml-1205977562) — function
+- [`miniquake.memory.Cache_FreeLow`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cache-freelow-function-cache-freelow-state-newlowhunk-src-miniquake-memory-ml-1427936188) — function
+- [`miniquake.memory.CACHE_HEADER_SIZE`](File-src-miniquake-memory-ml-37601647.md#constant-constant-miniquake-memory-cache-header-size-const-cache-header-size-40-src-miniquake-memory-ml-606373978) — constant
+- [`miniquake.memory.Cache_Init`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cache-init-function-cache-init-state-src-miniquake-memory-ml-1896027878) — function
+- [`miniquake.memory.Cache_MakeLRU`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cache-makelru-function-cache-makelru-block-src-miniquake-memory-ml-1836112366) — function
+- [`miniquake.memory.Cache_Move`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cache-move-function-cache-move-block-src-miniquake-memory-ml-441110446) — function
+- [`miniquake.memory.Cache_Print`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cache-print-function-cache-print-state-src-miniquake-memory-ml-923865314) — function
+- [`miniquake.memory.Cache_Report`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cache-report-function-cache-report-state-src-miniquake-memory-ml-11779038) — function
+- [`miniquake.memory.Cache_TryAlloc`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cache-tryalloc-function-cache-tryalloc-state-size-nobottom-src-miniquake-memory-ml-1677225661) — function
+- [`miniquake.memory.Cache_UnlinkLRU`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cache-unlinklru-function-cache-unlinklru-block-src-miniquake-memory-ml-775501280) — function
+- [`miniquake.memory.cacheAlloc`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cachealloc-function-cachealloc-state-size-name-src-miniquake-memory-ml-290606188) — function
+- [`miniquake.memory.cacheAllocUser`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cacheallocuser-function-cacheallocuser-state-user-size-name-src-miniquake-memory-ml-821992865) — function
+- [`miniquake.memory.CacheBlock`](Type-miniquake-memory-cacheblock-1820573865.md) — struct
+- [`miniquake.memory.cacheCheck`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cachecheck-function-cachecheck-state-user-src-miniquake-memory-ml-1317966199) — function
+- [`miniquake.memory.cacheCompact`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cachecompact-function-cachecompact-state-src-miniquake-memory-ml-1509939246) — function
+- [`miniquake.memory.cacheFlush`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cacheflush-function-cacheflush-state-src-miniquake-memory-ml-792253710) — function
+- [`miniquake.memory.cacheFree`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cachefree-function-cachefree-user-src-miniquake-memory-ml-1130112048) — function
+- [`miniquake.memory.cacheFreeHigh`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cachefreehigh-function-cachefreehigh-state-newhighhunk-src-miniquake-memory-ml-1215134842) — function
+- [`miniquake.memory.cacheFreeLow`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cachefreelow-function-cachefreelow-state-newlowhunk-src-miniquake-memory-ml-2145701546) — function
+- [`miniquake.memory.cacheInit`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cacheinit-function-cacheinit-state-src-miniquake-memory-ml-282819534) — function
+- [`miniquake.memory.cacheMove`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cachemove-function-cachemove-block-src-miniquake-memory-ml-143930832) — function
+- [`miniquake.memory.cachePayloadUsed`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cachepayloadused-function-cachepayloadused-state-src-miniquake-memory-ml-1215957870) — function
+- [`miniquake.memory.cachePrint`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cacheprint-function-cacheprint-state-src-miniquake-memory-ml-906277062) — function
+- [`miniquake.memory.cacheReport`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cachereport-function-cachereport-state-src-miniquake-memory-ml-2099374582) — function
+- [`miniquake.memory.cacheStartIndex`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cachestartindex-function-cachestartindex-state-block-src-miniquake-memory-ml-388496919) — function
+- [`miniquake.memory.cacheTryAlloc`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cachetryalloc-function-cachetryalloc-state-span-nobottom-src-miniquake-memory-ml-831336886) — function
+- [`miniquake.memory.cacheTryAllocBlock`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-cachetryallocblock-function-cachetryallocblock-state-span-nobottom-src-miniquake-memory-ml-1463697086) — function
+- [`miniquake.memory.CacheUser`](Type-miniquake-memory-cacheuser-951233691.md) — struct
+- [`miniquake.memory.create`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-create-function-create-capacity-src-miniquake-memory-ml-1233429105) — function
+- [`miniquake.memory.freeHunkBytes`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-freehunkbytes-inline-function-freehunkbytes-state-src-miniquake-memory-ml-1532100675) — function
+- [`miniquake.memory.freeToHighMark`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-freetohighmark-function-freetohighmark-state-mark-src-miniquake-memory-ml-1990417005) — function
+- [`miniquake.memory.freeToLowMark`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-freetolowmark-function-freetolowmark-state-mark-src-miniquake-memory-ml-1509292341) — function
+- [`miniquake.memory.highMark`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-highmark-function-highmark-state-src-miniquake-memory-ml-2011768570) — function
+- [`miniquake.memory.Hunk_Alloc`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-hunk-alloc-function-hunk-alloc-state-size-src-miniquake-memory-ml-471739193) — function
+- [`miniquake.memory.Hunk_AllocName`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-hunk-allocname-function-hunk-allocname-state-size-name-src-miniquake-memory-ml-992636896) — function
+- [`miniquake.memory.Hunk_Check`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-hunk-check-function-hunk-check-state-src-miniquake-memory-ml-824526634) — function
+- [`miniquake.memory.Hunk_FreeToHighMark`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-hunk-freetohighmark-function-hunk-freetohighmark-state-mark-src-miniquake-memory-ml-808291019) — function
+- [`miniquake.memory.Hunk_FreeToLowMark`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-hunk-freetolowmark-function-hunk-freetolowmark-state-mark-src-miniquake-memory-ml-1598897809) — function
+- [`miniquake.memory.HUNK_HEADER_SIZE`](File-src-miniquake-memory-ml-37601647.md#constant-constant-miniquake-memory-hunk-header-size-const-hunk-header-size-16-src-miniquake-memory-ml-235479115) — constant
+- [`miniquake.memory.Hunk_HighAllocName`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-hunk-highallocname-function-hunk-highallocname-state-size-name-src-miniquake-memory-ml-1134526460) — function
+- [`miniquake.memory.Hunk_HighMark`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-hunk-highmark-function-hunk-highmark-state-src-miniquake-memory-ml-1468791458) — function
+- [`miniquake.memory.Hunk_LowMark`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-hunk-lowmark-function-hunk-lowmark-state-src-miniquake-memory-ml-1679274098) — function
+- [`miniquake.memory.Hunk_Print`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-hunk-print-function-hunk-print-state-all-src-miniquake-memory-ml-211311753) — function
+- [`miniquake.memory.HUNK_SENTINEL`](File-src-miniquake-memory-ml-37601647.md#constant-constant-miniquake-memory-hunk-sentinel-const-hunk-sentinel-502268397-src-miniquake-memory-ml-1911644718) — constant
+- [`miniquake.memory.Hunk_TempAlloc`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-hunk-tempalloc-function-hunk-tempalloc-state-size-src-miniquake-memory-ml-692492017) — function
+- [`miniquake.memory.hunkAlloc`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-hunkalloc-function-hunkalloc-state-size-src-miniquake-memory-ml-1462978687) — function
+- [`miniquake.memory.hunkAllocName`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-hunkallocname-function-hunkallocname-state-size-name-src-miniquake-memory-ml-743965644) — function
+- [`miniquake.memory.HunkBlock`](Type-miniquake-memory-hunkblock-1777378239.md) — struct
+- [`miniquake.memory.hunkCheck`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-hunkcheck-function-hunkcheck-state-src-miniquake-memory-ml-1669810454) — function
+- [`miniquake.memory.hunkHighAllocName`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-hunkhighallocname-function-hunkhighallocname-state-size-name-src-miniquake-memory-ml-477334404) — function
+- [`miniquake.memory.hunkPayloadUsed`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-hunkpayloadused-function-hunkpayloadused-state-src-miniquake-memory-ml-1097463784) — function
+- [`miniquake.memory.hunkPrint`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-hunkprint-function-hunkprint-state-all-src-miniquake-memory-ml-7762123) — function
+- [`miniquake.memory.hunkTempAlloc`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-hunktempalloc-function-hunktempalloc-state-size-name-src-miniquake-memory-ml-1187954290) — function
+- [`miniquake.memory.insertCacheSorted`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-insertcachesorted-function-insertcachesorted-state-block-src-miniquake-memory-ml-1783713023) — function
+- [`miniquake.memory.leastRecentlyUsed`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-leastrecentlyused-function-leastrecentlyused-state-src-miniquake-memory-ml-1147703950) — function
+- [`miniquake.memory.lowMark`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-lowmark-function-lowmark-state-src-miniquake-memory-ml-471510028) — function
+- [`miniquake.memory.makeLru`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-makelru-function-makelru-block-src-miniquake-memory-ml-1010611872) — function
+- [`miniquake.memory.Memory_Init`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-memory-init-function-memory-init-capacity-zonesize-src-miniquake-memory-ml-266177956) — function
+- [`miniquake.memory.memoryInit`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-memoryinit-function-memoryinit-capacity-zonesize-src-miniquake-memory-ml-1481033608) — function
+- [`miniquake.memory.memoryInitArguments`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-memoryinitarguments-function-memoryinitarguments-capacity-commandline-src-miniquake-memory-ml-522167462) — function
+- [`miniquake.memory.MemoryManager`](Type-miniquake-memory-memorymanager-2931116.md) — struct
+- [`miniquake.memory.newCacheUser`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-newcacheuser-function-newcacheuser-state-src-miniquake-memory-ml-1681562214) — function
+- [`miniquake.memory.newHunkBlock`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-newhunkblock-function-newhunkblock-state-requestedsize-name-kind-side-start-span-src-miniquake-memory-ml-785468381) — function
+- [`miniquake.memory.removeCacheAt`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-removecacheat-function-removecacheat-state-index-src-miniquake-memory-ml-914759110) — function
+- [`miniquake.memory.truncateName`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-truncatename-function-truncatename-name-count-src-miniquake-memory-ml-292623987) — function
+- [`miniquake.memory.unlinkLru`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-unlinklru-function-unlinklru-block-src-miniquake-memory-ml-1066209374) — function
+- [`miniquake.memory.used`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-used-function-used-state-src-miniquake-memory-ml-1730987018) — function
+- [`miniquake.memory.zoneCheck`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-zonecheck-function-zonecheck-state-src-miniquake-memory-ml-374259906) — function
+- [`miniquake.memory.zoneDumpHeap`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-zonedumpheap-function-zonedumpheap-state-src-miniquake-memory-ml-592442946) — function
+- [`miniquake.memory.zoneFree`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-zonefree-function-zonefree-block-src-miniquake-memory-ml-1470582838) — function
+- [`miniquake.memory.zoneFreeMemory`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-zonefreememory-function-zonefreememory-state-src-miniquake-memory-ml-1977971334) — function
+- [`miniquake.memory.zoneMalloc`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-zonemalloc-function-zonemalloc-state-size-name-src-miniquake-memory-ml-1182973292) — function
+- [`miniquake.memory.zonePayloadUsed`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-zonepayloadused-function-zonepayloadused-state-src-miniquake-memory-ml-1374916924) — function
+- [`miniquake.memory.zonePrint`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-zoneprint-function-zoneprint-state-src-miniquake-memory-ml-1442318140) — function
+- [`miniquake.memory.zoneState`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-zonestate-function-zonestate-state-src-miniquake-memory-ml-845616976) — function
+- [`miniquake.memory.zoneTagMalloc`](File-src-miniquake-memory-ml-37601647.md#function-function-miniquake-memory-zonetagmalloc-function-zonetagmalloc-state-size-tag-name-src-miniquake-memory-ml-328542296) — function

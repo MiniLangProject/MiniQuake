@@ -12,9 +12,12 @@ package miniquake.optimization_baseline
 import miniquake.native as native
 import std.fs as fs
 
+/// Defines the stage count value used by `miniquake.optimization_baseline`.
 const STAGE_COUNT = 46
+/// Defines the other stage index value used by `miniquake.optimization_baseline`.
 const OTHER_STAGE_INDEX = 19
 
+/// Tracks the module-level stage names state owned by `miniquake.optimization_baseline`.
 stageNames = [
   "filter",
   "commands",
@@ -64,21 +67,34 @@ stageNames = [
   "alias_native",
 ]
 
+/// Tracks the module-level stage lookup keys state owned by `miniquake.optimization_baseline`.
 stageLookupKeys = array(64, 0)
+/// Tracks the module-level stage lookup values state owned by `miniquake.optimization_baseline`.
 stageLookupValues = array(64, -1)
 
+/// Tracks the module-level profile enabled state owned by `miniquake.optimization_baseline`.
 profileEnabled = false
+/// Tracks the module-level profile capacity state owned by `miniquake.optimization_baseline`.
 profileCapacity = 0
+/// Tracks the module-level profile frame count state owned by `miniquake.optimization_baseline`.
 profileFrameCount = 0
+/// Tracks the module-level profile frame start state owned by `miniquake.optimization_baseline`.
 profileFrameStart = 0
+/// Tracks the module-level profile last tick state owned by `miniquake.optimization_baseline`.
 profileLastTick = 0
+/// Tracks the module-level profile frame active state owned by `miniquake.optimization_baseline`.
 profileFrameActive = false
+/// Tracks the module-level profile durations state owned by `miniquake.optimization_baseline`.
 profileDurations = []
+/// Tracks the module-level profile stage totals state owned by `miniquake.optimization_baseline`.
 profileStageTotals = array(STAGE_COUNT, 0)
+/// Tracks the module-level profile stage hits state owned by `miniquake.optimization_baseline`.
 profileStageHits = array(STAGE_COUNT, 0)
+/// Tracks the module-level profile stage frames state owned by `miniquake.optimization_baseline`.
 profileStageFrames = []
 
-// Provide bool text behavior for the active subsystem.
+/// Implements the `boolText` operation for `miniquake.optimization_baseline` (bool text).
+/// @param value Value consumed by `boolText`.
 function boolText(value)
   if value then return "true" end if
   return "false"
@@ -89,7 +105,8 @@ function enabled()
   return profileEnabled
 end function
 
-// Convert stage into its canonical representation.
+/// Convert stage into its canonical representation.
+/// @param stage The stage input consumed by `normalizeStage`.
 function normalizeStage(stage)
   if stage == "demo_send" or stage == "local_send" or stage == "remote_send" then
     return "send"
@@ -97,7 +114,8 @@ function normalizeStage(stage)
   return stage
 end function
 
-// Return stage index derived from the active module state.
+/// Return stage index derived from the active module state.
+/// @param stage The stage input consumed by `stageIndex`.
 function stageIndex(stage)
   global stageLookupKeys, stageLookupValues
   key = nativeRawValue(stage)
@@ -118,7 +136,8 @@ function stageIndex(stage)
   return OTHER_STAGE_INDEX
 end function
 
-// Update subsystem configuration for configure.
+/// Implements the `configure` operation for `miniquake.optimization_baseline` (configure).
+/// @param frameCapacity The frame capacity input consumed by `configure`.
 function configure(frameCapacity)
   global profileEnabled, profileCapacity, profileFrameCount
   global profileFrameStart, profileLastTick, profileFrameActive
@@ -138,7 +157,7 @@ function configure(frameCapacity)
   return true
 end function
 
-// Provide disable behavior for the active subsystem.
+/// Implements the `disable` operation for `miniquake.optimization_baseline` (disable).
 function disable()
   global profileEnabled, profileFrameActive
   profileEnabled = false
@@ -157,7 +176,8 @@ function beginFrame()
   return true
 end function
 
-// Provide checkpoint behavior for the active subsystem.
+/// Checks point for `miniquake.optimization_baseline`.
+/// @param stage The stage input consumed by `checkpoint`.
 function checkpoint(stage)
   global profileLastTick, profileStageTotals, profileStageHits, profileStageFrames
   if not profileEnabled or not profileFrameActive then return true end if
@@ -173,7 +193,7 @@ function checkpoint(stage)
   return true
 end function
 
-// Provide filtered frame behavior for the active subsystem.
+/// Implements the `filteredFrame` operation for `miniquake.optimization_baseline` (filtered frame).
 function filteredFrame()
   global profileFrameActive
   if not profileEnabled then return true end if
@@ -199,12 +219,12 @@ function completeFrame()
   return true
 end function
 
-// Provide recorded frames behavior for the active subsystem.
+/// Implements the `recordedFrames` operation for `miniquake.optimization_baseline` (recorded frames).
 function recordedFrames()
   return profileFrameCount
 end function
 
-// Provide sorted durations behavior for the active subsystem.
+/// Implements the `sortedDurations` operation for `miniquake.optimization_baseline` (sorted durations).
 function sortedDurations()
   count = profileFrameCount
   values = array(count, 0)
@@ -226,7 +246,10 @@ function sortedDurations()
   return values
 end function
 
-// Provide percentile from sorted behavior for the active subsystem.
+/// Implements the `percentileFromSorted` operation for `miniquake.optimization_baseline` (percentile from sorted).
+/// @param values The values input consumed by `percentileFromSorted`.
+/// @param numerator The numerator input consumed by `percentileFromSorted`.
+/// @param denominator The denominator input consumed by `percentileFromSorted`.
 function percentileFromSorted(values, numerator, denominator)
   count = len(values)
   if count == 0 then return 0 end if
@@ -259,7 +282,7 @@ function summary()
   ]
 end function
 
-// Provide stage totals json behavior for the active subsystem.
+/// Implements the `stageTotalsJson` operation for `miniquake.optimization_baseline` (stage totals json).
 function stageTotalsJson()
   result = "["
   index = 0
@@ -273,7 +296,8 @@ function stageTotalsJson()
   return result + "]"
 end function
 
-// Provide resource json behavior for the active subsystem.
+/// Implements the `resourceJson` operation for `miniquake.optimization_baseline` (resource json).
+/// @param values The values input consumed by `resourceJson`.
 function resourceJson(values)
   result = "["
   index = 0
@@ -285,7 +309,12 @@ function resourceJson(values)
   return result + "]"
 end function
 
-// Encode and write reports.
+/// Encode and write reports.
+/// @param prefix The prefix input consumed by `writeReports`.
+/// @param mode The mode input consumed by `writeReports`.
+/// @param mapName Name of the map to load or inspect.
+/// @param beforeResources The before resources input consumed by `writeReports`.
+/// @param afterResources The after resources input consumed by `writeReports`.
 function writeReports(prefix, mode, mapName, beforeResources, afterResources)
   stats = summary()
 
@@ -329,7 +358,9 @@ function writeReports(prefix, mode, mapName, beforeResources, afterResources)
   return true
 end function
 
-// Format and emit summary.
+/// Format and emit summary.
+/// @param mode The mode input consumed by `printSummary`.
+/// @param mapName Name of the map to load or inspect.
 function printSummary(mode, mapName)
   stats = summary()
   print "MiniQuake OPT-001A frame baseline"
@@ -348,7 +379,8 @@ function printSummary(mode, mapName)
   return stats
 end function
 
-// Print the stage breakdown for frames at or above the requested duration.
+/// Print the stage breakdown for frames at or above the requested duration.
+/// @param minimumMilliseconds The minimum milliseconds input consumed by `printSlowFrames`.
 function printSlowFrames(minimumMilliseconds)
   index = 0
   while index < profileFrameCount
@@ -370,7 +402,8 @@ function printSlowFrames(minimumMilliseconds)
   return true
 end function
 
-// Handle sequence text and update the associated state.
+/// Handle sequence text and update the associated state.
+/// @param values The values input consumed by `handleSequenceText`.
 function handleSequenceText(values)
   result = ""
   index = 0
@@ -382,7 +415,9 @@ function handleSequenceText(values)
   return result
 end function
 
-// Provide classify handles behavior for the active subsystem.
+/// Implements the `classifyHandles` operation for `miniquake.optimization_baseline` (classify handles).
+/// @param handles The handles input consumed by `classifyHandles`.
+/// @param nonHandleStable The non handle stable input consumed by `classifyHandles`.
 function classifyHandles(handles, nonHandleStable)
   if not nonHandleStable then return "RESOURCE_GROWTH" end if
   if len(handles) < 2 then return "INCONCLUSIVE" end if

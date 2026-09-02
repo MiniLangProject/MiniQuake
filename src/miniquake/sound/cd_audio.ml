@@ -19,23 +19,36 @@ import miniquake.common as common
 
 // Track mutable cd audio state across subsystem calls.
 struct CdAudioState
+  /// Stores the mixer value in `miniquake.sound.cd_audio.CdAudioState`.
   mixer
+  /// Stores the initialized value in `miniquake.sound.cd_audio.CdAudioState`.
   initialized
+  /// Stores the enabled value in `miniquake.sound.cd_audio.CdAudioState`.
   enabled
+  /// Stores the valid value in `miniquake.sound.cd_audio.CdAudioState`.
   valid
+  /// Stores the playing value in `miniquake.sound.cd_audio.CdAudioState`.
   playing
+  /// Stores the was playing value in `miniquake.sound.cd_audio.CdAudioState`.
   wasPlaying
+  /// Stores the looping value in `miniquake.sound.cd_audio.CdAudioState`.
   looping
+  /// Stores the track value in `miniquake.sound.cd_audio.CdAudioState`.
   track
+  /// Stores the max track value in `miniquake.sound.cd_audio.CdAudioState`.
   maxTrack
+  /// Stores the volume value in `miniquake.sound.cd_audio.CdAudioState`.
   volume
+  /// Stores the remap value in `miniquake.sound.cd_audio.CdAudioState`.
   remap
+  /// Stores the last message value in `miniquake.sound.cd_audio.CdAudioState`.
   lastMessage
 end struct
 
+/// Tracks the default module-level CD-audio state owned by `miniquake.sound.cd_audio`.
 defaultState = void
 
-// Provide identity remap behavior for the active subsystem.
+/// Implements the `identityRemap` operation for `miniquake.sound.cd_audio` (identity remap).
 function identityRemap()
   result = arrays.makeFilledArray(100, 0)
   index = 0
@@ -46,7 +59,9 @@ function identityRemap()
   return result
 end function
 
-// Create and initialize the module state.
+/// Implements the `create` operation for `miniquake.sound.cd_audio` (create).
+/// @param mixerState Mutable state used by `create`.
+/// @param maxTrack The max track input consumed by `create`.
 function create(mixerState, maxTrack)
   if maxTrack < 1 then maxTrack = 99 end if
   if maxTrack > 99 then maxTrack = 99 end if
@@ -66,7 +81,8 @@ function create(mixerState, maxTrack)
   )
 end function
 
-// Ensure sufficient storage or state for the requested value.
+/// Ensure sufficient storage or state for the requested value.
+/// @param mixerState Mutable state used by `ensure`.
 function ensure(mixerState)
   global defaultState
   if defaultState is void or defaultState.mixer != mixerState then
@@ -77,7 +93,8 @@ function ensure(mixerState)
   return defaultState
 end function
 
-// Release or remove state for the requested value.
+/// Release or remove state for the requested value.
+/// @param mixerState Mutable state used by `release`.
 function release(mixerState)
   global defaultState
   if defaultState is void or defaultState.mixer != mixerState then return false end if
@@ -86,7 +103,8 @@ function release(mixerState)
   return true
 end function
 
-// Mirror Quake's CDAudio_Init routine and its observable state changes.
+/// Mirror Quake's CDAudio_Init routine and its observable state changes.
+/// @param state Mutable `miniquake.sound.cd_audio` state used by `CDAudio_Init`.
 function CDAudio_Init(state)
   state.remap = identityRemap()
   state.initialized = true
@@ -101,7 +119,10 @@ function CDAudio_Init(state)
   return 0
 end function
 
-// Mirror Quake's CDAudio_Play routine and its observable state changes.
+/// Mirror Quake's CDAudio_Play routine and its observable state changes.
+/// @param state Mutable `miniquake.sound.cd_audio` state used by `CDAudio_Play`.
+/// @param requestedTrack The requested track input consumed by `CDAudio_Play`.
+/// @param looping The looping input consumed by `CDAudio_Play`.
 function CDAudio_Play(state, requestedTrack, looping)
   if not state.enabled then return false end if
   if not state.valid then return false end if
@@ -130,7 +151,8 @@ function CDAudio_Play(state, requestedTrack, looping)
   return true
 end function
 
-// Mirror Quake's CDAudio_Stop routine and its observable state changes.
+/// Mirror Quake's CDAudio_Stop routine and its observable state changes.
+/// @param state Mutable `miniquake.sound.cd_audio` state used by `CDAudio_Stop`.
 function CDAudio_Stop(state)
   if not state.enabled or not state.playing then return false end if
   if state.mixer is not void then mixer.stopMusic(state.mixer) end if
@@ -139,7 +161,8 @@ function CDAudio_Stop(state)
   return true
 end function
 
-// Mirror Quake's CDAudio_Pause routine and its observable state changes.
+/// Mirror Quake's CDAudio_Pause routine and its observable state changes.
+/// @param state Mutable `miniquake.sound.cd_audio` state used by `CDAudio_Pause`.
 function CDAudio_Pause(state)
   if not state.enabled or not state.playing then return false end if
   if state.mixer is not void then mixer.pauseMusic(state.mixer) end if
@@ -148,7 +171,8 @@ function CDAudio_Pause(state)
   return true
 end function
 
-// Mirror Quake's CDAudio_Resume routine and its observable state changes.
+/// Mirror Quake's CDAudio_Resume routine and its observable state changes.
+/// @param state Mutable `miniquake.sound.cd_audio` state used by `CDAudio_Resume`.
 function CDAudio_Resume(state)
   if not state.enabled or not state.valid or not state.wasPlaying then return false end if
   if state.mixer is not void then mixer.resumeMusic(state.mixer) end if
@@ -156,7 +180,9 @@ function CDAudio_Resume(state)
   return true
 end function
 
-// Mirror Quake's CDAudio_Update routine and its observable state changes.
+/// Mirror Quake's CDAudio_Update routine and its observable state changes.
+/// @param state Mutable `miniquake.sound.cd_audio` state used by `CDAudio_Update`.
+/// @param requestedVolume The requested volume input consumed by `CDAudio_Update`.
 function CDAudio_Update(state, requestedVolume)
   if not state.enabled then return state.volume end if
   // MCI_NOTIFY_SUCCESSFUL clears `playing` at track completion.  The OGG
@@ -177,7 +203,8 @@ function CDAudio_Update(state, requestedVolume)
   return state.volume
 end function
 
-// Mirror Quake's CDAudio_Shutdown routine and its observable state changes.
+/// Mirror Quake's CDAudio_Shutdown routine and its observable state changes.
+/// @param state Mutable `miniquake.sound.cd_audio` state used by `CDAudio_Shutdown`.
 function CDAudio_Shutdown(state)
   if not state.initialized then return false end if
   CDAudio_Stop(state)
@@ -185,7 +212,9 @@ function CDAudio_Shutdown(state)
   return true
 end function
 
-// Provide remap command behavior for the active subsystem.
+/// Implements the `remapCommand` operation for `miniquake.sound.cd_audio` (remap command).
+/// @param state Mutable `miniquake.sound.cd_audio` state used by `remapCommand`.
+/// @param arguments Command-line arguments to inspect or execute.
 function remapCommand(state, arguments)
   count = len(arguments) - 2
   if count <= 0 then
@@ -206,7 +235,8 @@ function remapCommand(state, arguments)
   return ""
 end function
 
-// Provide info text behavior for the active subsystem.
+/// Implements the `infoText` operation for `miniquake.sound.cd_audio` (info text).
+/// @param state Mutable `miniquake.sound.cd_audio` state used by `infoText`.
 function infoText(state)
   result = state.maxTrack + " tracks\n"
   if state.playing then
@@ -222,7 +252,9 @@ function infoText(state)
   return result + "Volume is " + common.fixedFloat(volume) + "\n"
 end function
 
-// Mirror Quake's CD_f routine and its observable state changes.
+/// Mirror Quake's CD_f routine and its observable state changes.
+/// @param state Mutable `miniquake.sound.cd_audio` state used by `CD_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function CD_f(state, arguments)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if len(arguments) < 2 then return "" end if
@@ -274,11 +306,15 @@ end function
 // ---------------------------------------------------------------------------
 
 const MCI_NOTIFY_SUCCESSFUL = 1
+/// Defines the mci notify superseded value used by `miniquake.sound.cd_audio`.
 const MCI_NOTIFY_SUPERSEDED = 2
+/// Defines the mci notify aborted value used by `miniquake.sound.cd_audio`.
 const MCI_NOTIFY_ABORTED = 4
+/// Defines the mci notify failure value used by `miniquake.sound.cd_audio`.
 const MCI_NOTIFY_FAILURE = 8
 
-// Mirror Quake's CDAudio_Eject routine and its observable state changes.
+/// Mirror Quake's CDAudio_Eject routine and its observable state changes.
+/// @param state Mutable `miniquake.sound.cd_audio` state used by `CDAudio_Eject`.
 function CDAudio_Eject(state)
   if state.playing then CDAudio_Stop(state) end if
   state.valid = false
@@ -286,13 +322,15 @@ function CDAudio_Eject(state)
   return true
 end function
 
-// Mirror Quake's CDAudio_CloseDoor routine and its observable state changes.
+/// Mirror Quake's CDAudio_CloseDoor routine and its observable state changes.
+/// @param state Mutable `miniquake.sound.cd_audio` state used by `CDAudio_CloseDoor`.
 function CDAudio_CloseDoor(state)
   state.lastMessage = "CDAudio: close door acknowledged by virtual media backend"
   return true
 end function
 
-// Mirror Quake's CDAudio_GetAudioDiskInfo routine and its observable state changes.
+/// Mirror Quake's CDAudio_GetAudioDiskInfo routine and its observable state changes.
+/// @param state Mutable `miniquake.sound.cd_audio` state used by `CDAudio_GetAudioDiskInfo`.
 function CDAudio_GetAudioDiskInfo(state)
   state.valid = false
   if not state.initialized or state.maxTrack < 1 then
@@ -304,7 +342,10 @@ function CDAudio_GetAudioDiskInfo(state)
   return 0
 end function
 
-// Mirror Quake's CDAudio_MessageHandler routine and its observable state changes.
+/// Mirror Quake's CDAudio_MessageHandler routine and its observable state changes.
+/// @param state Mutable `miniquake.sound.cd_audio` state used by `CDAudio_MessageHandler`.
+/// @param notification The notification input consumed by `CDAudio_MessageHandler`.
+/// @param deviceMatches The device matches input consumed by `CDAudio_MessageHandler`.
 function CDAudio_MessageHandler(state, notification, deviceMatches)
   if not deviceMatches then return 1 end if
 
@@ -331,4 +372,3 @@ function CDAudio_MessageHandler(state, notification, deviceMatches)
   state.lastMessage = "Unexpected MM_MCINOTIFY type (" + notification + ")"
   return 1
 end function
-

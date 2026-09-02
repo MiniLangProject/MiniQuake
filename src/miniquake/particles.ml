@@ -16,61 +16,92 @@ import miniquake.message as msg
 import miniquake.array_util as arrays
 import miniquake.render.alias_normals as aliasNormals
 
+/// Defines the pt static value used by `miniquake.particles`.
 const PT_STATIC = 0
+/// Defines the pt gravity value used by `miniquake.particles`.
 const PT_GRAVITY = 1
+/// Defines the pt slow gravity value used by `miniquake.particles`.
 const PT_SLOW_GRAVITY = 2
+/// Defines the pt fire value used by `miniquake.particles`.
 const PT_FIRE = 3
+/// Defines the pt explode value used by `miniquake.particles`.
 const PT_EXPLODE = 4
+/// Defines the pt explode2 value used by `miniquake.particles`.
 const PT_EXPLODE2 = 5
+/// Defines the pt blob value used by `miniquake.particles`.
 const PT_BLOB = 6
+/// Defines the pt blob2 value used by `miniquake.particles`.
 const PT_BLOB2 = 7
 
+/// Defines the max particles value used by `miniquake.particles`.
 const MAX_PARTICLES = 2048
+/// Defines the absolute min particles value used by `miniquake.particles`.
 const ABSOLUTE_MIN_PARTICLES = 512
+/// Defines the num vertex normals value used by `miniquake.particles`.
 const NUM_VERTEX_NORMALS = 162
 
-// Provide particle float behavior for the active subsystem.
+/// Implements the `particleFloat` operation for `miniquake.particles` (particle float).
+/// @param value Value consumed by `particleFloat`.
 function particleFloat(value)
   return native.bitsFloat(native.floatBits(value))
 end function
 
+/// Tracks the module-level ramp1 state owned by `miniquake.particles`.
 ramp1 = [0x6f, 0x6d, 0x6b, 0x69, 0x67, 0x65, 0x63, 0x61]
+/// Tracks the module-level ramp2 state owned by `miniquake.particles`.
 ramp2 = [0x6f, 0x6e, 0x6d, 0x6c, 0x6b, 0x6a, 0x68, 0x66]
+/// Tracks the module-level ramp3 state owned by `miniquake.particles`.
 ramp3 = [0x6d, 0x6b, 6, 5, 4, 3]
 
 // Own the coordinated data required by the particle system.
 struct ParticleSystem
+  /// Stores the capacity value in `miniquake.particles.ParticleSystem`.
   capacity
+  /// Stores the active value in `miniquake.particles.ParticleSystem`.
   active
+  /// Stores the random seed value in `miniquake.particles.ParticleSystem`.
   randomSeed
+  /// Stores the tracer count value in `miniquake.particles.ParticleSystem`.
   tracerCount
+  /// Stores the angular velocities value in `miniquake.particles.ParticleSystem`.
   angularVelocities
 end struct
 
+/// Tracks the module-level compat random seed state owned by `miniquake.particles`.
 compatRandomSeed = 1
+/// Tracks the module-level compat tracer count state owned by `miniquake.particles`.
 compatTracerCount = 0
+/// Tracks the module-level compat angular velocities state owned by `miniquake.particles`.
 compatAngularVelocities = []
+/// Tracks the module-level canonical vertex normals state owned by `miniquake.particles`.
 canonicalVertexNormals = []
 
-// Allocate and initialize the requested value.
+/// Implements the `spawn` operation for `miniquake.particles` (spawn).
+/// @param origin World-space origin of the operation.
+/// @param velocity Velocity applied by the operation.
+/// @param dieTime Time value used by the operation.
+/// @param color Color value used by the operation.
+/// @param type The type input consumed by `spawn`.
 function spawn(origin, velocity, dieTime, color, type)
   originCopy = t.Vec3(origin.x, origin.y, origin.z)
   velocityCopy = t.Vec3(velocity.x, velocity.y, velocity.z)
   return t.Particle(originCopy, velocityCopy, dieTime, color, 0.0, type)
 end function
 
-// Create the zero-initialized state for vector.
+/// Implements the `zeroVector` operation for `miniquake.particles` (zero vector).
 function zeroVector()
   return t.Vec3(0.0, 0.0, 0.0)
 end function
 
-// Create and initialize system.
+/// Create and initialize system.
+/// @param capacity Maximum number of entries the destination can hold.
 function createSystem(capacity)
   if capacity < ABSOLUTE_MIN_PARTICLES then capacity = ABSOLUTE_MIN_PARTICLES end if
   return ParticleSystem(capacity, [], 1, 0, [])
 end function
 
-// Apply the Quake-compatible r init particles behavior.
+/// Apply the Quake-compatible r init particles behavior.
+/// @param arguments Command-line arguments to inspect or execute.
 function R_InitParticles(arguments)
   capacity = MAX_PARTICLES
   index = 0
@@ -86,25 +117,30 @@ function R_InitParticles(arguments)
   return createSystem(capacity)
 end function
 
-// Apply the Quake-compatible r clear particles behavior.
+/// Apply the Quake-compatible r clear particles behavior.
+/// @param system The system input consumed by `R_ClearParticles`.
 function R_ClearParticles(system)
   system.active = []
   return system
 end function
 
-// Apply the Quake-compatible r set random seed behavior.
+/// Apply the Quake-compatible r set random seed behavior.
+/// @param system The system input consumed by `R_SetRandomSeed`.
+/// @param seed The seed input consumed by `R_SetRandomSeed`.
 function R_SetRandomSeed(system, seed)
   system.randomSeed = seed & 0xffffffff
   return system.randomSeed
 end function
 
-// MiniQuake's Win32 build uses the Microsoft C runtime rand() sequence.
+/// MiniQuake's Win32 build uses the Microsoft C runtime rand() sequence.
+/// @param system The system input consumed by `R_Rand`.
 function R_Rand(system)
   system.randomSeed = (system.randomSeed * 214013 + 2531011) & 0xffffffff
   return (system.randomSeed >> 16) & 0x7fff
 end function
 
-// Apply the Quake-compatible r alloc particle behavior.
+/// Apply the Quake-compatible r alloc particle behavior.
+/// @param system The system input consumed by `R_AllocParticle`.
 function R_AllocParticle(system)
   if len(system.active) >= system.capacity then return void end if
   origin = zeroVector()
@@ -116,7 +152,9 @@ function R_AllocParticle(system)
   return particle
 end function
 
-// Provide ramp color behavior for the active subsystem.
+/// Implements the `rampColor` operation for `miniquake.particles` (ramp color).
+/// @param values The values input consumed by `rampColor`.
+/// @param ramp The ramp input consumed by `rampColor`.
 function rampColor(values, ramp)
   index = native.trunc(ramp)
   if index < 0 then index = 0 end if
@@ -124,7 +162,10 @@ function rampColor(values, ramp)
   return values[index]
 end function
 
-// Apply the Quake-compatible r dark field particles behavior.
+/// Apply the Quake-compatible r dark field particles behavior.
+/// @param system The system input consumed by `R_DarkFieldParticles`.
+/// @param entityOrigin The entity origin input consumed by `R_DarkFieldParticles`.
+/// @param currentTime Time value used by the operation.
 function R_DarkFieldParticles(system, entityOrigin, currentTime)
   i = -16
   while i < 16
@@ -154,7 +195,9 @@ function R_DarkFieldParticles(system, entityOrigin, currentTime)
   return system.active
 end function
 
-// Initialize state for initialize angular velocities.
+/// Initialize state for initialize angular velocities.
+/// @param system The system input consumed by `initializeAngularVelocities`.
+/// @param count Number of entries or units to process.
 function initializeAngularVelocities(system, count)
   if len(system.angularVelocities) != 0 then return true end if
   system.angularVelocities = []
@@ -172,8 +215,12 @@ function initializeAngularVelocities(system, count)
   return true
 end function
 
-// r_avertexnormals belongs to the renderer rather than r_part.c, so callers
-// provide that canonical 162-vector table as the explicit dependency.
+/// r_avertexnormals belongs to the renderer rather than r_part.c, so callers
+/// provide that canonical 162-vector table as the explicit dependency.
+/// @param system The system input consumed by `R_EntityParticles`.
+/// @param entityOrigin The entity origin input consumed by `R_EntityParticles`.
+/// @param currentTime Time value used by the operation.
+/// @param vertexNormals The vertex normals input consumed by `R_EntityParticles`.
 function R_EntityParticles(system, entityOrigin, currentTime, vertexNormals)
   count = len(vertexNormals)
   if count > NUM_VERTEX_NORMALS then count = NUM_VERTEX_NORMALS end if
@@ -210,7 +257,9 @@ function R_EntityParticles(system, entityOrigin, currentTime, vertexNormals)
   return system.active
 end function
 
-// Apply the Quake-compatible r read point file f behavior.
+/// Apply the Quake-compatible r read point file f behavior.
+/// @param system The system input consumed by `R_ReadPointFile_f`.
+/// @param text Text to parse or process.
 function R_ReadPointFile_f(system, text)
   offset = 0
   pointCount = 0
@@ -235,7 +284,10 @@ function R_ReadPointFile_f(system, text)
   return pointCount
 end function
 
-// Apply the Quake-compatible r parse particle effect behavior.
+/// Apply the Quake-compatible r parse particle effect behavior.
+/// @param system The system input consumed by `R_ParseParticleEffect`.
+/// @param reader The reader input consumed by `R_ParseParticleEffect`.
+/// @param currentTime Time value used by the operation.
 function R_ParseParticleEffect(system, reader, currentTime)
   origin = t.Vec3(msg.readCoord(reader), msg.readCoord(reader), msg.readCoord(reader))
   direction = t.Vec3(
@@ -250,7 +302,10 @@ function R_ParseParticleEffect(system, reader, currentTime)
   return R_RunParticleEffect(system, origin, direction, color, count, currentTime)
 end function
 
-// Return random explosion vector derived from the active module state.
+/// Return random explosion vector derived from the active module state.
+/// @param system The system input consumed by `randomExplosionVector`.
+/// @param origin World-space origin of the operation.
+/// @param particle The particle input consumed by `randomExplosionVector`.
 function randomExplosionVector(system, origin, particle)
   // The C body assigns org[j] and vel[j] in the same loop.  The interleaved
   // rand() order is observable in demos/effects and must not be regrouped.
@@ -262,7 +317,10 @@ function randomExplosionVector(system, origin, particle)
   particle.velocity.z = (R_Rand(system) % 512) - 256
 end function
 
-// Apply the Quake-compatible r particle explosion behavior.
+/// Apply the Quake-compatible r particle explosion behavior.
+/// @param system The system input consumed by `R_ParticleExplosion`.
+/// @param origin World-space origin of the operation.
+/// @param currentTime Time value used by the operation.
 function R_ParticleExplosion(system, origin, currentTime)
   index = 0
   while index < 1024
@@ -279,7 +337,12 @@ function R_ParticleExplosion(system, origin, currentTime)
   return system.active
 end function
 
-// Apply the Quake-compatible r particle explosion2 behavior.
+/// Apply the Quake-compatible r particle explosion2 behavior.
+/// @param system The system input consumed by `R_ParticleExplosion2`.
+/// @param origin World-space origin of the operation.
+/// @param colorStart The color start input consumed by `R_ParticleExplosion2`.
+/// @param colorLength Length of the requested data in units appropriate to the operation.
+/// @param currentTime Time value used by the operation.
 function R_ParticleExplosion2(system, origin, colorStart, colorLength, currentTime)
   if colorLength <= 0 then return error(3701, "R_ParticleExplosion2 colorLength must be positive") end if
   colorMod = 0
@@ -297,7 +360,10 @@ function R_ParticleExplosion2(system, origin, colorStart, colorLength, currentTi
   return system.active
 end function
 
-// Apply the Quake-compatible r blob explosion behavior.
+/// Apply the Quake-compatible r blob explosion behavior.
+/// @param system The system input consumed by `R_BlobExplosion`.
+/// @param origin World-space origin of the operation.
+/// @param currentTime Time value used by the operation.
 function R_BlobExplosion(system, origin, currentTime)
   index = 0
   while index < 1024
@@ -317,7 +383,13 @@ function R_BlobExplosion(system, origin, currentTime)
   return system.active
 end function
 
-// Apply the Quake-compatible r run particle effect behavior.
+/// Apply the Quake-compatible r run particle effect behavior.
+/// @param system The system input consumed by `R_RunParticleEffect`.
+/// @param origin World-space origin of the operation.
+/// @param direction The direction input consumed by `R_RunParticleEffect`.
+/// @param color Color value used by the operation.
+/// @param count Number of entries or units to process.
+/// @param currentTime Time value used by the operation.
 function R_RunParticleEffect(system, origin, direction, color, count, currentTime)
   index = 0
   while index < count
@@ -346,7 +418,10 @@ function R_RunParticleEffect(system, origin, direction, color, count, currentTim
   return system.active
 end function
 
-// Apply the Quake-compatible r lava splash behavior.
+/// Apply the Quake-compatible r lava splash behavior.
+/// @param system The system input consumed by `R_LavaSplash`.
+/// @param origin World-space origin of the operation.
+/// @param currentTime Time value used by the operation.
 function R_LavaSplash(system, origin, currentTime)
   i = -16
   while i < 16
@@ -373,7 +448,10 @@ function R_LavaSplash(system, origin, currentTime)
   return system.active
 end function
 
-// Apply the Quake-compatible r teleport splash behavior.
+/// Apply the Quake-compatible r teleport splash behavior.
+/// @param system The system input consumed by `R_TeleportSplash`.
+/// @param origin World-space origin of the operation.
+/// @param currentTime Time value used by the operation.
 function R_TeleportSplash(system, origin, currentTime)
   i = -16
   while i < 16
@@ -404,7 +482,12 @@ function R_TeleportSplash(system, origin, currentTime)
   return system.active
 end function
 
-// Apply the Quake-compatible r rocket trail behavior.
+/// Apply the Quake-compatible r rocket trail behavior.
+/// @param system The system input consumed by `R_RocketTrail`.
+/// @param start The start input consumed by `R_RocketTrail`.
+/// @param finish The finish input consumed by `R_RocketTrail`.
+/// @param trailType The trail type input consumed by `R_RocketTrail`.
+/// @param currentTime Time value used by the operation.
 function R_RocketTrail(system, start, finish, trailType, currentTime)
   direction = math.VectorSubtract(finish, start)
   length = math.VectorNormalize(direction)
@@ -484,7 +567,12 @@ function R_RocketTrail(system, start, finish, trailType, currentTime)
   return system.active
 end function
 
-// Provide particle draw command behavior for the active subsystem.
+/// Implements the `particleDrawCommand` operation for `miniquake.particles` (particle draw command).
+/// @param particle The particle input consumed by `particleDrawCommand`.
+/// @param viewOrigin The view origin input consumed by `particleDrawCommand`.
+/// @param viewForward The view forward input consumed by `particleDrawCommand`.
+/// @param scaledUp The scaled up input consumed by `particleDrawCommand`.
+/// @param scaledRight The scaled right input consumed by `particleDrawCommand`.
 function particleDrawCommand(particle, viewOrigin, viewForward, scaledUp, scaledRight)
   distance = math.DotProduct(math.VectorSubtract(particle.origin, viewOrigin), viewForward)
   scale = 1.0
@@ -494,7 +582,10 @@ function particleDrawCommand(particle, viewOrigin, viewForward, scaledUp, scaled
   return ["particle", particle.color, math.VectorCopy(particle.origin), upVertex, rightVertex, scale]
 end function
 
-// Update module state for particle physics.
+/// Update module state for particle physics.
+/// @param particle The particle input consumed by `updateParticlePhysics`.
+/// @param frameTime Time value used by the operation.
+/// @param gravity The gravity input consumed by `updateParticlePhysics`.
 function updateParticlePhysics(particle, frameTime, gravity)
   // r_part.c stores frametime and all particle fields as float.
   frameTime = particleFloat(frameTime)
@@ -547,8 +638,16 @@ function updateParticlePhysics(particle, frameTime, gravity)
   return particle
 end function
 
-// Produces the fixed-function MiniQuake command trace and advances particles in
-// the same draw-before-simulate order as R_DrawParticles.
+/// Produces the fixed-function MiniQuake command trace and advances particles in
+/// the same draw-before-simulate order as R_DrawParticles.
+/// @param system The system input consumed by `R_DrawParticles`.
+/// @param currentTime Time value used by the operation.
+/// @param oldTime Time value used by the operation.
+/// @param gravity The gravity input consumed by `R_DrawParticles`.
+/// @param viewOrigin The view origin input consumed by `R_DrawParticles`.
+/// @param viewForward The view forward input consumed by `R_DrawParticles`.
+/// @param viewUp The view up input consumed by `R_DrawParticles`.
+/// @param viewRight The view right input consumed by `R_DrawParticles`.
 function R_DrawParticles(system, currentTime, oldTime, gravity, viewOrigin, viewForward, viewUp, viewRight)
   activeCount = len(system.active)
   commandBuffer = array(activeCount + 7, void)
@@ -590,19 +689,20 @@ function R_DrawParticles(system, currentTime, oldTime, gravity, viewOrigin, view
   return arrays.copyArrayPrefix(commandBuffer, commandCount)
 end function
 
-// Provide compatibility system behavior for the active subsystem.
+/// Implements the `compatibilitySystem` operation for `miniquake.particles` (compatibility system).
 function compatibilitySystem()
   global compatRandomSeed, compatTracerCount, compatAngularVelocities
   return ParticleSystem(MAX_PARTICLES, [], compatRandomSeed, compatTracerCount, compatAngularVelocities)
 end function
 
-// Report whether compatibility system with active holds for the active state.
+/// Report whether compatibility system with active holds for the active state.
+/// @param active The active input consumed by `compatibilitySystemWithActive`.
 function compatibilitySystemWithActive(active)
   global compatRandomSeed, compatTracerCount, compatAngularVelocities
   return ParticleSystem(MAX_PARTICLES, active, compatRandomSeed, compatTracerCount, compatAngularVelocities)
 end function
 
-// Provide canonical entity normals behavior for the active subsystem.
+/// Returns whether `miniquake.particles` can onical entity normals.
 function canonicalEntityNormals()
   global canonicalVertexNormals
   if len(canonicalVertexNormals) == NUM_VERTEX_NORMALS then return canonicalVertexNormals end if
@@ -616,7 +716,8 @@ function canonicalEntityNormals()
   return canonicalVertexNormals
 end function
 
-// Finalize state for finish compatibility.
+/// Finalize state for finish compatibility.
+/// @param system The system input consumed by `finishCompatibility`.
 function finishCompatibility(system)
   global compatRandomSeed, compatTracerCount, compatAngularVelocities
   compatRandomSeed = system.randomSeed
@@ -625,7 +726,8 @@ function finishCompatibility(system)
   return system.active
 end function
 
-// Update module state for random.
+/// Update module state for random.
+/// @param seed The seed input consumed by `resetRandom`.
 function resetRandom(seed)
   global compatRandomSeed, compatTracerCount, compatAngularVelocities
   compatRandomSeed = seed & 0xffffffff
@@ -634,14 +736,16 @@ function resetRandom(seed)
   return compatRandomSeed
 end function
 
-// Provide compat rand behavior for the active subsystem.
+/// Implements the `compatRand` operation for `miniquake.particles` (compat rand).
 function compatRand()
   global compatRandomSeed
   compatRandomSeed = (compatRandomSeed * 214013 + 2531011) & 0xffffffff
   return (compatRandomSeed >> 16) & 0x7fff
 end function
 
-// Add state for append limited.
+/// Add state for append limited.
+/// @param target The target input consumed by `appendLimited`.
+/// @param source Source value or collection to read.
 function appendLimited(target, source)
   appendCount = len(source)
   available = MAX_PARTICLES - len(target)
@@ -657,7 +761,11 @@ function appendLimited(target, source)
   return result
 end function
 
-// Update module state for with gravity.
+/// Update module state for with gravity.
+/// @param particles The particles input consumed by `updateWithGravity`.
+/// @param currentTime Time value used by the operation.
+/// @param deltaTime Time value used by the operation.
+/// @param gravity The gravity input consumed by `updateWithGravity`.
 function updateWithGravity(particles, currentTime, deltaTime, gravity)
   // Host_Frame advances effects even in a headless client/demo.  Building the
   // complete GL command trace here used to allocate several copied Vec3s and
@@ -701,33 +809,51 @@ function updateWithGravity(particles, currentTime, deltaTime, gravity)
   return alive
 end function
 
-// Compatibility wrapper for callers that do not own the server cvar table.
-// The integrated Host_Frame path uses updateWithGravity and passes the current
-// sv_gravity value, matching R_DrawParticles' extern cvar dependency.
+/// Compatibility wrapper for callers that do not own the server cvar table.
+/// The integrated Host_Frame path uses updateWithGravity and passes the current
+/// sv_gravity value, matching R_DrawParticles' extern cvar dependency.
+/// @param particles The particles input consumed by `update`.
+/// @param currentTime Time value used by the operation.
+/// @param deltaTime Time value used by the operation.
 function update(particles, currentTime, deltaTime)
   return updateWithGravity(particles, currentTime, deltaTime, 800.0)
 end function
 
-// Execute effect.
+/// Execute effect.
+/// @param origin World-space origin of the operation.
+/// @param direction The direction input consumed by `runEffect`.
+/// @param count Number of entries or units to process.
+/// @param color Color value used by the operation.
+/// @param currentTime Time value used by the operation.
 function runEffect(origin, direction, count, color, currentTime)
   system = compatibilitySystem()
   R_RunParticleEffect(system, origin, direction, color, count, currentTime)
   return finishCompatibility(system)
 end function
 
-// Provide point effect behavior for the active subsystem.
+/// Implements the `pointEffect` operation for `miniquake.particles` (point effect).
+/// @param origin World-space origin of the operation.
+/// @param count Number of entries or units to process.
+/// @param color Color value used by the operation.
+/// @param currentTime Time value used by the operation.
 function pointEffect(origin, count, color, currentTime)
   return runEffect(origin, zeroVector(), count, color, currentTime)
 end function
 
-// Provide explosion behavior for the active subsystem.
+/// Implements the `explosion` operation for `miniquake.particles` (explosion).
+/// @param origin World-space origin of the operation.
+/// @param currentTime Time value used by the operation.
 function explosion(origin, currentTime)
   system = compatibilitySystem()
   R_ParticleExplosion(system, origin, currentTime)
   return finishCompatibility(system)
 end function
 
-// Provide explosion2 behavior for the active subsystem.
+/// Implements the `explosion2` operation for `miniquake.particles` (explosion2).
+/// @param origin World-space origin of the operation.
+/// @param colorStart The color start input consumed by `explosion2`.
+/// @param colorLength Length of the requested data in units appropriate to the operation.
+/// @param currentTime Time value used by the operation.
 function explosion2(origin, colorStart, colorLength, currentTime)
   system = compatibilitySystem()
   result = R_ParticleExplosion2(system, origin, colorStart, colorLength, currentTime)
@@ -735,45 +861,63 @@ function explosion2(origin, colorStart, colorLength, currentTime)
   return finishCompatibility(system)
 end function
 
-// Provide blob explosion behavior for the active subsystem.
+/// Implements the `blobExplosion` operation for `miniquake.particles` (blob explosion).
+/// @param origin World-space origin of the operation.
+/// @param currentTime Time value used by the operation.
 function blobExplosion(origin, currentTime)
   system = compatibilitySystem()
   R_BlobExplosion(system, origin, currentTime)
   return finishCompatibility(system)
 end function
 
-// Provide lava splash behavior for the active subsystem.
+/// Implements the `lavaSplash` operation for `miniquake.particles` (lava splash).
+/// @param origin World-space origin of the operation.
+/// @param currentTime Time value used by the operation.
 function lavaSplash(origin, currentTime)
   system = compatibilitySystem()
   R_LavaSplash(system, origin, currentTime)
   return finishCompatibility(system)
 end function
 
-// Provide teleport splash behavior for the active subsystem.
+/// Implements the `teleportSplash` operation for `miniquake.particles` (teleport splash).
+/// @param origin World-space origin of the operation.
+/// @param currentTime Time value used by the operation.
 function teleportSplash(origin, currentTime)
   system = compatibilitySystem()
   R_TeleportSplash(system, origin, currentTime)
   return finishCompatibility(system)
 end function
 
-// Provide rocket trail behavior for the active subsystem.
+/// Implements the `rocketTrail` operation for `miniquake.particles` (rocket trail).
+/// @param start The start input consumed by `rocketTrail`.
+/// @param finish The finish input consumed by `rocketTrail`.
+/// @param trailType The trail type input consumed by `rocketTrail`.
+/// @param currentTime Time value used by the operation.
 function rocketTrail(start, finish, trailType, currentTime)
   system = compatibilitySystem()
   R_RocketTrail(system, start, finish, trailType, currentTime)
   return finishCompatibility(system)
 end function
 
-// CL_RelinkEntities shares r_part.c's single active/free particle pool with
-// temp entities.  These integration helpers operate on that existing pool so
-// saturation stops allocation (and random-number consumption) at the same
-// particle as the original linked-list implementation.
+/// CL_RelinkEntities shares r_part.c's single active/free particle pool with
+/// temp entities.  These integration helpers operate on that existing pool so
+/// saturation stops allocation (and random-number consumption) at the same
+/// particle as the original linked-list implementation.
+/// @param active The active input consumed by `entityParticlesInto`.
+/// @param entityOrigin The entity origin input consumed by `entityParticlesInto`.
+/// @param currentTime Time value used by the operation.
 function entityParticlesInto(active, entityOrigin, currentTime)
   system = compatibilitySystemWithActive(active)
   R_EntityParticles(system, entityOrigin, currentTime, canonicalEntityNormals())
   return finishCompatibility(system)
 end function
 
-// Provide rocket trail into behavior for the active subsystem.
+/// Implements the `rocketTrailInto` operation for `miniquake.particles` (rocket trail into).
+/// @param active The active input consumed by `rocketTrailInto`.
+/// @param start The start input consumed by `rocketTrailInto`.
+/// @param finish The finish input consumed by `rocketTrailInto`.
+/// @param trailType The trail type input consumed by `rocketTrailInto`.
+/// @param currentTime Time value used by the operation.
 function rocketTrailInto(active, start, finish, trailType, currentTime)
   system = compatibilitySystemWithActive(active)
   R_RocketTrail(system, start, finish, trailType, currentTime)

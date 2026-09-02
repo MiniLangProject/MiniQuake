@@ -29,76 +29,139 @@ import std.fs as compatRmainFs
 // gameplay equations are retained; only platform/pointer storage differs.
 
 struct EfragRef
+  /// Stores the entity value in `miniquake.render.original.EfragRef`.
   entity
+  /// Stores the leaf index value in `miniquake.render.original.EfragRef`.
   leafIndex
 end struct
 
+/// Tracks the module-level r worldentity state owned by `miniquake.render.original`.
 r_worldentity = void
+/// Tracks the module-level r cache thrash state owned by `miniquake.render.original`.
 r_cache_thrash = false
+/// Tracks the module-level modelorg state owned by `miniquake.render.original`.
 modelorg = compatRmainTypes.Vec3(0.0, 0.0, 0.0)
+/// Tracks the module-level r entorigin state owned by `miniquake.render.original`.
 r_entorigin = compatRmainTypes.Vec3(0.0, 0.0, 0.0)
+/// Tracks the module-level currententity state owned by `miniquake.render.original`.
 currententity = void
+/// Tracks the module-level frustum state owned by `miniquake.render.original`.
 frustum = [
   compatRmainTypes.Plane(compatRmainTypes.Vec3(0.0, 0.0, 0.0), 0.0, 5, 0),
   compatRmainTypes.Plane(compatRmainTypes.Vec3(0.0, 0.0, 0.0), 0.0, 5, 0),
   compatRmainTypes.Plane(compatRmainTypes.Vec3(0.0, 0.0, 0.0), 0.0, 5, 0),
   compatRmainTypes.Plane(compatRmainTypes.Vec3(0.0, 0.0, 0.0), 0.0, 5, 0),
 ]
+/// Tracks the module-level c brush polys state owned by `miniquake.render.original`.
 c_brush_polys = 0
+/// Tracks the module-level c alias polys state owned by `miniquake.render.original`.
 c_alias_polys = 0
+/// Tracks the module-level envmap state owned by `miniquake.render.original`.
 envmap = false
+/// Tracks the module-level currenttexture state owned by `miniquake.render.original`.
 currenttexture = -1
+/// Tracks the module-level cnttextures state owned by `miniquake.render.original`.
 cnttextures = [-1, -1]
+/// Tracks the module-level particletexture state owned by `miniquake.render.original`.
 particletexture = 0
+/// Tracks the module-level playertextures state owned by `miniquake.render.original`.
 playertextures = []
+/// Tracks the module-level mirrortexturenum state owned by `miniquake.render.original`.
 mirrortexturenum = -1
+/// Tracks the module-level mirror state owned by `miniquake.render.original`.
 mirror = false
+/// Tracks the module-level mirror plane state owned by `miniquake.render.original`.
 mirror_plane = void
+/// Tracks the module-level vup state owned by `miniquake.render.original`.
 vup = compatRmainTypes.Vec3(0.0, 0.0, 1.0)
+/// Tracks the module-level vpn state owned by `miniquake.render.original`.
 vpn = compatRmainTypes.Vec3(1.0, 0.0, 0.0)
+/// Tracks the module-level vright state owned by `miniquake.render.original`.
 vright = compatRmainTypes.Vec3(0.0, -1.0, 0.0)
+/// Tracks the module-level r origin state owned by `miniquake.render.original`.
 r_origin = compatRmainTypes.Vec3(0.0, 0.0, 0.0)
+/// Tracks the module-level r viewleaf state owned by `miniquake.render.original`.
 r_viewleaf = 0
+/// Tracks the module-level r oldviewleaf state owned by `miniquake.render.original`.
 r_oldviewleaf = 0
+/// Tracks the module-level r notexture mip state owned by `miniquake.render.original`.
 r_notexture_mip = void
+/// Tracks the module-level r notexture mips state owned by `miniquake.render.original`.
 r_notexture_mips = []
+/// Tracks the module-level r compat particle texture state owned by `miniquake.render.original`.
 rCompatParticleTexture = 0
+/// Tracks the module-level r compat renderer state owned by `miniquake.render.original`.
 rCompatRenderer = void
+/// Tracks the module-level r compat entity renderer state owned by `miniquake.render.original`.
 rCompatEntityRenderer = void
+/// Tracks the module-level r compat view state owned by `miniquake.render.original`.
 rCompatView = void
+/// Tracks the module-level r compat player state owned by `miniquake.render.original`.
 rCompatPlayer = void
+/// Tracks the module-level r compat client state owned by `miniquake.render.original`.
 rCompatClient = void
+/// Tracks the module-level r compat server state owned by `miniquake.render.original`.
 rCompatServer = void
+/// Tracks the module-level r compat particles state owned by `miniquake.render.original`.
 rCompatParticles = []
+/// Tracks the module-level r compat temporary state owned by `miniquake.render.original`.
 rCompatTemporary = []
+/// Tracks the module-level r compat cvars state owned by `miniquake.render.original`.
 rCompatCvars = void
+/// Tracks the module-level r compat game directory state owned by `miniquake.render.original`.
 rCompatGameDirectory = ""
+/// Tracks the module-level r compat width state owned by `miniquake.render.original`.
 rCompatWidth = 640
+/// Tracks the module-level r compat height state owned by `miniquake.render.original`.
 rCompatHeight = 480
+/// Tracks the module-level r compat time state owned by `miniquake.render.original`.
 rCompatTime = 0.0
+/// Tracks the module-level r compat realtime state owned by `miniquake.render.original`.
 rCompatRealtime = 0.0
+/// Tracks the module-level r compat frame time state owned by `miniquake.render.original`.
 rCompatFrameTime = 0.0
+/// Tracks the module-level r compat view entity state owned by `miniquake.render.original`.
 rCompatViewEntity = 0
+/// Tracks the module-level r compat draw entities state owned by `miniquake.render.original`.
 rCompatDrawEntities = true
+/// Tracks the module-level r compat draw view model state owned by `miniquake.render.original`.
 rCompatDrawViewModel = true
+/// Tracks the module-level r compat depth min state owned by `miniquake.render.original`.
 rCompatDepthMin = 0.0
+/// Tracks the module-level r compat depth max state owned by `miniquake.render.original`.
 rCompatDepthMax = 1.0
+/// Tracks the module-level r compat trick frame state owned by `miniquake.render.original`.
 rCompatTrickFrame = 0
+/// Tracks the module-level r compat leaf efrags state owned by `miniquake.render.original`.
 rCompatLeafEfrags = []
+/// Tracks the module-level r compat entity efrags state owned by `miniquake.render.original`.
 rCompatEntityEfrags = []
+/// Tracks the module-level r compat efrag valid state owned by `miniquake.render.original`.
 rCompatEfragValid = []
+/// Tracks the module-level r compat efrag model state owned by `miniquake.render.original`.
 rCompatEfragModel = []
+/// Tracks the module-level r compat efrag origin x state owned by `miniquake.render.original`.
 rCompatEfragOriginX = []
+/// Tracks the module-level r compat efrag origin y state owned by `miniquake.render.original`.
 rCompatEfragOriginY = []
+/// Tracks the module-level r compat efrag origin z state owned by `miniquake.render.original`.
 rCompatEfragOriginZ = []
+/// Tracks the module-level r compat efrag top node state owned by `miniquake.render.original`.
 rCompatEfragTopNode = void
+/// Tracks the module-level r compat add entity state owned by `miniquake.render.original`.
 rCompatAddEntity = void
+/// Tracks the module-level r compat entity mins state owned by `miniquake.render.original`.
 rCompatEntityMins = compatRmainTypes.Vec3(0.0, 0.0, 0.0)
+/// Tracks the module-level r compat entity maxs state owned by `miniquake.render.original`.
 rCompatEntityMaxs = compatRmainTypes.Vec3(0.0, 0.0, 0.0)
+/// Tracks the module-level cl visedicts state owned by `miniquake.render.original`.
 cl_visedicts = []
+/// Tracks the module-level cl numvisedicts state owned by `miniquake.render.original`.
 cl_numvisedicts = 0
 
-// Return compat cvar value derived from the active module state.
+/// Return compat cvar value derived from the active module state.
+/// @param name Stable name that identifies the requested object or option.
+/// @param fallback Value to use when the requested input is unavailable or invalid.
 function compatCvarValue(name, fallback)
   if rCompatCvars is void then return fallback end if
   variable = compatRmainCvar.find(rCompatCvars, name)
@@ -106,18 +169,36 @@ function compatCvarValue(name, fallback)
   return variable.value
 end function
 
-// Provide compat bool cvar behavior for the active subsystem.
+/// Implements the `compatBoolCvar` operation for `miniquake.render.original` (compat bool cvar).
+/// @param name Stable name that identifies the requested object or option.
+/// @param fallback Value to use when the requested input is unavailable or invalid.
 function compatBoolCvar(name, fallback)
   return compatCvarValue(name, fallback) != 0.0
 end function
 
-// Return compat vector derived from the active module state.
+/// Return compat vector derived from the active module state.
+/// @param value Value consumed by `compatVector`.
 function compatVector(value)
   if value is void then return compatRmainTypes.Vec3(0.0, 0.0, 0.0) end if
   return compatRmainMath.copy(value)
 end function
 
-// Apply the Quake-compatible r configure compatibility behavior.
+/// Apply the Quake-compatible r configure compatibility behavior.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param entityRenderer The entity renderer input consumed by `R_ConfigureCompatibility`.
+/// @param viewState Mutable state used by `R_ConfigureCompatibility`.
+/// @param player The player input consumed by `R_ConfigureCompatibility`.
+/// @param client Client state participating in the operation.
+/// @param server Server state participating in the operation.
+/// @param particles The particles input consumed by `R_ConfigureCompatibility`.
+/// @param temporaryEntities The temporary entities input consumed by `R_ConfigureCompatibility`.
+/// @param cvars The cvars input consumed by `R_ConfigureCompatibility`.
+/// @param gameDirectory Selected Quake game-data directory.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param currentTime Time value used by the operation.
+/// @param realtime Time value used by the operation.
+/// @param frameTime Time value used by the operation.
 function R_ConfigureCompatibility(
   renderer,
   entityRenderer,
@@ -238,7 +319,8 @@ function compatEnsureEfragState()
   return true
 end function
 
-// Apply the Quake-compatible r remove efrags behavior.
+/// Apply the Quake-compatible r remove efrags behavior.
+/// @param ent The ent input consumed by `R_RemoveEfrags`.
 function R_RemoveEfrags(ent)
   global rCompatLeafEfrags, rCompatEntityEfrags
   if ent is void then return false end if
@@ -260,7 +342,8 @@ function R_RemoveEfrags(ent)
   return true
 end function
 
-// Provide compat append efrag behavior for the active subsystem.
+/// Implements the `compatAppendEfrag` operation for `miniquake.render.original` (compat append efrag).
+/// @param leafIndex Zero-based index of the requested entry.
 function compatAppendEfrag(leafIndex)
   global rCompatLeafEfrags, rCompatEntityEfrags, rCompatEfragTopNode
   if rCompatAddEntity is void then return false end if
@@ -275,7 +358,8 @@ function compatAppendEfrag(leafIndex)
   return true
 end function
 
-// Apply the Quake-compatible r split entity on node behavior.
+/// Apply the Quake-compatible r split entity on node behavior.
+/// @param node The node input consumed by `R_SplitEntityOnNode`.
 function R_SplitEntityOnNode(node)
   global rCompatEfragTopNode
   if rCompatRenderer is void or rCompatAddEntity is void then return 0 end if
@@ -298,7 +382,8 @@ function R_SplitEntityOnNode(node)
   return count
 end function
 
-// Provide compat model bounds behavior for the active subsystem.
+/// Implements the `compatModelBounds` operation for `miniquake.render.original` (compat model bounds).
+/// @param ent The ent input consumed by `compatModelBounds`.
 function compatModelBounds(ent)
   if rCompatEntityRenderer is void or ent.modelIndex <= 0 or ent.modelIndex >= len(rCompatEntityRenderer.models) then return void end if
   model = rCompatEntityRenderer.models[ent.modelIndex]
@@ -316,7 +401,8 @@ function compatModelBounds(ent)
   return [compatRmainMath.subtract(ent.origin, extent), compatRmainMath.add(ent.origin, extent)]
 end function
 
-// Apply the Quake-compatible r add efrags behavior.
+/// Apply the Quake-compatible r add efrags behavior.
+/// @param ent The ent input consumed by `R_AddEfrags`.
 function R_AddEfrags(ent)
   global rCompatAddEntity, rCompatEntityMins, rCompatEntityMaxs, rCompatEfragTopNode
   if ent is void or rCompatRenderer is void or len(rCompatRenderer.map.models) == 0 then return 0 end if
@@ -333,7 +419,9 @@ function R_AddEfrags(ent)
   return result
 end function
 
-// Provide compat store reference behavior for the active subsystem.
+/// Implements the `compatStoreReference` operation for `miniquake.render.original` (compat store reference).
+/// @param reference The reference input consumed by `compatStoreReference`.
+/// @param output Destination that receives the compatibility reference.
 function compatStoreReference(reference, output)
   global cl_numvisedicts
   if reference is void or reference.entity is void then return false end if
@@ -349,7 +437,8 @@ function compatStoreReference(reference, output)
   return true
 end function
 
-// Apply the Quake-compatible r store efrags behavior.
+/// Apply the Quake-compatible r store efrags behavior.
+/// @param ppefrag The ppefrag input consumed by `R_StoreEfrags`.
 function R_StoreEfrags(ppefrag)
   global cl_visedicts, cl_numvisedicts
   builder = compatRmainArrays.createArrayBuilder(compatRmainConstants.MAX_VISEDICTS)
@@ -430,9 +519,11 @@ function compatCollectVisibleEfrags()
   return cl_visedicts
 end function
 
-// -----------------------------------------------------------------------------
-// gl_rmain.c
-// -----------------------------------------------------------------------------
+/// -----------------------------------------------------------------------------
+/// gl_rmain.c
+/// -----------------------------------------------------------------------------
+/// @param mins The mins input consumed by `R_CullBox`.
+/// @param maxs The maxs input consumed by `R_CullBox`.
 
 function R_CullBox(mins, maxs)
   index = 0
@@ -443,7 +534,8 @@ function R_CullBox(mins, maxs)
   return false
 end function
 
-// Apply the Quake-compatible r rotate for entity behavior.
+/// Apply the Quake-compatible r rotate for entity behavior.
+/// @param entity Entity affected by the operation.
 function R_RotateForEntity(entity)
   if entity is void then return false end if
   compatRmainGl.translate(entity.origin.x, entity.origin.y, entity.origin.z)
@@ -453,7 +545,8 @@ function R_RotateForEntity(entity)
   return true
 end function
 
-// Apply the Quake-compatible r get sprite frame behavior.
+/// Apply the Quake-compatible r get sprite frame behavior.
+/// @param entity Entity affected by the operation.
 function R_GetSpriteFrame(entity)
   if entity is void or rCompatEntityRenderer is void then return void end if
   if entity.modelIndex <= 0 or entity.modelIndex >= len(rCompatEntityRenderer.models) then return void end if
@@ -464,7 +557,8 @@ function R_GetSpriteFrame(entity)
   return selected[0]
 end function
 
-// Apply the Quake-compatible r draw sprite model behavior.
+/// Apply the Quake-compatible r draw sprite model behavior.
+/// @param entity Entity affected by the operation.
 function R_DrawSpriteModel(entity)
   global currententity
   if entity is void or rCompatEntityRenderer is void or rCompatView is void then return 0 end if
@@ -475,7 +569,8 @@ function R_DrawSpriteModel(entity)
   return compatRmainEntities.drawSprite(rCompatEntityRenderer, model, entity, rCompatView.right, rCompatView.up, rCompatTime)
 end function
 
-// Apply the Quake-compatible r draw alias model behavior.
+/// Apply the Quake-compatible r draw alias model behavior.
+/// @param entity Entity affected by the operation.
 function R_DrawAliasModel(entity)
   global currententity, c_alias_polys, r_entorigin, modelorg
   if entity is void or rCompatEntityRenderer is void or rCompatRenderer is void then return 0 end if
@@ -559,7 +654,8 @@ function R_PolyBlend()
   return true
 end function
 
-// Provide signbits for plane behavior for the active subsystem.
+/// Implements the `SignbitsForPlane` operation for `miniquake.render.original` (signbits for plane).
+/// @param plane The plane input consumed by `SignbitsForPlane`.
 function SignbitsForPlane(plane)
   bitsValue = 0
   if plane.normal.x < 0.0 then bitsValue = bitsValue | 1 end if
@@ -622,7 +718,11 @@ function R_SetupFrame()
   return true
 end function
 
-// Provide myglu perspective behavior for the active subsystem.
+/// Implements the `MYgluPerspective` operation for `miniquake.render.original` (m yglu perspective).
+/// @param fovy The fovy input consumed by `MYgluPerspective`.
+/// @param aspect The aspect input consumed by `MYgluPerspective`.
+/// @param zNear The z near input consumed by `MYgluPerspective`.
+/// @param zFar The z far input consumed by `MYgluPerspective`.
 function MYgluPerspective(fovy, aspect, zNear, zFar)
   angle = fovy * compatRmainMath.PI / 360.0
   cosine = compatRmainNative.cos(angle)
@@ -796,7 +896,7 @@ function R_InitTextures()
   return r_notexture_mip
 end function
 
-// Apply the Quake-compatible r init particle texture behavior.
+/// Implements the `R_InitParticleTexture` operation for `miniquake.render.original` (r init particle texture).
 function R_InitParticleTexture()
   global particletexture, rCompatParticleTexture
   dot = [
@@ -833,7 +933,8 @@ function R_InitParticleTexture()
   return particletexture
 end function
 
-// Return compat envmap path derived from the active module state.
+/// Return compat envmap path derived from the active module state.
+/// @param index Zero-based index of the requested entry.
 function compatEnvmapPath(index)
   name = "env" + index + ".rgb"
   if rCompatGameDirectory == "" then return name end if
@@ -885,7 +986,10 @@ function R_Init()
   return true
 end function
 
-// Provide compat translate range behavior for the active subsystem.
+/// Implements the `compatTranslateRange` operation for `miniquake.render.original` (compat translate range).
+/// @param table The table input consumed by `compatTranslateRange`.
+/// @param destination Destination value or collection to update.
+/// @param source Source value or collection to read.
 function compatTranslateRange(table, destination, source)
   index = 0
   while index < 16
@@ -897,7 +1001,8 @@ function compatTranslateRange(table, destination, source)
   return table
 end function
 
-// Apply the Quake-compatible r translate player skin behavior.
+/// Apply the Quake-compatible r translate player skin behavior.
+/// @param playernum The playernum input consumed by `R_TranslatePlayerSkin`.
 function R_TranslatePlayerSkin(playernum)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global playertextures

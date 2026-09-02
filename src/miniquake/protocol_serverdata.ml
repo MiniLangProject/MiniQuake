@@ -16,23 +16,35 @@ import miniquake.message as msg
 import miniquake.native as native
 import miniquake.protocol_transients as transients
 
+/// Defines the plan send unreliable value used by `miniquake.protocol_serverdata`.
 const PLAN_SEND_UNRELIABLE = 1
+/// Defines the plan send nop value used by `miniquake.protocol_serverdata`.
 const PLAN_SEND_NOP = 2
+/// Defines the plan wait signon value used by `miniquake.protocol_serverdata`.
 const PLAN_WAIT_SIGNON = 4
+/// Defines the plan reliable phase value used by `miniquake.protocol_serverdata`.
 const PLAN_RELIABLE_PHASE = 8
 
+/// Defines the reliable none value used by `miniquake.protocol_serverdata`.
 const RELIABLE_NONE = 0
+/// Defines the reliable drop overflow value used by `miniquake.protocol_serverdata`.
 const RELIABLE_DROP_OVERFLOW = 1
+/// Defines the reliable wait value used by `miniquake.protocol_serverdata`.
 const RELIABLE_WAIT = 2
+/// Defines the reliable drop asap value used by `miniquake.protocol_serverdata`.
 const RELIABLE_DROP_ASAP = 3
+/// Defines the reliable send value used by `miniquake.protocol_serverdata`.
 const RELIABLE_SEND = 4
 
-// Provide progs crc text behavior for the active subsystem.
+/// Implements the `progsCrcText` operation for `miniquake.protocol_serverdata` (progs crc text).
+/// @param crc The crc input consumed by `progsCrcText`.
 function progsCrcText(crc)
   return "\u0002\nVERSION 1.09 SERVER (" + native.trunc(crc) + " CRC)"
 end function
 
-// Encode and write precache list.
+/// Encode and write precache list.
+/// @param buffer The buffer input consumed by `writePrecacheList`.
+/// @param values The values input consumed by `writePrecacheList`.
 function writePrecacheList(buffer, values)
   index = 1
   while index < len(values)
@@ -45,8 +57,17 @@ function writePrecacheList(buffer, values)
   return index - 1
 end function
 
-// SV_SendServerinfo payload, including the leading version print and stage-1
-// signon marker.  client lifecycle flags remain the caller's responsibility.
+/// SV_SendServerinfo payload, including the leading version print and stage-1
+/// signon marker.  client lifecycle flags remain the caller's responsibility.
+/// @param buffer The buffer input consumed by `writeServerInfo`.
+/// @param progsCrc The progs crc input consumed by `writeServerInfo`.
+/// @param maxClients The max clients input consumed by `writeServerInfo`.
+/// @param gameType The game type input consumed by `writeServerInfo`.
+/// @param levelName Name that identifies the requested value or resource.
+/// @param modelPrecache The model precache input consumed by `writeServerInfo`.
+/// @param soundPrecache The sound precache input consumed by `writeServerInfo`.
+/// @param cdTrack The cd track input consumed by `writeServerInfo`.
+/// @param viewEntity The view entity input consumed by `writeServerInfo`.
 function writeServerInfo(
   buffer,
   progsCrc,
@@ -78,16 +99,25 @@ function writeServerInfo(
   return buffer.curSize - start
 end function
 
-// Provide sound field mask behavior for the active subsystem.
+/// Implements the `soundFieldMask` operation for `miniquake.protocol_serverdata` (sound field mask).
+/// @param volume The volume input consumed by `soundFieldMask`.
+/// @param attenuation The attenuation input consumed by `soundFieldMask`.
 function soundFieldMask(volume, attenuation)
   return transients.soundFieldMask(volume, attenuation)
 end function
 
-// SV_StartSound's wire payload. C has already converted channel/volume to int
-// and attenuation to float before entering the function. Recreate that ABI
-// boundary here so dynamic MiniLang callers cannot alter the optional bits.
-// Validation, precache lookup and the MAX_DATAGRAM-16 early-out are performed
-// by the production wrappers.
+/// SV_StartSound's wire payload. C has already converted channel/volume to int
+/// and attenuation to float before entering the function. Recreate that ABI
+/// boundary here so dynamic MiniLang callers cannot alter the optional bits.
+/// Validation, precache lookup and the MAX_DATAGRAM-16 early-out are performed
+/// by the production wrappers.
+/// @param buffer The buffer input consumed by `writeSound`.
+/// @param entityNumber The entity number input consumed by `writeSound`.
+/// @param channel The channel input consumed by `writeSound`.
+/// @param soundNumber The sound number input consumed by `writeSound`.
+/// @param volume The volume input consumed by `writeSound`.
+/// @param attenuation The attenuation input consumed by `writeSound`.
+/// @param center The center input consumed by `writeSound`.
 function writeSound(buffer, entityNumber, channel, soundNumber, volume, attenuation, center)
   start = buffer.curSize
   entityValue = native.trunc(entityNumber)
@@ -109,7 +139,10 @@ function writeSound(buffer, entityNumber, channel, soundNumber, volume, attenuat
   return buffer.curSize - start
 end function
 
-// Encode and write baseline.
+/// Writes baseline for `miniquake.protocol_serverdata`.
+/// @param buffer The buffer input consumed by `writeBaseline`.
+/// @param entityNumber The entity number input consumed by `writeBaseline`.
+/// @param baseline The baseline input consumed by `writeBaseline`.
 function writeBaseline(buffer, entityNumber, baseline)
   start = buffer.curSize
   msg.writeByte(buffer, c.SVC_SPAWNBASELINE)
@@ -127,7 +160,8 @@ function writeBaseline(buffer, entityNumber, baseline)
   return buffer.curSize - start
 end function
 
-// Return client data bits derived from the active module state.
+/// Return client data bits derived from the active module state.
+/// @param data Input data consumed by the operation.
 function clientDataBits(data)
   bits = c.SU_ITEMS | c.SU_WEAPON
   if data.viewHeight != c.DEFAULT_VIEWHEIGHT then bits = bits | c.SU_VIEWHEIGHT end if
@@ -146,9 +180,11 @@ function clientDataBits(data)
   return bits
 end function
 
-// The final active-weapon byte intentionally follows stock Quake's two modes.
-// In mission-pack mode a zero bitfield emits no byte, matching the original C
-// loop's fall-through behavior.
+/// The final active-weapon byte intentionally follows stock Quake's two modes.
+/// In mission-pack mode a zero bitfield emits no byte, matching the original C
+/// loop's fall-through behavior.
+/// @param buffer The buffer input consumed by `writeClientData`.
+/// @param data Input data consumed by the operation.
 function writeClientData(buffer, data)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   start = buffer.curSize
@@ -192,17 +228,22 @@ function writeClientData(buffer, data)
   return [bits, buffer.curSize - start]
 end function
 
-// SV_SendClientDatagram copies sv.datagram only when the resulting size is
-// strictly less than MAX_DATAGRAM. Equality is intentionally rejected.
+/// SV_SendClientDatagram copies sv.datagram only when the resulting size is
+/// strictly less than MAX_DATAGRAM. Equality is intentionally rejected.
+/// @param destination Destination value or collection to update.
+/// @param source Source value or collection to read.
 function appendDatagramIfFits(destination, source)
   if destination.curSize + source.curSize >= destination.maxSize then return false end if
   if source.curSize > 0 then sz.write(destination, source.data, 0, source.curSize) end if
   return true
 end function
 
-// First phase of SV_SendClientMessages. Spawned clients send an unreliable
-// datagram and continue into the reliable phase. Unspawned clients without a
-// requested signon stage either receive a five-second keepalive or wait.
+/// First phase of SV_SendClientMessages. Spawned clients send an unreliable
+/// datagram and continue into the reliable phase. Unspawned clients without a
+/// requested signon stage either receive a five-second keepalive or wait.
+/// @param spawned The spawned input consumed by `initialDeliveryPlan`.
+/// @param sendSignon The send signon input consumed by `initialDeliveryPlan`.
+/// @param elapsed The elapsed input consumed by `initialDeliveryPlan`.
 function initialDeliveryPlan(spawned, sendSignon, elapsed)
   if spawned then return PLAN_SEND_UNRELIABLE | PLAN_RELIABLE_PHASE end if
   if not sendSignon then
@@ -212,7 +253,11 @@ function initialDeliveryPlan(spawned, sendSignon, elapsed)
   return PLAN_RELIABLE_PHASE
 end function
 
-// Provide reliable delivery plan behavior for the active subsystem.
+/// Implements the `reliableDeliveryPlan` operation for `miniquake.protocol_serverdata` (reliable delivery plan).
+/// @param overflowed The overflowed input consumed by `reliableDeliveryPlan`.
+/// @param messageSize Size of the requested data or resource.
+/// @param dropAsap The drop asap input consumed by `reliableDeliveryPlan`.
+/// @param canSend The can send input consumed by `reliableDeliveryPlan`.
 function reliableDeliveryPlan(overflowed, messageSize, dropAsap, canSend)
   if overflowed then return RELIABLE_DROP_OVERFLOW end if
   if messageSize <= 0 and not dropAsap then return RELIABLE_NONE end if

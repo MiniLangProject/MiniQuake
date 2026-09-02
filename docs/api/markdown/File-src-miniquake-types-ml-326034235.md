@@ -1,0 +1,188 @@
+# `src/miniquake/types.ml`
+
+[Home](README.md) · [Files](Files.md)
+
+Package: [`miniquake.types`](Package-miniquake-types-837147252.md)
+
+Reachable from entry: **yes**
+
+## Declarations
+
+- [miniquake.types.AliasGpuModel](Type-miniquake-types-aliasgpumodel-2018693805.md) — struct
+- [miniquake.types.AudioState](Type-miniquake-types-audiostate-318011837.md) — struct
+- [miniquake.types.BspClipNode](Type-miniquake-types-bspclipnode-100388193.md) — struct
+- [miniquake.types.BspCollisionHull](Type-miniquake-types-bspcollisionhull-1022382010.md) — struct
+- [miniquake.types.BspEdge](Type-miniquake-types-bspedge-711949946.md) — struct
+- [miniquake.types.BspFace](Type-miniquake-types-bspface-2036030038.md) — struct
+- [miniquake.types.BspLeaf](Type-miniquake-types-bspleaf-231991131.md) — struct
+- [miniquake.types.BspMap](Type-miniquake-types-bspmap-493701663.md) — struct
+- [miniquake.types.BspModel](Type-miniquake-types-bspmodel-72911452.md) — struct
+- [miniquake.types.BspNode](Type-miniquake-types-bspnode-1156985215.md) — struct
+- [miniquake.types.BspPlane](Type-miniquake-types-bspplane-523572903.md) — struct
+- [miniquake.types.BspTexInfo](Type-miniquake-types-bsptexinfo-468115152.md) — struct
+- [miniquake.types.BspTexture](Type-miniquake-types-bsptexture-953113950.md) — struct
+- [miniquake.types.BspVertex](Type-miniquake-types-bspvertex-488062305.md) — struct
+- [miniquake.types.CacheUser](Type-miniquake-types-cacheuser-878134319.md) — struct
+- [miniquake.types.ChaseState](Type-miniquake-types-chasestate-2131365.md) — struct
+- [miniquake.types.ClientEntityState](Type-miniquake-types-cliententitystate-1887053015.md) — struct
+- [miniquake.types.ClientRenderModel](Type-miniquake-types-clientrendermodel-1538042522.md) — struct
+- [miniquake.types.ClientScore](Type-miniquake-types-clientscore-917761405.md) — struct
+- [miniquake.types.ClientState](Type-miniquake-types-clientstate-1242553390.md) — struct
+- [miniquake.types.CommandAlias](Type-miniquake-types-commandalias-735022521.md) — struct
+- [miniquake.types.CommandLine](Type-miniquake-types-commandline-901271485.md) — struct
+- [miniquake.types.CommandSystem](Type-miniquake-types-commandsystem-1439117502.md) — struct
+- [miniquake.types.CommonFileHandle](Type-miniquake-types-commonfilehandle-664783983.md) — struct
+- [miniquake.types.CompatibilityTraceResult](Type-miniquake-types-compatibilitytraceresult-9855370.md) — struct
+<a id="function-function-miniquake-types-concretetypenamematches-function-concretetypenamematches-value-shortname-qualifiedname-src-miniquake-types-ml-2127081444"></a>
+### concreteTypeNameMatches
+
+```ml
+function concreteTypeNameMatches(value, shortName, qualifiedName)
+```
+
+MiniLang's native backend returns package-qualified concrete type names for packaged structs (for example "miniquake.types.Vec3"), while older backends and package-free fixtures may return the short name.  Accept both spellings so runtime type guards remain backend-independent.
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `value` | `dynamic` | — | Value consumed by `concreteTypeNameMatches`. |
+| `shortName` | `dynamic` | — | Name that identifies the requested value or resource. |
+| `qualifiedName` | `dynamic` | — | Name that identifies the requested value or resource. |
+
+
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/types.ml#L2508)
+
+- [miniquake.types.ConsoleState](Type-miniquake-types-consolestate-1119365048.md) — struct
+- [miniquake.types.Cvar](Type-miniquake-types-cvar-540733164.md) — struct
+- [miniquake.types.CvarRegistry](Type-miniquake-types-cvarregistry-945247227.md) — struct
+- [miniquake.types.DatagramChannel](Type-miniquake-types-datagramchannel-938542480.md) — struct
+- [miniquake.types.DatagramPacket](Type-miniquake-types-datagrampacket-12573509.md) — struct
+- [miniquake.types.Demo](Type-miniquake-types-demo-123427921.md) — struct
+- [miniquake.types.DemoMessage](Type-miniquake-types-demomessage-379083848.md) — struct
+- [miniquake.types.DemoPlayback](Type-miniquake-types-demoplayback-1574035184.md) — struct
+- [miniquake.types.DemoVerification](Type-miniquake-types-demoverification-432096026.md) — struct
+- [miniquake.types.DynamicLight](Type-miniquake-types-dynamiclight-966221205.md) — struct
+- [miniquake.types.EdictRuntime](Type-miniquake-types-edictruntime-1848676731.md) — struct
+- [miniquake.types.Entity](Type-miniquake-types-entity-1923089069.md) — struct
+- [miniquake.types.EntityBaseline](Type-miniquake-types-entitybaseline-29154362.md) — struct
+- [miniquake.types.EntityPair](Type-miniquake-types-entitypair-1021435625.md) — struct
+- [miniquake.types.EntityRenderer](Type-miniquake-types-entityrenderer-1517364022.md) — struct
+- [miniquake.types.FileSystem](Type-miniquake-types-filesystem-1508664745.md) — struct
+- [miniquake.types.GameServer](Type-miniquake-types-gameserver-1779369991.md) — struct
+- [miniquake.types.GameSession](Type-miniquake-types-gamesession-930661760.md) — struct
+- [miniquake.types.GameValidation](Type-miniquake-types-gamevalidation-1659394855.md) — struct
+- [miniquake.types.HostSoakResult](Type-miniquake-types-hostsoakresult-600499351.md) — struct
+- [miniquake.types.HostTiming](Type-miniquake-types-hosttiming-65813506.md) — struct
+- [miniquake.types.Hull](Type-miniquake-types-hull-788149637.md) — struct
+<a id="function-function-miniquake-types-isentitybaselinevalue-function-isentitybaselinevalue-value-src-miniquake-types-ml-1217874374"></a>
+### isEntityBaselineValue
+
+```ml
+function isEntityBaselineValue(value)
+```
+
+Report whether is entity baseline value.
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `value` | `dynamic` | — | Value consumed by `isEntityBaselineValue`. |
+
+
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/types.ml#L2521)
+
+<a id="function-function-miniquake-types-isquakeedictvalue-function-isquakeedictvalue-value-src-miniquake-types-ml-367072694"></a>
+### isQuakeEdictValue
+
+```ml
+function isQuakeEdictValue(value)
+```
+
+Report whether is quake edict value.
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `value` | `dynamic` | — | Value consumed by `isQuakeEdictValue`. |
+
+
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/types.ml#L2531)
+
+<a id="function-function-miniquake-types-isvec3value-function-isvec3value-value-src-miniquake-types-ml-157557548"></a>
+### isVec3Value
+
+```ml
+function isVec3Value(value)
+```
+
+Report whether is vec3 value.
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `value` | `dynamic` | — | Value consumed by `isVec3Value`. |
+
+
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/types.ml#L2515)
+
+- [miniquake.types.LaunchOptions](Type-miniquake-types-launchoptions-2112955697.md) — struct
+- [miniquake.types.LightmapPage](Type-miniquake-types-lightmappage-1373022647.md) — struct
+- [miniquake.types.Link](Type-miniquake-types-link-1284876966.md) — struct
+- [miniquake.types.LocalClient](Type-miniquake-types-localclient-1885858990.md) — struct
+- [miniquake.types.LoopSocket](Type-miniquake-types-loopsocket-1421106565.md) — struct
+- [miniquake.types.LoopState](Type-miniquake-types-loopstate-957585737.md) — struct
+- [miniquake.types.Lump](Type-miniquake-types-lump-500982740.md) — struct
+- [miniquake.types.MdlFrame](Type-miniquake-types-mdlframe-2108795490.md) — struct
+- [miniquake.types.MdlFrameSet](Type-miniquake-types-mdlframeset-426375986.md) — struct
+- [miniquake.types.MdlModel](Type-miniquake-types-mdlmodel-415789734.md) — struct
+- [miniquake.types.MdlSkin](Type-miniquake-types-mdlskin-881419740.md) — struct
+- [miniquake.types.MdlTexCoord](Type-miniquake-types-mdltexcoord-826648631.md) — struct
+- [miniquake.types.MdlTriangle](Type-miniquake-types-mdltriangle-1292965433.md) — struct
+- [miniquake.types.MdlVertex](Type-miniquake-types-mdlvertex-954301843.md) — struct
+- [miniquake.types.MemoryBlock](Type-miniquake-types-memoryblock-1731203838.md) — struct
+- [miniquake.types.MemoryState](Type-miniquake-types-memorystate-1199930954.md) — struct
+- [miniquake.types.MenuPicture](Type-miniquake-types-menupicture-537362421.md) — struct
+- [miniquake.types.MenuState](Type-miniquake-types-menustate-1878858578.md) — struct
+- [miniquake.types.MessageReader](Type-miniquake-types-messagereader-782301246.md) — struct
+- [miniquake.types.MixerChannel](Type-miniquake-types-mixerchannel-1344217934.md) — struct
+- [miniquake.types.ModelRegistry](Type-miniquake-types-modelregistry-1698599740.md) — struct
+- [miniquake.types.MusicTrack](Type-miniquake-types-musictrack-1585750636.md) — struct
+- [miniquake.types.PackArchive](Type-miniquake-types-packarchive-769287959.md) — struct
+- [miniquake.types.PackFile](Type-miniquake-types-packfile-1559378953.md) — struct
+- [miniquake.types.Particle](Type-miniquake-types-particle-526583488.md) — struct
+- [miniquake.types.Plane](Type-miniquake-types-plane-1480852176.md) — struct
+- [miniquake.types.PlayerState](Type-miniquake-types-playerstate-1224913144.md) — struct
+- [miniquake.types.ProtocolClientData](Type-miniquake-types-protocolclientdata-1359101877.md) — struct
+- [miniquake.types.ProtocolEvent](Type-miniquake-types-protocolevent-668638994.md) — struct
+- [miniquake.types.ProtocolResult](Type-miniquake-types-protocolresult-852855311.md) — struct
+- [miniquake.types.QuakeCCallFrame](Type-miniquake-types-quakeccallframe-18378321.md) — struct
+- [miniquake.types.QuakeCContext](Type-miniquake-types-quakeccontext-1637666935.md) — struct
+- [miniquake.types.QuakeCDef](Type-miniquake-types-quakecdef-1312320523.md) — struct
+- [miniquake.types.QuakeCFunction](Type-miniquake-types-quakecfunction-2036115708.md) — struct
+- [miniquake.types.QuakeCMachine](Type-miniquake-types-quakecmachine-325441945.md) — struct
+- [miniquake.types.QuakeCProgram](Type-miniquake-types-quakecprogram-2016538624.md) — struct
+- [miniquake.types.QuakeCStatement](Type-miniquake-types-quakecstatement-1104972657.md) — struct
+- [miniquake.types.QuakeEdict](Type-miniquake-types-quakeedict-161520290.md) — struct
+- [miniquake.types.RenderSurface](Type-miniquake-types-rendersurface-1351903665.md) — struct
+- [miniquake.types.RenderTexture](Type-miniquake-types-rendertexture-2143949557.md) — struct
+- [miniquake.types.RenderVertex](Type-miniquake-types-rendervertex-1157680288.md) — struct
+- [miniquake.types.RuntimeValidation](Type-miniquake-types-runtimevalidation-1014656997.md) — struct
+- [miniquake.types.SaveGame](Type-miniquake-types-savegame-1445601673.md) — struct
+- [miniquake.types.SearchPath](Type-miniquake-types-searchpath-1581760629.md) — struct
+- [miniquake.types.ServerClient](Type-miniquake-types-serverclient-2109059938.md) — struct
+- [miniquake.types.ServerState](Type-miniquake-types-serverstate-1603323082.md) — struct
+- [miniquake.types.SizeBuffer](Type-miniquake-types-sizebuffer-923506469.md) — struct
+- [miniquake.types.SoundEffect](Type-miniquake-types-soundeffect-245961884.md) — struct
+- [miniquake.types.SoundMixer](Type-miniquake-types-soundmixer-1355730338.md) — struct
+- [miniquake.types.SpriteFrame](Type-miniquake-types-spriteframe-1135605300.md) — struct
+- [miniquake.types.SpriteFrameSet](Type-miniquake-types-spriteframeset-648285020.md) — struct
+- [miniquake.types.SpriteGpuModel](Type-miniquake-types-spritegpumodel-1345993236.md) — struct
+- [miniquake.types.SpriteModel](Type-miniquake-types-spritemodel-1953696780.md) — struct
+- [miniquake.types.TemporaryEntity](Type-miniquake-types-temporaryentity-916155442.md) — struct
+- [miniquake.types.Trace](Type-miniquake-types-trace-422758387.md) — struct
+- [miniquake.types.UdpSmokeResult](Type-miniquake-types-udpsmokeresult-831230839.md) — struct
+- [miniquake.types.UdpSocket](Type-miniquake-types-udpsocket-1754583076.md) — struct
+- [miniquake.types.UserCommand](Type-miniquake-types-usercommand-330358190.md) — struct
+- [miniquake.types.Vec3](Type-miniquake-types-vec3-1059924573.md) — struct
+- [miniquake.types.ViewState](Type-miniquake-types-viewstate-474081632.md) — struct
+- [miniquake.types.WadArchive](Type-miniquake-types-wadarchive-450422076.md) — struct
+- [miniquake.types.WadLump](Type-miniquake-types-wadlump-1635193508.md) — struct
+- [miniquake.types.WaveInfo](Type-miniquake-types-waveinfo-600385747.md) — struct
+- [miniquake.types.WinSockAddress](Type-miniquake-types-winsockaddress-1193026016.md) — struct
+- [miniquake.types.WorldRenderer](Type-miniquake-types-worldrenderer-1750373713.md) — struct

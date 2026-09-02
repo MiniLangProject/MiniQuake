@@ -7,11 +7,14 @@ MiniLang implementation of miniquake.black_port_corpus.
 */
 package miniquake.black_port_corpus
 
+/// Defines the schema version value used by `miniquake.black_port_corpus`.
 const SCHEMA_VERSION = 1
+/// Defines the frames per scenario value used by `miniquake.black_port_corpus`.
 const FRAMES_PER_SCENARIO = 64
+/// Defines the scenario count value used by `miniquake.black_port_corpus`.
 const SCENARIO_COUNT = 4
 
-// Provide scenarios behavior for the active subsystem.
+/// Implements the `scenarios` operation for `miniquake.black_port_corpus` (scenarios).
 function scenarios()
   return [
     ["start-064", "start", 64],
@@ -21,14 +24,15 @@ function scenarios()
   ]
 end function
 
-// Provide scenario at behavior for the active subsystem.
+/// Implements the `scenarioAt` operation for `miniquake.black_port_corpus` (scenario at).
+/// @param index Zero-based index of the requested entry.
 function scenarioAt(index)
   values = scenarios()
   if index < 0 or index >= len(values) then return error(8400, "black-port corpus scenario index out of range") end if
   return values[index]
 end function
 
-// Validate the requested value and report any incompatibility.
+/// Implements the `validate` operation for `miniquake.black_port_corpus` (validate).
 function validate()
   values = scenarios()
   if SCHEMA_VERSION != 1 or len(values) != SCENARIO_COUNT then return false end if

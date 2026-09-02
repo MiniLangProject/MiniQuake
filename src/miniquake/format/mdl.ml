@@ -13,13 +13,18 @@ import miniquake.byteio as bio
 import miniquake.array_util as arrayutil
 import std.fs as fs
 
-// Read and validate vertex.
+/// Read and validate vertex.
+/// @param data Input data consumed by the operation.
+/// @param offset Zero-based offset of the requested data.
 function parseVertex(data, offset)
   if offset < 0 or offset + 4 > len(data) then return error(1800, "MDL vertex outside file") end if
   return t.MdlVertex(data[offset], data[offset + 1], data[offset + 2], data[offset + 3])
 end function
 
-// Read and validate single frame.
+/// Read and validate single frame.
+/// @param data Input data consumed by the operation.
+/// @param offset Zero-based offset of the requested data.
+/// @param numVertices The num vertices input consumed by `parseSingleFrame`.
 function parseSingleFrame(data, offset, numVertices)
   size = 24 + numVertices * 4
   if offset < 0 or offset + size > len(data) then return error(1801, "MDL frame outside file") end if
@@ -35,7 +40,10 @@ function parseSingleFrame(data, offset, numVertices)
   return [t.MdlFrame(name, mins, maxs, vertices), offset + size]
 end function
 
-// Mirror Quake's Mod_FloodFillSkin routine and its observable state changes.
+/// Mirror Quake's Mod_FloodFillSkin routine and its observable state changes.
+/// @param skin The skin input consumed by `Mod_FloodFillSkin`.
+/// @param skinWidth The skin width input consumed by `Mod_FloodFillSkin`.
+/// @param skinHeight The skin height input consumed by `Mod_FloodFillSkin`.
 function Mod_FloodFillSkin(skin, skinWidth, skinHeight)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if skinWidth <= 0 or skinHeight <= 0 or len(skin) < skinWidth * skinHeight then return skin end if
@@ -104,7 +112,11 @@ function Mod_FloodFillSkin(skin, skinWidth, skinHeight)
   return skin
 end function
 
-// Read and validate skin.
+/// Read and validate skin.
+/// @param data Input data consumed by the operation.
+/// @param offset Zero-based offset of the requested data.
+/// @param skinWidth The skin width input consumed by `parseSkin`.
+/// @param skinHeight The skin height input consumed by `parseSkin`.
 function parseSkin(data, offset, skinWidth, skinHeight)
   skinBytes = skinWidth * skinHeight
   if offset + 4 > len(data) then return error(1802, "MDL skin type outside file") end if
@@ -140,12 +152,18 @@ function parseSkin(data, offset, skinWidth, skinHeight)
   return [t.MdlSkin(true, intervals, images), offset]
 end function
 
-// Mirror Quake's Mod_LoadAliasFrame routine and its observable state changes.
+/// Mirror Quake's Mod_LoadAliasFrame routine and its observable state changes.
+/// @param data Input data consumed by the operation.
+/// @param offset Zero-based offset of the requested data.
+/// @param numVertices The num vertices input consumed by `Mod_LoadAliasFrame`.
 function Mod_LoadAliasFrame(data, offset, numVertices)
   return parseSingleFrame(data, offset, numVertices)
 end function
 
-// Mirror Quake's Mod_LoadAliasGroup routine and its observable state changes.
+/// Mirror Quake's Mod_LoadAliasGroup routine and its observable state changes.
+/// @param data Input data consumed by the operation.
+/// @param offset Zero-based offset of the requested data.
+/// @param numVertices The num vertices input consumed by `Mod_LoadAliasGroup`.
 function Mod_LoadAliasGroup(data, offset, numVertices)
   if offset + 12 > len(data) then return error(1818, "MDL frame group outside file") end if
   count = bio.i32(data, offset)
@@ -171,7 +189,10 @@ function Mod_LoadAliasGroup(data, offset, numVertices)
   return [t.MdlFrameSet(true, intervals, frames), cursor]
 end function
 
-// Read and validate frame set.
+/// Read and validate frame set.
+/// @param data Input data consumed by the operation.
+/// @param offset Zero-based offset of the requested data.
+/// @param numVertices The num vertices input consumed by `parseFrameSet`.
 function parseFrameSet(data, offset, numVertices)
   if offset + 4 > len(data) then return error(1808, "MDL frame type outside file") end if
   group = bio.i32(data, offset)
@@ -184,7 +205,12 @@ function parseFrameSet(data, offset, numVertices)
   return Mod_LoadAliasGroup(data, offset, numVertices)
 end function
 
-// Mirror Quake's Mod_LoadAllSkins routine and its observable state changes.
+/// Mirror Quake's Mod_LoadAllSkins routine and its observable state changes.
+/// @param data Input data consumed by the operation.
+/// @param offset Zero-based offset of the requested data.
+/// @param numSkins The num skins input consumed by `Mod_LoadAllSkins`.
+/// @param skinWidth The skin width input consumed by `Mod_LoadAllSkins`.
+/// @param skinHeight The skin height input consumed by `Mod_LoadAllSkins`.
 function Mod_LoadAllSkins(data, offset, numSkins, skinWidth, skinHeight)
   skins = arrayutil.makeEmptyArray(numSkins)
   index = 0
@@ -198,7 +224,9 @@ function Mod_LoadAllSkins(data, offset, numSkins, skinWidth, skinHeight)
   return [skins, offset]
 end function
 
-// Read and validate the requested value.
+/// Implements the `parse` operation for `miniquake.format.mdl` (parse).
+/// @param data Input data consumed by the operation.
+/// @param filename Path of the file to process.
 function parse(data, filename)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if len(data) < 84 then return error(1812, filename + ": MDL header is truncated") end if
@@ -272,12 +300,15 @@ function parse(data, filename)
   return t.MdlModel(filename, data, version, scale, scaleOrigin, boundingRadius, eyePosition, numSkins, skinWidth, skinHeight, numVertices, numTriangles, numFrames, syncType, flags, modelSize * c.ALIAS_BASE_SIZE_RATIO, skins, texCoords, triangles, frames)
 end function
 
-// Mirror Quake's Mod_LoadAliasModel routine and its observable state changes.
+/// Mirror Quake's Mod_LoadAliasModel routine and its observable state changes.
+/// @param data Input data consumed by the operation.
+/// @param filename Path of the file to process.
 function Mod_LoadAliasModel(data, filename)
   return parse(data, filename)
 end function
 
-// Read and validate the requested value.
+/// Implements the `load` operation for `miniquake.format.mdl` (load).
+/// @param filename Path of the file to process.
 function load(filename)
   data = fs.readAllBytes(filename)
   return parse(data, filename)

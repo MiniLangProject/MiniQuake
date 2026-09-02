@@ -14,7 +14,7 @@ import miniquake.format.bsp as bsp
 import miniquake.byteio as bio
 import miniquake.array_util as arrayutil
 
-// Provide empty baseline behavior for the active subsystem.
+/// Implements the `emptyBaseline` operation for `miniquake.edict` (empty baseline).
 function emptyBaseline()
   // EntityBaseline and Vec3 are heap-backed MiniLang structs.  Keep both
   // vectors in named roots while the baseline object itself is allocated.
@@ -26,7 +26,8 @@ function emptyBaseline()
   return t.EntityBaseline(0, 0, 0, 0, 0, origin, angles)
 end function
 
-// Create and initialize the module state.
+/// Implements the `create` operation for `miniquake.edict` (create).
+/// @param number The number input consumed by `create`.
 function create(number)
   // QuakeEdict contains several heap-backed values.  Constructing all of them
   // inline used to expose a native-backend GC rooting edge case: during the
@@ -76,12 +77,16 @@ function create(number)
   )
 end function
 
-// Return value derived from the active module state.
+/// Return value derived from the active module state.
+/// @param entity Entity affected by the operation.
+/// @param key Key used to identify the requested entry.
 function value(entity, key)
   return bsp.entityValue(entity, key)
 end function
 
-// Return number value derived from the active module state.
+/// Return number value derived from the active module state.
+/// @param text Text to parse or process.
+/// @param fallback Value to use when the requested input is unavailable or invalid.
 function numberValue(text, fallback)
   if text == "" then return fallback end if
   result = toNumber(text)
@@ -89,7 +94,10 @@ function numberValue(text, fallback)
   return fallback
 end function
 
-// Update module state for pair.
+/// Update module state for pair.
+/// @param edict QuakeC edict affected by the operation.
+/// @param key Key used to identify the requested entry.
+/// @param newValue The new value input consumed by `setPair`.
 function setPair(edict, key, newValue)
   for each pair in edict.keyValues
     if pair.key == key then pair.value = newValue; return true end if
@@ -98,7 +106,9 @@ function setPair(edict, key, newValue)
   return true
 end function
 
-// Return pair.
+/// Return pair.
+/// @param edict QuakeC edict affected by the operation.
+/// @param key Key used to identify the requested entry.
 function getPair(edict, key)
   for each pair in edict.keyValues
     if pair.key == key then return pair.value end if
@@ -106,7 +116,8 @@ function getPair(edict, key)
   return ""
 end function
 
-// Transfer data for copy pairs.
+/// Transfer data for copy pairs.
+/// @param entity Entity affected by the operation.
 function copyPairs(entity)
   result = arrayutil.makeEmptyArray(len(entity.pairs))
   index = 0
@@ -118,7 +129,9 @@ function copyPairs(entity)
   return result
 end function
 
-// Provide from entity behavior for the active subsystem.
+/// Implements the `fromEntity` operation for `miniquake.edict` (from entity).
+/// @param number The number input consumed by `fromEntity`.
+/// @param entity Entity affected by the operation.
 function fromEntity(number, entity)
   edict = create(number)
   edict.keyValues = copyPairs(entity)
@@ -153,7 +166,8 @@ function fromEntity(number, entity)
   return edict
 end function
 
-// Read and validate map entities.
+/// Read and validate map entities.
+/// @param map The map input consumed by `loadMapEntities`.
 function loadMapEntities(map)
   // Keep the live BSP graph intact while deriving server edicts.  See the
   // QuakeC loader counterpart for the nested-object GC rationale.
@@ -170,7 +184,9 @@ function loadMapEntities(map)
   return result
 end function
 
-// Return class.
+/// Return class.
+/// @param edicts The edicts input consumed by `findClass`.
+/// @param className Name that identifies the requested value or resource.
 function findClass(edicts, className)
   wanted = bio.lower(className)
   builder = arrayutil.createArrayBuilder(16)
@@ -180,7 +196,9 @@ function findClass(edicts, className)
   return arrayutil.finishArrayBuilder(builder)
 end function
 
-// Return first class.
+/// Return first class.
+/// @param edicts The edicts input consumed by `findFirstClass`.
+/// @param className Name that identifies the requested value or resource.
 function findFirstClass(edicts, className)
   wanted = bio.lower(className)
   for each item in edicts
@@ -189,7 +207,9 @@ function findFirstClass(edicts, className)
   return void
 end function
 
-// Allocate and initialize point.
+/// Allocate and initialize point.
+/// @param edicts The edicts input consumed by `spawnPoint`.
+/// @param deathmatch The deathmatch input consumed by `spawnPoint`.
 function spawnPoint(edicts, deathmatch)
   selected = void
   if deathmatch then selected = findFirstClass(edicts, "info_player_deathmatch") end if
@@ -199,7 +219,9 @@ function spawnPoint(edicts, deathmatch)
   return [math.copy(selected.origin), math.copy(selected.angles)]
 end function
 
-// Allocate and initialize the requested value.
+/// Implements the `allocate` operation for `miniquake.edict` (allocate).
+/// @param edicts The edicts input consumed by `allocate`.
+/// @param currentTime Time value used by the operation.
 function allocate(edicts, currentTime)
   index = 1
   while index < len(edicts)
@@ -216,7 +238,9 @@ function allocate(edicts, currentTime)
   return [replacement, edicts]
 end function
 
-// Release state for free.
+/// Implements the `free` operation for `miniquake.edict` (free).
+/// @param item The item input consumed by `free`.
+/// @param currentTime Time value used by the operation.
 function free(item, currentTime)
   item.free = true
   item.freeTime = currentTime
@@ -228,7 +252,8 @@ function free(item, currentTime)
   return true
 end function
 
-// Provide baseline behavior for the active subsystem.
+/// Implements the `baseline` operation for `miniquake.edict` (baseline).
+/// @param item The item input consumed by `baseline`.
 function baseline(item)
   origin = math.copy(item.origin)
   angles = math.copy(item.angles)
@@ -245,7 +270,8 @@ function baseline(item)
   return item.baseline
 end function
 
-// Create and initialize baselines.
+/// Create and initialize baselines.
+/// @param edicts The edicts input consumed by `buildBaselines`.
 function buildBaselines(edicts)
   count = 0
   for each item in edicts

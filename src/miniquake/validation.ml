@@ -14,7 +14,10 @@ import miniquake.render.world as renderer
 import miniquake.world_bsp as world
 import miniquake.constants as c
 
-// Validate map and report any incompatibility.
+/// Validate map and report any incompatibility.
+/// @param filesystem The filesystem input consumed by `validateMap`.
+/// @param mapName Name of the map to load or inspect.
+/// @param palette The palette input consumed by `validateMap`.
 function validateMap(filesystem, mapName, palette)
   path = "maps/" + mapName + ".bsp"
   data = qfs.readFile(filesystem, path)
@@ -31,7 +34,9 @@ function validateMap(filesystem, mapName, palette)
   return map
 end function
 
-// Execute one named test case and record its pass/fail result.
+/// Implements the `run` operation for `miniquake.validation` (run).
+/// @param baseDirectory Root directory containing the Quake installation.
+/// @param preferredMap The preferred map input consumed by `run`.
 function run(baseDirectory, preferredMap)
   filesystem = qfs.standard(baseDirectory, "id1")
   palette = qfs.readFile(filesystem, "gfx/palette.lmp")

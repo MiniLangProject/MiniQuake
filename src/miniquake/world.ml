@@ -18,80 +18,120 @@ import miniquake.world_bsp as bspworld
 import miniquake.world_hull as boxworld
 import miniquake.server_collision as collision
 
+/// Defines the area depth value used by `miniquake.world`.
 const AREA_DEPTH = 4
+/// Defines the area nodes value used by `miniquake.world`.
 const AREA_NODES = 32
+/// Defines the max ent leafs value used by `miniquake.world`.
 const MAX_ENT_LEAFS = 16
 
 // Group the fields that describe one area node.
 struct AreaNode
+  /// Stores the axis value in `miniquake.world.AreaNode`.
   axis
+  /// Stores the dist value in `miniquake.world.AreaNode`.
   dist
+  /// Stores the child0 value in `miniquake.world.AreaNode`.
   child0
+  /// Stores the child1 value in `miniquake.world.AreaNode`.
   child1
+  /// Stores the trigger edicts value in `miniquake.world.AreaNode`.
   triggerEdicts
+  /// Stores the solid edicts value in `miniquake.world.AreaNode`.
   solidEdicts
 end struct
 
 // Track mutable world area state across subsystem calls.
 struct WorldAreaState
+  /// Stores the server value in `miniquake.world.WorldAreaState`.
   server
+  /// Stores the map value in `miniquake.world.WorldAreaState`.
   map
+  /// Stores the nodes value in `miniquake.world.WorldAreaState`.
   nodes
+  /// Stores the root value in `miniquake.world.WorldAreaState`.
   root
+  /// Stores the linked node value in `miniquake.world.WorldAreaState`.
   linkedNode
+  /// Stores the linked trigger value in `miniquake.world.WorldAreaState`.
   linkedTrigger
+  /// Stores the abs mins value in `miniquake.world.WorldAreaState`.
   absMins
+  /// Stores the abs maxs value in `miniquake.world.WorldAreaState`.
   absMaxs
+  /// Stores the leaf nums value in `miniquake.world.WorldAreaState`.
   leafNums
+  /// Stores the touch enabled value in `miniquake.world.WorldAreaState`.
   touchEnabled
+  /// Stores the touch events value in `miniquake.world.WorldAreaState`.
   touchEvents
 end struct
 
 // Group the fields that describe one move clip.
 struct MoveClip
+  /// Stores the box mins value in `miniquake.world.MoveClip`.
   boxMins
+  /// Stores the box maxs value in `miniquake.world.MoveClip`.
   boxMaxs
+  /// Stores the mins value in `miniquake.world.MoveClip`.
   mins
+  /// Stores the maxs value in `miniquake.world.MoveClip`.
   maxs
+  /// Stores the mins2 value in `miniquake.world.MoveClip`.
   mins2
+  /// Stores the maxs2 value in `miniquake.world.MoveClip`.
   maxs2
+  /// Stores the start value in `miniquake.world.MoveClip`.
   start
+  /// Stores the finish value in `miniquake.world.MoveClip`.
   finish
+  /// Stores the trace value in `miniquake.world.MoveClip`.
   trace
+  /// Stores the move type value in `miniquake.world.MoveClip`.
   moveType
+  /// Stores the passed entity value in `miniquake.world.MoveClip`.
   passedEntity
 end struct
 
-// Create the zero-initialized state for vector.
+/// Implements the `zeroVector` operation for `miniquake.world` (zero vector).
 function zeroVector()
   return t.Vec3(0.0, 0.0, 0.0)
 end function
 
-// Provide absolute behavior for the active subsystem.
+/// Implements the `absolute` operation for `miniquake.world` (absolute).
+/// @param value Value consumed by `absolute`.
 function absolute(value)
   if value < 0.0 then return -value end if
   return value
 end function
 
-// Provide fallback edict behavior for the active subsystem.
+/// Implements the `fallbackEdict` operation for `miniquake.world` (fallback edict).
+/// @param state Mutable `miniquake.world` state used by `fallbackEdict`.
+/// @param entityIndex Zero-based index of the requested entry.
 function fallbackEdict(state, entityIndex)
   if state.server is void or entityIndex < 0 or entityIndex >= len(state.server.edicts) then return void end if
   return state.server.edicts[entityIndex]
 end function
 
-// Report whether runtime.
+/// Report whether runtime.
+/// @param state Mutable `miniquake.world` state used by `hasRuntime`.
 function inline hasRuntime(state)
   return state.server is not void and state.server.machine is not void and state.server.machine.context is not void
 end function
 
-// Report whether entity valid holds for the active state.
+/// Report whether entity valid holds for the active state.
+/// @param state Mutable `miniquake.world` state used by `entityValid`.
+/// @param entityIndex Zero-based index of the requested entry.
 function entityValid(state, entityIndex)
   if hasRuntime(state) then return collision.entityValid(state.server, entityIndex) end if
   item = fallbackEdict(state, entityIndex)
   return item is not void and not item.free
 end function
 
-// Return entity vector derived from the active module state.
+/// Implements the `entityVector` operation for `miniquake.world` (entity vector).
+/// @param state Mutable `miniquake.world` state used by `entityVector`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param name Stable name that identifies the requested object or option.
 function entityVector(state, entityIndex, name)
   if hasRuntime(state) then return collision.entityVectorZero(state.server, entityIndex, name) end if
   item = fallbackEdict(state, entityIndex)
@@ -103,7 +143,11 @@ function entityVector(state, entityIndex, name)
   return zeroVector()
 end function
 
-// Return entity number derived from the active module state.
+/// Return entity number derived from the active module state.
+/// @param state Mutable `miniquake.world` state used by `entityNumber`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param name Stable name that identifies the requested object or option.
+/// @param fallback Value to use when the requested input is unavailable or invalid.
 function entityNumber(state, entityIndex, name, fallback)
   if hasRuntime(state) then
     if name == "owner" or name == "modelindex" or name == "touch" then
@@ -128,7 +172,9 @@ function entityNumber(state, entityIndex, name, fallback)
   return fallback
 end function
 
-// Provide entity model behavior for the active subsystem.
+/// Implements the `entityModel` operation for `miniquake.world` (entity model).
+/// @param state Mutable `miniquake.world` state used by `entityModel`.
+/// @param entityIndex Zero-based index of the requested entry.
 function entityModel(state, entityIndex)
   if hasRuntime(state) then return collision.entityString(state.server, entityIndex, "model", "") end if
   item = fallbackEdict(state, entityIndex)
@@ -136,7 +182,9 @@ function entityModel(state, entityIndex)
   return item.model
 end function
 
-// Create and initialize state.
+/// Creates state for `miniquake.world`.
+/// @param server Server state participating in the operation.
+/// @param map The map input consumed by `makeState`.
 function makeState(server, map)
   capacity = c.MAX_EDICTS
   if server is not void and server.maxEdicts > capacity then capacity = server.maxEdicts end if
@@ -161,17 +209,26 @@ function SV_InitBoxHull()
   return boxworld.createBoxHull(zeroVector(), zeroVector())
 end function
 
-// Apply the Quake-compatible sv hull for box behavior.
+/// Apply the Quake-compatible sv hull for box behavior.
+/// @param mins The mins input consumed by `SV_HullForBox`.
+/// @param maxs The maxs input consumed by `SV_HullForBox`.
 function SV_HullForBox(mins, maxs)
   return boxworld.createBoxHull(math.VectorCopy(mins), math.VectorCopy(maxs))
 end function
 
-// Apply the Quake-compatible sv box on plane side behavior.
+/// Apply the Quake-compatible sv box on plane side behavior.
+/// @param mins The mins input consumed by `SV_BoxOnPlaneSide`.
+/// @param maxs The maxs input consumed by `SV_BoxOnPlaneSide`.
+/// @param plane The plane input consumed by `SV_BoxOnPlaneSide`.
 function SV_BoxOnPlaneSide(mins, maxs, plane)
   return math.BOX_ON_PLANE_SIDE(mins, maxs, plane)
 end function
 
-// Apply the Quake-compatible sv create area node behavior.
+/// Apply the Quake-compatible sv create area node behavior.
+/// @param state Mutable `miniquake.world` state used by `SV_CreateAreaNode`.
+/// @param depth The depth input consumed by `SV_CreateAreaNode`.
+/// @param mins The mins input consumed by `SV_CreateAreaNode`.
+/// @param maxs The maxs input consumed by `SV_CreateAreaNode`.
 function SV_CreateAreaNode(state, depth, mins, maxs)
   if len(state.nodes) >= AREA_NODES then return error(3800, "SV_CreateAreaNode: AREA_NODES exhausted") end if
   node = AreaNode(-1, 0.0, -1, -1, [], [])
@@ -200,7 +257,9 @@ function SV_CreateAreaNode(state, depth, mins, maxs)
   return nodeIndex
 end function
 
-// Apply the Quake-compatible sv clear world behavior.
+/// Apply the Quake-compatible sv clear world behavior.
+/// @param server Server state participating in the operation.
+/// @param map The map input consumed by `SV_ClearWorld`.
 function SV_ClearWorld(server, map)
   if map is void or len(map.models) == 0 then return error(3801, "SV_ClearWorld: world model is missing") end if
   state = makeState(server, map)
@@ -209,7 +268,9 @@ function SV_ClearWorld(server, map)
   return state
 end function
 
-// Release state for remove entity.
+/// Release state for remove entity.
+/// @param values The values input consumed by `removeEntity`.
+/// @param entityIndex Zero-based index of the requested entry.
 function removeEntity(values, entityIndex)
   result = []
   for each value in values
@@ -218,7 +279,9 @@ function removeEntity(values, entityIndex)
   return result
 end function
 
-// Apply the Quake-compatible sv unlink edict behavior.
+/// Apply the Quake-compatible sv unlink edict behavior.
+/// @param state Mutable `miniquake.world` state used by `SV_UnlinkEdict`.
+/// @param entityIndex Zero-based index of the requested entry.
 function SV_UnlinkEdict(state, entityIndex)
   if entityIndex < 0 or entityIndex >= len(state.linkedNode) then return false end if
   nodeIndex = state.linkedNode[entityIndex]
@@ -234,7 +297,9 @@ function SV_UnlinkEdict(state, entityIndex)
   return true
 end function
 
-// Provide box plane behavior for the active subsystem.
+/// Implements the `boxPlane` operation for `miniquake.world` (box plane).
+/// @param state Mutable `miniquake.world` state used by `boxPlane`.
+/// @param planeIndex Zero-based index of the requested entry.
 function boxPlane(state, planeIndex)
   source = state.map.planes[planeIndex]
   signBits = 0
@@ -244,7 +309,10 @@ function boxPlane(state, planeIndex)
   return t.Plane(math.VectorCopy(source.normal), source.dist, source.type, signBits)
 end function
 
-// Apply the Quake-compatible sv find touched leafs behavior.
+/// Apply the Quake-compatible sv find touched leafs behavior.
+/// @param state Mutable `miniquake.world` state used by `SV_FindTouchedLeafs`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param nodeNumber The node number input consumed by `SV_FindTouchedLeafs`.
 function SV_FindTouchedLeafs(state, entityIndex, nodeNumber)
   if len(state.leafNums[entityIndex]) >= MAX_ENT_LEAFS then return false end if
   if nodeNumber < 0 then
@@ -263,32 +331,47 @@ function SV_FindTouchedLeafs(state, entityIndex, nodeNumber)
   return true
 end function
 
-// Report whether world set touch enabled holds for the active state.
+/// Report whether world set touch enabled holds for the active state.
+/// @param state Mutable `miniquake.world` state used by `World_SetTouchEnabled`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param enabled Whether the optional behavior is enabled.
 function World_SetTouchEnabled(state, entityIndex, enabled)
   if entityIndex < 0 or entityIndex >= len(state.touchEnabled) then return false end if
   state.touchEnabled[entityIndex] = enabled
   return true
 end function
 
-// Provide entity has touch behavior for the active subsystem.
+/// Implements the `entityHasTouch` operation for `miniquake.world` (entity has touch).
+/// @param state Mutable `miniquake.world` state used by `entityHasTouch`.
+/// @param entityIndex Zero-based index of the requested entry.
 function entityHasTouch(state, entityIndex)
   if hasRuntime(state) then return entityNumber(state, entityIndex, "touch", 0) != 0 end if
   return state.touchEnabled[entityIndex]
 end function
 
-// Execute trigger.
+/// Execute trigger.
+/// @param state Mutable `miniquake.world` state used by `executeTrigger`.
+/// @param triggerIndex Zero-based index of the requested entry.
+/// @param entityIndex Zero-based index of the requested entry.
 function executeTrigger(state, triggerIndex, entityIndex)
   if hasRuntime(state) then return collision.executeTouch(state.server, triggerIndex, entityIndex) end if
   state.touchEvents = state.touchEvents + [[triggerIndex, entityIndex, state.server.time]]
   return true
 end function
 
-// Provide boxes overlap behavior for the active subsystem.
+/// Implements the `boxesOverlap` operation for `miniquake.world` (boxes overlap).
+/// @param minsA The mins a input consumed by `boxesOverlap`.
+/// @param maxsA The maxs a input consumed by `boxesOverlap`.
+/// @param minsB The mins b input consumed by `boxesOverlap`.
+/// @param maxsB The maxs b input consumed by `boxesOverlap`.
 function boxesOverlap(minsA, maxsA, minsB, maxsB)
   return collision.boxesOverlap(minsA, maxsA, minsB, maxsB)
 end function
 
-// Apply the Quake-compatible sv touch links behavior.
+/// Apply the Quake-compatible sv touch links behavior.
+/// @param state Mutable `miniquake.world` state used by `SV_TouchLinks`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param nodeIndex Zero-based index of the requested entry.
 function SV_TouchLinks(state, entityIndex, nodeIndex)
   node = state.nodes[nodeIndex]
   // Iterate a snapshot: QuakeC may unlink/free the current trigger during touch.
@@ -314,7 +397,10 @@ function SV_TouchLinks(state, entityIndex, nodeIndex)
   return true
 end function
 
-// Provide rotated bounds behavior for the active subsystem.
+/// Implements the `rotatedBounds` operation for `miniquake.world` (rotated bounds).
+/// @param origin World-space origin of the operation.
+/// @param mins The mins input consumed by `rotatedBounds`.
+/// @param maxs The maxs input consumed by `rotatedBounds`.
 function rotatedBounds(origin, mins, maxs)
   maximum = 0.0
   values = [mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z]
@@ -328,7 +414,10 @@ function rotatedBounds(origin, mins, maxs)
   ]
 end function
 
-// Apply the Quake-compatible sv link edict behavior.
+/// Apply the Quake-compatible sv link edict behavior.
+/// @param state Mutable `miniquake.world` state used by `SV_LinkEdict`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param touchTriggers The touch triggers input consumed by `SV_LinkEdict`.
 function SV_LinkEdict(state, entityIndex, touchTriggers)
   SV_UnlinkEdict(state, entityIndex)
   if entityIndex == 0 or not entityValid(state, entityIndex) then return false end if
@@ -400,29 +489,41 @@ function SV_LinkEdict(state, entityIndex, touchTriggers)
   return true
 end function
 
-// Apply the Quake-compatible sv hull point contents behavior.
+/// Apply the Quake-compatible sv hull point contents behavior.
+/// @param hull The hull input consumed by `SV_HullPointContents`.
+/// @param number The number input consumed by `SV_HullPointContents`.
+/// @param point The point input consumed by `SV_HullPointContents`.
 function SV_HullPointContents(hull, number, point)
   return boxworld.pointContentsFromNode(hull, number, point)
 end function
 
-// Apply the Quake-compatible sv bsp hull point contents behavior.
+/// Apply the Quake-compatible sv bsp hull point contents behavior.
+/// @param hull The hull input consumed by `SV_BspHullPointContents`.
+/// @param number The number input consumed by `SV_BspHullPointContents`.
+/// @param point The point input consumed by `SV_BspHullPointContents`.
 function SV_BspHullPointContents(hull, number, point)
   return bspworld.pointContentsFromNode(hull, number, point)
 end function
 
-// Apply the Quake-compatible sv point contents behavior.
+/// Apply the Quake-compatible sv point contents behavior.
+/// @param state Mutable `miniquake.world` state used by `SV_PointContents`.
+/// @param point The point input consumed by `SV_PointContents`.
 function SV_PointContents(state, point)
   contents = SV_TruePointContents(state, point)
   if contents <= -9 and contents >= -14 then return c.CONTENTS_WATER end if
   return contents
 end function
 
-// Apply the Quake-compatible sv true point contents behavior.
+/// Apply the Quake-compatible sv true point contents behavior.
+/// @param state Mutable `miniquake.world` state used by `SV_TruePointContents`.
+/// @param point The point input consumed by `SV_TruePointContents`.
 function SV_TruePointContents(state, point)
   return bspworld.truePointContents(state.map, point)
 end function
 
-// Return hull index derived from the active module state.
+/// Return hull index derived from the active module state.
+/// @param mins The mins input consumed by `hullIndex`.
+/// @param maxs The maxs input consumed by `hullIndex`.
 function hullIndex(mins, maxs)
   sizeX = maxs.x - mins.x
   if sizeX < 3.0 then return 0 end if
@@ -430,7 +531,11 @@ function hullIndex(mins, maxs)
   return 2
 end function
 
-// Apply the Quake-compatible sv hull for entity behavior.
+/// Apply the Quake-compatible sv hull for entity behavior.
+/// @param state Mutable `miniquake.world` state used by `SV_HullForEntity`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param mins The mins input consumed by `SV_HullForEntity`.
+/// @param maxs The maxs input consumed by `SV_HullForEntity`.
 function SV_HullForEntity(state, entityIndex, mins, maxs)
   solid = entityNumber(state, entityIndex, "solid", c.SOLID_NOT)
   origin = entityVector(state, entityIndex, "origin")
@@ -452,7 +557,9 @@ function SV_HullForEntity(state, entityIndex, mins, maxs)
   return [SV_HullForBox(hullMins, hullMaxs), origin, false]
 end function
 
-// Provide rotate into model behavior for the active subsystem.
+/// Implements the `rotateIntoModel` operation for `miniquake.world` (rotate into model).
+/// @param value Value consumed by `rotateIntoModel`.
+/// @param angles Orientation angles used by the operation.
 function rotateIntoModel(value, angles)
   vectors = math.AngleVectors(angles)
   return t.Vec3(
@@ -462,18 +569,33 @@ function rotateIntoModel(value, angles)
   )
 end function
 
-// Provide rotate from model behavior for the active subsystem.
+/// Implements the `rotateFromModel` operation for `miniquake.world` (rotate from model).
+/// @param value Value consumed by `rotateFromModel`.
+/// @param angles Orientation angles used by the operation.
 function rotateFromModel(value, angles)
   inverse = t.Vec3(-angles.x, -angles.y, -angles.z)
   return rotateIntoModel(value, inverse)
 end function
 
-// Apply the Quake-compatible sv recursive hull check behavior.
+/// Apply the Quake-compatible sv recursive hull check behavior.
+/// @param hull The hull input consumed by `SV_RecursiveHullCheck`.
+/// @param number The number input consumed by `SV_RecursiveHullCheck`.
+/// @param p1Fraction The p1 fraction input consumed by `SV_RecursiveHullCheck`.
+/// @param p2Fraction The p2 fraction input consumed by `SV_RecursiveHullCheck`.
+/// @param p1 The p1 input consumed by `SV_RecursiveHullCheck`.
+/// @param p2 The p2 input consumed by `SV_RecursiveHullCheck`.
+/// @param trace The trace input consumed by `SV_RecursiveHullCheck`.
 function SV_RecursiveHullCheck(hull, number, p1Fraction, p2Fraction, p1, p2, trace)
   return bspworld.recursiveHullCheck(hull, number, p1Fraction, p2Fraction, p1, p2, trace)
 end function
 
-// Apply the Quake-compatible sv clip move to entity behavior.
+/// Apply the Quake-compatible sv clip move to entity behavior.
+/// @param state Mutable `miniquake.world` state used by `SV_ClipMoveToEntity`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param start The start input consumed by `SV_ClipMoveToEntity`.
+/// @param mins The mins input consumed by `SV_ClipMoveToEntity`.
+/// @param maxs The maxs input consumed by `SV_ClipMoveToEntity`.
+/// @param finish The finish input consumed by `SV_ClipMoveToEntity`.
 function SV_ClipMoveToEntity(state, entityIndex, start, mins, maxs, finish)
   selected = SV_HullForEntity(state, entityIndex, mins, maxs)
   hull = selected[0]
@@ -509,17 +631,26 @@ function SV_ClipMoveToEntity(state, entityIndex, start, mins, maxs, finish)
   return trace
 end function
 
-// Apply the Quake-compatible sv move bounds behavior.
+/// Apply the Quake-compatible sv move bounds behavior.
+/// @param start The start input consumed by `SV_MoveBounds`.
+/// @param mins The mins input consumed by `SV_MoveBounds`.
+/// @param maxs The maxs input consumed by `SV_MoveBounds`.
+/// @param finish The finish input consumed by `SV_MoveBounds`.
 function SV_MoveBounds(start, mins, maxs, finish)
   return collision.moveBounds(start, mins, maxs, finish)
 end function
 
-// Provide choose trace behavior for the active subsystem.
+/// Implements the `chooseTrace` operation for `miniquake.world` (choose trace).
+/// @param best The best input consumed by `chooseTrace`.
+/// @param candidate The candidate input consumed by `chooseTrace`.
 function chooseTrace(best, candidate)
   return collision.chooseTrace(best, candidate)
 end function
 
-// Apply the Quake-compatible sv clip to links behavior.
+/// Apply the Quake-compatible sv clip to links behavior.
+/// @param state Mutable `miniquake.world` state used by `SV_ClipToLinks`.
+/// @param nodeIndex Zero-based index of the requested entry.
+/// @param clip The clip input consumed by `SV_ClipToLinks`.
 function SV_ClipToLinks(state, nodeIndex, clip)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   node = state.nodes[nodeIndex]
@@ -566,7 +697,14 @@ function SV_ClipToLinks(state, nodeIndex, clip)
   return true
 end function
 
-// Apply the Quake-compatible sv move behavior.
+/// Apply the Quake-compatible sv move behavior.
+/// @param state Mutable `miniquake.world` state used by `SV_Move`.
+/// @param start The start input consumed by `SV_Move`.
+/// @param mins The mins input consumed by `SV_Move`.
+/// @param maxs The maxs input consumed by `SV_Move`.
+/// @param finish The finish input consumed by `SV_Move`.
+/// @param moveType The move type input consumed by `SV_Move`.
+/// @param passedEntity The passed entity input consumed by `SV_Move`.
 function SV_Move(state, start, mins, maxs, finish, moveType, passedEntity)
   trace = bspworld.trace(state.map, start, mins, maxs, finish)
   if trace.fraction < 1.0 or trace.startSolid then trace.entity = 0 else trace.entity = -1 end if
@@ -582,7 +720,9 @@ function SV_Move(state, start, mins, maxs, finish, moveType, passedEntity)
   return clip.trace
 end function
 
-// Apply the Quake-compatible sv test entity position behavior.
+/// Apply the Quake-compatible sv test entity position behavior.
+/// @param state Mutable `miniquake.world` state used by `SV_TestEntityPosition`.
+/// @param entityIndex Zero-based index of the requested entry.
 function SV_TestEntityPosition(state, entityIndex)
   if not entityValid(state, entityIndex) then return -1 end if
   origin = entityVector(state, entityIndex, "origin")

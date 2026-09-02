@@ -13,16 +13,22 @@ import miniquake.constants as c
 import miniquake.sizebuf as sz
 import miniquake.message as msg
 
+/// Defines the max alias name value used by `miniquake.cmd`.
 const MAX_ALIAS_NAME = 32
+/// Defines the max args value used by `miniquake.cmd`.
 const MAX_ARGS = 80
+/// Defines the command buffer size value used by `miniquake.cmd`.
 const COMMAND_BUFFER_SIZE = 8192
 
-// Create and initialize the module state.
+/// Implements the `create` operation for `miniquake.cmd` (create).
 function create()
   return t.CommandSystem([], [], [], "", "", false)
 end function
 
-// Add state for add command.
+/// Add state for add command.
+/// @param system The system input consumed by `addCommand`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param callback The callback input consumed by `addCommand`.
 function addCommand(system, name, callback)
   for each item in system.commands
     if item[0] == name then return error(1450, "Cmd_AddCommand: " + name + " already defined") end if
@@ -32,7 +38,9 @@ function addCommand(system, name, callback)
   return true
 end function
 
-// Report whether command exists holds for the active state.
+/// Report whether command exists holds for the active state.
+/// @param system The system input consumed by `commandExists`.
+/// @param name Stable name that identifies the requested object or option.
 function commandExists(system, name)
   for each item in system.commands
     if item[0] == name then return true end if
@@ -40,7 +48,8 @@ function commandExists(system, name)
   return false
 end function
 
-// Return terminated alias value derived from the active module state.
+/// Return terminated alias value derived from the active module state.
+/// @param value Value consumed by `terminatedAliasValue`.
 function terminatedAliasValue(value)
   data = bytes(value)
   if len(data) > 0 and data[len(data) - 1] == 10 then return value end if
@@ -48,7 +57,10 @@ function terminatedAliasValue(value)
   return value + " \n"
 end function
 
-// Add state for add alias.
+/// Add state for add alias.
+/// @param system The system input consumed by `addAlias`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param value Value consumed by `addAlias`.
 function addAlias(system, name, value)
   if len(bytes(name)) >= MAX_ALIAS_NAME then return error(1451, "Alias name is too long") end if
   for each alias in system.aliases
@@ -64,7 +76,8 @@ function addAlias(system, name, value)
   return alias
 end function
 
-// Convert the requested value into its canonical representation.
+/// Convert the requested value into its canonical representation.
+/// @param text Text to parse or process.
 function tokenize(text)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   source = bytes(text)
@@ -109,7 +122,8 @@ function tokenize(text)
   return result
 end function
 
-// Provide raw argument tail behavior for the active subsystem.
+/// Implements the `rawArgumentTail` operation for `miniquake.cmd` (raw argument tail).
+/// @param text Text to parse or process.
 function rawArgumentTail(text)
   source = bytes(text)
   index = 0
@@ -143,18 +157,23 @@ function rawArgumentTail(text)
   return decode(slice(source, index, finish - index))
 end function
 
-// Return the number of tokenized command arguments.
+/// Return the number of tokenized command arguments.
+/// @param system The system input consumed by `argc`.
 function argc(system)
   return len(system.arguments)
 end function
 
-// Return one tokenized command argument by index.
+/// Return one tokenized command argument by index.
+/// @param system The system input consumed by `argv`.
+/// @param index Zero-based index of the requested entry.
 function argv(system, index)
   if index < 0 or index >= len(system.arguments) then return "" end if
   return system.arguments[index]
 end function
 
-// Provide args from behavior for the active subsystem.
+/// Implements the `argsFrom` operation for `miniquake.cmd` (args from).
+/// @param system The system input consumed by `argsFrom`.
+/// @param first The first input consumed by `argsFrom`.
 function argsFrom(system, first)
   result = ""
   index = first
@@ -166,7 +185,9 @@ function argsFrom(system, first)
   return result
 end function
 
-// Validate parm and report any incompatibility.
+/// Validate parm and report any incompatibility.
+/// @param system The system input consumed by `checkParm`.
+/// @param name Stable name that identifies the requested object or option.
 function checkParm(system, name)
   if name is void then return error(1452, "Cmd_CheckParm: NULL") end if
   index = 1
@@ -177,7 +198,9 @@ function checkParm(system, name)
   return 0
 end function
 
-// Execute string.
+/// Execute string.
+/// @param system The system input consumed by `executeString`.
+/// @param text Text to parse or process.
 function executeString(system, text)
   system.arguments = tokenize(text)
   system.rawArgs = rawArgumentTail(text)
@@ -199,7 +222,9 @@ function executeString(system, text)
   return false
 end function
 
-// Add state for add text.
+/// Add state for add text.
+/// @param system The system input consumed by `addText`.
+/// @param text Text to parse or process.
 function addText(system, text)
   if len(bytes(system.text)) + len(bytes(text)) >= COMMAND_BUFFER_SIZE then
     print "Cbuf_AddText: overflow"
@@ -209,7 +234,9 @@ function addText(system, text)
   return true
 end function
 
-// Add state for insert text.
+/// Add state for insert text.
+/// @param system The system input consumed by `insertText`.
+/// @param text Text to parse or process.
 function insertText(system, text)
   if len(bytes(system.text)) + len(bytes(text)) >= COMMAND_BUFFER_SIZE then
     print "Cbuf_AddText: overflow"
@@ -219,8 +246,10 @@ function insertText(system, text)
   return true
 end function
 
-// Remove every pending command with the requested name while preserving the
-// order of unrelated buffered commands.
+/// Remove every pending command with the requested name while preserving the
+/// order of unrelated buffered commands.
+/// @param system The system input consumed by `removeCommandsNamed`.
+/// @param requestedName Name that identifies the requested value or resource.
 function removeCommandsNamed(system, requestedName)
   wanted = bio.lower(requestedName)
   remaining = system.text
@@ -237,7 +266,8 @@ function removeCommandsNamed(system, requestedName)
   return true
 end function
 
-// Convert first command into its canonical representation.
+/// Convert first command into its canonical representation.
+/// @param text Text to parse or process.
 function splitFirstCommand(text)
   source = bytes(text)
   quoted = false
@@ -259,7 +289,8 @@ function splitFirstCommand(text)
   return [line, rest]
 end function
 
-// Execute buffer.
+/// Execute buffer.
+/// @param system The system input consumed by `executeBuffer`.
 function executeBuffer(system)
   count = 0
   while system.text != ""
@@ -277,7 +308,9 @@ function executeBuffer(system)
   return count
 end function
 
-// Provide prefix matches behavior for the active subsystem.
+/// Implements the `prefixMatches` operation for `miniquake.cmd` (prefix matches).
+/// @param candidate The candidate input consumed by `prefixMatches`.
+/// @param partial The partial input consumed by `prefixMatches`.
 function prefixMatches(candidate, partial)
   left = bytes(candidate)
   right = bytes(partial)
@@ -290,7 +323,9 @@ function prefixMatches(candidate, partial)
   return true
 end function
 
-// Handle command and update the associated state.
+/// Handle command and update the associated state.
+/// @param system The system input consumed by `completeCommand`.
+/// @param partial The partial input consumed by `completeCommand`.
 function completeCommand(system, partial)
   for each item in system.commands
     if prefixMatches(item[0], partial) then return item[0] end if
@@ -298,7 +333,8 @@ function completeCommand(system, partial)
   return void
 end function
 
-// Mirror Quake's Cmd_Wait_f routine and its observable state changes.
+/// Mirror Quake's Cmd_Wait_f routine and its observable state changes.
+/// @param system The system input consumed by `Cmd_Wait_f`.
 function Cmd_Wait_f(system)
   system.wait = true
   return true
@@ -309,22 +345,29 @@ function Cbuf_Init()
   return create()
 end function
 
-// Mirror Quake's Cbuf_AddText routine and its observable state changes.
+/// Mirror Quake's Cbuf_AddText routine and its observable state changes.
+/// @param system The system input consumed by `Cbuf_AddText`.
+/// @param text Text to parse or process.
 function Cbuf_AddText(system, text)
   return addText(system, text)
 end function
 
-// Mirror Quake's Cbuf_InsertText routine and its observable state changes.
+/// Mirror Quake's Cbuf_InsertText routine and its observable state changes.
+/// @param system The system input consumed by `Cbuf_InsertText`.
+/// @param text Text to parse or process.
 function Cbuf_InsertText(system, text)
   return insertText(system, text)
 end function
 
-// Mirror Quake's Cbuf_Execute routine and its observable state changes.
+/// Mirror Quake's Cbuf_Execute routine and its observable state changes.
+/// @param system The system input consumed by `Cbuf_Execute`.
 function Cbuf_Execute(system)
   return executeBuffer(system)
 end function
 
-// Mirror Quake's Cmd_StuffCmds_f routine and its observable state changes.
+/// Mirror Quake's Cmd_StuffCmds_f routine and its observable state changes.
+/// @param system The system input consumed by `Cmd_StuffCmds_f`.
+/// @param commandLineArgs The command line args input consumed by `Cmd_StuffCmds_f`.
 function Cmd_StuffCmds_f(system, commandLineArgs)
   if len(system.arguments) != 1 then return false end if
   combined = ""
@@ -355,13 +398,17 @@ function Cmd_StuffCmds_f(system, commandLineArgs)
   return insertText(system, build)
 end function
 
-// Mirror Quake's Cmd_Exec_f routine and its observable state changes.
+/// Mirror Quake's Cmd_Exec_f routine and its observable state changes.
+/// @param system The system input consumed by `Cmd_Exec_f`.
+/// @param arguments Command-line arguments to inspect or execute.
+/// @param loadedText The loaded text input consumed by `Cmd_Exec_f`.
 function Cmd_Exec_f(system, arguments, loadedText)
   if len(arguments) != 2 or loadedText is void then return false end if
   return insertText(system, loadedText)
 end function
 
-// Mirror Quake's Cmd_Echo_f routine and its observable state changes.
+/// Mirror Quake's Cmd_Echo_f routine and its observable state changes.
+/// @param arguments Command-line arguments to inspect or execute.
 function Cmd_Echo_f(arguments)
   text = ""
   index = 1
@@ -373,12 +420,15 @@ function Cmd_Echo_f(arguments)
   return len(arguments)
 end function
 
-// Transfer data for copy string.
+/// Transfer data for copy string.
+/// @param value Value consumed by `CopyString`.
 function CopyString(value)
   return "" + value
 end function
 
-// Mirror Quake's Cmd_Alias_f routine and its observable state changes.
+/// Mirror Quake's Cmd_Alias_f routine and its observable state changes.
+/// @param system The system input consumed by `Cmd_Alias_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function Cmd_Alias_f(system, arguments)
   if len(arguments) == 1 then return false end if
   value = ""
@@ -391,12 +441,14 @@ function Cmd_Alias_f(system, arguments)
   return addAlias(system, arguments[1], value)
 end function
 
-// Mirror Quake's Cmd_InitCallback routine and its observable state changes.
+/// Mirror Quake's Cmd_InitCallback routine and its observable state changes.
+/// @param arguments Command-line arguments to inspect or execute.
 function Cmd_InitCallback(arguments)
   return true
 end function
 
-// Mirror Quake's Cmd_Init routine and its observable state changes.
+/// Mirror Quake's Cmd_Init routine and its observable state changes.
+/// @param system The system input consumed by `Cmd_Init`.
 function Cmd_Init(system)
   addCommand(system, "stuffcmds", Cmd_InitCallback)
   addCommand(system, "exec", Cmd_InitCallback)
@@ -407,50 +459,71 @@ function Cmd_Init(system)
   return system
 end function
 
-// Mirror Quake's Cmd_Argc routine and its observable state changes.
+/// Mirror Quake's Cmd_Argc routine and its observable state changes.
+/// @param system The system input consumed by `Cmd_Argc`.
 function Cmd_Argc(system)
   return argc(system)
 end function
 
-// Mirror Quake's Cmd_Argv routine and its observable state changes.
+/// Mirror Quake's Cmd_Argv routine and its observable state changes.
+/// @param system The system input consumed by `Cmd_Argv`.
+/// @param index Zero-based index of the requested entry.
 function Cmd_Argv(system, index)
   return argv(system, index)
 end function
 
-// Mirror Quake's Cmd_Args routine and its observable state changes.
+/// Mirror Quake's Cmd_Args routine and its observable state changes.
+/// @param system The system input consumed by `Cmd_Args`.
 function Cmd_Args(system)
   return system.rawArgs
 end function
 
-// Mirror Quake's Cmd_TokenizeString routine and its observable state changes.
+/// Mirror Quake's Cmd_TokenizeString routine and its observable state changes.
+/// @param system The system input consumed by `Cmd_TokenizeString`.
+/// @param text Text to parse or process.
 function Cmd_TokenizeString(system, text)
   system.arguments = tokenize(text)
   system.rawArgs = rawArgumentTail(text)
   return system.arguments
 end function
 
-// Mirror Quake's Cmd_AddCommand routine and its observable state changes.
+/// Mirror Quake's Cmd_AddCommand routine and its observable state changes.
+/// @param system The system input consumed by `Cmd_AddCommand`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param callback The callback input consumed by `Cmd_AddCommand`.
+/// @param variableExists The variable exists input consumed by `Cmd_AddCommand`.
 function Cmd_AddCommand(system, name, callback, variableExists)
   if variableExists then return error(1453, "Cmd_AddCommand: " + name + " already defined as a var") end if
   return addCommand(system, name, callback)
 end function
 
-// Report whether cmd exists holds for the active state.
+/// Report whether cmd exists holds for the active state.
+/// @param system The system input consumed by `Cmd_Exists`.
+/// @param name Stable name that identifies the requested object or option.
 function Cmd_Exists(system, name)
   return commandExists(system, name)
 end function
 
-// Mirror Quake's Cmd_CompleteCommand routine and its observable state changes.
+/// Mirror Quake's Cmd_CompleteCommand routine and its observable state changes.
+/// @param system The system input consumed by `Cmd_CompleteCommand`.
+/// @param partial The partial input consumed by `Cmd_CompleteCommand`.
 function Cmd_CompleteCommand(system, partial)
   return completeCommand(system, partial)
 end function
 
-// Mirror Quake's Cmd_ExecuteString routine and its observable state changes.
+/// Mirror Quake's Cmd_ExecuteString routine and its observable state changes.
+/// @param system The system input consumed by `Cmd_ExecuteString`.
+/// @param text Text to parse or process.
+/// @param source Source value or collection to read.
 function Cmd_ExecuteString(system, text, source)
   return executeString(system, text)
 end function
 
-// Mirror Quake's Cmd_ForwardToServer routine and its observable state changes.
+/// Mirror Quake's Cmd_ForwardToServer routine and its observable state changes.
+/// @param system The system input consumed by `Cmd_ForwardToServer`.
+/// @param outgoing The outgoing input consumed by `Cmd_ForwardToServer`.
+/// @param connected The connected input consumed by `Cmd_ForwardToServer`.
+/// @param demoPlayback The demo playback input consumed by `Cmd_ForwardToServer`.
 function Cmd_ForwardToServer(system, outgoing, connected, demoPlayback)
   if not connected or demoPlayback then return false end if
   msg.writeByte(outgoing, c.CLC_STRINGCMD)
@@ -462,7 +535,9 @@ function Cmd_ForwardToServer(system, outgoing, connected, demoPlayback)
   return true
 end function
 
-// Mirror Quake's Cmd_CheckParm routine and its observable state changes.
+/// Mirror Quake's Cmd_CheckParm routine and its observable state changes.
+/// @param system The system input consumed by `Cmd_CheckParm`.
+/// @param name Stable name that identifies the requested object or option.
 function Cmd_CheckParm(system, name)
   return checkParm(system, name)
 end function

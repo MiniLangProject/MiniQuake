@@ -12,19 +12,23 @@ import miniquake.byteio as bio
 import miniquake.memory as memory
 import miniquake.protocol_text as protocolText
 
-// Create and initialize the requested value.
+/// Create and initialize the requested value.
+/// @param maxSize Size of the requested data or resource.
 function alloc(maxSize)
   if maxSize < 0 then return error(1200, "negative size buffer") end if
   return t.SizeBuffer(bytes(maxSize), maxSize, 0, false, false)
 end function
 
-// Create and initialize hunk.
+/// Create and initialize hunk.
+/// @param startSize Size of the requested data or resource.
 function allocHunk(startSize)
   if startSize < 256 then startSize = 256 end if
   return alloc(startSize)
 end function
 
-// Create and initialize hunk managed.
+/// Create and initialize hunk managed.
+/// @param memoryState Mutable state used by `allocHunkManaged`.
+/// @param startSize Size of the requested data or resource.
 function allocHunkManaged(memoryState, startSize)
   if startSize < 256 then startSize = 256 end if
   block = memory.hunkAllocName(memoryState, startSize, "sizebuf")
@@ -32,20 +36,23 @@ function allocHunkManaged(memoryState, startSize)
   return [buffer, block]
 end function
 
-// Create and initialize overflowing.
+/// Create and initialize overflowing.
+/// @param maxSize Size of the requested data or resource.
 function allocOverflowing(maxSize)
   buffer = alloc(maxSize)
   buffer.allowOverflow = true
   return buffer
 end function
 
-// Update module state for the requested operation.
+/// Implements the `clear` operation for `miniquake.sizebuf` (clear).
+/// @param buffer The buffer input consumed by `clear`.
 function clear(buffer)
   buffer.curSize = 0
   return buffer
 end function
 
-// Release state for free.
+/// Implements the `free` operation for `miniquake.sizebuf` (free).
+/// @param buffer The buffer input consumed by `free`.
 function free(buffer)
   // SZ_Free did not release its hunk allocation in MiniQuake 1.09; only the
   // logical contents became empty.
@@ -53,7 +60,9 @@ function free(buffer)
   return buffer
 end function
 
-// Return space.
+/// Return space.
+/// @param buffer The buffer input consumed by `getSpace`.
+/// @param count Number of entries or units to process.
 function getSpace(buffer, count)
   if count < 0 then return error(1201, "negative size request") end if
   if buffer.curSize + count > buffer.maxSize then
@@ -67,26 +76,38 @@ function getSpace(buffer, count)
   return offset
 end function
 
-// Encode and write the requested data.
+/// Implements the `write` operation for `miniquake.sizebuf` (write).
+/// @param buffer The buffer input consumed by `write`.
+/// @param source Source value or collection to read.
+/// @param sourceOffset Zero-based offset of the requested data.
+/// @param count Number of entries or units to process.
 function write(buffer, source, sourceOffset, count)
   offset = getSpace(buffer, count)
   bio.copyInto(buffer.data, offset, source, sourceOffset, count)
   return offset
 end function
 
-// Encode and write bytes.
+/// Writes bytes for `miniquake.sizebuf`.
+/// @param buffer The buffer input consumed by `writeBytes`.
+/// @param source Source value or collection to read.
 function writeBytes(buffer, source)
   return write(buffer, source, 0, len(source))
 end function
 
-// Encode and write encoded cstring at.
+/// Encode and write encoded cstring at.
+/// @param buffer The buffer input consumed by `writeEncodedCStringAt`.
+/// @param encoded The encoded input consumed by `writeEncodedCStringAt`.
+/// @param count Number of entries or units to process.
+/// @param offset Zero-based offset of the requested data.
 function writeEncodedCStringAt(buffer, encoded, count, offset)
   if count > 0 then bio.copyInto(buffer.data, offset, encoded, 0, count) end if
   buffer.data[offset + count] = 0
   return offset + count
 end function
 
-// Format and emit text.
+/// Format and emit text.
+/// @param buffer The buffer input consumed by `printText`.
+/// @param text Text to parse or process.
 function printText(buffer, text)
   // SZ_Print consumes the same raw one-byte C string representation as
   // MSG_WriteString. Stop at embedded NUL and never leak UTF-8 multibyte data
@@ -119,37 +140,49 @@ function printText(buffer, text)
   end if
 end function
 
-// Provide data slice behavior for the active subsystem.
+/// Implements the `dataSlice` operation for `miniquake.sizebuf` (data slice).
+/// @param buffer The buffer input consumed by `dataSlice`.
 function dataSlice(buffer)
   return slice(buffer.data, 0, buffer.curSize)
 end function
 
-// Direct pendants for the size-buffer section of WinQuake/common.c.
+/// Direct pendants for the size-buffer section of WinQuake/common.c.
+/// @param startSize Size of the requested data or resource.
 function SZ_Alloc(startSize)
   return allocHunk(startSize)
 end function
 
-// Mirror Quake's SZ_Free routine and its observable state changes.
+/// Mirror Quake's SZ_Free routine and its observable state changes.
+/// @param buffer The buffer input consumed by `SZ_Free`.
 function SZ_Free(buffer)
   return free(buffer)
 end function
 
-// Mirror Quake's SZ_Clear routine and its observable state changes.
+/// Mirror Quake's SZ_Clear routine and its observable state changes.
+/// @param buffer The buffer input consumed by `SZ_Clear`.
 function SZ_Clear(buffer)
   return clear(buffer)
 end function
 
-// Mirror Quake's SZ_GetSpace routine and its observable state changes.
+/// Mirror Quake's SZ_GetSpace routine and its observable state changes.
+/// @param buffer The buffer input consumed by `SZ_GetSpace`.
+/// @param count Number of entries or units to process.
 function SZ_GetSpace(buffer, count)
   return getSpace(buffer, count)
 end function
 
-// Mirror Quake's SZ_Write routine and its observable state changes.
+/// Mirror Quake's SZ_Write routine and its observable state changes.
+/// @param buffer The buffer input consumed by `SZ_Write`.
+/// @param source Source value or collection to read.
+/// @param sourceOffset Zero-based offset of the requested data.
+/// @param count Number of entries or units to process.
 function SZ_Write(buffer, source, sourceOffset, count)
   return write(buffer, source, sourceOffset, count)
 end function
 
-// Mirror Quake's SZ_Print routine and its observable state changes.
+/// Mirror Quake's SZ_Print routine and its observable state changes.
+/// @param buffer The buffer input consumed by `SZ_Print`.
+/// @param text Text to parse or process.
 function SZ_Print(buffer, text)
   return printText(buffer, text)
 end function

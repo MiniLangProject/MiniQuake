@@ -10,16 +10,27 @@ package miniquake.protocol_update
 import miniquake.constants as c
 import miniquake.message as msg
 
-// Provide absolute behavior for the active subsystem.
+/// Implements the `absolute` operation for `miniquake.protocol_update` (absolute).
+/// @param value Value consumed by `absolute`.
 function absolute(value)
   if value < 0.0 then return -value end if
   return value
 end function
 
-// Exact Protocol-15 bit selection from WinQuake sv_main.c:
-// SV_WriteEntitiesToClient.  The entity-state baseline includes effects even
-// though svc_spawnbaseline does not transmit it; SV_CreateBaseline leaves that
-// field at zero in the original zero-initialized edict baseline.
+/// Exact Protocol-15 bit selection from WinQuake sv_main.c:
+/// SV_WriteEntitiesToClient.  The entity-state baseline includes effects even
+/// though svc_spawnbaseline does not transmit it; SV_CreateBaseline leaves that
+/// field at zero in the original zero-initialized edict baseline.
+/// @param entityNumber The entity number input consumed by `computeBits`.
+/// @param baseline The baseline input consumed by `computeBits`.
+/// @param modelIndex Zero-based index of the requested entry.
+/// @param frame The frame input consumed by `computeBits`.
+/// @param colormap The colormap input consumed by `computeBits`.
+/// @param skin The skin input consumed by `computeBits`.
+/// @param effects The effects input consumed by `computeBits`.
+/// @param origin World-space origin of the operation.
+/// @param angles Orientation angles used by the operation.
+/// @param moveType The move type input consumed by `computeBits`.
 function computeBits(
   entityNumber,
   baseline,
@@ -50,10 +61,11 @@ function computeBits(
   return bits
 end function
 
-// Exact byte count for one Protocol-15 fast entity update. The original
-// SV_WriteEntitiesToClient used a fixed 16-byte preflight even though the
-// theoretical long-entity maximum is 18 bytes. MiniQuake preserves the
-// original 16-byte scheduling gate and adds this exact memory-safety check.
+/// Exact byte count for one Protocol-15 fast entity update. The original
+/// SV_WriteEntitiesToClient used a fixed 16-byte preflight even though the
+/// theoretical long-entity maximum is 18 bytes. MiniQuake preserves the
+/// original 16-byte scheduling gate and adds this exact memory-safety check.
+/// @param bits The bits input consumed by `encodedSize`.
 function encodedSize(bits)
   count = 1
   if (bits & c.U_MOREBITS) != 0 then count = count + 1 end if
@@ -72,17 +84,22 @@ function encodedSize(bits)
   return count
 end function
 
-// Report whether can write.
+/// Report whether can write.
+/// @param buffer The buffer input consumed by `canWrite`.
+/// @param bits The bits input consumed by `canWrite`.
 function canWrite(buffer, bits)
   remaining = buffer.maxSize - buffer.curSize
   if remaining < 16 then return false end if
   return encodedSize(bits) <= remaining
 end function
 
-// The stock server appends sv.datagram after fast entity updates. Under a
-// dense PVS that can discard the complete transient tail, including gunshot
-// puffs and explosions. Reserve the already-known tail while scheduling
-// entity deltas; the strict '< maxSize' append boundary still applies.
+/// The stock server appends sv.datagram after fast entity updates. Under a
+/// dense PVS that can discard the complete transient tail, including gunshot
+/// puffs and explosions. Reserve the already-known tail while scheduling
+/// entity deltas; the strict '< maxSize' append boundary still applies.
+/// @param buffer The buffer input consumed by `canWriteWithReservedTail`.
+/// @param bits The bits input consumed by `canWriteWithReservedTail`.
+/// @param reservedBytes Byte data consumed by the operation.
 function canWriteWithReservedTail(buffer, bits, reservedBytes)
   if reservedBytes <= 0 then return canWrite(buffer, bits) end if
   remaining = buffer.maxSize - buffer.curSize - reservedBytes
@@ -90,7 +107,17 @@ function canWriteWithReservedTail(buffer, bits, reservedBytes)
   return encodedSize(bits) < remaining
 end function
 
-// Encode and write fast update bits.
+/// Encode and write fast update bits.
+/// @param buffer The buffer input consumed by `writeFastUpdateBits`.
+/// @param bits The bits input consumed by `writeFastUpdateBits`.
+/// @param entityNumber The entity number input consumed by `writeFastUpdateBits`.
+/// @param modelIndex Zero-based index of the requested entry.
+/// @param frame The frame input consumed by `writeFastUpdateBits`.
+/// @param colormap The colormap input consumed by `writeFastUpdateBits`.
+/// @param skin The skin input consumed by `writeFastUpdateBits`.
+/// @param effects The effects input consumed by `writeFastUpdateBits`.
+/// @param origin World-space origin of the operation.
+/// @param angles Orientation angles used by the operation.
 function writeFastUpdateBits(
   buffer,
   bits,
@@ -124,7 +151,18 @@ function writeFastUpdateBits(
   return bits
 end function
 
-// Encode and write fast update.
+/// Encode and write fast update.
+/// @param buffer The buffer input consumed by `writeFastUpdate`.
+/// @param entityNumber The entity number input consumed by `writeFastUpdate`.
+/// @param baseline The baseline input consumed by `writeFastUpdate`.
+/// @param modelIndex Zero-based index of the requested entry.
+/// @param frame The frame input consumed by `writeFastUpdate`.
+/// @param colormap The colormap input consumed by `writeFastUpdate`.
+/// @param skin The skin input consumed by `writeFastUpdate`.
+/// @param effects The effects input consumed by `writeFastUpdate`.
+/// @param origin World-space origin of the operation.
+/// @param angles Orientation angles used by the operation.
+/// @param moveType The move type input consumed by `writeFastUpdate`.
 function writeFastUpdate(
   buffer,
   entityNumber,

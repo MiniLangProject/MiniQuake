@@ -20,67 +20,122 @@ import miniquake.array_util as arrayutil
 import miniquake.render.texture_upscale as textureUpscale
 import std.string as string
 
+/// Defines the max scraps value used by `miniquake.render.draw2d`.
 const MAX_SCRAPS = 2
+/// Defines the scrap width value used by `miniquake.render.draw2d`.
 const SCRAP_WIDTH = 256
+/// Defines the scrap height value used by `miniquake.render.draw2d`.
 const SCRAP_HEIGHT = 256
+/// Defines the max gltextures value used by `miniquake.render.draw2d`.
 const MAX_GLTEXTURES = 1024
+/// Defines the max cached pics value used by `miniquake.render.draw2d`.
 const MAX_CACHED_PICS = 128
 
+/// Tracks the module-level draw filesystem state owned by `miniquake.render.draw2d`.
 drawFilesystem = void
+/// Tracks the module-level draw palette state owned by `miniquake.render.draw2d`.
 drawPalette = bytes()
+/// Tracks the module-level draw wad state owned by `miniquake.render.draw2d`.
 drawWad = void
+/// Tracks the module-level draw cvars state owned by `miniquake.render.draw2d`.
 drawCvars = void
+/// Tracks the module-level draw video width state owned by `miniquake.render.draw2d`.
 drawVideoWidth = 320
+/// Tracks the module-level draw video height state owned by `miniquake.render.draw2d`.
 drawVideoHeight = 200
+/// Tracks the module-level draw viewport state owned by `miniquake.render.draw2d`.
 drawViewport = [0, 0, 320, 200]
+/// Tracks the module-level draw chars state owned by `miniquake.render.draw2d`.
 draw_chars = bytes()
+/// Tracks the module-level draw disc state owned by `miniquake.render.draw2d`.
 draw_disc = void
+/// Tracks the module-level draw backtile state owned by `miniquake.render.draw2d`.
 draw_backtile = void
+/// Tracks the module-level conback state owned by `miniquake.render.draw2d`.
 conback = void
+/// Tracks the module-level menuplyr pixels state owned by `miniquake.render.draw2d`.
 menuplyr_pixels = bytes(4096)
 
+/// Tracks the module-level char texture state owned by `miniquake.render.draw2d`.
 char_texture = 0
+/// Tracks the module-level translate texture state owned by `miniquake.render.draw2d`.
 translate_texture = 0
+/// Tracks the module-level currenttexture state owned by `miniquake.render.draw2d`.
 currenttexture = -1
+/// Tracks the module-level gl nobind state owned by `miniquake.render.draw2d`.
 gl_nobind = 0.0
+/// Tracks the module-level gl max size state owned by `miniquake.render.draw2d`.
 gl_max_size = 1024.0
+/// Tracks the module-level gl picmip state owned by `miniquake.render.draw2d`.
 gl_picmip = 0.0
+/// Tracks the module-level gl textureupscale state owned by `miniquake.render.draw2d`.
 gl_textureupscale = 0
+/// Tracks the module-level gl anisotropy state owned by `miniquake.render.draw2d`.
 gl_anisotropy = 1
+/// Tracks the module-level gl filter min state owned by `miniquake.render.draw2d`.
 gl_filter_min = gl.GL_LINEAR_MIPMAP_NEAREST
+/// Tracks the module-level gl filter max state owned by `miniquake.render.draw2d`.
 gl_filter_max = gl.GL_LINEAR
+/// Tracks the module-level gl lightmap format state owned by `miniquake.render.draw2d`.
 gl_lightmap_format = 4
+/// Tracks the module-level gl solid format state owned by `miniquake.render.draw2d`.
 gl_solid_format = 3
+/// Tracks the module-level gl alpha format state owned by `miniquake.render.draw2d`.
 gl_alpha_format = 4
+/// Tracks the module-level texels state owned by `miniquake.render.draw2d`.
 texels = 0
 
+/// Tracks the module-level scrap allocated state owned by `miniquake.render.draw2d`.
 scrap_allocated = []
+/// Tracks the module-level scrap texels state owned by `miniquake.render.draw2d`.
 scrap_texels = []
+/// Tracks the module-level scrap textures state owned by `miniquake.render.draw2d`.
 scrap_textures = []
+/// Tracks the module-level scrap dirty state owned by `miniquake.render.draw2d`.
 scrap_dirty = false
+/// Tracks the module-level scrap uploads state owned by `miniquake.render.draw2d`.
 scrap_uploads = 0
+/// Tracks the module-level pic texels state owned by `miniquake.render.draw2d`.
 pic_texels = 0
+/// Tracks the module-level pic count state owned by `miniquake.render.draw2d`.
 pic_count = 0
+/// Tracks the module-level draw sbar changes state owned by `miniquake.render.draw2d`.
 drawSbarChanges = 0
 
+/// Tracks the module-level menu cachepics state owned by `miniquake.render.draw2d`.
 menu_cachepics = []
+/// Tracks the module-level wad cachepics state owned by `miniquake.render.draw2d`.
 wad_cachepics = []
+/// Tracks the module-level draw picture objects state owned by `miniquake.render.draw2d`.
 drawPictureObjects = []
+/// Tracks the module-level draw picture coordinates state owned by `miniquake.render.draw2d`.
 drawPictureCoordinates = []
+/// Tracks the module-level draw picture pixels state owned by `miniquake.render.draw2d`.
 drawPicturePixels = []
 
+/// Tracks the module-level gl texture names state owned by `miniquake.render.draw2d`.
 glTextureNames = []
+/// Tracks the module-level gl texture ids state owned by `miniquake.render.draw2d`.
 glTextureIds = []
+/// Tracks the module-level gl texture widths state owned by `miniquake.render.draw2d`.
 glTextureWidths = []
+/// Tracks the module-level gl texture heights state owned by `miniquake.render.draw2d`.
 glTextureHeights = []
+/// Tracks the module-level gl texture mipmaps state owned by `miniquake.render.draw2d`.
 glTextureMipmaps = []
+/// Tracks the module-level texture extension number state owned by `miniquake.render.draw2d`.
 texture_extension_number = 1
 
+/// Tracks the module-level gl multi texture available state owned by `miniquake.render.draw2d`.
 glMultiTextureAvailable = false
+/// Tracks the module-level old texture target state owned by `miniquake.render.draw2d`.
 oldTextureTarget = gl.GL_TEXTURE0_SGIS
+/// Tracks the module-level current texture slots state owned by `miniquake.render.draw2d`.
 currentTextureSlots = [-1, -1]
 
-// Provide indexed font rgba behavior for the active subsystem.
+/// Implements the `indexedFontRgba` operation for `miniquake.render.draw2d` (indexed font rgba).
+/// @param pixels The pixels input consumed by `indexedFontRgba`.
+/// @param palette The palette input consumed by `indexedFontRgba`.
 function indexedFontRgba(pixels, palette)
   count = len(pixels)
   output = bytes(count * 4)
@@ -105,7 +160,9 @@ function indexedFontRgba(pixels, palette)
   return output
 end function
 
-// Upload font to the active renderer.
+/// Upload font to the active renderer.
+/// @param conchars The conchars input consumed by `uploadFont`.
+/// @param palette The palette input consumed by `uploadFont`.
 function uploadFont(conchars, palette)
   if len(conchars) < 16384 then return error(3300, "Draw_Init: conchars.lmp is truncated") end if
   if len(palette) < 768 then return error(3301, "Draw_Init: palette.lmp is truncated") end if
@@ -120,7 +177,10 @@ function uploadFont(conchars, palette)
 end function
 
 
-// Provide indexed picture rgba behavior for the active subsystem.
+/// Implements the `indexedPictureRgba` operation for `miniquake.render.draw2d` (indexed picture rgba).
+/// @param pixels The pixels input consumed by `indexedPictureRgba`.
+/// @param palette The palette input consumed by `indexedPictureRgba`.
+/// @param transparent The transparent input consumed by `indexedPictureRgba`.
 function indexedPictureRgba(pixels, palette, transparent)
   if len(palette) < 768 then return error(3302, "Draw_Pic: palette.lmp is truncated") end if
   output = bytes(len(pixels) * 4)
@@ -140,8 +200,12 @@ function indexedPictureRgba(pixels, palette, transparent)
   return output
 end function
 
-// Quake qpic_t files store little-endian width/height followed by indexed
-// pixels.  Menu artwork uses palette index 255 as transparent.
+/// Quake qpic_t files store little-endian width/height followed by indexed
+/// pixels.  Menu artwork uses palette index 255 as transparent.
+/// @param data Input data consumed by the operation.
+/// @param palette The palette input consumed by `uploadPicture`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param transparent The transparent input consumed by `uploadPicture`.
 function uploadPicture(data, palette, name, transparent)
   if len(data) < 8 then return error(3303, name + ": qpic header is truncated") end if
   width = bio.i32(data, 0)
@@ -163,7 +227,9 @@ function uploadPicture(data, palette, name, transparent)
   return t.MenuPicture(name, width, height, texture)
 end function
 
-// Initialize state for begin2d.
+/// Initialize state for begin2d.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function begin2d(width, height)
   if width < 1 then width = 1 end if
   if height < 1 then height = 1 end if
@@ -186,7 +252,15 @@ function end2d()
   gl.depthMask(true)
 end function
 
-// Provide solid quad behavior for the active subsystem.
+/// Implements the `solidQuad` operation for `miniquake.render.draw2d` (solid quad).
+/// @param x The x input consumed by `solidQuad`.
+/// @param y The y input consumed by `solidQuad`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param red The red input consumed by `solidQuad`.
+/// @param green The green input consumed by `solidQuad`.
+/// @param blue The blue input consumed by `solidQuad`.
+/// @param alpha The alpha input consumed by `solidQuad`.
 function solidQuad(x, y, width, height, red, green, blue, alpha)
   gl.disable(gl.GL_TEXTURE_2D)
   gl.color(red, green, blue, alpha)
@@ -199,7 +273,20 @@ function solidQuad(x, y, width, height, red, green, blue, alpha)
   gl.enable(gl.GL_TEXTURE_2D)
 end function
 
-// Provide textured quad behavior for the active subsystem.
+/// Implements the `texturedQuad` operation for `miniquake.render.draw2d` (textured quad).
+/// @param texture Texture resource processed by the operation.
+/// @param x The x input consumed by `texturedQuad`.
+/// @param y The y input consumed by `texturedQuad`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param s0 The s0 input consumed by `texturedQuad`.
+/// @param t0 The t0 input consumed by `texturedQuad`.
+/// @param s1 The s1 input consumed by `texturedQuad`.
+/// @param t1 The t1 input consumed by `texturedQuad`.
+/// @param red The red input consumed by `texturedQuad`.
+/// @param green The green input consumed by `texturedQuad`.
+/// @param blue The blue input consumed by `texturedQuad`.
+/// @param alpha The alpha input consumed by `texturedQuad`.
 function texturedQuad(texture, x, y, width, height, s0, t0, s1, t1, red, green, blue, alpha)
   gl.enable(gl.GL_TEXTURE_2D)
   gl.bindTexture(texture)
@@ -212,7 +299,13 @@ function texturedQuad(texture, x, y, width, height, s0, t0, s1, t1, red, green, 
   gl.finishPrimitive()
 end function
 
-// Provide character behavior for the active subsystem.
+/// Implements the `character` operation for `miniquake.render.draw2d` (character).
+/// @param texture Texture resource processed by the operation.
+/// @param x The x input consumed by `character`.
+/// @param y The y input consumed by `character`.
+/// @param code The code input consumed by `character`.
+/// @param scale The scale input consumed by `character`.
+/// @param alpha The alpha input consumed by `character`.
 function character(texture, x, y, code, scale, alpha)
   code = code & 255
   row = code >> 4
@@ -224,7 +317,13 @@ function character(texture, x, y, code, scale, alpha)
   texturedQuad(texture, x, y, 8.0 * scale, 8.0 * scale, s0, t0, s1, t1, 255, 255, 255, alpha)
 end function
 
-// Provide string behavior for the active subsystem.
+/// Implements the `string` operation for `miniquake.render.draw2d` (string).
+/// @param texture Texture resource processed by the operation.
+/// @param x The x input consumed by `string`.
+/// @param y The y input consumed by `string`.
+/// @param text Text to parse or process.
+/// @param scale The scale input consumed by `string`.
+/// @param alpha The alpha input consumed by `string`.
 function string(texture, x, y, text, scale, alpha)
   data = bytes(text)
   cursorX = x
@@ -244,7 +343,11 @@ function string(texture, x, y, text, scale, alpha)
   return cursorY
 end function
 
-// Render console.
+/// Render console.
+/// @param state Mutable `miniquake.render.draw2d` state used by `drawConsole`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param scale The scale input consumed by `drawConsole`.
 function drawConsole(state, width, height, scale)
   if state is void or not state.active or state.textureId == 0 then return false end if
   if scale <= 0.0 then scale = 1.0 end if
@@ -274,7 +377,11 @@ function drawConsole(state, width, height, scale)
   return true
 end function
 
-// Render status.
+/// Render status.
+/// @param texture Texture resource processed by the operation.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param text Text to parse or process.
 function drawStatus(texture, width, height, text)
   if texture == 0 then return false end if
   begin2d(width, height)
@@ -284,9 +391,12 @@ function drawStatus(texture, width, height, text)
   return true
 end function
 
-// =============================================================================
-// gl_draw.c compatibility surface
-// =============================================================================
+/// =============================================================================
+/// gl_draw.c compatibility surface
+/// =============================================================================
+/// @param filesystem The filesystem input consumed by `configureDraw`.
+/// @param palette The palette input consumed by `configureDraw`.
+/// @param cvars The cvars input consumed by `configureDraw`.
 
 function configureDraw(filesystem, palette, cvars)
   global drawFilesystem, drawPalette, drawCvars
@@ -296,8 +406,9 @@ function configureDraw(filesystem, palette, cvars)
   return true
 end function
 
-// gl_draw.c owns the process-wide indexed-texture upload palette. Model and
-// world loading use the same GL_LoadTexture path after VID_SetPalette.
+/// gl_draw.c owns the process-wide indexed-texture upload palette. Model and
+/// world loading use the same GL_LoadTexture path after VID_SetPalette.
+/// @param palette The palette input consumed by `Draw_SetPalette`.
 function Draw_SetPalette(palette)
   global drawPalette
   if palette is void or len(palette) < 768 then return error(3338, "GL_LoadTexture: palette is unavailable") end if
@@ -326,7 +437,9 @@ function syncDrawCvars()
   return true
 end function
 
-// Update module state for video size.
+/// Update module state for video size.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function SetVideoSize(width, height)
   global drawVideoWidth, drawVideoHeight, drawViewport
   if width < 1 then width = 1 end if
@@ -337,7 +450,10 @@ function SetVideoSize(width, height)
   return true
 end function
 
-// Update subsystem configuration for register draw picture.
+/// Update subsystem configuration for register draw picture.
+/// @param picture The picture input consumed by `registerDrawPicture`.
+/// @param coordinates The coordinates input consumed by `registerDrawPicture`.
+/// @param pixels The pixels input consumed by `registerDrawPicture`.
 function registerDrawPicture(picture, coordinates, pixels)
   global drawPictureObjects, drawPictureCoordinates, drawPicturePixels
   index = 0
@@ -355,7 +471,8 @@ function registerDrawPicture(picture, coordinates, pixels)
   return picture
 end function
 
-// Return picture metadata index derived from the active module state.
+/// Return picture metadata index derived from the active module state.
+/// @param picture The picture input consumed by `pictureMetadataIndex`.
 function pictureMetadataIndex(picture)
   index = 0
   while index < len(drawPictureObjects)
@@ -365,21 +482,25 @@ function pictureMetadataIndex(picture)
   return -1
 end function
 
-// Provide picture coordinates behavior for the active subsystem.
+/// Implements the `pictureCoordinates` operation for `miniquake.render.draw2d` (picture coordinates).
+/// @param picture The picture input consumed by `pictureCoordinates`.
 function pictureCoordinates(picture)
   index = pictureMetadataIndex(picture)
   if index < 0 then return [0.0, 0.0, 1.0, 1.0] end if
   return drawPictureCoordinates[index]
 end function
 
-// Provide picture pixels behavior for the active subsystem.
+/// Implements the `picturePixels` operation for `miniquake.render.draw2d` (picture pixels).
+/// @param picture The picture input consumed by `picturePixels`.
 function picturePixels(picture)
   index = pictureMetadataIndex(picture)
   if index < 0 then return bytes() end if
   return drawPicturePixels[index]
 end function
 
-// Read and validate qpic.
+/// Read and validate qpic.
+/// @param data Input data consumed by the operation.
+/// @param name Stable name that identifies the requested object or option.
 function parseQpic(data, name)
   if len(data) < 8 then return error(3310, name + ": qpic header is truncated") end if
   width = bio.i32(data, 0)
@@ -390,7 +511,8 @@ function parseQpic(data, name)
   return [width, height, slice(data, 8, count)]
 end function
 
-// Mirror Quake's GL_Bind routine and its observable state changes.
+/// Mirror Quake's GL_Bind routine and its observable state changes.
+/// @param texnum The texnum input consumed by `GL_Bind`.
 function GL_Bind(texnum)
   global currenttexture
   syncDrawCvars()
@@ -405,7 +527,8 @@ function GL_Bind(texnum)
   return texnum
 end function
 
-// Mirror Quake's GL_FindTexture routine and its observable state changes.
+/// Mirror Quake's GL_FindTexture routine and its observable state changes.
+/// @param identifier The identifier input consumed by `GL_FindTexture`.
 function GL_FindTexture(identifier)
   index = 0
   while index < len(glTextureNames)
@@ -415,7 +538,12 @@ function GL_FindTexture(identifier)
   return -1
 end function
 
-// Mirror Quake's GL_ResampleTexture routine and its observable state changes.
+/// Mirror Quake's GL_ResampleTexture routine and its observable state changes.
+/// @param input The input input consumed by `GL_ResampleTexture`.
+/// @param inputWidth The input width input consumed by `GL_ResampleTexture`.
+/// @param inputHeight The input height input consumed by `GL_ResampleTexture`.
+/// @param outputWidth The output width input consumed by `GL_ResampleTexture`.
+/// @param outputHeight The output height input consumed by `GL_ResampleTexture`.
 function GL_ResampleTexture(input, inputWidth, inputHeight, outputWidth, outputHeight)
   if inputWidth <= 0 or inputHeight <= 0 or outputWidth <= 0 or outputHeight <= 0 then return error(3313, "GL_ResampleTexture: invalid dimensions") end if
   if len(input) < inputWidth * inputHeight * 4 then return error(3314, "GL_ResampleTexture: source is truncated") end if
@@ -442,7 +570,12 @@ function GL_ResampleTexture(input, inputWidth, inputHeight, outputWidth, outputH
   return output
 end function
 
-// Mirror Quake's GL_Resample8BitTexture routine and its observable state changes.
+/// Mirror Quake's GL_Resample8BitTexture routine and its observable state changes.
+/// @param input The input input consumed by `GL_Resample8BitTexture`.
+/// @param inputWidth The input width input consumed by `GL_Resample8BitTexture`.
+/// @param inputHeight The input height input consumed by `GL_Resample8BitTexture`.
+/// @param outputWidth The output width input consumed by `GL_Resample8BitTexture`.
+/// @param outputHeight The output height input consumed by `GL_Resample8BitTexture`.
 function GL_Resample8BitTexture(input, inputWidth, inputHeight, outputWidth, outputHeight)
   if inputWidth <= 0 or inputHeight <= 0 or outputWidth <= 0 or outputHeight <= 0 then return error(3315, "GL_Resample8BitTexture: invalid dimensions") end if
   if len(input) < inputWidth * inputHeight then return error(3316, "GL_Resample8BitTexture: source is truncated") end if
@@ -463,7 +596,10 @@ function GL_Resample8BitTexture(input, inputWidth, inputHeight, outputWidth, out
   return output
 end function
 
-// Mirror Quake's GL_MipMap routine and its observable state changes.
+/// Mirror Quake's GL_MipMap routine and its observable state changes.
+/// @param input The input input consumed by `GL_MipMap`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function GL_MipMap(input, width, height)
   if width <= 1 or height <= 1 then
     keepWidth = width >> 1
@@ -499,7 +635,10 @@ function GL_MipMap(input, width, height)
   return output
 end function
 
-// Return nearest palette index derived from the active module state.
+/// Return nearest palette index derived from the active module state.
+/// @param red The red input consumed by `nearestPaletteIndex`.
+/// @param green The green input consumed by `nearestPaletteIndex`.
+/// @param blue The blue input consumed by `nearestPaletteIndex`.
 function nearestPaletteIndex(red, green, blue)
   if len(drawPalette) < 768 then return 0 end if
   best = 0
@@ -517,7 +656,10 @@ function nearestPaletteIndex(red, green, blue)
   return best
 end function
 
-// Mirror Quake's GL_MipMap8Bit routine and its observable state changes.
+/// Mirror Quake's GL_MipMap8Bit routine and its observable state changes.
+/// @param input The input input consumed by `GL_MipMap8Bit`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function GL_MipMap8Bit(input, width, height)
   if len(drawPalette) < 768 then return error(3326, "GL_MipMap8Bit: palette is unavailable") end if
   if width <= 1 or height <= 1 then
@@ -554,7 +696,8 @@ function GL_MipMap8Bit(input, width, height)
   return output
 end function
 
-// Return next power of two for the active module state.
+/// Return next power of two for the active module state.
+/// @param value Value consumed by `nextPowerOfTwo`.
 function nextPowerOfTwo(value)
   result = 1
   while result < value
@@ -580,9 +723,12 @@ function effectiveTextureMaximum()
   return maximum
 end function
 
-// Upscale one non-UI RGBA texture before the ordinary power-of-two and mip
-// processing. Textures which cannot gain resolution within the configured
-// upload limit remain unchanged instead of allocating a throwaway image.
+/// Upscale one non-UI RGBA texture before the ordinary power-of-two and mip
+/// processing. Textures which cannot gain resolution within the configured
+/// upload limit remain unchanged instead of allocating a throwaway image.
+/// @param data Input data consumed by the operation.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function GL_UpscaleTextureRgba(data, width, height)
   mode = GL_TextureUpscaleMode()
   if mode == textureUpscale.UPSCALE_OFF then return [data, width, height] end if
@@ -592,7 +738,11 @@ function GL_UpscaleTextureRgba(data, width, height)
   return textureUpscale.apply(data, width, height, mode)
 end function
 
-// Create and initialize upload32 levels.
+/// Create and initialize upload32 levels.
+/// @param data Input data consumed by the operation.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param mipmap The mipmap input consumed by `BuildUpload32Levels`.
 function BuildUpload32Levels(data, width, height, mipmap)
   syncDrawCvars()
   if width <= 0 or height <= 0 or len(data) < width * height * 4 then return error(3317, "GL_Upload32: invalid source") end if
@@ -635,7 +785,12 @@ function BuildUpload32Levels(data, width, height, mipmap)
   return levels
 end function
 
-// Mirror Quake's GL_Upload32 routine and its observable state changes.
+/// Mirror Quake's GL_Upload32 routine and its observable state changes.
+/// @param data Input data consumed by the operation.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param mipmap The mipmap input consumed by `GL_Upload32`.
+/// @param alpha The alpha input consumed by `GL_Upload32`.
 function GL_Upload32(data, width, height, mipmap, alpha)
   global texels
   levels = BuildUpload32Levels(data, width, height, mipmap)
@@ -665,7 +820,11 @@ function GL_Upload32(data, width, height, mipmap, alpha)
   return levels
 end function
 
-// Provide indexed to upload rgba behavior for the active subsystem.
+/// Implements the `indexedToUploadRgba` operation for `miniquake.render.draw2d` (indexed to upload rgba).
+/// @param data Input data consumed by the operation.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param alpha The alpha input consumed by `indexedToUploadRgba`.
 function indexedToUploadRgba(data, width, height, alpha)
   count = width * height
   if len(drawPalette) < 768 then return error(3319, "GL_Upload8: palette is unavailable") end if
@@ -687,7 +846,12 @@ function indexedToUploadRgba(data, width, height, alpha)
   return [rgba, alpha and hasAlpha]
 end function
 
-// Mirror Quake's GL_Upload8_EXT routine and its observable state changes.
+/// Mirror Quake's GL_Upload8_EXT routine and its observable state changes.
+/// @param data Input data consumed by the operation.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param mipmap The mipmap input consumed by `GL_Upload8_EXT`.
+/// @param alpha The alpha input consumed by `GL_Upload8_EXT`.
 function GL_Upload8_EXT(data, width, height, mipmap, alpha)
   // GL_COLOR_INDEX8_EXT is not guaranteed by modern Windows drivers.  The
   // indexed mip chain is converted through the same Quake palette before
@@ -700,7 +864,12 @@ function GL_Upload8_EXT(data, width, height, mipmap, alpha)
   return GL_Upload32(prepared[0], prepared[1], prepared[2], mipmap, converted[1])
 end function
 
-// Mirror Quake's GL_Upload8 routine and its observable state changes.
+/// Mirror Quake's GL_Upload8 routine and its observable state changes.
+/// @param data Input data consumed by the operation.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param mipmap The mipmap input consumed by `GL_Upload8`.
+/// @param alpha The alpha input consumed by `GL_Upload8`.
 function GL_Upload8(data, width, height, mipmap, alpha)
   if not alpha and ((width * height) & 3) != 0 then return error(3321, "GL_Upload8: s&3") end if
   converted = indexedToUploadRgba(data, width, height, alpha)
@@ -711,7 +880,13 @@ function GL_Upload8(data, width, height, mipmap, alpha)
   return GL_Upload32(prepared[0], prepared[1], prepared[2], mipmap, converted[1])
 end function
 
-// Mirror Quake's GL_LoadTexture routine and its observable state changes.
+/// Mirror Quake's GL_LoadTexture routine and its observable state changes.
+/// @param identifier The identifier input consumed by `GL_LoadTexture`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param data Input data consumed by the operation.
+/// @param mipmap The mipmap input consumed by `GL_LoadTexture`.
+/// @param alpha The alpha input consumed by `GL_LoadTexture`.
 function GL_LoadTexture(identifier, width, height, data, mipmap, alpha)
   global glTextureNames, glTextureIds, glTextureWidths, glTextureHeights, glTextureMipmaps, texture_extension_number
   if identifier != "" then
@@ -743,14 +918,16 @@ function GL_LoadTexture(identifier, width, height, data, mipmap, alpha)
   return texture
 end function
 
-// Mirror Quake's GL_LoadPicTexture routine and its observable state changes.
+/// Mirror Quake's GL_LoadPicTexture routine and its observable state changes.
+/// @param pic The pic input consumed by `GL_LoadPicTexture`.
 function GL_LoadPicTexture(pic)
   pixels = picturePixels(pic)
   if len(pixels) < pic.width * pic.height then return error(3324, "GL_LoadPicTexture: picture pixels unavailable") end if
   return GL_LoadTexture("", pic.width, pic.height, pixels, false, true)
 end function
 
-// Mirror Quake's GL_SelectTexture routine and its observable state changes.
+/// Mirror Quake's GL_SelectTexture routine and its observable state changes.
+/// @param target The target input consumed by `GL_SelectTexture`.
 function GL_SelectTexture(target)
   global oldTextureTarget, currenttexture, currentTextureSlots
   if not glMultiTextureAvailable then return false end if
@@ -764,7 +941,8 @@ function GL_SelectTexture(target)
   return true
 end function
 
-// Update module state for scrap.
+/// Update module state for scrap.
+/// @param textureIds The texture ids input consumed by `ResetScrap`.
 function ResetScrap(textureIds)
   global scrap_allocated, scrap_texels, scrap_textures, scrap_dirty, scrap_uploads
   scrap_allocated = []
@@ -792,8 +970,10 @@ function ensureScrapState()
   return true
 end function
 
-// C returns the scrap number and writes x/y through pointer arguments.  The
-// MiniLang port returns the three values as [scrap, x, y].
+/// C returns the scrap number and writes x/y through pointer arguments.  The
+/// MiniLang port returns the three values as [scrap, x, y].
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function Scrap_AllocBlock(width, height)
   if width <= 0 or height <= 0 or width > SCRAP_WIDTH or height > SCRAP_HEIGHT then
     return error(3327, "Scrap_AllocBlock: invalid dimensions")
@@ -853,14 +1033,21 @@ function Scrap_Upload()
   return true
 end function
 
-// Provide picture from pixels behavior for the active subsystem.
+/// Implements the `pictureFromPixels` operation for `miniquake.render.draw2d` (picture from pixels).
+/// @param name Stable name that identifies the requested object or option.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param pixels The pixels input consumed by `pictureFromPixels`.
+/// @param texture Texture resource processed by the operation.
+/// @param coordinates The coordinates input consumed by `pictureFromPixels`.
 function pictureFromPixels(name, width, height, pixels, texture, coordinates)
   picture = t.MenuPicture(name, width, height, texture)
   registerDrawPicture(picture, coordinates, pixels)
   return picture
 end function
 
-// Render pic from wad.
+/// Render pic from wad.
+/// @param name Stable name that identifies the requested object or option.
 function Draw_PicFromWad(name)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global scrap_dirty, pic_count, pic_texels, wad_cachepics
@@ -914,7 +1101,8 @@ function Draw_PicFromWad(name)
   return temporary
 end function
 
-// Render cache pic.
+/// Render cache pic.
+/// @param path Filesystem path to process.
 function Draw_CachePic(path)
   global menu_cachepics, menuplyr_pixels
   for each picture in menu_cachepics
@@ -947,7 +1135,10 @@ function Draw_CachePic(path)
   return picture
 end function
 
-// C's dest pointer is represented by an explicit destination byte offset.
+/// C's dest pointer is represented by an explicit destination byte offset.
+/// @param num The num input consumed by `Draw_CharToConback`.
+/// @param destination Destination value or collection to update.
+/// @param destinationOffset Zero-based offset of the requested data.
 function Draw_CharToConback(num, destination, destinationOffset)
   if len(draw_chars) < 16384 then return error(3333, "Draw_CharToConback: charset unavailable") end if
   num = num & 255
@@ -968,7 +1159,7 @@ function Draw_CharToConback(num, destination, destinationOffset)
   return destination
 end function
 
-// Provide filter modes behavior for the active subsystem.
+/// Implements the `filterModes` operation for `miniquake.render.draw2d` (filter modes).
 function filterModes()
   return [
     ["GL_NEAREST", gl.GL_NEAREST, gl.GL_NEAREST],
@@ -980,7 +1171,8 @@ function filterModes()
   ]
 end function
 
-// Render texture mode f.
+/// Render texture mode f.
+/// @param arguments Command-line arguments to inspect or execute.
 function Draw_TextureMode_f(arguments)
   global gl_filter_min, gl_filter_max
   modes = filterModes()
@@ -1030,7 +1222,12 @@ function Draw_ApplyAnisotropy()
   return gl_anisotropy
 end function
 
-// Render init.
+/// Render init.
+/// @param filesystem The filesystem input consumed by `Draw_Init`.
+/// @param palette The palette input consumed by `Draw_Init`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param cvars The cvars input consumed by `Draw_Init`.
 function Draw_Init(filesystem, palette, width, height, cvars)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global drawWad, draw_chars, char_texture, translate_texture, conback, draw_disc, draw_backtile, wad_cachepics, texture_extension_number, gl_max_size
@@ -1173,12 +1370,13 @@ function Draw_Shutdown()
   return true
 end function
 
-// Provide char texture behavior for the active subsystem.
+/// Implements the `CharTexture` operation for `miniquake.render.draw2d` (char texture).
 function CharTexture()
   return char_texture
 end function
 
-// Provide picture uses scrap behavior for the active subsystem.
+/// Implements the `PictureUsesScrap` operation for `miniquake.render.draw2d` (picture uses scrap).
+/// @param picture The picture input consumed by `PictureUsesScrap`.
 function PictureUsesScrap(picture)
   if picture is void then return false end if
   for each texture in scrap_textures
@@ -1187,7 +1385,10 @@ function PictureUsesScrap(picture)
   return false
 end function
 
-// Render character.
+/// Render character.
+/// @param x The x input consumed by `Draw_Character`.
+/// @param y The y input consumed by `Draw_Character`.
+/// @param num The num input consumed by `Draw_Character`.
 function Draw_Character(x, y, num)
   if num == 32 or y <= -8 then return false end if
   num = num & 255
@@ -1205,7 +1406,10 @@ function Draw_Character(x, y, num)
   return true
 end function
 
-// Render string.
+/// Render string.
+/// @param x The x input consumed by `Draw_String`.
+/// @param y The y input consumed by `Draw_String`.
+/// @param text Text to parse or process.
 function Draw_String(x, y, text)
   data = bytes(text)
   index = 0
@@ -1217,12 +1421,14 @@ function Draw_String(x, y, text)
   return x
 end function
 
-// Render debug char.
+/// Render debug char.
+/// @param num The num input consumed by `Draw_DebugChar`.
 function Draw_DebugChar(num)
   return false
 end function
 
-// Return alpha byte derived from the active module state.
+/// Return alpha byte derived from the active module state.
+/// @param alpha The alpha input consumed by `alphaByte`.
 function alphaByte(alpha)
   value = native.trunc(alpha * 255.0 + 0.5)
   if value < 0 then value = 0 end if
@@ -1230,7 +1436,13 @@ function alphaByte(alpha)
   return value
 end function
 
-// Render picture quad.
+/// Render picture quad.
+/// @param picture The picture input consumed by `drawPictureQuad`.
+/// @param x The x input consumed by `drawPictureQuad`.
+/// @param y The y input consumed by `drawPictureQuad`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param alpha The alpha input consumed by `drawPictureQuad`.
 function drawPictureQuad(picture, x, y, width, height, alpha)
   coordinates = pictureCoordinates(picture)
   GL_Bind(picture.textureId)
@@ -1244,7 +1456,13 @@ function drawPictureQuad(picture, x, y, width, height, alpha)
   return true
 end function
 
-// Render pic trace.
+/// Render pic trace.
+/// @param x The x input consumed by `Draw_PicTrace`.
+/// @param y The y input consumed by `Draw_PicTrace`.
+/// @param picture The picture input consumed by `Draw_PicTrace`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param alpha The alpha input consumed by `Draw_PicTrace`.
 function Draw_PicTrace(x, y, picture, width, height, alpha)
   coordinates = pictureCoordinates(picture)
   return [
@@ -1257,12 +1475,22 @@ function Draw_PicTrace(x, y, picture, width, height, alpha)
   ]
 end function
 
-// Render alpha pic.
+/// Render alpha pic.
+/// @param x The x input consumed by `Draw_AlphaPic`.
+/// @param y The y input consumed by `Draw_AlphaPic`.
+/// @param picture The picture input consumed by `Draw_AlphaPic`.
+/// @param alpha The alpha input consumed by `Draw_AlphaPic`.
 function Draw_AlphaPic(x, y, picture, alpha)
   return Draw_AlphaPicSized(x, y, picture, picture.width, picture.height, alpha)
 end function
 
-// Render alpha pic sized.
+/// Render alpha pic sized.
+/// @param x The x input consumed by `Draw_AlphaPicSized`.
+/// @param y The y input consumed by `Draw_AlphaPicSized`.
+/// @param picture The picture input consumed by `Draw_AlphaPicSized`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param alpha The alpha input consumed by `Draw_AlphaPicSized`.
 function Draw_AlphaPicSized(x, y, picture, width, height, alpha)
   if scrap_dirty then
     uploaded = Scrap_Upload()
@@ -1285,7 +1513,10 @@ function Draw_AlphaPicSized(x, y, picture, width, height, alpha)
   return true
 end function
 
-// Render pic.
+/// Render pic.
+/// @param x The x input consumed by `Draw_Pic`.
+/// @param y The y input consumed by `Draw_Pic`.
+/// @param picture The picture input consumed by `Draw_Pic`.
 function Draw_Pic(x, y, picture)
   if scrap_dirty then
     uploaded = Scrap_Upload()
@@ -1294,7 +1525,12 @@ function Draw_Pic(x, y, picture)
   return drawPictureQuad(picture, x, y, picture.width, picture.height, 255)
 end function
 
-// Render pic scaled.
+/// Render pic scaled.
+/// @param picture The picture input consumed by `Draw_PicScaled`.
+/// @param x The x input consumed by `Draw_PicScaled`.
+/// @param y The y input consumed by `Draw_PicScaled`.
+/// @param scale The scale input consumed by `Draw_PicScaled`.
+/// @param alpha The alpha input consumed by `Draw_PicScaled`.
 function Draw_PicScaled(picture, x, y, scale, alpha)
   if scrap_dirty then
     uploaded = Scrap_Upload()
@@ -1303,7 +1539,13 @@ function Draw_PicScaled(picture, x, y, scale, alpha)
   return drawPictureQuad(picture, x, y, picture.width * scale, picture.height * scale, alpha)
 end function
 
-// Render pic sized.
+/// Render pic sized.
+/// @param picture The picture input consumed by `Draw_PicSized`.
+/// @param x The x input consumed by `Draw_PicSized`.
+/// @param y The y input consumed by `Draw_PicSized`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param alpha The alpha input consumed by `Draw_PicSized`.
 function Draw_PicSized(picture, x, y, width, height, alpha)
   if scrap_dirty then
     uploaded = Scrap_Upload()
@@ -1312,7 +1554,13 @@ function Draw_PicSized(picture, x, y, width, height, alpha)
   return drawPictureQuad(picture, x, y, width, height, alpha)
 end function
 
-// Render pic sized nearest.
+/// Render pic sized nearest.
+/// @param picture The picture input consumed by `Draw_PicSizedNearest`.
+/// @param x The x input consumed by `Draw_PicSizedNearest`.
+/// @param y The y input consumed by `Draw_PicSizedNearest`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param alpha The alpha input consumed by `Draw_PicSizedNearest`.
 function Draw_PicSizedNearest(picture, x, y, width, height, alpha)
   if scrap_dirty then
     uploaded = Scrap_Upload()
@@ -1330,7 +1578,10 @@ function Draw_PicSizedNearest(picture, x, y, width, height, alpha)
   return result
 end function
 
-// Render trans pic.
+/// Render trans pic.
+/// @param x The x input consumed by `Draw_TransPic`.
+/// @param y The y input consumed by `Draw_TransPic`.
+/// @param picture The picture input consumed by `Draw_TransPic`.
 function Draw_TransPic(x, y, picture)
   if x < 0 or x + picture.width > drawVideoWidth or y < 0 or y + picture.height > drawVideoHeight then
     return error(3335, "Draw_TransPic: bad coordinates")
@@ -1338,7 +1589,9 @@ function Draw_TransPic(x, y, picture)
   return Draw_Pic(x, y, picture)
 end function
 
-// Create and initialize translated pic pixels.
+/// Create and initialize translated pic pixels.
+/// @param picture The picture input consumed by `BuildTranslatedPicPixels`.
+/// @param translation The translation input consumed by `BuildTranslatedPicPixels`.
 function BuildTranslatedPicPixels(picture, translation)
   if len(translation) < 256 then return error(3336, "Draw_TransPicTranslate: translation is truncated") end if
   if len(drawPalette) < 768 then return error(3337, "Draw_TransPicTranslate: palette is unavailable") end if
@@ -1373,7 +1626,13 @@ function BuildTranslatedPicPixels(picture, translation)
   return output
 end function
 
-// Render trans pic translate sized.
+/// Render trans pic translate sized.
+/// @param x The x input consumed by `Draw_TransPicTranslateSized`.
+/// @param y The y input consumed by `Draw_TransPicTranslateSized`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param picture The picture input consumed by `Draw_TransPicTranslateSized`.
+/// @param translation The translation input consumed by `Draw_TransPicTranslateSized`.
 function Draw_TransPicTranslateSized(x, y, width, height, picture, translation)
   translatedPixels = try(BuildTranslatedPicPixels(picture, translation))
   if translatedPixels is error then return translatedPixels end if
@@ -1391,12 +1650,17 @@ function Draw_TransPicTranslateSized(x, y, width, height, picture, translation)
   return true
 end function
 
-// Render trans pic translate.
+/// Render trans pic translate.
+/// @param x The x input consumed by `Draw_TransPicTranslate`.
+/// @param y The y input consumed by `Draw_TransPicTranslate`.
+/// @param picture The picture input consumed by `Draw_TransPicTranslate`.
+/// @param translation The translation input consumed by `Draw_TransPicTranslate`.
 function Draw_TransPicTranslate(x, y, picture, translation)
   return Draw_TransPicTranslateSized(x, y, picture.width, picture.height, picture, translation)
 end function
 
-// Render console background.
+/// Render console background.
+/// @param lines The lines input consumed by `Draw_ConsoleBackground`.
 function Draw_ConsoleBackground(lines)
   if conback is void then return false end if
   threshold = (drawVideoHeight * 3) >> 2
@@ -1405,7 +1669,11 @@ function Draw_ConsoleBackground(lines)
   return Draw_AlphaPicSized(0, lines - drawVideoHeight, conback, drawVideoWidth, drawVideoHeight, alpha)
 end function
 
-// Render tile clear.
+/// Render tile clear.
+/// @param x The x input consumed by `Draw_TileClear`.
+/// @param y The y input consumed by `Draw_TileClear`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function Draw_TileClear(x, y, width, height)
   if draw_backtile is void then return false end if
   gl.color(255, 255, 255, 255)
@@ -1419,7 +1687,8 @@ function Draw_TileClear(x, y, width, height)
   return true
 end function
 
-// Render trace set backtile.
+/// Render trace set backtile.
+/// @param picture The picture input consumed by `Draw_TraceSetBacktile`.
 function Draw_TraceSetBacktile(picture)
   global draw_backtile, currenttexture
   draw_backtile = picture
@@ -1427,9 +1696,10 @@ function Draw_TraceSetBacktile(picture)
   return picture
 end function
 
-// Deterministic state injection used only by the pinned-source differential.
-// It keeps the actual production functions under test and avoids requiring an
-// OpenGL context merely to arrange their original global inputs.
+/// Deterministic state injection used only by the pinned-source differential.
+/// It keeps the actual production functions under test and avoids requiring an
+/// OpenGL context merely to arrange their original global inputs.
+/// @param palette The palette input consumed by `Draw_DifferentialReset`.
 function Draw_DifferentialReset(palette)
   global drawFilesystem, drawPalette, drawWad, drawCvars, drawVideoWidth, drawVideoHeight, drawViewport
   global draw_chars, draw_disc, draw_backtile, conback, menuplyr_pixels
@@ -1484,7 +1754,12 @@ function Draw_DifferentialReset(palette)
   return true
 end function
 
-// Render differential set globals.
+/// Render differential set globals.
+/// @param characterTexture The character texture input consumed by `Draw_DifferentialSetGlobals`.
+/// @param translatedTexture The translated texture input consumed by `Draw_DifferentialSetGlobals`.
+/// @param noBind The no bind input consumed by `Draw_DifferentialSetGlobals`.
+/// @param characters The characters input consumed by `Draw_DifferentialSetGlobals`.
+/// @param menuPixels The menu pixels input consumed by `Draw_DifferentialSetGlobals`.
 function Draw_DifferentialSetGlobals(characterTexture, translatedTexture, noBind, characters, menuPixels)
   global char_texture, translate_texture, gl_nobind, draw_chars, menuplyr_pixels, currenttexture
   char_texture = characterTexture
@@ -1496,7 +1771,9 @@ function Draw_DifferentialSetGlobals(characterTexture, translatedTexture, noBind
   return true
 end function
 
-// Render differential use assets.
+/// Render differential use assets.
+/// @param filesystem The filesystem input consumed by `Draw_DifferentialUseAssets`.
+/// @param wadArchive The wad archive input consumed by `Draw_DifferentialUseAssets`.
 function Draw_DifferentialUseAssets(filesystem, wadArchive)
   global drawFilesystem, drawWad
   drawFilesystem = filesystem
@@ -1515,7 +1792,10 @@ function Draw_DifferentialResetPictureCaches()
   return true
 end function
 
-// Render differential set pictures.
+/// Render differential set pictures.
+/// @param disc The disc input consumed by `Draw_DifferentialSetPictures`.
+/// @param backtile The backtile input consumed by `Draw_DifferentialSetPictures`.
+/// @param consolePicture The console picture input consumed by `Draw_DifferentialSetPictures`.
 function Draw_DifferentialSetPictures(disc, backtile, consolePicture)
   global draw_disc, draw_backtile, conback, currenttexture
   draw_disc = disc
@@ -1525,7 +1805,10 @@ function Draw_DifferentialSetPictures(disc, backtile, consolePicture)
   return true
 end function
 
-// Render differential set caches.
+/// Render differential set caches.
+/// @param wadPictures The wad pictures input consumed by `Draw_DifferentialSetCaches`.
+/// @param menuPictures The menu pictures input consumed by `Draw_DifferentialSetCaches`.
+/// @param consolePicture The console picture input consumed by `Draw_DifferentialSetCaches`.
 function Draw_DifferentialSetCaches(wadPictures, menuPictures, consolePicture)
   global wad_cachepics, menu_cachepics, conback
   wad_cachepics = wadPictures
@@ -1534,7 +1817,14 @@ function Draw_DifferentialSetCaches(wadPictures, menuPictures, consolePicture)
   return true
 end function
 
-// Render differential set texture state.
+/// Render differential set texture state.
+/// @param nextTexture The next texture input consumed by `Draw_DifferentialSetTextureState`.
+/// @param current The current input consumed by `Draw_DifferentialSetTextureState`.
+/// @param names The names input consumed by `Draw_DifferentialSetTextureState`.
+/// @param ids The ids input consumed by `Draw_DifferentialSetTextureState`.
+/// @param widths The widths input consumed by `Draw_DifferentialSetTextureState`.
+/// @param heights The heights input consumed by `Draw_DifferentialSetTextureState`.
+/// @param mipmaps The mipmaps input consumed by `Draw_DifferentialSetTextureState`.
 function Draw_DifferentialSetTextureState(nextTexture, current, names, ids, widths, heights, mipmaps)
   global texture_extension_number, currenttexture
   global glTextureNames, glTextureIds, glTextureWidths, glTextureHeights, glTextureMipmaps
@@ -1550,7 +1840,11 @@ function Draw_DifferentialSetTextureState(nextTexture, current, names, ids, widt
   return true
 end function
 
-// Render differential set multitexture.
+/// Render differential set multitexture.
+/// @param available The available input consumed by `Draw_DifferentialSetMultitexture`.
+/// @param current The current input consumed by `Draw_DifferentialSetMultitexture`.
+/// @param slot0 The slot0 input consumed by `Draw_DifferentialSetMultitexture`.
+/// @param slot1 The slot1 input consumed by `Draw_DifferentialSetMultitexture`.
 function Draw_DifferentialSetMultitexture(available, current, slot0, slot1)
   global glMultiTextureAvailable, oldTextureTarget, currenttexture, currentTextureSlots
   glMultiTextureAvailable = available
@@ -1572,7 +1866,12 @@ function Draw_DifferentialState()
   ]
 end function
 
-// Render fill.
+/// Render fill.
+/// @param x The x input consumed by `Draw_Fill`.
+/// @param y The y input consumed by `Draw_Fill`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param colorIndex Zero-based index of the requested entry.
 function Draw_Fill(x, y, width, height, colorIndex)
   if colorIndex < 0 or colorIndex > 255 or len(drawPalette) < 768 then return error(3339, "Draw_Fill: bad color") end if
   paletteOffset = colorIndex * 3

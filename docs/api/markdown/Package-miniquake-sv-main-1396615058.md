@@ -1,0 +1,81 @@
+# Package `miniquake.sv_main`
+
+[Home](README.md) · [Packages](Packages.md)
+
+## Files
+
+- [src/miniquake/sv_main.ml](File-src-miniquake-sv-main-ml-809541265.md)
+
+## Symbols
+
+- [`miniquake.sv_main.MULTICAST_ALL`](File-src-miniquake-sv-main-ml-809541265.md#constant-constant-miniquake-sv-main-multicast-all-const-multicast-all-0-src-miniquake-sv-main-ml-1078142128) — constant
+- [`miniquake.sv_main.MULTICAST_PHS`](File-src-miniquake-sv-main-ml-809541265.md#constant-constant-miniquake-sv-main-multicast-phs-const-multicast-phs-2-src-miniquake-sv-main-ml-1320195610) — constant
+- [`miniquake.sv_main.MULTICAST_PVS`](File-src-miniquake-sv-main-ml-809541265.md#constant-constant-miniquake-sv-main-multicast-pvs-const-multicast-pvs-1-src-miniquake-sv-main-ml-1729643553) — constant
+- [`miniquake.sv_main.SV_AddClientToServer`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-addclienttoserver-function-sv-addclienttoserver-state-socket-src-miniquake-sv-main-ml-417761669) — function
+- [`miniquake.sv_main.SV_AddToFatPVS`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-addtofatpvs-function-sv-addtofatpvs-state-origin-nodeindex-src-miniquake-sv-main-ml-184427568) — function
+- [`miniquake.sv_main.SV_AddUpdates`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-addupdates-function-sv-addupdates-state-src-miniquake-sv-main-ml-1424349462) — function
+- [`miniquake.sv_main.SV_BroadcastPrintf`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-broadcastprintf-function-sv-broadcastprintf-state-text-src-miniquake-sv-main-ml-2056829911) — function
+- [`miniquake.sv_main.SV_CheckBottom`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-checkbottom-function-sv-checkbottom-state-entityindex-src-miniquake-sv-main-ml-733961735) — function
+- [`miniquake.sv_main.SV_CheckForNewClients`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-checkfornewclients-function-sv-checkfornewclients-state-src-miniquake-sv-main-ml-191447470) — function
+- [`miniquake.sv_main.SV_CleanupEnts`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-cleanupents-function-sv-cleanupents-state-src-miniquake-sv-main-ml-1308373576) — function
+- [`miniquake.sv_main.SV_ClearDatagram`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-cleardatagram-function-sv-cleardatagram-state-src-miniquake-sv-main-ml-1500979184) — function
+- [`miniquake.sv_main.SV_ClientPrintf`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-clientprintf-function-sv-clientprintf-state-clientvalue-text-src-miniquake-sv-main-ml-143669289) — function
+- [`miniquake.sv_main.SV_ClientThink`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-clientthink-function-sv-clientthink-state-player-frametime-registry-src-miniquake-sv-main-ml-98561182) — function
+- [`miniquake.sv_main.SV_ConnectClient`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-connectclient-function-sv-connectclient-state-clientindex-socket-src-miniquake-sv-main-ml-1928826802) — function
+- [`miniquake.sv_main.SV_CreateBaseline`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-createbaseline-function-sv-createbaseline-state-src-miniquake-sv-main-ml-30672086) — function
+- [`miniquake.sv_main.SV_DropClient`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-dropclient-function-sv-dropclient-state-clientvalue-crashed-src-miniquake-sv-main-ml-297344926) — function
+- [`miniquake.sv_main.SV_FatPVS`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-fatpvs-function-sv-fatpvs-state-origin-src-miniquake-sv-main-ml-1267286970) — function
+- [`miniquake.sv_main.SV_Init`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-init-function-sv-init-maxclients-src-miniquake-sv-main-ml-19052011) — function
+- [`miniquake.sv_main.SV_ModelIndex`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-modelindex-function-sv-modelindex-state-name-src-miniquake-sv-main-ml-639574137) — function
+- [`miniquake.sv_main.SV_movestep`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-movestep-function-sv-movestep-state-entityindex-movement-relink-src-miniquake-sv-main-ml-508400765) — function
+- [`miniquake.sv_main.SV_MoveToGoal`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-movetogoal-function-sv-movetogoal-state-entityindex-distance-src-miniquake-sv-main-ml-696757502) — function
+- [`miniquake.sv_main.SV_Multicast`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-multicast-function-sv-multicast-state-origin-source-mode-src-miniquake-sv-main-ml-1658047924) — function
+- [`miniquake.sv_main.SV_Physics`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-physics-function-sv-physics-state-frametime-gravity-maxvelocity-src-miniquake-sv-main-ml-945206709) — function
+- [`miniquake.sv_main.SV_RunClients`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-runclients-function-sv-runclients-state-player-src-miniquake-sv-main-ml-77187163) — function
+- [`miniquake.sv_main.SV_SaveSpawnparms`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-savespawnparms-function-sv-savespawnparms-state-src-miniquake-sv-main-ml-173726918) — function
+- [`miniquake.sv_main.SV_SendClientDatagram`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-sendclientdatagram-function-sv-sendclientdatagram-state-clientvalue-player-src-miniquake-sv-main-ml-1775933147) — function
+- [`miniquake.sv_main.SV_SendClientMessages`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-sendclientmessages-function-sv-sendclientmessages-state-player-src-miniquake-sv-main-ml-489419063) — function
+- [`miniquake.sv_main.SV_SendNop`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-sendnop-function-sv-sendnop-state-clientvalue-src-miniquake-sv-main-ml-1427531782) — function
+- [`miniquake.sv_main.SV_SendReconnect`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-sendreconnect-function-sv-sendreconnect-state-src-miniquake-sv-main-ml-1450970612) — function
+- [`miniquake.sv_main.SV_SendServerinfo`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-sendserverinfo-function-sv-sendserverinfo-state-clientvalue-src-miniquake-sv-main-ml-1622420392) — function
+- [`miniquake.sv_main.SV_SetClientFrags`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-setclientfrags-function-sv-setclientfrags-state-clientindex-frags-src-miniquake-sv-main-ml-432179398) — function
+- [`miniquake.sv_main.SV_SetDropAsap`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-setdropasap-function-sv-setdropasap-state-clientindex-enabled-src-miniquake-sv-main-ml-2096880698) — function
+- [`miniquake.sv_main.SV_SetIdealPitch`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-setidealpitch-function-sv-setidealpitch-state-clientindex-player-pitchscale-src-miniquake-sv-main-ml-1417366082) — function
+- [`miniquake.sv_main.SV_SetNetworkState`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-setnetworkstate-function-sv-setnetworkstate-state-network-src-miniquake-sv-main-ml-1056791988) — function
+- [`miniquake.sv_main.SV_SetRealtime`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-setrealtime-function-sv-setrealtime-state-value-src-miniquake-sv-main-ml-1074602691) — function
+- [`miniquake.sv_main.SV_SetStandardQuake`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-setstandardquake-function-sv-setstandardquake-state-enabled-src-miniquake-sv-main-ml-1057060371) — function
+- [`miniquake.sv_main.SV_SpawnServer`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-spawnserver-function-sv-spawnserver-state-filesystem-mapname-skill-registry-commandsystem-src-miniquake-sv-main-ml-1024122064) — function
+- [`miniquake.sv_main.SV_StartParticle`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-startparticle-function-sv-startparticle-state-origin-direction-color-count-src-miniquake-sv-main-ml-1855293275) — function
+- [`miniquake.sv_main.SV_StartSound`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-startsound-function-sv-startsound-state-entityindex-channel-sample-volume-attenuation-src-miniquake-sv-main-ml-1344171260) — function
+- [`miniquake.sv_main.SV_UpdateToReliableMessages`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-updatetoreliablemessages-function-sv-updatetoreliablemessages-state-src-miniquake-sv-main-ml-663019384) — function
+- [`miniquake.sv_main.SV_WriteClientdataToMessage`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-writeclientdatatomessage-function-sv-writeclientdatatomessage-state-clientvalue-player-buffer-src-miniquake-sv-main-ml-775629321) — function
+- [`miniquake.sv_main.SV_WriteEntitiesToClient`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-writeentitiestoclient-function-sv-writeentitiestoclient-state-cliententity-buffer-src-miniquake-sv-main-ml-1377655250) — function
+- [`miniquake.sv_main.SV_WriteEntitiesToClientReserved`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-writeentitiestoclientreserved-function-sv-writeentitiestoclientreserved-state-cliententity-buffer-reservedbytes-src-miniquake-sv-main-ml-1095289203) — function
+- [`miniquake.sv_main.SV_WriteEntityDelta`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-sv-writeentitydelta-function-sv-writeentitydelta-state-buffer-item-src-miniquake-sv-main-ml-648376877) — function
+- [`miniquake.sv_main.svmAbsolute`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmabsolute-function-svmabsolute-value-src-miniquake-sv-main-ml-936260654) — function
+- [`miniquake.sv_main.SvMainState`](Type-miniquake-sv-main-svmainstate-899777601.md) — struct
+- [`miniquake.sv_main.svmAppendDatagram`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmappenddatagram-function-svmappenddatagram-destination-source-src-miniquake-sv-main-ml-135783554) — function
+- [`miniquake.sv_main.svmAppendServerInfo`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmappendserverinfo-function-svmappendserverinfo-server-clientvalue-src-miniquake-sv-main-ml-1750508326) — function
+- [`miniquake.sv_main.svmBoxPlaneSides`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmboxplanesides-function-svmboxplanesides-mins-maxs-plane-src-miniquake-sv-main-ml-1587965201) — function
+- [`miniquake.sv_main.svmClampByte`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmclampbyte-function-svmclampbyte-value-src-miniquake-sv-main-ml-2065677416) — function
+- [`miniquake.sv_main.svmClientItems`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmclientitems-function-svmclientitems-state-clientvalue-player-src-miniquake-sv-main-ml-1761002467) — function
+- [`miniquake.sv_main.svmCurrentFrags`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmcurrentfrags-function-svmcurrentfrags-state-clientindex-src-miniquake-sv-main-ml-947565883) — function
+- [`miniquake.sv_main.svmEntityBits`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmentitybits-function-svmentitybits-item-src-miniquake-sv-main-ml-1769660720) — function
+- [`miniquake.sv_main.svmEntityCenter`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmentitycenter-function-svmentitycenter-item-src-miniquake-sv-main-ml-1212575054) — function
+- [`miniquake.sv_main.svmEntityVisible`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmentityvisible-function-svmentityvisible-state-item-clientedict-pvs-src-miniquake-sv-main-ml-935039206) — function
+- [`miniquake.sv_main.svmFreeClientIndex`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmfreeclientindex-function-svmfreeclientindex-state-src-miniquake-sv-main-ml-968544056) — function
+- [`miniquake.sv_main.svmLeafBitVisible`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmleafbitvisible-function-svmleafbitvisible-pvs-leafindex-src-miniquake-sv-main-ml-1429345622) — function
+- [`miniquake.sv_main.svmLocalModels`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmlocalmodels-function-svmlocalmodels-src-miniquake-sv-main-ml-341303317) — function
+- [`miniquake.sv_main.svmOrBytes`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmorbytes-function-svmorbytes-destination-source-count-src-miniquake-sv-main-ml-33872973) — function
+- [`miniquake.sv_main.svmProgsCrc`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmprogscrc-function-svmprogscrc-server-src-miniquake-sv-main-ml-738078812) — function
+- [`miniquake.sv_main.svmQcFloat`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmqcfloat-function-svmqcfloat-state-entityindex-fieldname-fallback-src-miniquake-sv-main-ml-123296834) — function
+- [`miniquake.sv_main.svmQcVector`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmqcvector-function-svmqcvector-state-entityindex-fieldname-fallback-src-miniquake-sv-main-ml-355256996) — function
+- [`miniquake.sv_main.svmResetClient`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmresetclient-function-svmresetclient-state-clientindex-socket-src-miniquake-sv-main-ml-1471060494) — function
+- [`miniquake.sv_main.svmSoundIndex`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmsoundindex-function-svmsoundindex-server-sample-src-miniquake-sv-main-ml-1531055758) — function
+- [`miniquake.sv_main.svmTouchedLeaves`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmtouchedleaves-function-svmtouchedleaves-map-nodeindex-mins-maxs-result-src-miniquake-sv-main-ml-1820187308) — function
+- [`miniquake.sv_main.svmWeaponModelIndex`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmweaponmodelindex-function-svmweaponmodelindex-state-entityindex-fallback-src-miniquake-sv-main-ml-312160671) — function
+- [`miniquake.sv_main.svmWriteBaseline`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmwritebaseline-function-svmwritebaseline-buffer-entitynumber-baseline-src-miniquake-sv-main-ml-1906914678) — function
+- [`miniquake.sv_main.svmWriteDamage`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmwritedamage-function-svmwritedamage-state-clientvalue-buffer-src-miniquake-sv-main-ml-1397780616) — function
+- [`miniquake.sv_main.svmWriteDamageAndAngle`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmwritedamageandangle-function-svmwritedamageandangle-state-clientvalue-player-buffer-src-miniquake-sv-main-ml-715656241) — function
+- [`miniquake.sv_main.svmWriteFixAngle`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmwritefixangle-function-svmwritefixangle-state-clientvalue-player-buffer-src-miniquake-sv-main-ml-802651897) — function
+- [`miniquake.sv_main.svmZeroSpawnParms`](File-src-miniquake-sv-main-ml-809541265.md#function-function-miniquake-sv-main-svmzerospawnparms-function-svmzerospawnparms-src-miniquake-sv-main-ml-1815707793) — function

@@ -14,24 +14,37 @@ import miniquake.array_util as arrayutil
 import miniquake.protocol_text as quakeText
 import std.fs as fs
 
+/// Defines the cmp none value used by `miniquake.wad`.
 const CMP_NONE = 0
+/// Defines the cmp lzss value used by `miniquake.wad`.
 const CMP_LZSS = 1
 
+/// Defines the typ none value used by `miniquake.wad`.
 const TYP_NONE = 0
+/// Defines the typ label value used by `miniquake.wad`.
 const TYP_LABEL = 1
+/// Defines the typ lumpy value used by `miniquake.wad`.
 const TYP_LUMPY = 64
+/// Defines the typ palette value used by `miniquake.wad`.
 const TYP_PALETTE = 64
+/// Defines the typ qtex value used by `miniquake.wad`.
 const TYP_QTEX = 65
+/// Defines the typ qpic value used by `miniquake.wad`.
 const TYP_QPIC = 66
+/// Defines the typ sound value used by `miniquake.wad`.
 const TYP_SOUND = 67
+/// Defines the typ miptex value used by `miniquake.wad`.
 const TYP_MIPTEX = 68
 
+/// Defines the wad name length value used by `miniquake.wad`.
 const WAD_NAME_LENGTH = 16
+/// Defines the wad lumpinfo size value used by `miniquake.wad`.
 const WAD_LUMPINFO_SIZE = 32
 
-// W_CleanupName lowercases only ASCII A-Z, stops at the first NUL, truncates
-// at 16 bytes, and NUL-pads the rest.  Returning the fixed buffer preserves
-// the exact lumpinfo_t name representation and is safe for in-place callers.
+/// W_CleanupName lowercases only ASCII A-Z, stops at the first NUL, truncates
+/// at 16 bytes, and NUL-pads the rest.  Returning the fixed buffer preserves
+/// the exact lumpinfo_t name representation and is safe for in-place callers.
+/// @param input The input input consumed by `W_CleanupName`.
 function W_CleanupName(input)
   source = input
   if input is not bytes then
@@ -50,7 +63,8 @@ function W_CleanupName(input)
   return output
 end function
 
-// Provide cleanup name text behavior for the active subsystem.
+/// Implements the `cleanupNameText` operation for `miniquake.wad` (cleanup name text).
+/// @param input The input input consumed by `cleanupNameText`.
 function cleanupNameText(input)
   cleaned = W_CleanupName(input)
   length = 0
@@ -60,9 +74,11 @@ function cleanupNameText(input)
   return quakeText.decodeBytes(slice(cleaned, 0, length))
 end function
 
-// SwapPic performs the two LittleLong conversions from the original.  The
-// supported Windows x64 build is little-endian, but writing the decoded values
-// back makes the operation explicit and keeps the observable in-place API.
+/// SwapPic performs the two LittleLong conversions from the original.  The
+/// supported Windows x64 build is little-endian, but writing the decoded values
+/// back makes the operation explicit and keeps the observable in-place API.
+/// @param data Input data consumed by the operation.
+/// @param offset Zero-based offset of the requested data.
 function SwapPic(data, offset)
   if typeof(data) != "bytes" then return error(1557, "qpic buffer must be bytes") end if
   if offset < 0 or offset + 8 > len(data) then return error(1557, "WAD picture header is truncated") end if
@@ -73,8 +89,10 @@ function SwapPic(data, offset)
   return [width, height]
 end function
 
-// Data-oriented counterpart used when gfx.wad came from a Quake search path
-// (most retail installs keep it inside pak0.pak).
+/// Data-oriented counterpart used when gfx.wad came from a Quake search path
+/// (most retail installs keep it inside pak0.pak).
+/// @param data Input data consumed by the operation.
+/// @param filename Path of the file to process.
 function W_LoadWadData(data, filename)
   if typeof(data) != "bytes" then return error(1550, filename + ": WAD data must be bytes") end if
   if len(data) < 12 then return error(1550, filename + ": WAD header is truncated") end if
@@ -115,13 +133,16 @@ function W_LoadWadData(data, filename)
   return t.WadArchive(filename, data, lumps, count)
 end function
 
-// Mirror Quake's W_LoadWadFile routine and its observable state changes.
+/// Mirror Quake's W_LoadWadFile routine and its observable state changes.
+/// @param filename Path of the file to process.
 function W_LoadWadFile(filename)
   data = fs.readAllBytes(filename)
   return W_LoadWadData(data, filename)
 end function
 
-// Mirror Quake's W_GetLumpinfo routine and its observable state changes.
+/// Mirror Quake's W_GetLumpinfo routine and its observable state changes.
+/// @param archive The archive input consumed by `W_GetLumpinfo`.
+/// @param name Stable name that identifies the requested object or option.
 function W_GetLumpinfo(archive, name)
   wanted = cleanupNameText(name)
   for each lump in archive.lumps
@@ -130,14 +151,18 @@ function W_GetLumpinfo(archive, name)
   return error(1554, "W_GetLumpinfo: " + name + " not found")
 end function
 
-// C returns an untyped pointer.  MiniLang exposes the exact on-disk byte range
-// instead; like the original this does not reject compressed lumps.
+/// C returns an untyped pointer.  MiniLang exposes the exact on-disk byte range
+/// instead; like the original this does not reject compressed lumps.
+/// @param archive The archive input consumed by `W_GetLumpName`.
+/// @param name Stable name that identifies the requested object or option.
 function W_GetLumpName(archive, name)
   lump = W_GetLumpinfo(archive, name)
   return slice(archive.data, lump.filePosition, lump.diskSize)
 end function
 
-// Mirror Quake's W_GetLumpNum routine and its observable state changes.
+/// Mirror Quake's W_GetLumpNum routine and its observable state changes.
+/// @param archive The archive input consumed by `W_GetLumpNum`.
+/// @param number The number input consumed by `W_GetLumpNum`.
 function W_GetLumpNum(archive, number)
   // wad.c accidentally accepts num == wad_numlumps and then dereferences one
   // directory entry past the table.  That undefined access cannot be a useful
@@ -149,17 +174,22 @@ function W_GetLumpNum(archive, number)
   return slice(archive.data, lump.filePosition, lump.diskSize)
 end function
 
-// Existing idiomatic API retained for callers already ported to MiniLang.
+/// Existing idiomatic API retained for callers already ported to MiniLang.
+/// @param data Input data consumed by the operation.
+/// @param filename Path of the file to process.
 function parse(data, filename)
   return W_LoadWadData(data, filename)
 end function
 
-// Read and validate the requested value.
+/// Implements the `load` operation for `miniquake.wad` (load).
+/// @param filename Path of the file to process.
 function load(filename)
   return W_LoadWadFile(filename)
 end function
 
-// Return the requested value.
+/// Implements the `find` operation for `miniquake.wad` (find).
+/// @param archive The archive input consumed by `find`.
+/// @param name Stable name that identifies the requested object or option.
 function find(archive, name)
   wanted = cleanupNameText(name)
   for each lump in archive.lumps
@@ -168,14 +198,18 @@ function find(archive, name)
   return void
 end function
 
-// Read and validate lump.
+/// Read and validate lump.
+/// @param archive The archive input consumed by `readLump`.
+/// @param name Stable name that identifies the requested object or option.
 function readLump(archive, name)
   lump = W_GetLumpinfo(archive, name)
   if lump.compression != CMP_NONE then return error(1555, "compressed WAD lumps are unsupported") end if
   return slice(archive.data, lump.filePosition, lump.diskSize)
 end function
 
-// Provide picture dimensions behavior for the active subsystem.
+/// Implements the `pictureDimensions` operation for `miniquake.wad` (picture dimensions).
+/// @param archive The archive input consumed by `pictureDimensions`.
+/// @param name Stable name that identifies the requested object or option.
 function pictureDimensions(archive, name)
   lump = W_GetLumpinfo(archive, name)
   if lump.diskSize < 8 then return error(1557, "WAD picture header is truncated") end if

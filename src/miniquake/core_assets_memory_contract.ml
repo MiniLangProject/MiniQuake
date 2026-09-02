@@ -7,24 +7,40 @@ MiniLang implementation of miniquake.core_assets_memory_contract.
 */
 package miniquake.core_assets_memory_contract
 
+/// Defines the status value used by `miniquake.core_assets_memory_contract`.
 const STATUS = "core_assets_memory_109_frozen_v1"
+/// Defines the fingerprint value used by `miniquake.core_assets_memory_contract`.
 const FINGERPRINT = 0x6c8d974d
+/// Defines the pak entry bytes value used by `miniquake.core_assets_memory_contract`.
 const PAK_ENTRY_BYTES = 64
+/// Defines the pack name bytes value used by `miniquake.core_assets_memory_contract`.
 const PACK_NAME_BYTES = 56
+/// Defines the max pack files value used by `miniquake.core_assets_memory_contract`.
 const MAX_PACK_FILES = 2048
+/// Defines the wad name bytes value used by `miniquake.core_assets_memory_contract`.
 const WAD_NAME_BYTES = 16
+/// Defines the wad lumpinfo bytes value used by `miniquake.core_assets_memory_contract`.
 const WAD_LUMPINFO_BYTES = 32
+/// Defines the bsp version value used by `miniquake.core_assets_memory_contract`.
 const BSP_VERSION = 29
+/// Defines the mdl version value used by `miniquake.core_assets_memory_contract`.
 const MDL_VERSION = 6
+/// Defines the sprite version value used by `miniquake.core_assets_memory_contract`.
 const SPRITE_VERSION = 1
+/// Defines the hunk alignment value used by `miniquake.core_assets_memory_contract`.
 const HUNK_ALIGNMENT = 16
+/// Defines the zone alignment value used by `miniquake.core_assets_memory_contract`.
 const ZONE_ALIGNMENT = 8
+/// Defines the hunk name bytes value used by `miniquake.core_assets_memory_contract`.
 const HUNK_NAME_BYTES = 8
+/// Defines the cache name bytes value used by `miniquake.core_assets_memory_contract`.
 const CACHE_NAME_BYTES = 15
+/// Defines the zone dynamic size value used by `miniquake.core_assets_memory_contract`.
 const ZONE_DYNAMIC_SIZE = 0xc000
+/// Defines the retail evidence files value used by `miniquake.core_assets_memory_contract`.
 const RETAIL_EVIDENCE_FILES = 4
 
-// Report whether canonical text.
+/// Returns whether `miniquake.core_assets_memory_contract` can onical text.
 function canonicalText()
   return STATUS + "\n" +
     "common_q_atof_binary32=1\n" +
@@ -46,7 +62,8 @@ function canonicalText()
     "retail_evidence_files=4\n"
 end function
 
-// Provide fnv1a32 behavior for the active subsystem.
+/// Implements the `fnv1a32` operation for `miniquake.core_assets_memory_contract` (fnv1a32).
+/// @param text Text to parse or process.
 function fnv1a32(text)
   data = bytes(text)
   value = 0x811c9dc5
@@ -58,7 +75,7 @@ function fnv1a32(text)
   return value
 end function
 
-// Validate the requested value and report any invalid state.
+/// Implements the `verify` operation for `miniquake.core_assets_memory_contract` (verify).
 function verify()
   if fnv1a32(canonicalText()) != FINGERPRINT then return error(10740, "core assets/memory fingerprint mismatch") end if
   if PAK_ENTRY_BYTES != 64 or PACK_NAME_BYTES != 56 or MAX_PACK_FILES != 2048 then return error(10741, "PACK contract mismatch") end if

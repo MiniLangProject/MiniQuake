@@ -10,17 +10,19 @@ package miniquake.client_state
 import miniquake.types as t
 import miniquake.constants as c
 
-// Create the zero-initialized state for stats.
+/// Create the zero-initialized state for stats.
+/// @param count Number of entries or units to process.
 function zeroStats(count)
   return array(count, 0)
 end function
 
-// Create and initialize the module state.
+/// Implements the `create` operation for `miniquake.client_state` (create).
 function create()
   return t.ClientState(c.PROTOCOL_VERSION, 0.0, 0, t.Vec3(0.0, 0.0, 0.0), [], zeroStats(32), [])
 end function
 
-// Update module state for the requested operation.
+/// Implements the `clear` operation for `miniquake.client_state` (clear).
+/// @param state Mutable `miniquake.client_state` state used by `clear`.
 function clear(state)
   state.time = 0.0
   state.viewEntity = 0
@@ -31,7 +33,9 @@ function clear(state)
   return state
 end function
 
-// Add state for queue event.
+/// Add state for queue event.
+/// @param state Mutable `miniquake.client_state` state used by `queueEvent`.
+/// @param event Runtime event to process.
 function queueEvent(state, event)
   state.messages = state.messages + [event]
 end function

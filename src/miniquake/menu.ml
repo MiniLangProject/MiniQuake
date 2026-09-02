@@ -21,51 +21,76 @@ import miniquake.gl_vidnt as glvid
 import miniquake.mathlib as menuMath
 import miniquake.render_ui_contract as menuUiContract
 
+/// Defines the page main value used by `miniquake.menu`.
 const PAGE_MAIN = "main"
+/// Defines the page single value used by `miniquake.menu`.
 const PAGE_SINGLE = "singleplayer"
+/// Defines the page multi value used by `miniquake.menu`.
 const PAGE_MULTI = "multiplayer"
 // Descriptive aliases retained for callers that use the long names.
 const PAGE_SINGLEPLAYER = PAGE_SINGLE
+/// Defines the page multiplayer value used by `miniquake.menu`.
 const PAGE_MULTIPLAYER = PAGE_MULTI
+/// Defines the page options value used by `miniquake.menu`.
 const PAGE_OPTIONS = "options"
+/// Defines the page keys value used by `miniquake.menu`.
 const PAGE_KEYS = "keys"
+/// Defines the page load value used by `miniquake.menu`.
 const PAGE_LOAD = "load"
+/// Defines the page save value used by `miniquake.menu`.
 const PAGE_SAVE = "save"
+/// Defines the page setup value used by `miniquake.menu`.
 const PAGE_SETUP = "setup"
+/// Defines the page video value used by `miniquake.menu`.
 const PAGE_VIDEO = "video"
+/// Defines the page help value used by `miniquake.menu`.
 const PAGE_HELP = "help"
+/// Defines the page quit value used by `miniquake.menu`.
 const PAGE_QUIT = "quit"
+/// Defines the page net value used by `miniquake.menu`.
 const PAGE_NET = "net"
+/// Defines the page lan value used by `miniquake.menu`.
 const PAGE_LAN = "lanconfig"
+/// Defines the page game options value used by `miniquake.menu`.
 const PAGE_GAME_OPTIONS = "gameoptions"
+/// Defines the page search value used by `miniquake.menu`.
 const PAGE_SEARCH = "search"
+/// Defines the page server list value used by `miniquake.menu`.
 const PAGE_SERVER_LIST = "serverlist"
+/// Defines the page serial value used by `miniquake.menu`.
 const PAGE_SERIAL = "serialconfig"
+/// Defines the page modem value used by `miniquake.menu`.
 const PAGE_MODEM = "modemconfig"
+/// Defines the help pages value used by `miniquake.menu`.
 const HELP_PAGES = 6
+/// Defines the mnet ipx value used by `miniquake.menu`.
 const MNET_IPX = 1
+/// Defines the mnet tcp value used by `miniquake.menu`.
 const MNET_TCP = 2
 
+/// Tracks the module-level cached layout width state owned by `miniquake.menu`.
 cachedLayoutWidth = -1
+/// Tracks the module-level cached layout height state owned by `miniquake.menu`.
 cachedLayoutHeight = -1
+/// Tracks the module-level cached layout state owned by `miniquake.menu`.
 cachedLayout = []
 
-// Provide main items behavior for the active subsystem.
+/// Implements the `mainItems` operation for `miniquake.menu` (main items).
 function mainItems()
   return ["Single Player", "Multiplayer", "Options", "Help", "Quit"]
 end function
 
-// Provide single player items behavior for the active subsystem.
+/// Implements the `singlePlayerItems` operation for `miniquake.menu` (single player items).
 function singlePlayerItems()
   return ["New Game", "Load", "Save"]
 end function
 
-// Provide multiplayer items behavior for the active subsystem.
+/// Implements the `multiplayerItems` operation for `miniquake.menu` (multiplayer items).
 function multiplayerItems()
   return ["Join a Game", "New Game", "Setup"]
 end function
 
-// Provide options items behavior for the active subsystem.
+/// Implements the `optionsItems` operation for `miniquake.menu` (options items).
 function optionsItems()
   // OPTIONS_ITEMS is 14 in WinQuake on Windows.
   return [
@@ -86,7 +111,7 @@ function optionsItems()
   ]
 end function
 
-// Provide key commands behavior for the active subsystem.
+/// Implements the `keyCommands` operation for `miniquake.menu` (key commands).
 function keyCommands()
   // bindnames from WinQuake/menu.c, kept in the original order.
   return [
@@ -96,7 +121,7 @@ function keyCommands()
   ]
 end function
 
-// Provide key items behavior for the active subsystem.
+/// Implements the `keyItems` operation for `miniquake.menu` (key items).
 function keyItems()
   return [
     "attack", "change weapon", "jump / swim up", "walk forward", "backpedal",
@@ -116,7 +141,8 @@ function saveSlotItems()
   ]
 end function
 
-// Provide items for page behavior for the active subsystem.
+/// Implements the `itemsForPage` operation for `miniquake.menu` (items for page).
+/// @param page The page input consumed by `itemsForPage`.
 function itemsForPage(page)
   if page == PAGE_MAIN then return mainItems() end if
   if page == PAGE_SINGLEPLAYER then return singlePlayerItems() end if
@@ -134,7 +160,8 @@ function itemsForPage(page)
   return []
 end function
 
-// Provide title for page behavior for the active subsystem.
+/// Implements the `titleForPage` operation for `miniquake.menu` (title for page).
+/// @param page The page input consumed by `titleForPage`.
 function titleForPage(page)
   if page == PAGE_SINGLEPLAYER then return "SINGLE PLAYER" end if
   if page == PAGE_MULTIPLAYER then return "MULTIPLAYER" end if
@@ -154,7 +181,7 @@ function titleForPage(page)
   return "QUAKE"
 end function
 
-// Create and initialize the module state.
+/// Implements the `create` operation for `miniquake.menu` (create).
 function create()
   return t.MenuState(
     false,
@@ -202,7 +229,10 @@ function create()
   )
 end function
 
-// Provide stored selection behavior for the active subsystem.
+/// Implements the `storedSelection` operation for `miniquake.menu` (stored selection).
+/// @param state Mutable `miniquake.menu` state used by `storedSelection`.
+/// @param page The page input consumed by `storedSelection`.
+/// @param fallback Value to use when the requested input is unavailable or invalid.
 function storedSelection(state, page, fallback)
   for each item in state.pageSelections
     if item[0] == page then return item[1] end if
@@ -210,7 +240,8 @@ function storedSelection(state, page, fallback)
   return fallback
 end function
 
-// Provide remember selection behavior for the active subsystem.
+/// Implements the `rememberSelection` operation for `miniquake.menu` (remember selection).
+/// @param state Mutable `miniquake.menu` state used by `rememberSelection`.
 function rememberSelection(state)
   if state.page == "" then return 0 end if
   updated = []
@@ -228,7 +259,9 @@ function rememberSelection(state)
   return state.selection
 end function
 
-// Initialize state for open page.
+/// Initialize state for open page.
+/// @param state Mutable `miniquake.menu` state used by `openPage`.
+/// @param page The page input consumed by `openPage`.
 function openPage(state, page)
   rememberSelection(state)
   if page == PAGE_QUIT then state.previousPage = state.page end if
@@ -247,33 +280,42 @@ function openPage(state, page)
   return page
 end function
 
-// Public spelling used by the host and tests.  Keeping page changes in one
-// function ensures selection/status state is reset exactly once.
+/// Public spelling used by the host and tests.  Keeping page changes in one
+/// function ensures selection/status state is reset exactly once.
+/// @param state Mutable `miniquake.menu` state used by `setPage`.
+/// @param page The page input consumed by `setPage`.
 function setPage(state, page)
   return openPage(state, page)
 end function
 
-// Initialize state for open main.
+/// Initialize state for open main.
+/// @param state Mutable `miniquake.menu` state used by `openMain`.
 function openMain(state)
   openPage(state, PAGE_MAIN)
   state.active = true
   return true
 end function
 
-// Update module state for status.
+/// Update module state for status.
+/// @param state Mutable `miniquake.menu` state used by `setStatus`.
+/// @param text Text to parse or process.
 function setStatus(state, text)
   state.statusText = text
   return text
 end function
 
-// Update module state for items.
+/// Update module state for items.
+/// @param state Mutable `miniquake.menu` state used by `setItems`.
+/// @param items The items input consumed by `setItems`.
 function setItems(state, items)
   state.items = items
   if state.selection < 0 or state.selection >= len(state.items) then state.selection = 0 end if
   return len(state.items)
 end function
 
-// Update module state for active.
+/// Update module state for active.
+/// @param state Mutable `miniquake.menu` state used by `setActive`.
+/// @param active The active input consumed by `setActive`.
 function setActive(state, active)
   state.active = active
   if active and state.page == "" then openPage(state, PAGE_MAIN) end if
@@ -281,13 +323,16 @@ function setActive(state, active)
   return state.active
 end function
 
-// Update subsystem configuration for toggle.
+/// Update subsystem configuration for toggle.
+/// @param state Mutable `miniquake.menu` state used by `toggle`.
 function toggle(state)
   if state.active then return setActive(state, false) end if
   return openMain(state)
 end function
 
-// Transfer data for move.
+/// Transfer data for move.
+/// @param state Mutable `miniquake.menu` state used by `move`.
+/// @param delta The delta input consumed by `move`.
 function move(state, delta)
   if state.page == PAGE_HELP then return moveHelp(state, delta) end if
   if len(state.items) == 0 then state.selection = 0; return 0 end if
@@ -302,7 +347,9 @@ function move(state, delta)
   return state.selection
 end function
 
-// Transfer data for move help.
+/// Transfer data for move help.
+/// @param state Mutable `miniquake.menu` state used by `moveHelp`.
+/// @param delta The delta input consumed by `moveHelp`.
 function moveHelp(state, delta)
   state.helpPage = state.helpPage + delta
   while state.helpPage < 0
@@ -314,13 +361,16 @@ function moveHelp(state, delta)
   return state.helpPage
 end function
 
-// Update subsystem configuration for change help page.
+/// Update subsystem configuration for change help page.
+/// @param state Mutable `miniquake.menu` state used by `changeHelpPage`.
+/// @param delta The delta input consumed by `changeHelpPage`.
 function changeHelpPage(state, delta)
   return moveHelp(state, delta)
 end function
 
-// This mirrors the original escape path: submenus return to the main menu;
-// escape from the main menu returns to the game; quit returns to its caller.
+/// This mirrors the original escape path: submenus return to the main menu;
+/// escape from the main menu returns to the game; quit returns to its caller.
+/// @param state Mutable `miniquake.menu` state used by `back`.
 function back(state)
   if state.waitingForKey then state.waitingForKey = false; return "page" end if
   if state.page == PAGE_MAIN then return "close" end if
@@ -348,7 +398,8 @@ function back(state)
   return "page"
 end function
 
-// Provide selected command behavior for the active subsystem.
+/// Implements the `selectedCommand` operation for `miniquake.menu` (selected command).
+/// @param state Mutable `miniquake.menu` state used by `selectedCommand`.
 function selectedCommand(state)
   if state.page == PAGE_MAIN then
     if state.selection == 0 then return "menu_single" end if
@@ -386,7 +437,9 @@ function selectedCommand(state)
   return "none"
 end function
 
-// Return picture.
+/// Return picture.
+/// @param state Mutable `miniquake.menu` state used by `findPicture`.
+/// @param name Stable name that identifies the requested object or option.
 function findPicture(state, name)
   for each pictureValue in state.pictures
     if pictureValue.name == name then return pictureValue end if
@@ -394,7 +447,12 @@ function findPicture(state, name)
   return void
 end function
 
-// Read and validate picture.
+/// Read and validate picture.
+/// @param state Mutable `miniquake.menu` state used by `loadPicture`.
+/// @param filesystem The filesystem input consumed by `loadPicture`.
+/// @param palette The palette input consumed by `loadPicture`.
+/// @param path Filesystem path to process.
+/// @param transparent The transparent input consumed by `loadPicture`.
 function loadPicture(state, filesystem, palette, path, transparent)
   if findPicture(state, path) is not void then return true end if
   menuDraw.configureDraw(filesystem, palette, void)
@@ -404,9 +462,14 @@ function loadPicture(state, filesystem, palette, path, transparent)
   return true
 end function
 
-// Draw_PicFromWad compatibility. Status-bar and common UI pictures live in
-// gfx.wad rather than as loose qpic files. Keep a distinct registry key so a
-// WAD lump can never collide with a similarly named filesystem picture.
+/// Draw_PicFromWad compatibility. Status-bar and common UI pictures live in
+/// gfx.wad rather than as loose qpic files. Keep a distinct registry key so a
+/// WAD lump can never collide with a similarly named filesystem picture.
+/// @param state Mutable `miniquake.menu` state used by `loadWadPicture`.
+/// @param archive The archive input consumed by `loadWadPicture`.
+/// @param palette The palette input consumed by `loadWadPicture`.
+/// @param lumpName Name that identifies the requested value or resource.
+/// @param transparent The transparent input consumed by `loadWadPicture`.
 function loadWadPicture(state, archive, palette, lumpName, transparent)
   key = "wad:" + lumpName
   if findPicture(state, key) is not void then return true end if
@@ -416,12 +479,17 @@ function loadWadPicture(state, archive, palette, lumpName, transparent)
   return true
 end function
 
-// Return wad picture.
+/// Return wad picture.
+/// @param state Mutable `miniquake.menu` state used by `findWadPicture`.
+/// @param lumpName Name that identifies the requested value or resource.
 function findWadPicture(state, lumpName)
   return findPicture(state, "wad:" + lumpName)
 end function
 
-// Read and validate status bar pictures.
+/// Read and validate status bar pictures.
+/// @param state Mutable `miniquake.menu` state used by `loadStatusBarPictures`.
+/// @param filesystem The filesystem input consumed by `loadStatusBarPictures`.
+/// @param palette The palette input consumed by `loadStatusBarPictures`.
 function loadStatusBarPictures(state, filesystem, palette)
   wadData = try(menuFs.readFile(filesystem, "gfx.wad"))
   if wadData is error then return false end if
@@ -471,7 +539,10 @@ function loadStatusBarPictures(state, filesystem, palette)
   return true
 end function
 
-// Initialize state for initialize.
+/// Initializes ialize for `miniquake.menu`.
+/// @param state Mutable `miniquake.menu` state used by `initialize`.
+/// @param filesystem The filesystem input consumed by `initialize`.
+/// @param palette The palette input consumed by `initialize`.
 function initialize(state, filesystem, palette)
   if state is void or state.initialized then return true end if
 
@@ -532,7 +603,8 @@ function initialize(state, filesystem, palette)
   return true
 end function
 
-// Release state for shutdown.
+/// Implements the `shutdown` operation for `miniquake.menu` (shutdown).
+/// @param state Mutable `miniquake.menu` state used by `shutdown`.
 function shutdown(state)
   if state is void then return true end if
   deletedTextures = []
@@ -553,7 +625,9 @@ function shutdown(state)
   return true
 end function
 
-// Provide layout behavior for the active subsystem.
+/// Implements the `layout` operation for `miniquake.menu` (layout).
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function layout(width, height)
   global cachedLayoutWidth, cachedLayoutHeight, cachedLayout
   if width != cachedLayoutWidth or height != cachedLayoutHeight or len(cachedLayout) != 3 then
@@ -564,7 +638,13 @@ function layout(width, height)
   return cachedLayout
 end function
 
-// Provide virtual picture behavior for the active subsystem.
+/// Implements the `virtualPicture` operation for `miniquake.menu` (virtual picture).
+/// @param state Mutable `miniquake.menu` state used by `virtualPicture`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param x The x input consumed by `virtualPicture`.
+/// @param y The y input consumed by `virtualPicture`.
+/// @param transform The transform input consumed by `virtualPicture`.
+/// @param alpha The alpha input consumed by `virtualPicture`.
 function virtualPicture(state, name, x, y, transform, alpha)
   pictureValue = findPicture(state, name)
   if pictureValue is void or pictureValue.textureId == 0 then return false end if
@@ -580,14 +660,25 @@ function virtualPicture(state, name, x, y, transform, alpha)
   return true
 end function
 
-// Provide virtual centered picture behavior for the active subsystem.
+/// Implements the `virtualCenteredPicture` operation for `miniquake.menu` (virtual centered picture).
+/// @param state Mutable `miniquake.menu` state used by `virtualCenteredPicture`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param y The y input consumed by `virtualCenteredPicture`.
+/// @param transform The transform input consumed by `virtualCenteredPicture`.
+/// @param alpha The alpha input consumed by `virtualCenteredPicture`.
 function virtualCenteredPicture(state, name, y, transform, alpha)
   pictureValue = findPicture(state, name)
   if pictureValue is void then return false end if
   return virtualPicture(state, name, (320.0 - pictureValue.width) * 0.5, y, transform, alpha)
 end function
 
-// Provide virtual string behavior for the active subsystem.
+/// Implements the `virtualString` operation for `miniquake.menu` (virtual string).
+/// @param texture Texture resource processed by the operation.
+/// @param x The x input consumed by `virtualString`.
+/// @param y The y input consumed by `virtualString`.
+/// @param text Text to parse or process.
+/// @param transform The transform input consumed by `virtualString`.
+/// @param alpha The alpha input consumed by `virtualString`.
 function virtualString(texture, x, y, text, transform, alpha)
   if texture == 0 then return false end if
   // M_Print uses the brown character bank in conchars (ASCII + 128).
@@ -616,7 +707,13 @@ function virtualString(texture, x, y, text, transform, alpha)
   return true
 end function
 
-// Provide virtual white string behavior for the active subsystem.
+/// Implements the `virtualWhiteString` operation for `miniquake.menu` (virtual white string).
+/// @param texture Texture resource processed by the operation.
+/// @param x The x input consumed by `virtualWhiteString`.
+/// @param y The y input consumed by `virtualWhiteString`.
+/// @param text Text to parse or process.
+/// @param transform The transform input consumed by `virtualWhiteString`.
+/// @param alpha The alpha input consumed by `virtualWhiteString`.
 function virtualWhiteString(texture, x, y, text, transform, alpha)
   if texture == 0 then return false end if
   // M_PrintWhite uses the normal ASCII bank unchanged.
@@ -631,14 +728,28 @@ function virtualWhiteString(texture, x, y, text, transform, alpha)
   return true
 end function
 
-// Provide virtual centered string behavior for the active subsystem.
+/// Implements the `virtualCenteredString` operation for `miniquake.menu` (virtual centered string).
+/// @param texture Texture resource processed by the operation.
+/// @param y The y input consumed by `virtualCenteredString`.
+/// @param text Text to parse or process.
+/// @param transform The transform input consumed by `virtualCenteredString`.
+/// @param alpha The alpha input consumed by `virtualCenteredString`.
 function virtualCenteredString(texture, y, text, transform, alpha)
   x = (320.0 - len(bytes(text)) * 8.0) * 0.5
   if x < 0.0 then x = 0.0 end if
   return virtualString(texture, x, y, text, transform, alpha)
 end function
 
-// Provide virtual solid behavior for the active subsystem.
+/// Implements the `virtualSolid` operation for `miniquake.menu` (virtual solid).
+/// @param x The x input consumed by `virtualSolid`.
+/// @param y The y input consumed by `virtualSolid`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param transform The transform input consumed by `virtualSolid`.
+/// @param red The red input consumed by `virtualSolid`.
+/// @param green The green input consumed by `virtualSolid`.
+/// @param blue The blue input consumed by `virtualSolid`.
+/// @param alpha The alpha input consumed by `virtualSolid`.
 function virtualSolid(x, y, width, height, transform, red, green, blue, alpha)
   menuDraw.solidQuad(
     transform[0] + x * transform[2],
@@ -652,8 +763,14 @@ function virtualSolid(x, y, width, height, transform, red, green, blue, alpha)
   )
 end function
 
-// M_DrawTextBox from WinQuake/menu.c. Width is measured in characters; every
-// center tile covers two characters (16 pixels).
+/// M_DrawTextBox from WinQuake/menu.c. Width is measured in characters; every
+/// center tile covers two characters (16 pixels).
+/// @param state Mutable `miniquake.menu` state used by `drawTextBox`.
+/// @param x The x input consumed by `drawTextBox`.
+/// @param y The y input consumed by `drawTextBox`.
+/// @param width Requested width in pixels or data units.
+/// @param lines The lines input consumed by `drawTextBox`.
+/// @param transform The transform input consumed by `drawTextBox`.
 function drawTextBox(state, x, y, width, lines, transform)
   cx = x
   cy = y
@@ -698,7 +815,10 @@ function drawTextBox(state, x, y, width, lines, transform)
   return true
 end function
 
-// Render fallback list.
+/// Render fallback list.
+/// @param state Mutable `miniquake.menu` state used by `drawFallbackList`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `drawFallbackList`.
 function drawFallbackList(state, texture, transform)
   virtualCenteredString(texture, 12.0, state.title, transform, 255)
   y = 48.0
@@ -712,13 +832,21 @@ function drawFallbackList(state, texture, transform)
   end while
 end function
 
-// Render dot.
+/// Render dot.
+/// @param state Mutable `miniquake.menu` state used by `drawDot`.
+/// @param realtime Time value used by the operation.
+/// @param y The y input consumed by `drawDot`.
+/// @param transform The transform input consumed by `drawDot`.
 function drawDot(state, realtime, y, transform)
   frame = (menuNative.trunc(realtime * 10.0) % 6) + 1
   return virtualPicture(state, "gfx/menudot" + frame + ".lmp", 54.0, y, transform, 255)
 end function
 
-// Render main.
+/// Render main.
+/// @param state Mutable `miniquake.menu` state used by `drawMain`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `drawMain`.
+/// @param realtime Time value used by the operation.
 function drawMain(state, texture, transform, realtime)
   plaque = virtualPicture(state, "gfx/qplaque.lmp", 16.0, 4.0, transform, 255)
   title = virtualCenteredPicture(state, "gfx/ttl_main.lmp", 4.0, transform, 255)
@@ -727,7 +855,11 @@ function drawMain(state, texture, transform, realtime)
   if not plaque or not title or not body then drawFallbackList(state, texture, transform) end if
 end function
 
-// Render single player.
+/// Render single player.
+/// @param state Mutable `miniquake.menu` state used by `drawSinglePlayer`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `drawSinglePlayer`.
+/// @param realtime Time value used by the operation.
 function drawSinglePlayer(state, texture, transform, realtime)
   plaque = virtualPicture(state, "gfx/qplaque.lmp", 16.0, 4.0, transform, 255)
   title = virtualCenteredPicture(state, "gfx/ttl_sgl.lmp", 4.0, transform, 255)
@@ -736,7 +868,11 @@ function drawSinglePlayer(state, texture, transform, realtime)
   if not plaque or not title or not body then drawFallbackList(state, texture, transform) end if
 end function
 
-// Render multiplayer.
+/// Render multiplayer.
+/// @param state Mutable `miniquake.menu` state used by `drawMultiplayer`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `drawMultiplayer`.
+/// @param realtime Time value used by the operation.
 function drawMultiplayer(state, texture, transform, realtime)
   plaque = virtualPicture(state, "gfx/qplaque.lmp", 16.0, 4.0, transform, 255)
   title = virtualCenteredPicture(state, "gfx/p_multi.lmp", 4.0, transform, 255)
@@ -746,7 +882,12 @@ function drawMultiplayer(state, texture, transform, realtime)
   if not state.tcpAvailable then virtualCenteredString(texture, 148.0, "No Communications Available", transform, 255) end if
 end function
 
-// Render slider.
+/// Render slider.
+/// @param texture Texture resource processed by the operation.
+/// @param x The x input consumed by `drawSlider`.
+/// @param y The y input consumed by `drawSlider`.
+/// @param range The range input consumed by `drawSlider`.
+/// @param transform The transform input consumed by `drawSlider`.
 function drawSlider(texture, x, y, range, transform)
   if range < 0.0 then range = 0.0 end if
   if range > 1.0 then range = 1.0 end if
@@ -761,7 +902,12 @@ function drawSlider(texture, x, y, range, transform)
   menuDraw.character(texture, transform[0] + (x + 72.0 * range) * scale, transform[1] + y * scale, 131, scale, 255)
 end function
 
-// Render checkbox.
+/// Render checkbox.
+/// @param texture Texture resource processed by the operation.
+/// @param x The x input consumed by `drawCheckbox`.
+/// @param y The y input consumed by `drawCheckbox`.
+/// @param enabled Whether the optional behavior is enabled.
+/// @param transform The transform input consumed by `drawCheckbox`.
 function drawCheckbox(texture, x, y, enabled, transform)
   if enabled then
     virtualString(texture, x, y, "on", transform, 255)
@@ -770,7 +916,12 @@ function drawCheckbox(texture, x, y, enabled, transform)
   end if
 end function
 
-// Render options.
+/// Render options.
+/// @param state Mutable `miniquake.menu` state used by `drawOptions`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `drawOptions`.
+/// @param realtime Time value used by the operation.
+/// @param registry The registry input consumed by `drawOptions`.
 function drawOptions(state, texture, transform, realtime, registry)
   plaque = virtualPicture(state, "gfx/qplaque.lmp", 16.0, 4.0, transform, 255)
   title = virtualCenteredPicture(state, "gfx/p_option.lmp", 4.0, transform, 255)
@@ -825,14 +976,19 @@ function drawOptions(state, texture, transform, realtime, registry)
   )
 end function
 
-// Provide key command at behavior for the active subsystem.
+/// Implements the `keyCommandAt` operation for `miniquake.menu` (key command at).
+/// @param state Mutable `miniquake.menu` state used by `keyCommandAt`.
 function keyCommandAt(state)
   commands = keyCommands()
   if state.selection < 0 or state.selection >= len(commands) then return "" end if
   return commands[state.selection]
 end function
 
-// Render keys.
+/// Render keys.
+/// @param state Mutable `miniquake.menu` state used by `drawKeys`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `drawKeys`.
+/// @param realtime Time value used by the operation.
 function drawKeys(state, texture, transform, realtime)
   virtualCenteredPicture(state, "gfx/ttl_cstm.lmp", 4.0, transform, 255)
   if state.waitingForKey then
@@ -866,7 +1022,12 @@ function drawKeys(state, texture, transform, realtime)
   )
 end function
 
-// Render save slots.
+/// Render save slots.
+/// @param state Mutable `miniquake.menu` state used by `drawSaveSlots`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `drawSaveSlots`.
+/// @param realtime Time value used by the operation.
+/// @param page The page input consumed by `drawSaveSlots`.
 function drawSaveSlots(state, texture, transform, realtime, page)
   pictureName = "gfx/p_load.lmp"
   if page == PAGE_SAVE then pictureName = "gfx/p_save.lmp" end if
@@ -880,7 +1041,8 @@ function drawSaveSlots(state, texture, transform, realtime, page)
   menuDraw.character(texture, transform[0] + 8.0 * transform[2], transform[1] + (32.0 + state.selection * 8.0) * transform[2], cursor, transform[2], 255)
 end function
 
-// Provide player translation behavior for the active subsystem.
+/// Implements the `playerTranslation` operation for `miniquake.menu` (player translation).
+/// @param registry The registry input consumed by `playerTranslation`.
 function playerTranslation(registry)
   colors = 0
   if registry is not void then colors = menuNative.trunc(menuCvar.variableValue(registry, "_cl_color")) end if
@@ -901,7 +1063,12 @@ function playerTranslation(registry)
   return translation
 end function
 
-// Render setup.
+/// Render setup.
+/// @param state Mutable `miniquake.menu` state used by `drawSetup`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `drawSetup`.
+/// @param realtime Time value used by the operation.
+/// @param registry The registry input consumed by `drawSetup`.
 function drawSetup(state, texture, transform, realtime, registry)
   virtualCenteredPicture(state, "gfx/p_multi.lmp", 4.0, transform, 255)
   virtualString(texture, 64.0, 40.0, "Hostname", transform, 255)
@@ -936,7 +1103,7 @@ function drawSetup(state, texture, transform, realtime, registry)
   end if
 end function
 
-// Provide base episodes behavior for the active subsystem.
+/// Implements the `baseEpisodes` operation for `miniquake.menu` (base episodes).
 function baseEpisodes()
   return [
     ["Welcome to Quake", 0, 1],
@@ -949,7 +1116,7 @@ function baseEpisodes()
   ]
 end function
 
-// Provide base levels behavior for the active subsystem.
+/// Implements the `baseLevels` operation for `miniquake.menu` (base levels).
 function baseLevels()
   return [
     ["start", "Entrance"],
@@ -967,7 +1134,7 @@ function baseLevels()
   ]
 end function
 
-// Provide hipnotic episodes behavior for the active subsystem.
+/// Implements the `hipnoticEpisodes` operation for `miniquake.menu` (hipnotic episodes).
 function hipnoticEpisodes()
   return [
     ["Scourge of Armagon", 0, 1],
@@ -979,7 +1146,7 @@ function hipnoticEpisodes()
   ]
 end function
 
-// Provide hipnotic levels behavior for the active subsystem.
+/// Implements the `hipnoticLevels` operation for `miniquake.menu` (hipnotic levels).
 function hipnoticLevels()
   return [
     ["start", "Command HQ"],
@@ -992,7 +1159,7 @@ function hipnoticLevels()
   ]
 end function
 
-// Provide rogue episodes behavior for the active subsystem.
+/// Implements the `rogueEpisodes` operation for `miniquake.menu` (rogue episodes).
 function rogueEpisodes()
   return [
     ["Introduction", 0, 1],
@@ -1002,7 +1169,7 @@ function rogueEpisodes()
   ]
 end function
 
-// Provide rogue levels behavior for the active subsystem.
+/// Implements the `rogueLevels` operation for `miniquake.menu` (rogue levels).
 function rogueLevels()
   return [
     ["start", "Split Decision"],
@@ -1014,21 +1181,24 @@ function rogueLevels()
   ]
 end function
 
-// Provide episode table behavior for the active subsystem.
+/// Implements the `episodeTable` operation for `miniquake.menu` (episode table).
+/// @param state Mutable `miniquake.menu` state used by `episodeTable`.
 function episodeTable(state)
   if state.missionPack == "hipnotic" then return hipnoticEpisodes() end if
   if state.missionPack == "rogue" then return rogueEpisodes() end if
   return baseEpisodes()
 end function
 
-// Provide level table behavior for the active subsystem.
+/// Implements the `levelTable` operation for `miniquake.menu` (level table).
+/// @param state Mutable `miniquake.menu` state used by `levelTable`.
 function levelTable(state)
   if state.missionPack == "hipnotic" then return hipnoticLevels() end if
   if state.missionPack == "rogue" then return rogueLevels() end if
   return baseLevels()
 end function
 
-// Provide selected level behavior for the active subsystem.
+/// Implements the `selectedLevel` operation for `miniquake.menu` (selected level).
+/// @param state Mutable `miniquake.menu` state used by `selectedLevel`.
 function selectedLevel(state)
   episodes = episodeTable(state)
   levels = levelTable(state)
@@ -1036,7 +1206,11 @@ function selectedLevel(state)
   return levels[episode[1] + state.startLevel]
 end function
 
-// Render network.
+/// Render network.
+/// @param state Mutable `miniquake.menu` state used by `drawNetwork`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `drawNetwork`.
+/// @param realtime Time value used by the operation.
 function drawNetwork(state, texture, transform, realtime)
   virtualPicture(state, "gfx/qplaque.lmp", 16.0, 4.0, transform, 255)
   virtualCenteredPicture(state, "gfx/p_multi.lmp", 4.0, transform, 255)
@@ -1054,7 +1228,11 @@ function drawNetwork(state, texture, transform, realtime)
   drawDot(state, realtime, 32.0 + state.selection * 20.0, transform)
 end function
 
-// Render lan config.
+/// Render lan config.
+/// @param state Mutable `miniquake.menu` state used by `drawLanConfig`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `drawLanConfig`.
+/// @param realtime Time value used by the operation.
 function drawLanConfig(state, texture, transform, realtime)
   virtualPicture(state, "gfx/qplaque.lmp", 16.0, 4.0, transform, 255)
   title = findPicture(state, "gfx/p_multi.lmp")
@@ -1084,13 +1262,16 @@ function drawLanConfig(state, texture, transform, realtime)
   if state.returnReason != "" then virtualWhiteString(texture, baseX, 148.0, state.returnReason, transform, 255) end if
 end function
 
-// Provide game type text behavior for the active subsystem.
+/// Implements the `gameTypeText` operation for `miniquake.menu` (game type text).
+/// @param registry The registry input consumed by `gameTypeText`.
 function gameTypeText(registry)
   if menuCvar.variableValue(registry, "coop") != 0.0 then return "Cooperative" end if
   return "Deathmatch"
 end function
 
-// Provide teamplay text behavior for the active subsystem.
+/// Implements the `teamplayText` operation for `miniquake.menu` (teamplay text).
+/// @param state Mutable `miniquake.menu` state used by `teamplayText`.
+/// @param registry The registry input consumed by `teamplayText`.
 function teamplayText(state, registry)
   value = menuNative.trunc(menuCvar.variableValue(registry, "teamplay"))
   if value == 1 then return "No Friendly Fire" end if
@@ -1104,7 +1285,12 @@ function teamplayText(state, registry)
   return "Off"
 end function
 
-// Render game options.
+/// Render game options.
+/// @param state Mutable `miniquake.menu` state used by `drawGameOptions`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `drawGameOptions`.
+/// @param realtime Time value used by the operation.
+/// @param registry The registry input consumed by `drawGameOptions`.
 function drawGameOptions(state, texture, transform, realtime, registry)
   virtualPicture(state, "gfx/qplaque.lmp", 16.0, 4.0, transform, 255)
   virtualCenteredPicture(state, "gfx/p_multi.lmp", 4.0, transform, 255)
@@ -1143,7 +1329,10 @@ function drawGameOptions(state, texture, transform, realtime, registry)
   M_DrawCharacter(texture, 144.0, cursorY, 12 + (menuNative.trunc(realtime * 4.0) & 1), transform)
 end function
 
-// Render search.
+/// Render search.
+/// @param state Mutable `miniquake.menu` state used by `drawSearch`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `drawSearch`.
 function drawSearch(state, texture, transform)
   virtualCenteredPicture(state, "gfx/p_multi.lmp", 4.0, transform, 255)
   drawTextBox(state, 104.0, 32.0, 12, 1, transform)
@@ -1153,7 +1342,8 @@ function drawSearch(state, texture, transform)
   end if
 end function
 
-// Provide sort servers behavior for the active subsystem.
+/// Implements the `sortServers` operation for `miniquake.menu` (sort servers).
+/// @param state Mutable `miniquake.menu` state used by `sortServers`.
 function sortServers(state)
   if state.serverListSorted then return state.servers end if
   i = 0
@@ -1173,7 +1363,9 @@ function sortServers(state)
   return state.servers
 end function
 
-// Provide menu string less behavior for the active subsystem.
+/// Implements the `menuStringLess` operation for `miniquake.menu` (menu string less).
+/// @param left The left input consumed by `menuStringLess`.
+/// @param right The right input consumed by `menuStringLess`.
 function menuStringLess(left, right)
   leftBytes = bytes(left)
   rightBytes = bytes(right)
@@ -1190,7 +1382,9 @@ function menuStringLess(left, right)
   return len(leftBytes) < len(rightBytes)
 end function
 
-// Provide fixed server field behavior for the active subsystem.
+/// Implements the `fixedServerField` operation for `miniquake.menu` (fixed server field).
+/// @param text Text to parse or process.
+/// @param width Requested width in pixels or data units.
 function fixedServerField(text, width)
   source = bytes(text)
   result = ""
@@ -1202,13 +1396,18 @@ function fixedServerField(text, width)
   return result
 end function
 
-// Provide width two behavior for the active subsystem.
+/// Implements the `widthTwo` operation for `miniquake.menu` (width two).
+/// @param number The number input consumed by `widthTwo`.
 function widthTwo(number)
   if number < 10 then return " " + number end if
   return "" + number
 end function
 
-// Render server list.
+/// Render server list.
+/// @param state Mutable `miniquake.menu` state used by `drawServerList`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `drawServerList`.
+/// @param realtime Time value used by the operation.
 function drawServerList(state, texture, transform, realtime)
   sortServers(state)
   virtualCenteredPicture(state, "gfx/p_multi.lmp", 4.0, transform, 255)
@@ -1226,7 +1425,11 @@ function drawServerList(state, texture, transform, realtime)
   if state.returnReason != "" then virtualWhiteString(texture, 16.0, 148.0, state.returnReason, transform, 255) end if
 end function
 
-// Render video.
+/// Render video.
+/// @param state Mutable `miniquake.menu` state used by `drawVideo`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `drawVideo`.
+/// @param realtime Time value used by the operation.
 function drawVideo(state, texture, transform, realtime)
   virtualCenteredPicture(state, "gfx/vidmodes.lmp", 4.0, transform, 255)
   // Translate backend-neutral menu commands into the 320x200 Quake canvas;
@@ -1288,7 +1491,10 @@ function drawVideo(state, texture, transform, realtime)
   virtualCenteredString(texture, 196.0, "ESC RETURNS TO OPTIONS", transform, 220)
 end function
 
-// Render help.
+/// Render help.
+/// @param state Mutable `miniquake.menu` state used by `drawHelp`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `drawHelp`.
 function drawHelp(state, texture, transform)
   name = "gfx/help" + state.helpPage + ".lmp"
   if not virtualPicture(state, name, 0.0, 0.0, transform, 255) then
@@ -1297,7 +1503,10 @@ function drawHelp(state, texture, transform)
   end if
 end function
 
-// Render quit.
+/// Render quit.
+/// @param state Mutable `miniquake.menu` state used by `drawQuit`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `drawQuit`.
 function drawQuit(state, texture, transform)
   drawTextBox(state, 0.0, 0.0, 38, 23, transform)
   virtualWhiteString(texture, 16.0, 12.0, "  Quake version 1.09 by id Software", transform, 255)
@@ -1323,7 +1532,13 @@ function drawQuit(state, texture, transform)
   virtualWhiteString(texture, 16.0, 180.0, "reserved. Press y to exit", transform, 255)
 end function
 
-// Render page.
+/// Render page.
+/// @param state Mutable `miniquake.menu` state used by `drawPage`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `drawPage`.
+/// @param realtime Time value used by the operation.
+/// @param registry The registry input consumed by `drawPage`.
+/// @param page The page input consumed by `drawPage`.
 function drawPage(state, texture, transform, realtime, registry, page)
   if page == PAGE_MAIN then
     M_Main_Draw(state, texture, transform, realtime)
@@ -1356,7 +1571,14 @@ function drawPage(state, texture, transform, realtime, registry, page)
   end if
 end function
 
-// Apply the Quake-compatible m draw behavior.
+/// Apply the Quake-compatible m draw behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Draw`.
+/// @param texture Texture resource processed by the operation.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param mapName Name of the map to load or inspect.
+/// @param realtime Time value used by the operation.
+/// @param registry The registry input consumed by `M_Draw`.
 function M_Draw(state, texture, width, height, mapName, realtime, registry)
   if state is void or not state.active or texture == 0 then return false end if
   state.drawTrace = [["fade"]]
@@ -1386,47 +1608,83 @@ function M_Draw(state, texture, width, height, mapName, realtime, registry)
   return true
 end function
 
-// Render the requested value.
+/// Implements the `render` operation for `miniquake.menu` (render).
+/// @param state Mutable `miniquake.menu` state used by `render`.
+/// @param texture Texture resource processed by the operation.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param mapName Name of the map to load or inspect.
+/// @param realtime Time value used by the operation.
+/// @param registry The registry input consumed by `render`.
 function render(state, texture, width, height, mapName, realtime, registry)
   return M_Draw(state, texture, width, height, mapName, realtime, registry)
 end function
 
-// -----------------------------------------------------------------------------
-// Exact menu.c / menu.h entry points.
+/// -----------------------------------------------------------------------------
+/// Exact menu.c / menu.h entry points.
+/// @param state Mutable `miniquake.menu` state used by `traceDraw`.
+/// @param name Stable name that identifies the requested object or option.
 
 function traceDraw(state, name)
   state.drawTrace = state.drawTrace + [[name]]
   return name
 end function
 
-// Apply the Quake-compatible m draw character behavior.
+/// Apply the Quake-compatible m draw character behavior.
+/// @param texture Texture resource processed by the operation.
+/// @param x The x input consumed by `M_DrawCharacter`.
+/// @param y The y input consumed by `M_DrawCharacter`.
+/// @param number The number input consumed by `M_DrawCharacter`.
+/// @param transform The transform input consumed by `M_DrawCharacter`.
 function M_DrawCharacter(texture, x, y, number, transform)
   if texture == 0 then return false end if
   menuDraw.character(texture, transform[0] + x * transform[2], transform[1] + y * transform[2], number, transform[2], 255)
   return true
 end function
 
-// Apply the Quake-compatible m print behavior.
+/// Apply the Quake-compatible m print behavior.
+/// @param texture Texture resource processed by the operation.
+/// @param x The x input consumed by `M_Print`.
+/// @param y The y input consumed by `M_Print`.
+/// @param text Text to parse or process.
+/// @param transform The transform input consumed by `M_Print`.
 function M_Print(texture, x, y, text, transform)
   return virtualString(texture, x, y, text, transform, 255)
 end function
 
-// Apply the Quake-compatible m print white behavior.
+/// Apply the Quake-compatible m print white behavior.
+/// @param texture Texture resource processed by the operation.
+/// @param x The x input consumed by `M_PrintWhite`.
+/// @param y The y input consumed by `M_PrintWhite`.
+/// @param text Text to parse or process.
+/// @param transform The transform input consumed by `M_PrintWhite`.
 function M_PrintWhite(texture, x, y, text, transform)
   return virtualWhiteString(texture, x, y, text, transform, 255)
 end function
 
-// Apply the Quake-compatible m draw trans pic behavior.
+/// Apply the Quake-compatible m draw trans pic behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_DrawTransPic`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param x The x input consumed by `M_DrawTransPic`.
+/// @param y The y input consumed by `M_DrawTransPic`.
+/// @param transform The transform input consumed by `M_DrawTransPic`.
 function M_DrawTransPic(state, name, x, y, transform)
   return virtualPicture(state, name, x, y, transform, 255)
 end function
 
-// Apply the Quake-compatible m draw pic behavior.
+/// Apply the Quake-compatible m draw pic behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_DrawPic`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param x The x input consumed by `M_DrawPic`.
+/// @param y The y input consumed by `M_DrawPic`.
+/// @param transform The transform input consumed by `M_DrawPic`.
 function M_DrawPic(state, name, x, y, transform)
   return virtualPicture(state, name, x, y, transform, 255)
 end function
 
-// Apply the Quake-compatible m build translation table behavior.
+/// Apply the Quake-compatible m build translation table behavior.
+/// @param top The top input consumed by `M_BuildTranslationTable`.
+/// @param bottom The bottom input consumed by `M_BuildTranslationTable`.
 function M_BuildTranslationTable(top, bottom)
   translation = bytes(256)
   index = 0
@@ -1443,7 +1701,14 @@ function M_BuildTranslationTable(top, bottom)
   return translation
 end function
 
-// Apply the Quake-compatible m draw trans pic translate behavior.
+/// Apply the Quake-compatible m draw trans pic translate behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_DrawTransPicTranslate`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param x The x input consumed by `M_DrawTransPicTranslate`.
+/// @param y The y input consumed by `M_DrawTransPicTranslate`.
+/// @param transform The transform input consumed by `M_DrawTransPicTranslate`.
+/// @param top The top input consumed by `M_DrawTransPicTranslate`.
+/// @param bottom The bottom input consumed by `M_DrawTransPicTranslate`.
 function M_DrawTransPicTranslate(state, name, x, y, transform, top, bottom)
   pictureValue = findPicture(state, name)
   if pictureValue is void then return false end if
@@ -1458,12 +1723,19 @@ function M_DrawTransPicTranslate(state, name, x, y, transform, top, bottom)
   return true
 end function
 
-// Apply the Quake-compatible m draw text box behavior.
+/// Apply the Quake-compatible m draw text box behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_DrawTextBox`.
+/// @param x The x input consumed by `M_DrawTextBox`.
+/// @param y The y input consumed by `M_DrawTextBox`.
+/// @param width Requested width in pixels or data units.
+/// @param lines The lines input consumed by `M_DrawTextBox`.
+/// @param transform The transform input consumed by `M_DrawTextBox`.
 function M_DrawTextBox(state, x, y, width, lines, transform)
   return drawTextBox(state, x, y, width, lines, transform)
 end function
 
-// Apply the Quake-compatible m toggle menu f behavior.
+/// Apply the Quake-compatible m toggle menu f behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_ToggleMenu_f`.
 function M_ToggleMenu_f(state)
   state.enterSound = true
   if state.active then
@@ -1474,7 +1746,8 @@ function M_ToggleMenu_f(state)
   return M_Menu_Main_f(state)
 end function
 
-// Apply the Quake-compatible m menu main f behavior.
+/// Apply the Quake-compatible m menu main f behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Menu_Main_f`.
 function M_Menu_Main_f(state)
   openPage(state, PAGE_MAIN)
   state.active = true
@@ -1482,7 +1755,8 @@ function M_Menu_Main_f(state)
   return true
 end function
 
-// Apply the Quake-compatible m menu single player f behavior.
+/// Apply the Quake-compatible m menu single player f behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Menu_SinglePlayer_f`.
 function M_Menu_SinglePlayer_f(state)
   openPage(state, PAGE_SINGLEPLAYER)
   state.active = true
@@ -1490,7 +1764,8 @@ function M_Menu_SinglePlayer_f(state)
   return true
 end function
 
-// Apply the Quake-compatible m menu load f behavior.
+/// Apply the Quake-compatible m menu load f behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Menu_Load_f`.
 function M_Menu_Load_f(state)
   openPage(state, PAGE_LOAD)
   state.active = true
@@ -1498,7 +1773,11 @@ function M_Menu_Load_f(state)
   return true
 end function
 
-// Apply the Quake-compatible m menu save f behavior.
+/// Apply the Quake-compatible m menu save f behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Menu_Save_f`.
+/// @param serverActive The server active input consumed by `M_Menu_Save_f`.
+/// @param intermission The intermission input consumed by `M_Menu_Save_f`.
+/// @param maxClients The max clients input consumed by `M_Menu_Save_f`.
 function M_Menu_Save_f(state, serverActive, intermission, maxClients)
   if not serverActive or intermission != 0 or maxClients != 1 then return false end if
   openPage(state, PAGE_SAVE)
@@ -1507,7 +1786,8 @@ function M_Menu_Save_f(state, serverActive, intermission, maxClients)
   return true
 end function
 
-// Apply the Quake-compatible m menu multi player f behavior.
+/// Apply the Quake-compatible m menu multi player f behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Menu_MultiPlayer_f`.
 function M_Menu_MultiPlayer_f(state)
   openPage(state, PAGE_MULTIPLAYER)
   state.active = true
@@ -1515,7 +1795,9 @@ function M_Menu_MultiPlayer_f(state)
   return true
 end function
 
-// Apply the Quake-compatible m menu setup f behavior.
+/// Apply the Quake-compatible m menu setup f behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Menu_Setup_f`.
+/// @param registry The registry input consumed by `M_Menu_Setup_f`.
 function M_Menu_Setup_f(state, registry)
   openPage(state, PAGE_SETUP)
   state.active = true
@@ -1530,7 +1812,8 @@ function M_Menu_Setup_f(state, registry)
   return true
 end function
 
-// Apply the Quake-compatible m menu net f behavior.
+/// Apply the Quake-compatible m menu net f behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Menu_Net_f`.
 function M_Menu_Net_f(state)
   openPage(state, PAGE_NET)
   state.active = true
@@ -1541,7 +1824,8 @@ function M_Menu_Net_f(state)
   return true
 end function
 
-// Apply the Quake-compatible m menu options f behavior.
+/// Apply the Quake-compatible m menu options f behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Menu_Options_f`.
 function M_Menu_Options_f(state)
   openPage(state, PAGE_OPTIONS)
   state.active = true
@@ -1549,7 +1833,8 @@ function M_Menu_Options_f(state)
   return true
 end function
 
-// Apply the Quake-compatible m menu keys f behavior.
+/// Apply the Quake-compatible m menu keys f behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Menu_Keys_f`.
 function M_Menu_Keys_f(state)
   openPage(state, PAGE_KEYS)
   state.active = true
@@ -1557,7 +1842,8 @@ function M_Menu_Keys_f(state)
   return true
 end function
 
-// Apply the Quake-compatible m menu video f behavior.
+/// Apply the Quake-compatible m menu video f behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Menu_Video_f`.
 function M_Menu_Video_f(state)
   openPage(state, PAGE_VIDEO)
   glvid.VID_MenuReset()
@@ -1566,7 +1852,8 @@ function M_Menu_Video_f(state)
   return true
 end function
 
-// Apply the Quake-compatible m menu help f behavior.
+/// Apply the Quake-compatible m menu help f behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Menu_Help_f`.
 function M_Menu_Help_f(state)
   openPage(state, PAGE_HELP)
   state.helpPage = 0
@@ -1575,7 +1862,8 @@ function M_Menu_Help_f(state)
   return true
 end function
 
-// Apply the Quake-compatible m menu quit f behavior.
+/// Apply the Quake-compatible m menu quit f behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Menu_Quit_f`.
 function M_Menu_Quit_f(state)
   if state.page == PAGE_QUIT then return false end if
   state.previousPage = state.page
@@ -1585,24 +1873,29 @@ function M_Menu_Quit_f(state)
   return true
 end function
 
-// Return excluded menu path derived from the active module state.
+/// Return excluded menu path derived from the active module state.
+/// @param state Mutable `miniquake.menu` state used by `excludedMenuPath`.
+/// @param name Stable name that identifies the requested object or option.
 function excludedMenuPath(state, name)
   state.action = ["excluded", name]
   state.statusText = name + " networking is excluded from the Windows x64 MiniQuake target"
   return false
 end function
 
-// Apply the Quake-compatible m menu serial config f behavior.
+/// Apply the Quake-compatible m menu serial config f behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Menu_SerialConfig_f`.
 function M_Menu_SerialConfig_f(state)
   return excludedMenuPath(state, "serial/modem")
 end function
 
-// Apply the Quake-compatible m menu modem config f behavior.
+/// Apply the Quake-compatible m menu modem config f behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Menu_ModemConfig_f`.
 function M_Menu_ModemConfig_f(state)
   return excludedMenuPath(state, "physical modem")
 end function
 
-// Apply the Quake-compatible m menu lan config f behavior.
+/// Apply the Quake-compatible m menu lan config f behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Menu_LanConfig_f`.
 function M_Menu_LanConfig_f(state)
   hadSelection = false
   for each item in state.pageSelections
@@ -1621,7 +1914,10 @@ function M_Menu_LanConfig_f(state)
   return true
 end function
 
-// Apply the Quake-compatible m menu game options f behavior.
+/// Apply the Quake-compatible m menu game options f behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Menu_GameOptions_f`.
+/// @param maximumClients The maximum clients input consumed by `M_Menu_GameOptions_f`.
+/// @param missionPack The mission pack input consumed by `M_Menu_GameOptions_f`.
 function M_Menu_GameOptions_f(state, maximumClients, missionPack)
   openPage(state, PAGE_GAME_OPTIONS)
   state.active = true
@@ -1634,7 +1930,11 @@ function M_Menu_GameOptions_f(state, maximumClients, missionPack)
   return true
 end function
 
-// Apply the Quake-compatible m menu search f behavior.
+/// Apply the Quake-compatible m menu search f behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Menu_Search_f`.
+/// @param network The network input consumed by `M_Menu_Search_f`.
+/// @param port The port input consumed by `M_Menu_Search_f`.
+/// @param realtime Time value used by the operation.
 function M_Menu_Search_f(state, network, port, realtime)
   openPage(state, PAGE_SEARCH)
   state.active = true
@@ -1646,7 +1946,9 @@ function M_Menu_Search_f(state, network, port, realtime)
   return true
 end function
 
-// Apply the Quake-compatible m menu server list f behavior.
+/// Apply the Quake-compatible m menu server list f behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Menu_ServerList_f`.
+/// @param servers The servers input consumed by `M_Menu_ServerList_f`.
 function M_Menu_ServerList_f(state, servers)
   openPage(state, PAGE_SERVER_LIST)
   state.active = true
@@ -1662,106 +1964,173 @@ function M_Menu_ServerList_f(state, servers)
   return true
 end function
 
-// Apply the Quake-compatible m main draw behavior.
+/// Apply the Quake-compatible m main draw behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Main_Draw`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `M_Main_Draw`.
+/// @param realtime Time value used by the operation.
 function M_Main_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_Main_Draw")
   return drawMain(state, texture, transform, realtime)
 end function
 
-// Apply the Quake-compatible m single player draw behavior.
+/// Apply the Quake-compatible m single player draw behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_SinglePlayer_Draw`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `M_SinglePlayer_Draw`.
+/// @param realtime Time value used by the operation.
 function M_SinglePlayer_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_SinglePlayer_Draw")
   return drawSinglePlayer(state, texture, transform, realtime)
 end function
 
-// Apply the Quake-compatible m load draw behavior.
+/// Apply the Quake-compatible m load draw behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Load_Draw`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `M_Load_Draw`.
+/// @param realtime Time value used by the operation.
 function M_Load_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_Load_Draw")
   return drawSaveSlots(state, texture, transform, realtime, PAGE_LOAD)
 end function
 
-// Apply the Quake-compatible m save draw behavior.
+/// Apply the Quake-compatible m save draw behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Save_Draw`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `M_Save_Draw`.
+/// @param realtime Time value used by the operation.
 function M_Save_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_Save_Draw")
   return drawSaveSlots(state, texture, transform, realtime, PAGE_SAVE)
 end function
 
-// Apply the Quake-compatible m multi player draw behavior.
+/// Apply the Quake-compatible m multi player draw behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_MultiPlayer_Draw`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `M_MultiPlayer_Draw`.
+/// @param realtime Time value used by the operation.
 function M_MultiPlayer_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_MultiPlayer_Draw")
   return drawMultiplayer(state, texture, transform, realtime)
 end function
 
-// Apply the Quake-compatible m setup draw behavior.
+/// Apply the Quake-compatible m setup draw behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Setup_Draw`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `M_Setup_Draw`.
+/// @param realtime Time value used by the operation.
+/// @param registry The registry input consumed by `M_Setup_Draw`.
 function M_Setup_Draw(state, texture, transform, realtime, registry)
   traceDraw(state, "M_Setup_Draw")
   return drawSetup(state, texture, transform, realtime, registry)
 end function
 
-// Apply the Quake-compatible m net draw behavior.
+/// Apply the Quake-compatible m net draw behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Net_Draw`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `M_Net_Draw`.
+/// @param realtime Time value used by the operation.
 function M_Net_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_Net_Draw")
   return drawNetwork(state, texture, transform, realtime)
 end function
 
-// Apply the Quake-compatible m options draw behavior.
+/// Apply the Quake-compatible m options draw behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Options_Draw`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `M_Options_Draw`.
+/// @param realtime Time value used by the operation.
+/// @param registry The registry input consumed by `M_Options_Draw`.
 function M_Options_Draw(state, texture, transform, realtime, registry)
   traceDraw(state, "M_Options_Draw")
   return drawOptions(state, texture, transform, realtime, registry)
 end function
 
-// Apply the Quake-compatible m keys draw behavior.
+/// Apply the Quake-compatible m keys draw behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Keys_Draw`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `M_Keys_Draw`.
+/// @param realtime Time value used by the operation.
 function M_Keys_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_Keys_Draw")
   return drawKeys(state, texture, transform, realtime)
 end function
 
-// Apply the Quake-compatible m video draw behavior.
+/// Apply the Quake-compatible m video draw behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Video_Draw`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `M_Video_Draw`.
+/// @param realtime Time value used by the operation.
 function M_Video_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_Video_Draw")
   if state.videoDrawCallback is not void then state.action = state.videoDrawCallback() end if
   return drawVideo(state, texture, transform, realtime)
 end function
 
-// Apply the Quake-compatible m help draw behavior.
+/// Apply the Quake-compatible m help draw behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Help_Draw`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `M_Help_Draw`.
 function M_Help_Draw(state, texture, transform)
   traceDraw(state, "M_Help_Draw")
   return drawHelp(state, texture, transform)
 end function
 
-// Apply the Quake-compatible m quit draw behavior.
+/// Apply the Quake-compatible m quit draw behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Quit_Draw`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `M_Quit_Draw`.
 function M_Quit_Draw(state, texture, transform)
   traceDraw(state, "M_Quit_Draw")
   return drawQuit(state, texture, transform)
 end function
 
-// Apply the Quake-compatible m serial config draw behavior.
+/// Apply the Quake-compatible m serial config draw behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_SerialConfig_Draw`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `M_SerialConfig_Draw`.
 function M_SerialConfig_Draw(state, texture, transform)
   traceDraw(state, "M_SerialConfig_Draw:excluded")
   virtualCenteredString(texture, 96.0, "SERIAL/MODEM EXCLUDED", transform, 255)
   return false
 end function
 
-// Apply the Quake-compatible m modem config draw behavior.
+/// Apply the Quake-compatible m modem config draw behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_ModemConfig_Draw`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `M_ModemConfig_Draw`.
 function M_ModemConfig_Draw(state, texture, transform)
   traceDraw(state, "M_ModemConfig_Draw:excluded")
   virtualCenteredString(texture, 96.0, "PHYSICAL MODEM EXCLUDED", transform, 255)
   return false
 end function
 
-// Apply the Quake-compatible m lan config draw behavior.
+/// Apply the Quake-compatible m lan config draw behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_LanConfig_Draw`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `M_LanConfig_Draw`.
+/// @param realtime Time value used by the operation.
 function M_LanConfig_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_LanConfig_Draw")
   return drawLanConfig(state, texture, transform, realtime)
 end function
 
-// Apply the Quake-compatible m game options draw behavior.
+/// Apply the Quake-compatible m game options draw behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_GameOptions_Draw`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `M_GameOptions_Draw`.
+/// @param realtime Time value used by the operation.
+/// @param registry The registry input consumed by `M_GameOptions_Draw`.
 function M_GameOptions_Draw(state, texture, transform, realtime, registry)
   traceDraw(state, "M_GameOptions_Draw")
   return drawGameOptions(state, texture, transform, realtime, registry)
 end function
 
-// Apply the Quake-compatible m search draw behavior.
+/// Apply the Quake-compatible m search draw behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Search_Draw`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `M_Search_Draw`.
+/// @param realtime Time value used by the operation.
 function M_Search_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_Search_Draw")
   drawSearch(state, texture, transform)
@@ -1782,20 +2151,30 @@ function M_Search_Draw(state, texture, transform, realtime)
   return true
 end function
 
-// Apply the Quake-compatible m server list draw behavior.
+/// Apply the Quake-compatible m server list draw behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_ServerList_Draw`.
+/// @param texture Texture resource processed by the operation.
+/// @param transform The transform input consumed by `M_ServerList_Draw`.
+/// @param realtime Time value used by the operation.
 function M_ServerList_Draw(state, texture, transform, realtime)
   traceDraw(state, "M_ServerList_Draw")
   return drawServerList(state, texture, transform, realtime)
 end function
 
-// Apply the Quake-compatible m scan saves behavior.
+/// Apply the Quake-compatible m scan saves behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_ScanSaves`.
+/// @param labels The labels input consumed by `M_ScanSaves`.
+/// @param loadable The loadable input consumed by `M_ScanSaves`.
 function M_ScanSaves(state, labels, loadable)
   state.items = labels
   state.loadable = loadable
   return len(labels)
 end function
 
-// Apply the Quake-compatible m adjust sliders behavior.
+/// Apply the Quake-compatible m adjust sliders behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_AdjustSliders`.
+/// @param registry The registry input consumed by `M_AdjustSliders`.
+/// @param direction The direction input consumed by `M_AdjustSliders`.
 function M_AdjustSliders(state, registry, direction)
   selection = state.selection
   if selection == 3 then
@@ -1836,19 +2215,30 @@ function M_AdjustSliders(state, registry, direction)
   return true
 end function
 
-// Apply the Quake-compatible m draw slider behavior.
+/// Apply the Quake-compatible m draw slider behavior.
+/// @param texture Texture resource processed by the operation.
+/// @param x The x input consumed by `M_DrawSlider`.
+/// @param y The y input consumed by `M_DrawSlider`.
+/// @param range The range input consumed by `M_DrawSlider`.
+/// @param transform The transform input consumed by `M_DrawSlider`.
 function M_DrawSlider(texture, x, y, range, transform)
   drawSlider(texture, x, y, range, transform)
   return true
 end function
 
-// Apply the Quake-compatible m draw checkbox behavior.
+/// Apply the Quake-compatible m draw checkbox behavior.
+/// @param texture Texture resource processed by the operation.
+/// @param x The x input consumed by `M_DrawCheckbox`.
+/// @param y The y input consumed by `M_DrawCheckbox`.
+/// @param enabled Whether the optional behavior is enabled.
+/// @param transform The transform input consumed by `M_DrawCheckbox`.
 function M_DrawCheckbox(texture, x, y, enabled, transform)
   drawCheckbox(texture, x, y, enabled, transform)
   return true
 end function
 
-// Apply the Quake-compatible m find keys for command behavior.
+/// Apply the Quake-compatible m find keys for command behavior.
+/// @param command Console or protocol command to execute.
 function M_FindKeysForCommand(command)
   result = [-1, -1]
   commandBytes = bytes(command)
@@ -1872,7 +2262,8 @@ function M_FindKeysForCommand(command)
   return result
 end function
 
-// Apply the Quake-compatible m unbind command behavior.
+/// Apply the Quake-compatible m unbind command behavior.
+/// @param command Console or protocol command to execute.
 function M_UnbindCommand(command)
   commandBytes = bytes(command)
   keynum = 0
@@ -1894,7 +2285,9 @@ function M_UnbindCommand(command)
   return true
 end function
 
-// Update module state for up append.
+/// Update module state for up append.
+/// @param state Mutable `miniquake.menu` state used by `setupAppend`.
+/// @param key Key used to identify the requested entry.
 function setupAppend(state, key)
   character = menuNative.asciiChar(key)
   if state.selection == 0 and len(bytes(state.setupHostname)) < 15 then state.setupHostname = state.setupHostname + character end if
@@ -1902,14 +2295,17 @@ function setupAppend(state, key)
   return true
 end function
 
-// Update module state for up backspace.
+/// Update module state for up backspace.
+/// @param state Mutable `miniquake.menu` state used by `setupBackspace`.
 function setupBackspace(state)
   if state.selection == 0 and len(bytes(state.setupHostname)) > 0 then state.setupHostname = decode(slice(bytes(state.setupHostname), 0, len(bytes(state.setupHostname)) - 1)) end if
   if state.selection == 1 and len(bytes(state.setupName)) > 0 then state.setupName = decode(slice(bytes(state.setupName), 0, len(bytes(state.setupName)) - 1)) end if
   return true
 end function
 
-// Apply the Quake-compatible m main key behavior.
+/// Apply the Quake-compatible m main key behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Main_Key`.
+/// @param key Key used to identify the requested entry.
 function M_Main_Key(state, key)
   if key == menuKeys.K_ESCAPE then state.active = false; return "close" end if
   if key == menuKeys.K_DOWNARROW then move(state, 1); return "move" end if
@@ -1918,7 +2314,9 @@ function M_Main_Key(state, key)
   return "none"
 end function
 
-// Apply the Quake-compatible m single player key behavior.
+/// Apply the Quake-compatible m single player key behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_SinglePlayer_Key`.
+/// @param key Key used to identify the requested entry.
 function M_SinglePlayer_Key(state, key)
   if key == menuKeys.K_ESCAPE then M_Menu_Main_f(state); return "back" end if
   if key == menuKeys.K_DOWNARROW then move(state, 1); return "move" end if
@@ -1927,7 +2325,9 @@ function M_SinglePlayer_Key(state, key)
   return "none"
 end function
 
-// Apply the Quake-compatible m load key behavior.
+/// Apply the Quake-compatible m load key behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Load_Key`.
+/// @param key Key used to identify the requested entry.
 function M_Load_Key(state, key)
   if key == menuKeys.K_ESCAPE then M_Menu_SinglePlayer_f(state); return "back" end if
   if key == menuKeys.K_UPARROW or key == menuKeys.K_LEFTARROW then move(state, -1); return "move" end if
@@ -1936,7 +2336,9 @@ function M_Load_Key(state, key)
   return "none"
 end function
 
-// Apply the Quake-compatible m save key behavior.
+/// Apply the Quake-compatible m save key behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Save_Key`.
+/// @param key Key used to identify the requested entry.
 function M_Save_Key(state, key)
   if key == menuKeys.K_ESCAPE then M_Menu_SinglePlayer_f(state); return "back" end if
   if key == menuKeys.K_UPARROW or key == menuKeys.K_LEFTARROW then move(state, -1); return "move" end if
@@ -1945,7 +2347,9 @@ function M_Save_Key(state, key)
   return "none"
 end function
 
-// Apply the Quake-compatible m multi player key behavior.
+/// Apply the Quake-compatible m multi player key behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_MultiPlayer_Key`.
+/// @param key Key used to identify the requested entry.
 function M_MultiPlayer_Key(state, key)
   if key == menuKeys.K_ESCAPE then M_Menu_Main_f(state); return "back" end if
   if key == menuKeys.K_DOWNARROW then move(state, 1); return "move" end if
@@ -1959,7 +2363,9 @@ function M_MultiPlayer_Key(state, key)
   return "none"
 end function
 
-// Apply the Quake-compatible m setup key behavior.
+/// Apply the Quake-compatible m setup key behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Setup_Key`.
+/// @param key Key used to identify the requested entry.
 function M_Setup_Key(state, key)
   if key == menuKeys.K_ESCAPE then M_Menu_MultiPlayer_f(state); return "back" end if
   if key == menuKeys.K_UPARROW then move(state, -1); return "move" end if
@@ -1990,7 +2396,9 @@ function M_Setup_Key(state, key)
   return "none"
 end function
 
-// Apply the Quake-compatible m net key behavior.
+/// Apply the Quake-compatible m net key behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Net_Key`.
+/// @param key Key used to identify the requested entry.
 function M_Net_Key(state, key)
   if key == menuKeys.K_ESCAPE then M_Menu_MultiPlayer_f(state); return "back" end if
   if key == menuKeys.K_UPARROW or key == menuKeys.K_DOWNARROW then state.selection = 3; return "move" end if
@@ -1998,7 +2406,10 @@ function M_Net_Key(state, key)
   return "none"
 end function
 
-// Apply the Quake-compatible m options key behavior.
+/// Apply the Quake-compatible m options key behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Options_Key`.
+/// @param key Key used to identify the requested entry.
+/// @param registry The registry input consumed by `M_Options_Key`.
 function M_Options_Key(state, key, registry)
   if key == menuKeys.K_ESCAPE then M_Menu_Main_f(state); return "back" end if
   if key == menuKeys.K_UPARROW or key == menuKeys.K_DOWNARROW then
@@ -2019,7 +2430,9 @@ function M_Options_Key(state, key, registry)
   return "none"
 end function
 
-// Apply the Quake-compatible m keys key behavior.
+/// Apply the Quake-compatible m keys key behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Keys_Key`.
+/// @param key Key used to identify the requested entry.
 function M_Keys_Key(state, key)
   if state.waitingForKey then
     if key == menuKeys.K_ESCAPE then state.waitingForKey = false; return "bind_cancel" end if
@@ -2040,7 +2453,9 @@ function M_Keys_Key(state, key)
   return "none"
 end function
 
-// Apply the Quake-compatible m video key behavior.
+/// Apply the Quake-compatible m video key behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Video_Key`.
+/// @param key Key used to identify the requested entry.
 function M_Video_Key(state, key)
   if state.videoKeyCallback is not void then
     action = state.videoKeyCallback(key)
@@ -2056,7 +2471,9 @@ function M_Video_Key(state, key)
   return "none"
 end function
 
-// Apply the Quake-compatible m help key behavior.
+/// Apply the Quake-compatible m help key behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Help_Key`.
+/// @param key Key used to identify the requested entry.
 function M_Help_Key(state, key)
   if key == menuKeys.K_ESCAPE then M_Menu_Main_f(state); return "back" end if
   if key == menuKeys.K_UPARROW or key == menuKeys.K_RIGHTARROW then moveHelp(state, 1); state.enterSound = true; return "page" end if
@@ -2064,26 +2481,33 @@ function M_Help_Key(state, key)
   return "none"
 end function
 
-// Apply the Quake-compatible m quit key behavior.
+/// Apply the Quake-compatible m quit key behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Quit_Key`.
+/// @param key Key used to identify the requested entry.
 function M_Quit_Key(state, key)
   if key == menuKeys.K_ESCAPE or key == 110 or key == 78 then back(state); state.enterSound = true; return "cancel_quit" end if
   if key == 121 or key == 89 then return "quit" end if
   return "none"
 end function
 
-// Apply the Quake-compatible m serial config key behavior.
+/// Apply the Quake-compatible m serial config key behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_SerialConfig_Key`.
+/// @param key Key used to identify the requested entry.
 function M_SerialConfig_Key(state, key)
   excludedMenuPath(state, "serial/modem")
   return "excluded"
 end function
 
-// Apply the Quake-compatible m modem config key behavior.
+/// Apply the Quake-compatible m modem config key behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_ModemConfig_Key`.
+/// @param key Key used to identify the requested entry.
 function M_ModemConfig_Key(state, key)
   excludedMenuPath(state, "physical modem")
   return "excluded"
 end function
 
-// Convert lan port into its canonical representation.
+/// Convert lan port into its canonical representation.
+/// @param state Mutable `miniquake.menu` state used by `normalizeLanPort`.
 function normalizeLanPort(state)
   parsed = toNumber(state.lanPortText)
   if parsed is void and state.lanPortText == "" then parsed = 0 end if
@@ -2096,7 +2520,9 @@ function normalizeLanPort(state)
   return state.lanPort
 end function
 
-// Apply the Quake-compatible m lan config key behavior.
+/// Apply the Quake-compatible m lan config key behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_LanConfig_Key`.
+/// @param key Key used to identify the requested entry.
 function M_LanConfig_Key(state, key)
   if key == menuKeys.K_ESCAPE then M_Menu_Net_f(state); return "back" end if
   if key == menuKeys.K_UPARROW then
@@ -2127,7 +2553,10 @@ function M_LanConfig_Key(state, key)
   return "edit"
 end function
 
-// Apply the Quake-compatible m net start change behavior.
+/// Apply the Quake-compatible m net start change behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_NetStart_Change`.
+/// @param registry The registry input consumed by `M_NetStart_Change`.
+/// @param direction The direction input consumed by `M_NetStart_Change`.
 function M_NetStart_Change(state, registry, direction)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   selection = state.selection
@@ -2179,7 +2608,10 @@ function M_NetStart_Change(state, registry, direction)
   return true
 end function
 
-// Apply the Quake-compatible m game options key behavior.
+/// Apply the Quake-compatible m game options key behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_GameOptions_Key`.
+/// @param key Key used to identify the requested entry.
+/// @param registry The registry input consumed by `M_GameOptions_Key`.
 function M_GameOptions_Key(state, key, registry)
   if key == menuKeys.K_ESCAPE then M_Menu_Net_f(state); return "back" end if
   if key == menuKeys.K_UPARROW then move(state, -1); return "move" end if
@@ -2194,12 +2626,16 @@ function M_GameOptions_Key(state, key, registry)
   return "none"
 end function
 
-// Apply the Quake-compatible m search key behavior.
+/// Apply the Quake-compatible m search key behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Search_Key`.
+/// @param key Key used to identify the requested entry.
 function M_Search_Key(state, key)
   return "none"
 end function
 
-// Apply the Quake-compatible m server list key behavior.
+/// Apply the Quake-compatible m server list key behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_ServerList_Key`.
+/// @param key Key used to identify the requested entry.
 function M_ServerList_Key(state, key)
   if key == menuKeys.K_ESCAPE then M_Menu_LanConfig_f(state); return "back" end if
   if key == menuKeys.K_SPACE then return "search" end if
@@ -2212,7 +2648,10 @@ function M_ServerList_Key(state, key)
   return "none"
 end function
 
-// Apply the Quake-compatible m keydown behavior.
+/// Apply the Quake-compatible m keydown behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Keydown`.
+/// @param key Key used to identify the requested entry.
+/// @param registry The registry input consumed by `M_Keydown`.
 function M_Keydown(state, key, registry)
   if state.page == PAGE_MAIN then return M_Main_Key(state, key) end if
   if state.page == PAGE_SINGLEPLAYER then return M_SinglePlayer_Key(state, key) end if
@@ -2235,29 +2674,36 @@ function M_Keydown(state, key, registry)
   return "none"
 end function
 
-// Apply the Quake-compatible m configure net subsystem behavior.
+/// Apply the Quake-compatible m configure net subsystem behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_ConfigureNetSubsystem`.
 function M_ConfigureNetSubsystem(state)
   return state.lanPort
 end function
 
-// Apply the Quake-compatible m set video callbacks behavior.
+/// Apply the Quake-compatible m set video callbacks behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_SetVideoCallbacks`.
+/// @param drawCallback The draw callback input consumed by `M_SetVideoCallbacks`.
+/// @param keyCallback The key callback input consumed by `M_SetVideoCallbacks`.
 function M_SetVideoCallbacks(state, drawCallback, keyCallback)
   state.videoDrawCallback = drawCallback
   state.videoKeyCallback = keyCallback
   return true
 end function
 
-// Apply the Quake-compatible m command trace behavior.
+/// Apply the Quake-compatible m command trace behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_CommandTrace`.
 function M_CommandTrace(state)
   return state.drawTrace
 end function
 
-// Apply the Quake-compatible m excluded paths behavior.
+/// Apply the Quake-compatible m excluded paths behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_ExcludedPaths`.
 function M_ExcludedPaths(state)
   return state.excludedPaths
 end function
 
-// Apply the Quake-compatible m init behavior.
+/// Apply the Quake-compatible m init behavior.
+/// @param state Mutable `miniquake.menu` state used by `M_Init`.
 function M_Init(state)
   state.excludedPaths = ["serial", "modem", "ipx"]
   return [

@@ -8,16 +8,25 @@ profile.  Backends may change, but these stage relationships are authoritative.
 */
 package miniquake.host_lifecycle_contract
 
+/// Defines the status value used by `miniquake.host_lifecycle_contract`.
 const STATUS = "host_lifecycle_109_frozen_v1"
+/// Defines the contract fingerprint value used by `miniquake.host_lifecycle_contract`.
 const CONTRACT_FINGERPRINT = 0x8cbb709f
+/// Defines the savegame version value used by `miniquake.host_lifecycle_contract`.
 const SAVEGAME_VERSION = 5
+/// Defines the savegame comment length value used by `miniquake.host_lifecycle_contract`.
 const SAVEGAME_COMMENT_LENGTH = 39
+/// Defines the spawn parm count value used by `miniquake.host_lifecycle_contract`.
 const SPAWN_PARM_COUNT = 16
+/// Defines the lightstyle count value used by `miniquake.host_lifecycle_contract`.
 const LIGHTSTYLE_COUNT = 64
+/// Defines the shutdown flush seconds value used by `miniquake.host_lifecycle_contract`.
 const SHUTDOWN_FLUSH_SECONDS = 3
+/// Defines the shutdown broadcast seconds value used by `miniquake.host_lifecycle_contract`.
 const SHUTDOWN_BROADCAST_SECONDS = 5
 
-// Advance trace stages by one processing step.
+/// Advance trace stages by one processing step.
+/// @param sendStage The send stage input consumed by `frameTraceStages`.
 function frameTraceStages(sendStage)
   return [
     "filter", "commands", "net_poll", sendStage, "console", "server",
@@ -27,29 +36,30 @@ function frameTraceStages(sendStage)
   ]
 end function
 
-// Provide local frame stages behavior for the active subsystem.
+/// Implements the `localFrameStages` operation for `miniquake.host_lifecycle_contract` (local frame stages).
 function localFrameStages()
   return frameTraceStages("local_send")
 end function
 
-// Provide remote frame stages behavior for the active subsystem.
+/// Implements the `remoteFrameStages` operation for `miniquake.host_lifecycle_contract` (remote frame stages).
 function remoteFrameStages()
   return frameTraceStages("remote_send")
 end function
 
-// Provide demo frame stages behavior for the active subsystem.
+/// Implements the `demoFrameStages` operation for `miniquake.host_lifecycle_contract` (demo frame stages).
 function demoFrameStages()
   return frameTraceStages("demo_send")
 end function
 
-// Provide server frame stages behavior for the active subsystem.
+/// Implements the `serverFrameStages` operation for `miniquake.host_lifecycle_contract` (server frame stages).
+/// @param simulate The simulate input consumed by `serverFrameStages`.
 function serverFrameStages(simulate)
   stages = ["clear_datagram", "new_clients", "run_clients"]
   if simulate then stages = stages + ["physics"] end if
   return stages + ["send_messages"]
 end function
 
-// Provide map replace stages behavior for the active subsystem.
+/// Implements the `mapReplaceStages` operation for `miniquake.host_lifecycle_contract` (map replace stages).
 function mapReplaceStages()
   return [
     "stop_demo_loop", "disconnect_client", "shutdown_server",
@@ -62,7 +72,7 @@ function changeLevelStages()
   return ["save_spawnparms", "send_reconnect", "spawn_server", "restore_clients"]
 end function
 
-// Provide restart stages behavior for the active subsystem.
+/// Implements the `restartStages` operation for `miniquake.host_lifecycle_contract` (restart stages).
 function restartStages()
   return ["copy_mapname", "preserve_spawnparms", "spawn_server"]
 end function
@@ -91,7 +101,7 @@ function errorStages()
   ]
 end function
 
-// Report whether canonical text.
+/// Returns whether `miniquake.host_lifecycle_contract` can onical text.
 function canonicalText()
   text = "status=host_lifecycle_109_frozen_v1\n"
   text = text + "filter=rand,realtime,gate,clamp\n"
@@ -106,7 +116,8 @@ function canonicalText()
   return text
 end function
 
-// Return the stable compatibility-contract fingerprint.
+/// Returns the compatibility fingerprint for `miniquake.host_lifecycle_contract`.
+/// @param text Text to parse or process.
 function fingerprint(text)
   hash = 2166136261
   for each value in bytes(text)
@@ -115,7 +126,7 @@ function fingerprint(text)
   return hash
 end function
 
-// Validate the requested value and report any invalid state.
+/// Implements the `verify` operation for `miniquake.host_lifecycle_contract` (verify).
 function verify()
   return fingerprint(canonicalText()) == CONTRACT_FINGERPRINT
 end function

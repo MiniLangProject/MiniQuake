@@ -23,53 +23,105 @@ import miniquake.gl_vidnt as glvid
 import std.fs as fs
 import miniquake.render_ui_contract as renderUiContract
 
+/// Tracks the module-level scr copytop state owned by `miniquake.screen`.
 scr_copytop = 0
+/// Tracks the module-level scr copyeverything state owned by `miniquake.screen`.
 scr_copyeverything = 0
+/// Tracks the module-level scr con current state owned by `miniquake.screen`.
 scr_con_current = 0.0
+/// Tracks the module-level scr conlines state owned by `miniquake.screen`.
 scr_conlines = 0.0
+/// Tracks the module-level oldscreensize state owned by `miniquake.screen`.
 oldscreensize = -1.0
+/// Tracks the module-level oldfov state owned by `miniquake.screen`.
 oldfov = -1.0
+/// Tracks the module-level old refdef width state owned by `miniquake.screen`.
 oldRefdefWidth = -1
+/// Tracks the module-level old refdef height state owned by `miniquake.screen`.
 oldRefdefHeight = -1
+/// Tracks the module-level old refdef intermission state owned by `miniquake.screen`.
 oldRefdefIntermission = -1
+/// Tracks the module-level scr initialized state owned by `miniquake.screen`.
 scr_initialized = false
+/// Tracks the module-level scr ram state owned by `miniquake.screen`.
 scr_ram = void
+/// Tracks the module-level scr net state owned by `miniquake.screen`.
 scr_net = void
+/// Tracks the module-level scr turtle state owned by `miniquake.screen`.
 scr_turtle = void
+/// Tracks the module-level scr fullupdate state owned by `miniquake.screen`.
 scr_fullupdate = 0
+/// Tracks the module-level clearconsole state owned by `miniquake.screen`.
 clearconsole = 0
+/// Tracks the module-level clearnotify state owned by `miniquake.screen`.
 clearnotify = 0
+/// Tracks the module-level sb lines state owned by `miniquake.screen`.
 sb_lines = 0
+/// Tracks the module-level scr vrect state owned by `miniquake.screen`.
 scr_vrect = [0, 0, 320, 152, 90.0, 74.0]
+/// Tracks the module-level scr disabled for loading state owned by `miniquake.screen`.
 scr_disabled_for_loading = false
+/// Tracks the module-level scr drawloading state owned by `miniquake.screen`.
 scr_drawloading = false
+/// Tracks the module-level scr disabled time state owned by `miniquake.screen`.
 scr_disabled_time = 0.0
+/// Tracks the module-level scr loading pending state owned by `miniquake.screen`.
 scr_loading_pending = false
+/// Tracks the module-level scr loading warmup updates state owned by `miniquake.screen`.
 scr_loading_warmup_updates = 0
+/// Tracks the module-level block drawing state owned by `miniquake.screen`.
 block_drawing = false
+/// Tracks the module-level scr skipupdate state owned by `miniquake.screen`.
 scr_skipupdate = false
+/// Tracks the module-level scr centerstring state owned by `miniquake.screen`.
 scr_centerstring = ""
+/// Tracks the module-level scr centertime start state owned by `miniquake.screen`.
 scr_centertime_start = 0.0
+/// Tracks the module-level scr centertime off state owned by `miniquake.screen`.
 scr_centertime_off = 0.0
+/// Tracks the module-level scr center lines state owned by `miniquake.screen`.
 scr_center_lines = 0
+/// Tracks the module-level scr erase lines state owned by `miniquake.screen`.
 scr_erase_lines = 0
+/// Tracks the module-level scr erase center state owned by `miniquake.screen`.
 scr_erase_center = 0
+/// Tracks the module-level scr notifystring state owned by `miniquake.screen`.
 scr_notifystring = ""
+/// Tracks the module-level scr drawdialog state owned by `miniquake.screen`.
 scr_drawdialog = false
+/// Tracks the module-level scr turtle count state owned by `miniquake.screen`.
 scr_turtle_count = 0
+/// Tracks the module-level scr intermission state owned by `miniquake.screen`.
 scr_intermission = 0
+/// Tracks the module-level scr transition clear frames state owned by `miniquake.screen`.
 scr_transition_clear_frames = 0
+/// Tracks the module-level screen filesystem state owned by `miniquake.screen`.
 screenFilesystem = void
+/// Tracks the module-level screen registry state owned by `miniquake.screen`.
 screenRegistry = void
+/// Tracks the module-level screen client state owned by `miniquake.screen`.
 screenClient = void
+/// Tracks the module-level screen console state owned by `miniquake.screen`.
 screenConsole = void
+/// Tracks the module-level screen base palette state owned by `miniquake.screen`.
 screenBasePalette = void
+/// Tracks the module-level last screen commands state owned by `miniquake.screen`.
 lastScreenCommands = []
+/// Tracks the module-level screen command trace enabled state owned by `miniquake.screen`.
 screenCommandTraceEnabled = true
+/// Tracks the module-level screen realtime state owned by `miniquake.screen`.
 screenRealtime = 0.0
+/// Tracks the module-level screen video width state owned by `miniquake.screen`.
 screenVideoWidth = 320
 
-// Initialize state for initialize.
+/// Initializes ialize for `miniquake.screen`.
+/// @param consoleState Mutable state used by `initialize`.
+/// @param menuState Mutable state used by `initialize`.
+/// @param filesystem The filesystem input consumed by `initialize`.
+/// @param palette The palette input consumed by `initialize`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param registry The registry input consumed by `initialize`.
 function initialize(consoleState, menuState, filesystem, palette, width, height, registry)
   global screenConsole, screenBasePalette
   if consoleState is void then return false end if
@@ -106,14 +158,17 @@ function SCR_PrecachePictures()
   return len(paths)
 end function
 
-// Mirror Quake's SCR_ConfigureClient routine and its observable state changes.
+/// Mirror Quake's SCR_ConfigureClient routine and its observable state changes.
+/// @param clientState Mutable state used by `SCR_ConfigureClient`.
 function SCR_ConfigureClient(clientState)
   global screenClient
   screenClient = clientState
   return true
 end function
 
-// Release state for shutdown.
+/// Implements the `shutdown` operation for `miniquake.screen` (shutdown).
+/// @param consoleState Mutable state used by `shutdown`.
+/// @param menuState Mutable state used by `shutdown`.
 function shutdown(consoleState, menuState)
   global scr_initialized, scr_ram, scr_net, scr_turtle, screenFilesystem, screenRegistry, screenClient, screenConsole, screenBasePalette, scr_loading_warmup_updates
   if menuState is not void then menu.shutdown(menuState) end if
@@ -133,14 +188,19 @@ function shutdown(consoleState, menuState)
   return true
 end function
 
-// Render crosshair.
+/// Render crosshair.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function drawCrosshair(width, height)
   centerX = native.trunc(width * 0.5) - 4
   centerY = native.trunc(height * 0.5) - 4
   return draw.Draw_Character(centerX, centerY, 43)
 end function
 
-// Render blend.
+/// Render blend.
+/// @param viewState Mutable state used by `drawBlend`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function drawBlend(viewState, width, height)
   if viewState is void or len(viewState.blend) < 4 or viewState.blend[3] <= 0.0 then return false end if
   red = native.trunc(viewState.blend[0] * 255.0)
@@ -151,7 +211,13 @@ function drawBlend(viewState, width, height)
   return true
 end function
 
-// Render hud.
+/// Render hud.
+/// @param consoleState Mutable state used by `drawHud`.
+/// @param menuState Mutable state used by `drawHud`.
+/// @param player The player input consumed by `drawHud`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param registry The registry input consumed by `drawHud`.
 function drawHud(consoleState, menuState, player, width, height, registry)
   if consoleState is void or consoleState.textureId == 0 then return false end if
   viewSize = 100.0
@@ -162,7 +228,10 @@ function drawHud(consoleState, menuState, player, width, height, registry)
 end function
 
 
-// Render notify.
+/// Render notify.
+/// @param consoleState Mutable state used by `drawNotify`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function drawNotify(consoleState, width, height)
   if consoleState is void or consoleState.textureId == 0 or consoleState.active then return false end if
   scale = renderUiContract.consoleScale(width, height)
@@ -196,7 +265,10 @@ function drawNotify(consoleState, width, height)
   return true
 end function
 
-// Render center.
+/// Render center.
+/// @param consoleState Mutable state used by `drawCenter`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function drawCenter(consoleState, width, height)
   if consoleState is void or consoleState.textureId == 0 or consoleState.centerText == "" then return false end if
   data = bytes(consoleState.centerText)
@@ -224,9 +296,11 @@ function drawCenter(consoleState, width, height)
   return true
 end function
 
-// =============================================================================
-// gl_screen.c compatibility surface
-// =============================================================================
+/// =============================================================================
+/// gl_screen.c compatibility surface
+/// =============================================================================
+/// @param name Stable name that identifies the requested object or option.
+/// @param fallback Value to use when the requested input is unavailable or invalid.
 
 function screenCvar(name, fallback)
   if screenRegistry is void then return fallback end if
@@ -235,7 +309,10 @@ function screenCvar(name, fallback)
   return variable.value
 end function
 
-// Mirror Quake's SCR_CenterPrint routine and its observable state changes.
+/// Mirror Quake's SCR_CenterPrint routine and its observable state changes.
+/// @param consoleState Mutable state used by `SCR_CenterPrint`.
+/// @param text Text to parse or process.
+/// @param currentTime Time value used by the operation.
 function SCR_CenterPrint(consoleState, text, currentTime)
   global scr_centerstring, scr_centertime_off, scr_centertime_start, scr_center_lines
   data = bytes(text)
@@ -257,7 +334,12 @@ function SCR_CenterPrint(consoleState, text, currentTime)
   return scr_center_lines
 end function
 
-// Provide center string trace behavior for the active subsystem.
+/// Implements the `CenterStringTrace` operation for `miniquake.screen` (center string trace).
+/// @param text Text to parse or process.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param lineCount Number of entries or units to process.
+/// @param remaining The remaining input consumed by `CenterStringTrace`.
 function CenterStringTrace(text, width, height, lineCount, remaining)
   commands = []
   source = bytes(text)
@@ -286,7 +368,10 @@ function CenterStringTrace(text, width, height, lineCount, remaining)
   return commands
 end function
 
-// Mirror Quake's SCR_DrawCenterString routine and its observable state changes.
+/// Mirror Quake's SCR_DrawCenterString routine and its observable state changes.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param currentTime Time value used by the operation.
 function SCR_DrawCenterString(width, height, currentTime)
   global scr_erase_center
   remaining = 9999
@@ -325,7 +410,12 @@ function SCR_DrawCenterString(width, height, currentTime)
   return len(commands)
 end function
 
-// Mirror Quake's SCR_CheckDrawCenterString routine and its observable state changes.
+/// Mirror Quake's SCR_CheckDrawCenterString routine and its observable state changes.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param currentTime Time value used by the operation.
+/// @param frameTime Time value used by the operation.
+/// @param gameInput The game input input consumed by `SCR_CheckDrawCenterString`.
 function SCR_CheckDrawCenterString(width, height, currentTime, frameTime, gameInput)
   global scr_copytop, scr_erase_lines, scr_centertime_off
   scr_copytop = 1
@@ -336,7 +426,10 @@ function SCR_CheckDrawCenterString(width, height, currentTime, frameTime, gameIn
   return SCR_DrawCenterString(width, height, currentTime)
 end function
 
-// Provide calc fov behavior for the active subsystem.
+/// Implements the `CalcFov` operation for `miniquake.screen` (calc fov).
+/// @param fov_x The fov x input consumed by `CalcFov`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function CalcFov(fov_x, width, height)
   if fov_x < 1.0 or fov_x > 179.0 then return error(3400, "Bad fov: " + fov_x) end if
   halfAngle = fov_x * math.DEG_TO_RAD * 0.5
@@ -345,7 +438,11 @@ function CalcFov(fov_x, width, height)
   return math.atan2(height, x) * 2.0 * math.RAD_TO_DEG
 end function
 
-// Mirror Quake's SCR_CalcRefdef routine and its observable state changes.
+/// Mirror Quake's SCR_CalcRefdef routine and its observable state changes.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param registry The registry input consumed by `SCR_CalcRefdef`.
+/// @param intermission The intermission input consumed by `SCR_CalcRefdef`.
 function SCR_CalcRefdef(width, height, registry, intermission)
   global scr_fullupdate, sb_lines, scr_vrect, oldscreensize, oldfov, screenRegistry
   global oldRefdefWidth, oldRefdefHeight, oldRefdefIntermission, scr_transition_clear_frames
@@ -395,13 +492,15 @@ function SCR_CalcRefdef(width, height, registry, intermission)
   return scr_vrect
 end function
 
-// Mirror Quake's SCR_SizeUp_f routine and its observable state changes.
+/// Mirror Quake's SCR_SizeUp_f routine and its observable state changes.
+/// @param registry The registry input consumed by `SCR_SizeUp_f`.
 function SCR_SizeUp_f(registry)
   if registry is void then return false end if
   return cvar.setValue(registry, "viewsize", cvar.variableValue(registry, "viewsize") + 10.0)
 end function
 
-// Mirror Quake's SCR_SizeDown_f routine and its observable state changes.
+/// Mirror Quake's SCR_SizeDown_f routine and its observable state changes.
+/// @param registry The registry input consumed by `SCR_SizeDown_f`.
 function SCR_SizeDown_f(registry)
   if registry is void then return false end if
   return cvar.setValue(registry, "viewsize", cvar.variableValue(registry, "viewsize") - 10.0)
@@ -417,7 +516,11 @@ function SCR_SizeDown()
   return SCR_SizeDown_f(screenRegistry)
 end function
 
-// Mirror Quake's SCR_Init routine and its observable state changes.
+/// Mirror Quake's SCR_Init routine and its observable state changes.
+/// @param filesystem The filesystem input consumed by `SCR_Init`.
+/// @param registry The registry input consumed by `SCR_Init`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function SCR_Init(filesystem, registry, width, height)
   global scr_initialized, scr_ram, scr_net, scr_turtle, screenFilesystem, screenRegistry, screenVideoWidth, scr_loading_warmup_updates
   screenFilesystem = filesystem
@@ -436,10 +539,14 @@ function SCR_Init(filesystem, registry, width, height)
   return true
 end function
 
-// scr_conspeed is expressed in the original UI's logical pixels per second.
-// The console itself is enlarged by an integral factor on high-resolution
-// displays, so its physical travel must use that same factor. Otherwise a
-// 1080p/4K console takes two to four times as long to open or close.
+/// scr_conspeed is expressed in the original UI's logical pixels per second.
+/// The console itself is enlarged by an integral factor on high-resolution
+/// displays, so its physical travel must use that same factor. Otherwise a
+/// 1080p/4K console takes two to four times as long to open or close.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param frameTime Time value used by the operation.
+/// @param registry The registry input consumed by `SCR_ConsoleSlidePixels`.
 function SCR_ConsoleSlidePixels(width, height, frameTime, registry)
   if registry is not void then
     variable = cvar.find(registry, "scr_conspeed")
@@ -448,13 +555,15 @@ function SCR_ConsoleSlidePixels(width, height, frameTime, registry)
   return 300.0 * frameTime * renderUiContract.consoleScale(width, height)
 end function
 
-// Mirror Quake's SCR_DrawRam routine and its observable state changes.
+/// Mirror Quake's SCR_DrawRam routine and its observable state changes.
+/// @param cacheThrash The cache thrash input consumed by `SCR_DrawRam`.
 function SCR_DrawRam(cacheThrash)
   if screenCvar("showram", 1.0) == 0.0 or not cacheThrash or scr_ram is void then return false end if
   return draw.Draw_Pic(scr_vrect[0] + 32, scr_vrect[1], scr_ram)
 end function
 
-// Mirror Quake's SCR_DrawTurtle routine and its observable state changes.
+/// Mirror Quake's SCR_DrawTurtle routine and its observable state changes.
+/// @param frameTime Time value used by the operation.
 function SCR_DrawTurtle(frameTime)
   global scr_turtle_count
   if screenCvar("showturtle", 0.0) == 0.0 or scr_turtle is void then return false end if
@@ -464,21 +573,34 @@ function SCR_DrawTurtle(frameTime)
   return draw.Draw_Pic(scr_vrect[0], scr_vrect[1], scr_turtle)
 end function
 
-// Mirror Quake's SCR_ShouldDrawNet routine and its observable state changes.
+/// Mirror Quake's SCR_ShouldDrawNet routine and its observable state changes.
+/// @param realtime Time value used by the operation.
+/// @param lastMessageTime Time value used by the operation.
+/// @param demoPlayback The demo playback input consumed by `SCR_ShouldDrawNet`.
+/// @param connected The connected input consumed by `SCR_ShouldDrawNet`.
+/// @param localServerActive The local server active input consumed by `SCR_ShouldDrawNet`.
 function inline SCR_ShouldDrawNet(realtime, lastMessageTime, demoPlayback, connected, localServerActive)
   if not connected or localServerActive or demoPlayback then return false end if
   if lastMessageTime <= 0.0 or realtime - lastMessageTime < 0.3 then return false end if
   return true
 end function
 
-// Mirror Quake's SCR_DrawNet routine and its observable state changes.
+/// Mirror Quake's SCR_DrawNet routine and its observable state changes.
+/// @param realtime Time value used by the operation.
+/// @param lastMessageTime Time value used by the operation.
+/// @param demoPlayback The demo playback input consumed by `SCR_DrawNet`.
+/// @param connected The connected input consumed by `SCR_DrawNet`.
+/// @param localServerActive The local server active input consumed by `SCR_DrawNet`.
 function SCR_DrawNet(realtime, lastMessageTime, demoPlayback, connected, localServerActive)
   if not SCR_ShouldDrawNet(realtime, lastMessageTime, demoPlayback, connected, localServerActive) then return false end if
   if scr_net is void then return false end if
   return draw.Draw_Pic(scr_vrect[0] + 64, scr_vrect[1], scr_net)
 end function
 
-// Mirror Quake's SCR_DrawPause routine and its observable state changes.
+/// Mirror Quake's SCR_DrawPause routine and its observable state changes.
+/// @param paused The paused input consumed by `SCR_DrawPause`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function SCR_DrawPause(paused, width, height)
   if screenCvar("showpause", 1.0) == 0.0 or not paused then return false end if
   picture = try(draw.Draw_CachePic("gfx/pause.lmp"))
@@ -486,7 +608,9 @@ function SCR_DrawPause(paused, width, height)
   return draw.Draw_Pic(native.trunc((width - picture.width) / 2), native.trunc((height - 48 - picture.height) / 2), picture)
 end function
 
-// Mirror Quake's SCR_DrawLoading routine and its observable state changes.
+/// Mirror Quake's SCR_DrawLoading routine and its observable state changes.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function SCR_DrawLoading(width, height)
   if not scr_drawloading then return false end if
   picture = try(draw.Draw_CachePic("gfx/loading.lmp"))
@@ -494,7 +618,14 @@ function SCR_DrawLoading(width, height)
   return draw.Draw_Pic(native.trunc((width - picture.width) / 2), native.trunc((height - 48 - picture.height) / 2), picture)
 end function
 
-// Mirror Quake's SCR_SetUpToDrawConsole routine and its observable state changes.
+/// Mirror Quake's SCR_SetUpToDrawConsole routine and its observable state changes.
+/// @param consoleState Mutable state used by `SCR_SetUpToDrawConsole`.
+/// @param height Requested height in pixels or data units.
+/// @param frameTime Time value used by the operation.
+/// @param registry The registry input consumed by `SCR_SetUpToDrawConsole`.
+/// @param forcedUp The forced up input consumed by `SCR_SetUpToDrawConsole`.
+/// @param consoleInput The console input input consumed by `SCR_SetUpToDrawConsole`.
+/// @param numPages The num pages input consumed by `SCR_SetUpToDrawConsole`.
 function SCR_SetUpToDrawConsole(consoleState, height, frameTime, registry, forcedUp, consoleInput, numPages)
   global scr_conlines, scr_con_current, clearconsole, clearnotify, screenRegistry, screenVideoWidth
   if registry is not void then screenRegistry = registry end if
@@ -526,7 +657,11 @@ function SCR_SetUpToDrawConsole(consoleState, height, frameTime, registry, force
   return scr_con_current
 end function
 
-// Render console height.
+/// Render console height.
+/// @param consoleState Mutable state used by `drawConsoleHeight`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param visibleHeight The visible height input consumed by `drawConsoleHeight`.
 function drawConsoleHeight(consoleState, width, height, visibleHeight)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if consoleState is void or consoleState.textureId == 0 or visibleHeight <= 0 then return false end if
@@ -570,7 +705,11 @@ function drawConsoleHeight(consoleState, width, height, visibleHeight)
   return true
 end function
 
-// Mirror Quake's SCR_DrawConsole routine and its observable state changes.
+/// Mirror Quake's SCR_DrawConsole routine and its observable state changes.
+/// @param consoleState Mutable state used by `SCR_DrawConsole`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param gameOrMessageInput The game or message input input consumed by `SCR_DrawConsole`.
 function SCR_DrawConsole(consoleState, width, height, gameOrMessageInput)
   global scr_copyeverything, clearconsole
   if scr_con_current > 0.0 then
@@ -583,7 +722,10 @@ function SCR_DrawConsole(consoleState, width, height, gameOrMessageInput)
   return "none"
 end function
 
-// Create and initialize tga.
+/// Create and initialize tga.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param rgba The rgba input consumed by `BuildTga`.
 function BuildTga(width, height, rgba)
   if width <= 0 or height <= 0 or len(rgba) < width * height * 4 then return error(3401, "SCR_ScreenShot_f: invalid framebuffer") end if
   output = bytes(renderUiContract.tgaByteLength(width, height))
@@ -605,7 +747,8 @@ function BuildTga(width, height, rgba)
   return output
 end function
 
-// Return screenshot name derived from the active module state.
+/// Return screenshot name derived from the active module state.
+/// @param filesystem The filesystem input consumed by `screenshotName`.
 function screenshotName(filesystem)
   index = 0
   while index <= 99
@@ -624,7 +767,12 @@ function SCR_ScreenshotFailure()
   return error(3402, "SCR_ScreenShot_f: Couldn't create a PCX file")
 end function
 
-// Mirror Quake's SCR_ScreenShot_f routine and its observable state changes.
+/// Mirror Quake's SCR_ScreenShot_f routine and its observable state changes.
+/// @param filesystem The filesystem input consumed by `SCR_ScreenShot_f`.
+/// @param x The x input consumed by `SCR_ScreenShot_f`.
+/// @param y The y input consumed by `SCR_ScreenShot_f`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function SCR_ScreenShot_f(filesystem, x, y, width, height)
   name = screenshotName(filesystem)
   if name == "" then return SCR_ScreenshotFailure() end if
@@ -636,7 +784,11 @@ function SCR_ScreenShot_f(filesystem, x, y, width, height)
   return name
 end function
 
-// Mirror Quake's SCR_BeginLoadingPlaque routine and its observable state changes.
+/// Mirror Quake's SCR_BeginLoadingPlaque routine and its observable state changes.
+/// @param consoleState Mutable state used by `SCR_BeginLoadingPlaque`.
+/// @param realtime Time value used by the operation.
+/// @param connected The connected input consumed by `SCR_BeginLoadingPlaque`.
+/// @param signon The signon input consumed by `SCR_BeginLoadingPlaque`.
 function SCR_BeginLoadingPlaque(consoleState, realtime, connected, signon)
   global scr_drawloading, scr_fullupdate, scr_disabled_for_loading, scr_disabled_time, scr_centertime_off, scr_con_current, scr_loading_pending, scr_loading_warmup_updates
   if not connected or signon != c.SIGNONS then return false end if
@@ -653,7 +805,8 @@ function SCR_BeginLoadingPlaque(consoleState, realtime, connected, signon)
   return true
 end function
 
-// Mirror Quake's SCR_EndLoadingPlaque routine and its observable state changes.
+/// Mirror Quake's SCR_EndLoadingPlaque routine and its observable state changes.
+/// @param consoleState Mutable state used by `SCR_EndLoadingPlaque`.
 function SCR_EndLoadingPlaque(consoleState)
   global scr_disabled_for_loading, scr_drawloading, scr_fullupdate, scr_loading_pending, scr_loading_warmup_updates
   scr_disabled_for_loading = false
@@ -665,10 +818,11 @@ function SCR_EndLoadingPlaque(consoleState)
   return true
 end function
 
-// Keep the plaque over a small number of ordinary Host_Frame updates. These
-// frames perform the unavoidable first QuakeC/server and GPU-driver work in
-// normal order, but their final swap still shows LOADING instead of a hitch in
-// playable output. No extra frames are simulated.
+/// Keep the plaque over a small number of ordinary Host_Frame updates. These
+/// frames perform the unavoidable first QuakeC/server and GPU-driver work in
+/// normal order, but their final swap still shows LOADING instead of a hitch in
+/// playable output. No extra frames are simulated.
+/// @param count Number of entries or units to process.
 function SCR_FinishLoadingAfterUpdates(count)
   global scr_drawloading, scr_loading_pending, scr_loading_warmup_updates, scr_disabled_for_loading
   if count < 1 then return SCR_EndLoadingPlaque(screenConsole) end if
@@ -679,7 +833,9 @@ function SCR_FinishLoadingAfterUpdates(count)
   return count
 end function
 
-// Mirror Quake's SCR_DrawNotifyString routine and its observable state changes.
+/// Mirror Quake's SCR_DrawNotifyString routine and its observable state changes.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function SCR_DrawNotifyString(width, height)
   transform = menu.layout(width, height)
   if transform[2] <= 1.0 then
@@ -711,8 +867,11 @@ function SCR_DrawNotifyString(width, height)
   return len(commands)
 end function
 
-// The original blocks in a platform event loop.  MiniLang's host owns that
-// loop, so a key code is supplied when available; void means "still pending".
+/// The original blocks in a platform event loop.  MiniLang's host owns that
+/// loop, so a key code is supplied when available; void means "still pending".
+/// @param text Text to parse or process.
+/// @param keyCode The key code input consumed by `SCR_ModalMessage`.
+/// @param dedicated The dedicated input consumed by `SCR_ModalMessage`.
 function SCR_ModalMessage(text, keyCode, dedicated)
   global scr_notifystring, scr_drawdialog, scr_fullupdate
   if dedicated then return true end if
@@ -725,7 +884,12 @@ function SCR_ModalMessage(text, keyCode, dedicated)
   return void
 end function
 
-// Mirror Quake's SCR_BringDownConsole routine and its observable state changes.
+/// Mirror Quake's SCR_BringDownConsole routine and its observable state changes.
+/// @param consoleState Mutable state used by `SCR_BringDownConsole`.
+/// @param height Requested height in pixels or data units.
+/// @param frameTime Time value used by the operation.
+/// @param registry The registry input consumed by `SCR_BringDownConsole`.
+/// @param viewState Mutable state used by `SCR_BringDownConsole`.
 function SCR_BringDownConsole(consoleState, height, frameTime, registry, viewState)
   global scr_centertime_off
   scr_centertime_off = 0.0
@@ -739,7 +903,9 @@ function SCR_BringDownConsole(consoleState, height, frameTime, registry, viewSta
   return steps
 end function
 
-// Mirror Quake's SCR_TileClear routine and its observable state changes.
+/// Mirror Quake's SCR_TileClear routine and its observable state changes.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function SCR_TileClear(width, height)
   commands = []
   x = scr_vrect[0]
@@ -765,7 +931,11 @@ function SCR_TileClear(width, height)
   return commands
 end function
 
-// Mirror Quake's SCR_SetIntermission routine and its observable state changes.
+/// Mirror Quake's SCR_SetIntermission routine and its observable state changes.
+/// @param mode The mode input consumed by `SCR_SetIntermission`.
+/// @param text Text to parse or process.
+/// @param consoleState Mutable state used by `SCR_SetIntermission`.
+/// @param currentTime Time value used by the operation.
 function SCR_SetIntermission(mode, text, consoleState, currentTime)
   global scr_intermission, scr_fullupdate, scr_transition_clear_frames
   if mode != scr_intermission then
@@ -793,29 +963,34 @@ function inline SCR_IntermissionMode()
   return scr_intermission
 end function
 
-// Deterministic differential hooks. They expose logical C globals without
-// putting renderer or platform behavior into the native bridge.
+/// Deterministic differential hooks. They expose logical C globals without
+/// putting renderer or platform behavior into the native bridge.
+/// @param value Value consumed by `SCR_DifferentialSetEraseLines`.
 function SCR_DifferentialSetEraseLines(value)
   global scr_erase_lines
   scr_erase_lines = value
   return value
 end function
 
-// Mirror Quake's SCR_DifferentialSetTurtleCount routine and its observable state changes.
+/// Mirror Quake's SCR_DifferentialSetTurtleCount routine and its observable state changes.
+/// @param value Value consumed by `SCR_DifferentialSetTurtleCount`.
 function SCR_DifferentialSetTurtleCount(value)
   global scr_turtle_count
   scr_turtle_count = value
   return value
 end function
 
-// Mirror Quake's SCR_DifferentialSetDrawLoading routine and its observable state changes.
+/// Mirror Quake's SCR_DifferentialSetDrawLoading routine and its observable state changes.
+/// @param value Value consumed by `SCR_DifferentialSetDrawLoading`.
 function SCR_DifferentialSetDrawLoading(value)
   global scr_drawloading
   scr_drawloading = value
   return value
 end function
 
-// Mirror Quake's SCR_DifferentialSetConsole routine and its observable state changes.
+/// Mirror Quake's SCR_DifferentialSetConsole routine and its observable state changes.
+/// @param current The current input consumed by `SCR_DifferentialSetConsole`.
+/// @param lines The lines input consumed by `SCR_DifferentialSetConsole`.
 function SCR_DifferentialSetConsole(current, lines)
   global scr_con_current, scr_conlines
   scr_con_current = current
@@ -823,14 +998,17 @@ function SCR_DifferentialSetConsole(current, lines)
   return current
 end function
 
-// Mirror Quake's SCR_DifferentialSetNotify routine and its observable state changes.
+/// Mirror Quake's SCR_DifferentialSetNotify routine and its observable state changes.
+/// @param text Text to parse or process.
 function SCR_DifferentialSetNotify(text)
   global scr_notifystring
   scr_notifystring = text
   return text
 end function
 
-// Mirror Quake's SCR_DifferentialSetTile routine and its observable state changes.
+/// Mirror Quake's SCR_DifferentialSetTile routine and its observable state changes.
+/// @param viewRectangle The view rectangle input consumed by `SCR_DifferentialSetTile`.
+/// @param statusLines The status lines input consumed by `SCR_DifferentialSetTile`.
 function SCR_DifferentialSetTile(viewRectangle, statusLines)
   global scr_vrect, sb_lines
   scr_vrect = viewRectangle
@@ -838,15 +1016,17 @@ function SCR_DifferentialSetTile(viewRectangle, statusLines)
   return scr_vrect
 end function
 
-// Mirror Quake's SCR_DifferentialSetBlocked routine and its observable state changes.
+/// Mirror Quake's SCR_DifferentialSetBlocked routine and its observable state changes.
+/// @param value Value consumed by `SCR_DifferentialSetBlocked`.
 function SCR_DifferentialSetBlocked(value)
   global block_drawing
   block_drawing = value
   return block_drawing
 end function
 
-// Set the initialized flag for deterministic guard-order fixtures. Production
-// startup continues to own this state through SCR_Init and shutdown.
+/// Set the initialized flag for deterministic guard-order fixtures. Production
+/// startup continues to own this state through SCR_Init and shutdown.
+/// @param value Value consumed by `SCR_DifferentialSetInitialized`.
 function SCR_DifferentialSetInitialized(value)
   global scr_initialized
   scr_initialized = value
@@ -876,7 +1056,8 @@ function SCR_DifferentialState()
   ]
 end function
 
-// Mirror Quake's SCR_ShouldSkipUpdate routine and its observable state changes.
+/// Mirror Quake's SCR_ShouldSkipUpdate routine and its observable state changes.
+/// @param realtime Time value used by the operation.
 function SCR_ShouldSkipUpdate(realtime)
   global scr_disabled_for_loading
   if block_drawing or scr_skipupdate then return true end if
@@ -894,13 +1075,14 @@ function SCR_ShouldSkipUpdate(realtime)
   return true
 end function
 
-// Provide screen command trace behavior for the active subsystem.
+/// Implements the `ScreenCommandTrace` operation for `miniquake.screen` (screen command trace).
 function ScreenCommandTrace()
   return lastScreenCommands
 end function
 
-// Enable command recording for differential fixtures. The production host
-// disables this diagnostic-only allocation stream after creating a session.
+/// Enable command recording for differential fixtures. The production host
+/// disables this diagnostic-only allocation stream after creating a session.
+/// @param enabled Whether the optional behavior is enabled.
 function SCR_SetCommandTraceEnabled(enabled)
   global screenCommandTraceEnabled, lastScreenCommands
   screenCommandTraceEnabled = enabled
@@ -915,12 +1097,36 @@ function SCR_UpdateWholeScreen()
   return true
 end function
 
-// Provide screen overlay order behavior for the active subsystem.
+/// Implements the `ScreenOverlayOrder` operation for `miniquake.screen` (screen overlay order).
+/// @param dialog The dialog input consumed by `ScreenOverlayOrder`.
+/// @param loading The loading input consumed by `ScreenOverlayOrder`.
+/// @param intermission The intermission input consumed by `ScreenOverlayOrder`.
+/// @param gameInput The game input input consumed by `ScreenOverlayOrder`.
 function ScreenOverlayOrder(dialog, loading, intermission, gameInput)
   return renderUiContract.overlayOrder(dialog, loading, intermission, gameInput)
 end function
 
-// Mirror Quake's SCR_UpdateScreen routine and its observable state changes.
+/// Mirror Quake's SCR_UpdateScreen routine and its observable state changes.
+/// @param consoleState Mutable state used by `SCR_UpdateScreen`.
+/// @param menuState Mutable state used by `SCR_UpdateScreen`.
+/// @param viewState Mutable state used by `SCR_UpdateScreen`.
+/// @param player The player input consumed by `SCR_UpdateScreen`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param mapName Name of the map to load or inspect.
+/// @param showCrosshair The show crosshair input consumed by `SCR_UpdateScreen`.
+/// @param realtime Time value used by the operation.
+/// @param frameTime Time value used by the operation.
+/// @param registry The registry input consumed by `SCR_UpdateScreen`.
+/// @param connected The connected input consumed by `SCR_UpdateScreen`.
+/// @param localServerActive The local server active input consumed by `SCR_UpdateScreen`.
+/// @param signon The signon input consumed by `SCR_UpdateScreen`.
+/// @param paused The paused input consumed by `SCR_UpdateScreen`.
+/// @param lastMessageTime Time value used by the operation.
+/// @param demoPlayback The demo playback input consumed by `SCR_UpdateScreen`.
+/// @param cacheThrash The cache thrash input consumed by `SCR_UpdateScreen`.
+/// @param gameInput The game input input consumed by `SCR_UpdateScreen`.
+/// @param consoleInput The console input input consumed by `SCR_UpdateScreen`.
 function SCR_UpdateScreen(
   consoleState,
   menuState,
@@ -1048,7 +1254,17 @@ function SCR_UpdateScreen(
   return lastScreenCommands
 end function
 
-// Render the requested value.
+/// Implements the `render` operation for `miniquake.screen` (render).
+/// @param consoleState Mutable state used by `render`.
+/// @param menuState Mutable state used by `render`.
+/// @param viewState Mutable state used by `render`.
+/// @param player The player input consumed by `render`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param mapName Name of the map to load or inspect.
+/// @param showCrosshair The show crosshair input consumed by `render`.
+/// @param realtime Time value used by the operation.
+/// @param registry The registry input consumed by `render`.
 function render(consoleState, menuState, viewState, player, width, height, mapName, showCrosshair, realtime, registry)
   global screenRealtime
   screenRealtime = realtime

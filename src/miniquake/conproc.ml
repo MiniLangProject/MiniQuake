@@ -11,40 +11,63 @@ package miniquake.conproc
 
 import miniquake.native as native
 
+/// Defines the ccom write text value used by `miniquake.conproc`.
 const CCOM_WRITE_TEXT = 0x2
+/// Defines the ccom get text value used by `miniquake.conproc`.
 const CCOM_GET_TEXT = 0x3
+/// Defines the ccom get scr lines value used by `miniquake.conproc`.
 const CCOM_GET_SCR_LINES = 0x4
+/// Defines the ccom set scr lines value used by `miniquake.conproc`.
 const CCOM_SET_SCR_LINES = 0x5
+/// Defines the infinite value used by `miniquake.conproc`.
 const INFINITE = 0xffffffff
 
 // Track mutable con proc state across subsystem calls.
 struct ConProcState
+  /// Stores the file buffer value in `miniquake.conproc.ConProcState`.
   fileBuffer
+  /// Stores the parent send value in `miniquake.conproc.ConProcState`.
   parentSend
+  /// Stores the child send value in `miniquake.conproc.ConProcState`.
   childSend
+  /// Stores the event done value in `miniquake.conproc.ConProcState`.
   eventDone
+  /// Stores the active value in `miniquake.conproc.ConProcState`.
   active
+  /// Stores the use native value in `miniquake.conproc.ConProcState`.
   useNative
+  /// Stores the mapped buffer value in `miniquake.conproc.ConProcState`.
   mappedBuffer
+  /// Stores the test buffer value in `miniquake.conproc.ConProcState`.
   testBuffer
+  /// Stores the screen width value in `miniquake.conproc.ConProcState`.
   screenWidth
+  /// Stores the screen height value in `miniquake.conproc.ConProcState`.
   screenHeight
+  /// Stores the maximum width value in `miniquake.conproc.ConProcState`.
   maximumWidth
+  /// Stores the maximum height value in `miniquake.conproc.ConProcState`.
   maximumHeight
+  /// Stores the console lines value in `miniquake.conproc.ConProcState`.
   consoleLines
+  /// Stores the input events value in `miniquake.conproc.ConProcState`.
   inputEvents
+  /// Stores the last error value in `miniquake.conproc.ConProcState`.
   lastError
+  /// Stores the requests value in `miniquake.conproc.ConProcState`.
   requests
 end struct
 
+/// Tracks the module-level console-process state owned by `miniquake.conproc`.
 conProcState = void
 
-// Create and initialize state.
+/// Creates state for `miniquake.conproc`.
 function createState()
   return ConProcState(0, 0, 0, 0, false, false, void, void, 80, 25, 200, 200, [], [], "", 0)
 end function
 
-// Mirror Quake's ConProc_UseState routine and its observable state changes.
+/// Mirror Quake's ConProc_UseState routine and its observable state changes.
+/// @param state Mutable `miniquake.conproc` state used by `ConProc_UseState`.
 function ConProc_UseState(state)
   global conProcState
   conProcState = state
@@ -58,7 +81,11 @@ function ConProc_State()
   return conProcState
 end function
 
-// Initialize state for init con proc.
+/// Initialize state for init con proc.
+/// @param fileHandle The file handle input consumed by `InitConProc`.
+/// @param parentEvent The parent event input consumed by `InitConProc`.
+/// @param childEvent The child event input consumed by `InitConProc`.
+/// @param useNative The use native input consumed by `InitConProc`.
 function InitConProc(fileHandle, parentEvent, childEvent, useNative)
   state = createState()
   ConProc_UseState(state)
@@ -86,7 +113,8 @@ function DeinitConProc()
   return true
 end function
 
-// Return mapped buffer.
+/// Return mapped buffer.
+/// @param fileHandle The file handle input consumed by `GetMappedBuffer`.
 function GetMappedBuffer(fileHandle)
   state = ConProc_State()
   if state.testBuffer is not void then state.mappedBuffer = state.testBuffer; return state.testBuffer end if
@@ -95,7 +123,8 @@ function GetMappedBuffer(fileHandle)
   return state.mappedBuffer
 end function
 
-// Release or remove state for mapped buffer.
+/// Release or remove state for mapped buffer.
+/// @param mapped The mapped input consumed by `ReleaseMappedBuffer`.
 function ReleaseMappedBuffer(mapped)
   state = ConProc_State()
   if mapped is void then return false end if
@@ -114,12 +143,15 @@ function GetScreenBufferLines()
   return state.screenHeight
 end function
 
-// Update module state for screen buffer lines.
+/// Update module state for screen buffer lines.
+/// @param lines The lines input consumed by `SetScreenBufferLines`.
 function SetScreenBufferLines(lines)
   return SetConsoleCXCY(0, 80, lines)
 end function
 
-// Provide padded line behavior for the active subsystem.
+/// Implements the `paddedLine` operation for `miniquake.conproc` (padded line).
+/// @param text Text to parse or process.
+/// @param width Requested width in pixels or data units.
 function paddedLine(text, width)
   source = bytes(text)
   output = bytes(width)
@@ -132,7 +164,9 @@ function paddedLine(text, width)
   return decode(output)
 end function
 
-// Read and validate text.
+/// Reads text for `miniquake.conproc`.
+/// @param beginLine The begin line input consumed by `ReadText`.
+/// @param endLine The end line input consumed by `ReadText`.
 function ReadText(beginLine, endLine)
   state = ConProc_State()
   if endLine < beginLine then return "" end if
@@ -148,13 +182,15 @@ function ReadText(beginLine, endLine)
   return result
 end function
 
-// Provide ascii upper behavior for the active subsystem.
+/// Implements the `asciiUpper` operation for `miniquake.conproc` (ascii upper).
+/// @param code The code input consumed by `asciiUpper`.
 function asciiUpper(code)
   if code >= 97 and code <= 122 then return code - 32 end if
   return code
 end function
 
-// Provide char to code behavior for the active subsystem.
+/// Implements the `CharToCode` operation for `miniquake.conproc` (char to code).
+/// @param character The character input consumed by `CharToCode`.
 function CharToCode(character)
   if character == 13 then return 28 end if
   upper = asciiUpper(character)
@@ -163,7 +199,8 @@ function CharToCode(character)
   return character
 end function
 
-// Encode and write text.
+/// Writes text for `miniquake.conproc`.
+/// @param text Text to parse or process.
 function WriteText(text)
   state = ConProc_State()
   source = bytes(text)
@@ -192,7 +229,10 @@ function WriteText(text)
   return true
 end function
 
-// Update module state for console cxcy.
+/// Update module state for console cxcy.
+/// @param stdoutHandle The stdout handle input consumed by `SetConsoleCXCY`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function SetConsoleCXCY(stdoutHandle, width, height)
   state = ConProc_State()
   if width < 1 or height < 1 then return false end if
@@ -204,7 +244,8 @@ function SetConsoleCXCY(stdoutHandle, width, height)
   return true
 end function
 
-// Execute test request.
+/// Execute test request.
+/// @param state Mutable `miniquake.conproc` state used by `processTestRequest`.
 function processTestRequest(state)
   buffer = state.testBuffer
   if buffer is void or len(buffer) == 0 then return false end if
@@ -226,7 +267,9 @@ function processTestRequest(state)
   return true
 end function
 
-// Execute native request.
+/// Execute native request.
+/// @param state Mutable `miniquake.conproc` state used by `processNativeRequest`.
+/// @param mapped The mapped input consumed by `processNativeRequest`.
 function processNativeRequest(state, mapped)
   command = native.conprocReadI32(mapped, 0)
   success = false
@@ -250,7 +293,8 @@ function processNativeRequest(state, mapped)
   return success
 end function
 
-// Provide request proc behavior for the active subsystem.
+/// Implements the `RequestProc` operation for `miniquake.conproc` (request proc).
+/// @param block The block input consumed by `RequestProc`.
 function RequestProc(block)
   state = ConProc_State()
   if not state.active then return false end if
@@ -273,7 +317,8 @@ function RequestProc(block)
   return success
 end function
 
-// Mirror Quake's ConProc_SetTestBuffer routine and its observable state changes.
+/// Mirror Quake's ConProc_SetTestBuffer routine and its observable state changes.
+/// @param buffer The buffer input consumed by `ConProc_SetTestBuffer`.
 function ConProc_SetTestBuffer(buffer)
   state = ConProc_State()
   state.testBuffer = buffer

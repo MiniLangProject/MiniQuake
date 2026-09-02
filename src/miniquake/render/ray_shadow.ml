@@ -14,60 +14,111 @@ import miniquake.constants as c
 import miniquake.byteio as byteio
 import miniquake.render.gl_rlight as glRlight
 
+/// Defines the initial vertex cache value used by `miniquake.render.ray_shadow`.
 const INITIAL_VERTEX_CACHE = 1024
+/// Defines the max receiver distance value used by `miniquake.render.ray_shadow`.
 const MAX_RECEIVER_DISTANCE = 768.0
+/// Defines the receiver bias value used by `miniquake.render.ray_shadow`.
 const RECEIVER_BIAS = 0.65
 
+/// Tracks the module-level active map state owned by `miniquake.render.ray_shadow`.
 activeMap = void
+/// Tracks the module-level active surfaces state owned by `miniquake.render.ray_shadow`.
 activeSurfaces = []
+/// Tracks the module-level active root node state owned by `miniquake.render.ray_shadow`.
 activeRootNode = 0
+/// Tracks the module-level ready state owned by `miniquake.render.ray_shadow`.
 ready = false
+/// Tracks the module-level origin x state owned by `miniquake.render.ray_shadow`.
 originX = 0.0
+/// Tracks the module-level origin y state owned by `miniquake.render.ray_shadow`.
 originY = 0.0
+/// Tracks the module-level origin z state owned by `miniquake.render.ray_shadow`.
 originZ = 0.0
+/// Tracks the module-level model scale x state owned by `miniquake.render.ray_shadow`.
 modelScaleX = 1.0
+/// Tracks the module-level model scale y state owned by `miniquake.render.ray_shadow`.
 modelScaleY = 1.0
+/// Tracks the module-level model scale z state owned by `miniquake.render.ray_shadow`.
 modelScaleZ = 1.0
+/// Tracks the module-level model offset x state owned by `miniquake.render.ray_shadow`.
 modelOffsetX = 0.0
+/// Tracks the module-level model offset y state owned by `miniquake.render.ray_shadow`.
 modelOffsetY = 0.0
+/// Tracks the module-level model offset z state owned by `miniquake.render.ray_shadow`.
 modelOffsetZ = 0.0
+/// Tracks the module-level yaw cos state owned by `miniquake.render.ray_shadow`.
 yawCos = 1.0
+/// Tracks the module-level yaw sin state owned by `miniquake.render.ray_shadow`.
 yawSin = 0.0
+/// Tracks the module-level pitch cos state owned by `miniquake.render.ray_shadow`.
 pitchCos = 1.0
+/// Tracks the module-level pitch sin state owned by `miniquake.render.ray_shadow`.
 pitchSin = 0.0
+/// Tracks the module-level roll cos state owned by `miniquake.render.ray_shadow`.
 rollCos = 1.0
+/// Tracks the module-level roll sin state owned by `miniquake.render.ray_shadow`.
 rollSin = 0.0
+/// Tracks the module-level point light active state owned by `miniquake.render.ray_shadow`.
 pointLightActive = false
+/// Tracks the module-level point light x state owned by `miniquake.render.ray_shadow`.
 pointLightX = 0.0
+/// Tracks the module-level point light y state owned by `miniquake.render.ray_shadow`.
 pointLightY = 0.0
+/// Tracks the module-level point light z state owned by `miniquake.render.ray_shadow`.
 pointLightZ = 0.0
+/// Tracks the module-level sample offset x state owned by `miniquake.render.ray_shadow`.
 sampleOffsetX = 0.0
+/// Tracks the module-level sample offset y state owned by `miniquake.render.ray_shadow`.
 sampleOffsetY = 0.0
+/// Tracks the module-level projection generation state owned by `miniquake.render.ray_shadow`.
 projectionGeneration = 1
+/// Tracks the module-level projection stamp state owned by `miniquake.render.ray_shadow`.
 projectionStamp = array(INITIAL_VERTEX_CACHE, 0)
+/// Tracks the module-level projection valid state owned by `miniquake.render.ray_shadow`.
 projectionValid = array(INITIAL_VERTEX_CACHE, false)
+/// Tracks the module-level projection x state owned by `miniquake.render.ray_shadow`.
 projectionX = array(INITIAL_VERTEX_CACHE, 0.0)
+/// Tracks the module-level projection y state owned by `miniquake.render.ray_shadow`.
 projectionY = array(INITIAL_VERTEX_CACHE, 0.0)
+/// Tracks the module-level projection z state owned by `miniquake.render.ray_shadow`.
 projectionZ = array(INITIAL_VERTEX_CACHE, 0.0)
+/// Tracks the module-level projection normal x state owned by `miniquake.render.ray_shadow`.
 projectionNormalX = array(INITIAL_VERTEX_CACHE, 0.0)
+/// Tracks the module-level projection normal y state owned by `miniquake.render.ray_shadow`.
 projectionNormalY = array(INITIAL_VERTEX_CACHE, 0.0)
+/// Tracks the module-level projection normal z state owned by `miniquake.render.ray_shadow`.
 projectionNormalZ = array(INITIAL_VERTEX_CACHE, 1.0)
+/// Tracks the module-level projection surface state owned by `miniquake.render.ray_shadow`.
 projectionSurface = array(INITIAL_VERTEX_CACHE, -1)
+/// Tracks the module-level projection travel state owned by `miniquake.render.ray_shadow`.
 projectionTravel = array(INITIAL_VERTEX_CACHE, 0.0)
+/// Tracks the module-level source x state owned by `miniquake.render.ray_shadow`.
 sourceX = array(INITIAL_VERTEX_CACHE, 0.0)
+/// Tracks the module-level source y state owned by `miniquake.render.ray_shadow`.
 sourceY = array(INITIAL_VERTEX_CACHE, 0.0)
+/// Tracks the module-level source z state owned by `miniquake.render.ray_shadow`.
 sourceZ = array(INITIAL_VERTEX_CACHE, 0.0)
+/// Tracks the module-level minimum hit fraction state owned by `miniquake.render.ray_shadow`.
 minimumHitFraction = array(INITIAL_VERTEX_CACHE, 0.0)
+/// Tracks the module-level ray prepared valid state owned by `miniquake.render.ray_shadow`.
 rayPreparedValid = array(INITIAL_VERTEX_CACHE, false)
+/// Tracks the module-level ray packet state owned by `miniquake.render.ray_shadow`.
 rayPacket = bytes(INITIAL_VERTEX_CACHE * 24)
+/// Tracks the module-level hit packet state owned by `miniquake.render.ray_shadow`.
 hitPacket = bytes(INITIAL_VERTEX_CACHE * 32)
+/// Tracks the module-level uploaded map name state owned by `miniquake.render.ray_shadow`.
 uploadedMapName = ""
+/// Tracks the module-level uploaded surface count state owned by `miniquake.render.ray_shadow`.
 uploadedSurfaceCount = -1
+/// Tracks the module-level native world ready state owned by `miniquake.render.ray_shadow`.
 nativeWorldReady = false
+/// Tracks the module-level world triangle packet state owned by `miniquake.render.ray_shadow`.
 worldTrianglePacket = bytes()
 
-// Grow every parallel vertex cache together so a model vertex index remains a
-// stable key throughout one shadow sample.
+/// Grow every parallel vertex cache together so a model vertex index remains a
+/// stable key throughout one shadow sample.
+/// @param index Zero-based index of the requested entry.
 function ensureVertexCapacity(index)
   global projectionStamp, projectionValid, projectionX, projectionY, projectionZ
   global projectionNormalX, projectionNormalY, projectionNormalZ
@@ -100,9 +151,11 @@ function ensureVertexCapacity(index)
   return true
 end function
 
-// Upload a triangulated copy of the render BSP once per map. The native bridge
-// builds a CPU BVH; MiniLang retains ownership of caster/light policy and all
-// emitted shadow geometry.
+/// Upload a triangulated copy of the render BSP once per map. The native bridge
+/// builds a CPU BVH; MiniLang retains ownership of caster/light policy and all
+/// emitted shadow geometry.
+/// @param worldMap The world map input consumed by `ensureNativeWorld`.
+/// @param worldSurfaces The world surfaces input consumed by `ensureNativeWorld`.
 function ensureNativeWorld(worldMap, worldSurfaces)
   global uploadedMapName, uploadedSurfaceCount, nativeWorldReady, worldTrianglePacket
   // Keep the map identity check ahead of packet construction, then count,
@@ -153,7 +206,21 @@ function ensureNativeWorld(worldMap, worldSurfaces)
   return nativeWorldReady
 end function
 
-// Configure common world, entity transform and light state for one caster.
+/// Configure common world, entity transform and light state for one caster.
+/// @param worldMap The world map input consumed by `configureCaster`.
+/// @param worldSurfaces The world surfaces input consumed by `configureCaster`.
+/// @param entity Entity affected by the operation.
+/// @param scaleX The scale x input consumed by `configureCaster`.
+/// @param scaleY The scale y input consumed by `configureCaster`.
+/// @param scaleZ The scale z input consumed by `configureCaster`.
+/// @param offsetX The offset x input consumed by `configureCaster`.
+/// @param offsetY The offset y input consumed by `configureCaster`.
+/// @param offsetZ The offset z input consumed by `configureCaster`.
+/// @param pitchSign The pitch sign input consumed by `configureCaster`.
+/// @param lightActive The light active input consumed by `configureCaster`.
+/// @param lightX The light x input consumed by `configureCaster`.
+/// @param lightY The light y input consumed by `configureCaster`.
+/// @param lightZ The light z input consumed by `configureCaster`.
 function configureCaster(worldMap, worldSurfaces, entity, scaleX, scaleY, scaleZ, offsetX, offsetY, offsetZ, pitchSign, lightActive, lightX, lightY, lightZ)
   global activeMap, activeSurfaces, activeRootNode, ready
   global originX, originY, originZ
@@ -193,8 +260,17 @@ function configureCaster(worldMap, worldSurfaces, entity, scaleX, scaleY, scaleZ
   return true
 end function
 
-// Configure an MDL caster using the exact GLQuake alias transform, including
-// the doubled-eyes compatibility special case.
+/// Configure an MDL caster using the exact GLQuake alias transform, including
+/// the doubled-eyes compatibility special case.
+/// @param worldMap The world map input consumed by `configureAlias`.
+/// @param worldSurfaces The world surfaces input consumed by `configureAlias`.
+/// @param entity Entity affected by the operation.
+/// @param model Model resource processed by the operation.
+/// @param doubleEyes The double eyes input consumed by `configureAlias`.
+/// @param lightActive The light active input consumed by `configureAlias`.
+/// @param lightX The light x input consumed by `configureAlias`.
+/// @param lightY The light y input consumed by `configureAlias`.
+/// @param lightZ The light z input consumed by `configureAlias`.
 function configureAlias(worldMap, worldSurfaces, entity, model, doubleEyes, lightActive, lightX, lightY, lightZ)
   if model is void then return false end if
   scaleX = model.scale.x
@@ -216,8 +292,15 @@ function configureAlias(worldMap, worldSurfaces, entity, model, doubleEyes, ligh
   )
 end function
 
-// Configure an inline or external BSP caster. Brush model vertices are already
-// expressed in model-local world units and use the positive pitch transform.
+/// Configure an inline or external BSP caster. Brush model vertices are already
+/// expressed in model-local world units and use the positive pitch transform.
+/// @param worldMap The world map input consumed by `configureBrush`.
+/// @param worldSurfaces The world surfaces input consumed by `configureBrush`.
+/// @param entity Entity affected by the operation.
+/// @param lightActive The light active input consumed by `configureBrush`.
+/// @param lightX The light x input consumed by `configureBrush`.
+/// @param lightY The light y input consumed by `configureBrush`.
+/// @param lightZ The light z input consumed by `configureBrush`.
 function configureBrush(worldMap, worldSurfaces, entity, lightActive, lightX, lightY, lightZ)
   return configureCaster(
     worldMap, worldSurfaces, entity,
@@ -226,8 +309,10 @@ function configureBrush(worldMap, worldSurfaces, entity, lightActive, lightX, li
   )
 end function
 
-// Begin one hard-shadow or area-light sample and invalidate cached projected
-// vertices by advancing a generation counter instead of clearing large arrays.
+/// Begin one hard-shadow or area-light sample and invalidate cached projected
+/// vertices by advancing a generation counter instead of clearing large arrays.
+/// @param offsetX The offset x input consumed by `beginProjectionSample`.
+/// @param offsetY The offset y input consumed by `beginProjectionSample`.
 function beginProjectionSample(offsetX, offsetY)
   global sampleOffsetX, sampleOffsetY, projectionGeneration, projectionStamp
   sampleOffsetX = offsetX
@@ -247,8 +332,12 @@ function beginPrimitive()
   return beginProjectionSample(sampleOffsetX, sampleOffsetY)
 end function
 
-// Transform one model vertex and pack its finite light segment for either the
-// native BVH batch or the scalar MiniLang fallback.
+/// Transform one model vertex and pack its finite light segment for either the
+/// native BVH batch or the scalar MiniLang fallback.
+/// @param index Zero-based index of the requested entry.
+/// @param packedX The packed x input consumed by `prepareVertexRay`.
+/// @param packedY The packed y input consumed by `prepareVertexRay`.
+/// @param packedZ The packed z input consumed by `prepareVertexRay`.
 function prepareVertexRay(index, packedX, packedY, packedZ)
   global projectionStamp, projectionValid, sourceX, sourceY, sourceZ
   global minimumHitFraction, rayPreparedValid, rayPacket
@@ -326,8 +415,18 @@ function prepareVertexRay(index, packedX, packedY, packedZ)
   return true
 end function
 
-// Validate and store one native or scalar ray result with a receiver-normal
-// bias that prevents depth fighting on the actual world polygon.
+/// Validate and store one native or scalar ray result with a receiver-normal
+/// bias that prevents depth fighting on the actual world polygon.
+/// @param index Zero-based index of the requested entry.
+/// @param hit The hit input consumed by `acceptProjection`.
+/// @param receiverSurface The receiver surface input consumed by `acceptProjection`.
+/// @param fraction The fraction input consumed by `acceptProjection`.
+/// @param hitX The hit x input consumed by `acceptProjection`.
+/// @param hitY The hit y input consumed by `acceptProjection`.
+/// @param hitZ The hit z input consumed by `acceptProjection`.
+/// @param normalX The normal x input consumed by `acceptProjection`.
+/// @param normalY The normal y input consumed by `acceptProjection`.
+/// @param normalZ The normal z input consumed by `acceptProjection`.
 function acceptProjection(index, hit, receiverSurface, fraction, hitX, hitY, hitZ, normalX, normalY, normalZ)
   global projectionValid, projectionX, projectionY, projectionZ
   global projectionNormalX, projectionNormalY, projectionNormalZ
@@ -353,8 +452,9 @@ function acceptProjection(index, hit, receiverSurface, fraction, hitX, hitY, hit
   return true
 end function
 
-// Trace the prepared prefix as one native BVH batch, falling back to the
-// allocation-free render-BSP walker if the native acceleration is unavailable.
+/// Trace the prepared prefix as one native BVH batch, falling back to the
+/// allocation-free render-BSP walker if the native acceleration is unavailable.
+/// @param count Number of entries or units to process.
 function tracePreparedVertices(count)
   global projectionValid, hitPacket
   // Prefer one packed native traversal for the prepared prefix. Only if that
@@ -400,7 +500,8 @@ function tracePreparedVertices(count)
   return traced
 end function
 
-// Trace every MDL frame vertex through one native call for the current sample.
+/// Trace every MDL frame vertex through one native call for the current sample.
+/// @param vertices The vertices input consumed by `projectAliasVertices`.
 function projectAliasVertices(vertices)
   if len(vertices) == 0 then return 0 end if
   ensureVertexCapacity(len(vertices) - 1)
@@ -413,7 +514,8 @@ function projectAliasVertices(vertices)
   return tracePreparedVertices(len(vertices))
 end function
 
-// Trace every vertex of one BSP caster polygon through one native call.
+/// Trace every vertex of one BSP caster polygon through one native call.
+/// @param vertices The vertices input consumed by `projectBrushVertices`.
 function projectBrushVertices(vertices)
   if len(vertices) == 0 then return 0 end if
   ensureVertexCapacity(len(vertices) - 1)
@@ -426,8 +528,12 @@ function projectBrushVertices(vertices)
   return tracePreparedVertices(len(vertices))
 end function
 
-// Project an individual vertex for diagnostics and compatibility callers. The
-// production alias/brush paths use the two batch entry points above.
+/// Project an individual vertex for diagnostics and compatibility callers. The
+/// production alias/brush paths use the two batch entry points above.
+/// @param index Zero-based index of the requested entry.
+/// @param packedX The packed x input consumed by `projectVertex`.
+/// @param packedY The packed y input consumed by `projectVertex`.
+/// @param packedZ The packed z input consumed by `projectVertex`.
 function projectVertex(index, packedX, packedY, packedZ)
   if not ready or index < 0 then return false end if
   ensureVertexCapacity(index)
@@ -437,24 +543,31 @@ function projectVertex(index, packedX, packedY, packedZ)
   return projectionValid[index]
 end function
 
-// Reject receiver discontinuities before the rasterizer interpolates a source
-// edge across empty space.  The allowance scales with the caster edge so a
-// normal slope remains intact, while an adjacent ledge/floor pair cannot form
-// the long translucent triangles previously visible around crate corners.
+/// Reject receiver discontinuities before the rasterizer interpolates a source
+/// edge across empty space.  The allowance scales with the caster edge so a
+/// normal slope remains intact, while an adjacent ledge/floor pair cannot form
+/// the long translucent triangles previously visible around crate corners.
+/// @param sourceLength Length of the requested data in units appropriate to the operation.
+/// @param projectedLength Length of the requested data in units appropriate to the operation.
+/// @param travelDifference The travel difference input consumed by `receiverEdgeContinuity`.
 function inline receiverEdgeContinuity(sourceLength, projectedLength, travelDifference)
   if projectedLength > sourceLength * 3.0 + 24.0 then return false end if
   return travelDifference <= sourceLength * 1.5 + 12.0
 end function
 
-// Require native ray hits to remain on one concrete BSP receiver polygon.
-// The scalar fallback cannot expose a surface id and retains the geometric
-// normal/stretch checks below, represented by its negative sentinel.
+/// Require native ray hits to remain on one concrete BSP receiver polygon.
+/// The scalar fallback cannot expose a surface id and retains the geometric
+/// normal/stretch checks below, represented by its negative sentinel.
+/// @param leftSurface The left surface input consumed by `receiverSurfaceContinuity`.
+/// @param rightSurface The right surface input consumed by `receiverSurfaceContinuity`.
 function inline receiverSurfaceContinuity(leftSurface, rightSurface)
   if leftSurface < 0 or rightSurface < 0 then return true end if
   return leftSurface == rightSurface
 end function
 
-// Test one projected edge for a compatible receiver plane and bounded stretch.
+/// Test one projected edge for a compatible receiver plane and bounded stretch.
+/// @param left The left input consumed by `receiverEdgeCompatible`.
+/// @param right The right input consumed by `receiverEdgeCompatible`.
 function receiverEdgeCompatible(left, right)
   if not receiverSurfaceContinuity(projectionSurface[left], projectionSurface[right]) then return false end if
   normalDot = projectionNormalX[left] * projectionNormalX[right] + projectionNormalY[left] * projectionNormalY[right] + projectionNormalZ[left] * projectionNormalZ[right]
@@ -472,9 +585,12 @@ function receiverEdgeCompatible(left, right)
   return receiverEdgeContinuity(sourceLength, projectedLength, travelDifference)
 end function
 
-// Reject a triangle whose rays land across an abrupt BSP corner or stretch far
-// beyond its source edge. Skipping that triangle prevents geometry from being
-// interpolated through a wall between otherwise individually valid hits.
+/// Reject a triangle whose rays land across an abrupt BSP corner or stretch far
+/// beyond its source edge. Skipping that triangle prevents geometry from being
+/// interpolated through a wall between otherwise individually valid hits.
+/// @param first The first input consumed by `receiverTriangleCompatible`.
+/// @param second The second input consumed by `receiverTriangleCompatible`.
+/// @param third The third input consumed by `receiverTriangleCompatible`.
 function receiverTriangleCompatible(first, second, third)
   if not receiverEdgeCompatible(first, second) then return false end if
   if not receiverEdgeCompatible(second, third) then return false end if
@@ -482,27 +598,32 @@ function receiverTriangleCompatible(first, second, third)
   return true
 end function
 
-// Return one cached projected x coordinate.
+/// Return one cached projected x coordinate.
+/// @param index Zero-based index of the requested entry.
 function inline projectedPointX(index)
   return projectionX[index]
 end function
 
-// Return one cached projected y coordinate.
+/// Return one cached projected y coordinate.
+/// @param index Zero-based index of the requested entry.
 function inline projectedPointY(index)
   return projectionY[index]
 end function
 
-// Return one cached projected z coordinate.
+/// Return one cached projected z coordinate.
+/// @param index Zero-based index of the requested entry.
 function inline projectedPointZ(index)
   return projectionZ[index]
 end function
 
-// Return the render-BSP surface reached by one cached native ray.
+/// Return the render-BSP surface reached by one cached native ray.
+/// @param index Zero-based index of the requested entry.
 function inline projectedPointSurface(index)
   return projectionSurface[index]
 end function
 
-// Report whether one vertex reached a compatible receiver in this sample.
+/// Report whether one vertex reached a compatible receiver in this sample.
+/// @param index Zero-based index of the requested entry.
 function inline projectedPointValid(index)
   return index >= 0 and index < len(projectionValid) and projectionStamp[index] == projectionGeneration and projectionValid[index]
 end function

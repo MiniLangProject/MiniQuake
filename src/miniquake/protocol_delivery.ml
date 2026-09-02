@@ -10,18 +10,25 @@ result must retain the queued message; only a committed send clears it.
 */
 package miniquake.protocol_delivery
 
+/// Defines the send drop value used by `miniquake.protocol_delivery`.
 const SEND_DROP = 1
+/// Defines the send retain value used by `miniquake.protocol_delivery`.
 const SEND_RETAIN = 2
+/// Defines the send commit value used by `miniquake.protocol_delivery`.
 const SEND_COMMIT = 3
 
-// Provide reliable send outcome behavior for the active subsystem.
+/// Implements the `reliableSendOutcome` operation for `miniquake.protocol_delivery` (reliable send outcome).
+/// @param result Result value to report or translate into a status code.
 function reliableSendOutcome(result)
   if result < 0 then return SEND_DROP end if
   if result == 0 then return SEND_RETAIN end if
   return SEND_COMMIT
 end function
 
-// Provide client reliable plan behavior for the active subsystem.
+/// Implements the `clientReliablePlan` operation for `miniquake.protocol_delivery` (client reliable plan).
+/// @param connected The connected input consumed by `clientReliablePlan`.
+/// @param messageSize Size of the requested data or resource.
+/// @param canSend The can send input consumed by `clientReliablePlan`.
 function clientReliablePlan(connected, messageSize, canSend)
   if not connected then return SEND_DROP end if
   if messageSize <= 0 then return 0 end if
@@ -29,17 +36,21 @@ function clientReliablePlan(connected, messageSize, canSend)
   return SEND_COMMIT
 end function
 
-// Provide keepalive due behavior for the active subsystem.
+/// Implements the `keepaliveDue` operation for `miniquake.protocol_delivery` (keepalive due).
+/// @param elapsed The elapsed input consumed by `keepaliveDue`.
 function inline keepaliveDue(elapsed)
   return elapsed > 5.0
 end function
 
-// Provide reliable work pending behavior for the active subsystem.
+/// Implements the `reliableWorkPending` operation for `miniquake.protocol_delivery` (reliable work pending).
+/// @param messageSize Size of the requested data or resource.
+/// @param dropAsap The drop asap input consumed by `reliableWorkPending`.
 function reliableWorkPending(messageSize, dropAsap)
   return messageSize > 0 or dropAsap
 end function
 
-// Update module state for after send.
+/// Update module state for after send.
+/// @param result Result value to report or translate into a status code.
 function clearAfterSend(result)
   return reliableSendOutcome(result) == SEND_COMMIT
 end function

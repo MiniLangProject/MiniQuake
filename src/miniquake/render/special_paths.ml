@@ -15,17 +15,23 @@ import miniquake.mathlib as math
 import miniquake.native as native
 import miniquake.render.gl11 as gl
 
+/// Defines the mirror texture prefix value used by `miniquake.render.special_paths`.
 const MIRROR_TEXTURE_PREFIX = "window02_1"
+/// Defines the envmap size value used by `miniquake.render.special_paths`.
 const ENVMAP_SIZE = 256
+/// Defines the envmap faces value used by `miniquake.render.special_paths`.
 const ENVMAP_FACES = 6
+/// Defines the timerefresh steps value used by `miniquake.render.special_paths`.
 const TIMEREFRESH_STEPS = 128
 
-// Read an IEEE-754 single-precision value from the byte buffer.
+/// Read an IEEE-754 single-precision value from the byte buffer.
+/// @param value Value consumed by `f32`.
 function f32(value)
   return native.bitsFloat(native.floatBits(value))
 end function
 
-// Return mirror texture name derived from the active module state.
+/// Return mirror texture name derived from the active module state.
+/// @param name Stable name that identifies the requested object or option.
 function mirrorTextureName(name)
   source = bytes(name)
   prefix = bytes(MIRROR_TEXTURE_PREFIX)
@@ -38,7 +44,8 @@ function mirrorTextureName(name)
   return true
 end function
 
-// Return mirror texture.
+/// Return mirror texture.
+/// @param textures The textures input consumed by `findMirrorTexture`.
 function findMirrorTexture(textures)
   index = 0
   while index < len(textures)
@@ -49,12 +56,18 @@ function findMirrorTexture(textures)
   return -1
 end function
 
-// Provide mirror distance behavior for the active subsystem.
+/// Implements the `mirrorDistance` operation for `miniquake.render.special_paths` (mirror distance).
+/// @param point The point input consumed by `mirrorDistance`.
+/// @param normal The normal input consumed by `mirrorDistance`.
+/// @param distance The distance input consumed by `mirrorDistance`.
 function mirrorDistance(point, normal, distance)
   return f32(math.dot(point, normal) - distance)
 end function
 
-// Provide reflect point behavior for the active subsystem.
+/// Implements the `reflectPoint` operation for `miniquake.render.special_paths` (reflect point).
+/// @param point The point input consumed by `reflectPoint`.
+/// @param normal The normal input consumed by `reflectPoint`.
+/// @param distance The distance input consumed by `reflectPoint`.
 function reflectPoint(point, normal, distance)
   scalar = f32(-2.0 * mirrorDistance(point, normal, distance))
   return t.Vec3(
@@ -64,7 +77,9 @@ function reflectPoint(point, normal, distance)
   )
 end function
 
-// Return reflect vector derived from the active module state.
+/// Return reflect vector derived from the active module state.
+/// @param direction The direction input consumed by `reflectVector`.
+/// @param normal The normal input consumed by `reflectVector`.
 function reflectVector(direction, normal)
   scalar = f32(-2.0 * f32(math.dot(direction, normal)))
   return t.Vec3(
@@ -74,7 +89,9 @@ function reflectVector(direction, normal)
   )
 end function
 
-// Return direction angles derived from the active module state.
+/// Return direction angles derived from the active module state.
+/// @param direction The direction input consumed by `directionAngles`.
+/// @param sourceRoll The source roll input consumed by `directionAngles`.
 function directionAngles(direction, sourceRoll)
   horizontal = f32(native.sqrt(f32(direction.x * direction.x + direction.y * direction.y)))
   pitch = f32(-native.atan2(direction.z, horizontal) * math.RAD_TO_DEG)
@@ -83,7 +100,10 @@ function directionAngles(direction, sourceRoll)
   return t.Vec3(pitch, yaw, f32(-sourceRoll))
 end function
 
-// Provide reflect view behavior for the active subsystem.
+/// Implements the `reflectView` operation for `miniquake.render.special_paths` (reflect view).
+/// @param origin World-space origin of the operation.
+/// @param angles Orientation angles used by the operation.
+/// @param plane The plane input consumed by `reflectView`.
 function reflectView(origin, angles, plane)
   if plane is void then return error(5000, "R_Mirror: missing mirror plane") end if
   vectors = math.angleVectors(angles)
@@ -93,14 +113,19 @@ function reflectView(origin, angles, plane)
   return [reflectedOrigin, reflectedAngles, reflectedForward]
 end function
 
-// Provide mirror projection scale behavior for the active subsystem.
+/// Implements the `mirrorProjectionScale` operation for `miniquake.render.special_paths` (mirror projection scale).
+/// @param plane The plane input consumed by `mirrorProjectionScale`.
 function mirrorProjectionScale(plane)
   if plane is void then return t.Vec3(1.0, 1.0, 1.0) end if
   if plane.normal.z != 0.0 then return t.Vec3(1.0, -1.0, 1.0) end if
   return t.Vec3(-1.0, 1.0, 1.0)
 end function
 
-// Update module state for plan.
+/// Update module state for plan.
+/// @param mirrorAlpha The mirror alpha input consumed by `clearPlan`.
+/// @param clearColor The clear color input consumed by `clearPlan`.
+/// @param zTrick The z trick input consumed by `clearPlan`.
+/// @param trickFrame The trick frame input consumed by `clearPlan`.
 function clearPlan(mirrorAlpha, clearColor, zTrick, trickFrame)
   mask = gl.GL_DEPTH_BUFFER_BIT
   if clearColor then mask = mask | gl.GL_COLOR_BUFFER_BIT end if
@@ -119,7 +144,7 @@ function clearPlan(mirrorAlpha, clearColor, zTrick, trickFrame)
   return [mask, 0.0, 1.0, gl.GL_LEQUAL, trickFrame]
 end function
 
-// Provide envmap directions behavior for the active subsystem.
+/// Implements the `envmapDirections` operation for `miniquake.render.special_paths` (envmap directions).
 function envmapDirections()
   return [
     t.Vec3(0.0, 0.0, 0.0),
@@ -136,24 +161,28 @@ function envmapByteCount()
   return ENVMAP_SIZE * ENVMAP_SIZE * 4
 end function
 
-// Return envmap file name derived from the active module state.
+/// Return envmap file name derived from the active module state.
+/// @param index Zero-based index of the requested entry.
 function envmapFileName(index)
   return "env" + index + ".rgb"
 end function
 
-// Provide time refresh yaw behavior for the active subsystem.
+/// Implements the `timeRefreshYaw` operation for `miniquake.render.special_paths` (time refresh yaw).
+/// @param index Zero-based index of the requested entry.
 function timeRefreshYaw(index)
   return f32(f32(index * 1.0 / TIMEREFRESH_STEPS) * 360.0)
 end function
 
-// Provide time refresh result behavior for the active subsystem.
+/// Implements the `timeRefreshResult` operation for `miniquake.render.special_paths` (time refresh result).
+/// @param seconds The seconds input consumed by `timeRefreshResult`.
 function timeRefreshResult(seconds)
   value = f32(seconds)
   if value <= 0.0 then return error(5001, "R_TimeRefresh_f: non-positive duration") end if
   return [value, f32(TIMEREFRESH_STEPS / value)]
 end function
 
-// Return time refresh angles derived from the active module state.
+/// Return time refresh angles derived from the active module state.
+/// @param sourceAngles The source angles input consumed by `timeRefreshAngles`.
 function timeRefreshAngles(sourceAngles)
   result = []
   index = 0
@@ -165,7 +194,7 @@ function timeRefreshAngles(sourceAngles)
 end function
 
 
-// Provide special render stage order behavior for the active subsystem.
+/// Implements the `specialRenderStageOrder` operation for `miniquake.render.special_paths` (special render stage order).
 function specialRenderStageOrder()
   return [
     "clear",

@@ -14,21 +14,25 @@ import miniquake.native as native
 import miniquake.world_bsp as world
 import miniquake.server_collision as collision
 
+/// Defines the step size value used by `miniquake.server_move`.
 const STEP_SIZE = 18.0
+/// Defines the di nodir value used by `miniquake.server_move`.
 const DI_NODIR = -1.0
 
-// Create the zero-initialized state for vector.
+/// Implements the `zeroVector` operation for `miniquake.server_move` (zero vector).
 function zeroVector()
   return t.Vec3(0.0, 0.0, 0.0)
 end function
 
-// Provide absolute behavior for the active subsystem.
+/// Implements the `absolute` operation for `miniquake.server_move` (absolute).
+/// @param value Value consumed by `absolute`.
 function absolute(value)
   if value < 0.0 then return -value end if
   return value
 end function
 
-// Provide random word behavior for the active subsystem.
+/// Implements the `randomWord` operation for `miniquake.server_move` (random word).
+/// @param server Server state participating in the operation.
 function randomWord(server)
   if server is void or server.machine is void or server.machine.context is void then return 0 end if
   ctx = server.machine.context
@@ -36,7 +40,9 @@ function randomWord(server)
   return (ctx.randomSeed >> 16) & 0x7fff
 end function
 
-// PF_changeyaw / SV_StepDirection share this exact angle update.
+/// PF_changeyaw / SV_StepDirection share this exact angle update.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
 function changeYaw(server, entityIndex)
   angles = collision.entityVectorZero(server, entityIndex, "angles")
   current = math.angleMod(angles.y)
@@ -56,8 +62,12 @@ function changeYaw(server, entityIndex)
   return angles.y
 end function
 
-// SV_movestep: QuakeC monster movement, including stair/drop checks and
-// flying/swimming pursuit height adjustment.
+/// SV_movestep: QuakeC monster movement, including stair/drop checks and
+/// flying/swimming pursuit height adjustment.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param movement The movement input consumed by `moveStep`.
+/// @param relink The relink input consumed by `moveStep`.
 function moveStep(server, entityIndex, movement, relink)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if not collision.entityValid(server, entityIndex) then return false end if
@@ -134,7 +144,11 @@ function moveStep(server, entityIndex, movement, relink)
   return true
 end function
 
-// Advance direction by one processing step.
+/// Advance direction by one processing step.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param yaw The yaw input consumed by `stepDirection`.
+/// @param distance The distance input consumed by `stepDirection`.
 function stepDirection(server, entityIndex, yaw, distance)
   collision.setEntityFloat(server, entityIndex, "ideal_yaw", yaw)
   changeYaw(server, entityIndex)
@@ -153,13 +167,19 @@ function stepDirection(server, entityIndex, yaw, distance)
   return false
 end function
 
-// Provide fix check bottom behavior for the active subsystem.
+/// Implements the `fixCheckBottom` operation for `miniquake.server_move` (fix check bottom).
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
 function fixCheckBottom(server, entityIndex)
   flags = native.trunc(collision.entityFloat(server, entityIndex, "flags", 0.0))
   collision.setEntityFloat(server, entityIndex, "flags", flags | c.FL_PARTIALGROUND)
 end function
 
-// Create and initialize chase direction.
+/// Create and initialize chase direction.
+/// @param server Server state participating in the operation.
+/// @param actor The actor input consumed by `newChaseDirection`.
+/// @param enemy The enemy input consumed by `newChaseDirection`.
+/// @param distance The distance input consumed by `newChaseDirection`.
 function newChaseDirection(server, actor, enemy, distance)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   actorOrigin = collision.entityVectorZero(server, actor, "origin")
@@ -212,7 +232,11 @@ function newChaseDirection(server, actor, enemy, distance)
   return false
 end function
 
-// Release state for close enough.
+/// Release state for close enough.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param goalIndex Zero-based index of the requested entry.
+/// @param distance The distance input consumed by `closeEnough`.
 function closeEnough(server, entityIndex, goalIndex, distance)
   entityMins = collision.entityAbsMin(server, entityIndex)
   entityMaxs = collision.entityAbsMax(server, entityIndex)
@@ -224,7 +248,10 @@ function closeEnough(server, entityIndex, goalIndex, distance)
   return true
 end function
 
-// Transfer data for move to goal.
+/// Transfer data for move to goal.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param distance The distance input consumed by `moveToGoal`.
 function moveToGoal(server, entityIndex, distance)
   flags = native.trunc(collision.entityFloat(server, entityIndex, "flags", 0.0))
   if (flags & (c.FL_ONGROUND | c.FL_FLY | c.FL_SWIM)) == 0 then return false end if
@@ -239,49 +266,74 @@ function moveToGoal(server, entityIndex, distance)
   return true
 end function
 
-// --------------------------------------------------------------------------
-// sv_move.c public compatibility surface.  Keep these names one-for-one with
-// the original server movement unit; the lower-case spellings above remain
-// convenient internal helpers for existing MiniQuake callers.
+/// --------------------------------------------------------------------------
+/// sv_move.c public compatibility surface.  Keep these names one-for-one with
+/// the original server movement unit; the lower-case spellings above remain
+/// convenient internal helpers for existing MiniQuake callers.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
 
 function SV_CheckBottom(server, entityIndex)
   return collision.checkBottom(server, entityIndex)
 end function
 
-// Apply the Quake-compatible sv movestep behavior.
+/// Apply the Quake-compatible sv movestep behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param movement The movement input consumed by `SV_movestep`.
+/// @param relink The relink input consumed by `SV_movestep`.
 function SV_movestep(server, entityIndex, movement, relink)
   return moveStep(server, entityIndex, movement, relink)
 end function
 
-// Apply the Quake-compatible sv step direction behavior.
+/// Apply the Quake-compatible sv step direction behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param yaw The yaw input consumed by `SV_StepDirection`.
+/// @param distance The distance input consumed by `SV_StepDirection`.
 function SV_StepDirection(server, entityIndex, yaw, distance)
   return stepDirection(server, entityIndex, yaw, distance)
 end function
 
-// Apply the Quake-compatible sv fix check bottom behavior.
+/// Apply the Quake-compatible sv fix check bottom behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
 function SV_FixCheckBottom(server, entityIndex)
   fixCheckBottom(server, entityIndex)
   return true
 end function
 
-// Apply the Quake-compatible sv new chase dir behavior.
+/// Apply the Quake-compatible sv new chase dir behavior.
+/// @param server Server state participating in the operation.
+/// @param actor The actor input consumed by `SV_NewChaseDir`.
+/// @param enemy The enemy input consumed by `SV_NewChaseDir`.
+/// @param distance The distance input consumed by `SV_NewChaseDir`.
 function SV_NewChaseDir(server, actor, enemy, distance)
   return newChaseDirection(server, actor, enemy, distance)
 end function
 
-// Apply the Quake-compatible sv close enough behavior.
+/// Apply the Quake-compatible sv close enough behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param goalIndex Zero-based index of the requested entry.
+/// @param distance The distance input consumed by `SV_CloseEnough`.
 function SV_CloseEnough(server, entityIndex, goalIndex, distance)
   return closeEnough(server, entityIndex, goalIndex, distance)
 end function
 
-// Apply the Quake-compatible sv move to goal behavior.
+/// Apply the Quake-compatible sv move to goal behavior.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param distance The distance input consumed by `SV_MoveToGoal`.
 function SV_MoveToGoal(server, entityIndex, distance)
   return moveToGoal(server, entityIndex, distance)
 end function
 
-// PF_changeyaw is declared in sv_move.c and implemented in pr_cmds.c.  This
-// explicit server hook completes the combined C/header pendant without
-// duplicating the QuakeC builtin.
+/// PF_changeyaw is declared in sv_move.c and implemented in pr_cmds.c.  This
+/// explicit server hook completes the combined C/header pendant without
+/// duplicating the QuakeC builtin.
+/// @param server Server state participating in the operation.
+/// @param entityIndex Zero-based index of the requested entry.
 function SV_ChangeYaw(server, entityIndex)
   return changeYaw(server, entityIndex)
 end function

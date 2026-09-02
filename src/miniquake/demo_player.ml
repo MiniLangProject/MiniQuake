@@ -14,7 +14,8 @@ import miniquake.player_move as movement
 import miniquake.mathlib as math
 import miniquake.native as native
 
-// Create and initialize the module state.
+/// Implements the `create` operation for `miniquake.demo_player` (create).
+/// @param recording The recording input consumed by `create`.
 function create(recording)
   player = movement.create(t.Vec3(0.0, 0.0, 0.0), t.Vec3(0.0, 0.0, 0.0))
   state = client.create(player)
@@ -36,7 +37,10 @@ function create(recording)
   )
 end function
 
-// Apply the Quake-compatible cl finish time demo behavior.
+/// Apply the Quake-compatible cl finish time demo behavior.
+/// @param playback The playback input consumed by `CL_FinishTimeDemo`.
+/// @param hostFrameCount Number of entries or units to process.
+/// @param realtime Time value used by the operation.
 function CL_FinishTimeDemo(playback, hostFrameCount, realtime)
   playback.timedemo = false
   playback.client.timedemo = false
@@ -50,7 +54,10 @@ function CL_FinishTimeDemo(playback, hostFrameCount, realtime)
   return playback.finishResult
 end function
 
-// Apply the Quake-compatible cl stop playback behavior.
+/// Apply the Quake-compatible cl stop playback behavior.
+/// @param playback The playback input consumed by `CL_StopPlayback`.
+/// @param hostFrameCount Number of entries or units to process.
+/// @param realtime Time value used by the operation.
 function CL_StopPlayback(playback, hostFrameCount, realtime)
   if playback is void or playback.stopped then return false end if
   playback.client.demoPlayback = false
@@ -62,7 +69,9 @@ function CL_StopPlayback(playback, hostFrameCount, realtime)
   return true
 end function
 
-// Apply the Quake-compatible cl time demo f behavior.
+/// Apply the Quake-compatible cl time demo f behavior.
+/// @param playback The playback input consumed by `CL_TimeDemo_f`.
+/// @param hostFrameCount Number of entries or units to process.
 function CL_TimeDemo_f(playback, hostFrameCount)
   if playback is void then return error(2020, "timedemo has no playback") end if
   playback.timedemo = true
@@ -73,7 +82,10 @@ function CL_TimeDemo_f(playback, hostFrameCount)
   return true
 end function
 
-// Apply the Quake-compatible cl get message behavior.
+/// Apply the Quake-compatible cl get message behavior.
+/// @param playback The playback input consumed by `CL_GetMessage`.
+/// @param hostFrameCount Number of entries or units to process.
+/// @param realtime Time value used by the operation.
 function CL_GetMessage(playback, hostFrameCount, realtime)
   if playback is void or playback.stopped then return void end if
   if playback.client.signon == c.SIGNONS then
@@ -102,7 +114,9 @@ function CL_GetMessage(playback, hostFrameCount, realtime)
   return item
 end function
 
-// Execute message.
+/// Execute message.
+/// @param playback The playback input consumed by `processMessage`.
+/// @param item The item input consumed by `processMessage`.
 function processMessage(playback, item)
   parsed = try(client.parseMessage(playback.client, item.payload))
   if parsed is error then
@@ -115,7 +129,11 @@ function processMessage(playback, item)
   return parsed
 end function
 
-// Advance frame by one processing step.
+/// Advance frame by one processing step.
+/// @param playback The playback input consumed by `stepFrame`.
+/// @param hostFrameCount Number of entries or units to process.
+/// @param realtime Time value used by the operation.
+/// @param frameTime Time value used by the operation.
 function stepFrame(playback, hostFrameCount, realtime, frameTime)
   if playback is void or playback.stopped then return 0 end if
   playback.client.oldTime = playback.client.time
@@ -138,7 +156,8 @@ function stepFrame(playback, hostFrameCount, realtime, frameTime)
   return parsedEvents
 end function
 
-// Advance the requested value by one processing step.
+/// Implements the `step` operation for `miniquake.demo_player` (step).
+/// @param playback The playback input consumed by `step`.
 function step(playback)
   if playback.complete then return 0 end if
   if playback.index < 0 or playback.index >= len(playback.recording.messages) then
@@ -158,7 +177,8 @@ function step(playback)
   return parsed
 end function
 
-// Play all through the active media subsystem.
+/// Play all through the active media subsystem.
+/// @param playback The playback input consumed by `playAll`.
 function playAll(playback)
   while not playback.complete
     result = step(playback)
@@ -167,7 +187,8 @@ function playAll(playback)
   return playback.eventCount
 end function
 
-// Validate the requested value and report any invalid state.
+/// Implements the `verify` operation for `miniquake.demo_player` (verify).
+/// @param recording The recording input consumed by `verify`.
 function verify(recording)
   playback = create(recording)
   result = try(playAll(playback))
@@ -196,7 +217,8 @@ function verify(recording)
   )
 end function
 
-// Format and emit report.
+/// Implements the `printReport` operation for `miniquake.demo_player` (print report).
+/// @param report The report input consumed by `printReport`.
 function printReport(report)
   for each line in report.messages
     print line

@@ -23,45 +23,79 @@ import miniquake.render.draw2d as draw2d
 import miniquake.render_ui_contract as renderUiContract
 import miniquake.optimization_baseline as optBaseline
 
+/// Defines the model none value used by `miniquake.render.entities`.
 const MODEL_NONE = 0
+/// Defines the model brush value used by `miniquake.render.entities`.
 const MODEL_BRUSH = 1
+/// Defines the model alias value used by `miniquake.render.entities`.
 const MODEL_ALIAS = 2
+/// Defines the model sprite value used by `miniquake.render.entities`.
 const MODEL_SPRITE = 3
 
+/// Defines the spr oriented value used by `miniquake.render.entities`.
 const SPR_ORIENTED = 3
 
+/// Tracks the module-level translated player textures state owned by `miniquake.render.entities`.
 translatedPlayerTextures = []
+/// Tracks the module-level render model registry state owned by `miniquake.render.entities`.
 renderModelRegistry = void
+/// Tracks the module-level alias smooth models state owned by `miniquake.render.entities`.
 aliasSmoothModels = true
+/// Tracks the module-level alias affine models state owned by `miniquake.render.entities`.
 aliasAffineModels = false
+/// Tracks the module-level alias shadows state owned by `miniquake.render.entities`.
 aliasShadows = false
+/// Tracks the module-level alias shadow quality state owned by `miniquake.render.entities`.
 aliasShadowQuality = 1
+/// Tracks the module-level alias no colors state owned by `miniquake.render.entities`.
 aliasNoColors = false
+/// Tracks the module-level alias double eyes state owned by `miniquake.render.entities`.
 aliasDoubleEyes = true
+/// Tracks the module-level alias pose interpolation state owned by `miniquake.render.entities`.
 aliasPoseInterpolation = false
+/// Tracks the module-level alias pose previous state owned by `miniquake.render.entities`.
 aliasPosePrevious = []
+/// Tracks the module-level alias pose current state owned by `miniquake.render.entities`.
 aliasPoseCurrent = []
+/// Tracks the module-level alias pose models state owned by `miniquake.render.entities`.
 aliasPoseModels = []
+/// Tracks the module-level alias pose change times state owned by `miniquake.render.entities`.
 aliasPoseChangeTimes = []
+/// Tracks the module-level alias shade cache valid state owned by `miniquake.render.entities`.
 aliasShadeCacheValid = []
+/// Tracks the module-level alias shade cache stamp state owned by `miniquake.render.entities`.
 aliasShadeCacheStamp = []
+/// Tracks the module-level alias shade cache model state owned by `miniquake.render.entities`.
 aliasShadeCacheModel = []
+/// Tracks the module-level alias shade cache colormap state owned by `miniquake.render.entities`.
 aliasShadeCacheColormap = []
+/// Tracks the module-level alias shade cache view model state owned by `miniquake.render.entities`.
 aliasShadeCacheViewModel = []
+/// Tracks the module-level alias shade cache origin x state owned by `miniquake.render.entities`.
 aliasShadeCacheOriginX = []
+/// Tracks the module-level alias shade cache origin y state owned by `miniquake.render.entities`.
 aliasShadeCacheOriginY = []
+/// Tracks the module-level alias shade cache origin z state owned by `miniquake.render.entities`.
 aliasShadeCacheOriginZ = []
+/// Tracks the module-level alias shade cache shade state owned by `miniquake.render.entities`.
 aliasShadeCacheShade = []
+/// Tracks the module-level alias shade cache ambient state owned by `miniquake.render.entities`.
 aliasShadeCacheAmbient = []
+/// Tracks the module-level alias shade cache spot state owned by `miniquake.render.entities`.
 aliasShadeCacheSpot = []
+/// Tracks the module-level alias shade cache receiver hit state owned by `miniquake.render.entities`.
 aliasShadeCacheReceiverHit = []
+/// Tracks the module-level alias lighting scratch state owned by `miniquake.render.entities`.
 aliasLightingScratch = [0.0, 0.0, t.Vec3(0.0, 0.0, 0.0), false, 0.0, 0.0, 0.0, false]
+/// Tracks the module-level brush shadow source scratch state owned by `miniquake.render.entities`.
 brushShadowSourceScratch = [false, 0.0, 0.0, 0.0]
+/// Tracks the module-level view model scratch state owned by `miniquake.render.entities`.
 viewModelScratch = void
 // Root complete external renderers (map, textures, surfaces and lightmaps) for
 // the lifetime of the entity renderer.  These are independent BSP models and
 // therefore are not owned by the active WorldRenderer.
 externalBrushRendererRoots = []
+/// Tracks the module-level external brush renderer names state owned by `miniquake.render.entities`.
 externalBrushRendererNames = []
 
 // Update module state for alias shade cache.
@@ -97,7 +131,12 @@ function resetAliasPoseCache()
   return true
 end function
 
-// Update subsystem configuration for configure alias rendering.
+/// Update subsystem configuration for configure alias rendering.
+/// @param smoothModels The smooth models input consumed by `ConfigureAliasRendering`.
+/// @param affineModels The affine models input consumed by `ConfigureAliasRendering`.
+/// @param shadows The shadows input consumed by `ConfigureAliasRendering`.
+/// @param noColors The no colors input consumed by `ConfigureAliasRendering`.
+/// @param doubleEyes The double eyes input consumed by `ConfigureAliasRendering`.
 function ConfigureAliasRendering(smoothModels, affineModels, shadows, noColors, doubleEyes)
   global aliasSmoothModels, aliasAffineModels, aliasShadows, aliasNoColors, aliasDoubleEyes
   aliasSmoothModels = smoothModels
@@ -111,7 +150,8 @@ function ConfigureAliasRendering(smoothModels, affineModels, shadows, noColors, 
   ]
 end function
 
-// Enable or disable temporal interpolation between consecutive MDL poses.
+/// Enable or disable temporal interpolation between consecutive MDL poses.
+/// @param enabled Whether the optional behavior is enabled.
 function ConfigureModelInterpolation(enabled)
   global aliasPoseInterpolation
   if aliasPoseInterpolation != enabled then resetAliasPoseCache() end if
@@ -119,7 +159,7 @@ function ConfigureModelInterpolation(enabled)
   return aliasPoseInterpolation
 end function
 
-// Provide alias rendering configuration behavior for the active subsystem.
+/// Implements the `AliasRenderingConfiguration` operation for `miniquake.render.entities` (alias rendering configuration).
 function AliasRenderingConfiguration()
   return [
     aliasSmoothModels, aliasAffineModels, aliasShadows,
@@ -127,7 +167,8 @@ function AliasRenderingConfiguration()
   ]
 end function
 
-// Configure the backend-neutral projected-shadow sampling level.
+/// Configure the backend-neutral projected-shadow sampling level.
+/// @param value Value consumed by `ConfigureEnhancedShadowQuality`.
 function ConfigureEnhancedShadowQuality(value)
   global aliasShadowQuality
   aliasShadowQuality = native.trunc(value)
@@ -136,7 +177,9 @@ function ConfigureEnhancedShadowQuality(value)
   return aliasShadowQuality
 end function
 
-// Initialize state for starts with.
+/// Starts s with for `miniquake.render.entities`.
+/// @param text Text to parse or process.
+/// @param prefix The prefix input consumed by `startsWith`.
 function startsWith(text, prefix)
   left = bytes(text)
   right = bytes(prefix)
@@ -149,7 +192,9 @@ function startsWith(text, prefix)
   return true
 end function
 
-// Finalize state for ends with insensitive.
+/// Finalize state for ends with insensitive.
+/// @param text Text to parse or process.
+/// @param suffix The suffix input consumed by `endsWithInsensitive`.
 function endsWithInsensitive(text, suffix)
   left = bytes(bio.lower(text))
   right = bytes(bio.lower(suffix))
@@ -163,12 +208,15 @@ function endsWithInsensitive(text, suffix)
   return true
 end function
 
-// Provide empty model behavior for the active subsystem.
+/// Implements the `emptyModel` operation for `miniquake.render.entities` (empty model).
+/// @param name Stable name that identifies the requested object or option.
+/// @param kind The kind input consumed by `emptyModel`.
 function emptyModel(name, kind)
   return t.ClientRenderModel(name, kind, void, void, void, [], false)
 end function
 
-// Return external brush for name derived from the active module state.
+/// Return external brush for name derived from the active module state.
+/// @param name Stable name that identifies the requested object or option.
 function externalBrushForName(name)
   index = 0
   while index < len(externalBrushRendererNames) and index < len(externalBrushRendererRoots)
@@ -178,14 +226,17 @@ function externalBrushForName(name)
   return void
 end function
 
-// Provide brush renderer for model behavior for the active subsystem.
+/// Implements the `brushRendererForModel` operation for `miniquake.render.entities` (brush renderer for model).
+/// @param model Model resource processed by the operation.
 function brushRendererForModel(model)
   if model is void then return void end if
   if model.brushRenderer is not void then return model.brushRenderer end if
   return externalBrushForName(model.name)
 end function
 
-// Read and validate model.
+/// Read and validate model.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param name Stable name that identifies the requested object or option.
 function loadModel(renderer, name)
   global renderModelRegistry
   if name == "" then return emptyModel(name, MODEL_NONE) end if
@@ -217,7 +268,9 @@ function loadModel(renderer, name)
   return emptyModel(name, MODEL_NONE)
 end function
 
-// Read and validate world model.
+/// Read and validate world model.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param name Stable name that identifies the requested object or option.
 function loadWorldModel(renderer, name)
   global renderModelRegistry
   if name == "" then return emptyModel(name, MODEL_NONE) end if
@@ -230,7 +283,10 @@ function loadWorldModel(renderer, name)
   return emptyModel(name, MODEL_BRUSH)
 end function
 
-// Create and initialize the module state.
+/// Implements the `create` operation for `miniquake.render.entities` (create).
+/// @param filesystem The filesystem input consumed by `create`.
+/// @param palette The palette input consumed by `create`.
+/// @param modelPrecache The model precache input consumed by `create`.
 function create(filesystem, palette, modelPrecache)
   global renderModelRegistry, externalBrushRendererRoots, externalBrushRendererNames
   aliasMesh.clearCaches()
@@ -245,7 +301,12 @@ function create(filesystem, palette, modelPrecache)
   return renderer
 end function
 
-// Upload indexed texture to the active renderer.
+/// Upload indexed texture to the active renderer.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param pixels The pixels input consumed by `uploadIndexedTexture`.
+/// @param palette The palette input consumed by `uploadIndexedTexture`.
+/// @param transparent The transparent input consumed by `uploadIndexedTexture`.
 function uploadIndexedTexture(width, height, pixels, palette, transparent)
   if width <= 0 or height <= 0 then return 0 end if
   if len(pixels) < width * height then return 0 end if
@@ -263,13 +324,16 @@ function uploadIndexedTexture(width, height, pixels, palette, transparent)
   return texture
 end function
 
-// Provide translated player texture behavior for the active subsystem.
+/// Implements the `translatedPlayerTexture` operation for `miniquake.render.entities` (translated player texture).
+/// @param entityNumber The entity number input consumed by `translatedPlayerTexture`.
 function inline translatedPlayerTexture(entityNumber)
   if entityNumber < 0 or entityNumber >= len(translatedPlayerTextures) then return 0 end if
   return translatedPlayerTextures[entityNumber]
 end function
 
-// Update module state for translated player texture.
+/// Update module state for translated player texture.
+/// @param entityNumber The entity number input consumed by `setTranslatedPlayerTexture`.
+/// @param texture Texture resource processed by the operation.
 function setTranslatedPlayerTexture(entityNumber, texture)
   global translatedPlayerTextures
   if entityNumber < 0 then return false end if
@@ -282,7 +346,9 @@ function setTranslatedPlayerTexture(entityNumber, texture)
   return true
 end function
 
-// Update module state for the requested value.
+/// Update module state for the requested value.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param modelPrecache The model precache input consumed by `synchronize`.
 function synchronize(renderer, modelPrecache)
   oldCount = len(renderer.models)
   targetCount = len(modelPrecache)
@@ -304,7 +370,9 @@ function synchronize(renderer, modelPrecache)
   return targetCount
 end function
 
-// Upload alias to the active renderer.
+/// Upload alias to the active renderer.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param model Model resource processed by the operation.
 function uploadAlias(renderer, model)
   if model.uploaded then return true end if
   source = model.aliasModel
@@ -342,7 +410,9 @@ function uploadAlias(renderer, model)
   return true
 end function
 
-// Upload sprite to the active renderer.
+/// Upload sprite to the active renderer.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param model Model resource processed by the operation.
 function uploadSprite(renderer, model)
   if model.uploaded then return true end if
   source = model.spriteModel
@@ -377,7 +447,9 @@ function uploadSprite(renderer, model)
   return true
 end function
 
-// Upload the requested value to the active renderer.
+/// Upload the requested value to the active renderer.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param model Model resource processed by the operation.
 function upload(renderer, model)
   if model.kind == MODEL_ALIAS then return uploadAlias(renderer, model) end if
   if model.kind == MODEL_SPRITE then return uploadSprite(renderer, model) end if
@@ -391,7 +463,8 @@ function upload(renderer, model)
   return false
 end function
 
-// Preload and register the the requested value asset.
+/// Preload and register the the requested value asset.
+/// @param renderer Renderer instance or backend used for drawing.
 function precache(renderer)
   if renderer is void then return error(3940, "entity precache: renderer is void") end if
   // Native alias batches select one of sixteen yaw lighting rows. Building all
@@ -426,7 +499,10 @@ function precache(renderer)
   return count
 end function
 
-// Return cycle index derived from the active module state.
+/// Return cycle index derived from the active module state.
+/// @param intervals The intervals input consumed by `cycleIndex`.
+/// @param time Simulation or presentation time for the operation.
+/// @param count Number of entries or units to process.
 function cycleIndex(intervals, time, count)
   if count <= 1 or len(intervals) == 0 then return 0 end if
   full = intervals[len(intervals) - 1]
@@ -440,7 +516,10 @@ function cycleIndex(intervals, time, count)
   return count - 1
 end function
 
-// Provide alias frame behavior for the active subsystem.
+/// Implements the `aliasFrame` operation for `miniquake.render.entities` (alias frame).
+/// @param source Source value or collection to read.
+/// @param frameNumber The frame number input consumed by `aliasFrame`.
+/// @param time Simulation or presentation time for the operation.
 function aliasFrame(source, frameNumber, time)
   if len(source.frames) == 0 then return void end if
   index = frameNumber
@@ -457,9 +536,14 @@ function aliasFrame(source, frameNumber, time)
   return set.frames[0]
 end function
 
-// Return [previous pose, current pose, blend fraction] for one render entity.
-// Networked Quake changes MDL frame numbers at the 10 Hz server cadence; this
-// short history removes visible pose stepping without changing simulation.
+/// Return [previous pose, current pose, blend fraction] for one render entity.
+/// Networked Quake changes MDL frame numbers at the 10 Hz server cadence; this
+/// short history removes visible pose stepping without changing simulation.
+/// @param source Source value or collection to read.
+/// @param entity Entity affected by the operation.
+/// @param currentFrame The current frame input consumed by `aliasPoseBlend`.
+/// @param time Simulation or presentation time for the operation.
+/// @param viewModel The view model input consumed by `aliasPoseBlend`.
 function aliasPoseBlend(source, entity, currentFrame, time, viewModel)
   if not aliasPoseInterpolation or currentFrame is void then return [currentFrame, currentFrame, 1.0] end if
   slot = entity.number
@@ -496,7 +580,10 @@ function aliasPoseBlend(source, entity, currentFrame, time, viewModel)
   return [previous, aliasPoseCurrent[slot], fraction]
 end function
 
-// Provide sprite frame and texture behavior for the active subsystem.
+/// Implements the `spriteFrameAndTexture` operation for `miniquake.render.entities` (sprite frame and texture).
+/// @param model Model resource processed by the operation.
+/// @param entity Entity affected by the operation.
+/// @param time Simulation or presentation time for the operation.
 function spriteFrameAndTexture(model, entity, time)
   source = model.spriteModel
   if source is void or len(source.frames) == 0 then return void end if
@@ -520,7 +607,9 @@ function spriteFrameAndTexture(model, entity, time)
   return [frame, texture]
 end function
 
-// Provide alias vertex behavior for the active subsystem.
+/// Implements the `aliasVertex` operation for `miniquake.render.entities` (alias vertex).
+/// @param source Source value or collection to read.
+/// @param packed The packed input consumed by `aliasVertex`.
 function aliasVertex(source, packed)
   return t.Vec3(
     packed.x * source.scale.x + source.scaleOrigin.x,
@@ -529,7 +618,11 @@ function aliasVertex(source, packed)
   )
 end function
 
-// Provide alias shade behavior for the active subsystem.
+/// Implements the `aliasShade` operation for `miniquake.render.entities` (alias shade).
+/// @param model Model resource processed by the operation.
+/// @param entity Entity affected by the operation.
+/// @param time Simulation or presentation time for the operation.
+/// @param viewModel The view model input consumed by `aliasShade`.
 function aliasShade(model, entity, time, viewModel)
   global aliasShadeCacheValid, aliasShadeCacheStamp, aliasShadeCacheModel
   global aliasShadeCacheColormap, aliasShadeCacheViewModel
@@ -629,8 +722,13 @@ function aliasShade(model, entity, time, viewModel)
   return aliasLightingScratch
 end function
 
-// Transform the strongest world-space point light into the alias model's
-// yaw-local coordinates used by the projected silhouette routine.
+/// Transform the strongest world-space point light into the alias model's
+/// yaw-local coordinates used by the projected silhouette routine.
+/// @param entity Entity affected by the operation.
+/// @param enabled Whether the optional behavior is enabled.
+/// @param lightX The light x input consumed by `configureAliasShadowSource`.
+/// @param lightY The light y input consumed by `configureAliasShadowSource`.
+/// @param lightZ The light z input consumed by `configureAliasShadowSource`.
 function configureAliasShadowSource(entity, enabled, lightX, lightY, lightZ)
   if not enabled then return aliasMesh.configureAliasShadowPointLight(false, 0.0, 0.0, 0.0) end if
   relativeX = lightX - entity.origin.x
@@ -644,10 +742,11 @@ function configureAliasShadowSource(entity, enabled, lightX, lightY, lightZ)
   return aliasMesh.configureAliasShadowPointLight(true, localX, localY, localZ)
 end function
 
-// Return whether an alias model represents opaque physical geometry. Flames
-// and beam/light effects are alias MDLs in retail Quake rather than sprites;
-// projecting them created bright duplicate torches and energy streaks on the
-// receiver floor on backends that defer fixed-function texture state.
+/// Return whether an alias model represents opaque physical geometry. Flames
+/// and beam/light effects are alias MDLs in retail Quake rather than sprites;
+/// projecting them created bright duplicate torches and energy streaks on the
+/// receiver floor on backends that defer fixed-function texture state.
+/// @param model Model resource processed by the operation.
 function aliasModelCastsShadow(model)
   if model is void then return false end if
   name = bio.lower(model.name)
@@ -657,7 +756,13 @@ function aliasModelCastsShadow(model)
   return true
 end function
 
-// Render alias.
+/// Render alias.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param model Model resource processed by the operation.
+/// @param entity Entity affected by the operation.
+/// @param time Simulation or presentation time for the operation.
+/// @param viewModel The view model input consumed by `drawAlias`.
+/// @param enhancedOverlay The enhanced overlay input consumed by `drawAlias`.
 function drawAlias(renderer, model, entity, time, viewModel, enhancedOverlay)
   // Close the preceding model's optional shadow tail before measuring this
   // model's lazy upload.  Without this diagnostic-only boundary the profiler
@@ -792,7 +897,13 @@ function drawAlias(renderer, model, entity, time, viewModel, enhancedOverlay)
   return drawn
 end function
 
-// Render sprite.
+/// Render sprite.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param model Model resource processed by the operation.
+/// @param entity Entity affected by the operation.
+/// @param viewRight The view right input consumed by `drawSprite`.
+/// @param viewUp The view up input consumed by `drawSprite`.
+/// @param time Simulation or presentation time for the operation.
 function drawSprite(renderer, model, entity, viewRight, viewUp, time)
   uploadSprite(renderer, model)
   // R_DrawSpriteModel has the same texture-unit-zero precondition.
@@ -847,7 +958,8 @@ function drawSprite(renderer, model, entity, viewRight, viewUp, time)
   return 1
 end function
 
-// Return brush model index derived from the active module state.
+/// Return brush model index derived from the active module state.
+/// @param name Stable name that identifies the requested object or option.
 function brushModelIndex(name)
   source = bytes(name)
   if len(source) < 2 or source[0] != 42 then return -1 end if
@@ -856,7 +968,11 @@ function brushModelIndex(name)
   return value
 end function
 
-// Render brush.
+/// Render brush.
+/// @param worldRendererValue The world renderer value input consumed by `drawBrush`.
+/// @param model Model resource processed by the operation.
+/// @param entity Entity affected by the operation.
+/// @param time Simulation or presentation time for the operation.
 function drawBrush(worldRendererValue, model, entity, time)
   submodelIndex = brushModelIndex(model.name)
   if submodelIndex <= 0 then
@@ -878,8 +994,12 @@ function drawBrush(worldRendererValue, model, entity, time)
   return worldRenderer.R_DrawBrushModelForSubmodel(entity, submodelIndex)
 end function
 
-// Render one brush entity without its classic lightmap pass so the optional
-// additive GPU program can light the geometry exactly once.
+/// Render one brush entity without its classic lightmap pass so the optional
+/// additive GPU program can light the geometry exactly once.
+/// @param worldRendererValue The world renderer value input consumed by `drawBrushEnhanced`.
+/// @param model Model resource processed by the operation.
+/// @param entity Entity affected by the operation.
+/// @param time Simulation or presentation time for the operation.
 function drawBrushEnhanced(worldRendererValue, model, entity, time)
   submodelIndex = brushModelIndex(model.name)
   if submodelIndex <= 0 then
@@ -896,9 +1016,11 @@ function drawBrushEnhanced(worldRendererValue, model, entity, time)
   return worldRenderer.R_DrawBrushModelEnhancedForSubmodel(entity, submodelIndex)
 end function
 
-// Resolve a stable receiver height from the main BSP beneath an object.  A
-// production miss must suppress the shadow: lightspot retains reusable storage
-// and may still contain another entity's receiver from an earlier trace.
+/// Resolve a stable receiver height from the main BSP beneath an object.  A
+/// production miss must suppress the shadow: lightspot retains reusable storage
+/// and may still contain another entity's receiver from an earlier trace.
+/// @param worldRendererValue The world renderer value input consumed by `objectShadowFloorZ`.
+/// @param entity Entity affected by the operation.
 function objectShadowFloorZ(worldRendererValue, entity)
   if worldRendererValue is void or worldRendererValue.map is void or len(worldRendererValue.map.models) == 0 then
     return entity.origin.z + 1.0
@@ -917,9 +1039,11 @@ function objectShadowFloorZ(worldRendererValue, entity)
   return spot.z + 1.0
 end function
 
-// Select the dynamic light with the strongest local contribution and retain
-// its world-space source for BSP ray projection. When no live point light
-// reaches the object, the projector uses a stable directional fallback.
+/// Select the dynamic light with the strongest local contribution and retain
+/// its world-space source for BSP ray projection. When no live point light
+/// reaches the object, the projector uses a stable directional fallback.
+/// @param entity Entity affected by the operation.
+/// @param time Simulation or presentation time for the operation.
 function brushShadowSource(entity, time)
   global brushShadowSourceScratch
   strongest = void
@@ -941,8 +1065,16 @@ function brushShadowSource(entity, time)
   return brushShadowSourceScratch
 end function
 
-// Draw one projected footprint sample for either an external pickup BSP or an
-// inline moving brush model.
+/// Draw one projected footprint sample for either an external pickup BSP or an
+/// inline moving brush model.
+/// @param worldRendererValue The world renderer value input consumed by `drawBrushShadowSample`.
+/// @param model Model resource processed by the operation.
+/// @param entity Entity affected by the operation.
+/// @param floorWorldZ The floor world z input consumed by `drawBrushShadowSample`.
+/// @param source Source value or collection to read.
+/// @param offsetX The offset x input consumed by `drawBrushShadowSample`.
+/// @param offsetY The offset y input consumed by `drawBrushShadowSample`.
+/// @param contactOnly The contact only input consumed by `drawBrushShadowSample`.
 function drawBrushShadowSample(worldRendererValue, model, entity, floorWorldZ, source, offsetX, offsetY, contactOnly)
   submodelIndex = brushModelIndex(model.name)
   if submodelIndex <= 0 then
@@ -960,8 +1092,12 @@ function drawBrushShadowSample(worldRendererValue, model, entity, floorWorldZ, s
   )
 end function
 
-// Render a backend-neutral soft footprint for BSP pickups, crates, doors and
-// platforms. Sprite effects stay emissive and intentionally cast no shadow.
+/// Render a backend-neutral soft footprint for BSP pickups, crates, doors and
+/// platforms. Sprite effects stay emissive and intentionally cast no shadow.
+/// @param worldRendererValue The world renderer value input consumed by `drawBrushShadow`.
+/// @param model Model resource processed by the operation.
+/// @param entity Entity affected by the operation.
+/// @param time Simulation or presentation time for the operation.
 function drawBrushShadow(worldRendererValue, model, entity, time)
   source = brushShadowSource(entity, time)
   if not rayShadow.configureBrush(
@@ -1021,7 +1157,14 @@ function finishEnhancedEntityOverlay()
   return true
 end function
 
-// Render submitted.
+/// Render submitted.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param worldRendererValue The world renderer value input consumed by `renderSubmitted`.
+/// @param entities The entities input consumed by `renderSubmitted`.
+/// @param hiddenEntityNumber The hidden entity number input consumed by `renderSubmitted`.
+/// @param viewRight The view right input consumed by `renderSubmitted`.
+/// @param viewUp The view up input consumed by `renderSubmitted`.
+/// @param time Simulation or presentation time for the operation.
 function renderSubmitted(renderer, worldRendererValue, entities, hiddenEntityNumber, viewRight, viewUp, time)
   rendered = 0
   // R_DrawEntitiesOnList renders opaque alias/brush models first and performs
@@ -1064,8 +1207,13 @@ function renderSubmitted(renderer, worldRendererValue, entities, hiddenEntityNum
   return rendered
 end function
 
-// Draw the entity portion of the optional additive per-pixel light layer.
-// Sprites remain emissive/alpha-tested and intentionally do not receive it.
+/// Draw the entity portion of the optional additive per-pixel light layer.
+/// Sprites remain emissive/alpha-tested and intentionally do not receive it.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param worldRendererValue The world renderer value input consumed by `renderEnhancedSubmitted`.
+/// @param entities The entities input consumed by `renderEnhancedSubmitted`.
+/// @param hiddenEntityNumber The hidden entity number input consumed by `renderEnhancedSubmitted`.
+/// @param time Simulation or presentation time for the operation.
 function renderEnhancedSubmitted(renderer, worldRendererValue, entities, hiddenEntityNumber, time)
   if not enhanced.hasActiveLights() then return 0 end if
   worldRenderer.GL_DisableMultitexture()
@@ -1099,20 +1247,33 @@ function renderEnhancedSubmitted(renderer, worldRendererValue, entities, hiddenE
   return rendered
 end function
 
-// Render the requested value.
+/// Implements the `render` operation for `miniquake.render.entities` (render).
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param worldRendererValue The world renderer value input consumed by `render`.
+/// @param entities The entities input consumed by `render`.
+/// @param viewEntity The view entity input consumed by `render`.
+/// @param viewRight The view right input consumed by `render`.
+/// @param viewUp The view up input consumed by `render`.
+/// @param time Simulation or presentation time for the operation.
 function render(renderer, worldRendererValue, entities, viewEntity, viewRight, viewUp, time)
   return renderSubmitted(renderer, worldRendererValue, entities, viewEntity, viewRight, viewUp, time)
 end function
 
-// R_DrawViewModel / V_CalcRefdef. The gun is a normal alias model drawn
-// from the view entity, with a compressed depth range so it cannot poke
-// through nearby world surfaces.
+/// R_DrawViewModel / V_CalcRefdef. The gun is a normal alias model drawn
+/// from the view entity, with a compressed depth range so it cannot poke
+/// through nearby world surfaces.
+/// @param depthMin The depth min input consumed by `viewModelDepthRange`.
+/// @param depthMax The depth max input consumed by `viewModelDepthRange`.
 function viewModelDepthRange(depthMin, depthMax)
   weaponMax = depthMin + renderUiContract.viewModelDepthMaximum() * (depthMax - depthMin)
   return [depthMin, weaponMax]
 end function
 
-// Render view model.
+/// Render view model.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param player The player input consumed by `renderViewModel`.
+/// @param view The view input consumed by `renderViewModel`.
+/// @param time Simulation or presentation time for the operation.
 function renderViewModel(renderer, player, view, time)
   global viewModelScratch
   if player.weapon <= 0 or player.weapon >= len(renderer.models) then return 0 end if
@@ -1165,8 +1326,12 @@ function renderViewModel(renderer, player, view, time)
   return result
 end function
 
-// Add per-pixel dynamic light to the first-person weapon using the same
-// compressed depth range as the classic viewmodel draw.
+/// Add per-pixel dynamic light to the first-person weapon using the same
+/// compressed depth range as the classic viewmodel draw.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param player The player input consumed by `renderViewModelEnhanced`.
+/// @param view The view input consumed by `renderViewModelEnhanced`.
+/// @param time Simulation or presentation time for the operation.
 function renderViewModelEnhanced(renderer, player, view, time)
   if not enhanced.hasActiveLights() then return 0 end if
   if player.weapon <= 0 or player.weapon >= len(renderer.models) then return 0 end if
@@ -1190,7 +1355,8 @@ function renderViewModelEnhanced(renderer, player, view, time)
   return result
 end function
 
-// Release resources owned by the requested value.
+/// Implements the `destroy` operation for `miniquake.render.entities` (destroy).
+/// @param renderer Renderer instance or backend used for drawing.
 function destroy(renderer)
   global translatedPlayerTextures, externalBrushRendererRoots, externalBrushRendererNames, viewModelScratch
   for each brush in externalBrushRendererRoots

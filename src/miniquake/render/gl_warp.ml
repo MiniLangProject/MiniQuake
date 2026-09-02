@@ -18,7 +18,9 @@ import miniquake.mathlib as math
 import miniquake.native as native
 import miniquake.array_util as arrayutil
 
+/// Defines the default subdivide size value used by `miniquake.render.gl_warp`.
 const DEFAULT_SUBDIVIDE_SIZE = 128.0
+/// Defines the turbscale value used by `miniquake.render.gl_warp`.
 const TURBSCALE = 40.74366543152521
 
 // gl_model.c owns this archived cvar in MiniQuake.  Keep its current numeric
@@ -26,14 +28,16 @@ const TURBSCALE = 40.74366543152521
 // through the console instead of baking the default into generated polygons.
 gl_subdivide_size = DEFAULT_SUBDIVIDE_SIZE
 
-// gl_warp.c stores all polygon, direction, and texture-coordinate values in
-// float fields. Explicitly cross the IEEE-754 binary32 boundary at the same
-// assignments so the MiniLang backend cannot retain additional precision.
+/// gl_warp.c stores all polygon, direction, and texture-coordinate values in
+/// float fields. Explicitly cross the IEEE-754 binary32 boundary at the same
+/// assignments so the MiniLang backend cannot retain additional precision.
+/// @param value Value consumed by `warpFloat`.
 function warpFloat(value)
   return native.bitsFloat(native.floatBits(value))
 end function
 
-// Update module state for subdivide size.
+/// Update module state for subdivide size.
+/// @param value Value consumed by `SetSubdivideSize`.
 function SetSubdivideSize(value)
   global gl_subdivide_size
   if value <= 0.0 then value = DEFAULT_SUBDIVIDE_SIZE end if
@@ -83,14 +87,16 @@ turbsin = [
   -1.56072, -1.3677, -1.17384, -0.979285, -0.784137, -0.588517, -0.392541, -0.19633,
 ]
 
-// Return floor value derived from the active module state.
+/// Implements the `floorValue` operation for `miniquake.render.gl_warp` (floor value).
+/// @param value Value consumed by `floorValue`.
 function floorValue(value)
   result = native.trunc(value)
   if result > value then result = result - 1 end if
   return result
 end function
 
-// Provide bound poly behavior for the active subsystem.
+/// Implements the `BoundPoly` operation for `miniquake.render.gl_warp` (bound poly).
+/// @param vertices The vertices input consumed by `BoundPoly`.
 function BoundPoly(vertices)
   minimums = t.Vec3(9999.0, 9999.0, 9999.0)
   maximums = t.Vec3(-9999.0, -9999.0, -9999.0)
@@ -106,7 +112,10 @@ function BoundPoly(vertices)
   return [minimums, maximums]
 end function
 
-// Provide interpolate vertex behavior for the active subsystem.
+/// Implements the `interpolateVertex` operation for `miniquake.render.gl_warp` (interpolate vertex).
+/// @param first The first input consumed by `interpolateVertex`.
+/// @param second The second input consumed by `interpolateVertex`.
+/// @param fraction The fraction input consumed by `interpolateVertex`.
 function interpolateVertex(first, second, fraction)
   fraction = warpFloat(fraction)
   position = t.Vec3(
@@ -123,7 +132,10 @@ function interpolateVertex(first, second, fraction)
   )
 end function
 
-// Provide subdivide recursive behavior for the active subsystem.
+/// Implements the `subdivideRecursive` operation for `miniquake.render.gl_warp` (subdivide recursive).
+/// @param vertices The vertices input consumed by `subdivideRecursive`.
+/// @param output Destination collection that receives subdivided polygons.
+/// @param subdivideSize Size of the requested data or resource.
 function subdivideRecursive(vertices, output, subdivideSize)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if len(vertices) > 60 then return error(3800, "SubdividePolygon: numverts > 60") end if
@@ -177,7 +189,9 @@ function subdivideRecursive(vertices, output, subdivideSize)
   return true
 end function
 
-// Provide subdivide polygon behavior for the active subsystem.
+/// Implements the `SubdividePolygon` operation for `miniquake.render.gl_warp` (subdivide polygon).
+/// @param vertices The vertices input consumed by `SubdividePolygon`.
+/// @param subdivideSize Size of the requested data or resource.
 function SubdividePolygon(vertices, subdivideSize)
   if subdivideSize <= 0.0 then subdivideSize = DEFAULT_SUBDIVIDE_SIZE end if
   output = arrayutil.createArrayBuilder(8)
@@ -194,7 +208,10 @@ function SubdividePolygon(vertices, subdivideSize)
   return polygons
 end function
 
-// Provide surface warp vertices behavior for the active subsystem.
+/// Implements the `SurfaceWarpVertices` operation for `miniquake.render.gl_warp` (surface warp vertices).
+/// @param vertices The vertices input consumed by `SurfaceWarpVertices`.
+/// @param sVector The s vector input consumed by `SurfaceWarpVertices`.
+/// @param tVector The t vector input consumed by `SurfaceWarpVertices`.
 function SurfaceWarpVertices(vertices, sVector, tVector)
   result = arrayutil.makeEmptyArray(len(vertices))
   index = 0
@@ -209,12 +226,19 @@ function SurfaceWarpVertices(vertices, sVector, tVector)
   return result
 end function
 
-// Mirror Quake's GL_SubdivideSurface routine and its observable state changes.
+/// Mirror Quake's GL_SubdivideSurface routine and its observable state changes.
+/// @param vertices The vertices input consumed by `GL_SubdivideSurface`.
+/// @param sVector The s vector input consumed by `GL_SubdivideSurface`.
+/// @param tVector The t vector input consumed by `GL_SubdivideSurface`.
+/// @param subdivideSize Size of the requested data or resource.
 function GL_SubdivideSurface(vertices, sVector, tVector, subdivideSize)
   return SubdividePolygon(SurfaceWarpVertices(vertices, sVector, tVector), subdivideSize)
 end function
 
-// Provide water tex coords behavior for the active subsystem.
+/// Implements the `WaterTexCoords` operation for `miniquake.render.gl_warp` (water tex coords).
+/// @param originalS The original s input consumed by `WaterTexCoords`.
+/// @param originalT The original t input consumed by `WaterTexCoords`.
+/// @param realtime Time value used by the operation.
 function WaterTexCoords(originalS, originalT, realtime)
   originalS = warpFloat(originalS)
   originalT = warpFloat(originalT)
@@ -225,9 +249,10 @@ function WaterTexCoords(originalS, originalT, realtime)
   return [textureS, textureT]
 end function
 
-// Interpolate adjacent entries in GLQuake's canonical turbulence table. This
-// preserves the original wave shape while removing visible 256-step texture
-// coordinate jumps in the optional Enhanced presentation.
+/// Interpolate adjacent entries in GLQuake's canonical turbulence table. This
+/// preserves the original wave shape while removing visible 256-step texture
+/// coordinate jumps in the optional Enhanced presentation.
+/// @param indexValue The index value input consumed by `InterpolatedTurb`.
 function InterpolatedTurb(indexValue)
   base = native.trunc(indexValue)
   if indexValue < base then base = base - 1 end if
@@ -237,7 +262,10 @@ function InterpolatedTurb(indexValue)
   return warpFloat(first + (second - first) * fraction)
 end function
 
-// Return smoothly interpolated water coordinates for the Enhanced profile.
+/// Return smoothly interpolated water coordinates for the Enhanced profile.
+/// @param originalS The original s input consumed by `SmoothWaterTexCoords`.
+/// @param originalT The original t input consumed by `SmoothWaterTexCoords`.
+/// @param realtime Time value used by the operation.
 function SmoothWaterTexCoords(originalS, originalT, realtime)
   originalS = warpFloat(originalS)
   originalT = warpFloat(originalT)
@@ -248,7 +276,9 @@ function SmoothWaterTexCoords(originalS, originalT, realtime)
   return [textureS, textureT]
 end function
 
-// Add water polys to the destination state.
+/// Add water polys to the destination state.
+/// @param polygons The polygons input consumed by `EmitWaterPolys`.
+/// @param realtime Time value used by the operation.
 function EmitWaterPolys(polygons, realtime)
   result = arrayutil.makeEmptyArray(len(polygons))
   polygonIndex = 0
@@ -272,13 +302,18 @@ function EmitWaterPolys(polygons, realtime)
   return result
 end function
 
-// Provide wrapped speed scale behavior for the active subsystem.
+/// Implements the `WrappedSpeedScale` operation for `miniquake.render.gl_warp` (wrapped speed scale).
+/// @param realtime Time value used by the operation.
+/// @param speed The speed input consumed by `WrappedSpeedScale`.
 function WrappedSpeedScale(realtime, speed)
   value = warpFloat(realtime * speed)
   return warpFloat(value - (native.trunc(value) & -128))
 end function
 
-// Provide sky tex coords behavior for the active subsystem.
+/// Implements the `SkyTexCoords` operation for `miniquake.render.gl_warp` (sky tex coords).
+/// @param position Position used by the operation.
+/// @param viewOrigin The view origin input consumed by `SkyTexCoords`.
+/// @param currentSpeedScale The current speed scale input consumed by `SkyTexCoords`.
 function SkyTexCoords(position, viewOrigin, currentSpeedScale)
   direction = t.Vec3(
     warpFloat(position.x - viewOrigin.x),
@@ -296,7 +331,10 @@ function SkyTexCoords(position, viewOrigin, currentSpeedScale)
   return [textureS, textureT]
 end function
 
-// Add sky polys to the destination state.
+/// Add sky polys to the destination state.
+/// @param polygons The polygons input consumed by `EmitSkyPolys`.
+/// @param viewOrigin The view origin input consumed by `EmitSkyPolys`.
+/// @param currentSpeedScale The current speed scale input consumed by `EmitSkyPolys`.
 function EmitSkyPolys(polygons, viewOrigin, currentSpeedScale)
   result = arrayutil.makeEmptyArray(len(polygons))
   polygonIndex = 0
@@ -320,7 +358,10 @@ function EmitSkyPolys(polygons, viewOrigin, currentSpeedScale)
   return result
 end function
 
-// Add both sky layers to the destination state.
+/// Add both sky layers to the destination state.
+/// @param polygons The polygons input consumed by `EmitBothSkyLayers`.
+/// @param viewOrigin The view origin input consumed by `EmitBothSkyLayers`.
+/// @param realtime Time value used by the operation.
 function EmitBothSkyLayers(polygons, viewOrigin, realtime)
   solidSpeed = WrappedSpeedScale(realtime, 8.0)
   alphaSpeed = WrappedSpeedScale(realtime, 16.0)
@@ -332,7 +373,10 @@ function EmitBothSkyLayers(polygons, viewOrigin, realtime)
   ]
 end function
 
-// Apply the Quake-compatible r draw sky chain behavior.
+/// Apply the Quake-compatible r draw sky chain behavior.
+/// @param surfacePolygons The surface polygons input consumed by `R_DrawSkyChain`.
+/// @param viewOrigin The view origin input consumed by `R_DrawSkyChain`.
+/// @param realtime Time value used by the operation.
 function R_DrawSkyChain(surfacePolygons, viewOrigin, realtime)
   solidSpeed = WrappedSpeedScale(realtime, 8.0)
   alphaSpeed = WrappedSpeedScale(realtime, 16.0)
@@ -347,7 +391,9 @@ function R_DrawSkyChain(surfacePolygons, viewOrigin, realtime)
   return [solidSpeed, solid, alphaSpeed, alpha]
 end function
 
-// Apply the Quake-compatible r init sky pixels behavior.
+/// Apply the Quake-compatible r init sky pixels behavior.
+/// @param texture Texture resource processed by the operation.
+/// @param palette The palette input consumed by `R_InitSkyPixels`.
 function R_InitSkyPixels(texture, palette)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if texture is void or texture.width != 256 or texture.height != 128 or len(texture.pixels) < 256 * 128 then
@@ -405,7 +451,9 @@ function R_InitSkyPixels(texture, palette)
   return [solid, alpha]
 end function
 
-// Apply the Quake-compatible r init sky behavior.
+/// Apply the Quake-compatible r init sky behavior.
+/// @param texture Texture resource processed by the operation.
+/// @param palette The palette input consumed by `R_InitSky`.
 function R_InitSky(texture, palette)
   return R_InitSkyPixels(texture, palette)
 end function

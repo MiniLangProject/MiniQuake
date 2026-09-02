@@ -7,25 +7,42 @@ MiniLang implementation of miniquake.gameplay_presentation_contract.
 */
 package miniquake.gameplay_presentation_contract
 
+/// Defines the status value used by `miniquake.gameplay_presentation_contract`.
 const STATUS = "gameplay_presentation_109_frozen_v1"
+/// Defines the fingerprint value used by `miniquake.gameplay_presentation_contract`.
 const FINGERPRINT = 0xad91624c
+/// Defines the angle units value used by `miniquake.gameplay_presentation_contract`.
 const ANGLE_UNITS = 65536
+/// Defines the chase trace distance value used by `miniquake.gameplay_presentation_contract`.
 const CHASE_TRACE_DISTANCE = 4096
+/// Defines the chase back default value used by `miniquake.gameplay_presentation_contract`.
 const CHASE_BACK_DEFAULT = 100
+/// Defines the chase up default value used by `miniquake.gameplay_presentation_contract`.
 const CHASE_UP_DEFAULT = 16
+/// Defines the chase right default value used by `miniquake.gameplay_presentation_contract`.
 const CHASE_RIGHT_DEFAULT = 0
+/// Defines the gamma entries value used by `miniquake.gameplay_presentation_contract`.
 const GAMMA_ENTRIES = 256
+/// Defines the cshift count value used by `miniquake.gameplay_presentation_contract`.
 const CSHIFT_COUNT = 4
+/// Defines the view bsp nudge value used by `miniquake.gameplay_presentation_contract`.
 const VIEW_BSP_NUDGE = 0.03125
+/// Defines the bob max value used by `miniquake.gameplay_presentation_contract`.
 const BOB_MAX = 4
+/// Defines the bob min value used by `miniquake.gameplay_presentation_contract`.
 const BOB_MIN = -7
+/// Defines the center line chars value used by `miniquake.gameplay_presentation_contract`.
 const CENTER_LINE_CHARS = 40
+/// Defines the screenshot slots value used by `miniquake.gameplay_presentation_contract`.
 const SCREENSHOT_SLOTS = 100
+/// Defines the loading timeout seconds value used by `miniquake.gameplay_presentation_contract`.
 const LOADING_TIMEOUT_SECONDS = 60
+/// Defines the statusbar height value used by `miniquake.gameplay_presentation_contract`.
 const STATUSBAR_HEIGHT = 24
+/// Defines the max scoreboard value used by `miniquake.gameplay_presentation_contract`.
 const MAX_SCOREBOARD = 16
 
-// Report whether canonical text.
+/// Returns whether `miniquake.gameplay_presentation_contract` can onical text.
 function canonicalText()
   return STATUS + "\n" +
     "angle_units=65536\n" +
@@ -52,7 +69,8 @@ function canonicalText()
     "screenshot_failure_text=PCX\n"
 end function
 
-// Provide fnv1a32 behavior for the active subsystem.
+/// Implements the `fnv1a32` operation for `miniquake.gameplay_presentation_contract` (fnv1a32).
+/// @param text Text to parse or process.
 function fnv1a32(text)
   data = bytes(text)
   value = 0x811c9dc5
@@ -64,7 +82,7 @@ function fnv1a32(text)
   return value
 end function
 
-// Validate the requested value and report any invalid state.
+/// Implements the `verify` operation for `miniquake.gameplay_presentation_contract` (verify).
 function verify()
   if fnv1a32(canonicalText()) != FINGERPRINT then return error(10790, "gameplay/presentation fingerprint mismatch") end if
   if ANGLE_UNITS != 65536 or CHASE_TRACE_DISTANCE != 4096 then return error(10791, "math/chase contract mismatch") end if

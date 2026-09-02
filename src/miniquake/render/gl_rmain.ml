@@ -15,65 +15,123 @@ import miniquake.native as native
 // its richer model/entity objects in render/original.ml and render/entities.ml.
 
 GL_ALPHA_TEST = 3008
+/// Tracks the module-level gl blend state owned by `miniquake.render.gl_rmain`.
 GL_BLEND = 3042
+/// Tracks the module-level gl cull face state owned by `miniquake.render.gl_rmain`.
 GL_CULL_FACE = 2884
+/// Tracks the module-level gl depth test state owned by `miniquake.render.gl_rmain`.
 GL_DEPTH_TEST = 2929
+/// Tracks the module-level gl texture 2 d state owned by `miniquake.render.gl_rmain`.
 GL_TEXTURE_2D = 3553
+/// Tracks the module-level gl quads state owned by `miniquake.render.gl_rmain`.
 GL_QUADS = 7
+/// Tracks the module-level gl triangle strip state owned by `miniquake.render.gl_rmain`.
 GL_TRIANGLE_STRIP = 5
+/// Tracks the module-level gl smooth state owned by `miniquake.render.gl_rmain`.
 GL_SMOOTH = 7425
+/// Tracks the module-level gl flat state owned by `miniquake.render.gl_rmain`.
 GL_FLAT = 7424
+/// Tracks the module-level gl texture env state owned by `miniquake.render.gl_rmain`.
 GL_TEXTURE_ENV = 8960
+/// Tracks the module-level gl texture env mode state owned by `miniquake.render.gl_rmain`.
 GL_TEXTURE_ENV_MODE = 8704
+/// Tracks the module-level gl modulate state owned by `miniquake.render.gl_rmain`.
 GL_MODULATE = 8448
+/// Tracks the module-level gl replace state owned by `miniquake.render.gl_rmain`.
 GL_REPLACE = 7681
+/// Tracks the module-level gl perspective correction hint state owned by `miniquake.render.gl_rmain`.
 GL_PERSPECTIVE_CORRECTION_HINT = 3152
+/// Tracks the module-level gl fastest state owned by `miniquake.render.gl_rmain`.
 GL_FASTEST = 4353
+/// Tracks the module-level gl nicest state owned by `miniquake.render.gl_rmain`.
 GL_NICEST = 4354
+/// Tracks the module-level gl projection state owned by `miniquake.render.gl_rmain`.
 GL_PROJECTION = 5889
+/// Tracks the module-level gl modelview state owned by `miniquake.render.gl_rmain`.
 GL_MODELVIEW = 5888
+/// Tracks the module-level gl front state owned by `miniquake.render.gl_rmain`.
 GL_FRONT = 1028
+/// Tracks the module-level gl back state owned by `miniquake.render.gl_rmain`.
 GL_BACK = 1029
+/// Tracks the module-level gl modelview matrix state owned by `miniquake.render.gl_rmain`.
 GL_MODELVIEW_MATRIX = 2982
+/// Tracks the module-level gl color buffer bit state owned by `miniquake.render.gl_rmain`.
 GL_COLOR_BUFFER_BIT = 16384
+/// Tracks the module-level gl depth buffer bit state owned by `miniquake.render.gl_rmain`.
 GL_DEPTH_BUFFER_BIT = 256
+/// Tracks the module-level gl lequal state owned by `miniquake.render.gl_rmain`.
 GL_LEQUAL = 515
+/// Tracks the module-level gl gequal state owned by `miniquake.render.gl_rmain`.
 GL_GEQUAL = 518
 
+/// Tracks the module-level sink hash state owned by `miniquake.render.gl_rmain`.
 sinkHash = 0
+/// Tracks the module-level sink calls state owned by `miniquake.render.gl_rmain`.
 sinkCalls = 0
+/// Tracks the module-level sink scalar state owned by `miniquake.render.gl_rmain`.
 sinkScalar = 0.0
+/// Tracks the module-level sink vertices state owned by `miniquake.render.gl_rmain`.
 sinkVertices = 0
+/// Tracks the module-level sink binds state owned by `miniquake.render.gl_rmain`.
 sinkBinds = 0
+/// Tracks the module-level sink last texture state owned by `miniquake.render.gl_rmain`.
 sinkLastTexture = -1
+/// Tracks the module-level sink clear mask state owned by `miniquake.render.gl_rmain`.
 sinkClearMask = 0
+/// Tracks the module-level sink depth func state owned by `miniquake.render.gl_rmain`.
 sinkDepthFunc = 0
+/// Tracks the module-level sink depth min state owned by `miniquake.render.gl_rmain`.
 sinkDepthMin = 0.0
+/// Tracks the module-level sink depth max state owned by `miniquake.render.gl_rmain`.
 sinkDepthMax = 0.0
 
+/// Tracks the module-level frustum state owned by `miniquake.render.gl_rmain`.
 frustum = []
+/// Tracks the module-level vpn state owned by `miniquake.render.gl_rmain`.
 vpn = [1.0, 0.0, 0.0]
+/// Tracks the module-level vright state owned by `miniquake.render.gl_rmain`.
 vright = [0.0, -1.0, 0.0]
+/// Tracks the module-level vup state owned by `miniquake.render.gl_rmain`.
 vup = [0.0, 0.0, 1.0]
+/// Tracks the module-level r origin state owned by `miniquake.render.gl_rmain`.
 r_origin = [0.0, 0.0, 0.0]
+/// Tracks the module-level r vieworg state owned by `miniquake.render.gl_rmain`.
 r_vieworg = [8.0, 4.0, 2.0]
+/// Tracks the module-level r viewangles state owned by `miniquake.render.gl_rmain`.
 r_viewangles = [5.0, 15.0, 1.0]
+/// Tracks the module-level r fov x state owned by `miniquake.render.gl_rmain`.
 r_fov_x = 90.0
+/// Tracks the module-level r fov y state owned by `miniquake.render.gl_rmain`.
 r_fov_y = 75.0
+/// Tracks the module-level r framecount state owned by `miniquake.render.gl_rmain`.
 r_framecount = 0
+/// Tracks the module-level c brush polys state owned by `miniquake.render.gl_rmain`.
 c_brush_polys = 0
+/// Tracks the module-level c alias polys state owned by `miniquake.render.gl_rmain`.
 c_alias_polys = 0
+/// Tracks the module-level lastposenum state owned by `miniquake.render.gl_rmain`.
 lastposenum = 0
+/// Tracks the module-level gldepthmin state owned by `miniquake.render.gl_rmain`.
 gldepthmin = 0.0
+/// Tracks the module-level gldepthmax state owned by `miniquake.render.gl_rmain`.
 gldepthmax = 0.0
+/// Tracks the module-level r drawentities state owned by `miniquake.render.gl_rmain`.
 r_drawentities = false
+/// Tracks the module-level r drawviewmodel state owned by `miniquake.render.gl_rmain`.
 r_drawviewmodel = false
+/// Tracks the module-level mirror state owned by `miniquake.render.gl_rmain`.
 mirror = false
+/// Tracks the module-level mirror plane state owned by `miniquake.render.gl_rmain`.
 mirrorPlane = [[1.0, 0.0, 0.0], 0.0]
+/// Tracks the module-level mirror alpha state owned by `miniquake.render.gl_rmain`.
 mirrorAlpha = 1.0
+/// Tracks the module-level clear color state owned by `miniquake.render.gl_rmain`.
 clearColor = false
+/// Tracks the module-level z trick state owned by `miniquake.render.gl_rmain`.
 zTrick = false
+/// Tracks the module-level trick frame state owned by `miniquake.render.gl_rmain`.
 trickFrame = 0
+/// Tracks the module-level blend color state owned by `miniquake.render.gl_rmain`.
 blendColor = [0.0, 0.0, 0.0, 0.0]
 
 // Update module state for sink.
@@ -135,7 +193,12 @@ function ResetCompatibility()
   return true
 end function
 
-// Provide note behavior for the active subsystem.
+/// Implements the `Note` operation for `miniquake.render.gl_rmain` (note).
+/// @param operation The operation input consumed by `Note`.
+/// @param a The a input consumed by `Note`.
+/// @param b The b input consumed by `Note`.
+/// @param c The c input consumed by `Note`.
+/// @param d The d input consumed by `Note`.
 function Note(operation, a, b, c, d)
   global sinkHash, sinkCalls, sinkScalar
   sinkHash = (sinkHash * 131 + operation) % 1000000007
@@ -144,7 +207,8 @@ function Note(operation, a, b, c, d)
   return true
 end function
 
-// Provide bind behavior for the active subsystem.
+/// Implements the `Bind` operation for `miniquake.render.gl_rmain` (bind).
+/// @param texture Texture resource processed by the operation.
 function Bind(texture)
   global sinkBinds, sinkLastTexture
   sinkBinds = sinkBinds + 1
@@ -152,14 +216,18 @@ function Bind(texture)
   Note(104, texture, 0, 0, 0)
 end function
 
-// Provide vertex behavior for the active subsystem.
+/// Implements the `Vertex` operation for `miniquake.render.gl_rmain` (vertex).
+/// @param operation The operation input consumed by `Vertex`.
+/// @param point The point input consumed by `Vertex`.
 function Vertex(operation, point)
   global sinkVertices
   sinkVertices = sinkVertices + 1
   Note(operation, point[0], point[1], point[2], 0)
 end function
 
-// Provide depth range behavior for the active subsystem.
+/// Implements the `DepthRange` operation for `miniquake.render.gl_rmain` (depth range).
+/// @param minimum Smallest accepted value.
+/// @param maximum Largest accepted value.
 function DepthRange(minimum, maximum)
   global sinkDepthMin, sinkDepthMax
   sinkDepthMin = minimum
@@ -167,14 +235,16 @@ function DepthRange(minimum, maximum)
   Note(19, minimum, maximum, 0, 0)
 end function
 
-// Provide depth func behavior for the active subsystem.
+/// Implements the `DepthFunc` operation for `miniquake.render.gl_rmain` (depth func).
+/// @param value Value consumed by `DepthFunc`.
 function DepthFunc(value)
   global sinkDepthFunc
   sinkDepthFunc = value
   Note(27, value, 0, 0, 0)
 end function
 
-// Update module state for the requested operation.
+/// Implements the `Clear` operation for `miniquake.render.gl_rmain` (clear).
+/// @param mask The mask input consumed by `Clear`.
 function Clear(mask)
   global sinkClearMask
   sinkClearMask = mask
@@ -189,27 +259,37 @@ function GetSinkState()
   ]
 end function
 
-// Provide dot behavior for the active subsystem.
+/// Implements the `Dot` operation for `miniquake.render.gl_rmain` (dot).
+/// @param left The left input consumed by `Dot`.
+/// @param right The right input consumed by `Dot`.
 function inline Dot(left, right)
   return left[0] * right[0] + left[1] * right[1] + left[2] * right[2]
 end function
 
-// Provide f32 behavior for the active subsystem.
+/// Implements the `F32` operation for `miniquake.render.gl_rmain` (f32).
+/// @param value Value consumed by `F32`.
 function F32(value)
   return native.bitsFloat(native.floatBits(value))
 end function
 
-// Add state for add.
+/// Add state for add.
+/// @param left The left input consumed by `Add`.
+/// @param right The right input consumed by `Add`.
 function Add(left, right)
   return [left[0] + right[0], left[1] + right[1], left[2] + right[2]]
 end function
 
-// Provide subtract behavior for the active subsystem.
+/// Implements the `Subtract` operation for `miniquake.render.gl_rmain` (subtract).
+/// @param left The left input consumed by `Subtract`.
+/// @param right The right input consumed by `Subtract`.
 function Subtract(left, right)
   return [left[0] - right[0], left[1] - right[1], left[2] - right[2]]
 end function
 
-// Provide multiply add behavior for the active subsystem.
+/// Implements the `MultiplyAdd` operation for `miniquake.render.gl_rmain` (multiply add).
+/// @param origin World-space origin of the operation.
+/// @param scale The scale input consumed by `MultiplyAdd`.
+/// @param direction The direction input consumed by `MultiplyAdd`.
 function MultiplyAdd(origin, scale, direction)
   return [
     origin[0] + scale * direction[0],
@@ -218,7 +298,10 @@ function MultiplyAdd(origin, scale, direction)
   ]
 end function
 
-// Provide box on plane side behavior for the active subsystem.
+/// Implements the `BoxOnPlaneSide` operation for `miniquake.render.gl_rmain` (box on plane side).
+/// @param mins The mins input consumed by `BoxOnPlaneSide`.
+/// @param maxs The maxs input consumed by `BoxOnPlaneSide`.
+/// @param plane The plane input consumed by `BoxOnPlaneSide`.
 function BoxOnPlaneSide(mins, maxs, plane)
   distance1 = Dot(maxs, plane[0]) - plane[1]
   distance2 = Dot(mins, plane[0]) - plane[1]
@@ -228,7 +311,9 @@ function BoxOnPlaneSide(mins, maxs, plane)
   return sides
 end function
 
-// Apply the Quake-compatible r cull box behavior.
+/// Apply the Quake-compatible r cull box behavior.
+/// @param mins The mins input consumed by `R_CullBox`.
+/// @param maxs The maxs input consumed by `R_CullBox`.
 function R_CullBox(mins, maxs)
   index = 0
   while index < 4
@@ -238,7 +323,8 @@ function R_CullBox(mins, maxs)
   return false
 end function
 
-// Apply the Quake-compatible r rotate for entity behavior.
+/// Apply the Quake-compatible r rotate for entity behavior.
+/// @param entity Entity affected by the operation.
 function R_RotateForEntity(entity)
   origin = entity[0]
   angles = entity[1]
@@ -249,7 +335,12 @@ function R_RotateForEntity(entity)
   return true
 end function
 
-// Apply the Quake-compatible r get sprite frame behavior.
+/// Apply the Quake-compatible r get sprite frame behavior.
+/// @param frameType The frame type input consumed by `R_GetSpriteFrame`.
+/// @param textures The textures input consumed by `R_GetSpriteFrame`.
+/// @param intervals The intervals input consumed by `R_GetSpriteFrame`.
+/// @param time Simulation or presentation time for the operation.
+/// @param syncbase The syncbase input consumed by `R_GetSpriteFrame`.
 function R_GetSpriteFrame(frameType, textures, intervals, time, syncbase)
   if frameType == 0 then return textures[0] end if
   fullinterval = intervals[len(intervals) - 1]
@@ -263,7 +354,9 @@ function R_GetSpriteFrame(frameType, textures, intervals, time, syncbase)
   return textures[len(textures) - 1]
 end function
 
-// Apply the Quake-compatible r draw sprite model behavior.
+/// Apply the Quake-compatible r draw sprite model behavior.
+/// @param entity Entity affected by the operation.
+/// @param frame The frame input consumed by `R_DrawSpriteModel`.
 function R_DrawSpriteModel(entity, frame)
   origin = entity[0]
   up = vup
@@ -296,7 +389,10 @@ function MakeAliasHeader()
   ]
 end function
 
-// Mirror Quake's GL_DrawAliasFrame routine and its observable state changes.
+/// Mirror Quake's GL_DrawAliasFrame routine and its observable state changes.
+/// @param header The header input consumed by `GL_DrawAliasFrame`.
+/// @param posenum The posenum input consumed by `GL_DrawAliasFrame`.
+/// @param light The light input consumed by `GL_DrawAliasFrame`.
 function GL_DrawAliasFrame(header, posenum, light)
   global lastposenum
   lastposenum = posenum
@@ -315,7 +411,12 @@ function GL_DrawAliasFrame(header, posenum, light)
   return posenum
 end function
 
-// Mirror Quake's GL_DrawAliasShadow routine and its observable state changes.
+/// Mirror Quake's GL_DrawAliasShadow routine and its observable state changes.
+/// @param header The header input consumed by `GL_DrawAliasShadow`.
+/// @param posenum The posenum input consumed by `GL_DrawAliasShadow`.
+/// @param entityOrigin The entity origin input consumed by `GL_DrawAliasShadow`.
+/// @param lightSpot The light spot input consumed by `GL_DrawAliasShadow`.
+/// @param vector The vector input consumed by `GL_DrawAliasShadow`.
 function GL_DrawAliasShadow(header, posenum, entityOrigin, lightSpot, vector)
   vertices = header[2][posenum]
   scale = header[0]
@@ -341,7 +442,11 @@ function GL_DrawAliasShadow(header, posenum, entityOrigin, lightSpot, vector)
   return true
 end function
 
-// Apply the Quake-compatible r setup alias frame behavior.
+/// Apply the Quake-compatible r setup alias frame behavior.
+/// @param frame The frame input consumed by `R_SetupAliasFrame`.
+/// @param header The header input consumed by `R_SetupAliasFrame`.
+/// @param time Simulation or presentation time for the operation.
+/// @param light The light input consumed by `R_SetupAliasFrame`.
 function R_SetupAliasFrame(frame, header, time, light)
   pose = 0
   numposes = header[5]
@@ -350,7 +455,11 @@ function R_SetupAliasFrame(frame, header, time, light)
   return pose
 end function
 
-// Apply the Quake-compatible r draw alias model behavior.
+/// Apply the Quake-compatible r draw alias model behavior.
+/// @param entity Entity affected by the operation.
+/// @param header The header input consumed by `R_DrawAliasModel`.
+/// @param time Simulation or presentation time for the operation.
+/// @param shadows The shadows input consumed by `R_DrawAliasModel`.
 function R_DrawAliasModel(entity, header, time, shadows)
   global c_alias_polys
   // Fixture platform edge: R_LightPoint.
@@ -393,7 +502,9 @@ function R_DrawAliasModel(entity, header, time, shadows)
   return header[4]
 end function
 
-// Apply the Quake-compatible r draw entities on list behavior.
+/// Apply the Quake-compatible r draw entities on list behavior.
+/// @param brushCount Number of entries or units to process.
+/// @param sprites The sprites input consumed by `R_DrawEntitiesOnList`.
 function R_DrawEntitiesOnList(brushCount, sprites)
   if not r_drawentities then return 0 end if
   index = 0
@@ -407,7 +518,11 @@ function R_DrawEntitiesOnList(brushCount, sprites)
   return brushCount + len(sprites)
 end function
 
-// Apply the Quake-compatible r draw view model behavior.
+/// Apply the Quake-compatible r draw view model behavior.
+/// @param entity Entity affected by the operation.
+/// @param header The header input consumed by `R_DrawViewModel`.
+/// @param time Simulation or presentation time for the operation.
+/// @param shadows The shadows input consumed by `R_DrawViewModel`.
 function R_DrawViewModel(entity, header, time, shadows)
   if not r_drawviewmodel or not r_drawentities or mirror then return 0 end if
   Note(107, 0, 0, 0, 0)
@@ -441,7 +556,8 @@ function R_PolyBlend()
   return true
 end function
 
-// Provide signbits for plane behavior for the active subsystem.
+/// Implements the `SignbitsForPlane` operation for `miniquake.render.gl_rmain` (signbits for plane).
+/// @param plane The plane input consumed by `SignbitsForPlane`.
 function SignbitsForPlane(plane)
   bits = 0
   if plane[0][0] < 0.0 then bits = bits | 1 end if
@@ -494,7 +610,11 @@ function R_SetupFrame()
   return true
 end function
 
-// Provide myglu perspective behavior for the active subsystem.
+/// Implements the `MYgluPerspective` operation for `miniquake.render.gl_rmain` (m yglu perspective).
+/// @param fovy The fovy input consumed by `MYgluPerspective`.
+/// @param aspect The aspect input consumed by `MYgluPerspective`.
+/// @param zNear The z near input consumed by `MYgluPerspective`.
+/// @param zFar The z far input consumed by `MYgluPerspective`.
 function MYgluPerspective(fovy, aspect, zNear, zFar)
   angle = fovy * 3.141592653589793 / 360.0
   ymax = zNear * native.sin(angle) / native.cos(angle)
@@ -629,26 +749,33 @@ function R_RenderView()
   return true
 end function
 
-// Update module state for cull planes.
+/// Update module state for cull planes.
+/// @param planes The planes input consumed by `SetCullPlanes`.
 function SetCullPlanes(planes)
   global frustum
   frustum = planes
 end function
 
-// Update module state for blend.
+/// Update module state for blend.
+/// @param value Value consumed by `SetBlend`.
 function SetBlend(value)
   global blendColor
   blendColor = value
 end function
 
-// Update module state for draw flags.
+/// Update module state for draw flags.
+/// @param entities The entities input consumed by `SetDrawFlags`.
+/// @param viewModel The view model input consumed by `SetDrawFlags`.
 function SetDrawFlags(entities, viewModel)
   global r_drawentities, r_drawviewmodel
   r_drawentities = entities
   r_drawviewmodel = viewModel
 end function
 
-// Update module state for clear flags.
+/// Update module state for clear flags.
+/// @param alpha The alpha input consumed by `SetClearFlags`.
+/// @param clearValue The clear value input consumed by `SetClearFlags`.
+/// @param zValue The z value input consumed by `SetClearFlags`.
 function SetClearFlags(alpha, clearValue, zValue)
   global mirrorAlpha, clearColor, zTrick
   mirrorAlpha = alpha
@@ -656,14 +783,20 @@ function SetClearFlags(alpha, clearValue, zValue)
   zTrick = zValue
 end function
 
-// Update module state for mirror.
+/// Update module state for mirror.
+/// @param value Value consumed by `SetMirror`.
+/// @param plane The plane input consumed by `SetMirror`.
 function SetMirror(value, plane)
   global mirror, mirrorPlane
   mirror = value
   mirrorPlane = plane
 end function
 
-// Update module state for view basis.
+/// Update module state for view basis.
+/// @param origin World-space origin of the operation.
+/// @param forward The forward input consumed by `SetViewBasis`.
+/// @param right The right input consumed by `SetViewBasis`.
+/// @param up The up input consumed by `SetViewBasis`.
 function SetViewBasis(origin, forward, right, up)
   global r_origin, vpn, vright, vup
   r_origin = origin
@@ -673,7 +806,10 @@ function SetViewBasis(origin, forward, right, up)
   return true
 end function
 
-// Update module state for frame state.
+/// Update module state for frame state.
+/// @param frame The frame input consumed by `SetFrameState`.
+/// @param brushPolys The brush polys input consumed by `SetFrameState`.
+/// @param aliasPolys The alias polys input consumed by `SetFrameState`.
 function SetFrameState(frame, brushPolys, aliasPolys)
   global r_framecount, c_brush_polys, c_alias_polys
   r_framecount = frame
@@ -681,7 +817,9 @@ function SetFrameState(frame, brushPolys, aliasPolys)
   c_alias_polys = aliasPolys
 end function
 
-// Update module state for depth compatibility.
+/// Update module state for depth compatibility.
+/// @param minimum Smallest accepted value.
+/// @param maximum Largest accepted value.
 function SetDepthCompatibility(minimum, maximum)
   global gldepthmin, gldepthmax
   gldepthmin = minimum
@@ -689,7 +827,7 @@ function SetDepthCompatibility(minimum, maximum)
   return true
 end function
 
-// Provide prepare world behavior for the active subsystem.
+/// Implements the `PrepareWorld` operation for `miniquake.render.gl_rmain` (prepare world).
 function PrepareWorld()
   global r_vieworg, r_viewangles, r_fov_x, r_fov_y
   global r_drawentities, r_drawviewmodel

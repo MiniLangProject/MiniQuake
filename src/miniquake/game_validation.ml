@@ -21,12 +21,16 @@ import miniquake.world_bsp as world
 import miniquake.mathlib as math
 import miniquake.common as common
 
-// Add state for append.
+/// Implements the `append` operation for `miniquake.game_validation` (append).
+/// @param messages The messages input consumed by `append`.
+/// @param level The level input consumed by `append`.
+/// @param text Text to parse or process.
 function inline append(messages, level, text)
   return messages + [level + " " + text]
 end function
 
-// Provide filesystem arguments behavior for the active subsystem.
+/// Implements the `filesystemArguments` operation for `miniquake.game_validation` (filesystem arguments).
+/// @param options The options input consumed by `filesystemArguments`.
 function filesystemArguments(options)
   // Preserve the full COM_InitFilesystem profile instead of reducing it to
   // only the final com_gamedir.  In particular, -rogue and -hipnotic may both
@@ -59,14 +63,17 @@ function filesystemArguments(options)
   return result
 end function
 
-// Provide runtime arguments behavior for the active subsystem.
+/// Runs time arguments for `miniquake.game_validation`.
+/// @param options The options input consumed by `runtimeArguments`.
 function runtimeArguments(options)
   result = filesystemArguments(options)
   result = result + ["-headless", "-nosound", "+map", options.startMap]
   return result
 end function
 
-// Validate integrated runtime and report any incompatibility.
+/// Validate integrated runtime and report any incompatibility.
+/// @param options The options input consumed by `validateIntegratedRuntime`.
+/// @param messages The messages input consumed by `validateIntegratedRuntime`.
 function validateIntegratedRuntime(options, messages)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   session = host.create(runtimeArguments(options))
@@ -120,7 +127,9 @@ function validateIntegratedRuntime(options, messages)
   return [messages, ok]
 end function
 
-// Validate graphics data and report any incompatibility.
+/// Validate graphics data and report any incompatibility.
+/// @param system The system input consumed by `validateGraphicsData`.
+/// @param messages The messages input consumed by `validateGraphicsData`.
 function validateGraphicsData(system, messages)
   ok = true
   paletteData = try(qfs.readFile(system, "gfx/palette.lmp"))
@@ -155,7 +164,9 @@ function validateGraphicsData(system, messages)
   return [messages, ok]
 end function
 
-// Validate program data and report any incompatibility.
+/// Validate program data and report any incompatibility.
+/// @param system The system input consumed by `validateProgramData`.
+/// @param messages The messages input consumed by `validateProgramData`.
 function validateProgramData(system, messages)
   ok = true
   functionCount = 0
@@ -177,7 +188,10 @@ function validateProgramData(system, messages)
   return [messages, ok, functionCount]
 end function
 
-// Validate map data and report any incompatibility.
+/// Validate map data and report any incompatibility.
+/// @param system The system input consumed by `validateMapData`.
+/// @param options The options input consumed by `validateMapData`.
+/// @param messages The messages input consumed by `validateMapData`.
 function validateMapData(system, options, messages)
   ok = true
   faceCount = 0
@@ -215,7 +229,9 @@ function validateMapData(system, options, messages)
   return [messages, ok, faceCount, textureCount, entityCount]
 end function
 
-// Validate player model and report any incompatibility.
+/// Validate player model and report any incompatibility.
+/// @param system The system input consumed by `validatePlayerModel`.
+/// @param messages The messages input consumed by `validatePlayerModel`.
 function validatePlayerModel(system, messages)
   ok = true
   playerData = try(qfs.readFile(system, "progs/player.mdl"))
@@ -233,7 +249,9 @@ function validatePlayerModel(system, messages)
   return [messages, ok]
 end function
 
-// Validate menu sound and report any incompatibility.
+/// Validate menu sound and report any incompatibility.
+/// @param system The system input consumed by `validateMenuSound`.
+/// @param messages The messages input consumed by `validateMenuSound`.
 function validateMenuSound(system, messages)
   ok = true
   soundData = try(qfs.readFile(system, "sound/misc/menu1.wav"))
@@ -251,7 +269,8 @@ function validateMenuSound(system, messages)
   return [messages, ok]
 end function
 
-// Validate the requested value and report any incompatibility.
+/// Implements the `validate` operation for `miniquake.game_validation` (validate).
+/// @param options The options input consumed by `validate`.
 function validate(options)
   print "[validate 1/7] mounting game search paths"
   system = qfs.initializeArguments(options.basedir, common.create(filesystemArguments(options)))
@@ -322,7 +341,8 @@ function validate(options)
   return t.GameValidation(ok, messages, packFiles, mapFaces, mapTextures, mapEntities, progsFunctions)
 end function
 
-// Format and emit report.
+/// Implements the `printReport` operation for `miniquake.game_validation` (print report).
+/// @param report The report input consumed by `printReport`.
 function printReport(report)
   print "MiniQuake game-data validation"
   for each line in report.messages

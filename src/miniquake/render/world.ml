@@ -30,18 +30,25 @@ import miniquake.byteio as byteio
 // GameSession -> WorldRenderer -> surfaces is not reliable across allocations
 // performed while the entity renderer is built.
 worldSurfaceRoots = []
+/// Tracks the module-level clear static cache on create state owned by `miniquake.render.world`.
 clearStaticCacheOnCreate = true
+/// Tracks the module-level visible face count renderer state owned by `miniquake.render.world`.
 visibleFaceCountRenderer = void
+/// Tracks the module-level visible face count leaf state owned by `miniquake.render.world`.
 visibleFaceCountLeaf = -2
+/// Tracks the module-level visible face count value state owned by `miniquake.render.world`.
 visibleFaceCountValue = 0
 // R_RecursiveWorldNode must not visit BSP branches which contain no PVS
 // surfaces.  GLQuake stores this as node->visframe; MiniQuake keeps the same
 // derived state in a renderer-local byte mask so an unchanged view leaf does
 // not force a complete BSP walk on every displayed frame.
 rCompatVisibleNodeRenderer = void
+/// Tracks the module-level r compat visible nodes state owned by `miniquake.render.world`.
 rCompatVisibleNodes = bytes()
 
-// Initialize state for starts with.
+/// Starts s with for `miniquake.render.world`.
+/// @param text Text to parse or process.
+/// @param prefix The prefix input consumed by `startsWith`.
 function startsWith(text, prefix)
   textBytes = bytes(text)
   prefixBytes = bytes(prefix)
@@ -54,21 +61,26 @@ function startsWith(text, prefix)
   return true
 end function
 
-// Return floor value derived from the active module state.
+/// Implements the `floorValue` operation for `miniquake.render.world` (floor value).
+/// @param value Value consumed by `floorValue`.
 function floorValue(value)
   truncated = native.trunc(value)
   if truncated > value then truncated = truncated - 1 end if
   return truncated
 end function
 
-// Return ceil value derived from the active module state.
+/// Return ceil value derived from the active module state.
+/// @param value Value consumed by `ceilValue`.
 function ceilValue(value)
   truncated = native.trunc(value)
   if truncated < value then truncated = truncated + 1 end if
   return truncated
 end function
 
-// Provide face vertex behavior for the active subsystem.
+/// Implements the `faceVertex` operation for `miniquake.render.world` (face vertex).
+/// @param map The map input consumed by `faceVertex`.
+/// @param face The face input consumed by `faceVertex`.
+/// @param edgeNumber The edge number input consumed by `faceVertex`.
 function faceVertex(map, face, edgeNumber)
   surfEdgeIndex = face.firstEdge + edgeNumber
   if surfEdgeIndex < 0 or surfEdgeIndex >= len(map.surfEdges) then return error(2700, "R_BuildSurface: bad surfedge") end if
@@ -83,7 +95,10 @@ function faceVertex(map, face, edgeNumber)
   return map.vertices[vertexIndex].position
 end function
 
-// Provide indexed to rgba behavior for the active subsystem.
+/// Implements the `indexedToRgba` operation for `miniquake.render.world` (indexed to rgba).
+/// @param indexed The indexed input consumed by `indexedToRgba`.
+/// @param palette The palette input consumed by `indexedToRgba`.
+/// @param transparent The transparent input consumed by `indexedToRgba`.
 function indexedToRgba(indexed, palette, transparent)
   if len(palette) < 768 then return error(2703, "palette.lmp is truncated") end if
   output = bytes(len(indexed) * 4)
@@ -101,7 +116,7 @@ function indexedToRgba(indexed, palette, transparent)
   return output
 end function
 
-// Provide missing texture pixels behavior for the active subsystem.
+/// Implements the `missingTexturePixels` operation for `miniquake.render.world` (missing texture pixels).
 function missingTexturePixels()
   output = bytes(16 * 16 * 4)
   y = 0
@@ -127,7 +142,11 @@ function missingTexturePixels()
   return output
 end function
 
-// Upload pixels to the active renderer.
+/// Upload pixels to the active renderer.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param rgba The rgba input consumed by `uploadPixels`.
+/// @param nearest The nearest input consumed by `uploadPixels`.
 function uploadPixels(width, height, rgba, nearest)
   textureId = gl.generateTexture()
   gl.bindTexture(textureId)
@@ -141,7 +160,9 @@ function uploadPixels(width, height, rgba, nearest)
   return textureId
 end function
 
-// Provide texture flags behavior for the active subsystem.
+/// Implements the `textureFlags` operation for `miniquake.render.world` (texture flags).
+/// @param textureName Name that identifies the requested value or resource.
+/// @param faceSide The face side input consumed by `textureFlags`.
 function textureFlags(textureName, faceSide)
   flags = 0
   if faceSide != 0 then flags = flags | c.SURF_PLANEBACK end if
@@ -150,7 +171,8 @@ function textureFlags(textureName, faceSide)
   return flags
 end function
 
-// Create and initialize underwater flags.
+/// Create and initialize underwater flags.
+/// @param map The map input consumed by `buildUnderwaterFlags`.
 function buildUnderwaterFlags(map)
   flags = bytes(len(map.faces), 0)
   leafIndex = 0
@@ -172,7 +194,10 @@ function buildUnderwaterFlags(map)
   return flags
 end function
 
-// Create and initialize surface.
+/// Create and initialize surface.
+/// @param map The map input consumed by `buildSurface`.
+/// @param faceIndex Zero-based index of the requested entry.
+/// @param underwaterFlags The underwater flags input consumed by `buildSurface`.
 function buildSurface(map, faceIndex, underwaterFlags)
   if faceIndex < 0 or faceIndex >= len(map.faces) then return error(2704, "R_BuildSurface: bad face") end if
   face = map.faces[faceIndex]
@@ -268,7 +293,9 @@ function buildSurface(map, faceIndex, underwaterFlags)
   return surface
 end function
 
-// Create and initialize lightmap.
+/// Create and initialize lightmap.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param surface The surface input consumed by `buildLightmap`.
 function buildLightmap(renderer, surface)
   if surface.lightOffset < 0 then return 0 end if
   if (surface.flags & c.SURF_DRAWTILED) != 0 then return 0 end if
@@ -296,7 +323,9 @@ function buildLightmap(renderer, surface)
   return textureId
 end function
 
-// Create and initialize the module state.
+/// Implements the `create` operation for `miniquake.render.world` (create).
+/// @param map The map input consumed by `create`.
+/// @param palette The palette input consumed by `create`.
 function create(map, palette)
   global worldSurfaceRoots
   if len(palette) < 768 then return error(2706, "R_NewMap: invalid palette") end if
@@ -349,7 +378,9 @@ function create(map, palette)
   return renderer
 end function
 
-// Create and initialize external.
+/// Create and initialize external.
+/// @param map The map input consumed by `createExternal`.
+/// @param palette The palette input consumed by `createExternal`.
 function createExternal(map, palette)
   global worldSurfaceRoots, clearStaticCacheOnCreate
   // External BSP pickups use the same surface builder but do not replace the
@@ -364,7 +395,8 @@ function createExternal(map, palette)
   return renderer
 end function
 
-// Upload the requested value to the active renderer.
+/// Upload the requested value to the active renderer.
+/// @param renderer Renderer instance or backend used for drawing.
 function upload(renderer)
   if renderer.uploaded then return renderer end if
   draw2d.Draw_SetPalette(renderer.palette)
@@ -415,10 +447,12 @@ function upload(renderer)
   return renderer
 end function
 
-// External BSP models such as maps/b_bh25.bsp are independent brush models,
-// not *n submodels of the active world. GLQuake includes all of them in
-// GL_BuildLightmaps. Keep their uploads independent from the world's shared
-// atlas so loading one cannot replace the active world's compatibility state.
+/// External BSP models such as maps/b_bh25.bsp are independent brush models,
+/// not *n submodels of the active world. GLQuake includes all of them in
+/// GL_BuildLightmaps. Keep their uploads independent from the world's shared
+/// atlas so loading one cannot replace the active world's compatibility state.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param surface The surface input consumed by `buildStandaloneLightmap`.
 function buildStandaloneLightmap(renderer, surface)
   // Build dependent state in order so later fields reference fully initialized data.
   if (surface.flags & (c.SURF_DRAWSKY | c.SURF_DRAWTURB | c.SURF_DRAWTILED)) != 0 then return 0 end if
@@ -463,7 +497,8 @@ function buildStandaloneLightmap(renderer, surface)
   return textureId
 end function
 
-// Upload standalone brush to the active renderer.
+/// Upload standalone brush to the active renderer.
+/// @param renderer Renderer instance or backend used for drawing.
 function uploadStandaloneBrush(renderer)
   if renderer.uploaded then return renderer end if
   draw2d.Draw_SetPalette(renderer.palette)
@@ -498,7 +533,11 @@ function uploadStandaloneBrush(renderer)
   return renderer
 end function
 
-// Provide standalone texture id behavior for the active subsystem.
+/// Implements the `standaloneTextureId` operation for `miniquake.render.world` (standalone texture id).
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param surface The surface input consumed by `standaloneTextureId`.
+/// @param currentTime Time value used by the operation.
+/// @param alternate The alternate input consumed by `standaloneTextureId`.
 function standaloneTextureId(renderer, surface, currentTime, alternate)
   if surface.textureIndex >= 0 and surface.textureIndex < len(renderer.textures) then
     texture = renderer.textures[surface.textureIndex]
@@ -514,7 +553,9 @@ function standaloneTextureId(renderer, surface, currentTime, alternate)
   return renderer.noTextureId
 end function
 
-// Return standalone model origin derived from the active module state.
+/// Return standalone model origin derived from the active module state.
+/// @param viewOrigin The view origin input consumed by `standaloneModelOrigin`.
+/// @param entity Entity affected by the operation.
 function standaloneModelOrigin(viewOrigin, entity)
   result = math.subtract(viewOrigin, entity.origin)
   if entity.angles.x == 0.0 and entity.angles.y == 0.0 and entity.angles.z == 0.0 then return result end if
@@ -526,13 +567,19 @@ function standaloneModelOrigin(viewOrigin, entity)
   )
 end function
 
-// Provide standalone surface faces viewer behavior for the active subsystem.
+/// Implements the `standaloneSurfaceFacesViewer` operation for `miniquake.render.world` (standalone surface faces viewer).
+/// @param surface The surface input consumed by `standaloneSurfaceFacesViewer`.
+/// @param distance The distance input consumed by `standaloneSurfaceFacesViewer`.
 function standaloneSurfaceFacesViewer(surface, distance)
   if (surface.flags & c.SURF_PLANEBACK) != 0 then return distance < -GLQUAKE_BACKFACE_EPSILON end if
   return distance > GLQUAKE_BACKFACE_EPSILON
 end function
 
-// Render standalone base.
+/// Render standalone base.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param surface The surface input consumed by `drawStandaloneBase`.
+/// @param currentTime Time value used by the operation.
+/// @param alternate The alternate input consumed by `drawStandaloneBase`.
 function drawStandaloneBase(renderer, surface, currentTime, alternate)
   if len(surface.vertices) < 3 then return false end if
   gl.bindTexture(standaloneTextureId(renderer, surface, currentTime, alternate))
@@ -552,7 +599,8 @@ function drawStandaloneBase(renderer, surface, currentTime, alternate)
   return true
 end function
 
-// Render standalone light.
+/// Render standalone light.
+/// @param surface The surface input consumed by `drawStandaloneLight`.
 function drawStandaloneLight(surface)
   if surface.lightmapId == 0 or len(surface.vertices) < 3 then return false end if
   gl.bindTexture(surface.lightmapId)
@@ -565,7 +613,11 @@ function drawStandaloneLight(surface)
   return true
 end function
 
-// Render standalone brush.
+/// Render standalone brush.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param entity Entity affected by the operation.
+/// @param viewOrigin The view origin input consumed by `drawStandaloneBrush`.
+/// @param currentTime Time value used by the operation.
 function drawStandaloneBrush(renderer, entity, viewOrigin, currentTime)
   if renderer is void or entity is void or viewOrigin is void or len(renderer.map.models) == 0 then return 0 end if
   uploaded = try(uploadStandaloneBrush(renderer))
@@ -628,8 +680,12 @@ function drawStandaloneBrush(renderer, entity, viewOrigin, currentTime)
   return visibleCount
 end function
 
-// Draw only the base polygons of an external BSP entity for the additive
-// per-pixel light pass.  The caller owns blend/depth/shader state.
+/// Draw only the base polygons of an external BSP entity for the additive
+/// per-pixel light pass.  The caller owns blend/depth/shader state.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param entity Entity affected by the operation.
+/// @param viewOrigin The view origin input consumed by `drawStandaloneBrushEnhanced`.
+/// @param currentTime Time value used by the operation.
 function drawStandaloneBrushEnhanced(renderer, entity, viewOrigin, currentTime)
   if renderer is void or entity is void or viewOrigin is void or len(renderer.map.models) == 0 then return 0 end if
   uploaded = try(uploadStandaloneBrush(renderer))
@@ -663,9 +719,19 @@ function drawStandaloneBrushEnhanced(renderer, entity, viewOrigin, currentTime)
   return visibleCount
 end function
 
-// Ray-project every polygon of an external BSP object onto the first visible
-// main-world receiver. The legacy floor/contact parameters remain in the ABI;
-// receiver selection now comes exclusively from the configured BSP ray caster.
+/// Ray-project every polygon of an external BSP object onto the first visible
+/// main-world receiver. The legacy floor/contact parameters remain in the ABI;
+/// receiver selection now comes exclusively from the configured BSP ray caster.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param entity Entity affected by the operation.
+/// @param floorWorldZ The floor world z input consumed by `drawStandaloneBrushShadow`.
+/// @param offsetX The offset x input consumed by `drawStandaloneBrushShadow`.
+/// @param offsetY The offset y input consumed by `drawStandaloneBrushShadow`.
+/// @param contactOnly The contact only input consumed by `drawStandaloneBrushShadow`.
+/// @param pointLightActive The point light active input consumed by `drawStandaloneBrushShadow`.
+/// @param lightX The light x input consumed by `drawStandaloneBrushShadow`.
+/// @param lightY The light y input consumed by `drawStandaloneBrushShadow`.
+/// @param lightZ The light z input consumed by `drawStandaloneBrushShadow`.
 function drawStandaloneBrushShadow(renderer, entity, floorWorldZ, offsetX, offsetY, contactOnly, pointLightActive, lightX, lightY, lightZ)
   if renderer is void or entity is void or len(renderer.map.models) == 0 or not rayShadow.isReady() then return 0 end if
   // Project each convex source face, then triangulate only receiver-compatible
@@ -708,7 +774,8 @@ function drawStandaloneBrushShadow(renderer, entity, floorWorldZ, offsetX, offse
   return drawn
 end function
 
-// Release resources owned by standalone brush.
+/// Release resources owned by standalone brush.
+/// @param renderer Renderer instance or backend used for drawing.
 function destroyStandaloneBrush(renderer)
   if renderer is void then return false end if
   if renderer.noTextureId != 0 then gl.deleteTexture(renderer.noTextureId); renderer.noTextureId = 0 end if
@@ -726,7 +793,8 @@ function destroyStandaloneBrush(renderer)
   return true
 end function
 
-// Release resources owned by the requested value.
+/// Implements the `destroy` operation for `miniquake.render.world` (destroy).
+/// @param renderer Renderer instance or backend used for drawing.
 function destroy(renderer)
   global worldSurfaceRoots, visibleFaceCountRenderer, visibleFaceCountLeaf, visibleFaceCountValue
   if renderer is void then return false end if
@@ -755,7 +823,9 @@ function destroy(renderer)
   return true
 end function
 
-// Provide compat contains integer behavior for the active subsystem.
+/// Implements the `compatContainsInteger` operation for `miniquake.render.world` (compat contains integer).
+/// @param values The values input consumed by `compatContainsInteger`.
+/// @param wanted The wanted input consumed by `compatContainsInteger`.
 function compatContainsInteger(values, wanted)
   for each value in values
     if value == wanted then return true end if
@@ -763,7 +833,8 @@ function compatContainsInteger(values, wanted)
   return false
 end function
 
-// Apply the Quake-compatible r collect lightmap texture ids behavior.
+/// Apply the Quake-compatible r collect lightmap texture ids behavior.
+/// @param renderer Renderer instance or backend used for drawing.
 function R_CollectLightmapTextureIds(renderer)
   if renderer is void then return [] end if
   result = []
@@ -776,7 +847,8 @@ function R_CollectLightmapTextureIds(renderer)
   return result
 end function
 
-// Report whether mark all visible holds for the active state.
+/// Report whether mark all visible holds for the active state.
+/// @param renderer Renderer instance or backend used for drawing.
 function markAllVisible(renderer)
   global visibleFaceCountRenderer, visibleFaceCountLeaf, visibleFaceCountValue
   global rCompatVisibleNodeRenderer, rCompatVisibleNodes
@@ -791,10 +863,16 @@ function markAllVisible(renderer)
   return visibleFaceCountValue
 end function
 
-// Mark the exact node path to each PVS-visible leaf.  GLQuake propagates
-// node->visframe from visible leaves rather than from faces: a leaf with no
-// marksurfaces may still contain efrags/static entities and must keep every
-// ancestor visible.  The temporary value two guards malformed cyclic data.
+/// Mark the exact node path to each PVS-visible leaf.  GLQuake propagates
+/// node->visframe from visible leaves rather than from faces: a leaf with no
+/// marksurfaces may still contain efrags/static entities and must keep every
+/// ancestor visible.  The temporary value two guards malformed cyclic data.
+/// @param map The map input consumed by `markVisibleNodeSubtree`.
+/// @param visibility The visibility input consumed by `markVisibleNodeSubtree`.
+/// @param currentLeaf The current leaf input consumed by `markVisibleNodeSubtree`.
+/// @param rowBytes Byte data consumed by the operation.
+/// @param visibleNodes The visible nodes input consumed by `markVisibleNodeSubtree`.
+/// @param nodeNumber The node number input consumed by `markVisibleNodeSubtree`.
 function markVisibleNodeSubtree(map, visibility, currentLeaf, rowBytes, visibleNodes, nodeNumber)
   if nodeNumber < 0 then
     leafIndex = -1 - nodeNumber
@@ -814,9 +892,10 @@ function markVisibleNodeSubtree(map, visibility, currentLeaf, rowBytes, visibleN
   return visible
 end function
 
-// Rebuild the GLQuake-compatible node visibility mask only when the PVS face
-// mask changes.  This moves the complete tree scan from every render frame to
-// the much rarer event of entering a different BSP leaf.
+/// Rebuild the GLQuake-compatible node visibility mask only when the PVS face
+/// mask changes.  This moves the complete tree scan from every render frame to
+/// the much rarer event of entering a different BSP leaf.
+/// @param renderer Renderer instance or backend used for drawing.
 function rebuildVisibleNodes(renderer)
   global rCompatVisibleNodeRenderer, rCompatVisibleNodes
   if renderer is void or renderer.map is void then return false end if
@@ -849,7 +928,8 @@ function rebuildVisibleNodes(renderer)
   return true
 end function
 
-// Report whether count visible faces holds for the active state.
+/// Report whether count visible faces holds for the active state.
+/// @param visibleFaces The visible faces input consumed by `countVisibleFaces`.
 function countVisibleFaces(visibleFaces)
   count = 0
   index = 0
@@ -861,7 +941,9 @@ function countVisibleFaces(visibleFaces)
   return count
 end function
 
-// Report whether mark visible holds for the active state.
+/// Report whether mark visible holds for the active state.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param viewOrigin The view origin input consumed by `markVisible`.
 function markVisible(renderer, viewOrigin)
   global visibleFaceCountRenderer, visibleFaceCountLeaf, visibleFaceCountValue
   global rCompatVisibleNodeRenderer, rCompatVisibleNodes
@@ -925,8 +1007,10 @@ function markVisible(renderer, viewOrigin)
   return count
 end function
 
-// R_SetupFrame assigns r_viewleaf from the final (possibly chase-adjusted)
-// r_refdef.vieworg before it selects the contents cshift.
+/// R_SetupFrame assigns r_viewleaf from the final (possibly chase-adjusted)
+/// r_refdef.vieworg before it selects the contents cshift.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param viewOrigin The view origin input consumed by `ViewContents`.
 function ViewContents(renderer, viewOrigin)
   if renderer is void or renderer.map is void or len(renderer.map.leafs) == 0 then return c.CONTENTS_EMPTY end if
   leafIndex = world.leafForPoint(renderer.map, viewOrigin)
@@ -934,7 +1018,9 @@ function ViewContents(renderer, viewOrigin)
   return renderer.map.leafs[leafIndex].contents
 end function
 
-// Provide texture id for surface behavior for the active subsystem.
+/// Implements the `textureIdForSurface` operation for `miniquake.render.world` (texture id for surface).
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param surface The surface input consumed by `textureIdForSurface`.
 function textureIdForSurface(renderer, surface)
   if surface.textureIndex >= 0 and surface.textureIndex < len(renderer.textures) then
     texture = renderer.textures[surface.textureIndex]
@@ -960,7 +1046,9 @@ function textureIdForSurface(renderer, surface)
   return renderer.noTextureId
 end function
 
-// Render base surface.
+/// Render base surface.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param surface The surface input consumed by `drawBaseSurface`.
 function drawBaseSurface(renderer, surface)
   if len(surface.vertices) < 3 then return end if
   gl.bindTexture(textureIdForSurface(renderer, surface))
@@ -977,7 +1065,8 @@ function drawBaseSurface(renderer, surface)
   if transparent then gl.disable(gl.GL_ALPHA_TEST) end if
 end function
 
-// Render light surface.
+/// Render light surface.
+/// @param surface The surface input consumed by `drawLightSurface`.
 function drawLightSurface(surface)
   if surface.lightmapId == 0 or len(surface.vertices) < 3 then return end if
   gl.bindTexture(surface.lightmapId)
@@ -989,7 +1078,11 @@ function drawLightSurface(surface)
   gl.finishPrimitive()
 end function
 
-// Update module state for up view.
+/// Update module state for up view.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param origin World-space origin of the operation.
+/// @param angles Orientation angles used by the operation.
 function setupView(width, height, origin, angles)
   if width <= 0 then width = 1 end if
   if height <= 0 then height = 1 end if
@@ -997,7 +1090,13 @@ function setupView(width, height, origin, angles)
   return setupViewRect(0, 0, width, height, width, height, 90.0, fovY, origin, angles)
 end function
 
-// Apply the Quake-compatible r viewport rect behavior.
+/// Apply the Quake-compatible r viewport rect behavior.
+/// @param viewX The view x input consumed by `R_ViewportRect`.
+/// @param viewY The view y input consumed by `R_ViewportRect`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param screenWidth The screen width input consumed by `R_ViewportRect`.
+/// @param screenHeight The screen height input consumed by `R_ViewportRect`.
 function R_ViewportRect(viewX, viewY, width, height, screenWidth, screenHeight)
   if width <= 0 then width = 1 end if
   if height <= 0 then height = 1 end if
@@ -1015,15 +1114,21 @@ function R_ViewportRect(viewX, viewY, width, height, screenWidth, screenHeight)
   return [x, y2, x2 - x, y - y2]
 end function
 
-// Apply the Quake-compatible r set cull compatibility behavior.
+/// Apply the Quake-compatible r set cull compatibility behavior.
+/// @param enabled Whether the optional behavior is enabled.
 function R_SetCullCompatibility(enabled)
   global rCompatCull
   rCompatCull = enabled
   return rCompatCull
 end function
 
-// Configure MiniQuake's frame-clear and special-render cvars without changing the
-// public renderViewport signature used by older compatibility fixtures.
+/// Configure MiniQuake's frame-clear and special-render cvars without changing the
+/// public renderViewport signature used by older compatibility fixtures.
+/// @param mirrorAlpha The mirror alpha input consumed by `R_ConfigureSpecialCompatibility`.
+/// @param clearColor The clear color input consumed by `R_ConfigureSpecialCompatibility`.
+/// @param zTrick The z trick input consumed by `R_ConfigureSpecialCompatibility`.
+/// @param finishBeforeRender The finish before render input consumed by `R_ConfigureSpecialCompatibility`.
+/// @param noRefresh The no refresh input consumed by `R_ConfigureSpecialCompatibility`.
 function R_ConfigureSpecialCompatibility(mirrorAlpha, clearColor, zTrick, finishBeforeRender, noRefresh)
   global rCompatMirrorAlpha, rCompatClearColor, rCompatZTrick
   global rCompatFinish, rCompatNoRefresh
@@ -1115,7 +1220,9 @@ function inline R_MirrorReady()
   return mirror and mirror_plane is not void and len(rCompatMirrorChain) > 0 and rCompatMirrorAlpha != 1.0
 end function
 
-// Apply the Quake-compatible r mirror view behavior.
+/// Apply the Quake-compatible r mirror view behavior.
+/// @param origin World-space origin of the operation.
+/// @param angles Orientation angles used by the operation.
 function R_MirrorView(origin, angles)
   if not R_MirrorReady() then return void end if
   return specialPaths.reflectView(origin, angles, mirror_plane)
@@ -1131,7 +1238,12 @@ function R_MirrorChainCount()
   return len(rCompatMirrorChain)
 end function
 
-// Apply the Quake-compatible r draw mirror overlay behavior.
+/// Apply the Quake-compatible r draw mirror overlay behavior.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param viewRect The view rect input consumed by `R_DrawMirrorOverlay`.
+/// @param origin World-space origin of the operation.
+/// @param angles Orientation angles used by the operation.
 function R_DrawMirrorOverlay(width, height, viewRect, origin, angles)
   global mirror, rCompatMirrorChain
   if not R_MirrorReady() then return 0 end if
@@ -1166,7 +1278,17 @@ function R_MainRenderStageOrder()
   return ["world", "entities", "dlights", "particles", "viewmodel", "water", "polyblend"]
 end function
 
-// Update module state for up view rect.
+/// Update module state for up view rect.
+/// @param viewX The view x input consumed by `setupViewRect`.
+/// @param viewY The view y input consumed by `setupViewRect`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param screenWidth The screen width input consumed by `setupViewRect`.
+/// @param screenHeight The screen height input consumed by `setupViewRect`.
+/// @param fovX The fov x input consumed by `setupViewRect`.
+/// @param fovY The fov y input consumed by `setupViewRect`.
+/// @param origin World-space origin of the operation.
+/// @param angles Orientation angles used by the operation.
 function setupViewRect(viewX, viewY, width, height, screenWidth, screenHeight, fovX, fovY, origin, angles)
   if width <= 0 then width = 1 end if
   if height <= 0 then height = 1 end if
@@ -1192,7 +1314,12 @@ function setupViewRect(viewX, viewY, width, height, screenWidth, screenHeight, f
   gl.translate(-origin.x, -origin.y, -origin.z)
 end function
 
-// Render the requested value.
+/// Implements the `render` operation for `miniquake.render.world` (render).
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param origin World-space origin of the operation.
+/// @param angles Orientation angles used by the operation.
 function render(renderer, width, height, origin, angles)
   fovY = math.atan2(height * 1.0, width * 1.0) * 2.0 * math.RAD_TO_DEG
   return renderViewport(
@@ -1202,7 +1329,19 @@ function render(renderer, width, height, origin, angles)
   )
 end function
 
-// Render viewport.
+/// Render viewport.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param viewRect The view rect input consumed by `renderViewport`.
+/// @param origin World-space origin of the operation.
+/// @param angles Orientation angles used by the operation.
+/// @param dynamicLights The dynamic lights input consumed by `renderViewport`.
+/// @param lightStyles The light styles input consumed by `renderViewport`.
+/// @param currentTime Time value used by the operation.
+/// @param realtime Time value used by the operation.
+/// @param frameTime Time value used by the operation.
+/// @param blend The blend input consumed by `renderViewport`.
 function renderViewport(renderer, width, height, viewRect, origin, angles, dynamicLights, lightStyles, currentTime, realtime, frameTime, blend)
   if not renderer.uploaded then
     uploadResult = try(upload(renderer))
@@ -1252,8 +1391,20 @@ function renderViewport(renderer, width, height, viewRect, origin, angles, dynam
   return count
 end function
 
-// Mirror R_RenderScene pass.  The caller submits reflected entities and
-// particles around this world pass, matching gl_rmain.c's host-owned order.
+/// Mirror R_RenderScene pass.  The caller submits reflected entities and
+/// particles around this world pass, matching gl_rmain.c's host-owned order.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param viewRect The view rect input consumed by `renderMirrorViewport`.
+/// @param origin World-space origin of the operation.
+/// @param angles Orientation angles used by the operation.
+/// @param dynamicLights The dynamic lights input consumed by `renderMirrorViewport`.
+/// @param lightStyles The light styles input consumed by `renderMirrorViewport`.
+/// @param currentTime Time value used by the operation.
+/// @param realtime Time value used by the operation.
+/// @param frameTime Time value used by the operation.
+/// @param blend The blend input consumed by `renderMirrorViewport`.
 function renderMirrorViewport(renderer, width, height, viewRect, origin, angles, dynamicLights, lightStyles, currentTime, realtime, frameTime, blend)
   global rCompatDepthMin, rCompatDepthMax, rCompatDepthFunc
   if not R_MirrorReady() then return 0 end if
@@ -1301,109 +1452,209 @@ end function
 // =============================================================================
 
 const GLQUAKE_BLOCK_WIDTH = 128
+/// Defines the glquake block height value used by `miniquake.render.world`.
 const GLQUAKE_BLOCK_HEIGHT = 128
+/// Defines the glquake max lightmaps value used by `miniquake.render.world`.
 const GLQUAKE_MAX_LIGHTMAPS = 64
+/// Defines the glquake surf underwater value used by `miniquake.render.world`.
 const GLQUAKE_SURF_UNDERWATER = 0x80
+/// Defines the glquake plane anyz value used by `miniquake.render.world`.
 const GLQUAKE_PLANE_ANYZ = 5
+/// Defines the glquake turbscale value used by `miniquake.render.world`.
 const GLQUAKE_TURBSCALE = 40.74366543152521
+/// Defines the glquake backface epsilon value used by `miniquake.render.world`.
 const GLQUAKE_BACKFACE_EPSILON = 0.01
 
+/// Tracks the module-level r compat renderer state owned by `miniquake.render.world`.
 rCompatRenderer = void
+/// Tracks the module-level r compat view origin state owned by `miniquake.render.world`.
 rCompatViewOrigin = void
+/// Tracks the module-level r compat view angles state owned by `miniquake.render.world`.
 rCompatViewAngles = void
+/// Tracks the module-level r compat view forward state owned by `miniquake.render.world`.
 rCompatViewForward = void
+/// Tracks the module-level r compat view right state owned by `miniquake.render.world`.
 rCompatViewRight = void
+/// Tracks the module-level r compat view up state owned by `miniquake.render.world`.
 rCompatViewUp = void
+/// Tracks the module-level r compat dlights state owned by `miniquake.render.world`.
 rCompatDlights = []
+/// Tracks the module-level r compat light styles state owned by `miniquake.render.world`.
 rCompatLightStyles = []
+/// Tracks the module-level r compat blend state owned by `miniquake.render.world`.
 rCompatBlend = [0.0, 0.0, 0.0, 0.0]
+/// Tracks the module-level r compat time state owned by `miniquake.render.world`.
 rCompatTime = 0.0
+/// Tracks the module-level r compat realtime state owned by `miniquake.render.world`.
 rCompatRealtime = 0.0
+/// Tracks the module-level r compat frame time state owned by `miniquake.render.world`.
 rCompatFrameTime = 0.0
+/// Tracks the module-level r compat flash blend state owned by `miniquake.render.world`.
 rCompatFlashBlend = true
+/// Tracks the module-level r compat dynamic state owned by `miniquake.render.world`.
 rCompatDynamic = true
+/// Tracks the module-level r compat no vis state owned by `miniquake.render.world`.
 rCompatNoVis = false
+/// Tracks the module-level r compat surface dlight bits state owned by `miniquake.render.world`.
 rCompatSurfaceDlightBits = []
+/// Tracks the module-level r compat enhanced texture builders state owned by `miniquake.render.world`.
 rCompatEnhancedTextureBuilders = []
+/// Tracks the module-level r compat enhanced batch keys state owned by `miniquake.render.world`.
 rCompatEnhancedBatchKeys = bytes()
+/// Tracks the module-level r compat surface dlight frame state owned by `miniquake.render.world`.
 rCompatSurfaceDlightFrame = []
+/// Tracks the module-level r compat surface cached light state owned by `miniquake.render.world`.
 rCompatSurfaceCachedLight = []
+/// Tracks the module-level r compat surface cached dlight state owned by `miniquake.render.world`.
 rCompatSurfaceCachedDlight = []
+/// Tracks the module-level r compat surface lightmap page state owned by `miniquake.render.world`.
 rCompatSurfaceLightmapPage = []
+/// Tracks the module-level r compat surface light s state owned by `miniquake.render.world`.
 rCompatSurfaceLightS = []
+/// Tracks the module-level r compat surface light t state owned by `miniquake.render.world`.
 rCompatSurfaceLightT = []
+/// Tracks the module-level r compat lightmap allocated state owned by `miniquake.render.world`.
 rCompatLightmapAllocated = []
+/// Tracks the module-level r compat lightmap modified state owned by `miniquake.render.world`.
 rCompatLightmapModified = []
+/// Tracks the module-level r compat lightmap rect change state owned by `miniquake.render.world`.
 rCompatLightmapRectChange = []
+/// Tracks the module-level r compat warp polys state owned by `miniquake.render.world`.
 rCompatWarpPolys = []
+/// Tracks the module-level r compat surface warp polys state owned by `miniquake.render.world`.
 rCompatSurfaceWarpPolys = []
+/// Tracks the module-level r compat sky texture state owned by `miniquake.render.world`.
 rCompatSkyTexture = 0
+/// Tracks the module-level r compat alpha sky texture state owned by `miniquake.render.world`.
 rCompatAlphaSkyTexture = 0
+/// Tracks the module-level r compat sky chain state owned by `miniquake.render.world`.
 rCompatSkyChain = []
+/// Tracks the module-level r compat water chain state owned by `miniquake.render.world`.
 rCompatWaterChain = []
+/// Tracks the module-level r compat texture chains state owned by `miniquake.render.world`.
 rCompatTextureChains = []
+/// Tracks the module-level r compat texture chain builders state owned by `miniquake.render.world`.
 rCompatTextureChainBuilders = []
+/// Tracks the module-level r compat multi texture enabled state owned by `miniquake.render.world`.
 rCompatMultiTextureEnabled = false
+/// Tracks the module-level r compat multi texture available state owned by `miniquake.render.world`.
 rCompatMultiTextureAvailable = false
+/// Tracks the module-level r compat use multitexture state owned by `miniquake.render.world`.
 rCompatUseMultitexture = false
+/// Tracks the module-level r compat depth min state owned by `miniquake.render.world`.
 rCompatDepthMin = 0.0
+/// Tracks the module-level r compat depth max state owned by `miniquake.render.world`.
 rCompatDepthMax = 1.0
+/// Tracks the module-level r compat depth func state owned by `miniquake.render.world`.
 rCompatDepthFunc = gl.GL_LEQUAL
+/// Tracks the module-level r compat light spot state owned by `miniquake.render.world`.
 rCompatLightSpot = void
+/// Tracks the module-level r compat light plane state owned by `miniquake.render.world`.
 rCompatLightPlane = void
+/// Tracks the module-level r compat abstract surface calls state owned by `miniquake.render.world`.
 rCompatAbstractSurfaceCalls = false
+/// Tracks the module-level r compat texture sort state owned by `miniquake.render.world`.
 rCompatTextureSort = true
+/// Tracks the module-level r compat cull state owned by `miniquake.render.world`.
 rCompatCull = true
+/// Tracks the module-level r compat mirror alpha state owned by `miniquake.render.world`.
 rCompatMirrorAlpha = 1.0
+/// Tracks the module-level r compat clear color state owned by `miniquake.render.world`.
 rCompatClearColor = false
+/// Tracks the module-level r compat z trick state owned by `miniquake.render.world`.
 rCompatZTrick = true
+/// Tracks the module-level r compat finish state owned by `miniquake.render.world`.
 rCompatFinish = false
+/// Tracks the module-level r compat no refresh state owned by `miniquake.render.world`.
 rCompatNoRefresh = false
+/// Tracks the module-level r compat trick frame state owned by `miniquake.render.world`.
 rCompatTrickFrame = 0
+/// Tracks the module-level r compat mirror texture state owned by `miniquake.render.world`.
 rCompatMirrorTexture = -1
+/// Tracks the module-level r compat mirror chain state owned by `miniquake.render.world`.
 rCompatMirrorChain = []
+/// Tracks the module-level r compat last clear plan state owned by `miniquake.render.world`.
 rCompatLastClearPlan = [gl.GL_DEPTH_BUFFER_BIT, 0.0, 1.0, gl.GL_LEQUAL, 0]
 
 // Original MiniQuake globals retained under their public names.
 skytexturenum = -1
+/// Tracks the module-level lightmap bytes state owned by `miniquake.render.world`.
 lightmap_bytes = 1
+/// Tracks the module-level lightmap textures state owned by `miniquake.render.world`.
 lightmap_textures = 0
+/// Tracks the module-level active lightmaps state owned by `miniquake.render.world`.
 active_lightmaps = 0
+/// Tracks the module-level blocklights state owned by `miniquake.render.world`.
 blocklights = []
+/// Tracks the module-level lightmap polys state owned by `miniquake.render.world`.
 lightmap_polys = []
+/// Tracks the module-level lightmap modified state owned by `miniquake.render.world`.
 lightmap_modified = []
+/// Tracks the module-level lightmap rectchange state owned by `miniquake.render.world`.
 lightmap_rectchange = []
+/// Tracks the module-level allocated state owned by `miniquake.render.world`.
 allocated = []
+/// Tracks the module-level lightmaps state owned by `miniquake.render.world`.
 lightmaps = bytes()
+/// Tracks the module-level r compat lightmap scratch state owned by `miniquake.render.world`.
 rCompatLightmapScratch = bytes()
+/// Tracks the module-level r compat colored lighting state owned by `miniquake.render.world`.
 rCompatColoredLighting = void
+/// Tracks the module-level colored lightmaps requested state owned by `miniquake.render.world`.
 coloredLightmapsRequested = false
+/// Tracks the module-level skychain state owned by `miniquake.render.world`.
 skychain = []
+/// Tracks the module-level waterchain state owned by `miniquake.render.world`.
 waterchain = []
+/// Tracks the module-level r compat lightmap builders state owned by `miniquake.render.world`.
 rCompatLightmapBuilders = []
+/// Tracks the module-level r compat sequential surfaces state owned by `miniquake.render.world`.
 rCompatSequentialSurfaces = []
+/// Tracks the module-level r compat sequential builder state owned by `miniquake.render.world`.
 rCompatSequentialBuilder = void
+/// Tracks the module-level r compat collect sequential state owned by `miniquake.render.world`.
 rCompatCollectSequential = false
+/// Tracks the module-level r compat mtex record faces state owned by `miniquake.render.world`.
 rCompatMtexRecordFaces = []
+/// Tracks the module-level r compat mtex records state owned by `miniquake.render.world`.
 rCompatMtexRecords = bytes()
+/// Tracks the module-level r compat mtex record count state owned by `miniquake.render.world`.
 rCompatMtexRecordCount = 0
+/// Tracks the module-level r compat mtex record stamp state owned by `miniquake.render.world`.
 rCompatMtexRecordStamp = -1
+/// Tracks the module-level r compat mtex texture ids state owned by `miniquake.render.world`.
 rCompatMtexTextureIds = []
+/// Tracks the module-level r compat mtex texture checked state owned by `miniquake.render.world`.
 rCompatMtexTextureChecked = []
+/// Tracks the module-level r compat surface batch keys state owned by `miniquake.render.world`.
 rCompatSurfaceBatchKeys = bytes()
+/// Tracks the module-level mtexenabled state owned by `miniquake.render.world`.
 mtexenabled = false
+/// Tracks the module-level r dlightframecount state owned by `miniquake.render.world`.
 r_dlightframecount = 0
+/// Tracks the module-level d lightstylevalue state owned by `miniquake.render.world`.
 d_lightstylevalue = []
+/// Tracks the module-level lightspot state owned by `miniquake.render.world`.
 lightspot = void
+/// Tracks the module-level lightplane state owned by `miniquake.render.world`.
 lightplane = void
+/// Tracks the module-level speedscale state owned by `miniquake.render.world`.
 speedscale = 0.0
+/// Tracks the module-level solidskytexture state owned by `miniquake.render.world`.
 solidskytexture = 0
+/// Tracks the module-level alphaskytexture state owned by `miniquake.render.world`.
 alphaskytexture = 0
+/// Tracks the module-level r framecount state owned by `miniquake.render.world`.
 r_framecount = 0
+/// Tracks the module-level r visframecount state owned by `miniquake.render.world`.
 r_visframecount = 0
+/// Tracks the module-level c brush polys state owned by `miniquake.render.world`.
 c_brush_polys = 0
+/// Tracks the module-level n colin elim state owned by `miniquake.render.world`.
 nColinElim = 0
+/// Tracks the module-level mirror state owned by `miniquake.render.world`.
 mirror = false
+/// Tracks the module-level mirror plane state owned by `miniquake.render.world`.
 mirror_plane = void
 
 // Apply the Quake-compatible r reset world compatibility behavior.
@@ -1515,24 +1766,28 @@ function compatZeroVector()
   return t.Vec3(0.0, 0.0, 0.0)
 end function
 
-// Provide compat empty plane behavior for the active subsystem.
+/// Implements the `compatEmptyPlane` operation for `miniquake.render.world` (compat empty plane).
 function compatEmptyPlane()
   return t.Plane(compatZeroVector(), 0.0, GLQUAKE_PLANE_ANYZ, 0)
 end function
 
-// Provide compat abs behavior for the active subsystem.
+/// Implements the `compatAbs` operation for `miniquake.render.world` (compat abs).
+/// @param value Value consumed by `compatAbs`.
 function inline compatAbs(value)
   if value < 0.0 then return -value end if
   return value
 end function
 
-// Return compat ensure array size derived from the active module state.
+/// Return compat ensure array size derived from the active module state.
+/// @param values The values input consumed by `compatEnsureArraySize`.
+/// @param count Number of entries or units to process.
+/// @param fillValue The fill value input consumed by `compatEnsureArraySize`.
 function compatEnsureArraySize(values, count, fillValue)
   if len(values) == count then return values end if
   return arrayutil.makeFilledArray(count, fillValue)
 end function
 
-// Provide compat fresh lightmap allocation behavior for the active subsystem.
+/// Implements the `compatFreshLightmapAllocation` operation for `miniquake.render.world` (compat fresh lightmap allocation).
 function compatFreshLightmapAllocation()
   pages = arrayutil.makeEmptyArray(GLQUAKE_MAX_LIGHTMAPS)
   index = 0
@@ -1599,8 +1854,16 @@ function compatEnsureWorldState()
   return true
 end function
 
-// Private compatibility-state adapters used by deterministic renderer oracles
-// and by the higher-level MiniQuake host integration.
+/// Private compatibility-state adapters used by deterministic renderer oracles
+/// and by the higher-level MiniQuake host integration.
+/// @param index Zero-based index of the requested entry.
+/// @param bitsValue The bits value input consumed by `R_SetSurfaceCompatibilityState`.
+/// @param dlightFrame The dlight frame input consumed by `R_SetSurfaceCompatibilityState`.
+/// @param cachedValues The cached values input consumed by `R_SetSurfaceCompatibilityState`.
+/// @param cachedDlight The cached dlight input consumed by `R_SetSurfaceCompatibilityState`.
+/// @param page The page input consumed by `R_SetSurfaceCompatibilityState`.
+/// @param lightS The light s input consumed by `R_SetSurfaceCompatibilityState`.
+/// @param lightT The light t input consumed by `R_SetSurfaceCompatibilityState`.
 function R_SetSurfaceCompatibilityState(index, bitsValue, dlightFrame, cachedValues, cachedDlight, page, lightS, lightT)
   global rCompatSurfaceDlightBits, rCompatSurfaceDlightFrame, rCompatSurfaceCachedLight
   global rCompatSurfaceCachedDlight, rCompatSurfaceLightmapPage
@@ -1617,7 +1880,9 @@ function R_SetSurfaceCompatibilityState(index, bitsValue, dlightFrame, cachedVal
   return true
 end function
 
-// Apply the Quake-compatible r set multitexture compatibility behavior.
+/// Apply the Quake-compatible r set multitexture compatibility behavior.
+/// @param available The available input consumed by `R_SetMultitextureCompatibility`.
+/// @param enabled Whether the optional behavior is enabled.
 function R_SetMultitextureCompatibility(available, enabled)
   global rCompatMultiTextureAvailable, rCompatMultiTextureEnabled, rCompatUseMultitexture, rCompatTextureSort, mtexenabled
   rCompatMultiTextureAvailable = available
@@ -1630,14 +1895,17 @@ function R_SetMultitextureCompatibility(available, enabled)
   return true
 end function
 
-// Apply the Quake-compatible r set texture animation frame behavior.
+/// Apply the Quake-compatible r set texture animation frame behavior.
+/// @param frame The frame input consumed by `R_SetTextureAnimationFrame`.
 function R_SetTextureAnimationFrame(frame)
   global currentTextureFrame
   currentTextureFrame = frame
   return currentTextureFrame
 end function
 
-// Apply the Quake-compatible r set frame compatibility behavior.
+/// Apply the Quake-compatible r set frame compatibility behavior.
+/// @param frame The frame input consumed by `R_SetFrameCompatibility`.
+/// @param visFrame The vis frame input consumed by `R_SetFrameCompatibility`.
 function R_SetFrameCompatibility(frame, visFrame)
   global r_framecount, r_visframecount
   r_framecount = frame
@@ -1645,14 +1913,17 @@ function R_SetFrameCompatibility(frame, visFrame)
   return true
 end function
 
-// Apply the Quake-compatible r set light style compatibility behavior.
+/// Apply the Quake-compatible r set light style compatibility behavior.
+/// @param values The values input consumed by `R_SetLightStyleCompatibility`.
 function R_SetLightStyleCompatibility(values)
   global d_lightstylevalue
   d_lightstylevalue = values
   return d_lightstylevalue
 end function
 
-// Apply the Quake-compatible r set lightmap compatibility behavior.
+/// Apply the Quake-compatible r set lightmap compatibility behavior.
+/// @param textureBase The texture base input consumed by `R_SetLightmapCompatibility`.
+/// @param bytesPerSample The bytes per sample input consumed by `R_SetLightmapCompatibility`.
 function R_SetLightmapCompatibility(textureBase, bytesPerSample)
   global lightmap_textures, lightmap_bytes
   lightmap_textures = textureBase
@@ -1660,15 +1931,19 @@ function R_SetLightmapCompatibility(textureBase, bytesPerSample)
   return true
 end function
 
-// Apply the Quake-compatible r set lightmap dirty compatibility behavior.
+/// Apply the Quake-compatible r set lightmap dirty compatibility behavior.
+/// @param page The page input consumed by `R_SetLightmapDirtyCompatibility`.
+/// @param rectangle The rectangle input consumed by `R_SetLightmapDirtyCompatibility`.
+/// @param modified The modified input consumed by `R_SetLightmapDirtyCompatibility`.
 function R_SetLightmapDirtyCompatibility(page, rectangle, modified)
   rCompatLightmapRectChange[page] = rectangle
   rCompatLightmapModified[page] = modified
   return true
 end function
 
-// Reset a dirty rectangle in place. Animated lightstyles hit this path often,
-// so retaining the four-slot record avoids one heap object per atlas upload.
+/// Reset a dirty rectangle in place. Animated lightstyles hit this path often,
+/// so retaining the four-slot record avoids one heap object per atlas upload.
+/// @param page The page input consumed by `compatResetLightmapRectangle`.
 function compatResetLightmapRectangle(page)
   rectangle = rCompatLightmapRectChange[page]
   rectangle[0] = GLQUAKE_BLOCK_WIDTH
@@ -1678,14 +1953,18 @@ function compatResetLightmapRectangle(page)
   return rectangle
 end function
 
-// Apply the Quake-compatible r set lightmap chain compatibility behavior.
+/// Apply the Quake-compatible r set lightmap chain compatibility behavior.
+/// @param page The page input consumed by `R_SetLightmapChainCompatibility`.
+/// @param surfaces The surfaces input consumed by `R_SetLightmapChainCompatibility`.
 function R_SetLightmapChainCompatibility(page, surfaces)
   rCompatLightmapBuilders[page] = false
   lightmap_polys[page] = surfaces
   return true
 end function
 
-// Provide compat add lightmap poly behavior for the active subsystem.
+/// Implements the `compatAddLightmapPoly` operation for `miniquake.render.world` (compat add lightmap poly).
+/// @param page The page input consumed by `compatAddLightmapPoly`.
+/// @param value Value consumed by `compatAddLightmapPoly`.
 function compatAddLightmapPoly(page, value)
   global rCompatLightmapBuilders, lightmap_polys
   builder = rCompatLightmapBuilders[page]
@@ -1705,7 +1984,8 @@ function compatAddLightmapPoly(page, value)
   return true
 end function
 
-// Provide compat finish lightmap chain behavior for the active subsystem.
+/// Implements the `compatFinishLightmapChain` operation for `miniquake.render.world` (compat finish lightmap chain).
+/// @param page The page input consumed by `compatFinishLightmapChain`.
 function compatFinishLightmapChain(page)
   global rCompatLightmapBuilders, lightmap_polys
   builder = rCompatLightmapBuilders[page]
@@ -1725,14 +2005,18 @@ function compatFinishLightmapChain(page)
   return result
 end function
 
-// Apply the Quake-compatible r set abstract surface calls behavior.
+/// Apply the Quake-compatible r set abstract surface calls behavior.
+/// @param enabled Whether the optional behavior is enabled.
 function R_SetAbstractSurfaceCalls(enabled)
   global rCompatAbstractSurfaceCalls
   rCompatAbstractSurfaceCalls = enabled
   return enabled
 end function
 
-// Apply the Quake-compatible r set surface chain compatibility behavior.
+/// Apply the Quake-compatible r set surface chain compatibility behavior.
+/// @param textureSort The texture sort input consumed by `R_SetSurfaceChainCompatibility`.
+/// @param skySurfaces The sky surfaces input consumed by `R_SetSurfaceChainCompatibility`.
+/// @param waterSurfaces The water surfaces input consumed by `R_SetSurfaceChainCompatibility`.
 function R_SetSurfaceChainCompatibility(textureSort, skySurfaces, waterSurfaces)
   global rCompatTextureSort, skychain, waterchain
   rCompatTextureSort = textureSort
@@ -1781,7 +2065,8 @@ function R_GetTextureChains()
   return rCompatTextureChains
 end function
 
-// Apply the Quake-compatible r chain surface behavior.
+/// Apply the Quake-compatible r chain surface behavior.
+/// @param surface The surface input consumed by `R_ChainSurface`.
 function R_ChainSurface(surface)
   global rCompatTextureChains, rCompatTextureChainBuilders
   value = compatSurface(surface)
@@ -1797,9 +2082,10 @@ function R_ChainSurface(surface)
   return true
 end function
 
-// Resolve one texture chain in GLQuake head-insertion order. Production keeps
-// a reusable tail-appending builder to avoid allocating/copying an array for
-// every visible world polygon; only the consumed chain is materialized.
+/// Resolve one texture chain in GLQuake head-insertion order. Production keeps
+/// a reusable tail-appending builder to avoid allocating/copying an array for
+/// every visible world polygon; only the consumed chain is materialized.
+/// @param index Zero-based index of the requested entry.
 function compatFinishTextureChain(index)
   global rCompatTextureChains, rCompatTextureChainBuilders
   if index < 0 or index >= len(rCompatTextureChains) then return [] end if
@@ -1818,7 +2104,8 @@ function compatFinishTextureChain(index)
   return chain
 end function
 
-// Clear one consumed texture chain without discarding its reusable capacity.
+/// Clear one consumed texture chain without discarding its reusable capacity.
+/// @param index Zero-based index of the requested entry.
 function compatClearTextureChain(index)
   global rCompatTextureChains, rCompatTextureChainBuilders
   if index < 0 or index >= len(rCompatTextureChains) then return false end if
@@ -1828,9 +2115,11 @@ function compatClearTextureChain(index)
   return true
 end function
 
-// World surfaces use the exact dot-sign rule from R_RecursiveWorldNode.
-// Underwater polygons bypass back-face rejection because their warped vertices
-// may cross the original plane.
+/// World surfaces use the exact dot-sign rule from R_RecursiveWorldNode.
+/// Underwater polygons bypass back-face rejection because their warped vertices
+/// may cross the original plane.
+/// @param surface The surface input consumed by `R_SurfaceFacesViewer`.
+/// @param planeDistance The plane distance input consumed by `R_SurfaceFacesViewer`.
 function R_SurfaceFacesViewer(surface, planeDistance)
   value = compatSurface(surface)
   if value is void then return false end if
@@ -1839,8 +2128,10 @@ function R_SurfaceFacesViewer(surface, planeDistance)
   return not ((planeDistance < 0.0) != planeBack)
 end function
 
-// Brush models use BACKFACE_EPSILON and the opposite-facing test from
-// R_DrawBrushModel.
+/// Brush models use BACKFACE_EPSILON and the opposite-facing test from
+/// R_DrawBrushModel.
+/// @param surface The surface input consumed by `R_BrushSurfaceFacesViewer`.
+/// @param planeDistance The plane distance input consumed by `R_BrushSurfaceFacesViewer`.
 function R_BrushSurfaceFacesViewer(surface, planeDistance)
   value = compatSurface(surface)
   if value is void then return false end if
@@ -1848,7 +2139,9 @@ function R_BrushSurfaceFacesViewer(surface, planeDistance)
   return planeDistance > GLQUAKE_BACKFACE_EPSILON
 end function
 
-// Apply the Quake-compatible r water pass deferred behavior.
+/// Apply the Quake-compatible r water pass deferred behavior.
+/// @param textureSort The texture sort input consumed by `R_WaterPassDeferred`.
+/// @param waterAlpha The water alpha input consumed by `R_WaterPassDeferred`.
 function inline R_WaterPassDeferred(textureSort, waterAlpha)
   return textureSort and waterAlpha != 1.0
 end function
@@ -1863,7 +2156,8 @@ function R_GetLightmapBytes()
   return lightmaps
 end function
 
-// Apply the Quake-compatible r get surface compatibility state behavior.
+/// Apply the Quake-compatible r get surface compatibility state behavior.
+/// @param index Zero-based index of the requested entry.
 function R_GetSurfaceCompatibilityState(index)
   return [
     rCompatSurfaceCachedLight[index],
@@ -1874,7 +2168,8 @@ function R_GetSurfaceCompatibilityState(index)
   ]
 end function
 
-// Apply the Quake-compatible r get lightmap compatibility state behavior.
+/// Apply the Quake-compatible r get lightmap compatibility state behavior.
+/// @param page The page input consumed by `R_GetLightmapCompatibilityState`.
 function R_GetLightmapCompatibilityState(page)
   surfaces = compatFinishLightmapChain(page)
   return [
@@ -1885,7 +2180,8 @@ function R_GetLightmapCompatibilityState(page)
   ]
 end function
 
-// Apply the Quake-compatible r get allocation compatibility state behavior.
+/// Apply the Quake-compatible r get allocation compatibility state behavior.
+/// @param page The page input consumed by `R_GetAllocationCompatibilityState`.
 function R_GetAllocationCompatibilityState(page)
   return rCompatLightmapAllocated[page]
 end function
@@ -1900,13 +2196,16 @@ function R_GetFrameCompatibility()
   return [r_framecount, r_visframecount]
 end function
 
-// Apply the Quake-compatible r get dynamic light compatibility state behavior.
+/// Apply the Quake-compatible r get dynamic light compatibility state behavior.
+/// @param index Zero-based index of the requested entry.
 function R_GetDynamicLightCompatibilityState(index)
   if index < 0 or index >= len(rCompatSurfaceDlightBits) then return [0, 0] end if
   return [rCompatSurfaceDlightBits[index], rCompatSurfaceDlightFrame[index]]
 end function
 
-// Apply the Quake-compatible r dynamic light is active behavior.
+/// Apply the Quake-compatible r dynamic light is active behavior.
+/// @param light The light input consumed by `R_DynamicLightIsActive`.
+/// @param currentTime Time value used by the operation.
 function inline R_DynamicLightIsActive(light, currentTime)
   return light is not void and light.die >= currentTime and light.radius > 0.0
 end function
@@ -1937,7 +2236,10 @@ function R_ResetLightmapCompatibility()
   return true
 end function
 
-// Provide compat fnv1a behavior for the active subsystem.
+/// Implements the `compatFnv1a` operation for `miniquake.render.world` (compat fnv1a).
+/// @param data Input data consumed by the operation.
+/// @param offset Zero-based offset of the requested data.
+/// @param count Number of entries or units to process.
 function compatFnv1a(data, offset, count)
   hash = 2166136261
   index = 0
@@ -1948,7 +2250,10 @@ function compatFnv1a(data, offset, count)
   return hash
 end function
 
-// Provide compat hash lightmap rows behavior for the active subsystem.
+/// Implements the `compatHashLightmapRows` operation for `miniquake.render.world` (compat hash lightmap rows).
+/// @param page The page input consumed by `compatHashLightmapRows`.
+/// @param firstRow The first row input consumed by `compatHashLightmapRows`.
+/// @param rowCount Number of entries or units to process.
 function compatHashLightmapRows(page, firstRow, rowCount)
   offset = (page * GLQUAKE_BLOCK_HEIGHT + firstRow) * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
   return compatFnv1a(lightmaps, offset, rowCount * GLQUAKE_BLOCK_WIDTH * lightmap_bytes)
@@ -1961,7 +2266,9 @@ function compatLightmapFormat()
   return gl.GL_LUMINANCE
 end function
 
-// Transfer one dirty atlas rectangle using the format selected at map load.
+/// Transfer one dirty atlas rectangle using the format selected at map load.
+/// @param page The page input consumed by `compatUploadLightmapSubImage`.
+/// @param rectangle The rectangle input consumed by `compatUploadLightmapSubImage`.
 function compatUploadLightmapSubImage(page, rectangle)
   if rectangle[3] <= 0 then return false end if
   uploadOffset = (page * GLQUAKE_BLOCK_HEIGHT + rectangle[1]) * GLQUAKE_BLOCK_WIDTH * lightmap_bytes
@@ -1975,7 +2282,9 @@ function compatUploadLightmapSubImage(page, rectangle)
   return true
 end function
 
-// Provide compat copy surface lightmap to atlas behavior for the active subsystem.
+/// Implements the `compatCopySurfaceLightmapToAtlas` operation for `miniquake.render.world` (compat copy surface lightmap to atlas).
+/// @param surface The surface input consumed by `compatCopySurfaceLightmapToAtlas`.
+/// @param pixels The pixels input consumed by `compatCopySurfaceLightmapToAtlas`.
 function compatCopySurfaceLightmapToAtlas(surface, pixels)
   index = compatSurfaceIndex(surface)
   if index < 0 then return false end if
@@ -2000,7 +2309,22 @@ function compatCopySurfaceLightmapToAtlas(surface, pixels)
   return true
 end function
 
-// Apply the Quake-compatible r configure world compatibility behavior.
+/// Apply the Quake-compatible r configure world compatibility behavior.
+/// @param renderer Renderer instance or backend used for drawing.
+/// @param viewOrigin The view origin input consumed by `R_ConfigureWorldCompatibility`.
+/// @param viewAngles The view angles input consumed by `R_ConfigureWorldCompatibility`.
+/// @param viewForward The view forward input consumed by `R_ConfigureWorldCompatibility`.
+/// @param viewRight The view right input consumed by `R_ConfigureWorldCompatibility`.
+/// @param viewUp The view up input consumed by `R_ConfigureWorldCompatibility`.
+/// @param dynamicLights The dynamic lights input consumed by `R_ConfigureWorldCompatibility`.
+/// @param lightStyles The light styles input consumed by `R_ConfigureWorldCompatibility`.
+/// @param blend The blend input consumed by `R_ConfigureWorldCompatibility`.
+/// @param currentTime Time value used by the operation.
+/// @param realtime Time value used by the operation.
+/// @param frameTime Time value used by the operation.
+/// @param flashBlend The flash blend input consumed by `R_ConfigureWorldCompatibility`.
+/// @param dynamicEnabled The dynamic enabled input consumed by `R_ConfigureWorldCompatibility`.
+/// @param noVis The no vis input consumed by `R_ConfigureWorldCompatibility`.
 function R_ConfigureWorldCompatibility(
   renderer,
   viewOrigin,
@@ -2047,17 +2371,21 @@ function R_ConfigureWorldCompatibility(
   return true
 end function
 
-// Select whether optional QLIT sidecars may replace the scalar lightmap
-// samples when the next world atlas is built. The Classic renderer calls this
-// with false, preserving byte-for-byte GLQuake lightmap behavior.
+/// Select whether optional QLIT sidecars may replace the scalar lightmap
+/// samples when the next world atlas is built. The Classic renderer calls this
+/// with false, preserving byte-for-byte GLQuake lightmap behavior.
+/// @param enabled Whether the optional behavior is enabled.
 function R_ConfigureColoredLightmaps(enabled)
   global coloredLightmapsRequested
   coloredLightmapsRequested = enabled
   return coloredLightmapsRequested
 end function
 
-// Configure the optional renderer extension.  This never mutates Quake world
-// state: an unavailable backend simply leaves the exact Classic path active.
+/// Configure the optional renderer extension.  This never mutates Quake world
+/// state: an unavailable backend simply leaves the exact Classic path active.
+/// @param requestedEnabled The requested enabled input consumed by `R_ConfigureEnhancedLighting`.
+/// @param requestedShadows The requested shadows input consumed by `R_ConfigureEnhancedLighting`.
+/// @param shadowQuality The shadow quality input consumed by `R_ConfigureEnhancedLighting`.
 function R_ConfigureEnhancedLighting(requestedEnabled, requestedShadows, shadowQuality)
   return enhanced.configure(requestedEnabled, requestedShadows, shadowQuality)
 end function
@@ -2082,8 +2410,10 @@ function compatEnsureEnhancedBuilders()
   return true
 end function
 
-// Pack the populated prefix of a surface builder into the reusable native-key
-// buffer used by the static geometry batch bridge.
+/// Pack the populated prefix of a surface builder into the reusable native-key
+/// buffer used by the static geometry batch bridge.
+/// @param values The values input consumed by `compatEnhancedBatchKeys`.
+/// @param count Number of entries or units to process.
 function compatEnhancedBatchKeys(values, count)
   global rCompatEnhancedBatchKeys
   index = 0
@@ -2164,12 +2494,14 @@ function R_DrawEnhancedWorldLighting()
   return drawn
 end function
 
-// Apply the Quake-compatible r set subdivide size behavior.
+/// Apply the Quake-compatible r set subdivide size behavior.
+/// @param value Value consumed by `R_SetSubdivideSize`.
 function R_SetSubdivideSize(value)
   return glWarp.SetSubdivideSize(value)
 end function
 
-// Return compat surface index derived from the active module state.
+/// Return compat surface index derived from the active module state.
+/// @param surface The surface input consumed by `compatSurfaceIndex`.
 function compatSurfaceIndex(surface)
   if rCompatRenderer is void then return -1 end if
   if typeof(surface) == "int" and surface >= 0 and surface < len(rCompatRenderer.surfaces) then return surface end if
@@ -2183,7 +2515,8 @@ function compatSurfaceIndex(surface)
   return -1
 end function
 
-// Provide compat surface behavior for the active subsystem.
+/// Implements the `compatSurface` operation for `miniquake.render.world` (compat surface).
+/// @param surface The surface input consumed by `compatSurface`.
 function compatSurface(surface)
   if rCompatRenderer is void then return void end if
   if typeof(surface) == "int" then
@@ -2193,7 +2526,8 @@ function compatSurface(surface)
   return surface
 end function
 
-// Provide compat face behavior for the active subsystem.
+/// Implements the `compatFace` operation for `miniquake.render.world` (compat face).
+/// @param surface The surface input consumed by `compatFace`.
 function compatFace(surface)
   value = compatSurface(surface)
   if value is void then return void end if
@@ -2201,7 +2535,8 @@ function compatFace(surface)
   return rCompatRenderer.map.faces[value.faceIndex]
 end function
 
-// Provide compat plane behavior for the active subsystem.
+/// Implements the `compatPlane` operation for `miniquake.render.world` (compat plane).
+/// @param surface The surface input consumed by `compatPlane`.
 function compatPlane(surface)
   face = compatFace(surface)
   if face is void then return void end if
@@ -2209,7 +2544,8 @@ function compatPlane(surface)
   return rCompatRenderer.map.planes[face.planeIndex]
 end function
 
-// Provide compat tex info behavior for the active subsystem.
+/// Implements the `compatTexInfo` operation for `miniquake.render.world` (compat tex info).
+/// @param surface The surface input consumed by `compatTexInfo`.
 function compatTexInfo(surface)
   face = compatFace(surface)
   if face is void then return void end if
@@ -2217,7 +2553,9 @@ function compatTexInfo(surface)
   return rCompatRenderer.map.texInfo[face.texInfo]
 end function
 
-// Provide compat plane distance behavior for the active subsystem.
+/// Implements the `compatPlaneDistance` operation for `miniquake.render.world` (compat plane distance).
+/// @param plane The plane input consumed by `compatPlaneDistance`.
+/// @param point The point input consumed by `compatPlaneDistance`.
 function compatPlaneDistance(plane, point)
   if plane.type == 0 then return point.x - plane.dist end if
   if plane.type == 1 then return point.y - plane.dist end if
@@ -2241,7 +2579,8 @@ function R_AnimateLight()
   return d_lightstylevalue
 end function
 
-// Provide compat assign light blend behavior for the active subsystem.
+/// Implements the `compatAssignLightBlend` operation for `miniquake.render.world` (compat assign light blend).
+/// @param updated The updated input consumed by `compatAssignLightBlend`.
 function compatAssignLightBlend(updated)
   global rCompatBlend
   if rCompatBlend is void or len(rCompatBlend) < 4 then rCompatBlend = [0.0, 0.0, 0.0, 0.0] end if
@@ -2253,12 +2592,17 @@ function compatAssignLightBlend(updated)
   return rCompatBlend
 end function
 
-// Add state for add light blend.
+/// Add state for add light blend.
+/// @param red The red input consumed by `AddLightBlend`.
+/// @param green The green input consumed by `AddLightBlend`.
+/// @param blue The blue input consumed by `AddLightBlend`.
+/// @param alpha2 The alpha2 input consumed by `AddLightBlend`.
 function AddLightBlend(red, green, blue, alpha2)
   return compatAssignLightBlend(glRlight.AddLightBlend(rCompatBlend, red, green, blue, alpha2))
 end function
 
-// Apply the Quake-compatible r render dlight behavior.
+/// Apply the Quake-compatible r render dlight behavior.
+/// @param light The light input consumed by `R_RenderDlight`.
 function R_RenderDlight(light)
   global rCompatBlend
   trace = glRlight.R_RenderDlight(
@@ -2316,11 +2660,13 @@ function R_RenderDlights()
   return count
 end function
 
-// Production MiniQuake R_PolyBlend.  Host invokes this after entities,
-// viewmodel and particles, while the 3-D viewport/projection from R_SetupGL
-// is still active and before gl_screen switches to its full-screen 2-D
-// projection.  Drawing this as a 2-D quad would incorrectly tint the HUD and
-// console outside r_refdef.vrect.
+/// Production MiniQuake R_PolyBlend.  Host invokes this after entities,
+/// viewmodel and particles, while the 3-D viewport/projection from R_SetupGL
+/// is still active and before gl_screen switches to its full-screen 2-D
+/// projection.  Drawing this as a 2-D quad would incorrectly tint the HUD and
+/// console outside r_refdef.vrect.
+/// @param blend The blend input consumed by `R_PolyBlendProduction`.
+/// @param enabled Whether the optional behavior is enabled.
 function R_PolyBlendProduction(blend, enabled)
   if not enabled or blend is void or len(blend) < 4 or blend[3] == 0.0 then return false end if
   GL_DisableMultitexture()
@@ -2356,7 +2702,10 @@ function R_PolyBlendProduction(blend, enabled)
   return true
 end function
 
-// Apply the Quake-compatible r mark lights behavior.
+/// Apply the Quake-compatible r mark lights behavior.
+/// @param light The light input consumed by `R_MarkLights`.
+/// @param bit The bit input consumed by `R_MarkLights`.
+/// @param nodeNumber The node number input consumed by `R_MarkLights`.
 function R_MarkLights(light, bit, nodeNumber)
   global rCompatSurfaceDlightBits, rCompatSurfaceDlightFrame
   if rCompatRenderer is void or light is void or nodeNumber < 0 then return 0 end if
@@ -2398,7 +2747,9 @@ function R_BeginWorldFrame()
   return [frame, r_dlightframecount, marked]
 end function
 
-// Apply the Quake-compatible r mark brush model lights for submodel behavior.
+/// Apply the Quake-compatible r mark brush model lights for submodel behavior.
+/// @param entity Entity affected by the operation.
+/// @param submodelIndex Zero-based index of the requested entry.
 function R_MarkBrushModelLightsForSubmodel(entity, submodelIndex)
   if rCompatRenderer is void or entity is void or rCompatFlashBlend or not rCompatDynamic then return 0 end if
   if submodelIndex < 1 or submodelIndex >= len(rCompatRenderer.map.models) then return 0 end if
@@ -2416,13 +2767,15 @@ function R_MarkBrushModelLightsForSubmodel(entity, submodelIndex)
   return marked
 end function
 
-// Apply the Quake-compatible r mark brush model lights behavior.
+/// Apply the Quake-compatible r mark brush model lights behavior.
+/// @param entity Entity affected by the operation.
 function R_MarkBrushModelLights(entity)
   if entity is void then return 0 end if
   return R_MarkBrushModelLightsForSubmodel(entity, entity.modelIndex)
 end function
 
-// Apply the Quake-compatible r add dynamic lights behavior.
+/// Apply the Quake-compatible r add dynamic lights behavior.
+/// @param surface The surface input consumed by `R_AddDynamicLights`.
 function R_AddDynamicLights(surface)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global blocklights
@@ -2482,7 +2835,11 @@ function R_AddDynamicLights(surface)
   return blocklights
 end function
 
-// Apply the Quake-compatible r lightmap required bytes behavior.
+/// Apply the Quake-compatible r lightmap required bytes behavior.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param stride The stride input consumed by `R_LightmapRequiredBytes`.
+/// @param bytesPerSample The bytes per sample input consumed by `R_LightmapRequiredBytes`.
 function R_LightmapRequiredBytes(width, height, stride, bytesPerSample)
   if width < 1 or height < 1 then return 0 end if
   if bytesPerSample != 1 and bytesPerSample != 4 then return error(3771, "Bad lightmap format") end if
@@ -2491,7 +2848,10 @@ function R_LightmapRequiredBytes(width, height, stride, bytesPerSample)
   return (height - 1) * stride + rowBytes
 end function
 
-// Apply the Quake-compatible r build light map behavior.
+/// Apply the Quake-compatible r build light map behavior.
+/// @param surface The surface input consumed by `R_BuildLightMap`.
+/// @param destination Destination value or collection to update.
+/// @param stride The stride input consumed by `R_BuildLightMap`.
 function R_BuildLightMap(surface, destination, stride)
   global blocklights, rCompatSurfaceCachedLight, rCompatSurfaceCachedDlight
   value = compatSurface(surface)
@@ -2588,7 +2948,10 @@ function R_BuildLightMap(surface, destination, stride)
   return destination
 end function
 
-// Provide recursive light point behavior for the active subsystem.
+/// Implements the `RecursiveLightPoint` operation for `miniquake.render.world` (recursive light point).
+/// @param nodeNumber The node number input consumed by `RecursiveLightPoint`.
+/// @param start The start input consumed by `RecursiveLightPoint`.
+/// @param finish The finish input consumed by `RecursiveLightPoint`.
 function RecursiveLightPoint(nodeNumber, start, finish)
   global lightspot, lightplane, rCompatLightSpot, rCompatLightPlane
   if rCompatRenderer is void then return -1 end if
@@ -2609,7 +2972,8 @@ function RecursiveLightPoint(nodeNumber, start, finish)
   return result[0]
 end function
 
-// Apply the Quake-compatible r light point behavior.
+/// Apply the Quake-compatible r light point behavior.
+/// @param point The point input consumed by `R_LightPoint`.
 function R_LightPoint(point)
   global lightspot, lightplane, rCompatLightSpot, rCompatLightPlane
   if rCompatRenderer is void or len(rCompatRenderer.map.models) == 0 then return 255 end if
@@ -2647,9 +3011,10 @@ function R_ActiveDynamicLights()
   return rCompatDlights
 end function
 
-// -----------------------------------------------------------------------------
-// gl_rsurf.c
-// -----------------------------------------------------------------------------
+/// -----------------------------------------------------------------------------
+/// gl_rsurf.c
+/// -----------------------------------------------------------------------------
+/// @param base The base input consumed by `R_TextureAnimation`.
 
 function R_TextureAnimation(base)
   if base is void or rCompatRenderer is void then return base end if
@@ -2671,6 +3036,7 @@ function R_TextureAnimation(base)
   return base
 end function
 
+/// Tracks the module-level current texture frame state owned by `miniquake.render.world`.
 currentTextureFrame = 0
 
 // Mirror Quake's GL_DisableMultitexture routine and its observable state changes.
@@ -2699,7 +3065,8 @@ function GL_EnableMultitexture()
   return true
 end function
 
-// Apply the Quake-compatible r draw sequential poly behavior.
+/// Apply the Quake-compatible r draw sequential poly behavior.
+/// @param surface The surface input consumed by `R_DrawSequentialPoly`.
 function R_DrawSequentialPoly(surface)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global rCompatSequentialSurfaces, rCompatSequentialBuilder
@@ -2766,7 +3133,8 @@ function R_DrawSequentialPoly(surface)
   return true
 end function
 
-// Render glwater poly.
+/// Render glwater poly.
+/// @param poly The poly input consumed by `DrawGLWaterPoly`.
 function DrawGLWaterPoly(poly)
   value = compatSurface(poly)
   if value is void or len(value.vertices) < 3 then return false end if
@@ -2782,7 +3150,8 @@ function DrawGLWaterPoly(poly)
   return true
 end function
 
-// Render glwater poly lightmap.
+/// Render glwater poly lightmap.
+/// @param poly The poly input consumed by `DrawGLWaterPolyLightmap`.
 function DrawGLWaterPolyLightmap(poly)
   value = compatSurface(poly)
   if value is void or len(value.vertices) < 3 then return false end if
@@ -2798,7 +3167,8 @@ function DrawGLWaterPolyLightmap(poly)
   return true
 end function
 
-// Render glpoly.
+/// Render glpoly.
+/// @param poly The poly input consumed by `DrawGLPoly`.
 function DrawGLPoly(poly)
   value = compatSurface(poly)
   if value is void or len(value.vertices) < 3 then return false end if
@@ -2812,7 +3182,8 @@ function DrawGLPoly(poly)
   return true
 end function
 
-// Preload and register the static geometry asset.
+/// Preload and register the static geometry asset.
+/// @param renderer Renderer instance or backend used for drawing.
 function precacheStaticGeometry(renderer)
   if renderer is void or gl.traceEnabled() then return 0 end if
   count = 0
@@ -2865,7 +3236,8 @@ function precacheStaticGeometry(renderer)
   return count
 end function
 
-// Provide compat surface batch keys behavior for the active subsystem.
+/// Implements the `compatSurfaceBatchKeys` operation for `miniquake.render.world` (compat surface batch keys).
+/// @param surfaces The surfaces input consumed by `compatSurfaceBatchKeys`.
 function compatSurfaceBatchKeys(surfaces)
   global rCompatSurfaceBatchKeys
   required = len(surfaces) * 8
@@ -2881,7 +3253,9 @@ function compatSurfaceBatchKeys(surfaces)
   return keys
 end function
 
-// Provide compat multitexture records behavior for the active subsystem.
+/// Implements the `compatMultitextureRecords` operation for `miniquake.render.world` (compat multitexture records).
+/// @param surfaces The surfaces input consumed by `compatMultitextureRecords`.
+/// @param surfaceCount Number of entries or units to process.
 function compatMultitextureRecords(surfaces, surfaceCount)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global rCompatMtexRecordFaces, rCompatMtexRecords, rCompatMtexRecordCount, rCompatMtexRecordStamp, rCompatMtexTextureIds, rCompatMtexTextureChecked
@@ -2965,7 +3339,9 @@ function compatMultitextureRecords(surfaces, surfaceCount)
   return records
 end function
 
-// Apply the Quake-compatible r draw multitexture batch behavior.
+/// Apply the Quake-compatible r draw multitexture batch behavior.
+/// @param surfaces The surfaces input consumed by `R_DrawMultitextureBatch`.
+/// @param surfaceCount Number of entries or units to process.
 function R_DrawMultitextureBatch(surfaces, surfaceCount)
   if surfaceCount <= 0 then return 0 end if
   surfaceIndex = 0
@@ -3087,7 +3463,9 @@ function R_BlendLightmaps()
   return count
 end function
 
-// Provide compat render dynamic lightmaps behavior for the active subsystem.
+/// Implements the `compatRenderDynamicLightmaps` operation for `miniquake.render.world` (compat render dynamic lightmaps).
+/// @param surface The surface input consumed by `compatRenderDynamicLightmaps`.
+/// @param addToChain The add to chain input consumed by `compatRenderDynamicLightmaps`.
 function compatRenderDynamicLightmaps(surface, addToChain)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global c_brush_polys
@@ -3130,12 +3508,14 @@ function compatRenderDynamicLightmaps(surface, addToChain)
   return true
 end function
 
-// Apply the Quake-compatible r render dynamic lightmaps behavior.
+/// Apply the Quake-compatible r render dynamic lightmaps behavior.
+/// @param surface The surface input consumed by `R_RenderDynamicLightmaps`.
 function R_RenderDynamicLightmaps(surface)
   return compatRenderDynamicLightmaps(surface, true)
 end function
 
-// Apply the Quake-compatible r render brush poly behavior.
+/// Apply the Quake-compatible r render brush poly behavior.
+/// @param surface The surface input consumed by `R_RenderBrushPoly`.
 function R_RenderBrushPoly(surface)
   global c_brush_polys
   value = compatSurface(surface)
@@ -3155,7 +3535,8 @@ function R_RenderBrushPoly(surface)
   return true
 end function
 
-// Provide compat prepare batched brush poly behavior for the active subsystem.
+/// Implements the `compatPrepareBatchedBrushPoly` operation for `miniquake.render.world` (compat prepare batched brush poly).
+/// @param surface The surface input consumed by `compatPrepareBatchedBrushPoly`.
 function compatPrepareBatchedBrushPoly(surface)
   global c_brush_polys
   value = compatSurface(surface)
@@ -3168,7 +3549,8 @@ function compatPrepareBatchedBrushPoly(surface)
   return true
 end function
 
-// Apply the Quake-compatible r mirror chain behavior.
+/// Apply the Quake-compatible r mirror chain behavior.
+/// @param surface The surface input consumed by `R_MirrorChain`.
 function R_MirrorChain(surface)
   global mirror, mirror_plane
   if mirror then return false end if
@@ -3294,7 +3676,8 @@ function DrawTextureChains()
   return count
 end function
 
-// Return compat brush model origin derived from the active module state.
+/// Return compat brush model origin derived from the active module state.
+/// @param entity Entity affected by the operation.
 function compatBrushModelOrigin(entity)
   result = math.subtract(rCompatViewOrigin, entity.origin)
   if entity.angles.x == 0.0 and entity.angles.y == 0.0 and entity.angles.z == 0.0 then return result end if
@@ -3322,7 +3705,9 @@ function R_ClearLightmapChains()
   return true
 end function
 
-// Apply the Quake-compatible r draw brush model for submodel behavior.
+/// Apply the Quake-compatible r draw brush model for submodel behavior.
+/// @param entity Entity affected by the operation.
+/// @param submodelIndex Zero-based index of the requested entry.
 function R_DrawBrushModelForSubmodel(entity, submodelIndex)
   global currentTextureFrame
   if rCompatRenderer is void or entity is void then return 0 end if
@@ -3369,9 +3754,11 @@ function R_DrawBrushModelForSubmodel(entity, submodelIndex)
   return count
 end function
 
-// Draw only the textured faces of one inline BSP model for the enhanced
-// additive pass; classic lightmap chains and dynamic-light marks are not
-// touched by this second draw.
+/// Draw only the textured faces of one inline BSP model for the enhanced
+/// additive pass; classic lightmap chains and dynamic-light marks are not
+/// touched by this second draw.
+/// @param entity Entity affected by the operation.
+/// @param submodelIndex Zero-based index of the requested entry.
 function R_DrawBrushModelEnhancedForSubmodel(entity, submodelIndex)
   global currentTextureFrame
   if rCompatRenderer is void or entity is void then return 0 end if
@@ -3408,9 +3795,19 @@ function R_DrawBrushModelEnhancedForSubmodel(entity, submodelIndex)
   return count
 end function
 
-// Ray-project an inline BSP object's complete silhouette onto arbitrary world
-// polygons. Each fan triangle is emitted only when all three rays reach a
-// compatible receiver, preventing interpolation through a BSP corner.
+/// Ray-project an inline BSP object's complete silhouette onto arbitrary world
+/// polygons. Each fan triangle is emitted only when all three rays reach a
+/// compatible receiver, preventing interpolation through a BSP corner.
+/// @param entity Entity affected by the operation.
+/// @param submodelIndex Zero-based index of the requested entry.
+/// @param floorWorldZ The floor world z input consumed by `R_DrawBrushModelShadowForSubmodel`.
+/// @param offsetX The offset x input consumed by `R_DrawBrushModelShadowForSubmodel`.
+/// @param offsetY The offset y input consumed by `R_DrawBrushModelShadowForSubmodel`.
+/// @param contactOnly The contact only input consumed by `R_DrawBrushModelShadowForSubmodel`.
+/// @param pointLightActive The point light active input consumed by `R_DrawBrushModelShadowForSubmodel`.
+/// @param lightX The light x input consumed by `R_DrawBrushModelShadowForSubmodel`.
+/// @param lightY The light y input consumed by `R_DrawBrushModelShadowForSubmodel`.
+/// @param lightZ The light z input consumed by `R_DrawBrushModelShadowForSubmodel`.
 function R_DrawBrushModelShadowForSubmodel(entity, submodelIndex, floorWorldZ, offsetX, offsetY, contactOnly, pointLightActive, lightX, lightY, lightZ)
   if rCompatRenderer is void or entity is void then return 0 end if
   if submodelIndex < 1 or submodelIndex >= len(rCompatRenderer.map.models) then return 0 end if
@@ -3455,15 +3852,21 @@ function R_DrawBrushModelShadowForSubmodel(entity, submodelIndex, floorWorldZ, o
   return count
 end function
 
-// Apply the Quake-compatible r draw brush model behavior.
+/// Apply the Quake-compatible r draw brush model behavior.
+/// @param entity Entity affected by the operation.
 function R_DrawBrushModel(entity)
   if entity is void then return 0 end if
   return R_DrawBrushModelForSubmodel(entity, entity.modelIndex)
 end function
 
-// Traverse one visible BSP subtree with frame-stable collection sizes.  The
-// public wrapper computes these values once; recursive calls no longer repeat
-// array-length and visible-mask identity checks at every node and surface.
+/// Traverse one visible BSP subtree with frame-stable collection sizes.  The
+/// public wrapper computes these values once; recursive calls no longer repeat
+/// array-length and visible-mask identity checks at every node and surface.
+/// @param nodeNumber The node number input consumed by `compatRecursiveWorldNode`.
+/// @param nodeCount Number of entries or units to process.
+/// @param surfaceCount Number of entries or units to process.
+/// @param visibleFaceCount Number of entries or units to process.
+/// @param useVisibleMask The use visible mask input consumed by `compatRecursiveWorldNode`.
 function compatRecursiveWorldNode(nodeNumber, nodeCount, surfaceCount, visibleFaceCount, useVisibleMask)
   global skychain, waterchain, rCompatTextureChainBuilders, rCompatSequentialBuilder
   if nodeNumber < 0 or nodeNumber >= nodeCount then return 0 end if
@@ -3522,7 +3925,8 @@ function compatRecursiveWorldNode(nodeNumber, nodeCount, surfaceCount, visibleFa
   return count
 end function
 
-// Apply the Quake-compatible r recursive world node behavior.
+/// Apply the Quake-compatible r recursive world node behavior.
+/// @param nodeNumber The node number input consumed by `R_RecursiveWorldNode`.
 function R_RecursiveWorldNode(nodeNumber)
   if rCompatRenderer is void then return 0 end if
   nodeCount = len(rCompatRenderer.map.nodes)
@@ -3578,7 +3982,11 @@ function R_MarkLeaves()
   return markVisible(rCompatRenderer, rCompatViewOrigin)
 end function
 
-// Create and initialize block.
+/// Create and initialize block.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param xOut The x out input consumed by `AllocBlock`.
+/// @param yOut The y out input consumed by `AllocBlock`.
 function AllocBlock(width, height, xOut, yOut)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   global rCompatLightmapAllocated, allocated, active_lightmaps
@@ -3618,7 +4026,8 @@ function AllocBlock(width, height, xOut, yOut)
   return error(3763, "AllocBlock: full")
 end function
 
-// Create and initialize surface display list.
+/// Create and initialize surface display list.
+/// @param surface The surface input consumed by `BuildSurfaceDisplayList`.
 function BuildSurfaceDisplayList(surface)
   global nColinElim
   value = compatSurface(surface)
@@ -3674,7 +4083,8 @@ function BuildSurfaceDisplayList(surface)
   return value
 end function
 
-// Mirror Quake's GL_CreateSurfaceLightmap routine and its observable state changes.
+/// Mirror Quake's GL_CreateSurfaceLightmap routine and its observable state changes.
+/// @param surface The surface input consumed by `GL_CreateSurfaceLightmap`.
 function GL_CreateSurfaceLightmap(surface)
   value = compatSurface(surface)
   if value is void then return error(3765, "GL_CreateSurfaceLightmap: bad surface") end if
@@ -3793,9 +4203,13 @@ function GL_BuildLightmaps()
   return count
 end function
 
-// -----------------------------------------------------------------------------
-// gl_warp.c
-// -----------------------------------------------------------------------------
+/// -----------------------------------------------------------------------------
+/// gl_warp.c
+/// -----------------------------------------------------------------------------
+/// @param numverts The numverts input consumed by `BoundPoly`.
+/// @param vertices The vertices input consumed by `BoundPoly`.
+/// @param minimums The minimums input consumed by `BoundPoly`.
+/// @param maximums The maximums input consumed by `BoundPoly`.
 
 function BoundPoly(numverts, vertices, minimums, maximums)
   source = vertices
@@ -3814,7 +4228,9 @@ function BoundPoly(numverts, vertices, minimums, maximums)
   return [minimums, maximums]
 end function
 
-// Provide subdivide polygon behavior for the active subsystem.
+/// Implements the `SubdividePolygon` operation for `miniquake.render.world` (subdivide polygon).
+/// @param numverts The numverts input consumed by `SubdividePolygon`.
+/// @param vertices The vertices input consumed by `SubdividePolygon`.
 function SubdividePolygon(numverts, vertices)
   global rCompatWarpPolys
   source = vertices
@@ -3823,7 +4239,8 @@ function SubdividePolygon(numverts, vertices)
   return rCompatWarpPolys
 end function
 
-// Mirror Quake's GL_SubdivideSurface routine and its observable state changes.
+/// Mirror Quake's GL_SubdivideSurface routine and its observable state changes.
+/// @param surface The surface input consumed by `GL_SubdivideSurface`.
 function GL_SubdivideSurface(surface)
   global rCompatSurfaceWarpPolys
   value = compatSurface(surface)
@@ -3840,7 +4257,8 @@ function GL_SubdivideSurface(surface)
   return polygons
 end function
 
-// Add water polys to the destination state.
+/// Add water polys to the destination state.
+/// @param surface The surface input consumed by `EmitWaterPolys`.
 function EmitWaterPolys(surface)
   value = compatSurface(surface)
   if value is void then return false end if
@@ -3877,7 +4295,8 @@ function EmitWaterPolys(surface)
   return len(polygons)
 end function
 
-// Add sky polys to the destination state.
+/// Add sky polys to the destination state.
+/// @param surface The surface input consumed by `EmitSkyPolys`.
 function EmitSkyPolys(surface)
   value = compatSurface(surface)
   if value is void then return false end if
@@ -3909,7 +4328,8 @@ function EmitSkyPolys(surface)
   return len(polygons)
 end function
 
-// Add both sky layers to the destination state.
+/// Add both sky layers to the destination state.
+/// @param surface The surface input consumed by `EmitBothSkyLayers`.
 function EmitBothSkyLayers(surface)
   global speedscale
   value = compatSurface(surface)
@@ -3930,7 +4350,8 @@ function EmitBothSkyLayers(surface)
   return first + second
 end function
 
-// Apply the Quake-compatible r draw sky chain behavior.
+/// Apply the Quake-compatible r draw sky chain behavior.
+/// @param chain The chain input consumed by `R_DrawSkyChain`.
 function R_DrawSkyChain(chain)
   global speedscale
   if chain is void then return 0 end if
@@ -3957,7 +4378,8 @@ function R_DrawSkyChain(chain)
   return count
 end function
 
-// Apply the Quake-compatible r init sky behavior.
+/// Apply the Quake-compatible r init sky behavior.
+/// @param texture Texture resource processed by the operation.
 function R_InitSky(texture)
   global solidskytexture, alphaskytexture, rCompatSkyTexture, rCompatAlphaSkyTexture
   if rCompatRenderer is void or len(rCompatRenderer.palette) < 768 then
@@ -3998,7 +4420,8 @@ function R_AdvanceFrameCounters()
   return r_framecount
 end function
 
-// Apply the Quake-compatible r reset light styles behavior.
+/// Apply the Quake-compatible r reset light styles behavior.
+/// @param value Value consumed by `R_ResetLightStyles`.
 function R_ResetLightStyles(value)
   global d_lightstylevalue
   if len(d_lightstylevalue) != c.MAX_LIGHTSTYLES then d_lightstylevalue = arrayutil.makeFilledArray(c.MAX_LIGHTSTYLES, value) end if

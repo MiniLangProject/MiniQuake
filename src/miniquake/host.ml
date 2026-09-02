@@ -68,15 +68,21 @@ import miniquake.external_reference_contract as externalReference
 import miniquake.optimization_baseline as optBaseline
 import std.fs as fs
 
+/// Tracks the module-level title fps initialized state owned by `miniquake.host`.
 titleFpsInitialized = false
+/// Tracks the module-level title fps last frame state owned by `miniquake.host`.
 titleFpsLastFrame = 0
+/// Tracks the module-level title fps last realtime state owned by `miniquake.host`.
 titleFpsLastRealtime = 0.0
+/// Tracks the module-level title fps last value state owned by `miniquake.host`.
 titleFpsLastValue = -1
 
-// Append only static entities linked into leaves visible from the current
-// world PVS. CL_RelinkEntities intentionally contains dynamic entities only;
-// this is the production counterpart of GLQuake's R_StoreEfrags calls made
-// while traversing visible world leaves.
+/// Append only static entities linked into leaves visible from the current
+/// world PVS. CL_RelinkEntities intentionally contains dynamic entities only;
+/// this is the production counterpart of GLQuake's R_StoreEfrags calls made
+/// while traversing visible world leaves.
+/// @param session The session input consumed by `appendVisibleStaticEntities`.
+/// @param dynamicEntities The dynamic entities input consumed by `appendVisibleStaticEntities`.
 function appendVisibleStaticEntities(session, dynamicEntities)
   if session.renderer is void or session.entityRenderer is void or len(session.client.staticEntities) == 0 then return dynamicEntities end if
   glRefrag.ConfigureStaticEntities(session.renderer, session.entityRenderer, session.client.staticEntities)
@@ -84,17 +90,25 @@ function appendVisibleStaticEntities(session, dynamicEntities)
   return glRefrag.R_AppendVisiblePvs(dynamicEntities, pvs)
 end function
 
-// Report whether command never exists holds for the active state.
+/// Report whether command never exists holds for the active state.
+/// @param name Stable name that identifies the requested object or option.
 function commandNeverExists(name)
   return false
 end function
 
-// Update subsystem configuration for register cvar.
+/// Update subsystem configuration for register cvar.
+/// @param registry The registry input consumed by `registerCvar`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param value Value consumed by `registerCvar`.
+/// @param archive The archive input consumed by `registerCvar`.
+/// @param serverFlag The server flag input consumed by `registerCvar`.
 function registerCvar(registry, name, value, archive, serverFlag)
   return cvar.register(registry, cvar.create(name, value, archive, serverFlag), commandNeverExists)
 end function
 
-// Create and initialize cvars.
+/// Create and initialize cvars.
+/// @param commandLine The command line input consumed by `createCvars`.
+/// @param registered The registered input consumed by `createCvars`.
 function createCvars(commandLine, registered)
   registry = cvar.createRegistry()
   registeredValue = "0"
@@ -267,7 +281,8 @@ function createCvars(commandLine, registered)
   return registry
 end function
 
-// Apply the Quake-compatible host find max clients behavior.
+/// Apply the Quake-compatible host find max clients behavior.
+/// @param arguments Command-line arguments to inspect or execute.
 function Host_FindMaxClients(arguments)
   dedicated = common.hasParm(arguments, "-dedicated")
   listening = common.hasParm(arguments, "-listen")
@@ -280,7 +295,8 @@ function Host_FindMaxClients(arguments)
   return [maximum, dedicated, listening]
 end function
 
-// Create and initialize the module state.
+/// Implements the `create` operation for `miniquake.host` (create).
+/// @param args Command-line arguments supplied by the host process.
 function create(args)
   // Screen command arrays are a differential-test trace, not renderer input.
   // Keep them disabled in the production host to avoid per-frame UI garbage.
@@ -385,7 +401,8 @@ function create(args)
   )
 end function
 
-// Report whether gameplay mouse enabled holds for the active state.
+/// Report whether gameplay mouse enabled holds for the active state.
+/// @param session The session input consumed by `gameplayMouseEnabled`.
 function gameplayMouseEnabled(session)
   // WinQuake always owns the mouse in fullscreen.  In a window the original
   // _windowed_mouse cvar controls capture and relative mouse-look.
@@ -393,7 +410,8 @@ function gameplayMouseEnabled(session)
   return cvar.variableValue(session.cvars, "_windowed_mouse") != 0.0
 end function
 
-// Update module state for mouse capture.
+/// Update module state for mouse capture.
+/// @param session The session input consumed by `updateMouseCapture`.
 function updateMouseCapture(session)
   desired = false
   if session.windowCreated and win.hasFocus() and not session.menu.active and not session.console.active then
@@ -402,12 +420,19 @@ function updateMouseCapture(session)
   return input.setMouseCapture(desired)
 end function
 
-// Provide filter time behavior for the active subsystem.
+/// Implements the `filterTime` operation for `miniquake.host` (filter time).
+/// @param timing The timing input consumed by `filterTime`.
+/// @param newRealtime Time value used by the operation.
+/// @param maxFps The max fps input consumed by `filterTime`.
+/// @param forcedFrameRate The forced frame rate input consumed by `filterTime`.
+/// @param timedemo The timedemo input consumed by `filterTime`.
 function filterTime(timing, newRealtime, maxFps, forcedFrameRate, timedemo)
   return hostTiming.filterAbsolute(timing, newRealtime, maxFps, forcedFrameRate, timedemo, 1.0)
 end function
 
-// Provide cvar command behavior for the active subsystem.
+/// Implements the `cvarCommand` operation for `miniquake.host` (cvar command).
+/// @param session The session input consumed by `cvarCommand`.
+/// @param arguments Command-line arguments to inspect or execute.
 function cvarCommand(session, arguments)
   result = cvar.command(session.cvars, arguments)
   if not result[0] then return false end if
@@ -415,7 +440,8 @@ function cvarCommand(session, arguments)
   return true
 end function
 
-// Provide flush server cvar changes behavior for the active subsystem.
+/// Implements the `flushServerCvarChanges` operation for `miniquake.host` (flush server cvar changes).
+/// @param session The session input consumed by `flushServerCvarChanges`.
 function flushServerCvarChanges(session)
   changes = cvar.takeServerChanges(session.cvars)
   if not session.server.active then return 0 end if
@@ -427,7 +453,9 @@ function flushServerCvarChanges(session)
   return written
 end function
 
-// Return alias.
+/// Return alias.
+/// @param system The system input consumed by `findAlias`.
+/// @param name Stable name that identifies the requested object or option.
 function findAlias(system, name)
   wanted = bio.lower(name)
   for each alias in system.aliases
@@ -436,26 +464,34 @@ function findAlias(system, name)
   return void
 end function
 
-// Initialize state for start map.
+/// Initialize state for start map.
+/// @param session The session input consumed by `startMap`.
+/// @param mapName Name of the map to load or inspect.
 function startMap(session, mapName)
   return transitionMap(session, mapName, false, false, false)
 end function
 
-// Update subsystem configuration for change level.
+/// Update subsystem configuration for change level.
+/// @param session The session input consumed by `changeLevel`.
+/// @param mapName Name of the map to load or inspect.
 function changeLevel(session, mapName)
   return transitionMap(session, mapName, true, true, false)
 end function
 
-// Provide restart level behavior for the active subsystem.
+/// Implements the `restartLevel` operation for `miniquake.host` (restart level).
+/// @param session The session input consumed by `restartLevel`.
+/// @param mapName Name of the map to load or inspect.
 function restartLevel(session, mapName)
   // Host_Restart_f keeps the existing spawn_parms.  Only changelevel calls
   // SV_SaveSpawnparms/SetChangeParms before SV_SpawnServer.
   return transitionMap(session, mapName, true, false, false)
 end function
 
-// Complete every deterministic client-side first-use cache before gameplay is
-// exposed. This corresponds to the original CL_InitTEnts/S_BeginPrecaching and
-// renderer cache work, with the modern OGG/audio queue included as well.
+/// Complete every deterministic client-side first-use cache before gameplay is
+/// exposed. This corresponds to the original CL_InitTEnts/S_BeginPrecaching and
+/// renderer cache work, with the modern OGG/audio queue included as well.
+/// @param session The session input consumed by `precachePlayableLevel`.
+/// @param developerValue The developer value input consumed by `precachePlayableLevel`.
 function precachePlayableLevel(session, developerValue)
   server.precacheClientFrameLookups(session.server, session.player)
   if session.entityRenderer is not void then
@@ -521,10 +557,11 @@ function precachePlayableLevel(session, developerValue)
   return true
 end function
 
-// Present one non-simulating loading frame after the new renderer and all
-// level assets exist.  This moves the driver's one-time first SwapBuffers cost
-// out of the first ordinary Host_Frame while retaining four stock-order warmup
-// updates under the loading plaque.
+/// Present one non-simulating loading frame after the new renderer and all
+/// level assets exist.  This moves the driver's one-time first SwapBuffers cost
+/// out of the first ordinary Host_Frame while retaining four stock-order warmup
+/// updates under the loading plaque.
+/// @param session The session input consumed by `finishLoadingPresentation`.
 function finishLoadingPresentation(session)
   if not session.windowCreated or session.renderer is void then
     screen.SCR_EndLoadingPlaque(session.console)
@@ -562,7 +599,9 @@ function finishLoadingPresentation(session)
   return true
 end function
 
-// Finalize state for finish local map connection.
+/// Finalize state for finish local map connection.
+/// @param session The session input consumed by `finishLocalMapConnection`.
+/// @param preserveClients The preserve clients input consumed by `finishLocalMapConnection`.
 function finishLocalMapConnection(session, preserveClients)
   opt001dCvarDeveloper = cvar.variableValue(session.cvars, "developer")
   // Demo playback and remote connections deliberately use a non-authoritative
@@ -631,7 +670,9 @@ function finishLocalMapConnection(session, preserveClients)
   return true
 end function
 
-// Provide failed map transition behavior for the active subsystem.
+/// Implements the `failedMapTransition` operation for `miniquake.host` (failed map transition).
+/// @param session The session input consumed by `failedMapTransition`.
+/// @param result Result value to report or translate into a status code.
 function failedMapTransition(session, result)
   // A failed create/upload may leave either the error value itself or a
   // partially initialized renderer in the session.  Never let the following
@@ -665,7 +706,12 @@ function failedMapTransition(session, result)
   return result
 end function
 
-// Provide transition map behavior for the active subsystem.
+/// Implements the `transitionMap` operation for `miniquake.host` (transition map).
+/// @param session The session input consumed by `transitionMap`.
+/// @param mapName Name of the map to load or inspect.
+/// @param preserveClients The preserve clients input consumed by `transitionMap`.
+/// @param saveChangeParms The save change parms input consumed by `transitionMap`.
+/// @param deferLocalConnection The defer local connection input consumed by `transitionMap`.
 function transitionMap(session, mapName, preserveClients, saveChangeParms, deferLocalConnection)
   if session.windowCreated then
     input.IN_BlockGameplayTransition()
@@ -827,7 +873,8 @@ function transitionMap(session, mapName, preserveClients, saveChangeParms, defer
   return connected
 end function
 
-// Encode and write configuration.
+/// Encode and write configuration.
+/// @param session The session input consumed by `writeConfiguration`.
 function writeConfiguration(session)
   if session.filesystem is void then return false end if
   // Automated render/transition diagnostics deliberately force small windowed
@@ -844,7 +891,8 @@ function writeConfiguration(session)
   return true
 end function
 
-// Apply the Quake-compatible host init local behavior.
+/// Apply the Quake-compatible host init local behavior.
+/// @param session The session input consumed by `Host_InitLocal`.
 function Host_InitLocal(session)
   mode = Host_FindMaxClients(session.arguments)
   if mode is error then return mode end if
@@ -856,23 +904,30 @@ function Host_InitLocal(session)
   return true
 end function
 
-// Apply the Quake-compatible host write configuration behavior.
+/// Apply the Quake-compatible host write configuration behavior.
+/// @param session The session input consumed by `Host_WriteConfiguration`.
 function Host_WriteConfiguration(session)
   if not session.initialized or common.hasParm(session.arguments, "-dedicated") then return false end if
   return writeConfiguration(session)
 end function
 
-// Apply the Quake-compatible sv client printf behavior.
+/// Apply the Quake-compatible sv client printf behavior.
+/// @param clientValue The client value input consumed by `SV_ClientPrintf`.
+/// @param text Text to parse or process.
 function SV_ClientPrintf(clientValue, text)
   return server.clientPrint(clientValue, text)
 end function
 
-// Apply the Quake-compatible sv broadcast printf behavior.
+/// Apply the Quake-compatible sv broadcast printf behavior.
+/// @param session The session input consumed by `SV_BroadcastPrintf`.
+/// @param text Text to parse or process.
 function SV_BroadcastPrintf(session, text)
   return server.broadcastPrint(session.server, text)
 end function
 
-// Apply the Quake-compatible host client commands behavior.
+/// Apply the Quake-compatible host client commands behavior.
+/// @param clientValue The client value input consumed by `Host_ClientCommands`.
+/// @param text Text to parse or process.
 function Host_ClientCommands(clientValue, text)
   if clientValue is void or not clientValue.active then return false end if
   msg.writeByte(clientValue.message, c.SVC_STUFFTEXT)
@@ -880,13 +935,18 @@ function Host_ClientCommands(clientValue, text)
   return true
 end function
 
-// Apply the Quake-compatible sv drop client behavior.
+/// Apply the Quake-compatible sv drop client behavior.
+/// @param session The session input consumed by `SV_DropClient`.
+/// @param clientValue The client value input consumed by `SV_DropClient`.
+/// @param crash The crash input consumed by `SV_DropClient`.
 function SV_DropClient(session, clientValue, crash)
   if clientValue is void then return false end if
   return server.dropClient(session.server, clientValue, crash)
 end function
 
-// Apply the Quake-compatible host flush pending client messages behavior.
+/// Apply the Quake-compatible host flush pending client messages behavior.
+/// @param session The session input consumed by `Host_FlushPendingClientMessages`.
+/// @param timeoutSeconds The timeout seconds input consumed by `Host_FlushPendingClientMessages`.
 function Host_FlushPendingClientMessages(session, timeoutSeconds)
   start = win.ticks() / 1000.0
   count = 0
@@ -915,7 +975,9 @@ function Host_FlushPendingClientMessages(session, timeoutSeconds)
   return count
 end function
 
-// Apply the Quake-compatible host shutdown server behavior.
+/// Apply the Quake-compatible host shutdown server behavior.
+/// @param session The session input consumed by `Host_ShutdownServer`.
+/// @param crash The crash input consumed by `Host_ShutdownServer`.
 function Host_ShutdownServer(session, crash)
   if not session.server.active then return false end if
   // Mark inactive before disconnecting the local client, matching host.c and
@@ -938,7 +1000,8 @@ function Host_ShutdownServer(session, crash)
   return true
 end function
 
-// Apply the Quake-compatible host clear memory behavior.
+/// Apply the Quake-compatible host clear memory behavior.
+/// @param session The session input consumed by `Host_ClearMemory`.
 function Host_ClearMemory(session)
   if session.entityRenderer is not void or session.renderer is not void then destroyScene(session) end if
   if session.client.connected then client.dropConnection(session.client) end if
@@ -954,7 +1017,9 @@ function Host_ClearMemory(session)
   return true
 end function
 
-// Apply the Quake-compatible host filter time behavior.
+/// Apply the Quake-compatible host filter time behavior.
+/// @param session The session input consumed by `Host_FilterTime`.
+/// @param elapsedSeconds The elapsed seconds input consumed by `Host_FilterTime`.
 function Host_FilterTime(session, elapsedSeconds)
   forced = cvar.variableValue(session.cvars, "host_framerate")
   maximum = cvar.variableValue(session.cvars, "host_maxfps")
@@ -963,7 +1028,9 @@ function Host_FilterTime(session, elapsedSeconds)
   return hostTiming.filter(session.timing, elapsedSeconds, timedemo, forced, 1.0, maximum)
 end function
 
-// Apply the Quake-compatible host get console commands behavior.
+/// Apply the Quake-compatible host get console commands behavior.
+/// @param session The session input consumed by `Host_GetConsoleCommands`.
+/// @param inputLines The input lines input consumed by `Host_GetConsoleCommands`.
 function Host_GetConsoleCommands(session, inputLines)
   count = 0
   for each line in inputLines
@@ -975,7 +1042,8 @@ function Host_GetConsoleCommands(session, inputLines)
   return count
 end function
 
-// Apply the Quake-compatible host init vcr behavior.
+/// Apply the Quake-compatible host init vcr behavior.
+/// @param session The session input consumed by `Host_InitVCR`.
 function Host_InitVCR(session)
   // VCR network capture/playback is an explicit project exclusion.  Rejecting
   // the original switches at initialization is deterministic and avoids
@@ -986,7 +1054,9 @@ function Host_InitVCR(session)
   return true
 end function
 
-// Apply the Quake-compatible host end game behavior.
+/// Apply the Quake-compatible host end game behavior.
+/// @param session The session input consumed by `Host_EndGame`.
+/// @param message Diagnostic message that explains a failure or event.
 function Host_EndGame(session, message)
   if cvar.variableValue(session.cvars, "developer") != 0.0 then print "Host_EndGame: " + message end if
   if session.server.active then Host_ShutdownServer(session, false) end if
@@ -998,7 +1068,9 @@ function Host_EndGame(session, message)
   return error(3013, "Host_EndGame: " + message)
 end function
 
-// Apply the Quake-compatible host error behavior.
+/// Apply the Quake-compatible host error behavior.
+/// @param session The session input consumed by `Host_Error`.
+/// @param message Diagnostic message that explains a failure or event.
 function Host_Error(session, message)
   if session.inError then
     session.running = false
@@ -1015,7 +1087,8 @@ function Host_Error(session, message)
   return error(3015, "Host_Error: " + message)
 end function
 
-// Provide refresh save slots behavior for the active subsystem.
+/// Implements the `refreshSaveSlots` operation for `miniquake.host` (refresh save slots).
+/// @param session The session input consumed by `refreshSaveSlots`.
 function refreshSaveSlots(session)
   items = []
   loadable = []
@@ -1038,7 +1111,9 @@ function refreshSaveSlots(session)
   return items
 end function
 
-// Encode and write game.
+/// Encode and write game.
+/// @param session The session input consumed by `saveGame`.
+/// @param requestedName Name that identifies the requested value or resource.
 function saveGame(session, requestedName)
   if not session.server.active then return error(3712, "Not playing a local game.") end if
   if screen.SCR_IntermissionMode() != 0 then return error(3715, "Can't save in intermission.") end if
@@ -1064,7 +1139,9 @@ function saveGame(session, requestedName)
   return true
 end function
 
-// Read and validate game.
+/// Read and validate game.
+/// @param session The session input consumed by `loadGame`.
+/// @param requestedName Name that identifies the requested value or resource.
 function loadGame(session, requestedName)
   name = savegame.filename(requestedName)
   if name is error then return name end if
@@ -1112,7 +1189,10 @@ function loadGame(session, requestedName)
   return true
 end function
 
-// Update module state for player flag.
+/// Update module state for player flag.
+/// @param session The session input consumed by `setPlayerFlag`.
+/// @param flag The flag input consumed by `setPlayerFlag`.
+/// @param enabled Whether the optional behavior is enabled.
 function setPlayerFlag(session, flag, enabled)
   if enabled then session.player.flags = session.player.flags | flag else session.player.flags = session.player.flags & ~flag end if
   if session.server.machine is not void and len(session.server.clients) > 0 then
@@ -1121,12 +1201,15 @@ function setPlayerFlag(session, flag, enabled)
   return enabled
 end function
 
-// Report whether player flag enabled holds for the active state.
+/// Report whether player flag enabled holds for the active state.
+/// @param session The session input consumed by `playerFlagEnabled`.
+/// @param flag The flag input consumed by `playerFlagEnabled`.
 function playerFlagEnabled(session, flag)
   return (session.player.flags & flag) != 0
 end function
 
-// Advance client by one processing step.
+/// Advance client by one processing step.
+/// @param session The session input consumed by `pumpClient`.
 function pumpClient(session)
   if session.demoRecording is not void then
     return client.pumpRecording(session.client, session.demoRecording)
@@ -1134,7 +1217,8 @@ function pumpClient(session)
   return client.pump(session.client)
 end function
 
-// Finalize state for stop demo recording.
+/// Finalize state for stop demo recording.
+/// @param session The session input consumed by `stopDemoRecording`.
 function stopDemoRecording(session)
   if session.demoRecording is void then return error(3722, "Not recording a demo.") end if
   stopped = try(demo.CL_Stop_f(session.demoRecording, session.client.command.viewAngles))
@@ -1147,7 +1231,9 @@ function stopDemoRecording(session)
   return true
 end function
 
-// Initialize state for begin demo recording.
+/// Initialize state for begin demo recording.
+/// @param session The session input consumed by `beginDemoRecording`.
+/// @param arguments Command-line arguments to inspect or execute.
 function beginDemoRecording(session, arguments)
   if session.demoRecording is not void then return error(3724, "Already recording a demo.") end if
   plan = try(demo.CL_Record_f(arguments, session.client.connected))
@@ -1169,7 +1255,8 @@ function beginDemoRecording(session, arguments)
   return true
 end function
 
-// Release resources owned by scene.
+/// Release resources owned by scene.
+/// @param session The session input consumed by `destroyScene`.
 function destroyScene(session)
   if session.entityRenderer is not void then entityRenderer.destroy(session.entityRenderer); session.entityRenderer = void end if
   if session.renderer is not void then worldRenderer.destroy(session.renderer) end if
@@ -1177,10 +1264,11 @@ function destroyScene(session)
   return true
 end function
 
-// Clear the non-authoritative world retained solely for demo or remote
-// presentation. A live local server owns these fields and must keep them
-// across renderer rebuilds; an inactive server must not let an old demo BSP
-// suppress preparation of the next remote server's world.
+/// Clear the non-authoritative world retained solely for demo or remote
+/// presentation. A live local server owns these fields and must keep them
+/// across renderer rebuilds; an inactive server must not let an old demo BSP
+/// suppress preparation of the next remote server's world.
+/// @param session The session input consumed by `clearInactivePresentationWorld`.
 function clearInactivePresentationWorld(session)
   if session.server.active then return false end if
   session.server.worldModel = void
@@ -1191,7 +1279,8 @@ function clearInactivePresentationWorld(session)
   return true
 end function
 
-// Provide rebuild renderer resources behavior for the active subsystem.
+/// Implements the `rebuildRendererResources` operation for `miniquake.host` (rebuild renderer resources).
+/// @param session The session input consumed by `rebuildRendererResources`.
 function rebuildRendererResources(session)
   videoState = glvid.VID_State()
   palette = videoState.palette
@@ -1226,7 +1315,9 @@ function rebuildRendererResources(session)
   return true
 end function
 
-// Provide restart renderer behavior for the active subsystem.
+/// Implements the `restartRenderer` operation for `miniquake.host` (restart renderer).
+/// @param session The session input consumed by `restartRenderer`.
+/// @param backend The backend input consumed by `restartRenderer`.
 function restartRenderer(session, backend)
   particleRenderer.R_ShutdownParticleTexture()
   destroyScene(session)
@@ -1240,7 +1331,8 @@ function restartRenderer(session, backend)
   return true
 end function
 
-// Provide prepare demo scene behavior for the active subsystem.
+/// Implements the `prepareDemoScene` operation for `miniquake.host` (prepare demo scene).
+/// @param session The session input consumed by `prepareDemoScene`.
 function prepareDemoScene(session)
   if len(session.client.modelPrecache) <= 1 then return error(3727, "demo has no world model") end if
   modelName = session.client.modelPrecache[1]
@@ -1294,7 +1386,9 @@ function prepareDemoScene(session)
   return true
 end function
 
-// Establish remote host using the active network transport.
+/// Establish remote host using the active network transport.
+/// @param session The session input consumed by `connectRemoteHost`.
+/// @param hostName Name that identifies the requested value or resource.
 function connectRemoteHost(session, hostName)
   if session.demoRecording is not void then stopDemoRecording(session) end if
   if session.demoPlayback is not void then finishDemoPlayback(session) end if
@@ -1321,7 +1415,11 @@ function connectRemoteHost(session, hostName)
   return true
 end function
 
-// Establish remote host interop using the active network transport.
+/// Establish remote host interop using the active network transport.
+/// @param session The session input consumed by `connectRemoteHostInterop`.
+/// @param hostName Name that identifies the requested value or resource.
+/// @param timeoutMilliseconds The timeout milliseconds input consumed by `connectRemoteHostInterop`.
+/// @param resendMilliseconds The resend milliseconds input consumed by `connectRemoteHostInterop`.
 function connectRemoteHostInterop(session, hostName, timeoutMilliseconds, resendMilliseconds)
   if session.demoRecording is not void then stopDemoRecording(session) end if
   if session.demoPlayback is not void then finishDemoPlayback(session) end if
@@ -1343,7 +1441,8 @@ function connectRemoteHostInterop(session, hostName, timeoutMilliseconds, resend
   return true
 end function
 
-// Report whether active server clients holds for the active state.
+/// Report whether active server clients holds for the active state.
+/// @param session The session input consumed by `activeServerClients`.
 function activeServerClients(session)
   count = 0
   for each serverClient in session.server.clients
@@ -1352,7 +1451,8 @@ function activeServerClients(session)
   return count
 end function
 
-// Update subsystem configuration for configure network queries.
+/// Update subsystem configuration for configure network queries.
+/// @param session The session input consumed by `configureNetworkQueries`.
 function configureNetworkQueries(session)
   players = []
   now = win.ticks() / 1000.0
@@ -1377,7 +1477,8 @@ function configureNetworkQueries(session)
   return netloop.configureQueryData(session.network, players, rules)
 end function
 
-// Advance new connections by one processing step.
+/// Advance new connections by one processing step.
+/// @param session The session input consumed by `pumpNewConnections`.
 function pumpNewConnections(session)
   if session.network.listener is void or not session.server.active then return 0 end if
   netloop.configureServer(
@@ -1405,7 +1506,8 @@ function pumpNewConnections(session)
   return accepted
 end function
 
-// Finalize state for finish demo playback.
+/// Finalize state for finish demo playback.
+/// @param session The session input consumed by `finishDemoPlayback`.
 function finishDemoPlayback(session)
   if session.demoPlayback is void then return false end if
   playback = session.demoPlayback
@@ -1423,7 +1525,8 @@ function finishDemoPlayback(session)
   return true
 end function
 
-// Advance demo playback by one processing step.
+/// Advance demo playback by one processing step.
+/// @param session The session input consumed by `stepDemoPlayback`.
 function stepDemoPlayback(session)
   playback = session.demoPlayback
   if playback is void then return 0 end if
@@ -1434,7 +1537,10 @@ function stepDemoPlayback(session)
   return parsed
 end function
 
-// Play demo through the active media subsystem.
+/// Play demo through the active media subsystem.
+/// @param session The session input consumed by `playDemo`.
+/// @param requestedName Name that identifies the requested value or resource.
+/// @param timed The timed input consumed by `playDemo`.
 function playDemo(session, requestedName, timed)
   name = demo.filename(requestedName)
   if name is error then return name end if
@@ -1473,20 +1579,24 @@ function playDemo(session, requestedName, timed)
   return true
 end function
 
-// Provide network command address behavior for the active subsystem.
+/// Implements the `networkCommandAddress` operation for `miniquake.host` (network command address).
+/// @param arguments Command-line arguments to inspect or execute.
 function networkCommandAddress(arguments)
   if len(arguments) == 2 then return arguments[1] end if
   if len(arguments) == 4 and arguments[2] == ":" then return arguments[1] + ":" + arguments[3] end if
   return ""
 end function
 
-// Apply the Quake-compatible host forward to server behavior.
+/// Apply the Quake-compatible host forward to server behavior.
+/// @param session The session input consumed by `Host_ForwardToServer`.
+/// @param text Text to parse or process.
 function Host_ForwardToServer(session, text)
   if not session.client.connected or session.client.socket is void then return false end if
   return client.sendString(session.client, text + "\n") >= 0
 end function
 
-// Apply the Quake-compatible host disconnect f behavior.
+/// Apply the Quake-compatible host disconnect f behavior.
+/// @param session The session input consumed by `Host_Disconnect_f`.
 function Host_Disconnect_f(session)
   // CL_Disconnect_f disconnects the client and explicitly shuts down a local
   // server as a second step.  Keep the explicit host shutdown even when the
@@ -1496,7 +1606,8 @@ function Host_Disconnect_f(session)
   return true
 end function
 
-// Apply the Quake-compatible host quit f behavior.
+/// Apply the Quake-compatible host quit f behavior.
+/// @param session The session input consumed by `Host_Quit_f`.
 function Host_Quit_f(session)
   dedicated = common.hasParm(session.arguments, "-dedicated")
   if not session.console.active and not dedicated then
@@ -1509,7 +1620,8 @@ function Host_Quit_f(session)
   return true
 end function
 
-// Apply the Quake-compatible host status f behavior.
+/// Apply the Quake-compatible host status f behavior.
+/// @param session The session input consumed by `Host_Status_f`.
 function Host_Status_f(session)
   if not session.server.active then return Host_ForwardToServer(session, "status") end if
   print "host:    " + cvar.variableString(session.cvars, "hostname")
@@ -1542,17 +1654,20 @@ function Host_Status_f(session)
   return true
 end function
 
-// Apply the Quake-compatible host god f behavior.
+/// Apply the Quake-compatible host god f behavior.
+/// @param session The session input consumed by `Host_God_f`.
 function Host_God_f(session)
   return Host_ForwardToServer(session, "god")
 end function
 
-// Apply the Quake-compatible host notarget f behavior.
+/// Apply the Quake-compatible host notarget f behavior.
+/// @param session The session input consumed by `Host_Notarget_f`.
 function Host_Notarget_f(session)
   return Host_ForwardToServer(session, "notarget")
 end function
 
-// Forward the MiniQuake AI-invisibility cheat to the authoritative server.
+/// Forward the MiniQuake AI-invisibility cheat to the authoritative server.
+/// @param session The session input consumed by `Host_Invisible_f`.
 function Host_Invisible_f(session)
   return Host_ForwardToServer(session, "invisible")
 end function
@@ -1577,7 +1692,8 @@ function Host_CheatHelpLines()
   ]
 end function
 
-// Print the complete cheat reference from either accepted help alias.
+/// Print the complete cheat reference from either accepted help alias.
+/// @param session The session input consumed by `Host_Cheats_f`.
 function Host_Cheats_f(session)
   lines = Host_CheatHelpLines()
   for each line in lines
@@ -1586,22 +1702,27 @@ function Host_Cheats_f(session)
   return true
 end function
 
-// Apply the Quake-compatible host noclip f behavior.
+/// Apply the Quake-compatible host noclip f behavior.
+/// @param session The session input consumed by `Host_Noclip_f`.
 function Host_Noclip_f(session)
   return Host_ForwardToServer(session, "noclip")
 end function
 
-// Apply the Quake-compatible host fly f behavior.
+/// Apply the Quake-compatible host fly f behavior.
+/// @param session The session input consumed by `Host_Fly_f`.
 function Host_Fly_f(session)
   return Host_ForwardToServer(session, "fly")
 end function
 
-// Apply the Quake-compatible host ping f behavior.
+/// Apply the Quake-compatible host ping f behavior.
+/// @param session The session input consumed by `Host_Ping_f`.
 function Host_Ping_f(session)
   return Host_ForwardToServer(session, "ping")
 end function
 
-// Apply the Quake-compatible host map f behavior.
+/// Apply the Quake-compatible host map f behavior.
+/// @param session The session input consumed by `Host_Map_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function Host_Map_f(session, arguments)
   if len(arguments) < 2 then print "map <levelname> : start a new server"; return false end if
   requestedMap = server.cleanMapName(arguments[1])
@@ -1627,20 +1748,24 @@ function Host_Map_f(session, arguments)
   return startMap(session, requestedMap)
 end function
 
-// Apply the Quake-compatible host changelevel f behavior.
+/// Apply the Quake-compatible host changelevel f behavior.
+/// @param session The session input consumed by `Host_Changelevel_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function Host_Changelevel_f(session, arguments)
   if len(arguments) != 2 then print "changelevel <levelname> : continue game on a new level"; return false end if
   if session.demoPlayback is not void or not session.server.active then print "Only the server may changelevel"; return false end if
   return changeLevel(session, arguments[1])
 end function
 
-// Apply the Quake-compatible host restart f behavior.
+/// Apply the Quake-compatible host restart f behavior.
+/// @param session The session input consumed by `Host_Restart_f`.
 function Host_Restart_f(session)
   if session.demoPlayback is not void or not session.server.active then return false end if
   return restartLevel(session, session.server.mapName)
 end function
 
-// Apply the Quake-compatible host reconnect f behavior.
+/// Apply the Quake-compatible host reconnect f behavior.
+/// @param session The session input consumed by `Host_Reconnect_f`.
 function Host_Reconnect_f(session)
   // SCR_BeginLoadingPlaque begins with S_StopAllSounds(true) in WinQuake.
   if session.mixer is not void then mixer.stopAll(session.mixer) end if
@@ -1655,7 +1780,9 @@ function Host_Reconnect_f(session)
   return true
 end function
 
-// Apply the Quake-compatible host connect f behavior.
+/// Apply the Quake-compatible host connect f behavior.
+/// @param session The session input consumed by `Host_Connect_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function Host_Connect_f(session, arguments)
   remoteName = networkCommandAddress(arguments)
   if remoteName == "" then print "connect <server>"; return false end if
@@ -1674,7 +1801,9 @@ function Host_Connect_f(session, arguments)
   return Host_Reconnect_f(session)
 end function
 
-// Apply the Quake-compatible host savegame f behavior.
+/// Apply the Quake-compatible host savegame f behavior.
+/// @param session The session input consumed by `Host_Savegame_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function Host_Savegame_f(session, arguments)
   if len(arguments) != 2 then print "save <savename> : save a game"; return false end if
   saved = try(saveGame(session, arguments[1]))
@@ -1682,7 +1811,9 @@ function Host_Savegame_f(session, arguments)
   return true
 end function
 
-// Apply the Quake-compatible host loadgame f behavior.
+/// Apply the Quake-compatible host loadgame f behavior.
+/// @param session The session input consumed by `Host_Loadgame_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function Host_Loadgame_f(session, arguments)
   if len(arguments) != 2 then print "load <savename> : load a game"; return false end if
   session.demoNumber = -1
@@ -1691,14 +1822,18 @@ function Host_Loadgame_f(session, arguments)
   return true
 end function
 
-// Apply the Quake-compatible host changelevel2 f behavior.
+/// Apply the Quake-compatible host changelevel2 f behavior.
+/// @param session The session input consumed by `Host_Changelevel2_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function Host_Changelevel2_f(session, arguments)
   // QUAKE2-only in MiniQuake 1.09.  Retain the transition entry point while the
   // target build deliberately omits .gip hub-state semantics.
   return Host_Changelevel_f(session, arguments)
 end function
 
-// Apply the Quake-compatible host name f behavior.
+/// Apply the Quake-compatible host name f behavior.
+/// @param session The session input consumed by `Host_Name_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function Host_Name_f(session, arguments)
   if len(arguments) == 1 then print "\"name\" is \"" + cvar.variableString(session.cvars, "_cl_name") + "\""; return true end if
   newName = server.commandText(arguments, 1)
@@ -1716,7 +1851,9 @@ function Host_Version_f()
   return true
 end function
 
-// Apply the Quake-compatible host please f behavior.
+/// Apply the Quake-compatible host please f behavior.
+/// @param session The session input consumed by `Host_Please_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function Host_Please_f(session, arguments)
   // IDGODS-only in the reference.  The state is retained for faithful
   // privilege checks without enabling it automatically for public clients.
@@ -1741,7 +1878,10 @@ function Host_Please_f(session, arguments)
   return true
 end function
 
-// Apply the Quake-compatible host say behavior.
+/// Apply the Quake-compatible host say behavior.
+/// @param session The session input consumed by `Host_Say`.
+/// @param arguments Command-line arguments to inspect or execute.
+/// @param teamOnly The team only input consumed by `Host_Say`.
 function Host_Say(session, arguments, teamOnly)
   if len(arguments) < 2 then return false end if
   commandName = "say"
@@ -1756,23 +1896,31 @@ function Host_Say(session, arguments, teamOnly)
   return Host_ForwardToServer(session, commandName + " \"" + server.commandText(arguments, 1) + "\"")
 end function
 
-// Apply the Quake-compatible host say f behavior.
+/// Apply the Quake-compatible host say f behavior.
+/// @param session The session input consumed by `Host_Say_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function Host_Say_f(session, arguments)
   return Host_Say(session, arguments, false)
 end function
 
-// Apply the Quake-compatible host say team f behavior.
+/// Apply the Quake-compatible host say team f behavior.
+/// @param session The session input consumed by `Host_Say_Team_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function Host_Say_Team_f(session, arguments)
   return Host_Say(session, arguments, true)
 end function
 
-// Apply the Quake-compatible host tell f behavior.
+/// Apply the Quake-compatible host tell f behavior.
+/// @param session The session input consumed by `Host_Tell_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function Host_Tell_f(session, arguments)
   if len(arguments) < 3 then return false end if
   return Host_ForwardToServer(session, "tell " + arguments[1] + " \"" + server.commandText(arguments, 2) + "\"")
 end function
 
-// Apply the Quake-compatible host color f behavior.
+/// Apply the Quake-compatible host color f behavior.
+/// @param session The session input consumed by `Host_Color_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function Host_Color_f(session, arguments)
   if len(arguments) == 1 then
     colors = native.trunc(cvar.variableValue(session.cvars, "_cl_color"))
@@ -1790,12 +1938,14 @@ function Host_Color_f(session, arguments)
   return true
 end function
 
-// Apply the Quake-compatible host kill f behavior.
+/// Apply the Quake-compatible host kill f behavior.
+/// @param session The session input consumed by `Host_Kill_f`.
 function Host_Kill_f(session)
   return Host_ForwardToServer(session, "kill")
 end function
 
-// Apply the Quake-compatible host pause f behavior.
+/// Apply the Quake-compatible host pause f behavior.
+/// @param session The session input consumed by `Host_Pause_f`.
 function Host_Pause_f(session)
   return Host_ForwardToServer(session, "pause")
 end function
@@ -1818,18 +1968,23 @@ function Host_Begin_f()
   return false
 end function
 
-// Apply the Quake-compatible host kick f behavior.
+/// Apply the Quake-compatible host kick f behavior.
+/// @param session The session input consumed by `Host_Kick_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function Host_Kick_f(session, arguments)
   if session.server.active then return server.Host_Kick_f(session.server, void, arguments) end if
   return Host_ForwardToServer(session, server.commandText(arguments, 0))
 end function
 
-// Apply the Quake-compatible host give f behavior.
+/// Apply the Quake-compatible host give f behavior.
+/// @param session The session input consumed by `Host_Give_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function Host_Give_f(session, arguments)
   return Host_ForwardToServer(session, server.commandText(arguments, 0))
 end function
 
-// Return viewthing.
+/// Return viewthing.
+/// @param session The session input consumed by `FindViewthing`.
 function FindViewthing(session)
   for each item in session.server.edicts
     // The original scans every edict without testing ent->free.  ED_Free
@@ -1840,7 +1995,9 @@ function FindViewthing(session)
   return void
 end function
 
-// Apply the Quake-compatible host viewmodel f behavior.
+/// Apply the Quake-compatible host viewmodel f behavior.
+/// @param session The session input consumed by `Host_Viewmodel_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function Host_Viewmodel_f(session, arguments)
   if len(arguments) < 2 or session.entityRenderer is void then return false end if
   item = FindViewthing(session)
@@ -1854,14 +2011,18 @@ function Host_Viewmodel_f(session, arguments)
   return true
 end function
 
-// Provide viewthing model behavior for the active subsystem.
+/// Implements the `viewthingModel` operation for `miniquake.host` (viewthing model).
+/// @param session The session input consumed by `viewthingModel`.
+/// @param item The item input consumed by `viewthingModel`.
 function viewthingModel(session, item)
   if session.entityRenderer is void then return void end if
   if item.modelIndex < 0 or item.modelIndex >= len(session.entityRenderer.models) then return void end if
   return session.entityRenderer.models[item.modelIndex]
 end function
 
-// Apply the Quake-compatible host viewframe f behavior.
+/// Apply the Quake-compatible host viewframe f behavior.
+/// @param session The session input consumed by `Host_Viewframe_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function Host_Viewframe_f(session, arguments)
   if len(arguments) < 2 then return false end if
   item = FindViewthing(session)
@@ -1875,7 +2036,9 @@ function Host_Viewframe_f(session, arguments)
   return true
 end function
 
-// Format and emit frame name.
+/// Format and emit frame name.
+/// @param model Model resource processed by the operation.
+/// @param frame The frame input consumed by `PrintFrameName`.
 function PrintFrameName(model, frame)
   if model is void or model.aliasModel is void then return "" end if
   if frame < 0 or frame >= len(model.aliasModel.frames) then return "" end if
@@ -1886,7 +2049,8 @@ function PrintFrameName(model, frame)
   return text
 end function
 
-// Apply the Quake-compatible host viewnext f behavior.
+/// Apply the Quake-compatible host viewnext f behavior.
+/// @param session The session input consumed by `Host_Viewnext_f`.
 function Host_Viewnext_f(session)
   item = FindViewthing(session)
   if item is void then return false end if
@@ -1899,7 +2063,8 @@ function Host_Viewnext_f(session)
   return true
 end function
 
-// Apply the Quake-compatible host viewprev f behavior.
+/// Apply the Quake-compatible host viewprev f behavior.
+/// @param session The session input consumed by `Host_Viewprev_f`.
 function Host_Viewprev_f(session)
   item = FindViewthing(session)
   if item is void then return false end if
@@ -1912,7 +2077,8 @@ function Host_Viewprev_f(session)
   return true
 end function
 
-// Return next demo for the active module state.
+/// Return next demo for the active module state.
+/// @param session The session input consumed by `nextDemo`.
 function nextDemo(session)
   if len(session.demoLoop) == 0 or session.demoNumber < 0 then return false end if
   if session.demoNumber >= len(session.demoLoop) then session.demoNumber = 0 end if
@@ -1921,8 +2087,9 @@ function nextDemo(session)
   return cmd.addText(session.commands, "playdemo " + name + "\n")
 end function
 
-// Stop attract playback before a user-selected game action. This also removes
-// a next-demo command queued at the end of the preceding host frame.
+/// Stop attract playback before a user-selected game action. This also removes
+/// a next-demo command queued at the end of the preceding host frame.
+/// @param session The session input consumed by `stopAttractMode`.
 function stopAttractMode(session)
   session.demoNumber = -1
   cmd.removeCommandsNamed(session.commands, "playdemo")
@@ -1938,7 +2105,9 @@ function stopAttractMode(session)
   return true
 end function
 
-// Apply the Quake-compatible host startdemos f behavior.
+/// Apply the Quake-compatible host startdemos f behavior.
+/// @param session The session input consumed by `Host_Startdemos_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function Host_Startdemos_f(session, arguments)
   if common.hasParm(session.arguments, "-dedicated") then
     if not session.server.active then cmd.addText(session.commands, "map start\n") end if
@@ -1975,7 +2144,8 @@ function Host_Startdemos_f(session, arguments)
   return true
 end function
 
-// Apply the Quake-compatible host demos f behavior.
+/// Apply the Quake-compatible host demos f behavior.
+/// @param session The session input consumed by `Host_Demos_f`.
 function Host_Demos_f(session)
   if common.hasParm(session.arguments, "-dedicated") then return false end if
   // MiniQuake resumes a stopped loop at slot one; CL_NextDemo wraps to zero if
@@ -1986,7 +2156,8 @@ function Host_Demos_f(session)
   return nextDemo(session)
 end function
 
-// Apply the Quake-compatible host stopdemo f behavior.
+/// Apply the Quake-compatible host stopdemo f behavior.
+/// @param session The session input consumed by `Host_Stopdemo_f`.
 function Host_Stopdemo_f(session)
   if common.hasParm(session.arguments, "-dedicated") or session.demoPlayback is void then return false end if
   session.demoNumber = -1
@@ -1995,7 +2166,9 @@ function Host_Stopdemo_f(session)
   return true
 end function
 
-// Apply the Quake-compatible host edict f behavior.
+/// Apply the Quake-compatible host edict f behavior.
+/// @param session The session input consumed by `Host_Edict_f`.
+/// @param arguments Command-line arguments to inspect or execute.
 function Host_Edict_f(session, arguments)
   if session.server.machine is void then print "No server running."; return false end if
   if len(arguments) != 2 then print "edict <number>"; return false end if
@@ -2006,7 +2179,8 @@ function Host_Edict_f(session, arguments)
   return true
 end function
 
-// Apply the Quake-compatible host edicts f behavior.
+/// Apply the Quake-compatible host edicts f behavior.
+/// @param session The session input consumed by `Host_Edicts_f`.
 function Host_Edicts_f(session)
   if session.server.machine is void then print "No server running."; return false end if
   index = 0
@@ -2017,7 +2191,8 @@ function Host_Edicts_f(session)
   return true
 end function
 
-// Apply the Quake-compatible host edict count f behavior.
+/// Apply the Quake-compatible host edict count f behavior.
+/// @param session The session input consumed by `Host_EdictCount_f`.
 function Host_EdictCount_f(session)
   if session.server.machine is void then print "No server running."; return false end if
   counts = qcedict.ED_Count(session.server.machine)
@@ -2029,7 +2204,8 @@ function Host_EdictCount_f(session)
   return true
 end function
 
-// Apply the Quake-compatible host profile f behavior.
+/// Apply the Quake-compatible host profile f behavior.
+/// @param session The session input consumed by `Host_Profile_f`.
 function Host_Profile_f(session)
   if session.server.machine is void then print "No server running."; return false end if
   for each line in qcvm.PR_Profile_f(session.server.machine)
@@ -2038,7 +2214,8 @@ function Host_Profile_f(session)
   return true
 end function
 
-// Apply the Quake-compatible host mod print behavior.
+/// Apply the Quake-compatible host mod print behavior.
+/// @param session The session input consumed by `Host_Mod_Print`.
 function Host_Mod_Print(session)
   count = 0
   index = 0
@@ -2053,7 +2230,8 @@ function Host_Mod_Print(session)
   return count
 end function
 
-// Apply the Quake-compatible host flush cache f behavior.
+/// Apply the Quake-compatible host flush cache f behavior.
+/// @param session The session input consumed by `Host_FlushCache_f`.
 function Host_FlushCache_f(session)
   // Cache_Flush makes purgeable alias/sprite data get loaded again on demand.
   // MiniQuake's GC-backed model cache has no hunk address to purge, so rebuild
@@ -2080,7 +2258,10 @@ function Host_InitCommands()
   ]
 end function
 
-// Apply the Quake-compatible host dispatch command behavior.
+/// Apply the Quake-compatible host dispatch command behavior.
+/// @param session The session input consumed by `Host_DispatchCommand`.
+/// @param text Text to parse or process.
+/// @param arguments Command-line arguments to inspect or execute.
 function Host_DispatchCommand(session, text, arguments)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   name = bio.lower(arguments[0])
@@ -2132,7 +2313,9 @@ function Host_DispatchCommand(session, text, arguments)
   return void
 end function
 
-// Execute command.
+/// Execute command.
+/// @param session The session input consumed by `executeCommand`.
+/// @param text Text to parse or process.
 function executeCommand(session, text)
   arguments = cmd.tokenize(text)
   if len(arguments) == 0 then return false end if
@@ -2569,7 +2752,9 @@ function executeCommand(session, text)
   return false
 end function
 
-// Execute command buffer.
+/// Execute command buffer.
+/// @param session The session input consumed by `executeCommandBuffer`.
+/// @param maximumCommands The maximum commands input consumed by `executeCommandBuffer`.
 function executeCommandBuffer(session, maximumCommands)
   executed = 0
   session.commands.wait = false
@@ -2592,7 +2777,8 @@ function executeCommandBuffer(session, maximumCommands)
   return executed
 end function
 
-// Add state for queue startup commands.
+/// Add state for queue startup commands.
+/// @param session The session input consumed by `queueStartupCommands`.
 function queueStartupCommands(session)
   if qfs.fileExists(session.filesystem, "quake.rc") then
     cmd.addText(session.commands, "exec quake.rc\n")
@@ -2606,9 +2792,10 @@ function queueStartupCommands(session)
   return true
 end function
 
-// Upgrade legacy retail/default.cfg controls once, after every startup script
-// has run.  This repairs existing installations without overriding bindings
-// that the player customizes after the migrated configuration is saved.
+/// Upgrade legacy retail/default.cfg controls once, after every startup script
+/// has run.  This repairs existing installations without overriding bindings
+/// that the player customizes after the migrated configuration is saved.
+/// @param session The session input consumed by `migrateModernInputConfiguration`.
 function migrateModernInputConfiguration(session)
   if cvar.variableValue(session.cvars, "cl_inputversion") >= 1.0 then return false end if
   input.applyModernMovementBindings()
@@ -2619,7 +2806,8 @@ function migrateModernInputConfiguration(session)
   return true
 end function
 
-// Apply the Quake-compatible host init behavior.
+/// Apply the Quake-compatible host init behavior.
+/// @param session The session input consumed by `Host_Init`.
 function Host_Init(session)
   // The original 8 MiB small-object threshold collected far too often during
   // rendering. Disabling periodic collection entirely avoided those pauses,
@@ -2782,12 +2970,14 @@ function Host_Init(session)
   return session
 end function
 
-// Initialize state for initialize.
+/// Initializes ialize for `miniquake.host`.
+/// @param session The session input consumed by `initialize`.
 function initialize(session)
   return Host_Init(session)
 end function
 
-// Consume pending state for consume client events.
+/// Consume pending state for consume client events.
+/// @param session The session input consumed by `consumeClientEvents`.
 function consumeClientEvents(session)
   pending = client.consumeMessages(session.client)
   processable = []
@@ -2851,7 +3041,8 @@ function consumeClientEvents(session)
   return len(pending)
 end function
 
-// Update module state for client relink models.
+/// Update module state for client relink models.
+/// @param session The session input consumed by `synchronizeClientRelinkModels`.
 function synchronizeClientRelinkModels(session)
   targetCount = len(session.client.modelPrecache)
   modelsChanged = false
@@ -2890,7 +3081,8 @@ function synchronizeClientRelinkModels(session)
   return len(flags)
 end function
 
-// Consume pending state for consume relink particle effects.
+/// Consume pending state for consume relink particle effects.
+/// @param session The session input consumed by `consumeRelinkParticleEffects`.
 function consumeRelinkParticleEffects(session)
   effects = client.CL_TakeRelinkParticleEffects()
   for each item in effects
@@ -2909,7 +3101,8 @@ function consumeRelinkParticleEffects(session)
   return len(effects)
 end function
 
-// Consume pending state for consume quake ccontrol.
+/// Consume pending state for consume quake ccontrol.
+/// @param session The session input consumed by `consumeQuakeCControl`.
 function consumeQuakeCControl(session)
   opt001dCvarDeveloper = cvar.variableValue(session.cvars, "developer")
   count = 0
@@ -2942,7 +3135,9 @@ function consumeQuakeCControl(session)
   return count
 end function
 
-// Play local sound through the active media subsystem.
+/// Play local sound through the active media subsystem.
+/// @param session The session input consumed by `playLocalSound`.
+/// @param name Stable name that identifies the requested object or option.
 function playLocalSound(session, name)
   if session.mixer is void or not session.mixer.enabled then return false end if
   played = try(mixer.localSound(session.mixer, name))
@@ -2950,7 +3145,9 @@ function playLocalSound(session, name)
   return played
 end function
 
-// Play menu sound through the active media subsystem.
+/// Play menu sound through the active media subsystem.
+/// @param session The session input consumed by `playMenuSound`.
+/// @param name Stable name that identifies the requested object or option.
 function playMenuSound(session, name)
   if session.mixer is void or not session.mixer.enabled then return false end if
   result = try(mixer.localSound(session.mixer, name))
@@ -2958,9 +3155,10 @@ function playMenuSound(session, name)
   return result
 end function
 
-// console.c performs these two effects synchronously from Con_Print/Con_Printf.
-// MiniLang records them on ConsoleState so the host can invoke the production
-// audio and screen paths without creating a console<->host import cycle.
+/// console.c performs these two effects synchronously from Con_Print/Con_Printf.
+/// MiniLang records them on ConsoleState so the host can invoke the production
+/// audio and screen paths without creating a console<->host import cycle.
+/// @param session The session input consumed by `consumeConsoleSideEffects`.
 function consumeConsoleSideEffects(session)
   if session.console.talkSoundRequested then
     session.console.talkSoundRequested = false
@@ -2975,7 +3173,9 @@ function consumeConsoleSideEffects(session)
   return forceScreen
 end function
 
-// Update module state for menu active.
+/// Update module state for menu active.
+/// @param session The session input consumed by `setMenuActive`.
+/// @param active The active input consumed by `setMenuActive`.
 function setMenuActive(session, active)
   wasActive = session.menu.active
   // Some exact menu handlers clear MenuState.active before returning "close".
@@ -3016,8 +3216,9 @@ function setMenuActive(session, active)
   return active
 end function
 
-// menu.c::M_ToggleMenu_f returns from a submenu to the main menu before it
-// closes the menu. Keep this distinct from explicit action-driven closes.
+/// menu.c::M_ToggleMenu_f returns from a submenu to the main menu before it
+/// closes the menu. Keep this distinct from explicit action-driven closes.
+/// @param session The session input consumed by `toggleMenu`.
 function toggleMenu(session)
   if session.menu.active and session.menu.page != menu.PAGE_MAIN then
     menu.M_Menu_Main_f(session.menu)
@@ -3028,7 +3229,9 @@ function toggleMenu(session)
   return setMenuActive(session, not session.menu.active)
 end function
 
-// Update module state for console active.
+/// Update module state for console active.
+/// @param session The session input consumed by `setConsoleActive`.
+/// @param active The active input consumed by `setConsoleActive`.
 function setConsoleActive(session, active)
   // Con_ToggleConsole_f mutates ConsoleState.active before returning its next
   // destination. consoleVisible and KEY_CONSOLE therefore preserve ownership
@@ -3057,7 +3260,9 @@ function setConsoleActive(session, active)
   return active
 end function
 
-// Provide adjust menu option behavior for the active subsystem.
+/// Implements the `adjustMenuOption` operation for `miniquake.host` (adjust menu option).
+/// @param session The session input consumed by `adjustMenuOption`.
+/// @param direction The direction input consumed by `adjustMenuOption`.
 function adjustMenuOption(session, direction)
   selection = session.menu.selection
   changed = true
@@ -3107,7 +3312,8 @@ function adjustMenuOption(session, direction)
   return changed
 end function
 
-// Execute menu selection.
+/// Execute menu selection.
+/// @param session The session input consumed by `executeMenuSelection`.
 function executeMenuSelection(session)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   action = menu.selectedCommand(session.menu)
@@ -3201,7 +3407,9 @@ function executeMenuSelection(session)
   return action
 end function
 
-// Handle exact menu action and update the associated state.
+/// Handle exact menu action and update the associated state.
+/// @param session The session input consumed by `handleExactMenuAction`.
+/// @param result Result value to report or translate into a status code.
 function handleExactMenuAction(session, result)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if result is array then
@@ -3360,7 +3568,9 @@ function discardTextInput()
   return count
 end function
 
-// Handle menu key and update the associated state.
+/// Handle menu key and update the associated state.
+/// @param session The session input consumed by `handleMenuKey`.
+/// @param key Key used to identify the requested entry.
 function handleMenuKey(session, key)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if session.menu.page == menu.PAGE_QUIT then
@@ -3413,7 +3623,9 @@ function handleMenuKey(session, key)
   return false
 end function
 
-// Handle key result and update the associated state.
+/// Handle key result and update the associated state.
+/// @param session The session input consumed by `handleKeyResult`.
+/// @param result Result value to report or translate into a status code.
 function handleKeyResult(session, result)
   if result[0] != "" then cmd.addText(session.commands, result[0]) end if
   action = result[1]
@@ -3432,7 +3644,8 @@ function handleKeyResult(session, result)
   return result[0] != ""
 end function
 
-// Execute console input.
+/// Execute console input.
+/// @param session The session input consumed by `processConsoleInput`.
 function processConsoleInput(session)
   if not session.windowCreated then return 0 end if
   handled = 0
@@ -3491,7 +3704,8 @@ function processConsoleInput(session)
   return handled
 end function
 
-// Update module state for title.
+/// Update module state for title.
+/// @param session The session input consumed by `updateTitle`.
 function updateTitle(session)
   global titleFpsInitialized, titleFpsLastFrame, titleFpsLastRealtime, titleFpsLastValue
   if not session.windowCreated then return end if
@@ -3523,28 +3737,38 @@ function updateTitle(session)
   titleFpsLastRealtime = realtime
 end function
 
-// Live Win32 button polling is a convenience layer for the interactive port.
-// It must never participate in a headless/deterministic run: unlike original
-// WinQuake's window-message input, GetAsyncKeyState-style polling can observe
-// keys pressed in another application and make two identical traces diverge.
+/// Live Win32 button polling is a convenience layer for the interactive port.
+/// It must never participate in a headless/deterministic run: unlike original
+/// WinQuake's window-message input, GetAsyncKeyState-style polling can observe
+/// keys pressed in another application and make two identical traces diverge.
+/// @param headless The headless input consumed by `shouldPollLiveButtonBindings`.
+/// @param destinationIsGame The destination is game input consumed by `shouldPollLiveButtonBindings`.
+/// @param consoleActive The console active input consumed by `shouldPollLiveButtonBindings`.
+/// @param menuActive The menu active input consumed by `shouldPollLiveButtonBindings`.
 function inline shouldPollLiveButtonBindings(headless, destinationIsGame, consoleActive, menuActive)
   return not headless and destinationIsGame and not consoleActive and not menuActive
 end function
 
-// Report whether the current Win32 client area can accept a complete render
-// frame. Minimizing a window makes GetClientRect transiently return 0x0; the
-// original WinQuake loop skips that frame instead of feeding invalid dimensions
-// into the screen and status-bar layout code.
+/// Report whether the current Win32 client area can accept a complete render
+/// frame. Minimizing a window makes GetClientRect transiently return 0x0; the
+/// original WinQuake loop skips that frame instead of feeding invalid dimensions
+/// into the screen and status-bar layout code.
+/// @param windowCreated The window created input consumed by `shouldRenderWindowFrame`.
+/// @param minimized The minimized input consumed by `shouldRenderWindowFrame`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function inline shouldRenderWindowFrame(windowCreated, minimized, width, height)
   return windowCreated and not minimized and width > 0 and height > 0
 end function
 
-// Provide deterministic input requested behavior for the active subsystem.
+/// Implements the `deterministicInputRequested` operation for `miniquake.host` (deterministic input requested).
+/// @param session The session input consumed by `deterministicInputRequested`.
 function deterministicInputRequested(session)
   return common.hasParm(session.arguments, "-noinput")
 end function
 
-// Send client intentions through the active connection.
+/// Send client intentions through the active connection.
+/// @param session The session input consumed by `sendClientIntentions`.
 function sendClientIntentions(session)
   if session.demoPlayback is void and not session.client.connected then return 0 end if
   command = session.client.command
@@ -3596,7 +3820,8 @@ function sendClientIntentions(session)
   return client.CL_SendCmd(session.client, command)
 end function
 
-// Apply the Quake-compatible host server frame behavior.
+/// Apply the Quake-compatible host server frame behavior.
+/// @param session The session input consumed by `Host_ServerFrame`.
 function Host_ServerFrame(session)
   if not session.server.active then return false end if
   sz.clear(session.server.datagram)
@@ -3613,12 +3838,15 @@ function Host_ServerFrame(session)
   return result
 end function
 
-// Apply the Quake-compatible host server frame behavior.
+/// Apply the Quake-compatible host server frame behavior.
+/// @param session The session input consumed by `_Host_ServerFrame`.
 function _Host_ServerFrame(session)
   return Host_ServerFrame(session)
 end function
 
-// Apply the Quake-compatible host frame behavior.
+/// Apply the Quake-compatible host frame behavior.
+/// @param session The session input consumed by `_Host_Frame`.
+/// @param elapsedSeconds The elapsed seconds input consumed by `_Host_Frame`.
 function _Host_Frame(session, elapsedSeconds)
   // BP-001 persists the last completed host stage only when a compatibility
   // trace explicitly provides a context path. Normal gameplay does no I/O.
@@ -4074,7 +4302,9 @@ function _Host_Frame(session, elapsedSeconds)
   return true
 end function
 
-// Apply the Quake-compatible host frame behavior.
+/// Apply the Quake-compatible host frame behavior.
+/// @param session The session input consumed by `Host_Frame`.
+/// @param elapsedSeconds The elapsed seconds input consumed by `Host_Frame`.
 function Host_Frame(session, elapsedSeconds)
   if cvar.variableValue(session.cvars, "serverprofile") == 0.0 then return _Host_Frame(session, elapsedSeconds) end if
   started = win.ticks()
@@ -4090,12 +4320,15 @@ function Host_Frame(session, elapsedSeconds)
   return result
 end function
 
-// Advance the requested value by one processing step.
+/// Implements the `frame` operation for `miniquake.host` (frame).
+/// @param session The session input consumed by `frame`.
+/// @param elapsedSeconds The elapsed seconds input consumed by `frame`.
 function frame(session, elapsedSeconds)
   return Host_Frame(session, elapsedSeconds)
 end function
 
-// Apply the Quake-compatible host shutdown behavior.
+/// Apply the Quake-compatible host shutdown behavior.
+/// @param session The session input consumed by `Host_Shutdown`.
 function Host_Shutdown(session)
   if session.shutdownStarted then
     print "recursive shutdown"
@@ -4133,12 +4366,14 @@ function Host_Shutdown(session)
   return true
 end function
 
-// Release state for shutdown.
+/// Implements the `shutdown` operation for `miniquake.host` (shutdown).
+/// @param session The session input consumed by `shutdown`.
 function shutdown(session)
   return Host_Shutdown(session)
 end function
 
-// Execute one named test case and record its pass/fail result.
+/// Implements the `run` operation for `miniquake.host` (run).
+/// @param args Command-line arguments supplied by the host process.
 function run(args)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   session = create(args)
@@ -4216,7 +4451,8 @@ function run(args)
   return 0
 end function
 
-// Provide protocol queue snapshot behavior for the active subsystem.
+/// Implements the `protocolQueueSnapshot` operation for `miniquake.host` (protocol queue snapshot).
+/// @param session The session input consumed by `protocolQueueSnapshot`.
 function protocolQueueSnapshot(session)
   queuedMessages = 0
   queuedBytes = 0
@@ -4241,7 +4477,8 @@ function protocolQueueSnapshot(session)
   return [queuedMessages, queuedBytes]
 end function
 
-// Return udp endpoint count derived from the active module state.
+/// Return udp endpoint count derived from the active module state.
+/// @param session The session input consumed by `udpEndpointCount`.
 function udpEndpointCount(session)
   count = 0
   if session.network.listener is not void and session.network.listener.open then count = count + 1 end if
@@ -4251,7 +4488,8 @@ function udpEndpointCount(session)
   return count
 end function
 
-// Provide resource snapshot behavior for the active subsystem.
+/// Implements the `resourceSnapshot` operation for `miniquake.host` (resource snapshot).
+/// @param session The session input consumed by `resourceSnapshot`.
 function resourceSnapshot(session)
   network = netmain.NET_QueueSnapshot()
   protocol = protocolQueueSnapshot(session)
@@ -4283,7 +4521,9 @@ function resourceSnapshot(session)
   ]
 end function
 
-// Provide resource high water behavior for the active subsystem.
+/// Implements the `resourceHighWater` operation for `miniquake.host` (resource high water).
+/// @param high The high input consumed by `resourceHighWater`.
+/// @param value Value consumed by `resourceHighWater`.
 function resourceHighWater(high, value)
   updated = []
   index = 0
@@ -4296,18 +4536,33 @@ function resourceHighWater(high, value)
   return updated
 end function
 
-// Provide resource stable behavior for the active subsystem.
+/// Implements the `resourceStable` operation for `miniquake.host` (resource stable).
+/// @param before The before input consumed by `resourceStable`.
+/// @param after The after input consumed by `resourceStable`.
 function resourceStable(before, after)
   return stability.longStable(before, after)
 end function
 
-// Format and emit resource delta.
+/// Format and emit resource delta.
+/// @param label The label input consumed by `printResourceDelta`.
+/// @param before The before input consumed by `printResourceDelta`.
+/// @param after The after input consumed by `printResourceDelta`.
+/// @param high The high input consumed by `printResourceDelta`.
 function printResourceDelta(label, before, after, high)
   print "  " + label + ": " + before + " -> " + after + " (max " + high + ")"
   return true
 end function
 
-// Format and emit resource soak.
+/// Format and emit resource soak.
+/// @param mode The mode input consumed by `printResourceSoak`.
+/// @param target The target input consumed by `printResourceSoak`.
+/// @param frameCount Number of entries or units to process.
+/// @param before The before input consumed by `printResourceSoak`.
+/// @param after The after input consumed by `printResourceSoak`.
+/// @param high The high input consumed by `printResourceSoak`.
+/// @param cycles The cycles input consumed by `printResourceSoak`.
+/// @param demoMessages The demo messages input consumed by `printResourceSoak`.
+/// @param stable The stable input consumed by `printResourceSoak`.
 function printResourceSoak(mode, target, frameCount, before, after, high, cycles, demoMessages, stable)
   print "MiniQuake long soak"
   print "  mode=" + mode + " target=" + target + " frames=" + frameCount
@@ -4346,14 +4601,20 @@ function printResourceSoak(mode, target, frameCount, before, after, high, cycles
   return stable
 end function
 
-// Provide soak frame error behavior for the active subsystem.
+/// Implements the `soakFrameError` operation for `miniquake.host` (soak frame error).
+/// @param session The session input consumed by `soakFrameError`.
+/// @param phase The phase input consumed by `soakFrameError`.
+/// @param frameIndex Zero-based index of the requested entry.
+/// @param frameError The frame error input consumed by `soakFrameError`.
 function soakFrameError(session, phase, frameIndex, frameError)
   stage = "before-filter"
   if len(session.frameTrace) > 0 then stage = session.frameTrace[len(session.frameTrace) - 1] end if
   return error(3736, phase + " frame " + frameIndex + " [" + stage + "]: " + frameError.message)
 end function
 
-// Execute measured frames.
+/// Execute measured frames.
+/// @param session The session input consumed by `runMeasuredFrames`.
+/// @param frameCount Number of entries or units to process.
 function runMeasuredFrames(session, frameCount)
   gc_collect()
   before = resourceSnapshot(session)
@@ -4376,7 +4637,11 @@ function runMeasuredFrames(session, frameCount)
   return [before, after, high]
 end function
 
-// Execute server mode soak.
+/// Execute server mode soak.
+/// @param args Command-line arguments supplied by the host process.
+/// @param mode The mode input consumed by `runServerModeSoak`.
+/// @param target The target input consumed by `runServerModeSoak`.
+/// @param frameCount Number of entries or units to process.
 function runServerModeSoak(args, mode, target, frameCount)
   session = create(args)
   initialized = try(initialize(session))
@@ -4404,13 +4669,18 @@ function runServerModeSoak(args, mode, target, frameCount)
   return true
 end function
 
-// Provide restart soak demo behavior for the active subsystem.
+/// Implements the `restartSoakDemo` operation for `miniquake.host` (restart soak demo).
+/// @param session The session input consumed by `restartSoakDemo`.
+/// @param demoName Name that identifies the requested value or resource.
 function restartSoakDemo(session, demoName)
   if session.demoPlayback is not void then finishDemoPlayback(session) end if
   return playDemo(session, demoName, false)
 end function
 
-// Execute demo mode soak.
+/// Execute demo mode soak.
+/// @param args Command-line arguments supplied by the host process.
+/// @param demoName Name that identifies the requested value or resource.
+/// @param frameCount Number of entries or units to process.
 function runDemoModeSoak(args, demoName, frameCount)
   session = create(args)
   initialized = try(initialize(session))
@@ -4494,12 +4764,15 @@ function runDemoModeSoak(args, demoName, frameCount)
 end function
 
 
-// Provide opt001a resource header behavior for the active subsystem.
+/// Implements the `opt001aResourceHeader` operation for `miniquake.host` (opt001a resource header).
 function opt001aResourceHeader()
   return "sample,frame,heap_live,heap_high_water_bytes,heap_live_bytes,heap_free_bytes,edicts,client_entities,active_clients,active_qsockets,free_qsockets,queued_messages,queued_bytes,poll_procedures,udp_endpoints,audio_queued,audio_channels,process_handles,particles,temporary_entities\n"
 end function
 
-// Provide opt001a resource row behavior for the active subsystem.
+/// Implements the `opt001aResourceRow` operation for `miniquake.host` (opt001a resource row).
+/// @param sampleName Name that identifies the requested value or resource.
+/// @param frameIndex Zero-based index of the requested entry.
+/// @param values The values input consumed by `opt001aResourceRow`.
 function opt001aResourceRow(sampleName, frameIndex, values)
   result = sampleName + "," + frameIndex
   index = 0
@@ -4510,7 +4783,8 @@ function opt001aResourceRow(sampleName, frameIndex, values)
   return result + "\n"
 end function
 
-// Provide opt001a resource json behavior for the active subsystem.
+/// Implements the `opt001aResourceJson` operation for `miniquake.host` (opt001a resource json).
+/// @param values The values input consumed by `opt001aResourceJson`.
 function opt001aResourceJson(values)
   result = "["
   index = 0
@@ -4522,7 +4796,9 @@ function opt001aResourceJson(values)
   return result + "]"
 end function
 
-// Provide opt001a non handle stable behavior for the active subsystem.
+/// Implements the `opt001aNonHandleStable` operation for `miniquake.host` (opt001a non handle stable).
+/// @param before The before input consumed by `opt001aNonHandleStable`.
+/// @param after The after input consumed by `opt001aNonHandleStable`.
 function opt001aNonHandleStable(before, after)
   checks = stability.longChecks(before, after)
   index = 0
@@ -4533,7 +4809,11 @@ function opt001aNonHandleStable(before, after)
   return true
 end function
 
-// Provide opt001a map parse behavior for the active subsystem.
+/// Implements the `opt001aMapParse` operation for `miniquake.host` (opt001a map parse).
+/// @param baseDirectory Root directory containing the Quake installation.
+/// @param gameDirectory Selected Quake game-data directory.
+/// @param mapName Name of the map to load or inspect.
+/// @param outputPrefix The output prefix input consumed by `opt001aMapParse`.
 function opt001aMapParse(baseDirectory, gameDirectory, mapName, outputPrefix)
   commandLine = common.create(["-basedir", baseDirectory, "-game", gameDirectory])
   filesystem = qfs.initializeArguments(baseDirectory, commandLine)
@@ -4585,7 +4865,14 @@ function opt001aMapParse(baseDirectory, gameDirectory, mapName, outputPrefix)
   return true
 end function
 
-// Provide opt001a session arguments behavior for the active subsystem.
+/// Implements the `opt001aSessionArguments` operation for `miniquake.host` (opt001a session arguments).
+/// @param baseDirectory Root directory containing the Quake installation.
+/// @param gameDirectory Selected Quake game-data directory.
+/// @param mapName Name of the map to load or inspect.
+/// @param mode The mode input consumed by `opt001aSessionArguments`.
+/// @param port The port input consumed by `opt001aSessionArguments`.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function opt001aSessionArguments(baseDirectory, gameDirectory, mapName, mode, port, width, height)
   if mode == "demo" or mode == "demo-audio" then
     arguments = [
@@ -4648,7 +4935,10 @@ function opt001aSessionArguments(baseDirectory, gameDirectory, mapName, mode, po
   ]
 end function
 
-// Provide opt001a run frames behavior for the active subsystem.
+/// Implements the `opt001aRunFrames` operation for `miniquake.host` (opt001a run frames).
+/// @param session The session input consumed by `opt001aRunFrames`.
+/// @param frameCount Number of entries or units to process.
+/// @param phase The phase input consumed by `opt001aRunFrames`.
 function opt001aRunFrames(session, frameCount, phase)
   index = 0
   checkpoint = 500
@@ -4664,7 +4954,17 @@ function opt001aRunFrames(session, frameCount, phase)
   return true
 end function
 
-// Execute opt001 aframe baseline.
+/// Execute opt001 aframe baseline.
+/// @param baseDirectory Root directory containing the Quake installation.
+/// @param gameDirectory Selected Quake game-data directory.
+/// @param mapName Name of the map to load or inspect.
+/// @param mode The mode input consumed by `runOpt001AFrameBaseline`.
+/// @param warmupFrames The warmup frames input consumed by `runOpt001AFrameBaseline`.
+/// @param measureFrames The measure frames input consumed by `runOpt001AFrameBaseline`.
+/// @param outputPrefix The output prefix input consumed by `runOpt001AFrameBaseline`.
+/// @param rendererName Name that identifies the requested value or resource.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
 function runOpt001AFrameBaseline(baseDirectory, gameDirectory, mapName, mode, warmupFrames, measureFrames, outputPrefix, rendererName, width, height)
   demoMode = mode == "demo" or mode == "demo-audio"
   renderMode = mode == "render" or mode == "render-audio" or demoMode
@@ -4719,7 +5019,9 @@ function runOpt001AFrameBaseline(baseDirectory, gameDirectory, mapName, mode, wa
   return error(3803, "OPT-001A frame baseline recorded an unexpected frame count")
 end function
 
-// Provide opt001b change level trigger behavior for the active subsystem.
+/// Implements the `opt001bChangeLevelTrigger` operation for `miniquake.host` (opt001b change level trigger).
+/// @param session The session input consumed by `opt001bChangeLevelTrigger`.
+/// @param destination Destination value or collection to update.
 function opt001bChangeLevelTrigger(session, destination)
   if session.server.machine is void then return error(3823, "OPT-001B QuakeC VM is unavailable") end if
   triggerIndex = -1
@@ -4739,7 +5041,10 @@ function opt001bChangeLevelTrigger(session, destination)
   return triggerIndex
 end function
 
-// Execute opt001 bquake cexit.
+/// Execute opt001 bquake cexit.
+/// @param session The session input consumed by `runOpt001BQuakeCExit`.
+/// @param destination Destination value or collection to update.
+/// @param maximumFrames The maximum frames input consumed by `runOpt001BQuakeCExit`.
 function runOpt001BQuakeCExit(session, destination, maximumFrames)
   triggerIndex = try(opt001bChangeLevelTrigger(session, destination))
   if triggerIndex is error then return triggerIndex end if
@@ -4780,7 +5085,12 @@ function runOpt001BQuakeCExit(session, destination, maximumFrames)
   return frames
 end function
 
-// Execute opt001 btransition.
+/// Execute opt001 btransition.
+/// @param baseDirectory Root directory containing the Quake installation.
+/// @param gameDirectory Selected Quake game-data directory.
+/// @param frameCount Number of entries or units to process.
+/// @param outputPrefix The output prefix input consumed by `runOpt001BTransition`.
+/// @param rendererName Name that identifies the requested value or resource.
 function runOpt001BTransition(baseDirectory, gameDirectory, frameCount, outputPrefix, rendererName)
   transitionArguments = []
   for each argument in opt001aSessionArguments(baseDirectory, gameDirectory, "start", "render", 26000, 640, 480)
@@ -4845,7 +5155,12 @@ function runOpt001BTransition(baseDirectory, gameDirectory, frameCount, outputPr
   return true
 end function
 
-// Execute renderer switch smoke.
+/// Execute renderer switch smoke.
+/// @param baseDirectory Root directory containing the Quake installation.
+/// @param gameDirectory Selected Quake game-data directory.
+/// @param mapName Name of the map to load or inspect.
+/// @param frameCount Number of entries or units to process.
+/// @param outputPrefix The output prefix input consumed by `runRendererSwitchSmoke`.
 function runRendererSwitchSmoke(baseDirectory, gameDirectory, mapName, frameCount, outputPrefix)
   sessionArguments = opt001aSessionArguments(baseDirectory, gameDirectory, mapName, "render", 26000, 640, 480)
   sessionArguments = sessionArguments + ["-renderer", "opengl"]
@@ -4880,7 +5195,12 @@ function runRendererSwitchSmoke(baseDirectory, gameDirectory, mapName, frameCoun
   return true
 end function
 
-// Execute endscreen evidence.
+/// Execute endscreen evidence.
+/// @param baseDirectory Root directory containing the Quake installation.
+/// @param gameDirectory Selected Quake game-data directory.
+/// @param width Requested width in pixels or data units.
+/// @param height Requested height in pixels or data units.
+/// @param outputPrefix The output prefix input consumed by `runEndscreenEvidence`.
 function runEndscreenEvidence(baseDirectory, gameDirectory, width, height, outputPrefix)
   renderEvidence.reset()
   session = create([
@@ -4971,7 +5291,11 @@ function runEndscreenEvidence(baseDirectory, gameDirectory, width, height, outpu
   return true
 end function
 
-// Provide capture ui resolution scene behavior for the active subsystem.
+/// Implements the `captureUiResolutionScene` operation for `miniquake.host` (capture ui resolution scene).
+/// @param session The session input consumed by `captureUiResolutionScene`.
+/// @param outputPrefix The output prefix input consumed by `captureUiResolutionScene`.
+/// @param expectedWidth The expected width input consumed by `captureUiResolutionScene`.
+/// @param expectedHeight The expected height input consumed by `captureUiResolutionScene`.
 function captureUiResolutionScene(session, outputPrefix, expectedWidth, expectedHeight)
   renderEvidence.reset()
   targetFrame = session.timing.frameCount + 1
@@ -4997,7 +5321,8 @@ function captureUiResolutionScene(session, outputPrefix, expectedWidth, expected
   return result
 end function
 
-// Provide warm ui resolution scene behavior for the active subsystem.
+/// Implements the `warmUiResolutionScene` operation for `miniquake.host` (warm ui resolution scene).
+/// @param session The session input consumed by `warmUiResolutionScene`.
 function warmUiResolutionScene(session)
   index = 0
   while index < 3
@@ -5008,7 +5333,10 @@ function warmUiResolutionScene(session)
   return true
 end function
 
-// Execute ui resolution matrix.
+/// Execute ui resolution matrix.
+/// @param baseDirectory Root directory containing the Quake installation.
+/// @param gameDirectory Selected Quake game-data directory.
+/// @param outputPrefix The output prefix input consumed by `runUiResolutionMatrix`.
 function runUiResolutionMatrix(baseDirectory, gameDirectory, outputPrefix)
   session = create([
     "-basedir", baseDirectory,
@@ -5150,7 +5478,16 @@ function runUiResolutionMatrix(baseDirectory, gameDirectory, outputPrefix)
   return true
 end function
 
-// Execute opt001 ahandle plateau.
+/// Execute opt001 ahandle plateau.
+/// @param baseDirectory Root directory containing the Quake installation.
+/// @param gameDirectory Selected Quake game-data directory.
+/// @param mapName Name of the map to load or inspect.
+/// @param warmupFrames The warmup frames input consumed by `runOpt001AHandlePlateau`.
+/// @param windowFrames The window frames input consumed by `runOpt001AHandlePlateau`.
+/// @param windowCount Number of entries or units to process.
+/// @param port The port input consumed by `runOpt001AHandlePlateau`.
+/// @param outputPrefix The output prefix input consumed by `runOpt001AHandlePlateau`.
+/// @param rendererName Name that identifies the requested value or resource.
 function runOpt001AHandlePlateau(baseDirectory, gameDirectory, mapName, warmupFrames, windowFrames, windowCount, port, outputPrefix, rendererName)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   if windowCount < 3 then windowCount = 3 end if
@@ -5243,7 +5580,13 @@ function runOpt001AHandlePlateau(baseDirectory, gameDirectory, mapName, warmupFr
 end function
 
 
-// Execute long soak.
+/// Execute long soak.
+/// @param baseDirectory Root directory containing the Quake installation.
+/// @param gameDirectory Selected Quake game-data directory.
+/// @param mode The mode input consumed by `runLongSoak`.
+/// @param target The target input consumed by `runLongSoak`.
+/// @param frameCount Number of entries or units to process.
+/// @param port The port input consumed by `runLongSoak`.
 function runLongSoak(baseDirectory, gameDirectory, mode, target, frameCount, port)
   if mode == "listen" then
     return runServerModeSoak([
@@ -5278,7 +5621,10 @@ function runLongSoak(baseDirectory, gameDirectory, mode, target, frameCount, por
   return error(3735, "unknown long soak mode " + mode)
 end function
 
-// Provide soak behavior for the active subsystem.
+/// Implements the `soak` operation for `miniquake.host` (soak).
+/// @param session The session input consumed by `soak`.
+/// @param frameCount Number of entries or units to process.
+/// @param frameTime Time value used by the operation.
 function soak(session, frameCount, frameTime)
   gc_collect()
   liveBefore = heap_count()
@@ -5295,7 +5641,9 @@ function soak(session, frameCount, frameTime)
   return t.HostSoakResult(frameCount, liveBefore, liveAfter, bytesBefore, bytesAfter, stable)
 end function
 
-// Execute soak.
+/// Execute soak.
+/// @param args Command-line arguments supplied by the host process.
+/// @param frameCount Number of entries or units to process.
 function runSoak(args, frameCount)
   session = create(args)
   initialized = try(initialize(session))
@@ -5327,7 +5675,10 @@ function runSoak(args, frameCount)
   if result.stable then return 0 end if
   return 3
 end function
-// Execute render evidence.
+/// Execute render evidence.
+/// @param args Command-line arguments supplied by the host process.
+/// @param frameCount Number of entries or units to process.
+/// @param outputPrefix The output prefix input consumed by `runRenderEvidence`.
 function runRenderEvidence(args, frameCount, outputPrefix)
   renderEvidence.reset()
   configured = try(renderEvidence.configure(outputPrefix, frameCount))
@@ -5400,13 +5751,30 @@ end function
 
 
 
-// Provide interop bool behavior for the active subsystem.
+/// Implements the `interopBool` operation for `miniquake.host` (interop bool).
+/// @param value Value consumed by `interopBool`.
 function interopBool(value)
   if value then return "true" end if
   return "false"
 end function
 
-// Return interop write summary derived from the active module state.
+/// Return interop write summary derived from the active module state.
+/// @param outputPrefix The output prefix input consumed by `interopWriteSummary`.
+/// @param mode The mode input consumed by `interopWriteSummary`.
+/// @param success The success input consumed by `interopWriteSummary`.
+/// @param frames The frames input consumed by `interopWriteSummary`.
+/// @param address Network address of the peer.
+/// @param port The port input consumed by `interopWriteSummary`.
+/// @param mapName Name of the map to load or inspect.
+/// @param connected The connected input consumed by `interopWriteSummary`.
+/// @param spawned The spawned input consumed by `interopWriteSummary`.
+/// @param signon The signon input consumed by `interopWriteSummary`.
+/// @param clientName Name that identifies the requested value or resource.
+/// @param viewEntity The view entity input consumed by `interopWriteSummary`.
+/// @param modelCount Number of entries or units to process.
+/// @param soundCount Number of entries or units to process.
+/// @param activeClients The active clients input consumed by `interopWriteSummary`.
+/// @param errorText The error text input consumed by `interopWriteSummary`.
 function interopWriteSummary(
   outputPrefix,
   mode,
@@ -5451,7 +5819,10 @@ function interopWriteSummary(
   return path
 end function
 
-// Provide interop write ready behavior for the active subsystem.
+/// Implements the `interopWriteReady` operation for `miniquake.host` (interop write ready).
+/// @param outputPrefix The output prefix input consumed by `interopWriteReady`.
+/// @param port The port input consumed by `interopWriteReady`.
+/// @param mapName Name of the map to load or inspect.
 function interopWriteReady(outputPrefix, port, mapName)
   path = outputPrefix + "-ready.json"
   text = "{\n"
@@ -5465,7 +5836,8 @@ function interopWriteReady(outputPrefix, port, mapName)
   return path
 end function
 
-// Return first remote server client for the active module state.
+/// Return first remote server client for the active module state.
+/// @param session The session input consumed by `firstRemoteServerClient`.
 function firstRemoteServerClient(session)
   for each serverClient in session.server.clients
     if serverClient.active and serverClient.socket is not void and serverClient.socket.transport == "udp" then
@@ -5475,7 +5847,10 @@ function firstRemoteServerClient(session)
   return void
 end function
 
-// Execute original interop server.
+/// Execute original interop server.
+/// @param args Command-line arguments supplied by the host process.
+/// @param maximumFrames The maximum frames input consumed by `runOriginalInteropServer`.
+/// @param outputPrefix The output prefix input consumed by `runOriginalInteropServer`.
 function runOriginalInteropServer(args, maximumFrames, outputPrefix)
   // Preserve this routine's phase ordering: validate and prepare state before mutation and output.
   session = create(args)
@@ -5596,7 +5971,9 @@ function runOriginalInteropServer(args, maximumFrames, outputPrefix)
   return 3
 end function
 
-// Provide original interop client network provenance behavior for the active subsystem.
+/// Implements the `originalInteropClientNetworkProvenance` operation for `miniquake.host` (original interop client network provenance).
+/// @param session The session input consumed by `originalInteropClientNetworkProvenance`.
+/// @param controlAddress The control address input consumed by `originalInteropClientNetworkProvenance`.
 function originalInteropClientNetworkProvenance(session, controlAddress)
   transport = "none"
   remoteAddress = ""
@@ -5614,7 +5991,12 @@ function originalInteropClientNetworkProvenance(session, controlAddress)
   )
 end function
 
-// Execute original interop client.
+/// Execute original interop client.
+/// @param args Command-line arguments supplied by the host process.
+/// @param maximumFrames The maximum frames input consumed by `runOriginalInteropClient`.
+/// @param outputPrefix The output prefix input consumed by `runOriginalInteropClient`.
+/// @param controlAddress The control address input consumed by `runOriginalInteropClient`.
+/// @param controlPort The control port input consumed by `runOriginalInteropClient`.
 function runOriginalInteropClient(args, maximumFrames, outputPrefix, controlAddress, controlPort)
   session = create(args)
   initialized = try(initialize(session))
@@ -5752,7 +6134,9 @@ function runOriginalInteropClient(args, maximumFrames, outputPrefix, controlAddr
   return 3
 end function
 
-// Execute headless frames.
+/// Execute headless frames.
+/// @param args Command-line arguments supplied by the host process.
+/// @param frameCount Number of entries or units to process.
 function runHeadlessFrames(args, frameCount)
   session = create(args)
   initialized = try(initialize(session))

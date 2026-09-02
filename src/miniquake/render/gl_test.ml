@@ -12,48 +12,64 @@ import miniquake.mathlib as math
 import miniquake.world_bsp as world
 import miniquake.render.gl11 as gl
 
+/// Defines the max puffs value used by `miniquake.render.gl_test`.
 const MAX_PUFFS = 64
 
 // Group the fields that describe one test puff.
 struct TestPuff
+  /// Stores the plane value in `miniquake.render.gl_test.TestPuff`.
   plane
+  /// Stores the origin value in `miniquake.render.gl_test.TestPuff`.
   origin
+  /// Stores the normal value in `miniquake.render.gl_test.TestPuff`.
   normal
+  /// Stores the up value in `miniquake.render.gl_test.TestPuff`.
   up
+  /// Stores the right value in `miniquake.render.gl_test.TestPuff`.
   right
+  /// Stores the reflect value in `miniquake.render.gl_test.TestPuff`.
   reflect
+  /// Stores the length value in `miniquake.render.gl_test.TestPuff`.
   length
 end struct
 
 // Track mutable GL test state across subsystem calls.
 struct GlTestState
+  /// Stores the puffs value in `miniquake.render.gl_test.GlTestState`.
   puffs
+  /// Stores the world map value in `miniquake.render.gl_test.GlTestState`.
   worldMap
+  /// Stores the view origin value in `miniquake.render.gl_test.GlTestState`.
   viewOrigin
+  /// Stores the frame time value in `miniquake.render.gl_test.GlTestState`.
   frameTime
+  /// Stores the draw native value in `miniquake.render.gl_test.GlTestState`.
   drawNative
+  /// Stores the hit plane override value in `miniquake.render.gl_test.GlTestState`.
   hitPlaneOverride
+  /// Stores the command trace value in `miniquake.render.gl_test.GlTestState`.
   commandTrace
 end struct
 
+/// Tracks the module-level renderer test state owned by `miniquake.render.gl_test`.
 testState = void
 
-// Create the zero-initialized state for vector.
+/// Implements the `zeroVector` operation for `miniquake.render.gl_test` (zero vector).
 function zeroVector()
   return t.Vec3(0.0, 0.0, 0.0)
 end function
 
-// Provide empty plane behavior for the active subsystem.
+/// Implements the `emptyPlane` operation for `miniquake.render.gl_test` (empty plane).
 function emptyPlane()
   return t.Plane(zeroVector(), 0.0, 0, 0)
 end function
 
-// Provide empty puff behavior for the active subsystem.
+/// Implements the `emptyPuff` operation for `miniquake.render.gl_test` (empty puff).
 function emptyPuff()
   return TestPuff(emptyPlane(), zeroVector(), zeroVector(), zeroVector(), zeroVector(), zeroVector(), 0.0)
 end function
 
-// Create and initialize state.
+/// Creates state for `miniquake.render.gl_test`.
 function createState()
   puffs = []
   index = 0
@@ -64,7 +80,8 @@ function createState()
   return GlTestState(puffs, void, zeroVector(), 0.0, false, void, [])
 end function
 
-// Verify use state against the expected Quake behavior.
+/// Verify use state against the expected Quake behavior.
+/// @param state Mutable `miniquake.render.gl_test` state used by `Test_UseState`.
 function Test_UseState(state)
   global testState
   testState = state
@@ -78,7 +95,11 @@ function Test_State()
   return testState
 end function
 
-// Verify configure against the expected Quake behavior.
+/// Verify configure against the expected Quake behavior.
+/// @param worldMap The world map input consumed by `Test_Configure`.
+/// @param viewOrigin The view origin input consumed by `Test_Configure`.
+/// @param frameTime Time value used by the operation.
+/// @param drawNative The draw native input consumed by `Test_Configure`.
 function Test_Configure(worldMap, viewOrigin, frameTime, drawNative)
   state = Test_State()
   state.worldMap = worldMap
@@ -100,7 +121,9 @@ function Test_Init()
   return true
 end function
 
-// Provide hit plane behavior for the active subsystem.
+/// Implements the `HitPlane` operation for `miniquake.render.gl_test` (hit plane).
+/// @param start The start input consumed by `HitPlane`.
+/// @param finish The finish input consumed by `HitPlane`.
 function HitPlane(start, finish)
   state = Test_State()
   if state.hitPlaneOverride is not void then return state.hitPlaneOverride end if
@@ -110,7 +133,8 @@ function HitPlane(start, finish)
   return t.Plane(math.VectorCopy(traced.plane.normal), traced.plane.dist, traced.plane.type, traced.plane.signBits)
 end function
 
-// Verify spawn against the expected Quake behavior.
+/// Verify spawn against the expected Quake behavior.
+/// @param origin World-space origin of the operation.
 function Test_Spawn(origin)
   state = Test_State()
   index = 0
@@ -138,7 +162,8 @@ function Test_Spawn(origin)
   return index
 end function
 
-// Provide puff points behavior for the active subsystem.
+/// Implements the `puffPoints` operation for `miniquake.render.gl_test` (puff points).
+/// @param puff The puff input consumed by `puffPoints`.
 function puffPoints(puff)
   points = []
   layer = 0
@@ -155,13 +180,16 @@ function puffPoints(puff)
   return points
 end function
 
-// Add vertex to the destination state.
+/// Add vertex to the destination state.
+/// @param point The point input consumed by `emitVertex`.
+/// @param drawNative The draw native input consumed by `emitVertex`.
 function emitVertex(point, drawNative)
   if drawNative then gl.vertex3(point.x, point.y, point.z) end if
   return [point.x, point.y, point.z]
 end function
 
-// Render puff.
+/// Render puff.
+/// @param puff The puff input consumed by `DrawPuff`.
 function DrawPuff(puff)
   state = Test_State()
   points = puffPoints(puff)

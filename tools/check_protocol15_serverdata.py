@@ -16,6 +16,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import struct
@@ -755,7 +756,12 @@ def check_source_contract(root: Path) -> Check:
         }
         for key, required in markers.items():
             for marker in required:
-                if marker not in files[key]:
+                # Layout markers describe adjacent MiniLang declarations, but
+                # explicit MiniDoc comments are valid between those members.
+                source_text = files[key]
+                if "\n" in marker:
+                    source_text = re.sub(r"(?m)^[ \t]*///[^\n]*(?:\n|$)", "", source_text)
+                if marker not in source_text:
                     errors.append(f"{paths[key].relative_to(root).as_posix()} is missing source-contract marker: {marker}")
 
         # The historical BP-012 path copied the previous baseline directly.

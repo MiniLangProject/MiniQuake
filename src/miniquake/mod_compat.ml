@@ -16,16 +16,22 @@ import miniquake.game_profile as profile
 import miniquake.common as common
 import std.fs as fs
 
+/// Defines the status value used by `miniquake.mod_compat`.
 const STATUS = "mod_runtime_109_frozen_v1"
+/// Defines the fingerprint value used by `miniquake.mod_compat`.
 const FINGERPRINT = 0x4649813d
+/// Defines the contract text value used by `miniquake.mod_compat`.
 const CONTRACT_TEXT = "mod-runtime|progs-v6|bsp-v29|id1-required|rogue-optional|hipnotic-optional|integrated-host"
 
-// Provide directory present behavior for the active subsystem.
+/// Implements the `directoryPresent` operation for `miniquake.mod_compat` (directory present).
+/// @param baseDirectory Root directory containing the Quake installation.
+/// @param gameDirectory Selected Quake game-data directory.
 function directoryPresent(baseDirectory, gameDirectory)
   return fs.isDir(fs.joinPath(baseDirectory, gameDirectory))
 end function
 
-// Report whether candidate directories.
+/// Report whether candidate directories.
+/// @param baseDirectory Root directory containing the Quake installation.
 function candidateDirectories(baseDirectory)
   result = ["id1"]
   if directoryPresent(baseDirectory, "rogue") then result = result + ["rogue"] end if
@@ -33,7 +39,9 @@ function candidateDirectories(baseDirectory)
   return result
 end function
 
-// Provide profile arguments behavior for the active subsystem.
+/// Implements the `profileArguments` operation for `miniquake.mod_compat` (profile arguments).
+/// @param baseDirectory Root directory containing the Quake installation.
+/// @param gameDirectory Selected Quake game-data directory.
 function profileArguments(baseDirectory, gameDirectory)
   if gameDirectory == "rogue" then return ["-basedir", baseDirectory, "-rogue"] end if
   if gameDirectory == "hipnotic" then return ["-basedir", baseDirectory, "-hipnotic"] end if
@@ -41,7 +49,10 @@ function profileArguments(baseDirectory, gameDirectory)
   return ["-basedir", baseDirectory, "-game", gameDirectory]
 end function
 
-// Inspect the requested value and emit its decoded metadata.
+/// Implements the `inspect` operation for `miniquake.mod_compat` (inspect).
+/// @param baseDirectory Root directory containing the Quake installation.
+/// @param gameDirectory Selected Quake game-data directory.
+/// @param mapName Name of the map to load or inspect.
 function inspect(baseDirectory, gameDirectory, mapName)
   args = profileArguments(baseDirectory, gameDirectory)
   commandLine = common.create(args)
@@ -74,13 +85,14 @@ function inspect(baseDirectory, gameDirectory, mapName)
   return result
 end function
 
-// Report whether valid summary.
+/// Report whether valid summary.
+/// @param summary The summary input consumed by `validSummary`.
 function validSummary(summary)
   if summary is not array or len(summary) != 13 then return false end if
   return summary[2] > 0 and summary[3] == 6 and summary[8] == 29 and summary[5] > 0 and summary[9] > 0
 end function
 
-// Return contract vector derived from the active module state.
+/// Implements the `contractVector` operation for `miniquake.mod_compat` (contract vector).
 function inline contractVector()
   return [STATUS, FINGERPRINT, 6, 29, ["id1", "rogue", "hipnotic"]]
 end function

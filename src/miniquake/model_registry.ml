@@ -20,18 +20,25 @@ import miniquake.render.colored_lightmaps as coloredLightmaps
 import miniquake.world_bsp as world
 import miniquake.array_util as arrayutil
 
+/// Defines the mod unknown value used by `miniquake.model_registry`.
 const MOD_UNKNOWN = -1
+/// Defines the mod brush value used by `miniquake.model_registry`.
 const MOD_BRUSH = 0
+/// Defines the mod sprite value used by `miniquake.model_registry`.
 const MOD_SPRITE = 1
+/// Defines the mod alias value used by `miniquake.model_registry`.
 const MOD_ALIAS = 2
 
-// Report whether model command never exists holds for the active state.
+/// Report whether model command never exists holds for the active state.
+/// @param name Stable name that identifies the requested object or option.
 function modelCommandNeverExists(name)
   return false
 end function
 
-// Mod_Init.  mod_novis is the original MAX_MAP_LEAFS/8 all-visible row.
-// gl_subdivide_size is archived exactly as in gl_model.c.
+/// Mod_Init.  mod_novis is the original MAX_MAP_LEAFS/8 all-visible row.
+/// gl_subdivide_size is archived exactly as in gl_model.c.
+/// @param registry The registry input consumed by `Mod_Init`.
+/// @param cvars The cvars input consumed by `Mod_Init`.
 function Mod_Init(registry, cvars)
   if registry is void then registry = create() end if
   registry.noVis = bytes(1024, 255)
@@ -44,12 +51,14 @@ function Mod_Init(registry, cvars)
   return registry
 end function
 
-// Create and initialize the module state.
+/// Implements the `create` operation for `miniquake.model_registry` (create).
 function create()
   return t.ModelRegistry([], [], [], [], [], bytes(1024, 255))
 end function
 
-// strcmp, not Q_strcasecmp: model identity is case-sensitive in MiniQuake.
+/// strcmp, not Q_strcasecmp: model identity is case-sensitive in MiniQuake.
+/// @param registry The registry input consumed by `findIndex`.
+/// @param name Stable name that identifies the requested object or option.
 function findIndex(registry, name)
   i = 0
   while i < len(registry.names)
@@ -59,7 +68,9 @@ function findIndex(registry, name)
   return -1
 end function
 
-// Mirror Quake's Mod_FindName routine and its observable state changes.
+/// Mirror Quake's Mod_FindName routine and its observable state changes.
+/// @param registry The registry input consumed by `Mod_FindName`.
+/// @param name Stable name that identifies the requested object or option.
 function Mod_FindName(registry, name)
   if name == "" then return error(1900, "Mod_ForName: NULL name") end if
   index = findIndex(registry, name)
@@ -73,7 +84,11 @@ function Mod_FindName(registry, name)
   return len(registry.names) - 1
 end function
 
-// Update subsystem configuration for register typed.
+/// Update subsystem configuration for register typed.
+/// @param registry The registry input consumed by `registerTyped`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param model Model resource processed by the operation.
+/// @param type The type input consumed by `registerTyped`.
 function registerTyped(registry, name, model, type)
   index = Mod_FindName(registry, name)
   if index is error then return index end if
@@ -83,26 +98,35 @@ function registerTyped(registry, name, model, type)
   return index
 end function
 
-// Compatibility helper retained for existing callers.
+/// Compatibility helper retained for existing callers.
+/// @param registry The registry input consumed by `register`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param model Model resource processed by the operation.
 function register(registry, name, model)
   return registerTyped(registry, name, model, MOD_UNKNOWN)
 end function
 
-// Return the requested value.
+/// Implements the `get` operation for `miniquake.model_registry` (get).
+/// @param registry The registry input consumed by `get`.
+/// @param name Stable name that identifies the requested object or option.
 function get(registry, name)
   index = findIndex(registry, name)
   if index < 0 then return void end if
   return registry.models[index]
 end function
 
-// Return model type derived from the active module state.
+/// Return model type derived from the active module state.
+/// @param registry The registry input consumed by `modelType`.
+/// @param name Stable name that identifies the requested object or option.
 function modelType(registry, name)
   index = findIndex(registry, name)
   if index < 0 then return MOD_UNKNOWN end if
   return registry.types[index]
 end function
 
-// Update subsystem configuration for register brush submodels.
+/// Update subsystem configuration for register brush submodels.
+/// @param registry The registry input consumed by `registerBrushSubmodels`.
+/// @param map The map input consumed by `registerBrushSubmodels`.
 function registerBrushSubmodels(registry, map)
   if len(map.models) <= 1 then return 0 end if
   index = 1
@@ -114,7 +138,10 @@ function registerBrushSubmodels(registry, map)
   return len(map.models) - 1
 end function
 
-// Read and validate bytes.
+/// Loads bytes for `miniquake.model_registry`.
+/// @param registry The registry input consumed by `loadBytes`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param data Input data consumed by the operation.
 function loadBytes(registry, name, data)
   if len(data) < 4 then return error(1902, name + ": model file is truncated") end if
   magic = bio.fourCC(data, 0)
@@ -123,8 +150,12 @@ function loadBytes(registry, name, data)
   return [bsp.Mod_LoadBrushModel(data, name), MOD_BRUSH]
 end function
 
-// Mod_LoadModel.  MiniLang objects are relocatable GC values, so the alias
-// cache check is represented by retaining registry.models[index].
+/// Mod_LoadModel.  MiniLang objects are relocatable GC values, so the alias
+/// cache check is represented by retaining registry.models[index].
+/// @param registry The registry input consumed by `Mod_LoadModel`.
+/// @param filesystem The filesystem input consumed by `Mod_LoadModel`.
+/// @param index Zero-based index of the requested entry.
+/// @param crash The crash input consumed by `Mod_LoadModel`.
 function Mod_LoadModel(registry, filesystem, index, crash)
   if index < 0 or index >= len(registry.names) then return error(1903, "Mod_LoadModel: bad model index") end if
   if not registry.needLoad[index] and registry.models[index] is not void then
@@ -153,14 +184,20 @@ function Mod_LoadModel(registry, filesystem, index, crash)
   return model
 end function
 
-// Mirror Quake's Mod_ForName routine and its observable state changes.
+/// Mirror Quake's Mod_ForName routine and its observable state changes.
+/// @param registry The registry input consumed by `Mod_ForName`.
+/// @param filesystem The filesystem input consumed by `Mod_ForName`.
+/// @param name Stable name that identifies the requested object or option.
+/// @param crash The crash input consumed by `Mod_ForName`.
 function Mod_ForName(registry, filesystem, name, crash)
   index = Mod_FindName(registry, name)
   if index is error then return index end if
   return Mod_LoadModel(registry, filesystem, index, crash)
 end function
 
-// Mirror Quake's Mod_TouchModel routine and its observable state changes.
+/// Mirror Quake's Mod_TouchModel routine and its observable state changes.
+/// @param registry The registry input consumed by `Mod_TouchModel`.
+/// @param name Stable name that identifies the requested object or option.
 function Mod_TouchModel(registry, name)
   index = Mod_FindName(registry, name)
   if index is error then return index end if
@@ -170,7 +207,10 @@ function Mod_TouchModel(registry, name)
   return index
 end function
 
-// Mirror Quake's Mod_Extradata routine and its observable state changes.
+/// Mirror Quake's Mod_Extradata routine and its observable state changes.
+/// @param registry The registry input consumed by `Mod_Extradata`.
+/// @param filesystem The filesystem input consumed by `Mod_Extradata`.
+/// @param index Zero-based index of the requested entry.
 function Mod_Extradata(registry, filesystem, index)
   if index < 0 or index >= len(registry.models) then return error(1905, "Mod_Extradata: bad model") end if
   value = registry.models[index]
@@ -181,7 +221,8 @@ function Mod_Extradata(registry, filesystem, index)
   return value
 end function
 
-// Mirror Quake's Mod_ClearAll routine and its observable state changes.
+/// Mirror Quake's Mod_ClearAll routine and its observable state changes.
+/// @param registry The registry input consumed by `Mod_ClearAll`.
 function Mod_ClearAll(registry)
   index = 0
   while index < len(registry.names)
@@ -191,7 +232,8 @@ function Mod_ClearAll(registry)
   return len(registry.names)
 end function
 
-// Mirror Quake's Mod_Print routine and its observable state changes.
+/// Mirror Quake's Mod_Print routine and its observable state changes.
+/// @param registry The registry input consumed by `Mod_Print`.
 function Mod_Print(registry)
   print "Cached models:"
   index = 0
@@ -204,7 +246,9 @@ function Mod_Print(registry)
   return len(registry.names)
 end function
 
-// Provide model bounds behavior for the active subsystem.
+/// Implements the `modelBounds` operation for `miniquake.model_registry` (model bounds).
+/// @param registry The registry input consumed by `modelBounds`.
+/// @param name Stable name that identifies the requested object or option.
 function modelBounds(registry, name)
   index = findIndex(registry, name)
   if index < 0 or registry.models[index] is void then return void end if
@@ -225,7 +269,9 @@ function modelBounds(registry, name)
   return [model.mins, model.maxs]
 end function
 
-// Provide model radius behavior for the active subsystem.
+/// Implements the `modelRadius` operation for `miniquake.model_registry` (model radius).
+/// @param registry The registry input consumed by `modelRadius`.
+/// @param name Stable name that identifies the requested object or option.
 function modelRadius(registry, name)
   bounds = modelBounds(registry, name)
   if bounds is void then return 0.0 end if

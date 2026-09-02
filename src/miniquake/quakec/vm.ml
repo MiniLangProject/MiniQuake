@@ -14,25 +14,42 @@ import miniquake.quakec.opcodes as op
 import miniquake.array_util as arrayutil
 import miniquake.protocol_text as protocolText
 
+/// Defines the max stack depth value used by `miniquake.quakec.vm`.
 const MAX_STACK_DEPTH = 32
+/// Defines the localstack size value used by `miniquake.quakec.vm`.
 const LOCALSTACK_SIZE = 2048
+/// Defines the temp string handle value used by `miniquake.quakec.vm`.
 const TEMP_STRING_HANDLE = 0xffffffff
+/// Defines the lookup cache size value used by `miniquake.quakec.vm`.
 const LOOKUP_CACHE_SIZE = 512
 
+/// Tracks the module-level lookup machine state owned by `miniquake.quakec.vm`.
 lookupMachine = void
+/// Tracks the module-level field lookup keys state owned by `miniquake.quakec.vm`.
 fieldLookupKeys = array(LOOKUP_CACHE_SIZE)
+/// Tracks the module-level field lookup raw keys state owned by `miniquake.quakec.vm`.
 fieldLookupRawKeys = array(LOOKUP_CACHE_SIZE, 0)
+/// Tracks the module-level field lookup values state owned by `miniquake.quakec.vm`.
 fieldLookupValues = array(LOOKUP_CACHE_SIZE, -2)
+/// Tracks the module-level global lookup keys state owned by `miniquake.quakec.vm`.
 globalLookupKeys = array(LOOKUP_CACHE_SIZE)
+/// Tracks the module-level global lookup raw keys state owned by `miniquake.quakec.vm`.
 globalLookupRawKeys = array(LOOKUP_CACHE_SIZE, 0)
+/// Tracks the module-level global lookup values state owned by `miniquake.quakec.vm`.
 globalLookupValues = array(LOOKUP_CACHE_SIZE, -2)
+/// Tracks the module-level function lookup keys state owned by `miniquake.quakec.vm`.
 functionLookupKeys = array(LOOKUP_CACHE_SIZE)
+/// Tracks the module-level function lookup raw keys state owned by `miniquake.quakec.vm`.
 functionLookupRawKeys = array(LOOKUP_CACHE_SIZE, 0)
+/// Tracks the module-level function lookup values state owned by `miniquake.quakec.vm`.
 functionLookupValues = array(LOOKUP_CACHE_SIZE, -2)
+/// Tracks the module-level program string cache machine state owned by `miniquake.quakec.vm`.
 programStringCacheMachine = void
+/// Tracks the module-level program string cache state owned by `miniquake.quakec.vm`.
 programStringCache = []
 
-// Ensure sufficient storage or state for lookup machine.
+/// Ensure sufficient storage or state for lookup machine.
+/// @param machine The machine input consumed by `ensureLookupMachine`.
 function ensureLookupMachine(machine)
   global lookupMachine, fieldLookupKeys, fieldLookupRawKeys, fieldLookupValues
   global globalLookupKeys, globalLookupRawKeys, globalLookupValues
@@ -53,7 +70,8 @@ function ensureLookupMachine(machine)
   return true
 end function
 
-// Ensure immutable progs.dat strings have one decoded value per byte offset.
+/// Ensure immutable progs.dat strings have one decoded value per byte offset.
+/// @param machine The machine input consumed by `ensureProgramStringCache`.
 function ensureProgramStringCache(machine)
   global programStringCacheMachine, programStringCache
   if programStringCacheMachine is not void and
@@ -69,22 +87,27 @@ function ensureProgramStringCache(machine)
   return true
 end function
 
-// Return slot.
+/// Return slot.
+/// @param key Key used to identify the requested entry.
 function inline lookupSlot(key)
   return ((key >> 3) ^ (key >> 13) ^ (key >> 23)) & (LOOKUP_CACHE_SIZE - 1)
 end function
 
-// Create the zero-initialized state for array.
+/// Create the zero-initialized state for array.
+/// @param count Number of entries or units to process.
 function zeroArray(count)
   return arrayutil.makeFilledArray(count, 0)
 end function
 
-// Transfer data for copy program words.
+/// Transfer data for copy program words.
+/// @param source Source value or collection to read.
 function copyProgramWords(source)
   return arrayutil.copyArrayLinear(source)
 end function
 
-// Create and initialize the module state.
+/// Implements the `create` operation for `miniquake.quakec.vm` (create).
+/// @param program The program input consumed by `create`.
+/// @param maxEdicts The max edicts input consumed by `create`.
 function create(program, maxEdicts)
   globals = copyProgramWords(program.globals)
   edicts = arrayutil.makeEmptyArray(maxEdicts)
@@ -105,7 +128,9 @@ function create(program, maxEdicts)
   )
 end function
 
-// Ensure sufficient storage or state for global.
+/// Ensure sufficient storage or state for global.
+/// @param machine The machine input consumed by `ensureGlobal`.
+/// @param offset Zero-based offset of the requested data.
 function ensureGlobal(machine, offset)
   if offset < 0 then return error(2212, "negative QuakeC global offset") end if
   if len(machine.globals) <= offset then
@@ -113,25 +138,35 @@ function ensureGlobal(machine, offset)
   end if
 end function
 
-// Provide word behavior for the active subsystem.
+/// Implements the `word` operation for `miniquake.quakec.vm` (word).
+/// @param machine The machine input consumed by `word`.
+/// @param offset Zero-based offset of the requested data.
 function word(machine, offset)
   ensureGlobal(machine, offset)
   return machine.globals[offset]
 end function
 
-// Update module state for word.
+/// Update module state for word.
+/// @param machine The machine input consumed by `setWord`.
+/// @param offset Zero-based offset of the requested data.
+/// @param value Value consumed by `setWord`.
 function setWord(machine, offset, value)
   ensureGlobal(machine, offset)
   machine.globals[offset] = value & 0xffffffff
   return value
 end function
 
-// Provide global float behavior for the active subsystem.
+/// Implements the `globalFloat` operation for `miniquake.quakec.vm` (global float).
+/// @param machine The machine input consumed by `globalFloat`.
+/// @param offset Zero-based offset of the requested data.
 function globalFloat(machine, offset)
   return native.bitsFloat(word(machine, offset))
 end function
 
-// Update module state for global float.
+/// Update module state for global float.
+/// @param machine The machine input consumed by `setGlobalFloat`.
+/// @param offset Zero-based offset of the requested data.
+/// @param value Value consumed by `setGlobalFloat`.
 function setGlobalFloat(machine, offset, value)
   if value is bool then
     if value then value = 1.0 else value = 0.0 end if
@@ -139,12 +174,15 @@ function setGlobalFloat(machine, offset, value)
   setWord(machine, offset, native.floatBits(value))
 end function
 
-// Provide return float behavior for the active subsystem.
+/// Implements the `returnFloat` operation for `miniquake.quakec.vm` (return float).
+/// @param machine The machine input consumed by `returnFloat`.
 function returnFloat(machine)
   return globalFloat(machine, op.OFS_RETURN)
 end function
 
-// Return string value derived from the active module state.
+/// Return string value derived from the active module state.
+/// @param machine The machine input consumed by `stringValue`.
+/// @param rawValue The raw value input consumed by `stringValue`.
 function stringValue(machine, rawValue)
   if rawValue == TEMP_STRING_HANDLE then return machine.temporaryString end if
   if rawValue >= 0x80000000 then
@@ -164,18 +202,23 @@ function stringValue(machine, rawValue)
   return decoded
 end function
 
-// Report whether canonical string.
+/// Report whether canonical string.
+/// @param text Text to parse or process.
 function canonicalString(text)
   encoded = protocolText.encodeBytes(text)
   return protocolText.decodeBytes(encoded)
 end function
 
-// Provide string at behavior for the active subsystem.
+/// Implements the `stringAt` operation for `miniquake.quakec.vm` (string at).
+/// @param machine The machine input consumed by `stringAt`.
+/// @param globalOffset Zero-based offset of the requested data.
 function stringAt(machine, globalOffset)
   return stringValue(machine, word(machine, globalOffset))
 end function
 
-// Provide intern string behavior for the active subsystem.
+/// Implements the `internString` operation for `miniquake.quakec.vm` (intern string).
+/// @param machine The machine input consumed by `internString`.
+/// @param text Text to parse or process.
 function internString(machine, text)
   text = canonicalString(text)
   index = 0
@@ -187,30 +230,43 @@ function internString(machine, text)
   return 0x80000000 + len(machine.dynamicStrings) - 1
 end function
 
-// Update module state for temporary string.
+/// Update module state for temporary string.
+/// @param machine The machine input consumed by `setTemporaryString`.
+/// @param text Text to parse or process.
 function setTemporaryString(machine, text)
   machine.temporaryString = canonicalString(text)
   return TEMP_STRING_HANDLE
 end function
 
-// Update module state for global string.
+/// Update module state for global string.
+/// @param machine The machine input consumed by `setGlobalString`.
+/// @param offset Zero-based offset of the requested data.
+/// @param text Text to parse or process.
 function setGlobalString(machine, offset, text)
   return setWord(machine, offset, internString(machine, text))
 end function
 
-// Return vector derived from the active module state.
+/// Return vector derived from the active module state.
+/// @param machine The machine input consumed by `vector`.
+/// @param offset Zero-based offset of the requested data.
 function vector(machine, offset)
   return t.Vec3(globalFloat(machine, offset), globalFloat(machine, offset + 1), globalFloat(machine, offset + 2))
 end function
 
-// Update module state for vector.
+/// Update module state for vector.
+/// @param machine The machine input consumed by `setVector`.
+/// @param offset Zero-based offset of the requested data.
+/// @param value Value consumed by `setVector`.
 function setVector(machine, offset, value)
   setGlobalFloat(machine, offset, value.x)
   setGlobalFloat(machine, offset + 1, value.y)
   setGlobalFloat(machine, offset + 2, value.z)
 end function
 
-// Provide entity field behavior for the active subsystem.
+/// Implements the `entityField` operation for `miniquake.quakec.vm` (entity field).
+/// @param machine The machine input consumed by `entityField`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param fieldOffset Zero-based offset of the requested data.
 function entityField(machine, entityIndex, fieldOffset)
   if entityIndex < 0 or entityIndex >= len(machine.edicts) then return error(2200, "QuakeC entity outside edict table") end if
   fields = machine.edicts[entityIndex]
@@ -218,26 +274,37 @@ function entityField(machine, entityIndex, fieldOffset)
   return fields[fieldOffset]
 end function
 
-// Update module state for entity field.
+/// Update module state for entity field.
+/// @param machine The machine input consumed by `setEntityField`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param fieldOffset Zero-based offset of the requested data.
+/// @param value Value consumed by `setEntityField`.
 function setEntityField(machine, entityIndex, fieldOffset, value)
   if entityIndex < 0 or entityIndex >= len(machine.edicts) then return error(2202, "QuakeC entity outside edict table") end if
   if fieldOffset < 0 or fieldOffset >= len(machine.edicts[entityIndex]) then return error(2203, "QuakeC field outside edict") end if
   machine.edicts[entityIndex][fieldOffset] = value
 end function
 
-// Provide pointer entity behavior for the active subsystem.
+/// Implements the `pointerEntity` operation for `miniquake.quakec.vm` (pointer entity).
+/// @param machine The machine input consumed by `pointerEntity`.
+/// @param pointer The pointer input consumed by `pointerEntity`.
 function pointerEntity(machine, pointer)
   if machine.program.entityFields <= 0 then return 0 end if
   return native.trunc(pointer / machine.program.entityFields)
 end function
 
-// Provide pointer field behavior for the active subsystem.
+/// Implements the `pointerField` operation for `miniquake.quakec.vm` (pointer field).
+/// @param machine The machine input consumed by `pointerField`.
+/// @param pointer The pointer input consumed by `pointerField`.
 function pointerField(machine, pointer)
   if machine.program.entityFields <= 0 then return 0 end if
   return pointer % machine.program.entityFields
 end function
 
-// Validate pointer and report any incompatibility.
+/// Validate pointer and report any incompatibility.
+/// @param machine The machine input consumed by `validatePointer`.
+/// @param pointer The pointer input consumed by `validatePointer`.
+/// @param wordCount Number of entries or units to process.
 function validatePointer(machine, pointer, wordCount)
   if machine.program.entityFields <= 0 then return error(2218, "QuakeC pointer uses an empty edict layout") end if
   totalWords = len(machine.edicts) * machine.program.entityFields
@@ -251,7 +318,9 @@ function validatePointer(machine, pointer, wordCount)
   return true
 end function
 
-// Encode and write locals.
+/// Encode and write locals.
+/// @param machine The machine input consumed by `saveLocals`.
+/// @param functionValue The function value input consumed by `saveLocals`.
 function saveLocals(machine, functionValue)
   saved = arrayutil.makeEmptyArray(functionValue.locals)
   i = 0
@@ -262,7 +331,8 @@ function saveLocals(machine, functionValue)
   return saved
 end function
 
-// Encode and write d local count.
+/// Encode and write d local count.
+/// @param machine The machine input consumed by `savedLocalCount`.
 function savedLocalCount(machine)
   if machine.fastExecutionDepth > 0 then return machine.fastLocalDepth end if
   count = 0
@@ -272,8 +342,10 @@ function savedLocalCount(machine)
   return count
 end function
 
-// Enter a QuakeC function using the original fixed execution and locals
-// stacks. Sources are saved before parameters overwrite a callee's locals.
+/// Enter a QuakeC function using the original fixed execution and locals
+/// stacks. Sources are saved before parameters overwrite a callee's locals.
+/// @param machine The machine input consumed by `fastEnterFunction`.
+/// @param functionIndex Zero-based index of the requested entry.
 function fastEnterFunction(machine, functionIndex)
   if functionIndex <= 0 or functionIndex >= len(machine.program.functions) then return error(2204, "bad QuakeC function index " + functionIndex) end if
   functionValue = machine.program.functions[functionIndex]
@@ -310,7 +382,9 @@ function fastEnterFunction(machine, functionIndex)
   return true
 end function
 
-// Provide enter function behavior for the active subsystem.
+/// Implements the `enterFunction` operation for `miniquake.quakec.vm` (enter function).
+/// @param machine The machine input consumed by `enterFunction`.
+/// @param functionIndex Zero-based index of the requested entry.
 function enterFunction(machine, functionIndex)
   if machine.fastExecutionDepth > 0 then return fastEnterFunction(machine, functionIndex) end if
   if functionIndex <= 0 or functionIndex >= len(machine.program.functions) then return error(2204, "bad QuakeC function index " + functionIndex) end if
@@ -339,13 +413,15 @@ function enterFunction(machine, functionIndex)
   machine.statement = functionValue.firstStatement
 end function
 
-// Consume pending state for pop array.
+/// Consume pending state for pop array.
+/// @param values The values input consumed by `popArray`.
 function popArray(values)
   if len(values) <= 1 then return [] end if
   return arrayutil.copyArrayPrefix(values, len(values) - 1)
 end function
 
-// Provide leave function behavior for the active subsystem.
+/// Implements the `leaveFunction` operation for `miniquake.quakec.vm` (leave function).
+/// @param machine The machine input consumed by `leaveFunction`.
 function leaveFunction(machine)
   if machine.fastExecutionDepth > 0 then
     if machine.fastDepth == 0 then return error(2217, "prog stack underflow") end if
@@ -378,14 +454,17 @@ function leaveFunction(machine)
   return true
 end function
 
-// Provide call builtin behavior for the active subsystem.
+/// Implements the `callBuiltin` operation for `miniquake.quakec.vm` (call builtin).
+/// @param machine The machine input consumed by `callBuiltin`.
+/// @param builtinIndex Zero-based index of the requested entry.
 function callBuiltin(machine, builtinIndex)
   index = -builtinIndex
   if index < 0 or index >= len(machine.builtins) then return error(2205, "missing QuakeC builtin " + index) end if
   return machine.builtins[index](machine)
 end function
 
-// Return opcode name derived from the active module state.
+/// Return opcode name derived from the active module state.
+/// @param code The code input consumed by `opcodeName`.
 function opcodeName(code)
   names = [
     "DONE", "MUL_F", "MUL_V", "MUL_FV", "MUL_VF", "DIV_F",
@@ -404,21 +483,24 @@ function opcodeName(code)
   return names[code]
 end function
 
-// Provide debug floor behavior for the active subsystem.
+/// Implements the `debugFloor` operation for `miniquake.quakec.vm` (debug floor).
+/// @param value Value consumed by `debugFloor`.
 function debugFloor(value)
   truncated = native.trunc(value)
   if value < truncated then return truncated - 1 end if
   return truncated
 end function
 
-// Provide debug ceil behavior for the active subsystem.
+/// Implements the `debugCeil` operation for `miniquake.quakec.vm` (debug ceil).
+/// @param value Value consumed by `debugCeil`.
 function debugCeil(value)
   truncated = native.trunc(value)
   if value > truncated then return truncated + 1 end if
   return truncated
 end function
 
-// Provide debug one decimal behavior for the active subsystem.
+/// Implements the `debugOneDecimal` operation for `miniquake.quakec.vm` (debug one decimal).
+/// @param value Value consumed by `debugOneDecimal`.
 function debugOneDecimal(value)
   scaled = 0
   if value >= 0.0 then scaled = debugFloor(value * 10.0 + 0.5) else scaled = debugCeil(value * 10.0 - 0.5) end if
@@ -432,7 +514,9 @@ function debugOneDecimal(value)
   return text
 end function
 
-// Return definition at offset derived from the active module state.
+/// Return definition at offset derived from the active module state.
+/// @param definitions The definitions input consumed by `definitionAtOffset`.
+/// @param offset Zero-based offset of the requested data.
 function definitionAtOffset(definitions, offset)
   for each definition in definitions
     if definition.offset == offset then return definition end if
@@ -440,7 +524,10 @@ function definitionAtOffset(definitions, offset)
   return void
 end function
 
-// Provide debug value string behavior for the active subsystem.
+/// Implements the `debugValueString` operation for `miniquake.quakec.vm` (debug value string).
+/// @param machine The machine input consumed by `debugValueString`.
+/// @param definition The definition input consumed by `debugValueString`.
+/// @param offset Zero-based offset of the requested data.
 function debugValueString(machine, definition, offset)
   valueType = definition.type & 0x7fff
   if valueType == c.EV_STRING then return stringAt(machine, offset) end if
@@ -465,7 +552,10 @@ function debugValueString(machine, definition, offset)
   return "bad type " + valueType
 end function
 
-// Provide debug global string behavior for the active subsystem.
+/// Implements the `debugGlobalString` operation for `miniquake.quakec.vm` (debug global string).
+/// @param machine The machine input consumed by `debugGlobalString`.
+/// @param offset Zero-based offset of the requested data.
+/// @param includeContents The include contents input consumed by `debugGlobalString`.
 function debugGlobalString(machine, offset, includeContents)
   definition = definitionAtOffset(machine.program.globalDefs, offset)
   text = ""
@@ -481,7 +571,9 @@ function debugGlobalString(machine, offset, includeContents)
   return text + " "
 end function
 
-// Format and emit statement.
+/// Format and emit statement.
+/// @param machine The machine input consumed by `printStatement`.
+/// @param statementValue The statement value input consumed by `printStatement`.
 function printStatement(machine, statementValue)
   text = ""
   codeName = opcodeName(statementValue.op)
@@ -507,7 +599,8 @@ function printStatement(machine, statementValue)
   return text
 end function
 
-// Provide stack line behavior for the active subsystem.
+/// Implements the `stackLine` operation for `miniquake.quakec.vm` (stack line).
+/// @param functionValue The function value input consumed by `stackLine`.
 function stackLine(functionValue)
   fileName = functionValue.file
   while len(bytes(fileName)) < 12
@@ -516,7 +609,8 @@ function stackLine(functionValue)
   return fileName + " : " + functionValue.name
 end function
 
-// Provide stack trace behavior for the active subsystem.
+/// Implements the `stackTrace` operation for `miniquake.quakec.vm` (stack trace).
+/// @param machine The machine input consumed by `stackTrace`.
 function stackTrace(machine)
   lines = []
   if machine.fastExecutionDepth > 0 then
@@ -562,7 +656,8 @@ function stackTrace(machine)
   return lines
 end function
 
-// Provide profile report behavior for the active subsystem.
+/// Implements the `profileReport` operation for `miniquake.quakec.vm` (profile report).
+/// @param machine The machine input consumed by `profileReport`.
 function profileReport(machine)
   lines = []
   emitted = 0
@@ -587,7 +682,9 @@ function profileReport(machine)
   return lines
 end function
 
-// Execute error.
+/// Execute error.
+/// @param machine The machine input consumed by `runError`.
+/// @param message Diagnostic message that explains a failure or event.
 function runError(machine, message)
   if machine.context is not void then
     statementIndex = machine.statement - 1
@@ -608,12 +705,15 @@ function runError(machine, message)
   return error(2216, "Program error: " + message)
 end function
 
-// Provide float truth behavior for the active subsystem.
+/// Implements the `floatTruth` operation for `miniquake.quakec.vm` (float truth).
+/// @param value Value consumed by `floatTruth`.
 function inline floatTruth(value)
   return value != 0.0
 end function
 
-// Provide string compare behavior for the active subsystem.
+/// Implements the `stringCompare` operation for `miniquake.quakec.vm` (string compare).
+/// @param left The left input consumed by `stringCompare`.
+/// @param right The right input consumed by `stringCompare`.
 function stringCompare(left, right)
   leftBytes = protocolText.encodeBytes(left)
   rightBytes = protocolText.encodeBytes(right)
@@ -628,7 +728,9 @@ function stringCompare(left, right)
 end function
 
 
-// Return definition offset derived from the active module state.
+/// Return definition offset derived from the active module state.
+/// @param definitions The definitions input consumed by `definitionOffset`.
+/// @param name Stable name that identifies the requested object or option.
 function definitionOffset(definitions, name)
   for each definition in definitions
     // ED_FindField/ED_FindGlobal use strcmp.  Treating generated names as
@@ -638,26 +740,35 @@ function definitionOffset(definitions, name)
   return -1
 end function
 
-// Provide named global word behavior for the active subsystem.
+/// Implements the `namedGlobalWord` operation for `miniquake.quakec.vm` (named global word).
+/// @param machine The machine input consumed by `namedGlobalWord`.
+/// @param name Stable name that identifies the requested object or option.
 function namedGlobalWord(machine, name)
   offset = globalOffset(machine, name)
   if offset < 0 then return 0 end if
   return word(machine, offset)
 end function
 
-// Provide named global float behavior for the active subsystem.
+/// Implements the `namedGlobalFloat` operation for `miniquake.quakec.vm` (named global float).
+/// @param machine The machine input consumed by `namedGlobalFloat`.
+/// @param name Stable name that identifies the requested object or option.
 function namedGlobalFloat(machine, name)
   offset = globalOffset(machine, name)
   if offset < 0 then return 0.0 end if
   return globalFloat(machine, offset)
 end function
 
-// Return named field offset derived from the active module state.
+/// Return named field offset derived from the active module state.
+/// @param machine The machine input consumed by `namedFieldOffset`.
+/// @param name Stable name that identifies the requested object or option.
 function namedFieldOffset(machine, name)
   return fieldOffset(machine, name)
 end function
 
-// Execute state.
+/// Execute state.
+/// @param machine The machine input consumed by `executeState`.
+/// @param frameOffset Zero-based offset of the requested data.
+/// @param thinkOffset Zero-based offset of the requested data.
 function executeState(machine, frameOffset, thinkOffset)
   selfIndex = namedGlobalWord(machine, "self")
   if selfIndex < 0 or selfIndex >= len(machine.edicts) then return error(2210, "OP_STATE: self is outside edict table") end if
@@ -678,7 +789,9 @@ function executeState(machine, frameOffset, thinkOffset)
   return true
 end function
 
-// Execute the requested value.
+/// Execute the requested value.
+/// @param machine The machine input consumed by `execute`.
+/// @param functionIndex Zero-based index of the requested entry.
 function execute(machine, functionIndex)
   // PR_ExecuteProgram resets the global pr_trace flag at the start of every
   // invocation, including recursive entries made by movement builtins.
@@ -897,20 +1010,25 @@ function execute(machine, functionIndex)
   return machine.returnWord
 end function
 
-// Resolve the active PR_ExecuteProgram depth for diagnostics without exposing
-// the fixed-stack representation to compatibility fixtures.
+/// Resolve the active PR_ExecuteProgram depth for diagnostics without exposing
+/// the fixed-stack representation to compatibility fixtures.
+/// @param machine The machine input consumed by `callDepth`.
 function callDepth(machine)
   if machine.fastExecutionDepth > 0 then return machine.fastDepth end if
   return len(machine.callStack)
 end function
 
-// Update module state for context.
+/// Update module state for context.
+/// @param machine The machine input consumed by `setContext`.
+/// @param context The context input consumed by `setContext`.
 function setContext(machine, context)
   machine.context = context
   return machine
 end function
 
-// Return field offset derived from the active module state.
+/// Implements the `fieldOffset` operation for `miniquake.quakec.vm` (field offset).
+/// @param machine The machine input consumed by `fieldOffset`.
+/// @param name Stable name that identifies the requested object or option.
 function fieldOffset(machine, name)
   global fieldLookupKeys, fieldLookupRawKeys, fieldLookupValues
   ensureLookupMachine(machine)
@@ -931,7 +1049,9 @@ function fieldOffset(machine, name)
   return -1
 end function
 
-// Return global offset derived from the active module state.
+/// Return global offset derived from the active module state.
+/// @param machine The machine input consumed by `globalOffset`.
+/// @param name Stable name that identifies the requested object or option.
 function globalOffset(machine, name)
   global globalLookupKeys, globalLookupRawKeys, globalLookupValues
   ensureLookupMachine(machine)
@@ -952,7 +1072,9 @@ function globalOffset(machine, name)
   return -1
 end function
 
-// Return function index derived from the active module state.
+/// Return function index derived from the active module state.
+/// @param machine The machine input consumed by `functionIndex`.
+/// @param name Stable name that identifies the requested object or option.
 function functionIndex(machine, name)
   global functionLookupKeys, functionLookupRawKeys, functionLookupValues
   ensureLookupMachine(machine)
@@ -975,17 +1097,27 @@ function functionIndex(machine, name)
   return 0
 end function
 
-// Provide entity float behavior for the active subsystem.
+/// Implements the `entityFloat` operation for `miniquake.quakec.vm` (entity float).
+/// @param machine The machine input consumed by `entityFloat`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param fieldOffsetValue The field offset value input consumed by `entityFloat`.
 function entityFloat(machine, entityIndex, fieldOffsetValue)
   return native.bitsFloat(entityField(machine, entityIndex, fieldOffsetValue))
 end function
 
-// Update module state for entity float.
+/// Sets entity float for `miniquake.quakec.vm`.
+/// @param machine The machine input consumed by `setEntityFloat`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param fieldOffsetValue The field offset value input consumed by `setEntityFloat`.
+/// @param value Value consumed by `setEntityFloat`.
 function setEntityFloat(machine, entityIndex, fieldOffsetValue, value)
   return setEntityField(machine, entityIndex, fieldOffsetValue, native.floatBits(value))
 end function
 
-// Return entity vector derived from the active module state.
+/// Implements the `entityVector` operation for `miniquake.quakec.vm` (entity vector).
+/// @param machine The machine input consumed by `entityVector`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param fieldOffsetValue The field offset value input consumed by `entityVector`.
 function entityVector(machine, entityIndex, fieldOffsetValue)
   return t.Vec3(
     entityFloat(machine, entityIndex, fieldOffsetValue),
@@ -994,7 +1126,11 @@ function entityVector(machine, entityIndex, fieldOffsetValue)
   )
 end function
 
-// Update module state for entity vector.
+/// Sets entity vector for `miniquake.quakec.vm`.
+/// @param machine The machine input consumed by `setEntityVector`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param fieldOffsetValue The field offset value input consumed by `setEntityVector`.
+/// @param value Value consumed by `setEntityVector`.
 function setEntityVector(machine, entityIndex, fieldOffsetValue, value)
   setEntityFloat(machine, entityIndex, fieldOffsetValue, value.x)
   setEntityFloat(machine, entityIndex, fieldOffsetValue + 1, value.y)
@@ -1002,17 +1138,26 @@ function setEntityVector(machine, entityIndex, fieldOffsetValue, value)
   return value
 end function
 
-// Provide entity string behavior for the active subsystem.
+/// Implements the `entityString` operation for `miniquake.quakec.vm` (entity string).
+/// @param machine The machine input consumed by `entityString`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param fieldOffsetValue The field offset value input consumed by `entityString`.
 function entityString(machine, entityIndex, fieldOffsetValue)
   return stringValue(machine, entityField(machine, entityIndex, fieldOffsetValue))
 end function
 
-// Update module state for entity string.
+/// Update module state for entity string.
+/// @param machine The machine input consumed by `setEntityString`.
+/// @param entityIndex Zero-based index of the requested entry.
+/// @param fieldOffsetValue The field offset value input consumed by `setEntityString`.
+/// @param text Text to parse or process.
 function setEntityString(machine, entityIndex, fieldOffsetValue, text)
   return setEntityField(machine, entityIndex, fieldOffsetValue, internString(machine, text))
 end function
 
-// Update module state for entity.
+/// Update module state for entity.
+/// @param machine The machine input consumed by `clearEntity`.
+/// @param entityIndex Zero-based index of the requested entry.
 function clearEntity(machine, entityIndex)
   if entityIndex < 0 or entityIndex >= len(machine.edicts) then return error(2210, "clearEntity outside edict table") end if
   index = 0
@@ -1023,44 +1168,56 @@ function clearEntity(machine, entityIndex)
   return true
 end function
 
-// Provide random float behavior for the active subsystem.
+/// Implements the `randomFloat` operation for `miniquake.quakec.vm` (random float).
+/// @param machine The machine input consumed by `randomFloat`.
 function randomFloat(machine)
   machine.randomSeed = (machine.randomSeed * 214013 + 2531011) & 0xffffffff
   return ((machine.randomSeed >> 16) & 0x7fff) / 32767.0
 end function
 
-// Names matching the MiniQuake entry points keep the source-to-port mapping
-// explicit while the lower-camel functions remain the idiomatic MiniLang API.
+/// Names matching the MiniQuake entry points keep the source-to-port mapping
+/// explicit while the lower-camel functions remain the idiomatic MiniLang API.
+/// @param machine The machine input consumed by `PR_PrintStatement`.
+/// @param statementValue The statement value input consumed by `PR_PrintStatement`.
 function PR_PrintStatement(machine, statementValue)
   return printStatement(machine, statementValue)
 end function
 
-// Mirror Quake's PR_StackTrace routine and its observable state changes.
+/// Mirror Quake's PR_StackTrace routine and its observable state changes.
+/// @param machine The machine input consumed by `PR_StackTrace`.
 function PR_StackTrace(machine)
   return stackTrace(machine)
 end function
 
-// Mirror Quake's PR_Profile_f routine and its observable state changes.
+/// Mirror Quake's PR_Profile_f routine and its observable state changes.
+/// @param machine The machine input consumed by `PR_Profile_f`.
 function PR_Profile_f(machine)
   return profileReport(machine)
 end function
 
-// Mirror Quake's PR_RunError routine and its observable state changes.
+/// Mirror Quake's PR_RunError routine and its observable state changes.
+/// @param machine The machine input consumed by `PR_RunError`.
+/// @param message Diagnostic message that explains a failure or event.
 function PR_RunError(machine, message)
   return runError(machine, message)
 end function
 
-// Mirror Quake's PR_EnterFunction routine and its observable state changes.
+/// Mirror Quake's PR_EnterFunction routine and its observable state changes.
+/// @param machine The machine input consumed by `PR_EnterFunction`.
+/// @param functionIndexValue The function index value input consumed by `PR_EnterFunction`.
 function PR_EnterFunction(machine, functionIndexValue)
   return enterFunction(machine, functionIndexValue)
 end function
 
-// Mirror Quake's PR_LeaveFunction routine and its observable state changes.
+/// Mirror Quake's PR_LeaveFunction routine and its observable state changes.
+/// @param machine The machine input consumed by `PR_LeaveFunction`.
 function PR_LeaveFunction(machine)
   return leaveFunction(machine)
 end function
 
-// Mirror Quake's PR_ExecuteProgram routine and its observable state changes.
+/// Mirror Quake's PR_ExecuteProgram routine and its observable state changes.
+/// @param machine The machine input consumed by `PR_ExecuteProgram`.
+/// @param functionIndexValue The function index value input consumed by `PR_ExecuteProgram`.
 function PR_ExecuteProgram(machine, functionIndexValue)
   return execute(machine, functionIndexValue)
 end function
