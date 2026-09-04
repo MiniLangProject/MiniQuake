@@ -40,7 +40,13 @@ end function
 /// @param fullscreen The fullscreen input consumed by `create`.
 function create(title, width, height, fullscreen)
   handle = native.winCreate(title, width, height, fullscreen)
-  if handle is void then return error(2300, "Win32/WGL window creation failed") end if
+  if handle is void then
+#if TARGET_OS == "windows"
+    return error(2300, "Win32/WGL window creation failed")
+#else
+    return error(2300, "SDL2/OpenGL window creation failed")
+#endif
+  end if
   return handle
 end function
 

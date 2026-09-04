@@ -1,8 +1,8 @@
 # MiniQuake current port status
 
-Updated: 2026-09-01
+Updated: 2026-09-04
 
-MiniQuake targets GLQuake/WinQuake 1.09 behavior on Windows x64, Protocol 15
+MiniQuake targets GLQuake/WinQuake 1.09 behavior on Windows and Linux x64, Protocol 15
 and the original Quake data formats. Engine behavior is implemented in
 MiniLang. The native boundary is limited to operating-system integration,
 rendering, audio, UDP, controller and codec facilities.
@@ -14,6 +14,8 @@ rendering, audio, UDP, controller and codec facilities.
   runtime scenario is defect-free.
 - OpenGL, Direct3D 9 and Vulkan backends are present. Vulkan is loaded at
   runtime and preserves the OpenGL fallback path.
+- Linux x86-64 builds use SDL2, OpenGL, queued audio, POSIX UDP and POSIX file
+  primitives. Direct3D 9 and the current Vulkan bridge remain Windows-only.
 - All three backends provide an optional enhanced path for per-pixel dynamic
   lights and geometry-projected real-time shadows while retaining the original
   BSP lightmaps.
@@ -23,9 +25,9 @@ rendering, audio, UDP, controller and codec facilities.
   `native/text_build`) are excluded from source integrity checks.
 - Proprietary Quake data is not part of the repository. Retail qualification
   uses a local Quake installation.
-- The `v2026.09.01` Windows x64 release is built with MiniLangPy revision
-  `d7e143a`; its package contains only MiniQuake, the required native runtime
-  bridges, documentation and license notices.
+- The `v2026.09.04` release is built with MiniLangPy 1.2.3 and provides separate
+  Windows x64 and Linux x86-64 packages. Both contain only MiniQuake, required
+  native runtime bridges, documentation and license notices.
 - Safe fixed-array hot paths use MiniLang's native `copyArray` primitive.
   Differential traces remain byte-identical, all 59 optimization checks pass,
   and a 5,000-frame OpenGL A/B workload measured an 18% conservative

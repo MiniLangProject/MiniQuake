@@ -13,7 +13,7 @@ Reachable from entry: **yes**
 - `miniquake/optimization_baseline.ml` as `optBaseline` → [src/miniquake/optimization_baseline.ml](File-src-miniquake-optimization-baseline-ml-636998107.md)
 - `miniquake/quakec/vm.ml` as `vm` → [src/miniquake/quakec/vm.ml](File-src-miniquake-quakec-vm-ml-1211659018.md)
 - `miniquake/types.ml` as `t` → [src/miniquake/types.ml](File-src-miniquake-types-ml-326034235.md)
-- `std/fs.ml` as `fs` → `../MiniLangCompilerOptimization/MiniLangCompilerML/std/fs.ml` — external dependency
+- `std/fs.ml` as `fs` → `../MiniLangCompilerOptimization/MiniLangCompilerPy/std/fs.ml` — external dependency
 
 ## Declarations
 

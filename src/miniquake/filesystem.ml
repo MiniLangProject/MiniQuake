@@ -16,17 +16,43 @@ import miniquake.array_util as arrayutil
 import miniquake.protocol_text as quakeText
 import std.fs as fs
 
-/// Invokes the native `CreateDirectoryW` bridge operation used by `miniquake.filesystem`.
-/// @param path Filesystem path to process.
-/// @param security The security input consumed by `CreateDirectoryW`.
-/// @returns The newly created value returned by `CreateDirectoryW`.
+#if TARGET_OS == "windows"
+/// Create a directory through the Win32 wide-character filesystem API.
+/// @param path Filesystem path to create.
+/// @param security Optional Win32 security attributes pointer.
+/// @returns True when Windows creates the directory.
 extern function CreateDirectoryW(path as wstr, security as ptr) from "kernel32.dll" returns bool
-/// Invokes the native `GetFileAttributesExW` bridge operation used by `miniquake.filesystem`.
-/// @param path Filesystem path to process.
-/// @param infoLevel The info level input consumed by `GetFileAttributesExW`.
-/// @param data Input data consumed by the operation.
-/// @returns The value resolved by `GetFileAttributesExW`.
+/// Read file metadata through the Win32 wide-character filesystem API.
+/// @param path Filesystem path to inspect.
+/// @param infoLevel Win32 attribute-information level.
+/// @param data Caller-owned output buffer for the attribute record.
+/// @returns True when Windows reads the metadata successfully.
 extern function GetFileAttributesExW(path as wstr, infoLevel as i32, data as bytes) from "kernel32.dll" returns bool
+#else
+/// Create a directory through the POSIX filesystem API.
+/// @param path Filesystem path to create.
+/// @param mode POSIX permission bits filtered by the process umask.
+/// @returns Zero on success or a negative failure result.
+extern function PosixMkdir(path as cstr, mode as u32) from "libc.so.6" symbol "mkdir" returns i32
+/// Read Linux x86-64 file metadata into a caller-owned `struct stat` buffer.
+/// @param path Filesystem path to inspect.
+/// @param data Caller-owned output buffer for the native stat record.
+/// @returns Zero on success or a negative failure result.
+extern function PosixStat(path as cstr, data as bytes) from "libc.so.6" symbol "stat" returns i32
+#endif
+
+/// Create one directory component on the active host platform and report
+/// whether it exists after the operation.
+/// @param path Filesystem path to create.
+function createDirectory(path)
+  if fs.isDir(path) then return true end if
+#if TARGET_OS == "windows"
+  return CreateDirectoryW(path, 0)
+#else
+  // 0777 is filtered by the process umask, matching conventional mkdir behavior.
+  return PosixMkdir(path, 0x1ff) == 0 or fs.isDir(path)
+#endif
+end function
 
 /// Implements the `create` operation for `miniquake.filesystem` (create).
 /// @param baseDirectory Root directory containing the Quake installation.
@@ -249,7 +275,7 @@ function createPath(path)
   while index < len(source)
     if source[index] == 47 or source[index] == 92 then
       prefix = common.substring(path, 0, index)
-      if len(bytes(prefix)) > 2 then CreateDirectoryW(prefix, 0) end if
+      if len(bytes(prefix)) > 2 then createDirectory(prefix) end if
     end if
     index = index + 1
   end while
@@ -282,11 +308,22 @@ end function
 /// Implements the `fileTime` operation for `miniquake.filesystem` (file time).
 /// @param path Filesystem path to process.
 function fileTime(path)
+#if TARGET_OS == "windows"
   data = bytes(36)
   if not GetFileAttributesExW(path, 0, data) then return -1 end if
   low = bio.u32(data, 20)
   high = bio.u32(data, 24)
   return high * 4294967296 + low
+#else
+  // Linux x86-64 glibc stores st_mtim.tv_sec at byte offset 88.  Seconds are
+  // sufficient here because the value is used only to decide whether the
+  // optional Quake cache copy is older than its source.
+  data = bytes(144)
+  if PosixStat(path, data) != 0 then return -1 end if
+  low = bio.u32(data, 88)
+  high = bio.u32(data, 92)
+  return high * 4294967296 + low
+#endif
 end function
 
 /// Return cached location derived from the active module state.

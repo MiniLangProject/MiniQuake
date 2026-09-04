@@ -13,7 +13,7 @@ Reachable from entry: **yes**
 - `miniquake/host.ml` as `host` → [src/miniquake/host.ml](File-src-miniquake-host-ml-652298408.md)
 - `miniquake/native.ml` as `native` → [src/miniquake/native.ml](File-src-miniquake-native-ml-1937216067.md)
 - `miniquake/types.ml` as `t` → [src/miniquake/types.ml](File-src-miniquake-types-ml-326034235.md)
-- `std/fs.ml` as `fs` → `../MiniLangCompilerOptimization/MiniLangCompilerML/std/fs.ml` — external dependency
+- `std/fs.ml` as `fs` → `../MiniLangCompilerOptimization/MiniLangCompilerPy/std/fs.ml` — external dependency
 
 ## Declarations
 

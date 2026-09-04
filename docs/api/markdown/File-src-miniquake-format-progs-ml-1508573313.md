@@ -14,7 +14,7 @@ Reachable from entry: **yes**
 - `miniquake/crc.ml` as `crc16` → [src/miniquake/crc.ml](File-src-miniquake-crc-ml-699476266.md)
 - `miniquake/protocol_text.ml` as `protocolText` → [src/miniquake/protocol_text.ml](File-src-miniquake-protocol-text-ml-438970794.md)
 - `miniquake/types.ml` as `t` → [src/miniquake/types.ml](File-src-miniquake-types-ml-326034235.md)
-- `std/fs.ml` as `fs` → `../MiniLangCompilerOptimization/MiniLangCompilerML/std/fs.ml` — external dependency
+- `std/fs.ml` as `fs` → `../MiniLangCompilerOptimization/MiniLangCompilerPy/std/fs.ml` — external dependency
 
 ## Declarations
 

@@ -67,7 +67,7 @@ Reachable from entry: **yes**
 - `miniquake/types.ml` as `t` → [src/miniquake/types.ml](File-src-miniquake-types-ml-326034235.md)
 - `miniquake/view.ml` as `view` → [src/miniquake/view.ml](File-src-miniquake-view-ml-709264737.md)
 - `miniquake/world_bsp.ml` as `worldBsp` → [src/miniquake/world_bsp.ml](File-src-miniquake-world-bsp-ml-1111600182.md)
-- `std/fs.ml` as `fs` → `../MiniLangCompilerOptimization/MiniLangCompilerML/std/fs.ml` — external dependency
+- `std/fs.ml` as `fs` → `../MiniLangCompilerOptimization/MiniLangCompilerPy/std/fs.ml` — external dependency
 
 ## Declarations
 

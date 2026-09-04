@@ -35,7 +35,7 @@ Reachable from entry: **yes**
 - `miniquake/sound/wav.ml` as `wav` → [src/miniquake/sound/wav.ml](File-src-miniquake-sound-wav-ml-1458929962.md)
 - `miniquake/sys_win.ml` as `sysWin` → [src/miniquake/sys_win.ml](File-src-miniquake-sys-win-ml-1437273508.md)
 - `miniquake/wad.ml` as `wad` → [src/miniquake/wad.ml](File-src-miniquake-wad-ml-1195240084.md)
-- `std/fs.ml` as `fs` → `../MiniLangCompilerOptimization/MiniLangCompilerML/std/fs.ml` — external dependency
+- `std/fs.ml` as `fs` → `../MiniLangCompilerOptimization/MiniLangCompilerPy/std/fs.ml` — external dependency
 
 ## Declarations
 

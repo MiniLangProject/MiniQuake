@@ -22,7 +22,7 @@ Reachable from entry: **no**
 - `miniquake/render/world.ml` as `compatRmainWorld` → [src/miniquake/render/world.ml](File-src-miniquake-render-world-ml-1647521183.md)
 - `miniquake/types.ml` as `compatRmainTypes` → [src/miniquake/types.ml](File-src-miniquake-types-ml-326034235.md)
 - `miniquake/world_bsp.ml` as `compatRmainBsp` → [src/miniquake/world_bsp.ml](File-src-miniquake-world-bsp-ml-1111600182.md)
-- `std/fs.ml` as `compatRmainFs` → `../MiniLangCompilerOptimization/MiniLangCompilerML/std/fs.ml` — external dependency
+- `std/fs.ml` as `compatRmainFs` → `../MiniLangCompilerOptimization/MiniLangCompilerPy/std/fs.ml` — external dependency
 
 ## Declarations
 

@@ -18,8 +18,8 @@ Reachable from entry: **yes**
 - `miniquake/render/gl11.ml` as `gl` → [src/miniquake/render/gl11.ml](File-src-miniquake-render-gl11-ml-805308144.md)
 - `miniquake/render/texture_upscale.ml` as `textureUpscale` → [src/miniquake/render/texture_upscale.ml](File-src-miniquake-render-texture-upscale-ml-880792328.md)
 - `miniquake/sound/mixer.ml` as `sound` → [src/miniquake/sound/mixer.ml](File-src-miniquake-sound-mixer-ml-2037667391.md)
-- `std/math.ml` as `stdmath` → `../MiniLangCompilerOptimization/MiniLangCompilerML/std/math.ml` — external dependency
-- `std/string.ml` as `string` → `../MiniLangCompilerOptimization/MiniLangCompilerML/std/string.ml` — external dependency
+- `std/math.ml` as `stdmath` → `../MiniLangCompilerOptimization/MiniLangCompilerPy/std/math.ml` — external dependency
+- `std/string.ml` as `string` → `../MiniLangCompilerOptimization/MiniLangCompilerPy/std/string.ml` — external dependency
 
 ## Declarations
 
@@ -474,7 +474,7 @@ Cycle the archived cross-backend anisotropic filtering level.
 | `direction` | `dynamic` | — | The direction input consumed by `VID_AdjustAnisotropy`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1584)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1603)
 
 <a id="function-function-miniquake-gl-vidnt-vid-adjustenhancedshadowquality-function-vid-adjustenhancedshadowquality-direction-src-miniquake-gl-vidnt-ml-42706750"></a>
 ### VID_AdjustEnhancedShadowQuality
@@ -490,7 +490,7 @@ Cycle the archived soft-shadow sampling level in the requested direction.
 | `direction` | `dynamic` | — | The direction input consumed by `VID_AdjustEnhancedShadowQuality`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1541)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1560)
 
 <a id="function-function-miniquake-gl-vidnt-vid-adjusttextureupscale-function-vid-adjusttextureupscale-direction-src-miniquake-gl-vidnt-ml-1261506602"></a>
 ### VID_AdjustTextureUpscale
@@ -506,7 +506,7 @@ Cycle the archived load-time texture-upscaling algorithm.
 | `direction` | `dynamic` | — | The direction input consumed by `VID_AdjustTextureUpscale`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1569)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1588)
 
 <a id="function-function-miniquake-gl-vidnt-vid-applyconfiguredrenderer-function-vid-applyconfiguredrenderer-src-miniquake-gl-vidnt-ml-513199103"></a>
 ### VID_ApplyConfiguredRenderer
@@ -518,7 +518,7 @@ function VID_ApplyConfiguredRenderer()
 Apply the Quake-compatible vid apply configured renderer behavior.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1378)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1397)
 
 <a id="function-function-miniquake-gl-vidnt-vid-applyconfiguredresolution-function-vid-applyconfiguredresolution-src-miniquake-gl-vidnt-ml-1509731841"></a>
 ### VID_ApplyConfiguredResolution
@@ -530,7 +530,7 @@ function VID_ApplyConfiguredResolution()
 config.cfg is executed after VID_Init.  Apply a resolution previously chosen in the menu once the archived cvars have been read, unless command-line video arguments explicitly override it.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1742)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1761)
 
 <a id="function-function-miniquake-gl-vidnt-vid-applydisplaymode-function-vid-applydisplaymode-modenumber-fullscreen-src-miniquake-gl-vidnt-ml-1093917248"></a>
 ### VID_ApplyDisplayMode
@@ -547,7 +547,7 @@ Change resolution and presentation style on the existing HWND/HDC/WGL context.  
 | `fullscreen` | `dynamic` | — | The fullscreen input consumed by `VID_ApplyDisplayMode`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1663)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1682)
 
 <a id="function-function-miniquake-gl-vidnt-vid-applygammaramp-function-vid-applygammaramp-gamma-src-miniquake-gl-vidnt-ml-1286311678"></a>
 ### VID_ApplyGammaRamp
@@ -579,7 +579,7 @@ Apply the Quake-compatible vid apply resolution behavior.
 | `modeNumber` | `dynamic` | — | The mode number input consumed by `VID_ApplyResolution`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1728)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1747)
 
 <a id="function-function-miniquake-gl-vidnt-vid-build15to8-function-vid-build15to8-state-src-miniquake-gl-vidnt-ml-1434843926"></a>
 ### VID_Build15To8
@@ -810,7 +810,7 @@ Apply the Quake-compatible vid init behavior.
 | `createNative` | `dynamic` | — | The create native input consumed by `VID_Init`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1280)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1299)
 
 <a id="function-function-miniquake-gl-vidnt-vid-init8bitpalette-function-vid-init8bitpalette-src-miniquake-gl-vidnt-ml-1110491665"></a>
 ### VID_Init8bitPalette
@@ -892,7 +892,7 @@ function VID_MenuAnisotropyFocused()
 Report whether the anisotropic texture-filter row owns keyboard focus.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1504)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1523)
 
 <a id="function-function-miniquake-gl-vidnt-vid-menudisplayfocused-function-vid-menudisplayfocused-src-miniquake-gl-vidnt-ml-1679792149"></a>
 ### VID_MenuDisplayFocused
@@ -904,7 +904,7 @@ function VID_MenuDisplayFocused()
 Apply the Quake-compatible vid menu display focused behavior.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1462)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1481)
 
 <a id="function-function-miniquake-gl-vidnt-vid-menudraw-function-vid-menudraw-src-miniquake-gl-vidnt-ml-781640265"></a>
 ### VID_MenuDraw
@@ -916,7 +916,7 @@ function VID_MenuDraw()
 Apply the Quake-compatible vid menu draw behavior.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1793)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1812)
 
 <a id="function-function-miniquake-gl-vidnt-vid-menudrawcallback-function-vid-menudrawcallback-src-miniquake-gl-vidnt-ml-148603345"></a>
 ### VID_MenuDrawCallback
@@ -928,7 +928,7 @@ function VID_MenuDrawCallback()
 Apply the Quake-compatible vid menu draw callback behavior.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1971)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1990)
 
 <a id="function-function-miniquake-gl-vidnt-vid-menukey-function-vid-menukey-key-src-miniquake-gl-vidnt-ml-944458984"></a>
 ### VID_MenuKey
@@ -944,7 +944,7 @@ Apply the Quake-compatible vid menu key behavior.
 | `key` | `dynamic` | — | Key used to identify the requested entry. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1855)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1874)
 
 <a id="function-function-miniquake-gl-vidnt-vid-menukeycallback-function-vid-menukeycallback-key-src-miniquake-gl-vidnt-ml-2119719006"></a>
 ### VID_MenuKeyCallback
@@ -960,7 +960,7 @@ Apply the Quake-compatible vid menu key callback behavior.
 | `key` | `dynamic` | — | Key used to identify the requested entry. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1977)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1996)
 
 <a id="function-function-miniquake-gl-vidnt-vid-menulightingfocused-function-vid-menulightingfocused-src-miniquake-gl-vidnt-ml-1787483289"></a>
 ### VID_MenuLightingFocused
@@ -972,7 +972,7 @@ function VID_MenuLightingFocused()
 Report whether the enhanced-lighting row owns keyboard focus.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1474)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1493)
 
 <a id="function-function-miniquake-gl-vidnt-vid-menumodecount-function-vid-menumodecount-src-miniquake-gl-vidnt-ml-1499183263"></a>
 ### VID_MenuModeCount
@@ -984,7 +984,7 @@ function VID_MenuModeCount()
 Apply the Quake-compatible vid menu mode count behavior.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1390)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1409)
 
 <a id="function-function-miniquake-gl-vidnt-vid-menumodelinterpolationfocused-function-vid-menumodelinterpolationfocused-src-miniquake-gl-vidnt-ml-745165991"></a>
 ### VID_MenuModelInterpolationFocused
@@ -996,7 +996,7 @@ function VID_MenuModelInterpolationFocused()
 Report whether the alias-pose interpolation row owns keyboard focus.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1492)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1511)
 
 <a id="function-function-miniquake-gl-vidnt-vid-menumove-function-vid-menumove-delta-src-miniquake-gl-vidnt-ml-2114828867"></a>
 ### VID_MenuMove
@@ -1012,7 +1012,7 @@ Apply the Quake-compatible vid menu move behavior.
 | `delta` | `dynamic` | — | The delta input consumed by `VID_MenuMove`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1446)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1465)
 
 <a id="function-function-miniquake-gl-vidnt-vid-menurendererfocused-function-vid-menurendererfocused-src-miniquake-gl-vidnt-ml-1628853927"></a>
 ### VID_MenuRendererFocused
@@ -1024,7 +1024,7 @@ function VID_MenuRendererFocused()
 Apply the Quake-compatible vid menu renderer focused behavior.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1468)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1487)
 
 <a id="function-function-miniquake-gl-vidnt-vid-menureset-function-vid-menureset-src-miniquake-gl-vidnt-ml-1554966881"></a>
 ### VID_MenuReset
@@ -1036,7 +1036,7 @@ function VID_MenuReset()
 Apply the Quake-compatible vid menu reset behavior.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1398)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1417)
 
 <a id="function-function-miniquake-gl-vidnt-vid-menuselection-function-vid-menuselection-src-miniquake-gl-vidnt-ml-850965463"></a>
 ### VID_MenuSelection
@@ -1048,7 +1048,7 @@ function VID_MenuSelection()
 Apply the Quake-compatible vid menu selection behavior.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1436)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1455)
 
 <a id="function-function-miniquake-gl-vidnt-vid-menushadowfocused-function-vid-menushadowfocused-src-miniquake-gl-vidnt-ml-1612005329"></a>
 ### VID_MenuShadowFocused
@@ -1060,7 +1060,7 @@ function VID_MenuShadowFocused()
 Report whether the shadow row owns keyboard focus.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1480)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1499)
 
 <a id="function-function-miniquake-gl-vidnt-vid-menushadowqualityfocused-function-vid-menushadowqualityfocused-src-miniquake-gl-vidnt-ml-1689185185"></a>
 ### VID_MenuShadowQualityFocused
@@ -1072,7 +1072,7 @@ function VID_MenuShadowQualityFocused()
 Report whether the shadow-quality row owns keyboard focus.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1486)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1505)
 
 <a id="function-function-miniquake-gl-vidnt-vid-menutextureupscalefocused-function-vid-menutextureupscalefocused-src-miniquake-gl-vidnt-ml-22812113"></a>
 ### VID_MenuTextureUpscaleFocused
@@ -1084,7 +1084,7 @@ function VID_MenuTextureUpscaleFocused()
 Report whether the load-time texture-upscaling row owns keyboard focus.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1498)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1517)
 
 <a id="function-function-miniquake-gl-vidnt-vid-modeexists-function-vid-modeexists-modes-candidate-src-miniquake-gl-vidnt-ml-1028329730"></a>
 ### VID_ModeExists
@@ -1223,7 +1223,7 @@ Apply the Quake-compatible vid restart renderer behavior.
 | `backend` | `dynamic` | — | The backend input consumed by `VID_RestartRenderer`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1325)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1344)
 
 <a id="function-function-miniquake-gl-vidnt-vid-restorenativemode-function-vid-restorenativemode-state-wasfullscreen-previouswidth-previousheight-previousbpp-previousfrequency-previoushalfscreen-src-miniquake-gl-vidnt-ml-2097468411"></a>
 ### VID_RestoreNativeMode
@@ -1245,7 +1245,7 @@ Apply the Quake-compatible vid restore native mode behavior.
 | `previousHalfscreen` | `dynamic` | — | The previous halfscreen input consumed by `VID_RestoreNativeMode`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1648)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1667)
 
 <a id="constant-constant-miniquake-gl-vidnt-vid-row-size-const-vid-row-size-3-src-miniquake-gl-vidnt-ml-460690045"></a>
 ### VID_ROW_SIZE
@@ -1269,7 +1269,7 @@ function VID_SaveCurrentConfigurationCvars()
 Synchronize the live window, fullscreen and renderer state into archived cvars immediately before config.cfg is written.  This also captures a window resized by dragging its frame rather than only changes made in the menu.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1627)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1646)
 
 <a id="function-function-miniquake-gl-vidnt-vid-saveresolutioncvars-function-vid-saveresolutioncvars-state-width-height-bpp-src-miniquake-gl-vidnt-ml-1333428687"></a>
 ### VID_SaveResolutionCvars
@@ -1288,7 +1288,7 @@ Apply the Quake-compatible vid save resolution cvars behavior.
 | `bpp` | `dynamic` | — | The bpp input consumed by `VID_SaveResolutionCvars`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1610)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1629)
 
 <a id="function-function-miniquake-gl-vidnt-vid-selectconfiguredrenderer-function-vid-selectconfiguredrenderer-arguments-registry-src-miniquake-gl-vidnt-ml-1578663692"></a>
 ### VID_SelectConfiguredRenderer
@@ -1493,7 +1493,7 @@ function VID_ToggleEnhancedLighting()
 Toggle the archived classic/enhanced renderer policy without changing maps.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1510)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1529)
 
 <a id="function-function-miniquake-gl-vidnt-vid-toggleenhancedshadows-function-vid-toggleenhancedshadows-src-miniquake-gl-vidnt-ml-968354947"></a>
 ### VID_ToggleEnhancedShadows
@@ -1505,7 +1505,7 @@ function VID_ToggleEnhancedShadows()
 Toggle archived dynamic entity shadows used by enhanced rendering.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1527)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1546)
 
 <a id="function-function-miniquake-gl-vidnt-vid-togglefullscreen-function-vid-togglefullscreen-src-miniquake-gl-vidnt-ml-448395833"></a>
 ### VID_ToggleFullscreen
@@ -1517,7 +1517,7 @@ function VID_ToggleFullscreen()
 Apply the Quake-compatible vid toggle fullscreen behavior.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1733)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1752)
 
 <a id="function-function-miniquake-gl-vidnt-vid-togglemodelinterpolation-function-vid-togglemodelinterpolation-src-miniquake-gl-vidnt-ml-1063403425"></a>
 ### VID_ToggleModelInterpolation
@@ -1529,7 +1529,7 @@ function VID_ToggleModelInterpolation()
 Toggle archived interpolation between consecutive MDL animation poses.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1555)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/gl_vidnt.ml#L1574)
 
 <a id="function-function-miniquake-gl-vidnt-vid-unlockbuffer-function-vid-unlockbuffer-src-miniquake-gl-vidnt-ml-1289165233"></a>
 ### VID_UnlockBuffer

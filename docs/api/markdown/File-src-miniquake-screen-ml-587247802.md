@@ -22,7 +22,7 @@ Reachable from entry: **yes**
 - `miniquake/render_ui_contract.ml` as `renderUiContract` → [src/miniquake/render_ui_contract.ml](File-src-miniquake-render-ui-contract-ml-1308372980.md)
 - `miniquake/statusbar.ml` as `statusbar` → [src/miniquake/statusbar.ml](File-src-miniquake-statusbar-ml-945138613.md)
 - `miniquake/view.ml` as `view` → [src/miniquake/view.ml](File-src-miniquake-view-ml-709264737.md)
-- `std/fs.ml` as `fs` → `../MiniLangCompilerOptimization/MiniLangCompilerML/std/fs.ml` — external dependency
+- `std/fs.ml` as `fs` → `../MiniLangCompilerOptimization/MiniLangCompilerPy/std/fs.ml` — external dependency
 
 ## Declarations
 

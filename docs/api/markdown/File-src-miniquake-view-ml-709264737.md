@@ -14,7 +14,7 @@ Reachable from entry: **yes**
 - `miniquake/mathlib.ml` as `math` → [src/miniquake/mathlib.ml](File-src-miniquake-mathlib-ml-2131866431.md)
 - `miniquake/native.ml` as `native` → [src/miniquake/native.ml](File-src-miniquake-native-ml-1937216067.md)
 - `miniquake/types.ml` as `t` → [src/miniquake/types.ml](File-src-miniquake-types-ml-326034235.md)
-- `std/math.ml` as `stdmath` → `../MiniLangCompilerOptimization/MiniLangCompilerML/std/math.ml` — external dependency
+- `std/math.ml` as `stdmath` → `../MiniLangCompilerOptimization/MiniLangCompilerPy/std/math.ml` — external dependency
 
 ## Declarations
 

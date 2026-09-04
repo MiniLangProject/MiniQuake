@@ -1,10 +1,12 @@
 [project]
 name = "MiniQuake"
-description = "MiniQuake is an unofficial Windows x64 port of the original GLQuake and WinQuake 1.09 engine to MiniLang, preserving Quake behavior, data formats, QuakeC semantics, Protocol 15 networking, rendering, audio, input, demos, and savegames."
+description = "MiniQuake is an unofficial Windows and Linux x64 port of the original GLQuake and WinQuake 1.09 engine to MiniLang, preserving Quake behavior, data formats, QuakeC semantics, Protocol 15 networking, rendering, audio, input, demos, and savegames."
 entry = "src/main.ml"
 source_roots = ["src"]
 include = ["src", "native"]
 exclude = ["build", "docs/api"]
+# Windows exposes the renderer superset; the public MiniLang engine API is
+# shared with linux-x64 and Linux platform differences are documented manually.
 target = "windows-x64"
 
 [documentation]

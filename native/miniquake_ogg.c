@@ -9,24 +9,36 @@
  * single CD music stream owned by the Quake client.
  */
 
-typedef unsigned char mq_u8;
-typedef unsigned int mq_u32;
-typedef unsigned long long mq_u64;
-typedef signed short mq_i16;
-typedef signed int mq_i32;
-typedef signed long long mq_i64;
-typedef void *mq_ptr;
+#include "miniquake_native.h"
 
-#define MQ_EXPORT __declspec(dllexport)
+typedef signed short mq_i16;
+
 #define STB_VORBIS_NO_STDIO
 #define STB_VORBIS_NO_CRT
 #define STB_VORBIS_NO_PUSHDATA_API
 #define STB_VORBIS_MAX_CHANNELS 2
 #define assert(expression) ((void)0)
+#if defined(_WIN32)
 #define alloca _alloca
-
 #define MQ_DLLIMPORT __declspec(dllimport)
 #define MQ_WINAPI __stdcall
+#define MQ_CDECL __cdecl
+#else
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#define alloca __builtin_alloca
+#define MQ_DLLIMPORT
+#define MQ_WINAPI
+#define MQ_CDECL
+
+/* stb_vorbis deliberately replaces the CRT allocators when STB_VORBIS_NO_CRT
+ * is enabled. Keep private wrappers compiled before that replacement so the
+ * Linux file owner can still retain compressed track data outside MiniLang. */
+static mq_ptr mq_linux_allocate(mq_u64 size) { return malloc((size_t)size); }
+/* Release compressed track storage through the Linux system allocator. */
+static mq_i32 mq_linux_release(mq_ptr address) { free(address); return 1; }
+#endif
 #define MQ_NULL ((void *)0)
 #define MQ_INVALID_HANDLE_VALUE ((mq_ptr)(mq_i64)-1)
 #define MQ_GENERIC_READ 0x80000000u
@@ -46,6 +58,7 @@ typedef mq_i32 BOOL;
 /* Mirror the Win32 large integer ABI layout without requiring SDK declarations. */
 typedef struct MQ_LARGE_INTEGER { mq_i64 QuadPart; } MQ_LARGE_INTEGER;
 
+#if defined(_WIN32)
 MQ_DLLIMPORT HANDLE MQ_WINAPI CreateFileW(LPCWSTR filename, DWORD access, DWORD share,
     mq_ptr security, DWORD creation, DWORD attributes, HANDLE template_file);
 MQ_DLLIMPORT BOOL MQ_WINAPI GetFileSizeEx(HANDLE file, MQ_LARGE_INTEGER *size);
@@ -53,11 +66,17 @@ MQ_DLLIMPORT BOOL MQ_WINAPI ReadFile(HANDLE file, mq_ptr buffer, DWORD count, DW
 MQ_DLLIMPORT BOOL MQ_WINAPI CloseHandle(HANDLE handle);
 MQ_DLLIMPORT mq_ptr MQ_WINAPI VirtualAlloc(mq_ptr address, mq_u64 size, DWORD allocation_type, DWORD protect);
 MQ_DLLIMPORT BOOL MQ_WINAPI VirtualFree(mq_ptr address, mq_u64 size, DWORD free_type);
+#else
+#define VirtualAlloc(address, size, allocation_type, protect) mq_linux_allocate((mq_u64)(size))
+#define VirtualFree(address, size, free_type) mq_linux_release(address)
+#endif
 
+#if defined(_WIN32)
 void *_alloca(mq_u64 size);
 void *memcpy(void *destination, const void *source, mq_u64 count);
 void *memset(void *destination, mq_i32 value, mq_u64 count);
-void qsort(void *base, mq_u64 count, mq_u64 width, mq_i32 (__cdecl *compare)(const void *, const void *));
+void qsort(void *base, mq_u64 count, mq_u64 width, mq_i32 (MQ_CDECL *compare)(const void *, const void *));
+#endif
 double sin(double value);
 double cos(double value);
 double exp(double value);
@@ -66,6 +85,9 @@ double pow(double value, double exponent);
 double floor(double value);
 double ldexp(double value, mq_i32 exponent);
 
+#if !defined(_WIN32) && defined(NULL)
+#undef NULL
+#endif
 #include "../third_party/stb/stb_vorbis.c"
 
 #define MQ_OGG_WORKSPACE_BYTES (1024u * 1024u)
@@ -138,7 +160,14 @@ MQ_EXPORT mq_u32 mq_ogg_open(const void *data, mq_u32 byte_count) {
 }
 
 /* Open and validate file. */
-MQ_EXPORT mq_u32 mq_ogg_open_file(const unsigned short *filename) {
+MQ_EXPORT mq_u32 mq_ogg_open_file(
+#if defined(_WIN32)
+    const unsigned short *filename
+#else
+    const char *filename
+#endif
+) {
+#if defined(_WIN32)
     HANDLE file;
     MQ_LARGE_INTEGER size;
     mq_u32 total = 0;
@@ -177,6 +206,29 @@ MQ_EXPORT mq_u32 mq_ogg_open_file(const unsigned short *filename) {
         return 0;
     }
     return 1;
+#else
+    FILE *file;
+    long size;
+    mq_u32 total = 0;
+    if (filename == 0 || filename[0] == 0) return 0;
+    mq_ogg_close();
+    file = fopen(filename, "rb");
+    if (!file) return 0;
+    if (fseek(file, 0, SEEK_END) != 0 || (size = ftell(file)) <= 0 || size > 0x7fffffffL || fseek(file, 0, SEEK_SET) != 0) {
+        fclose(file);
+        return 0;
+    }
+    mq_ogg_file_data = (mq_u8 *)VirtualAlloc(MQ_NULL, (mq_u64)size,
+        MQ_MEM_RESERVE | MQ_MEM_COMMIT, MQ_PAGE_READWRITE);
+    if (!mq_ogg_file_data) { fclose(file); return 0; }
+    total = (mq_u32)fread(mq_ogg_file_data, 1, (size_t)size, file);
+    fclose(file);
+    if (total != (mq_u32)size || !mq_ogg_open_decoder(mq_ogg_file_data, total)) {
+        mq_ogg_close();
+        return 0;
+    }
+    return 1;
+#endif
 }
 
 /* Return the current rate value. */

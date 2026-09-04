@@ -15,7 +15,7 @@ Reachable from entry: **yes**
 - `miniquake/pak.ml` as `pak` → [src/miniquake/pak.ml](File-src-miniquake-pak-ml-44503636.md)
 - `miniquake/protocol_text.ml` as `quakeText` → [src/miniquake/protocol_text.ml](File-src-miniquake-protocol-text-ml-438970794.md)
 - `miniquake/types.ml` as `t` → [src/miniquake/types.ml](File-src-miniquake-types-ml-326034235.md)
-- `std/fs.ml` as `fs` → `../MiniLangCompilerOptimization/MiniLangCompilerML/std/fs.ml` — external dependency
+- `std/fs.ml` as `fs` → `../MiniLangCompilerOptimization/MiniLangCompilerPy/std/fs.ml` — external dependency
 
 ## Declarations
 
@@ -34,7 +34,7 @@ Add state for add directory.
 | `directory` | `dynamic` | — | The directory input consumed by `addDirectory`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L56)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L82)
 
 <a id="function-function-miniquake-filesystem-addgamedirectory-function-addgamedirectory-system-directory-src-miniquake-filesystem-ml-1783459957"></a>
 ### addGameDirectory
@@ -51,7 +51,7 @@ Add state for add game directory.
 | `directory` | `dynamic` | — | The directory input consumed by `addGameDirectory`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L80)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L106)
 
 <a id="function-function-miniquake-filesystem-addpack-function-addpack-system-filename-src-miniquake-filesystem-ml-2114214293"></a>
 ### addPack
@@ -68,7 +68,7 @@ Add state for add pack.
 | `filename` | `dynamic` | — | Path of the file to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L70)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L96)
 
 <a id="function-function-miniquake-filesystem-cachedlocation-function-cachedlocation-system-netpath-src-miniquake-filesystem-ml-409356752"></a>
 ### cachedLocation
@@ -85,7 +85,7 @@ Return cached location derived from the active module state.
 | `netPath` | `dynamic` | — | Filesystem path used by the operation. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L295)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L332)
 
 <a id="function-function-miniquake-filesystem-cachepath-function-cachepath-system-netpath-src-miniquake-filesystem-ml-1600329822"></a>
 ### cachePath
@@ -102,7 +102,7 @@ Return cache path derived from the active module state.
 | `netPath` | `dynamic` | — | Filesystem path used by the operation. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L262)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L288)
 
 <a id="function-function-miniquake-filesystem-checkregistered-function-checkregistered-system-src-miniquake-filesystem-ml-1495834446"></a>
 ### checkRegistered
@@ -118,7 +118,7 @@ Validate registered and report any incompatibility.
 | `system` | `dynamic` | — | The system input consumed by `checkRegistered`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L211)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L237)
 
 <a id="function-function-miniquake-filesystem-closefile-function-closefile-handle-src-miniquake-filesystem-ml-624654999"></a>
 ### closeFile
@@ -134,7 +134,7 @@ Release state for close file.
 | `handle` | `dynamic` | — | The handle input consumed by `closeFile`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L416)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L453)
 
 <a id="function-function-miniquake-filesystem-com-addgamedirectory-function-com-addgamedirectory-system-directory-src-miniquake-filesystem-ml-2071174845"></a>
 ### COM_AddGameDirectory
@@ -151,7 +151,7 @@ Mirror Quake's COM_AddGameDirectory routine and its observable state changes.
 | `directory` | `dynamic` | — | The directory input consumed by `COM_AddGameDirectory`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L880)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L917)
 
 <a id="function-function-miniquake-filesystem-com-checkregistered-function-com-checkregistered-system-src-miniquake-filesystem-ml-474409722"></a>
 ### COM_CheckRegistered
@@ -167,7 +167,7 @@ Original WinQuake/common.c filesystem entry points.  The state that was global i
 | `system` | `dynamic` | — | The system input consumed by `COM_CheckRegistered`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L776)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L813)
 
 <a id="function-function-miniquake-filesystem-com-closefile-function-com-closefile-handle-src-miniquake-filesystem-ml-1382540907"></a>
 ### COM_CloseFile
@@ -183,7 +183,7 @@ Mirror Quake's COM_CloseFile routine and its observable state changes.
 | `handle` | `dynamic` | — | The handle input consumed by `COM_CloseFile`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L830)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L867)
 
 <a id="function-function-miniquake-filesystem-com-copyfile-function-com-copyfile-netpath-cachepath-src-miniquake-filesystem-ml-830199618"></a>
 ### COM_CopyFile
@@ -200,7 +200,7 @@ Mirror Quake's COM_CopyFile routine and its observable state changes.
 | `cachePath` | `dynamic` | — | Filesystem path used by the operation. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L803)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L840)
 
 <a id="function-function-miniquake-filesystem-com-createpath-function-com-createpath-path-src-miniquake-filesystem-ml-1778502148"></a>
 ### COM_CreatePath
@@ -216,7 +216,7 @@ Mirror Quake's COM_CreatePath routine and its observable state changes.
 | `path` | `dynamic` | — | Filesystem path to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L796)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L833)
 
 <a id="function-function-miniquake-filesystem-com-findfile-function-com-findfile-system-filename-src-miniquake-filesystem-ml-172133097"></a>
 ### COM_FindFile
@@ -233,7 +233,7 @@ Mirror Quake's COM_FindFile routine and its observable state changes.
 | `filename` | `dynamic` | — | Path of the file to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L810)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L847)
 
 <a id="function-function-miniquake-filesystem-com-fopenfile-function-com-fopenfile-system-filename-src-miniquake-filesystem-ml-863754181"></a>
 ### COM_FOpenFile
@@ -250,7 +250,7 @@ Mirror Quake's COM_FOpenFile routine and its observable state changes.
 | `filename` | `dynamic` | — | Path of the file to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L824)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L861)
 
 <a id="function-function-miniquake-filesystem-com-initfilesystem-function-com-initfilesystem-suppliedbasedirectory-commandline-src-miniquake-filesystem-ml-1924398158"></a>
 ### COM_InitFilesystem
@@ -267,7 +267,7 @@ Mirror Quake's COM_InitFilesystem routine and its observable state changes.
 | `commandLine` | `dynamic` | — | The command line input consumed by `COM_InitFilesystem`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L887)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L924)
 
 <a id="function-function-miniquake-filesystem-com-loadcachefile-function-com-loadcachefile-system-path-src-miniquake-filesystem-ml-2017524375"></a>
 ### COM_LoadCacheFile
@@ -284,7 +284,7 @@ Mirror Quake's COM_LoadCacheFile routine and its observable state changes.
 | `path` | `dynamic` | — | Filesystem path to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L858)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L895)
 
 <a id="function-function-miniquake-filesystem-com-loadfile-function-com-loadfile-system-path-src-miniquake-filesystem-ml-1802122599"></a>
 ### COM_LoadFile
@@ -301,7 +301,7 @@ Mirror Quake's COM_LoadFile routine and its observable state changes.
 | `path` | `dynamic` | — | Filesystem path to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L837)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L874)
 
 <a id="function-function-miniquake-filesystem-com-loadhunkfile-function-com-loadhunkfile-system-path-src-miniquake-filesystem-ml-266843815"></a>
 ### COM_LoadHunkFile
@@ -318,7 +318,7 @@ Mirror Quake's COM_LoadHunkFile routine and its observable state changes.
 | `path` | `dynamic` | — | Filesystem path to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L844)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L881)
 
 <a id="function-function-miniquake-filesystem-com-loadpackfile-function-com-loadpackfile-filename-src-miniquake-filesystem-ml-1125248114"></a>
 ### COM_LoadPackFile
@@ -334,7 +334,7 @@ Mirror Quake's COM_LoadPackFile routine and its observable state changes.
 | `filename` | `dynamic` | — | Path of the file to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L872)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L909)
 
 <a id="function-function-miniquake-filesystem-com-loadstackfile-function-com-loadstackfile-system-path-buffer-src-miniquake-filesystem-ml-748810153"></a>
 ### COM_LoadStackFile
@@ -352,7 +352,7 @@ Mirror Quake's COM_LoadStackFile routine and its observable state changes.
 | `buffer` | `dynamic` | — | The buffer input consumed by `COM_LoadStackFile`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L866)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L903)
 
 <a id="function-function-miniquake-filesystem-com-loadtempfile-function-com-loadtempfile-system-path-src-miniquake-filesystem-ml-154705279"></a>
 ### COM_LoadTempFile
@@ -369,7 +369,7 @@ Mirror Quake's COM_LoadTempFile routine and its observable state changes.
 | `path` | `dynamic` | — | Filesystem path to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L851)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L888)
 
 <a id="function-function-miniquake-filesystem-com-openfile-function-com-openfile-system-filename-src-miniquake-filesystem-ml-74824505"></a>
 ### COM_OpenFile
@@ -386,7 +386,7 @@ Mirror Quake's COM_OpenFile routine and its observable state changes.
 | `filename` | `dynamic` | — | Path of the file to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L817)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L854)
 
 <a id="function-function-miniquake-filesystem-com-path-f-function-com-path-f-system-src-miniquake-filesystem-ml-2090219626"></a>
 ### COM_Path_f
@@ -402,7 +402,7 @@ Mirror Quake's COM_Path_f routine and its observable state changes.
 | `system` | `dynamic` | — | The system input consumed by `COM_Path_f`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L782)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L819)
 
 <a id="function-function-miniquake-filesystem-com-writefile-function-com-writefile-system-filename-data-src-miniquake-filesystem-ml-2028083335"></a>
 ### COM_WriteFile
@@ -420,7 +420,7 @@ Mirror Quake's COM_WriteFile routine and its observable state changes.
 | `data` | `dynamic` | — | Input data consumed by the operation. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L790)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L827)
 
 <a id="function-function-miniquake-filesystem-containsdirectoryseparator-function-containsdirectoryseparator-name-src-miniquake-filesystem-ml-1551574944"></a>
 ### containsDirectorySeparator
@@ -436,7 +436,7 @@ Implements the `containsDirectorySeparator` operation for `miniquake.filesystem`
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L236)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L262)
 
 <a id="function-function-miniquake-filesystem-copyfile-function-copyfile-netpath-destination-src-miniquake-filesystem-ml-1229615297"></a>
 ### copyFile
@@ -453,7 +453,7 @@ Transfer data for copy file.
 | `destination` | `dynamic` | — | Destination value or collection to update. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L275)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L301)
 
 <a id="function-function-miniquake-filesystem-copyterminated-function-copyterminated-destination-source-src-miniquake-filesystem-ml-186519166"></a>
 ### copyTerminated
@@ -470,7 +470,7 @@ Transfer data for copy terminated.
 | `source` | `dynamic` | — | Source value or collection to read. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L474)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L511)
 
 <a id="function-function-miniquake-filesystem-create-function-create-basedirectory-gamedirectory-src-miniquake-filesystem-ml-257403074"></a>
 ### create
@@ -487,7 +487,23 @@ Implements the `create` operation for `miniquake.filesystem` (create).
 | `gameDirectory` | `dynamic` | — | Selected Quake game-data directory. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L34)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L60)
+
+<a id="function-function-miniquake-filesystem-createdirectory-function-createdirectory-path-src-miniquake-filesystem-ml-369961538"></a>
+### createDirectory
+
+```ml
+function createDirectory(path)
+```
+
+Create one directory component on the active host platform and report whether it exists after the operation.
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `path` | `dynamic` | — | Filesystem path to create. |
+
+
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L47)
 
 <a id="extern_function-extern-function-miniquake-filesystem-createdirectoryw-extern-function-createdirectoryw-path-as-wstr-security-as-ptr-from-kernel32-dll-returns-bool-src-miniquake-filesystem-ml-643027048"></a>
 ### CreateDirectoryW
@@ -496,17 +512,17 @@ Implements the `create` operation for `miniquake.filesystem` (create).
 extern function CreateDirectoryW(path as wstr, security as ptr) from "kernel32.dll" returns bool
 ```
 
-Invokes the native `CreateDirectoryW` bridge operation used by `miniquake.filesystem`.
+Create a directory through the Win32 wide-character filesystem API.
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `path` | `wstr` | — | Filesystem path to process. |
-| `security` | `ptr` | — | The security input consumed by `CreateDirectoryW`. |
+| `path` | `wstr` | — | Filesystem path to create. |
+| `security` | `ptr` | — | Optional Win32 security attributes pointer. |
 
 
-**Returns:** The newly created value returned by `CreateDirectoryW`.
+**Returns:** True when Windows creates the directory.
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L23)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L24)
 
 <a id="function-function-miniquake-filesystem-createpath-function-createpath-path-src-miniquake-filesystem-ml-1531015204"></a>
 ### createPath
@@ -522,7 +538,7 @@ Create and initialize path.
 | `path` | `dynamic` | — | Filesystem path to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L246)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L272)
 
 <a id="function-function-miniquake-filesystem-describe-function-describe-system-src-miniquake-filesystem-ml-429375370"></a>
 ### describe
@@ -538,7 +554,7 @@ Implements the `describe` operation for `miniquake.filesystem` (describe).
 | `system` | `dynamic` | — | The system input consumed by `describe`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L690)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L727)
 
 <a id="function-function-miniquake-filesystem-exists-function-exists-system-name-src-miniquake-filesystem-ml-279192691"></a>
 ### exists
@@ -555,7 +571,7 @@ Report whether exists holds for the active state.
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L573)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L610)
 
 <a id="function-function-miniquake-filesystem-fileexists-function-fileexists-system-name-src-miniquake-filesystem-ml-1678747127"></a>
 ### fileExists
@@ -572,7 +588,7 @@ Report whether file exists holds for the active state.
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L548)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L585)
 
 <a id="function-function-miniquake-filesystem-filetime-function-filetime-path-src-miniquake-filesystem-ml-1549433668"></a>
 ### fileTime
@@ -588,7 +604,7 @@ Implements the `fileTime` operation for `miniquake.filesystem` (file time).
 | `path` | `dynamic` | — | Filesystem path to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L284)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L310)
 
 <a id="function-function-miniquake-filesystem-findfile-function-findfile-system-name-src-miniquake-filesystem-ml-383708435"></a>
 ### findFile
@@ -605,7 +621,7 @@ Return file.
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L365)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L402)
 
 <a id="function-function-miniquake-filesystem-findlocation-function-findlocation-system-name-src-miniquake-filesystem-ml-1126898683"></a>
 ### findLocation
@@ -622,7 +638,7 @@ Return location.
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L580)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L617)
 
 <a id="function-function-miniquake-filesystem-fopenfile-function-fopenfile-system-name-src-miniquake-filesystem-ml-1164883647"></a>
 ### fOpenFile
@@ -639,7 +655,7 @@ Implements the `fOpenFile` operation for `miniquake.filesystem` (f open file).
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L384)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L421)
 
 <a id="function-function-miniquake-filesystem-gamepath-function-gamepath-system-name-src-miniquake-filesystem-ml-2030407819"></a>
 ### gamePath
@@ -656,7 +672,7 @@ Return game path derived from the active module state.
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L589)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L626)
 
 <a id="extern_function-extern-function-miniquake-filesystem-getfileattributesexw-extern-function-getfileattributesexw-path-as-wstr-infolevel-as-i32-data-as-bytes-from-kernel32-dll-returns-bool-src-miniquake-filesystem-ml-254768929"></a>
 ### GetFileAttributesExW
@@ -665,18 +681,18 @@ Return game path derived from the active module state.
 extern function GetFileAttributesExW(path as wstr, infoLevel as i32, data as bytes) from "kernel32.dll" returns bool
 ```
 
-Invokes the native `GetFileAttributesExW` bridge operation used by `miniquake.filesystem`.
+Read file metadata through the Win32 wide-character filesystem API.
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `path` | `wstr` | — | Filesystem path to process. |
-| `infoLevel` | `i32` | — | The info level input consumed by `GetFileAttributesExW`. |
-| `data` | `bytes` | — | Input data consumed by the operation. |
+| `path` | `wstr` | — | Filesystem path to inspect. |
+| `infoLevel` | `i32` | — | Win32 attribute-information level. |
+| `data` | `bytes` | — | Caller-owned output buffer for the attribute record. |
 
 
-**Returns:** The value resolved by `GetFileAttributesExW`.
+**Returns:** True when Windows reads the metadata successfully.
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L29)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L30)
 
 <a id="function-function-miniquake-filesystem-handleread-function-handleread-handle-count-src-miniquake-filesystem-ml-919096482"></a>
 ### handleRead
@@ -693,7 +709,7 @@ Handle read and update the associated state.
 | `count` | `dynamic` | — | Number of entries or units to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L404)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L441)
 
 <a id="function-function-miniquake-filesystem-handleseek-function-handleseek-handle-position-src-miniquake-filesystem-ml-202175422"></a>
 ### handleSeek
@@ -710,7 +726,7 @@ Handle seek and update the associated state.
 | `position` | `dynamic` | — | Position used by the operation. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L394)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L431)
 
 <a id="function-function-miniquake-filesystem-initfilesystem-function-initfilesystem-suppliedbasedirectory-commandline-src-miniquake-filesystem-ml-600256186"></a>
 ### initFilesystem
@@ -727,7 +743,7 @@ Initialize state for init filesystem.
 | `commandLine` | `dynamic` | — | The command line input consumed by `initFilesystem`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L191)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L217)
 
 <a id="function-function-miniquake-filesystem-initialize-function-initialize-basedirectory-gamename-src-miniquake-filesystem-ml-1209369502"></a>
 ### initialize
@@ -744,7 +760,7 @@ Initializes ialize for `miniquake.filesystem`.
 | `gameName` | `dynamic` | — | Name that identifies the requested value or resource. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L111)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L137)
 
 <a id="function-function-miniquake-filesystem-initializearguments-function-initializearguments-suppliedbasedirectory-commandline-src-miniquake-filesystem-ml-812685338"></a>
 ### initializeArguments
@@ -761,7 +777,7 @@ Initialize state for initialize arguments.
 | `commandLine` | `dynamic` | — | The command line input consumed by `initializeArguments`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L128)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L154)
 
 <a id="function-function-miniquake-filesystem-ismodified-function-ismodified-system-src-miniquake-filesystem-ml-1466446218"></a>
 ### isModified
@@ -777,7 +793,7 @@ Report whether is modified.
 | `system` | `dynamic` | — | The system input consumed by `isModified`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L762)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L799)
 
 <a id="function-function-miniquake-filesystem-join-function-join-a-b-src-miniquake-filesystem-ml-1080243196"></a>
 ### join
@@ -794,7 +810,7 @@ Implements the `join` operation for `miniquake.filesystem` (join).
 | `b` | `dynamic` | — | The b input consumed by `join`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L41)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L67)
 
 <a id="function-function-miniquake-filesystem-loadcacheallocation-function-loadcacheallocation-system-memorystate-name-src-miniquake-filesystem-ml-1758803829"></a>
 ### loadCacheAllocation
@@ -812,7 +828,7 @@ Read and validate cache allocation.
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L520)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L557)
 
 <a id="function-function-miniquake-filesystem-loadcachefile-function-loadcachefile-system-name-src-miniquake-filesystem-ml-1072342119"></a>
 ### loadCacheFile
@@ -829,7 +845,7 @@ Read and validate cache file.
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L453)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L490)
 
 <a id="function-function-miniquake-filesystem-loadfile-function-loadfile-system-name-src-miniquake-filesystem-ml-423213879"></a>
 ### loadFile
@@ -846,7 +862,7 @@ COM_LoadFile always allocated one extra byte and NUL-terminated it.  Keep readFi
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L428)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L465)
 
 <a id="function-function-miniquake-filesystem-loadhunkallocation-function-loadhunkallocation-system-memorystate-name-src-miniquake-filesystem-ml-1259659745"></a>
 ### loadHunkAllocation
@@ -864,7 +880,7 @@ Read and validate hunk allocation.
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L484)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L521)
 
 <a id="function-function-miniquake-filesystem-loadhunkfile-function-loadhunkfile-system-name-src-miniquake-filesystem-ml-794621847"></a>
 ### loadHunkFile
@@ -881,7 +897,7 @@ Read and validate hunk file.
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L439)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L476)
 
 <a id="function-function-miniquake-filesystem-loadpackfile-function-loadpackfile-filename-src-miniquake-filesystem-ml-2052531306"></a>
 ### loadPackFile
@@ -897,7 +913,7 @@ Read and validate pack file.
 | `filename` | `dynamic` | — | Path of the file to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L63)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L89)
 
 <a id="function-function-miniquake-filesystem-loadstackallocation-function-loadstackallocation-system-memorystate-name-buffer-src-miniquake-filesystem-ml-191914307"></a>
 ### loadStackAllocation
@@ -916,7 +932,7 @@ Read and validate stack allocation.
 | `buffer` | `dynamic` | — | The buffer input consumed by `loadStackAllocation`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L533)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L570)
 
 <a id="function-function-miniquake-filesystem-loadstackfile-function-loadstackfile-system-name-buffer-src-miniquake-filesystem-ml-398151521"></a>
 ### loadStackFile
@@ -934,7 +950,7 @@ Read and validate stack file.
 | `buffer` | `dynamic` | — | The buffer input consumed by `loadStackFile`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L461)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L498)
 
 <a id="function-function-miniquake-filesystem-loadtempallocation-function-loadtempallocation-system-memorystate-name-src-miniquake-filesystem-ml-460721329"></a>
 ### loadTempAllocation
@@ -952,7 +968,7 @@ Read and validate temp allocation.
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L496)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L533)
 
 <a id="function-function-miniquake-filesystem-loadtempfile-function-loadtempfile-system-name-src-miniquake-filesystem-ml-278190483"></a>
 ### loadTempFile
@@ -969,7 +985,7 @@ Read and validate temp file.
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L446)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L483)
 
 <a id="function-function-miniquake-filesystem-loadzoneallocation-function-loadzoneallocation-system-memorystate-name-src-miniquake-filesystem-ml-1401041613"></a>
 ### loadZoneAllocation
@@ -987,7 +1003,7 @@ Read and validate zone allocation.
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L508)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L545)
 
 <a id="function-function-miniquake-filesystem-musictrackname-function-musictrackname-track-src-miniquake-filesystem-ml-1831354268"></a>
 ### musicTrackName
@@ -1003,7 +1019,7 @@ Return music track name derived from the active module state.
 | `track` | `dynamic` | — | The track input consumed by `musicTrackName`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L621)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L658)
 
 <a id="function-function-miniquake-filesystem-musictrackpath-function-musictrackpath-system-track-src-miniquake-filesystem-ml-1607811569"></a>
 ### musicTrackPath
@@ -1020,7 +1036,7 @@ Return music track path derived from the active module state.
 | `track` | `dynamic` | — | The track input consumed by `musicTrackPath`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L652)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L689)
 
 <a id="function-function-miniquake-filesystem-normalizename-function-normalizename-name-src-miniquake-filesystem-ml-1226516964"></a>
 ### normalizeName
@@ -1036,7 +1052,7 @@ Convert name into its canonical representation.
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L47)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L73)
 
 <a id="function-function-miniquake-filesystem-openfile-function-openfile-system-name-src-miniquake-filesystem-ml-551041175"></a>
 ### openFile
@@ -1053,7 +1069,7 @@ Initialize state for open file.
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L374)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L411)
 
 <a id="function-function-miniquake-filesystem-packfilecount-function-packfilecount-system-src-miniquake-filesystem-ml-1929039098"></a>
 ### packFileCount
@@ -1069,7 +1085,7 @@ Return pack file count derived from the active module state.
 | `system` | `dynamic` | — | The system input consumed by `packFileCount`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L752)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L789)
 
 <a id="function-function-miniquake-filesystem-pathcommandtext-function-pathcommandtext-system-src-miniquake-filesystem-ml-2084466228"></a>
 ### pathCommandText
@@ -1085,7 +1101,7 @@ Return path command text for the active module state.
 | `system` | `dynamic` | — | The system input consumed by `pathCommandText`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L704)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L741)
 
 <a id="function-function-miniquake-filesystem-readfile-function-readfile-system-name-src-miniquake-filesystem-ml-1259010295"></a>
 ### readFile
@@ -1102,7 +1118,7 @@ Read and validate file.
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L347)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L384)
 
 <a id="function-function-miniquake-filesystem-readloosemusictrack-function-readloosemusictrack-directory-filename-src-miniquake-filesystem-ml-769810375"></a>
 ### readLooseMusicTrack
@@ -1119,7 +1135,7 @@ Read and validate loose music track.
 | `filename` | `dynamic` | — | Path of the file to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L630)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L667)
 
 <a id="function-function-miniquake-filesystem-readmusictrack-function-readmusictrack-system-track-src-miniquake-filesystem-ml-1229674457"></a>
 ### readMusicTrack
@@ -1136,7 +1152,7 @@ Read and validate music track.
 | `track` | `dynamic` | — | The track input consumed by `readMusicTrack`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L671)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L708)
 
 <a id="function-function-miniquake-filesystem-readtext-function-readtext-system-name-src-miniquake-filesystem-ml-595771487"></a>
 ### readText
@@ -1153,7 +1169,7 @@ Reads text for `miniquake.filesystem`.
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L356)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L393)
 
 <a id="function-function-miniquake-filesystem-registeredwords-function-registeredwords-src-miniquake-filesystem-ml-1642941295"></a>
 ### registeredWords
@@ -1165,7 +1181,7 @@ function registeredWords()
 Registers ed words for `miniquake.filesystem`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L196)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L222)
 
 <a id="function-function-miniquake-filesystem-release-function-release-system-src-miniquake-filesystem-ml-24858712"></a>
 ### release
@@ -1181,7 +1197,7 @@ Release or remove state for the requested value.
 | `system` | `dynamic` | — | The system input consumed by `release`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L736)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L773)
 
 <a id="function-function-miniquake-filesystem-rereleasemusicdirectory-function-rereleasemusicdirectory-system-gamedirectory-src-miniquake-filesystem-ml-1271948451"></a>
 ### rereleaseMusicDirectory
@@ -1198,7 +1214,7 @@ Implements the `rereleaseMusicDirectory` operation for `miniquake.filesystem` (r
 | `gameDirectory` | `dynamic` | — | Selected Quake game-data directory. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L639)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L676)
 
 <a id="function-function-miniquake-filesystem-resolve-function-resolve-system-name-src-miniquake-filesystem-ml-745143559"></a>
 ### resolve
@@ -1215,7 +1231,7 @@ Implements the `resolve` operation for `miniquake.filesystem` (resolve).
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L308)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L345)
 
 <a id="function-function-miniquake-filesystem-searchpathsummary-function-searchpathsummary-system-src-miniquake-filesystem-ml-1350325076"></a>
 ### searchPathSummary
@@ -1231,7 +1247,7 @@ Return search path summary derived from the active module state.
 | `system` | `dynamic` | — | The system input consumed by `searchPathSummary`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L718)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L755)
 
 <a id="function-function-miniquake-filesystem-standard-function-standard-basedirectory-gamename-src-miniquake-filesystem-ml-2057884686"></a>
 ### standard
@@ -1248,7 +1264,7 @@ Implements the `standard` operation for `miniquake.filesystem` (standard).
 | `gameName` | `dynamic` | — | Name that identifies the requested value or resource. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L97)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L123)
 
 <a id="function-function-miniquake-filesystem-trimtrailingseparator-function-trimtrailingseparator-path-src-miniquake-filesystem-ml-641128186"></a>
 ### trimTrailingSeparator
@@ -1264,7 +1280,7 @@ Implements the `trimTrailingSeparator` operation for `miniquake.filesystem` (tri
 | `path` | `dynamic` | — | Filesystem path to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L117)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L143)
 
 <a id="function-function-miniquake-filesystem-writebytes-function-writebytes-system-name-data-src-miniquake-filesystem-ml-1979038219"></a>
 ### writeBytes
@@ -1282,7 +1298,7 @@ Writes bytes for `miniquake.filesystem`.
 | `data` | `dynamic` | — | Input data consumed by the operation. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L605)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L642)
 
 <a id="function-function-miniquake-filesystem-writefile-function-writefile-system-name-data-src-miniquake-filesystem-ml-1809097985"></a>
 ### writeFile
@@ -1300,7 +1316,7 @@ Encode and write file.
 | `data` | `dynamic` | — | Input data consumed by the operation. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L597)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L634)
 
 <a id="function-function-miniquake-filesystem-writetext-function-writetext-system-name-text-src-miniquake-filesystem-ml-645835794"></a>
 ### writeText
@@ -1318,4 +1334,4 @@ Writes text for `miniquake.filesystem`.
 | `text` | `dynamic` | — | Text to parse or process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L613)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/filesystem.ml#L650)

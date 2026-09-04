@@ -10,93 +10,173 @@ package miniquake.native
 /// Invokes the native `f32FromText` bridge operation used by `miniquake.native`.
 /// @param text Text to parse or process.
 /// @returns The `u32` result produced by `f32FromText`.
+#if TARGET_OS == "windows"
 extern function f32FromText(text as cstr) from "miniquake_native.dll" symbol "mq_f32_from_text" returns u32
+#else
+extern function f32FromText(text as cstr) from "libminiquake_native.so" symbol "mq_f32_from_text" returns u32
+#endif
 /// Invokes the native `f32FromRaw` bridge operation used by `miniquake.native`.
 /// @param rawValue The raw value input consumed by `f32FromRaw`.
 /// @returns The `u32` result produced by `f32FromRaw`.
+#if TARGET_OS == "windows"
 extern function f32FromRaw(rawValue as u64) from "miniquake_native.dll" symbol "mq_f32_from_ml_raw" returns u32
+#else
+extern function f32FromRaw(rawValue as u64) from "libminiquake_native.so" symbol "mq_f32_from_ml_raw" returns u32
+#endif
 /// Invokes the native `f32ToRaw` bridge operation used by `miniquake.native`.
 /// @param bits The bits input consumed by `f32ToRaw`.
 /// @returns The `u64` result produced by `f32ToRaw`.
+#if TARGET_OS == "windows"
 extern function f32ToRaw(bits as u32) from "miniquake_native.dll" symbol "mq_f32_to_ml_raw" returns u64
+#else
+extern function f32ToRaw(bits as u32) from "libminiquake_native.so" symbol "mq_f32_to_ml_raw" returns u64
+#endif
 /// Invokes the native `f32ToTextRaw` bridge operation used by `miniquake.native`.
 /// @param bits The bits input consumed by `f32ToTextRaw`.
 /// @param output Destination buffer that receives the formatted text.
 /// @param capacity Maximum number of entries the destination can hold.
 /// @returns The `u32` result produced by `f32ToTextRaw`.
+#if TARGET_OS == "windows"
 extern function f32ToTextRaw(bits as u32, output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_f32_to_text" returns u32
+#else
+extern function f32ToTextRaw(bits as u32, output as bytes, capacity as u32) from "libminiquake_text.so" symbol "mqt_f32_to_text" returns u32
+#endif
 /// Invokes the native `f32ToFixed6Raw` bridge operation used by `miniquake.native`.
 /// @param bits The bits input consumed by `f32ToFixed6Raw`.
 /// @param output Destination buffer that receives the fixed-point text.
 /// @param capacity Maximum number of entries the destination can hold.
 /// @returns The `u32` result produced by `f32ToFixed6Raw`.
+#if TARGET_OS == "windows"
 extern function f32ToFixed6Raw(bits as u32, output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_f32_to_fixed6" returns u32
+#else
+extern function f32ToFixed6Raw(bits as u32, output as bytes, capacity as u32) from "libminiquake_text.so" symbol "mqt_f32_to_fixed6" returns u32
+#endif
 /// Invokes the native `f32Sin` bridge operation used by `miniquake.native`.
 /// @param bits The bits input consumed by `f32Sin`.
 /// @returns The `u32` result produced by `f32Sin`.
+#if TARGET_OS == "windows"
 extern function f32Sin(bits as u32) from "miniquake_native.dll" symbol "mq_f32_sin" returns u32
+#else
+extern function f32Sin(bits as u32) from "libminiquake_native.so" symbol "mq_f32_sin" returns u32
+#endif
 /// Invokes the native `f32Cos` bridge operation used by `miniquake.native`.
 /// @param bits The bits input consumed by `f32Cos`.
 /// @returns The `u32` result produced by `f32Cos`.
+#if TARGET_OS == "windows"
 extern function f32Cos(bits as u32) from "miniquake_native.dll" symbol "mq_f32_cos" returns u32
+#else
+extern function f32Cos(bits as u32) from "libminiquake_native.so" symbol "mq_f32_cos" returns u32
+#endif
 /// Invokes the native `f32Sqrt` bridge operation used by `miniquake.native`.
 /// @param bits The bits input consumed by `f32Sqrt`.
 /// @returns The `u32` result produced by `f32Sqrt`.
+#if TARGET_OS == "windows"
 extern function f32Sqrt(bits as u32) from "miniquake_native.dll" symbol "mq_f32_sqrt" returns u32
+#else
+extern function f32Sqrt(bits as u32) from "libminiquake_native.so" symbol "mq_f32_sqrt" returns u32
+#endif
 /// Invokes the native `f32Atan2` bridge operation used by `miniquake.native`.
 /// @param yBits The y bits input consumed by `f32Atan2`.
 /// @param xBits The x bits input consumed by `f32Atan2`.
 /// @returns The `u32` result produced by `f32Atan2`.
+#if TARGET_OS == "windows"
 extern function f32Atan2(yBits as u32, xBits as u32) from "miniquake_native.dll" symbol "mq_f32_atan2" returns u32
+#else
+extern function f32Atan2(yBits as u32, xBits as u32) from "libminiquake_native.so" symbol "mq_f32_atan2" returns u32
+#endif
 /// Invokes the native `f32ToI32Trunc` bridge operation used by `miniquake.native`.
 /// @param bits The bits input consumed by `f32ToI32Trunc`.
 /// @returns The `i32` result produced by `f32ToI32Trunc`.
+#if TARGET_OS == "windows"
 extern function f32ToI32Trunc(bits as u32) from "miniquake_native.dll" symbol "mq_f32_to_i32_trunc" returns i32
+#else
+extern function f32ToI32Trunc(bits as u32) from "libminiquake_native.so" symbol "mq_f32_to_i32_trunc" returns i32
+#endif
 /// Invokes the native `i32ToF32` bridge operation used by `miniquake.native`.
 /// @param value Value consumed by `i32ToF32`.
 /// @returns The `u32` result produced by `i32ToF32`.
+#if TARGET_OS == "windows"
 extern function i32ToF32(value as i32) from "miniquake_native.dll" symbol "mq_i32_to_f32" returns u32
+#else
+extern function i32ToF32(value as i32) from "libminiquake_native.so" symbol "mq_i32_to_f32" returns u32
+#endif
 /// Invokes the native `asciiCode` bridge operation used by `miniquake.native`.
 /// @param text Text to parse or process.
 /// @returns The `i32` result produced by `asciiCode`.
+#if TARGET_OS == "windows"
 extern function asciiCode(text as cstr) from "miniquake_native.dll" symbol "mq_ascii_code" returns i32
+#else
+extern function asciiCode(text as cstr) from "libminiquake_native.so" symbol "mq_ascii_code" returns i32
+#endif
 /// Invokes the native `asciiCharRaw` bridge operation used by `miniquake.native`.
 /// @param value Value consumed by `asciiCharRaw`.
 /// @param output Destination buffer that receives the encoded character.
 /// @param capacity Maximum number of entries the destination can hold.
 /// @returns The `u32` result produced by `asciiCharRaw`.
+#if TARGET_OS == "windows"
 extern function asciiCharRaw(value as i32, output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_ascii_char" returns u32
+#else
+extern function asciiCharRaw(value as i32, output as bytes, capacity as u32) from "libminiquake_text.so" symbol "mqt_ascii_char" returns u32
+#endif
 
 /// Invokes the native `renderSelect` bridge operation used by `miniquake.native`.
 /// @param backend The backend input consumed by `renderSelect`.
 /// @returns The `i32` result produced by `renderSelect`.
+#if TARGET_OS == "windows"
 extern function renderSelect(backend as i32) from "miniquake_native.dll" symbol "mq_render_select" returns i32
+#else
+extern function renderSelect(backend as i32) from "libminiquake_native.so" symbol "mq_render_select" returns i32
+#endif
 /// Invokes the native `renderBackend` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `renderBackend`.
+#if TARGET_OS == "windows"
 extern function renderBackend() from "miniquake_native.dll" symbol "mq_render_backend" returns i32
+#else
+extern function renderBackend() from "libminiquake_native.so" symbol "mq_render_backend" returns i32
+#endif
 /// Invokes the native `renderAvailable` bridge operation used by `miniquake.native`.
 /// @param backend The backend input consumed by `renderAvailable`.
 /// @returns The `i32` result produced by `renderAvailable`.
+#if TARGET_OS == "windows"
 extern function renderAvailable(backend as i32) from "miniquake_native.dll" symbol "mq_render_available" returns i32
+#else
+extern function renderAvailable(backend as i32) from "libminiquake_native.so" symbol "mq_render_available" returns i32
+#endif
 /// Invokes the native `shadowWorldClear` bridge operation used by `miniquake.native`.
+#if TARGET_OS == "windows"
 extern function shadowWorldClear() from "miniquake_native.dll" symbol "mq_shadow_world_clear" returns void
+#else
+extern function shadowWorldClear() from "libminiquake_native.so" symbol "mq_shadow_world_clear" returns void
+#endif
 /// Invokes the native `shadowWorldUpload` bridge operation used by `miniquake.native`.
 /// @param data Input data consumed by the operation.
 /// @param byteCount Number of entries or units to process.
 /// @returns The `i32` result produced by `shadowWorldUpload`.
+#if TARGET_OS == "windows"
 extern function shadowWorldUpload(data as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_shadow_world_upload" returns i32
+#else
+extern function shadowWorldUpload(data as bytes, byteCount as u32) from "libminiquake_native.so" symbol "mq_shadow_world_upload" returns i32
+#endif
 /// Invokes the native `shadowWorldUploadSurfaces` bridge operation used by `miniquake.native`.
 /// @param data Input data consumed by the operation.
 /// @param byteCount Number of entries or units to process.
 /// @returns The `i32` result produced by `shadowWorldUploadSurfaces`.
+#if TARGET_OS == "windows"
 extern function shadowWorldUploadSurfaces(data as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_shadow_world_upload_surfaces" returns i32
+#else
+extern function shadowWorldUploadSurfaces(data as bytes, byteCount as u32) from "libminiquake_native.so" symbol "mq_shadow_world_upload_surfaces" returns i32
+#endif
 /// Invokes the native `shadowTraceBatch` bridge operation used by `miniquake.native`.
 /// @param rays The rays input consumed by `shadowTraceBatch`.
 /// @param rayBytes Byte data consumed by the operation.
 /// @param results The results input consumed by `shadowTraceBatch`.
 /// @param resultBytes Byte data consumed by the operation.
 /// @returns The `i32` result produced by `shadowTraceBatch`.
+#if TARGET_OS == "windows"
 extern function shadowTraceBatch(rays as bytes, rayBytes as u32, results as bytes, resultBytes as u32) from "miniquake_native.dll" symbol "mq_shadow_trace_batch" returns i32
+#else
+extern function shadowTraceBatch(rays as bytes, rayBytes as u32, results as bytes, resultBytes as u32) from "libminiquake_native.so" symbol "mq_shadow_trace_batch" returns i32
+#endif
 
 /// Invokes the native `winCreate` bridge operation used by `miniquake.native`.
 /// @param title The title input consumed by `winCreate`.
@@ -104,87 +184,179 @@ extern function shadowTraceBatch(rays as bytes, rayBytes as u32, results as byte
 /// @param height Requested height in pixels or data units.
 /// @param fullscreen The fullscreen input consumed by `winCreate`.
 /// @returns The `ptr` result produced by `winCreate`.
+#if TARGET_OS == "windows"
 extern function winCreate(title as wstr, width as i32, height as i32, fullscreen as i32) from "miniquake_native.dll" symbol "mq_win_create" returns ptr
+#else
+extern function winCreate(title as cstr, width as i32, height as i32, fullscreen as i32) from "libminiquake_native.so" symbol "mq_win_create" returns ptr
+#endif
 /// Invokes the native `winDestroy` bridge operation used by `miniquake.native`.
+#if TARGET_OS == "windows"
 extern function winDestroy() from "miniquake_native.dll" symbol "mq_win_destroy" returns void
+#else
+extern function winDestroy() from "libminiquake_native.so" symbol "mq_win_destroy" returns void
+#endif
 /// Invokes the native `winPoll` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `winPoll`.
+#if TARGET_OS == "windows"
 extern function winPoll() from "miniquake_native.dll" symbol "mq_win_poll" returns i32
+#else
+extern function winPoll() from "libminiquake_native.so" symbol "mq_win_poll" returns i32
+#endif
 /// Invokes the native `winSwap` bridge operation used by `miniquake.native`.
+#if TARGET_OS == "windows"
 extern function winSwap() from "miniquake_native.dll" symbol "mq_win_swap" returns void
+#else
+extern function winSwap() from "libminiquake_native.so" symbol "mq_win_swap" returns void
+#endif
 /// Invokes the native `winKeyDown` bridge operation used by `miniquake.native`.
 /// @param virtualKey The virtual key input consumed by `winKeyDown`.
 /// @returns The `i32` result produced by `winKeyDown`.
+#if TARGET_OS == "windows"
 extern function winKeyDown(virtualKey as i32) from "miniquake_native.dll" symbol "mq_win_key_down" returns i32
+#else
+extern function winKeyDown(virtualKey as i32) from "libminiquake_native.so" symbol "mq_win_key_down" returns i32
+#endif
 /// Invokes the native `winKeyPressed` bridge operation used by `miniquake.native`.
 /// @param virtualKey The virtual key input consumed by `winKeyPressed`.
 /// @returns The `i32` result produced by `winKeyPressed`.
+#if TARGET_OS == "windows"
 extern function winKeyPressed(virtualKey as i32) from "miniquake_native.dll" symbol "mq_win_key_pressed" returns i32
+#else
+extern function winKeyPressed(virtualKey as i32) from "libminiquake_native.so" symbol "mq_win_key_pressed" returns i32
+#endif
 /// Invokes the native `winKeySnapshot` bridge operation used by `miniquake.native`.
 /// @param downStates The down states input consumed by `winKeySnapshot`.
 /// @param pressedStates The pressed states input consumed by `winKeySnapshot`.
 /// @param queryMask The query mask input consumed by `winKeySnapshot`.
 /// @param stateCount Number of entries or units to process.
 /// @returns The `i32` result produced by `winKeySnapshot`.
+#if TARGET_OS == "windows"
 extern function winKeySnapshot(downStates as bytes, pressedStates as bytes, queryMask as bytes, stateCount as u32) from "miniquake_native.dll" symbol "mq_win_key_snapshot" returns i32
+#else
+extern function winKeySnapshot(downStates as bytes, pressedStates as bytes, queryMask as bytes, stateCount as u32) from "libminiquake_native.so" symbol "mq_win_key_snapshot" returns i32
+#endif
 /// Invokes the native `winTextPop` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `winTextPop`.
+#if TARGET_OS == "windows"
 extern function winTextPop() from "miniquake_native.dll" symbol "mq_win_text_pop" returns i32
+#else
+extern function winTextPop() from "libminiquake_native.so" symbol "mq_win_text_pop" returns i32
+#endif
 /// Invokes the native `winHasFocus` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `winHasFocus`.
+#if TARGET_OS == "windows"
 extern function winHasFocus() from "miniquake_native.dll" symbol "mq_win_has_focus" returns i32
+#else
+extern function winHasFocus() from "libminiquake_native.so" symbol "mq_win_has_focus" returns i32
+#endif
 /// Invokes the native `winClientWidth` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `winClientWidth`.
+#if TARGET_OS == "windows"
 extern function winClientWidth() from "miniquake_native.dll" symbol "mq_win_client_width" returns i32
+#else
+extern function winClientWidth() from "libminiquake_native.so" symbol "mq_win_client_width" returns i32
+#endif
 /// Invokes the native `winClientHeight` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `winClientHeight`.
+#if TARGET_OS == "windows"
 extern function winClientHeight() from "miniquake_native.dll" symbol "mq_win_client_height" returns i32
+#else
+extern function winClientHeight() from "libminiquake_native.so" symbol "mq_win_client_height" returns i32
+#endif
 /// Invokes the native `winResizeClient` bridge operation used by `miniquake.native`.
 /// @param width Requested width in pixels or data units.
 /// @param height Requested height in pixels or data units.
 /// @returns The `i32` result produced by `winResizeClient`.
+#if TARGET_OS == "windows"
 extern function winResizeClient(width as i32, height as i32) from "miniquake_native.dll" symbol "mq_win_resize_client" returns i32
+#else
+extern function winResizeClient(width as i32, height as i32) from "libminiquake_native.so" symbol "mq_win_resize_client" returns i32
+#endif
 /// Invokes the native `winWindowX` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `winWindowX`.
+#if TARGET_OS == "windows"
 extern function winWindowX() from "miniquake_native.dll" symbol "mq_win_window_x" returns i32
+#else
+extern function winWindowX() from "libminiquake_native.so" symbol "mq_win_window_x" returns i32
+#endif
 /// Invokes the native `winWindowY` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `winWindowY`.
+#if TARGET_OS == "windows"
 extern function winWindowY() from "miniquake_native.dll" symbol "mq_win_window_y" returns i32
+#else
+extern function winWindowY() from "libminiquake_native.so" symbol "mq_win_window_y" returns i32
+#endif
 /// Invokes the native `winIsMinimized` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `winIsMinimized`.
+#if TARGET_OS == "windows"
 extern function winIsMinimized() from "miniquake_native.dll" symbol "mq_win_is_minimized" returns i32
+#else
+extern function winIsMinimized() from "libminiquake_native.so" symbol "mq_win_is_minimized" returns i32
+#endif
 /// Invokes the native `winDesktopWidth` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `winDesktopWidth`.
+#if TARGET_OS == "windows"
 extern function winDesktopWidth() from "miniquake_native.dll" symbol "mq_win_desktop_width" returns i32
+#else
+extern function winDesktopWidth() from "libminiquake_native.so" symbol "mq_win_desktop_width" returns i32
+#endif
 /// Invokes the native `winDesktopHeight` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `winDesktopHeight`.
+#if TARGET_OS == "windows"
 extern function winDesktopHeight() from "miniquake_native.dll" symbol "mq_win_desktop_height" returns i32
+#else
+extern function winDesktopHeight() from "libminiquake_native.so" symbol "mq_win_desktop_height" returns i32
+#endif
 /// Invokes the native `winDisplayModeCount` bridge operation used by `miniquake.native`.
 /// @returns The `u32` result produced by `winDisplayModeCount`.
+#if TARGET_OS == "windows"
 extern function winDisplayModeCount() from "miniquake_native.dll" symbol "mq_win_display_mode_count" returns u32
+#else
+extern function winDisplayModeCount() from "libminiquake_native.so" symbol "mq_win_display_mode_count" returns u32
+#endif
 /// Invokes the native `winDisplayModeWidth` bridge operation used by `miniquake.native`.
 /// @param index Zero-based index of the requested entry.
 /// @returns The `i32` result produced by `winDisplayModeWidth`.
+#if TARGET_OS == "windows"
 extern function winDisplayModeWidth(index as u32) from "miniquake_native.dll" symbol "mq_win_display_mode_width" returns i32
+#else
+extern function winDisplayModeWidth(index as u32) from "libminiquake_native.so" symbol "mq_win_display_mode_width" returns i32
+#endif
 /// Invokes the native `winDisplayModeHeight` bridge operation used by `miniquake.native`.
 /// @param index Zero-based index of the requested entry.
 /// @returns The `i32` result produced by `winDisplayModeHeight`.
+#if TARGET_OS == "windows"
 extern function winDisplayModeHeight(index as u32) from "miniquake_native.dll" symbol "mq_win_display_mode_height" returns i32
+#else
+extern function winDisplayModeHeight(index as u32) from "libminiquake_native.so" symbol "mq_win_display_mode_height" returns i32
+#endif
 /// Invokes the native `winDisplayModeBpp` bridge operation used by `miniquake.native`.
 /// @param index Zero-based index of the requested entry.
 /// @returns The `i32` result produced by `winDisplayModeBpp`.
+#if TARGET_OS == "windows"
 extern function winDisplayModeBpp(index as u32) from "miniquake_native.dll" symbol "mq_win_display_mode_bpp" returns i32
+#else
+extern function winDisplayModeBpp(index as u32) from "libminiquake_native.so" symbol "mq_win_display_mode_bpp" returns i32
+#endif
 /// Invokes the native `winDisplayModeFrequency` bridge operation used by `miniquake.native`.
 /// @param index Zero-based index of the requested entry.
 /// @returns The `i32` result produced by `winDisplayModeFrequency`.
+#if TARGET_OS == "windows"
 extern function winDisplayModeFrequency(index as u32) from "miniquake_native.dll" symbol "mq_win_display_mode_frequency" returns i32
+#else
+extern function winDisplayModeFrequency(index as u32) from "libminiquake_native.so" symbol "mq_win_display_mode_frequency" returns i32
+#endif
 /// Invokes the native `winTestDisplayMode` bridge operation used by `miniquake.native`.
 /// @param width Requested width in pixels or data units.
 /// @param height Requested height in pixels or data units.
 /// @param bpp The bpp input consumed by `winTestDisplayMode`.
 /// @param frequency The frequency input consumed by `winTestDisplayMode`.
 /// @returns The `i32` result produced by `winTestDisplayMode`.
+#if TARGET_OS == "windows"
 extern function winTestDisplayMode(width as i32, height as i32, bpp as i32, frequency as i32) from "miniquake_native.dll" symbol "mq_win_test_display_mode" returns i32
+#else
+extern function winTestDisplayMode(width as i32, height as i32, bpp as i32, frequency as i32) from "libminiquake_native.so" symbol "mq_win_test_display_mode" returns i32
+#endif
 /// Invokes the native `winConfigureDisplayMode` bridge operation used by `miniquake.native`.
 /// @param width Requested width in pixels or data units.
 /// @param height Requested height in pixels or data units.
@@ -193,195 +365,399 @@ extern function winTestDisplayMode(width as i32, height as i32, bpp as i32, freq
 /// @param fullscreen The fullscreen input consumed by `winConfigureDisplayMode`.
 /// @param useCurrent The use current input consumed by `winConfigureDisplayMode`.
 /// @returns The `i32` result produced by `winConfigureDisplayMode`.
+#if TARGET_OS == "windows"
 extern function winConfigureDisplayMode(width as i32, height as i32, bpp as i32, frequency as i32, fullscreen as i32, useCurrent as i32) from "miniquake_native.dll" symbol "mq_win_configure_display_mode" returns i32
+#else
+extern function winConfigureDisplayMode(width as i32, height as i32, bpp as i32, frequency as i32, fullscreen as i32, useCurrent as i32) from "libminiquake_native.so" symbol "mq_win_configure_display_mode" returns i32
+#endif
 /// Invokes the native `winRestoreDisplayMode` bridge operation used by `miniquake.native`.
+#if TARGET_OS == "windows"
 extern function winRestoreDisplayMode() from "miniquake_native.dll" symbol "mq_win_restore_display_mode" returns void
+#else
+extern function winRestoreDisplayMode() from "libminiquake_native.so" symbol "mq_win_restore_display_mode" returns void
+#endif
 /// Invokes the native `winGetGammaRamp` bridge operation used by `miniquake.native`.
 /// @param ramp The ramp input consumed by `winGetGammaRamp`.
 /// @param byteCount Number of entries or units to process.
 /// @returns The `i32` result produced by `winGetGammaRamp`.
+#if TARGET_OS == "windows"
 extern function winGetGammaRamp(ramp as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_win_get_gamma_ramp" returns i32
+#else
+extern function winGetGammaRamp(ramp as bytes, byteCount as u32) from "libminiquake_native.so" symbol "mq_win_get_gamma_ramp" returns i32
+#endif
 /// Invokes the native `winSetGammaRamp` bridge operation used by `miniquake.native`.
 /// @param ramp The ramp input consumed by `winSetGammaRamp`.
 /// @param byteCount Number of entries or units to process.
 /// @returns The `i32` result produced by `winSetGammaRamp`.
+#if TARGET_OS == "windows"
 extern function winSetGammaRamp(ramp as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_win_set_gamma_ramp" returns i32
+#else
+extern function winSetGammaRamp(ramp as bytes, byteCount as u32) from "libminiquake_native.so" symbol "mq_win_set_gamma_ramp" returns i32
+#endif
 /// Invokes the native `winContextReady` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `winContextReady`.
+#if TARGET_OS == "windows"
 extern function winContextReady() from "miniquake_native.dll" symbol "mq_win_context_ready" returns i32
+#else
+extern function winContextReady() from "libminiquake_native.so" symbol "mq_win_context_ready" returns i32
+#endif
 /// Invokes the native `winMakeCurrent` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `winMakeCurrent`.
+#if TARGET_OS == "windows"
 extern function winMakeCurrent() from "miniquake_native.dll" symbol "mq_win_make_current" returns i32
+#else
+extern function winMakeCurrent() from "libminiquake_native.so" symbol "mq_win_make_current" returns i32
+#endif
 /// Invokes the native `winActivate` bridge operation used by `miniquake.native`.
 /// @param active The active input consumed by `winActivate`.
 /// @param minimized The minimized input consumed by `winActivate`.
+#if TARGET_OS == "windows"
 extern function winActivate(active as i32, minimized as i32) from "miniquake_native.dll" symbol "mq_win_activate" returns void
+#else
+extern function winActivate(active as i32, minimized as i32) from "libminiquake_native.so" symbol "mq_win_activate" returns void
+#endif
 /// Invokes the native `winSetTitle` bridge operation used by `miniquake.native`.
 /// @param title The title input consumed by `winSetTitle`.
+#if TARGET_OS == "windows"
 extern function winSetTitle(title as wstr) from "miniquake_native.dll" symbol "mq_win_set_title" returns void
+#else
+extern function winSetTitle(title as cstr) from "libminiquake_native.so" symbol "mq_win_set_title" returns void
+#endif
 /// Invokes the native `winSetCursorCapture` bridge operation used by `miniquake.native`.
 /// @param enabled Whether the optional behavior is enabled.
+#if TARGET_OS == "windows"
 extern function winSetCursorCapture(enabled as i32) from "miniquake_native.dll" symbol "mq_win_set_cursor_capture" returns void
+#else
+extern function winSetCursorCapture(enabled as i32) from "libminiquake_native.so" symbol "mq_win_set_cursor_capture" returns void
+#endif
 /// Invokes the native `winMouseDx` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `winMouseDx`.
+#if TARGET_OS == "windows"
 extern function winMouseDx() from "miniquake_native.dll" symbol "mq_win_mouse_dx" returns i32
+#else
+extern function winMouseDx() from "libminiquake_native.so" symbol "mq_win_mouse_dx" returns i32
+#endif
 /// Invokes the native `winMouseDy` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `winMouseDy`.
+#if TARGET_OS == "windows"
 extern function winMouseDy() from "miniquake_native.dll" symbol "mq_win_mouse_dy" returns i32
+#else
+extern function winMouseDy() from "libminiquake_native.so" symbol "mq_win_mouse_dy" returns i32
+#endif
 /// Invokes the native `winMouseButtons` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `winMouseButtons`.
+#if TARGET_OS == "windows"
 extern function winMouseButtons() from "miniquake_native.dll" symbol "mq_win_mouse_buttons" returns i32
+#else
+extern function winMouseButtons() from "libminiquake_native.so" symbol "mq_win_mouse_buttons" returns i32
+#endif
 /// Invokes the native `winMouseWheel` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `winMouseWheel`.
+#if TARGET_OS == "windows"
 extern function winMouseWheel() from "miniquake_native.dll" symbol "mq_win_mouse_wheel" returns i32
+#else
+extern function winMouseWheel() from "libminiquake_native.so" symbol "mq_win_mouse_wheel" returns i32
+#endif
 /// Invokes the native `winInputEventPop` bridge operation used by `miniquake.native`.
 /// @returns The `u32` result produced by `winInputEventPop`.
+#if TARGET_OS == "windows"
 extern function winInputEventPop() from "miniquake_native.dll" symbol "mq_win_input_event_pop" returns u32
+#else
+extern function winInputEventPop() from "libminiquake_native.so" symbol "mq_win_input_event_pop" returns u32
+#endif
 /// Invokes the native `winInputTestPush` bridge operation used by `miniquake.native`.
 /// @param eventType The event type input consumed by `winInputTestPush`.
 /// @param code The code input consumed by `winInputTestPush`.
 /// @param value Value consumed by `winInputTestPush`.
+#if TARGET_OS == "windows"
 extern function winInputTestPush(eventType as u32, code as u32, value as i32) from "miniquake_native.dll" symbol "mq_win_input_test_push" returns void
+#else
+extern function winInputTestPush(eventType as u32, code as u32, value as i32) from "libminiquake_native.so" symbol "mq_win_input_test_push" returns void
+#endif
 /// Invokes the native `winCursorShow` bridge operation used by `miniquake.native`.
 /// @param show The show input consumed by `winCursorShow`.
+#if TARGET_OS == "windows"
 extern function winCursorShow(show as i32) from "miniquake_native.dll" symbol "mq_win_cursor_show" returns void
+#else
+extern function winCursorShow(show as i32) from "libminiquake_native.so" symbol "mq_win_cursor_show" returns void
+#endif
 /// Invokes the native `winCursorCenter` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `winCursorCenter`.
+#if TARGET_OS == "windows"
 extern function winCursorCenter() from "miniquake_native.dll" symbol "mq_win_cursor_center" returns i32
+#else
+extern function winCursorCenter() from "libminiquake_native.so" symbol "mq_win_cursor_center" returns i32
+#endif
 /// Invokes the native `winUpdateClipCursor` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `winUpdateClipCursor`.
+#if TARGET_OS == "windows"
 extern function winUpdateClipCursor() from "miniquake_native.dll" symbol "mq_win_update_clip_cursor" returns i32
+#else
+extern function winUpdateClipCursor() from "libminiquake_native.so" symbol "mq_win_update_clip_cursor" returns i32
+#endif
 /// Invokes the native `winJoyStartup` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `winJoyStartup`.
+#if TARGET_OS == "windows"
 extern function winJoyStartup() from "miniquake_native.dll" symbol "mq_win_joy_startup" returns i32
+#else
+extern function winJoyStartup() from "libminiquake_native.so" symbol "mq_win_joy_startup" returns i32
+#endif
 /// Invokes the native `winJoyRead` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `winJoyRead`.
+#if TARGET_OS == "windows"
 extern function winJoyRead() from "miniquake_native.dll" symbol "mq_win_joy_read" returns i32
+#else
+extern function winJoyRead() from "libminiquake_native.so" symbol "mq_win_joy_read" returns i32
+#endif
 /// Invokes the native `winJoyAxis` bridge operation used by `miniquake.native`.
 /// @param axis The axis input consumed by `winJoyAxis`.
 /// @returns The `u32` result produced by `winJoyAxis`.
+#if TARGET_OS == "windows"
 extern function winJoyAxis(axis as u32) from "miniquake_native.dll" symbol "mq_win_joy_axis" returns u32
+#else
+extern function winJoyAxis(axis as u32) from "libminiquake_native.so" symbol "mq_win_joy_axis" returns u32
+#endif
 /// Invokes the native `winJoyButtons` bridge operation used by `miniquake.native`.
 /// @returns The `u32` result produced by `winJoyButtons`.
+#if TARGET_OS == "windows"
 extern function winJoyButtons() from "miniquake_native.dll" symbol "mq_win_joy_buttons" returns u32
+#else
+extern function winJoyButtons() from "libminiquake_native.so" symbol "mq_win_joy_buttons" returns u32
+#endif
 /// Invokes the native `winJoyPov` bridge operation used by `miniquake.native`.
 /// @returns The `u32` result produced by `winJoyPov`.
+#if TARGET_OS == "windows"
 extern function winJoyPov() from "miniquake_native.dll" symbol "mq_win_joy_pov" returns u32
+#else
+extern function winJoyPov() from "libminiquake_native.so" symbol "mq_win_joy_pov" returns u32
+#endif
 /// Invokes the native `winJoyButtonCount` bridge operation used by `miniquake.native`.
 /// @returns The `u32` result produced by `winJoyButtonCount`.
+#if TARGET_OS == "windows"
 extern function winJoyButtonCount() from "miniquake_native.dll" symbol "mq_win_joy_button_count" returns u32
+#else
+extern function winJoyButtonCount() from "libminiquake_native.so" symbol "mq_win_joy_button_count" returns u32
+#endif
 /// Invokes the native `winJoyHasPov` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `winJoyHasPov`.
+#if TARGET_OS == "windows"
 extern function winJoyHasPov() from "miniquake_native.dll" symbol "mq_win_joy_has_pov" returns i32
+#else
+extern function winJoyHasPov() from "libminiquake_native.so" symbol "mq_win_joy_has_pov" returns i32
+#endif
 /// Invokes the native `winJoyWarriorCurve` bridge operation used by `miniquake.native`.
 /// @param rawValue The raw value input consumed by `winJoyWarriorCurve`.
 /// @returns The `i32` result produced by `winJoyWarriorCurve`.
+#if TARGET_OS == "windows"
 extern function winJoyWarriorCurve(rawValue as i32) from "miniquake_native.dll" symbol "mq_win_joy_warrior_curve" returns i32
+#else
+extern function winJoyWarriorCurve(rawValue as i32) from "libminiquake_native.so" symbol "mq_win_joy_warrior_curve" returns i32
+#endif
 /// Invokes the native `winJoyWarriorCurveF32` bridge operation used by `miniquake.native`.
 /// @param rawValue The raw value input consumed by `winJoyWarriorCurveF32`.
 /// @returns The `u32` result produced by `winJoyWarriorCurveF32`.
+#if TARGET_OS == "windows"
 extern function winJoyWarriorCurveF32(rawValue as i32) from "miniquake_native.dll" symbol "mq_win_joy_warrior_curve_f32" returns u32
+#else
+extern function winJoyWarriorCurveF32(rawValue as i32) from "libminiquake_native.so" symbol "mq_win_joy_warrior_curve_f32" returns u32
+#endif
 /// Invokes the native `winTicks` bridge operation used by `miniquake.native`.
 /// @returns The `u32` result produced by `winTicks`.
+#if TARGET_OS == "windows"
 extern function winTicks() from "miniquake_native.dll" symbol "mq_win_ticks" returns u32
+#else
+extern function winTicks() from "libminiquake_native.so" symbol "mq_win_ticks" returns u32
+#endif
 /// Invokes the native `winSleep` bridge operation used by `miniquake.native`.
 /// @param milliseconds The milliseconds input consumed by `winSleep`.
+#if TARGET_OS == "windows"
 extern function winSleep(milliseconds as u32) from "miniquake_native.dll" symbol "mq_win_sleep" returns void
+#else
+extern function winSleep(milliseconds as u32) from "libminiquake_native.so" symbol "mq_win_sleep" returns void
+#endif
 
 /// Invokes the native `sysCounter` bridge operation used by `miniquake.native`.
 /// @returns The `u64` result produced by `sysCounter`.
+#if TARGET_OS == "windows"
 extern function sysCounter() from "miniquake_native.dll" symbol "mq_sys_counter" returns u64
+#else
+extern function sysCounter() from "libminiquake_native.so" symbol "mq_sys_counter" returns u64
+#endif
 /// Invokes the native `sysFrequency` bridge operation used by `miniquake.native`.
 /// @returns The `u64` result produced by `sysFrequency`.
+#if TARGET_OS == "windows"
 extern function sysFrequency() from "miniquake_native.dll" symbol "mq_sys_frequency" returns u64
+#else
+extern function sysFrequency() from "libminiquake_native.so" symbol "mq_sys_frequency" returns u64
+#endif
 /// Invokes the native `processHandleCount` bridge operation used by `miniquake.native`.
 /// @returns The `u32` result produced by `processHandleCount`.
+#if TARGET_OS == "windows"
 extern function processHandleCount() from "miniquake_native.dll" symbol "mq_process_handle_count" returns u32
+#else
+extern function processHandleCount() from "libminiquake_native.so" symbol "mq_process_handle_count" returns u32
+#endif
 /// Invokes the native `sysMakeCodeWriteable` bridge operation used by `miniquake.native`.
 /// @param address Network address of the peer.
 /// @param length Length of the requested data in units appropriate to the operation.
 /// @returns The `i32` result produced by `sysMakeCodeWriteable`.
+#if TARGET_OS == "windows"
 extern function sysMakeCodeWriteable(address as u64, length as u64) from "miniquake_native.dll" symbol "mq_sys_make_code_writeable" returns i32
+#else
+extern function sysMakeCodeWriteable(address as u64, length as u64) from "libminiquake_native.so" symbol "mq_sys_make_code_writeable" returns i32
+#endif
 /// Invokes the native `sysConsoleAlloc` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `sysConsoleAlloc`.
+#if TARGET_OS == "windows"
 extern function sysConsoleAlloc() from "miniquake_native.dll" symbol "mq_sys_console_alloc" returns i32
+#else
+extern function sysConsoleAlloc() from "libminiquake_native.so" symbol "mq_sys_console_alloc" returns i32
+#endif
 /// Invokes the native `sysConsoleFree` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `sysConsoleFree`.
+#if TARGET_OS == "windows"
 extern function sysConsoleFree() from "miniquake_native.dll" symbol "mq_sys_console_free" returns i32
+#else
+extern function sysConsoleFree() from "libminiquake_native.so" symbol "mq_sys_console_free" returns i32
+#endif
 /// Invokes the native `sysConsoleEventPop` bridge operation used by `miniquake.native`.
 /// @returns The `u32` result produced by `sysConsoleEventPop`.
+#if TARGET_OS == "windows"
 extern function sysConsoleEventPop() from "miniquake_native.dll" symbol "mq_sys_console_event_pop" returns u32
+#else
+extern function sysConsoleEventPop() from "libminiquake_native.so" symbol "mq_sys_console_event_pop" returns u32
+#endif
 /// Invokes the native `sysConsoleWrite` bridge operation used by `miniquake.native`.
 /// @param text Text to parse or process.
 /// @returns The `i32` result produced by `sysConsoleWrite`.
+#if TARGET_OS == "windows"
 extern function sysConsoleWrite(text as cstr) from "miniquake_native.dll" symbol "mq_sys_console_write" returns i32
+#else
+extern function sysConsoleWrite(text as cstr) from "libminiquake_native.so" symbol "mq_sys_console_write" returns i32
+#endif
 /// Invokes the native `sysSleepUntilInput` bridge operation used by `miniquake.native`.
 /// @param milliseconds The milliseconds input consumed by `sysSleepUntilInput`.
+#if TARGET_OS == "windows"
 extern function sysSleepUntilInput(milliseconds as u32) from "miniquake_native.dll" symbol "mq_sys_sleep_until_input" returns void
+#else
+extern function sysSleepUntilInput(milliseconds as u32) from "libminiquake_native.so" symbol "mq_sys_sleep_until_input" returns void
+#endif
 
 /// Invokes the native `conprocCreateEvent` bridge operation used by `miniquake.native`.
 /// @returns The `u64` result produced by `conprocCreateEvent`.
+#if TARGET_OS == "windows"
 extern function conprocCreateEvent() from "miniquake_native.dll" symbol "mq_conproc_create_event" returns u64
+#else
+extern function conprocCreateEvent() from "libminiquake_native.so" symbol "mq_conproc_create_event" returns u64
+#endif
 /// Invokes the native `conprocSetEvent` bridge operation used by `miniquake.native`.
 /// @param handle The handle input consumed by `conprocSetEvent`.
 /// @returns The `i32` result produced by `conprocSetEvent`.
+#if TARGET_OS == "windows"
 extern function conprocSetEvent(handle as u64) from "miniquake_native.dll" symbol "mq_conproc_set_event" returns i32
+#else
+extern function conprocSetEvent(handle as u64) from "libminiquake_native.so" symbol "mq_conproc_set_event" returns i32
+#endif
 /// Invokes the native `conprocCloseHandle` bridge operation used by `miniquake.native`.
 /// @param handle The handle input consumed by `conprocCloseHandle`.
+#if TARGET_OS == "windows"
 extern function conprocCloseHandle(handle as u64) from "miniquake_native.dll" symbol "mq_conproc_close_handle" returns void
+#else
+extern function conprocCloseHandle(handle as u64) from "libminiquake_native.so" symbol "mq_conproc_close_handle" returns void
+#endif
 /// Invokes the native `conprocWaitAny` bridge operation used by `miniquake.native`.
 /// @param first The first input consumed by `conprocWaitAny`.
 /// @param second The second input consumed by `conprocWaitAny`.
 /// @param milliseconds The milliseconds input consumed by `conprocWaitAny`.
 /// @returns The `i32` result produced by `conprocWaitAny`.
+#if TARGET_OS == "windows"
 extern function conprocWaitAny(first as u64, second as u64, milliseconds as u32) from "miniquake_native.dll" symbol "mq_conproc_wait_any" returns i32
+#else
+extern function conprocWaitAny(first as u64, second as u64, milliseconds as u32) from "libminiquake_native.so" symbol "mq_conproc_wait_any" returns i32
+#endif
 /// Invokes the native `conprocMap` bridge operation used by `miniquake.native`.
 /// @param handle The handle input consumed by `conprocMap`.
 /// @returns The `ptr` result produced by `conprocMap`.
+#if TARGET_OS == "windows"
 extern function conprocMap(handle as u64) from "miniquake_native.dll" symbol "mq_conproc_map" returns ptr
+#else
+extern function conprocMap(handle as u64) from "libminiquake_native.so" symbol "mq_conproc_map" returns ptr
+#endif
 /// Invokes the native `conprocUnmap` bridge operation used by `miniquake.native`.
 /// @param mapped The mapped input consumed by `conprocUnmap`.
 /// @returns The `i32` result produced by `conprocUnmap`.
+#if TARGET_OS == "windows"
 extern function conprocUnmap(mapped as ptr) from "miniquake_native.dll" symbol "mq_conproc_unmap" returns i32
+#else
+extern function conprocUnmap(mapped as ptr) from "libminiquake_native.so" symbol "mq_conproc_unmap" returns i32
+#endif
 /// Invokes the native `conprocReadI32` bridge operation used by `miniquake.native`.
 /// @param mapped The mapped input consumed by `conprocReadI32`.
 /// @param index Zero-based index of the requested entry.
 /// @returns The `i32` result produced by `conprocReadI32`.
+#if TARGET_OS == "windows"
 extern function conprocReadI32(mapped as ptr, index as u32) from "miniquake_native.dll" symbol "mq_conproc_read_i32" returns i32
+#else
+extern function conprocReadI32(mapped as ptr, index as u32) from "libminiquake_native.so" symbol "mq_conproc_read_i32" returns i32
+#endif
 /// Invokes the native `conprocWriteI32` bridge operation used by `miniquake.native`.
 /// @param mapped The mapped input consumed by `conprocWriteI32`.
 /// @param index Zero-based index of the requested entry.
 /// @param value Value consumed by `conprocWriteI32`.
+#if TARGET_OS == "windows"
 extern function conprocWriteI32(mapped as ptr, index as u32, value as i32) from "miniquake_native.dll" symbol "mq_conproc_write_i32" returns void
+#else
+extern function conprocWriteI32(mapped as ptr, index as u32, value as i32) from "libminiquake_native.so" symbol "mq_conproc_write_i32" returns void
+#endif
 /// Invokes the native `conprocReadTextRaw` bridge operation used by `miniquake.native`.
 /// @param mapped The mapped input consumed by `conprocReadTextRaw`.
 /// @param byteOffset Zero-based offset of the requested data.
 /// @param output Destination buffer that receives process text.
 /// @param capacity Maximum number of entries the destination can hold.
 /// @returns The `u32` result produced by `conprocReadTextRaw`.
+#if TARGET_OS == "windows"
 extern function conprocReadTextRaw(mapped as ptr, byteOffset as u32, output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_conproc_read_text" returns u32
+#else
+extern function conprocReadTextRaw(mapped as ptr, byteOffset as u32, output as bytes, capacity as u32) from "libminiquake_text.so" symbol "mqt_conproc_read_text" returns u32
+#endif
 /// Invokes the native `conprocWriteText` bridge operation used by `miniquake.native`.
 /// @param mapped The mapped input consumed by `conprocWriteText`.
 /// @param byteOffset Zero-based offset of the requested data.
 /// @param text Text to parse or process.
 /// @param capacity Maximum number of entries the destination can hold.
 /// @returns The `i32` result produced by `conprocWriteText`.
+#if TARGET_OS == "windows"
 extern function conprocWriteText(mapped as ptr, byteOffset as u32, text as cstr, capacity as u32) from "miniquake_native.dll" symbol "mq_conproc_write_text" returns i32
+#else
+extern function conprocWriteText(mapped as ptr, byteOffset as u32, text as cstr, capacity as u32) from "libminiquake_native.so" symbol "mq_conproc_write_text" returns i32
+#endif
 /// Invokes the native `conprocScreenLines` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `conprocScreenLines`.
+#if TARGET_OS == "windows"
 extern function conprocScreenLines() from "miniquake_native.dll" symbol "mq_conproc_screen_lines" returns i32
+#else
+extern function conprocScreenLines() from "libminiquake_native.so" symbol "mq_conproc_screen_lines" returns i32
+#endif
 /// Invokes the native `conprocSetScreenSize` bridge operation used by `miniquake.native`.
 /// @param width Requested width in pixels or data units.
 /// @param height Requested height in pixels or data units.
 /// @returns The `i32` result produced by `conprocSetScreenSize`.
+#if TARGET_OS == "windows"
 extern function conprocSetScreenSize(width as i32, height as i32) from "miniquake_native.dll" symbol "mq_conproc_set_screen_size" returns i32
+#else
+extern function conprocSetScreenSize(width as i32, height as i32) from "libminiquake_native.so" symbol "mq_conproc_set_screen_size" returns i32
+#endif
 /// Invokes the native `conprocReadConsoleTextRaw` bridge operation used by `miniquake.native`.
 /// @param beginLine The begin line input consumed by `conprocReadConsoleTextRaw`.
 /// @param endLine The end line input consumed by `conprocReadConsoleTextRaw`.
 /// @param output Destination buffer that receives console text.
 /// @param capacity Maximum number of entries the destination can hold.
 /// @returns The `u32` result produced by `conprocReadConsoleTextRaw`.
+#if TARGET_OS == "windows"
 extern function conprocReadConsoleTextRaw(beginLine as i32, endLine as i32, output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_conproc_read_console_text" returns u32
+#else
+extern function conprocReadConsoleTextRaw(beginLine as i32, endLine as i32, output as bytes, capacity as u32) from "libminiquake_text.so" symbol "mqt_conproc_read_console_text" returns u32
+#endif
 /// Invokes the native `conprocWriteKey` bridge operation used by `miniquake.native`.
 /// @param character The character input consumed by `conprocWriteKey`.
 /// @param virtualKey The virtual key input consumed by `conprocWriteKey`.
@@ -389,110 +765,222 @@ extern function conprocReadConsoleTextRaw(beginLine as i32, endLine as i32, outp
 /// @param shift The shift input consumed by `conprocWriteKey`.
 /// @param down The down input consumed by `conprocWriteKey`.
 /// @returns The `i32` result produced by `conprocWriteKey`.
+#if TARGET_OS == "windows"
 extern function conprocWriteKey(character as i32, virtualKey as i32, scanCode as i32, shift as i32, down as i32) from "miniquake_native.dll" symbol "mq_conproc_write_key" returns i32
+#else
+extern function conprocWriteKey(character as i32, virtualKey as i32, scanCode as i32, shift as i32, down as i32) from "libminiquake_native.so" symbol "mq_conproc_write_key" returns i32
+#endif
 
 /// Invokes the native `audioOpen` bridge operation used by `miniquake.native`.
 /// @param sampleRate The sample rate input consumed by `audioOpen`.
 /// @param channels Number of interleaved audio channels.
 /// @param bitsPerSample The bits per sample input consumed by `audioOpen`.
 /// @returns The `i32` result produced by `audioOpen`.
+#if TARGET_OS == "windows"
 extern function audioOpen(sampleRate as u32, channels as u32, bitsPerSample as u32) from "miniquake_native.dll" symbol "mq_audio_open" returns i32
+#else
+extern function audioOpen(sampleRate as u32, channels as u32, bitsPerSample as u32) from "libminiquake_native.so" symbol "mq_audio_open" returns i32
+#endif
 /// Invokes the native `audioSubmit` bridge operation used by `miniquake.native`.
 /// @param data Input data consumed by the operation.
 /// @param byteCount Number of entries or units to process.
 /// @returns The `i32` result produced by `audioSubmit`.
+#if TARGET_OS == "windows"
 extern function audioSubmit(data as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_audio_submit" returns i32
+#else
+extern function audioSubmit(data as bytes, byteCount as u32) from "libminiquake_native.so" symbol "mq_audio_submit" returns i32
+#endif
 /// Invokes the native `audioClose` bridge operation used by `miniquake.native`.
+#if TARGET_OS == "windows"
 extern function audioClose() from "miniquake_native.dll" symbol "mq_audio_close" returns void
+#else
+extern function audioClose() from "libminiquake_native.so" symbol "mq_audio_close" returns void
+#endif
 /// Invokes the native `audioQueued` bridge operation used by `miniquake.native`.
 /// @returns The `u32` result produced by `audioQueued`.
+#if TARGET_OS == "windows"
 extern function audioQueued() from "miniquake_native.dll" symbol "mq_audio_queued" returns u32
+#else
+extern function audioQueued() from "libminiquake_native.so" symbol "mq_audio_queued" returns u32
+#endif
 /// Invokes the native `audioReset` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `audioReset`.
+#if TARGET_OS == "windows"
 extern function audioReset() from "miniquake_native.dll" symbol "mq_audio_reset" returns i32
+#else
+extern function audioReset() from "libminiquake_native.so" symbol "mq_audio_reset" returns i32
+#endif
 /// Invokes the native `audioPosition` bridge operation used by `miniquake.native`.
 /// @param sampleMask The sample mask input consumed by `audioPosition`.
 /// @returns The `u32` result produced by `audioPosition`.
+#if TARGET_OS == "windows"
 extern function audioPosition(sampleMask as u32) from "miniquake_native.dll" symbol "mq_audio_position" returns u32
+#else
+extern function audioPosition(sampleMask as u32) from "libminiquake_native.so" symbol "mq_audio_position" returns u32
+#endif
 /// Invokes the native `audioSubmitted` bridge operation used by `miniquake.native`.
 /// @returns The `u32` result produced by `audioSubmitted`.
+#if TARGET_OS == "windows"
 extern function audioSubmitted() from "miniquake_native.dll" symbol "mq_audio_submitted" returns u32
+#else
+extern function audioSubmitted() from "libminiquake_native.so" symbol "mq_audio_submitted" returns u32
+#endif
 /// Invokes the native `audioCompleted` bridge operation used by `miniquake.native`.
 /// @returns The `u32` result produced by `audioCompleted`.
+#if TARGET_OS == "windows"
 extern function audioCompleted() from "miniquake_native.dll" symbol "mq_audio_completed" returns u32
+#else
+extern function audioCompleted() from "libminiquake_native.so" symbol "mq_audio_completed" returns u32
+#endif
 /// Invokes the native `audioUnderruns` bridge operation used by `miniquake.native`.
 /// @returns The `u32` result produced by `audioUnderruns`.
+#if TARGET_OS == "windows"
 extern function audioUnderruns() from "miniquake_native.dll" symbol "mq_audio_underruns" returns u32
+#else
+extern function audioUnderruns() from "libminiquake_native.so" symbol "mq_audio_underruns" returns u32
+#endif
 /// Invokes the native `audioHeaderState` bridge operation used by `miniquake.native`.
 /// @param index Zero-based index of the requested entry.
 /// @returns The `u32` result produced by `audioHeaderState`.
+#if TARGET_OS == "windows"
 extern function audioHeaderState(index as u32) from "miniquake_native.dll" symbol "mq_audio_header_state" returns u32
+#else
+extern function audioHeaderState(index as u32) from "libminiquake_native.so" symbol "mq_audio_header_state" returns u32
+#endif
 /// Invokes the native `audioCapacity` bridge operation used by `miniquake.native`.
 /// @returns The `u32` result produced by `audioCapacity`.
+#if TARGET_OS == "windows"
 extern function audioCapacity() from "miniquake_native.dll" symbol "mq_audio_capacity" returns u32
+#else
+extern function audioCapacity() from "libminiquake_native.so" symbol "mq_audio_capacity" returns u32
+#endif
 /// Invokes the native `audioIsOpen` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `audioIsOpen`.
+#if TARGET_OS == "windows"
 extern function audioIsOpen() from "miniquake_native.dll" symbol "mq_audio_is_open" returns i32
+#else
+extern function audioIsOpen() from "libminiquake_native.so" symbol "mq_audio_is_open" returns i32
+#endif
 /// Invokes the native `oggOpen` bridge operation used by `miniquake.native`.
 /// @param data Input data consumed by the operation.
 /// @param byteCount Number of entries or units to process.
 /// @returns The `u32` result produced by `oggOpen`.
+#if TARGET_OS == "windows"
 extern function oggOpen(data as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_ogg_open" returns u32
+#else
+extern function oggOpen(data as bytes, byteCount as u32) from "libminiquake_native.so" symbol "mq_ogg_open" returns u32
+#endif
 /// Invokes the native `oggOpenFile` bridge operation used by `miniquake.native`.
 /// @param filename Path of the file to process.
 /// @returns The `u32` result produced by `oggOpenFile`.
+#if TARGET_OS == "windows"
 extern function oggOpenFile(filename as wstr) from "miniquake_native.dll" symbol "mq_ogg_open_file" returns u32
+#else
+extern function oggOpenFile(filename as cstr) from "libminiquake_native.so" symbol "mq_ogg_open_file" returns u32
+#endif
 /// Invokes the native `oggRate` bridge operation used by `miniquake.native`.
 /// @returns The `u32` result produced by `oggRate`.
+#if TARGET_OS == "windows"
 extern function oggRate() from "miniquake_native.dll" symbol "mq_ogg_rate" returns u32
+#else
+extern function oggRate() from "libminiquake_native.so" symbol "mq_ogg_rate" returns u32
+#endif
 /// Invokes the native `oggChannels` bridge operation used by `miniquake.native`.
 /// @returns The `u32` result produced by `oggChannels`.
+#if TARGET_OS == "windows"
 extern function oggChannels() from "miniquake_native.dll" symbol "mq_ogg_channels" returns u32
+#else
+extern function oggChannels() from "libminiquake_native.so" symbol "mq_ogg_channels" returns u32
+#endif
 /// Invokes the native `oggFrames` bridge operation used by `miniquake.native`.
 /// @returns The `u32` result produced by `oggFrames`.
+#if TARGET_OS == "windows"
 extern function oggFrames() from "miniquake_native.dll" symbol "mq_ogg_frames" returns u32
+#else
+extern function oggFrames() from "libminiquake_native.so" symbol "mq_ogg_frames" returns u32
+#endif
 /// Invokes the native `oggDecode` bridge operation used by `miniquake.native`.
 /// @param output Destination buffer that receives decoded PCM samples.
 /// @param frameCapacity The frame capacity input consumed by `oggDecode`.
 /// @returns The `u32` result produced by `oggDecode`.
+#if TARGET_OS == "windows"
 extern function oggDecode(output as bytes, frameCapacity as u32) from "miniquake_native.dll" symbol "mq_ogg_decode" returns u32
+#else
+extern function oggDecode(output as bytes, frameCapacity as u32) from "libminiquake_native.so" symbol "mq_ogg_decode" returns u32
+#endif
 /// Invokes the native `oggSeekStart` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `oggSeekStart`.
+#if TARGET_OS == "windows"
 extern function oggSeekStart() from "miniquake_native.dll" symbol "mq_ogg_seek_start" returns i32
+#else
+extern function oggSeekStart() from "libminiquake_native.so" symbol "mq_ogg_seek_start" returns i32
+#endif
 /// Invokes the native `oggClose` bridge operation used by `miniquake.native`.
 /// @returns The `int` result produced by `oggClose`.
+#if TARGET_OS == "windows"
 extern function oggClose() from "miniquake_native.dll" symbol "mq_ogg_close"
+#else
+extern function oggClose() from "libminiquake_native.so" symbol "mq_ogg_close"
+#endif
 
 /// Invokes the native `udpOpen` bridge operation used by `miniquake.native`.
 /// @param port The port input consumed by `udpOpen`.
 /// @returns The `u64` result produced by `udpOpen`.
+#if TARGET_OS == "windows"
 extern function udpOpen(port as u32) from "miniquake_native.dll" symbol "mq_udp_open" returns u64
+#else
+extern function udpOpen(port as u32) from "libminiquake_native.so" symbol "mq_udp_open" returns u64
+#endif
 /// Invokes the native `udpOpenBound` bridge operation used by `miniquake.native`.
 /// @param port The port input consumed by `udpOpenBound`.
 /// @param address Network address of the peer.
 /// @returns The `u64` result produced by `udpOpenBound`.
+#if TARGET_OS == "windows"
 extern function udpOpenBound(port as u32, address as cstr) from "miniquake_native.dll" symbol "mq_udp_open_bound" returns u64
+#else
+extern function udpOpenBound(port as u32, address as cstr) from "libminiquake_native.so" symbol "mq_udp_open_bound" returns u64
+#endif
 /// Invokes the native `udpClose` bridge operation used by `miniquake.native`.
 /// @param handle The handle input consumed by `udpClose`.
+#if TARGET_OS == "windows"
 extern function udpClose(handle as u64) from "miniquake_native.dll" symbol "mq_udp_close" returns void
+#else
+extern function udpClose(handle as u64) from "libminiquake_native.so" symbol "mq_udp_close" returns void
+#endif
 /// Invokes the native `udpBoundPort` bridge operation used by `miniquake.native`.
 /// @param handle The handle input consumed by `udpBoundPort`.
 /// @returns The `u32` result produced by `udpBoundPort`.
+#if TARGET_OS == "windows"
 extern function udpBoundPort(handle as u64) from "miniquake_native.dll" symbol "mq_udp_bound_port" returns u32
+#else
+extern function udpBoundPort(handle as u64) from "libminiquake_native.so" symbol "mq_udp_bound_port" returns u32
+#endif
 /// Invokes the native `udpBoundAddressRaw` bridge operation used by `miniquake.native`.
 /// @param handle The handle input consumed by `udpBoundAddressRaw`.
 /// @param output Destination buffer that receives the bound address.
 /// @param capacity Maximum number of entries the destination can hold.
 /// @returns The `u32` result produced by `udpBoundAddressRaw`.
+#if TARGET_OS == "windows"
 extern function udpBoundAddressRaw(handle as u64, output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_udp_bound_address" returns u32
+#else
+extern function udpBoundAddressRaw(handle as u64, output as bytes, capacity as u32) from "libminiquake_text.so" symbol "mqt_udp_bound_address" returns u32
+#endif
 /// Invokes the native `udpEnableBroadcast` bridge operation used by `miniquake.native`.
 /// @param handle The handle input consumed by `udpEnableBroadcast`.
 /// @returns The `i32` result produced by `udpEnableBroadcast`.
+#if TARGET_OS == "windows"
 extern function udpEnableBroadcast(handle as u64) from "miniquake_native.dll" symbol "mq_udp_enable_broadcast" returns i32
+#else
+extern function udpEnableBroadcast(handle as u64) from "libminiquake_native.so" symbol "mq_udp_enable_broadcast" returns i32
+#endif
 /// Invokes the native `udpPeek` bridge operation used by `miniquake.native`.
 /// @param handle The handle input consumed by `udpPeek`.
 /// @returns The `i32` result produced by `udpPeek`.
+#if TARGET_OS == "windows"
 extern function udpPeek(handle as u64) from "miniquake_native.dll" symbol "mq_udp_peek" returns i32
+#else
+extern function udpPeek(handle as u64) from "libminiquake_native.so" symbol "mq_udp_peek" returns i32
+#endif
 /// Invokes the native `udpSend` bridge operation used by `miniquake.native`.
 /// @param handle The handle input consumed by `udpSend`.
 /// @param address Network address of the peer.
@@ -500,145 +988,285 @@ extern function udpPeek(handle as u64) from "miniquake_native.dll" symbol "mq_ud
 /// @param data Input data consumed by the operation.
 /// @param byteCount Number of entries or units to process.
 /// @returns The `i32` result produced by `udpSend`.
+#if TARGET_OS == "windows"
 extern function udpSend(handle as u64, address as cstr, port as u32, data as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_udp_send" returns i32
+#else
+extern function udpSend(handle as u64, address as cstr, port as u32, data as bytes, byteCount as u32) from "libminiquake_native.so" symbol "mq_udp_send" returns i32
+#endif
 /// Invokes the native `udpReceive` bridge operation used by `miniquake.native`.
 /// @param handle The handle input consumed by `udpReceive`.
 /// @param data Input data consumed by the operation.
 /// @param capacity Maximum number of entries the destination can hold.
 /// @returns The `i32` result produced by `udpReceive`.
+#if TARGET_OS == "windows"
 extern function udpReceive(handle as u64, data as bytes, capacity as u32) from "miniquake_native.dll" symbol "mq_udp_receive" returns i32
+#else
+extern function udpReceive(handle as u64, data as bytes, capacity as u32) from "libminiquake_native.so" symbol "mq_udp_receive" returns i32
+#endif
 /// Invokes the native `udpLastAddressRaw` bridge operation used by `miniquake.native`.
 /// @param output Destination buffer that receives the most recent peer address.
 /// @param capacity Maximum number of entries the destination can hold.
 /// @returns The `u32` result produced by `udpLastAddressRaw`.
+#if TARGET_OS == "windows"
 extern function udpLastAddressRaw(output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_udp_last_address" returns u32
+#else
+extern function udpLastAddressRaw(output as bytes, capacity as u32) from "libminiquake_text.so" symbol "mqt_udp_last_address" returns u32
+#endif
 /// Invokes the native `udpLastPort` bridge operation used by `miniquake.native`.
 /// @returns The `u32` result produced by `udpLastPort`.
+#if TARGET_OS == "windows"
 extern function udpLastPort() from "miniquake_native.dll" symbol "mq_udp_last_port" returns u32
+#else
+extern function udpLastPort() from "libminiquake_native.so" symbol "mq_udp_last_port" returns u32
+#endif
 /// Invokes the native `udpLastError` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `udpLastError`.
+#if TARGET_OS == "windows"
 extern function udpLastError() from "miniquake_native.dll" symbol "mq_udp_last_error" returns i32
+#else
+extern function udpLastError() from "libminiquake_native.so" symbol "mq_udp_last_error" returns i32
+#endif
 /// Invokes the native `udpLocalAddressRaw` bridge operation used by `miniquake.native`.
 /// @param output Destination buffer that receives the local address.
 /// @param capacity Maximum number of entries the destination can hold.
 /// @returns The `u32` result produced by `udpLocalAddressRaw`.
+#if TARGET_OS == "windows"
 extern function udpLocalAddressRaw(output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_udp_local_address" returns u32
+#else
+extern function udpLocalAddressRaw(output as bytes, capacity as u32) from "libminiquake_text.so" symbol "mqt_udp_local_address" returns u32
+#endif
 /// Invokes the native `udpHostNameRaw` bridge operation used by `miniquake.native`.
 /// @param output Destination buffer that receives the local host name.
 /// @param capacity Maximum number of entries the destination can hold.
 /// @returns The `u32` result produced by `udpHostNameRaw`.
+#if TARGET_OS == "windows"
 extern function udpHostNameRaw(output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_udp_host_name" returns u32
+#else
+extern function udpHostNameRaw(output as bytes, capacity as u32) from "libminiquake_text.so" symbol "mqt_udp_host_name" returns u32
+#endif
 /// Invokes the native `udpResolveNameRaw` bridge operation used by `miniquake.native`.
 /// @param name Stable name that identifies the requested object or option.
 /// @param output Destination buffer that receives the resolved address.
 /// @param capacity Maximum number of entries the destination can hold.
 /// @returns The `u32` result produced by `udpResolveNameRaw`.
+#if TARGET_OS == "windows"
 extern function udpResolveNameRaw(name as cstr, output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_udp_resolve_name" returns u32
+#else
+extern function udpResolveNameRaw(name as cstr, output as bytes, capacity as u32) from "libminiquake_text.so" symbol "mqt_udp_resolve_name" returns u32
+#endif
 /// Invokes the native `udpReverseNameRaw` bridge operation used by `miniquake.native`.
 /// @param address Network address of the peer.
 /// @param output Destination buffer that receives the reverse-resolved name.
 /// @param capacity Maximum number of entries the destination can hold.
 /// @returns The `u32` result produced by `udpReverseNameRaw`.
+#if TARGET_OS == "windows"
 extern function udpReverseNameRaw(address as cstr, output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_udp_reverse_name" returns u32
+#else
+extern function udpReverseNameRaw(address as cstr, output as bytes, capacity as u32) from "libminiquake_text.so" symbol "mqt_udp_reverse_name" returns u32
+#endif
 
 /// Invokes the native `glBegin` bridge operation used by `miniquake.native`.
 /// @param mode The mode input consumed by `glBegin`.
+#if TARGET_OS == "windows"
 extern function glBegin(mode as u32) from "miniquake_native.dll" symbol "mq_gl_begin" returns void
+#else
+extern function glBegin(mode as u32) from "libminiquake_native.so" symbol "mq_gl_begin" returns void
+#endif
 /// Invokes the native `glEnd` bridge operation used by `miniquake.native`.
+#if TARGET_OS == "windows"
 extern function glEnd() from "miniquake_native.dll" symbol "mq_gl_end" returns void
+#else
+extern function glEnd() from "libminiquake_native.so" symbol "mq_gl_end" returns void
+#endif
 /// Invokes the native `glVertex2` bridge operation used by `miniquake.native`.
 /// @param xBits The x bits input consumed by `glVertex2`.
 /// @param yBits The y bits input consumed by `glVertex2`.
+#if TARGET_OS == "windows"
 extern function glVertex2(xBits as u32, yBits as u32) from "miniquake_native.dll" symbol "mq_gl_vertex2" returns void
+#else
+extern function glVertex2(xBits as u32, yBits as u32) from "libminiquake_native.so" symbol "mq_gl_vertex2" returns void
+#endif
 /// Invokes the native `glVertex3` bridge operation used by `miniquake.native`.
 /// @param xBits The x bits input consumed by `glVertex3`.
 /// @param yBits The y bits input consumed by `glVertex3`.
 /// @param zBits The z bits input consumed by `glVertex3`.
+#if TARGET_OS == "windows"
 extern function glVertex3(xBits as u32, yBits as u32, zBits as u32) from "miniquake_native.dll" symbol "mq_gl_vertex3" returns void
+#else
+extern function glVertex3(xBits as u32, yBits as u32, zBits as u32) from "libminiquake_native.so" symbol "mq_gl_vertex3" returns void
+#endif
 /// Invokes the native `glTexcoord2` bridge operation used by `miniquake.native`.
 /// @param sBits The s bits input consumed by `glTexcoord2`.
 /// @param tBits The t bits input consumed by `glTexcoord2`.
+#if TARGET_OS == "windows"
 extern function glTexcoord2(sBits as u32, tBits as u32) from "miniquake_native.dll" symbol "mq_gl_texcoord2" returns void
+#else
+extern function glTexcoord2(sBits as u32, tBits as u32) from "libminiquake_native.so" symbol "mq_gl_texcoord2" returns void
+#endif
 /// Invokes the native `glColor4ub` bridge operation used by `miniquake.native`.
 /// @param red The red input consumed by `glColor4ub`.
 /// @param green The green input consumed by `glColor4ub`.
 /// @param blue The blue input consumed by `glColor4ub`.
 /// @param alpha The alpha input consumed by `glColor4ub`.
+#if TARGET_OS == "windows"
 extern function glColor4ub(red as u32, green as u32, blue as u32, alpha as u32) from "miniquake_native.dll" symbol "mq_gl_color4ub" returns void
+#else
+extern function glColor4ub(red as u32, green as u32, blue as u32, alpha as u32) from "libminiquake_native.so" symbol "mq_gl_color4ub" returns void
+#endif
 /// Invokes the native `glClearColor` bridge operation used by `miniquake.native`.
 /// @param redBits The red bits input consumed by `glClearColor`.
 /// @param greenBits The green bits input consumed by `glClearColor`.
 /// @param blueBits The blue bits input consumed by `glClearColor`.
 /// @param alphaBits The alpha bits input consumed by `glClearColor`.
+#if TARGET_OS == "windows"
 extern function glClearColor(redBits as u32, greenBits as u32, blueBits as u32, alphaBits as u32) from "miniquake_native.dll" symbol "mq_gl_clear_color" returns void
+#else
+extern function glClearColor(redBits as u32, greenBits as u32, blueBits as u32, alphaBits as u32) from "libminiquake_native.so" symbol "mq_gl_clear_color" returns void
+#endif
 /// Invokes the native `glClear` bridge operation used by `miniquake.native`.
 /// @param mask The mask input consumed by `glClear`.
+#if TARGET_OS == "windows"
 extern function glClear(mask as u32) from "miniquake_native.dll" symbol "mq_gl_clear" returns void
+#else
+extern function glClear(mask as u32) from "libminiquake_native.so" symbol "mq_gl_clear" returns void
+#endif
 /// Invokes the native `glEnable` bridge operation used by `miniquake.native`.
 /// @param capability The capability input consumed by `glEnable`.
+#if TARGET_OS == "windows"
 extern function glEnable(capability as u32) from "miniquake_native.dll" symbol "mq_gl_enable" returns void
+#else
+extern function glEnable(capability as u32) from "libminiquake_native.so" symbol "mq_gl_enable" returns void
+#endif
 /// Invokes the native `glDisable` bridge operation used by `miniquake.native`.
 /// @param capability The capability input consumed by `glDisable`.
+#if TARGET_OS == "windows"
 extern function glDisable(capability as u32) from "miniquake_native.dll" symbol "mq_gl_disable" returns void
+#else
+extern function glDisable(capability as u32) from "libminiquake_native.so" symbol "mq_gl_disable" returns void
+#endif
 /// Invokes the native `glBlendFunc` bridge operation used by `miniquake.native`.
 /// @param source Source value or collection to read.
 /// @param destination Destination value or collection to update.
+#if TARGET_OS == "windows"
 extern function glBlendFunc(source as u32, destination as u32) from "miniquake_native.dll" symbol "mq_gl_blend_func" returns void
+#else
+extern function glBlendFunc(source as u32, destination as u32) from "libminiquake_native.so" symbol "mq_gl_blend_func" returns void
+#endif
 /// Invokes the native `glDepthFunc` bridge operation used by `miniquake.native`.
 /// @param functionName Name that identifies the requested value or resource.
+#if TARGET_OS == "windows"
 extern function glDepthFunc(functionName as u32) from "miniquake_native.dll" symbol "mq_gl_depth_func" returns void
+#else
+extern function glDepthFunc(functionName as u32) from "libminiquake_native.so" symbol "mq_gl_depth_func" returns void
+#endif
 /// Invokes the native `glDepthMask` bridge operation used by `miniquake.native`.
 /// @param enabled Whether the optional behavior is enabled.
+#if TARGET_OS == "windows"
 extern function glDepthMask(enabled as i32) from "miniquake_native.dll" symbol "mq_gl_depth_mask" returns void
+#else
+extern function glDepthMask(enabled as i32) from "libminiquake_native.so" symbol "mq_gl_depth_mask" returns void
+#endif
 /// Invokes the native `glDepthRange` bridge operation used by `miniquake.native`.
 /// @param nearBits The near bits input consumed by `glDepthRange`.
 /// @param farBits The far bits input consumed by `glDepthRange`.
+#if TARGET_OS == "windows"
 extern function glDepthRange(nearBits as u32, farBits as u32) from "miniquake_native.dll" symbol "mq_gl_depth_range" returns void
+#else
+extern function glDepthRange(nearBits as u32, farBits as u32) from "libminiquake_native.so" symbol "mq_gl_depth_range" returns void
+#endif
 /// Invokes the native `glAlphaFunc` bridge operation used by `miniquake.native`.
 /// @param functionName Name that identifies the requested value or resource.
 /// @param referenceBits The reference bits input consumed by `glAlphaFunc`.
+#if TARGET_OS == "windows"
 extern function glAlphaFunc(functionName as u32, referenceBits as u32) from "miniquake_native.dll" symbol "mq_gl_alpha_func" returns void
+#else
+extern function glAlphaFunc(functionName as u32, referenceBits as u32) from "libminiquake_native.so" symbol "mq_gl_alpha_func" returns void
+#endif
 /// Invokes the native `glCullFace` bridge operation used by `miniquake.native`.
 /// @param mode The mode input consumed by `glCullFace`.
+#if TARGET_OS == "windows"
 extern function glCullFace(mode as u32) from "miniquake_native.dll" symbol "mq_gl_cull_face" returns void
+#else
+extern function glCullFace(mode as u32) from "libminiquake_native.so" symbol "mq_gl_cull_face" returns void
+#endif
 /// Invokes the native `glShadeModel` bridge operation used by `miniquake.native`.
 /// @param mode The mode input consumed by `glShadeModel`.
+#if TARGET_OS == "windows"
 extern function glShadeModel(mode as u32) from "miniquake_native.dll" symbol "mq_gl_shade_model" returns void
+#else
+extern function glShadeModel(mode as u32) from "libminiquake_native.so" symbol "mq_gl_shade_model" returns void
+#endif
 /// Invokes the native `glPolygonMode` bridge operation used by `miniquake.native`.
 /// @param face The face input consumed by `glPolygonMode`.
 /// @param mode The mode input consumed by `glPolygonMode`.
+#if TARGET_OS == "windows"
 extern function glPolygonMode(face as u32, mode as u32) from "miniquake_native.dll" symbol "mq_gl_polygon_mode" returns void
+#else
+extern function glPolygonMode(face as u32, mode as u32) from "libminiquake_native.so" symbol "mq_gl_polygon_mode" returns void
+#endif
 /// Invokes the native `glViewport` bridge operation used by `miniquake.native`.
 /// @param x The x input consumed by `glViewport`.
 /// @param y The y input consumed by `glViewport`.
 /// @param width Requested width in pixels or data units.
 /// @param height Requested height in pixels or data units.
+#if TARGET_OS == "windows"
 extern function glViewport(x as i32, y as i32, width as i32, height as i32) from "miniquake_native.dll" symbol "mq_gl_viewport" returns void
+#else
+extern function glViewport(x as i32, y as i32, width as i32, height as i32) from "libminiquake_native.so" symbol "mq_gl_viewport" returns void
+#endif
 /// Invokes the native `glMatrixMode` bridge operation used by `miniquake.native`.
 /// @param mode The mode input consumed by `glMatrixMode`.
+#if TARGET_OS == "windows"
 extern function glMatrixMode(mode as u32) from "miniquake_native.dll" symbol "mq_gl_matrix_mode" returns void
+#else
+extern function glMatrixMode(mode as u32) from "libminiquake_native.so" symbol "mq_gl_matrix_mode" returns void
+#endif
 /// Invokes the native `glLoadIdentity` bridge operation used by `miniquake.native`.
+#if TARGET_OS == "windows"
 extern function glLoadIdentity() from "miniquake_native.dll" symbol "mq_gl_load_identity" returns void
+#else
+extern function glLoadIdentity() from "libminiquake_native.so" symbol "mq_gl_load_identity" returns void
+#endif
 /// Invokes the native `glPushMatrix` bridge operation used by `miniquake.native`.
+#if TARGET_OS == "windows"
 extern function glPushMatrix() from "miniquake_native.dll" symbol "mq_gl_push_matrix" returns void
+#else
+extern function glPushMatrix() from "libminiquake_native.so" symbol "mq_gl_push_matrix" returns void
+#endif
 /// Invokes the native `glPopMatrix` bridge operation used by `miniquake.native`.
+#if TARGET_OS == "windows"
 extern function glPopMatrix() from "miniquake_native.dll" symbol "mq_gl_pop_matrix" returns void
+#else
+extern function glPopMatrix() from "libminiquake_native.so" symbol "mq_gl_pop_matrix" returns void
+#endif
 /// Invokes the native `glTranslate` bridge operation used by `miniquake.native`.
 /// @param xBits The x bits input consumed by `glTranslate`.
 /// @param yBits The y bits input consumed by `glTranslate`.
 /// @param zBits The z bits input consumed by `glTranslate`.
+#if TARGET_OS == "windows"
 extern function glTranslate(xBits as u32, yBits as u32, zBits as u32) from "miniquake_native.dll" symbol "mq_gl_translate" returns void
+#else
+extern function glTranslate(xBits as u32, yBits as u32, zBits as u32) from "libminiquake_native.so" symbol "mq_gl_translate" returns void
+#endif
 /// Invokes the native `glRotate` bridge operation used by `miniquake.native`.
 /// @param angleBits The angle bits input consumed by `glRotate`.
 /// @param xBits The x bits input consumed by `glRotate`.
 /// @param yBits The y bits input consumed by `glRotate`.
 /// @param zBits The z bits input consumed by `glRotate`.
+#if TARGET_OS == "windows"
 extern function glRotate(angleBits as u32, xBits as u32, yBits as u32, zBits as u32) from "miniquake_native.dll" symbol "mq_gl_rotate" returns void
+#else
+extern function glRotate(angleBits as u32, xBits as u32, yBits as u32, zBits as u32) from "libminiquake_native.so" symbol "mq_gl_rotate" returns void
+#endif
 /// Invokes the native `glScale` bridge operation used by `miniquake.native`.
 /// @param xBits The x bits input consumed by `glScale`.
 /// @param yBits The y bits input consumed by `glScale`.
 /// @param zBits The z bits input consumed by `glScale`.
+#if TARGET_OS == "windows"
 extern function glScale(xBits as u32, yBits as u32, zBits as u32) from "miniquake_native.dll" symbol "mq_gl_scale" returns void
+#else
+extern function glScale(xBits as u32, yBits as u32, zBits as u32) from "libminiquake_native.so" symbol "mq_gl_scale" returns void
+#endif
 /// Invokes the native `glOrtho` bridge operation used by `miniquake.native`.
 /// @param leftBits The left bits input consumed by `glOrtho`.
 /// @param rightBits The right bits input consumed by `glOrtho`.
@@ -646,7 +1274,11 @@ extern function glScale(xBits as u32, yBits as u32, zBits as u32) from "miniquak
 /// @param topBits The top bits input consumed by `glOrtho`.
 /// @param nearBits The near bits input consumed by `glOrtho`.
 /// @param farBits The far bits input consumed by `glOrtho`.
+#if TARGET_OS == "windows"
 extern function glOrtho(leftBits as u32, rightBits as u32, bottomBits as u32, topBits as u32, nearBits as u32, farBits as u32) from "miniquake_native.dll" symbol "mq_gl_ortho" returns void
+#else
+extern function glOrtho(leftBits as u32, rightBits as u32, bottomBits as u32, topBits as u32, nearBits as u32, farBits as u32) from "libminiquake_native.so" symbol "mq_gl_ortho" returns void
+#endif
 /// Invokes the native `glFrustum` bridge operation used by `miniquake.native`.
 /// @param leftBits The left bits input consumed by `glFrustum`.
 /// @param rightBits The right bits input consumed by `glFrustum`.
@@ -654,29 +1286,53 @@ extern function glOrtho(leftBits as u32, rightBits as u32, bottomBits as u32, to
 /// @param topBits The top bits input consumed by `glFrustum`.
 /// @param nearBits The near bits input consumed by `glFrustum`.
 /// @param farBits The far bits input consumed by `glFrustum`.
+#if TARGET_OS == "windows"
 extern function glFrustum(leftBits as u32, rightBits as u32, bottomBits as u32, topBits as u32, nearBits as u32, farBits as u32) from "miniquake_native.dll" symbol "mq_gl_frustum" returns void
+#else
+extern function glFrustum(leftBits as u32, rightBits as u32, bottomBits as u32, topBits as u32, nearBits as u32, farBits as u32) from "libminiquake_native.so" symbol "mq_gl_frustum" returns void
+#endif
 /// Invokes the native `glBindTexture` bridge operation used by `miniquake.native`.
 /// @param target The target input consumed by `glBindTexture`.
 /// @param texture Texture resource processed by the operation.
+#if TARGET_OS == "windows"
 extern function glBindTexture(target as u32, texture as u32) from "miniquake_native.dll" symbol "mq_gl_bind_texture" returns void
+#else
+extern function glBindTexture(target as u32, texture as u32) from "libminiquake_native.so" symbol "mq_gl_bind_texture" returns void
+#endif
 /// Invokes the native `glGenTextures` bridge operation used by `miniquake.native`.
 /// @param count Number of entries or units to process.
 /// @param textureIds The texture ids input consumed by `glGenTextures`.
+#if TARGET_OS == "windows"
 extern function glGenTextures(count as i32, textureIds as bytes) from "miniquake_native.dll" symbol "mq_gl_gen_textures" returns void
+#else
+extern function glGenTextures(count as i32, textureIds as bytes) from "libminiquake_native.so" symbol "mq_gl_gen_textures" returns void
+#endif
 /// Invokes the native `glDeleteTextures` bridge operation used by `miniquake.native`.
 /// @param count Number of entries or units to process.
 /// @param textureIds The texture ids input consumed by `glDeleteTextures`.
+#if TARGET_OS == "windows"
 extern function glDeleteTextures(count as i32, textureIds as bytes) from "miniquake_native.dll" symbol "mq_gl_delete_textures" returns void
+#else
+extern function glDeleteTextures(count as i32, textureIds as bytes) from "libminiquake_native.so" symbol "mq_gl_delete_textures" returns void
+#endif
 /// Invokes the native `glTexParameterI` bridge operation used by `miniquake.native`.
 /// @param target The target input consumed by `glTexParameterI`.
 /// @param name Stable name that identifies the requested object or option.
 /// @param value Value consumed by `glTexParameterI`.
+#if TARGET_OS == "windows"
 extern function glTexParameterI(target as u32, name as u32, value as i32) from "miniquake_native.dll" symbol "mq_gl_tex_parameter_i" returns void
+#else
+extern function glTexParameterI(target as u32, name as u32, value as i32) from "libminiquake_native.so" symbol "mq_gl_tex_parameter_i" returns void
+#endif
 /// Invokes the native `glTexEnvI` bridge operation used by `miniquake.native`.
 /// @param target The target input consumed by `glTexEnvI`.
 /// @param name Stable name that identifies the requested object or option.
 /// @param value Value consumed by `glTexEnvI`.
+#if TARGET_OS == "windows"
 extern function glTexEnvI(target as u32, name as u32, value as i32) from "miniquake_native.dll" symbol "mq_gl_tex_env_i" returns void
+#else
+extern function glTexEnvI(target as u32, name as u32, value as i32) from "libminiquake_native.so" symbol "mq_gl_tex_env_i" returns void
+#endif
 /// Invokes the native `glTexImage2D` bridge operation used by `miniquake.native`.
 /// @param target The target input consumed by `glTexImage2D`.
 /// @param level The level input consumed by `glTexImage2D`.
@@ -687,7 +1343,11 @@ extern function glTexEnvI(target as u32, name as u32, value as i32) from "miniqu
 /// @param format The format input consumed by `glTexImage2D`.
 /// @param type The type input consumed by `glTexImage2D`.
 /// @param pixels The pixels input consumed by `glTexImage2D`.
+#if TARGET_OS == "windows"
 extern function glTexImage2D(target as u32, level as i32, internalFormat as i32, width as i32, height as i32, border as i32, format as u32, type as u32, pixels as bytes) from "miniquake_native.dll" symbol "mq_gl_tex_image_2d" returns void
+#else
+extern function glTexImage2D(target as u32, level as i32, internalFormat as i32, width as i32, height as i32, border as i32, format as u32, type as u32, pixels as bytes) from "libminiquake_native.so" symbol "mq_gl_tex_image_2d" returns void
+#endif
 /// Invokes the native `glTexSubImage2D` bridge operation used by `miniquake.native`.
 /// @param target The target input consumed by `glTexSubImage2D`.
 /// @param level The level input consumed by `glTexSubImage2D`.
@@ -698,7 +1358,11 @@ extern function glTexImage2D(target as u32, level as i32, internalFormat as i32,
 /// @param format The format input consumed by `glTexSubImage2D`.
 /// @param type The type input consumed by `glTexSubImage2D`.
 /// @param pixels The pixels input consumed by `glTexSubImage2D`.
+#if TARGET_OS == "windows"
 extern function glTexSubImage2D(target as u32, level as i32, xOffset as i32, yOffset as i32, width as i32, height as i32, format as u32, type as u32, pixels as bytes) from "miniquake_native.dll" symbol "mq_gl_tex_sub_image_2d" returns void
+#else
+extern function glTexSubImage2D(target as u32, level as i32, xOffset as i32, yOffset as i32, width as i32, height as i32, format as u32, type as u32, pixels as bytes) from "libminiquake_native.so" symbol "mq_gl_tex_sub_image_2d" returns void
+#endif
 /// Invokes the native `glReadPixels` bridge operation used by `miniquake.native`.
 /// @param x The x input consumed by `glReadPixels`.
 /// @param y The y input consumed by `glReadPixels`.
@@ -707,23 +1371,47 @@ extern function glTexSubImage2D(target as u32, level as i32, xOffset as i32, yOf
 /// @param format The format input consumed by `glReadPixels`.
 /// @param type The type input consumed by `glReadPixels`.
 /// @param pixels The pixels input consumed by `glReadPixels`.
+#if TARGET_OS == "windows"
 extern function glReadPixels(x as i32, y as i32, width as i32, height as i32, format as u32, type as u32, pixels as bytes) from "miniquake_native.dll" symbol "mq_gl_read_pixels" returns void
+#else
+extern function glReadPixels(x as i32, y as i32, width as i32, height as i32, format as u32, type as u32, pixels as bytes) from "libminiquake_native.so" symbol "mq_gl_read_pixels" returns void
+#endif
 /// Invokes the native `glGetStringRaw` bridge operation used by `miniquake.native`.
 /// @param name Stable name that identifies the requested object or option.
 /// @param output Destination buffer that receives the OpenGL string.
 /// @param capacity Maximum number of entries the destination can hold.
 /// @returns The `u32` result produced by `glGetStringRaw`.
+#if TARGET_OS == "windows"
 extern function glGetStringRaw(name as u32, output as bytes, capacity as u32) from "miniquake_text.dll" symbol "mqt_gl_get_string" returns u32
+#else
+extern function glGetStringRaw(name as u32, output as bytes, capacity as u32) from "libminiquake_text.so" symbol "mqt_gl_get_string" returns u32
+#endif
 /// Invokes the native `glGetError` bridge operation used by `miniquake.native`.
 /// @returns The `u32` result produced by `glGetError`.
+#if TARGET_OS == "windows"
 extern function glGetError() from "miniquake_native.dll" symbol "mq_gl_get_error" returns u32
+#else
+extern function glGetError() from "libminiquake_native.so" symbol "mq_gl_get_error" returns u32
+#endif
 /// Invokes the native `glFinish` bridge operation used by `miniquake.native`.
+#if TARGET_OS == "windows"
 extern function glFinish() from "miniquake_native.dll" symbol "mq_gl_finish" returns void
+#else
+extern function glFinish() from "libminiquake_native.so" symbol "mq_gl_finish" returns void
+#endif
 /// Invokes the native `glFlush` bridge operation used by `miniquake.native`.
+#if TARGET_OS == "windows"
 extern function glFlush() from "miniquake_native.dll" symbol "mq_gl_flush" returns void
+#else
+extern function glFlush() from "libminiquake_native.so" symbol "mq_gl_flush" returns void
+#endif
 /// Invokes the native `glDrawBuffer` bridge operation used by `miniquake.native`.
 /// @param mode The mode input consumed by `glDrawBuffer`.
+#if TARGET_OS == "windows"
 extern function glDrawBuffer(mode as u32) from "miniquake_native.dll" symbol "mq_gl_draw_buffer" returns void
+#else
+extern function glDrawBuffer(mode as u32) from "libminiquake_native.so" symbol "mq_gl_draw_buffer" returns void
+#endif
 /// Invokes the native `glDrawAliasBatch` bridge operation used by `miniquake.native`.
 /// @param data Input data consumed by the operation.
 /// @param byteCount Number of entries or units to process.
@@ -731,12 +1419,20 @@ extern function glDrawBuffer(mode as u32) from "miniquake_native.dll" symbol "mq
 /// @param shadeDotCount Number of entries or units to process.
 /// @param shadeLightBits The shade light bits input consumed by `glDrawAliasBatch`.
 /// @returns The `i32` result produced by `glDrawAliasBatch`.
+#if TARGET_OS == "windows"
 extern function glDrawAliasBatch(data as bytes, byteCount as u32, shadeDots as bytes, shadeDotCount as u32, shadeLightBits as u32) from "miniquake_native.dll" symbol "mq_gl_draw_alias_batch" returns i32
+#else
+extern function glDrawAliasBatch(data as bytes, byteCount as u32, shadeDots as bytes, shadeDotCount as u32, shadeLightBits as u32) from "libminiquake_native.so" symbol "mq_gl_draw_alias_batch" returns i32
+#endif
 /// Invokes the native `glDrawShadowBatch` bridge operation used by `miniquake.native`.
 /// @param data Input data consumed by the operation.
 /// @param byteCount Number of entries or units to process.
 /// @returns The `i32` result produced by `glDrawShadowBatch`.
+#if TARGET_OS == "windows"
 extern function glDrawShadowBatch(data as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_gl_draw_shadow_batch" returns i32
+#else
+extern function glDrawShadowBatch(data as bytes, byteCount as u32) from "libminiquake_native.so" symbol "mq_gl_draw_shadow_batch" returns i32
+#endif
 /// Invokes the native `glDrawAliasRayShadow` bridge operation used by `miniquake.native`.
 /// @param data Input data consumed by the operation.
 /// @param byteCount Number of entries or units to process.
@@ -760,7 +1456,11 @@ extern function glDrawShadowBatch(data as bytes, byteCount as u32) from "miniqua
 /// @param sampleX The sample x input consumed by `glDrawAliasRayShadow`.
 /// @param sampleY The sample y input consumed by `glDrawAliasRayShadow`.
 /// @returns The `i32` result produced by `glDrawAliasRayShadow`.
+#if TARGET_OS == "windows"
 extern function glDrawAliasRayShadow(data as bytes, byteCount as u32, originX as u32, originY as u32, originZ as u32, angleX as u32, angleY as u32, angleZ as u32, scaleOriginX as u32, scaleOriginY as u32, scaleOriginZ as u32, scaleX as u32, scaleY as u32, scaleZ as u32, doubleEyes as i32, pointLightActive as i32, lightX as u32, lightY as u32, lightZ as u32, sampleX as u32, sampleY as u32) from "miniquake_native.dll" symbol "mq_gl_draw_alias_ray_shadow" returns i32
+#else
+extern function glDrawAliasRayShadow(data as bytes, byteCount as u32, originX as u32, originY as u32, originZ as u32, angleX as u32, angleY as u32, angleZ as u32, scaleOriginX as u32, scaleOriginY as u32, scaleOriginZ as u32, scaleX as u32, scaleY as u32, scaleZ as u32, doubleEyes as i32, pointLightActive as i32, lightX as u32, lightY as u32, lightZ as u32, sampleX as u32, sampleY as u32) from "libminiquake_native.so" symbol "mq_gl_draw_alias_ray_shadow" returns i32
+#endif
 /// Invokes the native `glDrawParticleBatch` bridge operation used by `miniquake.native`.
 /// @param data Input data consumed by the operation.
 /// @param byteCount Number of entries or units to process.
@@ -777,7 +1477,11 @@ extern function glDrawAliasRayShadow(data as bytes, byteCount as u32, originX as
 /// @param viewRightY The view right y input consumed by `glDrawParticleBatch`.
 /// @param viewRightZ The view right z input consumed by `glDrawParticleBatch`.
 /// @returns The `i32` result produced by `glDrawParticleBatch`.
+#if TARGET_OS == "windows"
 extern function glDrawParticleBatch(data as bytes, byteCount as u32, viewOriginX as u32, viewOriginY as u32, viewOriginZ as u32, viewForwardX as u32, viewForwardY as u32, viewForwardZ as u32, viewUpX as u32, viewUpY as u32, viewUpZ as u32, viewRightX as u32, viewRightY as u32, viewRightZ as u32) from "miniquake_native.dll" symbol "mq_gl_draw_particle_batch" returns i32
+#else
+extern function glDrawParticleBatch(data as bytes, byteCount as u32, viewOriginX as u32, viewOriginY as u32, viewOriginZ as u32, viewForwardX as u32, viewForwardY as u32, viewForwardZ as u32, viewUpX as u32, viewUpY as u32, viewUpZ as u32, viewRightX as u32, viewRightY as u32, viewRightZ as u32) from "libminiquake_native.so" symbol "mq_gl_draw_particle_batch" returns i32
+#endif
 /// Invokes the native `glDrawParticleBatchStyled` bridge operation used by `miniquake.native`.
 /// @param data Input data consumed by the operation.
 /// @param byteCount Number of entries or units to process.
@@ -794,7 +1498,11 @@ extern function glDrawParticleBatch(data as bytes, byteCount as u32, viewOriginX
 /// @param viewRightY The view right y input consumed by `glDrawParticleBatchStyled`.
 /// @param viewRightZ The view right z input consumed by `glDrawParticleBatchStyled`.
 /// @returns The `i32` result produced by `glDrawParticleBatchStyled`.
+#if TARGET_OS == "windows"
 extern function glDrawParticleBatchStyled(data as bytes, byteCount as u32, viewOriginX as u32, viewOriginY as u32, viewOriginZ as u32, viewForwardX as u32, viewForwardY as u32, viewForwardZ as u32, viewUpX as u32, viewUpY as u32, viewUpZ as u32, viewRightX as u32, viewRightY as u32, viewRightZ as u32) from "miniquake_native.dll" symbol "mq_gl_draw_particle_batch_styled" returns i32
+#else
+extern function glDrawParticleBatchStyled(data as bytes, byteCount as u32, viewOriginX as u32, viewOriginY as u32, viewOriginZ as u32, viewForwardX as u32, viewForwardY as u32, viewForwardZ as u32, viewUpX as u32, viewUpY as u32, viewUpZ as u32, viewRightX as u32, viewRightY as u32, viewRightZ as u32) from "libminiquake_native.so" symbol "mq_gl_draw_particle_batch_styled" returns i32
+#endif
 /// Invokes the native `glDrawAliasModel` bridge operation used by `miniquake.native`.
 /// @param data Input data consumed by the operation.
 /// @param byteCount Number of entries or units to process.
@@ -816,7 +1524,11 @@ extern function glDrawParticleBatchStyled(data as bytes, byteCount as u32, viewO
 /// @param doubleEyes The double eyes input consumed by `glDrawAliasModel`.
 /// @param smooth The smooth input consumed by `glDrawAliasModel`.
 /// @returns The `i32` result produced by `glDrawAliasModel`.
+#if TARGET_OS == "windows"
 extern function glDrawAliasModel(data as bytes, byteCount as u32, shadeDots as bytes, shadeDotCount as u32, shadeLightBits as u32, originX as u32, originY as u32, originZ as u32, angleX as u32, angleY as u32, angleZ as u32, scaleOriginX as u32, scaleOriginY as u32, scaleOriginZ as u32, scaleX as u32, scaleY as u32, scaleZ as u32, doubleEyes as i32, smooth as i32) from "miniquake_native.dll" symbol "mq_gl_draw_alias_model" returns i32
+#else
+extern function glDrawAliasModel(data as bytes, byteCount as u32, shadeDots as bytes, shadeDotCount as u32, shadeLightBits as u32, originX as u32, originY as u32, originZ as u32, angleX as u32, angleY as u32, angleZ as u32, scaleOriginX as u32, scaleOriginY as u32, scaleOriginZ as u32, scaleX as u32, scaleY as u32, scaleZ as u32, doubleEyes as i32, smooth as i32) from "libminiquake_native.so" symbol "mq_gl_draw_alias_model" returns i32
+#endif
 /// Invokes the native `glDrawAliasModelLerp` bridge operation used by `miniquake.native`.
 /// @param previousData The previous data input consumed by `glDrawAliasModelLerp`.
 /// @param previousByteCount Number of entries or units to process.
@@ -841,7 +1553,11 @@ extern function glDrawAliasModel(data as bytes, byteCount as u32, shadeDots as b
 /// @param doubleEyes The double eyes input consumed by `glDrawAliasModelLerp`.
 /// @param smooth The smooth input consumed by `glDrawAliasModelLerp`.
 /// @returns The `i32` result produced by `glDrawAliasModelLerp`.
+#if TARGET_OS == "windows"
 extern function glDrawAliasModelLerp(previousData as bytes, previousByteCount as u32, currentData as bytes, currentByteCount as u32, fractionBits as u32, shadeDots as bytes, shadeDotCount as u32, shadeLightBits as u32, originX as u32, originY as u32, originZ as u32, angleX as u32, angleY as u32, angleZ as u32, scaleOriginX as u32, scaleOriginY as u32, scaleOriginZ as u32, scaleX as u32, scaleY as u32, scaleZ as u32, doubleEyes as i32, smooth as i32) from "miniquake_native.dll" symbol "mq_gl_draw_alias_model_lerp" returns i32
+#else
+extern function glDrawAliasModelLerp(previousData as bytes, previousByteCount as u32, currentData as bytes, currentByteCount as u32, fractionBits as u32, shadeDots as bytes, shadeDotCount as u32, shadeLightBits as u32, originX as u32, originY as u32, originZ as u32, angleX as u32, angleY as u32, angleZ as u32, scaleOriginX as u32, scaleOriginY as u32, scaleOriginZ as u32, scaleX as u32, scaleY as u32, scaleZ as u32, doubleEyes as i32, smooth as i32) from "libminiquake_native.so" symbol "mq_gl_draw_alias_model_lerp" returns i32
+#endif
 
 /// Win64-safe native text bridge.
 ///
@@ -1016,58 +1732,118 @@ end function
 /// @param keyValue The key value input consumed by `glStaticGeometryCall`.
 /// @param passValue The pass value input consumed by `glStaticGeometryCall`.
 /// @returns The `i32` result produced by `glStaticGeometryCall`.
+#if TARGET_OS == "windows"
 extern function glStaticGeometryCall(keyValue as u64, passValue as i32) from "miniquake_native.dll" symbol "mq_gl_static_geometry_call" returns i32
+#else
+extern function glStaticGeometryCall(keyValue as u64, passValue as i32) from "libminiquake_native.so" symbol "mq_gl_static_geometry_call" returns i32
+#endif
 /// Invokes the native `glStaticGeometryCallBatch` bridge operation used by `miniquake.native`.
 /// @param keys The keys input consumed by `glStaticGeometryCallBatch`.
 /// @param byteCount Number of entries or units to process.
 /// @param passValue The pass value input consumed by `glStaticGeometryCallBatch`.
 /// @returns The `i32` result produced by `glStaticGeometryCallBatch`.
+#if TARGET_OS == "windows"
 extern function glStaticGeometryCallBatch(keys as bytes, byteCount as u32, passValue as i32) from "miniquake_native.dll" symbol "mq_gl_static_geometry_call_batch" returns i32
+#else
+extern function glStaticGeometryCallBatch(keys as bytes, byteCount as u32, passValue as i32) from "libminiquake_native.so" symbol "mq_gl_static_geometry_call_batch" returns i32
+#endif
 /// Invokes the native `glStaticGeometryCallMultitextureBatch` bridge operation used by `miniquake.native`.
 /// @param records The records input consumed by `glStaticGeometryCallMultitextureBatch`.
 /// @param byteCount Number of entries or units to process.
 /// @returns The `i32` result produced by `glStaticGeometryCallMultitextureBatch`.
+#if TARGET_OS == "windows"
 extern function glStaticGeometryCallMultitextureBatch(records as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_gl_static_geometry_call_multitexture_batch" returns i32
+#else
+extern function glStaticGeometryCallMultitextureBatch(records as bytes, byteCount as u32) from "libminiquake_native.so" symbol "mq_gl_static_geometry_call_multitexture_batch" returns i32
+#endif
 /// Invokes the native `glStaticGeometryPrepare` bridge operation used by `miniquake.native`.
 /// @param keyValue The key value input consumed by `glStaticGeometryPrepare`.
 /// @param passValue The pass value input consumed by `glStaticGeometryPrepare`.
 /// @returns The `i32` result produced by `glStaticGeometryPrepare`.
+#if TARGET_OS == "windows"
 extern function glStaticGeometryPrepare(keyValue as u64, passValue as i32) from "miniquake_native.dll" symbol "mq_gl_static_geometry_prepare" returns i32
+#else
+extern function glStaticGeometryPrepare(keyValue as u64, passValue as i32) from "libminiquake_native.so" symbol "mq_gl_static_geometry_prepare" returns i32
+#endif
 /// Invokes the native `glStaticGeometryClear` bridge operation used by `miniquake.native`.
+#if TARGET_OS == "windows"
 extern function glStaticGeometryClear() from "miniquake_native.dll" symbol "mq_gl_static_geometry_clear" returns void
+#else
+extern function glStaticGeometryClear() from "libminiquake_native.so" symbol "mq_gl_static_geometry_clear" returns void
+#endif
 /// Invokes the native `glMultitextureAvailable` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `glMultitextureAvailable`.
+#if TARGET_OS == "windows"
 extern function glMultitextureAvailable() from "miniquake_native.dll" symbol "mq_gl_multitexture_available" returns i32
+#else
+extern function glMultitextureAvailable() from "libminiquake_native.so" symbol "mq_gl_multitexture_available" returns i32
+#endif
 /// Invokes the native `glWorldProgramAvailable` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `glWorldProgramAvailable`.
+#if TARGET_OS == "windows"
 extern function glWorldProgramAvailable() from "miniquake_native.dll" symbol "mq_gl_world_program_available" returns i32
+#else
+extern function glWorldProgramAvailable() from "libminiquake_native.so" symbol "mq_gl_world_program_available" returns i32
+#endif
 /// Invokes the native `glWorldProgramEnable` bridge operation used by `miniquake.native`.
 /// @param enabled Whether the optional behavior is enabled.
+#if TARGET_OS == "windows"
 extern function glWorldProgramEnable(enabled as i32) from "miniquake_native.dll" symbol "mq_gl_world_program_enable" returns void
+#else
+extern function glWorldProgramEnable(enabled as i32) from "libminiquake_native.so" symbol "mq_gl_world_program_enable" returns void
+#endif
 /// Invokes the native `glEnhancedAvailable` bridge operation used by `miniquake.native`.
 /// @returns The `i32` result produced by `glEnhancedAvailable`.
+#if TARGET_OS == "windows"
 extern function glEnhancedAvailable() from "miniquake_native.dll" symbol "mq_gl_enhanced_available" returns i32
+#else
+extern function glEnhancedAvailable() from "libminiquake_native.so" symbol "mq_gl_enhanced_available" returns i32
+#endif
 /// Invokes the native `glEnhancedConfigure` bridge operation used by `miniquake.native`.
 /// @param enabled Whether the optional behavior is enabled.
 /// @param shadows The shadows input consumed by `glEnhancedConfigure`.
 /// @param shadowQuality The shadow quality input consumed by `glEnhancedConfigure`.
 /// @returns The `i32` result produced by `glEnhancedConfigure`.
+#if TARGET_OS == "windows"
 extern function glEnhancedConfigure(enabled as i32, shadows as i32, shadowQuality as i32) from "miniquake_native.dll" symbol "mq_gl_enhanced_configure" returns i32
+#else
+extern function glEnhancedConfigure(enabled as i32, shadows as i32, shadowQuality as i32) from "libminiquake_native.so" symbol "mq_gl_enhanced_configure" returns i32
+#endif
 /// Invokes the native `glEnhancedBeginFrame` bridge operation used by `miniquake.native`.
 /// @param lights The lights input consumed by `glEnhancedBeginFrame`.
 /// @param byteCount Number of entries or units to process.
 /// @returns The `i32` result produced by `glEnhancedBeginFrame`.
+#if TARGET_OS == "windows"
 extern function glEnhancedBeginFrame(lights as bytes, byteCount as u32) from "miniquake_native.dll" symbol "mq_gl_enhanced_begin_frame" returns i32
+#else
+extern function glEnhancedBeginFrame(lights as bytes, byteCount as u32) from "libminiquake_native.so" symbol "mq_gl_enhanced_begin_frame" returns i32
+#endif
 /// Invokes the native `glEnhancedDrawKind` bridge operation used by `miniquake.native`.
 /// @param kind The kind input consumed by `glEnhancedDrawKind`.
+#if TARGET_OS == "windows"
 extern function glEnhancedDrawKind(kind as i32) from "miniquake_native.dll" symbol "mq_gl_enhanced_draw_kind" returns void
+#else
+extern function glEnhancedDrawKind(kind as i32) from "libminiquake_native.so" symbol "mq_gl_enhanced_draw_kind" returns void
+#endif
 /// Invokes the native `glEnhancedEndFrame` bridge operation used by `miniquake.native`.
+#if TARGET_OS == "windows"
 extern function glEnhancedEndFrame() from "miniquake_native.dll" symbol "mq_gl_enhanced_end_frame" returns void
+#else
+extern function glEnhancedEndFrame() from "libminiquake_native.so" symbol "mq_gl_enhanced_end_frame" returns void
+#endif
 /// Invokes the native `glActiveTexture` bridge operation used by `miniquake.native`.
 /// @param unit The unit input consumed by `glActiveTexture`.
+#if TARGET_OS == "windows"
 extern function glActiveTexture(unit as i32) from "miniquake_native.dll" symbol "mq_gl_active_texture" returns void
+#else
+extern function glActiveTexture(unit as i32) from "libminiquake_native.so" symbol "mq_gl_active_texture" returns void
+#endif
 /// Invokes the native `glMultiTexCoord2` bridge operation used by `miniquake.native`.
 /// @param unit The unit input consumed by `glMultiTexCoord2`.
 /// @param sBits The s bits input consumed by `glMultiTexCoord2`.
 /// @param tBits The t bits input consumed by `glMultiTexCoord2`.
+#if TARGET_OS == "windows"
 extern function glMultiTexCoord2(unit as i32, sBits as u32, tBits as u32) from "miniquake_native.dll" symbol "mq_gl_multi_tex_coord2" returns void
+#else
+extern function glMultiTexCoord2(unit as i32, sBits as u32, tBits as u32) from "libminiquake_native.so" symbol "mq_gl_multi_tex_coord2" returns void
+#endif

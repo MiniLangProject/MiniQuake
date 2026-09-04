@@ -10,7 +10,7 @@ Reachable from entry: **yes**
 
 - `miniquake/native.ml` as `native` → [src/miniquake/native.ml](File-src-miniquake-native-ml-1937216067.md)
 - `miniquake/types.ml` as `t` → [src/miniquake/types.ml](File-src-miniquake-types-ml-326034235.md)
-- `std/math.ml` as `smath` → `../MiniLangCompilerOptimization/MiniLangCompilerML/std/math.ml` — external dependency
+- `std/math.ml` as `smath` → `../MiniLangCompilerOptimization/MiniLangCompilerPy/std/math.ml` — external dependency
 
 ## Declarations
 

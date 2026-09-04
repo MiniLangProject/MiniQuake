@@ -19,7 +19,7 @@ Reachable from entry: **yes**
 - `miniquake/render/texture_upscale.ml` as `textureUpscale` → [src/miniquake/render/texture_upscale.ml](File-src-miniquake-render-texture-upscale-ml-880792328.md)
 - `miniquake/types.ml` as `t` → [src/miniquake/types.ml](File-src-miniquake-types-ml-326034235.md)
 - `miniquake/wad.ml` as `wad` → [src/miniquake/wad.ml](File-src-miniquake-wad-ml-1195240084.md)
-- `std/string.ml` as `string` → `../MiniLangCompilerOptimization/MiniLangCompilerML/std/string.ml` — external dependency
+- `std/string.ml` as `string` → `../MiniLangCompilerOptimization/MiniLangCompilerPy/std/string.ml` — external dependency
 
 ## Declarations
 

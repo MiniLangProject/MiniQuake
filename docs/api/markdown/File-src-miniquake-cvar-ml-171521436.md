@@ -11,7 +11,7 @@ Reachable from entry: **yes**
 - `miniquake/common.ml` as `common` → [src/miniquake/common.ml](File-src-miniquake-common-ml-466436205.md)
 - `miniquake/native.ml` as `native` → [src/miniquake/native.ml](File-src-miniquake-native-ml-1937216067.md)
 - `miniquake/types.ml` as `t` → [src/miniquake/types.ml](File-src-miniquake-types-ml-326034235.md)
-- `std/ds/hashmap.ml` as `hashmap` → `../MiniLangCompilerOptimization/MiniLangCompilerML/std/ds/hashmap.ml` — external dependency
+- `std/ds/hashmap.ml` as `hashmap` → `../MiniLangCompilerOptimization/MiniLangCompilerPy/std/ds/hashmap.ml` — external dependency
 
 ## Declarations
 

@@ -1247,6 +1247,25 @@ function VID_FindRequestedMode(arguments)
     end if
     return NO_MODE
   end if
+#if TARGET_OS == "linux"
+  // SDL backends such as Wayland and WSLg may expose only the current desktop
+  // mode. A bare -fullscreen request therefore means desktop fullscreen on
+  // Linux; explicit width/height/depth requests remain strict and can fail.
+  bareFullscreen = common.hasParm(arguments, "-fullscreen") and
+    not common.hasParm(arguments, "-width") and
+    not common.hasParm(arguments, "-height") and
+    not common.hasParm(arguments, "-bpp") and
+    not common.hasParm(arguments, "-force")
+  if bareFullscreen and len(state.modes) > MODE_FULLSCREEN_DEFAULT then
+    state.leaveCurrentMode = true
+    if state.desktopWidth > 0 and state.desktopHeight > 0 then
+      state.modes[MODE_FULLSCREEN_DEFAULT].width = state.desktopWidth
+      state.modes[MODE_FULLSCREEN_DEFAULT].height = state.desktopHeight
+      state.modes[MODE_FULLSCREEN_DEFAULT].description = "" + state.desktopWidth + "x" + state.desktopHeight + "x" + state.modes[MODE_FULLSCREEN_DEFAULT].bpp
+    end if
+    return MODE_FULLSCREEN_DEFAULT
+  end if
+#endif
   width = common.integerOption(arguments, "-width", 640)
   requestedHeight = common.integerOption(arguments, "-height", -1)
   explicitBpp = common.hasParm(arguments, "-bpp")

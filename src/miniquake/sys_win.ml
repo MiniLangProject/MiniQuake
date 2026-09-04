@@ -31,12 +31,13 @@ const FILE_BEGIN = 0
 /// Defines the invalid set file pointer value used by `miniquake.sys_win`.
 const INVALID_SET_FILE_POINTER = 0xffffffff
 
-/// Invokes the native `SetFilePointer` bridge operation used by `miniquake.sys_win`.
-/// @param handle The handle input consumed by `SetFilePointer`.
-/// @param distance The distance input consumed by `SetFilePointer`.
-/// @param distanceHigh The distance high input consumed by `SetFilePointer`.
-/// @param moveMethod The move method input consumed by `SetFilePointer`.
-/// @returns The `u32` result produced by `SetFilePointer`.
+#if TARGET_OS == "windows"
+/// Move a file pointer through the Win32 filesystem API.
+/// @param handle Open Win32 file handle.
+/// @param distance Signed low-order seek distance.
+/// @param distanceHigh Optional high-order seek-distance pointer.
+/// @param moveMethod Win32 seek-origin selector.
+/// @returns The resulting low-order file position or the Win32 failure value.
 extern function SetFilePointer(
   handle as ptr,
   distance as i32,
@@ -44,14 +45,49 @@ extern function SetFilePointer(
   moveMethod as u32
 ) from "kernel32.dll" returns u32
 
-/// Invokes the native `CreateDirectoryW` bridge operation used by `miniquake.sys_win`.
-/// @param path Filesystem path to process.
-/// @param security The security input consumed by `CreateDirectoryW`.
-/// @returns The newly created value returned by `CreateDirectoryW`.
+/// Create a directory through the Win32 wide-character filesystem API.
+/// @param path Filesystem path to create.
+/// @param security Optional Win32 security attributes pointer.
+/// @returns True when Windows creates the directory.
 extern function CreateDirectoryW(
   path as wstr,
   security as ptr
 ) from "kernel32.dll" returns bool
+#else
+/// Open a file descriptor through the POSIX filesystem API.
+/// @param path Filesystem path to open.
+/// @param flags POSIX access and creation flags.
+/// @param mode Permission bits used when a file is created.
+/// @returns A non-negative file descriptor or a negative failure result.
+extern function PosixOpen(path as cstr, flags as i32, mode as u32) from "libc.so.6" symbol "open" returns i32
+/// Read bytes from a POSIX file descriptor.
+/// @param handle Open POSIX file descriptor.
+/// @param destination Caller-owned destination buffer.
+/// @param count Maximum number of bytes to read.
+/// @returns Bytes read or a negative failure result.
+extern function PosixRead(handle as i32, destination as bytes, count as u64) from "libc.so.6" symbol "read" returns i64
+/// Write bytes to a POSIX file descriptor.
+/// @param handle Open POSIX file descriptor.
+/// @param data Bytes to write.
+/// @param count Number of bytes to write.
+/// @returns Bytes written or a negative failure result.
+extern function PosixWrite(handle as i32, data as bytes, count as u64) from "libc.so.6" symbol "write" returns i64
+/// Reposition a POSIX file descriptor.
+/// @param handle Open POSIX file descriptor.
+/// @param offset Signed seek distance.
+/// @param origin POSIX seek-origin selector.
+/// @returns The resulting file offset or a negative failure result.
+extern function PosixSeek(handle as i32, offset as i64, origin as i32) from "libc.so.6" symbol "lseek" returns i64
+/// Close a POSIX file descriptor.
+/// @param handle Open POSIX file descriptor.
+/// @returns Zero on success or a negative failure result.
+extern function PosixClose(handle as i32) from "libc.so.6" symbol "close" returns i32
+/// Create a directory through the POSIX filesystem API.
+/// @param path Filesystem path to create.
+/// @param mode POSIX permission bits filtered by the process umask.
+/// @returns Zero on success or a negative failure result.
+extern function PosixMkdir(path as cstr, mode as u32) from "libc.so.6" symbol "mkdir" returns i32
+#endif
 
 // Track mutable sys win state across subsystem calls.
 struct SysWinState
@@ -256,12 +292,22 @@ end function
 function filelength(handle)
   state = Sys_State()
   if not validHandle(handle) then return -1 end if
+#if TARGET_OS == "windows"
   size = bytes(8)
   if not fs.GetFileSizeEx(state.handles[handle], size) then return -1 end if
   high = readU32(slice(size, 4, 4))
   low = readU32(size)
   if high != 0 or low > 0x7fffffff then return -1 end if
   return low
+#else
+  descriptor = state.handles[handle]
+  previous = PosixSeek(descriptor, 0, 1)
+  if previous < 0 then return -1 end if
+  size = PosixSeek(descriptor, 0, 2)
+  PosixSeek(descriptor, previous, 0)
+  if size < 0 or size > 0x7fffffff then return -1 end if
+  return size
+#endif
 end function
 
 /// Mirror Quake's Sys_FileOpenRead routine and its observable state changes.
@@ -270,6 +316,7 @@ function Sys_FileOpenRead(path)
   state = Sys_State()
   index = findhandle()
   if index is error then return index end if
+#if TARGET_OS == "windows"
   handle = fs.CreateFileW(
     path,
     fs.Access.GENERIC_READ,
@@ -280,6 +327,10 @@ function Sys_FileOpenRead(path)
     0
   )
   if handle == fs.INVALID_HANDLE_VALUE then return [-1, -1] end if
+#else
+  handle = PosixOpen(path, 0, 0)
+  if handle < 0 then return [-1, -1] end if
+#endif
   state.handles[index] = handle
   return [filelength(index), index]
 end function
@@ -290,6 +341,7 @@ function Sys_FileOpenWrite(path)
   state = Sys_State()
   index = findhandle()
   if index is error then return index end if
+#if TARGET_OS == "windows"
   handle = fs.CreateFileW(
     path,
     fs.Access.GENERIC_WRITE,
@@ -300,6 +352,11 @@ function Sys_FileOpenWrite(path)
     0
   )
   if handle == fs.INVALID_HANDLE_VALUE then return Sys_Error("Error opening " + path) end if
+#else
+  // O_WRONLY | O_CREAT | O_TRUNC with mode 0666 filtered by the process umask.
+  handle = PosixOpen(path, 577, 0x1b6)
+  if handle < 0 then return Sys_Error("Error opening " + path) end if
+#endif
   state.handles[index] = handle
   return index
 end function
@@ -309,7 +366,11 @@ end function
 function Sys_FileClose(handle)
   state = Sys_State()
   if not validHandle(handle) then return false end if
+#if TARGET_OS == "windows"
   result = fs.CloseHandle(state.handles[handle])
+#else
+  result = PosixClose(state.handles[handle]) == 0
+#endif
   state.handles[handle] = 0
   return result
 end function
@@ -320,8 +381,12 @@ end function
 function Sys_FileSeek(handle, position)
   state = Sys_State()
   if not validHandle(handle) then return false end if
+#if TARGET_OS == "windows"
   result = SetFilePointer(state.handles[handle], position, 0, FILE_BEGIN)
   return result != INVALID_SET_FILE_POINTER
+#else
+  return PosixSeek(state.handles[handle], position, 0) >= 0
+#endif
 end function
 
 /// Mirror Quake's Sys_FileRead routine and its observable state changes.
@@ -333,9 +398,13 @@ function Sys_FileRead(handle, destination, count)
   if not validHandle(handle) or typeof(destination) != "bytes" then return -1 end if
   if count > len(destination) then count = len(destination) end if
   if count < 0 then return -1 end if
+#if TARGET_OS == "windows"
   readCount = bytes(4)
   if not fs.ReadFile(state.handles[handle], destination, count, readCount, 0) then return -1 end if
   return readU32(readCount)
+#else
+  return PosixRead(state.handles[handle], destination, count)
+#endif
 end function
 
 /// Mirror Quake's Sys_FileWrite routine and its observable state changes.
@@ -347,9 +416,13 @@ function Sys_FileWrite(handle, data, count)
   if not validHandle(handle) or typeof(data) != "bytes" then return -1 end if
   if count > len(data) then count = len(data) end if
   if count < 0 then return -1 end if
+#if TARGET_OS == "windows"
   written = bytes(4)
   if not fs.WriteFile(state.handles[handle], data, count, written, 0) then return -1 end if
   return readU32(written)
+#else
+  return PosixWrite(state.handles[handle], data, count)
+#endif
 end function
 
 /// Mirror Quake's Sys_FileTime routine and its observable state changes.
@@ -363,7 +436,11 @@ end function
 /// @param path Filesystem path to process.
 function Sys_mkdir(path)
   if fs.isDir(path) then return true end if
+#if TARGET_OS == "windows"
   return CreateDirectoryW(path, 0)
+#else
+  return PosixMkdir(path, 0x1ff) == 0 or fs.isDir(path)
+#endif
 end function
 
 /// Mirror Quake's Sys_MakeCodeWriteable routine and its observable state changes.

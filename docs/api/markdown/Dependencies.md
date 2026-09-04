@@ -6,8 +6,8 @@ These MiniLang source files are reachable through imports but are outside the co
 
 | Direct project imports | Package | Source file |
 | ---: | --- | --- |
-| 1 | `std.ds.hashmap` | `../MiniLangCompilerOptimization/MiniLangCompilerML/std/ds/hashmap.ml` |
-| 21 | `std.fs` | `../MiniLangCompilerOptimization/MiniLangCompilerML/std/fs.ml` |
-| 3 | `std.math` | `../MiniLangCompilerOptimization/MiniLangCompilerML/std/math.ml` |
-| 2 | `std.string` | `../MiniLangCompilerOptimization/MiniLangCompilerML/std/string.ml` |
-| 0 | `std.string_builder` | `../MiniLangCompilerOptimization/MiniLangCompilerML/std/string_builder.ml` |
+| 1 | `std.ds.hashmap` | `../MiniLangCompilerOptimization/MiniLangCompilerPy/std/ds/hashmap.ml` |
+| 21 | `std.fs` | `../MiniLangCompilerOptimization/MiniLangCompilerPy/std/fs.ml` |
+| 3 | `std.math` | `../MiniLangCompilerOptimization/MiniLangCompilerPy/std/math.ml` |
+| 2 | `std.string` | `../MiniLangCompilerOptimization/MiniLangCompilerPy/std/string.ml` |
+| 0 | `std.string_builder` | `../MiniLangCompilerOptimization/MiniLangCompilerPy/std/string_builder.ml` |

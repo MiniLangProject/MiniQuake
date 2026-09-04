@@ -2,12 +2,14 @@
 
 [![License: GPL-2.0](https://img.shields.io/badge/License-GPL--2.0-blue.svg)](COPYING)
 [![Language: MiniLang](https://img.shields.io/badge/written%20in-MiniLang-5b5bd6.svg)](.)
+[![Platforms: Windows and Linux x64](https://img.shields.io/badge/platforms-Windows%20%7C%20Linux-4c8bf5.svg)](#download)
+[![Latest release](https://img.shields.io/github/v/release/MiniLangProject/MiniQuake?label=release)](https://github.com/MiniLangProject/MiniQuake/releases/latest)
 
 <p align="center">
   <img src="icons/MiniQuake.png" width="240" alt="MiniQuake application icon">
 </p>
 
-MiniQuake is an unofficial Windows x64 port of the original GLQuake/WinQuake
+MiniQuake is an unofficial Windows and Linux x64 port of the original GLQuake/WinQuake
 1.09 engine to [MiniLang](https://github.com/MiniLangProject). The project aims
 to preserve Quake's observable behavior, data formats, QuakeC semantics, and
 Protocol 15 while providing a smooth modern desktop experience.
@@ -84,13 +86,14 @@ resolution when clicked. Captures use each map's authored spawn viewpoint.
 ## Highlights
 
 - Engine and game-facing behavior implemented in MiniLang.
-- Windows x64 platform bridges for Win32, audio, UDP, input, codecs, and GPU
-  APIs.
+- Native Windows x64 and Linux x86-64 platform bridges for windowing, audio,
+  UDP, input, controllers, codecs, and OpenGL.
 - Original Quake formats including PAK, WAD, BSP29, MDL6, SPR1, `progs.dat`
   v6, DEM, SAV, and Protocol 15.
 - Single-player, listen-server, dedicated-server, demo, savegame, console,
   menu, HUD, and QuakeC runtime paths.
-- Selectable OpenGL 1.1, Direct3D 9, and Vulkan renderers.
+- OpenGL on Windows and Linux, plus selectable Direct3D 9 and Vulkan renderers
+  on Windows.
 - Resolution-aware classic UI, windowed/fullscreen switching, mouse input,
   controller support, and archived settings in `config.cfg`.
 - OGG soundtrack playback through the original CD-track command model.
@@ -123,14 +126,31 @@ generated package, source-file, symbol, dependency, metrics, and diagnostics
 documentation. A standalone HTML version is available under
 [`docs/api/html`](docs/api/html/index.html).
 
-Prebuilt Windows x64 packages are published on the
+Prebuilt packages are published on the
 [GitHub Releases page](https://github.com/MiniLangProject/MiniQuake/releases).
 Release archives contain the engine executable and its native runtime bridges,
 but never include proprietary Quake game data.
 
+## Download
+
+The latest release provides separate, self-contained engine packages for both
+supported desktop platforms:
+
+| Platform | Package | Runtime requirements |
+| --- | --- | --- |
+| Windows x64 | [Download ZIP](https://github.com/MiniLangProject/MiniQuake/releases/latest/download/MiniQuake-win64.zip) | Windows 10 or later |
+| Linux x86-64 | [Download TAR.GZ](https://github.com/MiniLangProject/MiniQuake/releases/latest/download/MiniQuake-linux-x86_64.tar.gz) | glibc, SDL2 and OpenGL |
+
+Every release also publishes `SHA256SUMS.txt`. MiniQuake still requires a
+legally owned Quake installation; no PAK files, maps or soundtrack files are
+contained in either package.
+
 ## Quick start
 
-Build MiniQuake, then point it at the directory that contains `id1`:
+Extract a release package or build MiniQuake, then point it at the directory
+that contains `id1`.
+
+### Windows
 
 ```powershell
 $QuakeBase = "C:\Program Files (x86)\Steam\steamapps\common\Quake"
@@ -161,11 +181,23 @@ The expanded command-line form is also supported:
 Use `-game hipnotic` or `-game rogue` for the official mission packs when
 their data is installed below the Quake directory.
 
+### Linux
+
+```bash
+./run-miniquake --play "$HOME/.local/share/Steam/steamapps/common/Quake"
+```
+
+When running the checkout instead of a release package, use
+`./build/linux/run-miniquake`. Steam library paths mounted into WSL use their
+Linux view, for example `/mnt/c/Program Files (x86)/Steam/steamapps/common/Quake`.
+See the [Linux guide](docs/linux/README.md) for dependencies, native Linux,
+WSLg, dedicated-server and troubleshooting instructions.
+
 ## Building
 
 Requirements:
 
-- Windows x64 and PowerShell.
+- Windows x64 with PowerShell, or Linux x86-64 with Bash and GCC.
 - Python 3.
 - The Python MiniLang compiler and standard library. A sibling checkout named
   `MiniLangCompilerPy` is detected automatically, or paths can be supplied
@@ -192,6 +224,48 @@ the repository-local MiniLang icon injector and embeds the multi-resolution
 `-Configuration Debug`, `-SkipTests`, `-NetworkTests`, `-RebuildNative`, and
 `-SkipIcon`. Run `Get-Help .\build.ps1 -Detailed` or inspect the script's
 parameter block for the complete build interface.
+
+### Linux x86-64
+
+Install GCC, the SDL2 runtime, and the OpenGL runtime using your distribution's
+package manager. On Debian and Ubuntu the required packages are:
+
+```bash
+sudo apt install python3 gcc libsdl2-2.0-0 libgl1
+```
+
+Then build the ELF executable and shared libraries from the repository root:
+
+```bash
+./scripts/build_linux.sh \
+  --compiler ../MiniLangCompilerPy/mlc_win64.py \
+  --stdlib ../MiniLangCompilerPy
+```
+
+The output is written to `build/linux`. Use the generated launcher so the two
+private shared libraries are found regardless of the current directory. Under
+WSLg the launcher also selects Mesa's accelerated D3D12 driver instead of the
+CPU-only `llvmpipe` fallback and prefers an available NVIDIA adapter:
+
+```bash
+./build/linux/run-miniquake --play /path/to/Quake
+```
+
+`MINILANG_COMPILER` and `MINILANG_STDLIB` may be used instead of command-line
+options. A complete Linux-specific smoke run is available as:
+
+```bash
+./scripts/test_linux.sh --quake-base /path/to/Quake
+```
+
+The test script verifies the native ABI sentinel, executable identity and
+deterministic CRC self-check, UDP loopback, SDL/OpenGL pixel readback, headless
+retail runtime, OGG decoding, a dedicated server, and windowed/fullscreen E1M1
+runs with audio enabled. Graphical checks are skipped only when neither
+`DISPLAY` nor `WAYLAND_DISPLAY` is available.
+
+Detailed Linux build, runtime and troubleshooting information is maintained in
+[`docs/linux/README.md`](docs/linux/README.md).
 
 ## Default controls
 
@@ -238,8 +312,10 @@ mode, resolution, renderer, and other archived settings are written to
 `config.cfg`. The console commands `vid_renderer` and `vid_restart` provide the
 same renderer selection without editing the configuration file manually.
 
-OpenGL remains the compatibility fallback. Direct3D 9 uses the Windows runtime,
-and Vulkan is loaded dynamically from `vulkan-1.dll` when available.
+OpenGL remains the cross-platform compatibility fallback. Direct3D 9 uses the
+Windows runtime, and Vulkan is loaded dynamically from `vulkan-1.dll` when
+available. Linux currently exposes OpenGL; unavailable Windows-specific
+backends are omitted from renderer selection rather than emulated.
 
 The **Lighting** entry in **Options > Video Mode** switches between the original
 GLQuake-compatible presentation and MiniQuake's optional enhanced lighting on
@@ -354,7 +430,7 @@ measurement run.
 | Path | Purpose |
 | --- | --- |
 | `src/` | MiniLang engine, client, server, renderer, audio, and platform logic |
-| `native/` | Narrow Windows x64 native bridges and renderer backends |
+| `native/` | Narrow Windows and Linux x64 platform bridges and renderer backends |
 | `tests/` | Deterministic, differential, and retail test programs |
 | `tools/` | Verification, comparison, build, and evidence utilities |
 | `scripts/` | Maintainer and retail-validation workflows |

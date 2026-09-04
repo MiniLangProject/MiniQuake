@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Nils Kopal
  * SPDX-License-Identifier: Apache-2.0
  *
- * Shared fixed-width types and exports for the MiniLang/Win64 bridge ABI.
+ * Shared fixed-width types and exports for the MiniLang native bridge ABI.
  */
 #ifndef MINIQUAKE_NATIVE_H
 #define MINIQUAKE_NATIVE_H
@@ -18,7 +18,11 @@ typedef signed int mq_i32;
 typedef signed long long mq_i64;
 typedef void *mq_ptr;
 
+#if defined(_WIN32)
 #define MQ_EXPORT __declspec(dllexport)
+#else
+#define MQ_EXPORT __attribute__((visibility("default")))
+#endif
 
 /* Forward declarations needed by the implementation before their definitions. */
 MQ_EXPORT void mq_win_destroy(void);

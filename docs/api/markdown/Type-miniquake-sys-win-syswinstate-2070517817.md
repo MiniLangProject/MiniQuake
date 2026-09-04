@@ -12,7 +12,7 @@ struct SysWinState
 Track mutable sys win state across subsystem calls.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L57)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L93)
 
 ## Members
 
@@ -26,7 +26,7 @@ ActiveApp
 Stores the active app value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L65)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L101)
 
 <a id="field-field-miniquake-sys-win-syswinstate-arguments-arguments-src-miniquake-sys-win-ml-1346801006"></a>
 ### arguments
@@ -38,7 +38,7 @@ arguments
 Stores the arguments value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L101)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L137)
 
 <a id="field-field-miniquake-sys-win-syswinstate-availablememory-availablememory-src-miniquake-sys-win-ml-949695046"></a>
 ### availableMemory
@@ -50,7 +50,7 @@ availableMemory
 Stores the available memory value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L105)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L141)
 
 <a id="field-field-miniquake-sys-win-syswinstate-checksum-checksum-src-miniquake-sys-win-ml-685996520"></a>
 ### checksum
@@ -62,7 +62,7 @@ checksum
 Stores the checksum value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L63)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L99)
 
 <a id="field-field-miniquake-sys-win-syswinstate-codewriterequests-codewriterequests-src-miniquake-sys-win-ml-1110876526"></a>
 ### codeWriteRequests
@@ -74,7 +74,7 @@ codeWriteRequests
 Stores the code write requests value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L115)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L151)
 
 <a id="field-field-miniquake-sys-win-syswinstate-consolebuffer-consolebuffer-src-miniquake-sys-win-ml-1473855906"></a>
 ### consoleBuffer
@@ -86,7 +86,7 @@ consoleBuffer
 Stores the console buffer value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L77)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L113)
 
 <a id="field-field-miniquake-sys-win-syswinstate-consoleevents-consoleevents-src-miniquake-sys-win-ml-1892280350"></a>
 ### consoleEvents
@@ -98,7 +98,7 @@ consoleEvents
 Stores the console events value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L81)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L117)
 
 <a id="field-field-miniquake-sys-win-syswinstate-consolelength-consolelength-src-miniquake-sys-win-ml-2143045262"></a>
 ### consoleLength
@@ -110,7 +110,7 @@ consoleLength
 Stores the console length value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L79)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L115)
 
 <a id="field-field-miniquake-sys-win-syswinstate-counterqueue-counterqueue-src-miniquake-sys-win-ml-251678864"></a>
 ### counterQueue
@@ -122,7 +122,7 @@ counterQueue
 Stores the counter queue value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L97)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L133)
 
 <a id="field-field-miniquake-sys-win-syswinstate-curtime-curtime-src-miniquake-sys-win-ml-2049557770"></a>
 ### curtime
@@ -134,7 +134,7 @@ curtime
 Stores the curtime value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L87)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L123)
 
 <a id="field-field-miniquake-sys-win-syswinstate-errortext-errortext-src-miniquake-sys-win-ml-2322822"></a>
 ### errorText
@@ -146,7 +146,7 @@ errorText
 Stores the error text value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L111)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L147)
 
 <a id="field-field-miniquake-sys-win-syswinstate-firsttime-firsttime-src-miniquake-sys-win-ml-1123379022"></a>
 ### firstTime
@@ -158,7 +158,7 @@ firstTime
 Stores the first time value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L93)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L129)
 
 <a id="field-field-miniquake-sys-win-syswinstate-handles-handles-src-miniquake-sys-win-ml-554252130"></a>
 ### handles
@@ -170,7 +170,7 @@ handles
 Stores the handles value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L61)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L97)
 
 <a id="field-field-miniquake-sys-win-syswinstate-hchild-hchild-src-miniquake-sys-win-ml-191015302"></a>
 ### hChild
@@ -182,7 +182,7 @@ hChild
 Stores the h child value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L125)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L161)
 
 <a id="field-field-miniquake-sys-win-syswinstate-hfile-hfile-src-miniquake-sys-win-ml-2066046222"></a>
 ### hFile
@@ -194,7 +194,7 @@ hFile
 Stores the h file value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L121)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L157)
 
 <a id="field-field-miniquake-sys-win-syswinstate-hparent-hparent-src-miniquake-sys-win-ml-290574774"></a>
 ### hParent
@@ -206,7 +206,7 @@ hParent
 Stores the h parent value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L123)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L159)
 
 <a id="field-field-miniquake-sys-win-syswinstate-initialized-initialized-src-miniquake-sys-win-ml-937465470"></a>
 ### initialized
@@ -218,7 +218,7 @@ initialized
 Stores the initialized value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L113)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L149)
 
 <a id="field-field-miniquake-sys-win-syswinstate-isdedicated-isdedicated-src-miniquake-sys-win-ml-2064059410"></a>
 ### isDedicated
@@ -230,7 +230,7 @@ isDedicated
 Stores the is dedicated value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L71)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L107)
 
 <a id="field-field-miniquake-sys-win-syswinstate-lastcurtime-lastcurtime-src-miniquake-sys-win-ml-1502481450"></a>
 ### lastcurtime
@@ -242,7 +242,7 @@ lastcurtime
 Stores the lastcurtime value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L89)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L125)
 
 <a id="field-field-miniquake-sys-win-syswinstate-lowshift-lowshift-src-miniquake-sys-win-ml-701704474"></a>
 ### lowshift
@@ -254,7 +254,7 @@ lowshift
 Stores the lowshift value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L85)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L121)
 
 <a id="field-field-miniquake-sys-win-syswinstate-memorysize-memorysize-src-miniquake-sys-win-ml-1238924978"></a>
 ### memorySize
@@ -266,7 +266,7 @@ memorySize
 Stores the memory size value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L103)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L139)
 
 <a id="field-field-miniquake-sys-win-syswinstate-minimized-minimized-src-miniquake-sys-win-ml-1246340342"></a>
 ### Minimized
@@ -278,7 +278,7 @@ Minimized
 Stores the minimized value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L67)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L103)
 
 <a id="field-field-miniquake-sys-win-syswinstate-oldtime-oldtime-src-miniquake-sys-win-ml-2073667874"></a>
 ### oldtime
@@ -290,7 +290,7 @@ oldtime
 Stores the oldtime value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L91)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L127)
 
 <a id="field-field-miniquake-sys-win-syswinstate-outputlog-outputlog-src-miniquake-sys-win-ml-1339840750"></a>
 ### outputLog
@@ -302,7 +302,7 @@ outputLog
 Stores the output log value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L75)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L111)
 
 <a id="field-field-miniquake-sys-win-syswinstate-pfreq-pfreq-src-miniquake-sys-win-ml-1166867118"></a>
 ### pfreq
@@ -314,7 +314,7 @@ pfreq
 Stores the pfreq value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L83)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L119)
 
 <a id="field-field-miniquake-sys-win-syswinstate-quitrequested-quitrequested-src-miniquake-sys-win-ml-773658826"></a>
 ### quitRequested
@@ -326,7 +326,7 @@ quitRequested
 Stores the quit requested value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L109)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L145)
 
 <a id="field-field-miniquake-sys-win-syswinstate-sametimecount-sametimecount-src-miniquake-sys-win-ml-466718750"></a>
 ### sameTimeCount
@@ -338,7 +338,7 @@ sameTimeCount
 Stores the same time count value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L95)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L131)
 
 <a id="field-field-miniquake-sys-win-syswinstate-screturnonenter-screturnonenter-src-miniquake-sys-win-ml-2124725810"></a>
 ### scReturnOnEnter
@@ -350,7 +350,7 @@ scReturnOnEnter
 Stores the sc return on enter value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L73)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L109)
 
 <a id="field-field-miniquake-sys-win-syswinstate-sentkeyevents-sentkeyevents-src-miniquake-sys-win-ml-803286814"></a>
 ### sentKeyEvents
@@ -362,7 +362,7 @@ sentKeyEvents
 Stores the sent key events value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L117)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L153)
 
 <a id="field-field-miniquake-sys-win-syswinstate-sleptmilliseconds-sleptmilliseconds-src-miniquake-sys-win-ml-91774102"></a>
 ### sleptMilliseconds
@@ -374,7 +374,7 @@ sleptMilliseconds
 Stores the slept milliseconds value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L119)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L155)
 
 <a id="field-field-miniquake-sys-win-syswinstate-testfrequency-testfrequency-src-miniquake-sys-win-ml-1331499862"></a>
 ### testFrequency
@@ -386,7 +386,7 @@ testFrequency
 Stores the test frequency value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L99)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L135)
 
 <a id="field-field-miniquake-sys-win-syswinstate-totalmemory-totalmemory-src-miniquake-sys-win-ml-1242397418"></a>
 ### totalMemory
@@ -398,7 +398,7 @@ totalMemory
 Stores the total memory value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L107)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L143)
 
 <a id="field-field-miniquake-sys-win-syswinstate-usenative-usenative-src-miniquake-sys-win-ml-1745552666"></a>
 ### useNative
@@ -410,7 +410,7 @@ useNative
 Stores the use native value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L59)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L95)
 
 <a id="field-field-miniquake-sys-win-syswinstate-winnt-winnt-src-miniquake-sys-win-ml-1795282314"></a>
 ### WinNT
@@ -422,4 +422,4 @@ WinNT
 Stores the win nt value in `miniquake.sys_win.SysWinState`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L69)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L105)

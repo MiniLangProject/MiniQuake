@@ -12,9 +12,19 @@
 #include "miniquake_native.h"
 #include "miniquake_d3d9.h"
 #include "miniquake_vulkan.h"
+#if defined(_WIN32)
 #define MQ_DLLIMPORT __declspec(dllimport)
 #define MQ_WINAPI __stdcall
 #define MQ_CDECL __cdecl
+#else
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#define MQ_DLLIMPORT
+#define MQ_WINAPI
+#define MQ_CDECL
+#endif
 
 #define MQ_RENDER_OPENGL 0
 #define MQ_RENDER_DIRECT3D9 1
@@ -422,8 +432,10 @@ typedef struct MQ_ML_FLOAT_OBJECT {
 /* msvcrt */
 MQ_DLLIMPORT double MQ_CDECL strtod(const char *text, char **end_pointer);
 MQ_DLLIMPORT int MQ_CDECL sprintf(char *buffer, const char *format, ...);
+#if defined(_WIN32)
 MQ_DLLIMPORT void *MQ_CDECL memcpy(void *destination, const void *source, mq_u64 count);
 MQ_DLLIMPORT void *MQ_CDECL memset(void *destination, mq_i32 value, mq_u64 count);
+#endif
 MQ_DLLIMPORT double MQ_CDECL sin(double value);
 MQ_DLLIMPORT double MQ_CDECL cos(double value);
 MQ_DLLIMPORT double MQ_CDECL sqrt(double value);
@@ -432,6 +444,7 @@ MQ_DLLIMPORT double MQ_CDECL atan2(double y, double x);
 MQ_DLLIMPORT double MQ_CDECL pow(double base, double exponent);
 
 /* kernel32 */
+#if defined(_WIN32)
 MQ_DLLIMPORT HMODULE MQ_WINAPI GetModuleHandleW(LPCWSTR name);
 MQ_DLLIMPORT HANDLE MQ_WINAPI GetCurrentProcess(void);
 MQ_DLLIMPORT BOOL MQ_WINAPI GetProcessHandleCount(HANDLE process, DWORD *handle_count);
@@ -463,8 +476,17 @@ MQ_DLLIMPORT BOOL MQ_WINAPI ReadFile(HANDLE file, LPVOID buffer, DWORD length, D
 MQ_DLLIMPORT BOOL MQ_WINAPI WriteFile(HANDLE file, LPCVOID buffer, DWORD length, DWORD *written, LPVOID overlapped);
 MQ_DLLIMPORT BOOL MQ_WINAPI AllocConsole(void);
 MQ_DLLIMPORT BOOL MQ_WINAPI FreeConsole(void);
+#else
+/* Preserve the common renderer's allocation vocabulary on POSIX hosts. */
+static LPVOID mq_linux_virtual_alloc(mq_u64 length) { return malloc((size_t)length); }
+/* Release one Linux allocation used by the shared renderer cache. */
+static BOOL mq_linux_virtual_free(LPVOID address) { free(address); return 1; }
+#define VirtualAlloc(address, length, allocation_type, protection) mq_linux_virtual_alloc(length)
+#define VirtualFree(address, length, free_type) mq_linux_virtual_free(address)
+#endif
 
 /* user32 */
+#if defined(_WIN32)
 MQ_DLLIMPORT ATOM MQ_WINAPI RegisterClassExW(const MQ_WNDCLASSEXW *window_class);
 MQ_DLLIMPORT BOOL MQ_WINAPI UnregisterClassW(LPCWSTR class_name, HINSTANCE instance);
 MQ_DLLIMPORT HWND MQ_WINAPI CreateWindowExW(DWORD ex_style, LPCWSTR class_name, LPCWSTR title, DWORD style, mq_i32 x, mq_i32 y, mq_i32 width, mq_i32 height, HWND parent, HMENU menu, HINSTANCE instance, LPVOID parameter);
@@ -517,6 +539,11 @@ MQ_DLLIMPORT HGLRC MQ_WINAPI wglCreateContext(HDC dc);
 MQ_DLLIMPORT BOOL MQ_WINAPI wglDeleteContext(HGLRC context);
 MQ_DLLIMPORT BOOL MQ_WINAPI wglMakeCurrent(HDC dc, HGLRC context);
 MQ_DLLIMPORT void *MQ_WINAPI wglGetProcAddress(const char *name);
+#else
+/* GLX resolves modern OpenGL entry points independently of SDL's public ABI. */
+MQ_DLLIMPORT void *glXGetProcAddressARB(const mq_u8 *name);
+#define wglGetProcAddress(name) glXGetProcAddressARB((const mq_u8 *)(name))
+#endif
 
 /* Compact CPU BVH used by the backend-neutral projected ray-shadow path. */
 typedef struct MQ_SHADOW_TRIANGLE {
@@ -1294,6 +1321,7 @@ static mq_i32 mq_gl_create_enhanced_program(void) {
 }
 
 /* winmm */
+#if defined(_WIN32)
 MQ_DLLIMPORT MMRESULT MQ_WINAPI waveOutOpen(HWAVEOUT *output, UINT device_id, const MQ_WAVEFORMATEX *format, ULONG_PTR callback, ULONG_PTR instance, DWORD flags);
 MQ_DLLIMPORT MMRESULT MQ_WINAPI waveOutPrepareHeader(HWAVEOUT output, MQ_WAVEHDR *header, UINT size);
 MQ_DLLIMPORT MMRESULT MQ_WINAPI waveOutUnprepareHeader(HWAVEOUT output, MQ_WAVEHDR *header, UINT size);
@@ -1323,6 +1351,7 @@ MQ_DLLIMPORT mq_u32 MQ_WINAPI inet_addr(const char *address);
 MQ_DLLIMPORT mq_i32 MQ_WINAPI gethostname(char *name, mq_i32 name_length);
 MQ_DLLIMPORT MQ_HOSTENT *MQ_WINAPI gethostbyname(const char *name);
 MQ_DLLIMPORT MQ_HOSTENT *MQ_WINAPI gethostbyaddr(const char *address, mq_i32 length, mq_i32 type);
+#endif
 
 /* OpenGL 1.1 */
 MQ_DLLIMPORT void MQ_WINAPI glBegin(mq_u32 mode);
@@ -2179,6 +2208,7 @@ MQ_EXPORT void mq_gl_static_geometry_clear(void) {
 #define MQ_FALSE 0
 #define MQ_TRUE 1
 #define MQ_NULL ((void *)0)
+#if defined(_WIN32)
 #define MQ_CS_OWNDC 0x0020u
 #define MQ_CS_HREDRAW 0x0002u
 #define MQ_CS_VREDRAW 0x0001u
@@ -2385,6 +2415,7 @@ static char mq_udp_reverse_name_text[256] = "";
 static mq_u32 mq_udp_last_port_value = 0;
 static mq_i32 mq_udp_last_error_value = 0;
 static mq_u8 mq_wsa_data[512];
+#endif
 
 /* Reinterpret MiniLang's IEEE-754 bit pattern as a native float. */
 static float mq_bits_to_float(mq_u32 bits) {
@@ -2400,6 +2431,7 @@ static mq_u32 mq_float_to_bits(float number) {
     return value.u;
 }
 
+#if defined(_WIN32)
 /* Return the absolute value of a signed integer. */
 static mq_i32 mq_abs_i32(mq_i32 value) {
     return value < 0 ? -value : value;
@@ -2745,6 +2777,7 @@ static LRESULT MQ_WINAPI mq_window_proc(HWND window, UINT message, WPARAM w_para
     }
     return DefWindowProcW(window, message, w_param, l_param);
 }
+#endif
 
 /* Convert the scalar between MiniLang and native representations. */
 MQ_EXPORT mq_u32 mq_f32_from_text(const char *text) {
@@ -2839,6 +2872,61 @@ MQ_EXPORT const char *mq_ascii_char(mq_i32 value) {
     return output;
 }
 
+#if defined(__linux__)
+/* Bind the extension entry points shared by the optimized compatibility
+ * renderer after SDL has made its OpenGL context current. */
+MQ_EXPORT void mq_linux_gl_initialize_extensions(void) {
+    mq_gl_world_program = 0u;
+    mq_gl_world_program_attempted = 0;
+    mq_gl_alias_program = 0u;
+    mq_gl_alias_program_attempted = 0;
+    mq_gl_alias_state_location = -1;
+    mq_gl_alias_program_active = 0;
+    mq_gl_md2_shadow_program = 0u;
+    mq_gl_md2_shadow_program_attempted = 0;
+    mq_gl_md2_shadow_state_location = -1;
+    mq_gl_enhanced_program = 0u;
+    mq_gl_enhanced_program_attempted = 0;
+    mq_gl_enhanced_enabled = 0;
+    mq_gl_enhanced_draw_kind_value = 0;
+
+    mq_gl_active_texture_value = (mq_gl_active_texture_proc)wglGetProcAddress("glActiveTexture");
+    if (!mq_valid_wgl_proc((const void *)mq_gl_active_texture_value))
+        mq_gl_active_texture_value = (mq_gl_active_texture_proc)wglGetProcAddress("glActiveTextureARB");
+    mq_gl_client_active_texture_value = (mq_gl_client_active_texture_proc)wglGetProcAddress("glClientActiveTexture");
+    if (!mq_valid_wgl_proc((const void *)mq_gl_client_active_texture_value))
+        mq_gl_client_active_texture_value = (mq_gl_client_active_texture_proc)wglGetProcAddress("glClientActiveTextureARB");
+    mq_gl_multi_tex_coord2f_value = (mq_gl_multi_tex_coord2f_proc)wglGetProcAddress("glMultiTexCoord2f");
+    if (!mq_valid_wgl_proc((const void *)mq_gl_multi_tex_coord2f_value))
+        mq_gl_multi_tex_coord2f_value = (mq_gl_multi_tex_coord2f_proc)wglGetProcAddress("glMultiTexCoord2fARB");
+    mq_gl_create_shader_value = (mq_gl_create_shader_proc)wglGetProcAddress("glCreateShader");
+    mq_gl_shader_source_value = (mq_gl_shader_source_proc)wglGetProcAddress("glShaderSource");
+    mq_gl_compile_shader_value = (mq_gl_compile_shader_proc)wglGetProcAddress("glCompileShader");
+    mq_gl_get_shader_iv_value = (mq_gl_get_shader_iv_proc)wglGetProcAddress("glGetShaderiv");
+    mq_gl_delete_shader_value = (mq_gl_delete_shader_proc)wglGetProcAddress("glDeleteShader");
+    mq_gl_create_program_value = (mq_gl_create_program_proc)wglGetProcAddress("glCreateProgram");
+    mq_gl_attach_shader_value = (mq_gl_attach_shader_proc)wglGetProcAddress("glAttachShader");
+    mq_gl_link_program_value = (mq_gl_link_program_proc)wglGetProcAddress("glLinkProgram");
+    mq_gl_get_program_iv_value = (mq_gl_get_program_iv_proc)wglGetProcAddress("glGetProgramiv");
+    mq_gl_use_program_value = (mq_gl_use_program_proc)wglGetProcAddress("glUseProgram");
+    mq_gl_delete_program_value = (mq_gl_delete_program_proc)wglGetProcAddress("glDeleteProgram");
+    mq_gl_get_uniform_location_value = (mq_gl_get_uniform_location_proc)wglGetProcAddress("glGetUniformLocation");
+    mq_gl_get_attrib_location_value = (mq_gl_get_attrib_location_proc)wglGetProcAddress("glGetAttribLocation");
+    mq_gl_vertex_attrib_4f_value = (mq_gl_vertex_attrib_4f_proc)wglGetProcAddress("glVertexAttrib4f");
+    mq_gl_uniform_1i_value = (mq_gl_uniform_1i_proc)wglGetProcAddress("glUniform1i");
+    mq_gl_uniform_4fv_value = (mq_gl_uniform_4fv_proc)wglGetProcAddress("glUniform4fv");
+    mq_gl_gen_buffers_value = (mq_gl_gen_buffers_proc)wglGetProcAddress("glGenBuffers");
+    mq_gl_bind_buffer_value = (mq_gl_bind_buffer_proc)wglGetProcAddress("glBindBuffer");
+    mq_gl_buffer_data_value = (mq_gl_buffer_data_proc)wglGetProcAddress("glBufferData");
+    mq_gl_delete_buffers_value = (mq_gl_delete_buffers_proc)wglGetProcAddress("glDeleteBuffers");
+    mq_gl_create_world_program();
+    mq_gl_create_alias_program();
+    mq_gl_create_md2_shadow_program();
+    mq_gl_create_enhanced_program();
+}
+#endif
+
+#if defined(_WIN32)
 /* Return display mode count. */
 MQ_EXPORT mq_u32 mq_win_display_mode_count(void) {
     MQ_DEVMODEW mode;
@@ -4574,6 +4662,7 @@ MQ_EXPORT const char *mq_udp_reverse_name(const char *address_text) {
     mq_udp_last_error_value = 0;
     return mq_udp_reverse_name_text;
 }
+#endif
 
 /* Begin collecting immediate-mode vertices for one draw. */
 MQ_EXPORT void mq_gl_begin(mq_u32 mode) {

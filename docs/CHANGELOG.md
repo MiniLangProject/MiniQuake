@@ -1,5 +1,20 @@
 # Changelog
 
+## v2026.09.04
+
+- Added a native Linux x86-64 build using the MiniLang compiler's `linux-x64`
+  target, SDL2 window/input/audio integration, OpenGL, POSIX UDP and POSIX file
+  services.
+- Added reproducible `build_linux.sh` and `test_linux.sh` entry points with
+  executable, ABI, network, OpenGL-readback and optional retail-data coverage.
+- Fixed an empty Linux text-event queue returning the wrong sentinel, which
+  otherwise trapped the first interactive host frame in an infinite drain loop.
+- Prevented WSLg from silently running compatibility OpenGL through the
+  CPU-only `llvmpipe` renderer by selecting its D3D12 Gallium path and
+  preferring an available NVIDIA adapter in the generated launcher.
+- Added separate Windows x64 and Linux x86-64 release packages, Linux build and
+  test automation, and a complete Linux deployment and troubleshooting guide.
+
 ## v2026.09.01
 
 - Migrated safe, non-overlapping MiniLang array transfers to the native

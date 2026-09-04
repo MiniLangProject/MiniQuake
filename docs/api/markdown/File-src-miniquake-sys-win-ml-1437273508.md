@@ -11,7 +11,7 @@ Reachable from entry: **yes**
 - `miniquake/conproc.ml` as `conproc` → [src/miniquake/conproc.ml](File-src-miniquake-conproc-ml-1901842008.md)
 - `miniquake/native.ml` as `native` → [src/miniquake/native.ml](File-src-miniquake-native-ml-1937216067.md)
 - `miniquake/platform/win32.ml` as `win` → [src/miniquake/platform/win32.ml](File-src-miniquake-platform-win32-ml-1233303091.md)
-- `std/fs.ml` as `fs` → `../MiniLangCompilerOptimization/MiniLangCompilerML/std/fs.ml` — external dependency
+- `std/fs.ml` as `fs` → `../MiniLangCompilerOptimization/MiniLangCompilerPy/std/fs.ml` — external dependency
 
 ## Declarations
 
@@ -30,7 +30,7 @@ Return argument index derived from the active module state.
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L446)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L523)
 
 <a id="constant-constant-miniquake-sys-win-console-error-timeout-const-console-error-timeout-60-src-miniquake-sys-win-ml-759350548"></a>
 ### CONSOLE_ERROR_TIMEOUT
@@ -51,17 +51,17 @@ Defines the console error timeout value used by `miniquake.sys_win`.
 extern function CreateDirectoryW(path as wstr, security as ptr) from "kernel32.dll" returns bool
 ```
 
-Invokes the native `CreateDirectoryW` bridge operation used by `miniquake.sys_win`.
+Create a directory through the Win32 wide-character filesystem API.
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `path` | `wstr` | — | Filesystem path to process. |
-| `security` | `ptr` | — | The security input consumed by `CreateDirectoryW`. |
+| `path` | `wstr` | — | Filesystem path to create. |
+| `security` | `ptr` | — | Optional Win32 security attributes pointer. |
 
 
-**Returns:** The newly created value returned by `CreateDirectoryW`.
+**Returns:** True when Windows creates the directory.
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L51)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L52)
 
 <a id="function-function-miniquake-sys-win-emptyhandles-function-emptyhandles-src-miniquake-sys-win-ml-20410223"></a>
 ### emptyHandles
@@ -73,7 +73,7 @@ function emptyHandles()
 Implements the `emptyHandles` operation for `miniquake.sys_win` (empty handles).
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L132)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L168)
 
 <a id="constant-constant-miniquake-sys-win-file-begin-const-file-begin-0-src-miniquake-sys-win-ml-914521738"></a>
 ### FILE_BEGIN
@@ -101,7 +101,7 @@ Implements the `filelength` operation for `miniquake.sys_win` (filelength).
 | `handle` | `dynamic` | — | The handle input consumed by `filelength`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L256)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L292)
 
 <a id="function-function-miniquake-sys-win-findhandle-function-findhandle-src-miniquake-sys-win-ml-280319159"></a>
 ### findhandle
@@ -113,7 +113,7 @@ function findhandle()
 Finds handle for `miniquake.sys_win`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L237)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L273)
 
 <a id="function-function-miniquake-sys-win-handleargument-function-handleargument-arguments-name-src-miniquake-sys-win-ml-887149470"></a>
 ### handleArgument
@@ -130,7 +130,7 @@ Handle argument and update the associated state.
 | `name` | `dynamic` | — | Stable name that identifies the requested object or option. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L696)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L773)
 
 <a id="constant-constant-miniquake-sys-win-invalid-set-file-pointer-const-invalid-set-file-pointer-4294967295-src-miniquake-sys-win-ml-70170739"></a>
 ### INVALID_SET_FILE_POINTER
@@ -158,7 +158,7 @@ Implements the `listTail` operation for `miniquake.sys_win` (list tail).
 | `values` | `dynamic` | — | The values input consumed by `listTail`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L405)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L482)
 
 <a id="function-function-miniquake-sys-win-maskexceptions-function-maskexceptions-src-miniquake-sys-win-ml-1831312963"></a>
 ### MaskExceptions
@@ -170,7 +170,7 @@ function MaskExceptions()
 Implements the `MaskExceptions` operation for `miniquake.sys_win` (mask exceptions).
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L399)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L476)
 
 <a id="constant-constant-miniquake-sys-win-max-handles-const-max-handles-10-src-miniquake-sys-win-ml-16754261"></a>
 ### MAX_HANDLES
@@ -218,7 +218,7 @@ function nextCounter()
 Return next counter for the active module state.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L416)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L493)
 
 <a id="constant-constant-miniquake-sys-win-not-focus-sleep-const-not-focus-sleep-20-src-miniquake-sys-win-ml-891495916"></a>
 ### NOT_FOCUS_SLEEP
@@ -254,7 +254,7 @@ function popConsoleEvent()
 Consume pending state for pop console event.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L568)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L645)
 
 <a id="function-function-miniquake-sys-win-readi32-function-readi32-data-offset-src-miniquake-sys-win-ml-2019485392"></a>
 ### readI32
@@ -271,7 +271,7 @@ Read and validate i32.
 | `offset` | `dynamic` | — | Zero-based offset of the requested data. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L203)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L239)
 
 <a id="function-function-miniquake-sys-win-readu32-inline-function-readu32-data-src-miniquake-sys-win-ml-193759792"></a>
 ### readU32
@@ -287,7 +287,7 @@ Read and validate u32.
 | `data` | `dynamic` | — | Input data consumed by the operation. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L210)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L246)
 
 <a id="extern_function-extern-function-miniquake-sys-win-setfilepointer-extern-function-setfilepointer-handle-as-ptr-distance-as-i32-distancehigh-as-ptr-movemethod-as-u32-from-kernel32-dll-returns-u32-src-miniquake-sys-win-ml-24692615"></a>
 ### SetFilePointer
@@ -296,19 +296,19 @@ Read and validate u32.
 extern function SetFilePointer(handle as ptr, distance as i32, distanceHigh as ptr, moveMethod as u32) from "kernel32.dll" returns u32
 ```
 
-Invokes the native `SetFilePointer` bridge operation used by `miniquake.sys_win`.
+Move a file pointer through the Win32 filesystem API.
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `handle` | `ptr` | — | The handle input consumed by `SetFilePointer`. |
-| `distance` | `i32` | — | The distance input consumed by `SetFilePointer`. |
-| `distanceHigh` | `ptr` | — | The distance high input consumed by `SetFilePointer`. |
-| `moveMethod` | `u32` | — | The move method input consumed by `SetFilePointer`. |
+| `handle` | `ptr` | — | Open Win32 file handle. |
+| `distance` | `i32` | — | Signed low-order seek distance. |
+| `distanceHigh` | `ptr` | — | Optional high-order seek-distance pointer. |
+| `moveMethod` | `u32` | — | Win32 seek-origin selector. |
 
 
-**Returns:** The `u32` result produced by `SetFilePointer`.
+**Returns:** The resulting low-order file position or the Win32 failure value.
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L40)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L41)
 
 <a id="function-function-miniquake-sys-win-signed32-function-signed32-value-src-miniquake-sys-win-ml-1081595676"></a>
 ### signed32
@@ -324,7 +324,7 @@ Implements the `signed32` operation for `miniquake.sys_win` (signed32).
 | `value` | `dynamic` | — | Value consumed by `signed32`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L194)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L230)
 
 <a id="function-function-miniquake-sys-win-sleepuntilinput-function-sleepuntilinput-time-src-miniquake-sys-win-ml-1593909476"></a>
 ### SleepUntilInput
@@ -340,7 +340,7 @@ Implements the `SleepUntilInput` operation for `miniquake.sys_win` (sleep until 
 | `time` | `dynamic` | — | Simulation or presentation time for the operation. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L647)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L724)
 
 <a id="function-function-miniquake-sys-win-sys-consoleinject-function-sys-consoleinject-character-keydown-src-miniquake-sys-win-ml-1731450329"></a>
 ### Sys_ConsoleInject
@@ -357,7 +357,7 @@ Mirror Quake's Sys_ConsoleInject routine and its observable state changes.
 | `keyDown` | `dynamic` | — | The key down input consumed by `Sys_ConsoleInject`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L561)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L638)
 
 <a id="function-function-miniquake-sys-win-sys-consoleinput-function-sys-consoleinput-src-miniquake-sys-win-ml-1653283811"></a>
 ### Sys_ConsoleInput
@@ -369,7 +369,7 @@ function Sys_ConsoleInput()
 Mirror Quake's Sys_ConsoleInput routine and its observable state changes.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L586)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L663)
 
 <a id="function-function-miniquake-sys-win-sys-createstate-function-sys-createstate-usenative-src-miniquake-sys-win-ml-1130771875"></a>
 ### Sys_CreateState
@@ -385,7 +385,7 @@ Mirror Quake's Sys_CreateState routine and its observable state changes.
 | `useNative` | `dynamic` | — | The use native input consumed by `Sys_CreateState`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L138)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L174)
 
 <a id="function-function-miniquake-sys-win-sys-error-function-sys-error-text-src-miniquake-sys-win-ml-406185932"></a>
 ### Sys_Error
@@ -401,7 +401,7 @@ Mirror Quake's Sys_Error routine and its observable state changes.
 | `text` | `dynamic` | — | Text to parse or process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L480)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L557)
 
 <a id="function-function-miniquake-sys-win-sys-fileclose-function-sys-fileclose-handle-src-miniquake-sys-win-ml-1297394585"></a>
 ### Sys_FileClose
@@ -417,7 +417,7 @@ Mirror Quake's Sys_FileClose routine and its observable state changes.
 | `handle` | `dynamic` | — | The handle input consumed by `Sys_FileClose`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L309)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L366)
 
 <a id="function-function-miniquake-sys-win-sys-fileopenread-function-sys-fileopenread-path-src-miniquake-sys-win-ml-536937668"></a>
 ### Sys_FileOpenRead
@@ -433,7 +433,7 @@ Mirror Quake's Sys_FileOpenRead routine and its observable state changes.
 | `path` | `dynamic` | — | Filesystem path to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L269)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L315)
 
 <a id="function-function-miniquake-sys-win-sys-fileopenwrite-function-sys-fileopenwrite-path-src-miniquake-sys-win-ml-645252382"></a>
 ### Sys_FileOpenWrite
@@ -449,7 +449,7 @@ Mirror Quake's Sys_FileOpenWrite routine and its observable state changes.
 | `path` | `dynamic` | — | Filesystem path to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L289)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L340)
 
 <a id="function-function-miniquake-sys-win-sys-fileread-function-sys-fileread-handle-destination-count-src-miniquake-sys-win-ml-708959398"></a>
 ### Sys_FileRead
@@ -467,7 +467,7 @@ Mirror Quake's Sys_FileRead routine and its observable state changes.
 | `count` | `dynamic` | — | Number of entries or units to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L331)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L396)
 
 <a id="function-function-miniquake-sys-win-sys-fileseek-function-sys-fileseek-handle-position-src-miniquake-sys-win-ml-695111630"></a>
 ### Sys_FileSeek
@@ -484,7 +484,7 @@ Mirror Quake's Sys_FileSeek routine and its observable state changes.
 | `position` | `dynamic` | — | Position used by the operation. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L320)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L381)
 
 <a id="function-function-miniquake-sys-win-sys-filetime-function-sys-filetime-path-src-miniquake-sys-win-ml-2129010324"></a>
 ### Sys_FileTime
@@ -500,7 +500,7 @@ Mirror Quake's Sys_FileTime routine and its observable state changes.
 | `path` | `dynamic` | — | Filesystem path to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L357)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L430)
 
 <a id="function-function-miniquake-sys-win-sys-filewrite-function-sys-filewrite-handle-data-count-src-miniquake-sys-win-ml-701551874"></a>
 ### Sys_FileWrite
@@ -518,7 +518,7 @@ Mirror Quake's Sys_FileWrite routine and its observable state changes.
 | `count` | `dynamic` | — | Number of entries or units to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L345)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L414)
 
 <a id="function-function-miniquake-sys-win-sys-floattime-function-sys-floattime-src-miniquake-sys-win-ml-1754558469"></a>
 ### Sys_FloatTime
@@ -530,7 +530,7 @@ function Sys_FloatTime()
 Mirror Quake's Sys_FloatTime routine and its observable state changes.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L511)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L588)
 
 <a id="function-function-miniquake-sys-win-sys-highfpprecision-function-sys-highfpprecision-src-miniquake-sys-win-ml-1755584299"></a>
 ### Sys_HighFPPrecision
@@ -542,7 +542,7 @@ function Sys_HighFPPrecision()
 Mirror Quake's Sys_HighFPPrecision routine and its observable state changes.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L735)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L812)
 
 <a id="function-function-miniquake-sys-win-sys-init-function-sys-init-src-miniquake-sys-win-ml-393868031"></a>
 ### Sys_Init
@@ -554,7 +554,7 @@ function Sys_Init()
 Mirror Quake's Sys_Init routine and its observable state changes.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L456)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L533)
 
 <a id="function-function-miniquake-sys-win-sys-initfloattime-function-sys-initfloattime-src-miniquake-sys-win-ml-1706708873"></a>
 ### Sys_InitFloatTime
@@ -566,7 +566,7 @@ function Sys_InitFloatTime()
 Mirror Quake's Sys_InitFloatTime routine and its observable state changes.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L543)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L620)
 
 <a id="function-function-miniquake-sys-win-sys-lowfpprecision-function-sys-lowfpprecision-src-miniquake-sys-win-ml-1901232747"></a>
 ### Sys_LowFPPrecision
@@ -578,7 +578,7 @@ function Sys_LowFPPrecision()
 Mirror Quake's Sys_LowFPPrecision routine and its observable state changes.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L730)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L807)
 
 <a id="function-function-miniquake-sys-win-sys-makecodewriteable-function-sys-makecodewriteable-startaddress-length-src-miniquake-sys-win-ml-960753183"></a>
 ### Sys_MakeCodeWriteable
@@ -595,7 +595,7 @@ Mirror Quake's Sys_MakeCodeWriteable routine and its observable state changes.
 | `length` | `dynamic` | — | Length of the requested data in units appropriate to the operation. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L372)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L449)
 
 <a id="function-function-miniquake-sys-win-sys-mkdir-function-sys-mkdir-path-src-miniquake-sys-win-ml-1050864442"></a>
 ### Sys_mkdir
@@ -611,7 +611,7 @@ Mirror Quake's Sys_mkdir routine and its observable state changes.
 | `path` | `dynamic` | — | Filesystem path to process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L364)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L437)
 
 <a id="function-function-miniquake-sys-win-sys-pagein-function-sys-pagein-memory-size-src-miniquake-sys-win-ml-610362025"></a>
 ### Sys_PageIn
@@ -628,7 +628,7 @@ Mirror Quake's Sys_PageIn routine and its observable state changes.
 | `size` | `dynamic` | — | Size of the requested data or resource. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L217)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L253)
 
 <a id="function-function-miniquake-sys-win-sys-parsecommandline-function-sys-parsecommandline-commandline-src-miniquake-sys-win-ml-1596493886"></a>
 ### Sys_ParseCommandLine
@@ -644,7 +644,7 @@ Mirror Quake's Sys_ParseCommandLine routine and its observable state changes.
 | `commandLine` | `dynamic` | — | The command line input consumed by `Sys_ParseCommandLine`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L657)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L734)
 
 <a id="function-function-miniquake-sys-win-sys-popfpcw-inline-function-sys-popfpcw-src-miniquake-sys-win-ml-1582520452"></a>
 ### Sys_PopFPCW
@@ -656,7 +656,7 @@ inline function Sys_PopFPCW()
 Mirror Quake's Sys_PopFPCW routine and its observable state changes.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L394)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L471)
 
 <a id="function-function-miniquake-sys-win-sys-printf-function-sys-printf-text-src-miniquake-sys-win-ml-1468033072"></a>
 ### Sys_Printf
@@ -672,7 +672,7 @@ Mirror Quake's Sys_Printf routine and its observable state changes.
 | `text` | `dynamic` | — | Text to parse or process. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L494)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L571)
 
 <a id="function-function-miniquake-sys-win-sys-pushfpcw-sethigh-inline-function-sys-pushfpcw-sethigh-src-miniquake-sys-win-ml-1279705612"></a>
 ### Sys_PushFPCW_SetHigh
@@ -684,7 +684,7 @@ inline function Sys_PushFPCW_SetHigh()
 Mirror Quake's Sys_PushFPCW_SetHigh routine and its observable state changes.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L389)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L466)
 
 <a id="function-function-miniquake-sys-win-sys-quit-function-sys-quit-src-miniquake-sys-win-ml-1559498931"></a>
 ### Sys_Quit
@@ -696,7 +696,7 @@ function Sys_Quit()
 Mirror Quake's Sys_Quit routine and its observable state changes.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L502)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L579)
 
 <a id="function-function-miniquake-sys-win-sys-selectmemorysize-function-sys-selectmemorysize-available-total-arguments-src-miniquake-sys-win-ml-1082506416"></a>
 ### Sys_SelectMemorySize
@@ -714,7 +714,7 @@ Mirror Quake's Sys_SelectMemorySize routine and its observable state changes.
 | `arguments` | `dynamic` | — | Command-line arguments to inspect or execute. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L679)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L756)
 
 <a id="function-function-miniquake-sys-win-sys-sendkeyevents-function-sys-sendkeyevents-src-miniquake-sys-win-ml-46585143"></a>
 ### Sys_SendKeyEvents
@@ -726,7 +726,7 @@ function Sys_SendKeyEvents()
 Mirror Quake's Sys_SendKeyEvents routine and its observable state changes.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L633)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L710)
 
 <a id="function-function-miniquake-sys-win-sys-setcounterfixture-function-sys-setcounterfixture-frequency-counters-src-miniquake-sys-win-ml-1359199628"></a>
 ### Sys_SetCounterFixture
@@ -743,7 +743,7 @@ Mirror Quake's Sys_SetCounterFixture routine and its observable state changes.
 | `counters` | `dynamic` | — | The counters input consumed by `Sys_SetCounterFixture`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L434)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L511)
 
 <a id="function-function-miniquake-sys-win-sys-setfpcw-function-sys-setfpcw-src-miniquake-sys-win-ml-834846255"></a>
 ### Sys_SetFPCW
@@ -755,7 +755,7 @@ function Sys_SetFPCW()
 Mirror Quake's Sys_SetFPCW routine and its observable state changes.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L384)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L461)
 
 <a id="function-function-miniquake-sys-win-sys-sleep-function-sys-sleep-src-miniquake-sys-win-ml-998133017"></a>
 ### Sys_Sleep
@@ -767,7 +767,7 @@ function Sys_Sleep()
 Mirror Quake's Sys_Sleep routine and its observable state changes.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L625)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L702)
 
 <a id="function-function-miniquake-sys-win-sys-state-function-sys-state-src-miniquake-sys-win-ml-1264420389"></a>
 ### Sys_State
@@ -779,7 +779,7 @@ function Sys_State()
 Mirror Quake's Sys_State routine and its observable state changes.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L186)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L222)
 
 <a id="function-function-miniquake-sys-win-sys-usestate-function-sys-usestate-state-src-miniquake-sys-win-ml-54382668"></a>
 ### Sys_UseState
@@ -795,7 +795,7 @@ Mirror Quake's Sys_UseState routine and its observable state changes.
 | `state` | `dynamic` | — | Mutable `miniquake.sys_win` state used by `Sys_UseState`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L179)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L215)
 
 <a id="global-global-miniquake-sys-win-syswinstate-syswinstate-src-miniquake-sys-win-ml-474710601"></a>
 ### sysWinState
@@ -807,7 +807,7 @@ sysWinState
 Tracks the module-level Windows system state owned by `miniquake.sys_win`.
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L129)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L165)
 
 - [miniquake.sys_win.SysWinState](Type-miniquake-sys-win-syswinstate-2070517817.md) — struct
 <a id="function-function-miniquake-sys-win-validhandle-function-validhandle-index-src-miniquake-sys-win-ml-1714795721"></a>
@@ -824,7 +824,7 @@ Report whether valid handle.
 | `index` | `dynamic` | — | Zero-based index of the requested entry. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L249)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L285)
 
 <a id="function-function-miniquake-sys-win-winmain-function-winmain-arguments-runner-src-miniquake-sys-win-ml-1464010593"></a>
 ### WinMain
@@ -841,4 +841,4 @@ Implements the `WinMain` operation for `miniquake.sys_win` (win main).
 | `runner` | `dynamic` | — | The runner input consumed by `WinMain`. |
 
 
-[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L707)
+[View source](https://github.com/MiniLangProject/MiniQuake/blob/main/src/miniquake/sys_win.ml#L784)

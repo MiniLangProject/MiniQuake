@@ -21,13 +21,27 @@ typedef const mq_u16 *LPCWSTR;
 typedef const char *LPCSTR;
 typedef mq_ptr FARPROC;
 
+#if defined(_WIN32)
 #define MQ_EXPORT __declspec(dllexport)
 #define MQ_DLLIMPORT __declspec(dllimport)
 #define MQ_WINAPI __stdcall
 #define MQ_CDECL __cdecl
+#else
+#include <dlfcn.h>
+#define MQ_EXPORT __attribute__((visibility("default")))
+#define MQ_DLLIMPORT
+#define MQ_WINAPI
+#define MQ_CDECL
+#endif
+
 #define MQ_NULL ((void *)0)
 
+#if defined(__linux__)
+static void *mq_linux_backend_module = MQ_NULL;
+#endif
+
 /* Required by MSVC-compatible code generation whenever float values appear. */
+#if defined(_WIN32)
 int _fltused = 0;
 
 MQ_DLLIMPORT HMODULE MQ_WINAPI GetModuleHandleW(LPCWSTR module_name);
@@ -43,9 +57,11 @@ static HMODULE mq_crt_module = MQ_NULL;
 static const mq_u16 mq_crt_name[] = {
     'm','s','v','c','r','t','.','d','l','l',0
 };
+#endif
 
 /* Resolve a text-conversion export from the native bridge. */
 static FARPROC mq_backend_proc(const char *name) {
+#if defined(_WIN32)
     if (mq_backend_module == MQ_NULL) {
         mq_backend_module = GetModuleHandleW(mq_backend_name);
         if (mq_backend_module == MQ_NULL) {
@@ -56,10 +72,19 @@ static FARPROC mq_backend_proc(const char *name) {
         return MQ_NULL;
     }
     return GetProcAddress(mq_backend_module, name);
+#else
+    if (mq_linux_backend_module == MQ_NULL) {
+        mq_linux_backend_module = dlopen("libminiquake_native.so", RTLD_LAZY | RTLD_LOCAL);
+    }
+    return name != MQ_NULL && mq_linux_backend_module != MQ_NULL
+        ? (FARPROC)dlsym(mq_linux_backend_module, name)
+        : MQ_NULL;
+#endif
 }
 
 /* Resolve a formatting routine from the process C runtime. */
 static FARPROC mq_crt_proc(const char *name) {
+#if defined(_WIN32)
     if (mq_crt_module == MQ_NULL) {
         mq_crt_module = GetModuleHandleW(mq_crt_name);
         if (mq_crt_module == MQ_NULL) {
@@ -70,6 +95,9 @@ static FARPROC mq_crt_proc(const char *name) {
         return MQ_NULL;
     }
     return GetProcAddress(mq_crt_module, name);
+#else
+    return name != MQ_NULL ? (FARPROC)dlsym(RTLD_DEFAULT, name) : MQ_NULL;
+#endif
 }
 
 /* Reinterpret MiniLang's IEEE-754 bit pattern as a native float. */
