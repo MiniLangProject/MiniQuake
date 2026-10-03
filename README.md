@@ -133,17 +133,17 @@ but never include proprietary Quake game data.
 
 ## Download
 
-The latest release provides separate, self-contained engine packages for both
-supported desktop platforms:
+The current Windows release and the last Linux build are available separately:
 
 | Platform | Package | Runtime requirements |
 | --- | --- | --- |
 | Windows x64 | [Download ZIP](https://github.com/MiniLangProject/MiniQuake/releases/latest/download/MiniQuake-win64.zip) | Windows 10 or later |
-| Linux x86-64 | [Download TAR.GZ](https://github.com/MiniLangProject/MiniQuake/releases/latest/download/MiniQuake-linux-x86_64.tar.gz) | glibc, SDL2 and OpenGL |
+| Linux x86-64 | [Download v2026.09.04 TAR.GZ](https://github.com/MiniLangProject/MiniQuake/releases/download/v2026.09.04/MiniQuake-linux-x86_64.tar.gz) | glibc, SDL2 and OpenGL |
 
-Every release also publishes `SHA256SUMS.txt`. MiniQuake still requires a
+The Windows release includes `SHA256SUMS.txt`. MiniQuake still requires a
 legally owned Quake installation; no PAK files, maps or soundtrack files are
 contained in either package.
+The current Windows executable is built with MiniLang Compiler 1.2.16.
 
 ## Quick start
 
